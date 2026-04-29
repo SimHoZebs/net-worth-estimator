@@ -1,4 +1,4 @@
-import { DEFAULT_SCENARIO, DEFAULT_SCENARIO_DEFINITION } from "./defaults";
+import { DEFAULT_SCENARIO, DEFAULT_SCENARIO_DEFINITION } from "./scenarios";
 import { buildProjectionInput } from "./normalize";
 import { buildScenarioDefinition } from "./scenarioBuilder";
 import type { ProjectionScenario, ScenarioDefinition, ScenarioDocument } from "./types";

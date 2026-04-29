@@ -1,4 +1,4 @@
-export { DEFAULT_SCENARIO, DEFAULT_SCENARIO_DEFINITION } from "./defaults";
+export { DEFAULT_SCENARIO, DEFAULT_SCENARIO_DEFINITION, PREDEFINED_SCENARIOS } from "./scenarios";
 export { ACCOUNT_CONFIG, DEFAULT_REFRESHER_PCT_OF_BASE, EVENT_TYPES, MODEL, RSU_PLANS } from "./model";
 export { getScenarioValue, setScenarioValue } from "./path";
 export { buildProjectionInput } from "./normalize";
