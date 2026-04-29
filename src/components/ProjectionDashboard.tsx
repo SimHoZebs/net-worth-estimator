@@ -12,55 +12,39 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card, CardContent } from "./ui";
 import { currency, formatChartCurrencyTick, pct } from "../lib/format";
-import { MODEL, monthLabel } from "../lib/projection";
-import type { EventSummaryRow, ProjectionResult } from "../lib/projection";
-
-const chartLabelByKey = Object.fromEntries(
-  Object.entries(MODEL.accounts).map(([key, value]) => [key, value.label])
-) as Record<string, string>;
+import { MODEL, type DashboardViewModel, type EventSummaryRow, type ProjectionResult } from "../lib/projection";
+import { Card, CardContent } from "./ui";
 
 interface ProjectionDashboardProps {
-  maxYears: number;
   result: ProjectionResult;
+  dashboard: DashboardViewModel;
   eventSummary: EventSummaryRow[];
 }
 
-export function ProjectionDashboard({ maxYears, result, eventSummary }: ProjectionDashboardProps) {
-  const hitText = result.hitMonth === null
-    ? `Not within ${maxYears} years`
-    : `${Math.floor(result.hitMonth / 12)} years, ${result.hitMonth % 12} months`;
-  const hitDate = result.hitMonth === null ? "-" : monthLabel(result.hitMonth);
-  const studentLoanPaidOffText = result.studentLoanPaidOffMonth === null
-    ? "Not within projection"
-    : `${Math.floor(result.studentLoanPaidOffMonth / 12)} years, ${result.studentLoanPaidOffMonth % 12} months`;
-  const studentLoanPaidOffDate = result.studentLoanPaidOffMonth === null ? "-" : monthLabel(result.studentLoanPaidOffMonth);
-  const finalRow = result.rows[result.rows.length - 1];
-  const effectiveTaxRate = result.firstYearTotalTax / Math.max(1, result.firstYearOrdinaryIncome);
-
+export default function ProjectionDashboard({ result, dashboard, eventSummary }: ProjectionDashboardProps) {
   return (
     <div className="lg:col-span-2 space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="rounded-2xl shadow-sm">
           <CardContent className="p-5">
             <p className="text-sm text-slate-500">Time to $1M</p>
-            <p className="text-2xl font-bold mt-1">{hitText}</p>
-            <p className="text-sm text-slate-500 mt-1">Estimated date: {hitDate}</p>
+            <p className="text-2xl font-bold mt-1">{dashboard.hitText}</p>
+            <p className="text-sm text-slate-500 mt-1">Estimated date: {dashboard.hitDate}</p>
           </CardContent>
         </Card>
         <Card className="rounded-2xl shadow-sm">
           <CardContent className="p-5">
             <p className="text-sm text-slate-500">Student loan payoff</p>
-            <p className="text-2xl font-bold mt-1">{studentLoanPaidOffText}</p>
-            <p className="text-sm text-slate-500 mt-1">Estimated date: {studentLoanPaidOffDate}</p>
+            <p className="text-2xl font-bold mt-1">{dashboard.studentLoanPaidOffText}</p>
+            <p className="text-sm text-slate-500 mt-1">Estimated date: {dashboard.studentLoanPaidOffDate}</p>
           </CardContent>
         </Card>
         <Card className="rounded-2xl shadow-sm">
           <CardContent className="p-5">
             <p className="text-sm text-slate-500">Max extra cash flow</p>
-            <p className="text-2xl font-bold mt-1">{currency.format(result.firstMonthMaxExtraFundContribution)} / mo</p>
-            <p className="text-sm text-slate-500 mt-1">Goes to loan first, then fund. Max x: {pct.format(result.firstMonthMaxExtraFundPct)}</p>
+            <p className="text-2xl font-bold mt-1">{currency.format(result.cashFlow.firstMonthMaxExtraFundContribution)} / mo</p>
+            <p className="text-sm text-slate-500 mt-1">Goes to loan first, then fund. Max x: {pct.format(result.cashFlow.firstMonthMaxExtraFundPct)}</p>
           </CardContent>
         </Card>
       </div>
@@ -73,26 +57,26 @@ export function ProjectionDashboard({ maxYears, result, eventSummary }: Projecti
               <p className="text-sm text-slate-500">Stacked area view shows how each account bucket contributes to total net worth.</p>
             </div>
             <div className="text-sm text-slate-600">
-              401(k): {currency.format(result.monthly401kEmployee)} / mo employee
-              {result.monthly401kEmployer > 0 ? ` + ${currency.format(result.monthly401kEmployer)} / mo employer` : ""}
-              <br />Ledger events modeled: {result.allEvents.length}
+              401(k): {currency.format(result.contributions.monthlyEmployee401k)} / mo employee
+              {result.contributions.monthlyEmployer401k > 0 ? ` + ${currency.format(result.contributions.monthlyEmployer401k)} / mo employer` : ""}
+              <br />Ledger events modeled: {result.events.all.length}
             </div>
           </div>
 
           <div className="h-[420px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={result.rows} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
+              <AreaChart data={result.timeline.sampledRows} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" minTickGap={36} />
                 <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
                 <Tooltip
                   formatter={(value: unknown, _name: unknown, item: { dataKey?: unknown }) => [
                     currency.format(Number(value ?? 0)),
-                    chartLabelByKey[String(item?.dataKey ?? "")] ?? String(item?.dataKey ?? "Value"),
+                    dashboard.chartLabelByKey[String(item?.dataKey ?? "") as keyof typeof dashboard.chartLabelByKey] ?? String(item?.dataKey ?? "Value"),
                   ]}
                   labelFormatter={(label: unknown) => `Date: ${String(label ?? "")}`}
                 />
-                <Legend formatter={(value: string) => chartLabelByKey[value] ?? value} />
+                <Legend formatter={(value: string) => dashboard.chartLabelByKey[value as keyof typeof dashboard.chartLabelByKey] ?? value} />
                 <ReferenceLine y={MODEL.targetNetWorth} stroke="#16a34a" strokeDasharray="6 6" label={{ value: "$1M target", position: "insideTopRight" }} />
                 {Object.entries(MODEL.accounts).map(([key, account]) => (
                   <Area
@@ -118,7 +102,7 @@ export function ProjectionDashboard({ maxYears, result, eventSummary }: Projecti
           <p className="text-sm text-slate-500 mb-4">This makes the backloaded 5/15/40/40 schedule visible instead of hiding it inside annual total compensation.</p>
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={result.annualTaxPlan} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
+              <BarChart data={dashboard.annualTaxPlan} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="label" />
                 <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
@@ -142,15 +126,15 @@ export function ProjectionDashboard({ maxYears, result, eventSummary }: Projecti
           <CardContent className="p-5 space-y-2">
             <h2 className="text-lg font-bold">First-year tax estimate</h2>
             <div className="grid grid-cols-2 gap-y-1 text-sm text-slate-600">
-              <span>Federal taxable income</span><strong className="text-right text-slate-900">{currency.format(result.firstYearFederalTaxableIncome)}</strong>
-              <span>Federal income tax</span><strong className="text-right text-slate-900">{currency.format(result.firstYearTaxEstimate.federalIncomeTax)}</strong>
-              <span>Social Security tax</span><strong className="text-right text-slate-900">{currency.format(result.firstYearTaxEstimate.socialSecurityTax)}</strong>
-              <span>Medicare tax</span><strong className="text-right text-slate-900">{currency.format(result.firstYearTaxEstimate.medicareTax)}</strong>
-              <span>WA state income tax</span><strong className="text-right text-slate-900">{currency.format(result.firstYearTaxEstimate.stateIncomeTax)}</strong>
-              <span>Total modeled tax</span><strong className="text-right text-slate-900">{currency.format(result.firstYearTotalTax)}</strong>
-              <span>Effective tax rate</span><strong className="text-right text-slate-900">{pct.format(effectiveTaxRate)}</strong>
-              <span>Tax allocated to salary</span><strong className="text-right text-slate-900">{currency.format(result.firstYearSalaryTax)}</strong>
-              <span>Tax allocated to RSUs</span><strong className="text-right text-slate-900">{currency.format(result.firstYearRsuTax)}</strong>
+              <span>Federal taxable income</span><strong className="text-right text-slate-900">{currency.format(result.taxes.firstYear.federalTaxableIncome)}</strong>
+              <span>Federal income tax</span><strong className="text-right text-slate-900">{currency.format(result.taxes.firstYear.estimate.federalIncomeTax)}</strong>
+              <span>Social Security tax</span><strong className="text-right text-slate-900">{currency.format(result.taxes.firstYear.estimate.socialSecurityTax)}</strong>
+              <span>Medicare tax</span><strong className="text-right text-slate-900">{currency.format(result.taxes.firstYear.estimate.medicareTax)}</strong>
+              <span>WA state income tax</span><strong className="text-right text-slate-900">{currency.format(result.taxes.firstYear.estimate.stateIncomeTax)}</strong>
+              <span>Total modeled tax</span><strong className="text-right text-slate-900">{currency.format(result.taxes.firstYear.totalTax)}</strong>
+              <span>Effective tax rate</span><strong className="text-right text-slate-900">{pct.format(dashboard.effectiveTaxRate)}</strong>
+              <span>Tax allocated to salary</span><strong className="text-right text-slate-900">{currency.format(result.taxes.firstYear.salaryTax)}</strong>
+              <span>Tax allocated to RSUs</span><strong className="text-right text-slate-900">{currency.format(result.taxes.firstYear.rsuTax)}</strong>
             </div>
           </CardContent>
         </Card>
@@ -159,17 +143,17 @@ export function ProjectionDashboard({ maxYears, result, eventSummary }: Projecti
           <CardContent className="p-5 space-y-2">
             <h2 className="text-lg font-bold">Projection totals until chart endpoint</h2>
             <div className="grid grid-cols-2 gap-y-1 text-sm text-slate-600">
-              <span>Employee 401(k), first year</span><strong className="text-right text-slate-900">{currency.format(result.annual401kEmployee)}</strong>
-              <span>Employer match, first year</span><strong className="text-right text-slate-900">{currency.format(result.annual401kEmployer)}</strong>
-              <span>Gross RSUs vested</span><strong className="text-right text-slate-900">{currency.format(result.totalGrossRsuVested)}</strong>
-              <span>Net RSUs held as AMZN</span><strong className="text-right text-slate-900">{currency.format(result.totalNetRsuAdded)}</strong>
-              <span>Taxable fund contributions</span><strong className="text-right text-slate-900">{currency.format(result.totalFundContributions)}</strong>
-              <span>Student loan payments</span><strong className="text-right text-slate-900">{currency.format(result.totalStudentLoanPayments)}</strong>
-              <span>Student loan interest</span><strong className="text-right text-slate-900">{currency.format(result.totalStudentLoanInterest)}</strong>
-              <span>Fixed obligations paid</span><strong className="text-right text-slate-900">{currency.format(result.totalFixedExpenses)}</strong>
-              <span>Cash-flow shortfall</span><strong className="text-right text-slate-900">{currency.format(result.totalCashShortfall)}</strong>
-              <span>Uninvested after-tax cash</span><strong className="text-right text-slate-900">{currency.format(result.totalUninvestedCash)}</strong>
-              <span>Final displayed net worth</span><strong className="text-right text-slate-900">{currency.format(finalRow?.netWorth ?? 0)}</strong>
+              <span>Employee 401(k), first year</span><strong className="text-right text-slate-900">{currency.format(result.contributions.annualEmployee401k)}</strong>
+              <span>Employer match, first year</span><strong className="text-right text-slate-900">{currency.format(result.contributions.annualEmployer401k)}</strong>
+              <span>Gross RSUs vested</span><strong className="text-right text-slate-900">{currency.format(result.totals.grossRsuVested)}</strong>
+              <span>Net RSUs held as AMZN</span><strong className="text-right text-slate-900">{currency.format(result.totals.netRsuAdded)}</strong>
+              <span>Taxable fund contributions</span><strong className="text-right text-slate-900">{currency.format(result.totals.fundContributions)}</strong>
+              <span>Student loan payments</span><strong className="text-right text-slate-900">{currency.format(result.totals.studentLoanPayments)}</strong>
+              <span>Student loan interest</span><strong className="text-right text-slate-900">{currency.format(result.totals.studentLoanInterest)}</strong>
+              <span>Fixed obligations paid</span><strong className="text-right text-slate-900">{currency.format(result.totals.fixedExpenses)}</strong>
+              <span>Cash-flow shortfall</span><strong className="text-right text-slate-900">{currency.format(result.totals.cashShortfall)}</strong>
+              <span>Uninvested after-tax cash</span><strong className="text-right text-slate-900">{currency.format(result.totals.uninvestedCash)}</strong>
+              <span>Final displayed net worth</span><strong className="text-right text-slate-900">{currency.format(dashboard.finalNetWorth)}</strong>
             </div>
           </CardContent>
         </Card>

@@ -1,22 +1,27 @@
-import { useMemo, useState } from "react";
+import { Suspense, lazy, useDeferredValue, useMemo } from "react";
+import { ProjectionActions } from "./components/ProjectionActions";
 import { ProjectionControls } from "./components/ProjectionControls";
-import { ProjectionDashboard } from "./components/ProjectionDashboard";
-import { DEFAULT_FORM_STATE, buildAssumptionsFromState, project, summarizeEventsByType } from "./lib/projection";
-import type { ProjectionFormState } from "./lib/projection";
+import { buildProjectionInput, project, selectDashboardModel, summarizeEventsByType } from "./lib/projection";
+import { useProjectionScenario } from "./hooks/useProjectionScenario";
+
+const ProjectionDashboard = lazy(() => import("./components/ProjectionDashboard"));
 
 export default function App() {
-  const [form, setForm] = useState<ProjectionFormState>(DEFAULT_FORM_STATE);
+  const {
+    scenario,
+    importError,
+    updateField,
+    resetScenario,
+    importScenario,
+    exportScenario,
+  } = useProjectionScenario();
+  const deferredScenario = useDeferredValue(scenario);
 
-  const assumptions = useMemo(() => buildAssumptionsFromState(form), [form]);
-  const result = useMemo(() => project(assumptions), [assumptions]);
-  const eventSummary = useMemo(() => summarizeEventsByType(result.allEvents), [result.allEvents]);
-
-  const requestedExtraFundContribution = result.firstMonthAfterTaxCashAfter401k * (form.extraInvestmentPct / 100);
-  const extraContributionIsCapped = requestedExtraFundContribution > result.firstMonthMaxExtraFundContribution + 1;
-
-  const updateField = <Key extends keyof ProjectionFormState>(field: Key, value: ProjectionFormState[Key]) => {
-    setForm((current) => ({ ...current, [field]: value }));
-  };
+  const projectionInput = useMemo(() => buildProjectionInput(deferredScenario), [deferredScenario]);
+  const result = useMemo(() => project(projectionInput), [projectionInput]);
+  const dashboard = useMemo(() => selectDashboardModel(result, deferredScenario), [result, deferredScenario]);
+  const eventSummary = useMemo(() => summarizeEventsByType(result.events.all), [result.events.all]);
+  const isProjecting = deferredScenario !== scenario;
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 text-slate-900">
@@ -28,18 +33,34 @@ export default function App() {
           </p>
         </div>
 
+        <ProjectionActions
+          importError={importError}
+          isProjecting={isProjecting}
+          onImport={importScenario}
+          onExport={exportScenario}
+          onReset={resetScenario}
+        />
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <ProjectionControls
-            form={form}
+            scenario={scenario}
             result={result}
-            extraContributionIsCapped={extraContributionIsCapped}
+            dashboard={dashboard}
             updateField={updateField}
           />
-          <ProjectionDashboard
-            maxYears={form.maxYears}
-            result={result}
-            eventSummary={eventSummary}
-          />
+          <Suspense
+            fallback={
+              <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
+                Loading projection dashboard...
+              </div>
+            }
+          >
+            <ProjectionDashboard
+              result={result}
+              dashboard={dashboard}
+              eventSummary={eventSummary}
+            />
+          </Suspense>
         </div>
       </div>
     </div>
