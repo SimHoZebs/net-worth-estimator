@@ -1,7 +1,6 @@
 import { EVENT_TYPES, MODEL } from "./model";
-import { sumEvents, createEvent } from "./eventGenerators";
 import type { AnnualTaxPlanYear, AnnualTaxes, ProjectionEvent } from "./types";
-import { yearLabel } from "./utils";
+import { createEvent, sumEvents, yearLabel } from "./utils";
 
 function calculateProgressiveTax(taxableIncome: number, brackets: ReadonlyArray<{ upTo: number; rate: number }>): number {
   let tax = 0;

@@ -1,7 +1,5 @@
-import { DEFAULT_SCENARIO, DEFAULT_SCENARIO_DEFINITION } from "./scenarios";
-import { buildProjectionInput } from "./normalize";
-import { buildScenarioDefinition } from "./scenarioBuilder";
-import type { ProjectionScenario, ScenarioDefinition, ScenarioDocument } from "./types";
+import { DEFAULT_SCENARIO_DEFINITION } from "./scenarios";
+import type { ScenarioDefinition, ScenarioDocument } from "./types";
 
 export const SCENARIO_DOCUMENT_VERSION = 2;
 export const SCENARIO_STORAGE_KEY = "net-worth-estimator/scenario";
@@ -47,10 +45,6 @@ function looksLikeScenarioDefinition(candidate: unknown): candidate is ScenarioD
   return isPlainObject(candidate) && Array.isArray(candidate.accounts) && Array.isArray(candidate.modules);
 }
 
-function migrateLegacyScenario(legacyScenario: ProjectionScenario): ScenarioDefinition {
-  return buildScenarioDefinition(buildProjectionInput(legacyScenario));
-}
-
 export function createScenarioDocument(scenario: ScenarioDefinition): ScenarioDocument {
   return {
     version: SCENARIO_DOCUMENT_VERSION,
@@ -72,7 +66,7 @@ export function parseScenarioData(data: unknown): ScenarioDefinition {
     return coerceToTemplate(candidate, DEFAULT_SCENARIO_DEFINITION);
   }
 
-  return migrateLegacyScenario(coerceToTemplate(candidate, DEFAULT_SCENARIO));
+  return DEFAULT_SCENARIO_DEFINITION;
 }
 
 export function parseScenarioDocument(serializedScenario: string): ScenarioDefinition {

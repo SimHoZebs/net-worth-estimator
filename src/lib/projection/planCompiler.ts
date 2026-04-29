@@ -1,4 +1,3 @@
-import { createEvent } from "./eventGenerators";
 import { MODEL } from "./model";
 import { buildAnnualTaxPlan, createTaxEvents } from "./taxes";
 import type {
@@ -15,6 +14,7 @@ import type {
   ScenarioModule,
   TaxModule,
 } from "./types";
+import { createEvent } from "./utils";
 
 interface SalaryFact {
   month: number;
