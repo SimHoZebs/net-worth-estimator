@@ -1,7 +1,9 @@
-import { DEFAULT_SCENARIO } from "./defaults";
-import type { ProjectionScenario, ScenarioDocument } from "./types";
+import { DEFAULT_SCENARIO, DEFAULT_SCENARIO_DEFINITION } from "./defaults";
+import { buildProjectionInput } from "./normalize";
+import { buildScenarioDefinition } from "./scenarioBuilder";
+import type { ProjectionScenario, ScenarioDefinition, ScenarioDocument } from "./types";
 
-export const SCENARIO_DOCUMENT_VERSION = 1;
+export const SCENARIO_DOCUMENT_VERSION = 2;
 export const SCENARIO_STORAGE_KEY = "net-worth-estimator/scenario";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -41,7 +43,15 @@ function coerceToTemplate<T>(candidate: unknown, template: T): T {
   return template;
 }
 
-export function createScenarioDocument(scenario: ProjectionScenario): ScenarioDocument {
+function looksLikeScenarioDefinition(candidate: unknown): candidate is ScenarioDefinition {
+  return isPlainObject(candidate) && Array.isArray(candidate.accounts) && Array.isArray(candidate.modules);
+}
+
+function migrateLegacyScenario(legacyScenario: ProjectionScenario): ScenarioDefinition {
+  return buildScenarioDefinition(buildProjectionInput(legacyScenario));
+}
+
+export function createScenarioDocument(scenario: ScenarioDefinition): ScenarioDocument {
   return {
     version: SCENARIO_DOCUMENT_VERSION,
     exportedAt: new Date().toISOString(),
@@ -49,34 +59,38 @@ export function createScenarioDocument(scenario: ProjectionScenario): ScenarioDo
   };
 }
 
-export function serializeScenarioDocument(scenario: ProjectionScenario): string {
+export function serializeScenarioDocument(scenario: ScenarioDefinition): string {
   return JSON.stringify(createScenarioDocument(scenario), null, 2);
 }
 
-export function parseScenarioData(data: unknown): ProjectionScenario {
+export function parseScenarioData(data: unknown): ScenarioDefinition {
   const candidate = isPlainObject(data) && isPlainObject(data.scenario)
     ? data.scenario
     : data;
 
-  return coerceToTemplate(candidate, DEFAULT_SCENARIO);
+  if (looksLikeScenarioDefinition(candidate)) {
+    return coerceToTemplate(candidate, DEFAULT_SCENARIO_DEFINITION);
+  }
+
+  return migrateLegacyScenario(coerceToTemplate(candidate, DEFAULT_SCENARIO));
 }
 
-export function parseScenarioDocument(serializedScenario: string): ProjectionScenario {
+export function parseScenarioDocument(serializedScenario: string): ScenarioDefinition {
   return parseScenarioData(JSON.parse(serializedScenario));
 }
 
-export function loadStoredScenario(storage: Storage | null): ProjectionScenario {
-  if (!storage) return DEFAULT_SCENARIO;
+export function loadStoredScenario(storage: Storage | null): ScenarioDefinition {
+  if (!storage) return DEFAULT_SCENARIO_DEFINITION;
 
   try {
     const stored = storage.getItem(SCENARIO_STORAGE_KEY);
-    return stored ? parseScenarioDocument(stored) : DEFAULT_SCENARIO;
+    return stored ? parseScenarioDocument(stored) : DEFAULT_SCENARIO_DEFINITION;
   } catch {
-    return DEFAULT_SCENARIO;
+    return DEFAULT_SCENARIO_DEFINITION;
   }
 }
 
-export function writeStoredScenario(storage: Storage | null, scenario: ProjectionScenario): void {
+export function writeStoredScenario(storage: Storage | null, scenario: ScenarioDefinition): void {
   if (!storage) return;
 
   try {

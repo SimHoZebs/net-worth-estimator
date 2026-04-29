@@ -1,11 +1,11 @@
-import { ACCOUNT_CONFIG, EVENT_TYPES } from "./model";
+import { EVENT_TYPES } from "./model";
 import type {
   AnnualTaxPlanDisplayRow,
   DashboardViewModel,
   EventSummaryRow,
   ProjectionEvent,
   ProjectionResult,
-  ProjectionScenario,
+  ScenarioDefinition,
 } from "./types";
 import { monthLabel } from "./utils";
 
@@ -36,24 +36,22 @@ function buildAnnualTaxPlanDisplayRows(result: ProjectionResult): AnnualTaxPlanD
     }));
 }
 
-export function selectDashboardModel(result: ProjectionResult, scenario: ProjectionScenario): DashboardViewModel {
-  const requestedExtraFundContribution = result.cashFlow.firstMonthAfterTaxCashAfter401k * (scenario.strategy.extraInvestmentPct / 100);
+export function selectDashboardModel(result: ProjectionResult, scenario: ScenarioDefinition): DashboardViewModel {
   const hitText = result.milestones.hitTargetMonth === null
-    ? `Not within ${scenario.projection.maxYears} years`
+    ? `Not within ${Math.max(1, Math.round(scenario.horizonMonths / 12))} years`
     : `${Math.floor(result.milestones.hitTargetMonth / 12)} years, ${result.milestones.hitTargetMonth % 12} months`;
-  const studentLoanPaidOffText = result.milestones.studentLoanPaidOffMonth === null
-    ? "Not within projection"
-    : `${Math.floor(result.milestones.studentLoanPaidOffMonth / 12)} years, ${result.milestones.studentLoanPaidOffMonth % 12} months`;
 
   return {
-    chartLabelByKey: Object.fromEntries(Object.entries(ACCOUNT_CONFIG).map(([key, account]) => [key, account.label])) as DashboardViewModel["chartLabelByKey"],
-    annualTaxPlan: buildAnnualTaxPlanDisplayRows(result),
+    accountLabelsById: Object.fromEntries(scenario.accounts.map((account) => [account.id, account.label])),
+    accountColorsById: Object.fromEntries(scenario.accounts.map((account) => [account.id, account.color ?? "#64748b"])),
+    assetAccountIds: scenario.accounts.filter((account) => account.kind === "asset").map((account) => account.id),
+    liabilityAccountIds: scenario.accounts.filter((account) => account.kind === "liability").map((account) => account.id),
     hitText,
     hitDate: result.milestones.hitTargetMonth === null ? "-" : monthLabel(result.milestones.hitTargetMonth),
-    studentLoanPaidOffText,
-    studentLoanPaidOffDate: result.milestones.studentLoanPaidOffMonth === null ? "-" : monthLabel(result.milestones.studentLoanPaidOffMonth),
     effectiveTaxRate: result.taxes.firstYear.totalTax / Math.max(1, result.taxes.firstYear.ordinaryIncome),
     finalNetWorth: result.timeline.sampledRows[result.timeline.sampledRows.length - 1]?.netWorth ?? 0,
-    extraContributionIsCapped: requestedExtraFundContribution > result.cashFlow.firstMonthMaxExtraFundContribution + 1,
+    totalAccounts: scenario.accounts.length,
+    totalModules: scenario.modules.length,
+    totalPolicies: scenario.allocationPolicies.length,
   };
 }

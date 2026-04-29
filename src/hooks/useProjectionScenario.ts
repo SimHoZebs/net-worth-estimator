@@ -1,55 +1,41 @@
-import { startTransition, useCallback, useEffect, useReducer, useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 import {
-  DEFAULT_SCENARIO,
+  DEFAULT_SCENARIO_DEFINITION,
   loadStoredScenario,
   parseScenarioDocument,
   serializeScenarioDocument,
   setScenarioValue,
   writeStoredScenario,
 } from "../lib/projection";
-import type { ProjectionScenario, ScenarioPath } from "../lib/projection";
-
-type ScenarioAction =
-  | { type: "update"; path: ScenarioPath; value: unknown }
-  | { type: "replace"; scenario: ProjectionScenario }
-  | { type: "reset" };
+import type { ScenarioDefinition, ScenarioPath } from "../lib/projection";
 
 function getBrowserStorage(): Storage | null {
   return typeof window === "undefined" ? null : window.localStorage;
 }
 
-function scenarioReducer(state: ProjectionScenario, action: ScenarioAction): ProjectionScenario {
-  switch (action.type) {
-    case "update":
-      return setScenarioValue(state, action.path, action.value);
-    case "replace":
-      return action.scenario;
-    case "reset":
-      return DEFAULT_SCENARIO;
-    default:
-      return state;
-  }
-}
-
 export function useProjectionScenario() {
-  const [scenario, dispatch] = useReducer(scenarioReducer, DEFAULT_SCENARIO, () => loadStoredScenario(getBrowserStorage()));
+  const [scenario, setScenario] = useState<ScenarioDefinition>(() => loadStoredScenario(getBrowserStorage()));
   const [importError, setImportError] = useState<string | null>(null);
 
   useEffect(() => {
     writeStoredScenario(getBrowserStorage(), scenario);
   }, [scenario]);
 
-  const updateField = useCallback((path: ScenarioPath, value: unknown) => {
+  const updateScenario = useCallback((updater: (current: ScenarioDefinition) => ScenarioDefinition) => {
     setImportError(null);
     startTransition(() => {
-      dispatch({ type: "update", path, value });
+      setScenario((current) => updater(current));
     });
   }, []);
+
+  const updateField = useCallback((path: ScenarioPath, value: unknown) => {
+    updateScenario((current) => setScenarioValue(current, path, value));
+  }, [updateScenario]);
 
   const resetScenario = useCallback(() => {
     setImportError(null);
     startTransition(() => {
-      dispatch({ type: "reset" });
+      setScenario(DEFAULT_SCENARIO_DEFINITION);
     });
   }, []);
 
@@ -58,7 +44,7 @@ export function useProjectionScenario() {
       const nextScenario = parseScenarioDocument(serializedScenario);
       setImportError(null);
       startTransition(() => {
-        dispatch({ type: "replace", scenario: nextScenario });
+        setScenario(nextScenario);
       });
       return true;
     } catch {
@@ -73,6 +59,7 @@ export function useProjectionScenario() {
     scenario,
     importError,
     updateField,
+    updateScenario,
     resetScenario,
     importScenario,
     exportScenario,

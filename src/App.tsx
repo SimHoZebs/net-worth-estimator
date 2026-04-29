@@ -1,7 +1,7 @@
 import { Suspense, lazy, useDeferredValue, useMemo } from "react";
 import { ProjectionActions } from "./components/ProjectionActions";
 import { ProjectionControls } from "./components/ProjectionControls";
-import { buildProjectionInput, project, selectDashboardModel, summarizeEventsByType } from "./lib/projection";
+import { project, selectDashboardModel, summarizeEventsByType } from "./lib/projection";
 import { useProjectionScenario } from "./hooks/useProjectionScenario";
 
 const ProjectionDashboard = lazy(() => import("./components/ProjectionDashboard"));
@@ -11,14 +11,14 @@ export default function App() {
     scenario,
     importError,
     updateField,
+    updateScenario,
     resetScenario,
     importScenario,
     exportScenario,
   } = useProjectionScenario();
   const deferredScenario = useDeferredValue(scenario);
 
-  const projectionInput = useMemo(() => buildProjectionInput(deferredScenario), [deferredScenario]);
-  const result = useMemo(() => project(projectionInput), [projectionInput]);
+  const result = useMemo(() => project(deferredScenario), [deferredScenario]);
   const dashboard = useMemo(() => selectDashboardModel(result, deferredScenario), [result, deferredScenario]);
   const eventSummary = useMemo(() => summarizeEventsByType(result.events.all), [result.events.all]);
   const isProjecting = deferredScenario !== scenario;
@@ -44,9 +44,8 @@ export default function App() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <ProjectionControls
             scenario={scenario}
-            result={result}
-            dashboard={dashboard}
             updateField={updateField}
+            updateScenario={updateScenario}
           />
           <Suspense
             fallback={
@@ -56,6 +55,7 @@ export default function App() {
             }
           >
             <ProjectionDashboard
+              scenario={deferredScenario}
               result={result}
               dashboard={dashboard}
               eventSummary={eventSummary}

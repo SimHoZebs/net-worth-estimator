@@ -1,37 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SCENARIO, parseScenarioData, parseScenarioDocument, serializeScenarioDocument } from "./projection";
+import { DEFAULT_SCENARIO, DEFAULT_SCENARIO_DEFINITION, parseScenarioData, parseScenarioDocument, serializeScenarioDocument } from "./projection";
 
 describe("scenario document IO", () => {
-  it("round-trips a serialized versioned scenario document", () => {
+  it("round-trips a serialized v2 scenario document", () => {
     const scenario = {
-      ...DEFAULT_SCENARIO,
-      compensation: {
-        ...DEFAULT_SCENARIO.compensation,
-        baseSalary: 150000,
-      },
-      strategy: {
-        ...DEFAULT_SCENARIO.strategy,
-        extraInvestmentPct: 22,
-      },
+      ...DEFAULT_SCENARIO_DEFINITION,
+      name: "Custom scenario",
+      targetNetWorth: 1_500_000,
     };
 
     const parsed = parseScenarioDocument(serializeScenarioDocument(scenario));
 
-    expect(parsed.compensation.baseSalary).toBe(150000);
-    expect(parsed.strategy.extraInvestmentPct).toBe(22);
+    expect(parsed.name).toBe("Custom scenario");
+    expect(parsed.targetNetWorth).toBe(1_500_000);
   });
 
-  it("fills missing or invalid fields from defaults", () => {
-    const parsed = parseScenarioData({
-      scenario: {
-        compensation: { baseSalary: 175000 },
-        strategy: { extraInvestmentPct: "not-a-number" },
-      },
-    });
+  it("migrates a legacy planner document into a scenario definition", () => {
+    const parsed = parseScenarioData({ scenario: DEFAULT_SCENARIO });
 
-    expect(parsed.compensation.baseSalary).toBe(175000);
-    expect(parsed.compensation.initialRsuGrantValue).toBe(DEFAULT_SCENARIO.compensation.initialRsuGrantValue);
-    expect(parsed.strategy.extraInvestmentPct).toBe(DEFAULT_SCENARIO.strategy.extraInvestmentPct);
-    expect(parsed.overrides.firstMonth.useActualPaycheck).toBe(DEFAULT_SCENARIO.overrides.firstMonth.useActualPaycheck);
+    expect(parsed.version).toBe(2);
+    expect(parsed.accounts.some((account) => account.id === "k401")).toBe(true);
+    expect(parsed.modules.some((module) => module.type === "employmentIncome")).toBe(true);
+    expect(parsed.allocationPolicies.length).toBeGreaterThan(0);
   });
 });
