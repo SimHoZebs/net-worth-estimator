@@ -75,8 +75,19 @@ export function useProjectionWorker(scenario: ScenarioDefinition, checkpoints: C
     const id = requestIdRef.current + 1;
     requestIdRef.current = id;
 
-    setState((current) => ({ ...current, isProjecting: true, runtimeError: null }));
-    workerRef.current.postMessage({ id, scenario, checkpoints });
+    setState((current) => {
+      if (current.isProjecting && current.runtimeError === null) {
+        return current;
+      }
+
+      return { ...current, isProjecting: true, runtimeError: null };
+    });
+
+    const timeoutId = setTimeout(() => {
+      workerRef.current?.postMessage({ id, scenario, checkpoints });
+    }, 150);
+
+    return () => clearTimeout(timeoutId);
   }, [checkpoints, scenario]);
 
   return state;

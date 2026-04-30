@@ -17,7 +17,6 @@ import { currency, formatChartCurrencyTick, pct } from "../lib/format";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface ProjectionDashboardProps {
-  scenario: ScenarioDefinition;
   result: ProjectionResult;
   dashboard: DashboardViewModel;
   eventSummary: EventSummaryRow[];
@@ -30,7 +29,7 @@ function buildAssetChartData(result: ProjectionResult, accountIds: string[]) {
   }));
 }
 
-export default function ProjectionDashboard({ scenario, result, dashboard, eventSummary }: ProjectionDashboardProps) {
+export default function ProjectionDashboard({ result, dashboard, eventSummary }: ProjectionDashboardProps) {
   const assetChartData = buildAssetChartData(result, dashboard.assetAccountIds);
   const endingBalanceData = dashboard.endingBalanceRows.map((row) => ({
     id: row.accountId,

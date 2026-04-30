@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import type { ScenarioDefinition, ScenarioValidationIssue } from "../lib/projection";
 import { scenarioDefinitionSchema } from "../lib/projection";
@@ -22,19 +22,33 @@ export function ProjectionControls({ scenario, scenarioRevision, validationIssue
     mode: "onChange",
   });
 
-  useEffect(() => {
-    form.reset(scenario);
-  }, [form, scenario, scenarioRevision]);
+  const latestScenario = useRef(scenario);
 
   useEffect(() => {
+    latestScenario.current = scenario;
+  }, [scenario]);
+
+  useEffect(() => {
+    form.reset(latestScenario.current);
+  }, [form, scenarioRevision]);
+
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+
     const subscription = form.watch((value) => {
-      const result = scenarioDefinitionSchema.safeParse(value);
-      if (result.success) {
-        onScenarioChange(result.data);
-      }
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const result = scenarioDefinitionSchema.safeParse(value);
+        if (result.success) {
+          onScenarioChange(result.data);
+        }
+      }, 300);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
   }, [form, onScenarioChange]);
 
   return (

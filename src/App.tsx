@@ -63,7 +63,6 @@ export default function App() {
           >
             {result && dashboard ? (
               <ProjectionDashboard
-                scenario={scenario}
                 result={result}
                 dashboard={dashboard}
                 eventSummary={eventSummary}
