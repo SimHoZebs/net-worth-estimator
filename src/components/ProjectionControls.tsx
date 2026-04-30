@@ -319,7 +319,7 @@ export function ProjectionControls({ scenario, updateField, updateScenario }: Pr
     .map((account) => ({ value: account.id, label: `${account.label} (${accountKindLabel(account.kind)})` }));
 
   return (
-    <Card className="rounded-2xl shadow-sm lg:col-span-1">
+    <Card className="rounded-2xl shadow-sm">
       <CardContent className="space-y-6 p-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4">
@@ -352,13 +352,13 @@ export function ProjectionControls({ scenario, updateField, updateScenario }: Pr
               <button type="button" className={sectionButtonClassName()} onClick={() => updateScenario((current) => addAccount(current, "liability"))}>Add liability</button>
             </div>
           </div>
-          <div className="space-y-4">
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
             {scenario.accounts.map((account, accountIndex) => {
               const accountIsReferenced = isAccountReferenced(scenario, account.id);
               const isCashAccount = account.id === "cash";
 
               return (
-                <div key={account.id} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+                <div key={account.id} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 min-w-[320px] max-w-[400px] shrink-0 snap-start">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <h3 className="font-semibold text-slate-900">{account.label}</h3>
@@ -434,9 +434,9 @@ export function ProjectionControls({ scenario, updateField, updateScenario }: Pr
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
             {scenario.modules.map((module, moduleIndex) => (
-              <div key={module.id} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <div key={module.id} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 min-w-[340px] max-w-[450px] shrink-0 snap-start">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="font-semibold text-slate-900">{moduleTitle(module.type)}</h3>
@@ -677,9 +677,9 @@ export function ProjectionControls({ scenario, updateField, updateScenario }: Pr
             <button type="button" className={sectionButtonClassName()} onClick={() => updateScenario((current) => addPolicy(current))}>Add policy</button>
           </div>
 
-          <div className="space-y-4">
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
             {scenario.allocationPolicies.map((policy, policyIndex) => (
-              <div key={policy.id} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+              <div key={policy.id} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 min-w-[360px] max-w-[500px] shrink-0 snap-start">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="font-semibold text-slate-900">Policy {policyIndex + 1}</h3>

@@ -41,7 +41,7 @@ export default function App() {
           onReset={resetScenario}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="space-y-8">
           <ProjectionControls
             scenario={scenario}
             updateField={updateField}
@@ -49,7 +49,7 @@ export default function App() {
           />
           <Suspense
             fallback={
-              <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
                 Loading projection dashboard...
               </div>
             }
