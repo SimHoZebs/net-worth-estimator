@@ -2,6 +2,8 @@
 
 Single-page React app for projecting net worth growth with salary, RSUs, taxes, 401(k), debt payoff, and investment contributions.
 
+Planned rewrite: see `REDESIGN_PLAN.md` for the phased CSV-backed simplification plan that intentionally breaks from the current module-based architecture.
+
 Scenarios are stored as canonical `v2` JSON documents, auto-saved locally in the browser, and can be imported/exported for comparison or backup. Legacy flat planner documents are migrated on import.
 
 The projection engine uses a generic runtime. Built-in modules such as employment income, recurring flows, one-time flows, scheduled transfers, equity grants, retirement match, and taxes compile the scenario into generic account operations, rate rules, and allocation policies. The runtime only executes those instructions over time.
