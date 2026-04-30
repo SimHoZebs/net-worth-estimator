@@ -1,4 +1,3 @@
-import { createEvent } from "./eventGenerators";
 import type {
   EventType,
   ProjectionEvent,
@@ -7,6 +6,7 @@ import type {
   RuntimeOperation,
   RuntimeRateRule,
 } from "./types";
+import { createEvent } from "./utils";
 
 interface RuntimeExecution {
   monthStates: RuntimeMonthState[];
