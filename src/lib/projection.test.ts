@@ -21,8 +21,8 @@ describe("projection engine", () => {
     };
     const result = project(scenario);
 
-    expect(result.timeline.monthlyRows[0]?.studentLoanPayment).toBe(1234);
-    expect(result.timeline.monthlyRows[0]?.studentLoan).toBeLessThan(0);
+    expect(result.timeline.monthlyRows[0]?.realizedAllocationAmount).toBe(1234);
+    expect((result.timeline.monthlyRows[0]?.accountBalances.studentLoan ?? Number.POSITIVE_INFINITY)).toBeLessThan(60000);
     expect(result.timeline.sampledRows.length).toBeGreaterThan(0);
   });
 
@@ -36,4 +36,3 @@ describe("projection engine", () => {
     expect(result.timeline.sampledRows.some((row) => row.month === 11)).toBe(true);
   });
 });
-

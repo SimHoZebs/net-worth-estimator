@@ -45,7 +45,7 @@ export function buildAnnualTaxPlan(ledgerEvents: ProjectionEvent[], projectionLa
     const yearEvents = ledgerEvents.filter((event) => event.month !== null && event.month >= startMonth && event.month <= endMonth);
     const salaryIncome = sumEvents(yearEvents, (event) => event.type === EVENT_TYPES.ORDINARY_INCOME && event.meta?.bucket === "salary");
     const rsuIncome = sumEvents(yearEvents, (event) => event.type === EVENT_TYPES.VEST && event.taxTreatment === "ordinary-income");
-    const preTax401kContribution = sumEvents(yearEvents, (event) => event.type === EVENT_TYPES.PRE_TAX_DEDUCTION && event.destination === "k401");
+    const preTax401kContribution = sumEvents(yearEvents, (event) => event.type === EVENT_TYPES.PRE_TAX_DEDUCTION);
     const ordinaryIncome = salaryIncome + rsuIncome;
     const taxes = estimateAnnualTaxes({ ordinaryIncome, preTax401kContribution });
     const totalIncomeForAllocation = Math.max(1, ordinaryIncome);

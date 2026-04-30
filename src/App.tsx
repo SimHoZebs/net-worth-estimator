@@ -1,7 +1,7 @@
 import { Suspense, lazy, useDeferredValue, useMemo } from "react";
 import { ProjectionActions } from "./components/ProjectionActions";
 import { ProjectionControls } from "./components/ProjectionControls";
-import { project, selectDashboardModel, summarizeEventsByType } from "./lib/projection";
+import { project, selectDashboardModel, summarizeEventsByType, summarizeValidationIssues, validateScenario } from "./lib/projection";
 import { useProjectionScenario } from "./hooks/useProjectionScenario";
 
 const ProjectionDashboard = lazy(() => import("./components/ProjectionDashboard"));
@@ -17,10 +17,23 @@ export default function App() {
     exportScenario,
   } = useProjectionScenario();
   const deferredScenario = useDeferredValue(scenario);
+  const validation = useMemo(() => summarizeValidationIssues(validateScenario(scenario)), [scenario]);
 
-  const result = useMemo(() => project(deferredScenario), [deferredScenario]);
-  const dashboard = useMemo(() => selectDashboardModel(result, deferredScenario), [result, deferredScenario]);
-  const eventSummary = useMemo(() => summarizeEventsByType(result.events.all), [result.events.all]);
+  const result = useMemo(() => {
+    if (!validation.isValid) return null;
+
+    try {
+      return project(deferredScenario);
+    } catch {
+      return null;
+    }
+  }, [deferredScenario, validation.isValid]);
+  const dashboard = useMemo(() => (
+    result ? selectDashboardModel(result, deferredScenario) : null
+  ), [result, deferredScenario]);
+  const eventSummary = useMemo(() => (
+    result ? summarizeEventsByType(result.events.all) : []
+  ), [result]);
   const isProjecting = deferredScenario !== scenario;
 
   return (
@@ -44,6 +57,7 @@ export default function App() {
         <div className="space-y-8">
           <ProjectionControls
             scenario={scenario}
+            validationIssues={validation.issues}
             updateField={updateField}
             updateScenario={updateScenario}
           />
@@ -54,12 +68,18 @@ export default function App() {
               </div>
             }
           >
-            <ProjectionDashboard
-              scenario={deferredScenario}
-              result={result}
-              dashboard={dashboard}
-              eventSummary={eventSummary}
-            />
+            {result && dashboard ? (
+              <ProjectionDashboard
+                scenario={deferredScenario}
+                result={result}
+                dashboard={dashboard}
+                eventSummary={eventSummary}
+              />
+            ) : (
+              <div className="lg:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800 shadow-sm">
+                The scenario could not be projected. Fix the validation issues in the builder and try again.
+              </div>
+            )}
           </Suspense>
         </div>
       </div>

@@ -2,10 +2,10 @@ import { compileProjectionPlan } from "./planCompiler";
 import { executeProjectionPlan } from "./runtime";
 import { estimateAnnualTaxes } from "./taxes";
 import type {
-  AnnualTaxPlanYear,
   ProjectionEvent,
   ProjectionResult,
   ProjectionRow,
+  ScenarioAccountDefinition,
   RuntimeMonthState,
   RuntimeOperation,
   ScenarioDefinition,
@@ -24,97 +24,44 @@ function sumOperationsForMonth(operations: RuntimeOperation[], month: number, pr
   ), 0);
 }
 
-function getRsuTaxRateForYear(yearPlan: AnnualTaxPlanYear | undefined): number {
-  return yearPlan && yearPlan.rsuIncome > 0 ? yearPlan.taxAllocatedToRsus / yearPlan.rsuIncome : 0;
-}
+function calculateNetWorth(state: RuntimeMonthState, accounts: ScenarioAccountDefinition[]): number {
+  return accounts.reduce((total, account) => {
+    if (account.id === "cash") return total;
 
-function calculateNetWorth(state: RuntimeMonthState): number {
-  const k401 = state.balances.k401 ?? 0;
-  const taxableFund = state.balances.taxableFund ?? 0;
-  const amazonStock = state.balances.amazonStock ?? 0;
-  const studentLoan = state.balances.studentLoan ?? 0;
-
-  return k401 + taxableFund + amazonStock - studentLoan;
+    const balance = state.balances[account.id] ?? 0;
+    return total + (account.kind === "liability" ? -balance : balance);
+  }, 0);
 }
 
 function createProjectionRow({
   monthState,
   externalEvents,
-  annualTaxPlan,
-  extraInvestmentRate,
+  accounts,
 }: {
   monthState: RuntimeMonthState;
   externalEvents: ProjectionEvent[];
-  annualTaxPlan: AnnualTaxPlanYear[];
-  extraInvestmentRate: number;
+  accounts: ScenarioAccountDefinition[];
 }): ProjectionRow {
   const month = monthState.month;
-  const yearPlan = annualTaxPlan[Math.floor(month / 12)];
-  const grossRsuVested = sumEventsForMonth(
-    externalEvents,
-    month,
-    (event) => event.type === "vest" && event.destination === "amazonStock" && event.taxTreatment === "ordinary-income"
-  );
-  const rsuTax = grossRsuVested * getRsuTaxRateForYear(yearPlan);
-  const netRsuAdded = sumOperationsForMonth(
-    monthState.baseOperations,
-    month,
-    (operation) => operation.type === "vest" && operation.destination === "amazonStock" && operation.taxTreatment === "after-tax"
-  );
   const fixedExpenses = sumEventsForMonth(externalEvents, month, (event) => event.type === "expense");
   const fixedExpensesForCashFlow = sumOperationsForMonth(monthState.baseOperations, month, (operation) => operation.type === "expense");
-  const salaryTax = sumEventsForMonth(
-    externalEvents,
-    month,
-    (event) => event.type === "tax" && event.meta?.bucket === "salary"
-  );
-  const afterTaxCashAfter401k = sumOperationsForMonth(
-    monthState.baseOperations,
-    month,
-    (operation) => operation.type === "ordinary_income" && operation.source === "after-tax-salary-cash"
-  );
-  const requestedExtraContribution = afterTaxCashAfter401k * extraInvestmentRate;
-  const modeledAvailableExtraContribution = Math.min(requestedExtraContribution, monthState.availableCashBeforeAllocation);
-  const taxableFundContribution = sumOperationsForMonth(
-    monthState.policyOperations,
-    month,
-    (operation) => operation.type === "transfer" && operation.destination === "taxableFund"
-  );
-  const studentLoanPayment = sumOperationsForMonth(
-    monthState.policyOperations,
-    month,
-    (operation) => operation.type === "debt_payment" && operation.destination === "studentLoan"
-  );
-  const studentLoanInterest = sumOperationsForMonth(
-    monthState.rateRuleOperations,
-    month,
-    (operation) => operation.type === "interest" && operation.destination === "studentLoan"
-  );
+  const taxPaid = sumEventsForMonth(externalEvents, month, (event) => event.type === "tax");
   const cashShortfall = sumOperationsForMonth(monthState.shortfallOperations, month, (operation) => operation.type === "shortfall");
-  const netWorth = calculateNetWorth(monthState);
+  const netWorth = calculateNetWorth(monthState, accounts);
 
   return {
     month,
     date: monthLabel(month),
     netWorth: Math.round(netWorth),
     accountBalances: { ...monthState.balances },
-    k401: Math.round(monthState.balances.k401 ?? 0),
-    taxableFund: Math.round(monthState.balances.taxableFund ?? 0),
-    amazonStock: Math.round(monthState.balances.amazonStock ?? 0),
-    studentLoan: Math.round(-(monthState.balances.studentLoan ?? 0)),
-    grossRsuVested: Math.round(grossRsuVested),
-    netRsuAdded: Math.round(netRsuAdded),
-    taxPaid: Math.round(salaryTax + rsuTax),
+    taxPaid: Math.round(taxPaid),
     fixedExpenses: Math.round(fixedExpenses),
     fixedExpensesForCashFlow: Math.round(fixedExpensesForCashFlow),
-    maxExtraFundContribution: Math.round(monthState.availableCashBeforeAllocation),
-    taxableFundContribution: Math.round(taxableFundContribution),
-    contributionMode: monthState.usedAllocationOverride ? "actual" : "projected",
-    requestedExtraContribution: Math.round(requestedExtraContribution),
-    modeledAvailableExtraContribution: Math.round(modeledAvailableExtraContribution),
-    studentLoanPayment: Math.round(studentLoanPayment),
-    studentLoanBalance: Math.round(monthState.balances.studentLoan ?? 0),
-    studentLoanInterest: Math.round(studentLoanInterest),
+    availableCashBeforeAllocation: Math.round(monthState.availableCashBeforeAllocation),
+    allocationMode: monthState.usedAllocationOverride ? "actual" : "projected",
+    requestedAllocationAmount: Math.round(monthState.requestedAllocation),
+    realizedAllocationAmount: Math.round(monthState.realizedAllocation),
+    sweptRemainder: Math.round(monthState.sweptRemainder),
     cashShortfall: Math.round(cashShortfall),
   };
 }
@@ -126,38 +73,30 @@ export function project(scenario: ScenarioDefinition): ProjectionResult {
     createProjectionRow({
       monthState,
       externalEvents: plan.externalEvents,
-      annualTaxPlan: plan.annualTaxPlan,
-      extraInvestmentRate: plan.scenario.allocationPolicies[0]?.rateOfAvailable ?? 0,
+      accounts: plan.scenario.accounts,
     })
   );
   const lastMonth = monthlyRows[monthlyRows.length - 1]?.month ?? 0;
   const sampledRows = monthlyRows.filter((row) => row.month % 3 === 0 || row.month === lastMonth || row.month === execution.hitTargetMonth);
   const firstYear = plan.annualTaxPlan[0];
-  const studentLoanAccount = plan.scenario.accounts.find((account) => account.id === "studentLoan");
-  const studentLoanPaidOffMonth = studentLoanAccount && studentLoanAccount.openingBalance > 0
-    ? execution.monthStates.find((state) => (state.balances.studentLoan ?? 0) <= 0.01)?.month ?? null
-    : null;
+  const payoffMonthByLiabilityAccountId = Object.fromEntries(
+    plan.scenario.accounts
+      .filter((account) => account.kind === "liability")
+      .map((account) => [
+        account.id,
+        account.openingBalance > 0
+          ? execution.monthStates.find((state) => (state.balances[account.id] ?? 0) <= 0.01)?.month ?? null
+          : null,
+      ])
+  );
   const totalTaxPaid = monthlyRows.reduce((sum, row) => sum + row.taxPaid, 0);
-  const totalGrossRsuVested = monthlyRows.reduce((sum, row) => sum + row.grossRsuVested, 0);
-  const totalNetRsuAdded = monthlyRows.reduce((sum, row) => sum + row.netRsuAdded, 0);
-  const totalFundContributions = monthlyRows.reduce((sum, row) => sum + row.taxableFundContribution, 0);
-  const totalStudentLoanPayments = monthlyRows.reduce((sum, row) => sum + row.studentLoanPayment, 0);
-  const totalStudentLoanInterest = monthlyRows.reduce((sum, row) => sum + row.studentLoanInterest, 0);
-  const totalUninvestedCash = execution.monthStates.reduce((sum, state) => sum + state.sweptRemainder, 0);
+  const totalUninvestedCash = monthlyRows.reduce((sum, row) => sum + row.sweptRemainder, 0);
   const totalFixedExpenses = monthlyRows.reduce((sum, row) => sum + row.fixedExpenses, 0);
   const totalCashShortfall = monthlyRows.reduce((sum, row) => sum + row.cashShortfall, 0);
   const firstMonthRow = monthlyRows[0];
   const monthlyFixedExpenses = plan.scenario.modules.reduce((sum, module) => (
     module.type === "recurringFlow" && module.eventType === "expense" ? sum + module.amount : sum
   ), 0);
-  const firstMonthAfterTaxCashAfter401k = sumOperationsForMonth(
-    execution.monthStates[0]?.baseOperations ?? [],
-    0,
-    (operation) => operation.type === "ordinary_income" && operation.source === "after-tax-salary-cash"
-  );
-  const firstMonthMaxExtraFundPct = firstMonthAfterTaxCashAfter401k > 0
-    ? (firstMonthRow?.maxExtraFundContribution ?? 0) / firstMonthAfterTaxCashAfter401k
-    : 0;
 
   return {
     timeline: {
@@ -179,34 +118,23 @@ export function project(scenario: ScenarioDefinition): ProjectionResult {
       all: [...plan.externalEvents, ...execution.generatedEvents],
       external: plan.externalEvents,
       generated: execution.generatedEvents,
-      rsuVest: plan.externalEvents.filter((event) => event.type === "vest" && event.taxTreatment === "ordinary-income"),
-    },
-    contributions: {
-      annualEmployee401k: plan.contributionSummary.annualEmployee401k,
-      annualEmployer401k: plan.contributionSummary.annualEmployer401k,
-      monthlyEmployee401k: plan.contributionSummary.monthlyEmployee401k,
-      monthlyEmployer401k: plan.contributionSummary.monthlyEmployer401k,
     },
     milestones: {
       hitTargetMonth: execution.hitTargetMonth,
-      studentLoanPaidOffMonth,
+      payoffMonthByLiabilityAccountId,
     },
     totals: {
       taxPaid: totalTaxPaid,
-      grossRsuVested: totalGrossRsuVested,
-      netRsuAdded: totalNetRsuAdded,
-      fundContributions: totalFundContributions,
-      studentLoanPayments: totalStudentLoanPayments,
-      studentLoanInterest: totalStudentLoanInterest,
       uninvestedCash: totalUninvestedCash,
       fixedExpenses: totalFixedExpenses,
       cashShortfall: totalCashShortfall,
       monthlyFixedExpenses,
     },
     cashFlow: {
-      firstMonthAfterTaxCashAfter401k,
-      firstMonthMaxExtraFundContribution: firstMonthRow?.maxExtraFundContribution ?? 0,
-      firstMonthMaxExtraFundPct,
+      firstMonthAvailableCashBeforeAllocation: firstMonthRow?.availableCashBeforeAllocation ?? 0,
+      firstMonthRequestedAllocationAmount: firstMonthRow?.requestedAllocationAmount ?? 0,
+      firstMonthRealizedAllocationAmount: firstMonthRow?.realizedAllocationAmount ?? 0,
+      firstMonthSweptRemainder: firstMonthRow?.sweptRemainder ?? 0,
     },
   };
 }

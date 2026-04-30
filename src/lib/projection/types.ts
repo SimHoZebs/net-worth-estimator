@@ -14,9 +14,18 @@ export type EventType =
   | "debt_payment"
   | "interest";
 
-export type ContributionMode = "actual" | "projected";
+export type AllocationMode = "actual" | "projected";
 
 export type ScenarioPath = readonly (string | number)[];
+
+export type ScenarioValidationSeverity = "error" | "warning";
+
+export interface ScenarioValidationIssue {
+  code: string;
+  message: string;
+  path: ScenarioPath;
+  severity: ScenarioValidationSeverity;
+}
 
 export type ScenarioAccountKind = "cash" | "asset" | "liability";
 
@@ -71,6 +80,32 @@ export interface RecurringFlowModule {
   skipWhenActualFirstMonthPaycheck?: boolean;
 }
 
+export interface OneTimeFlowModule {
+  id: string;
+  type: "oneTimeFlow";
+  label: string;
+  amount: number;
+  month: number;
+  eventType: "ordinary_income" | "expense";
+  source: string;
+  taxTreatment: string;
+}
+
+export interface ScheduledTransferModule {
+  id: string;
+  type: "scheduledTransfer";
+  label: string;
+  sourceAccountId: string;
+  destinationAccountId: string;
+  amount: number;
+  startMonth: number;
+  endMonth: number | null;
+  frequencyMonths: number;
+  destinationDeltaSign: 1 | -1;
+  eventType: "transfer" | "debt_payment";
+  taxTreatment: string;
+}
+
 export interface EquityGrantSeriesModule {
   id: string;
   type: "equityGrantSeries";
@@ -96,8 +131,12 @@ export type ScenarioModule =
   | EmploymentIncomeModule
   | RetirementPlanModule
   | RecurringFlowModule
+  | OneTimeFlowModule
+  | ScheduledTransferModule
   | EquityGrantSeriesModule
   | TaxModule;
+
+export type ScenarioModuleType = ScenarioModule["type"];
 
 export interface AllocationOverrideStep {
   destinationAccountId: string;
@@ -234,23 +273,14 @@ export interface ProjectionRow {
   date: string;
   netWorth: number;
   accountBalances: Record<string, number>;
-  k401: number;
-  taxableFund: number;
-  amazonStock: number;
-  studentLoan: number;
-  grossRsuVested: number;
-  netRsuAdded: number;
   taxPaid: number;
   fixedExpenses: number;
   fixedExpensesForCashFlow: number;
-  maxExtraFundContribution: number;
-  taxableFundContribution: number;
-  contributionMode: ContributionMode;
-  requestedExtraContribution: number;
-  modeledAvailableExtraContribution: number;
-  studentLoanPayment: number;
-  studentLoanBalance: number;
-  studentLoanInterest: number;
+  availableCashBeforeAllocation: number;
+  allocationMode: AllocationMode;
+  requestedAllocationAmount: number;
+  realizedAllocationAmount: number;
+  sweptRemainder: number;
   cashShortfall: number;
 }
 
@@ -274,34 +304,23 @@ export interface ProjectionResult {
     all: ProjectionEvent[];
     external: ProjectionEvent[];
     generated: ProjectionEvent[];
-    rsuVest: ProjectionEvent[];
-  };
-  contributions: {
-    annualEmployee401k: number;
-    annualEmployer401k: number;
-    monthlyEmployee401k: number;
-    monthlyEmployer401k: number;
   };
   milestones: {
     hitTargetMonth: number | null;
-    studentLoanPaidOffMonth: number | null;
+    payoffMonthByLiabilityAccountId: Record<string, number | null>;
   };
   totals: {
     taxPaid: number;
-    grossRsuVested: number;
-    netRsuAdded: number;
-    fundContributions: number;
-    studentLoanPayments: number;
-    studentLoanInterest: number;
     uninvestedCash: number;
     fixedExpenses: number;
     cashShortfall: number;
     monthlyFixedExpenses: number;
   };
   cashFlow: {
-    firstMonthAfterTaxCashAfter401k: number;
-    firstMonthMaxExtraFundContribution: number;
-    firstMonthMaxExtraFundPct: number;
+    firstMonthAvailableCashBeforeAllocation: number;
+    firstMonthRequestedAllocationAmount: number;
+    firstMonthRealizedAllocationAmount: number;
+    firstMonthSweptRemainder: number;
   };
 }
 
@@ -324,6 +343,44 @@ export interface DashboardViewModel {
   totalModules: number;
   totalPolicies: number;
   effectiveTaxRate: number;
+  endingBalanceRows: Array<{
+    accountId: string;
+    label: string;
+    color: string;
+    kind: ScenarioAccountKind;
+    openingBalance: number;
+    currentBalance: number;
+    signedBalance: number;
+  }>;
+  liabilityRows: Array<{
+    accountId: string;
+    label: string;
+    payoffMonth: number | null;
+    payoffDate: string;
+    currentBalance: number;
+    totalInterest: number;
+    totalDebtPayments: number;
+  }>;
+  retirementRows: Array<{
+    accountId: string;
+    label: string;
+    annualEmployeeContribution: number;
+    annualEmployerContribution: number;
+    firstMonthEmployeeContribution: number;
+    firstMonthEmployerContribution: number;
+  }>;
+  equityRows: Array<{
+    accountId: string;
+    label: string;
+    grossVested: number;
+    netAdded: number;
+  }>;
+  allocationRows: Array<{
+    accountId: string;
+    label: string;
+    totalTransfersIn: number;
+    totalDebtReduction: number;
+  }>;
 }
 
 export interface ScenarioDocument {
