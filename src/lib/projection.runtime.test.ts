@@ -7,6 +7,7 @@ describe("generic projection runtime", () => {
     const plan: ProjectionPlan = {
       scenario: {
         version: 2,
+  startDate: "2024-01",
         name: "runtime only",
         horizonMonths: 1,
         targetNetWorth: 10_000,
@@ -32,6 +33,7 @@ describe("generic projection runtime", () => {
       },
       externalEvents: [],
       annualTaxPlan: [],
+      checkpointsByMonth: new Map(),
       scheduledOperations: [
         {
           month: 0,

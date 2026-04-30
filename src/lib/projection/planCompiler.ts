@@ -1,6 +1,7 @@
 import { buildAnnualTaxPlan, createTaxEvents } from "./taxes";
 import type {
   AnnualTaxPlanYear,
+  CheckpointEntry,
   ProjectionEvent,
   ProjectionPlan,
   RuntimeRateRule,
@@ -16,6 +17,50 @@ import {
   type ModuleCompileStage,
   type ModuleCompileResult,
 } from "./modules";
+
+function getMonthIndex(startDate: string, dateString: string): number {
+  const startYear = parseInt(startDate.slice(0, 4), 10);
+  const startMonth = parseInt(startDate.slice(5, 7), 10) - 1;
+
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return -1;
+
+  const targetYear = d.getFullYear();
+  const targetMonth = d.getMonth();
+
+  return (targetYear - startYear) * 12 + (targetMonth - startMonth);
+}
+
+function processCheckpoints(scenario: ScenarioDefinition, checkpoints: CheckpointEntry[]) {
+  const checkpointsByMonth = new Map<number, Record<string, number>>();
+  const latestTimestamps = new Map<number, Record<string, number>>();
+
+  checkpoints.forEach((cp) => {
+    const monthIndex = getMonthIndex(scenario.startDate, cp.Date);
+    if (monthIndex < 0 || monthIndex >= scenario.horizonMonths) return;
+
+    const d = new Date(cp.Date);
+    const timestamp = d.getTime();
+
+    let monthMap = checkpointsByMonth.get(monthIndex);
+    let timestampMap = latestTimestamps.get(monthIndex);
+
+    if (!monthMap || !timestampMap) {
+      monthMap = {};
+      timestampMap = {};
+      checkpointsByMonth.set(monthIndex, monthMap);
+      latestTimestamps.set(monthIndex, timestampMap);
+    }
+
+    const currentLatest = timestampMap[cp.AccountId] ?? -1;
+    if (timestamp > currentLatest) {
+      timestampMap[cp.AccountId] = timestamp;
+      monthMap[cp.AccountId] = cp.Balance;
+    }
+  });
+
+  return checkpointsByMonth;
+}
 
 function compileStage({
   scenario,
@@ -82,7 +127,7 @@ function buildRateRules(scenario: ScenarioDefinition): RuntimeRateRule[] {
     }));
 }
 
-export function compileProjectionPlan(scenario: ScenarioDefinition): ProjectionPlan {
+export function compileProjectionPlan(scenario: ScenarioDefinition, checkpoints: CheckpointEntry[] = []): ProjectionPlan {
   const factCompilation = compileStage({
     scenario,
     stage: "facts",
@@ -114,12 +159,14 @@ export function compileProjectionPlan(scenario: ScenarioDefinition): ProjectionP
   });
 
   const scheduledOperations = runtimeCompilation.scheduledOperations.sort((left, right) => left.month - right.month);
+  const checkpointsByMonth = processCheckpoints(scenario, checkpoints);
 
   return {
     scenario,
     externalEvents,
     annualTaxPlan,
     scheduledOperations,
+    checkpointsByMonth,
     rateRules: buildRateRules(scenario),
     contributionSummary: eventCompilation.contributionSummary,
   };

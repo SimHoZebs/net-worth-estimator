@@ -165,6 +165,7 @@ export interface AllocationPolicyDefinition {
 export interface ScenarioDefinition {
   version: 2;
   name: string;
+  startDate: string;
   horizonMonths: number;
   targetNetWorth: number;
   accounts: ScenarioAccountDefinition[];
@@ -222,6 +223,7 @@ export interface ProjectionPlan {
   annualTaxPlan: AnnualTaxPlanYear[];
   scheduledOperations: RuntimeOperation[];
   rateRules: RuntimeRateRule[];
+  checkpointsByMonth: Map<number, Record<string, number>>;
   contributionSummary: {
     annualEmployee401k: number;
     annualEmployer401k: number;
@@ -271,6 +273,7 @@ export interface AnnualTaxPlanDisplayRow extends Omit<AnnualTaxPlanYear, "taxes"
 export interface ProjectionRow {
   month: number;
   date: string;
+  isHistorical: boolean;
   netWorth: number;
   accountBalances: Record<string, number>;
   taxPaid: number;
@@ -307,6 +310,7 @@ export interface ProjectionResult {
   };
   milestones: {
     hitTargetMonth: number | null;
+    lastReconciledMonth: number | null;
     payoffMonthByLiabilityAccountId: Record<string, number | null>;
   };
   totals: {
@@ -387,4 +391,10 @@ export interface ScenarioDocument {
   version: 2;
   exportedAt: string;
   scenario: ScenarioDefinition;
+}
+
+export interface CheckpointEntry {
+  Date: string;
+  AccountId: string;
+  Balance: number;
 }

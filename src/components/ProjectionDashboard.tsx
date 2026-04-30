@@ -14,7 +14,7 @@ import {
 } from "recharts";
 import { buildAnnualTaxPlanDisplayRows, type DashboardViewModel, type EventSummaryRow, type ProjectionResult, type ScenarioDefinition } from "../lib/projection";
 import { currency, formatChartCurrencyTick, pct } from "../lib/format";
-import { Card, CardContent } from "./ui";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface ProjectionDashboardProps {
   scenario: ScenarioDefinition;

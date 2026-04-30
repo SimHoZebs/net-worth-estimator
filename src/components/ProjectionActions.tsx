@@ -1,4 +1,6 @@
 import { useRef, useState, type ChangeEvent } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface ProjectionActionsProps {
   importError: string | null;
@@ -6,18 +8,6 @@ interface ProjectionActionsProps {
   onImport: (serializedScenario: string) => boolean;
   onExport: () => string;
   onReset: () => void;
-}
-
-function actionButtonClassName(kind: "primary" | "secondary" | "danger"): string {
-  switch (kind) {
-    case "primary":
-      return "rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700";
-    case "danger":
-      return "rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50";
-    case "secondary":
-    default:
-      return "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50";
-  }
 }
 
 export function ProjectionActions({ importError, isProjecting, onImport, onExport, onReset }: ProjectionActionsProps) {
@@ -49,7 +39,8 @@ export function ProjectionActions({ importError, isProjecting, onImport, onExpor
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <Card className="rounded-[1.8rem] border-slate-200 bg-white shadow-sm">
+      <CardContent className="p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm font-medium text-slate-900">Scenario management</p>
@@ -58,15 +49,15 @@ export function ProjectionActions({ importError, isProjecting, onImport, onExpor
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={actionButtonClassName("secondary")} onClick={handleImportClick}>
+          <Button type="button" variant="secondary" onClick={handleImportClick}>
             Import JSON
-          </button>
-          <button type="button" className={actionButtonClassName("primary")} onClick={handleExport}>
+          </Button>
+          <Button type="button" onClick={handleExport}>
             Export JSON
-          </button>
-          <button type="button" className={actionButtonClassName("danger")} onClick={onReset}>
+          </Button>
+          <Button type="button" variant="destructive" onClick={onReset}>
             Reset defaults
-          </button>
+          </Button>
           <input
             ref={fileInputRef}
             type="file"
@@ -85,6 +76,7 @@ export function ProjectionActions({ importError, isProjecting, onImport, onExpor
         </span>
       </div>
       {importError ? <p className="mt-2 text-sm text-rose-700">{importError}</p> : null}
-    </div>
+      </CardContent>
+    </Card>
   );
 }

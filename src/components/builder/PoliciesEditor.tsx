@@ -1,25 +1,21 @@
+import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import {
   addOverrideStep,
   addPolicy,
   addPolicyOverride,
   addPolicyStep,
-  removePolicyAt,
-  type AllocationOverrideStep,
-  type AllocationPolicyStep,
+  DEFAULT_SCENARIO_DEFINITION,
   type ScenarioDefinition,
-  type ScenarioPath,
 } from "../../lib/projection";
-import { CheckboxInput, Field, NumberInput, sectionButtonClassName, SelectInput } from "./shared";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { CheckboxField, NumberField, PercentField, SelectField } from "./shared";
 
-export function PoliciesEditor({
-  scenario,
-  updateField,
-  updateScenario,
-}: {
-  scenario: ScenarioDefinition;
-  updateField: (path: ScenarioPath, value: unknown) => void;
-  updateScenario: (updater: (current: ScenarioDefinition) => ScenarioDefinition) => void;
-}) {
+export function PoliciesEditor() {
+  const { control, setValue } = useFormContext<ScenarioDefinition>();
+  const scenario = (useWatch({ control }) ?? DEFAULT_SCENARIO_DEFINITION) as ScenarioDefinition;
+  const policies = (useWatch({ control, name: "allocationPolicies" }) ?? DEFAULT_SCENARIO_DEFINITION.allocationPolicies) as ScenarioDefinition["allocationPolicies"];
+  const { fields, append, remove } = useFieldArray({ control, name: "allocationPolicies" });
   const accountOptions = scenario.accounts.map((account) => ({
     value: account.id,
     label: `${account.label} (${account.kind})`,
@@ -29,6 +25,14 @@ export function PoliciesEditor({
     label: `${account.label} (${account.kind})`,
   }));
 
+  const updatePolicies = (updater: (currentPolicies: ScenarioDefinition["allocationPolicies"]) => ScenarioDefinition["allocationPolicies"]) => {
+    setValue("allocationPolicies", updater(scenario.allocationPolicies), {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
@@ -36,213 +40,207 @@ export function PoliciesEditor({
           <h2 className="text-lg font-bold">Allocation policies</h2>
           <p className="text-sm text-slate-500">Policies tell the runtime how to allocate available source-account cash after base operations have executed.</p>
         </div>
-        <button type="button" className={sectionButtonClassName()} onClick={() => updateScenario((current) => addPolicy(current))}>Add policy</button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            const nextPolicies = addPolicy(scenario).allocationPolicies;
+            const nextPolicy = nextPolicies[nextPolicies.length - 1];
+            if (nextPolicy) {
+              append(nextPolicy);
+            }
+          }}
+        >
+          Add policy
+        </Button>
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
-        {scenario.allocationPolicies.map((policy, policyIndex) => (
-          <div key={policy.id} className="min-w-[360px] max-w-[500px] shrink-0 snap-start space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="font-semibold text-slate-900">Policy {policyIndex + 1}</h3>
-                <p className="text-xs text-slate-500">ID: <code>{policy.id}</code></p>
-              </div>
-              <button type="button" className={sectionButtonClassName("danger")} onClick={() => updateScenario((current) => removePolicyAt(current, policyIndex))}>
-                Remove
-              </button>
-            </div>
+      <div className="overflow-x-auto">
+        <div className="flex gap-4 pb-4">
+          {fields.map((field, policyIndex) => {
+            const policy = policies[policyIndex];
+            if (!policy) return null;
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Field label="Source account">
-                <SelectInput value={policy.sourceAccountId} onChange={(value) => updateField(["allocationPolicies", policyIndex, "sourceAccountId"], value)}>
-                  {accountOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </SelectInput>
-              </Field>
-              <Field label="Rate of available %">
-                <NumberInput value={policy.rateOfAvailable * 100} onChange={(value) => updateField(["allocationPolicies", policyIndex, "rateOfAvailable"], Math.max(0, Math.min(100, value)) / 100)} min={0} />
-              </Field>
-              <div className="md:col-span-2">
-                <CheckboxInput
-                  checked={policy.sweepRemainderFromSource}
-                  onChange={(checked) => updateField(["allocationPolicies", policyIndex, "sweepRemainderFromSource"], checked)}
-                  label="Sweep any leftover source-account cash out of the runtime after the allocation steps run. This keeps residual cash from carrying forward."
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3 rounded-xl bg-slate-50 p-3">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h4 className="font-medium text-slate-900">Policy steps</h4>
-                  <p className="text-sm text-slate-500">Steps execute in order against the available source balance.</p>
-                </div>
-                <button
-                  type="button"
-                  className={sectionButtonClassName()}
-                  onClick={() => updateScenario((current) => ({
-                    ...current,
-                    allocationPolicies: current.allocationPolicies.map((currentPolicy, index) => (
-                      index === policyIndex ? addPolicyStep(currentPolicy, destinationAccountOptions[0]?.value ?? currentPolicy.sourceAccountId) : currentPolicy
-                    )),
-                  }))}
-                >
-                  Add step
-                </button>
-              </div>
-
-              {policy.steps.map((step, stepIndex) => (
-                <div key={`${policy.id}-step-${stepIndex}`} className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr_1fr_auto]">
-                  <Field label="Destination account">
-                    <SelectInput value={step.destinationAccountId} onChange={(value) => updateField(["allocationPolicies", policyIndex, "steps", stepIndex, "destinationAccountId"], value)}>
-                      {destinationAccountOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                    </SelectInput>
-                  </Field>
-                  <Field label="Direction">
-                    <SelectInput value={String(step.destinationDeltaSign)} onChange={(value) => updateField(["allocationPolicies", policyIndex, "steps", stepIndex, "destinationDeltaSign"], Number(value) as AllocationPolicyStep["destinationDeltaSign"])}>
-                      <option value="1">Increase destination</option>
-                      <option value="-1">Reduce destination</option>
-                    </SelectInput>
-                  </Field>
-                  <Field label="Mode">
-                    <SelectInput value={step.mode} onChange={(value) => updateField(["allocationPolicies", policyIndex, "steps", stepIndex, "mode"], value)}>
-                      <option value="allRemaining">All remaining</option>
-                      <option value="reduceToZero">Reduce destination to zero</option>
-                    </SelectInput>
-                  </Field>
-                  <div className="flex items-end">
-                    <button
-                      type="button"
-                      className={sectionButtonClassName("danger")}
-                      onClick={() => updateScenario((current) => ({
-                        ...current,
-                        allocationPolicies: current.allocationPolicies.map((currentPolicy, index) => (
-                          index === policyIndex
-                            ? { ...currentPolicy, steps: currentPolicy.steps.filter((_, indexToKeep) => indexToKeep !== stepIndex) }
-                            : currentPolicy
-                        )),
-                      }))}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-3 rounded-xl bg-slate-50 p-3">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h4 className="font-medium text-slate-900">Fixed month overrides</h4>
-                  <p className="text-sm text-slate-500">Overrides replace the normal policy calculation for a specific month.</p>
-                </div>
-                <button
-                  type="button"
-                  className={sectionButtonClassName()}
-                  onClick={() => updateScenario((current) => ({
-                    ...current,
-                    allocationPolicies: current.allocationPolicies.map((currentPolicy, index) => (
-                      index === policyIndex ? addPolicyOverride(currentPolicy, destinationAccountOptions[0]?.value ?? currentPolicy.sourceAccountId) : currentPolicy
-                    )),
-                  }))}
-                >
-                  Add override
-                </button>
-              </div>
-
-              {policy.overrides.map((override, overrideIndex) => (
-                <div key={`${policy.id}-override-${overrideIndex}`} className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+            return (
+              <Card key={field.id} className="min-w-[380px] max-w-[540px] shrink-0 rounded-[1.75rem] border-slate-200 bg-white">
+                <CardContent className="space-y-4 p-4">
                   <div className="flex items-start justify-between gap-4">
-                    <Field label="Override month" helper="Month 0 is the first projected month.">
-                      <NumberInput value={override.month} onChange={(value) => updateField(["allocationPolicies", policyIndex, "overrides", overrideIndex, "month"], Math.max(0, Math.round(value)))} min={0} step={1} />
-                    </Field>
-                    <div className="flex items-end">
-                      <button
-                        type="button"
-                        className={sectionButtonClassName("danger")}
-                        onClick={() => updateScenario((current) => ({
-                          ...current,
-                          allocationPolicies: current.allocationPolicies.map((currentPolicy, index) => (
-                            index === policyIndex
-                              ? { ...currentPolicy, overrides: currentPolicy.overrides.filter((_, indexToKeep) => indexToKeep !== overrideIndex) }
-                              : currentPolicy
-                          )),
-                        }))}
-                      >
-                        Remove override
-                      </button>
+                    <div>
+                      <h3 className="font-semibold text-slate-900">Policy {policyIndex + 1}</h3>
+                      <p className="text-xs text-slate-500">ID: <code>{policy.id}</code></p>
+                    </div>
+                    <Button type="button" variant="destructive" onClick={() => remove(policyIndex)}>
+                      Remove
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <SelectField name={`allocationPolicies.${policyIndex}.sourceAccountId` as const} label="Source account">
+                      {accountOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </SelectField>
+                    <PercentField name={`allocationPolicies.${policyIndex}.rateOfAvailable` as const} label="Rate of available %" min={0} max={100} transform={(value) => Math.max(0, Math.min(1, value))} />
+                    <div className="md:col-span-2">
+                      <CheckboxField
+                        name={`allocationPolicies.${policyIndex}.sweepRemainderFromSource` as const}
+                        label="Sweep leftover source cash"
+                        helper="Sweep any leftover source-account cash out of the runtime after the allocation steps run. This keeps residual cash from carrying forward."
+                      />
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    {override.steps.map((step, stepIndex) => (
-                      <div key={`${policy.id}-override-${overrideIndex}-step-${stepIndex}`} className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr_1fr_auto]">
-                        <Field label="Destination account">
-                          <SelectInput value={step.destinationAccountId} onChange={(value) => updateField(["allocationPolicies", policyIndex, "overrides", overrideIndex, "steps", stepIndex, "destinationAccountId"], value)}>
-                            {destinationAccountOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                          </SelectInput>
-                        </Field>
-                        <Field label="Direction">
-                          <SelectInput value={String(step.destinationDeltaSign)} onChange={(value) => updateField(["allocationPolicies", policyIndex, "overrides", overrideIndex, "steps", stepIndex, "destinationDeltaSign"], Number(value) as AllocationOverrideStep["destinationDeltaSign"])}>
-                            <option value="1">Increase destination</option>
-                            <option value="-1">Reduce destination</option>
-                          </SelectInput>
-                        </Field>
-                        <Field label="Amount">
-                          <NumberInput value={step.amount} onChange={(value) => updateField(["allocationPolicies", policyIndex, "overrides", overrideIndex, "steps", stepIndex, "amount"], Math.max(0, value))} min={0} />
-                        </Field>
-                        <div className="flex items-end">
-                          <button
-                            type="button"
-                            className={sectionButtonClassName("danger")}
-                            onClick={() => updateScenario((current) => ({
-                              ...current,
-                              allocationPolicies: current.allocationPolicies.map((currentPolicy, index) => {
-                                if (index !== policyIndex) return currentPolicy;
+                  <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h4 className="font-medium text-slate-900">Policy steps</h4>
+                        <p className="text-sm text-slate-500">Steps execute in order against the available source balance.</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => updatePolicies((currentPolicies) => currentPolicies.map((currentPolicy, index) => (
+                          index === policyIndex ? addPolicyStep(currentPolicy, destinationAccountOptions[0]?.value ?? currentPolicy.sourceAccountId) : currentPolicy
+                        )))}
+                      >
+                        Add step
+                      </Button>
+                    </div>
 
-                                return {
-                                  ...currentPolicy,
-                                  overrides: currentPolicy.overrides.map((currentOverride, currentOverrideIndex) => (
-                                    currentOverrideIndex === overrideIndex
-                                      ? { ...currentOverride, steps: currentOverride.steps.filter((_, indexToKeep) => indexToKeep !== stepIndex) }
-                                      : currentOverride
-                                  )),
-                                };
-                              }),
-                            }))}
+                    {policy.steps.map((_, stepIndex) => (
+                      <div key={`${policy.id}-step-${stepIndex}`} className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr_1fr_auto]">
+                        <SelectField name={`allocationPolicies.${policyIndex}.steps.${stepIndex}.destinationAccountId` as const} label="Destination account">
+                          {destinationAccountOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                        </SelectField>
+                        <SelectField name={`allocationPolicies.${policyIndex}.steps.${stepIndex}.destinationDeltaSign` as const} label="Direction">
+                          <option value="1">Increase destination</option>
+                          <option value="-1">Reduce destination</option>
+                        </SelectField>
+                        <SelectField name={`allocationPolicies.${policyIndex}.steps.${stepIndex}.mode` as const} label="Mode">
+                          <option value="allRemaining">All remaining</option>
+                          <option value="reduceToZero">Reduce destination to zero</option>
+                        </SelectField>
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={() => updatePolicies((currentPolicies) => currentPolicies.map((currentPolicy, index) => (
+                              index === policyIndex
+                                ? { ...currentPolicy, steps: currentPolicy.steps.filter((_, indexToKeep) => indexToKeep !== stepIndex) }
+                                : currentPolicy
+                            )))}
                           >
                             Remove
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <button
-                    type="button"
-                    className={sectionButtonClassName()}
-                    onClick={() => updateScenario((current) => ({
-                      ...current,
-                      allocationPolicies: current.allocationPolicies.map((currentPolicy, index) => {
-                        if (index !== policyIndex) return currentPolicy;
+                  <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h4 className="font-medium text-slate-900">Fixed month overrides</h4>
+                        <p className="text-sm text-slate-500">Overrides replace the normal policy calculation for a specific month.</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => updatePolicies((currentPolicies) => currentPolicies.map((currentPolicy, index) => (
+                          index === policyIndex ? addPolicyOverride(currentPolicy, destinationAccountOptions[0]?.value ?? currentPolicy.sourceAccountId) : currentPolicy
+                        )))}
+                      >
+                        Add override
+                      </Button>
+                    </div>
 
-                        return {
-                          ...currentPolicy,
-                          overrides: currentPolicy.overrides.map((currentOverride, currentOverrideIndex) => (
-                            currentOverrideIndex === overrideIndex
-                              ? { ...currentOverride, steps: addOverrideStep(currentOverride.steps, destinationAccountOptions[0]?.value ?? currentPolicy.sourceAccountId) }
-                              : currentOverride
-                          )),
-                        };
-                      }),
-                    }))}
-                  >
-                    Add override step
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
+                    {policy.overrides.map((_, overrideIndex) => (
+                      <div key={`${policy.id}-override-${overrideIndex}`} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <NumberField
+                              name={`allocationPolicies.${policyIndex}.overrides.${overrideIndex}.month` as const}
+                              label="Override month"
+                              helper="Month 0 is the first projected month."
+                              min={0}
+                              step={1}
+                              transform={(value) => Math.max(0, Math.round(value))}
+                            />
+                          </div>
+                          <div className="flex items-end pt-7">
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              onClick={() => updatePolicies((currentPolicies) => currentPolicies.map((currentPolicy, index) => (
+                                index === policyIndex
+                                  ? { ...currentPolicy, overrides: currentPolicy.overrides.filter((_, indexToKeep) => indexToKeep !== overrideIndex) }
+                                  : currentPolicy
+                              )))}
+                            >
+                              Remove override
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          {policy.overrides[overrideIndex]?.steps.map((_, stepIndex) => (
+                            <div key={`${policy.id}-override-${overrideIndex}-step-${stepIndex}`} className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr_1fr_auto]">
+                              <SelectField name={`allocationPolicies.${policyIndex}.overrides.${overrideIndex}.steps.${stepIndex}.destinationAccountId` as const} label="Destination account">
+                                {destinationAccountOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                              </SelectField>
+                              <SelectField name={`allocationPolicies.${policyIndex}.overrides.${overrideIndex}.steps.${stepIndex}.destinationDeltaSign` as const} label="Direction">
+                                <option value="1">Increase destination</option>
+                                <option value="-1">Reduce destination</option>
+                              </SelectField>
+                              <NumberField name={`allocationPolicies.${policyIndex}.overrides.${overrideIndex}.steps.${stepIndex}.amount` as const} label="Amount" min={0} transform={(value) => Math.max(0, value)} />
+                              <div className="flex items-end">
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  onClick={() => updatePolicies((currentPolicies) => currentPolicies.map((currentPolicy, index) => {
+                                    if (index !== policyIndex) return currentPolicy;
+
+                                    return {
+                                      ...currentPolicy,
+                                      overrides: currentPolicy.overrides.map((currentOverride, currentOverrideIndex) => (
+                                        currentOverrideIndex === overrideIndex
+                                          ? { ...currentOverride, steps: currentOverride.steps.filter((_, indexToKeep) => indexToKeep !== stepIndex) }
+                                          : currentOverride
+                                      )),
+                                    };
+                                  }))}
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => updatePolicies((currentPolicies) => currentPolicies.map((currentPolicy, index) => {
+                            if (index !== policyIndex) return currentPolicy;
+
+                            return {
+                              ...currentPolicy,
+                              overrides: currentPolicy.overrides.map((currentOverride, currentOverrideIndex) => (
+                                currentOverrideIndex === overrideIndex
+                                  ? { ...currentOverride, steps: addOverrideStep(currentOverride.steps, destinationAccountOptions[0]?.value ?? currentPolicy.sourceAccountId) }
+                                  : currentOverride
+                              )),
+                            };
+                          }))}
+                        >
+                          Add override step
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -1,47 +1,33 @@
-import { Suspense, lazy, useDeferredValue, useMemo } from "react";
+import { Suspense, lazy } from "react";
 import { ProjectionActions } from "./components/ProjectionActions";
 import { ProjectionControls } from "./components/ProjectionControls";
-import { project, selectDashboardModel, summarizeEventsByType, summarizeValidationIssues, validateScenario } from "./lib/projection";
+import { LedgerControls } from "./components/LedgerControls";
 import { useProjectionScenario } from "./hooks/useProjectionScenario";
+import { useLedgerCheckpoints } from "./hooks/useLedgerCheckpoints";
+import { useProjectionWorker } from "./hooks/useProjectionWorker";
 
 const ProjectionDashboard = lazy(() => import("./components/ProjectionDashboard"));
 
 export default function App() {
   const {
     scenario,
+    scenarioRevision,
     importError,
-    updateField,
-    updateScenario,
+    syncScenario,
     resetScenario,
     importScenario,
     exportScenario,
   } = useProjectionScenario();
-  const deferredScenario = useDeferredValue(scenario);
-  const validation = useMemo(() => summarizeValidationIssues(validateScenario(scenario)), [scenario]);
 
-  const result = useMemo(() => {
-    if (!validation.isValid) return null;
-
-    try {
-      return project(deferredScenario);
-    } catch {
-      return null;
-    }
-  }, [deferredScenario, validation.isValid]);
-  const dashboard = useMemo(() => (
-    result ? selectDashboardModel(result, deferredScenario) : null
-  ), [result, deferredScenario]);
-  const eventSummary = useMemo(() => (
-    result ? summarizeEventsByType(result.events.all) : []
-  ), [result]);
-  const isProjecting = deferredScenario !== scenario;
+  const { checkpoints, csvError, importCsv, clearCheckpoints } = useLedgerCheckpoints();
+  const { validation, result, dashboard, eventSummary, runtimeError, isProjecting } = useProjectionWorker(scenario, checkpoints);
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 text-slate-900">
+    <div className="min-h-screen bg-slate-50 p-4 text-slate-900 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="space-y-2">
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight">When will net worth reach $1M?</h1>
-          <p className="text-slate-600 max-w-3xl">
+          <p className="max-w-3xl text-slate-500">
             A ledger-style projection where salary, RSUs, 401(k), match, taxes, expenses, debt payments, transfers, and shortfalls are modeled as dated events processed by one projection engine.
           </p>
         </div>
@@ -54,12 +40,19 @@ export default function App() {
           onReset={resetScenario}
         />
 
+        <LedgerControls 
+          checkpointsCount={checkpoints.length} 
+          csvError={csvError} 
+          onImportCsv={importCsv} 
+          onClear={clearCheckpoints} 
+        />
+
         <div className="space-y-8">
           <ProjectionControls
             scenario={scenario}
+            scenarioRevision={scenarioRevision}
             validationIssues={validation.issues}
-            updateField={updateField}
-            updateScenario={updateScenario}
+            onScenarioChange={syncScenario}
           />
           <Suspense
             fallback={
@@ -70,14 +63,14 @@ export default function App() {
           >
             {result && dashboard ? (
               <ProjectionDashboard
-                scenario={deferredScenario}
+                scenario={scenario}
                 result={result}
                 dashboard={dashboard}
                 eventSummary={eventSummary}
               />
             ) : (
-              <div className="lg:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-800 shadow-sm">
-                The scenario could not be projected. Fix the validation issues in the builder and try again.
+              <div className="lg:col-span-2 rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 shadow-sm">
+                {runtimeError ?? "The scenario could not be projected. Fix the validation issues in the builder and try again."}
               </div>
             )}
           </Suspense>

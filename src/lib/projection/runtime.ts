@@ -319,6 +319,31 @@ export function executeProjectionPlan(plan: ProjectionPlan): RuntimeExecution {
       emitShortfallEvents: false,
     });
 
+    const monthCheckpoints = plan.checkpointsByMonth.get(month);
+    let usedCheckpoint = false;
+    if (monthCheckpoints) {
+      Object.entries(monthCheckpoints).forEach(([accountId, actualBalance]) => {
+        const currentBalance = balances[accountId] ?? 0;
+        const delta = actualBalance - currentBalance;
+        
+        if (Math.abs(delta) > 0.01) {
+          balances[accountId] = actualBalance;
+          const operation = createOperation({
+            month,
+            amount: Math.abs(delta),
+            type: "transfer",
+            source: "reality-checkpoint",
+            destination: accountId,
+            taxTreatment: "after-tax",
+            emitEvent: true,
+            effects: [{ accountId, delta }]
+          });
+          generatedEvents.push(operationToEvent(operation));
+        }
+        usedCheckpoint = true;
+      });
+    }
+
     monthStates.push({
       month,
       balances: { ...balances },
@@ -330,7 +355,7 @@ export function executeProjectionPlan(plan: ProjectionPlan): RuntimeExecution {
       requestedAllocation: allocationExecution.requestedAllocation,
       realizedAllocation: allocationExecution.realizedAllocation,
       sweptRemainder: allocationExecution.sweptRemainder,
-      usedAllocationOverride: allocationExecution.usedAllocationOverride,
+      usedAllocationOverride: allocationExecution.usedAllocationOverride || usedCheckpoint,
     });
 
     if (hitTargetMonth === null && calculateNetWorth(balances, plan.scenario.accounts) >= plan.scenario.targetNetWorth) {

@@ -52,6 +52,7 @@ function createProjectionRow({
   return {
     month,
     date: monthLabel(month),
+    isHistorical: false, // Default, overriden later if needed
     netWorth: Math.round(netWorth),
     accountBalances: { ...monthState.balances },
     taxPaid: Math.round(taxPaid),
@@ -66,16 +67,26 @@ function createProjectionRow({
   };
 }
 
-export function project(scenario: ScenarioDefinition): ProjectionResult {
-  const plan = compileProjectionPlan(scenario);
+export function project(scenario: ScenarioDefinition, checkpoints: import("./types").CheckpointEntry[] = []): ProjectionResult {
+  const plan = compileProjectionPlan(scenario, checkpoints);
   const execution = executeProjectionPlan(plan);
-  const monthlyRows = execution.monthStates.map((monthState) =>
-    createProjectionRow({
+  
+  // Calculate last reconciled month based on checkpoints
+  let lastReconciledMonth: number | null = null;
+  if (checkpoints.length > 0) {
+    const maxMonth = Math.max(...Array.from(plan.checkpointsByMonth.keys()));
+    lastReconciledMonth = maxMonth;
+  }
+
+  const monthlyRows = execution.monthStates.map((monthState) => {
+    const row = createProjectionRow({
       monthState,
       externalEvents: plan.externalEvents,
       accounts: plan.scenario.accounts,
-    })
-  );
+    });
+    row.isHistorical = lastReconciledMonth !== null && monthState.month <= lastReconciledMonth;
+    return row;
+  });
   const lastMonth = monthlyRows[monthlyRows.length - 1]?.month ?? 0;
   const sampledRows = monthlyRows.filter((row) => row.month % 3 === 0 || row.month === lastMonth || row.month === execution.hitTargetMonth);
   const firstYear = plan.annualTaxPlan[0];
@@ -121,6 +132,7 @@ export function project(scenario: ScenarioDefinition): ProjectionResult {
     },
     milestones: {
       hitTargetMonth: execution.hitTargetMonth,
+      lastReconciledMonth,
       payoffMonthByLiabilityAccountId,
     },
     totals: {
