@@ -69,7 +69,7 @@ export function parseScenarioData(data: unknown): ScenarioDefinition {
     : data;
 
   if (looksLikeScenarioDefinition(candidate)) {
-    return coerceToTemplate(candidate, DEFAULT_SCENARIO_DEFINITION);
+    return candidate as ScenarioDefinition;
   }
 
   return migrateLegacyScenario(coerceToTemplate(candidate, DEFAULT_SCENARIO));
