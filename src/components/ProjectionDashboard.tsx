@@ -7,8 +7,6 @@ import {
   CartesianGrid,
   Cell,
   Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -84,32 +82,6 @@ export default function ProjectionDashboard({ scenario, result, dashboard, event
           </CardContent>
         </Card>
       </div>
-
-      <Card className="rounded-2xl shadow-sm">
-        <CardContent className="p-5">
-          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-xl font-bold">Net worth over time</h2>
-              <p className="text-sm text-slate-500">The runtime only sees generic account deltas and policies. This chart shows the resulting net worth path.</p>
-            </div>
-            <div className="text-sm text-slate-600">
-              Total tax: {currency.format(result.totals.taxPaid)}
-              <br />Unallocated cash swept: {currency.format(result.totals.uninvestedCash)}
-            </div>
-          </div>
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={result.timeline.sampledRows} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" minTickGap={36} />
-                <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
-                <Tooltip formatter={(value: unknown) => currency.format(Number(value ?? 0))} labelFormatter={(label: unknown) => `Date: ${String(label ?? "")}`} />
-                <Line type="monotone" dataKey="netWorth" stroke="#0f172a" strokeWidth={3} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
 
       {dashboard.assetAccountIds.length > 0 ? (
         <Card className="rounded-2xl shadow-sm">
