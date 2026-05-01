@@ -223,9 +223,13 @@ function resolvePostingAmount(
 
   const sourceBalanceLimit = posting.sourceAccountId === null
     ? Number.POSITIVE_INFINITY
-    : Math.max(0, balances[posting.sourceAccountId] ?? 0);
+    : Math.max(0, (balances[posting.sourceAccountId] ?? 0) - (accountById.get(posting.sourceAccountId)!.minBalance ?? 0));
 
-  return Math.max(0, Math.min(requestedAmount, annualCapRemaining, sourceBalanceLimit));
+  const destBalanceLimit = posting.destinationAccountId === null
+    ? Number.POSITIVE_INFINITY
+    : (accountById.get(posting.destinationAccountId)!.maxBalance ?? Number.POSITIVE_INFINITY) - (balances[posting.destinationAccountId] ?? 0);
+
+  return Math.max(0, Math.min(requestedAmount, annualCapRemaining, sourceBalanceLimit, destBalanceLimit));
 }
 
 function applyPosting(

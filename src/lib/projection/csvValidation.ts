@@ -197,6 +197,18 @@ export function validateCsvScenarioPack(pack: CsvScenarioPack): ScenarioValidati
   validatePostingBaseChains(issues, pack.postings);
   validatePostings(issues, pack.postings, accountIds);
 
+  pack.accounts.forEach((account, index) => {
+    if (account.minBalance !== null && account.maxBalance !== null && account.minBalance > account.maxBalance) {
+      addIssue(
+        issues,
+        "error",
+        "account.balance.bounds",
+        `minBalance (${account.minBalance}) must not exceed maxBalance (${account.maxBalance}).`,
+        rowPath(CSV_SCENARIO_FILE_NAMES.accounts, index + 2)
+      );
+    }
+  });
+
   return issues;
 }
 

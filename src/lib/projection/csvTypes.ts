@@ -28,6 +28,8 @@ export interface CsvAccount {
   category: string;
   openingBalance: number;
   annualRate: number;
+  minBalance: number | null;
+  maxBalance: number | null;
   color: string | null;
   enabled: boolean;
 }

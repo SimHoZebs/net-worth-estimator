@@ -4,11 +4,11 @@ import type { CsvScenarioFileContents } from "./projection";
 
 const validCsvFiles: CsvScenarioFileContents = {
   accounts: [
-    "id,label,category,openingBalance,annualRate,color,enabled",
-    "checking,Checking,checking,15000,0.01,#0f172a,true",
-    "k401,401(k),401k,120000,0.07,#2563eb,true",
-    "brokerage,Brokerage,brokerage,80000,0.07,#16a34a,true",
-    "student_loan,Student Loan,loan,-12000,0.05,#dc2626,true",
+    "id,label,category,openingBalance,annualRate,minBalance,maxBalance,color,enabled",
+    "checking,Checking,checking,15000,0.01,,,#0f172a,true",
+    "k401,401(k),401k,120000,0.07,,,#2563eb,true",
+    "brokerage,Brokerage,brokerage,80000,0.07,,,#16a34a,true",
+    "student_loan,Student Loan,loan,-12000,0.05,,0,#dc2626,true",
   ].join("\n"),
   checkpoints: [
     "Date,AccountId,Balance",

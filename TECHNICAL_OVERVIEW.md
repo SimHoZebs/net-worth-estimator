@@ -41,6 +41,27 @@ The application loads canonical CSV files from the repo, validates them, project
 - `annualCap` is generic and enforced per calendar year.
 - Rows on the same date are applied by `priority`, then file order.
 
+### Checkpoint Semantics
+
+- Checkpoints are absolute balance snapshots, not adjustments. Each checkpoint row directly sets an account's balance to the given value — it does not add to or subtract from the current balance.
+- Multiple checkpoints for different accounts on the same date are applied together to form a single historical row.
+- Historical data exists only on exact checkpoint dates; there is no interpolation between checkpoints.
+
+### Engine Design Philosophy
+
+The projection engine in `src/lib/projection/csvProject.ts` is intentionally clueless about the specific meaning of accounts and postings. It processes every account, checkpoint, and posting through the same generic pipeline — there are no special cases for particular IDs, categories, or labels:
+
+- **No name-based branching**: The engine never inspects `account.id`, `account.category`, `posting.id`, or `posting.label` to choose different behavior. All accounts compound identically; all postings resolve the same way.
+- **Classification is structural, not semantic**: Whether a posting is an inflow, outflow, or transfer is derived entirely from which of `sourceAccountId` / `destinationAccountId` is null — never from interpreting labels or categories.
+- **The `enabled` flag is the only gate**: Disabled accounts are excluded from net worth; disabled postings are skipped. No other property controls engine behavior.
+- **`priority` is just ordering**: The engine sorts by ascending priority; it does not interpret specific priority values.
+- **Account `category` is a UI concern only**: The engine stores and passes through `category` but never inspects or branches on it.
+- **Pure function**: The engine is a deterministic pure function — given the same pack, settings, and what-if state, it always produces identical results. No randomness, no side effects, no external API calls.
+
+The boundary is at `CsvScenarioPack`: the CSV parsing and validation layer (`csvSchema.ts`, `csvValidation.ts`) handles domain-specific concerns (file names, column headers, cross-reference integrity). The engine receives validated, generic data and operates uniformly on it. The Zod schemas in `csvSchema.ts` are forward-compatible — they may validate CSV fields that are not yet wired into the engine types, and the engine simply ignores them.
+
+**Avoid adding special-case logic to the engine unless absolutely unavoidable.** If a feature seems to require engine-level branching, first consider whether it can be expressed within the existing model — additional fields on existing types, new `amountMode` values, or UI-level interpretation of projection outputs. Likewise, the what-if system is intentionally shallow (multiplier overrides only, session-only, never mutating canonical data) to keep the model simple and predictable.
+
 ## 4. UI Structure and Components
 
 - `App.tsx`: orchestrates pack loading, validation, overrides, and worker-based projection
