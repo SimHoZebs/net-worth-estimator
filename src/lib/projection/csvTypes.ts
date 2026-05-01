@@ -1,10 +1,9 @@
-export const CSV_SCENARIO_MODEL_VERSION = 3 as const;
+export const CSV_SCENARIO_MODEL_VERSION = 5 as const;
 
 export const CSV_SCENARIO_REPO_PATH = "public/scenario";
 export const CSV_SCENARIO_PUBLIC_PATH = "/scenario";
 
 export const CSV_SCENARIO_FILE_NAMES = {
-  scenario: "scenario.csv",
   accounts: "accounts.csv",
   checkpoints: "checkpoints.csv",
   budgetItems: "budget_items.csv",
@@ -15,25 +14,22 @@ export const CSV_SCENARIO_FILE_NAMES = {
 export type CsvScenarioCollectionKey = keyof typeof CSV_SCENARIO_FILE_NAMES;
 export type CsvScenarioFileName = (typeof CSV_SCENARIO_FILE_NAMES)[CsvScenarioCollectionKey];
 
-export type MonthLabel = string;
-export type AccountBalanceType = "asset" | "liability";
+export type IsoDate = string;
 export type BudgetDirection = "in" | "out";
 export type BudgetAmountMode = "fixed" | "percent_of_parent";
 export type ContributionCalculationMode = "fixed" | "percent_of_capacity" | "percent_of_budget_item";
 export type TransferAmountMode = "fixed";
 export type ContributionPlanOverrideMode = "amount" | "multiplier";
 
-export interface CsvScenarioSettings {
-  name: string;
-  startDate: MonthLabel;
-  horizonMonths: number;
+export interface ProjectionRuntimeSettings {
   targetNetWorth: number;
+  fallbackProjectionStartDate: IsoDate;
+  horizonYears: number;
 }
 
 export interface CsvAccount {
   id: string;
   label: string;
-  balanceType: AccountBalanceType;
   category: string;
   openingBalance: number;
   annualRate: number;
@@ -42,7 +38,7 @@ export interface CsvAccount {
 }
 
 export interface CsvCheckpoint {
-  Date: string;
+  Date: IsoDate;
   AccountId: string;
   Balance: number;
 }
@@ -55,9 +51,8 @@ export interface CsvBudgetItem {
   amountMode: BudgetAmountMode;
   amount: number;
   annualGrowthRate: number;
-  startMonth: MonthLabel;
-  endMonth: MonthLabel | null;
-  frequencyMonths: number;
+  startDate: IsoDate;
+  endDate: IsoDate | null;
   category: string;
   enabled: boolean;
 }
@@ -69,9 +64,8 @@ export interface CsvContributionPlan {
   calculationMode: ContributionCalculationMode;
   baseBudgetItemId: string | null;
   amount: number;
-  startMonth: MonthLabel;
-  endMonth: MonthLabel | null;
-  frequencyMonths: number;
+  startDate: IsoDate;
+  endDate: IsoDate | null;
   annualCap: number | null;
   priority: number;
   enabled: boolean;
@@ -84,16 +78,14 @@ export interface CsvTransfer {
   destinationAccountId: string;
   amountMode: TransferAmountMode;
   amount: number;
-  startMonth: MonthLabel;
-  endMonth: MonthLabel | null;
-  frequencyMonths: number;
+  startDate: IsoDate;
+  endDate: IsoDate | null;
   enabled: boolean;
 }
 
 export interface CsvScenarioPack {
   version: typeof CSV_SCENARIO_MODEL_VERSION;
   sourcePath: string;
-  scenario: CsvScenarioSettings;
   accounts: CsvAccount[];
   checkpoints: CsvCheckpoint[];
   budgetItems: CsvBudgetItem[];
@@ -102,7 +94,6 @@ export interface CsvScenarioPack {
 }
 
 export interface CsvScenarioFileContents {
-  scenario: string;
   accounts: string;
   checkpoints: string;
   budgetItems: string;
@@ -121,12 +112,12 @@ export interface CsvScenarioWhatIfState {
 }
 
 export interface CsvProjectionRow {
-  monthIndex: number;
-  monthLabel: MonthLabel;
+  date: IsoDate;
   isHistorical: boolean;
   netWorth: number;
   accountBalances: Record<string, number>;
-  investableCapacity: number;
+  availableContributionCapacity: number;
+  budgetCashflowAmount: number;
   requestedContributionAmount: number;
   realizedContributionAmount: number;
   transferAmount: number;
@@ -138,14 +129,12 @@ export interface CsvProjectionRow {
 export interface CsvProjectionAccountSummary {
   accountId: string;
   label: string;
-  balanceType: AccountBalanceType;
   color: string | null;
   annualRate: number;
   enabled: boolean;
   openingBalance: number;
   startingBalance: number;
   endingBalance: number;
-  signedEndingBalance: number;
 }
 
 export interface CsvProjectionContributionSummary {
@@ -162,25 +151,24 @@ export interface CsvProjectionContributionSummary {
 
 export interface CsvProjectionResult {
   timeline: {
-    monthlyRows: CsvProjectionRow[];
+    rows: CsvProjectionRow[];
     sampledRows: CsvProjectionRow[];
   };
   accountSummaries: CsvProjectionAccountSummary[];
   contributionSummaries: CsvProjectionContributionSummary[];
   totals: {
+    budgetCashflowAmount: number;
     requestedContributions: number;
     realizedContributions: number;
     transferAmount: number;
     growthNetWorthImpact: number;
-    averageProjectedInvestableCapacity: number;
-    latestProjectedInvestableCapacity: number;
+    latestAvailableContributionCapacity: number;
   };
   milestones: {
-    hitTargetMonthIndex: number | null;
-    hitTargetMonthLabel: MonthLabel | null;
-    latestCheckpointDate: string | null;
-    latestCheckpointMonthLabel: MonthLabel | null;
-    latestHistoricalMonthLabel: MonthLabel | null;
+    hitTargetDate: IsoDate | null;
+    latestCheckpointDate: IsoDate | null;
+    latestHistoricalDate: IsoDate | null;
+    projectionStartDate: IsoDate;
   };
   summary: {
     currentNetWorth: number;

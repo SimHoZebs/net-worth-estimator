@@ -5,18 +5,19 @@ Single-page React app for inspecting and projecting net worth from a repo-backed
 The current product model is intentionally simple:
 
 - Historical net worth comes from account balance checkpoints.
-- Future net worth comes from tracked account balances, contribution plans, transfers, and account growth.
-- Budget items affect investable capacity only. They do not directly mutate balances.
+- Future net worth comes from tracked signed account balances, dated contribution plans, dated transfers, and daily-compounded account growth between event dates.
+- Debt is represented by negative account balances rather than a special liability type.
+- Budget items create dated contribution-capacity cashflows only. They do not directly mutate tracked balances.
 - Canonical data lives in `public/scenario/*.csv`.
+- Runtime projection settings live in the app, not in CSV: target net worth is editable in-session, horizon is fixed at 50 years, and projection starts from the latest checkpoint date or today if none exist.
 - The UI is read-only for persistent data and supports temporary session-only what-if overrides for contribution plans.
 
-The phased redesign spec remains in `REDESIGN_PLAN.md` as a reference for the breaking rewrite that led to the current CSV-backed model.
+The current product-model summary and cleanup notes live in `REDESIGN_PLAN.md`.
 
 ## CSV Pack
 
 The app expects these files under `public/scenario/`:
 
-- `scenario.csv`
 - `accounts.csv`
 - `checkpoints.csv`
 - `budget_items.csv`

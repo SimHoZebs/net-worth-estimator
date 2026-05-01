@@ -1,73 +1,31 @@
-# Phased Redesign Plan
+# CSV Product Model
 
-This document describes the planned rewrite of the net worth estimator into a much simpler system that can be implemented over multiple sessions.
+Status: implemented.
 
-This is intentionally a breaking redesign.
+This file now describes the simplified product model that replaced the old module-based architecture.
 
-- No backward compatibility is required.
-- No migration from the current scenario model is required.
-- Existing module, policy, and tax-specific workflows can be deleted.
-- The new CSV pack becomes the source of truth.
+## Product Rules
 
-## Goals
-
-- Track historical and projected net worth from account balances.
-- Separate budget math from net worth math.
-- Treat subscriptions, rent, taxes, and similar spending as capacity inputs, not direct projection events.
-- Load canonical data from repo-backed CSV files.
-- Keep the UI read-only for persistent data, but allow temporary slider-based what-if overrides for contribution plans.
-- Remove special-case concepts like singleton salary modules, automatic cash sweeps, and module plugins.
-
-## Non-Goals
-
-- Preserving the current `v2` JSON scenario format.
-- Keeping the current module compiler architecture.
-- Keeping built-in derived tax planning.
-- Maintaining old dashboards centered on retirement/equity/tax module families.
-
-## Target Model
-
-The redesign uses six core concepts.
-
-1. `scenario`
-General settings such as start month, horizon, and target net worth.
-
-2. `accounts`
-Tracked balances that count toward net worth now or in the future.
-
-3. `checkpoints`
-Historical balance truth for accounts.
-
-4. `budget_items`
-Income and spending assumptions used only to compute investable capacity.
-
-5. `contribution_plans`
-Planned contributions into tracked accounts.
-
-6. `transfers`
-Optional moves between tracked accounts.
-
-### Core Rule
-
-- `budget_items` do not mutate account balances.
-- `contribution_plans` and `transfers` do mutate account balances.
-- `checkpoints` establish historical balances.
-- `accounts` plus contributions, transfers, and growth produce the future projection.
+- Historical net worth comes from account balance checkpoints.
+- Future net worth comes from tracked account balances, dated contribution plans, dated transfers, and account growth between exact event dates.
+- `budget_items` affect dated contribution capacity only.
+- `budget_items` do not directly mutate tracked balances.
+- Canonical persistent data lives in repo-backed CSV files under `public/scenario/`.
+- The UI is read-only for persistent data.
+- Runtime target net worth is session-only and editable in the UI.
+- Projection horizon is fixed at 50 years.
+- Future projection starts from the latest checkpoint date, or today if no checkpoints exist.
+- Temporary what-if overrides are session-only and apply only to contribution plans.
 
 ## Canonical CSV Pack
 
-The source of truth should live under a fixed repo path such as `public/scenario/`.
+The app loads these files from `public/scenario/`:
 
-### `scenario.csv`
-
-One-row file.
-
-Fields:
-
-- `name`
-- `startDate`
-- `horizonMonths`
-- `targetNetWorth`
+- `accounts.csv`
+- `checkpoints.csv`
+- `budget_items.csv`
+- `contribution_plans.csv`
+- `transfers.csv`
 
 ### `accounts.csv`
 
@@ -75,7 +33,6 @@ Fields:
 
 - `id`
 - `label`
-- `balanceType`
 - `category`
 - `openingBalance`
 - `annualRate`
@@ -84,9 +41,9 @@ Fields:
 
 Notes:
 
-- `balanceType` is `asset` or `liability`.
-- `category` is informational and can hold values like `checking`, `401k`, `roth_ira`, `brokerage`, `rsu`, `loan`, `crypto`, etc.
-- Net worth should be computed from all enabled accounts without hardcoding a special `cash` account.
+- `openingBalance` is signed. Positive balances help net worth and negative balances reduce it.
+- All enabled accounts participate in net worth.
+- No account ID is treated specially by name.
 
 ### `checkpoints.csv`
 
@@ -98,8 +55,8 @@ Fields:
 
 Notes:
 
-- This stays close to the current checkpoint CSV shape.
-- Multiple checkpoint rows for the same account and month should use the latest date in that month.
+- Multiple rows on the same date are applied in file order.
+- Historical rows are shown only on exact checkpoint dates.
 
 ### `budget_items.csv`
 
@@ -112,9 +69,8 @@ Fields:
 - `amountMode`
 - `amount`
 - `annualGrowthRate`
-- `startMonth`
-- `endMonth`
-- `frequencyMonths`
+- `startDate`
+- `endDate`
 - `category`
 - `enabled`
 
@@ -122,8 +78,7 @@ Notes:
 
 - `direction` is `in` or `out`.
 - `amountMode` is `fixed` or `percent_of_parent`.
-- `parentBudgetItemId` supports rows like `401k = 4% of salary` or `tax = 22% of salary`.
-- These rows do not directly change tracked balances.
+- These rows create dated contribution-capacity cashflows only.
 
 ### `contribution_plans.csv`
 
@@ -135,9 +90,8 @@ Fields:
 - `calculationMode`
 - `baseBudgetItemId`
 - `amount`
-- `startMonth`
-- `endMonth`
-- `frequencyMonths`
+- `startDate`
+- `endDate`
 - `annualCap`
 - `priority`
 - `enabled`
@@ -145,9 +99,8 @@ Fields:
 Notes:
 
 - `calculationMode` is `fixed`, `percent_of_capacity`, or `percent_of_budget_item`.
-- `baseBudgetItemId` is used only when `calculationMode` depends on a specific budget item.
-- `priority` determines which plans consume limited capacity first.
-- These rows are the main future-facing projection inputs.
+- Contributions are scheduled monthly from `startDate` using that day of month.
+- Contributions are applied in priority order and clamped by remaining capacity, annual caps, and schedule.
 
 ### `transfers.csv`
 
@@ -159,317 +112,72 @@ Fields:
 - `destinationAccountId`
 - `amountMode`
 - `amount`
-- `startMonth`
-- `endMonth`
-- `frequencyMonths`
+- `startDate`
+- `endDate`
 - `enabled`
 
 Notes:
 
-- `amountMode` can start as `fixed` only.
-- Transfers are optional and should be kept simpler than contribution plans.
+- `amountMode` is currently `fixed`.
+- Transfers are scheduled monthly from `startDate` using that day of month.
+- Transfers move balances between tracked accounts, do not depend on budget capacity, and are clamped by the source account's available positive balance.
 
 ## Projection Semantics
 
 ### Historical View
 
-- Historical net worth is built from checkpointed account balances.
-- Missing months can carry forward the last known balance for each account.
-- No synthetic historical expense or income replay is needed.
+- Historical rows are built directly from checkpoint dates.
 
 ### Future View
 
-For each projection month:
+For each projected event date:
 
-1. Start from the prior month balances or the latest checkpoint baseline.
-2. Compute `investableCapacity` from `budget_items`.
-3. Compute requested contributions from `contribution_plans`.
-4. Apply priority ordering and clamp contributions by:
-   - remaining capacity
-   - annual caps
-   - schedule
-5. Apply realized contributions to target accounts.
-6. Apply transfers.
-7. Apply account growth or interest.
-8. Compute month-end net worth from enabled accounts.
+1. Start from the prior checkpoint or prior projected event.
+2. Accrue account growth or interest from `annualRate` using daily compounding over the exact elapsed days.
+3. Apply dated `budget_items` cashflows to available contribution capacity.
+4. Compute requested contributions from `contribution_plans`.
+5. Clamp contributions by remaining capacity, annual caps, and schedule.
+6. Apply realized contributions to target accounts.
+7. Apply transfers.
+8. Compute end-of-date net worth from enabled accounts.
 
 ### Net Worth Formula
 
-- Assets add to net worth.
-- Liabilities subtract from net worth.
-- No account ID should be excluded by name.
+- Net worth is the sum of enabled account balances.
+- Positive balances increase net worth and negative balances reduce it.
 
 ## UI Model
 
-Persistent source of truth:
-
-- CSV files in the repo.
-
-UI behavior:
-
-- Read-only tables for accounts, budget items, contribution plans, transfers, and checkpoints.
-- Validation errors surfaced in the app.
-- Sliders for temporary what-if overrides on contribution plans.
-- No persistent in-app editing in CSV-pack mode.
-
-Suggested slider behavior:
-
-- A slider can override a contribution plan's `amount` or a multiplier on top of it.
-- Overrides are session-only and should be clearly labeled as temporary.
-
-## What Gets Deleted
-
-The redesign should aggressively remove current architecture that no longer matches the product model.
-
-Delete or replace:
-
-- module plugin registry
-- employment income module
-- retirement plan module
-- equity grant series module
-- tax marker module
-- allocation policies
-- cash shortfall and sweep logic
-- hardcoded `cash`-specific rules
-- localStorage scenario persistence as the canonical source
-
-High-impact files to replace or delete:
-
-- `src/lib/projection/types.ts`
-- `src/lib/projection/schema.ts`
-- `src/lib/projection/validation.ts`
-- `src/lib/projection/planCompiler.ts`
-- `src/lib/projection/taxes.ts`
-- `src/lib/projection/runtime.ts`
-- `src/lib/projection/project.ts`
-- `src/lib/projection/selectors.ts`
-- `src/lib/projection/modules/*`
-- `src/components/builder/ModulesEditor.tsx`
-- `src/components/builder/PoliciesEditor.tsx`
-- `src/stores/useProjectionStore.ts`
-
-## Phases
-
-Each phase is intended to be a reasonable standalone session or group of sessions.
-
-### Phase 1: Freeze the New Shape
-
-Goal:
-
-- Lock the new domain model and stop extending the old one.
-
-Tasks:
-
-- Add this plan doc.
-- Define the exact CSV schemas and TypeScript interfaces for:
-  - scenario
-  - accounts
-  - checkpoints
-  - budget items
-  - contribution plans
-  - transfers
-- Decide the canonical repo path for the CSV pack.
-- Decide slider override shape in state.
-
-Likely files:
-
-- `REDESIGN_PLAN.md`
-- new CSV schema/types files under `src/lib/projection/`
-
-Done when:
-
-- There is one agreed source of truth for the new model.
-- No open questions remain about CSV columns or projection semantics.
-
-### Phase 2: Build CSV Loading and Validation
-
-Goal:
-
-- Make the app load the new CSV pack directly from the repo.
-
-Tasks:
-
-- Add repo-backed CSV loading from `public/scenario/`.
-- Create parsers for each CSV file.
-- Create validation for:
-  - duplicate IDs
-  - missing account references
-  - missing parent budget item references
-  - invalid `balanceType`
-  - invalid schedule values
-  - invalid contribution targets
-  - circular `parentBudgetItemId` chains
-- Show validation errors in the UI before projection.
-
-Likely files:
-
-- new CSV loader/parsing modules in `src/lib/projection/`
-- `src/App.tsx`
-- `src/stores/useProjectionStore.ts`
-- `src/components/builder/ScenarioValidationPanel.tsx`
-
-Done when:
-
-- Editing CSV files and refreshing the app changes the loaded scenario.
-- The app can reject invalid CSV packs with useful errors.
-
-### Phase 3: Replace the Projection Engine
-
-Goal:
-
-- Remove the module compiler and switch to a direct account-plus-capacity executor.
-
-Tasks:
-
-- Remove the current module-based compile stages.
-- Implement direct month expansion for budget items, contribution plans, and transfers.
-- Implement investable-capacity calculation from budget items.
-- Implement contribution clamping by capacity, schedule, and annual cap.
-- Apply contributions directly to target account balances.
-- Apply transfers.
-- Apply account growth.
-- Apply checkpoints to establish history and future starting state.
-- Compute net worth from all enabled accounts.
-
-Likely files:
-
-- `src/lib/projection/runtime.ts`
-- `src/lib/projection/project.ts`
-- `src/lib/projection/types.ts`
-- `src/lib/projection/schema.ts`
-- delete or replace `src/lib/projection/planCompiler.ts`
-- delete `src/lib/projection/taxes.ts`
-- delete `src/lib/projection/modules/*`
-
-Done when:
-
-- The new engine runs without any dependency on module plugins or allocation policies.
-- Historical and projected net worth come entirely from accounts, checkpoints, contributions, transfers, and growth.
-
-### Phase 4: Simplify the UI Around the New Model
-
-Goal:
-
-- Replace the builder with a read-only inspector plus what-if controls.
-
-Tasks:
-
-- Remove module and policy editors.
-- Add read-only views for:
-  - accounts
-  - budget items
-  - contribution plans
-  - transfers
-  - checkpoints
-- Add temporary slider overrides for contribution plans.
-- Clearly label CSV-backed data as read-only.
-- Remove UI language that refers to modules compiling into runtime operations.
-
-Likely files:
-
-- `src/components/ProjectionControls.tsx`
-- `src/components/builder/AccountsEditor.tsx`
-- delete `src/components/builder/ModulesEditor.tsx`
-- delete `src/components/builder/PoliciesEditor.tsx`
-- `src/components/builder/ScenarioSettingsEditor.tsx`
-
-Done when:
-
-- The UI matches the new mental model.
-- A user can inspect the CSV-backed data and run temporary what-if contribution scenarios without editing persistent data in the browser.
-
-### Phase 5: Rewrite the Dashboard for the New Product
-
-Goal:
-
-- Show net worth history, projections, and contribution capacity instead of module-family summaries.
-
-Tasks:
-
-- Remove dashboard sections centered on retirement modules, equity modules, allocation policies, and tax plans.
-- Add summaries for:
-  - current net worth
-  - projected net worth
-  - latest checkpoint date
-  - monthly investable capacity
-  - requested vs realized contributions
-- Keep account balance charts and ending balance summaries.
-- Add a contribution utilization view by target account.
-
-Likely files:
-
-- `src/lib/projection/selectors.ts`
-- `src/components/ProjectionDashboard.tsx`
-- `src/lib/projection/types.ts`
-
-Done when:
-
-- The dashboard explains the new system without referring to removed concepts.
-
-### Phase 6: Remove Legacy Code and Old Tests
-
-Goal:
-
-- Finish the break from the old product model.
-
-Tasks:
-
-- Delete legacy module definitions and related tests.
-- Delete legacy default scenario assembly.
-- Delete JSON scenario persistence logic that no longer applies.
-- Rewrite tests to cover:
-  - CSV loading
-  - validation
-  - checkpoint history
-  - contribution capacity math
-  - contribution clamping
-  - transfers
-  - net worth computation
-
-Likely files:
-
-- `src/lib/projection.test.ts`
-- `src/lib/projection.runtime.test.ts`
-- `src/lib/projection.validation.test.ts`
-- `src/lib/projection.schema.test.ts`
-- `src/lib/projection.selectors.test.ts`
-- old scenario default files
-
-Done when:
-
-- There are no remaining product-critical references to modules, policies, or the old scenario shape.
-
-## Recommended Session Order
-
-Suggested implementation order across sessions:
-
-1. Phase 1
-2. Phase 2
-3. Phase 3
-4. Phase 4
-5. Phase 5
-6. Phase 6
-
-If time is tight, the best milestone cut points are:
-
-- after Phase 2: CSV pack loads and validates
-- after Phase 3: new engine works headlessly
-- after Phase 4: app is usable end-to-end
-
-## Guardrails During the Rewrite
-
-- Do not add compatibility shims for the old module system.
-- Do not preserve the old builder unless needed temporarily for bootstrapping tests.
-- Do not hardcode a `cash` account.
-- Do not reintroduce automatic tax modeling in v1.
-- Do not let budget items directly mutate net worth accounts.
-
-## First Implementation Target
-
-The best next coding session should focus on Phase 1 and the start of Phase 2:
-
-- define the new types
-- define the CSV schemas
-- add the repo-backed CSV loader scaffolding
-
-That work will unblock every later phase without dragging old architecture forward.
+- Read-only inspector tables for all CSV-backed data.
+- Runtime settings summary for projection start, fallback start, target net worth, and horizon.
+- Validation errors surfaced directly in the app.
+- Session-only slider overrides for contribution plans.
+- Projection dashboard focused on net worth, account balances, dated event rows, contribution capacity, and contribution utilization.
+
+## Current Code Layout
+
+- `src/App.tsx`: app shell
+- `src/hooks/useCsvScenarioPack.ts`: CSV loading and reload state
+- `src/hooks/useCsvWhatIfState.ts`: session-only contribution override state
+- `src/hooks/useCsvProjectionWorker.ts`: worker-backed projection execution
+- `src/components/CsvScenarioInspector.tsx`: read-only data inspection
+- `src/components/CsvContributionWhatIfControls.tsx`: temporary slider overrides
+- `src/components/CsvProjectionDashboard.tsx`: projection dashboard
+- `src/components/ScenarioValidationPanel.tsx`: validation issue display
+- `src/lib/projection/`: CSV schema, parsing, validation, projection logic, and shared types
+
+## Removed Architecture
+
+The old module/plugin/compiler/allocation-policy/localStorage product model has been removed.
+
+- No JSON scenario persistence.
+- No module compiler.
+- No allocation policy system.
+- No special-case `cash` account logic.
+- No tax-specific runtime layer.
+- No in-app persistent editor for scenario data.
+
+## Remaining Optional Work
+
+- Add exact amount override UI on top of the existing override engine support.
+- Reduce bundle size if the build warning becomes important.

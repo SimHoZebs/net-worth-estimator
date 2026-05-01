@@ -54,7 +54,7 @@ export function useCsvScenarioPack() {
       setState({
         pack: null,
         issues: [],
-        loadError: error instanceof Error ? error.message : "Could not load scenario CSV files.",
+        loadError: error instanceof Error ? error.message : "Could not load CSV data files.",
         isLoading: false,
         loadedAt: null,
       });

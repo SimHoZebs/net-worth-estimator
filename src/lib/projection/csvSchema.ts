@@ -4,7 +4,6 @@ import type {
   CsvBudgetItem,
   CsvCheckpoint,
   CsvContributionPlan,
-  CsvScenarioSettings,
   CsvTransfer,
 } from "./csvTypes";
 
@@ -71,18 +70,13 @@ const csvBoolean = z.preprocess(parseBoolean, z.boolean());
 const trimmedString = z.string().trim().min(1);
 const nullableTrimmedString = z.preprocess(parseNullableString, z.string().trim().min(1).nullable());
 
-export const monthLabelSchema = z
-  .string()
-  .trim()
-  .regex(/^\d{4}-(0[1-9]|1[0-2])$/u, "Expected YYYY-MM month label.");
-
 export const csvDateSchema = z
   .string()
   .trim()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/u, "Expected YYYY-MM-DD date.")
   .refine((value) => !Number.isNaN(new Date(value).getTime()), "Expected a valid date.");
 
-export const csvScenarioHeaders = ["name", "startDate", "horizonMonths", "targetNetWorth"] as const;
-export const csvAccountsHeaders = ["id", "label", "balanceType", "category", "openingBalance", "annualRate", "color", "enabled"] as const;
+export const csvAccountsHeaders = ["id", "label", "category", "openingBalance", "annualRate", "color", "enabled"] as const;
 export const csvCheckpointsHeaders = ["Date", "AccountId", "Balance"] as const;
 export const csvBudgetItemsHeaders = [
   "id",
@@ -92,9 +86,8 @@ export const csvBudgetItemsHeaders = [
   "amountMode",
   "amount",
   "annualGrowthRate",
-  "startMonth",
-  "endMonth",
-  "frequencyMonths",
+  "startDate",
+  "endDate",
   "category",
   "enabled",
 ] as const;
@@ -105,9 +98,8 @@ export const csvContributionPlansHeaders = [
   "calculationMode",
   "baseBudgetItemId",
   "amount",
-  "startMonth",
-  "endMonth",
-  "frequencyMonths",
+  "startDate",
+  "endDate",
   "annualCap",
   "priority",
   "enabled",
@@ -119,25 +111,16 @@ export const csvTransfersHeaders = [
   "destinationAccountId",
   "amountMode",
   "amount",
-  "startMonth",
-  "endMonth",
-  "frequencyMonths",
+  "startDate",
+  "endDate",
   "enabled",
 ] as const;
-
-export const csvScenarioSettingsSchema = z.object({
-  name: trimmedString,
-  startDate: monthLabelSchema,
-  horizonMonths: positiveInteger,
-  targetNetWorth: nonNegativeNumber,
-}) satisfies z.ZodType<CsvScenarioSettings>;
 
 export const csvAccountSchema = z.object({
   id: trimmedString,
   label: trimmedString,
-  balanceType: z.enum(["asset", "liability"]),
   category: trimmedString,
-  openingBalance: nonNegativeNumber,
+  openingBalance: finiteNumber,
   annualRate: finiteNumber,
   color: nullableTrimmedString,
   enabled: csvBoolean,
@@ -146,7 +129,7 @@ export const csvAccountSchema = z.object({
 export const csvCheckpointSchema = z.object({
   Date: csvDateSchema,
   AccountId: trimmedString,
-  Balance: nonNegativeNumber,
+  Balance: finiteNumber,
 }) satisfies z.ZodType<CsvCheckpoint>;
 
 export const csvBudgetItemSchema = z.object({
@@ -157,9 +140,8 @@ export const csvBudgetItemSchema = z.object({
   amountMode: z.enum(["fixed", "percent_of_parent"]),
   amount: nonNegativeNumber,
   annualGrowthRate: finiteNumber,
-  startMonth: monthLabelSchema,
-  endMonth: z.preprocess(parseNullableString, monthLabelSchema.nullable()),
-  frequencyMonths: positiveInteger,
+  startDate: csvDateSchema,
+  endDate: z.preprocess(parseNullableString, csvDateSchema.nullable()),
   category: trimmedString,
   enabled: csvBoolean,
 }) satisfies z.ZodType<CsvBudgetItem>;
@@ -171,9 +153,8 @@ export const csvContributionPlanSchema = z.object({
   calculationMode: z.enum(["fixed", "percent_of_capacity", "percent_of_budget_item"]),
   baseBudgetItemId: nullableTrimmedString,
   amount: nonNegativeNumber,
-  startMonth: monthLabelSchema,
-  endMonth: z.preprocess(parseNullableString, monthLabelSchema.nullable()),
-  frequencyMonths: positiveInteger,
+  startDate: csvDateSchema,
+  endDate: z.preprocess(parseNullableString, csvDateSchema.nullable()),
   annualCap: nullableNonNegativeNumber,
   priority: positiveInteger,
   enabled: csvBoolean,
@@ -186,8 +167,7 @@ export const csvTransferSchema = z.object({
   destinationAccountId: trimmedString,
   amountMode: z.enum(["fixed"]),
   amount: nonNegativeNumber,
-  startMonth: monthLabelSchema,
-  endMonth: z.preprocess(parseNullableString, monthLabelSchema.nullable()),
-  frequencyMonths: positiveInteger,
+  startDate: csvDateSchema,
+  endDate: z.preprocess(parseNullableString, csvDateSchema.nullable()),
   enabled: csvBoolean,
 }) satisfies z.ZodType<CsvTransfer>;

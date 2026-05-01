@@ -9,8 +9,6 @@ import {
   csvCheckpointsHeaders,
   csvContributionPlanSchema,
   csvContributionPlansHeaders,
-  csvScenarioSettingsSchema,
-  csvScenarioHeaders,
   csvTransferSchema,
   csvTransfersHeaders,
 } from "./csvSchema";
@@ -25,7 +23,6 @@ import {
   type CsvScenarioCollectionKey,
   type CsvScenarioFileContents,
   type CsvScenarioPack,
-  type CsvScenarioSettings,
   type CsvTransfer,
 } from "./csvTypes";
 import { validateCsvScenarioPack } from "./csvValidation";
@@ -118,44 +115,10 @@ function parseRows<TRow>(
   };
 }
 
-function parseScenarioSettings(csvText: string) {
-  const result = parseRows(CSV_SCENARIO_FILE_NAMES.scenario, csvText, csvScenarioHeaders, csvScenarioSettingsSchema);
-  let scenario: CsvScenarioSettings | null = null;
-
-  if (result.rows.length === 0) {
-    addIssue(
-      result.issues,
-      "csv.scenario.rowCount.invalid",
-      "scenario.csv must contain exactly one data row.",
-      [CSV_SCENARIO_FILE_NAMES.scenario]
-    );
-    result.hasFatalIssue = true;
-  } else {
-    scenario = result.rows[0];
-
-    if (result.rows.length > 1) {
-      addIssue(
-        result.issues,
-        "csv.scenario.rowCount.invalid",
-        "scenario.csv must contain exactly one data row.",
-        [CSV_SCENARIO_FILE_NAMES.scenario]
-      );
-      result.hasFatalIssue = true;
-    }
-  }
-
-  return {
-    scenario,
-    issues: result.issues,
-    hasFatalIssue: result.hasFatalIssue,
-  };
-}
-
 export function parseCsvScenarioPack(
   csvFiles: CsvScenarioFileContents,
   options: Pick<CsvScenarioLoadOptions, "basePath"> = {}
 ): CsvScenarioParseResult {
-  const scenarioResult = parseScenarioSettings(csvFiles.scenario);
   const accountsResult = parseRows(CSV_SCENARIO_FILE_NAMES.accounts, csvFiles.accounts, csvAccountsHeaders, csvAccountSchema);
   const checkpointsResult = parseRows(CSV_SCENARIO_FILE_NAMES.checkpoints, csvFiles.checkpoints, csvCheckpointsHeaders, csvCheckpointSchema);
   const budgetItemsResult = parseRows(CSV_SCENARIO_FILE_NAMES.budgetItems, csvFiles.budgetItems, csvBudgetItemsHeaders, csvBudgetItemSchema);
@@ -168,7 +131,6 @@ export function parseCsvScenarioPack(
   const transfersResult = parseRows(CSV_SCENARIO_FILE_NAMES.transfers, csvFiles.transfers, csvTransfersHeaders, csvTransferSchema);
 
   const issues = [
-    ...scenarioResult.issues,
     ...accountsResult.issues,
     ...checkpointsResult.issues,
     ...budgetItemsResult.issues,
@@ -177,13 +139,11 @@ export function parseCsvScenarioPack(
   ];
 
   if (
-    scenarioResult.hasFatalIssue ||
     accountsResult.hasFatalIssue ||
     checkpointsResult.hasFatalIssue ||
     budgetItemsResult.hasFatalIssue ||
     contributionPlansResult.hasFatalIssue ||
-    transfersResult.hasFatalIssue ||
-    scenarioResult.scenario === null
+    transfersResult.hasFatalIssue
   ) {
     return { data: null, issues };
   }
@@ -191,7 +151,6 @@ export function parseCsvScenarioPack(
   const pack: CsvScenarioPack = {
     version: CSV_SCENARIO_MODEL_VERSION,
     sourcePath: options.basePath ?? CSV_SCENARIO_PUBLIC_PATH,
-    scenario: scenarioResult.scenario,
     accounts: accountsResult.rows,
     checkpoints: checkpointsResult.rows,
     budgetItems: budgetItemsResult.rows,
@@ -224,7 +183,6 @@ export async function fetchCsvScenarioFiles(options: CsvScenarioLoadOptions = {}
   const fileMap = Object.fromEntries(entries) as Record<CsvScenarioCollectionKey, string>;
 
   return {
-    scenario: fileMap.scenario,
     accounts: fileMap.accounts,
     checkpoints: fileMap.checkpoints,
     budgetItems: fileMap.budgetItems,

@@ -26,13 +26,8 @@ function rowPath(fileName: string, rowNumber?: number, field?: string): Scenario
   return path;
 }
 
-function monthLabelToIndex(monthLabel: string): number {
-  const [year, month] = monthLabel.split("-").map(Number);
-  return year * 12 + (month - 1);
-}
-
-function hasInvalidDateRange(startMonth: string, endMonth: string | null): boolean {
-  return endMonth !== null && monthLabelToIndex(endMonth) < monthLabelToIndex(startMonth);
+function hasInvalidDateRange(startDate: string, endDate: string | null): boolean {
+  return endDate !== null && Date.parse(endDate) < Date.parse(startDate);
 }
 
 function validateUniqueIds(
@@ -118,13 +113,13 @@ function validateBudgetParentChains(issues: ScenarioValidationIssue[], budgetIte
 
 function validateBudgetSchedules(issues: ScenarioValidationIssue[], budgetItems: CsvBudgetItem[]) {
   budgetItems.forEach((budgetItem, index) => {
-    if (hasInvalidDateRange(budgetItem.startMonth, budgetItem.endMonth)) {
+    if (hasInvalidDateRange(budgetItem.startDate, budgetItem.endDate)) {
       addIssue(
         issues,
         "error",
         "budget.schedule.invalid",
-        "Budget item endMonth must be the same as or later than startMonth.",
-        rowPath(CSV_SCENARIO_FILE_NAMES.budgetItems, index + 2, "endMonth")
+        "Budget item endDate must be the same as or later than startDate.",
+        rowPath(CSV_SCENARIO_FILE_NAMES.budgetItems, index + 2, "endDate")
       );
     }
   });
@@ -149,13 +144,13 @@ function validateContributionPlans(
       );
     }
 
-    if (hasInvalidDateRange(plan.startMonth, plan.endMonth)) {
+    if (hasInvalidDateRange(plan.startDate, plan.endDate)) {
       addIssue(
         issues,
         "error",
         "contribution.schedule.invalid",
-        "Contribution plan endMonth must be the same as or later than startMonth.",
-        rowPath(CSV_SCENARIO_FILE_NAMES.contributionPlans, rowNumber, "endMonth")
+        "Contribution plan endDate must be the same as or later than startDate.",
+        rowPath(CSV_SCENARIO_FILE_NAMES.contributionPlans, rowNumber, "endDate")
       );
     }
 
@@ -215,13 +210,13 @@ function validateTransfers(issues: ScenarioValidationIssue[], transfers: CsvTran
       );
     }
 
-    if (hasInvalidDateRange(transfer.startMonth, transfer.endMonth)) {
+    if (hasInvalidDateRange(transfer.startDate, transfer.endDate)) {
       addIssue(
         issues,
         "error",
         "transfer.schedule.invalid",
-        "Transfer endMonth must be the same as or later than startMonth.",
-        rowPath(CSV_SCENARIO_FILE_NAMES.transfers, rowNumber, "endMonth")
+        "Transfer endDate must be the same as or later than startDate.",
+        rowPath(CSV_SCENARIO_FILE_NAMES.transfers, rowNumber, "endDate")
       );
     }
   });
@@ -231,16 +226,6 @@ export function validateCsvScenarioPack(pack: CsvScenarioPack): ScenarioValidati
   const issues: ScenarioValidationIssue[] = [];
   const accountIds = new Set(pack.accounts.map((account) => account.id));
   const budgetItemIds = new Set(pack.budgetItems.map((budgetItem) => budgetItem.id));
-
-  if (pack.scenario.horizonMonths < 1) {
-    addIssue(
-      issues,
-      "error",
-      "scenario.horizon.invalid",
-      "Scenario horizonMonths must be at least 1.",
-      rowPath(CSV_SCENARIO_FILE_NAMES.scenario, 2, "horizonMonths")
-    );
-  }
 
   validateUniqueIds(issues, CSV_SCENARIO_FILE_NAMES.accounts, "account.id", pack.accounts);
   validateUniqueIds(issues, CSV_SCENARIO_FILE_NAMES.budgetItems, "budget.id", pack.budgetItems);

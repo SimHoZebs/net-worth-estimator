@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { CsvProjectionResult, CsvScenarioPack, CsvScenarioWhatIfState } from "@/lib/projection";
+import type { CsvProjectionResult, CsvScenarioPack, CsvScenarioWhatIfState, ProjectionRuntimeSettings } from "@/lib/projection";
 
 interface CsvProjectionWorkerState {
   result: CsvProjectionResult | null;
@@ -13,7 +13,12 @@ const initialState: CsvProjectionWorkerState = {
   isProjecting: false,
 };
 
-export function useCsvProjectionWorker(pack: CsvScenarioPack | null, whatIfState: CsvScenarioWhatIfState, enabled: boolean) {
+export function useCsvProjectionWorker(
+  pack: CsvScenarioPack | null,
+  projectionSettings: ProjectionRuntimeSettings,
+  whatIfState: CsvScenarioWhatIfState,
+  enabled: boolean
+) {
   const workerRef = useRef<Worker | null>(null);
   const requestIdRef = useRef(0);
   const [state, setState] = useState<CsvProjectionWorkerState>(initialState);
@@ -68,12 +73,8 @@ export function useCsvProjectionWorker(pack: CsvScenarioPack | null, whatIfState
       isProjecting: true,
     }));
 
-    const timeoutId = setTimeout(() => {
-      workerRef.current?.postMessage({ id, pack, whatIfState });
-    }, 80);
-
-    return () => clearTimeout(timeoutId);
-  }, [enabled, pack, whatIfState]);
+    workerRef.current.postMessage({ id, pack, projectionSettings, whatIfState });
+  }, [enabled, pack, projectionSettings, whatIfState]);
 
   return state;
 }

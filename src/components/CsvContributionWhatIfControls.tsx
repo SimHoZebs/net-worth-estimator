@@ -42,9 +42,9 @@ export function CsvContributionWhatIfControls({
     <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
       <CardHeader>
         <div>
-          <CardTitle>What-If Contribution Overrides</CardTitle>
+          <CardTitle>Adjust contribution levers</CardTitle>
           <CardDescription>
-            Temporary slider overrides apply only in this browser session. They do not modify the CSV pack.
+            Test stronger or weaker funding plans without changing the CSV data files. These overrides are temporary to this browser session.
           </CardDescription>
         </div>
         <CardAction>
@@ -56,8 +56,8 @@ export function CsvContributionWhatIfControls({
       <CardContent className="space-y-4">
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
           {activeOverrideCount > 0
-            ? `${activeOverrideCount} temporary override${activeOverrideCount === 1 ? " is" : "s are"} active.`
-            : "No temporary overrides are active."}
+            ? `${activeOverrideCount} temporary override${activeOverrideCount === 1 ? " is" : "s are"} affecting the projection below.`
+            : "No temporary overrides are active. All plans are running at their CSV-defined levels."}
         </div>
 
         {enabledContributionPlans.length > 0 ? enabledContributionPlans.map((plan) => {

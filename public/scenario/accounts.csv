@@ -1,5 +1,7 @@
-id,label,balanceType,category,openingBalance,annualRate,color,enabled
-checking,Checking,asset,checking,15000,0.01,#0f172a,true
-k401,401(k),asset,401k,120000,0.07,#2563eb,true
-brokerage,Brokerage,asset,brokerage,80000,0.07,#16a34a,true
-student_loan,Student Loan,liability,loan,12000,0.05,#dc2626,true
+id,label,category,openingBalance,annualRate,color,enabled
+checking,Checking,checking,10000,0.00,#0f172a,true
+k401,401(k),401k,0,0.07,#2563eb,true
+brokerage,Brokerage,brokerage,0,0.07,#16a34a,true
+student_loan1,Student Loan 1,loan,-12901,0.05,#dc2626,true
+student_loan2,Student Loan 2,loan,-12303,0.13,#dc2626,true
+student_loan3,Student Loan 3,loan,-12303,0.15,#dc2626,true

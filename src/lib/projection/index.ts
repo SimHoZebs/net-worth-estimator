@@ -1,5 +1,5 @@
 export { fetchCsvScenarioFiles, loadCsvScenarioPack, parseCsvScenarioPack } from "./csvLoader";
-export { formatMonthIndex, parseMonthLabelToIndex, projectCsvScenarioPack } from "./csvProject";
+export { projectCsvScenarioPack } from "./csvProject";
 export {
   csvAccountSchema,
   csvAccountsHeaders,
@@ -10,11 +10,8 @@ export {
   csvContributionPlanSchema,
   csvContributionPlansHeaders,
   csvDateSchema,
-  csvScenarioHeaders,
-  csvScenarioSettingsSchema,
   csvTransferSchema,
   csvTransfersHeaders,
-  monthLabelSchema,
 } from "./csvSchema";
 export {
   CSV_SCENARIO_FILE_NAMES,
@@ -29,7 +26,6 @@ export type {
   ScenarioValidationSeverity,
 } from "./validationTypes";
 export type {
-  AccountBalanceType,
   BudgetAmountMode,
   BudgetDirection,
   ContributionCalculationMode,
@@ -47,9 +43,9 @@ export type {
   CsvScenarioFileContents,
   CsvScenarioFileName,
   CsvScenarioPack,
-  CsvScenarioSettings,
   CsvScenarioWhatIfState,
   CsvTransfer,
-  MonthLabel,
+  IsoDate,
+  ProjectionRuntimeSettings,
   TransferAmountMode,
 } from "./csvTypes";
