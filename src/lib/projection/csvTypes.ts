@@ -119,6 +119,8 @@ export interface CsvProjectionPostingSummary {
   requestedAmount: number;
   realizedAmount: number;
   utilizationRate: number;
+  firstShortfallDate: IsoDate | null;
+  shortfallAmount: number;
 }
 
 export interface CsvProjectionResult {

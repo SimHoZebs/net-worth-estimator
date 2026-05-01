@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import { CSV_SCENARIO_PUBLIC_PATH } from "@/lib/projection";
 import type { CsvScenarioPack, ProjectionRuntimeSettings, ScenarioValidationIssue } from "@/lib/projection";
 import { ScenarioValidationPanel } from "./ScenarioValidationPanel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface CsvScenarioInspectorProps {
@@ -53,7 +54,7 @@ function formatCurrency(value: unknown) {
 
 function formatLoadedAt(loadedAt: Date | null) {
   if (loadedAt === null) {
-    return "Not loaded yet.";
+    return "Not loaded yet";
   }
 
   return loadedAt.toLocaleString();
@@ -79,7 +80,7 @@ function SectionDisclosure({
   title: string;
   description: string;
   defaultOpen?: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <details
@@ -92,7 +93,7 @@ function SectionDisclosure({
             <div className="text-base font-semibold text-slate-900">{title}</div>
             <div className="text-sm text-slate-500">{description}</div>
           </div>
-          <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">Expand</div>
+          <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">Open</div>
         </div>
       </summary>
       <div className="mt-4">{children}</div>
@@ -134,6 +135,7 @@ function DataTable<TRow extends object>({
                 <TableRow key={`${title}-${rowIndex}`}>
                   {columns.map((column) => {
                     const value = row[column.key as keyof TRow];
+
                     return (
                       <TableCell key={String(column.key)}>
                         {column.format ? column.format(value, row) : formatValue(value)}
@@ -166,88 +168,69 @@ export function CsvScenarioInspector({
   projectionStartDate,
   onReload,
 }: CsvScenarioInspectorProps) {
+  const errorCount = issues.filter((issue) => issue.severity === "error").length;
+  const warningCount = issues.filter((issue) => issue.severity === "warning").length;
+  const shouldOpen = loadError !== null || issues.length > 0;
+  const loadStatus = isLoading ? "Loading" : loadError ? "Load failed" : pack ? "Loaded" : "Waiting";
+  const validationSummary = errorCount > 0
+    ? `${errorCount} error${errorCount === 1 ? "" : "s"}`
+    : warningCount > 0
+      ? `${warningCount} warning${warningCount === 1 ? "" : "s"}`
+      : pack
+        ? "Clean"
+        : "Pending";
+
   return (
-    <div className="space-y-6">
-      <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
-        <CardHeader>
+    <details open={shouldOpen} className="rounded-[1.8rem] border border-slate-200 bg-white px-5 py-5 shadow-sm open:border-slate-300">
+      <summary className="cursor-pointer list-none">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <CardTitle>Data pack status</CardTitle>
-            <CardDescription>
-              The model reads canonical CSV data from <code>{`${CSV_SCENARIO_PUBLIC_PATH}/*.csv`}</code> and combines it with runtime projection settings in memory.
-            </CardDescription>
+            <div className="text-base font-semibold text-slate-900">Source data and validation</div>
+            <div className="text-sm text-slate-500">Secondary inspection area for CSV health, runtime settings, and raw source tables.</div>
           </div>
-          <CardAction>
-            <Button type="button" variant="secondary" onClick={onReload} disabled={isLoading}>
-              {isLoading ? "Loading..." : "Reload CSVs"}
-            </Button>
-          </CardAction>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-3">
-            <SummaryCard label="Source path" value={CSV_SCENARIO_PUBLIC_PATH} />
-            <SummaryCard label="Load status" value={isLoading ? "Loading" : loadError ? "Load failed" : "Loaded"} />
-            <SummaryCard label="Last loaded" value={formatLoadedAt(loadedAt)} />
+          <div className="flex flex-wrap gap-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">{loadStatus}</span>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">{validationSummary}</span>
           </div>
-          {loadError ? (
-            <Alert variant="destructive">
-              <AlertTitle>CSV pack could not be loaded</AlertTitle>
-              <AlertDescription>{loadError}</AlertDescription>
-            </Alert>
-          ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </summary>
 
-      {pack || issues.length > 0 ? <ScenarioValidationPanel issues={issues} /> : null}
+      <div className="mt-5 space-y-5">
+        <div className="flex justify-end">
+          <Button type="button" variant="secondary" size="sm" onClick={onReload} disabled={isLoading}>
+            {isLoading ? "Loading..." : "Reload CSVs"}
+          </Button>
+        </div>
 
-      {pack ? (
-        <>
-          <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
-              <CardHeader>
-                <div>
-                  <CardTitle>Planning setup</CardTitle>
-                  <CardDescription>
-                    These are the runtime settings that most directly affect whether the target is reached.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <SummaryCard label="Projection start" value={projectionStartDate} />
-                <SummaryCard label="Fallback start" value={projectionSettings.fallbackProjectionStartDate} />
-                <SummaryCard label="Horizon" value={`${integerFormatter.format(projectionSettings.horizonYears)} years`} />
-                <SummaryCard label="Target net worth" value={currencyFormatter.format(projectionSettings.targetNetWorth)} />
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
-              <CardHeader>
-                <div>
-                  <CardTitle>Data inventory</CardTitle>
-                  <CardDescription>
-                    Useful for checking coverage, but secondary to the forecast itself.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-2">
-                <SummaryCard label="Accounts" value={integerFormatter.format(pack.accounts.length)} />
-                <SummaryCard label="Checkpoints" value={integerFormatter.format(pack.checkpoints.length)} />
-                <SummaryCard label="Postings" value={integerFormatter.format(pack.postings.length)} />
-              </CardContent>
-            </Card>
-          </div>
-
-          <Alert className="rounded-[1.6rem] border-sky-200 bg-sky-50 text-sky-950">
-            <AlertTitle>Projection model rules</AlertTitle>
-            <AlertDescription className="text-sky-950/80">
-              <code>postings</code> define all future external inflows, external outflows, and account-to-account transfers. Historical rows come from exact checkpoint dates. Account <code>annualRate</code> still compounds between dated events.
-            </AlertDescription>
+        {loadError ? (
+          <Alert variant="destructive" className="rounded-[1.6rem]">
+            <AlertTitle>CSV pack could not be loaded</AlertTitle>
+            <AlertDescription>{loadError}</AlertDescription>
           </Alert>
+        ) : null}
 
+        {issues.length > 0 ? <ScenarioValidationPanel issues={issues} /> : null}
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard label="Source path" value={CSV_SCENARIO_PUBLIC_PATH} />
+          <SummaryCard label="Last loaded" value={formatLoadedAt(loadedAt)} />
+          <SummaryCard label="Projection start" value={projectionStartDate} />
+          <SummaryCard label="Target" value={currencyFormatter.format(projectionSettings.targetNetWorth)} />
+        </div>
+
+        {pack ? (
+          <div className="grid gap-3 md:grid-cols-3">
+            <SummaryCard label="Accounts" value={integerFormatter.format(pack.accounts.length)} />
+            <SummaryCard label="Checkpoints" value={integerFormatter.format(pack.checkpoints.length)} />
+            <SummaryCard label="Postings" value={integerFormatter.format(pack.postings.length)} />
+          </div>
+        ) : null}
+
+        {pack ? (
           <div className="space-y-4">
             <SectionDisclosure
-              title="Core projection inputs"
-              description="Open to inspect the runtime settings and scheduled rules that most affect the projection."
-              defaultOpen
+              title="Runtime settings and postings"
+              description="Use this only when you need to verify the exact inputs behind the forecast."
             >
               <div className="space-y-4">
                 <DataTable
@@ -269,13 +252,13 @@ export function CsvScenarioInspector({
 
                 <DataTable
                   title="Postings"
-                  description="Generic scheduled debit and credit rules. Blank source or destination means an external flow."
+                  description="Scheduled inflows, outflows, and transfers. Blank source or destination means an external flow."
                   rows={pack.postings}
                   columns={[
                     { key: "id", label: "ID" },
                     { key: "label", label: "Label" },
                     { key: "sourceAccountId", label: "Source" },
-                    { key: "destinations", label: "Destinations", format: (value: string[] | null) => value === null ? "-" : value.join(" ; ") },
+                    { key: "destinations", label: "Destinations", format: (value) => Array.isArray(value) ? value.join(" ; ") : "-" },
                     { key: "amountMode", label: "Amount Mode" },
                     { key: "basePostingId", label: "Base Posting" },
                     { key: "amount", label: "Amount", format: (value, row) => row.amountMode === "fixed" ? formatCurrency(value) : formatValue(value) },
@@ -287,7 +270,14 @@ export function CsvScenarioInspector({
                     { key: "enabled", label: "Enabled" },
                   ]}
                 />
+              </div>
+            </SectionDisclosure>
 
+            <SectionDisclosure
+              title="Accounts and checkpoints"
+              description="Open for the raw account rows and historical checkpoint evidence."
+            >
+              <div className="space-y-4">
                 <DataTable
                   title="Accounts"
                   description="Tracked signed balances that contribute directly to net worth."
@@ -298,33 +288,28 @@ export function CsvScenarioInspector({
                     { key: "category", label: "Category" },
                     { key: "openingBalance", label: "Opening Balance", format: (value) => formatCurrency(value) },
                     { key: "annualRate", label: "Annual Rate" },
-                    { key: "minBalance", label: "Min Balance", format: (value) => value === null ? "—" : formatCurrency(value) },
-                    { key: "maxBalance", label: "Max Balance", format: (value) => value === null ? "—" : formatCurrency(value) },
+                    { key: "minBalance", label: "Min Balance", format: (value) => value === null ? "-" : formatCurrency(value) },
+                    { key: "maxBalance", label: "Max Balance", format: (value) => value === null ? "-" : formatCurrency(value) },
                     { key: "color", label: "Color" },
                     { key: "enabled", label: "Enabled" },
                   ]}
                 />
+
+                <DataTable
+                  title="Checkpoints"
+                  description="Historical account balance checkpoints from checkpoints.csv."
+                  rows={pack.checkpoints}
+                  columns={[
+                    { key: "Date", label: "Date" },
+                    { key: "AccountId", label: "Account ID" },
+                    { key: "Balance", label: "Balance", format: (value) => formatCurrency(value) },
+                  ]}
+                />
               </div>
             </SectionDisclosure>
-
-            <SectionDisclosure
-              title="Historical evidence"
-              description="Checkpoint rows backing the historical part of the timeline."
-            >
-              <DataTable
-                title="Checkpoints"
-                description="Historical account balance checkpoints from checkpoints.csv."
-                rows={pack.checkpoints}
-                columns={[
-                  { key: "Date", label: "Date" },
-                  { key: "AccountId", label: "Account ID" },
-                  { key: "Balance", label: "Balance", format: (value) => formatCurrency(value) },
-                ]}
-              />
-            </SectionDisclosure>
           </div>
-        </>
-      ) : null}
-    </div>
+        ) : null}
+      </div>
+    </details>
   );
 }

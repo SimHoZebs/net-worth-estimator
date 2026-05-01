@@ -3,6 +3,7 @@ import { CsvScenarioInspector } from "./components/CsvScenarioInspector";
 import { CsvProjectionDashboard } from "./components/CsvProjectionDashboard";
 import { CsvPostingWhatIfControls } from "./components/CsvContributionWhatIfControls";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
+import { Button } from "./components/ui/button";
 import { useCsvWhatIfState } from "./hooks/useCsvWhatIfState";
 import { useCsvProjectionWorker } from "./hooks/useCsvProjectionWorker";
 import { useCsvScenarioPack } from "./hooks/useCsvScenarioPack";
@@ -43,13 +44,12 @@ export default function App() {
   const { result, runtimeError, isProjecting } = useCsvProjectionWorker(pack, projectionSettings, whatIfState, validation.isValid);
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 text-slate-900 md:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight md:text-5xl">CSV-Backed Net Worth Model</h1>
-          <p className="max-w-3xl text-slate-500">
-            Prioritize the planning questions first: whether the target is reachable, which scheduled cash movements matter, and what changes the projection. The raw CSV pack remains available as reference below.
-          </p>
+    <div className="min-h-screen bg-slate-100 text-slate-900">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8 md:py-8">
+        <div className="flex justify-end">
+          <Button type="button" variant="ghost" size="sm" onClick={() => void reload()} disabled={isLoading}>
+            {isLoading ? "Loading..." : "Reload CSVs"}
+          </Button>
         </div>
 
         {isProjecting ? (
@@ -85,18 +85,16 @@ export default function App() {
             projectionSettings={projectionSettings}
             targetNetWorthInput={targetNetWorthInput}
             onTargetNetWorthInputChange={setTargetNetWorthInput}
-          />
-        ) : null}
-
-        {pack ? (
-          <CsvPostingWhatIfControls
-            pack={pack}
-            whatIfState={whatIfState}
-            activeOverrideCount={activeOverrideCount}
-            onSetPostingMultiplier={setPostingMultiplier}
-            onClearPostingOverride={clearPostingOverride}
-            onResetAllOverrides={resetAllOverrides}
-          />
+          >
+            <CsvPostingWhatIfControls
+              pack={pack}
+              whatIfState={whatIfState}
+              activeOverrideCount={activeOverrideCount}
+              onSetPostingMultiplier={setPostingMultiplier}
+              onClearPostingOverride={clearPostingOverride}
+              onResetAllOverrides={resetAllOverrides}
+            />
+          </CsvProjectionDashboard>
         ) : null}
 
         <CsvScenarioInspector

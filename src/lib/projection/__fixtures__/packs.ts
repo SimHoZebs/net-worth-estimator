@@ -4,7 +4,7 @@ import { makePosting } from "./postings";
 
 export function createBasePack(overrides: Partial<CsvScenarioPack> = {}): CsvScenarioPack {
   return {
-    version: 6,
+    version: 7,
     sourcePath: "/scenario",
     accounts: [
       makeAccount({ id: "checking", category: "checking" }),

@@ -375,6 +375,7 @@ export function projectCsvScenarioPack(
   const realizedPostingAmountByIdAndYear = new Map<string, number>();
   const requestedPostingTotalsById = new Map(pack.postings.map((posting) => [posting.id, 0]));
   const realizedPostingTotalsById = new Map(pack.postings.map((posting) => [posting.id, 0]));
+  const firstShortfallDateById = new Map<string, IsoDate>();
   let totalExternalInflowAmount = 0;
   let totalExternalOutflowAmount = 0;
   let totalInternalTransferAmount = 0;
@@ -447,6 +448,10 @@ export function projectCsvScenarioPack(
         : Math.max(0, posting.annualCap - (realizedPostingAmountByIdAndYear.get(capKey) ?? 0));
       const realizedAmount = resolvePostingAmount(posting, requestedAmount, annualCapRemaining, balances, accountById);
       const shortfallAmount = requestedAmount - realizedAmount;
+
+      if (shortfallAmount > 0 && !firstShortfallDateById.has(posting.id)) {
+        firstShortfallDateById.set(posting.id, date);
+      }
 
       requestedPostingAmountsById[posting.id] = requestedAmount;
       realizedPostingAmountsById[posting.id] = realizedAmount;
@@ -542,6 +547,8 @@ export function projectCsvScenarioPack(
       requestedAmount: roundCurrency(requestedAmount),
       realizedAmount: roundCurrency(realizedAmount),
       utilizationRate: requestedAmount > 0 ? realizedAmount / requestedAmount : 0,
+      firstShortfallDate: firstShortfallDateById.get(posting.id) ?? null,
+      shortfallAmount: roundCurrency(requestedAmount - realizedAmount),
     };
   });
 

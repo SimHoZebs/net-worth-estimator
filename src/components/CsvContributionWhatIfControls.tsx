@@ -1,6 +1,5 @@
 import type { CsvPosting, CsvScenarioPack, CsvScenarioWhatIfState } from "@/lib/projection";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { currency } from "@/lib/format";
 
 interface CsvPostingWhatIfControlsProps {
@@ -47,25 +46,31 @@ export function CsvPostingWhatIfControls({
   const enabledPostings = pack.postings.filter((posting) => posting.enabled);
 
   return (
-    <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
-      <CardHeader>
-        <div>
-          <CardTitle>Adjust scheduled postings</CardTitle>
-          <CardDescription>
-            Test stronger or weaker cash-flow rules without changing the CSV data files. These overrides are temporary to this browser session.
-          </CardDescription>
+    <details
+      open={activeOverrideCount > 0}
+      className="rounded-[1.8rem] border border-slate-200 bg-white px-5 py-5 shadow-sm open:border-slate-300"
+    >
+      <summary className="cursor-pointer list-none">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div className="text-base font-semibold text-slate-900">Adjust scheduled postings</div>
+            <div className="text-sm text-slate-500">
+              {activeOverrideCount > 0
+                ? `${activeOverrideCount} temporary override${activeOverrideCount === 1 ? " is" : "s are"} active.`
+                : `${enabledPostings.length} enabled posting${enabledPostings.length === 1 ? "" : "s"} available for temporary overrides.`}
+            </div>
+          </div>
+          <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+            {activeOverrideCount > 0 ? `${activeOverrideCount} active` : "Open"}
+          </div>
         </div>
-        <CardAction>
-          <Button type="button" variant="secondary" onClick={onResetAllOverrides} disabled={activeOverrideCount === 0}>
+      </summary>
+
+      <div className="mt-5 space-y-4">
+        <div className="flex justify-end">
+          <Button type="button" variant="secondary" size="sm" onClick={onResetAllOverrides} disabled={activeOverrideCount === 0}>
             Reset all overrides
           </Button>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          {activeOverrideCount > 0
-            ? `${activeOverrideCount} temporary override${activeOverrideCount === 1 ? " is" : "s are"} affecting the projection below.`
-            : "No temporary overrides are active. All postings are running at their CSV-defined levels."}
         </div>
 
         {enabledPostings.length > 0 ? enabledPostings.map((posting) => {
@@ -79,7 +84,7 @@ export function CsvPostingWhatIfControls({
                 <div>
                   <div className="font-medium text-slate-900">{posting.label}</div>
                   <div className="text-sm text-slate-500">
-                    Route: {describeRoute(posting, pack)}. Rule: {describePosting(posting)}.
+                    {describeRoute(posting, pack)}. {describePosting(posting)}.
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -113,7 +118,7 @@ export function CsvPostingWhatIfControls({
             No enabled postings are available for temporary overrides.
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </details>
   );
 }

@@ -3,11 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function ScenarioValidationPanel({ issues }: { issues: ScenarioValidationIssue[] }) {
   if (issues.length === 0) {
-    return (
-      <Alert className="rounded-[1.6rem] border-emerald-200 bg-emerald-50 text-emerald-900">
-        <AlertTitle>No CSV validation issues detected.</AlertTitle>
-      </Alert>
-    );
+    return null;
   }
 
   const errors = issues.filter((issue) => issue.severity === "error");
