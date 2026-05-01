@@ -1,42 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { projectCsvScenarioPack } from "./projection";
-import type { CsvScenarioPack, CsvScenarioWhatIfState, ProjectionRuntimeSettings } from "./projection";
-
-function createProjectionSettings(overrides: Partial<ProjectionRuntimeSettings> = {}): ProjectionRuntimeSettings {
-  return {
-    targetNetWorth: 5000,
-    fallbackProjectionStartDate: "2026-01-01",
-    horizonYears: 1,
-    ...overrides,
-  };
-}
-
-function createBasePack(): CsvScenarioPack {
-  return {
-    version: 6,
-    sourcePath: "/scenario",
-    accounts: [
-      { id: "checking", label: "Checking", category: "checking", openingBalance: 0, annualRate: 0, minBalance: null, maxBalance: null, color: null, enabled: true },
-      { id: "brokerage", label: "Brokerage", category: "brokerage", openingBalance: 0, annualRate: 0, minBalance: null, maxBalance: null, color: null, enabled: true },
-      { id: "loan", label: "Loan", category: "loan", openingBalance: -500, annualRate: 0, minBalance: null, maxBalance: null, color: null, enabled: true },
-    ],
-    checkpoints: [
-      { Date: "2026-01-31", AccountId: "checking", Balance: 800 },
-      { Date: "2026-01-31", AccountId: "brokerage", Balance: 1200 },
-      { Date: "2026-01-31", AccountId: "loan", Balance: -400 },
-    ],
-    postings: [
-      { id: "salary", label: "Salary", sourceAccountId: null, destinationAccountId: "checking", amountMode: "fixed", basePostingId: null, amount: 1000, annualGrowthRate: 0, startDate: "2026-02-05", endDate: "2026-02-05", annualCap: null, priority: 1, enabled: true },
-      { id: "spend", label: "Spend", sourceAccountId: "checking", destinationAccountId: null, amountMode: "fixed", basePostingId: null, amount: 200, annualGrowthRate: 0, startDate: "2026-02-06", endDate: "2026-02-06", annualCap: null, priority: 1, enabled: true },
-      { id: "invest", label: "Invest", sourceAccountId: "checking", destinationAccountId: "brokerage", amountMode: "fixed", basePostingId: null, amount: 900, annualGrowthRate: 0, startDate: "2026-02-10", endDate: "2026-02-10", annualCap: null, priority: 1, enabled: true },
-      { id: "paydown", label: "Paydown", sourceAccountId: "checking", destinationAccountId: "loan", amountMode: "percent_of_base", basePostingId: "salary", amount: 0.25, annualGrowthRate: 0, startDate: "2026-02-20", endDate: "2026-02-20", annualCap: null, priority: 2, enabled: true },
-    ],
-  };
-}
+import type { CsvScenarioWhatIfState } from "./projection";
+import { createBasePack, makeAccount, makePosting, makeSettings } from "./projection/__fixtures__";
 
 describe("CSV projection engine", () => {
   it("builds dated checkpoint rows and future event rows from real postings", () => {
-    const result = projectCsvScenarioPack(createBasePack(), createProjectionSettings());
+    const result = projectCsvScenarioPack(createBasePack(), makeSettings());
 
     expect(result.timeline.rows.map((row) => row.date)).toEqual([
       "2026-01-31",
@@ -62,18 +31,19 @@ describe("CSV projection engine", () => {
   });
 
   it("applies annual caps per calendar year on dated postings", () => {
-    const pack = createBasePack();
-    pack.checkpoints = [];
-    pack.accounts = [
-      { id: "checking", label: "Checking", category: "checking", openingBalance: 0, annualRate: 0, minBalance: null, maxBalance: null, color: null, enabled: true },
-      { id: "brokerage", label: "Brokerage", category: "brokerage", openingBalance: 0, annualRate: 0, minBalance: null, maxBalance: null, color: null, enabled: true },
-    ];
-    pack.postings = [
-      { id: "salary", label: "Salary", sourceAccountId: null, destinationAccountId: "checking", amountMode: "fixed", basePostingId: null, amount: 1000, annualGrowthRate: 0, startDate: "2026-01-01", endDate: null, annualCap: null, priority: 1, enabled: true },
-      { id: "capped", label: "Capped", sourceAccountId: "checking", destinationAccountId: "brokerage", amountMode: "fixed", basePostingId: null, amount: 200, annualGrowthRate: 0, startDate: "2026-01-15", endDate: null, annualCap: 500, priority: 2, enabled: true },
-    ];
+    const pack = createBasePack({
+      checkpoints: [],
+      accounts: [
+        makeAccount({ id: "checking", category: "checking" }),
+        makeAccount({ id: "brokerage", category: "brokerage" }),
+      ],
+      postings: [
+        makePosting({ id: "salary", destinationAccountId: "checking", amount: 1000, startDate: "2026-01-01" }),
+        makePosting({ id: "capped", sourceAccountId: "checking", destinationAccountId: "brokerage", amount: 200, startDate: "2026-01-15", annualCap: 500, priority: 2 }),
+      ],
+    });
 
-    const result = projectCsvScenarioPack(pack, createProjectionSettings({ horizonYears: 2 }));
+    const result = projectCsvScenarioPack(pack, makeSettings({ horizonYears: 2 }));
     const rowByDate = new Map(result.timeline.rows.map((row) => [row.date, row]));
 
     expect(rowByDate.get("2026-01-15")?.realizedPostingAmount).toBe(200);
@@ -84,19 +54,20 @@ describe("CSV projection engine", () => {
   });
 
   it("supports same-day percent_of_base chains in priority order", () => {
-    const pack = createBasePack();
-    pack.checkpoints = [];
-    pack.accounts = [
-      { id: "checking", label: "Checking", category: "checking", openingBalance: 0, annualRate: 0, minBalance: null, maxBalance: null, color: null, enabled: true },
-      { id: "k401", label: "401(k)", category: "401k", openingBalance: 0, annualRate: 0, minBalance: null, maxBalance: null, color: null, enabled: true },
-    ];
-    pack.postings = [
-      { id: "salary", label: "Salary", sourceAccountId: null, destinationAccountId: "checking", amountMode: "fixed", basePostingId: null, amount: 1000, annualGrowthRate: 0, startDate: "2026-01-10", endDate: "2026-01-10", annualCap: null, priority: 1, enabled: true },
-      { id: "employee_k401", label: "Employee 401(k)", sourceAccountId: null, destinationAccountId: "k401", amountMode: "percent_of_base", basePostingId: "salary", amount: 0.1, annualGrowthRate: 0, startDate: "2026-01-10", endDate: "2026-01-10", annualCap: null, priority: 2, enabled: true },
-      { id: "employer_match", label: "Employer Match", sourceAccountId: null, destinationAccountId: "k401", amountMode: "percent_of_base", basePostingId: "employee_k401", amount: 0.5, annualGrowthRate: 0, startDate: "2026-01-10", endDate: "2026-01-10", annualCap: null, priority: 3, enabled: true },
-    ];
+    const pack = createBasePack({
+      checkpoints: [],
+      accounts: [
+        makeAccount({ id: "checking", category: "checking" }),
+        makeAccount({ id: "k401", category: "401k" }),
+      ],
+      postings: [
+        makePosting({ id: "salary", destinationAccountId: "checking", amount: 1000, startDate: "2026-01-10", endDate: "2026-01-10" }),
+        makePosting({ id: "employee_k401", destinationAccountId: "k401", amountMode: "percent_of_base", basePostingId: "salary", amount: 0.1, startDate: "2026-01-10", endDate: "2026-01-10", priority: 2 }),
+        makePosting({ id: "employer_match", destinationAccountId: "k401", amountMode: "percent_of_base", basePostingId: "employee_k401", amount: 0.5, startDate: "2026-01-10", endDate: "2026-01-10", priority: 3 }),
+      ],
+    });
 
-    const result = projectCsvScenarioPack(pack, createProjectionSettings());
+    const result = projectCsvScenarioPack(pack, makeSettings());
 
     expect(result.timeline.rows[0]?.requestedPostingAmountsById.employee_k401).toBe(100);
     expect(result.timeline.rows[0]?.requestedPostingAmountsById.employer_match).toBe(50);
@@ -106,17 +77,18 @@ describe("CSV projection engine", () => {
   });
 
   it("clamps postings by source balance only", () => {
-    const pack = createBasePack();
-    pack.checkpoints = [];
-    pack.accounts = [
-      { id: "checking", label: "Checking", category: "checking", openingBalance: 250, annualRate: 0, minBalance: null, maxBalance: null, color: null, enabled: true },
-      { id: "loan", label: "Loan", category: "loan", openingBalance: -300, annualRate: 0, minBalance: null, maxBalance: null, color: null, enabled: true },
-    ];
-    pack.postings = [
-      { id: "loan_payment", label: "Loan Payment", sourceAccountId: "checking", destinationAccountId: "loan", amountMode: "fixed", basePostingId: null, amount: 400, annualGrowthRate: 0, startDate: "2026-01-10", endDate: "2026-01-10", annualCap: null, priority: 1, enabled: true },
-    ];
+    const pack = createBasePack({
+      checkpoints: [],
+      accounts: [
+        makeAccount({ id: "checking", openingBalance: 250 }),
+        makeAccount({ id: "loan", openingBalance: -300 }),
+      ],
+      postings: [
+        makePosting({ id: "loan_payment", sourceAccountId: "checking", destinationAccountId: "loan", amount: 400, startDate: "2026-01-10", endDate: "2026-01-10" }),
+      ],
+    });
 
-    const result = projectCsvScenarioPack(pack, createProjectionSettings());
+    const result = projectCsvScenarioPack(pack, makeSettings());
 
     expect(result.timeline.rows[0]?.requestedPostingAmount).toBe(400);
     expect(result.timeline.rows[0]?.realizedPostingAmount).toBe(250);
@@ -127,16 +99,17 @@ describe("CSV projection engine", () => {
   });
 
   it("applies daily compounding to negative balances between dated events", () => {
-    const pack = createBasePack();
-    pack.checkpoints = [];
-    pack.accounts = [
-      { id: "loan", label: "Loan", category: "loan", openingBalance: -1200, annualRate: 0.12, minBalance: null, maxBalance: null, color: null, enabled: true },
-    ];
-    pack.postings = [
-      { id: "marker", label: "Marker", sourceAccountId: null, destinationAccountId: "loan", amountMode: "fixed", basePostingId: null, amount: 0, annualGrowthRate: 0, startDate: "2026-02-01", endDate: "2026-02-01", annualCap: null, priority: 1, enabled: true },
-    ];
+    const pack = createBasePack({
+      checkpoints: [],
+      accounts: [
+        makeAccount({ id: "loan", openingBalance: -1200, annualRate: 0.12 }),
+      ],
+      postings: [
+        makePosting({ id: "marker", destinationAccountId: "loan", amount: 0, startDate: "2026-02-01", endDate: "2026-02-01" }),
+      ],
+    });
 
-    const result = projectCsvScenarioPack(pack, createProjectionSettings());
+    const result = projectCsvScenarioPack(pack, makeSettings());
 
     expect(result.timeline.rows[0]?.accountBalances.loan).toBe(-1212);
     expect(result.timeline.rows[0]?.growthNetWorthImpact).toBe(-12);
@@ -155,7 +128,7 @@ describe("CSV projection engine", () => {
       },
     };
 
-    const result = projectCsvScenarioPack(pack, createProjectionSettings(), whatIfState);
+    const result = projectCsvScenarioPack(pack, makeSettings(), whatIfState);
 
     expect(pack.postings[2]?.amount).toBe(900);
     expect(result.timeline.rows[3]?.requestedPostingAmount).toBe(1800);
@@ -164,17 +137,18 @@ describe("CSV projection engine", () => {
   });
 
   it("prevents destination accounts from exceeding maxBalance (overpayment guard)", () => {
-    const pack = createBasePack();
-    pack.checkpoints = [];
-    pack.accounts = [
-      { id: "checking", label: "Checking", category: "checking", openingBalance: 400, annualRate: 0, minBalance: null, maxBalance: null, color: null, enabled: true },
-      { id: "loan", label: "Loan", category: "loan", openingBalance: -300, annualRate: 0, minBalance: null, maxBalance: 0, color: null, enabled: true },
-    ];
-    pack.postings = [
-      { id: "paydown", label: "Paydown", sourceAccountId: "checking", destinationAccountId: "loan", amountMode: "fixed", basePostingId: null, amount: 400, annualGrowthRate: 0, startDate: "2026-01-10", endDate: "2026-01-10", annualCap: null, priority: 1, enabled: true },
-    ];
+    const pack = createBasePack({
+      checkpoints: [],
+      accounts: [
+        makeAccount({ id: "checking", openingBalance: 400 }),
+        makeAccount({ id: "loan", openingBalance: -300, maxBalance: 0 }),
+      ],
+      postings: [
+        makePosting({ id: "paydown", sourceAccountId: "checking", destinationAccountId: "loan", amount: 400, startDate: "2026-01-10", endDate: "2026-01-10" }),
+      ],
+    });
 
-    const result = projectCsvScenarioPack(pack, createProjectionSettings());
+    const result = projectCsvScenarioPack(pack, makeSettings());
 
     expect(result.timeline.rows[0]?.requestedPostingAmount).toBe(400);
     expect(result.timeline.rows[0]?.realizedPostingAmount).toBe(300);
@@ -185,17 +159,18 @@ describe("CSV projection engine", () => {
   });
 
   it("prevents source accounts from falling below minBalance", () => {
-    const pack = createBasePack();
-    pack.checkpoints = [];
-    pack.accounts = [
-      { id: "checking", label: "Checking", category: "checking", openingBalance: 300, annualRate: 0, minBalance: 100, maxBalance: null, color: null, enabled: true },
-      { id: "brokerage", label: "Brokerage", category: "brokerage", openingBalance: 0, annualRate: 0, minBalance: null, maxBalance: null, color: null, enabled: true },
-    ];
-    pack.postings = [
-      { id: "transfer", label: "Transfer", sourceAccountId: "checking", destinationAccountId: "brokerage", amountMode: "fixed", basePostingId: null, amount: 400, annualGrowthRate: 0, startDate: "2026-01-10", endDate: "2026-01-10", annualCap: null, priority: 1, enabled: true },
-    ];
+    const pack = createBasePack({
+      checkpoints: [],
+      accounts: [
+        makeAccount({ id: "checking", openingBalance: 300, minBalance: 100 }),
+        makeAccount({ id: "brokerage" }),
+      ],
+      postings: [
+        makePosting({ id: "transfer", sourceAccountId: "checking", destinationAccountId: "brokerage", amount: 400, startDate: "2026-01-10", endDate: "2026-01-10" }),
+      ],
+    });
 
-    const result = projectCsvScenarioPack(pack, createProjectionSettings());
+    const result = projectCsvScenarioPack(pack, makeSettings());
 
     expect(result.timeline.rows[0]?.realizedPostingAmount).toBe(200);
     expect(result.timeline.rows[0]?.clampedPostingShortfallAmount).toBe(200);
