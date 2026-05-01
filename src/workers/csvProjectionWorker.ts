@@ -1,9 +1,10 @@
 import { projectCsvScenarioPack } from "@/lib/projection";
-import type { CsvProjectionResult, CsvScenarioPack } from "@/lib/projection";
+import type { CsvProjectionResult, CsvScenarioPack, CsvScenarioWhatIfState } from "@/lib/projection";
 
 interface CsvProjectionWorkerRequest {
   id: number;
   pack: CsvScenarioPack;
+  whatIfState: CsvScenarioWhatIfState;
 }
 
 interface CsvProjectionWorkerResponse {
@@ -13,7 +14,7 @@ interface CsvProjectionWorkerResponse {
 }
 
 self.onmessage = (event: MessageEvent<CsvProjectionWorkerRequest>) => {
-  const { id, pack } = event.data;
+  const { id, pack, whatIfState } = event.data;
 
   const response: CsvProjectionWorkerResponse = {
     id,
@@ -22,7 +23,7 @@ self.onmessage = (event: MessageEvent<CsvProjectionWorkerRequest>) => {
   };
 
   try {
-    response.result = projectCsvScenarioPack(pack);
+    response.result = projectCsvScenarioPack(pack, whatIfState);
   } catch {
     response.runtimeError = "The CSV scenario pack could not be projected.";
   }

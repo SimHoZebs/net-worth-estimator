@@ -1,14 +1,23 @@
 import { CsvScenarioInspector } from "./components/CsvScenarioInspector";
 import { CsvProjectionDashboard } from "./components/CsvProjectionDashboard";
+import { CsvContributionWhatIfControls } from "./components/CsvContributionWhatIfControls";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
+import { useCsvWhatIfState } from "./hooks/useCsvWhatIfState";
 import { useCsvProjectionWorker } from "./hooks/useCsvProjectionWorker";
 import { useCsvScenarioPack } from "./hooks/useCsvScenarioPack";
 import { summarizeValidationIssues } from "./lib/projection";
 
 export default function App() {
   const { pack, issues, loadError, isLoading, loadedAt, reload } = useCsvScenarioPack();
+  const {
+    state: whatIfState,
+    activeOverrideCount,
+    setContributionMultiplier,
+    clearContributionOverride,
+    resetAllOverrides,
+  } = useCsvWhatIfState();
   const validation = summarizeValidationIssues(issues);
-  const { result, runtimeError, isProjecting } = useCsvProjectionWorker(pack, validation.isValid);
+  const { result, runtimeError, isProjecting } = useCsvProjectionWorker(pack, whatIfState, validation.isValid);
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 text-slate-900 md:p-8">
@@ -31,11 +40,22 @@ export default function App() {
           }}
         />
 
+        {pack ? (
+          <CsvContributionWhatIfControls
+            pack={pack}
+            whatIfState={whatIfState}
+            activeOverrideCount={activeOverrideCount}
+            onSetContributionMultiplier={setContributionMultiplier}
+            onClearContributionOverride={clearContributionOverride}
+            onResetAllOverrides={resetAllOverrides}
+          />
+        ) : null}
+
         {isProjecting ? (
           <Alert className="rounded-[1.6rem] border-amber-200 bg-amber-50 text-amber-950">
             <AlertTitle>Updating projection</AlertTitle>
             <AlertDescription className="text-amber-950/80">
-              Recomputing historical and projected balances from the loaded CSV pack.
+              Recomputing historical and projected balances from the loaded CSV pack{activeOverrideCount > 0 ? ` with ${activeOverrideCount} temporary override${activeOverrideCount === 1 ? "" : "s"}` : ""}.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -56,7 +76,7 @@ export default function App() {
           </Alert>
         ) : null}
 
-        {pack && validation.isValid && result ? <CsvProjectionDashboard pack={pack} result={result} /> : null}
+        {pack && validation.isValid && result ? <CsvProjectionDashboard pack={pack} result={result} whatIfState={whatIfState} /> : null}
       </div>
     </div>
   );

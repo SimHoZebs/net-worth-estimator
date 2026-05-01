@@ -266,3 +266,15 @@ export function validateCsvScenarioPack(pack: CsvScenarioPack): ScenarioValidati
 
   return issues;
 }
+
+export function summarizeValidationIssues(issues: ScenarioValidationIssue[]) {
+  const errors = issues.filter((issue) => issue.severity === "error");
+  const warnings = issues.filter((issue) => issue.severity === "warning");
+
+  return {
+    issues,
+    errors,
+    warnings,
+    isValid: errors.length === 0,
+  };
+}

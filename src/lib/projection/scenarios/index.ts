@@ -1,4 +1,0 @@
-export { DEFAULT_SCENARIO_DEFINITION } from "./default";
-
-import { DEFAULT_SCENARIO_DEFINITION } from "./default";
-export const PREDEFINED_SCENARIOS = [DEFAULT_SCENARIO_DEFINITION];

@@ -7,6 +7,7 @@ import type {
   CsvProjectionResult,
   CsvProjectionRow,
   CsvScenarioPack,
+  CsvScenarioWhatIfState,
   CsvTransfer,
   MonthLabel,
 } from "./csvTypes";
@@ -210,21 +211,30 @@ function calculateInvestableCapacity(budgetItems: CsvBudgetItem[], budgetItemAmo
 function getContributionRequestedAmount(
   contributionPlan: CsvContributionPlan,
   investableCapacity: number,
-  budgetItemAmountsById: Record<string, number>
+  budgetItemAmountsById: Record<string, number>,
+  whatIfState: CsvScenarioWhatIfState
 ): number {
+  const override = whatIfState.contributionPlanOverrides[contributionPlan.id];
+
+  if (override?.mode === "amount") {
+    return Math.max(0, override.value);
+  }
+
+  const multiplier = override?.mode === "multiplier" ? Math.max(0, override.value) : 1;
+
   if (contributionPlan.calculationMode === "fixed") {
-    return contributionPlan.amount;
+    return contributionPlan.amount * multiplier;
   }
 
   if (contributionPlan.calculationMode === "percent_of_capacity") {
-    return Math.max(0, investableCapacity) * contributionPlan.amount;
+    return Math.max(0, investableCapacity) * contributionPlan.amount * multiplier;
   }
 
   if (!contributionPlan.baseBudgetItemId) {
     return 0;
   }
 
-  return (budgetItemAmountsById[contributionPlan.baseBudgetItemId] ?? 0) * contributionPlan.amount;
+  return (budgetItemAmountsById[contributionPlan.baseBudgetItemId] ?? 0) * contributionPlan.amount * multiplier;
 }
 
 function applyContributionToBalance(account: CsvAccount, balances: Record<string, number>, amount: number): void {
@@ -343,7 +353,8 @@ function roundRow(row: CsvProjectionRow): CsvProjectionRow {
   };
 }
 
-export function projectCsvScenarioPack(pack: CsvScenarioPack): CsvProjectionResult {
+export function projectCsvScenarioPack(pack: CsvScenarioPack, whatIfState?: CsvScenarioWhatIfState): CsvProjectionResult {
+  const normalizedWhatIfState: CsvScenarioWhatIfState = whatIfState ?? { contributionPlanOverrides: {} };
   const projectionStartMonthIndex = parseMonthLabelToIndex(pack.scenario.startDate);
   const normalizedCheckpoints = normalizeCheckpoints(pack, projectionStartMonthIndex);
   const accountById = new Map(pack.accounts.map((account) => [account.id, account]));
@@ -413,7 +424,7 @@ export function projectCsvScenarioPack(pack: CsvScenarioPack): CsvProjectionResu
         return;
       }
 
-      const requestedAmount = Math.max(0, getContributionRequestedAmount(contributionPlan, investableCapacity, budgetItemAmountsById));
+      const requestedAmount = Math.max(0, getContributionRequestedAmount(contributionPlan, investableCapacity, budgetItemAmountsById, normalizedWhatIfState));
       const targetAccount = accountById.get(contributionPlan.targetAccountId);
       const capKey = `${contributionPlan.id}:${yearKey}`;
       const annualCapRemaining = contributionPlan.annualCap === null

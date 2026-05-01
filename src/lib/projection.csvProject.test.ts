@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { projectCsvScenarioPack } from "./projection";
-import type { CsvScenarioPack } from "./projection";
+import type { CsvScenarioPack, CsvScenarioWhatIfState } from "./projection";
 
 function createBasePack(): CsvScenarioPack {
   return {
@@ -96,5 +96,25 @@ describe("CSV projection engine", () => {
     expect(result.timeline.monthlyRows[0]?.accountBalances.checking).toBe(200);
     expect(result.timeline.monthlyRows[0]?.accountBalances.loan).toBe(0);
     expect(result.timeline.monthlyRows[0]?.netWorth).toBe(200);
+  });
+
+  it("applies temporary multiplier overrides without mutating the pack", () => {
+    const pack = createBasePack();
+    const whatIfState: CsvScenarioWhatIfState = {
+      contributionPlanOverrides: {
+        invest: {
+          contributionPlanId: "invest",
+          mode: "multiplier",
+          value: 2,
+        },
+      },
+    };
+
+    const result = projectCsvScenarioPack(pack, whatIfState);
+
+    expect(pack.contributionPlans[0]?.amount).toBe(500);
+    expect(result.timeline.monthlyRows[2]?.requestedContributionAmount).toBe(1400);
+    expect(result.timeline.monthlyRows[2]?.realizedContributionAmount).toBe(800);
+    expect(result.contributionSummaries.find((summary) => summary.contributionPlanId === "invest")?.requestedAmount).toBe(2000);
   });
 });

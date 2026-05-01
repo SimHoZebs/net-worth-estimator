@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { CsvProjectionResult, CsvScenarioPack } from "@/lib/projection";
+import type { CsvProjectionResult, CsvScenarioPack, CsvScenarioWhatIfState } from "@/lib/projection";
 import { currency, formatChartCurrencyTick, pct } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 interface CsvProjectionDashboardProps {
   pack: CsvScenarioPack;
   result: CsvProjectionResult;
+  whatIfState: CsvScenarioWhatIfState;
 }
 
 function buildBalanceChartData(pack: CsvScenarioPack, result: CsvProjectionResult) {
@@ -43,7 +44,7 @@ function SummaryCard({ title, value, detail }: { title: string; value: string; d
   );
 }
 
-export function CsvProjectionDashboard({ pack, result }: CsvProjectionDashboardProps) {
+export function CsvProjectionDashboard({ pack, result, whatIfState }: CsvProjectionDashboardProps) {
   const latestRow = result.timeline.monthlyRows[result.timeline.monthlyRows.length - 1] ?? null;
   const firstProjectedRow = result.timeline.monthlyRows.find((row) => !row.isHistorical) ?? null;
   const futureRows = result.timeline.monthlyRows.filter((row) => !row.isHistorical);
@@ -61,6 +62,7 @@ export function CsvProjectionDashboard({ pack, result }: CsvProjectionDashboardP
   const goalText = result.milestones.hitTargetMonthLabel
     ? `Target reached in ${result.milestones.hitTargetMonthLabel}`
     : `Not within ${pack.scenario.horizonMonths} projected months`;
+  const activeOverrideCount = Object.keys(whatIfState.contributionPlanOverrides).length;
 
   return (
     <div className="space-y-6">
@@ -96,6 +98,14 @@ export function CsvProjectionDashboard({ pack, result }: CsvProjectionDashboardP
           detail={`Requested ${currency.format(result.totals.requestedContributions)} across ${pack.contributionPlans.length} plans`}
         />
       </div>
+
+      {activeOverrideCount > 0 ? (
+        <Card className="rounded-2xl border-slate-200 shadow-sm">
+          <CardContent className="p-5 text-sm text-slate-600">
+            {activeOverrideCount} temporary contribution override{activeOverrideCount === 1 ? " is" : "s are"} active in this projection view.
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="rounded-2xl shadow-sm">
         <CardContent className="space-y-4 p-5">
