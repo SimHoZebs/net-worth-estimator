@@ -1,5 +1,0 @@
-id,label,direction,parentBudgetItemId,amountMode,amount,annualGrowthRate,startDate,endDate,category,enabled
-salary,Salary,in,,fixed,10000,0.03,2026-04-01,,earned_income,true
-taxes,Taxes,out,salary,percent_of_parent,0.22,0,2026-04-01,,tax,true
-housing,Housing,out,,fixed,3200,0.02,2026-04-05,,housing,true
-living,Living,out,,fixed,2400,0.02,2026-04-10,,living,true

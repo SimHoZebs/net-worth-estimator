@@ -2,20 +2,20 @@
 
 Status: implemented.
 
-This file now describes the simplified product model that replaced the old module-based architecture.
+This file describes the current CSV-backed product model.
 
 ## Product Rules
 
 - Historical net worth comes from account balance checkpoints.
-- Future net worth comes from tracked account balances, dated contribution plans, dated transfers, and account growth between exact event dates.
-- `budget_items` affect dated contribution capacity only.
-- `budget_items` do not directly mutate tracked balances.
+- Future net worth comes from tracked account balances, scheduled postings, and account growth between exact event dates.
+- Every future cash movement is represented as a posting.
+- Postings can represent external inflows, external outflows, or account-to-account transfers.
 - Canonical persistent data lives in repo-backed CSV files under `public/scenario/`.
 - The UI is read-only for persistent data.
 - Runtime target net worth is session-only and editable in the UI.
 - Projection horizon is fixed at 50 years.
 - Future projection starts from the latest checkpoint date, or today if no checkpoints exist.
-- Temporary what-if overrides are session-only and apply only to contribution plans.
+- Temporary what-if overrides are session-only and apply only to posting multipliers.
 
 ## Canonical CSV Pack
 
@@ -23,9 +23,7 @@ The app loads these files from `public/scenario/`:
 
 - `accounts.csv`
 - `checkpoints.csv`
-- `budget_items.csv`
-- `contribution_plans.csv`
-- `transfers.csv`
+- `postings.csv`
 
 ### `accounts.csv`
 
@@ -58,51 +56,7 @@ Notes:
 - Multiple rows on the same date are applied in file order.
 - Historical rows are shown only on exact checkpoint dates.
 
-### `budget_items.csv`
-
-Fields:
-
-- `id`
-- `label`
-- `direction`
-- `parentBudgetItemId`
-- `amountMode`
-- `amount`
-- `annualGrowthRate`
-- `startDate`
-- `endDate`
-- `category`
-- `enabled`
-
-Notes:
-
-- `direction` is `in` or `out`.
-- `amountMode` is `fixed` or `percent_of_parent`.
-- These rows create dated contribution-capacity cashflows only.
-
-### `contribution_plans.csv`
-
-Fields:
-
-- `id`
-- `label`
-- `targetAccountId`
-- `calculationMode`
-- `baseBudgetItemId`
-- `amount`
-- `startDate`
-- `endDate`
-- `annualCap`
-- `priority`
-- `enabled`
-
-Notes:
-
-- `calculationMode` is `fixed`, `percent_of_capacity`, or `percent_of_budget_item`.
-- Contributions are scheduled monthly from `startDate` using that day of month.
-- Contributions are applied in priority order and clamped by remaining capacity, annual caps, and schedule.
-
-### `transfers.csv`
+### `postings.csv`
 
 Fields:
 
@@ -111,16 +65,26 @@ Fields:
 - `sourceAccountId`
 - `destinationAccountId`
 - `amountMode`
+- `basePostingId`
 - `amount`
+- `annualGrowthRate`
 - `startDate`
 - `endDate`
+- `annualCap`
+- `priority`
 - `enabled`
 
 Notes:
 
-- `amountMode` is currently `fixed`.
-- Transfers are scheduled monthly from `startDate` using that day of month.
-- Transfers move balances between tracked accounts, do not depend on budget capacity, and are clamped by the source account's available positive balance.
+- Blank `sourceAccountId` means an external inflow.
+- Blank `destinationAccountId` means an external outflow.
+- Setting both account IDs creates an internal transfer.
+- `amountMode` is `fixed` or `percent_of_base`.
+- `percent_of_base` rows use the latest realized amount from `basePostingId`.
+- `annualGrowthRate` applies to the resolved amount over time.
+- `annualCap` is optional and enforced per calendar year.
+- Rows on the same date are applied in ascending `priority`, then file order.
+- Rows with a source account clamp to that account's available positive balance.
 
 ## Projection Semantics
 
@@ -134,50 +98,12 @@ For each projected event date:
 
 1. Start from the prior checkpoint or prior projected event.
 2. Accrue account growth or interest from `annualRate` using daily compounding over the exact elapsed days.
-3. Apply dated `budget_items` cashflows to available contribution capacity.
-4. Compute requested contributions from `contribution_plans`.
-5. Clamp contributions by remaining capacity, annual caps, and schedule.
-6. Apply realized contributions to target accounts.
-7. Apply transfers.
-8. Compute end-of-date net worth from enabled accounts.
+3. Resolve requested posting amounts.
+4. Clamp requested amounts by annual caps and source-account liquidity when a source account exists.
+5. Apply realized postings as real debits and credits.
+6. Compute end-of-date net worth from enabled accounts.
 
 ### Net Worth Formula
 
 - Net worth is the sum of enabled account balances.
 - Positive balances increase net worth and negative balances reduce it.
-
-## UI Model
-
-- Read-only inspector tables for all CSV-backed data.
-- Runtime settings summary for projection start, fallback start, target net worth, and horizon.
-- Validation errors surfaced directly in the app.
-- Session-only slider overrides for contribution plans.
-- Projection dashboard focused on net worth, account balances, dated event rows, contribution capacity, and contribution utilization.
-
-## Current Code Layout
-
-- `src/App.tsx`: app shell
-- `src/hooks/useCsvScenarioPack.ts`: CSV loading and reload state
-- `src/hooks/useCsvWhatIfState.ts`: session-only contribution override state
-- `src/hooks/useCsvProjectionWorker.ts`: worker-backed projection execution
-- `src/components/CsvScenarioInspector.tsx`: read-only data inspection
-- `src/components/CsvContributionWhatIfControls.tsx`: temporary slider overrides
-- `src/components/CsvProjectionDashboard.tsx`: projection dashboard
-- `src/components/ScenarioValidationPanel.tsx`: validation issue display
-- `src/lib/projection/`: CSV schema, parsing, validation, projection logic, and shared types
-
-## Removed Architecture
-
-The old module/plugin/compiler/allocation-policy/localStorage product model has been removed.
-
-- No JSON scenario persistence.
-- No module compiler.
-- No allocation policy system.
-- No special-case `cash` account logic.
-- No tax-specific runtime layer.
-- No in-app persistent editor for scenario data.
-
-## Remaining Optional Work
-
-- Add exact amount override UI on top of the existing override engine support.
-- Reduce bundle size if the build warning becomes important.

@@ -1,4 +1,4 @@
-export const CSV_SCENARIO_MODEL_VERSION = 5 as const;
+export const CSV_SCENARIO_MODEL_VERSION = 6 as const;
 
 export const CSV_SCENARIO_REPO_PATH = "public/scenario";
 export const CSV_SCENARIO_PUBLIC_PATH = "/scenario";
@@ -6,20 +6,15 @@ export const CSV_SCENARIO_PUBLIC_PATH = "/scenario";
 export const CSV_SCENARIO_FILE_NAMES = {
   accounts: "accounts.csv",
   checkpoints: "checkpoints.csv",
-  budgetItems: "budget_items.csv",
-  contributionPlans: "contribution_plans.csv",
-  transfers: "transfers.csv",
+  postings: "postings.csv",
 } as const;
 
 export type CsvScenarioCollectionKey = keyof typeof CSV_SCENARIO_FILE_NAMES;
 export type CsvScenarioFileName = (typeof CSV_SCENARIO_FILE_NAMES)[CsvScenarioCollectionKey];
 
 export type IsoDate = string;
-export type BudgetDirection = "in" | "out";
-export type BudgetAmountMode = "fixed" | "percent_of_parent";
-export type ContributionCalculationMode = "fixed" | "percent_of_capacity" | "percent_of_budget_item";
-export type TransferAmountMode = "fixed";
-export type ContributionPlanOverrideMode = "amount" | "multiplier";
+export type PostingAmountMode = "fixed" | "percent_of_base";
+export type PostingOverrideMode = "amount" | "multiplier";
 
 export interface ProjectionRuntimeSettings {
   targetNetWorth: number;
@@ -43,43 +38,19 @@ export interface CsvCheckpoint {
   Balance: number;
 }
 
-export interface CsvBudgetItem {
+export interface CsvPosting {
   id: string;
   label: string;
-  direction: BudgetDirection;
-  parentBudgetItemId: string | null;
-  amountMode: BudgetAmountMode;
+  sourceAccountId: string | null;
+  destinationAccountId: string | null;
+  amountMode: PostingAmountMode;
+  basePostingId: string | null;
   amount: number;
   annualGrowthRate: number;
   startDate: IsoDate;
   endDate: IsoDate | null;
-  category: string;
-  enabled: boolean;
-}
-
-export interface CsvContributionPlan {
-  id: string;
-  label: string;
-  targetAccountId: string;
-  calculationMode: ContributionCalculationMode;
-  baseBudgetItemId: string | null;
-  amount: number;
-  startDate: IsoDate;
-  endDate: IsoDate | null;
   annualCap: number | null;
   priority: number;
-  enabled: boolean;
-}
-
-export interface CsvTransfer {
-  id: string;
-  label: string;
-  sourceAccountId: string;
-  destinationAccountId: string;
-  amountMode: TransferAmountMode;
-  amount: number;
-  startDate: IsoDate;
-  endDate: IsoDate | null;
   enabled: boolean;
 }
 
@@ -88,27 +59,23 @@ export interface CsvScenarioPack {
   sourcePath: string;
   accounts: CsvAccount[];
   checkpoints: CsvCheckpoint[];
-  budgetItems: CsvBudgetItem[];
-  contributionPlans: CsvContributionPlan[];
-  transfers: CsvTransfer[];
+  postings: CsvPosting[];
 }
 
 export interface CsvScenarioFileContents {
   accounts: string;
   checkpoints: string;
-  budgetItems: string;
-  contributionPlans: string;
-  transfers: string;
+  postings: string;
 }
 
-export interface ContributionPlanWhatIfOverride {
-  contributionPlanId: string;
-  mode: ContributionPlanOverrideMode;
+export interface PostingWhatIfOverride {
+  postingId: string;
+  mode: PostingOverrideMode;
   value: number;
 }
 
 export interface CsvScenarioWhatIfState {
-  contributionPlanOverrides: Record<string, ContributionPlanWhatIfOverride>;
+  postingOverrides: Record<string, PostingWhatIfOverride>;
 }
 
 export interface CsvProjectionRow {
@@ -116,14 +83,15 @@ export interface CsvProjectionRow {
   isHistorical: boolean;
   netWorth: number;
   accountBalances: Record<string, number>;
-  availableContributionCapacity: number;
-  budgetCashflowAmount: number;
-  requestedContributionAmount: number;
-  realizedContributionAmount: number;
-  transferAmount: number;
+  externalInflowAmount: number;
+  externalOutflowAmount: number;
+  internalTransferAmount: number;
+  requestedPostingAmount: number;
+  realizedPostingAmount: number;
+  clampedPostingShortfallAmount: number;
   growthNetWorthImpact: number;
-  requestedContributionAmountsByPlanId: Record<string, number>;
-  realizedContributionAmountsByPlanId: Record<string, number>;
+  requestedPostingAmountsById: Record<string, number>;
+  realizedPostingAmountsById: Record<string, number>;
 }
 
 export interface CsvProjectionAccountSummary {
@@ -137,11 +105,13 @@ export interface CsvProjectionAccountSummary {
   endingBalance: number;
 }
 
-export interface CsvProjectionContributionSummary {
-  contributionPlanId: string;
+export interface CsvProjectionPostingSummary {
+  postingId: string;
   label: string;
-  targetAccountId: string;
-  targetAccountLabel: string;
+  sourceAccountId: string | null;
+  sourceAccountLabel: string | null;
+  destinationAccountId: string | null;
+  destinationAccountLabel: string | null;
   priority: number;
   annualCap: number | null;
   requestedAmount: number;
@@ -155,14 +125,15 @@ export interface CsvProjectionResult {
     sampledRows: CsvProjectionRow[];
   };
   accountSummaries: CsvProjectionAccountSummary[];
-  contributionSummaries: CsvProjectionContributionSummary[];
+  postingSummaries: CsvProjectionPostingSummary[];
   totals: {
-    budgetCashflowAmount: number;
-    requestedContributions: number;
-    realizedContributions: number;
-    transferAmount: number;
+    externalInflowAmount: number;
+    externalOutflowAmount: number;
+    internalTransferAmount: number;
+    requestedPostingAmount: number;
+    realizedPostingAmount: number;
+    clampedPostingShortfallAmount: number;
     growthNetWorthImpact: number;
-    latestAvailableContributionCapacity: number;
   };
   milestones: {
     hitTargetDate: IsoDate | null;

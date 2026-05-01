@@ -1,10 +1,8 @@
 import { z } from "zod";
 import type {
   CsvAccount,
-  CsvBudgetItem,
   CsvCheckpoint,
-  CsvContributionPlan,
-  CsvTransfer,
+  CsvPosting,
 } from "./csvTypes";
 
 function parseNumber(value: unknown) {
@@ -78,41 +76,19 @@ export const csvDateSchema = z
 
 export const csvAccountsHeaders = ["id", "label", "category", "openingBalance", "annualRate", "color", "enabled"] as const;
 export const csvCheckpointsHeaders = ["Date", "AccountId", "Balance"] as const;
-export const csvBudgetItemsHeaders = [
-  "id",
-  "label",
-  "direction",
-  "parentBudgetItemId",
-  "amountMode",
-  "amount",
-  "annualGrowthRate",
-  "startDate",
-  "endDate",
-  "category",
-  "enabled",
-] as const;
-export const csvContributionPlansHeaders = [
-  "id",
-  "label",
-  "targetAccountId",
-  "calculationMode",
-  "baseBudgetItemId",
-  "amount",
-  "startDate",
-  "endDate",
-  "annualCap",
-  "priority",
-  "enabled",
-] as const;
-export const csvTransfersHeaders = [
+export const csvPostingsHeaders = [
   "id",
   "label",
   "sourceAccountId",
   "destinationAccountId",
   "amountMode",
+  "basePostingId",
   "amount",
+  "annualGrowthRate",
   "startDate",
   "endDate",
+  "annualCap",
+  "priority",
   "enabled",
 ] as const;
 
@@ -132,42 +108,18 @@ export const csvCheckpointSchema = z.object({
   Balance: finiteNumber,
 }) satisfies z.ZodType<CsvCheckpoint>;
 
-export const csvBudgetItemSchema = z.object({
+export const csvPostingSchema = z.object({
   id: trimmedString,
   label: trimmedString,
-  direction: z.enum(["in", "out"]),
-  parentBudgetItemId: nullableTrimmedString,
-  amountMode: z.enum(["fixed", "percent_of_parent"]),
+  sourceAccountId: nullableTrimmedString,
+  destinationAccountId: nullableTrimmedString,
+  amountMode: z.enum(["fixed", "percent_of_base"]),
+  basePostingId: nullableTrimmedString,
   amount: nonNegativeNumber,
   annualGrowthRate: finiteNumber,
-  startDate: csvDateSchema,
-  endDate: z.preprocess(parseNullableString, csvDateSchema.nullable()),
-  category: trimmedString,
-  enabled: csvBoolean,
-}) satisfies z.ZodType<CsvBudgetItem>;
-
-export const csvContributionPlanSchema = z.object({
-  id: trimmedString,
-  label: trimmedString,
-  targetAccountId: trimmedString,
-  calculationMode: z.enum(["fixed", "percent_of_capacity", "percent_of_budget_item"]),
-  baseBudgetItemId: nullableTrimmedString,
-  amount: nonNegativeNumber,
   startDate: csvDateSchema,
   endDate: z.preprocess(parseNullableString, csvDateSchema.nullable()),
   annualCap: nullableNonNegativeNumber,
   priority: positiveInteger,
   enabled: csvBoolean,
-}) satisfies z.ZodType<CsvContributionPlan>;
-
-export const csvTransferSchema = z.object({
-  id: trimmedString,
-  label: trimmedString,
-  sourceAccountId: trimmedString,
-  destinationAccountId: trimmedString,
-  amountMode: z.enum(["fixed"]),
-  amount: nonNegativeNumber,
-  startDate: csvDateSchema,
-  endDate: z.preprocess(parseNullableString, csvDateSchema.nullable()),
-  enabled: csvBoolean,
-}) satisfies z.ZodType<CsvTransfer>;
+}) satisfies z.ZodType<CsvPosting>;

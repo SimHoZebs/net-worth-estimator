@@ -38,6 +38,10 @@ function buildBalanceChartData(pack: CsvScenarioPack, result: CsvProjectionResul
   }));
 }
 
+function formatRoute(sourceLabel: string | null, destinationLabel: string | null) {
+  return `${sourceLabel ?? "External"} -> ${destinationLabel ?? "External"}`;
+}
+
 function SummaryCard({ title, value, detail }: { title: string; value: string; detail: string }) {
   return (
     <Card className="rounded-2xl shadow-sm">
@@ -132,10 +136,10 @@ export function CsvProjectionDashboard({
   const goalText = result.milestones.hitTargetDate
     ? `Target reached on ${result.milestones.hitTargetDate}`
     : `Not within ${projectionSettings.horizonYears} projected years`;
-  const activeOverrideCount = Object.keys(whatIfState.contributionPlanOverrides).length;
+  const activeOverrideCount = Object.keys(whatIfState.postingOverrides).length;
   const gapToTarget = projectionSettings.targetNetWorth - result.summary.finalNetWorth;
   const goalTone = result.milestones.hitTargetDate ? "success" : "warning";
-  const enabledContributionPlans = pack.contributionPlans.filter((plan) => plan.enabled).length;
+  const enabledPostings = pack.postings.filter((posting) => posting.enabled).length;
 
   return (
     <div className="space-y-6">
@@ -169,14 +173,14 @@ export function CsvProjectionDashboard({
           onChange={onTargetNetWorthInputChange}
         />
         <SummaryCard
-          title="Latest available capacity"
-          value={currency.format(result.totals.latestAvailableContributionCapacity)}
-          detail={firstProjectedRow ? `First projected event: ${firstProjectedRow.date}` : "No projected events."}
+          title="Realized scheduled activity"
+          value={currency.format(result.totals.realizedPostingAmount)}
+          detail={`Requested ${currency.format(result.totals.requestedPostingAmount)} across ${enabledPostings} enabled postings`}
         />
         <SummaryCard
-          title="Realized contributions"
-          value={currency.format(result.totals.realizedContributions)}
-          detail={`Requested ${currency.format(result.totals.requestedContributions)} across ${enabledContributionPlans} enabled plans`}
+          title="Clamped shortfall"
+          value={currency.format(result.totals.clampedPostingShortfallAmount)}
+          detail={firstProjectedRow ? `First projected event: ${firstProjectedRow.date}` : "No projected events."}
         />
         <SummaryCard
           title="Latest checkpoint"
@@ -188,7 +192,7 @@ export function CsvProjectionDashboard({
       {activeOverrideCount > 0 ? (
         <Card className="rounded-2xl border-slate-200 shadow-sm">
           <CardContent className="p-5 text-sm text-slate-600">
-            {activeOverrideCount} temporary contribution override{activeOverrideCount === 1 ? " is" : "s are"} active in this projection view.
+            {activeOverrideCount} temporary posting override{activeOverrideCount === 1 ? " is" : "s are"} active in this projection view.
           </CardContent>
         </Card>
       ) : null}
@@ -198,7 +202,7 @@ export function CsvProjectionDashboard({
           <CardContent className="space-y-4 p-5">
             <div>
               <h2 className="text-xl font-bold text-slate-900">Net worth timeline</h2>
-              <p className="text-sm text-slate-500">Historical rows come from checkpoints. Future rows come from dated budget, contribution, and transfer events with daily compounding between dates.</p>
+              <p className="text-sm text-slate-500">Historical rows come from checkpoints. Future rows come from scheduled postings plus daily compounding between exact event dates.</p>
             </div>
             <div className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -218,24 +222,24 @@ export function CsvProjectionDashboard({
           <CardContent className="space-y-3 p-5">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Next projected events</h2>
-              <p className="text-sm text-slate-500">Use this to see which dated events are funded immediately and which remain limited by available capacity.</p>
+              <p className="text-sm text-slate-500">Use this to spot which scheduled rows clamp when source cash or annual caps are insufficient.</p>
             </div>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Capacity</TableHead>
                   <TableHead>Requested</TableHead>
                   <TableHead>Realized</TableHead>
+                  <TableHead>Shortfall</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {futureRows.slice(0, 6).map((row) => (
                   <TableRow key={row.date}>
                     <TableCell>{row.date}</TableCell>
-                    <TableCell>{currency.format(row.availableContributionCapacity)}</TableCell>
-                    <TableCell>{currency.format(row.requestedContributionAmount)}</TableCell>
-                    <TableCell>{currency.format(row.realizedContributionAmount)}</TableCell>
+                    <TableCell>{currency.format(row.requestedPostingAmount)}</TableCell>
+                    <TableCell>{currency.format(row.realizedPostingAmount)}</TableCell>
+                    <TableCell>{currency.format(row.clampedPostingShortfallAmount)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -249,7 +253,7 @@ export function CsvProjectionDashboard({
           <CardContent className="space-y-4 p-5">
             <div>
               <h2 className="text-xl font-bold text-slate-900">Account balances over time</h2>
-              <p className="text-sm text-slate-500">Enabled accounts are charted with their actual signed balances on each checkpoint or dated event.</p>
+              <p className="text-sm text-slate-500">Enabled accounts are charted with their actual signed balances on each checkpoint or scheduled event.</p>
             </div>
             <div className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -302,14 +306,14 @@ export function CsvProjectionDashboard({
         <Card className="rounded-2xl shadow-sm">
           <CardContent className="space-y-3 p-5">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Contribution utilization</h2>
-              <p className="text-sm text-slate-500">Requested contributions are clamped by dated available capacity and annual caps.</p>
+              <h2 className="text-lg font-bold text-slate-900">Posting utilization</h2>
+              <p className="text-sm text-slate-500">Requested postings are clamped only by source cash and annual caps.</p>
             </div>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Plan</TableHead>
-                  <TableHead>Target</TableHead>
+                  <TableHead>Posting</TableHead>
+                  <TableHead>Route</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Requested</TableHead>
                   <TableHead>Realized</TableHead>
@@ -317,10 +321,10 @@ export function CsvProjectionDashboard({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {result.contributionSummaries.length > 0 ? result.contributionSummaries.map((summary) => (
-                  <TableRow key={summary.contributionPlanId}>
+                {result.postingSummaries.length > 0 ? result.postingSummaries.map((summary) => (
+                  <TableRow key={summary.postingId}>
                     <TableCell>{summary.label}</TableCell>
-                    <TableCell>{summary.targetAccountLabel}</TableCell>
+                    <TableCell>{formatRoute(summary.sourceAccountLabel, summary.destinationAccountLabel)}</TableCell>
                     <TableCell>{summary.priority}</TableCell>
                     <TableCell>{currency.format(summary.requestedAmount)}</TableCell>
                     <TableCell>{currency.format(summary.realizedAmount)}</TableCell>
@@ -328,7 +332,7 @@ export function CsvProjectionDashboard({
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-6 text-center text-slate-500">No contribution plans are defined.</TableCell>
+                    <TableCell colSpan={6} className="py-6 text-center text-slate-500">No postings are defined.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -340,23 +344,25 @@ export function CsvProjectionDashboard({
           <CardContent className="space-y-3 p-5">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Upcoming event rows</h2>
-              <p className="text-sm text-slate-500">Budget cashflows adjust available capacity without directly changing tracked account balances.</p>
+              <p className="text-sm text-slate-500">Each projected date shows how much scheduled activity lands as external inflow, external outflow, or account-to-account transfer.</p>
             </div>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Budget</TableHead>
-                  <TableHead>Capacity</TableHead>
-                  <TableHead>Net worth</TableHead>
+                  <TableHead>Inflow</TableHead>
+                  <TableHead>Outflow</TableHead>
+                  <TableHead>Transfer</TableHead>
+                  <TableHead>Net Worth</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {futureRows.slice(0, 12).map((row) => (
                   <TableRow key={row.date}>
                     <TableCell>{row.date}</TableCell>
-                    <TableCell>{currency.format(row.budgetCashflowAmount)}</TableCell>
-                    <TableCell>{currency.format(row.availableContributionCapacity)}</TableCell>
+                    <TableCell>{currency.format(row.externalInflowAmount)}</TableCell>
+                    <TableCell>{currency.format(row.externalOutflowAmount)}</TableCell>
+                    <TableCell>{currency.format(row.internalTransferAmount)}</TableCell>
                     <TableCell>{currency.format(row.netWorth)}</TableCell>
                   </TableRow>
                 ))}

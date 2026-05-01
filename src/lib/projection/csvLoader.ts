@@ -3,27 +3,18 @@ import type { ZodType } from "zod";
 import {
   csvAccountSchema,
   csvAccountsHeaders,
-  csvBudgetItemSchema,
-  csvBudgetItemsHeaders,
   csvCheckpointSchema,
   csvCheckpointsHeaders,
-  csvContributionPlanSchema,
-  csvContributionPlansHeaders,
-  csvTransferSchema,
-  csvTransfersHeaders,
+  csvPostingSchema,
+  csvPostingsHeaders,
 } from "./csvSchema";
 import {
   CSV_SCENARIO_FILE_NAMES,
   CSV_SCENARIO_MODEL_VERSION,
   CSV_SCENARIO_PUBLIC_PATH,
-  type CsvAccount,
-  type CsvBudgetItem,
-  type CsvCheckpoint,
-  type CsvContributionPlan,
   type CsvScenarioCollectionKey,
   type CsvScenarioFileContents,
   type CsvScenarioPack,
-  type CsvTransfer,
 } from "./csvTypes";
 import { validateCsvScenarioPack } from "./csvValidation";
 import type { ScenarioPath, ScenarioValidationIssue } from "./validationTypes";
@@ -121,29 +112,18 @@ export function parseCsvScenarioPack(
 ): CsvScenarioParseResult {
   const accountsResult = parseRows(CSV_SCENARIO_FILE_NAMES.accounts, csvFiles.accounts, csvAccountsHeaders, csvAccountSchema);
   const checkpointsResult = parseRows(CSV_SCENARIO_FILE_NAMES.checkpoints, csvFiles.checkpoints, csvCheckpointsHeaders, csvCheckpointSchema);
-  const budgetItemsResult = parseRows(CSV_SCENARIO_FILE_NAMES.budgetItems, csvFiles.budgetItems, csvBudgetItemsHeaders, csvBudgetItemSchema);
-  const contributionPlansResult = parseRows(
-    CSV_SCENARIO_FILE_NAMES.contributionPlans,
-    csvFiles.contributionPlans,
-    csvContributionPlansHeaders,
-    csvContributionPlanSchema
-  );
-  const transfersResult = parseRows(CSV_SCENARIO_FILE_NAMES.transfers, csvFiles.transfers, csvTransfersHeaders, csvTransferSchema);
+  const postingsResult = parseRows(CSV_SCENARIO_FILE_NAMES.postings, csvFiles.postings, csvPostingsHeaders, csvPostingSchema);
 
   const issues = [
     ...accountsResult.issues,
     ...checkpointsResult.issues,
-    ...budgetItemsResult.issues,
-    ...contributionPlansResult.issues,
-    ...transfersResult.issues,
+    ...postingsResult.issues,
   ];
 
   if (
     accountsResult.hasFatalIssue ||
     checkpointsResult.hasFatalIssue ||
-    budgetItemsResult.hasFatalIssue ||
-    contributionPlansResult.hasFatalIssue ||
-    transfersResult.hasFatalIssue
+    postingsResult.hasFatalIssue
   ) {
     return { data: null, issues };
   }
@@ -153,9 +133,7 @@ export function parseCsvScenarioPack(
     sourcePath: options.basePath ?? CSV_SCENARIO_PUBLIC_PATH,
     accounts: accountsResult.rows,
     checkpoints: checkpointsResult.rows,
-    budgetItems: budgetItemsResult.rows,
-    contributionPlans: contributionPlansResult.rows,
-    transfers: transfersResult.rows,
+    postings: postingsResult.rows,
   };
 
   return {
@@ -185,9 +163,7 @@ export async function fetchCsvScenarioFiles(options: CsvScenarioLoadOptions = {}
   return {
     accounts: fileMap.accounts,
     checkpoints: fileMap.checkpoints,
-    budgetItems: fileMap.budgetItems,
-    contributionPlans: fileMap.contributionPlans,
-    transfers: fileMap.transfers,
+    postings: fileMap.postings,
   };
 }
 

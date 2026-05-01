@@ -17,19 +17,14 @@ const validCsvFiles: CsvScenarioFileContents = {
     "2026-03-31,brokerage,79500",
     "2026-03-31,student_loan,-12150",
   ].join("\n"),
-  budgetItems: [
-    "id,label,direction,parentBudgetItemId,amountMode,amount,annualGrowthRate,startDate,endDate,category,enabled",
-    "salary,Salary,in,,fixed,15000,0.03,2026-04-01,,earned_income,true",
-    "taxes,Taxes,out,salary,percent_of_parent,0.22,0,2026-04-01,,tax,true",
-    "housing,Housing,out,,fixed,3200,0.02,2026-04-05,,housing,true",
-  ].join("\n"),
-  contributionPlans: [
-    "id,label,targetAccountId,calculationMode,baseBudgetItemId,amount,startDate,endDate,annualCap,priority,enabled",
-    "k401_employee,401(k) Employee,k401,percent_of_budget_item,salary,0.1,2026-04-15,,23000,1,true",
-    "brokerage_auto,Brokerage Auto,brokerage,percent_of_capacity,,0.5,2026-04-28,,,2,true",
-  ].join("\n"),
-  transfers: [
-    "id,label,sourceAccountId,destinationAccountId,amountMode,amount,startDate,endDate,enabled",
+  postings: [
+    "id,label,sourceAccountId,destinationAccountId,amountMode,basePostingId,amount,annualGrowthRate,startDate,endDate,annualCap,priority,enabled",
+    "salary,Salary,,checking,fixed,,15000,0.03,2026-04-01,,,1,true",
+    "taxes,Taxes,checking,,percent_of_base,salary,0.22,0,2026-04-01,,,2,true",
+    "housing,Housing,checking,,fixed,,3200,0.02,2026-04-05,,,3,true",
+    "k401_employee,401(k) Employee,checking,k401,percent_of_base,salary,0.1,0,2026-04-15,,23000,4,true",
+    "k401_match,401(k) Match,,k401,percent_of_base,k401_employee,0.5,0,2026-04-15,,,5,true",
+    "brokerage_auto,Brokerage Auto,checking,brokerage,fixed,,500,0,2026-04-28,,,6,true",
   ].join("\n"),
 };
 
@@ -38,35 +33,35 @@ describe("CSV scenario pack", () => {
     const result = parseCsvScenarioPack(validCsvFiles, { basePath: CSV_SCENARIO_PUBLIC_PATH });
 
     expect(result.issues).toEqual([]);
-    expect(result.data?.version).toBe(5);
+    expect(result.data?.version).toBe(6);
     expect(result.data?.sourcePath).toBe(CSV_SCENARIO_PUBLIC_PATH);
-    expect(result.data?.budgetItems[1].parentBudgetItemId).toBe("salary");
-    expect(result.data?.contributionPlans[1].annualCap).toBeNull();
-    expect(result.data?.accounts[3].openingBalance).toBe(-12000);
+    expect(result.data?.postings[1]?.basePostingId).toBe("salary");
+    expect(result.data?.postings[3]?.annualCap).toBe(23000);
+    expect(result.data?.accounts[3]?.openingBalance).toBe(-12000);
   });
 
-  it("reports circular budget parent chains", () => {
+  it("reports circular posting base chains", () => {
     const result = parseCsvScenarioPack({
       ...validCsvFiles,
-      budgetItems: [
-        "id,label,direction,parentBudgetItemId,amountMode,amount,annualGrowthRate,startDate,endDate,category,enabled",
-        "salary,Salary,in,bonus,percent_of_parent,1,0,2026-04-01,,earned_income,true",
-        "bonus,Bonus,in,salary,percent_of_parent,1,0,2026-04-01,,earned_income,true",
+      postings: [
+        "id,label,sourceAccountId,destinationAccountId,amountMode,basePostingId,amount,annualGrowthRate,startDate,endDate,annualCap,priority,enabled",
+        "salary,Salary,,checking,percent_of_base,bonus,1,0,2026-04-01,,,1,true",
+        "bonus,Bonus,,checking,percent_of_base,salary,1,0,2026-04-01,,,2,true",
       ].join("\n"),
     });
 
-    expect(result.issues.some((issue) => issue.code === "budget.parent.circular")).toBe(true);
+    expect(result.issues.some((issue) => issue.code === "posting.base.circular")).toBe(true);
   });
 
-  it("reports missing contribution target accounts", () => {
+  it("reports missing posting destination accounts", () => {
     const result = parseCsvScenarioPack({
       ...validCsvFiles,
-      contributionPlans: [
-        "id,label,targetAccountId,calculationMode,baseBudgetItemId,amount,startDate,endDate,annualCap,priority,enabled",
-        "mystery,Unknown Target,missing_account,fixed,,500,2026-04-15,,,1,true",
+      postings: [
+        "id,label,sourceAccountId,destinationAccountId,amountMode,basePostingId,amount,annualGrowthRate,startDate,endDate,annualCap,priority,enabled",
+        "mystery,Unknown Target,checking,missing_account,fixed,,500,0,2026-04-15,,,1,true",
       ].join("\n"),
     });
 
-    expect(result.issues.some((issue) => issue.code === "contribution.target.missing")).toBe(true);
+    expect(result.issues.some((issue) => issue.code === "posting.destination.missing")).toBe(true);
   });
 });

@@ -231,9 +231,7 @@ export function CsvScenarioInspector({
               <CardContent className="grid gap-3 md:grid-cols-2">
                 <SummaryCard label="Accounts" value={integerFormatter.format(pack.accounts.length)} />
                 <SummaryCard label="Checkpoints" value={integerFormatter.format(pack.checkpoints.length)} />
-                <SummaryCard label="Budget items" value={integerFormatter.format(pack.budgetItems.length)} />
-                <SummaryCard label="Contribution plans" value={integerFormatter.format(pack.contributionPlans.length)} />
-                <SummaryCard label="Transfers" value={integerFormatter.format(pack.transfers.length)} />
+                <SummaryCard label="Postings" value={integerFormatter.format(pack.postings.length)} />
               </CardContent>
             </Card>
           </div>
@@ -241,14 +239,14 @@ export function CsvScenarioInspector({
           <Alert className="rounded-[1.6rem] border-sky-200 bg-sky-50 text-sky-950">
             <AlertTitle>Projection model rules</AlertTitle>
             <AlertDescription className="text-sky-950/80">
-              <code>budget_items</code> define dated contribution capacity only. <code>contribution_plans</code>, <code>transfers</code>, and account <code>annualRate</code> values change future balances. Historical rows come from exact checkpoint dates.
+              <code>postings</code> define all future external inflows, external outflows, and account-to-account transfers. Historical rows come from exact checkpoint dates. Account <code>annualRate</code> still compounds between dated events.
             </AlertDescription>
           </Alert>
 
           <div className="space-y-4">
             <SectionDisclosure
               title="Core projection inputs"
-              description="Open to inspect the runtime settings and plan definitions that most affect the projection."
+              description="Open to inspect the runtime settings and scheduled rules that most affect the projection."
               defaultOpen
             >
               <div className="space-y-4">
@@ -270,16 +268,18 @@ export function CsvScenarioInspector({
                 />
 
                 <DataTable
-                  title="Contribution Plans"
-                  description="Future balance-changing contributions into tracked accounts."
-                  rows={pack.contributionPlans}
+                  title="Postings"
+                  description="Generic scheduled debit and credit rules. Blank source or destination means an external flow."
+                  rows={pack.postings}
                   columns={[
                     { key: "id", label: "ID" },
                     { key: "label", label: "Label" },
-                    { key: "targetAccountId", label: "Target Account" },
-                    { key: "calculationMode", label: "Calculation Mode" },
-                    { key: "baseBudgetItemId", label: "Base Budget Item" },
-                    { key: "amount", label: "Amount" },
+                    { key: "sourceAccountId", label: "Source" },
+                    { key: "destinationAccountId", label: "Destination" },
+                    { key: "amountMode", label: "Amount Mode" },
+                    { key: "basePostingId", label: "Base Posting" },
+                    { key: "amount", label: "Amount", format: (value, row) => row.amountMode === "fixed" ? formatCurrency(value) : formatValue(value) },
+                    { key: "annualGrowthRate", label: "Annual Growth" },
                     { key: "startDate", label: "Start Date" },
                     { key: "endDate", label: "End Date" },
                     { key: "annualCap", label: "Annual Cap", format: (value) => value === null ? "-" : formatCurrency(value) },
@@ -290,7 +290,7 @@ export function CsvScenarioInspector({
 
                 <DataTable
                   title="Accounts"
-                  description="Tracked signed balances that contribute to net worth."
+                  description="Tracked signed balances that contribute directly to net worth."
                   rows={pack.accounts}
                   columns={[
                     { key: "id", label: "ID" },
@@ -299,50 +299,6 @@ export function CsvScenarioInspector({
                     { key: "openingBalance", label: "Opening Balance", format: (value) => formatCurrency(value) },
                     { key: "annualRate", label: "Annual Rate" },
                     { key: "color", label: "Color" },
-                    { key: "enabled", label: "Enabled" },
-                  ]}
-                />
-              </div>
-            </SectionDisclosure>
-
-            <SectionDisclosure
-              title="Supporting assumptions"
-              description="Budget capacity and transfer rules that influence the projection indirectly or conditionally."
-            >
-              <div className="space-y-4">
-                <DataTable
-                  title="Budget Items"
-                  description="Dated income and spending assumptions used only for contribution-capacity math."
-                  rows={pack.budgetItems}
-                  columns={[
-                    { key: "id", label: "ID" },
-                    { key: "label", label: "Label" },
-                    { key: "direction", label: "Direction" },
-                    { key: "parentBudgetItemId", label: "Parent" },
-                    { key: "amountMode", label: "Amount Mode" },
-                    { key: "amount", label: "Amount", format: (value, row) => row.amountMode === "fixed" ? formatCurrency(value) : formatValue(value) },
-                    { key: "annualGrowthRate", label: "Annual Growth" },
-                    { key: "startDate", label: "Start Date" },
-                    { key: "endDate", label: "End Date" },
-                    { key: "category", label: "Category" },
-                    { key: "enabled", label: "Enabled" },
-                  ]}
-                />
-
-                <DataTable
-                  title="Transfers"
-                  description="Optional moves between tracked accounts."
-                  rows={pack.transfers}
-                  emptyText="No transfers are defined in transfers.csv."
-                  columns={[
-                    { key: "id", label: "ID" },
-                    { key: "label", label: "Label" },
-                    { key: "sourceAccountId", label: "Source" },
-                    { key: "destinationAccountId", label: "Destination" },
-                    { key: "amountMode", label: "Amount Mode" },
-                    { key: "amount", label: "Amount", format: (value) => formatCurrency(value) },
-                    { key: "startDate", label: "Start Date" },
-                    { key: "endDate", label: "End Date" },
                     { key: "enabled", label: "Enabled" },
                   ]}
                 />

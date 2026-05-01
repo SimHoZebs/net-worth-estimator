@@ -1,13 +1,14 @@
-import type { CsvContributionPlan, CsvScenarioPack, CsvScenarioWhatIfState } from "@/lib/projection";
+import type { CsvPosting, CsvScenarioPack, CsvScenarioWhatIfState } from "@/lib/projection";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { currency } from "@/lib/format";
 
-interface CsvContributionWhatIfControlsProps {
+interface CsvPostingWhatIfControlsProps {
   pack: CsvScenarioPack;
   whatIfState: CsvScenarioWhatIfState;
   activeOverrideCount: number;
-  onSetContributionMultiplier: (contributionPlanId: string, multiplier: number) => void;
-  onClearContributionOverride: (contributionPlanId: string) => void;
+  onSetPostingMultiplier: (postingId: string, multiplier: number) => void;
+  onClearPostingOverride: (postingId: string) => void;
   onResetAllOverrides: () => void;
 }
 
@@ -16,35 +17,42 @@ const multiplierFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
-function describePlan(plan: CsvContributionPlan) {
-  if (plan.calculationMode === "fixed") {
-    return `Base amount ${plan.amount}`;
+function describePosting(posting: CsvPosting) {
+  if (posting.amountMode === "fixed") {
+    return `Base amount ${currency.format(posting.amount)}`;
   }
 
-  if (plan.calculationMode === "percent_of_capacity") {
-    return `${Math.round(plan.amount * 100)}% of capacity`;
-  }
-
-  return `${Math.round(plan.amount * 100)}% of ${plan.baseBudgetItemId ?? "budget item"}`;
+  return `${Math.round(posting.amount * 100)}% of ${posting.basePostingId ?? "base posting"}`;
 }
 
-export function CsvContributionWhatIfControls({
+function describeRoute(posting: CsvPosting, pack: CsvScenarioPack) {
+  const sourceLabel = posting.sourceAccountId
+    ? pack.accounts.find((account) => account.id === posting.sourceAccountId)?.label ?? posting.sourceAccountId
+    : "External";
+  const destinationLabel = posting.destinationAccountId
+    ? pack.accounts.find((account) => account.id === posting.destinationAccountId)?.label ?? posting.destinationAccountId
+    : "External";
+
+  return `${sourceLabel} -> ${destinationLabel}`;
+}
+
+export function CsvPostingWhatIfControls({
   pack,
   whatIfState,
   activeOverrideCount,
-  onSetContributionMultiplier,
-  onClearContributionOverride,
+  onSetPostingMultiplier,
+  onClearPostingOverride,
   onResetAllOverrides,
-}: CsvContributionWhatIfControlsProps) {
-  const enabledContributionPlans = pack.contributionPlans.filter((plan) => plan.enabled);
+}: CsvPostingWhatIfControlsProps) {
+  const enabledPostings = pack.postings.filter((posting) => posting.enabled);
 
   return (
     <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
       <CardHeader>
         <div>
-          <CardTitle>Adjust contribution levers</CardTitle>
+          <CardTitle>Adjust scheduled postings</CardTitle>
           <CardDescription>
-            Test stronger or weaker funding plans without changing the CSV data files. These overrides are temporary to this browser session.
+            Test stronger or weaker cash-flow rules without changing the CSV data files. These overrides are temporary to this browser session.
           </CardDescription>
         </div>
         <CardAction>
@@ -57,27 +65,26 @@ export function CsvContributionWhatIfControls({
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
           {activeOverrideCount > 0
             ? `${activeOverrideCount} temporary override${activeOverrideCount === 1 ? " is" : "s are"} affecting the projection below.`
-            : "No temporary overrides are active. All plans are running at their CSV-defined levels."}
+            : "No temporary overrides are active. All postings are running at their CSV-defined levels."}
         </div>
 
-        {enabledContributionPlans.length > 0 ? enabledContributionPlans.map((plan) => {
-          const override = whatIfState.contributionPlanOverrides[plan.id];
+        {enabledPostings.length > 0 ? enabledPostings.map((posting) => {
+          const override = whatIfState.postingOverrides[posting.id];
           const multiplier = override?.mode === "multiplier" ? override.value : 1;
           const sliderValue = Math.round(multiplier * 100);
-          const targetLabel = pack.accounts.find((account) => account.id === plan.targetAccountId)?.label ?? plan.targetAccountId;
 
           return (
-            <div key={plan.id} className="rounded-2xl border border-slate-200 p-4">
+            <div key={posting.id} className="rounded-2xl border border-slate-200 p-4">
               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <div className="font-medium text-slate-900">{plan.label}</div>
+                  <div className="font-medium text-slate-900">{posting.label}</div>
                   <div className="text-sm text-slate-500">
-                    Target: {targetLabel}. Rule: {describePlan(plan)}.
+                    Route: {describeRoute(posting, pack)}. Rule: {describePosting(posting)}.
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-slate-600">
                   <span>{multiplierFormatter.format(multiplier)}x</span>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => onClearContributionOverride(plan.id)} disabled={override === undefined}>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => onClearPostingOverride(posting.id)} disabled={override === undefined}>
                     Reset
                   </Button>
                 </div>
@@ -90,7 +97,7 @@ export function CsvContributionWhatIfControls({
                   max={200}
                   step={5}
                   value={sliderValue}
-                  onChange={(event) => onSetContributionMultiplier(plan.id, Number(event.currentTarget.value) / 100)}
+                  onChange={(event) => onSetPostingMultiplier(posting.id, Number(event.currentTarget.value) / 100)}
                   className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-slate-900"
                 />
                 <div className="flex justify-between text-xs text-slate-500">
@@ -103,7 +110,7 @@ export function CsvContributionWhatIfControls({
           );
         }) : (
           <div className="rounded-2xl border border-slate-200 p-6 text-center text-sm text-slate-500">
-            No enabled contribution plans are available for temporary overrides.
+            No enabled postings are available for temporary overrides.
           </div>
         )}
       </CardContent>

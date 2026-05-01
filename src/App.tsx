@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CsvScenarioInspector } from "./components/CsvScenarioInspector";
 import { CsvProjectionDashboard } from "./components/CsvProjectionDashboard";
-import { CsvContributionWhatIfControls } from "./components/CsvContributionWhatIfControls";
+import { CsvPostingWhatIfControls } from "./components/CsvContributionWhatIfControls";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
 import { useCsvWhatIfState } from "./hooks/useCsvWhatIfState";
 import { useCsvProjectionWorker } from "./hooks/useCsvProjectionWorker";
@@ -21,8 +21,8 @@ export default function App() {
   const {
     state: whatIfState,
     activeOverrideCount,
-    setContributionMultiplier,
-    clearContributionOverride,
+    setPostingMultiplier,
+    clearPostingOverride,
     resetAllOverrides,
   } = useCsvWhatIfState();
   const validation = summarizeValidationIssues(issues);
@@ -48,7 +48,7 @@ export default function App() {
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight md:text-5xl">CSV-Backed Net Worth Model</h1>
           <p className="max-w-3xl text-slate-500">
-            Prioritize the planning questions first: whether the target is reachable, which contributions matter, and what changes the projection. The raw CSV pack remains available as reference below.
+            Prioritize the planning questions first: whether the target is reachable, which scheduled cash movements matter, and what changes the projection. The raw CSV pack remains available as reference below.
           </p>
         </div>
 
@@ -89,12 +89,12 @@ export default function App() {
         ) : null}
 
         {pack ? (
-          <CsvContributionWhatIfControls
+          <CsvPostingWhatIfControls
             pack={pack}
             whatIfState={whatIfState}
             activeOverrideCount={activeOverrideCount}
-            onSetContributionMultiplier={setContributionMultiplier}
-            onClearContributionOverride={clearContributionOverride}
+            onSetPostingMultiplier={setPostingMultiplier}
+            onClearPostingOverride={clearPostingOverride}
             onResetAllOverrides={resetAllOverrides}
           />
         ) : null}

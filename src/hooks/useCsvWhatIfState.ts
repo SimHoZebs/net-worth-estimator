@@ -4,24 +4,24 @@ import type { CsvScenarioWhatIfState } from "@/lib/projection";
 const DEFAULT_MULTIPLIER = 1;
 
 const initialState: CsvScenarioWhatIfState = {
-  contributionPlanOverrides: {},
+  postingOverrides: {},
 };
 
 export function useCsvWhatIfState() {
   const [state, setState] = useState<CsvScenarioWhatIfState>(initialState);
 
-  const setContributionMultiplier = useCallback((contributionPlanId: string, multiplier: number) => {
+  const setPostingMultiplier = useCallback((postingId: string, multiplier: number) => {
     setState((current) => {
       if (Math.abs(multiplier - DEFAULT_MULTIPLIER) < 0.0001) {
-        const { [contributionPlanId]: _ignored, ...remainingOverrides } = current.contributionPlanOverrides;
-        return { contributionPlanOverrides: remainingOverrides };
+        const { [postingId]: _ignored, ...remainingOverrides } = current.postingOverrides;
+        return { postingOverrides: remainingOverrides };
       }
 
       return {
-        contributionPlanOverrides: {
-          ...current.contributionPlanOverrides,
-          [contributionPlanId]: {
-            contributionPlanId,
+        postingOverrides: {
+          ...current.postingOverrides,
+          [postingId]: {
+            postingId,
             mode: "multiplier",
             value: multiplier,
           },
@@ -30,10 +30,10 @@ export function useCsvWhatIfState() {
     });
   }, []);
 
-  const clearContributionOverride = useCallback((contributionPlanId: string) => {
+  const clearPostingOverride = useCallback((postingId: string) => {
     setState((current) => {
-      const { [contributionPlanId]: _ignored, ...remainingOverrides } = current.contributionPlanOverrides;
-      return { contributionPlanOverrides: remainingOverrides };
+      const { [postingId]: _ignored, ...remainingOverrides } = current.postingOverrides;
+      return { postingOverrides: remainingOverrides };
     });
   }, []);
 
@@ -42,15 +42,15 @@ export function useCsvWhatIfState() {
   }, []);
 
   const activeOverrideCount = useMemo(
-    () => Object.keys(state.contributionPlanOverrides).length,
-    [state.contributionPlanOverrides]
+    () => Object.keys(state.postingOverrides).length,
+    [state.postingOverrides]
   );
 
   return {
     state,
     activeOverrideCount,
-    setContributionMultiplier,
-    clearContributionOverride,
+    setPostingMultiplier,
+    clearPostingOverride,
     resetAllOverrides,
   };
 }

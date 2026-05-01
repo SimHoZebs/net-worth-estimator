@@ -1,14 +1,12 @@
 import type {
   CsvAccount,
-  CsvBudgetItem,
-  CsvContributionPlan,
+  CsvPosting,
   CsvProjectionAccountSummary,
-  CsvProjectionContributionSummary,
+  CsvProjectionPostingSummary,
   CsvProjectionResult,
   CsvProjectionRow,
   CsvScenarioPack,
   CsvScenarioWhatIfState,
-  CsvTransfer,
   IsoDate,
   ProjectionRuntimeSettings,
 } from "./csvTypes";
@@ -16,15 +14,10 @@ import type {
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const DAYS_PER_YEAR = 365;
 
-interface DatedBudgetItemOccurrence {
-  budgetItem: CsvBudgetItem;
+interface DatedPostingOccurrence {
+  posting: CsvPosting;
   monthsElapsed: number;
-}
-
-interface DatedEventGroup {
-  budgetItems: DatedBudgetItemOccurrence[];
-  contributionPlans: CsvContributionPlan[];
-  transfers: CsvTransfer[];
+  index: number;
 }
 
 interface NormalizedCheckpoints {
@@ -71,12 +64,6 @@ function addMonthsClamped(date: IsoDate, monthsToAdd: number): IsoDate {
 
 function addYearsClamped(date: IsoDate, yearsToAdd: number): IsoDate {
   return addMonthsClamped(date, yearsToAdd * 12);
-}
-
-function getCalendarMonthDifference(startDate: IsoDate, endDate: IsoDate): number {
-  const start = parseIsoDate(startDate);
-  const end = parseIsoDate(endDate);
-  return (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + (end.getUTCMonth() - start.getUTCMonth());
 }
 
 function roundCurrency(value: number): number {
@@ -156,23 +143,24 @@ function normalizeCheckpoints(pack: CsvScenarioPack): NormalizedCheckpoints {
   };
 }
 
-function addMonthlyOccurrences<T extends { enabled: boolean; startDate: IsoDate; endDate: IsoDate | null }>(
-  items: T[],
-  eventDates: Map<IsoDate, DatedEventGroup>,
+function addMonthlyOccurrences(
+  postings: CsvPosting[],
+  eventDates: Map<IsoDate, DatedPostingOccurrence[]>,
   projectionStartDate: IsoDate,
   projectionEndDate: IsoDate,
-  includeStartDate: boolean,
-  assign: (group: DatedEventGroup, item: T, monthsElapsed: number) => void
+  includeStartDate: boolean
 ): void {
-  items.forEach((item) => {
-    if (!item.enabled) {
+  postings.forEach((posting, index) => {
+    if (!posting.enabled) {
       return;
     }
 
-    const effectiveEndDate = item.endDate !== null && compareIsoDates(item.endDate, projectionEndDate) < 0 ? item.endDate : projectionEndDate;
+    const effectiveEndDate = posting.endDate !== null && compareIsoDates(posting.endDate, projectionEndDate) < 0
+      ? posting.endDate
+      : projectionEndDate;
 
     for (let monthsElapsed = 0; ; monthsElapsed += 1) {
-      const occurrenceDate = addMonthsClamped(item.startDate, monthsElapsed);
+      const occurrenceDate = addMonthsClamped(posting.startDate, monthsElapsed);
       if (compareIsoDates(occurrenceDate, effectiveEndDate) > 0) {
         break;
       }
@@ -185,124 +173,77 @@ function addMonthlyOccurrences<T extends { enabled: boolean; startDate: IsoDate;
         continue;
       }
 
-      const group = eventDates.get(occurrenceDate) ?? { budgetItems: [], contributionPlans: [], transfers: [] };
-      assign(group, item, monthsElapsed);
-      eventDates.set(occurrenceDate, group);
+      const occurrences = eventDates.get(occurrenceDate) ?? [];
+      occurrences.push({ posting, monthsElapsed, index });
+      eventDates.set(occurrenceDate, occurrences);
     }
   });
 }
 
-function buildBudgetItemAmountsForDate(
-  occurrences: DatedBudgetItemOccurrence[],
-  latestBudgetItemAmountById: Map<string, number>
-): Record<string, number> {
-  const occurrenceById = new Map(occurrences.map((occurrence) => [occurrence.budgetItem.id, occurrence]));
-  const memo = new Map<string, number>();
-  const resolving = new Set<string>();
-
-  const resolveAmount = (budgetItemId: string): number => {
-    const cached = memo.get(budgetItemId);
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const occurrence = occurrenceById.get(budgetItemId);
-    if (!occurrence) {
-      const latestAmount = latestBudgetItemAmountById.get(budgetItemId) ?? 0;
-      memo.set(budgetItemId, latestAmount);
-      return latestAmount;
-    }
-
-    if (resolving.has(budgetItemId)) {
-      memo.set(budgetItemId, 0);
-      return 0;
-    }
-
-    resolving.add(budgetItemId);
-
-    const { budgetItem, monthsElapsed } = occurrence;
-    const baseAmount = budgetItem.amountMode === "fixed"
-      ? budgetItem.amount
-      : budgetItem.parentBudgetItemId
-        ? resolveAmount(budgetItem.parentBudgetItemId) * budgetItem.amount
-        : 0;
-    const resolvedAmount = applyAnnualGrowth(baseAmount, budgetItem.annualGrowthRate, monthsElapsed);
-
-    resolving.delete(budgetItemId);
-    memo.set(budgetItemId, resolvedAmount);
-    return resolvedAmount;
-  };
-
-  occurrences.forEach((occurrence) => {
-    resolveAmount(occurrence.budgetItem.id);
-  });
-
-  return Object.fromEntries(memo.entries());
-}
-
-function getContributionRequestedAmount(
-  contributionPlan: CsvContributionPlan,
-  availableContributionCapacity: number,
-  latestBudgetItemAmountById: Map<string, number>,
+function getPostingRequestedAmount(
+  occurrence: DatedPostingOccurrence,
+  latestRealizedPostingAmountById: Map<string, number>,
   whatIfState: CsvScenarioWhatIfState
 ): number {
-  const override = whatIfState.contributionPlanOverrides[contributionPlan.id];
+  const { posting, monthsElapsed } = occurrence;
+  const override = whatIfState.postingOverrides[posting.id];
 
   if (override?.mode === "amount") {
     return Math.max(0, override.value);
   }
 
   const multiplier = override?.mode === "multiplier" ? Math.max(0, override.value) : 1;
+  const baseAmount = posting.amountMode === "fixed"
+    ? posting.amount
+    : posting.basePostingId
+      ? (latestRealizedPostingAmountById.get(posting.basePostingId) ?? 0) * posting.amount
+      : 0;
 
-  if (contributionPlan.calculationMode === "fixed") {
-    return contributionPlan.amount * multiplier;
-  }
-
-  if (contributionPlan.calculationMode === "percent_of_capacity") {
-    return Math.max(0, availableContributionCapacity) * contributionPlan.amount * multiplier;
-  }
-
-  if (!contributionPlan.baseBudgetItemId) {
-    return 0;
-  }
-
-  return (latestBudgetItemAmountById.get(contributionPlan.baseBudgetItemId) ?? 0) * contributionPlan.amount * multiplier;
+  return applyAnnualGrowth(baseAmount, posting.annualGrowthRate, monthsElapsed) * multiplier;
 }
 
-function applyContributionToBalance(account: CsvAccount, balances: Record<string, number>, amount: number): void {
-  balances[account.id] = (balances[account.id] ?? 0) + amount;
-}
-
-function resolveTransferAmount(
-  transfer: CsvTransfer,
+function resolvePostingAmount(
+  posting: CsvPosting,
+  requestedAmount: number,
+  annualCapRemaining: number,
   balances: Record<string, number>,
   accountById: Map<string, CsvAccount>
 ): number {
-  const sourceAccount = accountById.get(transfer.sourceAccountId);
-  const destinationAccount = accountById.get(transfer.destinationAccountId);
-
-  if (!sourceAccount || !destinationAccount) {
+  if (requestedAmount <= 0) {
     return 0;
   }
 
-  return Math.max(0, Math.min(transfer.amount, Math.max(0, balances[sourceAccount.id] ?? 0)));
+  if (posting.sourceAccountId !== null && !accountById.has(posting.sourceAccountId)) {
+    return 0;
+  }
+
+  if (posting.destinationAccountId !== null && !accountById.has(posting.destinationAccountId)) {
+    return 0;
+  }
+
+  const sourceBalanceLimit = posting.sourceAccountId === null
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, balances[posting.sourceAccountId] ?? 0);
+
+  return Math.max(0, Math.min(requestedAmount, annualCapRemaining, sourceBalanceLimit));
 }
 
-function applyTransfer(
-  transfer: CsvTransfer,
+function applyPosting(
+  posting: CsvPosting,
   realizedAmount: number,
-  balances: Record<string, number>,
-  accountById: Map<string, CsvAccount>
+  balances: Record<string, number>
 ): void {
-  const sourceAccount = accountById.get(transfer.sourceAccountId);
-  const destinationAccount = accountById.get(transfer.destinationAccountId);
-
-  if (!sourceAccount || !destinationAccount || realizedAmount <= 0) {
+  if (realizedAmount <= 0) {
     return;
   }
 
-  balances[sourceAccount.id] = (balances[sourceAccount.id] ?? 0) - realizedAmount;
-  balances[destinationAccount.id] = (balances[destinationAccount.id] ?? 0) + realizedAmount;
+  if (posting.sourceAccountId !== null) {
+    balances[posting.sourceAccountId] = (balances[posting.sourceAccountId] ?? 0) - realizedAmount;
+  }
+
+  if (posting.destinationAccountId !== null) {
+    balances[posting.destinationAccountId] = (balances[posting.destinationAccountId] ?? 0) + realizedAmount;
+  }
 }
 
 function createRow({
@@ -310,41 +251,44 @@ function createRow({
   isHistorical,
   balances,
   accounts,
-  availableContributionCapacity,
-  budgetCashflowAmount,
-  requestedContributionAmount,
-  realizedContributionAmount,
-  transferAmount,
+  externalInflowAmount,
+  externalOutflowAmount,
+  internalTransferAmount,
+  requestedPostingAmount,
+  realizedPostingAmount,
+  clampedPostingShortfallAmount,
   growthNetWorthImpact,
-  requestedContributionAmountsByPlanId,
-  realizedContributionAmountsByPlanId,
+  requestedPostingAmountsById,
+  realizedPostingAmountsById,
 }: {
   date: IsoDate;
   isHistorical: boolean;
   balances: Record<string, number>;
   accounts: CsvAccount[];
-  availableContributionCapacity: number;
-  budgetCashflowAmount: number;
-  requestedContributionAmount: number;
-  realizedContributionAmount: number;
-  transferAmount: number;
+  externalInflowAmount: number;
+  externalOutflowAmount: number;
+  internalTransferAmount: number;
+  requestedPostingAmount: number;
+  realizedPostingAmount: number;
+  clampedPostingShortfallAmount: number;
   growthNetWorthImpact: number;
-  requestedContributionAmountsByPlanId: Record<string, number>;
-  realizedContributionAmountsByPlanId: Record<string, number>;
+  requestedPostingAmountsById: Record<string, number>;
+  realizedPostingAmountsById: Record<string, number>;
 }): CsvProjectionRow {
   return {
     date,
     isHistorical,
     netWorth: computeNetWorth(balances, accounts),
     accountBalances: { ...balances },
-    availableContributionCapacity,
-    budgetCashflowAmount,
-    requestedContributionAmount,
-    realizedContributionAmount,
-    transferAmount,
+    externalInflowAmount,
+    externalOutflowAmount,
+    internalTransferAmount,
+    requestedPostingAmount,
+    realizedPostingAmount,
+    clampedPostingShortfallAmount,
     growthNetWorthImpact,
-    requestedContributionAmountsByPlanId,
-    realizedContributionAmountsByPlanId,
+    requestedPostingAmountsById,
+    realizedPostingAmountsById,
   };
 }
 
@@ -352,18 +296,19 @@ function roundRow(row: CsvProjectionRow): CsvProjectionRow {
   return {
     ...row,
     netWorth: roundCurrency(row.netWorth),
-    availableContributionCapacity: roundCurrency(row.availableContributionCapacity),
-    budgetCashflowAmount: roundCurrency(row.budgetCashflowAmount),
-    requestedContributionAmount: roundCurrency(row.requestedContributionAmount),
-    realizedContributionAmount: roundCurrency(row.realizedContributionAmount),
-    transferAmount: roundCurrency(row.transferAmount),
+    externalInflowAmount: roundCurrency(row.externalInflowAmount),
+    externalOutflowAmount: roundCurrency(row.externalOutflowAmount),
+    internalTransferAmount: roundCurrency(row.internalTransferAmount),
+    requestedPostingAmount: roundCurrency(row.requestedPostingAmount),
+    realizedPostingAmount: roundCurrency(row.realizedPostingAmount),
+    clampedPostingShortfallAmount: roundCurrency(row.clampedPostingShortfallAmount),
     growthNetWorthImpact: roundCurrency(row.growthNetWorthImpact),
     accountBalances: Object.fromEntries(Object.entries(row.accountBalances).map(([accountId, balance]) => [accountId, roundCurrency(balance)])),
-    requestedContributionAmountsByPlanId: Object.fromEntries(
-      Object.entries(row.requestedContributionAmountsByPlanId).map(([planId, amount]) => [planId, roundCurrency(amount)])
+    requestedPostingAmountsById: Object.fromEntries(
+      Object.entries(row.requestedPostingAmountsById).map(([postingId, amount]) => [postingId, roundCurrency(amount)])
     ),
-    realizedContributionAmountsByPlanId: Object.fromEntries(
-      Object.entries(row.realizedContributionAmountsByPlanId).map(([planId, amount]) => [planId, roundCurrency(amount)])
+    realizedPostingAmountsById: Object.fromEntries(
+      Object.entries(row.realizedPostingAmountsById).map(([postingId, amount]) => [postingId, roundCurrency(amount)])
     ),
   };
 }
@@ -373,7 +318,7 @@ export function projectCsvScenarioPack(
   projectionSettings: ProjectionRuntimeSettings,
   whatIfState?: CsvScenarioWhatIfState
 ): CsvProjectionResult {
-  const normalizedWhatIfState: CsvScenarioWhatIfState = whatIfState ?? { contributionPlanOverrides: {} };
+  const normalizedWhatIfState: CsvScenarioWhatIfState = whatIfState ?? { postingOverrides: {} };
   const normalizedCheckpoints = normalizeCheckpoints(pack);
   const projectionStartDate = normalizedCheckpoints.latestCheckpointDate ?? projectionSettings.fallbackProjectionStartDate;
   const projectionEndDate = addYearsClamped(projectionStartDate, projectionSettings.horizonYears);
@@ -382,15 +327,16 @@ export function projectCsvScenarioPack(
   const rows: CsvProjectionRow[] = [];
   const balances = createBaseBalances(pack.accounts);
   const futureStartingBalances = createBaseBalances(pack.accounts);
-  const latestBudgetItemAmountById = new Map<string, number>();
-  const realizedContributionAmountByPlanAndYear = new Map<string, number>();
-  const requestedContributionTotalsByPlanId = new Map(pack.contributionPlans.map((plan) => [plan.id, 0]));
-  const realizedContributionTotalsByPlanId = new Map(pack.contributionPlans.map((plan) => [plan.id, 0]));
-  let availableContributionCapacity = 0;
-  let totalBudgetCashflowAmount = 0;
-  let totalRequestedContributions = 0;
-  let totalRealizedContributions = 0;
-  let totalTransferAmount = 0;
+  const latestRealizedPostingAmountById = new Map<string, number>();
+  const realizedPostingAmountByIdAndYear = new Map<string, number>();
+  const requestedPostingTotalsById = new Map(pack.postings.map((posting) => [posting.id, 0]));
+  const realizedPostingTotalsById = new Map(pack.postings.map((posting) => [posting.id, 0]));
+  let totalExternalInflowAmount = 0;
+  let totalExternalOutflowAmount = 0;
+  let totalInternalTransferAmount = 0;
+  let totalRequestedPostingAmount = 0;
+  let totalRealizedPostingAmount = 0;
+  let totalClampedPostingShortfallAmount = 0;
   let totalGrowthNetWorthImpact = 0;
 
   normalizedCheckpoints.dates.forEach(({ date, checkpoints }) => {
@@ -404,43 +350,30 @@ export function projectCsvScenarioPack(
         isHistorical: true,
         balances,
         accounts: pack.accounts,
-        availableContributionCapacity,
-        budgetCashflowAmount: 0,
-        requestedContributionAmount: 0,
-        realizedContributionAmount: 0,
-        transferAmount: 0,
+        externalInflowAmount: 0,
+        externalOutflowAmount: 0,
+        internalTransferAmount: 0,
+        requestedPostingAmount: 0,
+        realizedPostingAmount: 0,
+        clampedPostingShortfallAmount: 0,
         growthNetWorthImpact: 0,
-        requestedContributionAmountsByPlanId: {},
-        realizedContributionAmountsByPlanId: {},
+        requestedPostingAmountsById: {},
+        realizedPostingAmountsById: {},
       })
     );
   });
 
   Object.assign(futureStartingBalances, balances);
 
-  const eventDates = new Map<IsoDate, DatedEventGroup>();
-
-  addMonthlyOccurrences(pack.budgetItems, eventDates, projectionStartDate, projectionEndDate, includeStartDateEvents, (group, budgetItem, monthsElapsed) => {
-    group.budgetItems.push({ budgetItem, monthsElapsed });
-  });
-  addMonthlyOccurrences(pack.contributionPlans, eventDates, projectionStartDate, projectionEndDate, includeStartDateEvents, (group, contributionPlan) => {
-    group.contributionPlans.push(contributionPlan);
-  });
-  addMonthlyOccurrences(pack.transfers, eventDates, projectionStartDate, projectionEndDate, includeStartDateEvents, (group, transfer) => {
-    group.transfers.push(transfer);
-  });
+  const eventDates = new Map<IsoDate, DatedPostingOccurrence[]>();
+  addMonthlyOccurrences(pack.postings, eventDates, projectionStartDate, projectionEndDate, includeStartDateEvents);
 
   const sortedProjectedDates = Array.from(eventDates.keys()).sort(compareIsoDates);
-  const sortedContributionPlans = pack.contributionPlans
-    .map((plan, index) => ({ plan, index }))
-    .filter(({ plan }) => plan.enabled)
-    .sort((left, right) => left.plan.priority - right.plan.priority || left.index - right.index)
-    .map(({ plan }) => plan);
   let previousProjectedDate = projectionStartDate;
 
   sortedProjectedDates.forEach((date) => {
-    const events = eventDates.get(date);
-    if (!events) {
+    const occurrences = eventDates.get(date);
+    if (!occurrences) {
       return;
     }
 
@@ -448,70 +381,60 @@ export function projectCsvScenarioPack(
     totalGrowthNetWorthImpact += growthNetWorthImpact;
     previousProjectedDate = date;
 
-    const budgetItemAmountsById = buildBudgetItemAmountsForDate(events.budgetItems, latestBudgetItemAmountById);
-    let budgetCashflowAmount = 0;
+    const requestedPostingAmountsById: Record<string, number> = {};
+    const realizedPostingAmountsById: Record<string, number> = {};
+    let externalInflowAmount = 0;
+    let externalOutflowAmount = 0;
+    let internalTransferAmount = 0;
+    let requestedPostingAmount = 0;
+    let realizedPostingAmount = 0;
+    let clampedPostingShortfallAmount = 0;
 
-    events.budgetItems.forEach(({ budgetItem }) => {
-      const amount = budgetItemAmountsById[budgetItem.id] ?? 0;
-      latestBudgetItemAmountById.set(budgetItem.id, amount);
-      budgetCashflowAmount += budgetItem.direction === "in" ? amount : -amount;
-    });
+    const sortedOccurrences = [...occurrences].sort(
+      (left, right) => left.posting.priority - right.posting.priority || left.index - right.index
+    );
 
-    availableContributionCapacity += budgetCashflowAmount;
-    totalBudgetCashflowAmount += budgetCashflowAmount;
-
-    const eventsContributionPlanIds = new Set(events.contributionPlans.map((plan) => plan.id));
-    const requestedContributionAmountsByPlanId: Record<string, number> = {};
-    const realizedContributionAmountsByPlanId: Record<string, number> = {};
-    let requestedContributionAmount = 0;
-    let realizedContributionAmount = 0;
-
-    sortedContributionPlans.forEach((contributionPlan) => {
-      if (!eventsContributionPlanIds.has(contributionPlan.id)) {
-        return;
-      }
-
-      const requestedAmount = Math.max(
-        0,
-        getContributionRequestedAmount(contributionPlan, availableContributionCapacity, latestBudgetItemAmountById, normalizedWhatIfState)
-      );
-      const targetAccount = accountById.get(contributionPlan.targetAccountId);
-      const capKey = `${contributionPlan.id}:${date.slice(0, 4)}`;
-      const annualCapRemaining = contributionPlan.annualCap === null
+    sortedOccurrences.forEach((occurrence) => {
+      const { posting } = occurrence;
+      const requestedAmount = Math.max(0, getPostingRequestedAmount(occurrence, latestRealizedPostingAmountById, normalizedWhatIfState));
+      const capKey = `${posting.id}:${date.slice(0, 4)}`;
+      const annualCapRemaining = posting.annualCap === null
         ? Number.POSITIVE_INFINITY
-        : Math.max(0, contributionPlan.annualCap - (realizedContributionAmountByPlanAndYear.get(capKey) ?? 0));
-      const realizedAmount = targetAccount
-        ? Math.max(0, Math.min(requestedAmount, Math.max(0, availableContributionCapacity), annualCapRemaining))
-        : 0;
+        : Math.max(0, posting.annualCap - (realizedPostingAmountByIdAndYear.get(capKey) ?? 0));
+      const realizedAmount = resolvePostingAmount(posting, requestedAmount, annualCapRemaining, balances, accountById);
+      const shortfallAmount = requestedAmount - realizedAmount;
 
-      requestedContributionAmountsByPlanId[contributionPlan.id] = requestedAmount;
-      realizedContributionAmountsByPlanId[contributionPlan.id] = realizedAmount;
-      requestedContributionAmount += requestedAmount;
-      realizedContributionAmount += realizedAmount;
-      totalRequestedContributions += requestedAmount;
-      totalRealizedContributions += realizedAmount;
-      requestedContributionTotalsByPlanId.set(contributionPlan.id, (requestedContributionTotalsByPlanId.get(contributionPlan.id) ?? 0) + requestedAmount);
-      realizedContributionTotalsByPlanId.set(contributionPlan.id, (realizedContributionTotalsByPlanId.get(contributionPlan.id) ?? 0) + realizedAmount);
-      realizedContributionAmountByPlanAndYear.set(capKey, (realizedContributionAmountByPlanAndYear.get(capKey) ?? 0) + realizedAmount);
+      requestedPostingAmountsById[posting.id] = requestedAmount;
+      realizedPostingAmountsById[posting.id] = realizedAmount;
+      requestedPostingAmount += requestedAmount;
+      realizedPostingAmount += realizedAmount;
+      clampedPostingShortfallAmount += shortfallAmount;
+      totalRequestedPostingAmount += requestedAmount;
+      totalRealizedPostingAmount += realizedAmount;
+      totalClampedPostingShortfallAmount += shortfallAmount;
+      requestedPostingTotalsById.set(posting.id, (requestedPostingTotalsById.get(posting.id) ?? 0) + requestedAmount);
+      realizedPostingTotalsById.set(posting.id, (realizedPostingTotalsById.get(posting.id) ?? 0) + realizedAmount);
+      realizedPostingAmountByIdAndYear.set(capKey, (realizedPostingAmountByIdAndYear.get(capKey) ?? 0) + realizedAmount);
 
-      availableContributionCapacity -= realizedAmount;
+      applyPosting(posting, realizedAmount, balances);
+      latestRealizedPostingAmountById.set(posting.id, realizedAmount);
 
-      if (targetAccount && realizedAmount > 0) {
-        applyContributionToBalance(targetAccount, balances, realizedAmount);
-      }
-    });
-
-    let transferAmount = 0;
-
-    events.transfers.forEach((transfer) => {
-      const realizedAmount = resolveTransferAmount(transfer, balances, accountById);
-      if (realizedAmount <= 0) {
+      if (posting.sourceAccountId === null && posting.destinationAccountId !== null) {
+        externalInflowAmount += realizedAmount;
+        totalExternalInflowAmount += realizedAmount;
         return;
       }
 
-      applyTransfer(transfer, realizedAmount, balances, accountById);
-      transferAmount += realizedAmount;
-      totalTransferAmount += realizedAmount;
+      if (posting.sourceAccountId !== null && posting.destinationAccountId === null) {
+        externalOutflowAmount += realizedAmount;
+        totalExternalOutflowAmount += realizedAmount;
+        return;
+      }
+
+      if (posting.sourceAccountId !== null && posting.destinationAccountId !== null) {
+        internalTransferAmount += realizedAmount;
+        totalInternalTransferAmount += realizedAmount;
+      }
     });
 
     rows.push(
@@ -520,21 +443,21 @@ export function projectCsvScenarioPack(
         isHistorical: false,
         balances,
         accounts: pack.accounts,
-        availableContributionCapacity,
-        budgetCashflowAmount,
-        requestedContributionAmount,
-        realizedContributionAmount,
-        transferAmount,
+        externalInflowAmount,
+        externalOutflowAmount,
+        internalTransferAmount,
+        requestedPostingAmount,
+        realizedPostingAmount,
+        clampedPostingShortfallAmount,
         growthNetWorthImpact,
-        requestedContributionAmountsByPlanId,
-        realizedContributionAmountsByPlanId,
+        requestedPostingAmountsById,
+        realizedPostingAmountsById,
       })
     );
   });
 
   const sampledRows = rows;
   const latestHistoricalRow = [...rows].reverse().find((row) => row.isHistorical) ?? null;
-  const latestProjectedRow = [...rows].reverse().find((row) => !row.isHistorical) ?? null;
   const latestRow = rows[rows.length - 1] ?? null;
   const currentNetWorth = latestHistoricalRow?.netWorth ?? computeNetWorth(futureStartingBalances, pack.accounts);
   const hitTargetRow = rows.find((row) => !row.isHistorical && row.netWorth >= projectionSettings.targetNetWorth) ?? null;
@@ -555,17 +478,21 @@ export function projectCsvScenarioPack(
     };
   });
 
-  const contributionSummaries: CsvProjectionContributionSummary[] = pack.contributionPlans.map((contributionPlan) => {
-    const requestedAmount = requestedContributionTotalsByPlanId.get(contributionPlan.id) ?? 0;
-    const realizedAmount = realizedContributionTotalsByPlanId.get(contributionPlan.id) ?? 0;
+  const postingSummaries: CsvProjectionPostingSummary[] = pack.postings.map((posting) => {
+    const requestedAmount = requestedPostingTotalsById.get(posting.id) ?? 0;
+    const realizedAmount = realizedPostingTotalsById.get(posting.id) ?? 0;
 
     return {
-      contributionPlanId: contributionPlan.id,
-      label: contributionPlan.label,
-      targetAccountId: contributionPlan.targetAccountId,
-      targetAccountLabel: accountById.get(contributionPlan.targetAccountId)?.label ?? contributionPlan.targetAccountId,
-      priority: contributionPlan.priority,
-      annualCap: contributionPlan.annualCap,
+      postingId: posting.id,
+      label: posting.label,
+      sourceAccountId: posting.sourceAccountId,
+      sourceAccountLabel: posting.sourceAccountId ? accountById.get(posting.sourceAccountId)?.label ?? posting.sourceAccountId : null,
+      destinationAccountId: posting.destinationAccountId,
+      destinationAccountLabel: posting.destinationAccountId
+        ? accountById.get(posting.destinationAccountId)?.label ?? posting.destinationAccountId
+        : null,
+      priority: posting.priority,
+      annualCap: posting.annualCap,
       requestedAmount: roundCurrency(requestedAmount),
       realizedAmount: roundCurrency(realizedAmount),
       utilizationRate: requestedAmount > 0 ? realizedAmount / requestedAmount : 0,
@@ -578,14 +505,15 @@ export function projectCsvScenarioPack(
       sampledRows: sampledRows.map(roundRow),
     },
     accountSummaries,
-    contributionSummaries,
+    postingSummaries,
     totals: {
-      budgetCashflowAmount: roundCurrency(totalBudgetCashflowAmount),
-      requestedContributions: roundCurrency(totalRequestedContributions),
-      realizedContributions: roundCurrency(totalRealizedContributions),
-      transferAmount: roundCurrency(totalTransferAmount),
+      externalInflowAmount: roundCurrency(totalExternalInflowAmount),
+      externalOutflowAmount: roundCurrency(totalExternalOutflowAmount),
+      internalTransferAmount: roundCurrency(totalInternalTransferAmount),
+      requestedPostingAmount: roundCurrency(totalRequestedPostingAmount),
+      realizedPostingAmount: roundCurrency(totalRealizedPostingAmount),
+      clampedPostingShortfallAmount: roundCurrency(totalClampedPostingShortfallAmount),
       growthNetWorthImpact: roundCurrency(totalGrowthNetWorthImpact),
-      latestAvailableContributionCapacity: latestProjectedRow ? roundCurrency(latestProjectedRow.availableContributionCapacity) : 0,
     },
     milestones: {
       hitTargetDate: hitTargetRow?.date ?? null,

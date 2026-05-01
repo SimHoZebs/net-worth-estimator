@@ -1,3 +1,0 @@
-id,label,targetAccountId,calculationMode,baseBudgetItemId,amount,startDate,endDate,annualCap,priority,enabled
-k401_employee,401(k) Employee,k401,percent_of_budget_item,salary,0.1,2026-04-15,,23000,1,true
-brokerage_auto,Brokerage Auto,brokerage,percent_of_capacity,,0.5,2026-04-28,,,2,true
