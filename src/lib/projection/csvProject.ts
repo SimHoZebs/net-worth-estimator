@@ -183,6 +183,7 @@ function addMonthlyOccurrences(
 function getPostingRequestedAmount(
   occurrence: DatedPostingOccurrence,
   latestRealizedPostingAmountById: Map<string, number>,
+  balances: Record<string, number>,
   whatIfState: CsvScenarioWhatIfState
 ): number {
   const { posting, monthsElapsed } = occurrence;
@@ -193,11 +194,25 @@ function getPostingRequestedAmount(
   }
 
   const multiplier = override?.mode === "multiplier" ? Math.max(0, override.value) : 1;
+
+  let baseValue = 0;
+
+  if (posting.amountMode === "percent_of_base" && posting.basePostingId !== null) {
+    const postingBase = latestRealizedPostingAmountById.get(posting.basePostingId);
+    const accountBase = balances[posting.basePostingId];
+
+    baseValue = postingBase !== undefined ? postingBase
+      : accountBase !== undefined ? accountBase
+      : 0;
+
+    if (posting.absBase) {
+      baseValue = Math.abs(baseValue);
+    }
+  }
+
   const baseAmount = posting.amountMode === "fixed"
     ? posting.amount
-    : posting.basePostingId
-      ? (latestRealizedPostingAmountById.get(posting.basePostingId) ?? 0) * posting.amount
-      : 0;
+    : baseValue * posting.amount;
 
   return applyAnnualGrowth(baseAmount, posting.annualGrowthRate, monthsElapsed) * multiplier;
 }
@@ -217,17 +232,20 @@ function resolvePostingAmount(
     return 0;
   }
 
-  if (posting.destinationAccountId !== null && !accountById.has(posting.destinationAccountId)) {
-    return 0;
-  }
-
   const sourceBalanceLimit = posting.sourceAccountId === null
     ? Number.POSITIVE_INFINITY
     : Math.max(0, (balances[posting.sourceAccountId] ?? 0) - (accountById.get(posting.sourceAccountId)!.minBalance ?? 0));
 
-  const destBalanceLimit = posting.destinationAccountId === null
+  const destBalanceLimit = posting.destinations === null
     ? Number.POSITIVE_INFINITY
-    : (accountById.get(posting.destinationAccountId)!.maxBalance ?? Number.POSITIVE_INFINITY) - (balances[posting.destinationAccountId] ?? 0);
+    : posting.destinations.reduce((total, destId) => {
+        const account = accountById.get(destId);
+        if (!account) {
+          return total;
+        }
+
+        return total + Math.max(0, (account.maxBalance ?? Number.POSITIVE_INFINITY) - (balances[destId] ?? 0));
+      }, 0);
 
   return Math.max(0, Math.min(requestedAmount, annualCapRemaining, sourceBalanceLimit, destBalanceLimit));
 }
@@ -235,7 +253,8 @@ function resolvePostingAmount(
 function applyPosting(
   posting: CsvPosting,
   realizedAmount: number,
-  balances: Record<string, number>
+  balances: Record<string, number>,
+  accountById: Map<string, CsvAccount>
 ): void {
   if (realizedAmount <= 0) {
     return;
@@ -245,8 +264,29 @@ function applyPosting(
     balances[posting.sourceAccountId] = (balances[posting.sourceAccountId] ?? 0) - realizedAmount;
   }
 
-  if (posting.destinationAccountId !== null) {
-    balances[posting.destinationAccountId] = (balances[posting.destinationAccountId] ?? 0) + realizedAmount;
+  if (posting.destinations === null) {
+    return;
+  }
+
+  let remaining = realizedAmount;
+
+  for (const destId of posting.destinations) {
+    if (remaining <= 0) {
+      break;
+    }
+
+    const account = accountById.get(destId);
+    if (!account) {
+      continue;
+    }
+
+    const destCap = account.maxBalance !== null
+      ? Math.max(0, account.maxBalance - (balances[destId] ?? 0))
+      : Number.POSITIVE_INFINITY;
+
+    const allocated = Math.min(remaining, destCap);
+    balances[destId] = (balances[destId] ?? 0) + allocated;
+    remaining -= allocated;
   }
 }
 
@@ -400,7 +440,7 @@ export function projectCsvScenarioPack(
 
     sortedOccurrences.forEach((occurrence) => {
       const { posting } = occurrence;
-      const requestedAmount = Math.max(0, getPostingRequestedAmount(occurrence, latestRealizedPostingAmountById, normalizedWhatIfState));
+      const requestedAmount = Math.max(0, getPostingRequestedAmount(occurrence, latestRealizedPostingAmountById, balances, normalizedWhatIfState));
       const capKey = `${posting.id}:${date.slice(0, 4)}`;
       const annualCapRemaining = posting.annualCap === null
         ? Number.POSITIVE_INFINITY
@@ -420,22 +460,22 @@ export function projectCsvScenarioPack(
       realizedPostingTotalsById.set(posting.id, (realizedPostingTotalsById.get(posting.id) ?? 0) + realizedAmount);
       realizedPostingAmountByIdAndYear.set(capKey, (realizedPostingAmountByIdAndYear.get(capKey) ?? 0) + realizedAmount);
 
-      applyPosting(posting, realizedAmount, balances);
+      applyPosting(posting, realizedAmount, balances, accountById);
       latestRealizedPostingAmountById.set(posting.id, realizedAmount);
 
-      if (posting.sourceAccountId === null && posting.destinationAccountId !== null) {
+      if (posting.sourceAccountId === null && posting.destinations !== null) {
         externalInflowAmount += realizedAmount;
         totalExternalInflowAmount += realizedAmount;
         return;
       }
 
-      if (posting.sourceAccountId !== null && posting.destinationAccountId === null) {
+      if (posting.sourceAccountId !== null && posting.destinations === null) {
         externalOutflowAmount += realizedAmount;
         totalExternalOutflowAmount += realizedAmount;
         return;
       }
 
-      if (posting.sourceAccountId !== null && posting.destinationAccountId !== null) {
+      if (posting.sourceAccountId !== null && posting.destinations !== null) {
         internalTransferAmount += realizedAmount;
         totalInternalTransferAmount += realizedAmount;
       }
@@ -491,9 +531,11 @@ export function projectCsvScenarioPack(
       label: posting.label,
       sourceAccountId: posting.sourceAccountId,
       sourceAccountLabel: posting.sourceAccountId ? accountById.get(posting.sourceAccountId)?.label ?? posting.sourceAccountId : null,
-      destinationAccountId: posting.destinationAccountId,
-      destinationAccountLabel: posting.destinationAccountId
-        ? accountById.get(posting.destinationAccountId)?.label ?? posting.destinationAccountId
+      destinations: posting.destinations
+        ? posting.destinations.map((destId) => ({
+            accountId: destId,
+            label: accountById.get(destId)?.label ?? destId,
+          }))
         : null,
       priority: posting.priority,
       annualCap: posting.annualCap,

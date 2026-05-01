@@ -38,8 +38,10 @@ function buildBalanceChartData(pack: CsvScenarioPack, result: CsvProjectionResul
   }));
 }
 
-function formatRoute(sourceLabel: string | null, destinationLabel: string | null) {
-  return `${sourceLabel ?? "External"} -> ${destinationLabel ?? "External"}`;
+function formatRoute(sourceLabel: string | null, destinations: Array<{ accountId: string; label: string }> | null) {
+  const dest = destinations === null ? "External" : destinations.map((d) => d.label).join(" ; ");
+
+  return `${sourceLabel ?? "External"} -> ${dest}`;
 }
 
 function SummaryCard({ title, value, detail }: { title: string; value: string; detail: string }) {
@@ -324,7 +326,7 @@ export function CsvProjectionDashboard({
                 {result.postingSummaries.length > 0 ? result.postingSummaries.map((summary) => (
                   <TableRow key={summary.postingId}>
                     <TableCell>{summary.label}</TableCell>
-                    <TableCell>{formatRoute(summary.sourceAccountLabel, summary.destinationAccountLabel)}</TableCell>
+                    <TableCell>{formatRoute(summary.sourceAccountLabel, summary.destinations)}</TableCell>
                     <TableCell>{summary.priority}</TableCell>
                     <TableCell>{currency.format(summary.requestedAmount)}</TableCell>
                     <TableCell>{currency.format(summary.realizedAmount)}</TableCell>

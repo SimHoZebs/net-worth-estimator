@@ -1,4 +1,4 @@
-export const CSV_SCENARIO_MODEL_VERSION = 6 as const;
+export const CSV_SCENARIO_MODEL_VERSION = 7 as const;
 
 export const CSV_SCENARIO_REPO_PATH = "public/scenario";
 export const CSV_SCENARIO_PUBLIC_PATH = "/scenario";
@@ -44,9 +44,10 @@ export interface CsvPosting {
   id: string;
   label: string;
   sourceAccountId: string | null;
-  destinationAccountId: string | null;
+  destinations: string[] | null;
   amountMode: PostingAmountMode;
   basePostingId: string | null;
+  absBase: boolean;
   amount: number;
   annualGrowthRate: number;
   startDate: IsoDate;
@@ -112,8 +113,7 @@ export interface CsvProjectionPostingSummary {
   label: string;
   sourceAccountId: string | null;
   sourceAccountLabel: string | null;
-  destinationAccountId: string | null;
-  destinationAccountLabel: string | null;
+  destinations: Array<{ accountId: string; label: string }> | null;
   priority: number;
   annualCap: number | null;
   requestedAmount: number;

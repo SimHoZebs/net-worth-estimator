@@ -275,7 +275,7 @@ export function CsvScenarioInspector({
                     { key: "id", label: "ID" },
                     { key: "label", label: "Label" },
                     { key: "sourceAccountId", label: "Source" },
-                    { key: "destinationAccountId", label: "Destination" },
+                    { key: "destinations", label: "Destinations", format: (value: string[] | null) => value === null ? "-" : value.join(" ; ") },
                     { key: "amountMode", label: "Amount Mode" },
                     { key: "basePostingId", label: "Base Posting" },
                     { key: "amount", label: "Amount", format: (value, row) => row.amountMode === "fixed" ? formatCurrency(value) : formatValue(value) },

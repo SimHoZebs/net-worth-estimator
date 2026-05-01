@@ -59,6 +59,19 @@ function parseNullableString(value: unknown) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function parseDestinationsArray(value: unknown): string[] | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed === "-") {
+    return null;
+  }
+
+  return trimmed.split(";").map((segment) => segment.trim()).filter(Boolean);
+}
+
 const finiteNumber = z.preprocess(parseNumber, z.number().finite());
 const nullableNumber = z.preprocess(parseOptionalNumber, z.number().finite().nullable());
 const nonNegativeNumber = z.preprocess(parseNumber, z.number().finite().min(0));
@@ -80,9 +93,10 @@ export const csvPostingsHeaders = [
   "id",
   "label",
   "sourceAccountId",
-  "destinationAccountId",
+  "destinations",
   "amountMode",
   "basePostingId",
+  "absBase",
   "amount",
   "annualGrowthRate",
   "startDate",
@@ -114,9 +128,10 @@ export const csvPostingSchema = z.object({
   id: trimmedString,
   label: trimmedString,
   sourceAccountId: nullableTrimmedString,
-  destinationAccountId: nullableTrimmedString,
+  destinations: z.preprocess(parseDestinationsArray, z.array(trimmedString).nullable()),
   amountMode: z.enum(["fixed", "percent_of_base"]),
   basePostingId: nullableTrimmedString,
+  absBase: csvBoolean,
   amount: nonNegativeNumber,
   annualGrowthRate: finiteNumber,
   startDate: csvDateSchema,

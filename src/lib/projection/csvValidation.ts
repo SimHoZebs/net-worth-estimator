@@ -57,7 +57,7 @@ function validateUniqueIds(
   });
 }
 
-function validatePostingBaseChains(issues: ScenarioValidationIssue[], postings: CsvPosting[]) {
+function validatePostingBaseChains(issues: ScenarioValidationIssue[], postings: CsvPosting[], accountIds: Set<string>) {
   const postingById = new Map(postings.map((posting) => [posting.id, posting]));
 
   postings.forEach((posting, index) => {
@@ -87,6 +87,10 @@ function validatePostingBaseChains(issues: ScenarioValidationIssue[], postings: 
       return;
     }
 
+    if (accountIds.has(posting.basePostingId)) {
+      return;
+    }
+
     if (!postingById.has(posting.basePostingId)) {
       addIssue(
         issues,
@@ -102,6 +106,10 @@ function validatePostingBaseChains(issues: ScenarioValidationIssue[], postings: 
     let currentBaseId: string | null = posting.basePostingId;
 
     while (currentBaseId !== null) {
+      if (accountIds.has(currentBaseId)) {
+        break;
+      }
+
       if (visitedIds.has(currentBaseId)) {
         addIssue(
           issues,
@@ -133,32 +141,54 @@ function validatePostings(issues: ScenarioValidationIssue[], postings: CsvPostin
       );
     }
 
-    if (posting.destinationAccountId !== null && !accountIds.has(posting.destinationAccountId)) {
-      addIssue(
-        issues,
-        "error",
-        "posting.destination.missing",
-        `Posting destination account '${posting.destinationAccountId}' does not exist.`,
-        rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber, "destinationAccountId")
-      );
+    if (posting.destinations !== null) {
+      const seenIds = new Set<string>();
+
+      posting.destinations.forEach((destinationId, destIndex) => {
+        if (!accountIds.has(destinationId)) {
+          addIssue(
+            issues,
+            "error",
+            "posting.destination.missing",
+            `Posting destination account '${destinationId}' does not exist.`,
+            rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber, "destinations")
+          );
+        }
+
+        if (seenIds.has(destinationId)) {
+          addIssue(
+            issues,
+            "error",
+            "posting.destinations.duplicate",
+            `Destination account '${destinationId}' appears more than once.`,
+            rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber, "destinations")
+          );
+        }
+
+        seenIds.add(destinationId);
+      });
     }
 
-    if (posting.sourceAccountId === null && posting.destinationAccountId === null) {
+    if (posting.sourceAccountId === null && posting.destinations === null) {
       addIssue(
         issues,
         "error",
         "posting.accounts.empty",
-        "Postings must set sourceAccountId, destinationAccountId, or both.",
+        "Postings must set sourceAccountId, destinations, or both.",
         rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber)
       );
     }
 
-    if (posting.sourceAccountId !== null && posting.sourceAccountId === posting.destinationAccountId) {
+    if (
+      posting.sourceAccountId !== null &&
+      posting.destinations !== null &&
+      posting.destinations.includes(posting.sourceAccountId)
+    ) {
       addIssue(
         issues,
         "error",
         "posting.accounts.same",
-        "Posting sourceAccountId and destinationAccountId must differ when both are set.",
+        "Posting sourceAccountId must not appear in destinations.",
         rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber)
       );
     }
@@ -178,9 +208,22 @@ function validatePostings(issues: ScenarioValidationIssue[], postings: CsvPostin
 export function validateCsvScenarioPack(pack: CsvScenarioPack): ScenarioValidationIssue[] {
   const issues: ScenarioValidationIssue[] = [];
   const accountIds = new Set(pack.accounts.map((account) => account.id));
+  const postingIds = new Set(pack.postings.map((posting) => posting.id));
 
   validateUniqueIds(issues, CSV_SCENARIO_FILE_NAMES.accounts, "account.id", pack.accounts);
   validateUniqueIds(issues, CSV_SCENARIO_FILE_NAMES.postings, "posting.id", pack.postings);
+
+  pack.accounts.forEach((account, index) => {
+    if (postingIds.has(account.id)) {
+      addIssue(
+        issues,
+        "error",
+        "account.id.collision",
+        `Account ID '${account.id}' collides with a posting ID. IDs must be unique across accounts and postings.`,
+        rowPath(CSV_SCENARIO_FILE_NAMES.accounts, index + 2, "id")
+      );
+    }
+  });
 
   pack.checkpoints.forEach((checkpoint, index) => {
     if (!accountIds.has(checkpoint.AccountId)) {
@@ -194,7 +237,7 @@ export function validateCsvScenarioPack(pack: CsvScenarioPack): ScenarioValidati
     }
   });
 
-  validatePostingBaseChains(issues, pack.postings);
+  validatePostingBaseChains(issues, pack.postings, accountIds);
   validatePostings(issues, pack.postings, accountIds);
 
   pack.accounts.forEach((account, index) => {

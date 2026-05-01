@@ -7,7 +7,7 @@ describe("CSV scenario pack", () => {
     const result = parseCsvScenarioPack(validCsvFiles, { basePath: CSV_SCENARIO_PUBLIC_PATH });
 
     expect(result.issues).toEqual([]);
-    expect(result.data?.version).toBe(6);
+    expect(result.data?.version).toBe(7);
     expect(result.data?.sourcePath).toBe(CSV_SCENARIO_PUBLIC_PATH);
     expect(result.data?.postings[1]?.basePostingId).toBe("salary");
     expect(result.data?.postings[3]?.annualCap).toBe(23000);
@@ -19,8 +19,8 @@ describe("CSV scenario pack", () => {
       ...validCsvFiles,
       postings: [
         postingsHeaderOnly.trimEnd(),
-        "salary,Salary,,checking,percent_of_base,bonus,1,0,2026-04-01,,,1,true",
-        "bonus,Bonus,,checking,percent_of_base,salary,1,0,2026-04-01,,,2,true",
+        "salary,Salary,,checking,percent_of_base,bonus,false,1,0,2026-04-01,,,1,true",
+        "bonus,Bonus,,checking,percent_of_base,salary,false,1,0,2026-04-01,,,2,true",
       ].join("\n"),
     });
 
@@ -32,7 +32,7 @@ describe("CSV scenario pack", () => {
       ...validCsvFiles,
       postings: [
         postingsHeaderOnly.trimEnd(),
-        "mystery,Unknown Target,checking,missing_account,fixed,,500,0,2026-04-15,,,1,true",
+        "mystery,Unknown Target,checking,missing_account,fixed,,false,500,0,2026-04-15,,,1,true",
       ].join("\n"),
     });
 

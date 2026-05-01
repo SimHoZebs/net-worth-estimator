@@ -1,5 +1,11 @@
 Date,AccountId,Balance
-2026-03-31,checking,10000
-2026-03-31,k401,1000
-2026-03-31,brokerage,0
-2026-03-31,student_loan1,-12150
+2026-04-30,checking,23182.42
+2026-04-30,k401,0
+2026-04-30,brokerage,234.54
+2026-04-30,roth_ira,1104.53
+2026-04-30,student_loan1_principal,-12901.13
+2026-04-30,student_loan1_interest,0
+2026-04-30,student_loan2_principal,-12203.44
+2026-04-30,student_loan2_interest,0
+2026-04-30,student_loan3_principal,-35492.35
+2026-04-30,student_loan3_interest,0

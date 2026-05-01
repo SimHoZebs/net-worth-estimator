@@ -29,8 +29,8 @@ function describeRoute(posting: CsvPosting, pack: CsvScenarioPack) {
   const sourceLabel = posting.sourceAccountId
     ? pack.accounts.find((account) => account.id === posting.sourceAccountId)?.label ?? posting.sourceAccountId
     : "External";
-  const destinationLabel = posting.destinationAccountId
-    ? pack.accounts.find((account) => account.id === posting.destinationAccountId)?.label ?? posting.destinationAccountId
+  const destinationLabel = posting.destinations
+    ? posting.destinations.map((destId) => pack.accounts.find((account) => account.id === destId)?.label ?? destId).join(" ; ")
     : "External";
 
   return `${sourceLabel} -> ${destinationLabel}`;
