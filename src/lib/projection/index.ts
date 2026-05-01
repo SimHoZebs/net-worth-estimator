@@ -27,7 +27,7 @@ export type {
   ScenarioPath,
   ScenarioValidationIssue,
   ScenarioValidationSeverity,
-} from "./types";
+} from "./validationTypes";
 export type {
   AccountBalanceType,
   BudgetAmountMode,

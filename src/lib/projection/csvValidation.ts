@@ -1,6 +1,6 @@
 import { CSV_SCENARIO_FILE_NAMES } from "./csvTypes";
 import type { CsvBudgetItem, CsvContributionPlan, CsvScenarioPack, CsvTransfer } from "./csvTypes";
-import type { ScenarioPath, ScenarioValidationIssue, ScenarioValidationSeverity } from "./types";
+import type { ScenarioPath, ScenarioValidationIssue, ScenarioValidationSeverity } from "./validationTypes";
 
 function addIssue(
   issues: ScenarioValidationIssue[],

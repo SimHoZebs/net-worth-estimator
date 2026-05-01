@@ -1,4 +1,4 @@
-import type { ScenarioValidationIssue } from "../../lib/projection";
+import type { ScenarioValidationIssue } from "@/lib/projection";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function ScenarioValidationPanel({ issues }: { issues: ScenarioValidationIssue[] }) {

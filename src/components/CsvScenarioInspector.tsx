@@ -1,6 +1,6 @@
 import { CSV_SCENARIO_PUBLIC_PATH } from "@/lib/projection";
 import type { CsvScenarioPack, ScenarioValidationIssue } from "@/lib/projection";
-import { ScenarioValidationPanel } from "./builder/ScenarioValidationPanel";
+import { ScenarioValidationPanel } from "./ScenarioValidationPanel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

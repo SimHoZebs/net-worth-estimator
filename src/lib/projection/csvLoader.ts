@@ -29,7 +29,7 @@ import {
   type CsvTransfer,
 } from "./csvTypes";
 import { validateCsvScenarioPack } from "./csvValidation";
-import type { ScenarioPath, ScenarioValidationIssue } from "./types";
+import type { ScenarioPath, ScenarioValidationIssue } from "./validationTypes";
 
 export interface CsvScenarioParseResult {
   data: CsvScenarioPack | null;
