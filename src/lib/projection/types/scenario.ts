@@ -24,13 +24,13 @@ export interface ProjectionRuntimeSettings {
 export interface Account {
   id: string;
   label: string;
-  annualRate: number;
-  volatility: number;
   minBalance: number | null;
   maxBalance: number | null;
   color: string | null;
   enabled: boolean;
 }
+
+export type PostingFrequency = "daily" | "weekly" | "monthly" | "quarterly" | "annual";
 
 export interface Checkpoint {
   Date: IsoDate;
@@ -44,7 +44,10 @@ export interface Posting {
   sourceAccountId: string | null;
   destinations: string[] | null;
   arithmetic: string;
+  frequency: PostingFrequency;
+  annualRate: number;
   annualGrowthRate: number;
+  volatility: number;
   startDate: IsoDate;
   endDate: IsoDate | null;
   annualCap: number | null;
@@ -85,7 +88,6 @@ export interface ProjectionRow {
   requestedPostingAmount: number;
   realizedPostingAmount: number;
   clampedPostingShortfallAmount: number;
-  growthNetWorthImpact: number;
   requestedPostingAmountsById: Record<string, number>;
   realizedPostingAmountsById: Record<string, number>;
 }
@@ -94,7 +96,6 @@ export interface ProjectionAccountSummary {
   accountId: string;
   label: string;
   color: string | null;
-  annualRate: number;
   enabled: boolean;
   startingBalance: number;
   endingBalance: number;
@@ -129,7 +130,6 @@ export interface ProjectionResult {
     requestedPostingAmount: number;
     realizedPostingAmount: number;
     clampedPostingShortfallAmount: number;
-    growthNetWorthImpact: number;
   };
   milestones: {
     hitTargetDate: IsoDate | null;

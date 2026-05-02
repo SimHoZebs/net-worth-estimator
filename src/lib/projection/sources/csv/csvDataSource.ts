@@ -6,19 +6,19 @@ import { validateCsvScenarioPack } from "./csvValidation";
 const LOCAL_STORAGE_KEY = "nwe-scenario-edits";
 
 function serializePack(pack: ScenarioPack): string {
-  const accountsHeader = "id,label,annualRate,volatility,minBalance,maxBalance,color,enabled";
-  const postingsHeader = "id,label,sourceAccountId,destinations,arithmetic,annualGrowthRate,startDate,endDate,annualCap,priority,enabled";
+  const accountsHeader = "id,label,minBalance,maxBalance,color,enabled";
+  const postingsHeader = "id,label,sourceAccountId,destinations,arithmetic,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled";
   const checkpointsHeader = "Date,AccountId,Balance";
 
   const accounts = [accountsHeader].concat(
     pack.accounts.map((a) =>
-      `${a.id},${a.label},${a.annualRate},${a.volatility},${a.minBalance ?? ""},${a.maxBalance ?? ""},${a.color ?? ""},${a.enabled}`
+      `${a.id},${a.label},${a.minBalance ?? ""},${a.maxBalance ?? ""},${a.color ?? ""},${a.enabled}`
     )
   ).join("\n");
 
   const postings = [postingsHeader].concat(
     pack.postings.map((p) =>
-      `${p.id},${p.label},${p.sourceAccountId ?? ""},${p.destinations?.join(";") ?? ""},${p.arithmetic},${p.annualGrowthRate},${p.startDate},${p.endDate ?? ""},${p.annualCap ?? ""},${p.priority},${p.enabled}`
+      `${p.id},${p.label},${p.sourceAccountId ?? ""},${p.destinations?.join(";") ?? ""},${p.arithmetic},${p.frequency},${p.annualRate},${p.annualGrowthRate},${p.volatility},${p.startDate},${p.endDate ?? ""},${p.annualCap ?? ""},${p.priority},${p.enabled}`
     )
   ).join("\n");
 
@@ -39,8 +39,10 @@ export function createCsvDataSource(options?: CsvScenarioLoadOptions): DataSourc
         const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (saved) {
           const { accounts, postings, checkpoints } = JSON.parse(saved) as { accounts: string; postings: string; checkpoints: string };
-          const { data, issues } = parseCsvScenarioPack({ accounts, checkpoints, postings }, { basePath: options?.basePath });
-          return { pack: data, issues };
+          const { data } = parseCsvScenarioPack({ accounts, checkpoints, postings }, { basePath: options?.basePath });
+          if (data) {
+            return { pack: data, issues: [] };
+          }
         }
       } catch {
         // localStorage unavailable or corrupted — fall through to canonical files

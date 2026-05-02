@@ -1,11 +1,11 @@
-id,label,annualRate,volatility,minBalance,maxBalance,color,enabled
-checking,Checking,0.00,0,,,#0f172a,true
-k401,401(k),0.07,0.15,,,#2563eb,true
-brokerage,Brokerage,0.08,0.18,,,#16a34a,true
-student_loan1_principal,Student Loan 1 (Principal),0.00,0,,0,#dc2626,true
-student_loan1_interest,Student Loan 1 (Interest),0.00,0,,0,#f87171,true
-student_loan2_principal,Student Loan 2 (Principal),0.00,0,,0,#dc2626,true
-student_loan2_interest,Student Loan 2 (Interest),0.00,0,,0,#f87171,true
-student_loan3_principal,Student Loan 3 (Principal),0.00,0,,0,#dc2626,true
-student_loan3_interest,Student Loan 3 (Interest),0.00,0,,0,#f87171,true
-roth_ira,Roth IRA,0.03,0,,,#7c3aed,true
+id,label,minBalance,maxBalance,color,enabled
+checking,Checking,,,#0f172a,true
+k401,401(k),,,#2563eb,true
+brokerage,Brokerage,,,#16a34a,true
+student_loan1_principal,Student Loan 1 (Principal),-Infinity,0,#dc2626,true
+student_loan1_interest,Student Loan 1 (Interest),-Infinity,0,#f87171,true
+student_loan2_principal,Student Loan 2 (Principal),-Infinity,0,#dc2626,true
+student_loan2_interest,Student Loan 2 (Interest),-Infinity,0,#f87171,true
+student_loan3_principal,Student Loan 3 (Principal),-Infinity,0,#dc2626,true
+student_loan3_interest,Student Loan 3 (Interest),-Infinity,0,#f87171,true
+roth_ira,Roth IRA,,,#7c3aed,true

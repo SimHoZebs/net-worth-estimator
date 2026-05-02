@@ -10,9 +10,9 @@ import type {
   IsoDate,
   ProjectionRuntimeSettings,
 } from "../types/scenario";
-import { applyGrowth, computeNetWorth, initAccountBalances } from "./accountEngine";
+import { computeNetWorth, initAccountBalances } from "./accountEngine";
 import {
-  addMonthlyOccurrences,
+  addOccurrences,
   applyPosting,
   computeRequestedAmount,
   resolvePostingAmount,
@@ -72,7 +72,6 @@ function createRow({
   requestedPostingAmount,
   realizedPostingAmount,
   clampedPostingShortfallAmount,
-  growthNetWorthImpact,
   requestedPostingAmountsById,
   realizedPostingAmountsById,
 }: {
@@ -86,7 +85,6 @@ function createRow({
   requestedPostingAmount: number;
   realizedPostingAmount: number;
   clampedPostingShortfallAmount: number;
-  growthNetWorthImpact: number;
   requestedPostingAmountsById: Record<string, number>;
   realizedPostingAmountsById: Record<string, number>;
 }): ProjectionRow {
@@ -101,7 +99,6 @@ function createRow({
     requestedPostingAmount,
     realizedPostingAmount,
     clampedPostingShortfallAmount,
-    growthNetWorthImpact,
     requestedPostingAmountsById,
     realizedPostingAmountsById,
   };
@@ -117,7 +114,6 @@ function roundRow(row: ProjectionRow): ProjectionRow {
     requestedPostingAmount: roundCurrency(row.requestedPostingAmount),
     realizedPostingAmount: roundCurrency(row.realizedPostingAmount),
     clampedPostingShortfallAmount: roundCurrency(row.clampedPostingShortfallAmount),
-    growthNetWorthImpact: roundCurrency(row.growthNetWorthImpact),
     accountBalances: Object.fromEntries(Object.entries(row.accountBalances).map(([accountId, balance]) => [accountId, roundCurrency(balance)])),
     requestedPostingAmountsById: Object.fromEntries(
       Object.entries(row.requestedPostingAmountsById).map(([postingId, amount]) => [postingId, roundCurrency(amount)])
@@ -168,7 +164,6 @@ export function projectScenarioPack(
   let totalRequestedPostingAmount = 0;
   let totalRealizedPostingAmount = 0;
   let totalClampedPostingShortfallAmount = 0;
-  let totalGrowthNetWorthImpact = 0;
 
   normalizedCheckpoints.dates.forEach(({ date, checkpoints }) => {
     checkpoints.forEach((checkpoint) => {
@@ -187,7 +182,6 @@ export function projectScenarioPack(
         requestedPostingAmount: 0,
         realizedPostingAmount: 0,
         clampedPostingShortfallAmount: 0,
-        growthNetWorthImpact: 0,
         requestedPostingAmountsById: {},
         realizedPostingAmountsById: {},
       })
@@ -197,10 +191,9 @@ export function projectScenarioPack(
   Object.assign(futureStartingBalances, balances);
 
   const eventDates = new Map<IsoDate, DatedPostingOccurrence[]>();
-  addMonthlyOccurrences(mergedPack.postings, eventDates, projectionStartDate, projectionEndDate, includeStartDateEvents);
+  addOccurrences(mergedPack.postings, eventDates, projectionStartDate, projectionEndDate, includeStartDateEvents);
 
   const sortedProjectedDates = Array.from(eventDates.keys()).sort(compareIsoDates);
-  let previousProjectedDate = projectionStartDate;
 
   sortedProjectedDates.forEach((date) => {
     const occurrences = eventDates.get(date);
@@ -208,16 +201,7 @@ export function projectScenarioPack(
       return;
     }
 
-    const growthNetWorthImpact = applyGrowth(
-      balances,
-      mergedPack.accounts,
-      daysBetween(previousProjectedDate, date),
-      previousProjectedDate,
-      projectionStartDate,
-      stochasticRates
-    );
-    totalGrowthNetWorthImpact += growthNetWorthImpact;
-    previousProjectedDate = date;
+    const yearIndex = Math.floor(daysBetween(projectionStartDate, date) / 365);
 
     const requestedPostingAmountsById: Record<string, number> = {};
     const realizedPostingAmountsById: Record<string, number> = {};
@@ -234,7 +218,23 @@ export function projectScenarioPack(
 
     sortedOccurrences.forEach((occurrence) => {
       const { posting } = occurrence;
-      const requestedAmount = Math.max(0, computeRequestedAmount(occurrence, latestRealizedPostingAmountById, balances, normalizedWhatIfState));
+
+      let stochasticRate: number | undefined;
+      if (stochasticRates !== undefined && posting.volatility > 0) {
+        const rates = stochasticRates.get(posting.id);
+        if (rates && yearIndex >= 0 && yearIndex < rates.length) {
+          stochasticRate = rates[yearIndex];
+        }
+      }
+
+      const requestedAmount = Math.max(0, computeRequestedAmount(
+        occurrence,
+        date,
+        latestRealizedPostingAmountById,
+        balances,
+        normalizedWhatIfState,
+        stochasticRate
+      ));
       const capKey = `${posting.id}:${date.slice(0, 4)}`;
       const annualCapRemaining = posting.annualCap === null
         ? Number.POSITIVE_INFINITY
@@ -291,7 +291,6 @@ export function projectScenarioPack(
         requestedPostingAmount,
         realizedPostingAmount,
         clampedPostingShortfallAmount,
-        growthNetWorthImpact,
         requestedPostingAmountsById,
         realizedPostingAmountsById,
       })
@@ -312,7 +311,6 @@ export function projectScenarioPack(
       accountId: account.id,
       label: account.label,
       color: account.color,
-      annualRate: account.annualRate,
       enabled: account.enabled,
       startingBalance: roundCurrency(startingBalance),
       endingBalance: roundCurrency(endingBalance),
@@ -358,7 +356,6 @@ export function projectScenarioPack(
       requestedPostingAmount: roundCurrency(totalRequestedPostingAmount),
       realizedPostingAmount: roundCurrency(totalRealizedPostingAmount),
       clampedPostingShortfallAmount: roundCurrency(totalClampedPostingShortfallAmount),
-      growthNetWorthImpact: roundCurrency(totalGrowthNetWorthImpact),
     },
     milestones: {
       hitTargetDate: hitTargetRow?.date ?? null,

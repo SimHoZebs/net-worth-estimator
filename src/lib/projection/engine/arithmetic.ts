@@ -1,4 +1,4 @@
-type TokenKind = "number" | "identifier" | "plus" | "minus" | "star" | "slash" | "lparen" | "rparen" | "abs" | "eof";
+type TokenKind = "number" | "identifier" | "plus" | "minus" | "star" | "slash" | "lparen" | "rparen" | "abs" | "rate" | "eof";
 
 interface Token {
   kind: TokenKind;
@@ -10,6 +10,7 @@ interface Token {
 interface Context {
   postingAmounts: Map<string, number>;
   accountBalances: Record<string, number>;
+  rate: number;
 }
 
 class Lexer {
@@ -88,6 +89,9 @@ class Lexer {
     const lexeme = this.input.slice(start, this.pos);
     if (lexeme === "abs") {
       return { kind: "abs", lexeme, offset: start };
+    }
+    if (lexeme === "rate") {
+      return { kind: "rate", lexeme, offset: start };
     }
     return { kind: "identifier", lexeme, offset: start };
   }
@@ -213,6 +217,11 @@ class Parser {
       const token = this.advance();
       const value = token.value!;
       return () => value;
+    }
+
+    if (this.check("rate")) {
+      this.advance();
+      return (ctx) => ctx.rate;
     }
 
     if (this.check("identifier")) {

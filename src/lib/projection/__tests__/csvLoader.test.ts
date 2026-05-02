@@ -19,8 +19,8 @@ describe("CSV scenario pack", () => {
       ...validCsvFiles,
       postings: [
         postingsHeaderOnly.trimEnd(),
-        "salary,Salary,,checking,bonus * 1,0,2026-04-01,,,1,true",
-        "bonus,Bonus,,checking,salary * 1,0,2026-04-01,,,2,true",
+        "salary,Salary,,checking,bonus * 1,monthly,0,0,0,2026-04-01,,,1,true",
+        "bonus,Bonus,,checking,salary * 1,monthly,0,0,0,2026-04-01,,,2,true",
       ].join("\n"),
     });
 
@@ -32,7 +32,7 @@ describe("CSV scenario pack", () => {
       ...validCsvFiles,
       postings: [
         postingsHeaderOnly.trimEnd(),
-        "mystery,Unknown Target,checking,missing_account,500,0,2026-04-15,,,1,true",
+        "mystery,Unknown Target,checking,missing_account,500,monthly,0,0,0,2026-04-15,,,1,true",
       ].join("\n"),
     });
 

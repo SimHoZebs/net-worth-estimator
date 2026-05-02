@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Area,
   Bar,
@@ -56,11 +56,26 @@ export function ProjectionDashboard({
   const [isAccountDiagnosticsOpen, setIsAccountDiagnosticsOpen] = useState(false);
   const [isPostingTablesOpen, setIsPostingTablesOpen] = useState(false);
   const [isTrendChartReady, setIsTrendChartReady] = useState(false);
+  const [expandedEventRows, setExpandedEventRows] = useState<Set<string>>(new Set());
   const trendChartContainerRef = useRef<HTMLDivElement | null>(null);
   const latestRow = result.timeline.rows[result.timeline.rows.length - 1] ?? null;
   const firstProjectedRow = result.timeline.rows.find((row) => !row.isHistorical) ?? null;
   const futureRows = result.timeline.rows.filter((row) => !row.isHistorical);
   const firstShortfallRow = futureRows.find((row) => row.clampedPostingShortfallAmount > 0) ?? null;
+  const postingLabelById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of pack.postings) map[p.id] = p.label;
+    return map;
+  }, [pack.postings]);
+  const toggleEventRow = (date: string) => {
+    setExpandedEventRows(prev => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
+  const activeFutureRows = futureRows.filter(row => row.requestedPostingAmount > 0);
   const biggestShortfallPosting = result.postingSummaries
     .filter((summary) => summary.shortfallAmount > 0)
     .sort((left, right) => right.shortfallAmount - left.shortfallAmount)[0] ?? null;
@@ -461,6 +476,7 @@ export function ProjectionDashboard({
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead></TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Requested</TableHead>
                       <TableHead>Realized</TableHead>
@@ -469,17 +485,77 @@ export function ProjectionDashboard({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {futureRows.length > 0 ? futureRows.slice(0, 12).map((row: ProjectionRow) => (
-                      <TableRow key={row.date}>
-                        <TableCell>{row.date}</TableCell>
-                        <TableCell>{currency.format(row.requestedPostingAmount)}</TableCell>
-                        <TableCell>{currency.format(row.realizedPostingAmount)}</TableCell>
-                        <TableCell>{currency.format(row.clampedPostingShortfallAmount)}</TableCell>
-                        <TableCell>{currency.format(row.netWorth)}</TableCell>
-                      </TableRow>
-                    )) : (
+                    {activeFutureRows.length > 0 ? activeFutureRows.slice(0, 12).map((row: ProjectionRow) => {
+                      const isExpanded = expandedEventRows.has(row.date);
+                      const activePostingIds = Object.entries(row.requestedPostingAmountsById)
+                        .filter(([, amount]) => amount > 0)
+                        .map(([id]) => id);
+                      const hasShortfall = row.clampedPostingShortfallAmount > 0;
+
+                      return (
+                        <>
+                          <TableRow
+                            key={row.date}
+                            className={`cursor-pointer transition-colors ${isExpanded ? "bg-slate-50" : "hover:bg-slate-50/50"}`}
+                            onClick={() => toggleEventRow(row.date)}
+                          >
+                            <TableCell className="w-8 select-none text-slate-400">
+                              {isExpanded ? "▾" : "▸"}
+                            </TableCell>
+                            <TableCell>
+                              <span className={hasShortfall ? "font-medium text-amber-700" : undefined}>{row.date}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className={hasShortfall ? "text-amber-700" : undefined}>{currency.format(row.requestedPostingAmount)}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className={hasShortfall ? "text-amber-700" : undefined}>{currency.format(row.realizedPostingAmount)}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className={hasShortfall ? "font-semibold text-amber-700" : undefined}>{currency.format(row.clampedPostingShortfallAmount)}</span>
+                            </TableCell>
+                            <TableCell>{currency.format(row.netWorth)}</TableCell>
+                          </TableRow>
+                          {isExpanded ? (
+                            <TableRow key={`${row.date}-detail`}>
+                              <TableCell colSpan={6} className="border-b-2 border-slate-100 bg-slate-50 p-0">
+                                <div className="px-8 pb-2 pt-1">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="bg-slate-100">
+                                        <TableHead className="text-xs">Posting</TableHead>
+                                        <TableHead className="text-xs">Requested</TableHead>
+                                        <TableHead className="text-xs">Realized</TableHead>
+                                        <TableHead className="text-xs">Shortfall</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {activePostingIds.map((id) => {
+                                        const requested = row.requestedPostingAmountsById[id] ?? 0;
+                                        const realized = row.realizedPostingAmountsById[id] ?? 0;
+                                        const shortfall = requested - realized;
+                                        const label = postingLabelById[id] ?? id;
+                                        const perShortfall = shortfall > 0;
+                                        return (
+                                          <TableRow key={id} className="border-b-0">
+                                            <TableCell className={perShortfall ? "font-medium text-amber-700" : undefined}>{label}</TableCell>
+                                            <TableCell>{currency.format(requested)}</TableCell>
+                                            <TableCell className={perShortfall ? "text-amber-700" : undefined}>{currency.format(realized)}</TableCell>
+                                            <TableCell className={perShortfall ? "font-semibold text-amber-700" : undefined}>{currency.format(shortfall)}</TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : null}
+                        </>
+                      );
+                    }) : (
                       <TableRow>
-                        <TableCell colSpan={5} className="py-6 text-center text-slate-500">No projected event rows are available.</TableCell>
+                        <TableCell colSpan={6} className="py-6 text-center text-slate-500">No projected event rows are available.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>

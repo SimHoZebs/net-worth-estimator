@@ -35,6 +35,7 @@ export type {
   Account,
   Checkpoint,
   Posting,
+  PostingFrequency,
   ProjectionAccountSummary,
   ProjectionPostingSummary,
   ProjectionResult,

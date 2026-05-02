@@ -56,7 +56,7 @@ export default function App() {
   ) ?? fallbackProjectionStartDate;
   const { result, runtimeError, isRunning: isProjecting } = useProjectionWorker(pack, projectionSettings, whatIfState, validation.isValid);
 
-  const hasStochasticAccounts = pack !== null && pack.accounts.some((a) => a.volatility > 0 && a.enabled);
+  const hasStochasticAccounts = pack !== null && pack.postings.some((p) => p.volatility > 0 && p.enabled);
   const [stochasticEnabled, setStochasticEnabled] = useState(false);
   const [stochasticConfig, setStochasticConfig] = useState<StochasticConfig>({
     runCount: DEFAULT_STOCHASTIC_RUN_COUNT,

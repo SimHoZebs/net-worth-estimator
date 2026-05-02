@@ -91,7 +91,7 @@ export function StochasticControls({
       description={enabled && hasStochasticAccounts
         ? statusLabel
         : enabled && !hasStochasticAccounts
-          ? "No accounts have volatility configured. Set volatility > 0 to enable simulation."
+          ? "No postings have volatility configured. Set volatility > 0 to enable simulation."
           : "Stochastic simulation is disabled. Toggle on to see probabilistic bands."}
       badge={isRunning ? "Running…" : enabled ? "Open" : "Off"}
     >
@@ -104,7 +104,7 @@ export function StochasticControls({
             <div className="text-xs text-slate-500">
               {hasStochasticAccounts
                 ? "Show probabilistic bands on the trend chart."
-                : "Add volatility to an account to use this feature."}
+                : "Add volatility to a posting to use this feature."}
             </div>
           </div>
           <label className="relative inline-flex cursor-pointer items-center">

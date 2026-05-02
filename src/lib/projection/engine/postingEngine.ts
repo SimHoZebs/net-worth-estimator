@@ -1,20 +1,48 @@
-import type { Posting, ScenarioWhatIfState, IsoDate } from "../types/scenario";
+import type { Posting, PostingFrequency, ScenarioWhatIfState, IsoDate } from "../types/scenario";
 import {
   getHeadroom,
   getTotalDestinationHeadroom,
   getWithdrawableAmount,
 } from "./accountEngine";
 import type { Account } from "../types/scenario";
-import { addMonthsClamped, compareIsoDates } from "../utils/date";
+import { addMonthsClamped, compareIsoDates, daysBetween } from "../utils/date";
 import { evaluateArithmetic } from "./arithmetic";
 
 export interface DatedPostingOccurrence {
   posting: Posting;
-  monthsElapsed: number;
   index: number;
 }
 
-export function addMonthlyOccurrences(
+export function frequencyDivisor(frequency: PostingFrequency): number {
+  switch (frequency) {
+    case "daily": return 365;
+    case "weekly": return 52;
+    case "monthly": return 12;
+    case "quarterly": return 4;
+    case "annual": return 1;
+  }
+}
+
+function advanceDate(date: IsoDate, frequency: PostingFrequency, periodCount: number): IsoDate {
+  switch (frequency) {
+    case "daily":
+    case "weekly": {
+      const daysPerPeriod = frequency === "daily" ? 1 : 7;
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const base = new Date(`${date}T00:00:00Z`).getTime();
+      const next = new Date(base + daysPerPeriod * periodCount * msPerDay);
+      return next.toISOString().slice(0, 10);
+    }
+    case "monthly":
+      return addMonthsClamped(date, periodCount);
+    case "quarterly":
+      return addMonthsClamped(date, periodCount * 3);
+    case "annual":
+      return addMonthsClamped(date, periodCount * 12);
+  }
+}
+
+export function addOccurrences(
   postings: Posting[],
   eventDates: Map<IsoDate, DatedPostingOccurrence[]>,
   projectionStartDate: IsoDate,
@@ -30,8 +58,8 @@ export function addMonthlyOccurrences(
       ? posting.endDate
       : projectionEndDate;
 
-    for (let monthsElapsed = 0; ; monthsElapsed += 1) {
-      const occurrenceDate = addMonthsClamped(posting.startDate, monthsElapsed);
+    for (let periodCount = 0; ; periodCount += 1) {
+      const occurrenceDate = advanceDate(posting.startDate, posting.frequency, periodCount);
       if (compareIsoDates(occurrenceDate, effectiveEndDate) > 0) {
         break;
       }
@@ -45,7 +73,7 @@ export function addMonthlyOccurrences(
       }
 
       const occurrences = eventDates.get(occurrenceDate) ?? [];
-      occurrences.push({ posting, monthsElapsed, index });
+      occurrences.push({ posting, index });
       eventDates.set(occurrenceDate, occurrences);
     }
   });
@@ -54,29 +82,36 @@ export function addMonthlyOccurrences(
 export function applyAnnualGrowth(
   amount: number,
   annualGrowthRate: number,
-  monthsElapsed: number
+  daysElapsed: number
 ): number {
-  if (amount === 0 || annualGrowthRate === 0 || monthsElapsed <= 0) {
+  if (amount === 0 || annualGrowthRate === 0 || daysElapsed <= 0) {
     return amount;
   }
 
-  return amount * Math.pow(1 + annualGrowthRate, monthsElapsed / 12);
+  return amount * Math.pow(1 + annualGrowthRate, daysElapsed / 365);
 }
 
 export function computeRequestedAmount(
   occurrence: DatedPostingOccurrence,
+  currentDate: IsoDate,
   latestRealizedPostingAmountById: Map<string, number>,
   balances: Record<string, number>,
-  _whatIfState: ScenarioWhatIfState
+  _whatIfState: ScenarioWhatIfState,
+  stochasticRate?: number
 ): number {
-  const { posting, monthsElapsed } = occurrence;
+  const { posting } = occurrence;
+
+  const daysElapsed = daysBetween(posting.startDate, currentDate);
+  const effectiveAnnualRate = stochasticRate !== undefined ? stochasticRate : posting.annualRate;
+  const ratePerOccurrence = posting.annualRate === 0 ? 0 : effectiveAnnualRate / frequencyDivisor(posting.frequency);
 
   const rawAmount = evaluateArithmetic(posting.arithmetic, {
     postingAmounts: latestRealizedPostingAmountById,
     accountBalances: balances,
+    rate: ratePerOccurrence,
   });
 
-  return applyAnnualGrowth(rawAmount, posting.annualGrowthRate, monthsElapsed);
+  return applyAnnualGrowth(rawAmount, posting.annualGrowthRate, daysElapsed);
 }
 
 export function resolvePostingAmount(

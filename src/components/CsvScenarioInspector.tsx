@@ -220,7 +220,8 @@ export function ScenarioInspector({
                             <TableRow>
                               <TableHead>ID</TableHead><TableHead>Label</TableHead><TableHead>Source</TableHead>
                               <TableHead>Destinations</TableHead><TableHead>Arithmetic</TableHead>
-                              <TableHead>Growth</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead>
+                              <TableHead>Freq</TableHead><TableHead>Rate</TableHead><TableHead>Growth</TableHead><TableHead>Vol</TableHead>
+                              <TableHead>Start</TableHead><TableHead>End</TableHead>
                               <TableHead>Cap</TableHead><TableHead>Pri</TableHead>
                               <TableHead>Enabled</TableHead><TableHead />
                             </TableRow>
@@ -244,8 +245,22 @@ export function ScenarioInspector({
                                     }} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={p.arithmetic}
                                     onChange={(e) => editor.updatePosting(p.id, { arithmetic: e.target.value })} /></TableCell>
+                                  <TableCell>
+                                    <select className={inputStyle(!!changed)} value={p.frequency}
+                                      onChange={(e) => editor.updatePosting(p.id, { frequency: e.target.value as Posting["frequency"] })}>
+                                      <option value="daily">daily</option>
+                                      <option value="weekly">weekly</option>
+                                      <option value="monthly">monthly</option>
+                                      <option value="quarterly">quarterly</option>
+                                      <option value="annual">annual</option>
+                                    </select>
+                                  </TableCell>
+                                  <TableCell><input className={inputStyle(!!changed)} type="number" step={0.01} value={p.annualRate}
+                                    onChange={(e) => editor.updatePosting(p.id, { annualRate: Number(e.target.value) })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} type="number" step={0.01} value={p.annualGrowthRate}
                                     onChange={(e) => editor.updatePosting(p.id, { annualGrowthRate: Number(e.target.value) })} /></TableCell>
+                                  <TableCell><input className={inputStyle(!!changed)} type="number" min={0} step={0.01} value={p.volatility}
+                                    onChange={(e) => editor.updatePosting(p.id, { volatility: Number(e.target.value) })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={p.startDate}
                                     onChange={(e) => editor.updatePosting(p.id, { startDate: e.target.value })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={p.endDate ?? ""}
@@ -268,7 +283,7 @@ export function ScenarioInspector({
                         </Table>
                         <div className="mt-3">
                           <Button type="button" variant="ghost" size="sm" onClick={() => editor.addPosting(
-                            { id: "new-posting-" + Date.now(), label: "New posting", sourceAccountId: null, destinations: null, arithmetic: "0", annualGrowthRate: 0, startDate: projectionStartDate, endDate: null, annualCap: null, priority: 1, enabled: true }
+                            { id: "new-posting-" + Date.now(), label: "New posting", sourceAccountId: null, destinations: null, arithmetic: "0", frequency: "monthly", annualRate: 0, annualGrowthRate: 0, volatility: 0, startDate: projectionStartDate, endDate: null, annualCap: null, priority: 1, enabled: true }
                           )}>+ Add posting</Button>
                         </div>
                       </CardContent>
@@ -285,7 +300,10 @@ export function ScenarioInspector({
                         { key: "sourceAccountId" as never, label: "Source" },
                         { key: "destinations" as never, label: "Destinations" },
                         { key: "arithmetic" as never, label: "Arithmetic" },
+                        { key: "frequency" as never, label: "Freq" },
+                        { key: "annualRate" as never, label: "Rate" },
                         { key: "annualGrowthRate" as never, label: "Growth" },
+                        { key: "volatility" as never, label: "Vol" },
                         { key: "startDate" as never, label: "Start" },
                         { key: "endDate" as never, label: "End" },
                         { key: "annualCap" as never, label: "Cap", format: (v) => v === null ? "-" : formatCurrency(v) },
@@ -317,7 +335,6 @@ export function ScenarioInspector({
                           <TableHeader>
                             <TableRow>
                               <TableHead>ID</TableHead><TableHead>Label</TableHead>
-                              <TableHead>Rate</TableHead><TableHead>Vol</TableHead>
                               <TableHead>Min</TableHead><TableHead>Max</TableHead>
                               <TableHead>Color</TableHead><TableHead>Enabled</TableHead>
                               <TableHead />
@@ -333,10 +350,6 @@ export function ScenarioInspector({
                                     onChange={(e) => editor.updateAccount(a.id, { id: e.target.value })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={a.label}
                                     onChange={(e) => editor.updateAccount(a.id, { label: e.target.value })} /></TableCell>
-                                  <TableCell><input className={inputStyle(!!changed)} type="number" step={0.01} value={a.annualRate}
-                                    onChange={(e) => editor.updateAccount(a.id, { annualRate: Number(e.target.value) })} /></TableCell>
-                                  <TableCell><input className={inputStyle(!!changed)} type="number" min={0} step={0.01} value={a.volatility}
-                                    onChange={(e) => editor.updateAccount(a.id, { volatility: Number(e.target.value) })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} type="number" value={a.minBalance ?? ""}
                                     onChange={(e) => editor.updateAccount(a.id, { minBalance: e.target.value ? Number(e.target.value) : null })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} type="number" value={a.maxBalance ?? ""}
@@ -357,7 +370,7 @@ export function ScenarioInspector({
                         </Table>
                         <div className="mt-3">
                           <Button type="button" variant="ghost" size="sm" onClick={() => editor.addAccount(
-                            { id: "new-account-" + Date.now(), label: "New account", annualRate: 0, volatility: 0, minBalance: null, maxBalance: null, color: null, enabled: true }
+                            { id: "new-account-" + Date.now(), label: "New account", minBalance: null, maxBalance: null, color: null, enabled: true }
                           )}>+ Add account</Button>
                         </div>
                       </CardContent>
@@ -371,8 +384,6 @@ export function ScenarioInspector({
                       columns={[
                         { key: "id" as never, label: "ID" },
                         { key: "label" as never, label: "Label" },
-                        { key: "annualRate" as never, label: "Rate" },
-                        { key: "volatility" as never, label: "Vol" },
                         { key: "minBalance" as never, label: "Min", format: (v) => v === null ? "-" : formatCurrency(v) },
                         { key: "maxBalance" as never, label: "Max", format: (v) => v === null ? "-" : formatCurrency(v) },
                         { key: "color" as never, label: "Color" },

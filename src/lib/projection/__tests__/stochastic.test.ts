@@ -99,7 +99,7 @@ describe("stochastic projection", () => {
 
     const deterministicOnlyPack = {
       ...pack!,
-      accounts: pack!.accounts.map((a) => ({ ...a, volatility: 0 })),
+      postings: pack!.postings.map((p) => ({ ...p, volatility: 0 })),
     };
 
     const result = stochasticProject(

@@ -33,11 +33,11 @@ function buildStochasticRates(
   projectionSettings: ProjectionRuntimeSettings
 ): Map<string, number[]> {
   const rates = new Map<string, number[]>();
-  pack.accounts.forEach((account) => {
-    if (account.volatility > 0 && account.enabled) {
+  pack.postings.forEach((posting) => {
+    if (posting.volatility > 0 && posting.enabled) {
       rates.set(
-        account.id,
-        generateYearlyRates(account.annualRate, account.volatility, projectionSettings.horizonYears)
+        posting.id,
+        generateYearlyRates(posting.annualRate, posting.volatility, projectionSettings.horizonYears)
       );
     }
   });

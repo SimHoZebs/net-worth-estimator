@@ -30,6 +30,22 @@ function parseOptionalNumber(value: unknown) {
   return parseNumber(value);
 }
 
+function parseNegInfinityNumber(value: unknown) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+
+    if (trimmed.length === 0) {
+      return null;
+    }
+
+    if (trimmed === "-Infinity") {
+      return Number.NEGATIVE_INFINITY;
+    }
+  }
+
+  return parseNumber(value);
+}
+
 function parseBoolean(value: unknown) {
   if (typeof value === "boolean") {
     return value;
@@ -74,6 +90,13 @@ function parseDestinationsArray(value: unknown): string[] | null {
 
 const finiteNumber = z.preprocess(parseNumber, z.number().finite());
 const nullableNumber = z.preprocess(parseOptionalNumber, z.number().finite().nullable());
+const nullableNegInfinityNumber = z.preprocess(
+  parseNegInfinityNumber,
+  z.any().refine(
+    (val): val is number | null => val === null || val === Number.NEGATIVE_INFINITY || (typeof val === "number" && Number.isFinite(val)),
+    { message: "Expected a finite number, null, or -Infinity" }
+  )
+);
 const nonNegativeNumber = z.preprocess(parseNumber, z.number().finite().min(0));
 const nullableNonNegativeNumber = z.preprocess(parseOptionalNumber, z.number().finite().min(0).nullable());
 const positiveInteger = z.preprocess(parseNumber, z.number().int().min(1));
@@ -87,7 +110,7 @@ export const csvDateSchema = z
   .regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/u, "Expected YYYY-MM-DD date.")
   .refine((value) => !Number.isNaN(new Date(value).getTime()), "Expected a valid date.");
 
-export const csvAccountsHeaders = ["id", "label", "annualRate", "volatility", "minBalance", "maxBalance", "color", "enabled"] as const;
+export const csvAccountsHeaders = ["id", "label", "minBalance", "maxBalance", "color", "enabled"] as const;
 export const csvCheckpointsHeaders = ["Date", "AccountId", "Balance"] as const;
 export const csvPostingsHeaders = [
   "id",
@@ -95,7 +118,10 @@ export const csvPostingsHeaders = [
   "sourceAccountId",
   "destinations",
   "arithmetic",
+  "frequency",
+  "annualRate",
   "annualGrowthRate",
+  "volatility",
   "startDate",
   "endDate",
   "annualCap",
@@ -106,9 +132,7 @@ export const csvPostingsHeaders = [
 export const csvAccountSchema = z.object({
   id: trimmedString,
   label: trimmedString,
-  annualRate: finiteNumber,
-  volatility: nonNegativeNumber,
-  minBalance: nullableNumber,
+  minBalance: nullableNegInfinityNumber,
   maxBalance: nullableNumber,
   color: nullableTrimmedString,
   enabled: csvBoolean,
@@ -120,13 +144,18 @@ export const csvCheckpointSchema = z.object({
   Balance: finiteNumber,
 }) satisfies z.ZodType<Checkpoint>;
 
+const postingFrequencySchema = z.enum(["daily", "weekly", "monthly", "quarterly", "annual"]);
+
 export const csvPostingSchema = z.object({
   id: trimmedString,
   label: trimmedString,
   sourceAccountId: nullableTrimmedString,
   destinations: z.preprocess(parseDestinationsArray, z.array(trimmedString).nullable()),
   arithmetic: trimmedString,
+  frequency: postingFrequencySchema,
+  annualRate: finiteNumber,
   annualGrowthRate: finiteNumber,
+  volatility: nonNegativeNumber,
   startDate: csvDateSchema,
   endDate: z.preprocess(parseNullableString, csvDateSchema.nullable()),
   annualCap: nullableNonNegativeNumber,

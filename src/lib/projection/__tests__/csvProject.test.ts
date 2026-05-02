@@ -100,23 +100,30 @@ describe("CSV projection engine", () => {
     expect(result.timeline.rows[1]?.netWorth).toBe(-50);
   });
 
-  it("applies daily compounding to negative balances between dated events", () => {
+  it("applies interest via postings with rate keyword", () => {
     const pack = createBasePack({
       checkpoints: [
         { Date: "2026-01-01", AccountId: "loan", Balance: -1200 },
       ],
       accounts: [
-        makeAccount({ id: "loan", annualRate: 0.12 }),
+        makeAccount({ id: "loan", minBalance: Number.NEGATIVE_INFINITY }),
       ],
       postings: [
-        makePosting({ id: "marker", destinations: ["loan"], arithmetic: "0", startDate: "2026-02-01", endDate: "2026-02-01" }),
+        makePosting({
+          id: "loan_interest",
+          sourceAccountId: "loan",
+          arithmetic: "abs(loan) * rate",
+          frequency: "monthly",
+          annualRate: 0.12,
+          startDate: "2026-02-01",
+          endDate: "2026-02-01",
+        }),
       ],
     });
 
     const result = projectScenarioPack(pack, makeSettings());
 
     expect(result.timeline.rows[1]?.accountBalances.loan).toBe(-1212);
-    expect(result.timeline.rows[1]?.growthNetWorthImpact).toBe(-12);
     expect(result.summary.finalNetWorth).toBe(-1212);
   });
 

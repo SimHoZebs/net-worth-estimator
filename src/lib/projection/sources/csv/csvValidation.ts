@@ -13,7 +13,7 @@ function extractIdentifiers(arithmetic: string): string[] {
   const regex = /[a-zA-Z_][a-zA-Z0-9_]*/g;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(arithmetic)) !== null) {
-    if (match[0] !== "abs") {
+    if (match[0] !== "abs" && match[0] !== "rate") {
       ids.push(match[0]);
     }
   }
@@ -55,6 +55,7 @@ function validatePostingArithmetic(
   const allowedIds = new Set([
     ...postings.map((p) => p.id),
     ...accountIds,
+    "rate",
   ]);
 
   const postingById = new Map(postings.map((posting) => [posting.id, posting]));

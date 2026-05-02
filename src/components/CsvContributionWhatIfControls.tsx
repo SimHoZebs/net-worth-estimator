@@ -31,8 +31,6 @@ function emptyAccount(): Account {
   return {
     id: "",
     label: "",
-    annualRate: 0,
-    volatility: 0,
     minBalance: null,
     maxBalance: null,
     color: null,
@@ -47,7 +45,10 @@ function emptyPosting(): Posting {
     sourceAccountId: null,
     destinations: null,
     arithmetic: "",
+    frequency: "monthly",
+    annualRate: 0,
     annualGrowthRate: 0,
+    volatility: 0,
     startDate: "",
     endDate: null,
     annualCap: null,
@@ -153,27 +154,7 @@ export function ContributionWhatIfControls({
                       placeholder="Savings"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs text-slate-500">Annual Rate</label>
-                    <input
-                      type="number"
-                      step={0.01}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm"
-                      value={addingAccount.annualRate}
-                      onChange={(e) => setAddingAccount({ ...addingAccount, annualRate: Number(e.target.value) })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-500">Volatility</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm"
-                      value={addingAccount.volatility}
-                      onChange={(e) => setAddingAccount({ ...addingAccount, volatility: Number(e.target.value) })}
-                    />
-                  </div>
+
                   <div>
                     <label className="block text-xs text-slate-500">Color (hex)</label>
                     <input
@@ -268,6 +249,51 @@ export function ContributionWhatIfControls({
                     />
                   </div>
                   <div>
+                    <label className="block text-xs text-slate-500">Frequency</label>
+                    <select
+                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                      value={addingPosting.frequency}
+                      onChange={(e) => setAddingPosting({ ...addingPosting, frequency: e.target.value as Posting["frequency"] })}
+                    >
+                      <option value="daily">daily</option>
+                      <option value="weekly">weekly</option>
+                      <option value="monthly">monthly</option>
+                      <option value="quarterly">quarterly</option>
+                      <option value="annual">annual</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500">Annual Rate</label>
+                    <input
+                      type="number"
+                      step={0.01}
+                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                      value={addingPosting.annualRate}
+                      onChange={(e) => setAddingPosting({ ...addingPosting, annualRate: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500">Annual Growth Rate</label>
+                    <input
+                      type="number"
+                      step={0.01}
+                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                      value={addingPosting.annualGrowthRate}
+                      onChange={(e) => setAddingPosting({ ...addingPosting, annualGrowthRate: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500">Volatility</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                      value={addingPosting.volatility}
+                      onChange={(e) => setAddingPosting({ ...addingPosting, volatility: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
                     <label className="block text-xs text-slate-500">Start Date</label>
                     <input
                       className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm"
@@ -283,16 +309,6 @@ export function ContributionWhatIfControls({
                       value={addingPosting.endDate ?? ""}
                       onChange={(e) => setAddingPosting({ ...addingPosting, endDate: e.target.value || null })}
                       placeholder="YYYY-MM-DD or blank"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-500">Annual Growth Rate</label>
-                    <input
-                      type="number"
-                      step={0.01}
-                      className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm"
-                      value={addingPosting.annualGrowthRate}
-                      onChange={(e) => setAddingPosting({ ...addingPosting, annualGrowthRate: Number(e.target.value) })}
                     />
                   </div>
                   <div>
