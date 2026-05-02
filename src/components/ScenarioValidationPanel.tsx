@@ -1,4 +1,5 @@
 import type { ScenarioValidationIssue } from "@/lib/projection";
+import { pluralize } from "@/lib/format";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function ScenarioValidationPanel({ issues }: { issues: ScenarioValidationIssue[] }) {
@@ -14,8 +15,8 @@ export function ScenarioValidationPanel({ issues }: { issues: ScenarioValidation
       <div>
         <AlertTitle>CSV validation</AlertTitle>
         <AlertDescription className="text-amber-950/80">
-          {errors.length > 0 ? `${errors.length} error${errors.length === 1 ? "" : "s"}` : "No errors"}
-          {warnings.length > 0 ? `, ${warnings.length} warning${warnings.length === 1 ? "" : "s"}` : ""}.
+          {errors.length > 0 ? pluralize(errors.length, "error") : "No errors"}
+          {warnings.length > 0 ? `, ${pluralize(warnings.length, "warning")}` : ""}.
         </AlertDescription>
       </div>
       <div className="space-y-2">

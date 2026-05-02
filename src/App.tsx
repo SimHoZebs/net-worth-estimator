@@ -1,16 +1,20 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CsvScenarioInspector } from "./components/CsvScenarioInspector";
 import { CsvProjectionDashboard } from "./components/CsvProjectionDashboard";
 import { CsvPostingWhatIfControls } from "./components/CsvContributionWhatIfControls";
+import { StochasticControls } from "./components/StochasticControls";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
 import { useCsvWhatIfState } from "./hooks/useCsvWhatIfState";
 import { useCsvProjectionWorker } from "./hooks/useCsvProjectionWorker";
 import { useCsvScenarioPack } from "./hooks/useCsvScenarioPack";
+import { useStochasticWorker } from "./hooks/useStochasticWorker";
 import { summarizeValidationIssues } from "./lib/projection";
+import type { StochasticConfig } from "./lib/projection";
 
 const DEFAULT_TARGET_NET_WORTH = 1_000_000;
 const PROJECTION_HORIZON_YEARS = 50;
+const DEFAULT_STOCHASTIC_RUN_COUNT = 1000;
 
 function formatTodayIsoDate() {
   return new Date().toISOString().slice(0, 10);
@@ -41,7 +45,30 @@ export default function App() {
     (latestDate, checkpoint) => latestDate === null || checkpoint.Date > latestDate ? checkpoint.Date : latestDate,
     null
   ) ?? fallbackProjectionStartDate;
-  const { result, runtimeError, isProjecting } = useCsvProjectionWorker(pack, projectionSettings, whatIfState, validation.isValid);
+  const { result, runtimeError, isRunning: isProjecting } = useCsvProjectionWorker(pack, projectionSettings, whatIfState, validation.isValid);
+
+  const hasStochasticAccounts = pack !== null && pack.accounts.some((a) => a.volatility > 0 && a.enabled);
+  const [stochasticEnabled, setStochasticEnabled] = useState(false);
+  const [stochasticConfig, setStochasticConfig] = useState<StochasticConfig>({
+    runCount: DEFAULT_STOCHASTIC_RUN_COUNT,
+    seed: null,
+  });
+
+  // Auto-enable stochastic mode when stochastic accounts are present and validation passes
+  useEffect(() => {
+    if (hasStochasticAccounts && validation.isValid) {
+      setStochasticEnabled(true);
+    }
+  }, [hasStochasticAccounts, validation.isValid]);
+
+  const stochasticWorkerEnabled = stochasticEnabled && hasStochasticAccounts && validation.isValid;
+  const { result: stochasticResult, runtimeError: stochasticError, isRunning: isStochasticRunning } = useStochasticWorker(
+    pack,
+    projectionSettings,
+    whatIfState,
+    stochasticConfig,
+    stochasticWorkerEnabled
+  );
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
@@ -70,6 +97,13 @@ export default function App() {
             </Alert>
         ) : null}
 
+        {stochasticError ? (
+          <Alert variant="destructive" className="rounded-[1.6rem]">
+            <AlertTitle>Stochastic simulation failed</AlertTitle>
+            <AlertDescription>{stochasticError}</AlertDescription>
+          </Alert>
+        ) : null}
+
         {runtimeError ? (
           <Alert variant="destructive" className="rounded-[1.6rem]">
             <AlertTitle>Projection failed</AlertTitle>
@@ -85,6 +119,7 @@ export default function App() {
             projectionSettings={projectionSettings}
             targetNetWorthInput={targetNetWorthInput}
             onTargetNetWorthInputChange={setTargetNetWorthInput}
+            stochasticResult={stochasticResult}
           >
             <CsvPostingWhatIfControls
               pack={pack}
@@ -95,6 +130,18 @@ export default function App() {
               onResetAllOverrides={resetAllOverrides}
             />
           </CsvProjectionDashboard>
+        ) : null}
+
+        {pack && validation.isValid && result ? (
+          <StochasticControls
+            enabled={stochasticEnabled}
+            onToggle={setStochasticEnabled}
+            config={stochasticConfig}
+            onConfigChange={setStochasticConfig}
+            isRunning={isStochasticRunning}
+            hasStochasticAccounts={hasStochasticAccounts}
+            stochasticResult={stochasticResult}
+          />
         ) : null}
 
         <CsvScenarioInspector

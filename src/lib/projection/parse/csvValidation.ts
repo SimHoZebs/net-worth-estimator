@@ -1,30 +1,7 @@
-import { CSV_SCENARIO_FILE_NAMES } from "./csvTypes";
-import type { CsvPosting, CsvScenarioPack } from "./csvTypes";
-import type { ScenarioPath, ScenarioValidationIssue, ScenarioValidationSeverity } from "./validationTypes";
-
-function addIssue(
-  issues: ScenarioValidationIssue[],
-  severity: ScenarioValidationSeverity,
-  code: string,
-  message: string,
-  path: ScenarioPath
-) {
-  issues.push({ severity, code, message, path });
-}
-
-function rowPath(fileName: string, rowNumber?: number, field?: string): ScenarioPath {
-  const path: Array<string | number> = [fileName];
-
-  if (rowNumber !== undefined) {
-    path.push(rowNumber);
-  }
-
-  if (field !== undefined) {
-    path.push(field);
-  }
-
-  return path;
-}
+import { CSV_SCENARIO_FILE_NAMES } from "../types/csv";
+import type { CsvPosting, CsvScenarioPack } from "../types/csv";
+import type { ScenarioValidationIssue } from "../types/validation";
+import { addIssue, rowPath } from "../utils/validation";
 
 function hasInvalidDateRange(startDate: string, endDate: string | null): boolean {
   return endDate !== null && Date.parse(endDate) < Date.parse(startDate);

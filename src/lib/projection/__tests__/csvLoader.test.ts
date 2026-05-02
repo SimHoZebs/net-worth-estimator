@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CSV_SCENARIO_PUBLIC_PATH, parseCsvScenarioPack } from "./projection";
-import { postingsHeaderOnly, validCsvFiles } from "./projection/__fixtures__";
+import { CSV_SCENARIO_PUBLIC_PATH, parseCsvScenarioPack } from "../";
+import { postingsHeaderOnly, validCsvFiles } from "../__fixtures__";
 
 describe("CSV scenario pack", () => {
   it("parses a valid CSV pack", () => {

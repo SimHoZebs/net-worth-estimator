@@ -1,4 +1,4 @@
-import type { CsvScenarioPack } from "../csvTypes";
+import type { CsvScenarioPack } from "../types/csv";
 import { makeAccount } from "./accounts";
 import { makePosting } from "./postings";
 

@@ -1,18 +1,8 @@
 import { projectCsvScenarioPack } from "@/lib/projection";
-import type { CsvProjectionResult, CsvScenarioPack, CsvScenarioWhatIfState, ProjectionRuntimeSettings } from "@/lib/projection";
-
-interface CsvProjectionWorkerRequest {
-  id: number;
-  pack: CsvScenarioPack;
-  projectionSettings: ProjectionRuntimeSettings;
-  whatIfState: CsvScenarioWhatIfState;
-}
-
-interface CsvProjectionWorkerResponse {
-  id: number;
-  result: CsvProjectionResult | null;
-  runtimeError: string | null;
-}
+import type {
+  CsvProjectionWorkerRequest,
+  CsvProjectionWorkerResponse,
+} from "./types";
 
 self.onmessage = (event: MessageEvent<CsvProjectionWorkerRequest>) => {
   const { id, pack, projectionSettings, whatIfState } = event.data;

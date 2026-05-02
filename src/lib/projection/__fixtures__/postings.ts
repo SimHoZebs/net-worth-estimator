@@ -1,4 +1,4 @@
-import type { CsvPosting } from "../csvTypes";
+import type { CsvPosting } from "../types/csv";
 
 export function makePosting(overrides: Partial<CsvPosting> & { id: string }): CsvPosting {
   return {

@@ -3,7 +3,7 @@ import type {
   CsvAccount,
   CsvCheckpoint,
   CsvPosting,
-} from "./csvTypes";
+} from "../types/csv";
 
 function parseNumber(value: unknown) {
   if (typeof value === "number") {
@@ -80,6 +80,9 @@ const positiveInteger = z.preprocess(parseNumber, z.number().int().min(1));
 const csvBoolean = z.preprocess(parseBoolean, z.boolean());
 const trimmedString = z.string().trim().min(1);
 const nullableTrimmedString = z.preprocess(parseNullableString, z.string().trim().min(1).nullable());
+export function trimmedEnum<T extends [string, ...string[]]>(values: T) {
+  return z.enum(values);
+}
 
 export const csvDateSchema = z
   .string()
@@ -87,7 +90,7 @@ export const csvDateSchema = z
   .regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/u, "Expected YYYY-MM-DD date.")
   .refine((value) => !Number.isNaN(new Date(value).getTime()), "Expected a valid date.");
 
-export const csvAccountsHeaders = ["id", "label", "category", "openingBalance", "annualRate", "minBalance", "maxBalance", "color", "enabled"] as const;
+export const csvAccountsHeaders = ["id", "label", "category", "openingBalance", "annualRate", "volatility", "minBalance", "maxBalance", "color", "enabled"] as const;
 export const csvCheckpointsHeaders = ["Date", "AccountId", "Balance"] as const;
 export const csvPostingsHeaders = [
   "id",
@@ -112,6 +115,7 @@ export const csvAccountSchema = z.object({
   category: trimmedString,
   openingBalance: finiteNumber,
   annualRate: finiteNumber,
+  volatility: nonNegativeNumber,
   minBalance: nullableNumber,
   maxBalance: nullableNumber,
   color: nullableTrimmedString,
@@ -129,7 +133,7 @@ export const csvPostingSchema = z.object({
   label: trimmedString,
   sourceAccountId: nullableTrimmedString,
   destinations: z.preprocess(parseDestinationsArray, z.array(trimmedString).nullable()),
-  amountMode: z.enum(["fixed", "percent_of_base"]),
+  amountMode: trimmedEnum(["fixed", "percent_of_base"] as const),
   basePostingId: nullableTrimmedString,
   absBase: csvBoolean,
   amount: nonNegativeNumber,
@@ -139,4 +143,4 @@ export const csvPostingSchema = z.object({
   annualCap: nullableNonNegativeNumber,
   priority: positiveInteger,
   enabled: csvBoolean,
-}) satisfies z.ZodType<CsvPosting>;
+});

@@ -28,6 +28,7 @@ export interface CsvAccount {
   category: string;
   openingBalance: number;
   annualRate: number;
+  volatility: number;
   minBalance: number | null;
   maxBalance: number | null;
   color: string | null;

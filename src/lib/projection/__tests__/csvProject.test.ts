@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { projectCsvScenarioPack } from "./projection";
-import type { CsvScenarioWhatIfState } from "./projection";
-import { createBasePack, makeAccount, makePosting, makeSettings } from "./projection/__fixtures__";
+import { projectCsvScenarioPack } from "../";
+import type { CsvScenarioWhatIfState } from "../";
+import { createBasePack, makeAccount, makePosting, makeSettings } from "../__fixtures__";
 
 describe("CSV projection engine", () => {
   it("builds dated checkpoint rows and future event rows from real postings", () => {

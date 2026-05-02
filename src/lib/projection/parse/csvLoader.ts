@@ -15,9 +15,10 @@ import {
   type CsvScenarioCollectionKey,
   type CsvScenarioFileContents,
   type CsvScenarioPack,
-} from "./csvTypes";
+} from "../types/csv";
 import { validateCsvScenarioPack } from "./csvValidation";
-import type { ScenarioPath, ScenarioValidationIssue } from "./validationTypes";
+import type { ScenarioValidationIssue } from "../types/validation";
+import { addIssue } from "../utils/validation";
 
 export interface CsvScenarioParseResult {
   data: CsvScenarioPack | null;
@@ -39,15 +40,6 @@ function normalizeBasePath(basePath: string): string {
   return basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
 }
 
-function addIssue(
-  issues: ScenarioValidationIssue[],
-  code: string,
-  message: string,
-  path: ScenarioPath
-) {
-  issues.push({ severity: "error", code, message, path });
-}
-
 function parseRows<TRow>(
   fileName: string,
   csvText: string,
@@ -59,10 +51,11 @@ function parseRows<TRow>(
     header: true,
     skipEmptyLines: "greedy",
     transformHeader: (header) => header.trim(),
+    transform: (value) => (typeof value === "string" ? value.trim() : value),
   });
 
   result.errors.forEach((error) => {
-    addIssue(issues, "csv.parse.error", error.message, [fileName, (error.row ?? 0) + 2]);
+    addIssue(issues, "error", "csv.parse.error", error.message, [fileName, (error.row ?? 0) + 2]);
   });
 
   const fields = result.meta.fields?.map((field) => field.trim()) ?? [];
@@ -71,6 +64,7 @@ function parseRows<TRow>(
   if (missingHeaders.length > 0) {
     addIssue(
       issues,
+      "error",
       "csv.headers.missing",
       `Missing required header${missingHeaders.length === 1 ? "" : "s"}: ${missingHeaders.join(", ")}.`,
       [fileName]
@@ -88,6 +82,7 @@ function parseRows<TRow>(
       parsedRow.error.issues.forEach((issue) => {
         addIssue(
           issues,
+          "error",
           "csv.row.invalid",
           issue.message,
           [fileName, index + 2, ...issue.path.map((segment) => (typeof segment === "number" ? segment : String(segment)))]

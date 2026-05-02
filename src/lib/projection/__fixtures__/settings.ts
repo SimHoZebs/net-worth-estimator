@@ -1,4 +1,4 @@
-import type { ProjectionRuntimeSettings } from "../csvTypes";
+import type { ProjectionRuntimeSettings } from "../types/csv";
 
 export function makeSettings(overrides: Partial<ProjectionRuntimeSettings> = {}): ProjectionRuntimeSettings {
   return {

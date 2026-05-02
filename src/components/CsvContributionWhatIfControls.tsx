@@ -1,6 +1,7 @@
 import type { CsvPosting, CsvScenarioPack, CsvScenarioWhatIfState } from "@/lib/projection";
 import { Button } from "@/components/ui/button";
-import { currency } from "@/lib/format";
+import { currency, formatRoute } from "@/lib/format";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 
 interface CsvPostingWhatIfControlsProps {
   pack: CsvScenarioPack;
@@ -25,14 +26,13 @@ function describePosting(posting: CsvPosting) {
 }
 
 function describeRoute(posting: CsvPosting, pack: CsvScenarioPack) {
-  const sourceLabel = posting.sourceAccountId
-    ? pack.accounts.find((account) => account.id === posting.sourceAccountId)?.label ?? posting.sourceAccountId
-    : "External";
-  const destinationLabel = posting.destinations
-    ? posting.destinations.map((destId) => pack.accounts.find((account) => account.id === destId)?.label ?? destId).join(" ; ")
-    : "External";
+  const accountById = new Map(pack.accounts.map((a) => [a.id, a]));
+  const sourceLabel = posting.sourceAccountId ? (accountById.get(posting.sourceAccountId)?.label ?? posting.sourceAccountId) : null;
+  const destinations = posting.destinations
+    ? posting.destinations.map((destId) => ({ label: accountById.get(destId)?.label ?? destId }))
+    : null;
 
-  return `${sourceLabel} -> ${destinationLabel}`;
+  return formatRoute(sourceLabel, destinations);
 }
 
 export function CsvPostingWhatIfControls({
@@ -46,25 +46,14 @@ export function CsvPostingWhatIfControls({
   const enabledPostings = pack.postings.filter((posting) => posting.enabled);
 
   return (
-    <details
+    <CollapsibleSection
       open={activeOverrideCount > 0}
-      className="rounded-[1.8rem] border border-slate-200 bg-white px-5 py-5 shadow-sm open:border-slate-300"
+      title="Adjust scheduled postings"
+      description={activeOverrideCount > 0
+        ? `${activeOverrideCount} temporary override${activeOverrideCount === 1 ? " is" : "s are"} active.`
+        : `${enabledPostings.length} enabled posting${enabledPostings.length === 1 ? "" : "s"} available for temporary overrides.`}
+      badge={activeOverrideCount > 0 ? `${activeOverrideCount} active` : undefined}
     >
-      <summary className="cursor-pointer list-none">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="text-base font-semibold text-slate-900">Adjust scheduled postings</div>
-            <div className="text-sm text-slate-500">
-              {activeOverrideCount > 0
-                ? `${activeOverrideCount} temporary override${activeOverrideCount === 1 ? " is" : "s are"} active.`
-                : `${enabledPostings.length} enabled posting${enabledPostings.length === 1 ? "" : "s"} available for temporary overrides.`}
-            </div>
-          </div>
-          <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-            {activeOverrideCount > 0 ? `${activeOverrideCount} active` : "Open"}
-          </div>
-        </div>
-      </summary>
 
       <div className="mt-5 space-y-4">
         <div className="flex justify-end">
@@ -119,6 +108,6 @@ export function CsvPostingWhatIfControls({
           </div>
         )}
       </div>
-    </details>
+    </CollapsibleSection>
   );
 }

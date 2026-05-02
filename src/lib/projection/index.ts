@@ -1,5 +1,13 @@
-export { fetchCsvScenarioFiles, loadCsvScenarioPack, parseCsvScenarioPack } from "./csvLoader";
-export { projectCsvScenarioPack } from "./csvProject";
+export { fetchCsvScenarioFiles, loadCsvScenarioPack, parseCsvScenarioPack } from "./parse/csvLoader";
+export { projectCsvScenarioPack } from "./engine/csvProject";
+export { stochasticProject } from "./engine/stochasticProject";
+export { computePercentiles, reseed, sampleLogNormal } from "./utils/stochastic";
+export type {
+  PercentileBands,
+  StochasticBandRow,
+  StochasticConfig,
+  StochasticProjectionResult,
+} from "./types/stochastic";
 export {
   csvAccountSchema,
   csvAccountsHeaders,
@@ -8,19 +16,19 @@ export {
   csvDateSchema,
   csvPostingSchema,
   csvPostingsHeaders,
-} from "./csvSchema";
+} from "./parse/csvSchema";
 export {
   CSV_SCENARIO_FILE_NAMES,
   CSV_SCENARIO_MODEL_VERSION,
   CSV_SCENARIO_PUBLIC_PATH,
   CSV_SCENARIO_REPO_PATH,
-} from "./csvTypes";
-export { summarizeValidationIssues, validateCsvScenarioPack } from "./csvValidation";
+} from "./types/csv";
+export { summarizeValidationIssues, validateCsvScenarioPack } from "./parse/csvValidation";
 export type {
   ScenarioPath,
   ScenarioValidationIssue,
   ScenarioValidationSeverity,
-} from "./validationTypes";
+} from "./types/validation";
 export type {
   CsvAccount,
   CsvCheckpoint,
@@ -39,4 +47,4 @@ export type {
   PostingOverrideMode,
   PostingWhatIfOverride,
   ProjectionRuntimeSettings,
-} from "./csvTypes";
+} from "./types/csv";

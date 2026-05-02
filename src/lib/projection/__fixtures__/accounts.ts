@@ -1,4 +1,4 @@
-import type { CsvAccount } from "../csvTypes";
+import type { CsvAccount } from "../types/csv";
 
 export function makeAccount(overrides: Partial<CsvAccount> & { id: string }): CsvAccount {
   return {
@@ -6,6 +6,7 @@ export function makeAccount(overrides: Partial<CsvAccount> & { id: string }): Cs
     category: "",
     openingBalance: 0,
     annualRate: 0,
+    volatility: 0,
     minBalance: null,
     maxBalance: null,
     color: null,

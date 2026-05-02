@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
   Line,
   LineChart,
   ReferenceLine,
@@ -19,9 +21,16 @@ import type {
   CsvScenarioWhatIfState,
   ProjectionRuntimeSettings,
 } from "@/lib/projection";
-import { currency, formatChartCurrencyTick, pct } from "@/lib/format";
+import type { StochasticProjectionResult } from "@/lib/projection";
+import { currency, formatChartCurrencyTick, formatTooltipCurrency, pct, pluralize } from "@/lib/format";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { OutcomeMetric } from "./dashboard/OutcomeMetric";
+import { CompactDetail } from "./dashboard/CompactDetail";
+import { DriverCard } from "./dashboard/DriverCard";
+import { buildBalanceChartData, buildStochasticChartData } from "@/chart/chartData";
+import { formatRoute } from "@/lib/format";
 
 interface CsvProjectionDashboardProps {
   pack: CsvScenarioPack;
@@ -30,69 +39,8 @@ interface CsvProjectionDashboardProps {
   projectionSettings: ProjectionRuntimeSettings;
   targetNetWorthInput: string;
   onTargetNetWorthInputChange: (value: string) => void;
+  stochasticResult?: StochasticProjectionResult | null;
   children?: ReactNode;
-}
-
-function buildBalanceChartData(pack: CsvScenarioPack, result: CsvProjectionResult) {
-  const enabledAccounts = pack.accounts.filter((account) => account.enabled);
-
-  return result.timeline.sampledRows.map((row) => ({
-    date: row.date,
-    ...Object.fromEntries(enabledAccounts.map((account) => [account.id, row.accountBalances[account.id] ?? 0])),
-  }));
-}
-
-function formatRoute(sourceLabel: string | null, destinations: Array<{ accountId: string; label: string }> | null) {
-  const destinationLabel = destinations === null ? "External" : destinations.map((dest) => dest.label).join(" ; ");
-
-  return `${sourceLabel ?? "External"} -> ${destinationLabel}`;
-}
-
-function OutcomeMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-      <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">{label}</div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{value}</div>
-      <div className="mt-1 text-sm text-slate-500">{detail}</div>
-    </div>
-  );
-}
-
-function CompactDetail({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-slate-200 py-2 last:border-b-0 last:pb-0 first:pt-0">
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className="text-sm font-medium text-slate-900">{value}</div>
-    </div>
-  );
-}
-
-function DriverCard({
-  label,
-  value,
-  detail,
-  tone = "default",
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: "default" | "warning" | "success";
-}) {
-  const toneClassName = tone === "success"
-    ? "border-emerald-200 bg-emerald-50"
-    : tone === "warning"
-      ? "border-amber-200 bg-amber-50"
-      : "border-slate-200 bg-white";
-
-  return (
-    <Card className={`rounded-[1.6rem] shadow-sm ${toneClassName}`}>
-      <CardContent className="space-y-2 p-5">
-        <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">{label}</div>
-        <div className="text-lg font-semibold tracking-tight text-slate-900">{value}</div>
-        <div className="text-sm text-slate-600">{detail}</div>
-      </CardContent>
-    </Card>
-  );
 }
 
 export function CsvProjectionDashboard({
@@ -102,8 +50,13 @@ export function CsvProjectionDashboard({
   projectionSettings,
   targetNetWorthInput,
   onTargetNetWorthInputChange,
+  stochasticResult,
   children,
 }: CsvProjectionDashboardProps) {
+  const [isAccountDiagnosticsOpen, setIsAccountDiagnosticsOpen] = useState(false);
+  const [isPostingTablesOpen, setIsPostingTablesOpen] = useState(false);
+  const [isTrendChartReady, setIsTrendChartReady] = useState(false);
+  const trendChartContainerRef = useRef<HTMLDivElement | null>(null);
   const latestRow = result.timeline.rows[result.timeline.rows.length - 1] ?? null;
   const firstProjectedRow = result.timeline.rows.find((row) => !row.isHistorical) ?? null;
   const futureRows = result.timeline.rows.filter((row) => !row.isHistorical);
@@ -117,10 +70,24 @@ export function CsvProjectionDashboard({
     color: summary.color ?? "#64748b",
     endingBalance: summary.endingBalance,
   }));
-  const netWorthChartData = result.timeline.rows.map((row) => ({
-    date: row.date,
-    netWorth: row.netWorth,
-  }));
+  const netWorthChartData = stochasticResult
+    ? buildStochasticChartData(result, stochasticResult)
+    : result.timeline.rows.map((row) => {
+        const nw = row.netWorth;
+        return {
+          date: row.date,
+          p10_base: nw,
+          outerThickness: 0,
+          p25_base: nw,
+          innerThickness: 0,
+          p50: nw,
+          _p10: nw,
+          _p90: nw,
+          _p25: nw,
+          _p75: nw,
+        };
+      });
+  const hasStochasticData = stochasticResult !== undefined && stochasticResult !== null;
   const balanceChartData = buildBalanceChartData(pack, result);
   const activeOverrideCount = Object.keys(whatIfState.postingOverrides).length;
   const goalReached = result.milestones.hitTargetDate !== null;
@@ -130,12 +97,33 @@ export function CsvProjectionDashboard({
   const requestedPostingAmount = result.totals.requestedPostingAmount;
   const realizedPostingAmount = result.totals.realizedPostingAmount;
   const postingUtilizationRate = requestedPostingAmount === 0 ? 1 : realizedPostingAmount / requestedPostingAmount;
-  const headline = goalReached
-    ? `Hits ${currency.format(projectionSettings.targetNetWorth)} on ${result.milestones.hitTargetDate}`
-    : `Misses target by ${currency.format(distanceToTarget)}`;
-  const headlineDetail = goalReached
-    ? `Projected final net worth is ${currency.format(result.summary.finalNetWorth)} on ${latestRow?.date ?? result.milestones.projectionStartDate}.`
-    : `Projected final net worth is ${currency.format(result.summary.finalNetWorth)} on ${latestRow?.date ?? result.milestones.projectionStartDate}.`;
+  const headline = (() => {
+    if (hasStochasticData && stochasticResult) {
+      const prob = pct.format(stochasticResult.milestones.hitTargetProbability);
+      if (goalReached) {
+        return `${prob} chance of ${currency.format(projectionSettings.targetNetWorth)}${stochasticResult.milestones.medianHitTargetDate ? ` by ${stochasticResult.milestones.medianHitTargetDate}` : ""}`;
+      }
+      return `${prob} chance of ${currency.format(projectionSettings.targetNetWorth)}`;
+    }
+
+    return goalReached
+      ? `Hits ${currency.format(projectionSettings.targetNetWorth)} on ${result.milestones.hitTargetDate}`
+      : `Misses target by ${currency.format(distanceToTarget)}`;
+  })();
+  const headlineDetail = (() => {
+    if (hasStochasticData && stochasticResult) {
+      const finalP50 = currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p50);
+      const hitDate = result.milestones.hitTargetDate;
+      if (hitDate) {
+        return `Deterministic: hits target on ${hitDate}. P50 final net worth: ${finalP50}.`;
+      }
+      return `Deterministic: misses by ${currency.format(distanceToTarget)}. P50 final net worth: ${finalP50}.`;
+    }
+
+    return goalReached
+      ? `Projected final net worth is ${currency.format(result.summary.finalNetWorth)} on ${latestRow?.date ?? result.milestones.projectionStartDate}.`
+      : `Projected final net worth is ${currency.format(result.summary.finalNetWorth)} on ${latestRow?.date ?? result.milestones.projectionStartDate}.`;
+  })();
   const statusBadgeClassName = goalReached
     ? "border-emerald-200 bg-emerald-50 text-emerald-900"
     : "border-amber-200 bg-amber-50 text-amber-900";
@@ -149,10 +137,34 @@ export function CsvProjectionDashboard({
     ? "No projected rows are scheduled after the historical checkpoints."
     : `${currency.format(firstProjectedRow.requestedPostingAmount)} requested and ${currency.format(firstProjectedRow.realizedPostingAmount)} realized${firstProjectedRow.clampedPostingShortfallAmount > 0 ? `, leaving ${currency.format(firstProjectedRow.clampedPostingShortfallAmount)} short.` : "."}`;
 
+  useEffect(() => {
+    const container = trendChartContainerRef.current;
+
+    if (container === null) {
+      return;
+    }
+
+    const updateReadyState = () => {
+      setIsTrendChartReady(container.clientWidth > 0 && container.clientHeight > 0);
+    };
+
+    updateReadyState();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateReadyState();
+    });
+
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [netWorthChartData.length, projectionSettings.targetNetWorth, hasStochasticData]);
+
   return (
     <div className="space-y-6">
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
-        <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
+        <Card className="min-w-0 rounded-[1.8rem] border-slate-200 shadow-sm">
           <CardContent className="p-5 md:p-6">
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
               <div className="space-y-4">
@@ -211,25 +223,56 @@ export function CsvProjectionDashboard({
           </CardContent>
         </Card>
 
-        <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
+        <Card className="min-w-0 rounded-[1.8rem] border-slate-200 shadow-sm">
           <CardHeader className="pb-0">
             <div>
               <CardTitle>Trend vs target</CardTitle>
               <CardDescription>{result.milestones.latestHistoricalDate ?? result.milestones.projectionStartDate} to {latestRow?.date ?? result.milestones.projectionStartDate}</CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="pt-4">
-            <div className="h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={netWorthChartData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" minTickGap={36} />
-                  <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
-                  <Tooltip formatter={(value: unknown) => currency.format(Number(value ?? 0))} />
-                  <ReferenceLine y={projectionSettings.targetNetWorth} stroke="#94a3b8" strokeDasharray="4 4" ifOverflow="extendDomain" />
-                  <Line type="monotone" dataKey="netWorth" stroke="#0f172a" strokeWidth={2.5} dot={false} name="Net worth" />
-                </LineChart>
-              </ResponsiveContainer>
+          <CardContent className="min-w-0 pt-4">
+            <div ref={trendChartContainerRef} className="min-w-0 h-[280px]">
+              {isTrendChartReady ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  {hasStochasticData ? (
+                    <ComposedChart data={netWorthChartData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" minTickGap={36} />
+                      <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload || payload.length === 0) return null;
+                          const p = payload[0]?.payload as Record<string, number> | undefined;
+                          if (!p) return null;
+                          return (
+                            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                              <div className="text-xs font-medium text-slate-500">{label}</div>
+                              <div className="mt-1 text-sm font-semibold text-slate-900">P50: {currency.format(p.p50)}</div>
+                              <div className="text-xs text-slate-500">P10–P90: {currency.format(p._p10)}–{currency.format(p._p90)}</div>
+                              <div className="text-xs text-slate-500">P25–P75: {currency.format(p._p25)}–{currency.format(p._p75)}</div>
+                            </div>
+                          );
+                        }}
+                      />
+                      <ReferenceLine y={projectionSettings.targetNetWorth} stroke="#94a3b8" strokeDasharray="4 4" ifOverflow="extendDomain" />
+                      <Area type="monotone" dataKey="p10_base" stackId="outer" stroke="none" fill="transparent" isAnimationActive={false} />
+                      <Area type="monotone" dataKey="outerThickness" stackId="outer" stroke="none" fill="#0f172a" fillOpacity={0.08} isAnimationActive={false} />
+                      <Area type="monotone" dataKey="p25_base" stackId="inner" stroke="none" fill="transparent" isAnimationActive={false} />
+                      <Area type="monotone" dataKey="innerThickness" stackId="inner" stroke="none" fill="#0f172a" fillOpacity={0.16} isAnimationActive={false} />
+                      <Line type="monotone" dataKey="p50" stroke="#0f172a" strokeWidth={2.5} dot={false} name="P50 median" isAnimationActive={false} />
+                    </ComposedChart>
+                  ) : (
+                    <LineChart data={netWorthChartData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" minTickGap={36} />
+                      <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
+                      <Tooltip formatter={formatTooltipCurrency} />
+                      <ReferenceLine y={projectionSettings.targetNetWorth} stroke="#94a3b8" strokeDasharray="4 4" ifOverflow="extendDomain" />
+                      <Line type="monotone" dataKey="p50" stroke="#0f172a" strokeWidth={2.5} dot={false} name="Net worth" />
+                    </LineChart>
+                  )}
+                </ResponsiveContainer>
+              ) : null}
             </div>
           </CardContent>
         </Card>
@@ -267,190 +310,180 @@ export function CsvProjectionDashboard({
         </section>
       ) : null}
 
-      <details className="rounded-[1.8rem] border border-slate-200 bg-white px-5 py-5 shadow-sm open:border-slate-300">
-        <summary className="cursor-pointer list-none">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-base font-semibold text-slate-900">Account diagnostics</div>
-              <div className="text-sm text-slate-500">Open for account-level balance curves and ending balances.</div>
-            </div>
-            <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">Details</div>
-          </div>
-        </summary>
+      <CollapsibleSection
+        open={isAccountDiagnosticsOpen}
+        onOpenChange={setIsAccountDiagnosticsOpen}
+        title="Account diagnostics"
+        description="Open for account-level balance curves and ending balances."
+      >
+        {isAccountDiagnosticsOpen ? (
+          <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
+            {balanceChartData.length > 0 ? (
+              <Card className="min-w-0 rounded-[1.6rem] border-slate-200 shadow-sm">
+                <CardHeader>
+                  <div>
+                    <CardTitle>Account balances over time</CardTitle>
+                    <CardDescription>Enabled accounts across sampled checkpoint and event rows.</CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent className="min-w-0">
+                  <div className="min-w-0 h-[320px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={balanceChartData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" minTickGap={36} />
+                        <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
+                        <Tooltip formatter={formatTooltipCurrency} />
+                        {pack.accounts.filter((account) => account.enabled).map((account) => (
+                          <Line
+                            key={account.id}
+                            type="monotone"
+                            dataKey={account.id}
+                            stroke={account.color ?? "#64748b"}
+                            strokeWidth={2}
+                            dot={false}
+                            name={account.label}
+                          />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
 
-        <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
-          {balanceChartData.length > 0 ? (
-            <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
+            <Card className="min-w-0 rounded-[1.6rem] border-slate-200 shadow-sm">
               <CardHeader>
                 <div>
-                  <CardTitle>Account balances over time</CardTitle>
-                  <CardDescription>Enabled accounts across sampled checkpoint and event rows.</CardDescription>
+                  <CardTitle>Ending balances by account</CardTitle>
+                  <CardDescription>Signed ending balances at the horizon.</CardDescription>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="h-[320px]">
+              <CardContent className="min-w-0">
+                <div className="min-w-0 h-[320px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={balanceChartData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
+                    <BarChart data={endingBalanceData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" minTickGap={36} />
+                      <XAxis dataKey="label" interval={0} angle={-20} textAnchor="end" height={70} />
                       <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
-                      <Tooltip formatter={(value: unknown) => currency.format(Number(value ?? 0))} />
-                      {pack.accounts.filter((account) => account.enabled).map((account) => (
-                        <Line
-                          key={account.id}
-                          type="monotone"
-                          dataKey={account.id}
-                          stroke={account.color ?? "#64748b"}
-                          strokeWidth={2}
-                          dot={false}
-                          name={account.label}
-                        />
-                      ))}
-                    </LineChart>
+                      <Tooltip formatter={formatTooltipCurrency} />
+                      <Bar dataKey="endingBalance" name="Ending balance">
+                        {endingBalanceData.map((entry) => (
+                          <Cell key={entry.id} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
-          ) : null}
-
-          <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
-            <CardHeader>
-              <div>
-                <CardTitle>Ending balances by account</CardTitle>
-                <CardDescription>Signed ending balances at the horizon.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={endingBalanceData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="label" interval={0} angle={-20} textAnchor="end" height={70} />
-                    <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
-                    <Tooltip formatter={(value: unknown) => currency.format(Number(value ?? 0))} />
-                    <Bar dataKey="endingBalance" name="Ending balance">
-                      {endingBalanceData.map((entry) => (
-                        <Cell key={entry.id} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </details>
-
-      <details
-        open={firstShortfallRow !== null}
-        className="rounded-[1.8rem] border border-slate-200 bg-white px-5 py-5 shadow-sm open:border-slate-300"
-      >
-        <summary className="cursor-pointer list-none">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-base font-semibold text-slate-900">Posting tables</div>
-              <div className="text-sm text-slate-500">Open for route-level utilization and the exact projected event rows.</div>
-            </div>
-            <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-              {firstShortfallRow ? `Shortfall starts ${firstShortfallRow.date}` : `${futureRows.length} future row${futureRows.length === 1 ? "" : "s"}`}
-            </div>
           </div>
-        </summary>
+        ) : null}
+      </CollapsibleSection>
 
-        <div className="mt-5 grid gap-6 xl:grid-cols-2">
-          <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
-            <CardHeader>
-              <div>
-                <CardTitle>Posting utilization</CardTitle>
-                <CardDescription>Which scheduled postings are fully realized and which ones clamp.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Posting</TableHead>
-                    <TableHead>Route</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Requested</TableHead>
-                    <TableHead>Realized</TableHead>
-                    <TableHead>Utilization</TableHead>
-                    <TableHead>First shortfall</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {result.postingSummaries.length > 0 ? result.postingSummaries.map((summary) => {
-                    const hasShortfall = summary.utilizationRate < 1;
+      <CollapsibleSection
+        open={isPostingTablesOpen}
+        onOpenChange={setIsPostingTablesOpen}
+        title="Posting tables"
+        description="Open for route-level utilization and the exact projected event rows."
+        badge={isPostingTablesOpen ? "Close" : firstShortfallRow ? `Shortfall starts ${firstShortfallRow.date}` : `${futureRows.length} future row${futureRows.length === 1 ? "" : "s"}`}
+      >
+        {isPostingTablesOpen ? (
+          <div className="mt-5 grid gap-6 xl:grid-cols-2">
+            <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
+              <CardHeader>
+                <div>
+                  <CardTitle>Posting utilization</CardTitle>
+                  <CardDescription>Which scheduled postings are fully realized and which ones clamp.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Posting</TableHead>
+                      <TableHead>Route</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Requested</TableHead>
+                      <TableHead>Realized</TableHead>
+                      <TableHead>Utilization</TableHead>
+                      <TableHead>First shortfall</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {result.postingSummaries.length > 0 ? result.postingSummaries.map((summary) => {
+                      const hasShortfall = summary.utilizationRate < 1;
 
-                    return (
-                      <TableRow key={summary.postingId}>
-                        <TableCell>
-                          <span className={hasShortfall ? "font-semibold text-amber-700" : undefined}>{summary.label}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className={hasShortfall ? "text-amber-700" : undefined}>{formatRoute(summary.sourceAccountLabel, summary.destinations)}</span>
-                        </TableCell>
-                        <TableCell>{summary.priority}</TableCell>
-                        <TableCell>{currency.format(summary.requestedAmount)}</TableCell>
-                        <TableCell>
-                          <span className={hasShortfall ? "text-amber-700" : undefined}>{currency.format(summary.realizedAmount)}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className={hasShortfall ? "font-semibold text-amber-700" : undefined}>{pct.format(summary.utilizationRate)}</span>
-                        </TableCell>
-                        <TableCell>
-                          <span className={hasShortfall ? "font-medium text-amber-700" : "text-slate-400"}>{hasShortfall ? summary.firstShortfallDate : "-"}</span>
-                        </TableCell>
+                      return (
+                        <TableRow key={summary.postingId}>
+                          <TableCell>
+                            <span className={hasShortfall ? "font-semibold text-amber-700" : undefined}>{summary.label}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={hasShortfall ? "text-amber-700" : undefined}>{formatRoute(summary.sourceAccountLabel, summary.destinations)}</span>
+                          </TableCell>
+                          <TableCell>{summary.priority}</TableCell>
+                          <TableCell>{currency.format(summary.requestedAmount)}</TableCell>
+                          <TableCell>
+                            <span className={hasShortfall ? "text-amber-700" : undefined}>{currency.format(summary.realizedAmount)}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={hasShortfall ? "font-semibold text-amber-700" : undefined}>{pct.format(summary.utilizationRate)}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={hasShortfall ? "font-medium text-amber-700" : "text-slate-400"}>{hasShortfall ? summary.firstShortfallDate : "-"}</span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }) : (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-6 text-center text-slate-500">No postings are defined.</TableCell>
                       </TableRow>
-                    );
-                  }) : (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-6 text-center text-slate-500">No postings are defined.</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
 
-          <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
-            <CardHeader>
-              <div>
-                <CardTitle>Upcoming event rows</CardTitle>
-                <CardDescription>The first projected dates and their requested vs realized scheduled activity.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Requested</TableHead>
-                    <TableHead>Realized</TableHead>
-                    <TableHead>Shortfall</TableHead>
-                    <TableHead>Net worth</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {futureRows.length > 0 ? futureRows.slice(0, 12).map((row: CsvProjectionRow) => (
-                    <TableRow key={row.date}>
-                      <TableCell>{row.date}</TableCell>
-                      <TableCell>{currency.format(row.requestedPostingAmount)}</TableCell>
-                      <TableCell>{currency.format(row.realizedPostingAmount)}</TableCell>
-                      <TableCell>{currency.format(row.clampedPostingShortfallAmount)}</TableCell>
-                      <TableCell>{currency.format(row.netWorth)}</TableCell>
-                    </TableRow>
-                  )) : (
+            <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
+              <CardHeader>
+                <div>
+                  <CardTitle>Upcoming event rows</CardTitle>
+                  <CardDescription>The first projected dates and their requested vs realized scheduled activity.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={5} className="py-6 text-center text-slate-500">No projected event rows are available.</TableCell>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Requested</TableHead>
+                      <TableHead>Realized</TableHead>
+                      <TableHead>Shortfall</TableHead>
+                      <TableHead>Net worth</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      </details>
+                  </TableHeader>
+                  <TableBody>
+                    {futureRows.length > 0 ? futureRows.slice(0, 12).map((row: CsvProjectionRow) => (
+                      <TableRow key={row.date}>
+                        <TableCell>{row.date}</TableCell>
+                        <TableCell>{currency.format(row.requestedPostingAmount)}</TableCell>
+                        <TableCell>{currency.format(row.realizedPostingAmount)}</TableCell>
+                        <TableCell>{currency.format(row.clampedPostingShortfallAmount)}</TableCell>
+                        <TableCell>{currency.format(row.netWorth)}</TableCell>
+                      </TableRow>
+                    )) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-6 text-center text-slate-500">No projected event rows are available.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
+      </CollapsibleSection>
     </div>
   );
 }

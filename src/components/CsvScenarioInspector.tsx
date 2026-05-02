@@ -1,11 +1,12 @@
-import type { ReactNode } from "react";
 import { CSV_SCENARIO_PUBLIC_PATH } from "@/lib/projection";
 import type { CsvScenarioPack, ProjectionRuntimeSettings, ScenarioValidationIssue } from "@/lib/projection";
 import { ScenarioValidationPanel } from "./ScenarioValidationPanel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { currency, integer, decimal, pluralize } from "@/lib/format";
 
 interface CsvScenarioInspectorProps {
   pack: CsvScenarioPack | null;
@@ -24,14 +25,6 @@ interface TableColumn<TRow> {
   format?: (value: TRow[keyof TRow], row: TRow) => string;
 }
 
-const integerFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-const decimalFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 });
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
-
 function formatValue(value: unknown) {
   if (value === null || value === undefined || value === "") {
     return "-";
@@ -42,14 +35,14 @@ function formatValue(value: unknown) {
   }
 
   if (typeof value === "number") {
-    return Number.isInteger(value) ? integerFormatter.format(value) : decimalFormatter.format(value);
+    return Number.isInteger(value) ? integer.format(value) : decimal.format(value);
   }
 
   return String(value);
 }
 
 function formatCurrency(value: unknown) {
-  return typeof value === "number" ? currencyFormatter.format(value) : formatValue(value);
+  return typeof value === "number" ? currency.format(value) : formatValue(value);
 }
 
 function formatLoadedAt(loadedAt: Date | null) {
@@ -68,36 +61,6 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
         <div className="text-lg font-semibold text-slate-900">{value}</div>
       </CardContent>
     </Card>
-  );
-}
-
-function SectionDisclosure({
-  title,
-  description,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  description: string;
-  defaultOpen?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <details
-      open={defaultOpen}
-      className="rounded-[1.6rem] border border-slate-200 bg-white px-4 py-4 shadow-sm open:border-slate-300"
-    >
-      <summary className="cursor-pointer list-none">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-base font-semibold text-slate-900">{title}</div>
-            <div className="text-sm text-slate-500">{description}</div>
-          </div>
-          <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">Open</div>
-        </div>
-      </summary>
-      <div className="mt-4">{children}</div>
-    </details>
   );
 }
 
@@ -173,29 +136,21 @@ export function CsvScenarioInspector({
   const shouldOpen = loadError !== null || issues.length > 0;
   const loadStatus = isLoading ? "Loading" : loadError ? "Load failed" : pack ? "Loaded" : "Waiting";
   const validationSummary = errorCount > 0
-    ? `${errorCount} error${errorCount === 1 ? "" : "s"}`
+    ? pluralize(errorCount, "error")
     : warningCount > 0
-      ? `${warningCount} warning${warningCount === 1 ? "" : "s"}`
+      ? pluralize(warningCount, "warning")
       : pack
         ? "Clean"
         : "Pending";
 
   return (
-    <details open={shouldOpen} className="rounded-[1.8rem] border border-slate-200 bg-white px-5 py-5 shadow-sm open:border-slate-300">
-      <summary className="cursor-pointer list-none">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="text-base font-semibold text-slate-900">Source data and validation</div>
-            <div className="text-sm text-slate-500">Secondary inspection area for CSV health, runtime settings, and raw source tables.</div>
-          </div>
-          <div className="flex flex-wrap gap-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">{loadStatus}</span>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">{validationSummary}</span>
-          </div>
-        </div>
-      </summary>
-
-      <div className="mt-5 space-y-5">
+    <CollapsibleSection
+      open={shouldOpen}
+      title="Source data and validation"
+      description="Secondary inspection area for CSV health, runtime settings, and raw source tables."
+      badge={`${loadStatus} • ${validationSummary}`}
+    >
+      <div className="space-y-5">
         <div className="flex justify-end">
           <Button type="button" variant="secondary" size="sm" onClick={onReload} disabled={isLoading}>
             {isLoading ? "Loading..." : "Reload CSVs"}
@@ -215,20 +170,20 @@ export function CsvScenarioInspector({
           <SummaryCard label="Source path" value={CSV_SCENARIO_PUBLIC_PATH} />
           <SummaryCard label="Last loaded" value={formatLoadedAt(loadedAt)} />
           <SummaryCard label="Projection start" value={projectionStartDate} />
-          <SummaryCard label="Target" value={currencyFormatter.format(projectionSettings.targetNetWorth)} />
+          <SummaryCard label="Target" value={currency.format(projectionSettings.targetNetWorth)} />
         </div>
 
         {pack ? (
           <div className="grid gap-3 md:grid-cols-3">
-            <SummaryCard label="Accounts" value={integerFormatter.format(pack.accounts.length)} />
-            <SummaryCard label="Checkpoints" value={integerFormatter.format(pack.checkpoints.length)} />
-            <SummaryCard label="Postings" value={integerFormatter.format(pack.postings.length)} />
+            <SummaryCard label="Accounts" value={integer.format(pack.accounts.length)} />
+            <SummaryCard label="Checkpoints" value={integer.format(pack.checkpoints.length)} />
+            <SummaryCard label="Postings" value={integer.format(pack.postings.length)} />
           </div>
         ) : null}
 
         {pack ? (
           <div className="space-y-4">
-            <SectionDisclosure
+            <CollapsibleSection
               title="Runtime settings and postings"
               description="Use this only when you need to verify the exact inputs behind the forecast."
             >
@@ -271,9 +226,9 @@ export function CsvScenarioInspector({
                   ]}
                 />
               </div>
-            </SectionDisclosure>
+            </CollapsibleSection>
 
-            <SectionDisclosure
+            <CollapsibleSection
               title="Accounts and checkpoints"
               description="Open for the raw account rows and historical checkpoint evidence."
             >
@@ -306,10 +261,10 @@ export function CsvScenarioInspector({
                   ]}
                 />
               </div>
-            </SectionDisclosure>
+            </CollapsibleSection>
           </div>
         ) : null}
       </div>
-    </details>
+    </CollapsibleSection>
   );
 }
