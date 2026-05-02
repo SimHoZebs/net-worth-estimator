@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { ScenarioPack } from "@/lib/projection";
+import { describe, it, expect, beforeEach } from "vitest";
 import { useStore, selectActiveOverrideCount, selectWhatIfState } from "@/store";
 
 /* ------------------------------------------------------------------ */
@@ -23,14 +22,19 @@ function makeCheckpoint(date = "2025-01-01", accountId = "a1", balance = 1000) {
   return { Date: date, AccountId: accountId, Balance: balance };
 }
 
-function makeScenarioPack(overrides?: Partial<ScenarioPack>): ScenarioPack {
+function makeScenarioPack(): {
+  version: 8;
+  sourcePath: string;
+  accounts: Array<{ id: string; label: string; minBalance: null; maxBalance: null; color: null; enabled: boolean }>;
+  checkpoints: Array<{ Date: string; AccountId: string; Balance: number }>;
+  postings: Array<{ id: string; label: string; sourceAccountId: null; destinations: null; arithmetic: string; frequency: "monthly"; annualRate: number; annualGrowthRate: number; volatility: number; startDate: string; endDate: null; annualCap: null; priority: number; enabled: boolean }>;
+} {
   return {
     version: 8,
     sourcePath: "/scenario",
     accounts: [{ id: "a1", label: "Savings", minBalance: null, maxBalance: null, color: null, enabled: true }],
     checkpoints: [{ Date: "2025-01-01", AccountId: "a1", Balance: 1000 }],
     postings: [makePosting("p1")],
-    ...overrides,
   };
 }
 
@@ -255,12 +259,8 @@ describe("Editor slice", () => {
   describe("with a canonical pack", () => {
     const pack = makeScenarioPack();
 
-    beforeEach(() => {
-      useStore.setState({ pack });
-    });
-
     it("startEditing clones the pack and sets isEditing", () => {
-      useStore.getState().startEditing();
+      useStore.getState().startEditing(pack);
       expect(useStore.getState().isEditing).toBe(true);
       expect(useStore.getState().isDirty).toBe(false);
       expect(useStore.getState().workingPack).toEqual(pack);
@@ -268,70 +268,64 @@ describe("Editor slice", () => {
     });
 
     it("cancelEditing resets state", () => {
-      useStore.getState().startEditing();
+      useStore.getState().startEditing(pack);
       useStore.getState().cancelEditing();
       expect(useStore.getState().isEditing).toBe(false);
       expect(useStore.getState().workingPack).toBeNull();
     });
 
-    it("startEditing is no-op when pack is null", () => {
-      useStore.setState({ pack: null });
-      useStore.getState().startEditing();
-      expect(useStore.getState().isEditing).toBe(false);
-    });
-
     it("updateAccount modifies workingPack and sets isDirty", () => {
-      useStore.getState().startEditing();
+      useStore.getState().startEditing(pack);
       useStore.getState().updateAccount("a1", { label: "Investment" });
       expect(useStore.getState().isDirty).toBe(true);
       expect(useStore.getState().workingPack?.accounts[0].label).toBe("Investment");
     });
 
     it("deleteAccount removes from workingPack", () => {
-      useStore.getState().startEditing();
+      useStore.getState().startEditing(pack);
       useStore.getState().deleteAccount("a1");
       expect(useStore.getState().workingPack?.accounts).toHaveLength(0);
     });
 
     it("addAccount appends to workingPack", () => {
-      useStore.getState().startEditing();
+      useStore.getState().startEditing(pack);
       useStore.getState().addAccount(makeAccount("a2", "Checking"));
       expect(useStore.getState().workingPack?.accounts).toHaveLength(2);
     });
 
     it("updatePosting modifies posting in workingPack", () => {
-      useStore.getState().startEditing();
+      useStore.getState().startEditing(pack);
       useStore.getState().updatePosting("p1", { annualRate: 10000 });
       expect(useStore.getState().isDirty).toBe(true);
       expect(useStore.getState().workingPack?.postings[0].annualRate).toBe(10000);
     });
 
     it("deletePosting removes from workingPack", () => {
-      useStore.getState().startEditing();
+      useStore.getState().startEditing(pack);
       useStore.getState().deletePosting("p1");
       expect(useStore.getState().workingPack?.postings).toHaveLength(0);
     });
 
     it("addPosting appends to workingPack", () => {
-      useStore.getState().startEditing();
+      useStore.getState().startEditing(pack);
       useStore.getState().addPosting(makePosting("p2"));
       expect(useStore.getState().workingPack?.postings).toHaveLength(2);
     });
 
     it("addCheckpoint appends to workingPack", () => {
-      useStore.getState().startEditing();
+      useStore.getState().startEditing(pack);
       useStore.getState().addCheckpoint(makeCheckpoint("2025-03-01", "a1", 2000));
       expect(useStore.getState().workingPack?.checkpoints).toHaveLength(2);
     });
 
     it("deleteCheckpoint removes by index from workingPack", () => {
-      useStore.getState().startEditing();
+      useStore.getState().startEditing(pack);
       useStore.getState().deleteCheckpoint(0);
       expect(useStore.getState().workingPack?.checkpoints).toHaveLength(0);
     });
 
     it("updateCheckpoint modifies checkpoint in workingPack", () => {
-      useStore.getState().startEditing();
+      useStore.getState().startEditing(pack);
       useStore.getState().updateCheckpoint(0, { Balance: 9999 });
       expect(useStore.getState().workingPack?.checkpoints[0].Balance).toBe(9999);
     });
@@ -364,38 +358,5 @@ describe("Settings slice", () => {
   it("setStochasticConfig updates config", () => {
     useStore.getState().setStochasticConfig({ runCount: 500, seed: 42 });
     expect(useStore.getState().stochasticConfig).toEqual({ runCount: 500, seed: 42 });
-  });
-});
-
-/* ------------------------------------------------------------------ */
-/*  Scenario slice fetch setters                                       */
-/* ------------------------------------------------------------------ */
-
-describe("Scenario fetch setters", () => {
-  it("beginFetch sets isLoading to true", () => {
-    useStore.setState({ isLoading: false, loadError: "old" });
-    useStore.getState().beginFetch();
-    expect(useStore.getState().isLoading).toBe(true);
-    expect(useStore.getState().loadError).toBeNull();
-  });
-
-  it("completeFetch sets pack, issues, and clears loading", () => {
-    useStore.setState({ isLoading: true, pack: null, issues: [], loadError: null, loadedAt: null });
-    const pack = makeScenarioPack();
-    useStore.getState().completeFetch({ pack, issues: [{ code: "WARN", message: "test", path: [], severity: "warning" as const }] });
-    expect(useStore.getState().pack).toEqual(pack);
-    expect(useStore.getState().issues).toHaveLength(1);
-    expect(useStore.getState().isLoading).toBe(false);
-    expect(useStore.getState().loadError).toBeNull();
-    expect(useStore.getState().loadedAt).toBeInstanceOf(Date);
-  });
-
-  it("recordFetchError sets loadError and clears loading", () => {
-    useStore.setState({ isLoading: true, pack: makeScenarioPack(), issues: [], loadError: null });
-    useStore.getState().recordFetchError("boom");
-    expect(useStore.getState().pack).toBeNull();
-    expect(useStore.getState().issues).toEqual([]);
-    expect(useStore.getState().isLoading).toBe(false);
-    expect(useStore.getState().loadError).toBe("boom");
   });
 });

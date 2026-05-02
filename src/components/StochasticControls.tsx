@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useStore } from "@/store";
 
 interface StochasticControlsProps {
+  hasStochasticAccounts: boolean;
   isRunning: boolean;
   progress: number | null;
   stochasticResult: StochasticProjectionResult | null;
@@ -15,6 +16,7 @@ interface StochasticControlsProps {
 const DEBOUNCE_MS = 2000;
 
 export function StochasticControls({
+  hasStochasticAccounts,
   isRunning,
   progress,
   stochasticResult,
@@ -23,7 +25,6 @@ export function StochasticControls({
   const config = useStore((s) => s.stochasticConfig);
   const onToggle = useStore((s) => s.setStochasticEnabled);
   const onConfigChange = useStore((s) => s.setStochasticConfig);
-  const hasStochasticAccounts = useStore((s) => s.pack !== null && s.pack.postings.some((p) => p.volatility > 0));
   const [runCountInput, setRunCountInput] = useState(String(config.runCount));
   const [seedInput, setSeedInput] = useState(config.seed !== null ? String(config.seed) : "");
   const [pendingConfig, setPendingConfig] = useState<StochasticConfig | null>(null);

@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { CSV_SCENARIO_PUBLIC_PATH } from "@/lib/projection";
-import type { Account, Checkpoint, Posting, ProjectionRuntimeSettings } from "@/lib/projection";
+import type { Account, Checkpoint, Posting, ProjectionRuntimeSettings, ScenarioPack } from "@/lib/projection";
+import type { ScenarioValidationIssue } from "@/lib/projection";
 import { ScenarioValidationPanel } from "./ScenarioValidationPanel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,11 @@ import { useStore } from "@/store";
 interface ScenarioInspectorProps {
   projectionSettings: ProjectionRuntimeSettings;
   projectionStartDate: string;
+  pack: ScenarioPack | null;
+  issues: ScenarioValidationIssue[];
+  isLoading: boolean;
+  loadError: string | null;
+  dataUpdatedAt: number;
   onReload: () => void;
   onSave: () => void;
 }
@@ -36,8 +42,8 @@ function formatCurrency(v: unknown) {
   return typeof v === "number" ? currency.format(v) : formatValue(v);
 }
 
-function formatLoadedAt(loadedAt: Date | null) {
-  return loadedAt === null ? "Not loaded yet" : loadedAt.toLocaleString();
+function formatLoadedAt(dataUpdatedAt: number) {
+  return dataUpdatedAt === 0 ? "Not loaded yet" : new Date(dataUpdatedAt).toLocaleString();
 }
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
@@ -103,13 +109,8 @@ function inputStyle(isDirty: boolean) {
 }
 
 export function ScenarioInspector({
-  projectionSettings, projectionStartDate, onReload, onSave,
+  projectionSettings, projectionStartDate, pack, issues, isLoading, loadError, dataUpdatedAt, onReload, onSave,
 }: ScenarioInspectorProps) {
-  const pack = useStore((s) => s.pack);
-  const issues = useStore((s) => s.issues);
-  const loadError = useStore((s) => s.loadError);
-  const isLoading = useStore((s) => s.isLoading);
-  const loadedAt = useStore((s) => s.loadedAt);
   const disabledAccountIds = useStore((s) => s.disabledAccountIds);
   const disabledPostingIds = useStore((s) => s.disabledPostingIds);
   const toggleAccountDisabled = useStore((s) => s.toggleAccountDisabled);
@@ -160,7 +161,7 @@ export function ScenarioInspector({
               <Button type="button" variant="secondary" size="sm" onClick={onReload} disabled={isLoading}>
                 {isLoading ? "Loading..." : "Reload"}
               </Button>
-              {pack ? <Button type="button" variant="secondary" size="sm" onClick={startEditing}>Edit</Button> : null}
+              {pack ? <Button type="button" variant="secondary" size="sm" onClick={() => startEditing(pack)}>Edit</Button> : null}
             </>
           )}
         </div>
@@ -176,7 +177,7 @@ export function ScenarioInspector({
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <SummaryCard label="Source path" value={CSV_SCENARIO_PUBLIC_PATH} />
-          <SummaryCard label="Last loaded" value={formatLoadedAt(loadedAt)} />
+          <SummaryCard label="Last loaded" value={formatLoadedAt(dataUpdatedAt)} />
           <SummaryCard label="Projection start" value={projectionStartDate} />
           <SummaryCard label="Target" value={currency.format(projectionSettings.targetNetWorth)} />
         </div>

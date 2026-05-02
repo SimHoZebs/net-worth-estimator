@@ -166,3 +166,27 @@ export async function loadCsvScenarioPack(options: CsvScenarioLoadOptions = {}):
   const csvFiles = await fetchCsvScenarioFiles(options);
   return parseCsvScenarioPack(csvFiles, { basePath: options.basePath ?? CSV_SCENARIO_PUBLIC_PATH });
 }
+
+export function serializeCsvScenarioPack(pack: ScenarioPack): ScenarioFileContents {
+  const accountsHeader = "id,label,minBalance,maxBalance,color,enabled";
+  const postingsHeader = "id,label,sourceAccountId,destinations,arithmetic,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled";
+  const checkpointsHeader = "Date,AccountId,Balance";
+
+  return {
+    accounts: [accountsHeader].concat(
+      pack.accounts.map((a) =>
+        `${a.id},${a.label},${a.minBalance ?? ""},${a.maxBalance ?? ""},${a.color ?? ""},${a.enabled}`
+      )
+    ).join("\n"),
+    postings: [postingsHeader].concat(
+      pack.postings.map((p) =>
+        `${p.id},${p.label},${p.sourceAccountId ?? ""},${p.destinations?.join(";") ?? ""},${p.arithmetic},${p.frequency},${p.annualRate},${p.annualGrowthRate},${p.volatility},${p.startDate},${p.endDate ?? ""},${p.annualCap ?? ""},${p.priority},${p.enabled}`
+      )
+    ).join("\n"),
+    checkpoints: [checkpointsHeader].concat(
+      pack.checkpoints.map((c) =>
+        `${c.Date},${c.AccountId},${c.Balance}`
+      )
+    ).join("\n"),
+  };
+}

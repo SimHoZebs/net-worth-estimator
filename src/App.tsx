@@ -10,8 +10,8 @@ import { useStochasticWorker } from "./hooks/useStochasticWorker";
 import { summarizeValidationIssues } from "./lib/projection";
 import { useStore, selectWhatIfState } from "./store";
 import { useShallow } from "zustand/shallow";
-import { reloadScenario } from "@/lib/reloadScenario";
 import { createCsvDataSource } from "@/lib/projection";
+import { useScenarioQuery, useScenarioMutation } from "./hooks/useScenario";
 
 const PROJECTION_HORIZON_YEARS = 25;
 
@@ -20,11 +20,21 @@ function formatTodayIsoDate() {
 }
 
 export default function App() {
-  const pack = useStore((s) => s.pack);
-  const issues = useStore((s) => s.issues);
-  const loadError = useStore((s) => s.loadError);
-  const isLoading = useStore((s) => s.isLoading);
-  const loadedAt = useStore((s) => s.loadedAt);
+  const dataSource = useMemo(() => createCsvDataSource(), []);
+  const {
+    data: scenarioData,
+    isLoading: isScenarioLoading,
+    error: scenarioError,
+    refetch: refetchScenario,
+    dataUpdatedAt,
+  } = useScenarioQuery(dataSource);
+  const scenarioMutation = useScenarioMutation(dataSource);
+
+  const pack = scenarioData?.pack ?? null;
+  const issues = scenarioData?.issues ?? [];
+  const loadError = scenarioError?.message ?? null;
+  const isLoading = isScenarioLoading;
+
   const whatIfState = useStore(useShallow(selectWhatIfState));
   const activeOverrideCount = useStore(
     (s) =>
@@ -34,8 +44,6 @@ export default function App() {
       s.disabledAccountIds.length +
       s.disabledPostingIds.length,
   );
-
-  useEffect(() => { reloadScenario(); }, []);
 
   const targetNetWorthInput = useStore((s) => s.targetNetWorthInput);
   const setTargetNetWorthInput = useStore((s) => s.setTargetNetWorthInput);
@@ -85,17 +93,16 @@ export default function App() {
 
   const handleSave = () => {
     const store = useStore.getState();
-    if (!store.workingPack) return;
+    if (!store.workingPack || scenarioMutation.isPending) return;
 
-    const dataSource = createCsvDataSource();
-    dataSource.savePack(store.workingPack).then((saved) => {
-      useStore.setState({
-        pack: saved.pack,
-        issues: saved.issues,
-        isDirty: false,
-        isEditing: false,
-        workingPack: null,
-      });
+    scenarioMutation.mutate(store.workingPack, {
+      onSuccess: () => {
+        useStore.setState({
+          isDirty: false,
+          isEditing: false,
+          workingPack: null,
+        });
+      },
     });
   };
 
@@ -103,7 +110,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8 md:py-8">
         <div className="flex justify-end">
-          <Button type="button" variant="ghost" size="sm" onClick={reloadScenario} disabled={isLoading}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => refetchScenario()} disabled={isLoading}>
             {isLoading ? "Loading..." : "Reload"}
           </Button>
         </div>
@@ -158,13 +165,18 @@ export default function App() {
         ) : null}
 
         {pack && validation.isValid && result ? (
-          <StochasticControls stochasticResult={stochasticResult} isRunning={isStochasticRunning} progress={stochasticProgress} />
+          <StochasticControls hasStochasticAccounts={hasStochasticAccounts} stochasticResult={stochasticResult} isRunning={isStochasticRunning} progress={stochasticProgress} />
         ) : null}
 
         <ScenarioInspector
           projectionSettings={projectionSettings}
           projectionStartDate={result?.milestones.projectionStartDate ?? projectionStartDate}
-          onReload={reloadScenario}
+          pack={pack}
+          issues={issues}
+          isLoading={isLoading}
+          loadError={loadError}
+          dataUpdatedAt={dataUpdatedAt}
+          onReload={() => refetchScenario()}
           onSave={handleSave}
         />
       </div>

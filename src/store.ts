@@ -1,45 +1,6 @@
 import { create } from "zustand";
 import type { StateCreator } from "zustand";
 import type { Account, Checkpoint, Posting, ScenarioPack, ScenarioWhatIfState, StochasticConfig } from "@/lib/projection";
-import type { ScenarioValidationIssue } from "@/lib/projection";
-import type { ScenarioParseResult } from "@/lib/projection/dataSource";
-
-/* ------------------------------------------------------------------ */
-/*  Scenario slice                                                     */
-/* ------------------------------------------------------------------ */
-
-interface ScenarioSlice {
-  pack: ScenarioPack | null;
-  issues: ScenarioValidationIssue[];
-  loadError: string | null;
-  isLoading: boolean;
-  loadedAt: Date | null;
-  beginFetch: () => void;
-  completeFetch: (result: ScenarioParseResult) => void;
-  recordFetchError: (message: string) => void;
-}
-
-const createScenarioSlice: StateCreator<AppStore, [], [], ScenarioSlice> = (set) => ({
-  pack: null,
-  issues: [],
-  loadError: null,
-  isLoading: false,
-  loadedAt: null,
-
-  beginFetch: () => set({ isLoading: true, loadError: null }),
-
-  completeFetch: (result) =>
-    set({
-      pack: result.pack,
-      issues: result.issues,
-      loadError: null,
-      isLoading: false,
-      loadedAt: new Date(),
-    }),
-
-  recordFetchError: (message) =>
-    set({ pack: null, issues: [], loadError: message, isLoading: false }),
-});
 
 /* ------------------------------------------------------------------ */
 /*  What-if slice                                                      */
@@ -111,7 +72,7 @@ interface EditorSlice {
   workingPack: ScenarioPack | null;
   isDirty: boolean;
   isEditing: boolean;
-  startEditing: () => void;
+  startEditing: (pack: ScenarioPack) => void;
   cancelEditing: () => void;
   updateAccount: (id: string, changes: Partial<Account>) => void;
   deleteAccount: (id: string) => void;
@@ -129,11 +90,9 @@ const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (set, get
   isDirty: false,
   isEditing: false,
 
-  startEditing: () => {
-    const canonical = get().pack;
-    if (!canonical) return;
+  startEditing: (pack: ScenarioPack) => {
     set({
-      workingPack: clonePack(canonical),
+      workingPack: clonePack(pack),
       isDirty: false,
       isEditing: true,
     });
@@ -279,10 +238,9 @@ const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (set)
 /*  Composed store                                                     */
 /* ------------------------------------------------------------------ */
 
-export type AppStore = ScenarioSlice & WhatIfSlice & EditorSlice & SettingsSlice;
+export type AppStore = WhatIfSlice & EditorSlice & SettingsSlice;
 
 export const useStore = create<AppStore>()((...args) => ({
-  ...createScenarioSlice(...args),
   ...createWhatIfSlice(...args),
   ...createEditorSlice(...args),
   ...createSettingsSlice(...args),
