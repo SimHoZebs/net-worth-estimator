@@ -1,14 +1,14 @@
-id                           ,label                  ,sourceAccountId       ,destinations                                  ,amountMode     ,basePostingId          ,absBase,amount     ,annualGrowthRate,startDate ,endDate,annualCap,priority,enabled
-salary                       ,Salary                 ,                      ,checking                                      ,fixed          ,                       ,false  ,9923.2     ,0.00            ,2026-04-01,       ,         ,1       ,true   
-k401_employee                ,401(k) Employee        ,checking              ,k401                                          ,percent_of_base,salary                 ,false  ,0.04       ,0               ,2026-04-15,       ,23000    ,2       ,true   
-taxes                        ,Taxes                  ,checking              ,                                              ,percent_of_base,salary                 ,false  ,0.22       ,0               ,2026-04-01,       ,         ,3       ,true   
-housing                      ,Housing                ,checking              ,                                              ,fixed          ,                       ,false  ,3200       ,0               ,2026-04-05,       ,         ,4       ,true   
-living                       ,Living                 ,checking              ,                                              ,fixed          ,                       ,false  ,2400       ,0               ,2026-04-10,       ,         ,5       ,true   
-k401_match                   ,401(k) Match           ,                      ,k401                                          ,percent_of_base,k401_employee          ,false  ,0.5        ,0               ,2026-04-15,       ,         ,5       ,true   
-student_loan1_interest_charge,Student Loan 1 Interest,student_loan1_interest,                                              ,percent_of_base,student_loan1_principal,true   ,0.011458333,0               ,2026-04-20,       ,         ,6       ,true   
-student_loan2_interest_charge,Student Loan 2 Interest,student_loan2_interest,                                              ,percent_of_base,student_loan2_principal,true   ,0.003325   ,0               ,2026-04-21,       ,         ,6       ,true   
-student_loan3_interest_charge,Student Loan 3 Interest,student_loan3_interest,                                              ,percent_of_base,student_loan3_principal,true   ,0.012604167,0               ,2026-04-22,       ,         ,6       ,true   
-student_loan1_payment        ,Student Loan 1 Payment ,checking              ,student_loan1_interest;student_loan1_principal,fixed          ,                       ,false  ,517        ,0               ,2026-04-20,       ,         ,7       ,true   
-student_loan2_payment        ,Student Loan 2 Payment ,checking              ,student_loan2_interest;student_loan2_principal,fixed          ,                       ,false  ,175        ,0               ,2026-04-21,       ,         ,8       ,true   
-student_loan3_payment        ,Student Loan 3 Payment ,checking              ,student_loan3_interest;student_loan3_principal,fixed          ,                       ,false  ,92         ,0               ,2026-04-22,       ,         ,9       ,true   
-brokerage_auto               ,Brokerage Auto         ,checking              ,brokerage                                     ,percent_of_base,salary                 ,false  ,0.04       ,0               ,2026-04-28,       ,         ,10      ,true   
+id,label,sourceAccountId,destinations,arithmetic,annualGrowthRate,startDate,endDate,annualCap,priority,enabled
+salary,Salary,,checking,10000,0.00,2026-04-01,,,1,true
+k401_employee,401(k) Employee,checking,k401,salary * 0.04,0,2026-04-15,,23000,2,true
+taxes,Taxes,checking,,salary * 0.22,0,2026-04-01,,,3,true
+housing,Housing,checking,,3200,0,2026-04-05,,,4,true
+living,Living,checking,,2400,0,2026-04-10,,,5,true
+k401_match,401(k) Match,,k401,k401_employee * 0.5,0,2026-04-15,,,5,true
+student_loan1_interest_charge,Student Loan 1 Interest,student_loan1_interest,,abs(student_loan1_principal) * 0.011458333,0,2026-04-20,,,6,true
+student_loan2_interest_charge,Student Loan 2 Interest,student_loan2_interest,,abs(student_loan2_principal) * 0.003325,0,2026-04-21,,,6,true
+student_loan3_interest_charge,Student Loan 3 Interest,student_loan3_interest,,abs(student_loan3_principal) * 0.012604167,0,2026-04-22,,,6,true
+student_loan1_payment,Student Loan 1 Payment,checking,student_loan1_interest;student_loan1_principal,517,0,2026-04-20,,,7,true
+student_loan2_payment,Student Loan 2 Payment,checking,student_loan2_interest;student_loan2_principal,175,0,2026-04-21,,,8,true
+student_loan3_payment,Student Loan 3 Payment,checking,student_loan3_interest;student_loan3_principal,92,0,2026-04-22,,,9,true
+brokerage_auto,Brokerage Auto,checking,brokerage,(salary - k401_employee - taxes) * 0.04,0,2026-04-28,,,10,true

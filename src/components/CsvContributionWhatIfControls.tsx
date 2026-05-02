@@ -18,11 +18,7 @@ const multiplierFormatter = new Intl.NumberFormat("en-US", {
 });
 
 function describePosting(posting: Posting) {
-  if (posting.amountMode === "fixed") {
-    return `Base amount ${currency.format(posting.amount)}`;
-  }
-
-  return `${Math.round(posting.amount * 100)}% of ${posting.basePostingId ?? "base posting"}`;
+  return posting.arithmetic;
 }
 
 function describeRoute(posting: Posting, pack: ScenarioPack) {

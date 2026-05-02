@@ -38,8 +38,8 @@ describe("CSV projection engine", () => {
         makeAccount({ id: "brokerage", category: "brokerage" }),
       ],
       postings: [
-        makePosting({ id: "salary", destinations: ["checking"], amount: 1000, startDate: "2026-01-01" }),
-        makePosting({ id: "capped", sourceAccountId: "checking", destinations: ["brokerage"], amount: 200, startDate: "2026-01-15", annualCap: 500, priority: 2 }),
+        makePosting({ id: "salary", destinations: ["checking"], arithmetic: "1000", startDate: "2026-01-01" }),
+        makePosting({ id: "capped", sourceAccountId: "checking", destinations: ["brokerage"], arithmetic: "200", startDate: "2026-01-15", annualCap: 500, priority: 2 }),
       ],
     });
 
@@ -61,9 +61,9 @@ describe("CSV projection engine", () => {
         makeAccount({ id: "k401", category: "401k" }),
       ],
       postings: [
-        makePosting({ id: "salary", destinations: ["checking"], amount: 1000, startDate: "2026-01-10", endDate: "2026-01-10" }),
-        makePosting({ id: "employee_k401", destinations: ["k401"], amountMode: "percent_of_base", basePostingId: "salary", amount: 0.1, startDate: "2026-01-10", endDate: "2026-01-10", priority: 2 }),
-        makePosting({ id: "employer_match", destinations: ["k401"], amountMode: "percent_of_base", basePostingId: "employee_k401", amount: 0.5, startDate: "2026-01-10", endDate: "2026-01-10", priority: 3 }),
+        makePosting({ id: "salary", destinations: ["checking"], arithmetic: "1000", startDate: "2026-01-10", endDate: "2026-01-10" }),
+        makePosting({ id: "employee_k401", destinations: ["k401"], arithmetic: "salary * 0.1", startDate: "2026-01-10", endDate: "2026-01-10", priority: 2 }),
+        makePosting({ id: "employer_match", destinations: ["k401"], arithmetic: "employee_k401 * 0.5", startDate: "2026-01-10", endDate: "2026-01-10", priority: 3 }),
       ],
     });
 
@@ -87,7 +87,7 @@ describe("CSV projection engine", () => {
         makeAccount({ id: "loan" }),
       ],
       postings: [
-        makePosting({ id: "loan_payment", sourceAccountId: "checking", destinations: ["loan"], amount: 400, startDate: "2026-01-10", endDate: "2026-01-10" }),
+        makePosting({ id: "loan_payment", sourceAccountId: "checking", destinations: ["loan"], arithmetic: "400", startDate: "2026-01-10", endDate: "2026-01-10" }),
       ],
     });
 
@@ -110,7 +110,7 @@ describe("CSV projection engine", () => {
         makeAccount({ id: "loan", annualRate: 0.12 }),
       ],
       postings: [
-        makePosting({ id: "marker", destinations: ["loan"], amount: 0, startDate: "2026-02-01", endDate: "2026-02-01" }),
+        makePosting({ id: "marker", destinations: ["loan"], arithmetic: "0", startDate: "2026-02-01", endDate: "2026-02-01" }),
       ],
     });
 
@@ -135,7 +135,7 @@ describe("CSV projection engine", () => {
 
     const result = projectScenarioPack(pack, makeSettings(), whatIfState);
 
-    expect(pack.postings[2]?.amount).toBe(900);
+    expect(pack.postings[2]?.arithmetic).toBe("900");
     expect(result.timeline.rows[3]?.requestedPostingAmount).toBe(1800);
     expect(result.timeline.rows[3]?.realizedPostingAmount).toBe(1600);
     expect(result.postingSummaries.find((summary) => summary.postingId === "invest")?.requestedAmount).toBe(1800);
@@ -152,7 +152,7 @@ describe("CSV projection engine", () => {
         makeAccount({ id: "loan", maxBalance: 0 }),
       ],
       postings: [
-        makePosting({ id: "paydown", sourceAccountId: "checking", destinations: ["loan"], amount: 400, startDate: "2026-01-10", endDate: "2026-01-10" }),
+        makePosting({ id: "paydown", sourceAccountId: "checking", destinations: ["loan"], arithmetic: "400", startDate: "2026-01-10", endDate: "2026-01-10" }),
       ],
     });
 
@@ -176,7 +176,7 @@ describe("CSV projection engine", () => {
         makeAccount({ id: "brokerage" }),
       ],
       postings: [
-        makePosting({ id: "transfer", sourceAccountId: "checking", destinations: ["brokerage"], amount: 400, startDate: "2026-01-10", endDate: "2026-01-10" }),
+        makePosting({ id: "transfer", sourceAccountId: "checking", destinations: ["brokerage"], arithmetic: "400", startDate: "2026-01-10", endDate: "2026-01-10" }),
       ],
     });
 

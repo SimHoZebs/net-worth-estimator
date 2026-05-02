@@ -4,7 +4,7 @@ import { makePosting } from "./postings";
 
 export function createBasePack(overrides: Partial<ScenarioPack> = {}): ScenarioPack {
   return {
-    version: 7,
+    version: 8,
     sourcePath: "/scenario",
     accounts: [
       makeAccount({ id: "checking", category: "checking" }),
@@ -17,10 +17,10 @@ export function createBasePack(overrides: Partial<ScenarioPack> = {}): ScenarioP
       { Date: "2026-01-31", AccountId: "loan", Balance: -400 },
     ],
     postings: [
-      makePosting({ id: "salary", destinations: ["checking"], amount: 1000, startDate: "2026-02-05", endDate: "2026-02-05" }),
-      makePosting({ id: "spend", sourceAccountId: "checking", amount: 200, startDate: "2026-02-06", endDate: "2026-02-06" }),
-      makePosting({ id: "invest", sourceAccountId: "checking", destinations: ["brokerage"], amount: 900, startDate: "2026-02-10", endDate: "2026-02-10" }),
-      makePosting({ id: "paydown", sourceAccountId: "checking", destinations: ["loan"], amountMode: "percent_of_base", basePostingId: "salary", amount: 0.25, startDate: "2026-02-20", endDate: "2026-02-20", priority: 2 }),
+      makePosting({ id: "salary", destinations: ["checking"], arithmetic: "1000", startDate: "2026-02-05", endDate: "2026-02-05" }),
+      makePosting({ id: "spend", sourceAccountId: "checking", arithmetic: "200", startDate: "2026-02-06", endDate: "2026-02-06" }),
+      makePosting({ id: "invest", sourceAccountId: "checking", destinations: ["brokerage"], arithmetic: "900", startDate: "2026-02-10", endDate: "2026-02-10" }),
+      makePosting({ id: "paydown", sourceAccountId: "checking", destinations: ["loan"], arithmetic: "salary * 0.25", startDate: "2026-02-20", endDate: "2026-02-20", priority: 2 }),
     ],
     ...overrides,
   };

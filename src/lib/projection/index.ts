@@ -45,7 +45,6 @@ export type {
   ScenarioPack,
   ScenarioWhatIfState,
   IsoDate,
-  PostingAmountMode,
   PostingOverrideMode,
   PostingWhatIfOverride,
   ProjectionRuntimeSettings,

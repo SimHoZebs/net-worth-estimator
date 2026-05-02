@@ -6,6 +6,7 @@ import {
 } from "./accountEngine";
 import type { Account } from "../types/scenario";
 import { addMonthsClamped, compareIsoDates } from "../utils/date";
+import { evaluateArithmetic } from "./arithmetic";
 
 export interface DatedPostingOccurrence {
   posting: Posting;
@@ -77,26 +78,12 @@ export function computeRequestedAmount(
 
   const multiplier = override?.mode === "multiplier" ? Math.max(0, override.value) : 1;
 
-  let baseValue = 0;
+  const rawAmount = evaluateArithmetic(posting.arithmetic, {
+    postingAmounts: latestRealizedPostingAmountById,
+    accountBalances: balances,
+  });
 
-  if (posting.amountMode === "percent_of_base" && posting.basePostingId !== null) {
-    const postingBase = latestRealizedPostingAmountById.get(posting.basePostingId);
-    const accountBase = balances[posting.basePostingId];
-
-    baseValue = postingBase !== undefined ? postingBase
-      : accountBase !== undefined ? accountBase
-      : 0;
-
-    if (posting.absBase) {
-      baseValue = Math.abs(baseValue);
-    }
-  }
-
-  const baseAmount = posting.amountMode === "fixed"
-    ? posting.amount
-    : baseValue * posting.amount;
-
-  return applyAnnualGrowth(baseAmount, posting.annualGrowthRate, monthsElapsed) * multiplier;
+  return applyAnnualGrowth(rawAmount, posting.annualGrowthRate, monthsElapsed) * multiplier;
 }
 
 export function resolvePostingAmount(
