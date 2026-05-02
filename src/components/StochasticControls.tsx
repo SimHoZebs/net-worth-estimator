@@ -4,28 +4,24 @@ import { pct, currency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Card, CardContent } from "@/components/ui/card";
+import { useStore } from "@/store";
 
 interface StochasticControlsProps {
-  enabled: boolean;
-  onToggle: (enabled: boolean) => void;
-  config: StochasticConfig;
-  onConfigChange: (config: StochasticConfig) => void;
   isRunning: boolean;
-  hasStochasticAccounts: boolean;
   stochasticResult: StochasticProjectionResult | null;
 }
 
 const DEBOUNCE_MS = 2000;
 
 export function StochasticControls({
-  enabled,
-  onToggle,
-  config,
-  onConfigChange,
   isRunning,
-  hasStochasticAccounts,
   stochasticResult,
 }: StochasticControlsProps) {
+  const enabled = useStore((s) => s.stochasticEnabled);
+  const config = useStore((s) => s.stochasticConfig);
+  const onToggle = useStore((s) => s.setStochasticEnabled);
+  const onConfigChange = useStore((s) => s.setStochasticConfig);
+  const hasStochasticAccounts = useStore((s) => s.pack !== null && s.pack.postings.some((p) => p.volatility > 0));
   const [runCountInput, setRunCountInput] = useState(String(config.runCount));
   const [seedInput, setSeedInput] = useState(config.seed !== null ? String(config.seed) : "");
   const [pendingConfig, setPendingConfig] = useState<StochasticConfig | null>(null);

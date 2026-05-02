@@ -1,0 +1,434 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { ScenarioPack } from "@/lib/projection";
+import { useStore, selectActiveOverrideCount, selectWhatIfState } from "@/store";
+
+/* ------------------------------------------------------------------ */
+/*  Test helpers                                                       */
+/* ------------------------------------------------------------------ */
+
+function makeAccount(id = "a1", label = "Savings") {
+  return { id, label, minBalance: null, maxBalance: null, color: null, enabled: true };
+}
+
+function makePosting(id = "p1") {
+  return {
+    id, label: "Salary", sourceAccountId: null, destinations: null,
+    arithmetic: "5000", frequency: "monthly" as const,
+    annualRate: 0, annualGrowthRate: 0, volatility: 0,
+    startDate: "2025-01-01", endDate: null, annualCap: null, priority: 1, enabled: true,
+  };
+}
+
+function makeCheckpoint(date = "2025-01-01", accountId = "a1", balance = 1000) {
+  return { Date: date, AccountId: accountId, Balance: balance };
+}
+
+function makeScenarioPack(overrides?: Partial<ScenarioPack>): ScenarioPack {
+  return {
+    version: 8,
+    sourcePath: "/scenario",
+    accounts: [{ id: "a1", label: "Savings", minBalance: null, maxBalance: null, color: null, enabled: true }],
+    checkpoints: [{ Date: "2025-01-01", AccountId: "a1", Balance: 1000 }],
+    postings: [makePosting("p1")],
+    ...overrides,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  What-if slice tests                                                */
+/* ------------------------------------------------------------------ */
+
+describe("WhatIf slice", () => {
+  beforeEach(() => {
+    useStore.getState().resetAllOverrides();
+  });
+
+  it("adds a temporary account", () => {
+    useStore.getState().addTemporaryAccount(makeAccount());
+    expect(useStore.getState().addedAccounts).toHaveLength(1);
+  });
+
+  it("removes a temporary account by id", () => {
+    useStore.getState().addTemporaryAccount(makeAccount("a1"));
+    useStore.getState().addTemporaryAccount(makeAccount("a2"));
+    useStore.getState().removeTemporaryAccount("a1");
+    expect(useStore.getState().addedAccounts).toHaveLength(1);
+    expect(useStore.getState().addedAccounts[0].id).toBe("a2");
+  });
+
+  it("adds a temporary posting", () => {
+    useStore.getState().addTemporaryPosting(makePosting());
+    expect(useStore.getState().addedPostings).toHaveLength(1);
+  });
+
+  it("removes a temporary posting by id", () => {
+    useStore.getState().addTemporaryPosting(makePosting("p1"));
+    useStore.getState().addTemporaryPosting(makePosting("p2"));
+    useStore.getState().removeTemporaryPosting("p1");
+    expect(useStore.getState().addedPostings).toHaveLength(1);
+    expect(useStore.getState().addedPostings[0].id).toBe("p2");
+  });
+
+  it("adds a temporary checkpoint", () => {
+    useStore.getState().addTemporaryCheckpoint(makeCheckpoint());
+    expect(useStore.getState().addedCheckpoints).toHaveLength(1);
+  });
+
+  it("removes a temporary checkpoint by index", () => {
+    useStore.getState().addTemporaryCheckpoint(makeCheckpoint("2025-01-01"));
+    useStore.getState().addTemporaryCheckpoint(makeCheckpoint("2025-02-01"));
+    useStore.getState().removeTemporaryCheckpoint(0);
+    expect(useStore.getState().addedCheckpoints).toHaveLength(1);
+    expect(useStore.getState().addedCheckpoints[0].Date).toBe("2025-02-01");
+  });
+
+  it("toggles account disabled state on and off", () => {
+    useStore.getState().toggleAccountDisabled("a1");
+    expect(useStore.getState().disabledAccountIds).toEqual(["a1"]);
+    useStore.getState().toggleAccountDisabled("a1");
+    expect(useStore.getState().disabledAccountIds).toEqual([]);
+  });
+
+  it("toggles posting disabled state on and off", () => {
+    useStore.getState().togglePostingDisabled("p1");
+    expect(useStore.getState().disabledPostingIds).toEqual(["p1"]);
+    useStore.getState().togglePostingDisabled("p1");
+    expect(useStore.getState().disabledPostingIds).toEqual([]);
+  });
+
+  it("supports multiple disabled accounts", () => {
+    useStore.getState().toggleAccountDisabled("a1");
+    useStore.getState().toggleAccountDisabled("a2");
+    expect(useStore.getState().disabledAccountIds).toEqual(["a1", "a2"]);
+  });
+
+  it("resets all overrides to initial state", () => {
+    useStore.getState().addTemporaryAccount(makeAccount());
+    useStore.getState().addTemporaryPosting(makePosting());
+    useStore.getState().addTemporaryCheckpoint(makeCheckpoint());
+    useStore.getState().toggleAccountDisabled("a1");
+    useStore.getState().togglePostingDisabled("p1");
+    useStore.getState().resetAllOverrides();
+    expect(useStore.getState().addedAccounts).toEqual([]);
+    expect(useStore.getState().addedPostings).toEqual([]);
+    expect(useStore.getState().addedCheckpoints).toEqual([]);
+    expect(useStore.getState().disabledAccountIds).toEqual([]);
+    expect(useStore.getState().disabledPostingIds).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Selector tests                                                     */
+/* ------------------------------------------------------------------ */
+
+describe("Selectors", () => {
+  it("selectActiveOverrideCount returns correct count", () => {
+    useStore.getState().resetAllOverrides();
+    useStore.getState().addTemporaryAccount(makeAccount());
+    useStore.getState().addTemporaryAccount(makeAccount("a2", "Checking"));
+    useStore.getState().addTemporaryPosting(makePosting());
+    useStore.getState().toggleAccountDisabled("a1");
+    expect(selectActiveOverrideCount(useStore.getState())).toBe(4);
+  });
+
+  it("selectWhatIfState returns a stable snapshot", () => {
+    useStore.getState().resetAllOverrides();
+    useStore.getState().addTemporaryAccount(makeAccount());
+    useStore.getState().togglePostingDisabled("p1");
+    const snapshot = selectWhatIfState(useStore.getState());
+    expect(snapshot.addedAccounts).toHaveLength(1);
+    expect(snapshot.disabledPostingIds).toEqual(["p1"]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Editor slice tests                                                 */
+/* ------------------------------------------------------------------ */
+
+describe("Editor slice", () => {
+  beforeEach(() => {
+    useStore.getState().resetAllOverrides();
+    useStore.getState().cancelEditing();
+  });
+
+  describe("no-op when workingPack is null", () => {
+    it("updateAccount does nothing", () => {
+      const before = useStore.getState();
+      useStore.getState().updateAccount("a1", { label: "New" });
+      expect(useStore.getState()).toEqual(before);
+    });
+
+    it("deleteAccount does nothing", () => {
+      const before = useStore.getState();
+      useStore.getState().deleteAccount("a1");
+      expect(useStore.getState()).toEqual(before);
+    });
+
+    it("addAccount does nothing", () => {
+      const before = useStore.getState();
+      useStore.getState().addAccount(makeAccount());
+      expect(useStore.getState()).toEqual(before);
+    });
+
+    it("updatePosting does nothing", () => {
+      const before = useStore.getState();
+      useStore.getState().updatePosting("p1", { label: "New" });
+      expect(useStore.getState()).toEqual(before);
+    });
+
+    it("deletePosting does nothing", () => {
+      const before = useStore.getState();
+      useStore.getState().deletePosting("p1");
+      expect(useStore.getState()).toEqual(before);
+    });
+
+    it("addPosting does nothing", () => {
+      const before = useStore.getState();
+      useStore.getState().addPosting(makePosting());
+      expect(useStore.getState()).toEqual(before);
+    });
+
+    it("addCheckpoint does nothing", () => {
+      const before = useStore.getState();
+      useStore.getState().addCheckpoint(makeCheckpoint());
+      expect(useStore.getState()).toEqual(before);
+    });
+
+    it("deleteCheckpoint does nothing", () => {
+      const before = useStore.getState();
+      useStore.getState().deleteCheckpoint(0);
+      expect(useStore.getState()).toEqual(before);
+    });
+
+    it("updateCheckpoint does nothing", () => {
+      const before = useStore.getState();
+      useStore.getState().updateCheckpoint(0, { Balance: 999 });
+      expect(useStore.getState()).toEqual(before);
+    });
+  });
+
+  describe("with a canonical pack", () => {
+    const pack = makeScenarioPack();
+
+    beforeEach(() => {
+      useStore.setState({ pack });
+    });
+
+    it("startEditing clones the pack and sets isEditing", () => {
+      useStore.getState().startEditing();
+      expect(useStore.getState().isEditing).toBe(true);
+      expect(useStore.getState().isDirty).toBe(false);
+      expect(useStore.getState().workingPack).toEqual(pack);
+      expect(useStore.getState().workingPack).not.toBe(pack);
+    });
+
+    it("cancelEditing resets state", () => {
+      useStore.getState().startEditing();
+      useStore.getState().cancelEditing();
+      expect(useStore.getState().isEditing).toBe(false);
+      expect(useStore.getState().workingPack).toBeNull();
+    });
+
+    it("startEditing is no-op when pack is null", () => {
+      useStore.setState({ pack: null });
+      useStore.getState().startEditing();
+      expect(useStore.getState().isEditing).toBe(false);
+    });
+
+    it("updateAccount modifies workingPack and sets isDirty", () => {
+      useStore.getState().startEditing();
+      useStore.getState().updateAccount("a1", { label: "Investment" });
+      expect(useStore.getState().isDirty).toBe(true);
+      expect(useStore.getState().workingPack?.accounts[0].label).toBe("Investment");
+    });
+
+    it("deleteAccount removes from workingPack", () => {
+      useStore.getState().startEditing();
+      useStore.getState().deleteAccount("a1");
+      expect(useStore.getState().workingPack?.accounts).toHaveLength(0);
+    });
+
+    it("addAccount appends to workingPack", () => {
+      useStore.getState().startEditing();
+      useStore.getState().addAccount(makeAccount("a2", "Checking"));
+      expect(useStore.getState().workingPack?.accounts).toHaveLength(2);
+    });
+
+    it("updatePosting modifies posting in workingPack", () => {
+      useStore.getState().startEditing();
+      useStore.getState().updatePosting("p1", { annualRate: 10000 });
+      expect(useStore.getState().isDirty).toBe(true);
+      expect(useStore.getState().workingPack?.postings[0].annualRate).toBe(10000);
+    });
+
+    it("deletePosting removes from workingPack", () => {
+      useStore.getState().startEditing();
+      useStore.getState().deletePosting("p1");
+      expect(useStore.getState().workingPack?.postings).toHaveLength(0);
+    });
+
+    it("addPosting appends to workingPack", () => {
+      useStore.getState().startEditing();
+      useStore.getState().addPosting(makePosting("p2"));
+      expect(useStore.getState().workingPack?.postings).toHaveLength(2);
+    });
+
+    it("addCheckpoint appends to workingPack", () => {
+      useStore.getState().startEditing();
+      useStore.getState().addCheckpoint(makeCheckpoint("2025-03-01", "a1", 2000));
+      expect(useStore.getState().workingPack?.checkpoints).toHaveLength(2);
+    });
+
+    it("deleteCheckpoint removes by index from workingPack", () => {
+      useStore.getState().startEditing();
+      useStore.getState().deleteCheckpoint(0);
+      expect(useStore.getState().workingPack?.checkpoints).toHaveLength(0);
+    });
+
+    it("updateCheckpoint modifies checkpoint in workingPack", () => {
+      useStore.getState().startEditing();
+      useStore.getState().updateCheckpoint(0, { Balance: 9999 });
+      expect(useStore.getState().workingPack?.checkpoints[0].Balance).toBe(9999);
+    });
+
+    it("markSaved clears editor state", () => {
+      useStore.getState().startEditing();
+      useStore.getState().updateAccount("a1", { label: "Changed" });
+      useStore.getState().markSaved();
+      expect(useStore.getState().isEditing).toBe(false);
+      expect(useStore.getState().isDirty).toBe(false);
+      expect(useStore.getState().workingPack).toBeNull();
+    });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Settings slice tests                                               */
+/* ------------------------------------------------------------------ */
+
+describe("Settings slice", () => {
+  it("setTargetNetWorthInput updates", () => {
+    useStore.getState().setTargetNetWorthInput("500000");
+    expect(useStore.getState().targetNetWorthInput).toBe("500000");
+  });
+
+  it("defaults stochasticEnabled to false", () => {
+    expect(useStore.getState().stochasticEnabled).toBe(false);
+  });
+
+  it("setStochasticEnabled toggles", () => {
+    useStore.getState().setStochasticEnabled(true);
+    expect(useStore.getState().stochasticEnabled).toBe(true);
+  });
+
+  it("defaults stochasticConfig", () => {
+    expect(useStore.getState().stochasticConfig).toEqual({ runCount: 1000, seed: null });
+  });
+
+  it("setStochasticConfig updates config", () => {
+    useStore.getState().setStochasticConfig({ runCount: 500, seed: 42 });
+    expect(useStore.getState().stochasticConfig).toEqual({ runCount: 500, seed: 42 });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Scenario slice reload tests                                        */
+/* ------------------------------------------------------------------ */
+
+describe("Scenario slice reload", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it("sets isLoading during reload and clears on success", async () => {
+    const samplePack = makeScenarioPack();
+
+    const mockLoadPack = vi.fn().mockResolvedValue({ pack: samplePack, issues: [] });
+    const mockDataSource = {
+      sourceType: "csv" as const,
+      loadPack: mockLoadPack,
+      savePack: vi.fn(),
+    };
+
+    vi.doMock("@/lib/projection", () => ({
+      createCsvDataSource: vi.fn(() => mockDataSource),
+    }));
+
+    const { useStore: store } = await import("@/store");
+
+    store.getState().reload();
+    expect(store.getState().isLoading).toBe(true);
+
+    await vi.waitFor(() => {
+      expect(store.getState().isLoading).toBe(false);
+    });
+
+    expect(store.getState().pack).toEqual(samplePack);
+    expect(store.getState().loadError).toBeNull();
+    expect(store.getState().loadedAt).toBeInstanceOf(Date);
+  });
+
+  it("handles load errors", async () => {
+    const mockLoadPack = vi.fn().mockRejectedValue(new Error("Network failure"));
+    const mockDataSource = {
+      sourceType: "csv" as const,
+      loadPack: mockLoadPack,
+      savePack: vi.fn(),
+    };
+
+    vi.doMock("@/lib/projection", () => ({
+      createCsvDataSource: vi.fn(() => mockDataSource),
+    }));
+
+    const { useStore: store } = await import("@/store");
+    store.getState().reload();
+
+    await vi.waitFor(() => {
+      expect(store.getState().isLoading).toBe(false);
+    });
+
+    expect(store.getState().pack).toBeNull();
+    expect(store.getState().loadError).toBe("Network failure");
+  });
+
+  it("ignores stale responses from request sequencing", async () => {
+    let resolveFirst!: (value: { pack: ScenarioPack; issues: [] }) => void;
+    let resolveSecond!: (value: { pack: ScenarioPack; issues: [] }) => void;
+
+    const firstPack = makeScenarioPack({ sourcePath: "/first" });
+    const secondPack = makeScenarioPack({ sourcePath: "/second" });
+
+    const mockLoadPack = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<{ pack: ScenarioPack; issues: [] }>((r) => { resolveFirst = r; }),
+      )
+      .mockImplementationOnce(
+        () => new Promise<{ pack: ScenarioPack; issues: [] }>((r) => { resolveSecond = r; }),
+      );
+
+    const mockDataSource = {
+      sourceType: "csv" as const,
+      loadPack: mockLoadPack,
+      savePack: vi.fn(),
+    };
+
+    vi.doMock("@/lib/projection", () => ({
+      createCsvDataSource: vi.fn(() => mockDataSource),
+    }));
+
+    const { useStore: store } = await import("@/store");
+
+    store.getState().reload();
+    store.getState().reload();
+
+    resolveSecond!({ pack: secondPack, issues: [] });
+    await vi.waitFor(() => {
+      expect(store.getState().pack?.sourcePath).toBe("/second");
+    });
+
+    resolveFirst!({ pack: firstPack, issues: [] });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(store.getState().pack?.sourcePath).toBe("/second");
+  });
+});

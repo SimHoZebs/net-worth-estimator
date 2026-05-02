@@ -18,7 +18,6 @@ import type {
   ProjectionResult,
   ProjectionRow,
   ScenarioPack,
-  ScenarioWhatIfState,
   ProjectionRuntimeSettings,
 } from "@/lib/projection";
 import type { StochasticProjectionResult } from "@/lib/projection";
@@ -31,11 +30,11 @@ import { CompactDetail } from "./dashboard/CompactDetail";
 import { DriverCard } from "./dashboard/DriverCard";
 import { buildBalanceChartData, buildStochasticChartData } from "@/chart/chartData";
 import { formatRoute } from "@/lib/format";
+import { useStore } from "@/store";
 
 interface ProjectionDashboardProps {
   pack: ScenarioPack;
   result: ProjectionResult;
-  whatIfState: ScenarioWhatIfState;
   projectionSettings: ProjectionRuntimeSettings;
   targetNetWorthInput: string;
   onTargetNetWorthInputChange: (value: string) => void;
@@ -46,7 +45,6 @@ interface ProjectionDashboardProps {
 export function ProjectionDashboard({
   pack,
   result,
-  whatIfState,
   projectionSettings,
   targetNetWorthInput,
   onTargetNetWorthInputChange,
@@ -104,12 +102,14 @@ export function ProjectionDashboard({
       });
   const hasStochasticData = stochasticResult !== undefined && stochasticResult !== null;
   const balanceChartData = buildBalanceChartData(pack, result);
-  const activeOverrideCount =
-    whatIfState.addedAccounts.length +
-    whatIfState.addedPostings.length +
-    whatIfState.addedCheckpoints.length +
-    whatIfState.disabledAccountIds.length +
-    whatIfState.disabledPostingIds.length;
+  const activeOverrideCount = useStore(
+    (s) =>
+      s.addedAccounts.length +
+      s.addedPostings.length +
+      s.addedCheckpoints.length +
+      s.disabledAccountIds.length +
+      s.disabledPostingIds.length,
+  );
   const goalReached = result.milestones.hitTargetDate !== null;
   const gapToTarget = projectionSettings.targetNetWorth - result.summary.finalNetWorth;
   const distanceToTarget = Math.abs(gapToTarget);

@@ -1,8 +1,6 @@
 import { type ReactNode } from "react";
 import { CSV_SCENARIO_PUBLIC_PATH } from "@/lib/projection";
-import type { Account, Checkpoint, Posting, ScenarioPack, ScenarioWhatIfState, ProjectionRuntimeSettings, ScenarioValidationIssue } from "@/lib/projection";
-import type { DataSource } from "@/lib/projection/dataSource";
-import type { UseScenarioEditorState } from "@/hooks/useScenarioEditor";
+import type { Account, Checkpoint, Posting, ProjectionRuntimeSettings } from "@/lib/projection";
 import { ScenarioValidationPanel } from "./ScenarioValidationPanel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,34 +8,12 @@ import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { currency, integer, decimal, pluralize } from "@/lib/format";
+import { useStore } from "@/store";
 
 interface ScenarioInspectorProps {
-  pack: ScenarioPack | null;
-  issues: ScenarioValidationIssue[];
-  loadError: string | null;
-  isLoading: boolean;
-  loadedAt: Date | null;
   projectionSettings: ProjectionRuntimeSettings;
   projectionStartDate: string;
   onReload: () => void;
-  whatIfState: ScenarioWhatIfState;
-  onToggleAccountDisabled: (id: string) => void;
-  onTogglePostingDisabled: (id: string) => void;
-  editor: UseScenarioEditorState & {
-    startEditing: () => void;
-    cancelEditing: () => void;
-    updateAccount: (id: string, changes: Partial<Account>) => void;
-    deleteAccount: (id: string) => void;
-    addAccount: (account: Account) => void;
-    updatePosting: (id: string, changes: Partial<Posting>) => void;
-    deletePosting: (id: string) => void;
-    addPosting: (posting: Posting) => void;
-    addCheckpoint: (checkpoint: Checkpoint) => void;
-    deleteCheckpoint: (index: number) => void;
-    updateCheckpoint: (index: number, changes: Partial<Checkpoint>) => void;
-    markSaved: () => void;
-  };
-  dataSource: DataSource | null;
   onSave: () => void;
 }
 
@@ -127,14 +103,34 @@ function inputStyle(isDirty: boolean) {
 }
 
 export function ScenarioInspector({
-  pack, issues, loadError, isLoading, loadedAt,
-  projectionSettings, projectionStartDate, onReload,
-  whatIfState, onToggleAccountDisabled, onTogglePostingDisabled,
-  editor, dataSource, onSave,
+  projectionSettings, projectionStartDate, onReload, onSave,
 }: ScenarioInspectorProps) {
-  const disabledAccountSet = new Set(whatIfState.disabledAccountIds);
-  const disabledPostingSet = new Set(whatIfState.disabledPostingIds);
-  const displayPack = editor.isEditing && editor.workingPack ? editor.workingPack : pack;
+  const pack = useStore((s) => s.pack);
+  const issues = useStore((s) => s.issues);
+  const loadError = useStore((s) => s.loadError);
+  const isLoading = useStore((s) => s.isLoading);
+  const loadedAt = useStore((s) => s.loadedAt);
+  const disabledAccountIds = useStore((s) => s.disabledAccountIds);
+  const disabledPostingIds = useStore((s) => s.disabledPostingIds);
+  const toggleAccountDisabled = useStore((s) => s.toggleAccountDisabled);
+  const togglePostingDisabled = useStore((s) => s.togglePostingDisabled);
+  const isEditing = useStore((s) => s.isEditing);
+  const isDirty = useStore((s) => s.isDirty);
+  const workingPack = useStore((s) => s.workingPack);
+  const startEditing = useStore((s) => s.startEditing);
+  const cancelEditing = useStore((s) => s.cancelEditing);
+  const updateAccount = useStore((s) => s.updateAccount);
+  const deleteAccount = useStore((s) => s.deleteAccount);
+  const addAccount = useStore((s) => s.addAccount);
+  const updatePosting = useStore((s) => s.updatePosting);
+  const deletePosting = useStore((s) => s.deletePosting);
+  const addPosting = useStore((s) => s.addPosting);
+  const addCheckpoint = useStore((s) => s.addCheckpoint);
+  const deleteCheckpoint = useStore((s) => s.deleteCheckpoint);
+  const updateCheckpoint = useStore((s) => s.updateCheckpoint);
+  const disabledAccountSet = new Set(disabledAccountIds);
+  const disabledPostingSet = new Set(disabledPostingIds);
+  const displayPack = isEditing && workingPack ? workingPack : pack;
 
   const errorCount = issues.filter((i) => i.severity === "error").length;
   const warningCount = issues.filter((i) => i.severity === "warning").length;
@@ -154,17 +150,17 @@ export function ScenarioInspector({
       <div className="space-y-5">
         {/* Top bar: reload + edit/save/cancel */}
         <div className="flex justify-end gap-2">
-          {editor.isEditing ? (
+          {isEditing ? (
             <>
-              <Button type="button" variant="secondary" size="sm" onClick={editor.cancelEditing}>Cancel</Button>
-              <Button type="button" size="sm" onClick={onSave} disabled={!editor.isDirty}>Save changes</Button>
+              <Button type="button" variant="secondary" size="sm" onClick={cancelEditing}>Cancel</Button>
+              <Button type="button" size="sm" onClick={onSave} disabled={!isDirty}>Save changes</Button>
             </>
           ) : (
             <>
               <Button type="button" variant="secondary" size="sm" onClick={onReload} disabled={isLoading}>
                 {isLoading ? "Loading..." : "Reload"}
               </Button>
-              {pack ? <Button type="button" variant="secondary" size="sm" onClick={editor.startEditing}>Edit</Button> : null}
+              {pack ? <Button type="button" variant="secondary" size="sm" onClick={startEditing}>Edit</Button> : null}
             </>
           )}
         </div>
@@ -210,7 +206,7 @@ export function ScenarioInspector({
                 />
 
                 {displayPack ? (
-                  editor.isEditing ? (
+                  isEditing ? (
                     /* ---- editable postings ---- */
                     <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
                       <CardHeader><CardTitle>Postings</CardTitle><CardDescription>Edit, add, or remove posting rows.</CardDescription></CardHeader>
@@ -228,26 +224,26 @@ export function ScenarioInspector({
                           </TableHeader>
                           <TableBody>
                             {displayPack.postings.map((p, pi) => {
-                              const changed = editor.isDirty && editor.workingPack?.postings[pi] &&
-                                JSON.stringify(editor.workingPack.postings[pi]) !== JSON.stringify(pack.postings[pi]);
+                              const changed = isDirty && workingPack?.postings[pi] &&
+                                JSON.stringify(workingPack.postings[pi]) !== JSON.stringify(pack.postings[pi]);
                               return (
                                 <TableRow key={p.id}>
                                   <TableCell><input className={inputStyle(!!changed)} value={p.id}
-                                    onChange={(e) => editor.updatePosting(p.id, { id: e.target.value })} /></TableCell>
+                                    onChange={(e) => updatePosting(p.id, { id: e.target.value })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={p.label}
-                                    onChange={(e) => editor.updatePosting(p.id, { label: e.target.value })} /></TableCell>
+                                    onChange={(e) => updatePosting(p.id, { label: e.target.value })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={p.sourceAccountId ?? ""}
-                                    onChange={(e) => editor.updatePosting(p.id, { sourceAccountId: e.target.value || null })} /></TableCell>
+                                    onChange={(e) => updatePosting(p.id, { sourceAccountId: e.target.value || null })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={p.destinations?.join(";") ?? ""}
                                     onChange={(e) => {
                                       const raw = e.target.value;
-                                      editor.updatePosting(p.id, { destinations: raw.trim() ? raw.split(";").map(s => s.trim()) : null });
+                                      updatePosting(p.id, { destinations: raw.trim() ? raw.split(";").map(s => s.trim()) : null });
                                     }} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={p.arithmetic}
-                                    onChange={(e) => editor.updatePosting(p.id, { arithmetic: e.target.value })} /></TableCell>
+                                    onChange={(e) => updatePosting(p.id, { arithmetic: e.target.value })} /></TableCell>
                                   <TableCell>
                                     <select className={inputStyle(!!changed)} value={p.frequency}
-                                      onChange={(e) => editor.updatePosting(p.id, { frequency: e.target.value as Posting["frequency"] })}>
+                                      onChange={(e) => updatePosting(p.id, { frequency: e.target.value as Posting["frequency"] })}>
                                       <option value="daily">daily</option>
                                       <option value="weekly">weekly</option>
                                       <option value="monthly">monthly</option>
@@ -256,25 +252,25 @@ export function ScenarioInspector({
                                     </select>
                                   </TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} type="number" step={0.01} value={p.annualRate}
-                                    onChange={(e) => editor.updatePosting(p.id, { annualRate: Number(e.target.value) })} /></TableCell>
+                                    onChange={(e) => updatePosting(p.id, { annualRate: Number(e.target.value) })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} type="number" step={0.01} value={p.annualGrowthRate}
-                                    onChange={(e) => editor.updatePosting(p.id, { annualGrowthRate: Number(e.target.value) })} /></TableCell>
+                                    onChange={(e) => updatePosting(p.id, { annualGrowthRate: Number(e.target.value) })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} type="number" min={0} step={0.01} value={p.volatility}
-                                    onChange={(e) => editor.updatePosting(p.id, { volatility: Number(e.target.value) })} /></TableCell>
+                                    onChange={(e) => updatePosting(p.id, { volatility: Number(e.target.value) })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={p.startDate}
-                                    onChange={(e) => editor.updatePosting(p.id, { startDate: e.target.value })} /></TableCell>
+                                    onChange={(e) => updatePosting(p.id, { startDate: e.target.value })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={p.endDate ?? ""}
-                                    onChange={(e) => editor.updatePosting(p.id, { endDate: e.target.value || null })} /></TableCell>
+                                    onChange={(e) => updatePosting(p.id, { endDate: e.target.value || null })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} type="number" min={0} value={p.annualCap ?? ""}
-                                    onChange={(e) => editor.updatePosting(p.id, { annualCap: e.target.value ? Number(e.target.value) : null })} /></TableCell>
+                                    onChange={(e) => updatePosting(p.id, { annualCap: e.target.value ? Number(e.target.value) : null })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} type="number" min={1} value={p.priority}
-                                    onChange={(e) => editor.updatePosting(p.id, { priority: Math.max(1, Number(e.target.value)) })} /></TableCell>
+                                    onChange={(e) => updatePosting(p.id, { priority: Math.max(1, Number(e.target.value)) })} /></TableCell>
                                   <TableCell>
                                     <input type="checkbox" className="h-4 w-4 rounded accent-slate-700" checked={p.enabled}
-                                      onChange={() => editor.updatePosting(p.id, { enabled: !p.enabled })} />
+                                      onChange={() => updatePosting(p.id, { enabled: !p.enabled })} />
                                   </TableCell>
                                   <TableCell>
-                                    <Button type="button" variant="ghost" size="sm" onClick={() => editor.deletePosting(p.id)}>✕</Button>
+                                    <Button type="button" variant="ghost" size="sm" onClick={() => deletePosting(p.id)}>✕</Button>
                                   </TableCell>
                                 </TableRow>
                               );
@@ -282,7 +278,7 @@ export function ScenarioInspector({
                           </TableBody>
                         </Table>
                         <div className="mt-3">
-                          <Button type="button" variant="ghost" size="sm" onClick={() => editor.addPosting(
+                          <Button type="button" variant="ghost" size="sm" onClick={() => addPosting(
                             { id: "new-posting-" + Date.now(), label: "New posting", sourceAccountId: null, destinations: null, arithmetic: "0", frequency: "monthly", annualRate: 0, annualGrowthRate: 0, volatility: 0, startDate: projectionStartDate, endDate: null, annualCap: null, priority: 1, enabled: true }
                           )}>+ Add posting</Button>
                         </div>
@@ -313,7 +309,7 @@ export function ScenarioInspector({
                           render: (_v, row) => {
                             const p = row as Posting;
                             return <input type="checkbox" className="h-4 w-4 rounded accent-slate-700" checked={!disabledPostingSet.has(p.id)}
-                              onChange={() => onTogglePostingDisabled(p.id)} />;
+                              onChange={() => togglePostingDisabled(p.id)} />;
                           },
                         },
                       ]}
@@ -326,7 +322,7 @@ export function ScenarioInspector({
             <CollapsibleSection title="Accounts and checkpoints" description="Raw account rows and historical checkpoint evidence.">
               <div className="space-y-4">
                 {displayPack ? (
-                  editor.isEditing ? (
+                  isEditing ? (
                     /* ---- editable accounts ---- */
                     <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
                       <CardHeader><CardTitle>Accounts</CardTitle><CardDescription>Edit, add, or remove account rows.</CardDescription></CardHeader>
@@ -342,26 +338,26 @@ export function ScenarioInspector({
                           </TableHeader>
                           <TableBody>
                             {displayPack.accounts.map((a) => {
-                              const changed = editor.isDirty && editor.workingPack?.accounts.some(wa => wa.id === a.id &&
+                              const changed = isDirty && workingPack?.accounts.some(wa => wa.id === a.id &&
                                 JSON.stringify(wa) !== JSON.stringify(pack.accounts.find(pa => pa.id === a.id)));
                               return (
                                 <TableRow key={a.id}>
                                   <TableCell><input className={inputStyle(!!changed)} value={a.id}
-                                    onChange={(e) => editor.updateAccount(a.id, { id: e.target.value })} /></TableCell>
+                                    onChange={(e) => updateAccount(a.id, { id: e.target.value })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={a.label}
-                                    onChange={(e) => editor.updateAccount(a.id, { label: e.target.value })} /></TableCell>
+                                    onChange={(e) => updateAccount(a.id, { label: e.target.value })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} type="number" value={a.minBalance ?? ""}
-                                    onChange={(e) => editor.updateAccount(a.id, { minBalance: e.target.value ? Number(e.target.value) : null })} /></TableCell>
+                                    onChange={(e) => updateAccount(a.id, { minBalance: e.target.value ? Number(e.target.value) : null })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} type="number" value={a.maxBalance ?? ""}
-                                    onChange={(e) => editor.updateAccount(a.id, { maxBalance: e.target.value ? Number(e.target.value) : null })} /></TableCell>
+                                    onChange={(e) => updateAccount(a.id, { maxBalance: e.target.value ? Number(e.target.value) : null })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={a.color ?? ""}
-                                    onChange={(e) => editor.updateAccount(a.id, { color: e.target.value || null })} /></TableCell>
+                                    onChange={(e) => updateAccount(a.id, { color: e.target.value || null })} /></TableCell>
                                   <TableCell>
                                     <input type="checkbox" className="h-4 w-4 rounded accent-slate-700" checked={a.enabled}
-                                      onChange={() => editor.updateAccount(a.id, { enabled: !a.enabled })} />
+                                      onChange={() => updateAccount(a.id, { enabled: !a.enabled })} />
                                   </TableCell>
                                   <TableCell>
-                                    <Button type="button" variant="ghost" size="sm" onClick={() => editor.deleteAccount(a.id)}>✕</Button>
+                                    <Button type="button" variant="ghost" size="sm" onClick={() => deleteAccount(a.id)}>✕</Button>
                                   </TableCell>
                                 </TableRow>
                               );
@@ -369,7 +365,7 @@ export function ScenarioInspector({
                           </TableBody>
                         </Table>
                         <div className="mt-3">
-                          <Button type="button" variant="ghost" size="sm" onClick={() => editor.addAccount(
+                          <Button type="button" variant="ghost" size="sm" onClick={() => addAccount(
                             { id: "new-account-" + Date.now(), label: "New account", minBalance: null, maxBalance: null, color: null, enabled: true }
                           )}>+ Add account</Button>
                         </div>
@@ -392,7 +388,7 @@ export function ScenarioInspector({
                           render: (_v, row) => {
                             const a = row as Account;
                             return <input type="checkbox" className="h-4 w-4 rounded accent-slate-700" checked={!disabledAccountSet.has(a.id)}
-                              onChange={() => onToggleAccountDisabled(a.id)} />;
+                              onChange={() => toggleAccountDisabled(a.id)} />;
                           },
                         },
                       ]}
@@ -401,7 +397,7 @@ export function ScenarioInspector({
                 ) : null}
 
                 {displayPack ? (
-                  editor.isEditing ? (
+                  isEditing ? (
                     /* ---- editable checkpoints ---- */
                     <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
                       <CardHeader><CardTitle>Checkpoints</CardTitle><CardDescription>Edit, add, or remove checkpoint rows.</CardDescription></CardHeader>
@@ -416,21 +412,21 @@ export function ScenarioInspector({
                           <TableBody>
                             {displayPack.checkpoints.map((c, ci) => (
                               <TableRow key={ci}>
-                                <TableCell><input className={inputStyle(!!editor.isDirty)} value={c.Date}
-                                  onChange={(e) => editor.updateCheckpoint(ci, { Date: e.target.value })} /></TableCell>
-                                <TableCell><input className={inputStyle(!!editor.isDirty)} value={c.AccountId}
-                                  onChange={(e) => editor.updateCheckpoint(ci, { AccountId: e.target.value })} /></TableCell>
-                                <TableCell><input className={inputStyle(!!editor.isDirty)} type="number" value={c.Balance}
-                                  onChange={(e) => editor.updateCheckpoint(ci, { Balance: Number(e.target.value) })} /></TableCell>
+                                <TableCell><input className={inputStyle(!!isDirty)} value={c.Date}
+                                  onChange={(e) => updateCheckpoint(ci, { Date: e.target.value })} /></TableCell>
+                                <TableCell><input className={inputStyle(!!isDirty)} value={c.AccountId}
+                                  onChange={(e) => updateCheckpoint(ci, { AccountId: e.target.value })} /></TableCell>
+                                <TableCell><input className={inputStyle(!!isDirty)} type="number" value={c.Balance}
+                                  onChange={(e) => updateCheckpoint(ci, { Balance: Number(e.target.value) })} /></TableCell>
                                 <TableCell>
-                                  <Button type="button" variant="ghost" size="sm" onClick={() => editor.deleteCheckpoint(ci)}>✕</Button>
+                                  <Button type="button" variant="ghost" size="sm" onClick={() => deleteCheckpoint(ci)}>✕</Button>
                                 </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                         </Table>
                         <div className="mt-3">
-                          <Button type="button" variant="ghost" size="sm" onClick={() => editor.addCheckpoint(
+                          <Button type="button" variant="ghost" size="sm" onClick={() => addCheckpoint(
                             { Date: projectionStartDate, AccountId: "", Balance: 0 }
                           )}>+ Add checkpoint</Button>
                         </div>

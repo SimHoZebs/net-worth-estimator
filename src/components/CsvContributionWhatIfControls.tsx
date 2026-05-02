@@ -1,20 +1,12 @@
 import { useState } from "react";
-import type { Account, Checkpoint, Posting, ScenarioPack, ScenarioWhatIfState } from "@/lib/projection";
+import type { Account, Checkpoint, Posting, ScenarioPack } from "@/lib/projection";
 import { Button } from "@/components/ui/button";
 import { currency, formatRoute } from "@/lib/format";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { useStore, selectActiveOverrideCount } from "@/store";
 
 interface ContributionWhatIfControlsProps {
   pack: ScenarioPack;
-  whatIfState: ScenarioWhatIfState;
-  activeOverrideCount: number;
-  onResetAllOverrides: () => void;
-  onAddTemporaryAccount: (account: Account) => void;
-  onRemoveTemporaryAccount: (id: string) => void;
-  onAddTemporaryPosting: (posting: Posting) => void;
-  onRemoveTemporaryPosting: (id: string) => void;
-  onAddTemporaryCheckpoint: (checkpoint: Checkpoint) => void;
-  onRemoveTemporaryCheckpoint: (index: number) => void;
 }
 
 function describeRoute(posting: Posting, pack: ScenarioPack) {
@@ -67,37 +59,42 @@ function emptyCheckpoint(): Checkpoint {
 
 export function ContributionWhatIfControls({
   pack,
-  whatIfState,
-  activeOverrideCount,
-  onResetAllOverrides,
-  onAddTemporaryAccount,
-  onRemoveTemporaryAccount,
-  onAddTemporaryPosting,
-  onRemoveTemporaryPosting,
-  onAddTemporaryCheckpoint,
-  onRemoveTemporaryCheckpoint,
 }: ContributionWhatIfControlsProps) {
+  const whatIfState = useStore((s) => ({
+    addedAccounts: s.addedAccounts,
+    addedPostings: s.addedPostings,
+    addedCheckpoints: s.addedCheckpoints,
+  }));
+  const activeOverrideCount = useStore(selectActiveOverrideCount);
+  const resetAllOverrides = useStore((s) => s.resetAllOverrides);
+  const addTemporaryAccount = useStore((s) => s.addTemporaryAccount);
+  const removeTemporaryAccount = useStore((s) => s.removeTemporaryAccount);
+  const addTemporaryPosting = useStore((s) => s.addTemporaryPosting);
+  const removeTemporaryPosting = useStore((s) => s.removeTemporaryPosting);
+  const addTemporaryCheckpoint = useStore((s) => s.addTemporaryCheckpoint);
+  const removeTemporaryCheckpoint = useStore((s) => s.removeTemporaryCheckpoint);
+
   const [addingAccount, setAddingAccount] = useState<Account | null>(null);
   const [addingPosting, setAddingPosting] = useState<Posting | null>(null);
   const [addingCheckpoint, setAddingCheckpoint] = useState<Checkpoint | null>(null);
 
   const commitAccount = () => {
     if (addingAccount && addingAccount.id.trim() && addingAccount.label.trim()) {
-      onAddTemporaryAccount(addingAccount);
+      addTemporaryAccount(addingAccount);
     }
     setAddingAccount(null);
   };
 
   const commitPosting = () => {
     if (addingPosting && addingPosting.id.trim()) {
-      onAddTemporaryPosting(addingPosting);
+      addTemporaryPosting(addingPosting);
     }
     setAddingPosting(null);
   };
 
   const commitCheckpoint = () => {
     if (addingCheckpoint && addingCheckpoint.Date.trim() && addingCheckpoint.AccountId.trim()) {
-      onAddTemporaryCheckpoint(addingCheckpoint);
+      addTemporaryCheckpoint(addingCheckpoint);
     }
     setAddingCheckpoint(null);
   };
@@ -113,7 +110,7 @@ export function ContributionWhatIfControls({
     >
       <div className="mt-5 space-y-6">
         <div className="flex justify-end">
-          <Button type="button" variant="secondary" size="sm" onClick={onResetAllOverrides} disabled={activeOverrideCount === 0}>
+          <Button type="button" variant="secondary" size="sm" onClick={resetAllOverrides} disabled={activeOverrideCount === 0}>
             Reset all overrides
           </Button>
         </div>
@@ -178,7 +175,7 @@ export function ContributionWhatIfControls({
                   <span className="text-sm font-medium text-amber-900">{account.label}</span>
                   <span className="text-xs text-amber-700">{account.id}</span>
                 </div>
-                <Button type="button" variant="ghost" size="sm" onClick={() => onRemoveTemporaryAccount(account.id)}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeTemporaryAccount(account.id)}>
                   Remove
                 </Button>
               </div>
@@ -346,7 +343,7 @@ export function ContributionWhatIfControls({
                   <span className="ml-2 text-xs text-amber-700">{posting.arithmetic}</span>
                   <span className="ml-2 text-xs text-amber-700">{describeRoute(posting, pack)}</span>
                 </div>
-                <Button type="button" variant="ghost" size="sm" onClick={() => onRemoveTemporaryPosting(posting.id)}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeTemporaryPosting(posting.id)}>
                   Remove
                 </Button>
               </div>
@@ -409,7 +406,7 @@ export function ContributionWhatIfControls({
                   <span className="ml-2 text-xs text-amber-700">{checkpoint.AccountId}</span>
                   <span className="ml-2 text-xs text-amber-700">{currency.format(checkpoint.Balance)}</span>
                 </div>
-                <Button type="button" variant="ghost" size="sm" onClick={() => onRemoveTemporaryCheckpoint(index)}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeTemporaryCheckpoint(index)}>
                   Remove
                 </Button>
               </div>
