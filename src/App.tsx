@@ -9,6 +9,7 @@ import { useWhatIfState } from "./hooks/useWhatIfState";
 import { useProjectionWorker } from "./hooks/useProjectionWorker";
 import { useScenarioPack } from "./hooks/useScenarioPack";
 import { useStochasticWorker } from "./hooks/useStochasticWorker";
+import { useScenarioEditor } from "./hooks/useScenarioEditor";
 import { createCsvDataSource, summarizeValidationIssues } from "./lib/projection";
 import type { StochasticConfig } from "./lib/projection";
 
@@ -27,10 +28,17 @@ export default function App() {
   const {
     state: whatIfState,
     activeOverrideCount,
-    setPostingMultiplier,
-    clearPostingOverride,
     resetAllOverrides,
+    addTemporaryAccount,
+    removeTemporaryAccount,
+    addTemporaryPosting,
+    removeTemporaryPosting,
+    addTemporaryCheckpoint,
+    removeTemporaryCheckpoint,
+    toggleAccountDisabled,
+    togglePostingDisabled,
   } = useWhatIfState();
+  const editor = useScenarioEditor(pack);
   const validation = summarizeValidationIssues(issues);
   const fallbackProjectionStartDate = useMemo(() => formatTodayIsoDate(), []);
   const targetNetWorth = Number.isFinite(Number(targetNetWorthInput)) ? Number(targetNetWorthInput) : 0;
@@ -55,7 +63,6 @@ export default function App() {
     seed: null,
   });
 
-  // Auto-enable stochastic mode when stochastic accounts are present and validation passes
   useEffect(() => {
     if (hasStochasticAccounts && validation.isValid) {
       setStochasticEnabled(true);
@@ -71,6 +78,13 @@ export default function App() {
     stochasticWorkerEnabled
   );
 
+  const handleSave = async () => {
+    if (!editor.workingPack) return;
+    await dataSource.savePack(editor.workingPack);
+    editor.markSaved();
+    void reload();
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8 md:py-8">
@@ -84,7 +98,7 @@ export default function App() {
           <Alert className="rounded-[1.6rem] border-amber-200 bg-amber-50 text-amber-950">
             <AlertTitle>Updating projection</AlertTitle>
             <AlertDescription className="text-amber-950/80">
-              Recomputing historical and projected balances from the loaded data pack{activeOverrideCount > 0 ? ` with ${activeOverrideCount} temporary override${activeOverrideCount === 1 ? "" : "s"}` : ""}.
+              Recomputing historical and projected balances from the loaded data pack{activeOverrideCount > 0 ? ` with ${activeOverrideCount} temporary change${activeOverrideCount === 1 ? "" : "s"}` : ""}.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -126,9 +140,13 @@ export default function App() {
               pack={pack}
               whatIfState={whatIfState}
               activeOverrideCount={activeOverrideCount}
-              onSetPostingMultiplier={setPostingMultiplier}
-              onClearPostingOverride={clearPostingOverride}
               onResetAllOverrides={resetAllOverrides}
+              onAddTemporaryAccount={addTemporaryAccount}
+              onRemoveTemporaryAccount={removeTemporaryAccount}
+              onAddTemporaryPosting={addTemporaryPosting}
+              onRemoveTemporaryPosting={removeTemporaryPosting}
+              onAddTemporaryCheckpoint={addTemporaryCheckpoint}
+              onRemoveTemporaryCheckpoint={removeTemporaryCheckpoint}
             />
           </ProjectionDashboard>
         ) : null}
@@ -153,9 +171,13 @@ export default function App() {
           loadedAt={loadedAt}
           projectionSettings={projectionSettings}
           projectionStartDate={result?.milestones.projectionStartDate ?? projectionStartDate}
-          onReload={() => {
-            void reload();
-          }}
+          onReload={() => { void reload(); }}
+          whatIfState={whatIfState}
+          onToggleAccountDisabled={toggleAccountDisabled}
+          onTogglePostingDisabled={togglePostingDisabled}
+          editor={editor}
+          dataSource={dataSource}
+          onSave={handleSave}
         />
       </div>
     </div>

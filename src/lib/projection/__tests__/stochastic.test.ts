@@ -59,7 +59,7 @@ describe("stochastic projection", () => {
     const result = stochasticProject(
       pack!,
       { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 10 },
-      { postingOverrides: {} },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
       { runCount: 100, seed: 42 }
     );
 
@@ -77,14 +77,14 @@ describe("stochastic projection", () => {
     const result1 = stochasticProject(
       pack!,
       { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 10 },
-      { postingOverrides: {} },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
       { runCount: 100, seed: 42 }
     );
 
     const result2 = stochasticProject(
       pack!,
       { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 10 },
-      { postingOverrides: {} },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
       { runCount: 100, seed: 42 }
     );
 
@@ -105,14 +105,14 @@ describe("stochastic projection", () => {
     const result = stochasticProject(
       deterministicOnlyPack,
       { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 10 },
-      { postingOverrides: {} },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
       { runCount: 100, seed: 42 }
     );
 
     const deterministic = projectScenarioPack(
       deterministicOnlyPack,
       { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 10 },
-      { postingOverrides: {} }
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] }
     );
 
     expect(result.bands[result.bands.length - 1].netWorth.p50).toBe(

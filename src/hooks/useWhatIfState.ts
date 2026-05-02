@@ -1,39 +1,80 @@
 import { useCallback, useMemo, useState } from "react";
-import type { ScenarioWhatIfState } from "@/lib/projection";
-
-const DEFAULT_MULTIPLIER = 1;
+import type { Account, Checkpoint, Posting, ScenarioWhatIfState } from "@/lib/projection";
 
 const initialState: ScenarioWhatIfState = {
-  postingOverrides: {},
+  addedAccounts: [],
+  addedPostings: [],
+  addedCheckpoints: [],
+  disabledAccountIds: [],
+  disabledPostingIds: [],
 };
 
 export function useWhatIfState() {
   const [state, setState] = useState<ScenarioWhatIfState>(initialState);
 
-  const setPostingMultiplier = useCallback((postingId: string, multiplier: number) => {
-    setState((current) => {
-      if (Math.abs(multiplier - DEFAULT_MULTIPLIER) < 0.0001) {
-        const { [postingId]: _ignored, ...remainingOverrides } = current.postingOverrides;
-        return { postingOverrides: remainingOverrides };
-      }
+  const addTemporaryAccount = useCallback((account: Account) => {
+    setState((current) => ({
+      ...current,
+      addedAccounts: [...current.addedAccounts, account],
+    }));
+  }, []);
 
+  const removeTemporaryAccount = useCallback((id: string) => {
+    setState((current) => ({
+      ...current,
+      addedAccounts: current.addedAccounts.filter((a) => a.id !== id),
+    }));
+  }, []);
+
+  const addTemporaryPosting = useCallback((posting: Posting) => {
+    setState((current) => ({
+      ...current,
+      addedPostings: [...current.addedPostings, posting],
+    }));
+  }, []);
+
+  const removeTemporaryPosting = useCallback((id: string) => {
+    setState((current) => ({
+      ...current,
+      addedPostings: current.addedPostings.filter((p) => p.id !== id),
+    }));
+  }, []);
+
+  const addTemporaryCheckpoint = useCallback((checkpoint: Checkpoint) => {
+    setState((current) => ({
+      ...current,
+      addedCheckpoints: [...current.addedCheckpoints, checkpoint],
+    }));
+  }, []);
+
+  const removeTemporaryCheckpoint = useCallback((index: number) => {
+    setState((current) => ({
+      ...current,
+      addedCheckpoints: current.addedCheckpoints.filter((_, i) => i !== index),
+    }));
+  }, []);
+
+  const toggleAccountDisabled = useCallback((id: string) => {
+    setState((current) => {
+      const alreadyDisabled = current.disabledAccountIds.includes(id);
       return {
-        postingOverrides: {
-          ...current.postingOverrides,
-          [postingId]: {
-            postingId,
-            mode: "multiplier",
-            value: multiplier,
-          },
-        },
+        ...current,
+        disabledAccountIds: alreadyDisabled
+          ? current.disabledAccountIds.filter((did) => did !== id)
+          : [...current.disabledAccountIds, id],
       };
     });
   }, []);
 
-  const clearPostingOverride = useCallback((postingId: string) => {
+  const togglePostingDisabled = useCallback((id: string) => {
     setState((current) => {
-      const { [postingId]: _ignored, ...remainingOverrides } = current.postingOverrides;
-      return { postingOverrides: remainingOverrides };
+      const alreadyDisabled = current.disabledPostingIds.includes(id);
+      return {
+        ...current,
+        disabledPostingIds: alreadyDisabled
+          ? current.disabledPostingIds.filter((did) => did !== id)
+          : [...current.disabledPostingIds, id],
+      };
     });
   }, []);
 
@@ -42,15 +83,32 @@ export function useWhatIfState() {
   }, []);
 
   const activeOverrideCount = useMemo(
-    () => Object.keys(state.postingOverrides).length,
-    [state.postingOverrides]
+    () =>
+      state.addedAccounts.length +
+      state.addedPostings.length +
+      state.addedCheckpoints.length +
+      state.disabledAccountIds.length +
+      state.disabledPostingIds.length,
+    [
+      state.addedAccounts,
+      state.addedPostings,
+      state.addedCheckpoints,
+      state.disabledAccountIds,
+      state.disabledPostingIds,
+    ]
   );
 
   return {
     state,
     activeOverrideCount,
-    setPostingMultiplier,
-    clearPostingOverride,
+    addTemporaryAccount,
+    removeTemporaryAccount,
+    addTemporaryPosting,
+    removeTemporaryPosting,
+    addTemporaryCheckpoint,
+    removeTemporaryCheckpoint,
+    toggleAccountDisabled,
+    togglePostingDisabled,
     resetAllOverrides,
   };
 }

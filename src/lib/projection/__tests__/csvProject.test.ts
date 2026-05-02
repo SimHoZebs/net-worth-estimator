@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { projectScenarioPack } from "../";
-import type { ScenarioWhatIfState } from "../";
 import { createBasePack, makeAccount, makePosting, makeSettings } from "../__fixtures__";
 
 describe("CSV projection engine", () => {
@@ -34,8 +33,8 @@ describe("CSV projection engine", () => {
     const pack = createBasePack({
       checkpoints: [],
       accounts: [
-        makeAccount({ id: "checking", category: "checking" }),
-        makeAccount({ id: "brokerage", category: "brokerage" }),
+        makeAccount({ id: "checking" }),
+        makeAccount({ id: "brokerage" }),
       ],
       postings: [
         makePosting({ id: "salary", destinations: ["checking"], arithmetic: "1000", startDate: "2026-01-01" }),
@@ -57,8 +56,8 @@ describe("CSV projection engine", () => {
     const pack = createBasePack({
       checkpoints: [],
       accounts: [
-        makeAccount({ id: "checking", category: "checking" }),
-        makeAccount({ id: "k401", category: "401k" }),
+        makeAccount({ id: "checking" }),
+        makeAccount({ id: "k401" }),
       ],
       postings: [
         makePosting({ id: "salary", destinations: ["checking"], arithmetic: "1000", startDate: "2026-01-10", endDate: "2026-01-10" }),
@@ -119,26 +118,6 @@ describe("CSV projection engine", () => {
     expect(result.timeline.rows[1]?.accountBalances.loan).toBe(-1212);
     expect(result.timeline.rows[1]?.growthNetWorthImpact).toBe(-12);
     expect(result.summary.finalNetWorth).toBe(-1212);
-  });
-
-  it("applies temporary multiplier overrides without mutating the pack", () => {
-    const pack = createBasePack();
-    const whatIfState: ScenarioWhatIfState = {
-      postingOverrides: {
-        invest: {
-          postingId: "invest",
-          mode: "multiplier",
-          value: 2,
-        },
-      },
-    };
-
-    const result = projectScenarioPack(pack, makeSettings(), whatIfState);
-
-    expect(pack.postings[2]?.arithmetic).toBe("900");
-    expect(result.timeline.rows[3]?.requestedPostingAmount).toBe(1800);
-    expect(result.timeline.rows[3]?.realizedPostingAmount).toBe(1600);
-    expect(result.postingSummaries.find((summary) => summary.postingId === "invest")?.requestedAmount).toBe(1800);
   });
 
   it("prevents destination accounts from exceeding maxBalance (overpayment guard)", () => {

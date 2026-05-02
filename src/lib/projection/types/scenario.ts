@@ -13,7 +13,7 @@ export type ScenarioCollectionKey = keyof typeof CSV_SCENARIO_FILE_NAMES;
 export type ScenarioFileName = (typeof CSV_SCENARIO_FILE_NAMES)[ScenarioCollectionKey];
 
 export type IsoDate = string;
-export type PostingOverrideMode = "amount" | "multiplier";
+
 
 export interface ProjectionRuntimeSettings {
   targetNetWorth: number;
@@ -24,7 +24,6 @@ export interface ProjectionRuntimeSettings {
 export interface Account {
   id: string;
   label: string;
-  category: string;
   annualRate: number;
   volatility: number;
   minBalance: number | null;
@@ -67,14 +66,12 @@ export interface ScenarioFileContents {
   postings: string;
 }
 
-export interface PostingWhatIfOverride {
-  postingId: string;
-  mode: PostingOverrideMode;
-  value: number;
-}
-
 export interface ScenarioWhatIfState {
-  postingOverrides: Record<string, PostingWhatIfOverride>;
+  addedAccounts: Account[];
+  addedPostings: Posting[];
+  addedCheckpoints: Checkpoint[];
+  disabledAccountIds: string[];
+  disabledPostingIds: string[];
 }
 
 export interface ProjectionRow {

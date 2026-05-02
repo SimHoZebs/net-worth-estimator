@@ -9,3 +9,7 @@ Date      ,AccountId              ,Balance
 2026-04-30,student_loan2_interest ,-203.44        
 2026-04-30,student_loan3_principal,-28788
 2026-04-30,student_loan3_interest ,-6714.35        
+2026-05-01,student_loan3_principal,-25528.12
+2026-05-01,student_loan3_interest ,-21.16
+2026-05-01,student_loan2_principal,-10917.70
+2026-05-01,student_loan2_interest ,-4.11

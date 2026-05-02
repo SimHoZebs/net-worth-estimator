@@ -31,7 +31,6 @@ Fields:
 
 - `id`
 - `label`
-- `category`
 - `annualRate`
 - `color`
 - `enabled`

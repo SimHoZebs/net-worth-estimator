@@ -9,4 +9,5 @@ export interface ScenarioParseResult {
 export interface DataSource {
   readonly sourceType: string;
   loadPack(): Promise<ScenarioParseResult>;
+  savePack(pack: ScenarioPack): Promise<ScenarioParseResult>;
 }

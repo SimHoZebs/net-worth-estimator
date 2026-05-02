@@ -5,9 +5,9 @@ taxes,Taxes,checking,,salary * 0.22,0,2026-04-01,,,3,true
 housing,Housing,checking,,3200,0,2026-04-05,,,4,true
 living,Living,checking,,2400,0,2026-04-10,,,5,true
 k401_match,401(k) Match,,k401,k401_employee * 0.5,0,2026-04-15,,,5,true
-student_loan1_interest_charge,Student Loan 1 Interest,student_loan1_interest,,abs(student_loan1_principal) * 0.011458333,0,2026-04-20,,,6,true
-student_loan2_interest_charge,Student Loan 2 Interest,student_loan2_interest,,abs(student_loan2_principal) * 0.003325,0,2026-04-21,,,6,true
-student_loan3_interest_charge,Student Loan 3 Interest,student_loan3_interest,,abs(student_loan3_principal) * 0.012604167,0,2026-04-22,,,6,true
+student_loan1_interest_charge,Student Loan 1 Interest,student_loan1_interest,,abs(student_loan1_principal) * 0.15,0,2026-04-20,,,6,true
+student_loan2_interest_charge,Student Loan 2 Interest,student_loan2_interest,,abs(student_loan2_principal) * 0.13,0,2026-04-21,,,6,true
+student_loan3_interest_charge,Student Loan 3 Interest,student_loan3_interest,,abs(student_loan3_principal) * 0.03,0,2026-04-22,,,6,true
 student_loan1_payment,Student Loan 1 Payment,checking,student_loan1_interest;student_loan1_principal,517,0,2026-04-20,,,7,true
 student_loan2_payment,Student Loan 2 Payment,checking,student_loan2_interest;student_loan2_principal,175,0,2026-04-21,,,8,true
 student_loan3_payment,Student Loan 3 Payment,checking,student_loan3_interest;student_loan3_principal,92,0,2026-04-22,,,9,true

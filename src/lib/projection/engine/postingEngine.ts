@@ -67,23 +67,16 @@ export function computeRequestedAmount(
   occurrence: DatedPostingOccurrence,
   latestRealizedPostingAmountById: Map<string, number>,
   balances: Record<string, number>,
-  whatIfState: ScenarioWhatIfState
+  _whatIfState: ScenarioWhatIfState
 ): number {
   const { posting, monthsElapsed } = occurrence;
-  const override = whatIfState.postingOverrides[posting.id];
-
-  if (override?.mode === "amount") {
-    return Math.max(0, override.value);
-  }
-
-  const multiplier = override?.mode === "multiplier" ? Math.max(0, override.value) : 1;
 
   const rawAmount = evaluateArithmetic(posting.arithmetic, {
     postingAmounts: latestRealizedPostingAmountById,
     accountBalances: balances,
   });
 
-  return applyAnnualGrowth(rawAmount, posting.annualGrowthRate, monthsElapsed) * multiplier;
+  return applyAnnualGrowth(rawAmount, posting.annualGrowthRate, monthsElapsed);
 }
 
 export function resolvePostingAmount(

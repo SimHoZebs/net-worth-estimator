@@ -7,9 +7,9 @@ export function createBasePack(overrides: Partial<ScenarioPack> = {}): ScenarioP
     version: 8,
     sourcePath: "/scenario",
     accounts: [
-      makeAccount({ id: "checking", category: "checking" }),
-      makeAccount({ id: "brokerage", category: "brokerage" }),
-      makeAccount({ id: "loan", category: "loan" }),
+      makeAccount({ id: "checking" }),
+      makeAccount({ id: "brokerage" }),
+      makeAccount({ id: "loan" }),
     ],
     checkpoints: [
       { Date: "2026-01-31", AccountId: "checking", Balance: 800 },

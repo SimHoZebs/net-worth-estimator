@@ -45,7 +45,5 @@ export type {
   ScenarioPack,
   ScenarioWhatIfState,
   IsoDate,
-  PostingOverrideMode,
-  PostingWhatIfOverride,
   ProjectionRuntimeSettings,
 } from "./types/scenario";

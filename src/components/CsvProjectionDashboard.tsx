@@ -89,7 +89,12 @@ export function ProjectionDashboard({
       });
   const hasStochasticData = stochasticResult !== undefined && stochasticResult !== null;
   const balanceChartData = buildBalanceChartData(pack, result);
-  const activeOverrideCount = Object.keys(whatIfState.postingOverrides).length;
+  const activeOverrideCount =
+    whatIfState.addedAccounts.length +
+    whatIfState.addedPostings.length +
+    whatIfState.addedCheckpoints.length +
+    whatIfState.disabledAccountIds.length +
+    whatIfState.disabledPostingIds.length;
   const goalReached = result.milestones.hitTargetDate !== null;
   const gapToTarget = projectionSettings.targetNetWorth - result.summary.finalNetWorth;
   const distanceToTarget = Math.abs(gapToTarget);

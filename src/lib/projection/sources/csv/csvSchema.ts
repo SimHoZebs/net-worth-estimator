@@ -87,7 +87,7 @@ export const csvDateSchema = z
   .regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/u, "Expected YYYY-MM-DD date.")
   .refine((value) => !Number.isNaN(new Date(value).getTime()), "Expected a valid date.");
 
-export const csvAccountsHeaders = ["id", "label", "category", "annualRate", "volatility", "minBalance", "maxBalance", "color", "enabled"] as const;
+export const csvAccountsHeaders = ["id", "label", "annualRate", "volatility", "minBalance", "maxBalance", "color", "enabled"] as const;
 export const csvCheckpointsHeaders = ["Date", "AccountId", "Balance"] as const;
 export const csvPostingsHeaders = [
   "id",
@@ -106,7 +106,6 @@ export const csvPostingsHeaders = [
 export const csvAccountSchema = z.object({
   id: trimmedString,
   label: trimmedString,
-  category: trimmedString,
   annualRate: finiteNumber,
   volatility: nonNegativeNumber,
   minBalance: nullableNumber,
