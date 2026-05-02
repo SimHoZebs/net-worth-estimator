@@ -1,19 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  Area,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ComposedChart,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useMemo, useState, type ReactNode } from "react";
 import type {
   ProjectionResult,
   ProjectionRow,
@@ -22,14 +7,15 @@ import type {
   ProjectionRuntimeSettings,
 } from "@/lib/projection";
 import type { StochasticProjectionResult } from "@/lib/projection";
-import { currency, formatChartCurrencyTick, formatTooltipCurrency, pct, pluralize } from "@/lib/format";
+import { currency, pct } from "@/lib/format";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { OutcomeMetric } from "./dashboard/OutcomeMetric";
 import { CompactDetail } from "./dashboard/CompactDetail";
 import { DriverCard } from "./dashboard/DriverCard";
-import { buildBalanceChartData, buildStochasticChartData } from "@/chart/chartData";
+import { AccountDiagnosticChart } from "./dashboard/AccountDiagnosticChart";
+import { buildAccountDiagnosticChartData } from "@/chart/chartData";
 import { formatRoute } from "@/lib/format";
 
 interface ProjectionDashboardProps {
@@ -53,11 +39,8 @@ export function ProjectionDashboard({
   stochasticResult,
   children,
 }: ProjectionDashboardProps) {
-  const [isAccountDiagnosticsOpen, setIsAccountDiagnosticsOpen] = useState(false);
   const [isPostingTablesOpen, setIsPostingTablesOpen] = useState(false);
-  const [isTrendChartReady, setIsTrendChartReady] = useState(false);
   const [expandedEventRows, setExpandedEventRows] = useState<Set<string>>(new Set());
-  const trendChartContainerRef = useRef<HTMLDivElement | null>(null);
   const latestRow = result.timeline.rows[result.timeline.rows.length - 1] ?? null;
   const firstProjectedRow = result.timeline.rows.find((row) => !row.isHistorical) ?? null;
   const futureRows = result.timeline.rows.filter((row) => !row.isHistorical);
@@ -79,31 +62,11 @@ export function ProjectionDashboard({
   const biggestShortfallPosting = result.postingSummaries
     .filter((summary) => summary.shortfallAmount > 0)
     .sort((left, right) => right.shortfallAmount - left.shortfallAmount)[0] ?? null;
-  const endingBalanceData = result.accountSummaries.map((summary) => ({
-    id: summary.accountId,
-    label: summary.label,
-    color: summary.color ?? "#64748b",
-    endingBalance: summary.endingBalance,
-  }));
-  const netWorthChartData = stochasticResult
-    ? buildStochasticChartData(result, stochasticResult)
-    : result.timeline.rows.map((row) => {
-        const nw = row.netWorth;
-        return {
-          date: row.date,
-          p10_base: nw,
-          outerThickness: 0,
-          p25_base: nw,
-          innerThickness: 0,
-          p50: nw,
-          _p10: nw,
-          _p90: nw,
-          _p25: nw,
-          _p75: nw,
-        };
-      });
   const hasStochasticData = stochasticResult !== undefined && stochasticResult !== null;
-  const balanceChartData = buildBalanceChartData(pack, result);
+  const accountDiagnosticChartData = useMemo(
+    () => buildAccountDiagnosticChartData(pack, result, stochasticResult),
+    [pack, result, stochasticResult],
+  );
   const activeOverrideCount =
     whatIfState.addedAccounts.length +
     whatIfState.addedPostings.length +
@@ -157,32 +120,15 @@ export function ProjectionDashboard({
     ? "No projected rows are scheduled after the historical checkpoints."
     : `${currency.format(firstProjectedRow.requestedPostingAmount)} requested and ${currency.format(firstProjectedRow.realizedPostingAmount)} realized${firstProjectedRow.clampedPostingShortfallAmount > 0 ? `, leaving ${currency.format(firstProjectedRow.clampedPostingShortfallAmount)} short.` : "."}`;
 
-  useEffect(() => {
-    const container = trendChartContainerRef.current;
-
-    if (container === null) {
-      return;
-    }
-
-    const updateReadyState = () => {
-      setIsTrendChartReady(container.clientWidth > 0 && container.clientHeight > 0);
-    };
-
-    updateReadyState();
-
-    const resizeObserver = new ResizeObserver(() => {
-      updateReadyState();
-    });
-
-    resizeObserver.observe(container);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [netWorthChartData.length, projectionSettings.targetNetWorth, hasStochasticData]);
-
   return (
     <div className="space-y-6">
+      <AccountDiagnosticChart
+        pack={pack}
+        targetNetWorth={projectionSettings.targetNetWorth}
+        hasStochasticData={hasStochasticData}
+        chartData={accountDiagnosticChartData}
+      />
+
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
         <Card className="min-w-0 rounded-[1.8rem] border-slate-200 shadow-sm">
           <CardContent className="p-5 md:p-6">
@@ -242,60 +188,6 @@ export function ProjectionDashboard({
             </div>
           </CardContent>
         </Card>
-
-        <Card className="min-w-0 rounded-[1.8rem] border-slate-200 shadow-sm">
-          <CardHeader className="pb-0">
-            <div>
-              <CardTitle>Trend vs target</CardTitle>
-              <CardDescription>{result.milestones.latestHistoricalDate ?? result.milestones.projectionStartDate} to {latestRow?.date ?? result.milestones.projectionStartDate}</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="min-w-0 pt-4">
-            <div ref={trendChartContainerRef} className="min-w-0 h-[280px]">
-              {isTrendChartReady ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  {hasStochasticData ? (
-                    <ComposedChart data={netWorthChartData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" minTickGap={36} />
-                      <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
-                      <Tooltip
-                        content={({ active, payload, label }) => {
-                          if (!active || !payload || payload.length === 0) return null;
-                          const p = payload[0]?.payload as Record<string, number> | undefined;
-                          if (!p) return null;
-                          return (
-                            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                              <div className="text-xs font-medium text-slate-500">{label}</div>
-                              <div className="mt-1 text-sm font-semibold text-slate-900">P50: {currency.format(p.p50)}</div>
-                              <div className="text-xs text-slate-500">P10–P90: {currency.format(p._p10)}–{currency.format(p._p90)}</div>
-                              <div className="text-xs text-slate-500">P25–P75: {currency.format(p._p25)}–{currency.format(p._p75)}</div>
-                            </div>
-                          );
-                        }}
-                      />
-                      <ReferenceLine y={projectionSettings.targetNetWorth} stroke="#94a3b8" strokeDasharray="4 4" ifOverflow="extendDomain" />
-                      <Area type="monotone" dataKey="p10_base" stackId="outer" stroke="none" fill="transparent" isAnimationActive={false} />
-                      <Area type="monotone" dataKey="outerThickness" stackId="outer" stroke="none" fill="#0f172a" fillOpacity={0.08} isAnimationActive={false} />
-                      <Area type="monotone" dataKey="p25_base" stackId="inner" stroke="none" fill="transparent" isAnimationActive={false} />
-                      <Area type="monotone" dataKey="innerThickness" stackId="inner" stroke="none" fill="#0f172a" fillOpacity={0.16} isAnimationActive={false} />
-                      <Line type="monotone" dataKey="p50" stroke="#0f172a" strokeWidth={2.5} dot={false} name="P50 median" isAnimationActive={false} />
-                    </ComposedChart>
-                  ) : (
-                    <LineChart data={netWorthChartData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" minTickGap={36} />
-                      <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
-                      <Tooltip formatter={formatTooltipCurrency} />
-                      <ReferenceLine y={projectionSettings.targetNetWorth} stroke="#94a3b8" strokeDasharray="4 4" ifOverflow="extendDomain" />
-                      <Line type="monotone" dataKey="p50" stroke="#0f172a" strokeWidth={2.5} dot={false} name="Net worth" />
-                    </LineChart>
-                  )}
-                </ResponsiveContainer>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -329,77 +221,6 @@ export function ProjectionDashboard({
           {children}
         </section>
       ) : null}
-
-      <CollapsibleSection
-        open={isAccountDiagnosticsOpen}
-        onOpenChange={setIsAccountDiagnosticsOpen}
-        title="Account diagnostics"
-        description="Open for account-level balance curves and ending balances."
-      >
-        {isAccountDiagnosticsOpen ? (
-          <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
-            {balanceChartData.length > 0 ? (
-              <Card className="min-w-0 rounded-[1.6rem] border-slate-200 shadow-sm">
-                <CardHeader>
-                  <div>
-                    <CardTitle>Account balances over time</CardTitle>
-                    <CardDescription>Enabled accounts across sampled checkpoint and event rows.</CardDescription>
-                  </div>
-                </CardHeader>
-                <CardContent className="min-w-0">
-                  <div className="min-w-0 h-[320px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={balanceChartData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" minTickGap={36} />
-                        <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
-                        <Tooltip formatter={formatTooltipCurrency} />
-                        {pack.accounts.filter((account) => account.enabled).map((account) => (
-                          <Line
-                            key={account.id}
-                            type="monotone"
-                            dataKey={account.id}
-                            stroke={account.color ?? "#64748b"}
-                            strokeWidth={2}
-                            dot={false}
-                            name={account.label}
-                          />
-                        ))}
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null}
-
-            <Card className="min-w-0 rounded-[1.6rem] border-slate-200 shadow-sm">
-              <CardHeader>
-                <div>
-                  <CardTitle>Ending balances by account</CardTitle>
-                  <CardDescription>Signed ending balances at the horizon.</CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="min-w-0">
-                <div className="min-w-0 h-[320px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={endingBalanceData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="label" interval={0} angle={-20} textAnchor="end" height={70} />
-                      <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
-                      <Tooltip formatter={formatTooltipCurrency} />
-                      <Bar dataKey="endingBalance" name="Ending balance">
-                        {endingBalanceData.map((entry) => (
-                          <Cell key={entry.id} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        ) : null}
-      </CollapsibleSection>
 
       <CollapsibleSection
         open={isPostingTablesOpen}
