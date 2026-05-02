@@ -241,7 +241,6 @@ export function CsvScenarioInspector({
                     { key: "id", label: "ID" },
                     { key: "label", label: "Label" },
                     { key: "category", label: "Category" },
-                    { key: "openingBalance", label: "Opening Balance", format: (value) => formatCurrency(value) },
                     { key: "annualRate", label: "Annual Rate" },
                     { key: "minBalance", label: "Min Balance", format: (value) => value === null ? "-" : formatCurrency(value) },
                     { key: "maxBalance", label: "Max Balance", format: (value) => value === null ? "-" : formatCurrency(value) },

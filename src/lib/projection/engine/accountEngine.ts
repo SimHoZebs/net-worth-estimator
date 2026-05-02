@@ -3,7 +3,7 @@ import type { CsvAccount } from "../types/csv";
 const DAYS_PER_YEAR = 365;
 
 export function initAccountBalances(accounts: CsvAccount[]): Record<string, number> {
-  return Object.fromEntries(accounts.map((account) => [account.id, account.openingBalance]));
+  return Object.fromEntries(accounts.map((account) => [account.id, 0]));
 }
 
 export function snapshotBalances(balances: Record<string, number>): Record<string, number> {

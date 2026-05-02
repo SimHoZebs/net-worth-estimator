@@ -1,15 +1,15 @@
 import type { CsvScenarioFileContents } from "../types/csv";
 
-const accountsHeader = "id,label,category,openingBalance,annualRate,volatility,minBalance,maxBalance,color,enabled";
+const accountsHeader = "id,label,category,annualRate,volatility,minBalance,maxBalance,color,enabled";
 const postingsHeader = "id,label,sourceAccountId,destinations,amountMode,basePostingId,absBase,amount,annualGrowthRate,startDate,endDate,annualCap,priority,enabled";
 
 export const validCsvFiles: CsvScenarioFileContents = {
   accounts: [
     accountsHeader,
-    "checking,Checking,checking,15000,0.01,0,,,#0f172a,true",
-    "k401,401(k),401k,120000,0.07,0.15,,,#2563eb,true",
-    "brokerage,Brokerage,brokerage,80000,0.07,0.18,,,#16a34a,true",
-    "student_loan,Student Loan,loan,-12000,0.05,0,,0,#dc2626,true",
+    "checking,Checking,checking,0.01,0,,,#0f172a,true",
+    "k401,401(k),401k,0.07,0.15,,,#2563eb,true",
+    "brokerage,Brokerage,brokerage,0.07,0.18,,,#16a34a,true",
+    "student_loan,Student Loan,loan,0.05,0,,0,#dc2626,true",
   ].join("\n"),
   checkpoints: [
     "Date,AccountId,Balance",

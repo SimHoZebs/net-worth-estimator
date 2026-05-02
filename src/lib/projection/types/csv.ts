@@ -26,7 +26,6 @@ export interface CsvAccount {
   id: string;
   label: string;
   category: string;
-  openingBalance: number;
   annualRate: number;
   volatility: number;
   minBalance: number | null;
@@ -104,7 +103,6 @@ export interface CsvProjectionAccountSummary {
   color: string | null;
   annualRate: number;
   enabled: boolean;
-  openingBalance: number;
   startingBalance: number;
   endingBalance: number;
 }

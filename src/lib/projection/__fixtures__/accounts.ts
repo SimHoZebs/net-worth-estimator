@@ -4,7 +4,6 @@ export function makeAccount(overrides: Partial<CsvAccount> & { id: string }): Cs
   return {
     label: overrides.id,
     category: "",
-    openingBalance: 0,
     annualRate: 0,
     volatility: 0,
     minBalance: null,

@@ -11,7 +11,7 @@ describe("CSV scenario pack", () => {
     expect(result.data?.sourcePath).toBe(CSV_SCENARIO_PUBLIC_PATH);
     expect(result.data?.postings[1]?.basePostingId).toBe("salary");
     expect(result.data?.postings[3]?.annualCap).toBe(23000);
-    expect(result.data?.accounts[3]?.openingBalance).toBe(-12000);
+    expect(result.data?.accounts[3]?.label).toBe("Student Loan");
   });
 
   it("reports circular posting base chains", () => {

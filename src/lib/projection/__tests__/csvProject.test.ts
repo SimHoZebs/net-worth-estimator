@@ -78,10 +78,13 @@ describe("CSV projection engine", () => {
 
   it("clamps postings by source balance only", () => {
     const pack = createBasePack({
-      checkpoints: [],
+      checkpoints: [
+        { Date: "2026-01-01", AccountId: "checking", Balance: 250 },
+        { Date: "2026-01-01", AccountId: "loan", Balance: -300 },
+      ],
       accounts: [
-        makeAccount({ id: "checking", openingBalance: 250 }),
-        makeAccount({ id: "loan", openingBalance: -300 }),
+        makeAccount({ id: "checking" }),
+        makeAccount({ id: "loan" }),
       ],
       postings: [
         makePosting({ id: "loan_payment", sourceAccountId: "checking", destinations: ["loan"], amount: 400, startDate: "2026-01-10", endDate: "2026-01-10" }),
@@ -90,19 +93,21 @@ describe("CSV projection engine", () => {
 
     const result = projectCsvScenarioPack(pack, makeSettings());
 
-    expect(result.timeline.rows[0]?.requestedPostingAmount).toBe(400);
-    expect(result.timeline.rows[0]?.realizedPostingAmount).toBe(250);
-    expect(result.timeline.rows[0]?.clampedPostingShortfallAmount).toBe(150);
-    expect(result.timeline.rows[0]?.accountBalances.checking).toBe(0);
-    expect(result.timeline.rows[0]?.accountBalances.loan).toBe(-50);
-    expect(result.timeline.rows[0]?.netWorth).toBe(-50);
+    expect(result.timeline.rows[1]?.requestedPostingAmount).toBe(400);
+    expect(result.timeline.rows[1]?.realizedPostingAmount).toBe(250);
+    expect(result.timeline.rows[1]?.clampedPostingShortfallAmount).toBe(150);
+    expect(result.timeline.rows[1]?.accountBalances.checking).toBe(0);
+    expect(result.timeline.rows[1]?.accountBalances.loan).toBe(-50);
+    expect(result.timeline.rows[1]?.netWorth).toBe(-50);
   });
 
   it("applies daily compounding to negative balances between dated events", () => {
     const pack = createBasePack({
-      checkpoints: [],
+      checkpoints: [
+        { Date: "2026-01-01", AccountId: "loan", Balance: -1200 },
+      ],
       accounts: [
-        makeAccount({ id: "loan", openingBalance: -1200, annualRate: 0.12 }),
+        makeAccount({ id: "loan", annualRate: 0.12 }),
       ],
       postings: [
         makePosting({ id: "marker", destinations: ["loan"], amount: 0, startDate: "2026-02-01", endDate: "2026-02-01" }),
@@ -111,8 +116,8 @@ describe("CSV projection engine", () => {
 
     const result = projectCsvScenarioPack(pack, makeSettings());
 
-    expect(result.timeline.rows[0]?.accountBalances.loan).toBe(-1212);
-    expect(result.timeline.rows[0]?.growthNetWorthImpact).toBe(-12);
+    expect(result.timeline.rows[1]?.accountBalances.loan).toBe(-1212);
+    expect(result.timeline.rows[1]?.growthNetWorthImpact).toBe(-12);
     expect(result.summary.finalNetWorth).toBe(-1212);
   });
 
@@ -138,10 +143,13 @@ describe("CSV projection engine", () => {
 
   it("prevents destination accounts from exceeding maxBalance (overpayment guard)", () => {
     const pack = createBasePack({
-      checkpoints: [],
+      checkpoints: [
+        { Date: "2026-01-01", AccountId: "checking", Balance: 400 },
+        { Date: "2026-01-01", AccountId: "loan", Balance: -300 },
+      ],
       accounts: [
-        makeAccount({ id: "checking", openingBalance: 400 }),
-        makeAccount({ id: "loan", openingBalance: -300, maxBalance: 0 }),
+        makeAccount({ id: "checking" }),
+        makeAccount({ id: "loan", maxBalance: 0 }),
       ],
       postings: [
         makePosting({ id: "paydown", sourceAccountId: "checking", destinations: ["loan"], amount: 400, startDate: "2026-01-10", endDate: "2026-01-10" }),
@@ -150,19 +158,21 @@ describe("CSV projection engine", () => {
 
     const result = projectCsvScenarioPack(pack, makeSettings());
 
-    expect(result.timeline.rows[0]?.requestedPostingAmount).toBe(400);
-    expect(result.timeline.rows[0]?.realizedPostingAmount).toBe(300);
-    expect(result.timeline.rows[0]?.clampedPostingShortfallAmount).toBe(100);
-    expect(result.timeline.rows[0]?.accountBalances.loan).toBe(0);
-    expect(result.timeline.rows[0]?.accountBalances.checking).toBe(100);
-    expect(result.timeline.rows[0]?.netWorth).toBe(100);
+    expect(result.timeline.rows[1]?.requestedPostingAmount).toBe(400);
+    expect(result.timeline.rows[1]?.realizedPostingAmount).toBe(300);
+    expect(result.timeline.rows[1]?.clampedPostingShortfallAmount).toBe(100);
+    expect(result.timeline.rows[1]?.accountBalances.loan).toBe(0);
+    expect(result.timeline.rows[1]?.accountBalances.checking).toBe(100);
+    expect(result.timeline.rows[1]?.netWorth).toBe(100);
   });
 
   it("prevents source accounts from falling below minBalance", () => {
     const pack = createBasePack({
-      checkpoints: [],
+      checkpoints: [
+        { Date: "2026-01-01", AccountId: "checking", Balance: 300 },
+      ],
       accounts: [
-        makeAccount({ id: "checking", openingBalance: 300, minBalance: 100 }),
+        makeAccount({ id: "checking", minBalance: 100 }),
         makeAccount({ id: "brokerage" }),
       ],
       postings: [
@@ -172,8 +182,8 @@ describe("CSV projection engine", () => {
 
     const result = projectCsvScenarioPack(pack, makeSettings());
 
-    expect(result.timeline.rows[0]?.realizedPostingAmount).toBe(200);
-    expect(result.timeline.rows[0]?.clampedPostingShortfallAmount).toBe(200);
-    expect(result.timeline.rows[0]?.accountBalances.checking).toBe(100);
+    expect(result.timeline.rows[1]?.realizedPostingAmount).toBe(200);
+    expect(result.timeline.rows[1]?.clampedPostingShortfallAmount).toBe(200);
+    expect(result.timeline.rows[1]?.accountBalances.checking).toBe(100);
   });
 });

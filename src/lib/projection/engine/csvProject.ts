@@ -291,8 +291,8 @@ export function projectCsvScenarioPack(
   const hitTargetRow = rows.find((row) => !row.isHistorical && row.netWorth >= projectionSettings.targetNetWorth) ?? null;
 
   const accountSummaries: CsvProjectionAccountSummary[] = pack.accounts.map((account) => {
-    const endingBalance = latestRow?.accountBalances[account.id] ?? futureStartingBalances[account.id] ?? account.openingBalance;
-    const startingBalance = futureStartingBalances[account.id] ?? account.openingBalance;
+    const endingBalance = latestRow?.accountBalances[account.id] ?? futureStartingBalances[account.id] ?? 0;
+    const startingBalance = futureStartingBalances[account.id] ?? 0;
 
     return {
       accountId: account.id,
@@ -300,7 +300,6 @@ export function projectCsvScenarioPack(
       color: account.color,
       annualRate: account.annualRate,
       enabled: account.enabled,
-      openingBalance: roundCurrency(account.openingBalance),
       startingBalance: roundCurrency(startingBalance),
       endingBalance: roundCurrency(endingBalance),
     };

@@ -9,7 +9,7 @@ export function createBasePack(overrides: Partial<CsvScenarioPack> = {}): CsvSce
     accounts: [
       makeAccount({ id: "checking", category: "checking" }),
       makeAccount({ id: "brokerage", category: "brokerage" }),
-      makeAccount({ id: "loan", category: "loan", openingBalance: -500 }),
+      makeAccount({ id: "loan", category: "loan" }),
     ],
     checkpoints: [
       { Date: "2026-01-31", AccountId: "checking", Balance: 800 },

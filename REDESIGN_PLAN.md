@@ -32,14 +32,9 @@ Fields:
 - `id`
 - `label`
 - `category`
-- `openingBalance`
 - `annualRate`
 - `color`
 - `enabled`
-
-Notes:
-
-- `openingBalance` is signed. Positive balances help net worth and negative balances reduce it.
 - All enabled accounts participate in net worth.
 - No account ID is treated specially by name.
 
