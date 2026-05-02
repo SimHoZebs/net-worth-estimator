@@ -13,7 +13,7 @@ import { summarizeValidationIssues } from "./lib/projection";
 import type { StochasticConfig } from "./lib/projection";
 
 const DEFAULT_TARGET_NET_WORTH = 1_000_000;
-const PROJECTION_HORIZON_YEARS = 50;
+const PROJECTION_HORIZON_YEARS = 25;
 const DEFAULT_STOCHASTIC_RUN_COUNT = 1000;
 
 function formatTodayIsoDate() {
