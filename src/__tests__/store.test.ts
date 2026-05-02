@@ -142,6 +142,51 @@ describe("Selectors", () => {
 });
 
 /* ------------------------------------------------------------------ */
+/*  Reference stability                                                */
+/* ------------------------------------------------------------------ */
+
+describe("Reference stability", () => {
+  beforeEach(() => {
+    useStore.getState().resetAllOverrides();
+  });
+
+  it("getState returns identical reference when state is unchanged", () => {
+    const a = useStore.getState();
+    const b = useStore.getState();
+    expect(a).toBe(b);
+  });
+
+  it("addedAccounts array reference is stable when no mutations occur", () => {
+    useStore.getState().addTemporaryAccount(makeAccount());
+    const before = useStore.getState().addedAccounts;
+    const after = useStore.getState().addedAccounts;
+    expect(before).toBe(after);
+  });
+
+  it("addedAccounts array reference changes when a new account is added", () => {
+    const before = useStore.getState().addedAccounts;
+    useStore.getState().addTemporaryAccount(makeAccount());
+    const after = useStore.getState().addedAccounts;
+    expect(before).not.toBe(after);
+  });
+
+  it("selectActiveOverrideCount returns stable values for identical state", () => {
+    const a = selectActiveOverrideCount(useStore.getState());
+    const b = selectActiveOverrideCount(useStore.getState());
+    expect(a).toBe(b);
+  });
+
+  it("selectWhatIfState creates new object each call (plain function, not memoized)", () => {
+    // This is expected behaviour — memoization happens at the useShallow layer.
+    const a = selectWhatIfState(useStore.getState());
+    const b = selectWhatIfState(useStore.getState());
+    expect(a).not.toBe(b);
+    // ...but values should be deeply equal
+    expect(a).toEqual(b);
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /*  Editor slice tests                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -290,15 +335,6 @@ describe("Editor slice", () => {
       useStore.getState().updateCheckpoint(0, { Balance: 9999 });
       expect(useStore.getState().workingPack?.checkpoints[0].Balance).toBe(9999);
     });
-
-    it("markSaved clears editor state", () => {
-      useStore.getState().startEditing();
-      useStore.getState().updateAccount("a1", { label: "Changed" });
-      useStore.getState().markSaved();
-      expect(useStore.getState().isEditing).toBe(false);
-      expect(useStore.getState().isDirty).toBe(false);
-      expect(useStore.getState().workingPack).toBeNull();
-    });
   });
 });
 
@@ -332,103 +368,34 @@ describe("Settings slice", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/*  Scenario slice reload tests                                        */
+/*  Scenario slice fetch setters                                       */
 /* ------------------------------------------------------------------ */
 
-describe("Scenario slice reload", () => {
-  beforeEach(() => {
-    vi.resetModules();
+describe("Scenario fetch setters", () => {
+  it("beginFetch sets isLoading to true", () => {
+    useStore.setState({ isLoading: false, loadError: "old" });
+    useStore.getState().beginFetch();
+    expect(useStore.getState().isLoading).toBe(true);
+    expect(useStore.getState().loadError).toBeNull();
   });
 
-  it("sets isLoading during reload and clears on success", async () => {
-    const samplePack = makeScenarioPack();
-
-    const mockLoadPack = vi.fn().mockResolvedValue({ pack: samplePack, issues: [] });
-    const mockDataSource = {
-      sourceType: "csv" as const,
-      loadPack: mockLoadPack,
-      savePack: vi.fn(),
-    };
-
-    vi.doMock("@/lib/projection", () => ({
-      createCsvDataSource: vi.fn(() => mockDataSource),
-    }));
-
-    const { useStore: store } = await import("@/store");
-
-    store.getState().reload();
-    expect(store.getState().isLoading).toBe(true);
-
-    await vi.waitFor(() => {
-      expect(store.getState().isLoading).toBe(false);
-    });
-
-    expect(store.getState().pack).toEqual(samplePack);
-    expect(store.getState().loadError).toBeNull();
-    expect(store.getState().loadedAt).toBeInstanceOf(Date);
+  it("completeFetch sets pack, issues, and clears loading", () => {
+    useStore.setState({ isLoading: true, pack: null, issues: [], loadError: null, loadedAt: null });
+    const pack = makeScenarioPack();
+    useStore.getState().completeFetch({ pack, issues: [{ code: "WARN", message: "test", path: [], severity: "warning" as const }] });
+    expect(useStore.getState().pack).toEqual(pack);
+    expect(useStore.getState().issues).toHaveLength(1);
+    expect(useStore.getState().isLoading).toBe(false);
+    expect(useStore.getState().loadError).toBeNull();
+    expect(useStore.getState().loadedAt).toBeInstanceOf(Date);
   });
 
-  it("handles load errors", async () => {
-    const mockLoadPack = vi.fn().mockRejectedValue(new Error("Network failure"));
-    const mockDataSource = {
-      sourceType: "csv" as const,
-      loadPack: mockLoadPack,
-      savePack: vi.fn(),
-    };
-
-    vi.doMock("@/lib/projection", () => ({
-      createCsvDataSource: vi.fn(() => mockDataSource),
-    }));
-
-    const { useStore: store } = await import("@/store");
-    store.getState().reload();
-
-    await vi.waitFor(() => {
-      expect(store.getState().isLoading).toBe(false);
-    });
-
-    expect(store.getState().pack).toBeNull();
-    expect(store.getState().loadError).toBe("Network failure");
-  });
-
-  it("ignores stale responses from request sequencing", async () => {
-    let resolveFirst!: (value: { pack: ScenarioPack; issues: [] }) => void;
-    let resolveSecond!: (value: { pack: ScenarioPack; issues: [] }) => void;
-
-    const firstPack = makeScenarioPack({ sourcePath: "/first" });
-    const secondPack = makeScenarioPack({ sourcePath: "/second" });
-
-    const mockLoadPack = vi
-      .fn()
-      .mockImplementationOnce(
-        () => new Promise<{ pack: ScenarioPack; issues: [] }>((r) => { resolveFirst = r; }),
-      )
-      .mockImplementationOnce(
-        () => new Promise<{ pack: ScenarioPack; issues: [] }>((r) => { resolveSecond = r; }),
-      );
-
-    const mockDataSource = {
-      sourceType: "csv" as const,
-      loadPack: mockLoadPack,
-      savePack: vi.fn(),
-    };
-
-    vi.doMock("@/lib/projection", () => ({
-      createCsvDataSource: vi.fn(() => mockDataSource),
-    }));
-
-    const { useStore: store } = await import("@/store");
-
-    store.getState().reload();
-    store.getState().reload();
-
-    resolveSecond!({ pack: secondPack, issues: [] });
-    await vi.waitFor(() => {
-      expect(store.getState().pack?.sourcePath).toBe("/second");
-    });
-
-    resolveFirst!({ pack: firstPack, issues: [] });
-    await new Promise((r) => setTimeout(r, 10));
-    expect(store.getState().pack?.sourcePath).toBe("/second");
+  it("recordFetchError sets loadError and clears loading", () => {
+    useStore.setState({ isLoading: true, pack: makeScenarioPack(), issues: [], loadError: null });
+    useStore.getState().recordFetchError("boom");
+    expect(useStore.getState().pack).toBeNull();
+    expect(useStore.getState().issues).toEqual([]);
+    expect(useStore.getState().isLoading).toBe(false);
+    expect(useStore.getState().loadError).toBe("boom");
   });
 });

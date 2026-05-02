@@ -8,7 +8,10 @@ import { Button } from "./components/ui/button";
 import { useProjectionWorker } from "./hooks/useProjectionWorker";
 import { useStochasticWorker } from "./hooks/useStochasticWorker";
 import { summarizeValidationIssues } from "./lib/projection";
-import { useStore, dataSource, selectWhatIfState } from "./store";
+import { useStore, selectWhatIfState } from "./store";
+import { useShallow } from "zustand/shallow";
+import { reloadScenario } from "@/lib/reloadScenario";
+import { createCsvDataSource } from "@/lib/projection";
 
 const PROJECTION_HORIZON_YEARS = 25;
 
@@ -22,8 +25,7 @@ export default function App() {
   const loadError = useStore((s) => s.loadError);
   const isLoading = useStore((s) => s.isLoading);
   const loadedAt = useStore((s) => s.loadedAt);
-  const reload = useStore((s) => s.reload);
-  const whatIfState = useStore(selectWhatIfState);
+  const whatIfState = useStore(useShallow(selectWhatIfState));
   const activeOverrideCount = useStore(
     (s) =>
       s.addedAccounts.length +
@@ -32,6 +34,8 @@ export default function App() {
       s.disabledAccountIds.length +
       s.disabledPostingIds.length,
   );
+
+  useEffect(() => { reloadScenario(); }, []);
 
   const targetNetWorthInput = useStore((s) => s.targetNetWorthInput);
   const setTargetNetWorthInput = useStore((s) => s.setTargetNetWorthInput);
@@ -81,9 +85,16 @@ export default function App() {
   const handleSave = () => {
     const store = useStore.getState();
     if (!store.workingPack) return;
-    dataSource.savePack(store.workingPack).then(() => {
-      store.markSaved();
-      store.reload();
+
+    const dataSource = createCsvDataSource();
+    dataSource.savePack(store.workingPack).then((saved) => {
+      useStore.setState({
+        pack: saved.pack,
+        issues: saved.issues,
+        isDirty: false,
+        isEditing: false,
+        workingPack: null,
+      });
     });
   };
 
@@ -91,7 +102,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8 md:py-8">
         <div className="flex justify-end">
-          <Button type="button" variant="ghost" size="sm" onClick={() => reload()} disabled={isLoading}>
+          <Button type="button" variant="ghost" size="sm" onClick={reloadScenario} disabled={isLoading}>
             {isLoading ? "Loading..." : "Reload"}
           </Button>
         </div>
@@ -152,7 +163,7 @@ export default function App() {
         <ScenarioInspector
           projectionSettings={projectionSettings}
           projectionStartDate={result?.milestones.projectionStartDate ?? projectionStartDate}
-          onReload={() => reload()}
+          onReload={reloadScenario}
           onSave={handleSave}
         />
       </div>

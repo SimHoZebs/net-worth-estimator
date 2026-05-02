@@ -3,6 +3,7 @@ import type { Account, Checkpoint, Posting, ScenarioPack } from "@/lib/projectio
 import { Button } from "@/components/ui/button";
 import { currency, formatRoute } from "@/lib/format";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { useShallow } from "zustand/shallow";
 import { useStore, selectActiveOverrideCount } from "@/store";
 
 interface ContributionWhatIfControlsProps {
@@ -60,11 +61,11 @@ function emptyCheckpoint(): Checkpoint {
 export function ContributionWhatIfControls({
   pack,
 }: ContributionWhatIfControlsProps) {
-  const whatIfState = useStore((s) => ({
+  const whatIfState = useStore(useShallow((s) => ({
     addedAccounts: s.addedAccounts,
     addedPostings: s.addedPostings,
     addedCheckpoints: s.addedCheckpoints,
-  }));
+  })));
   const activeOverrideCount = useStore(selectActiveOverrideCount);
   const resetAllOverrides = useStore((s) => s.resetAllOverrides);
   const addTemporaryAccount = useStore((s) => s.addTemporaryAccount);

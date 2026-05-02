@@ -2,9 +2,7 @@ import { create } from "zustand";
 import type { StateCreator } from "zustand";
 import type { Account, Checkpoint, Posting, ScenarioPack, ScenarioWhatIfState, StochasticConfig } from "@/lib/projection";
 import type { ScenarioValidationIssue } from "@/lib/projection";
-import { createCsvDataSource } from "@/lib/projection";
-
-const dataSource = createCsvDataSource();
+import type { ScenarioParseResult } from "@/lib/projection/dataSource";
 
 /* ------------------------------------------------------------------ */
 /*  Scenario slice                                                     */
@@ -16,47 +14,31 @@ interface ScenarioSlice {
   loadError: string | null;
   isLoading: boolean;
   loadedAt: Date | null;
-  reload: () => void;
+  beginFetch: () => void;
+  completeFetch: (result: ScenarioParseResult) => void;
+  recordFetchError: (message: string) => void;
 }
-
-let reloadRequestId = 0;
 
 const createScenarioSlice: StateCreator<AppStore, [], [], ScenarioSlice> = (set) => ({
   pack: null,
   issues: [],
   loadError: null,
-  isLoading: true,
+  isLoading: false,
   loadedAt: null,
 
-  reload: () => {
-    const requestId = reloadRequestId + 1;
-    reloadRequestId = requestId;
+  beginFetch: () => set({ isLoading: true, loadError: null }),
 
-    set({ isLoading: true, loadError: null });
+  completeFetch: (result) =>
+    set({
+      pack: result.pack,
+      issues: result.issues,
+      loadError: null,
+      isLoading: false,
+      loadedAt: new Date(),
+    }),
 
-    dataSource
-      .loadPack()
-      .then((result) => {
-        if (requestId !== reloadRequestId) return;
-        set({
-          pack: result.pack,
-          issues: result.issues,
-          loadError: null,
-          isLoading: false,
-          loadedAt: new Date(),
-        });
-      })
-      .catch((error: unknown) => {
-        if (requestId !== reloadRequestId) return;
-        set({
-          pack: null,
-          issues: [],
-          loadError: error instanceof Error ? error.message : "Could not load data files.",
-          isLoading: false,
-          loadedAt: null,
-        });
-      });
-  },
+  recordFetchError: (message) =>
+    set({ pack: null, issues: [], loadError: message, isLoading: false }),
 });
 
 /* ------------------------------------------------------------------ */
@@ -140,7 +122,6 @@ interface EditorSlice {
   addCheckpoint: (checkpoint: Checkpoint) => void;
   deleteCheckpoint: (index: number) => void;
   updateCheckpoint: (index: number, changes: Partial<Checkpoint>) => void;
-  markSaved: () => void;
 }
 
 const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (set, get) => ({
@@ -265,13 +246,6 @@ const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (set, get
         workingPack: { ...s.workingPack, checkpoints: next },
       };
     }),
-
-  markSaved: () =>
-    set({
-      isDirty: false,
-      isEditing: false,
-      workingPack: null,
-    }),
 });
 
 /* ------------------------------------------------------------------ */
@@ -332,8 +306,6 @@ export const selectWhatIfState = (s: AppStore): ScenarioWhatIfState => ({
   disabledAccountIds: s.disabledAccountIds,
   disabledPostingIds: s.disabledPostingIds,
 });
-
-export { dataSource };
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
