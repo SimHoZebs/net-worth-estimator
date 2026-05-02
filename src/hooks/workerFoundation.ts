@@ -4,6 +4,7 @@ export interface WorkerProjectionState<TResult> {
   result: TResult | null;
   runtimeError: string | null;
   isRunning: boolean;
+  progress: number | null;
 }
 
 interface UseWorkerProjectionOptions<TResult> {
@@ -29,6 +30,7 @@ export function useWorkerProjection<TResult>({
     result: null,
     runtimeError: null,
     isRunning: false,
+    progress: null,
   });
 
   useEffect(() => {
@@ -36,15 +38,30 @@ export function useWorkerProjection<TResult>({
     workerRef.current = worker;
 
     worker.onmessage = (event) => {
-      const payload = event.data as { id: number; result: TResult | null; runtimeError: string | null };
+      const payload = event.data as {
+        id: number;
+        type?: string;
+        progress?: number;
+        result?: TResult | null;
+        runtimeError?: string | null;
+      };
       if (payload.id !== requestIdRef.current) {
         return;
       }
 
+      if (payload.type === "progress" && typeof payload.progress === "number") {
+        setState((current) => ({
+          ...current,
+          progress: payload.progress!,
+        }));
+        return;
+      }
+
       setState({
-        result: payload.result,
-        runtimeError: payload.runtimeError,
+        result: payload.result ?? null,
+        runtimeError: payload.runtimeError ?? null,
         isRunning: false,
+        progress: null,
       });
     };
 
@@ -53,6 +70,7 @@ export function useWorkerProjection<TResult>({
         result: null,
         runtimeError: errorMessage,
         isRunning: false,
+        progress: null,
       });
     };
 
@@ -69,6 +87,7 @@ export function useWorkerProjection<TResult>({
           result: null,
           runtimeError: null,
           isRunning: false,
+          progress: null,
         });
       }
       return;
@@ -82,6 +101,7 @@ export function useWorkerProjection<TResult>({
       runtimeError: null,
       result: clearResultOnStart ? null : current.result,
       isRunning: true,
+      progress: null,
     }));
 
     workerRef.current.postMessage(buildPayload(id));

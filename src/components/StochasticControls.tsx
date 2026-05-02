@@ -8,6 +8,7 @@ import { useStore } from "@/store";
 
 interface StochasticControlsProps {
   isRunning: boolean;
+  progress: number | null;
   stochasticResult: StochasticProjectionResult | null;
 }
 
@@ -15,6 +16,7 @@ const DEBOUNCE_MS = 2000;
 
 export function StochasticControls({
   isRunning,
+  progress,
   stochasticResult,
 }: StochasticControlsProps) {
   const enabled = useStore((s) => s.stochasticEnabled);
@@ -73,8 +75,11 @@ export function StochasticControls({
     };
   }, []);
 
+  const progressPct = progress !== null ? Math.round(progress * 100) : null;
   const statusLabel = isRunning
-    ? `Computing ${config.runCount} projections…`
+    ? progressPct !== null
+      ? `Computing ${config.runCount} projections — ${progressPct}%`
+      : `Computing ${config.runCount} projections…`
     : stochasticResult
       ? `Ready — ${config.runCount} run${config.runCount === 1 ? "" : "s"}${config.seed !== null ? ` (seed ${config.seed})` : ""}`
       : enabled
@@ -89,7 +94,13 @@ export function StochasticControls({
         : enabled && !hasStochasticAccounts
           ? "No postings have volatility configured. Set volatility > 0 to enable simulation."
           : "Stochastic simulation is disabled. Toggle on to see probabilistic bands."}
-      badge={isRunning ? "Running…" : enabled ? "Open" : "Off"}
+      badge={isRunning
+        ? progressPct !== null
+          ? `Running ${progressPct}%`
+          : "Running…"
+        : enabled
+          ? "Open"
+          : "Off"}
     >
 
       <div className="mt-5 space-y-4">
@@ -170,6 +181,17 @@ export function StochasticControls({
                 </Button>
               </div>
             </div>
+
+            {isRunning && progressPct !== null ? (
+              <div className="space-y-1">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className="h-full rounded-full bg-slate-900 transition-[width] duration-300 ease-out"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+              </div>
+            ) : null}
 
             {stochasticResult ? (
               <div className="grid gap-3 sm:grid-cols-4">

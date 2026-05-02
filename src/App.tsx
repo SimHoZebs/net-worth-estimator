@@ -80,6 +80,7 @@ export default function App() {
     result: stochasticResult,
     runtimeError: stochasticError,
     isRunning: isStochasticRunning,
+    progress: stochasticProgress,
   } = useStochasticWorker(pack, projectionSettings, whatIfState, stochasticConfig, stochasticWorkerEnabled);
 
   const handleSave = () => {
@@ -157,7 +158,7 @@ export default function App() {
         ) : null}
 
         {pack && validation.isValid && result ? (
-          <StochasticControls stochasticResult={stochasticResult} isRunning={isStochasticRunning} />
+          <StochasticControls stochasticResult={stochasticResult} isRunning={isStochasticRunning} progress={stochasticProgress} />
         ) : null}
 
         <ScenarioInspector

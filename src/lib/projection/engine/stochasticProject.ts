@@ -98,22 +98,29 @@ function buildBands(snapshotsByRun: NetWorthSnapshot[][], sortedDates: string[])
   });
 }
 
+const STOCHASTIC_PROGRESS_BATCH = 100;
+
 export function stochasticProject(
   pack: ScenarioPack,
   projectionSettings: ProjectionRuntimeSettings,
   whatIfState: ScenarioWhatIfState,
-  config: StochasticConfig
+  config: StochasticConfig,
+  onProgress?: (progress: number) => void
 ): StochasticProjectionResult {
   reseed(config.seed);
   const deterministic = projectScenarioPack(pack, projectionSettings, whatIfState);
 
   const snapshotsByRun: NetWorthSnapshot[][] = [];
 
-  for (let i = 0; i < config.runCount; i++) {
-    const cloned = clonePack(pack);
-    const rates = buildStochasticRates(cloned, projectionSettings);
-    const snapshots = runAndExtract(cloned, projectionSettings, whatIfState, rates);
-    snapshotsByRun.push(snapshots);
+  for (let i = 0; i < config.runCount; i += STOCHASTIC_PROGRESS_BATCH) {
+    const batchEnd = Math.min(i + STOCHASTIC_PROGRESS_BATCH, config.runCount);
+    for (let j = i; j < batchEnd; j++) {
+      const cloned = clonePack(pack);
+      const rates = buildStochasticRates(cloned, projectionSettings);
+      const snapshots = runAndExtract(cloned, projectionSettings, whatIfState, rates);
+      snapshotsByRun.push(snapshots);
+    }
+    onProgress?.(batchEnd / config.runCount);
   }
 
   const dateSet = new Set<string>();

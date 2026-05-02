@@ -93,6 +93,21 @@ describe("stochastic projection", () => {
     expect(result1.milestones.hitTargetProbability).toBe(result2.milestones.hitTargetProbability);
   });
 
+  it("works without onProgress callback (backward compatible)", () => {
+    const { data: pack } = parseCsvScenarioPack(validCsvFiles);
+    expect(pack).not.toBeNull();
+
+    const result = stochasticProject(
+      pack!,
+      { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 5 },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
+      { runCount: 50, seed: 42 }
+    );
+
+    expect(result.bands.length).toBeGreaterThan(0);
+    expect(result.milestones.hitTargetProbability).toBeGreaterThanOrEqual(0);
+  });
+
   it("returns P50 close to deterministic when volatility is zero", () => {
     const { data: pack } = parseCsvScenarioPack(validCsvFiles);
     expect(pack).not.toBeNull();
@@ -118,5 +133,105 @@ describe("stochastic projection", () => {
     expect(result.bands[result.bands.length - 1].netWorth.p50).toBe(
       deterministic.timeline.rows[deterministic.timeline.rows.length - 1].netWorth
     );
+  });
+});
+
+describe("stochastic progress streaming", () => {
+  it("reports progress with ascending values and reaches 1.0", () => {
+    const { data: pack } = parseCsvScenarioPack(validCsvFiles);
+    expect(pack).not.toBeNull();
+
+    const progressValues: number[] = [];
+    stochasticProject(
+      pack!,
+      { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 10 },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
+      { runCount: 250, seed: 42 },
+      (p) => progressValues.push(p)
+    );
+
+    expect(progressValues.length).toBeGreaterThan(1);
+    expect(progressValues[0]).toBeLessThan(1);
+    expect(progressValues[progressValues.length - 1]).toBe(1);
+
+    for (let i = 1; i < progressValues.length; i++) {
+      expect(progressValues[i]).toBeGreaterThan(progressValues[i - 1]);
+    }
+  });
+
+  it("produces identical results with and without onProgress", () => {
+    const { data: pack } = parseCsvScenarioPack(validCsvFiles);
+    expect(pack).not.toBeNull();
+
+    const resultWithout = stochasticProject(
+      pack!,
+      { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 10 },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
+      { runCount: 100, seed: 42 }
+    );
+
+    const resultWith = stochasticProject(
+      pack!,
+      { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 10 },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
+      { runCount: 100, seed: 42 },
+      () => {}
+    );
+
+    expect(resultWith.bands.length).toBe(resultWithout.bands.length);
+    expect(resultWith.bands[0].netWorth.p50).toBe(resultWithout.bands[0].netWorth.p50);
+    expect(resultWith.milestones.hitTargetProbability).toBe(resultWithout.milestones.hitTargetProbability);
+  });
+
+  it("reports progress for a small run count (1)", () => {
+    const { data: pack } = parseCsvScenarioPack(validCsvFiles);
+    expect(pack).not.toBeNull();
+
+    const progressValues: number[] = [];
+    stochasticProject(
+      pack!,
+      { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 5 },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
+      { runCount: 1, seed: 42 },
+      (p) => progressValues.push(p)
+    );
+
+    expect(progressValues.length).toBe(1);
+    expect(progressValues[0]).toBe(1);
+  });
+
+  it("reports progress at expected batch boundaries", () => {
+    const { data: pack } = parseCsvScenarioPack(validCsvFiles);
+    expect(pack).not.toBeNull();
+
+    const progressValues: number[] = [];
+    stochasticProject(
+      pack!,
+      { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 5 },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
+      { runCount: 100, seed: 42 },
+      (p) => progressValues.push(p)
+    );
+
+    expect(progressValues).toEqual([1]);
+  });
+
+  it("reports multiple batches for count larger than batch size", () => {
+    const { data: pack } = parseCsvScenarioPack(validCsvFiles);
+    expect(pack).not.toBeNull();
+
+    const progressValues: number[] = [];
+    stochasticProject(
+      pack!,
+      { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 5 },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
+      { runCount: 250, seed: 42 },
+      (p) => progressValues.push(p)
+    );
+
+    expect(progressValues.length).toBe(3);
+    expect(progressValues[0]).toBeCloseTo(100 / 250, 5);
+    expect(progressValues[1]).toBeCloseTo(200 / 250, 5);
+    expect(progressValues[2]).toBe(1);
   });
 });
