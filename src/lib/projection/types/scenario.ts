@@ -1,4 +1,4 @@
-export const CSV_SCENARIO_MODEL_VERSION = 7 as const;
+export const SCENARIO_MODEL_VERSION = 7 as const;
 
 export const CSV_SCENARIO_REPO_PATH = "public/scenario";
 export const CSV_SCENARIO_PUBLIC_PATH = "/scenario";
@@ -9,8 +9,8 @@ export const CSV_SCENARIO_FILE_NAMES = {
   postings: "postings.csv",
 } as const;
 
-export type CsvScenarioCollectionKey = keyof typeof CSV_SCENARIO_FILE_NAMES;
-export type CsvScenarioFileName = (typeof CSV_SCENARIO_FILE_NAMES)[CsvScenarioCollectionKey];
+export type ScenarioCollectionKey = keyof typeof CSV_SCENARIO_FILE_NAMES;
+export type ScenarioFileName = (typeof CSV_SCENARIO_FILE_NAMES)[ScenarioCollectionKey];
 
 export type IsoDate = string;
 export type PostingAmountMode = "fixed" | "percent_of_base";
@@ -22,7 +22,7 @@ export interface ProjectionRuntimeSettings {
   horizonYears: number;
 }
 
-export interface CsvAccount {
+export interface Account {
   id: string;
   label: string;
   category: string;
@@ -34,13 +34,13 @@ export interface CsvAccount {
   enabled: boolean;
 }
 
-export interface CsvCheckpoint {
+export interface Checkpoint {
   Date: IsoDate;
   AccountId: string;
   Balance: number;
 }
 
-export interface CsvPosting {
+export interface Posting {
   id: string;
   label: string;
   sourceAccountId: string | null;
@@ -57,15 +57,15 @@ export interface CsvPosting {
   enabled: boolean;
 }
 
-export interface CsvScenarioPack {
-  version: typeof CSV_SCENARIO_MODEL_VERSION;
+export interface ScenarioPack {
+  version: typeof SCENARIO_MODEL_VERSION;
   sourcePath: string;
-  accounts: CsvAccount[];
-  checkpoints: CsvCheckpoint[];
-  postings: CsvPosting[];
+  accounts: Account[];
+  checkpoints: Checkpoint[];
+  postings: Posting[];
 }
 
-export interface CsvScenarioFileContents {
+export interface ScenarioFileContents {
   accounts: string;
   checkpoints: string;
   postings: string;
@@ -77,11 +77,11 @@ export interface PostingWhatIfOverride {
   value: number;
 }
 
-export interface CsvScenarioWhatIfState {
+export interface ScenarioWhatIfState {
   postingOverrides: Record<string, PostingWhatIfOverride>;
 }
 
-export interface CsvProjectionRow {
+export interface ProjectionRow {
   date: IsoDate;
   isHistorical: boolean;
   netWorth: number;
@@ -97,7 +97,7 @@ export interface CsvProjectionRow {
   realizedPostingAmountsById: Record<string, number>;
 }
 
-export interface CsvProjectionAccountSummary {
+export interface ProjectionAccountSummary {
   accountId: string;
   label: string;
   color: string | null;
@@ -107,7 +107,7 @@ export interface CsvProjectionAccountSummary {
   endingBalance: number;
 }
 
-export interface CsvProjectionPostingSummary {
+export interface ProjectionPostingSummary {
   postingId: string;
   label: string;
   sourceAccountId: string | null;
@@ -122,13 +122,13 @@ export interface CsvProjectionPostingSummary {
   shortfallAmount: number;
 }
 
-export interface CsvProjectionResult {
+export interface ProjectionResult {
   timeline: {
-    rows: CsvProjectionRow[];
-    sampledRows: CsvProjectionRow[];
+    rows: ProjectionRow[];
+    sampledRows: ProjectionRow[];
   };
-  accountSummaries: CsvProjectionAccountSummary[];
-  postingSummaries: CsvProjectionPostingSummary[];
+  accountSummaries: ProjectionAccountSummary[];
+  postingSummaries: ProjectionPostingSummary[];
   totals: {
     externalInflowAmount: number;
     externalOutflowAmount: number;

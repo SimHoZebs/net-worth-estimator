@@ -1,6 +1,6 @@
-import type { CsvAccount } from "../types/csv";
+import type { Account } from "../types/scenario";
 
-export function makeAccount(overrides: Partial<CsvAccount> & { id: string }): CsvAccount {
+export function makeAccount(overrides: Partial<Account> & { id: string }): Account {
   return {
     label: overrides.id,
     category: "",

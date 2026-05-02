@@ -1,29 +1,29 @@
 import type {
-  CsvProjectionResult,
-  CsvScenarioPack,
-  CsvScenarioWhatIfState,
+  ProjectionResult,
+  ScenarioPack,
+  ScenarioWhatIfState,
   ProjectionRuntimeSettings,
 } from "@/lib/projection";
 import type { StochasticConfig, StochasticProjectionResult } from "@/lib/projection";
 
-export interface CsvProjectionWorkerRequest {
+export interface ProjectionWorkerRequest {
   id: number;
-  pack: CsvScenarioPack;
+  pack: ScenarioPack;
   projectionSettings: ProjectionRuntimeSettings;
-  whatIfState: CsvScenarioWhatIfState;
+  whatIfState: ScenarioWhatIfState;
 }
 
-export interface CsvProjectionWorkerResponse {
+export interface ProjectionWorkerResponse {
   id: number;
-  result: CsvProjectionResult | null;
+  result: ProjectionResult | null;
   runtimeError: string | null;
 }
 
 export interface StochasticWorkerRequest {
   id: number;
-  pack: CsvScenarioPack;
+  pack: ScenarioPack;
   projectionSettings: ProjectionRuntimeSettings;
-  whatIfState: CsvScenarioWhatIfState;
+  whatIfState: ScenarioWhatIfState;
   config: StochasticConfig;
 }
 

@@ -1,9 +1,9 @@
-import type { CsvScenarioFileContents } from "../types/csv";
+import type { ScenarioFileContents } from "../types/scenario";
 
 const accountsHeader = "id,label,category,annualRate,volatility,minBalance,maxBalance,color,enabled";
 const postingsHeader = "id,label,sourceAccountId,destinations,amountMode,basePostingId,absBase,amount,annualGrowthRate,startDate,endDate,annualCap,priority,enabled";
 
-export const validCsvFiles: CsvScenarioFileContents = {
+export const validCsvFiles: ScenarioFileContents = {
   accounts: [
     accountsHeader,
     "checking,Checking,checking,0.01,0,,,#0f172a,true",

@@ -1,6 +1,6 @@
-import type { CsvPosting } from "../types/csv";
+import type { Posting } from "../types/scenario";
 
-export function makePosting(overrides: Partial<CsvPosting> & { id: string }): CsvPosting {
+export function makePosting(overrides: Partial<Posting> & { id: string }): Posting {
   return {
     label: overrides.id,
     sourceAccountId: null,

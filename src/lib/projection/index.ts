@@ -1,5 +1,6 @@
-export { fetchCsvScenarioFiles, loadCsvScenarioPack, parseCsvScenarioPack } from "./parse/csvLoader";
-export { projectCsvScenarioPack } from "./engine/csvProject";
+export { fetchCsvScenarioFiles, loadCsvScenarioPack, parseCsvScenarioPack } from "./sources/csv/csvLoader";
+export { createCsvDataSource } from "./sources/csv/csvDataSource";
+export { projectScenarioPack } from "./engine/scenarioProject";
 export { stochasticProject } from "./engine/stochasticProject";
 export { computePercentiles, reseed, sampleLogNormal } from "./utils/stochastic";
 export type {
@@ -16,35 +17,36 @@ export {
   csvDateSchema,
   csvPostingSchema,
   csvPostingsHeaders,
-} from "./parse/csvSchema";
+} from "./sources/csv/csvSchema";
 export {
   CSV_SCENARIO_FILE_NAMES,
-  CSV_SCENARIO_MODEL_VERSION,
+  SCENARIO_MODEL_VERSION,
   CSV_SCENARIO_PUBLIC_PATH,
   CSV_SCENARIO_REPO_PATH,
-} from "./types/csv";
-export { summarizeValidationIssues, validateCsvScenarioPack } from "./parse/csvValidation";
+} from "./types/scenario";
+export { summarizeValidationIssues, validateCsvScenarioPack } from "./sources/csv/csvValidation";
 export type {
   ScenarioPath,
   ScenarioValidationIssue,
   ScenarioValidationSeverity,
 } from "./types/validation";
+export type { DataSource, ScenarioParseResult } from "./dataSource";
 export type {
-  CsvAccount,
-  CsvCheckpoint,
-  CsvPosting,
-  CsvProjectionAccountSummary,
-  CsvProjectionPostingSummary,
-  CsvProjectionResult,
-  CsvProjectionRow,
-  CsvScenarioCollectionKey,
-  CsvScenarioFileContents,
-  CsvScenarioFileName,
-  CsvScenarioPack,
-  CsvScenarioWhatIfState,
+  Account,
+  Checkpoint,
+  Posting,
+  ProjectionAccountSummary,
+  ProjectionPostingSummary,
+  ProjectionResult,
+  ProjectionRow,
+  ScenarioCollectionKey,
+  ScenarioFileContents,
+  ScenarioFileName,
+  ScenarioPack,
+  ScenarioWhatIfState,
   IsoDate,
   PostingAmountMode,
   PostingOverrideMode,
   PostingWhatIfOverride,
   ProjectionRuntimeSettings,
-} from "./types/csv";
+} from "./types/scenario";

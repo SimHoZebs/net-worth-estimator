@@ -1,11 +1,11 @@
-import type { CsvPosting, CsvScenarioPack, CsvScenarioWhatIfState } from "@/lib/projection";
+import type { Posting, ScenarioPack, ScenarioWhatIfState } from "@/lib/projection";
 import { Button } from "@/components/ui/button";
 import { currency, formatRoute } from "@/lib/format";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 
-interface CsvPostingWhatIfControlsProps {
-  pack: CsvScenarioPack;
-  whatIfState: CsvScenarioWhatIfState;
+interface ContributionWhatIfControlsProps {
+  pack: ScenarioPack;
+  whatIfState: ScenarioWhatIfState;
   activeOverrideCount: number;
   onSetPostingMultiplier: (postingId: string, multiplier: number) => void;
   onClearPostingOverride: (postingId: string) => void;
@@ -17,7 +17,7 @@ const multiplierFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
-function describePosting(posting: CsvPosting) {
+function describePosting(posting: Posting) {
   if (posting.amountMode === "fixed") {
     return `Base amount ${currency.format(posting.amount)}`;
   }
@@ -25,7 +25,7 @@ function describePosting(posting: CsvPosting) {
   return `${Math.round(posting.amount * 100)}% of ${posting.basePostingId ?? "base posting"}`;
 }
 
-function describeRoute(posting: CsvPosting, pack: CsvScenarioPack) {
+function describeRoute(posting: Posting, pack: ScenarioPack) {
   const accountById = new Map(pack.accounts.map((a) => [a.id, a]));
   const sourceLabel = posting.sourceAccountId ? (accountById.get(posting.sourceAccountId)?.label ?? posting.sourceAccountId) : null;
   const destinations = posting.destinations
@@ -35,14 +35,14 @@ function describeRoute(posting: CsvPosting, pack: CsvScenarioPack) {
   return formatRoute(sourceLabel, destinations);
 }
 
-export function CsvPostingWhatIfControls({
+export function ContributionWhatIfControls({
   pack,
   whatIfState,
   activeOverrideCount,
   onSetPostingMultiplier,
   onClearPostingOverride,
   onResetAllOverrides,
-}: CsvPostingWhatIfControlsProps) {
+}: ContributionWhatIfControlsProps) {
   const enabledPostings = pack.postings.filter((posting) => posting.enabled);
 
   return (

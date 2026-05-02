@@ -10,18 +10,18 @@ import {
 } from "./csvSchema";
 import {
   CSV_SCENARIO_FILE_NAMES,
-  CSV_SCENARIO_MODEL_VERSION,
+  SCENARIO_MODEL_VERSION,
   CSV_SCENARIO_PUBLIC_PATH,
-  type CsvScenarioCollectionKey,
-  type CsvScenarioFileContents,
-  type CsvScenarioPack,
-} from "../types/csv";
+  type ScenarioCollectionKey,
+  type ScenarioFileContents,
+  type ScenarioPack,
+} from "../../types/scenario";
 import { validateCsvScenarioPack } from "./csvValidation";
-import type { ScenarioValidationIssue } from "../types/validation";
-import { addIssue } from "../utils/validation";
+import type { ScenarioValidationIssue } from "../../types/validation";
+import { addIssue } from "../../utils/validation";
 
 export interface CsvScenarioParseResult {
-  data: CsvScenarioPack | null;
+  data: ScenarioPack | null;
   issues: ScenarioValidationIssue[];
 }
 
@@ -102,7 +102,7 @@ function parseRows<TRow>(
 }
 
 export function parseCsvScenarioPack(
-  csvFiles: CsvScenarioFileContents,
+  csvFiles: ScenarioFileContents,
   options: Pick<CsvScenarioLoadOptions, "basePath"> = {}
 ): CsvScenarioParseResult {
   const accountsResult = parseRows(CSV_SCENARIO_FILE_NAMES.accounts, csvFiles.accounts, csvAccountsHeaders, csvAccountSchema);
@@ -123,8 +123,8 @@ export function parseCsvScenarioPack(
     return { data: null, issues };
   }
 
-  const pack: CsvScenarioPack = {
-    version: CSV_SCENARIO_MODEL_VERSION,
+  const pack: ScenarioPack = {
+    version: SCENARIO_MODEL_VERSION,
     sourcePath: options.basePath ?? CSV_SCENARIO_PUBLIC_PATH,
     accounts: accountsResult.rows,
     checkpoints: checkpointsResult.rows,
@@ -137,12 +137,12 @@ export function parseCsvScenarioPack(
   };
 }
 
-export async function fetchCsvScenarioFiles(options: CsvScenarioLoadOptions = {}): Promise<CsvScenarioFileContents> {
+export async function fetchCsvScenarioFiles(options: CsvScenarioLoadOptions = {}): Promise<ScenarioFileContents> {
   const fetchImpl = options.fetchImpl ?? fetch;
   const basePath = normalizeBasePath(options.basePath ?? CSV_SCENARIO_PUBLIC_PATH);
 
   const entries = await Promise.all(
-    (Object.entries(CSV_SCENARIO_FILE_NAMES) as Array<[CsvScenarioCollectionKey, string]>).map(async ([key, fileName]) => {
+    (Object.entries(CSV_SCENARIO_FILE_NAMES) as Array<[ScenarioCollectionKey, string]>).map(async ([key, fileName]) => {
       const response = await fetchImpl(`${basePath}/${fileName}`);
 
       if (!response.ok) {
@@ -153,7 +153,7 @@ export async function fetchCsvScenarioFiles(options: CsvScenarioLoadOptions = {}
     })
   );
 
-  const fileMap = Object.fromEntries(entries) as Record<CsvScenarioCollectionKey, string>;
+  const fileMap = Object.fromEntries(entries) as Record<ScenarioCollectionKey, string>;
 
   return {
     accounts: fileMap.accounts,

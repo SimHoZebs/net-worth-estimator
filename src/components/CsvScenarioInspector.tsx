@@ -1,5 +1,5 @@
 import { CSV_SCENARIO_PUBLIC_PATH } from "@/lib/projection";
-import type { CsvScenarioPack, ProjectionRuntimeSettings, ScenarioValidationIssue } from "@/lib/projection";
+import type { ScenarioPack, ProjectionRuntimeSettings, ScenarioValidationIssue } from "@/lib/projection";
 import { ScenarioValidationPanel } from "./ScenarioValidationPanel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { currency, integer, decimal, pluralize } from "@/lib/format";
 
-interface CsvScenarioInspectorProps {
-  pack: CsvScenarioPack | null;
+interface ScenarioInspectorProps {
+  pack: ScenarioPack | null;
   issues: ScenarioValidationIssue[];
   loadError: string | null;
   isLoading: boolean;
@@ -121,7 +121,7 @@ function DataTable<TRow extends object>({
   );
 }
 
-export function CsvScenarioInspector({
+export function ScenarioInspector({
   pack,
   issues,
   loadError,
@@ -130,7 +130,7 @@ export function CsvScenarioInspector({
   projectionSettings,
   projectionStartDate,
   onReload,
-}: CsvScenarioInspectorProps) {
+}: ScenarioInspectorProps) {
   const errorCount = issues.filter((issue) => issue.severity === "error").length;
   const warningCount = issues.filter((issue) => issue.severity === "warning").length;
   const shouldOpen = loadError !== null || issues.length > 0;
@@ -147,19 +147,19 @@ export function CsvScenarioInspector({
     <CollapsibleSection
       open={shouldOpen}
       title="Source data and validation"
-      description="Secondary inspection area for CSV health, runtime settings, and raw source tables."
+      description="Secondary inspection area for data health, runtime settings, and raw source tables."
       badge={`${loadStatus} • ${validationSummary}`}
     >
       <div className="space-y-5">
         <div className="flex justify-end">
           <Button type="button" variant="secondary" size="sm" onClick={onReload} disabled={isLoading}>
-            {isLoading ? "Loading..." : "Reload CSVs"}
+            {isLoading ? "Loading..." : "Reload"}
           </Button>
         </div>
 
         {loadError ? (
           <Alert variant="destructive" className="rounded-[1.6rem]">
-            <AlertTitle>CSV pack could not be loaded</AlertTitle>
+            <AlertTitle>Data pack could not be loaded</AlertTitle>
             <AlertDescription>{loadError}</AlertDescription>
           </Alert>
         ) : null}

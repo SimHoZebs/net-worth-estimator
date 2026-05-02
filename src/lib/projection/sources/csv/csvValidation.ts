@@ -1,7 +1,7 @@
-import { CSV_SCENARIO_FILE_NAMES } from "../types/csv";
-import type { CsvPosting, CsvScenarioPack } from "../types/csv";
-import type { ScenarioValidationIssue } from "../types/validation";
-import { addIssue, rowPath } from "../utils/validation";
+import { CSV_SCENARIO_FILE_NAMES } from "../../types/scenario";
+import type { Posting, ScenarioPack } from "../../types/scenario";
+import type { ScenarioValidationIssue } from "../../types/validation";
+import { addIssue, rowPath } from "../../utils/validation";
 
 function hasInvalidDateRange(startDate: string, endDate: string | null): boolean {
   return endDate !== null && Date.parse(endDate) < Date.parse(startDate);
@@ -34,7 +34,7 @@ function validateUniqueIds(
   });
 }
 
-function validatePostingBaseChains(issues: ScenarioValidationIssue[], postings: CsvPosting[], accountIds: Set<string>) {
+function validatePostingBaseChains(issues: ScenarioValidationIssue[], postings: Posting[], accountIds: Set<string>) {
   const postingById = new Map(postings.map((posting) => [posting.id, posting]));
 
   postings.forEach((posting, index) => {
@@ -104,7 +104,7 @@ function validatePostingBaseChains(issues: ScenarioValidationIssue[], postings: 
   });
 }
 
-function validatePostings(issues: ScenarioValidationIssue[], postings: CsvPosting[], accountIds: Set<string>) {
+function validatePostings(issues: ScenarioValidationIssue[], postings: Posting[], accountIds: Set<string>) {
   postings.forEach((posting, index) => {
     const rowNumber = index + 2;
 
@@ -182,7 +182,7 @@ function validatePostings(issues: ScenarioValidationIssue[], postings: CsvPostin
   });
 }
 
-export function validateCsvScenarioPack(pack: CsvScenarioPack): ScenarioValidationIssue[] {
+export function validateCsvScenarioPack(pack: ScenarioPack): ScenarioValidationIssue[] {
   const issues: ScenarioValidationIssue[] = [];
   const accountIds = new Set(pack.accounts.map((account) => account.id));
   const postingIds = new Set(pack.postings.map((posting) => posting.id));

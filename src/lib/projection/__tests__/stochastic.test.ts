@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computePercentiles,
   parseCsvScenarioPack,
-  projectCsvScenarioPack,
+  projectScenarioPack,
   reseed,
   sampleLogNormal,
   stochasticProject,
@@ -109,7 +109,7 @@ describe("stochastic projection", () => {
       { runCount: 100, seed: 42 }
     );
 
-    const deterministic = projectCsvScenarioPack(
+    const deterministic = projectScenarioPack(
       deterministicOnlyPack,
       { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 10 },
       { postingOverrides: {} }

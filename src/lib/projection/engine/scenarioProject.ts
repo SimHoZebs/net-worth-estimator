@@ -1,15 +1,15 @@
 import type {
-  CsvAccount,
-  CsvPosting,
-  CsvProjectionAccountSummary,
-  CsvProjectionPostingSummary,
-  CsvProjectionResult,
-  CsvProjectionRow,
-  CsvScenarioPack,
-  CsvScenarioWhatIfState,
+  Account,
+  Posting,
+  ProjectionAccountSummary,
+  ProjectionPostingSummary,
+  ProjectionResult,
+  ProjectionRow,
+  ScenarioPack,
+  ScenarioWhatIfState,
   IsoDate,
   ProjectionRuntimeSettings,
-} from "../types/csv";
+} from "../types/scenario";
 import { applyGrowth, computeNetWorth, initAccountBalances } from "./accountEngine";
 import {
   addMonthlyOccurrences,
@@ -23,7 +23,7 @@ import { addYearsClamped, compareIsoDates, daysBetween } from "../utils/date";
 interface NormalizedCheckpoints {
   dates: Array<{
     date: IsoDate;
-    checkpoints: CsvScenarioPack["checkpoints"];
+    checkpoints: ScenarioPack["checkpoints"];
   }>;
   earliestCheckpointDate: IsoDate | null;
   latestCheckpointDate: IsoDate | null;
@@ -33,11 +33,11 @@ function roundCurrency(value: number): number {
   return Math.round(value);
 }
 
-function normalizeCheckpoints(pack: CsvScenarioPack): NormalizedCheckpoints {
+function normalizeCheckpoints(pack: ScenarioPack): NormalizedCheckpoints {
   const checkpoints = pack.checkpoints
     .map((checkpoint, index) => ({ checkpoint, index }))
     .sort((left, right) => compareIsoDates(left.checkpoint.Date, right.checkpoint.Date) || left.index - right.index);
-  const groupedByDate = new Map<IsoDate, CsvScenarioPack["checkpoints"]>();
+  const groupedByDate = new Map<IsoDate, ScenarioPack["checkpoints"]>();
 
   checkpoints.forEach(({ checkpoint }) => {
     const existing = groupedByDate.get(checkpoint.Date);
@@ -79,7 +79,7 @@ function createRow({
   date: IsoDate;
   isHistorical: boolean;
   balances: Record<string, number>;
-  accounts: CsvAccount[];
+  accounts: Account[];
   externalInflowAmount: number;
   externalOutflowAmount: number;
   internalTransferAmount: number;
@@ -89,7 +89,7 @@ function createRow({
   growthNetWorthImpact: number;
   requestedPostingAmountsById: Record<string, number>;
   realizedPostingAmountsById: Record<string, number>;
-}): CsvProjectionRow {
+}): ProjectionRow {
   return {
     date,
     isHistorical,
@@ -107,7 +107,7 @@ function createRow({
   };
 }
 
-function roundRow(row: CsvProjectionRow): CsvProjectionRow {
+function roundRow(row: ProjectionRow): ProjectionRow {
   return {
     ...row,
     netWorth: roundCurrency(row.netWorth),
@@ -128,19 +128,19 @@ function roundRow(row: CsvProjectionRow): CsvProjectionRow {
   };
 }
 
-export function projectCsvScenarioPack(
-  pack: CsvScenarioPack,
+export function projectScenarioPack(
+  pack: ScenarioPack,
   projectionSettings: ProjectionRuntimeSettings,
-  whatIfState?: CsvScenarioWhatIfState,
+  whatIfState?: ScenarioWhatIfState,
   stochasticRates?: Map<string, number[]>
-): CsvProjectionResult {
-  const normalizedWhatIfState: CsvScenarioWhatIfState = whatIfState ?? { postingOverrides: {} };
+): ProjectionResult {
+  const normalizedWhatIfState: ScenarioWhatIfState = whatIfState ?? { postingOverrides: {} };
   const normalizedCheckpoints = normalizeCheckpoints(pack);
   const projectionStartDate = normalizedCheckpoints.latestCheckpointDate ?? projectionSettings.fallbackProjectionStartDate;
   const projectionEndDate = addYearsClamped(projectionStartDate, projectionSettings.horizonYears);
   const includeStartDateEvents = normalizedCheckpoints.latestCheckpointDate === null;
   const accountById = new Map(pack.accounts.map((account) => [account.id, account]));
-  const rows: CsvProjectionRow[] = [];
+  const rows: ProjectionRow[] = [];
   const balances = initAccountBalances(pack.accounts);
   const futureStartingBalances = initAccountBalances(pack.accounts);
   const latestRealizedPostingAmountById = new Map<string, number>();
@@ -290,7 +290,7 @@ export function projectCsvScenarioPack(
   const currentNetWorth = latestHistoricalRow?.netWorth ?? computeNetWorth(futureStartingBalances, pack.accounts);
   const hitTargetRow = rows.find((row) => !row.isHistorical && row.netWorth >= projectionSettings.targetNetWorth) ?? null;
 
-  const accountSummaries: CsvProjectionAccountSummary[] = pack.accounts.map((account) => {
+  const accountSummaries: ProjectionAccountSummary[] = pack.accounts.map((account) => {
     const endingBalance = latestRow?.accountBalances[account.id] ?? futureStartingBalances[account.id] ?? 0;
     const startingBalance = futureStartingBalances[account.id] ?? 0;
 
@@ -305,7 +305,7 @@ export function projectCsvScenarioPack(
     };
   });
 
-  const postingSummaries: CsvProjectionPostingSummary[] = pack.postings.map((posting) => {
+  const postingSummaries: ProjectionPostingSummary[] = pack.postings.map((posting) => {
     const requestedAmount = requestedPostingTotalsById.get(posting.id) ?? 0;
     const realizedAmount = realizedPostingTotalsById.get(posting.id) ?? 0;
 

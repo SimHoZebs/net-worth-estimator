@@ -1,4 +1,4 @@
-import type { CsvProjectionResult, IsoDate } from "./csv";
+import type { ProjectionResult, IsoDate } from "./scenario";
 
 export interface StochasticConfig {
   runCount: number;
@@ -21,7 +21,7 @@ export interface StochasticBandRow {
 
 export interface StochasticProjectionResult {
   config: StochasticConfig;
-  deterministic: CsvProjectionResult;
+  deterministic: ProjectionResult;
   bands: StochasticBandRow[];
   milestones: {
     hitTargetProbability: number;

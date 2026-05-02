@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type {
-  CsvAccount,
-  CsvCheckpoint,
-  CsvPosting,
-} from "../types/csv";
+  Account,
+  Checkpoint,
+  Posting,
+} from "../../types/scenario";
 
 function parseNumber(value: unknown) {
   if (typeof value === "number") {
@@ -119,13 +119,13 @@ export const csvAccountSchema = z.object({
   maxBalance: nullableNumber,
   color: nullableTrimmedString,
   enabled: csvBoolean,
-}) satisfies z.ZodType<CsvAccount>;
+}) satisfies z.ZodType<Account>;
 
 export const csvCheckpointSchema = z.object({
   Date: csvDateSchema,
   AccountId: trimmedString,
   Balance: finiteNumber,
-}) satisfies z.ZodType<CsvCheckpoint>;
+}) satisfies z.ZodType<Checkpoint>;
 
 export const csvPostingSchema = z.object({
   id: trimmedString,

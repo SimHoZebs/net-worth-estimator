@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import type {
-  CsvScenarioPack,
-  CsvScenarioWhatIfState,
+  ScenarioPack,
+  ScenarioWhatIfState,
   ProjectionRuntimeSettings,
 } from "@/lib/projection";
 import type { StochasticConfig, StochasticProjectionResult } from "@/lib/projection";
@@ -9,9 +9,9 @@ import { useWorkerProjection } from "./workerFoundation";
 import type { WorkerProjectionState } from "./workerFoundation";
 
 export function useStochasticWorker(
-  pack: CsvScenarioPack | null,
+  pack: ScenarioPack | null,
   projectionSettings: ProjectionRuntimeSettings,
-  whatIfState: CsvScenarioWhatIfState,
+  whatIfState: ScenarioWhatIfState,
   config: StochasticConfig | null,
   enabled: boolean
 ): WorkerProjectionState<StochasticProjectionResult> {
