@@ -2,9 +2,22 @@ import { CSV_SCENARIO_FILE_NAMES } from "../types/csv";
 import type { CsvPosting, CsvScenarioPack } from "../types/csv";
 import type { ScenarioValidationIssue } from "../types/validation";
 import { addIssue, rowPath } from "../utils/validation";
+import { ParseError, parseArithmetic } from "../engine/arithmetic";
 
 function hasInvalidDateRange(startDate: string, endDate: string | null): boolean {
   return endDate !== null && Date.parse(endDate) < Date.parse(startDate);
+}
+
+function extractIdentifiers(arithmetic: string): string[] {
+  const ids: string[] = [];
+  const regex = /[a-zA-Z_][a-zA-Z0-9_]*/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(arithmetic)) !== null) {
+    if (match[0] !== "abs") {
+      ids.push(match[0]);
+    }
+  }
+  return ids;
 }
 
 function validateUniqueIds(
@@ -34,72 +47,100 @@ function validateUniqueIds(
   });
 }
 
-function validatePostingBaseChains(issues: ScenarioValidationIssue[], postings: CsvPosting[], accountIds: Set<string>) {
+function validatePostingArithmetic(
+  issues: ScenarioValidationIssue[],
+  postings: CsvPosting[],
+  accountIds: Set<string>
+) {
+  const allowedIds = new Set([
+    ...postings.map((p) => p.id),
+    ...accountIds,
+  ]);
+
   const postingById = new Map(postings.map((posting) => [posting.id, posting]));
 
   postings.forEach((posting, index) => {
     const rowNumber = index + 2;
+    const fileName = CSV_SCENARIO_FILE_NAMES.postings;
 
-    if (posting.amountMode === "percent_of_base" && posting.basePostingId === null) {
-      addIssue(
-        issues,
-        "error",
-        "posting.base.required",
-        "Postings in percent_of_base mode must set basePostingId.",
-        rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber, "basePostingId")
-      );
-    }
-
-    if (posting.amountMode === "fixed" && posting.basePostingId !== null) {
-      addIssue(
-        issues,
-        "error",
-        "posting.base.unexpected",
-        "Postings in fixed mode must leave basePostingId blank.",
-        rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber, "basePostingId")
-      );
-    }
-
-    if (posting.basePostingId === null) {
+    try {
+      parseArithmetic(posting.arithmetic);
+    } catch (err) {
+      if (err instanceof ParseError) {
+        addIssue(
+          issues,
+          "error",
+          "posting.arithmetic.parse",
+          `Could not parse arithmetic expression: ${err.message}`,
+          rowPath(fileName, rowNumber, "arithmetic")
+        );
+      }
       return;
     }
 
-    if (accountIds.has(posting.basePostingId)) {
-      return;
-    }
+    const identifiers = extractIdentifiers(posting.arithmetic);
 
-    if (!postingById.has(posting.basePostingId)) {
+    identifiers.forEach((ident) => {
+      if (!allowedIds.has(ident)) {
+        addIssue(
+          issues,
+          "error",
+          "posting.arithmetic.unknown_identifier",
+          `Identifier '${ident}' is not a posting or account ID.`,
+          rowPath(fileName, rowNumber, "arithmetic")
+        );
+      }
+    });
+
+    const postingsRefd = identifiers.filter(
+      (ident) => !accountIds.has(ident) && postingById.has(ident)
+    );
+
+    if (postingsRefd.includes(posting.id)) {
       addIssue(
         issues,
         "error",
-        "posting.base.missing",
-        `Base posting '${posting.basePostingId}' does not exist.`,
-        rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber, "basePostingId")
+        "posting.arithmetic.self_reference",
+        `Arithmetic expression references the posting's own ID '${posting.id}'.`,
+        rowPath(fileName, rowNumber, "arithmetic")
       );
       return;
     }
 
     const visitedIds = new Set<string>([posting.id]);
-    let currentBaseId: string | null = posting.basePostingId;
 
-    while (currentBaseId !== null) {
-      if (accountIds.has(currentBaseId)) {
-        break;
+    for (const refId of postingsRefd) {
+      let currentId: string | null = refId;
+
+      while (currentId !== null) {
+        if (visitedIds.has(currentId)) {
+          addIssue(
+            issues,
+            "error",
+            "posting.arithmetic.circular",
+            `Arithmetic expression for '${posting.id}' creates a circular dependency chain.`,
+            rowPath(fileName, rowNumber, "arithmetic")
+          );
+          return;
+        }
+
+        visitedIds.add(currentId);
+
+        const refPosting = postingById.get(currentId);
+        if (!refPosting) {
+          break;
+        }
+
+        const refIdentifiers = extractIdentifiers(refPosting.arithmetic);
+        currentId = null;
+
+        for (const nextId of refIdentifiers) {
+          if (!accountIds.has(nextId) && postingById.has(nextId)) {
+            currentId = nextId;
+            break;
+          }
+        }
       }
-
-      if (visitedIds.has(currentBaseId)) {
-        addIssue(
-          issues,
-          "error",
-          "posting.base.circular",
-          `Base posting chain for '${posting.id}' is circular.`,
-          rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber, "basePostingId")
-        );
-        return;
-      }
-
-      visitedIds.add(currentBaseId);
-      currentBaseId = postingById.get(currentBaseId)?.basePostingId ?? null;
     }
   });
 }
@@ -214,7 +255,7 @@ export function validateCsvScenarioPack(pack: CsvScenarioPack): ScenarioValidati
     }
   });
 
-  validatePostingBaseChains(issues, pack.postings, accountIds);
+  validatePostingArithmetic(issues, pack.postings, accountIds);
   validatePostings(issues, pack.postings, accountIds);
 
   pack.accounts.forEach((account, index) => {

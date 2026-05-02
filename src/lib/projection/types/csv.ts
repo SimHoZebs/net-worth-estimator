@@ -1,4 +1,4 @@
-export const CSV_SCENARIO_MODEL_VERSION = 7 as const;
+export const CSV_SCENARIO_MODEL_VERSION = 8 as const;
 
 export const CSV_SCENARIO_REPO_PATH = "public/scenario";
 export const CSV_SCENARIO_PUBLIC_PATH = "/scenario";
@@ -13,7 +13,6 @@ export type CsvScenarioCollectionKey = keyof typeof CSV_SCENARIO_FILE_NAMES;
 export type CsvScenarioFileName = (typeof CSV_SCENARIO_FILE_NAMES)[CsvScenarioCollectionKey];
 
 export type IsoDate = string;
-export type PostingAmountMode = "fixed" | "percent_of_base";
 export type PostingOverrideMode = "amount" | "multiplier";
 
 export interface ProjectionRuntimeSettings {
@@ -45,10 +44,7 @@ export interface CsvPosting {
   label: string;
   sourceAccountId: string | null;
   destinations: string[] | null;
-  amountMode: PostingAmountMode;
-  basePostingId: string | null;
-  absBase: boolean;
-  amount: number;
+  arithmetic: string;
   annualGrowthRate: number;
   startDate: IsoDate;
   endDate: IsoDate | null;

@@ -80,9 +80,6 @@ const positiveInteger = z.preprocess(parseNumber, z.number().int().min(1));
 const csvBoolean = z.preprocess(parseBoolean, z.boolean());
 const trimmedString = z.string().trim().min(1);
 const nullableTrimmedString = z.preprocess(parseNullableString, z.string().trim().min(1).nullable());
-export function trimmedEnum<T extends [string, ...string[]]>(values: T) {
-  return z.enum(values);
-}
 
 export const csvDateSchema = z
   .string()
@@ -97,10 +94,7 @@ export const csvPostingsHeaders = [
   "label",
   "sourceAccountId",
   "destinations",
-  "amountMode",
-  "basePostingId",
-  "absBase",
-  "amount",
+  "arithmetic",
   "annualGrowthRate",
   "startDate",
   "endDate",
@@ -132,10 +126,7 @@ export const csvPostingSchema = z.object({
   label: trimmedString,
   sourceAccountId: nullableTrimmedString,
   destinations: z.preprocess(parseDestinationsArray, z.array(trimmedString).nullable()),
-  amountMode: trimmedEnum(["fixed", "percent_of_base"] as const),
-  basePostingId: nullableTrimmedString,
-  absBase: csvBoolean,
-  amount: nonNegativeNumber,
+  arithmetic: trimmedString,
   annualGrowthRate: finiteNumber,
   startDate: csvDateSchema,
   endDate: z.preprocess(parseNullableString, csvDateSchema.nullable()),

@@ -43,7 +43,6 @@ export type {
   CsvScenarioPack,
   CsvScenarioWhatIfState,
   IsoDate,
-  PostingAmountMode,
   PostingOverrideMode,
   PostingWhatIfOverride,
   ProjectionRuntimeSettings,
