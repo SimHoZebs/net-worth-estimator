@@ -13,6 +13,70 @@ export function buildBalanceChartData(pack: ScenarioPack, result: ProjectionResu
   }));
 }
 
+export function buildAccountDiagnosticChartData(
+  pack: ScenarioPack,
+  result: ProjectionResult,
+  stochasticResult?: StochasticProjectionResult | null,
+) {
+  const enabledAccounts = pack.accounts.filter((a) => a.enabled);
+  const hasStochastic = stochasticResult != null;
+
+  const bandByDate = hasStochastic
+    ? new Map(stochasticResult.bands.map((b) => [b.date, b]))
+    : null;
+
+  return result.timeline.sampledRows.map((row) => {
+    const entry: Record<string, string | number> = {
+      date: row.date,
+      netWorth: row.netWorth,
+    };
+
+    for (const account of enabledAccounts) {
+      entry[account.id] = row.accountBalances[account.id] ?? 0;
+    }
+
+    if (bandByDate) {
+      const band = bandByDate.get(row.date);
+      if (band) {
+        entry.p10_base = band.netWorth.p10;
+        entry.outerThickness = band.netWorth.p90 - band.netWorth.p10;
+        entry.p25_base = band.netWorth.p25;
+        entry.innerThickness = band.netWorth.p75 - band.netWorth.p25;
+        entry.p50 = band.netWorth.p50;
+        entry._p10 = band.netWorth.p10;
+        entry._p90 = band.netWorth.p90;
+        entry._p25 = band.netWorth.p25;
+        entry._p75 = band.netWorth.p75;
+        entry._hasStochastic = 1;
+      } else {
+        entry.p10_base = row.netWorth;
+        entry.outerThickness = 0;
+        entry.p25_base = row.netWorth;
+        entry.innerThickness = 0;
+        entry.p50 = row.netWorth;
+        entry._p10 = row.netWorth;
+        entry._p90 = row.netWorth;
+        entry._p25 = row.netWorth;
+        entry._p75 = row.netWorth;
+        entry._hasStochastic = 0;
+      }
+    } else {
+      entry.p10_base = row.netWorth;
+      entry.outerThickness = 0;
+      entry.p25_base = row.netWorth;
+      entry.innerThickness = 0;
+      entry.p50 = row.netWorth;
+      entry._p10 = row.netWorth;
+      entry._p90 = row.netWorth;
+      entry._p25 = row.netWorth;
+      entry._p75 = row.netWorth;
+      entry._hasStochastic = 0;
+    }
+
+    return entry;
+  });
+}
+
 export interface StochasticChartRow {
   date: string;
   p10_base: number;
