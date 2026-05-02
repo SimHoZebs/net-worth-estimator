@@ -1,8 +1,8 @@
-import type { CsvAccount } from "../types/csv";
+import type { Account } from "../types/scenario";
 
 const DAYS_PER_YEAR = 365;
 
-export function initAccountBalances(accounts: CsvAccount[]): Record<string, number> {
+export function initAccountBalances(accounts: Account[]): Record<string, number> {
   return Object.fromEntries(accounts.map((account) => [account.id, account.openingBalance]));
 }
 
@@ -10,7 +10,7 @@ export function snapshotBalances(balances: Record<string, number>): Record<strin
   return { ...balances };
 }
 
-export function computeNetWorth(balances: Record<string, number>, accounts: CsvAccount[]): number {
+export function computeNetWorth(balances: Record<string, number>, accounts: Account[]): number {
   return accounts.reduce((total, account) => {
     if (!account.enabled) {
       return total;
@@ -50,7 +50,7 @@ function applyYearlyGrowth(
 
 export function applyGrowth(
   balances: Record<string, number>,
-  accounts: CsvAccount[],
+  accounts: Account[],
   daysElapsed: number,
   fromDate?: string,
   projectionStartDate?: string,
@@ -99,7 +99,7 @@ export function applyGrowth(
 
 export function getWithdrawableAmount(
   balances: Record<string, number>,
-  accountById: Map<string, CsvAccount>,
+  accountById: Map<string, Account>,
   accountId: string
 ): number {
   const account = accountById.get(accountId);
@@ -112,7 +112,7 @@ export function getWithdrawableAmount(
 
 export function getHeadroom(
   balances: Record<string, number>,
-  accountById: Map<string, CsvAccount>,
+  accountById: Map<string, Account>,
   accountId: string
 ): number {
   const account = accountById.get(accountId);
@@ -125,7 +125,7 @@ export function getHeadroom(
 
 export function getTotalDestinationHeadroom(
   balances: Record<string, number>,
-  accountById: Map<string, CsvAccount>,
+  accountById: Map<string, Account>,
   destIds: string[]
 ): number {
   return destIds.reduce((total, destId) => {

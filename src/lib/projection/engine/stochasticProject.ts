@@ -1,13 +1,13 @@
 import type {
-  CsvScenarioPack,
-  CsvScenarioWhatIfState,
+  ScenarioPack,
+  ScenarioWhatIfState,
   ProjectionRuntimeSettings,
-} from "../types/csv";
-import { projectCsvScenarioPack } from "./csvProject";
+} from "../types/scenario";
+import { projectScenarioPack } from "./scenarioProject";
 import type { StochasticBandRow, StochasticConfig, StochasticProjectionResult } from "../types/stochastic";
 import { computePercentiles, reseed, sampleLogNormal } from "../utils/stochastic";
 
-function clonePack(pack: CsvScenarioPack): CsvScenarioPack {
+function clonePack(pack: ScenarioPack): ScenarioPack {
   return {
     ...pack,
     accounts: pack.accounts.map((a) => ({ ...a })),
@@ -29,7 +29,7 @@ function generateYearlyRates(
 }
 
 function buildStochasticRates(
-  pack: CsvScenarioPack,
+  pack: ScenarioPack,
   projectionSettings: ProjectionRuntimeSettings
 ): Map<string, number[]> {
   const rates = new Map<string, number[]>();
@@ -52,12 +52,12 @@ interface NetWorthSnapshot {
 }
 
 function runAndExtract(
-  pack: CsvScenarioPack,
+  pack: ScenarioPack,
   projectionSettings: ProjectionRuntimeSettings,
-  whatIfState: CsvScenarioWhatIfState,
+  whatIfState: ScenarioWhatIfState,
   stochasticRates: Map<string, number[]>
 ): NetWorthSnapshot[] {
-  const result = projectCsvScenarioPack(pack, projectionSettings, whatIfState, stochasticRates);
+  const result = projectScenarioPack(pack, projectionSettings, whatIfState, stochasticRates);
   return result.timeline.rows.map((row) => ({
     date: row.date,
     netWorth: row.netWorth,
@@ -99,13 +99,13 @@ function buildBands(snapshotsByRun: NetWorthSnapshot[][], sortedDates: string[])
 }
 
 export function stochasticProject(
-  pack: CsvScenarioPack,
+  pack: ScenarioPack,
   projectionSettings: ProjectionRuntimeSettings,
-  whatIfState: CsvScenarioWhatIfState,
+  whatIfState: ScenarioWhatIfState,
   config: StochasticConfig
 ): StochasticProjectionResult {
   reseed(config.seed);
-  const deterministic = projectCsvScenarioPack(pack, projectionSettings, whatIfState);
+  const deterministic = projectScenarioPack(pack, projectionSettings, whatIfState);
 
   const snapshotsByRun: NetWorthSnapshot[][] = [];
 

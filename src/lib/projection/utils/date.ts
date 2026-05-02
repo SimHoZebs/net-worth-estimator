@@ -1,4 +1,4 @@
-import type { IsoDate } from "../types/csv";
+import type { IsoDate } from "../types/scenario";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 

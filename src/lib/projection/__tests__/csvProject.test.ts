@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { projectCsvScenarioPack } from "../";
-import type { CsvScenarioWhatIfState } from "../";
+import { projectScenarioPack } from "../";
+import type { ScenarioWhatIfState } from "../";
 import { createBasePack, makeAccount, makePosting, makeSettings } from "../__fixtures__";
 
 describe("CSV projection engine", () => {
   it("builds dated checkpoint rows and future event rows from real postings", () => {
-    const result = projectCsvScenarioPack(createBasePack(), makeSettings());
+    const result = projectScenarioPack(createBasePack(), makeSettings());
 
     expect(result.timeline.rows.map((row) => row.date)).toEqual([
       "2026-01-31",
@@ -43,7 +43,7 @@ describe("CSV projection engine", () => {
       ],
     });
 
-    const result = projectCsvScenarioPack(pack, makeSettings({ horizonYears: 2 }));
+    const result = projectScenarioPack(pack, makeSettings({ horizonYears: 2 }));
     const rowByDate = new Map(result.timeline.rows.map((row) => [row.date, row]));
 
     expect(rowByDate.get("2026-01-15")?.realizedPostingAmount).toBe(200);
@@ -67,7 +67,7 @@ describe("CSV projection engine", () => {
       ],
     });
 
-    const result = projectCsvScenarioPack(pack, makeSettings());
+    const result = projectScenarioPack(pack, makeSettings());
 
     expect(result.timeline.rows[0]?.requestedPostingAmountsById.employee_k401).toBe(100);
     expect(result.timeline.rows[0]?.requestedPostingAmountsById.employer_match).toBe(50);
@@ -88,7 +88,7 @@ describe("CSV projection engine", () => {
       ],
     });
 
-    const result = projectCsvScenarioPack(pack, makeSettings());
+    const result = projectScenarioPack(pack, makeSettings());
 
     expect(result.timeline.rows[0]?.requestedPostingAmount).toBe(400);
     expect(result.timeline.rows[0]?.realizedPostingAmount).toBe(250);
@@ -109,7 +109,7 @@ describe("CSV projection engine", () => {
       ],
     });
 
-    const result = projectCsvScenarioPack(pack, makeSettings());
+    const result = projectScenarioPack(pack, makeSettings());
 
     expect(result.timeline.rows[0]?.accountBalances.loan).toBe(-1212);
     expect(result.timeline.rows[0]?.growthNetWorthImpact).toBe(-12);
@@ -118,7 +118,7 @@ describe("CSV projection engine", () => {
 
   it("applies temporary multiplier overrides without mutating the pack", () => {
     const pack = createBasePack();
-    const whatIfState: CsvScenarioWhatIfState = {
+    const whatIfState: ScenarioWhatIfState = {
       postingOverrides: {
         invest: {
           postingId: "invest",
@@ -128,7 +128,7 @@ describe("CSV projection engine", () => {
       },
     };
 
-    const result = projectCsvScenarioPack(pack, makeSettings(), whatIfState);
+    const result = projectScenarioPack(pack, makeSettings(), whatIfState);
 
     expect(pack.postings[2]?.amount).toBe(900);
     expect(result.timeline.rows[3]?.requestedPostingAmount).toBe(1800);
@@ -148,7 +148,7 @@ describe("CSV projection engine", () => {
       ],
     });
 
-    const result = projectCsvScenarioPack(pack, makeSettings());
+    const result = projectScenarioPack(pack, makeSettings());
 
     expect(result.timeline.rows[0]?.requestedPostingAmount).toBe(400);
     expect(result.timeline.rows[0]?.realizedPostingAmount).toBe(300);
@@ -170,7 +170,7 @@ describe("CSV projection engine", () => {
       ],
     });
 
-    const result = projectCsvScenarioPack(pack, makeSettings());
+    const result = projectScenarioPack(pack, makeSettings());
 
     expect(result.timeline.rows[0]?.realizedPostingAmount).toBe(200);
     expect(result.timeline.rows[0]?.clampedPostingShortfallAmount).toBe(200);

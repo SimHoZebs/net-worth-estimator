@@ -1,20 +1,20 @@
-import type { CsvPosting, CsvScenarioWhatIfState, IsoDate } from "../types/csv";
+import type { Posting, ScenarioWhatIfState, IsoDate } from "../types/scenario";
 import {
   getHeadroom,
   getTotalDestinationHeadroom,
   getWithdrawableAmount,
 } from "./accountEngine";
-import type { CsvAccount } from "../types/csv";
+import type { Account } from "../types/scenario";
 import { addMonthsClamped, compareIsoDates } from "../utils/date";
 
 export interface DatedPostingOccurrence {
-  posting: CsvPosting;
+  posting: Posting;
   monthsElapsed: number;
   index: number;
 }
 
 export function addMonthlyOccurrences(
-  postings: CsvPosting[],
+  postings: Posting[],
   eventDates: Map<IsoDate, DatedPostingOccurrence[]>,
   projectionStartDate: IsoDate,
   projectionEndDate: IsoDate,
@@ -66,7 +66,7 @@ export function computeRequestedAmount(
   occurrence: DatedPostingOccurrence,
   latestRealizedPostingAmountById: Map<string, number>,
   balances: Record<string, number>,
-  whatIfState: CsvScenarioWhatIfState
+  whatIfState: ScenarioWhatIfState
 ): number {
   const { posting, monthsElapsed } = occurrence;
   const override = whatIfState.postingOverrides[posting.id];
@@ -100,11 +100,11 @@ export function computeRequestedAmount(
 }
 
 export function resolvePostingAmount(
-  posting: CsvPosting,
+  posting: Posting,
   requestedAmount: number,
   annualCapRemaining: number,
   balances: Record<string, number>,
-  accountById: Map<string, CsvAccount>
+  accountById: Map<string, Account>
 ): number {
   if (requestedAmount <= 0) {
     return 0;
@@ -126,10 +126,10 @@ export function resolvePostingAmount(
 }
 
 export function applyPosting(
-  posting: CsvPosting,
+  posting: Posting,
   realizedAmount: number,
   balances: Record<string, number>,
-  accountById: Map<string, CsvAccount>
+  accountById: Map<string, Account>
 ): void {
   if (realizedAmount <= 0) {
     return;

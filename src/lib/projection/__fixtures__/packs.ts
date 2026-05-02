@@ -1,8 +1,8 @@
-import type { CsvScenarioPack } from "../types/csv";
+import type { ScenarioPack } from "../types/scenario";
 import { makeAccount } from "./accounts";
 import { makePosting } from "./postings";
 
-export function createBasePack(overrides: Partial<CsvScenarioPack> = {}): CsvScenarioPack {
+export function createBasePack(overrides: Partial<ScenarioPack> = {}): ScenarioPack {
   return {
     version: 7,
     sourcePath: "/scenario",

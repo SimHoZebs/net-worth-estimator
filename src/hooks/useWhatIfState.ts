@@ -1,14 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
-import type { CsvScenarioWhatIfState } from "@/lib/projection";
+import type { ScenarioWhatIfState } from "@/lib/projection";
 
 const DEFAULT_MULTIPLIER = 1;
 
-const initialState: CsvScenarioWhatIfState = {
+const initialState: ScenarioWhatIfState = {
   postingOverrides: {},
 };
 
-export function useCsvWhatIfState() {
-  const [state, setState] = useState<CsvScenarioWhatIfState>(initialState);
+export function useWhatIfState() {
+  const [state, setState] = useState<ScenarioWhatIfState>(initialState);
 
   const setPostingMultiplier = useCallback((postingId: string, multiplier: number) => {
     setState((current) => {

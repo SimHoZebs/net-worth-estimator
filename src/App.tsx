@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { CsvScenarioInspector } from "./components/CsvScenarioInspector";
-import { CsvProjectionDashboard } from "./components/CsvProjectionDashboard";
-import { CsvPostingWhatIfControls } from "./components/CsvContributionWhatIfControls";
+import { ScenarioInspector } from "./components/CsvScenarioInspector";
+import { ProjectionDashboard } from "./components/CsvProjectionDashboard";
+import { ContributionWhatIfControls } from "./components/CsvContributionWhatIfControls";
 import { StochasticControls } from "./components/StochasticControls";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
-import { useCsvWhatIfState } from "./hooks/useCsvWhatIfState";
-import { useCsvProjectionWorker } from "./hooks/useCsvProjectionWorker";
-import { useCsvScenarioPack } from "./hooks/useCsvScenarioPack";
+import { useWhatIfState } from "./hooks/useWhatIfState";
+import { useProjectionWorker } from "./hooks/useProjectionWorker";
+import { useScenarioPack } from "./hooks/useScenarioPack";
 import { useStochasticWorker } from "./hooks/useStochasticWorker";
-import { summarizeValidationIssues } from "./lib/projection";
+import { createCsvDataSource, summarizeValidationIssues } from "./lib/projection";
 import type { StochasticConfig } from "./lib/projection";
 
 const DEFAULT_TARGET_NET_WORTH = 1_000_000;
@@ -21,7 +21,8 @@ function formatTodayIsoDate() {
 }
 
 export default function App() {
-  const { pack, issues, loadError, isLoading, loadedAt, reload } = useCsvScenarioPack();
+  const dataSource = useMemo(() => createCsvDataSource(), []);
+  const { pack, issues, loadError, isLoading, loadedAt, reload } = useScenarioPack(dataSource);
   const [targetNetWorthInput, setTargetNetWorthInput] = useState(String(DEFAULT_TARGET_NET_WORTH));
   const {
     state: whatIfState,
@@ -29,7 +30,7 @@ export default function App() {
     setPostingMultiplier,
     clearPostingOverride,
     resetAllOverrides,
-  } = useCsvWhatIfState();
+  } = useWhatIfState();
   const validation = summarizeValidationIssues(issues);
   const fallbackProjectionStartDate = useMemo(() => formatTodayIsoDate(), []);
   const targetNetWorth = Number.isFinite(Number(targetNetWorthInput)) ? Number(targetNetWorthInput) : 0;
@@ -45,7 +46,7 @@ export default function App() {
     (latestDate, checkpoint) => latestDate === null || checkpoint.Date > latestDate ? checkpoint.Date : latestDate,
     null
   ) ?? fallbackProjectionStartDate;
-  const { result, runtimeError, isRunning: isProjecting } = useCsvProjectionWorker(pack, projectionSettings, whatIfState, validation.isValid);
+  const { result, runtimeError, isRunning: isProjecting } = useProjectionWorker(pack, projectionSettings, whatIfState, validation.isValid);
 
   const hasStochasticAccounts = pack !== null && pack.accounts.some((a) => a.volatility > 0 && a.enabled);
   const [stochasticEnabled, setStochasticEnabled] = useState(false);
@@ -75,7 +76,7 @@ export default function App() {
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8 md:py-8">
         <div className="flex justify-end">
           <Button type="button" variant="ghost" size="sm" onClick={() => void reload()} disabled={isLoading}>
-            {isLoading ? "Loading..." : "Reload CSVs"}
+            {isLoading ? "Loading..." : "Reload"}
           </Button>
         </div>
 
@@ -83,16 +84,16 @@ export default function App() {
           <Alert className="rounded-[1.6rem] border-amber-200 bg-amber-50 text-amber-950">
             <AlertTitle>Updating projection</AlertTitle>
             <AlertDescription className="text-amber-950/80">
-              Recomputing historical and projected balances from the loaded CSV pack{activeOverrideCount > 0 ? ` with ${activeOverrideCount} temporary override${activeOverrideCount === 1 ? "" : "s"}` : ""}.
+              Recomputing historical and projected balances from the loaded data pack{activeOverrideCount > 0 ? ` with ${activeOverrideCount} temporary override${activeOverrideCount === 1 ? "" : "s"}` : ""}.
             </AlertDescription>
           </Alert>
         ) : null}
 
         {!validation.isValid ? (
             <Alert variant="destructive" className="rounded-[1.6rem]">
-              <AlertTitle>Projection blocked by CSV validation errors</AlertTitle>
+              <AlertTitle>Projection blocked by validation errors</AlertTitle>
               <AlertDescription>
-                Fix the CSV pack issues above, then reload the data to resume projection.
+                Fix the data pack issues above, then reload the data to resume projection.
               </AlertDescription>
             </Alert>
         ) : null}
@@ -112,7 +113,7 @@ export default function App() {
         ) : null}
 
         {pack && validation.isValid && result ? (
-          <CsvProjectionDashboard
+          <ProjectionDashboard
             pack={pack}
             result={result}
             whatIfState={whatIfState}
@@ -121,7 +122,7 @@ export default function App() {
             onTargetNetWorthInputChange={setTargetNetWorthInput}
             stochasticResult={stochasticResult}
           >
-            <CsvPostingWhatIfControls
+            <ContributionWhatIfControls
               pack={pack}
               whatIfState={whatIfState}
               activeOverrideCount={activeOverrideCount}
@@ -129,7 +130,7 @@ export default function App() {
               onClearPostingOverride={clearPostingOverride}
               onResetAllOverrides={resetAllOverrides}
             />
-          </CsvProjectionDashboard>
+          </ProjectionDashboard>
         ) : null}
 
         {pack && validation.isValid && result ? (
@@ -144,7 +145,7 @@ export default function App() {
           />
         ) : null}
 
-        <CsvScenarioInspector
+        <ScenarioInspector
           pack={pack}
           issues={issues}
           loadError={loadError}

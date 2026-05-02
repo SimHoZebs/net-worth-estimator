@@ -15,10 +15,10 @@ import {
   YAxis,
 } from "recharts";
 import type {
-  CsvProjectionResult,
-  CsvProjectionRow,
-  CsvScenarioPack,
-  CsvScenarioWhatIfState,
+  ProjectionResult,
+  ProjectionRow,
+  ScenarioPack,
+  ScenarioWhatIfState,
   ProjectionRuntimeSettings,
 } from "@/lib/projection";
 import type { StochasticProjectionResult } from "@/lib/projection";
@@ -32,10 +32,10 @@ import { DriverCard } from "./dashboard/DriverCard";
 import { buildBalanceChartData, buildStochasticChartData } from "@/chart/chartData";
 import { formatRoute } from "@/lib/format";
 
-interface CsvProjectionDashboardProps {
-  pack: CsvScenarioPack;
-  result: CsvProjectionResult;
-  whatIfState: CsvScenarioWhatIfState;
+interface ProjectionDashboardProps {
+  pack: ScenarioPack;
+  result: ProjectionResult;
+  whatIfState: ScenarioWhatIfState;
   projectionSettings: ProjectionRuntimeSettings;
   targetNetWorthInput: string;
   onTargetNetWorthInputChange: (value: string) => void;
@@ -43,7 +43,7 @@ interface CsvProjectionDashboardProps {
   children?: ReactNode;
 }
 
-export function CsvProjectionDashboard({
+export function ProjectionDashboard({
   pack,
   result,
   whatIfState,
@@ -52,7 +52,7 @@ export function CsvProjectionDashboard({
   onTargetNetWorthInputChange,
   stochasticResult,
   children,
-}: CsvProjectionDashboardProps) {
+}: ProjectionDashboardProps) {
   const [isAccountDiagnosticsOpen, setIsAccountDiagnosticsOpen] = useState(false);
   const [isPostingTablesOpen, setIsPostingTablesOpen] = useState(false);
   const [isTrendChartReady, setIsTrendChartReady] = useState(false);
@@ -464,7 +464,7 @@ export function CsvProjectionDashboard({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {futureRows.length > 0 ? futureRows.slice(0, 12).map((row: CsvProjectionRow) => (
+                    {futureRows.length > 0 ? futureRows.slice(0, 12).map((row: ProjectionRow) => (
                       <TableRow key={row.date}>
                         <TableCell>{row.date}</TableCell>
                         <TableCell>{currency.format(row.requestedPostingAmount)}</TableCell>

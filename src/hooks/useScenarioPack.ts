@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { loadCsvScenarioPack } from "@/lib/projection";
-import type { CsvScenarioPack, ScenarioValidationIssue } from "@/lib/projection";
+import type { DataSource } from "@/lib/projection/dataSource";
+import type { ScenarioPack, ScenarioValidationIssue } from "@/lib/projection";
 
-interface CsvScenarioPackState {
-  pack: CsvScenarioPack | null;
+interface ScenarioPackState {
+  pack: ScenarioPack | null;
   issues: ScenarioValidationIssue[];
   loadError: string | null;
   isLoading: boolean;
   loadedAt: Date | null;
 }
 
-const initialState: CsvScenarioPackState = {
+const initialState: ScenarioPackState = {
   pack: null,
   issues: [],
   loadError: null,
@@ -18,9 +18,9 @@ const initialState: CsvScenarioPackState = {
   loadedAt: null,
 };
 
-export function useCsvScenarioPack() {
+export function useScenarioPack(dataSource: DataSource) {
   const requestIdRef = useRef(0);
-  const [state, setState] = useState<CsvScenarioPackState>(initialState);
+  const [state, setState] = useState<ScenarioPackState>(initialState);
 
   const reload = useCallback(async () => {
     const requestId = requestIdRef.current + 1;
@@ -33,14 +33,14 @@ export function useCsvScenarioPack() {
     }));
 
     try {
-      const result = await loadCsvScenarioPack();
+      const result = await dataSource.loadPack();
 
       if (requestId !== requestIdRef.current) {
         return;
       }
 
       setState({
-        pack: result.data,
+        pack: result.pack,
         issues: result.issues,
         loadError: null,
         isLoading: false,
@@ -54,12 +54,12 @@ export function useCsvScenarioPack() {
       setState({
         pack: null,
         issues: [],
-        loadError: error instanceof Error ? error.message : "Could not load CSV data files.",
+        loadError: error instanceof Error ? error.message : "Could not load data files.",
         isLoading: false,
         loadedAt: null,
       });
     }
-  }, []);
+  }, [dataSource]);
 
   useEffect(() => {
     void reload();

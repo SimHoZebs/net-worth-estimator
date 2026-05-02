@@ -1,16 +1,16 @@
 import { useCallback, useMemo } from "react";
-import type { CsvProjectionResult, CsvScenarioPack, CsvScenarioWhatIfState, ProjectionRuntimeSettings } from "@/lib/projection";
+import type { ProjectionResult, ScenarioPack, ScenarioWhatIfState, ProjectionRuntimeSettings } from "@/lib/projection";
 import { useWorkerProjection } from "./workerFoundation";
 import type { WorkerProjectionState } from "./workerFoundation";
 
-export function useCsvProjectionWorker(
-  pack: CsvScenarioPack | null,
+export function useProjectionWorker(
+  pack: ScenarioPack | null,
   projectionSettings: ProjectionRuntimeSettings,
-  whatIfState: CsvScenarioWhatIfState,
+  whatIfState: ScenarioWhatIfState,
   enabled: boolean
-): WorkerProjectionState<CsvProjectionResult> {
+): WorkerProjectionState<ProjectionResult> {
   const workerUrl = useMemo(
-    () => new URL("../workers/csvProjectionWorker.ts", import.meta.url),
+    () => new URL("../workers/projectionWorker.ts", import.meta.url),
     []
   );
 
@@ -19,7 +19,7 @@ export function useCsvProjectionWorker(
     [pack, projectionSettings, whatIfState]
   );
 
-  return useWorkerProjection<CsvProjectionResult>({
+  return useWorkerProjection<ProjectionResult>({
     workerUrl,
     enabled: enabled && pack !== null,
     errorMessage: "Projection worker crashed.",

@@ -1,11 +1,10 @@
 import type {
-  CsvProjectionResult,
-  CsvProjectionRow,
-  CsvScenarioPack,
+  ProjectionResult,
+  ScenarioPack,
 } from "@/lib/projection";
 import type { StochasticProjectionResult } from "@/lib/projection";
 
-export function buildBalanceChartData(pack: CsvScenarioPack, result: CsvProjectionResult) {
+export function buildBalanceChartData(pack: ScenarioPack, result: ProjectionResult) {
   const enabledAccounts = pack.accounts.filter((account) => account.enabled);
 
   return result.timeline.sampledRows.map((row) => ({
@@ -23,7 +22,7 @@ export interface StochasticChartRow {
   p50: number;
 }
 
-export function buildStochasticChartData(result: CsvProjectionResult, stochasticResult: StochasticProjectionResult): StochasticChartRow[] {
+export function buildStochasticChartData(result: ProjectionResult, stochasticResult: StochasticProjectionResult): StochasticChartRow[] {
   const bandDateIndex = new Map(stochasticResult.bands.map((band) => [band.date, band]));
   return result.timeline.rows.map((row) => {
     const band = bandDateIndex.get(row.date);
