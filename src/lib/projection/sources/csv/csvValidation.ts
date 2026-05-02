@@ -107,9 +107,8 @@ function validatePostingArithmetic(
       return;
     }
 
-    const visitedIds = new Set<string>([posting.id]);
-
     for (const refId of postingsRefd) {
+      const visitedIds = new Set<string>([posting.id]);
       let currentId: string | null = refId;
 
       while (currentId !== null) {
