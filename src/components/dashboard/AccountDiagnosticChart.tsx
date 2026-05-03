@@ -1,20 +1,10 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Area,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
-  Line,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { memo, useCallback, useMemo, useState } from "react";
+import type uPlot from "uplot";
 import type { ScenarioPack } from "@/lib/projection";
-import { currency, formatChartCurrencyTick } from "@/lib/format";
+import { currency } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import { UPlotChart } from "@/components/ui/UPlotChart";
+import { buildUplotDiagnosticOptions, formatDate } from "@/chart/uplotData";
 
 interface AccountDiagnosticChartProps {
   pack: ScenarioPack;
@@ -33,119 +23,129 @@ export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
 }: AccountDiagnosticChartProps) {
   const [viewMode, setViewMode] = useState<"net-worth" | "accounts">("net-worth");
 
-  const dataVersion = useMemo(() => {
-    if (chartData.length === 0) return "";
-    const first = chartData[0];
-    const last = chartData[chartData.length - 1];
-    return `${chartData.length}:${first?.date}:${last?.date}:${hasStochasticData}`;
-  }, [chartData, hasStochasticData]);
-
-  const [shouldAnimate, setShouldAnimate] = useState(true);
-
-  useEffect(() => {
-    setShouldAnimate(true);
-    const t = window.setTimeout(() => setShouldAnimate(false), 700);
-    return () => window.clearTimeout(t);
-  }, [dataVersion]);
-
-  const prefersReducedMotion = usePrefersReducedMotion();
-  const animate = shouldAnimate && !prefersReducedMotion;
-
-  const legendFormatter = useCallback((value: string) => {
-    if (value === "netWorth") return "Net worth";
-    if (value === "p50") return "Net worth (median simulation)";
-    return value;
-  }, []);
-
-  const tooltipContent = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (props: any) => {
-    const { active, payload, label } = props as { active?: boolean; payload?: Array<{ payload: Record<string, number> }>; label?: string };
-      if (!active || !payload || payload.length === 0) return null;
-      const data = payload[0]?.payload as Record<string, number> | undefined;
-      if (!data) return null;
-      return (
-        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm max-w-xs">
-          <div className="text-xs font-medium text-slate-500">{label}</div>
-          <div className="mt-2 border-b border-slate-100 pb-1">
-            <div className="text-sm font-semibold text-slate-900">
-              Net worth: {currency.format(data.netWorth ?? 0)}
-            </div>
-            {hasStochasticData && data._hasStochastic ? (
-              <div className="mt-0.5 text-[10px] text-slate-500 leading-tight">
-                P10–P90: {currency.format(data._p10 ?? 0)} – {currency.format(data._p90 ?? 0)}
-                <br />
-                P25–P75: {currency.format(data._p25 ?? 0)} – {currency.format(data._p75 ?? 0)}
-              </div>
-            ) : null}
-          </div>
-          <div className="mt-1 max-h-[160px] overflow-y-auto space-y-0.5">
-            {(() => {
-              const nonZero = pack.accounts.filter(a => a.enabled).filter(a => (data[a.id] ?? 0) !== 0);
-              const zeroCount = pack.accounts.filter(a => a.enabled).filter(a => (data[a.id] ?? 0) === 0).length;
-              return (
-                <>
-                  {nonZero.map((account) => {
-                    const balance = data[account.id] ?? 0;
-                    return (
-                      <div key={account.id} className="flex justify-between gap-3 text-xs">
-                        <span className="inline-flex items-center gap-1.5 text-slate-700">
-                          <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: account.color ?? "#64748b" }} />
-                          {account.label}
-                        </span>
-                        <span className="tabular-nums text-slate-700">{currency.format(balance)}</span>
-                      </div>
-                    );
-                  })}
-                  {zeroCount > 0 ? (
-                    <div className="flex justify-between gap-3 text-xs text-slate-400">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="inline-block h-2 w-2 rounded-full bg-slate-300" />
-                        {zeroCount} {zeroCount === 1 ? "account" : "accounts"} at $0
-                      </span>
-                      <span className="tabular-nums">$0</span>
-                    </div>
-                  ) : null}
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      );
-    },
-    [hasStochasticData, pack.accounts],
-  );
-
-  const targetReferenceLabel = useMemo(() => ({
-    value: `Target: ${currency.format(targetNetWorth)}`,
-    position: "insideTopRight" as const,
-    fill: "#334155",
-    fontSize: 12,
-    fontWeight: 600,
-  }), [targetNetWorth]);
-
-  const hitTargetLabel = useMemo(() => ({
-    value: "Target reached",
-    position: "insideTopLeft" as const,
-    fill: "#059669",
-    fontSize: 11,
-    fontWeight: 500,
-  }), []);
-
-  const firstShortfallLabel = useMemo(() => ({
-    value: "First shortfall",
-    position: "insideTopLeft" as const,
-    fill: "#d97706",
-    fontSize: 11,
-    fontWeight: 500,
-  }), []);
-
   const enabledAccounts = useMemo(
-    () => pack.accounts.filter(a => a.enabled),
+    () => pack.accounts.filter((a) => a.enabled),
     [pack.accounts],
   );
 
-  const chartMargin = useMemo(() => ({ top: 12, right: 24, left: 8, bottom: 12 }), []);
+  const tooltipContent = useCallback(
+    (self: uPlot, idx: number) => {
+      const data = self.data;
+      const ts = (data[0] as number[])[idx];
+      const d = new Date(ts);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const dateStr = formatDate(iso);
+
+      const nw = (data[6] as number[])[idx];
+      const p50 = (data[5] as number[])[idx];
+      const displayNw = hasStochasticData ? p50 : nw;
+
+      const p10 = (data[1] as number[])[idx];
+      const p90 = (data[2] as number[])[idx];
+      const p25 = (data[3] as number[])[idx];
+      const p75 = (data[4] as number[])[idx];
+
+      let html = `<div class="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm max-w-xs">`;
+      html += `<div class="text-xs font-medium text-slate-500">${dateStr}</div>`;
+      html += `<div class="mt-2 border-b border-slate-100 pb-1">`;
+      html += `<div class="text-sm font-semibold text-slate-900">Net worth: ${currency.format(displayNw)}</div>`;
+
+      if (hasStochasticData) {
+        html += `<div class="mt-0.5 text-[10px] text-slate-500 leading-tight">`;
+        html += `P10–P90: ${currency.format(p10)} – ${currency.format(p90)}<br />`;
+        html += `P25–P75: ${currency.format(p25)} – ${currency.format(p75)}`;
+        html += `</div>`;
+      }
+
+      html += `</div>`;
+      html += `<div class="mt-1 max-h-[160px] overflow-y-auto space-y-0.5">`;
+
+      const nonZero: { id: string; label: string; color: string | null; val: number }[] = [];
+      let zeroCount = 0;
+      for (let i = 0; i < enabledAccounts.length; i++) {
+        const a = enabledAccounts[i];
+        const val = (data[7 + i] as number[])[idx];
+        if (val !== 0) {
+          nonZero.push({ ...a, val });
+        } else {
+          zeroCount++;
+        }
+      }
+
+      for (const acct of nonZero) {
+        html += `<div class="flex justify-between gap-3 text-xs">`;
+        html += `<span class="inline-flex items-center gap-1.5 text-slate-700">`;
+        html += `<span class="inline-block h-2 w-2 rounded-full" style="background-color:${acct.color ?? "#64748b"}"></span>`;
+        html += `${acct.label}</span>`;
+        html += `<span class="tabular-nums text-slate-700">${currency.format(acct.val)}</span>`;
+        html += `</div>`;
+      }
+
+      if (zeroCount > 0) {
+        html += `<div class="flex justify-between gap-3 text-xs text-slate-400">`;
+        html += `<span class="inline-flex items-center gap-1.5">`;
+        html += `<span class="inline-block h-2 w-2 rounded-full bg-slate-300"></span>`;
+        html += `${zeroCount} ${zeroCount === 1 ? "account" : "accounts"} at $0`;
+        html += `</span>`;
+        html += `<span class="tabular-nums">$0</span>`;
+        html += `</div>`;
+      }
+
+      html += `</div></div>`;
+      return html;
+    },
+    [hasStochasticData, enabledAccounts],
+  );
+
+  const data = useMemo((): uPlot.AlignedData => {
+    if (chartData.length === 0) return [[0], [0], [0], [0], [0], [0], [0]];
+    const timestamps: number[] = [];
+    const p10Arr: number[] = [];
+    const p90Arr: number[] = [];
+    const p25Arr: number[] = [];
+    const p75Arr: number[] = [];
+    const p50Arr: number[] = [];
+    const nwArr: number[] = [];
+    const acctArrs: number[][] = enabledAccounts.map(() => []);
+
+    for (const row of chartData) {
+      const d = new Date(
+        Number(String(row.date).split("-")[0]),
+        Number(String(row.date).split("-")[1]) - 1,
+        Number(String(row.date).split("-")[2]),
+      );
+      timestamps.push(d.getTime());
+      const nw = Number(row.netWorth);
+      const p50 = Number(row.p50 ?? nw);
+      const p10 = Number((row as any)._p10 ?? nw);
+      const p90 = Number((row as any)._p90 ?? nw);
+      const p25 = Number((row as any)._p25 ?? nw);
+      const p75 = Number((row as any)._p75 ?? nw);
+      p10Arr.push(p10);
+      p90Arr.push(p90);
+      p25Arr.push(p25);
+      p75Arr.push(p75);
+      p50Arr.push(p50);
+      nwArr.push(nw);
+      for (let i = 0; i < enabledAccounts.length; i++) {
+        acctArrs[i].push(Number(row[enabledAccounts[i].id] ?? 0));
+      }
+    }
+
+    return [timestamps, p10Arr, p90Arr, p25Arr, p75Arr, p50Arr, nwArr, ...acctArrs];
+  }, [chartData, enabledAccounts]);
+
+  const options = useMemo(
+    () =>
+      buildUplotDiagnosticOptions(
+        targetNetWorth,
+        hasStochasticData,
+        milestoneDates ?? {},
+        viewMode,
+        enabledAccounts,
+      ),
+    [targetNetWorth, hasStochasticData, milestoneDates, viewMode, enabledAccounts],
+  );
 
   return (
     <section>
@@ -155,8 +155,12 @@ export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
             <div>
               <CardTitle>Net worth projection</CardTitle>
               <CardDescription>
-                {viewMode === "net-worth" ? "Net worth over time with percentile ranges." : "Net worth over time with account breakdown."}
-                {hasStochasticData ? " Shaded bands show P10–P90 and P25–P75 percentile ranges." : ""}
+                {viewMode === "net-worth"
+                  ? "Net worth over time with percentile ranges."
+                  : "Net worth over time with account breakdown."}
+                {hasStochasticData
+                  ? " Shaded bands show P10–P90 and P25–P75 percentile ranges."
+                  : ""}
               </CardDescription>
             </div>
             <button
@@ -169,74 +173,22 @@ export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
           </div>
         </CardHeader>
         <CardContent className="min-w-0">
-          <div className="min-w-0 h-[420px]">
-            <ResponsiveContainer width="100%" height={420}>
-              <ComposedChart data={chartData} margin={chartMargin}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" minTickGap={36} />
-                <YAxis
-                  domain={['auto',targetNetWorth*2]}
-                  allowDataOverflow
-                  tickFormatter={formatChartCurrencyTick} width={72} />
-                <Legend
-                  wrapperStyle={{ paddingTop: 8 }}
-                  formatter={legendFormatter}
-                />
-                <Tooltip content={tooltipContent} />
-                <ReferenceLine
-                  y={targetNetWorth}
-                  stroke="#334155"
-                  strokeDasharray="5 5"
-                  strokeWidth={2}
-                  ifOverflow="hidden"
-                  label={targetReferenceLabel}
-                />
-                {milestoneDates?.hitTarget ? (
-                  <ReferenceLine
-                    x={milestoneDates.hitTarget}
-                    stroke="#059669"
-                    strokeWidth={1.5}
-                    strokeDasharray="4 4"
-                    label={hitTargetLabel}
-                  />
-                ) : null}
-                {milestoneDates?.firstShortfall ? (
-                  <ReferenceLine
-                    x={milestoneDates.firstShortfall}
-                    stroke="#d97706"
-                    strokeWidth={1.5}
-                    strokeDasharray="4 4"
-                    label={firstShortfallLabel}
-                  />
-                ) : null}
-                {hasStochasticData ? (
-                  <>
-                    <Area type="monotone" dataKey="p10_base" stackId="outer" stroke="none" fill="transparent" isAnimationActive={false} legendType="none" />
-                    <Area type="monotone" dataKey="outerThickness" stackId="outer" stroke="none" fill="#0f172a" fillOpacity={0.05} isAnimationActive={false} legendType="none" />
-                    <Area type="monotone" dataKey="p25_base" stackId="inner" stroke="none" fill="transparent" isAnimationActive={false} legendType="none" />
-                    <Area type="monotone" dataKey="innerThickness" stackId="inner" stroke="none" fill="#0f172a" fillOpacity={0.10} isAnimationActive={false} legendType="none" />
-                    <Line type="monotone" dataKey="p50" stroke="#0f172a" strokeWidth={2.5} dot={false} name="Net worth (P50)" isAnimationActive={animate} animationDuration={500} animationEasing="ease-out" />
-                  </>
-                ) : (
-                  <Line type="monotone" dataKey="netWorth" stroke="#0f172a" strokeWidth={2.5} dot={false} name="Net worth" isAnimationActive={animate} animationDuration={500} animationEasing="ease-out" />
-                )}
-                {viewMode === "accounts" ? enabledAccounts.map((account) => (
-                  <Line
-                    key={account.id}
-                    type="monotone"
-                    dataKey={account.id}
-                    stroke={account.color ?? "#64748b"}
-                    strokeWidth={2}
-                    strokeOpacity={0.85}
-                    dot={false}
-                    isAnimationActive={animate}
-                    animationDuration={500}
-                    animationEasing="ease-out"
-                    name={account.label}
-                  />
-                )) : null}
-              </ComposedChart>
-            </ResponsiveContainer>
+          <div className="min-w-0">
+            <UPlotChart options={options} data={data} tooltipContent={tooltipContent} />
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 text-xs text-slate-600">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#0f172a]" />
+              {hasStochasticData ? "Net worth (median simulation)" : "Net worth"}
+            </span>
+            {viewMode === "accounts"
+              ? enabledAccounts.map((a) => (
+                  <span key={a.id} className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: a.color ?? "#334155" }} />
+                    {a.label}
+                  </span>
+                ))
+              : null}
           </div>
         </CardContent>
       </Card>
