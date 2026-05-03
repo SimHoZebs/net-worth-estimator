@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { currency, formatDate } from "@/lib/format";
 import type { ScenarioPack, ProjectionResult, Posting } from "@/lib/projection";
@@ -20,6 +21,18 @@ function findPaymentPosting(pack: ScenarioPack, accountId: string): Posting | un
 function isDebtAccount(label: string): boolean {
   const l = label.toLowerCase();
   return l.includes("loan") || l.includes("debt") || l.includes("mortgage") || l.includes("credit");
+}
+
+function estimateMonthlyPayment(p: Posting | undefined): number {
+  if (!p) return 0;
+  const num = Number(p.arithmetic);
+  if (!Number.isFinite(num)) return 0;
+  const freq = p.frequency;
+  if (freq === "monthly") return num;
+  if (freq === "weekly") return num * 4.33;
+  if (freq === "quarterly") return num / 3;
+  if (freq === "annual") return num / 12;
+  return num;
 }
 
 export function DebtSummary({ pack, result }: DebtSummaryProps) {
@@ -65,18 +78,6 @@ export function DebtSummary({ pack, result }: DebtSummaryProps) {
 
   const totalDebt = allDebts.reduce((sum, d) => sum + Math.abs(d.balance), 0);
 
-  function estimateMonthlyPayment(p: Posting | undefined): number {
-    if (!p) return 0;
-    const num = Number(p.arithmetic);
-    if (!Number.isFinite(num)) return 0;
-    const freq = p.frequency;
-    if (freq === "monthly") return num;
-    if (freq === "weekly") return num * 4.33;
-    if (freq === "quarterly") return num / 3;
-    if (freq === "annual") return num / 12;
-    return num;
-  }
-
   const estimatedTotalInterest = allDebts.reduce((sum, d) => {
     const monthlyPmt = estimateMonthlyPayment(d.paymentPosting ?? undefined);
     if (monthlyPmt <= 0) return sum;
@@ -104,25 +105,43 @@ export function DebtSummary({ pack, result }: DebtSummaryProps) {
               <TableHead className="text-right">Balance</TableHead>
               <TableHead className="text-right">Payment</TableHead>
               <TableHead>Frequency</TableHead>
+              <TableHead>Est. payoff</TableHead>
+              <TableHead className="text-right">Priority</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {allDebts.map((d) => (
-              <TableRow key={d.account.id}>
-                <TableCell className="text-sm text-slate-700">{d.account.label}</TableCell>
-                <TableCell className="text-right text-sm font-medium text-slate-900">{currency.format(d.balance)}</TableCell>
-                <TableCell className="text-right text-sm text-slate-700">
-                  {d.paymentPosting ? d.paymentPosting.arithmetic : "—"}
-                </TableCell>
-                <TableCell className="text-sm text-slate-500">
-                  {d.paymentPosting ? d.paymentPosting.frequency : "—"}
-                </TableCell>
-              </TableRow>
-            ))}
+            {allDebts.map((d) => {
+              const monthlyPmt = estimateMonthlyPayment(d.paymentPosting ?? undefined);
+              const principal = Math.abs(d.balance);
+              const monthsToPayoff = monthlyPmt > 0 ? Math.ceil(principal / monthlyPmt) : Infinity;
+              const payoffDate = monthsToPayoff < 1200
+                ? new Date(Date.now() + monthsToPayoff * 30 * 24 * 60 * 60 * 1000)
+                    .toISOString()
+                    .slice(0, 10)
+                : null;
+              return (
+                <TableRow key={d.account.id}>
+                  <TableCell className="text-sm text-slate-700">{d.account.label}</TableCell>
+                  <TableCell className="text-right text-sm font-medium text-slate-900">{currency.format(d.balance)}</TableCell>
+                  <TableCell className="text-right text-sm text-slate-700">
+                    {d.paymentPosting ? d.paymentPosting.arithmetic : "—"}
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-500">
+                    {d.paymentPosting ? d.paymentPosting.frequency : "—"}
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-600">
+                    {payoffDate ? formatDate(payoffDate) : "Beyond 100 yr"}
+                  </TableCell>
+                  <TableCell className="text-right text-sm tabular-nums text-slate-600">
+                    {d.paymentPosting?.priority ?? "—"}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
             <TableRow className="border-t-2 border-slate-200">
               <TableCell className="text-sm font-semibold text-slate-900">Total debt</TableCell>
               <TableCell className="text-right text-sm font-semibold text-slate-900">{currency.format(-totalDebt)}</TableCell>
-              <TableCell colSpan={2} />
+              <TableCell colSpan={4} />
             </TableRow>
           </TableBody>
         </Table>

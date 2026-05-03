@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useState } from "react";
 import type { ScenarioPack } from "@/lib/projection";
 import { currency, formatChartCurrencyTick } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,16 +30,26 @@ export function AccountDiagnosticChart({
   chartData,
   milestoneDates,
 }: AccountDiagnosticChartProps) {
+  const [viewMode, setViewMode] = useState<"net-worth" | "accounts">("net-worth");
   return (
     <section>
       <Card className="min-w-0 rounded-[1.8rem] border-slate-200 shadow-sm">
         <CardHeader>
-          <div>
-            <CardTitle>Net worth projection</CardTitle>
-            <CardDescription>
-              Projected net worth over time with account breakdown.
-              {hasStochasticData ? " Shaded bands show P10–P90 and P25–P75 percentile ranges." : ""}
-            </CardDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle>Net worth projection</CardTitle>
+              <CardDescription>
+                {viewMode === "net-worth" ? "Net worth over time with percentile ranges." : "Net worth over time with account breakdown."}
+                {hasStochasticData ? " Shaded bands show P10–P90 and P25–P75 percentile ranges." : ""}
+              </CardDescription>
+            </div>
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === "net-worth" ? "accounts" : "net-worth")}
+              className="shrink-0 rounded-lg border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-800 no-print"
+            >
+              {viewMode === "net-worth" ? "Show account breakdown" : "Net worth only"}
+            </button>
           </div>
         </CardHeader>
         <CardContent className="min-w-0">
@@ -147,7 +158,7 @@ export function AccountDiagnosticChart({
                 ) : (
                   <Line type="monotone" dataKey="netWorth" stroke="#0f172a" strokeWidth={2.5} dot={false} name="Net worth" isAnimationActive={false} />
                 )}
-                {pack.accounts.filter(a => a.enabled).map((account) => (
+                {viewMode === "accounts" ? pack.accounts.filter(a => a.enabled).map((account) => (
                   <Line
                     key={account.id}
                     type="monotone"
@@ -159,7 +170,7 @@ export function AccountDiagnosticChart({
                     name={account.label}
                     isAnimationActive={false}
                   />
-                ))}
+                )) : null}
               </ComposedChart>
             </ResponsiveContainer>
           </div>

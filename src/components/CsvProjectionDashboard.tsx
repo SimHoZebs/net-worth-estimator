@@ -331,6 +331,26 @@ export function ProjectionDashboard({
                 <span><span className="font-medium text-slate-900">{pack.checkpoints.length}</span> balance history points</span>
               </div>
             </div>
+
+            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <div className="text-xs font-medium tracking-wide text-slate-500">Annual rates</div>
+              {pack.postings.filter(p => p.enabled && p.annualRate > 0).length > 0 ? (
+                <div className="mt-2 grid grid-cols-[auto_1fr_auto] gap-x-6 gap-y-1 text-sm">
+                  {pack.postings.filter((p) => p.enabled && p.annualRate > 0).map((p) => (
+                    <div key={p.id} className="contents">
+                      <span className="text-slate-700">{p.label}:</span>
+                      <span className="text-slate-400 italic">{p.annualGrowthRate > 0 ? `${(p.annualRate * 100).toFixed(1)}%, growing ${(p.annualGrowthRate * 100).toFixed(1)}%/yr` : `${(p.annualRate * 100).toFixed(1)}%`}</span>
+                      <span className="text-right text-slate-500">
+                        {p.volatility > 0 ? `±${(p.volatility * 100).toFixed(1)}%` : "Fixed"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-1 text-sm text-slate-400">No annual rates configured on enabled transactions.</div>
+              )}
+            </div>
+
             <div className="mt-4 space-y-2 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
               <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Model assumptions</div>
               <ul className="space-y-1 text-xs text-slate-600">
@@ -364,12 +384,24 @@ export function ProjectionDashboard({
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
-        <DriverCard
-          label="Main constraint"
-          value={blockerValue}
-          detail={blockerDetail}
-          tone={biggestShortfallPosting ? "warning" : goalReached ? "success" : "default"}
-        />
+        <div className="flex flex-col gap-3">
+          <DriverCard
+            label="Main constraint"
+            value={blockerValue}
+            detail={blockerDetail}
+            tone={biggestShortfallPosting ? "warning" : goalReached ? "success" : "default"}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById("source-data");
+              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+            className="no-print w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Explore fixes
+          </button>
+        </div>
         <DriverCard
           label="Next projected transaction"
           value={firstProjectedRow ? formatDate(firstProjectedRow.date) : "No future transactions"}

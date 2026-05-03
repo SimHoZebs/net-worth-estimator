@@ -238,7 +238,16 @@ export default function App() {
           </section>
         ) : null}
 
-        <ScenarioComparison />
+        <ScenarioComparison
+          currentMetrics={{
+            currentNetWorth: result?.summary.currentNetWorth ?? 0,
+            finalNetWorth: result?.summary.finalNetWorth ?? 0,
+            hitTargetDate: result?.milestones.hitTargetDate ?? null,
+            shortfallAmount: result?.totals.clampedPostingShortfallAmount ?? 0,
+            overrideCount: activeOverrideCount,
+          }}
+          currentOverrideCount={activeOverrideCount}
+        />
 
         <section id="source-data">
           <ScenarioInspector

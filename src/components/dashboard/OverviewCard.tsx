@@ -31,19 +31,19 @@ export function OverviewCard({
       <CardContent className="p-5 md:p-6">
         <div className="grid gap-6 lg:grid-cols-5">
           <div className="space-y-1 lg:col-span-1">
-            <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Current net worth</div>
+            <div className="text-xs font-medium text-slate-500">Current net worth</div>
             <div className="text-2xl font-semibold tracking-tight text-slate-900">{currency.format(current)}</div>
             <div className="text-sm text-slate-500">as of {formatDate(result.milestones.latestHistoricalDate ?? result.milestones.projectionStartDate)}</div>
           </div>
 
           <div className="space-y-1 lg:col-span-1">
-            <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Target</div>
+            <div className="text-xs font-medium text-slate-500">Target</div>
             <div className="text-2xl font-semibold tracking-tight text-slate-900">{currency.format(target)}</div>
             <div className="text-sm text-slate-500">Nominal dollars</div>
           </div>
 
           <div className="space-y-1 lg:col-span-1">
-            <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Target date</div>
+            <div className="text-xs font-medium text-slate-500">Target date</div>
             <div className="text-2xl font-semibold tracking-tight text-slate-900">
               {hasStochasticData && stochasticResult?.milestones.medianHitTargetDate
                 ? formatDate(stochasticResult.milestones.medianHitTargetDate)
@@ -61,7 +61,7 @@ export function OverviewCard({
           </div>
 
           <div className="space-y-1 lg:col-span-1">
-            <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Confidence</div>
+            <div className="text-xs font-medium text-slate-500">Confidence</div>
             <div className="text-2xl font-semibold tracking-tight text-slate-900">
               {hasStochasticData && stochasticResult
                 ? pct.format(stochasticResult.milestones.hitTargetProbability)
@@ -77,7 +77,7 @@ export function OverviewCard({
           </div>
 
           <div className="space-y-1 lg:col-span-1">
-            <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Main constraint</div>
+            <div className="text-xs font-medium text-slate-500">Main constraint</div>
             <div className="text-lg font-semibold tracking-tight text-slate-900">{blockerValue}</div>
             <div className="text-sm text-slate-600 line-clamp-2">{blockerDetail}</div>
           </div>

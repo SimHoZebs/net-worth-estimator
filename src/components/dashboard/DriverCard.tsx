@@ -20,7 +20,7 @@ export function DriverCard({
   return (
     <Card className={`rounded-[1.6rem] shadow-sm ${toneClassName}`}>
       <CardContent className="space-y-2 p-5">
-        <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">{label}</div>
+        <div className="text-xs font-medium text-slate-500">{label}</div>
         <div className="text-lg font-semibold tracking-tight text-slate-900">{value}</div>
         <div className="text-sm text-slate-600">{detail}</div>
       </CardContent>
