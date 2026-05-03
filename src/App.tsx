@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ScenarioInspector } from "./components/CsvScenarioInspector";
 import { ProjectionDashboard } from "./components/CsvProjectionDashboard";
 import { ContributionWhatIfControls } from "./components/CsvContributionWhatIfControls";
 import { StochasticControls } from "./components/StochasticControls";
+import { TemplateWizard } from "./components/patterns/TemplateWizard";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
 import { useProjection } from "./hooks/useProjection";
@@ -106,13 +107,33 @@ export default function App() {
     });
   };
 
+  const [showWizard, setShowWizard] = useState(false);
+
+  const handleApplyTemplate = (output: import("@/lib/patterns").TemplateOutput) => {
+    const store = useStore.getState();
+    if (!store.isEditing && pack) {
+      store.startEditing(pack);
+    }
+    for (const account of output.accounts) {
+      store.addAccount(account);
+    }
+    for (const posting of output.postings) {
+      store.addPosting(posting);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8 md:py-8">
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={() => refetchScenario()} disabled={isLoading}>
             {isLoading ? "Loading..." : "Reload"}
           </Button>
+          {pack ? (
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowWizard(true)}>
+              Templates
+            </Button>
+          ) : null}
         </div>
 
         {isProjecting ? (
@@ -179,6 +200,14 @@ export default function App() {
           onReload={() => refetchScenario()}
           onSave={handleSave}
         />
+
+        {showWizard && pack ? (
+          <TemplateWizard
+            pack={pack}
+            onApply={handleApplyTemplate}
+            onClose={() => setShowWizard(false)}
+          />
+        ) : null}
       </div>
     </div>
   );
