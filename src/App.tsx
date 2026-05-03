@@ -4,6 +4,7 @@ import { ProjectionDashboard } from "./components/CsvProjectionDashboard";
 import { ContributionWhatIfControls } from "./components/CsvContributionWhatIfControls";
 import { StochasticControls } from "./components/StochasticControls";
 import { TemplateWizard } from "./components/patterns/TemplateWizard";
+import { SectionNav } from "./components/SectionNav";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
 import { useProjection } from "./hooks/useProjection";
@@ -13,8 +14,6 @@ import { useStore, selectWhatIfState } from "./store";
 import { useShallow } from "zustand/shallow";
 import { createCsvDataSource } from "@/lib/projection";
 import { useScenarioQuery, useScenarioMutation } from "./hooks/useScenario";
-
-const PROJECTION_HORIZON_YEARS = 25;
 
 function formatTodayIsoDate() {
   return new Date().toISOString().slice(0, 10);
@@ -50,6 +49,8 @@ export default function App() {
 
   const targetNetWorthInput = useStore((s) => s.targetNetWorthInput);
   const setTargetNetWorthInput = useStore((s) => s.setTargetNetWorthInput);
+  const horizonYears = useStore((s) => s.horizonYears);
+  const setHorizonYears = useStore((s) => s.setHorizonYears);
   const stochasticEnabled = useStore((s) => s.stochasticEnabled);
   const stochasticConfig = useStore((s) => s.stochasticConfig);
   const setStochasticEnabled = useStore((s) => s.setStochasticEnabled);
@@ -61,9 +62,9 @@ export default function App() {
     () => ({
       targetNetWorth,
       fallbackProjectionStartDate,
-      horizonYears: PROJECTION_HORIZON_YEARS,
+      horizonYears,
     }),
-    [fallbackProjectionStartDate, targetNetWorth],
+    [fallbackProjectionStartDate, targetNetWorth, horizonYears],
   );
   const projectionStartDate = pack?.checkpoints.reduce<string | null>(
     (latestDate, checkpoint) =>
@@ -124,34 +125,59 @@ export default function App() {
     }
   };
 
+  const [showPrintSummary, setShowPrintSummary] = useState(false);
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8 md:py-8">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-xs text-slate-500">
-            {pack ? (
-              <span>
-                Baseline loaded from <span className="font-mono text-slate-600">/scenario</span>
-                {activeOverrideCount > 0 ? ` · ${activeOverrideCount} temporary scenario override${activeOverrideCount === 1 ? "" : "s"}` : ""}
-                {isEditing && isDirty ? " · Unsaved baseline edits" : ""}
-                {isEditing && !isDirty ? " · Editing baseline" : ""}
-                {activeOverrideCount === 0 && !isEditing ? " · Projection settings are session-only" : ""}
-              </span>
-            ) : (
-              <span>Waiting for scenario data...</span>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button type="button" variant="ghost" size="sm" onClick={() => refetchScenario()} disabled={isLoading}>
-              {isLoading ? "Loading..." : "Reload source data"}
-            </Button>
-            {pack ? (
-              <Button type="button" variant="secondary" size="sm" onClick={() => setShowWizard(true)}>
-                Templates
+      <div className="mx-auto max-w-7xl space-y-0 px-0 md:px-0">
+        <div className="px-4 py-4 md:px-8">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs text-slate-500">
+              {pack ? (
+                <span>
+                  Baseline loaded from <span className="font-mono text-slate-600">/scenario</span>
+                  {activeOverrideCount > 0 ? ` · ${activeOverrideCount} temporary scenario override${activeOverrideCount === 1 ? "" : "s"}` : ""}
+                  {isEditing && isDirty ? " · Unsaved baseline edits" : ""}
+                  {isEditing && !isDirty ? " · Editing baseline" : ""}
+                  {activeOverrideCount === 0 && !isEditing ? " · Projection settings are session-only" : ""}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-slate-400" />
+                  Loading scenario data...
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2 no-print">
+              <Button type="button" variant="ghost" size="sm" onClick={() => window.print()} disabled={!pack}>
+                Print
               </Button>
-            ) : null}
+              <Button type="button" variant="ghost" size="sm" onClick={() => refetchScenario()} disabled={isLoading}>
+                {isLoading ? "Loading..." : "Reload source data"}
+              </Button>
+              {pack ? (
+                <Button type="button" variant="secondary" size="sm" onClick={() => setShowWizard(true)}>
+                  Templates
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
+
+        <SectionNav />
+
+        <div className="space-y-6 px-4 py-6 md:px-8">
+        {isLoading && !pack ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse rounded-[1.8rem] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="mb-2 h-3 w-20 rounded bg-slate-200" />
+                <div className="h-6 w-32 rounded bg-slate-200" />
+                <div className="mt-2 h-3 w-24 rounded bg-slate-200" />
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {isProjecting ? (
           <Alert className="rounded-[1.6rem] border-amber-200 bg-amber-50 text-amber-950">
@@ -196,6 +222,9 @@ export default function App() {
             projectionSettings={projectionSettings}
             targetNetWorthInput={targetNetWorthInput}
             onTargetNetWorthInputChange={setTargetNetWorthInput}
+            onProjectionSettingsChange={(partial) => {
+              if (partial.horizonYears !== undefined) setHorizonYears(partial.horizonYears);
+            }}
             stochasticResult={stochasticResult}
           >
             <ContributionWhatIfControls pack={pack} />
@@ -203,10 +232,13 @@ export default function App() {
         ) : null}
 
         {pack && validation.isValid && result ? (
-          <StochasticControls hasStochasticAccounts={hasStochasticAccounts} stochasticResult={stochasticResult} isRunning={isStochasticRunning} progress={stochasticProgress} />
+          <section id="monte-carlo">
+            <StochasticControls hasStochasticAccounts={hasStochasticAccounts} stochasticResult={stochasticResult} isRunning={isStochasticRunning} progress={stochasticProgress} />
+          </section>
         ) : null}
 
-        <ScenarioInspector
+        <section id="source-data">
+          <ScenarioInspector
           projectionSettings={projectionSettings}
           projectionStartDate={result?.milestones.projectionStartDate ?? projectionStartDate}
           pack={pack}
@@ -217,6 +249,7 @@ export default function App() {
           onReload={() => refetchScenario()}
           onSave={handleSave}
         />
+        </section>
 
         {showWizard && pack ? (
           <TemplateWizard
@@ -227,5 +260,6 @@ export default function App() {
         ) : null}
       </div>
     </div>
+  </div>
   );
 }

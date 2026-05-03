@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatChartCurrencyTick, formatDate } from "../format";
+import { formatChartCurrencyTick, formatDate, formatFrequency } from "../format";
 
 describe("formatChartCurrencyTick", () => {
   it("formats zero as $0", () => {
@@ -40,5 +40,19 @@ describe("formatDate", () => {
     expect(formatDate("")).toBe("");
     expect(formatDate("2026")).toBe("2026");
     expect(formatDate("2026-05")).toBe("2026-05");
+  });
+});
+
+describe("formatFrequency", () => {
+  it("capitalizes known frequencies", () => {
+    expect(formatFrequency("daily")).toBe("Daily");
+    expect(formatFrequency("weekly")).toBe("Weekly");
+    expect(formatFrequency("monthly")).toBe("Monthly");
+    expect(formatFrequency("quarterly")).toBe("Quarterly");
+    expect(formatFrequency("annual")).toBe("Annual");
+  });
+
+  it("returns unknown frequencies unchanged", () => {
+    expect(formatFrequency("biweekly")).toBe("biweekly");
   });
 });

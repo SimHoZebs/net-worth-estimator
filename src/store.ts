@@ -1,6 +1,33 @@
 import { create } from "zustand";
 import type { StateCreator } from "zustand";
-import type { Account, Checkpoint, Posting, ScenarioPack, ScenarioWhatIfState, StochasticConfig } from "@/lib/projection";
+import type { Account, Checkpoint, Posting, ScenarioPack, ScenarioWhatIfState, StochasticConfig, ProjectionResult, StochasticProjectionResult } from "@/lib/projection";
+
+/* ------------------------------------------------------------------ */
+/*  Snapshot slice                                                     */
+/* ------------------------------------------------------------------ */
+
+export interface ScenarioSnapshot {
+  id: string;
+  label: string;
+  timestamp: number;
+  whatIfState: ScenarioWhatIfState;
+  result: ProjectionResult;
+  stochasticResult?: StochasticProjectionResult | null;
+}
+
+interface SnapshotSlice {
+  snapshots: ScenarioSnapshot[];
+  addSnapshot: (snapshot: ScenarioSnapshot) => void;
+  removeSnapshot: (id: string) => void;
+  clearSnapshots: () => void;
+}
+
+const createSnapshotSlice: StateCreator<AppStore, [], [], SnapshotSlice> = (set) => ({
+  snapshots: [],
+  addSnapshot: (snapshot) => set((s) => ({ snapshots: [...s.snapshots, snapshot] })),
+  removeSnapshot: (id) => set((s) => ({ snapshots: s.snapshots.filter((sn) => sn.id !== id) })),
+  clearSnapshots: () => set({ snapshots: [] }),
+});
 
 /* ------------------------------------------------------------------ */
 /*  What-if slice                                                      */
@@ -217,15 +244,22 @@ const DEFAULT_STOCHASTIC_RUN_COUNT = 1000;
 interface SettingsSlice {
   targetNetWorthInput: string;
   setTargetNetWorthInput: (value: string) => void;
+  horizonYears: number;
+  setHorizonYears: (years: number) => void;
   stochasticEnabled: boolean;
   setStochasticEnabled: (enabled: boolean) => void;
   stochasticConfig: StochasticConfig;
   setStochasticConfig: (config: StochasticConfig) => void;
 }
 
+const DEFAULT_HORIZON_YEARS = 25;
+
 const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (set) => ({
   targetNetWorthInput: String(DEFAULT_TARGET_NET_WORTH),
   setTargetNetWorthInput: (value) => set({ targetNetWorthInput: value }),
+
+  horizonYears: DEFAULT_HORIZON_YEARS,
+  setHorizonYears: (years) => set({ horizonYears: years }),
 
   stochasticEnabled: false,
   setStochasticEnabled: (enabled) => set({ stochasticEnabled: enabled }),
@@ -238,12 +272,13 @@ const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (set)
 /*  Composed store                                                     */
 /* ------------------------------------------------------------------ */
 
-export type AppStore = WhatIfSlice & EditorSlice & SettingsSlice;
+export type AppStore = WhatIfSlice & EditorSlice & SettingsSlice & SnapshotSlice;
 
 export const useStore = create<AppStore>()((...args) => ({
   ...createWhatIfSlice(...args),
   ...createEditorSlice(...args),
   ...createSettingsSlice(...args),
+  ...createSnapshotSlice(...args),
 }));
 
 /* ------------------------------------------------------------------ */

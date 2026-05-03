@@ -19,6 +19,7 @@ interface AccountDiagnosticChartProps {
   targetNetWorth: number;
   hasStochasticData: boolean;
   chartData: Record<string, string | number>[];
+  milestoneDates?: { hitTarget?: string; firstShortfall?: string };
 }
 
 export function AccountDiagnosticChart({
@@ -26,6 +27,7 @@ export function AccountDiagnosticChart({
   targetNetWorth,
   hasStochasticData,
   chartData,
+  milestoneDates,
 }: AccountDiagnosticChartProps) {
   return (
     <section>
@@ -104,6 +106,36 @@ export function AccountDiagnosticChart({
                     fontWeight: 600,
                   }}
                 />
+                {milestoneDates?.hitTarget ? (
+                  <ReferenceLine
+                    x={milestoneDates.hitTarget}
+                    stroke="#059669"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                    label={{
+                      value: "Target reached",
+                      position: "insideTopLeft",
+                      fill: "#059669",
+                      fontSize: 11,
+                      fontWeight: 500,
+                    }}
+                  />
+                ) : null}
+                {milestoneDates?.firstShortfall ? (
+                  <ReferenceLine
+                    x={milestoneDates.firstShortfall}
+                    stroke="#d97706"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                    label={{
+                      value: "First shortfall",
+                      position: "insideTopLeft",
+                      fill: "#d97706",
+                      fontSize: 11,
+                      fontWeight: 500,
+                    }}
+                  />
+                ) : null}
                 {hasStochasticData ? (
                   <>
                     <Area type="monotone" dataKey="p10_base" stackId="outer" stroke="none" fill="transparent" isAnimationActive={false} />

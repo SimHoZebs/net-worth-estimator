@@ -45,6 +45,17 @@ export function pluralize(count: number, singular: string, plural?: string): str
   return `${count} ${count === 1 ? singular : (plural ?? `${singular}s`)}`;
 }
 
+export function formatFrequency(freq: string): string {
+  const map: Record<string, string> = {
+    daily: "Daily",
+    weekly: "Weekly",
+    monthly: "Monthly",
+    quarterly: "Quarterly",
+    annual: "Annual",
+  };
+  return map[freq] ?? freq;
+}
+
 export function formatRoute(
   sourceLabel: string | null,
   destinations: Array<{ label: string }> | null

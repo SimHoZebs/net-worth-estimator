@@ -1,103 +1,157 @@
-# CSV Product Model
+# Component Extraction & Composition Plan
 
-Status: implemented.
+Status: **In progress** — Phase 1 (dashboard sub-components) underway.
 
-This file describes the current CSV-backed product model.
+---
 
-## Product Rules
+## Problem
 
-- Historical net worth comes from account balance checkpoints.
-- Future net worth comes from tracked account balances, scheduled postings, and account growth between exact event dates.
-- Every future cash movement is represented as a posting.
-- Postings can represent external inflows, external outflows, or account-to-account transfers.
-- Canonical persistent data lives in repo-backed CSV files under `public/scenario/`.
-- The UI is read-only for persistent data.
-- Runtime target net worth is session-only and editable in the UI.
-- Projection horizon is fixed at 50 years.
-- Future projection starts from the latest checkpoint date, or today if no checkpoints exist.
-- Temporary what-if overrides are session-only and apply only to posting multipliers.
+Four large components violate the Single Responsibility Principle and mix concerns:
 
-## Canonical CSV Pack
+| Component | Lines | Problem |
+|-----------|-------|---------|
+| `CsvProjectionDashboard.tsx` | 472 | Computes ~15 derived values inline, renders 8 distinct UI sections monolithically |
+| `CsvScenarioInspector.tsx` | 457 | Doubles JSX via `isEditing` branch for accounts, postings, checkpoints |
+| `CsvContributionWhatIfControls.tsx` | 420 | Three duplicated form-in-a-section patterns (account, posting, checkpoint) |
+| `StochasticControls.tsx` | 236 | Debounce timer logic embedded in component body |
+| `App.tsx` | 231 | Minor: `activeOverrideCount` computed inline instead of using existing `selectActiveOverrideCount` selector |
 
-The app loads these files from `public/scenario/`:
+---
 
-- `accounts.csv`
-- `checkpoints.csv`
-- `postings.csv`
+## End State
 
-### `accounts.csv`
+```
+App (orchestrator)
+├── ProjectionDashboard (orchestrator, ~80 lines)
+│   ├── AccountDiagnosticChart   [existing, unchanged]
+│   ├── ProjectionHeadline        [NEW]
+│   ├── OutcomeMetricsRow         [NEW]
+│   │   └── OutcomeMetric × 3    [existing]
+│   ├── TargetNetWorthCard        [NEW]
+│   │   └── CompactDetail × 3    [existing]
+│   ├── AssumptionsPanel          [NEW]
+│   ├── DriverCardsRow            [NEW]
+│   │   └── DriverCard × 3       [existing]
+│   ├── TransactionCompletionTable [NEW]
+│   └── UpcomingTransactionsTable [NEW]
+├── ContributionWhatIfControls (orchestrator, ~50 lines)
+│   ├── WhatIfAccountForm         [NEW]
+│   ├── WhatIfPostingForm         [NEW]
+│   └── WhatIfCheckpointForm      [NEW]
+├── StochasticControls (orchestrator, ~190 lines)
+│   └── useDebouncedStochasticConfig [NEW hook]
+├── ScenarioInspector (orchestrator, ~130 lines)
+│   ├── SummaryCard × 7           [MOVED to ui/]
+│   ├── EditableAccountsTable     [NEW]
+│   ├── ReadOnlyAccountsTable     [NEW]
+│   │   └── DataTable             [MOVED to ui/]
+│   ├── EditablePostingsTable     [NEW]
+│   ├── ReadOnlyPostingsTable     [NEW]
+│   ├── EditableCheckpointsTable  [NEW]
+│   └── ReadOnlyCheckpointsTable  [NEW]
+└── TemplateWizard                [existing, unchanged]
+    ├── IncomeForm                [existing]
+    └── TemplatePreview           [existing]
+```
 
-Fields:
+---
 
-- `id`
-- `label`
-- `annualRate`
-- `color`
-- `enabled`
-- All enabled accounts participate in net worth.
-- No account ID is treated specially by name.
+## Phase 1: Extract Dashboard Sub-components
 
-### `checkpoints.csv`
+Extract 7 components from `CsvProjectionDashboard.tsx` into `src/components/dashboard/`.
 
-Fields:
+### Files to create
 
-- `Date`
-- `AccountId`
-- `Balance`
+| File | Responsibility | Props |
+|------|---------------|-------|
+| `ProjectionHeadline.tsx` | Status badge + headline text + detail text + override badge | `goalReached`, `headline`, `headlineDetail`, `activeOverrideCount` |
+| `OutcomeMetricsRow.tsx` | 3-column grid of OutcomeMetric cards | `currentNetWorth`, `currentDate`, `finalNetWorth`, `finalDate`, `distanceToTarget`, `goalReached` |
+| `TargetNetWorthCard.tsx` | Target input/display with inline editing + CompactDetails | `targetNetWorthInput`, `onChange`, `horizonYears`, `projectionStartDate`, `activeOverrideCount` |
+| `AssumptionsPanel.tsx` | Key assumptions card (income, expenses, counts, disclaimer) | `pack`, `horizonYears`, `hasStochasticData` |
+| `DriverCardsRow.tsx` | 3 DriverCards (constraint, next transaction, completion rate) | `biggestShortfallPosting`, `goalReached`, `firstProjectedRow`, `nextEventDetail`, `postingUtilizationRate`, `realizedPostingAmount`, `requestedPostingAmount`, `enabledPostingCount` |
+| `TransactionCompletionTable.tsx` | Table showing per-posting completion rates | `postingSummaries` |
+| `UpcomingTransactionsTable.tsx` | Expandable table of upcoming projected transactions | `activeFutureRows`, `postingLabelById`, `expandedEventRows`, `onToggleEventRow` |
 
-Notes:
+### Files to modify
 
-- Multiple rows on the same date are applied in file order.
-- Historical rows are shown only on exact checkpoint dates.
+- `CsvProjectionDashboard.tsx` — Replace inline JSX blocks with new component composition
 
-### `postings.csv`
+---
 
-Fields:
+## Phase 2: Extract Inspector Sub-components
 
-- `id`
-- `label`
-- `sourceAccountId`
-- `destinationAccountId`
-- `amountMode`
-- `basePostingId`
-- `amount`
-- `annualGrowthRate`
-- `startDate`
-- `endDate`
-- `annualCap`
-- `priority`
-- `enabled`
+Extract 6 components from `CsvScenarioInspector.tsx` into `src/components/inspector/`.
 
-Notes:
+### Files to create
 
-- Blank `sourceAccountId` means an external inflow.
-- Blank `destinationAccountId` means an external outflow.
-- Setting both account IDs creates an internal transfer.
-- `amountMode` is `fixed` or `percent_of_base`.
-- `percent_of_base` rows use the latest realized amount from `basePostingId`.
-- `annualGrowthRate` applies to the resolved amount over time.
-- `annualCap` is optional and enforced per calendar year.
-- Rows on the same date are applied in ascending `priority`, then file order.
-- Rows with a source account clamp to that account's available positive balance.
+| File | Responsibility |
+|------|---------------|
+| `EditableAccountsTable.tsx` | Inline-editable accounts table (ID, Label, Min, Max, Color, Enabled) |
+| `ReadOnlyAccountsTable.tsx` | Thin wrapper around DataTable for read-only accounts |
+| `EditablePostingsTable.tsx` | Inline-editable postings table (14 columns) |
+| `ReadOnlyPostingsTable.tsx` | Thin wrapper around DataTable for read-only postings |
+| `EditableCheckpointsTable.tsx` | Inline-editable checkpoints table (Date, AccountId, Balance) |
+| `ReadOnlyCheckpointsTable.tsx` | Thin wrapper around DataTable for read-only checkpoints |
 
-## Projection Semantics
+### Files to move
 
-### Historical View
+- `DataTable` — from private helper in `CsvScenarioInspector` to `src/components/ui/data-table.tsx`
+- `SummaryCard` — from private helper in `CsvScenarioInspector` to `src/components/ui/summary-card.tsx`
 
-- Historical rows are built directly from checkpoint dates.
+---
 
-### Future View
+## Phase 3: Extract What-If Form Sub-components
 
-For each projected event date:
+Extract 3 components from `CsvContributionWhatIfControls.tsx` into `src/components/what-if/`.
 
-1. Start from the prior checkpoint or prior projected event.
-2. Accrue account growth or interest from `annualRate` using daily compounding over the exact elapsed days.
-3. Resolve requested posting amounts.
-4. Clamp requested amounts by annual caps and source-account liquidity when a source account exists.
-5. Apply realized postings as real debits and credits.
-6. Compute end-of-date net worth from enabled accounts.
+### Files to create
 
-### Net Worth Formula
+| File | Responsibility |
+|------|---------------|
+| `WhatIfAccountForm.tsx` | Inline add-account form + added accounts list |
+| `WhatIfPostingForm.tsx` | Inline add-posting form (13 fields) + added postings list |
+| `WhatIfCheckpointForm.tsx` | Inline add-checkpoint form + added checkpoints list |
 
-- Net worth is the sum of enabled account balances.
-- Positive balances increase net worth and negative balances reduce it.
+---
+
+## Phase 4: Extract Debounce Hook
+
+### Files to create
+
+| File | Responsibility |
+|------|---------------|
+| `src/hooks/useDebouncedStochasticConfig.ts` | Encapsulates debounce timer, pending config, immediate apply |
+
+### Files to modify
+
+- `StochasticControls.tsx` — Use hook instead of inline debounce logic
+
+---
+
+## Phase 5: Minor Optimizations
+
+- `App.tsx`: Use `selectActiveOverrideCount` selector instead of manual computation
+- `CsvProjectionDashboard.tsx`: Same fix (or receive as prop after extraction)
+
+---
+
+## File Count Summary
+
+| Category | New files |
+|----------|-----------|
+| `src/components/dashboard/` | 7 |
+| `src/components/inspector/` | 6 |
+| `src/components/what-if/` | 3 |
+| `src/components/ui/` | 2 (moved) |
+| `src/hooks/` | 1 |
+| **Total new files** | **19** |
+| **Files modified** | 5 (`App.tsx`, `CsvProjectionDashboard.tsx`, `CsvScenarioInspector.tsx`, `CsvContributionWhatIfControls.tsx`, `StochasticControls.tsx`) |
+
+## Verification
+
+After each phase:
+```
+npm run typecheck
+npm run test
+npm run dev   # visual smoke test
+```

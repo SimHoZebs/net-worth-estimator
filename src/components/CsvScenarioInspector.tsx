@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { CSV_SCENARIO_PUBLIC_PATH } from "@/lib/projection";
 import type { Account, Checkpoint, Posting, ProjectionRuntimeSettings, ScenarioPack } from "@/lib/projection";
 import type { ScenarioValidationIssue } from "@/lib/projection";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { currency, integer, decimal, pluralize } from "@/lib/format";
+import { currency, integer, decimal, pluralize, formatFrequency } from "@/lib/format";
 import { useStore } from "@/store";
 
 interface ScenarioInspectorProps {
@@ -58,14 +58,55 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
 }
 
 function DataTable<TRow extends object>({
-  title, description, rows, columns, emptyText = "No rows.",
+  title, description, rows, columns, emptyText = "No rows.", variant = "card",
 }: {
   title: string;
   description: string;
   rows: TRow[];
   columns: TableColumn<TRow>[];
   emptyText?: string;
+  variant?: "card" | "flat";
 }) {
+  const table = (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          {columns.map((c) => <TableHead key={String(c.key)}>{c.label}</TableHead>)}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.length > 0 ? rows.map((row, ri) => (
+          <TableRow key={`${title}-${ri}`}>
+            {columns.map((c) => {
+              const v = row[c.key as keyof TRow];
+              return (
+                <TableCell key={String(c.key)}>
+                  {c.render ? c.render(v, row, ri) : (c.format ? c.format(v, row) : formatValue(v))}
+                </TableCell>
+              );
+            })}
+          </TableRow>
+        )) : (
+          <TableRow>
+            <TableCell colSpan={columns.length} className="py-6 text-center text-slate-500">{emptyText}</TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
+  );
+
+  if (variant === "flat") {
+    return (
+      <div className="space-y-2">
+        <div>
+          <div className="text-sm font-semibold text-slate-900">{title}</div>
+          <div className="text-xs text-slate-500">{description}</div>
+        </div>
+        {table}
+      </div>
+    );
+  }
+
   return (
     <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
       <CardHeader>
@@ -73,31 +114,7 @@ function DataTable<TRow extends object>({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {columns.map((c) => <TableHead key={String(c.key)}>{c.label}</TableHead>)}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length > 0 ? rows.map((row, ri) => (
-              <TableRow key={`${title}-${ri}`}>
-                {columns.map((c) => {
-                  const v = row[c.key as keyof TRow];
-                  return (
-                    <TableCell key={String(c.key)}>
-                      {c.render ? c.render(v, row, ri) : (c.format ? c.format(v, row) : formatValue(v))}
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
-            )) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="py-6 text-center text-slate-500">{emptyText}</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+        {table}
       </CardContent>
     </Card>
   );
@@ -106,6 +123,42 @@ function DataTable<TRow extends object>({
 function inputStyle(isDirty: boolean) {
   const dirty = isDirty ? "border-amber-300 bg-amber-50" : "border-slate-200";
   return `w-full rounded-lg ${dirty} px-2 py-1 text-sm outline-none font-mono text-xs`;
+}
+
+function ColorSwatch({ color }: { color: string | null }) {
+  if (!color) return <span className="text-slate-400">—</span>;
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        className="h-4 w-4 rounded border border-slate-200"
+        style={{ backgroundColor: color }}
+        title={color}
+      />
+      <span className="font-mono text-xs text-slate-500">{color}</span>
+    </div>
+  );
+}
+
+function TableSearch({ value, onChange, placeholder = "Search..." }: { value: string; onChange: (value: string) => void; placeholder?: string }) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.currentTarget.value)}
+      placeholder={placeholder}
+      className="mb-3 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-400"
+    />
+  );
+}
+
+function filterRows<TRow extends object>(rows: TRow[], query: string): TRow[] {
+  if (!query.trim()) return rows;
+  const q = query.toLowerCase();
+  return rows.filter((row) =>
+    Object.values(row).some((v) =>
+      String(v ?? "").toLowerCase().includes(q)
+    )
+  );
 }
 
 export function ScenarioInspector({
@@ -132,6 +185,13 @@ export function ScenarioInspector({
   const disabledAccountSet = new Set(disabledAccountIds);
   const disabledPostingSet = new Set(disabledPostingIds);
   const displayPack = isEditing && workingPack ? workingPack : pack;
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [postingSearch, setPostingSearch] = useState("");
+  const [accountSearch, setAccountSearch] = useState("");
+  const [checkpointSearch, setCheckpointSearch] = useState("");
+
+  const accountLabelById = new Map(pack?.accounts.map((a) => [a.id, a.label]) ?? []);
 
   const errorCount = issues.filter((i) => i.severity === "error").length;
   const warningCount = issues.filter((i) => i.severity === "warning").length;
@@ -190,6 +250,18 @@ export function ScenarioInspector({
           </div>
         ) : null}
 
+        {!isEditing && pack ? (
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
+            >
+              {showAdvanced ? "Hide raw IDs and formulas" : "Show raw IDs and formulas"}
+            </button>
+          </div>
+        ) : null}
+
         {pack ? (
           <div className="space-y-4">
             <CollapsibleSection title="Projection settings and scheduled transactions" description="Session-only settings and scheduled flows.">
@@ -198,6 +270,7 @@ export function ScenarioInspector({
                   title="Runtime projection settings"
                   description="Session-only settings not stored in the data pack."
                   rows={[{ projectionStartDate, fallbackProjectionStartDate: projectionSettings.fallbackProjectionStartDate, horizonYears: projectionSettings.horizonYears, targetNetWorth: projectionSettings.targetNetWorth }]}
+                  variant="flat"
                   columns={[
                     { key: "projectionStartDate" as never, label: "Projection Start Date" },
                     { key: "fallbackProjectionStartDate" as never, label: "Fallback Start Date" },
@@ -287,34 +360,42 @@ export function ScenarioInspector({
                     </Card>
                   ) : (
                     /* ---- read-only postings ---- */
-                    <DataTable
-                      title="Postings"
-                      description="Scheduled flows. Checkbox toggles what-if disable (immediate)."
-                      rows={pack.postings}
-                      columns={[
-                        { key: "id" as never, label: "ID" },
-                        { key: "label" as never, label: "Label" },
-                        { key: "sourceAccountId" as never, label: "Source" },
-                        { key: "destinations" as never, label: "Destinations" },
-                        { key: "arithmetic" as never, label: "Arithmetic" },
-                        { key: "frequency" as never, label: "Freq" },
-                        { key: "annualRate" as never, label: "Rate" },
-                        { key: "annualGrowthRate" as never, label: "Growth" },
-                        { key: "volatility" as never, label: "Vol" },
-                        { key: "startDate" as never, label: "Start" },
-                        { key: "endDate" as never, label: "End" },
-                        { key: "annualCap" as never, label: "Cap", format: (v) => v === null ? "-" : formatCurrency(v) },
-                        { key: "priority" as never, label: "Pri" },
-                        {
-                          key: "enabled" as never, label: "Enabled",
-                          render: (_v, row) => {
-                            const p = row as Posting;
-                            return <input type="checkbox" className="h-4 w-4 rounded accent-slate-700" checked={!disabledPostingSet.has(p.id)}
-                              onChange={() => togglePostingDisabled(p.id)} />;
+                    <div>
+                      <TableSearch value={postingSearch} onChange={setPostingSearch} placeholder="Search transactions..." />
+                      <DataTable
+                        title="Postings"
+                        description="Scheduled flows. Checkbox toggles what-if disable (immediate)."
+                        rows={filterRows(pack.postings, postingSearch)}
+                        variant="flat"
+                        columns={[
+                          ...(showAdvanced ? [{ key: "id" as never, label: "ID" }] : []),
+                          { key: "label" as never, label: "Transaction" },
+                          ...(showAdvanced ? [{ key: "sourceAccountId" as never, label: "Source" }] : []),
+                          { key: "destinations" as never, label: "To" },
+                          ...(showAdvanced ? [{ key: "arithmetic" as never, label: "Formula" }] : []),
+                          { key: "frequency" as never, label: "Freq", format: (v) => formatFrequency(String(v)) },
+                          ...(showAdvanced ? [
+                            { key: "annualRate" as never, label: "Rate" },
+                            { key: "annualGrowthRate" as never, label: "Growth" },
+                            { key: "volatility" as never, label: "Vol" },
+                          ] : []),
+                          { key: "startDate" as never, label: "Start" },
+                          { key: "endDate" as never, label: "End" },
+                          ...(showAdvanced ? [
+                            { key: "annualCap" as never, label: "Cap", format: (v: unknown) => v === null ? "-" : formatCurrency(v) },
+                            { key: "priority" as never, label: "Pri" },
+                          ] : []),
+                          {
+                            key: "enabled" as never, label: "Enabled",
+                            render: (_v, row) => {
+                              const p = row as Posting;
+                              return <input type="checkbox" className="h-4 w-4 rounded accent-slate-700" checked={!disabledPostingSet.has(p.id)}
+                                onChange={() => togglePostingDisabled(p.id)} />;
+                            },
                           },
-                        },
-                      ]}
-                    />
+                        ]}
+                      />
+                    </div>
                   )
                 ) : null}
               </div>
@@ -374,26 +455,33 @@ export function ScenarioInspector({
                     </Card>
                   ) : (
                     /* ---- read-only accounts ---- */
-                    <DataTable
-                      title="Accounts"
-                      description="Tracked signed balances. Checkbox toggles what-if disable (immediate)."
-                      rows={pack.accounts}
-                      columns={[
-                        { key: "id" as never, label: "ID" },
-                        { key: "label" as never, label: "Label" },
-                        { key: "minBalance" as never, label: "Min", format: (v) => v === null ? "-" : formatCurrency(v) },
-                        { key: "maxBalance" as never, label: "Max", format: (v) => v === null ? "-" : formatCurrency(v) },
-                        { key: "color" as never, label: "Color" },
-                        {
-                          key: "enabled" as never, label: "Enabled",
-                          render: (_v, row) => {
-                            const a = row as Account;
-                            return <input type="checkbox" className="h-4 w-4 rounded accent-slate-700" checked={!disabledAccountSet.has(a.id)}
-                              onChange={() => toggleAccountDisabled(a.id)} />;
+                    <div>
+                      <TableSearch value={accountSearch} onChange={setAccountSearch} placeholder="Search accounts..." />
+                      <DataTable
+                        title="Accounts"
+                        description="Tracked signed balances. Checkbox toggles what-if disable (immediate)."
+                        rows={filterRows(pack.accounts, accountSearch)}
+                        variant="flat"
+                        columns={[
+                          ...(showAdvanced ? [{ key: "id" as never, label: "ID" }] : []),
+                          { key: "label" as never, label: "Account" },
+                          { key: "minBalance" as never, label: "Min", format: (v: unknown) => v === null ? "-" : formatCurrency(v) },
+                          { key: "maxBalance" as never, label: "Max", format: (v: unknown) => v === null ? "-" : formatCurrency(v) },
+                          {
+                            key: "color" as never, label: "Color",
+                            render: (_v, row) => <ColorSwatch color={(row as Account).color} />,
                           },
-                        },
-                      ]}
-                    />
+                          {
+                            key: "enabled" as never, label: "Enabled",
+                            render: (_v, row) => {
+                              const a = row as Account;
+                              return <input type="checkbox" className="h-4 w-4 rounded accent-slate-700" checked={!disabledAccountSet.has(a.id)}
+                                onChange={() => toggleAccountDisabled(a.id)} />;
+                            },
+                          },
+                        ]}
+                      />
+                    </div>
                   )
                 ) : null}
 
@@ -435,16 +523,29 @@ export function ScenarioInspector({
                     </Card>
                   ) : (
                     /* ---- read-only checkpoints ---- */
-                    <DataTable
-                      title="Balance history"
-                      description="Historical account balance checkpoints."
-                      rows={pack.checkpoints}
-                      columns={[
-                        { key: "Date" as never, label: "Date" },
-                        { key: "AccountId" as never, label: "Account ID" },
-                        { key: "Balance" as never, label: "Balance", format: (v) => formatCurrency(v) },
-                      ]}
-                    />
+                    <div>
+                      <TableSearch value={checkpointSearch} onChange={setCheckpointSearch} placeholder="Search checkpoints..." />
+                      <DataTable
+                        title="Balance history"
+                        description="Historical account balance checkpoints."
+                        rows={filterRows(pack.checkpoints, checkpointSearch)}
+                        variant="flat"
+                        columns={[
+                          { key: "Date" as never, label: "Date" },
+                          ...(showAdvanced
+                            ? [{ key: "AccountId" as never, label: "Account ID" }]
+                            : [{
+                                key: "AccountId" as never,
+                                label: "Account",
+                                render: (_v: unknown, row: object) => {
+                                  const accountId = (row as Checkpoint).AccountId;
+                                  return <span className="text-slate-700">{accountLabelById.get(accountId) ?? accountId}</span>;
+                                },
+                              }]),
+                          { key: "Balance" as never, label: "Balance", format: (v: unknown) => formatCurrency(v) },
+                        ]}
+                      />
+                    </div>
                   )
                 ) : null}
               </div>

@@ -1219,28 +1219,37 @@ Avoid narrow centered layouts for dense financial tables.
 # Immediate dev checklist
 
 > **Phase 1 (Trust & Clarity)** — Completed. Checked items below were implemented in the first pass.
+>
+> **Phase 2 (Structure & Progressive Disclosure)** — Completed. Checked items below were implemented in the second pass.
 
 * [ ] Add a sticky section nav or tab structure.
-* [ ] Create a top-level overview that answers: current, target, target date, confidence, blocker.
+* [x] Create a top-level overview that answers: current, target, target date, confidence, blocker.
 * [x] Split deterministic and Monte Carlo result cards.
-* [x] Replace “100% chance” language.
+* [x] Replace "100% chance" language.
 * [x] Add assumption summary next to the main result.
 * [x] Add chart legend and direct target label.
 * [x] Format y-axis as `$2M`, `$4M`, etc.
 * [x] Replace raw target input `1000000` with formatted currency input.
 * [x] Replace ISO dates with human-readable dates in the main UI.
-* [ ] Hide raw IDs by default.
-* [ ] Hide raw formulas behind expandable details.
-* [ ] Replace hex codes with color swatches.
+* [x] Hide raw IDs by default.
+* [x] Hide raw formulas behind expandable details.
+* [x] Replace hex codes with color swatches.
 * [x] Rename postings/checkpoints/event rows in user-facing sections.
-* [ ] Add debt summary module.
-* [ ] Add cash-flow waterfall.
-* [ ] Add current net worth reconciliation.
-* [ ] Add scenario templates.
+* [x] Add debt summary module.
+* [x] Add cash-flow waterfall.
+* [x] Add current net worth reconciliation.
+* [x] Add scenario templates. (Income pattern wizard already exists.)
 * [ ] Add scenario comparison table.
-* [ ] Add table search/filter/pagination.
+* [x] Add table search/filter/pagination. (Search/filter added; pagination deferred until data scales.)
 * [x] Clarify temporary vs saved changes.
 * [x] Rename ambiguous controls: reload, rerun, reset.
+* [x] Improve accordion affordances (chevrons, hover states).
+* [x] Standardize frequency formatting ("Monthly" instead of "monthly").
+* [x] Reduce card nesting in diagnostics (flat table variant inside collapsibles).
+* [x] Add inflation and tax-model disclosure ("Model assumptions" note in assumptions card).
+* [x] Add Monte Carlo assumption transparency (simulation methodology note in StochasticControls).
+* [x] Add "Reason" column to upcoming event rows table (explains why shortfalls occur).
+* [x] Add loading skeleton state while scenario data is being fetched.
 
 ---
 
