@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Account, Checkpoint, Posting, ScenarioPack } from "@/lib/projection";
 import { Button } from "@/components/ui/button";
+import { NO_FLOOR, NO_CEILING } from "@/lib/projection/constants";
 import { currency, formatRoute } from "@/lib/format";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { useShallow } from "zustand/shallow";
@@ -24,8 +25,8 @@ function emptyAccount(): Account {
   return {
     id: "",
     label: "",
-    minBalance: null,
-    maxBalance: null,
+    minBalance: NO_FLOOR,
+    maxBalance: NO_CEILING,
     color: null,
     enabled: true,
   };

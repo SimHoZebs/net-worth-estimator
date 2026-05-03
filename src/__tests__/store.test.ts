@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { NO_FLOOR, NO_CEILING } from "@/lib/projection/constants";
 import { useStore, selectActiveOverrideCount, selectWhatIfState } from "@/store";
 
 /* ------------------------------------------------------------------ */
@@ -6,7 +7,7 @@ import { useStore, selectActiveOverrideCount, selectWhatIfState } from "@/store"
 /* ------------------------------------------------------------------ */
 
 function makeAccount(id = "a1", label = "Savings") {
-  return { id, label, minBalance: null, maxBalance: null, color: null, enabled: true };
+  return { id, label, minBalance: NO_FLOOR, maxBalance: NO_CEILING, color: null, enabled: true };
 }
 
 function makePosting(id = "p1") {
@@ -25,14 +26,14 @@ function makeCheckpoint(date = "2025-01-01", accountId = "a1", balance = 1000) {
 function makeScenarioPack(): {
   version: 8;
   sourcePath: string;
-  accounts: Array<{ id: string; label: string; minBalance: null; maxBalance: null; color: null; enabled: boolean }>;
+  accounts: Array<{ id: string; label: string; minBalance: number; maxBalance: number; color: null; enabled: boolean }>;
   checkpoints: Array<{ Date: string; AccountId: string; Balance: number }>;
   postings: Array<{ id: string; label: string; sourceAccountId: null; destinations: null; arithmetic: string; frequency: "monthly"; annualRate: number; annualGrowthRate: number; volatility: number; startDate: string; endDate: null; annualCap: null; priority: number; enabled: boolean }>;
 } {
   return {
     version: 8,
     sourcePath: "/scenario",
-    accounts: [{ id: "a1", label: "Savings", minBalance: null, maxBalance: null, color: null, enabled: true }],
+    accounts: [{ id: "a1", label: "Savings", minBalance: NO_FLOOR, maxBalance: NO_CEILING, color: null, enabled: true }],
     checkpoints: [{ Date: "2025-01-01", AccountId: "a1", Balance: 1000 }],
     postings: [makePosting("p1")],
   };

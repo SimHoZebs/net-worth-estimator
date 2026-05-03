@@ -8,6 +8,7 @@ import {
   csvPostingSchema,
   csvPostingsHeaders,
 } from "./csvSchema";
+import { NO_FLOOR, NO_CEILING } from "../../constants";
 import {
   CSV_SCENARIO_FILE_NAMES,
   SCENARIO_MODEL_VERSION,
@@ -175,7 +176,7 @@ export function serializeCsvScenarioPack(pack: ScenarioPack): ScenarioFileConten
   return {
     accounts: [accountsHeader].concat(
       pack.accounts.map((a) =>
-        `${a.id},${a.label},${a.minBalance ?? ""},${a.maxBalance ?? ""},${a.color ?? ""},${a.enabled}`
+        `${a.id},${a.label},${a.minBalance === NO_FLOOR ? "-Infinity" : a.minBalance},${a.maxBalance === NO_CEILING ? "Infinity" : a.maxBalance},${a.color ?? ""},${a.enabled}`
       )
     ).join("\n"),
     postings: [postingsHeader].concat(

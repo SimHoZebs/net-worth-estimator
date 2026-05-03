@@ -1,3 +1,4 @@
+import { NO_FLOOR, NO_CEILING } from "@/lib/projection/constants";
 import type { Account, Posting } from "@/lib/projection";
 import type { IncomeTemplateInput, TemplateOutput, TemplateGenerationResult } from "./types";
 
@@ -16,7 +17,7 @@ function sanitizeStem(label: string): string {
 }
 
 function makeAccount(id: string, label: string, color: string): Account {
-  return { id, label, minBalance: null, maxBalance: null, color, enabled: true };
+  return { id, label, minBalance: NO_FLOOR, maxBalance: NO_CEILING, color, enabled: true };
 }
 
 function makePosting(

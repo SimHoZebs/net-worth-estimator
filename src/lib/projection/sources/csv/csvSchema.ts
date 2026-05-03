@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { NO_FLOOR, NO_CEILING } from "../../constants";
 import type {
   Account,
   Checkpoint,
@@ -30,20 +31,42 @@ function parseOptionalNumber(value: unknown) {
   return parseNumber(value);
 }
 
-function parseNegInfinityNumber(value: unknown) {
+function parseNoFloor(value: unknown): number {
+  if (value === null || value === undefined) {
+    return Number.NaN;
+  }
+
   if (typeof value === "string") {
     const trimmed = value.trim();
-
     if (trimmed.length === 0) {
-      return null;
+      return Number.NaN;
     }
-
     if (trimmed === "-Infinity") {
-      return Number.NEGATIVE_INFINITY;
+      return NO_FLOOR;
     }
   }
 
-  return parseNumber(value);
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isNaN(n) || !Number.isFinite(n) ? Number.NaN : n;
+}
+
+function parseNoCeiling(value: unknown): number {
+  if (value === null || value === undefined) {
+    return Number.NaN;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return Number.NaN;
+    }
+    if (trimmed === "Infinity") {
+      return NO_CEILING;
+    }
+  }
+
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isNaN(n) || !Number.isFinite(n) ? Number.NaN : n;
 }
 
 function parseBoolean(value: unknown) {
@@ -90,13 +113,8 @@ function parseDestinationsArray(value: unknown): string[] | null {
 
 const finiteNumber = z.preprocess(parseNumber, z.number().finite());
 const nullableNumber = z.preprocess(parseOptionalNumber, z.number().finite().nullable());
-const nullableNegInfinityNumber = z.preprocess(
-  parseNegInfinityNumber,
-  z.any().refine(
-    (val): val is number | null => val === null || val === Number.NEGATIVE_INFINITY || (typeof val === "number" && Number.isFinite(val)),
-    { message: "Expected a finite number, null, or -Infinity" }
-  )
-);
+const nonNullableNoFloor = z.preprocess(parseNoFloor, z.number().finite());
+const nonNullableNoCeiling = z.preprocess(parseNoCeiling, z.number().finite());
 const nonNegativeNumber = z.preprocess(parseNumber, z.number().finite().min(0));
 const nullableNonNegativeNumber = z.preprocess(parseOptionalNumber, z.number().finite().min(0).nullable());
 const positiveInteger = z.preprocess(parseNumber, z.number().int().min(1));
@@ -132,8 +150,8 @@ export const csvPostingsHeaders = [
 export const csvAccountSchema = z.object({
   id: trimmedString,
   label: trimmedString,
-  minBalance: nullableNegInfinityNumber,
-  maxBalance: nullableNumber,
+  minBalance: nonNullableNoFloor,
+  maxBalance: nonNullableNoCeiling,
   color: nullableTrimmedString,
   enabled: csvBoolean,
 }) satisfies z.ZodType<Account>;

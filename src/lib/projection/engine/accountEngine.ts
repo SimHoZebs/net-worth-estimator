@@ -28,7 +28,13 @@ export function getWithdrawableAmount(
     return 0;
   }
 
-  return Math.max(0, (balances[accountId] ?? 0) - (account.minBalance ?? 0));
+  if (account.minBalance === null || account.minBalance === undefined) {
+    throw new Error(
+      `Account "${account.id}" has no minBalance configured. Set explicit value (use -Infinity for no floor).`
+    );
+  }
+
+  return Math.max(0, (balances[accountId] ?? 0) - account.minBalance);
 }
 
 export function getHeadroom(
@@ -41,7 +47,13 @@ export function getHeadroom(
     return 0;
   }
 
-  return Math.max(0, (account.maxBalance ?? Number.POSITIVE_INFINITY) - (balances[accountId] ?? 0));
+  if (account.maxBalance === null || account.maxBalance === undefined) {
+    throw new Error(
+      `Account "${account.id}" has no maxBalance configured. Set explicit value (use Infinity for no ceiling).`
+    );
+  }
+
+  return Math.max(0, account.maxBalance - (balances[accountId] ?? 0));
 }
 
 export function getTotalDestinationHeadroom(
@@ -55,6 +67,12 @@ export function getTotalDestinationHeadroom(
       return total;
     }
 
-    return total + Math.max(0, (account.maxBalance ?? Number.POSITIVE_INFINITY) - (balances[destId] ?? 0));
+    if (account.maxBalance === null || account.maxBalance === undefined) {
+      throw new Error(
+        `Account "${account.id}" has no maxBalance configured. Set explicit value (use Infinity for no ceiling).`
+      );
+    }
+
+    return total + Math.max(0, account.maxBalance - (balances[destId] ?? 0));
   }, 0);
 }

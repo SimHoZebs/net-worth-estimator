@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { NO_FLOOR, NO_CEILING } from "@/lib/projection/constants";
 import { CSV_SCENARIO_PUBLIC_PATH } from "@/lib/projection";
 import type { Account, Checkpoint, Posting, ProjectionRuntimeSettings, ScenarioPack } from "@/lib/projection";
 import type { ScenarioValidationIssue } from "@/lib/projection";
@@ -428,10 +429,10 @@ export function ScenarioInspector({
                                     onChange={(e) => updateAccount(a.id, { id: e.target.value })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={a.label}
                                     onChange={(e) => updateAccount(a.id, { label: e.target.value })} /></TableCell>
-                                  <TableCell><input className={inputStyle(!!changed)} type="number" value={a.minBalance ?? ""}
-                                    onChange={(e) => updateAccount(a.id, { minBalance: e.target.value ? Number(e.target.value) : null })} /></TableCell>
-                                  <TableCell><input className={inputStyle(!!changed)} type="number" value={a.maxBalance ?? ""}
-                                    onChange={(e) => updateAccount(a.id, { maxBalance: e.target.value ? Number(e.target.value) : null })} /></TableCell>
+                                  <TableCell><input className={inputStyle(!!changed)} type="number" value={a.minBalance === NO_FLOOR ? "" : a.minBalance}
+                                    onChange={(e) => updateAccount(a.id, { minBalance: e.target.value ? Number(e.target.value) : NO_FLOOR })} /></TableCell>
+                                  <TableCell><input className={inputStyle(!!changed)} type="number" value={a.maxBalance === NO_CEILING ? "" : a.maxBalance}
+                                    onChange={(e) => updateAccount(a.id, { maxBalance: e.target.value ? Number(e.target.value) : NO_CEILING })} /></TableCell>
                                   <TableCell><input className={inputStyle(!!changed)} value={a.color ?? ""}
                                     onChange={(e) => updateAccount(a.id, { color: e.target.value || null })} /></TableCell>
                                   <TableCell>
@@ -448,7 +449,7 @@ export function ScenarioInspector({
                         </Table>
                         <div className="mt-3">
                           <Button type="button" variant="ghost" size="sm" onClick={() => addAccount(
-                            { id: "new-account-" + Date.now(), label: "New account", minBalance: null, maxBalance: null, color: null, enabled: true }
+                            { id: "new-account-" + Date.now(), label: "New account", minBalance: NO_FLOOR, maxBalance: NO_CEILING, color: null, enabled: true }
                           )}>+ Add account</Button>
                         </div>
                       </CardContent>
@@ -465,8 +466,8 @@ export function ScenarioInspector({
                         columns={[
                           ...(showAdvanced ? [{ key: "id" as never, label: "ID" }] : []),
                           { key: "label" as never, label: "Account" },
-                          { key: "minBalance" as never, label: "Min", format: (v: unknown) => v === null ? "-" : formatCurrency(v) },
-                          { key: "maxBalance" as never, label: "Max", format: (v: unknown) => v === null ? "-" : formatCurrency(v) },
+                          { key: "minBalance" as never, label: "Min", format: (v: unknown) => v === NO_FLOOR ? "-" : formatCurrency(v) },
+                          { key: "maxBalance" as never, label: "Max", format: (v: unknown) => v === NO_CEILING ? "-" : formatCurrency(v) },
                           {
                             key: "color" as never, label: "Color",
                             render: (_v, row) => <ColorSwatch color={(row as Account).color} />,

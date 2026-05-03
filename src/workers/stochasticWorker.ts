@@ -28,11 +28,11 @@ self.onmessage = (event: MessageEvent<StochasticWorkerRequest>) => {
     };
 
     self.postMessage(response);
-  } catch {
+  } catch (err) {
     const response: StochasticWorkerResponse = {
       id,
       result: null,
-      runtimeError: "Stochastic projection failed.",
+      runtimeError: err instanceof Error ? err.message : "Stochastic projection failed.",
       type: "result",
     };
 

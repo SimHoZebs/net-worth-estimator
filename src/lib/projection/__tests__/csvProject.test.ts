@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NO_FLOOR, NO_CEILING } from "../constants";
 import { projectScenarioPack } from "../";
 import { createBasePack, makeAccount, makePosting, makeSettings } from "../__fixtures__";
 
@@ -82,7 +83,7 @@ describe("CSV projection engine", () => {
         { Date: "2026-01-01", AccountId: "loan", Balance: -300 },
       ],
       accounts: [
-        makeAccount({ id: "checking" }),
+        makeAccount({ id: "checking", minBalance: 0 }),
         makeAccount({ id: "loan" }),
       ],
       postings: [
@@ -100,13 +101,49 @@ describe("CSV projection engine", () => {
     expect(result.timeline.rows[1]?.netWorth).toBe(-50);
   });
 
+  it("throws when source account has null minBalance (fail-fast)", () => {
+    const pack = createBasePack({
+      checkpoints: [
+        { Date: "2026-01-01", AccountId: "checking", Balance: 300 },
+        { Date: "2026-01-01", AccountId: "loan", Balance: -200 },
+      ],
+      accounts: [
+        { id: "checking", label: "Checking", minBalance: NO_FLOOR, maxBalance: NO_CEILING, color: null, enabled: true },
+        { id: "loan", label: "Loan", minBalance: null as unknown as number, maxBalance: 0, color: null, enabled: true },
+      ],
+      postings: [
+        makePosting({ id: "interest", sourceAccountId: "loan", arithmetic: "100", startDate: "2026-01-10", endDate: "2026-01-10" }),
+      ],
+    });
+
+    expect(() => projectScenarioPack(pack, makeSettings())).toThrow("has no minBalance configured");
+  });
+
+  it("throws when destination account has null maxBalance (fail-fast)", () => {
+    const pack = createBasePack({
+      checkpoints: [
+        { Date: "2026-01-01", AccountId: "checking", Balance: 300 },
+        { Date: "2026-01-01", AccountId: "loan", Balance: -200 },
+      ],
+      accounts: [
+        { id: "checking", label: "Checking", minBalance: NO_FLOOR, maxBalance: null as unknown as number, color: null, enabled: true },
+        { id: "loan", label: "Loan", minBalance: NO_FLOOR, maxBalance: 0, color: null, enabled: true },
+      ],
+      postings: [
+        makePosting({ id: "payment", sourceAccountId: "loan", destinations: ["checking"], arithmetic: "100", startDate: "2026-01-10", endDate: "2026-01-10" }),
+      ],
+    });
+
+    expect(() => projectScenarioPack(pack, makeSettings())).toThrow("has no maxBalance configured");
+  });
+
   it("applies interest via postings with rate keyword", () => {
     const pack = createBasePack({
       checkpoints: [
         { Date: "2026-01-01", AccountId: "loan", Balance: -1200 },
       ],
       accounts: [
-        makeAccount({ id: "loan", minBalance: Number.NEGATIVE_INFINITY }),
+        makeAccount({ id: "loan", minBalance: NO_FLOOR }),
       ],
       postings: [
         makePosting({
@@ -125,6 +162,43 @@ describe("CSV projection engine", () => {
 
     expect(result.timeline.rows[1]?.accountBalances.loan).toBe(-1212);
     expect(result.summary.finalNetWorth).toBe(-1212);
+  });
+
+  it("applies both interest charge and payment on same date", () => {
+    const pack = createBasePack({
+      checkpoints: [
+        { Date: "2026-01-01", AccountId: "checking", Balance: 1000 },
+        { Date: "2026-01-01", AccountId: "loan_interest", Balance: -100 },
+        { Date: "2026-01-01", AccountId: "loan_principal", Balance: -1000 },
+      ],
+      accounts: [
+        makeAccount({ id: "checking", minBalance: 0 }),
+        makeAccount({ id: "loan_interest", maxBalance: 0 }),
+        makeAccount({ id: "loan_principal", maxBalance: 0 }),
+      ],
+      postings: [
+        makePosting({
+          id: "interest", sourceAccountId: "loan_interest",
+          arithmetic: "abs(loan_principal) * rate", frequency: "monthly",
+          annualRate: 0.12, startDate: "2026-02-01", endDate: "2026-02-01", priority: 1,
+        }),
+        makePosting({
+          id: "payment", sourceAccountId: "checking",
+          destinations: ["loan_interest", "loan_principal"],
+          arithmetic: "200", frequency: "monthly",
+          startDate: "2026-02-01", endDate: "2026-02-01", priority: 2,
+        }),
+      ],
+    });
+
+    const result = projectScenarioPack(pack, makeSettings());
+    const row = result.timeline.rows[1]!;
+
+    expect(row.accountBalances.loan_interest).toBeGreaterThan(-100);
+    expect(row.accountBalances.loan_principal).toBeGreaterThan(-1000);
+    expect(row.netWorth).toBeGreaterThan(-1100);
+    expect(row.realizedPostingAmount).toBe(210);
+    expect(row.accountBalances.checking).toBe(800);
   });
 
   it("prevents destination accounts from exceeding maxBalance (overpayment guard)", () => {

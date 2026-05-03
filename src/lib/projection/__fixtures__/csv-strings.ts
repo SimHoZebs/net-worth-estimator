@@ -6,10 +6,10 @@ const postingsHeader = "id,label,sourceAccountId,destinations,arithmetic,frequen
 export const validCsvFiles: ScenarioFileContents = {
   accounts: [
     accountsHeader,
-    "checking,Checking,,,#0f172a,true",
-    "k401,401(k),,,#2563eb,true",
-    "brokerage,Brokerage,,,#16a34a,true",
-    "student_loan,Student Loan,,0,#dc2626,true",
+    "checking,Checking,-Infinity,Infinity,#0f172a,true",
+    "k401,401(k),-Infinity,Infinity,#2563eb,true",
+    "brokerage,Brokerage,-Infinity,Infinity,#16a34a,true",
+    "student_loan,Student Loan,-Infinity,0,#dc2626,true",
   ].join("\n"),
   checkpoints: [
     "Date,AccountId,Balance",
@@ -30,3 +30,18 @@ export const validCsvFiles: ScenarioFileContents = {
 };
 
 export const postingsHeaderOnly = `${postingsHeader}\n`;
+
+export const nullMinMaxCsvFiles: ScenarioFileContents = {
+  accounts: [
+    accountsHeader,
+    "checking,Checking,,,#0f172a,true",
+  ].join("\n"),
+  checkpoints: [
+    "Date,AccountId,Balance",
+    "2026-03-31,checking,1000",
+  ].join("\n"),
+  postings: [
+    postingsHeader,
+    "salary,Salary,,checking,1000,monthly,0,0,0,2026-04-01,,,1,true",
+  ].join("\n"),
+};

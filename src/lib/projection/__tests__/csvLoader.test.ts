@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CSV_SCENARIO_PUBLIC_PATH, parseCsvScenarioPack } from "../";
-import { postingsHeaderOnly, validCsvFiles } from "../__fixtures__";
+import { postingsHeaderOnly, validCsvFiles, nullMinMaxCsvFiles } from "../__fixtures__";
 
 describe("CSV scenario pack", () => {
   it("parses a valid CSV pack", () => {
@@ -25,6 +25,14 @@ describe("CSV scenario pack", () => {
     });
 
     expect(result.issues.some((issue) => issue.code === "posting.arithmetic.circular")).toBe(true);
+  });
+
+  it("rejects accounts with empty minBalance/maxBalance (null is no longer allowed)", () => {
+    const result = parseCsvScenarioPack(nullMinMaxCsvFiles);
+
+    expect(result.data).toBeNull();
+    expect(result.issues.filter((i) => i.code === "csv.row.invalid").length).toBe(2);
+    expect(result.issues.every((i) => i.path?.[0] === "accounts.csv")).toBe(true);
   });
 
   it("reports missing posting destination accounts", () => {

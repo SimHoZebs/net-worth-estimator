@@ -24,8 +24,8 @@ export interface ProjectionRuntimeSettings {
 export interface Account {
   id: string;
   label: string;
-  minBalance: number | null;
-  maxBalance: number | null;
+  minBalance: number;
+  maxBalance: number;
   color: string | null;
   enabled: boolean;
 }

@@ -15,8 +15,8 @@ self.onmessage = (event: MessageEvent<ProjectionWorkerRequest>) => {
 
   try {
     response.result = projectScenarioPack(pack, projectionSettings, whatIfState);
-  } catch {
-    response.runtimeError = "The data pack could not be projected.";
+  } catch (err) {
+    response.runtimeError = err instanceof Error ? err.message : "The data pack could not be projected.";
   }
 
   self.postMessage(response);

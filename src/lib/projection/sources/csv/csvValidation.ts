@@ -259,7 +259,7 @@ export function validateCsvScenarioPack(pack: ScenarioPack): ScenarioValidationI
   validatePostings(issues, pack.postings, accountIds);
 
   pack.accounts.forEach((account, index) => {
-    if (account.minBalance !== null && account.maxBalance !== null && account.minBalance > account.maxBalance) {
+    if (account.minBalance > account.maxBalance) {
       addIssue(
         issues,
         "error",
