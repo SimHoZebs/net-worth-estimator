@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import type { StochasticConfig, StochasticProjectionResult } from "@/lib/projection";
+import { useState } from "react";
+import type { StochasticProjectionResult } from "@/lib/projection";
 import { pct, currency, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Card, CardContent } from "@/components/ui/card";
 import { useStore } from "@/store";
+import { useDebouncedStochasticConfig } from "@/hooks/useDebouncedStochasticConfig";
 
 interface StochasticControlsProps {
   hasStochasticAccounts: boolean;
@@ -12,8 +13,6 @@ interface StochasticControlsProps {
   progress: number | null;
   stochasticResult: StochasticProjectionResult | null;
 }
-
-const DEBOUNCE_MS = 2000;
 
 export function StochasticControls({
   hasStochasticAccounts,
@@ -27,8 +26,6 @@ export function StochasticControls({
   const onConfigChange = useStore((s) => s.setStochasticConfig);
   const [runCountInput, setRunCountInput] = useState(String(config.runCount));
   const [seedInput, setSeedInput] = useState(config.seed !== null ? String(config.seed) : "");
-  const [pendingConfig, setPendingConfig] = useState<StochasticConfig | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const parsedRunCount = Number.isFinite(Number(runCountInput))
     ? Math.max(1, Math.min(10000, Number(runCountInput)))
@@ -37,44 +34,12 @@ export function StochasticControls({
     ? Number(seedInput)
     : null;
 
-  const hasPendingChanges = pendingConfig !== null;
-
-  function scheduleConfigChange(nextConfig: StochasticConfig) {
-    setPendingConfig(nextConfig);
-
-    if (debounceRef.current !== null) {
-      clearTimeout(debounceRef.current);
-    }
-
-    debounceRef.current = setTimeout(() => {
-      onConfigChange(nextConfig);
-      setPendingConfig(null);
-      debounceRef.current = null;
-    }, DEBOUNCE_MS);
-  }
-
-  function applyImmediately() {
-    if (debounceRef.current !== null) {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = null;
-    }
-
-    const nextConfig: StochasticConfig = {
-      runCount: parsedRunCount,
-      seed: parsedSeed,
-    };
-
-    onConfigChange(nextConfig);
-    setPendingConfig(null);
-  }
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current !== null) {
-        clearTimeout(debounceRef.current);
-      }
-    };
-  }, []);
+  const { hasPendingChanges, scheduleConfigChange, applyImmediately } = useDebouncedStochasticConfig(
+    config,
+    onConfigChange,
+    parsedRunCount,
+    parsedSeed,
+  );
 
   const progressPct = progress !== null ? Math.round(progress * 100) : null;
   const statusLabel = isRunning

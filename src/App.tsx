@@ -11,7 +11,7 @@ import { Button } from "./components/ui/button";
 import { useProjection } from "./hooks/useProjection";
 import { useStochastic } from "./hooks/useStochastic";
 import { summarizeValidationIssues } from "./lib/projection";
-import { useStore, selectWhatIfState } from "./store";
+import { useStore, selectWhatIfState, selectActiveOverrideCount } from "./store";
 import { useShallow } from "zustand/shallow";
 import { createCsvDataSource } from "@/lib/projection";
 import { useScenarioQuery, useScenarioMutation } from "./hooks/useScenario";
@@ -37,14 +37,7 @@ export default function App() {
   const isLoading = isScenarioLoading;
 
   const whatIfState = useStore(useShallow(selectWhatIfState));
-  const activeOverrideCount = useStore(
-    (s) =>
-      s.addedAccounts.length +
-      s.addedPostings.length +
-      s.addedCheckpoints.length +
-      s.disabledAccountIds.length +
-      s.disabledPostingIds.length,
-  );
+  const activeOverrideCount = useStore(selectActiveOverrideCount);
   const isEditing = useStore((s) => s.isEditing);
   const isDirty = useStore((s) => s.isDirty);
 

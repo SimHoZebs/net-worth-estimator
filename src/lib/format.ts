@@ -56,6 +56,12 @@ export function formatFrequency(freq: string): string {
   return map[freq] ?? freq;
 }
 
+export function formatCurrencyInput(value: string): string {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return value;
+  return currency.format(num);
+}
+
 export function formatRoute(
   sourceLabel: string | null,
   destinations: Array<{ label: string }> | null

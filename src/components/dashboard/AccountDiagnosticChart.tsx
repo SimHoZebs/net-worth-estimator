@@ -54,7 +54,7 @@ export function AccountDiagnosticChart({
         </CardHeader>
         <CardContent className="min-w-0">
           <div className="min-w-0 h-[420px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={420}>
               <ComposedChart data={chartData} margin={{ top: 12, right: 24, left: 8, bottom: 12 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" minTickGap={36} />
