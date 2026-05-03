@@ -1221,8 +1221,12 @@ Avoid narrow centered layouts for dense financial tables.
 > **Phase 1 (Trust & Clarity)** — Completed. Checked items below were implemented in the first pass.
 >
 > **Phase 2 (Structure & Progressive Disclosure)** — Completed. Checked items below were implemented in the second pass.
+>
+> **Phase 3 (Model Transparency & States)** — Completed. Checked items below were implemented in the third pass.
+>
+> **Phase 4 (Navigation & Comparison)** — Completed. Checked items below were implemented in the fourth pass.
 
-* [ ] Add a sticky section nav or tab structure.
+* [x] Add a sticky section nav or tab structure.
 * [x] Create a top-level overview that answers: current, target, target date, confidence, blocker.
 * [x] Split deterministic and Monte Carlo result cards.
 * [x] Replace "100% chance" language.
@@ -1239,7 +1243,7 @@ Avoid narrow centered layouts for dense financial tables.
 * [x] Add cash-flow waterfall.
 * [x] Add current net worth reconciliation.
 * [x] Add scenario templates. (Income pattern wizard already exists.)
-* [ ] Add scenario comparison table.
+* [x] Add scenario comparison table. (Snapshot infrastructure + comparison panel added.)
 * [x] Add table search/filter/pagination. (Search/filter added; pagination deferred until data scales.)
 * [x] Clarify temporary vs saved changes.
 * [x] Rename ambiguous controls: reload, rerun, reset.

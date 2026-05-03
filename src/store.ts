@@ -1,18 +1,25 @@
 import { create } from "zustand";
 import type { StateCreator } from "zustand";
-import type { Account, Checkpoint, Posting, ScenarioPack, ScenarioWhatIfState, StochasticConfig, ProjectionResult, StochasticProjectionResult } from "@/lib/projection";
+import type { Account, Checkpoint, Posting, ScenarioPack, ScenarioWhatIfState, StochasticConfig } from "@/lib/projection";
 
 /* ------------------------------------------------------------------ */
 /*  Snapshot slice                                                     */
 /* ------------------------------------------------------------------ */
+
+export interface SnapshotMetrics {
+  currentNetWorth: number;
+  finalNetWorth: number;
+  hitTargetDate: string | null;
+  shortfallAmount: number;
+  overrideCount: number;
+}
 
 export interface ScenarioSnapshot {
   id: string;
   label: string;
   timestamp: number;
   whatIfState: ScenarioWhatIfState;
-  result: ProjectionResult;
-  stochasticResult?: StochasticProjectionResult | null;
+  metrics: SnapshotMetrics;
 }
 
 interface SnapshotSlice {

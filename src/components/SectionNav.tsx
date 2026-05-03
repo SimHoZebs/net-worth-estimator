@@ -49,18 +49,18 @@ export function SectionNav() {
   };
 
   return (
-    <nav className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
-      <div className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-0 md:px-8">
-        <span className="mr-4 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+    <nav className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80 no-print">
+      <div className="mx-auto flex max-w-7xl items-center gap-1 px-3 py-0 md:px-8">
+        <span className="hidden text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 md:mr-4 md:inline">
           Net Worth
         </span>
-        <div className="flex gap-0.5 overflow-x-auto">
+        <div className="flex gap-0.5 overflow-x-auto scrollbar-none">
           {sections.map((s) => (
             <button
               key={s.id}
               type="button"
               onClick={() => handleClick(s.id)}
-              className={`whitespace-nowrap border-b-2 px-3 py-3 text-xs font-medium transition-colors ${
+              className={`shrink-0 whitespace-nowrap border-b-2 px-2 py-3 text-xs font-medium transition-colors md:px-3 ${
                 activeId === s.id
                   ? "border-slate-900 text-slate-900"
                   : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"

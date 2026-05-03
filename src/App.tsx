@@ -3,6 +3,7 @@ import { ScenarioInspector } from "./components/CsvScenarioInspector";
 import { ProjectionDashboard } from "./components/CsvProjectionDashboard";
 import { ContributionWhatIfControls } from "./components/CsvContributionWhatIfControls";
 import { StochasticControls } from "./components/StochasticControls";
+import { ScenarioComparison } from "./components/ScenarioComparison";
 import { TemplateWizard } from "./components/patterns/TemplateWizard";
 import { SectionNav } from "./components/SectionNav";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
@@ -236,6 +237,8 @@ export default function App() {
             <StochasticControls hasStochasticAccounts={hasStochasticAccounts} stochasticResult={stochasticResult} isRunning={isStochasticRunning} progress={stochasticProgress} />
           </section>
         ) : null}
+
+        <ScenarioComparison />
 
         <section id="source-data">
           <ScenarioInspector
