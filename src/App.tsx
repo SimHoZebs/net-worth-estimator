@@ -5,8 +5,8 @@ import { ContributionWhatIfControls } from "./components/CsvContributionWhatIfCo
 import { StochasticControls } from "./components/StochasticControls";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
-import { useProjectionWorker } from "./hooks/useProjectionWorker";
-import { useStochasticWorker } from "./hooks/useStochasticWorker";
+import { useProjection } from "./hooks/useProjection";
+import { useStochastic } from "./hooks/useStochastic";
 import { summarizeValidationIssues } from "./lib/projection";
 import { useStore, selectWhatIfState } from "./store";
 import { useShallow } from "zustand/shallow";
@@ -67,7 +67,7 @@ export default function App() {
       latestDate === null || checkpoint.Date > latestDate ? checkpoint.Date : latestDate,
     null,
   ) ?? fallbackProjectionStartDate;
-  const { result, runtimeError, isRunning: isProjecting } = useProjectionWorker(
+  const { result, runtimeError, isRunning: isProjecting } = useProjection(
     pack,
     projectionSettings,
     whatIfState,
@@ -89,7 +89,7 @@ export default function App() {
     runtimeError: stochasticError,
     isRunning: isStochasticRunning,
     progress: stochasticProgress,
-  } = useStochasticWorker(pack, projectionSettings, whatIfState, stochasticConfig, stochasticWorkerEnabled);
+  } = useStochastic(pack, projectionSettings, whatIfState, stochasticConfig, stochasticWorkerEnabled);
 
   const handleSave = () => {
     const store = useStore.getState();
