@@ -77,11 +77,23 @@ export interface ScenarioWhatIfState {
   disabledPostingIds: string[];
 }
 
+export interface AccountDelta {
+  postingId: string;
+  delta: number;
+}
+
+export interface AccountSnapshot {
+  accountId: string;
+  date: IsoDate;
+  balance: number;
+  impacts: AccountDelta[];
+}
+
 export interface ProjectionRow {
   date: IsoDate;
   isHistorical: boolean;
   netWorth: number;
-  accountBalances: Record<string, number>;
+  accountSnapshots: AccountSnapshot[];
   externalInflowAmount: number;
   externalOutflowAmount: number;
   internalTransferAmount: number;

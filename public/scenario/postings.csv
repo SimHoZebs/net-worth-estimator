@@ -5,13 +5,24 @@ taxes,Taxes,checking,,salary * 0.22,monthly,0,0,0,2026-04-30,,,3,true
 housing,Housing,checking,,3200,monthly,0,0,0,2026-05-01,,,4,true
 living,Living,checking,,2400,monthly,0,0,0,2026-05-15,,,5,true
 k401_match,401(k) Match,,k401,k401_employee * 0.5,monthly,0,0,0,2026-05-30,,,5,true
-student_loan1_interest_charge,Student Loan 1 Interest,student_loan1_interest,,abs(student_loan1_principal) * rate,monthly,0.15,0,0,2026-04-20,,,6,true
-student_loan2_interest_charge,Student Loan 2 Interest,student_loan2_interest,,abs(student_loan2_principal) * rate,monthly,0.13,0,0,2026-04-21,,,6,true
-student_loan3_interest_charge,Student Loan 3 Interest,student_loan3_interest,,abs(student_loan3_principal) * rate,monthly,0.03,0,0,2026-04-22,,,6,true
-student_loan1_payment,Student Loan 1 Payment,checking,student_loan1_interest;student_loan1_principal,517,monthly,0,0,0,2026-04-20,,,7,true
-student_loan2_payment,Student Loan 2 Payment,checking,student_loan2_interest;student_loan2_principal,175,monthly,0,0,0,2026-04-21,,,8,true
-student_loan3_payment,Student Loan 3 Payment,checking,student_loan3_interest;student_loan3_principal,92,monthly,0,0,0,2026-04-22,,,9,true
+student_loan1_interest_charge,Student Loan 1 Interest,student_loan1_interest,,abs(student_loan1_principal) * rate,monthly,0.03,0,0,2026-04-20,,,6,true
+student_loan2_interest_charge,Student Loan 2 Interest,student_loan2_interest,,abs(student_loan2_principal) * rate,monthly,0.13,0,0,2026-04-21,2026-05-24,,6,true
+student_loan3_interest_charge,Student Loan 3 Interest,student_loan3_interest,,abs(student_loan3_principal) * rate,monthly,0.15,0,0,2026-04-22,2026-05-24,,6,true
+student_loan1_payment,Student Loan 1 Payment,checking,student_loan1_interest;student_loan1_principal,92,monthly,0,0,0,2026-04-20,,,7,true
+student_loan2_payment,Student Loan 2 Payment,checking,student_loan2_interest;student_loan2_principal,175,monthly,0,0,0,2026-04-21,2026-05-24,,8,true
+student_loan3_payment,Student Loan 3 Payment,checking,student_loan3_interest;student_loan3_principal,517,monthly,0,0,0,2026-04-22,2026-05-24,,9,true
 k401_growth,401(k) Growth,,k401,k401 * rate,monthly,0.07,0,0.15,2026-05-30,,,20,true
 brokerage_growth,Brokerage Growth,,brokerage,brokerage * rate,monthly,0.08,0,0.18,2026-04-28,,,20,true
 roth_ira_growth,Roth IRA Growth,,roth_ira,roth_ira * rate,monthly,0.03,0,0,2026-04-28,,,20,true
 brokerage_auto,Brokerage Auto,checking,brokerage,(salary - k401_employee - taxes) * 0.1,monthly,0,0,0,2026-04-28,,,10,true
+refi_disburse,Refi Disbursement,refi_loan,student_loan2_principal;student_loan2_interest;student_loan3_principal;student_loan3_interest,36447,monthly,0,0,0,2026-05-25,2026-05-25,,1,true
+refi_interest,Refi Interest Charge,refi_loan,,abs(refi_loan) * rate,monthly,0.0437,0,0,2026-05-25,,,6,true
+refi_payment,Refi Loan Payment,checking,refi_loan,1000,monthly,0,0,0,2026-05-25,,,7,true
+rsu_vest_1,RSU Vest 1,rsu,rsu_vested,rsu * 0.05,monthly,0,0,0,2027-04-06,2027-04-06,,15,true
+rsu_vest_2,RSU Vest 2,rsu,rsu_vested,rsu * 15 / 95,monthly,0,0,0,2028-04-06,2028-04-06,,15,true
+rsu_vest_3,RSU Vest 3,rsu,rsu_vested,rsu * 20 / 80,monthly,0,0,0,2028-10-06,2028-10-06,,15,true
+rsu_vest_4,RSU Vest 4,rsu,rsu_vested,rsu * 20 / 60,monthly,0,0,0,2029-04-06,2029-04-06,,15,true
+rsu_vest_5,RSU Vest 5,rsu,rsu_vested,rsu * 20 / 40,monthly,0,0,0,2029-10-06,2029-10-06,,15,true
+rsu_vest_6,RSU Vest 6,rsu,rsu_vested,rsu * 20 / 20,monthly,0,0,0,2030-04-06,2030-04-06,,15,true
+rsu_growth,RSU Growth,,rsu,rsu * rate,monthly,0.1,0,0.3,2026-04-06,,,20,true
+rsu_vested_growth,RSU Vested Growth,,rsu_vested,rsu_vested * rate,monthly,0.1,0,0.3,2026-04-06,,,20,true

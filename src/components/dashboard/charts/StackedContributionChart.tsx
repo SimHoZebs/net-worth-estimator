@@ -4,6 +4,7 @@ import type { ScenarioPack } from "@/lib/projection";
 import { currency } from "@/lib/format";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import { createBaseOptions, createReferenceLinesHooks, formatDate } from "@/chart/uplotBase";
+import { parseChartDate } from "@/chart/chartData";
 
 interface AccountMeta {
   id: string; label: string; color: string | null;
@@ -76,12 +77,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
     const p75Arr: number[] = [];
 
     for (const row of chartData) {
-      const d = new Date(
-        Number(String(row.date).split("-")[0]),
-        Number(String(row.date).split("-")[1]) - 1,
-        Number(String(row.date).split("-")[2]),
-      );
-      timestamps.push(d.getTime());
+      timestamps.push(parseChartDate(String(row.date)));
       const nw = Number(row.netWorth);
       const p50 = Number(row.p50 ?? nw);
       p50Arr.push(p50);

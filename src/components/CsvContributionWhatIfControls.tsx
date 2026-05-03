@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { useShallow } from "zustand/shallow";
 import { useStore, selectActiveOverrideCount } from "@/store";
-import { WhatIfAccountForm } from "@/components/dashboard/WhatIfAccountForm";
-import { WhatIfPostingForm } from "@/components/dashboard/WhatIfPostingForm";
-import { WhatIfCheckpointForm } from "@/components/dashboard/WhatIfCheckpointForm";
+import { WhatIfAccountForm } from "@/components/dashboard/what-if/WhatIfAccountForm";
+import { WhatIfPostingForm } from "@/components/dashboard/what-if/WhatIfPostingForm";
+import { WhatIfCheckpointForm } from "@/components/dashboard/what-if/WhatIfCheckpointForm";
 
 interface ContributionWhatIfControlsProps {
   pack: ScenarioPack;

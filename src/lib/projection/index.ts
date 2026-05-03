@@ -33,6 +33,8 @@ export type {
 export type { DataSource, ScenarioParseResult } from "./dataSource";
 export type {
   Account,
+  AccountDelta,
+  AccountSnapshot,
   Checkpoint,
   Posting,
   PostingFrequency,

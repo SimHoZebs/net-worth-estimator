@@ -4,12 +4,21 @@ import type {
 } from "@/lib/projection";
 import type { StochasticProjectionResult } from "@/lib/projection";
 
+export function parseChartDate(iso: string): number {
+  const parts = iso.split("-");
+  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).getTime();
+}
+
+function getAccountBalance(row: { accountSnapshots: Array<{ accountId: string; balance: number }> }, accountId: string): number {
+  return row.accountSnapshots.find((s) => s.accountId === accountId)?.balance ?? 0;
+}
+
 export function buildBalanceChartData(pack: ScenarioPack, result: ProjectionResult) {
   const enabledAccounts = pack.accounts.filter((account) => account.enabled);
 
   return result.timeline.sampledRows.map((row) => ({
     date: row.date,
-    ...Object.fromEntries(enabledAccounts.map((account) => [account.id, row.accountBalances[account.id] ?? 0])),
+    ...Object.fromEntries(enabledAccounts.map((account) => [account.id, getAccountBalance(row, account.id)])),
   }));
 }
 
@@ -32,7 +41,7 @@ export function buildAccountDiagnosticChartData(
     };
 
     for (const account of enabledAccounts) {
-      entry[account.id] = row.accountBalances[account.id] ?? 0;
+      entry[account.id] = getAccountBalance(row, account.id);
     }
 
     if (bandByDate) {

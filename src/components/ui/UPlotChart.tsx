@@ -12,6 +12,7 @@ export function UPlotChart({ options, data, tooltipContent }: UPlotChartProps) {
   const targetRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<uPlot | null>(null);
+  const lastWidthRef = useRef(0);
 
   useEffect(() => {
     const target = targetRef.current;
@@ -62,12 +63,15 @@ export function UPlotChart({ options, data, tooltipContent }: UPlotChartProps) {
     };
 
     chartRef.current = new uPlot(opts, data, target);
+    lastWidthRef.current = Math.round(width);
 
     const ro = new ResizeObserver((entries) => {
-      const { width: w, height: h } = entries[0].contentRect;
-      if (w > 0 && h > 0) {
-        chartRef.current?.setSize({ width: w, height: h });
-      }
+      const cw = entries[0].contentRect.width;
+      const w = Math.round(cw);
+      if (w <= 0 || !chartRef.current) return;
+      if (w === lastWidthRef.current) return;
+      lastWidthRef.current = w;
+      chartRef.current.setSize({ width: w, height: chartRef.current.height });
     });
     ro.observe(target);
 
@@ -83,7 +87,7 @@ export function UPlotChart({ options, data, tooltipContent }: UPlotChartProps) {
   }, [data]);
 
   return (
-    <div ref={targetRef} className="relative min-h-[420px] w-full">
+    <div ref={targetRef} className="relative min-h-[420px] w-full overflow-hidden">
       <div
         ref={tooltipRef}
         className="pointer-events-none absolute z-50 hidden"

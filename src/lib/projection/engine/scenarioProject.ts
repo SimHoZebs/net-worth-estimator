@@ -1,5 +1,7 @@
 import type {
   Account,
+  AccountDelta,
+  AccountSnapshot,
   Posting,
   ProjectionAccountSummary,
   ProjectionPostingSummary,
@@ -10,7 +12,7 @@ import type {
   IsoDate,
   ProjectionRuntimeSettings,
 } from "../types/scenario";
-import { computeNetWorth, initAccountBalances } from "./accountEngine";
+import { computeNetWorth, initAccountBalances, snapshotBalances } from "./accountEngine";
 import {
   addOccurrences,
   applyPosting,
@@ -66,6 +68,7 @@ function createRow({
   isHistorical,
   balances,
   accounts,
+  accountImpacts,
   externalInflowAmount,
   externalOutflowAmount,
   internalTransferAmount,
@@ -79,6 +82,7 @@ function createRow({
   isHistorical: boolean;
   balances: Record<string, number>;
   accounts: Account[];
+  accountImpacts: Record<string, AccountDelta[]>;
   externalInflowAmount: number;
   externalOutflowAmount: number;
   internalTransferAmount: number;
@@ -88,11 +92,18 @@ function createRow({
   requestedPostingAmountsById: Record<string, number>;
   realizedPostingAmountsById: Record<string, number>;
 }): ProjectionRow {
+  const accountSnapshots: AccountSnapshot[] = accounts.map((account) => ({
+    accountId: account.id,
+    date,
+    balance: balances[account.id] ?? 0,
+    impacts: accountImpacts[account.id] ?? [],
+  }));
+
   return {
     date,
     isHistorical,
     netWorth: computeNetWorth(balances, accounts),
-    accountBalances: { ...balances },
+    accountSnapshots,
     externalInflowAmount,
     externalOutflowAmount,
     internalTransferAmount,
@@ -114,7 +125,14 @@ function roundRow(row: ProjectionRow): ProjectionRow {
     requestedPostingAmount: roundCurrency(row.requestedPostingAmount),
     realizedPostingAmount: roundCurrency(row.realizedPostingAmount),
     clampedPostingShortfallAmount: roundCurrency(row.clampedPostingShortfallAmount),
-    accountBalances: Object.fromEntries(Object.entries(row.accountBalances).map(([accountId, balance]) => [accountId, roundCurrency(balance)])),
+    accountSnapshots: row.accountSnapshots.map((snap) => ({
+      ...snap,
+      balance: roundCurrency(snap.balance),
+      impacts: snap.impacts.map((impact) => ({
+        ...impact,
+        delta: roundCurrency(impact.delta),
+      })),
+    })),
     requestedPostingAmountsById: Object.fromEntries(
       Object.entries(row.requestedPostingAmountsById).map(([postingId, amount]) => [postingId, roundCurrency(amount)])
     ),
@@ -176,6 +194,7 @@ export function projectScenarioPack(
         isHistorical: true,
         balances,
         accounts: mergedPack.accounts,
+        accountImpacts: {},
         externalInflowAmount: 0,
         externalOutflowAmount: 0,
         internalTransferAmount: 0,
@@ -205,6 +224,7 @@ export function projectScenarioPack(
 
     const requestedPostingAmountsById: Record<string, number> = {};
     const realizedPostingAmountsById: Record<string, number> = {};
+    const accountImpacts: Record<string, AccountDelta[]> = {};
     let externalInflowAmount = 0;
     let externalOutflowAmount = 0;
     let internalTransferAmount = 0;
@@ -258,7 +278,15 @@ export function projectScenarioPack(
       realizedPostingTotalsById.set(posting.id, (realizedPostingTotalsById.get(posting.id) ?? 0) + realizedAmount);
       realizedPostingAmountByIdAndYear.set(capKey, (realizedPostingAmountByIdAndYear.get(capKey) ?? 0) + realizedAmount);
 
+      const beforeBalances = snapshotBalances(balances);
       applyPosting(posting, realizedAmount, balances, accountById);
+      for (const [accountId, after] of Object.entries(balances)) {
+        const before = beforeBalances[accountId] ?? 0;
+        if (before !== after) {
+          if (!accountImpacts[accountId]) accountImpacts[accountId] = [];
+          accountImpacts[accountId].push({ postingId: posting.id, delta: after - before });
+        }
+      }
       latestRealizedPostingAmountById.set(posting.id, realizedAmount);
 
       if (posting.sourceAccountId === null && posting.destinations !== null) {
@@ -285,6 +313,7 @@ export function projectScenarioPack(
         isHistorical: false,
         balances,
         accounts: mergedPack.accounts,
+        accountImpacts,
         externalInflowAmount,
         externalOutflowAmount,
         internalTransferAmount,
@@ -304,7 +333,8 @@ export function projectScenarioPack(
   const hitTargetRow = rows.find((row) => !row.isHistorical && row.netWorth >= projectionSettings.targetNetWorth) ?? null;
 
   const accountSummaries: ProjectionAccountSummary[] = mergedPack.accounts.map((account) => {
-    const endingBalance = latestRow?.accountBalances[account.id] ?? futureStartingBalances[account.id] ?? 0;
+    const endingSnapshot = latestRow?.accountSnapshots.find((s) => s.accountId === account.id);
+    const endingBalance = endingSnapshot?.balance ?? futureStartingBalances[account.id] ?? 0;
     const startingBalance = futureStartingBalances[account.id] ?? 0;
 
     return {

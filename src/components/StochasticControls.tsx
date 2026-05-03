@@ -3,7 +3,7 @@ import type { StochasticProjectionResult } from "@/lib/projection";
 import { pct, currency, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
-import { Card, CardContent } from "@/components/ui/card";
+import { StochasticResultCard } from "./dashboard/StochasticResultCard";
 import { useStore } from "@/store";
 import { useDebouncedStochasticConfig } from "@/hooks/useDebouncedStochasticConfig";
 
@@ -173,36 +173,26 @@ export function StochasticControls({
 
             {stochasticResult ? (
               <div className="grid gap-3 sm:grid-cols-4">
-                <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Modeled success rate</div>
-                    <div className="mt-1 text-xl font-semibold text-slate-900">{pct.format(stochasticResult.milestones.hitTargetProbability)}</div>
-                    <div className="text-xs text-slate-500">of simulated paths reached target</div>
-                  </CardContent>
-                </Card>
-                <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Median simulated target date</div>
-                    <div className="mt-1 text-xl font-semibold text-slate-900">{stochasticResult.milestones.medianHitTargetDate ? formatDate(stochasticResult.milestones.medianHitTargetDate) : "Never"}</div>
-                    <div className="text-xs text-slate-500">50th percentile across runs</div>
-                  </CardContent>
-                </Card>
-                <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Conservative target date</div>
-                    <div className="mt-1 text-xl font-semibold text-slate-900">{stochasticResult.milestones.worstCaseHitTargetDate ? formatDate(stochasticResult.milestones.worstCaseHitTargetDate) : "Never"}</div>
-                    <div className="text-xs text-slate-500">10th percentile (worst case)</div>
-                  </CardContent>
-                </Card>
-                <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Median simulated final net worth</div>
-                    <div className="mt-1 text-xl font-semibold text-slate-900">{currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p50)}</div>
-                    <div className="text-xs text-slate-500">
-                      range {currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p10)}–{currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p90)}
-                    </div>
-                  </CardContent>
-                </Card>
+                <StochasticResultCard
+                  label="Modeled success rate"
+                  value={pct.format(stochasticResult.milestones.hitTargetProbability)}
+                  detail="of simulated paths reached target"
+                />
+                <StochasticResultCard
+                  label="Median simulated target date"
+                  value={stochasticResult.milestones.medianHitTargetDate ? formatDate(stochasticResult.milestones.medianHitTargetDate) : "Never"}
+                  detail="50th percentile across runs"
+                />
+                <StochasticResultCard
+                  label="Conservative target date"
+                  value={stochasticResult.milestones.worstCaseHitTargetDate ? formatDate(stochasticResult.milestones.worstCaseHitTargetDate) : "Never"}
+                  detail="10th percentile (worst case)"
+                />
+                <StochasticResultCard
+                  label="Median simulated final net worth"
+                  value={currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p50)}
+                  detail={`range ${currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p10)}–${currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p90)}`}
+                />
               </div>
             ) : null}
           </>

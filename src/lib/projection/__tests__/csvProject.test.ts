@@ -3,6 +3,10 @@ import { NO_FLOOR, NO_CEILING } from "../constants";
 import { projectScenarioPack } from "../";
 import { createBasePack, makeAccount, makePosting, makeSettings } from "../__fixtures__";
 
+function getBalance(row: { accountSnapshots: Array<{ accountId: string; balance: number }> } | undefined, accountId: string): number {
+  return row?.accountSnapshots?.find((s) => s.accountId === accountId)?.balance ?? 0;
+}
+
 describe("CSV projection engine", () => {
   it("builds dated checkpoint rows and future event rows from real postings", () => {
     const result = projectScenarioPack(createBasePack(), makeSettings());
@@ -17,14 +21,14 @@ describe("CSV projection engine", () => {
     expect(result.timeline.rows[0]?.isHistorical).toBe(true);
     expect(result.timeline.rows[0]?.netWorth).toBe(1600);
     expect(result.timeline.rows[1]?.externalInflowAmount).toBe(1000);
-    expect(result.timeline.rows[1]?.accountBalances.checking).toBe(1800);
+    expect(getBalance(result.timeline.rows[1], "checking")).toBe(1800);
     expect(result.timeline.rows[2]?.externalOutflowAmount).toBe(200);
-    expect(result.timeline.rows[2]?.accountBalances.checking).toBe(1600);
+    expect(getBalance(result.timeline.rows[2], "checking")).toBe(1600);
     expect(result.timeline.rows[3]?.internalTransferAmount).toBe(900);
-    expect(result.timeline.rows[3]?.accountBalances.brokerage).toBe(2100);
+    expect(getBalance(result.timeline.rows[3], "brokerage")).toBe(2100);
     expect(result.timeline.rows[4]?.requestedPostingAmount).toBe(250);
     expect(result.timeline.rows[4]?.realizedPostingAmount).toBe(250);
-    expect(result.timeline.rows[4]?.accountBalances.loan).toBe(-150);
+    expect(getBalance(result.timeline.rows[4], "loan")).toBe(-150);
     expect(result.summary.currentNetWorth).toBe(1600);
     expect(result.summary.finalNetWorth).toBe(2400);
     expect(result.milestones.projectionStartDate).toBe("2026-01-31");
@@ -72,8 +76,8 @@ describe("CSV projection engine", () => {
     expect(result.timeline.rows[0]?.requestedPostingAmountsById.employee_k401).toBe(100);
     expect(result.timeline.rows[0]?.requestedPostingAmountsById.employer_match).toBe(50);
     expect(result.timeline.rows[0]?.externalInflowAmount).toBe(1150);
-    expect(result.timeline.rows[0]?.accountBalances.checking).toBe(1000);
-    expect(result.timeline.rows[0]?.accountBalances.k401).toBe(150);
+    expect(getBalance(result.timeline.rows[0], "checking")).toBe(1000);
+    expect(getBalance(result.timeline.rows[0], "k401")).toBe(150);
   });
 
   it("clamps postings by source balance only", () => {
@@ -96,8 +100,8 @@ describe("CSV projection engine", () => {
     expect(result.timeline.rows[1]?.requestedPostingAmount).toBe(400);
     expect(result.timeline.rows[1]?.realizedPostingAmount).toBe(250);
     expect(result.timeline.rows[1]?.clampedPostingShortfallAmount).toBe(150);
-    expect(result.timeline.rows[1]?.accountBalances.checking).toBe(0);
-    expect(result.timeline.rows[1]?.accountBalances.loan).toBe(-50);
+    expect(getBalance(result.timeline.rows[1], "checking")).toBe(0);
+    expect(getBalance(result.timeline.rows[1], "loan")).toBe(-50);
     expect(result.timeline.rows[1]?.netWorth).toBe(-50);
   });
 
@@ -160,7 +164,7 @@ describe("CSV projection engine", () => {
 
     const result = projectScenarioPack(pack, makeSettings());
 
-    expect(result.timeline.rows[1]?.accountBalances.loan).toBe(-1212);
+    expect(getBalance(result.timeline.rows[1], "loan")).toBe(-1212);
     expect(result.summary.finalNetWorth).toBe(-1212);
   });
 
@@ -194,11 +198,11 @@ describe("CSV projection engine", () => {
     const result = projectScenarioPack(pack, makeSettings());
     const row = result.timeline.rows[1]!;
 
-    expect(row.accountBalances.loan_interest).toBeGreaterThan(-100);
-    expect(row.accountBalances.loan_principal).toBeGreaterThan(-1000);
+    expect(getBalance(row, "loan_interest")).toBeGreaterThan(-100);
+    expect(getBalance(row, "loan_principal")).toBeGreaterThan(-1000);
     expect(row.netWorth).toBeGreaterThan(-1100);
     expect(row.realizedPostingAmount).toBe(210);
-    expect(row.accountBalances.checking).toBe(800);
+    expect(getBalance(row, "checking")).toBe(800);
   });
 
   it("prevents destination accounts from exceeding maxBalance (overpayment guard)", () => {
@@ -221,8 +225,8 @@ describe("CSV projection engine", () => {
     expect(result.timeline.rows[1]?.requestedPostingAmount).toBe(400);
     expect(result.timeline.rows[1]?.realizedPostingAmount).toBe(300);
     expect(result.timeline.rows[1]?.clampedPostingShortfallAmount).toBe(100);
-    expect(result.timeline.rows[1]?.accountBalances.loan).toBe(0);
-    expect(result.timeline.rows[1]?.accountBalances.checking).toBe(100);
+    expect(getBalance(result.timeline.rows[1], "loan")).toBe(0);
+    expect(getBalance(result.timeline.rows[1], "checking")).toBe(100);
     expect(result.timeline.rows[1]?.netWorth).toBe(100);
   });
 
@@ -244,6 +248,6 @@ describe("CSV projection engine", () => {
 
     expect(result.timeline.rows[1]?.realizedPostingAmount).toBe(200);
     expect(result.timeline.rows[1]?.clampedPostingShortfallAmount).toBe(200);
-    expect(result.timeline.rows[1]?.accountBalances.checking).toBe(100);
+    expect(getBalance(result.timeline.rows[1], "checking")).toBe(100);
   });
 });
