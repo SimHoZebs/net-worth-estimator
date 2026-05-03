@@ -141,7 +141,7 @@ function buildBands(snapshotsByRun: NetWorthSnapshot[][], sortedDates: string[])
   });
 }
 
-const STOCHASTIC_PROGRESS_BATCH = 100;
+const STOCHASTIC_PROGRESS_BATCH = 50;
 
 export function stochasticProject(
   pack: ScenarioPack,

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { memo, useCallback, useMemo, useState, type ReactNode } from "react";
 import type {
   ProjectionResult,
   ScenarioPack,
@@ -7,6 +7,7 @@ import type {
 import type { StochasticProjectionResult } from "@/lib/projection";
 import { currency, pct, formatDate } from "@/lib/format";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { LazySection } from "@/components/ui/lazy-section";
 import { DriverCard } from "./dashboard/DriverCard";
 import { AccountDiagnosticChart } from "./dashboard/AccountDiagnosticChart";
 import { OverviewCard } from "./dashboard/OverviewCard";
@@ -30,7 +31,7 @@ interface ProjectionDashboardProps {
   children?: ReactNode;
 }
 
-export function ProjectionDashboard({
+export const ProjectionDashboard = memo(function ProjectionDashboard({
   pack,
   result,
   projectionSettings,
@@ -50,15 +51,18 @@ export function ProjectionDashboard({
     for (const p of pack.postings) map[p.id] = p.label;
     return map;
   }, [pack.postings]);
-  const toggleEventRow = (date: string) => {
+  const toggleEventRow = useCallback((date: string) => {
     setExpandedEventRows(prev => {
       const next = new Set(prev);
       if (next.has(date)) next.delete(date);
       else next.add(date);
       return next;
     });
-  };
-  const activeFutureRows = futureRows.filter(row => row.requestedPostingAmount > 0);
+  }, []);
+  const activeFutureRows = useMemo(
+    () => futureRows.filter(row => row.requestedPostingAmount > 0),
+    [futureRows],
+  );
   const biggestShortfallPosting = result.postingSummaries
     .filter((summary) => summary.shortfallAmount > 0)
     .sort((left, right) => right.shortfallAmount - left.shortfallAmount)[0] ?? null;
@@ -68,6 +72,10 @@ export function ProjectionDashboard({
     [pack, result, stochasticResult],
   );
   const activeOverrideCount = useStore(selectActiveOverrideCount);
+  const milestoneDates = useMemo(() => ({
+    hitTarget: result.milestones.hitTargetDate ?? undefined,
+    firstShortfall: firstShortfallRow?.date ?? undefined,
+  }), [result.milestones.hitTargetDate, firstShortfallRow?.date]);
   const goalReached = result.milestones.hitTargetDate !== null;
   const enabledPostingCount = pack.postings.filter((posting) => posting.enabled).length;
   const requestedPostingAmount = result.totals.requestedPostingAmount;
@@ -84,6 +92,10 @@ export function ProjectionDashboard({
     : goalReached
       ? "No scheduled payment is currently limited by available funds, so the plan reaches the target without a visible cash-flow constraint."
       : "No scheduled payment is currently limited by available funds, so the shortfall is coming from overall cash-flow magnitude or growth assumptions rather than a hard funding constraint.";
+  const scrollToSourceData = useCallback(() => {
+    const el = document.getElementById("source-data");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
   const nextEventDetail = firstProjectedRow === null
     ? "No projected transactions are scheduled after the historical balance history."
     : `${currency.format(firstProjectedRow.requestedPostingAmount)} requested and ${currency.format(firstProjectedRow.realizedPostingAmount)} applied${firstProjectedRow.clampedPostingShortfallAmount > 0 ? `, leaving ${currency.format(firstProjectedRow.clampedPostingShortfallAmount)} unfunded.` : "."}`;
@@ -96,21 +108,20 @@ export function ProjectionDashboard({
           targetNetWorth={projectionSettings.targetNetWorth}
           hasStochasticData={hasStochasticData}
           chartData={accountDiagnosticChartData}
-          milestoneDates={{
-            hitTarget: result.milestones.hitTargetDate ?? undefined,
-            firstShortfall: firstShortfallRow?.date ?? undefined,
-          }}
+          milestoneDates={milestoneDates}
         />
       </section>
 
-      <OverviewCard
-        result={result}
-        projectionSettings={projectionSettings}
-        stochasticResult={stochasticResult}
-        blockerValue={blockerValue}
-        blockerDetail={blockerDetail}
-        goalReached={goalReached}
-      />
+      <section id="overview">
+        <OverviewCard
+          result={result}
+          projectionSettings={projectionSettings}
+          stochasticResult={stochasticResult}
+          blockerValue={blockerValue}
+          blockerDetail={blockerDetail}
+          goalReached={goalReached}
+        />
+      </section>
 
       <section className="flex flex-wrap items-center gap-2">
         <div className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${statusBadgeClassName}`}>
@@ -137,17 +148,19 @@ export function ProjectionDashboard({
       </section>
 
       <section id="cash-flow-debt">
-        <CollapsibleSection
-          title="Cash flow, debt, and reconciliation"
-          description="Monthly cash-flow map, debt summary, and current balance reconciliation."
-          defaultOpen={false}
-        >
-        <div className="mt-5 space-y-5">
-          <CashFlowWaterfall pack={pack} />
-          <DebtSummary pack={pack} result={result} />
-          <NetWorthReconciliation pack={pack} result={result} />
-        </div>
-        </CollapsibleSection>
+        <LazySection>
+          <CollapsibleSection
+            title="Cash flow, debt, and reconciliation"
+            description="Monthly cash-flow map, debt summary, and current balance reconciliation."
+            defaultOpen={false}
+          >
+          <div className="mt-5 space-y-5">
+            <CashFlowWaterfall pack={pack} />
+            <DebtSummary pack={pack} result={result} />
+            <NetWorthReconciliation pack={pack} result={result} />
+          </div>
+          </CollapsibleSection>
+        </LazySection>
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -160,10 +173,7 @@ export function ProjectionDashboard({
           />
           <button
             type="button"
-            onClick={() => {
-              const el = document.getElementById("source-data");
-              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
+            onClick={scrollToSourceData}
             className="no-print w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
           >
             Explore fixes
@@ -221,4 +231,4 @@ export function ProjectionDashboard({
       </CollapsibleSection>
     </div>
   );
-}
+});

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { currency, formatFrequency } from "@/lib/format";
@@ -47,7 +48,7 @@ interface CashFlowWaterfallProps {
   pack: ScenarioPack;
 }
 
-export function CashFlowWaterfall({ pack }: CashFlowWaterfallProps) {
+export const CashFlowWaterfall = memo(function CashFlowWaterfall({ pack }: CashFlowWaterfallProps) {
   const enabledPostings = pack.postings.filter((p) => p.enabled);
 
   const items = enabledPostings.map((p) => {
@@ -125,4 +126,4 @@ export function CashFlowWaterfall({ pack }: CashFlowWaterfallProps) {
       </CardContent>
     </Card>
   );
-}
+});

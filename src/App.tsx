@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScenarioInspector } from "./components/CsvScenarioInspector";
 import { ProjectionDashboard } from "./components/CsvProjectionDashboard";
 import { ContributionWhatIfControls } from "./components/CsvContributionWhatIfControls";
@@ -6,6 +6,7 @@ import { StochasticControls } from "./components/StochasticControls";
 import { ScenarioComparison } from "./components/ScenarioComparison";
 import { TemplateWizard } from "./components/patterns/TemplateWizard";
 import { SectionNav } from "./components/SectionNav";
+import { LazySection } from "./components/ui/lazy-section";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
 import { useProjection } from "./hooks/useProjection";
@@ -13,7 +14,7 @@ import { useStochastic } from "./hooks/useStochastic";
 import { summarizeValidationIssues } from "./lib/projection";
 import { useStore, selectWhatIfState, selectActiveOverrideCount } from "./store";
 import { useShallow } from "zustand/shallow";
-import { createCsvDataSource } from "@/lib/projection";
+import { createCsvDataSource, type ProjectionRuntimeSettings } from "@/lib/projection";
 import { useScenarioQuery, useScenarioMutation } from "./hooks/useScenario";
 
 function formatTodayIsoDate() {
@@ -37,17 +38,29 @@ export default function App() {
   const isLoading = isScenarioLoading;
 
   const whatIfState = useStore(useShallow(selectWhatIfState));
-  const activeOverrideCount = useStore(selectActiveOverrideCount);
-  const isEditing = useStore((s) => s.isEditing);
-  const isDirty = useStore((s) => s.isDirty);
-
-  const targetNetWorthInput = useStore((s) => s.targetNetWorthInput);
-  const setTargetNetWorthInput = useStore((s) => s.setTargetNetWorthInput);
-  const horizonYears = useStore((s) => s.horizonYears);
-  const setHorizonYears = useStore((s) => s.setHorizonYears);
-  const stochasticEnabled = useStore((s) => s.stochasticEnabled);
-  const stochasticConfig = useStore((s) => s.stochasticConfig);
-  const setStochasticEnabled = useStore((s) => s.setStochasticEnabled);
+  const {
+    activeOverrideCount,
+    isEditing,
+    isDirty,
+    targetNetWorthInput,
+    setTargetNetWorthInput,
+    horizonYears,
+    setHorizonYears,
+    stochasticEnabled,
+    stochasticConfig,
+    setStochasticEnabled,
+  } = useStore(useShallow((s) => ({
+    activeOverrideCount: selectActiveOverrideCount(s),
+    isEditing: s.isEditing,
+    isDirty: s.isDirty,
+    targetNetWorthInput: s.targetNetWorthInput,
+    setTargetNetWorthInput: s.setTargetNetWorthInput,
+    horizonYears: s.horizonYears,
+    setHorizonYears: s.setHorizonYears,
+    stochasticEnabled: s.stochasticEnabled,
+    stochasticConfig: s.stochasticConfig,
+    setStochasticEnabled: s.setStochasticEnabled,
+  })));
 
   const validation = summarizeValidationIssues(issues);
   const fallbackProjectionStartDate = useMemo(() => formatTodayIsoDate(), []);
@@ -89,7 +102,7 @@ export default function App() {
     progress: stochasticProgress,
   } = useStochastic(pack, projectionSettings, whatIfState, stochasticConfig, stochasticWorkerEnabled);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     const store = useStore.getState();
     if (!store.workingPack || scenarioMutation.isPending) return;
 
@@ -102,11 +115,12 @@ export default function App() {
         });
       },
     });
-  };
+  }, [scenarioMutation]);
 
   const [showWizard, setShowWizard] = useState(false);
+  const handleCloseWizard = useCallback(() => setShowWizard(false), []);
 
-  const handleApplyTemplate = (output: import("@/lib/patterns").TemplateOutput) => {
+  const handleApplyTemplate = useCallback((output: import("@/lib/patterns").TemplateOutput) => {
     const store = useStore.getState();
     if (!store.isEditing && pack) {
       store.startEditing(pack);
@@ -117,9 +131,26 @@ export default function App() {
     for (const posting of output.postings) {
       store.addPosting(posting);
     }
-  };
+  }, [pack]);
 
-  const [showPrintSummary, setShowPrintSummary] = useState(false);
+  const onProjectionSettingsChange = useCallback((partial: Partial<ProjectionRuntimeSettings>) => {
+    if (partial.horizonYears !== undefined) setHorizonYears(partial.horizonYears);
+  }, [setHorizonYears]);
+
+  const handleReload = useCallback(() => refetchScenario(), [refetchScenario]);
+
+  const currentMetrics = useMemo(() => ({
+    currentNetWorth: result?.summary.currentNetWorth ?? 0,
+    finalNetWorth: result?.summary.finalNetWorth ?? 0,
+    hitTargetDate: result?.milestones.hitTargetDate ?? null,
+    shortfallAmount: result?.totals.clampedPostingShortfallAmount ?? 0,
+    overrideCount: activeOverrideCount,
+  }), [result?.summary.currentNetWorth, result?.summary.finalNetWorth, result?.milestones.hitTargetDate, result?.totals.clampedPostingShortfallAmount, activeOverrideCount]);
+
+  const whatIfControls = useMemo(
+    () => pack ? <ContributionWhatIfControls pack={pack} /> : null,
+    [pack],
+  );
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
@@ -216,12 +247,10 @@ export default function App() {
             projectionSettings={projectionSettings}
             targetNetWorthInput={targetNetWorthInput}
             onTargetNetWorthInputChange={setTargetNetWorthInput}
-            onProjectionSettingsChange={(partial) => {
-              if (partial.horizonYears !== undefined) setHorizonYears(partial.horizonYears);
-            }}
+            onProjectionSettingsChange={onProjectionSettingsChange}
             stochasticResult={stochasticResult}
           >
-            <ContributionWhatIfControls pack={pack} />
+            {whatIfControls}
           </ProjectionDashboard>
         ) : null}
 
@@ -232,35 +261,31 @@ export default function App() {
         ) : null}
 
         <ScenarioComparison
-          currentMetrics={{
-            currentNetWorth: result?.summary.currentNetWorth ?? 0,
-            finalNetWorth: result?.summary.finalNetWorth ?? 0,
-            hitTargetDate: result?.milestones.hitTargetDate ?? null,
-            shortfallAmount: result?.totals.clampedPostingShortfallAmount ?? 0,
-            overrideCount: activeOverrideCount,
-          }}
+          currentMetrics={currentMetrics}
           currentOverrideCount={activeOverrideCount}
         />
 
         <section id="source-data">
-          <ScenarioInspector
-          projectionSettings={projectionSettings}
-          projectionStartDate={result?.milestones.projectionStartDate ?? projectionStartDate}
-          pack={pack}
-          issues={issues}
-          isLoading={isLoading}
-          loadError={loadError}
-          dataUpdatedAt={dataUpdatedAt}
-          onReload={() => refetchScenario()}
-          onSave={handleSave}
-        />
+          <LazySection>
+            <ScenarioInspector
+            projectionSettings={projectionSettings}
+            projectionStartDate={result?.milestones.projectionStartDate ?? projectionStartDate}
+            pack={pack}
+            issues={issues}
+            isLoading={isLoading}
+            loadError={loadError}
+            dataUpdatedAt={dataUpdatedAt}
+            onReload={handleReload}
+            onSave={handleSave}
+          />
+          </LazySection>
         </section>
 
         {showWizard && pack ? (
           <TemplateWizard
             pack={pack}
             onApply={handleApplyTemplate}
-            onClose={() => setShowWizard(false)}
+            onClose={handleCloseWizard}
           />
         ) : null}
       </div>

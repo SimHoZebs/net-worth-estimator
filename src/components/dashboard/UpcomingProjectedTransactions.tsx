@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ProjectionRow } from "@/lib/projection";
 import { currency, formatDate } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,7 @@ interface UpcomingProjectedTransactionsProps {
   postingLabelById: Record<string, string>;
 }
 
-export function UpcomingProjectedTransactions({
+export const UpcomingProjectedTransactions = memo(function UpcomingProjectedTransactions({
   rows,
   expandedEventRows,
   onToggleEventRow,
@@ -121,4 +122,4 @@ export function UpcomingProjectedTransactions({
       </CardContent>
     </Card>
   );
-}
+});

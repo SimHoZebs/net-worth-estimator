@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { currency, formatDate } from "@/lib/format";
@@ -8,7 +9,7 @@ interface NetWorthReconciliationProps {
   result: ProjectionResult;
 }
 
-export function NetWorthReconciliation({ pack, result }: NetWorthReconciliationProps) {
+export const NetWorthReconciliation = memo(function NetWorthReconciliation({ pack, result }: NetWorthReconciliationProps) {
   const latestDate = result.milestones.latestHistoricalDate ?? result.milestones.projectionStartDate;
 
   // Group checkpoints by account, take the latest one per account
@@ -107,4 +108,4 @@ export function NetWorthReconciliation({ pack, result }: NetWorthReconciliationP
       </CardContent>
     </Card>
   );
-}
+});

@@ -259,7 +259,7 @@ interface SettingsSlice {
   setStochasticConfig: (config: StochasticConfig) => void;
 }
 
-const DEFAULT_HORIZON_YEARS = 25;
+const DEFAULT_HORIZON_YEARS = 15;
 
 const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (set) => ({
   targetNetWorthInput: String(DEFAULT_TARGET_NET_WORTH),

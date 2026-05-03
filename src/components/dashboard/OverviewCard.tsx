@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { currency, formatDate, pct } from "@/lib/format";
 import type { ProjectionResult, StochasticProjectionResult, ProjectionRuntimeSettings } from "@/lib/projection";
@@ -11,7 +12,7 @@ interface OverviewCardProps {
   goalReached: boolean;
 }
 
-export function OverviewCard({
+export const OverviewCard = memo(function OverviewCard({
   result,
   projectionSettings,
   stochasticResult,
@@ -93,4 +94,4 @@ export function OverviewCard({
       </CardContent>
     </Card>
   );
-}
+});

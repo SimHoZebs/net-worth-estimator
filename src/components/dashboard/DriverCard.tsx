@@ -1,6 +1,7 @@
+import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
-export function DriverCard({
+export const DriverCard = memo(function DriverCard({
   label,
   value,
   detail,
@@ -26,4 +27,4 @@ export function DriverCard({
       </CardContent>
     </Card>
   );
-}
+});

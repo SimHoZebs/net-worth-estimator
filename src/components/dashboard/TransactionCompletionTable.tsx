@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ProjectionResult } from "@/lib/projection";
 import { currency, pct, formatDate } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,7 @@ interface TransactionCompletionTableProps {
   postingSummaries: ProjectionResult["postingSummaries"];
 }
 
-export function TransactionCompletionTable({ postingSummaries }: TransactionCompletionTableProps) {
+export const TransactionCompletionTable = memo(function TransactionCompletionTable({ postingSummaries }: TransactionCompletionTableProps) {
   return (
     <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
       <CardHeader>
@@ -65,4 +66,4 @@ export function TransactionCompletionTable({ postingSummaries }: TransactionComp
       </CardContent>
     </Card>
   );
-}
+});

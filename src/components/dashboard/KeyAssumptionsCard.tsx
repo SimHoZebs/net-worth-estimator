@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { ScenarioPack, ProjectionRuntimeSettings } from "@/lib/projection";
 import { formatDate, formatCurrencyInput } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ interface KeyAssumptionsCardProps {
   hasStochasticData: boolean;
 }
 
-export function KeyAssumptionsCard({
+export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
   pack,
   targetNetWorthInput,
   onTargetNetWorthInputChange,
@@ -132,4 +132,4 @@ export function KeyAssumptionsCard({
       </CardContent>
     </Card>
   );
-}
+});

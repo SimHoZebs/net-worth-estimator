@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -35,7 +35,7 @@ function estimateMonthlyPayment(p: Posting | undefined): number {
   return num;
 }
 
-export function DebtSummary({ pack, result }: DebtSummaryProps) {
+export const DebtSummary = memo(function DebtSummary({ pack, result }: DebtSummaryProps) {
   const latestDate = result.milestones.latestHistoricalDate ?? result.milestones.projectionStartDate;
 
   // Get latest checkpoint per account
@@ -155,4 +155,4 @@ export function DebtSummary({ pack, result }: DebtSummaryProps) {
       </CardContent>
     </Card>
   );
-}
+});
