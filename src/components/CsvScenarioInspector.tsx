@@ -185,14 +185,14 @@ export function ScenarioInspector({
         {pack ? (
           <div className="grid gap-3 md:grid-cols-3">
             <SummaryCard label="Accounts" value={integer.format(displayPack?.accounts.length ?? 0)} />
-            <SummaryCard label="Checkpoints" value={integer.format(displayPack?.checkpoints.length ?? 0)} />
-            <SummaryCard label="Postings" value={integer.format(displayPack?.postings.length ?? 0)} />
+            <SummaryCard label="Balance history" value={integer.format(displayPack?.checkpoints.length ?? 0)} />
+            <SummaryCard label="Scheduled transactions" value={integer.format(displayPack?.postings.length ?? 0)} />
           </div>
         ) : null}
 
         {pack ? (
           <div className="space-y-4">
-            <CollapsibleSection title="Runtime settings and postings" description="Session-only settings and scheduled flows.">
+            <CollapsibleSection title="Projection settings and scheduled transactions" description="Session-only settings and scheduled flows.">
               <div className="space-y-4">
                 <DataTable
                   title="Runtime projection settings"
@@ -320,7 +320,7 @@ export function ScenarioInspector({
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Accounts and checkpoints" description="Raw account rows and historical checkpoint evidence.">
+            <CollapsibleSection title="Accounts and balance history" description="Raw account rows and historical balance checkpoints.">
               <div className="space-y-4">
                 {displayPack ? (
                   isEditing ? (
@@ -401,7 +401,7 @@ export function ScenarioInspector({
                   isEditing ? (
                     /* ---- editable checkpoints ---- */
                     <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
-                      <CardHeader><CardTitle>Checkpoints</CardTitle><CardDescription>Edit, add, or remove checkpoint rows.</CardDescription></CardHeader>
+                      <CardHeader><CardTitle>Balance history</CardTitle><CardDescription>Edit, add, or remove balance checkpoint rows.</CardDescription></CardHeader>
                       <CardContent>
                         <Table>
                           <TableHeader>
@@ -436,7 +436,7 @@ export function ScenarioInspector({
                   ) : (
                     /* ---- read-only checkpoints ---- */
                     <DataTable
-                      title="Checkpoints"
+                      title="Balance history"
                       description="Historical account balance checkpoints."
                       rows={pack.checkpoints}
                       columns={[

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { StochasticConfig, StochasticProjectionResult } from "@/lib/projection";
-import { pct, currency } from "@/lib/format";
+import { pct, currency, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Card, CardContent } from "@/components/ui/card";
@@ -93,7 +93,7 @@ export function StochasticControls({
       description={enabled && hasStochasticAccounts
         ? statusLabel
         : enabled && !hasStochasticAccounts
-          ? "No postings have volatility configured. Set volatility > 0 to enable simulation."
+          ? "No scheduled transactions have volatility configured. Set volatility > 0 to enable simulation."
           : "Stochastic simulation is disabled. Toggle on to see probabilistic bands."}
       badge={isRunning
         ? progressPct !== null
@@ -198,28 +198,28 @@ export function StochasticControls({
               <div className="grid gap-3 sm:grid-cols-4">
                 <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
                   <CardContent className="p-4">
-                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Hit probability</div>
+                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Modeled success rate</div>
                     <div className="mt-1 text-xl font-semibold text-slate-900">{pct.format(stochasticResult.milestones.hitTargetProbability)}</div>
-                    <div className="text-xs text-slate-500">chance of reaching target</div>
+                    <div className="text-xs text-slate-500">of simulated paths reached target</div>
                   </CardContent>
                 </Card>
                 <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
                   <CardContent className="p-4">
-                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">P50 hit date</div>
-                    <div className="mt-1 text-xl font-semibold text-slate-900">{stochasticResult.milestones.medianHitTargetDate ?? "Never"}</div>
-                    <div className="text-xs text-slate-500">50th percentile</div>
+                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Median simulated target date</div>
+                    <div className="mt-1 text-xl font-semibold text-slate-900">{stochasticResult.milestones.medianHitTargetDate ? formatDate(stochasticResult.milestones.medianHitTargetDate) : "Never"}</div>
+                    <div className="text-xs text-slate-500">50th percentile across runs</div>
                   </CardContent>
                 </Card>
                 <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
                   <CardContent className="p-4">
-                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">P10 hit date</div>
-                    <div className="mt-1 text-xl font-semibold text-slate-900">{stochasticResult.milestones.worstCaseHitTargetDate ?? "Never"}</div>
-                    <div className="text-xs text-slate-500">worst case (10th %ile)</div>
+                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Conservative target date</div>
+                    <div className="mt-1 text-xl font-semibold text-slate-900">{stochasticResult.milestones.worstCaseHitTargetDate ? formatDate(stochasticResult.milestones.worstCaseHitTargetDate) : "Never"}</div>
+                    <div className="text-xs text-slate-500">10th percentile (worst case)</div>
                   </CardContent>
                 </Card>
                 <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
                   <CardContent className="p-4">
-                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Final P50</div>
+                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Median simulated final net worth</div>
                     <div className="mt-1 text-xl font-semibold text-slate-900">{currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p50)}</div>
                     <div className="text-xs text-slate-500">
                       range {currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p10)}–{currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p90)}

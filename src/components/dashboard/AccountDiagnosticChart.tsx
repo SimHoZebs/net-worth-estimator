@@ -2,6 +2,7 @@ import {
   Area,
   CartesianGrid,
   ComposedChart,
+  Legend,
   Line,
   ReferenceLine,
   ResponsiveContainer,
@@ -31,9 +32,9 @@ export function AccountDiagnosticChart({
       <Card className="min-w-0 rounded-[1.8rem] border-slate-200 shadow-sm">
         <CardHeader>
           <div>
-            <CardTitle>Account diagnostics</CardTitle>
+            <CardTitle>Net worth projection</CardTitle>
             <CardDescription>
-              Enabled account balances over time with the overall net worth trend.
+              Projected net worth over time with account breakdown.
               {hasStochasticData ? " Shaded bands show P10–P90 and P25–P75 percentile ranges." : ""}
             </CardDescription>
           </div>
@@ -45,6 +46,14 @@ export function AccountDiagnosticChart({
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" minTickGap={36} />
                 <YAxis tickFormatter={formatChartCurrencyTick} width={72} />
+                <Legend
+                  wrapperStyle={{ paddingTop: 8 }}
+                  formatter={(value: string) => {
+                    if (value === "netWorth") return "Net worth";
+                    if (value === "p50") return "Net worth (median simulation)";
+                    return value;
+                  }}
+                />
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (!active || !payload || payload.length === 0) return null;
@@ -81,7 +90,20 @@ export function AccountDiagnosticChart({
                     );
                   }}
                 />
-                <ReferenceLine y={targetNetWorth} stroke="#94a3b8" strokeDasharray="4 4" ifOverflow="extendDomain" />
+                <ReferenceLine
+                  y={targetNetWorth}
+                  stroke="#334155"
+                  strokeDasharray="5 5"
+                  strokeWidth={2}
+                  ifOverflow="extendDomain"
+                  label={{
+                    value: `Target: ${currency.format(targetNetWorth)}`,
+                    position: "insideTopRight",
+                    fill: "#334155",
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                />
                 {hasStochasticData ? (
                   <>
                     <Area type="monotone" dataKey="p10_base" stackId="outer" stroke="none" fill="transparent" isAnimationActive={false} />
@@ -99,7 +121,7 @@ export function AccountDiagnosticChart({
                     type="monotone"
                     dataKey={account.id}
                     stroke={account.color ?? "#64748b"}
-                    strokeWidth={1.5}
+                    strokeWidth={2}
                     strokeOpacity={0.85}
                     dot={false}
                     name={account.label}

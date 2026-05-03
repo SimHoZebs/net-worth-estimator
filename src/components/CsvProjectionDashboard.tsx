@@ -6,7 +6,7 @@ import type {
   ProjectionRuntimeSettings,
 } from "@/lib/projection";
 import type { StochasticProjectionResult } from "@/lib/projection";
-import { currency, pct } from "@/lib/format";
+import { currency, pct, formatDate } from "@/lib/format";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -28,6 +28,12 @@ interface ProjectionDashboardProps {
   children?: ReactNode;
 }
 
+function formatCurrencyInput(value: string): string {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return value;
+  return currency.format(num);
+}
+
 export function ProjectionDashboard({
   pack,
   result,
@@ -39,6 +45,7 @@ export function ProjectionDashboard({
 }: ProjectionDashboardProps) {
   const [isPostingTablesOpen, setIsPostingTablesOpen] = useState(false);
   const [expandedEventRows, setExpandedEventRows] = useState<Set<string>>(new Set());
+  const [isTargetFocused, setIsTargetFocused] = useState(false);
   const latestRow = result.timeline.rows[result.timeline.rows.length - 1] ?? null;
   const firstProjectedRow = result.timeline.rows.find((row) => !row.isHistorical) ?? null;
   const futureRows = result.timeline.rows.filter((row) => !row.isHistorical);
@@ -83,42 +90,40 @@ export function ProjectionDashboard({
   const headline = (() => {
     if (hasStochasticData && stochasticResult) {
       const prob = pct.format(stochasticResult.milestones.hitTargetProbability);
-      if (goalReached) {
-        return `${prob} chance of ${currency.format(projectionSettings.targetNetWorth)}${stochasticResult.milestones.medianHitTargetDate ? ` by ${stochasticResult.milestones.medianHitTargetDate}` : ""}`;
-      }
-      return `${prob} chance of ${currency.format(projectionSettings.targetNetWorth)}`;
+      const medianDate = stochasticResult.milestones.medianHitTargetDate;
+      return `${prob} of simulated paths reached ${currency.format(projectionSettings.targetNetWorth)}${medianDate ? ` by ${formatDate(medianDate)}` : ""}`;
     }
 
     return goalReached
-      ? `Hits ${currency.format(projectionSettings.targetNetWorth)} on ${result.milestones.hitTargetDate}`
-      : `Misses target by ${currency.format(distanceToTarget)}`;
+      ? `Deterministic projection reaches ${currency.format(projectionSettings.targetNetWorth)} on ${formatDate(result.milestones.hitTargetDate!)}`
+      : `Deterministic projection misses target by ${currency.format(distanceToTarget)}`;
   })();
   const headlineDetail = (() => {
     if (hasStochasticData && stochasticResult) {
       const finalP50 = currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p50);
       const hitDate = result.milestones.hitTargetDate;
       if (hitDate) {
-        return `Deterministic: hits target on ${hitDate}. P50 final net worth: ${finalP50}.`;
+        return `Deterministic target date: ${formatDate(hitDate)}. Median simulated final net worth is ${finalP50}.`;
       }
-      return `Deterministic: misses by ${currency.format(distanceToTarget)}. P50 final net worth: ${finalP50}.`;
+      return `Deterministic projection misses by ${currency.format(distanceToTarget)}. Median simulated final net worth is ${finalP50}.`;
     }
 
-    return goalReached
-      ? `Projected final net worth is ${currency.format(result.summary.finalNetWorth)} on ${latestRow?.date ?? result.milestones.projectionStartDate}.`
-      : `Projected final net worth is ${currency.format(result.summary.finalNetWorth)} on ${latestRow?.date ?? result.milestones.projectionStartDate}.`;
+    return `Projected final net worth is ${currency.format(result.summary.finalNetWorth)} on ${formatDate(latestRow?.date ?? result.milestones.projectionStartDate)}.`;
   })();
   const statusBadgeClassName = goalReached
     ? "border-emerald-200 bg-emerald-50 text-emerald-900"
     : "border-amber-200 bg-amber-50 text-amber-900";
-  const blockerValue = biggestShortfallPosting?.label ?? (goalReached ? "No clamp showing" : "No clamp showing");
+  const blockerValue = biggestShortfallPosting?.label ?? (goalReached ? "No constraint showing" : "No constraint showing");
   const blockerDetail = biggestShortfallPosting
-    ? `${currency.format(biggestShortfallPosting.shortfallAmount)} missed${biggestShortfallPosting.firstShortfallDate ? `, first visible on ${biggestShortfallPosting.firstShortfallDate}` : ""}.`
+    ? biggestShortfallPosting.firstShortfallDate
+      ? `Starting ${formatDate(biggestShortfallPosting.firstShortfallDate)}, the model cannot fully fund this scheduled payment from checking. Total unfunded amount across the projection: ${currency.format(biggestShortfallPosting.shortfallAmount)}.`
+      : `The model cannot fully fund this scheduled payment. Total unfunded amount: ${currency.format(biggestShortfallPosting.shortfallAmount)}.`
     : goalReached
-      ? "No posting is currently clamping, so the plan is reaching the target without a visible cash-flow constraint."
-      : "No posting is currently clamping, so the miss is coming from overall cash-flow magnitude or growth assumptions rather than a hard utilization shortfall.";
+      ? "No scheduled payment is currently limited by available funds, so the plan reaches the target without a visible cash-flow constraint."
+      : "No scheduled payment is currently limited by available funds, so the shortfall is coming from overall cash-flow magnitude or growth assumptions rather than a hard funding constraint.";
   const nextEventDetail = firstProjectedRow === null
-    ? "No projected rows are scheduled after the historical checkpoints."
-    : `${currency.format(firstProjectedRow.requestedPostingAmount)} requested and ${currency.format(firstProjectedRow.realizedPostingAmount)} realized${firstProjectedRow.clampedPostingShortfallAmount > 0 ? `, leaving ${currency.format(firstProjectedRow.clampedPostingShortfallAmount)} short.` : "."}`;
+    ? "No projected transactions are scheduled after the historical balance history."
+    : `${currency.format(firstProjectedRow.requestedPostingAmount)} requested and ${currency.format(firstProjectedRow.realizedPostingAmount)} applied${firstProjectedRow.clampedPostingShortfallAmount > 0 ? `, leaving ${currency.format(firstProjectedRow.clampedPostingShortfallAmount)} unfunded.` : "."}`;
 
   return (
     <div className="space-y-6">
@@ -154,12 +159,12 @@ export function ProjectionDashboard({
                   <OutcomeMetric
                     label="Current"
                     value={currency.format(result.summary.currentNetWorth)}
-                    detail={result.milestones.latestHistoricalDate ?? result.milestones.projectionStartDate}
+                    detail={formatDate(result.milestones.latestHistoricalDate ?? result.milestones.projectionStartDate)}
                   />
                   <OutcomeMetric
                     label="Projected Final"
                     value={currency.format(result.summary.finalNetWorth)}
-                    detail={latestRow?.date ?? result.milestones.projectionStartDate}
+                    detail={formatDate(latestRow?.date ?? result.milestones.projectionStartDate)}
                   />
                   <OutcomeMetric
                     label={goalReached ? "Surplus" : "Gap"}
@@ -170,18 +175,31 @@ export function ProjectionDashboard({
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Target</div>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  step={1000}
-                  value={targetNetWorthInput}
-                  onChange={(event) => onTargetNetWorthInputChange(event.currentTarget.value)}
-                  className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-2xl font-semibold text-slate-900 shadow-sm outline-none transition focus:border-slate-400"
-                />
+                <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Target net worth</div>
+                {isTargetFocused ? (
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    step={1000}
+                    autoFocus
+                    value={targetNetWorthInput}
+                    onChange={(event) => onTargetNetWorthInputChange(event.currentTarget.value)}
+                    onBlur={() => setIsTargetFocused(false)}
+                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-2xl font-semibold text-slate-900 shadow-sm outline-none transition focus:border-slate-400"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsTargetFocused(true)}
+                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-2xl font-semibold text-slate-900 shadow-sm outline-none transition hover:border-slate-300 focus:border-slate-400"
+                  >
+                    {formatCurrencyInput(targetNetWorthInput)}
+                  </button>
+                )}
+                <div className="mt-1 text-xs text-slate-400">Nominal dollars</div>
                 <div className="mt-4">
                   <CompactDetail label="Horizon" value={`${projectionSettings.horizonYears} years`} />
-                  <CompactDetail label="Start" value={result.milestones.projectionStartDate} />
+                  <CompactDetail label="Start" value={formatDate(result.milestones.projectionStartDate)} />
                   <CompactDetail label="Overrides" value={activeOverrideCount === 0 ? "None" : String(activeOverrideCount)} />
                 </div>
               </div>
@@ -190,24 +208,87 @@ export function ProjectionDashboard({
         </Card>
       </section>
 
+      {/* Assumptions summary */}
+      <section>
+        <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
+          <CardHeader>
+            <div>
+              <CardTitle>Key assumptions</CardTitle>
+              <CardDescription>The scheduled transactions and settings that drive this projection.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 md:grid-cols-2">
+              <div>
+                <h4 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Income</h4>
+                <div className="space-y-1">
+                  {pack.postings.filter((p) => p.enabled && !p.sourceAccountId).length > 0 ? (
+                    pack.postings
+                      .filter((p) => p.enabled && !p.sourceAccountId)
+                      .map((p) => (
+                        <div key={p.id} className="flex justify-between text-sm">
+                          <span className="text-slate-700">{p.label}</span>
+                          <span className="font-medium text-slate-900">{p.arithmetic} ({p.frequency})</span>
+                        </div>
+                      ))
+                  ) : (
+                    <div className="text-sm text-slate-400">No external income scheduled.</div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <h4 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Expenses & transfers</h4>
+                <div className="space-y-1">
+                  {pack.postings.filter((p) => p.enabled && p.sourceAccountId).length > 0 ? (
+                    pack.postings
+                      .filter((p) => p.enabled && p.sourceAccountId)
+                      .map((p) => (
+                        <div key={p.id} className="flex justify-between text-sm">
+                          <span className="text-slate-700">{p.label}</span>
+                          <span className="font-medium text-slate-900">{p.arithmetic} ({p.frequency})</span>
+                        </div>
+                      ))
+                  ) : (
+                    <div className="text-sm text-slate-400">No outgoing transactions scheduled.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600">
+                <span><span className="font-medium text-slate-900">{pack.accounts.filter((a) => a.enabled).length}</span> accounts tracked</span>
+                <span><span className="font-medium text-slate-900">{pack.postings.filter((p) => p.enabled).length}</span> scheduled transactions</span>
+                <span><span className="font-medium text-slate-900">{pack.checkpoints.length}</span> balance history points</span>
+                <span><span className="font-medium text-slate-900">{projectionSettings.horizonYears} years</span> projection horizon</span>
+              </div>
+            </div>
+            {hasStochasticData ? (
+              <div className="mt-3 text-xs text-slate-400">
+                Monte Carlo simulation enabled. This depends on the assumptions above and is not a guarantee.
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-3">
         <DriverCard
-          label="Main blocker"
+          label="Main constraint"
           value={blockerValue}
           detail={blockerDetail}
           tone={biggestShortfallPosting ? "warning" : goalReached ? "success" : "default"}
         />
         <DriverCard
-          label="Next event"
-          value={firstProjectedRow?.date ?? "No future rows"}
+          label="Next projected transaction"
+          value={firstProjectedRow ? formatDate(firstProjectedRow.date) : "No future transactions"}
           detail={nextEventDetail}
         />
         <DriverCard
-          label="Scheduled flow capture"
+          label="Planned transaction completion"
           value={pct.format(postingUtilizationRate)}
           detail={requestedPostingAmount === 0
-            ? `No enabled postings are requesting future activity across ${enabledPostingCount} posting${enabledPostingCount === 1 ? "" : "s"}.`
-            : `${currency.format(realizedPostingAmount)} realized from ${currency.format(requestedPostingAmount)} requested.`}
+            ? `No scheduled transactions are requesting future activity across ${enabledPostingCount} transaction${enabledPostingCount === 1 ? "" : "s"}.`
+            : `The model applied ${currency.format(realizedPostingAmount)} of ${currency.format(requestedPostingAmount)} in planned transactions.`}
           tone={postingUtilizationRate < 1 ? "warning" : "success"}
         />
       </section>
@@ -225,30 +306,30 @@ export function ProjectionDashboard({
       <CollapsibleSection
         open={isPostingTablesOpen}
         onOpenChange={setIsPostingTablesOpen}
-        title="Posting tables"
-        description="Open for route-level utilization and the exact projected event rows."
-        badge={isPostingTablesOpen ? "Close" : firstShortfallRow ? `Shortfall starts ${firstShortfallRow.date}` : `${futureRows.length} future row${futureRows.length === 1 ? "" : "s"}`}
+        title="Scheduled transactions"
+        description="Transaction completion rates and upcoming projected transactions."
+        badge={isPostingTablesOpen ? "Close" : firstShortfallRow ? `Unfunded amount starts ${formatDate(firstShortfallRow.date)}` : `${futureRows.length} upcoming transaction${futureRows.length === 1 ? "" : "s"}`}
       >
         {isPostingTablesOpen ? (
           <div className="mt-5 grid gap-6 xl:grid-cols-2">
             <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
               <CardHeader>
                 <div>
-                  <CardTitle>Posting utilization</CardTitle>
-                  <CardDescription>Which scheduled postings are fully realized and which ones clamp.</CardDescription>
+                  <CardTitle>Transaction completion</CardTitle>
+                  <CardDescription>Which scheduled transactions were fully applied and which were limited by available funds.</CardDescription>
                 </div>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Posting</TableHead>
+                      <TableHead>Transaction</TableHead>
                       <TableHead>Route</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead>Requested</TableHead>
-                      <TableHead>Realized</TableHead>
-                      <TableHead>Utilization</TableHead>
-                      <TableHead>First shortfall</TableHead>
+                      <TableHead>Applied</TableHead>
+                      <TableHead>Completion</TableHead>
+                      <TableHead>First unfunded</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -272,13 +353,13 @@ export function ProjectionDashboard({
                             <span className={hasShortfall ? "font-semibold text-amber-700" : undefined}>{pct.format(summary.utilizationRate)}</span>
                           </TableCell>
                           <TableCell>
-                            <span className={hasShortfall ? "font-medium text-amber-700" : "text-slate-400"}>{hasShortfall ? summary.firstShortfallDate : "-"}</span>
+                            <span className={hasShortfall ? "font-medium text-amber-700" : "text-slate-400"}>{hasShortfall ? formatDate(summary.firstShortfallDate!) : "-"}</span>
                           </TableCell>
                         </TableRow>
                       );
                     }) : (
                       <TableRow>
-                        <TableCell colSpan={7} className="py-6 text-center text-slate-500">No postings are defined.</TableCell>
+                        <TableCell colSpan={7} className="py-6 text-center text-slate-500">No scheduled transactions are defined.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -289,8 +370,8 @@ export function ProjectionDashboard({
             <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
               <CardHeader>
                 <div>
-                  <CardTitle>Upcoming event rows</CardTitle>
-                  <CardDescription>The first projected dates and their requested vs realized scheduled activity.</CardDescription>
+                  <CardTitle>Upcoming projected transactions</CardTitle>
+                  <CardDescription>The next projected dates and their requested vs applied scheduled activity.</CardDescription>
                 </div>
               </CardHeader>
               <CardContent>
@@ -300,8 +381,8 @@ export function ProjectionDashboard({
                       <TableHead></TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Requested</TableHead>
-                      <TableHead>Realized</TableHead>
-                      <TableHead>Shortfall</TableHead>
+                      <TableHead>Applied</TableHead>
+                      <TableHead>Unfunded</TableHead>
                       <TableHead>Net worth</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -324,7 +405,7 @@ export function ProjectionDashboard({
                               {isExpanded ? "▾" : "▸"}
                             </TableCell>
                             <TableCell>
-                              <span className={hasShortfall ? "font-medium text-amber-700" : undefined}>{row.date}</span>
+                              <span className={hasShortfall ? "font-medium text-amber-700" : undefined}>{formatDate(row.date)}</span>
                             </TableCell>
                             <TableCell>
                               <span className={hasShortfall ? "text-amber-700" : undefined}>{currency.format(row.requestedPostingAmount)}</span>
@@ -344,10 +425,10 @@ export function ProjectionDashboard({
                                   <Table>
                                     <TableHeader>
                                       <TableRow className="bg-slate-100">
-                                        <TableHead className="text-xs">Posting</TableHead>
+                                        <TableHead className="text-xs">Transaction</TableHead>
                                         <TableHead className="text-xs">Requested</TableHead>
-                                        <TableHead className="text-xs">Realized</TableHead>
-                                        <TableHead className="text-xs">Shortfall</TableHead>
+                                        <TableHead className="text-xs">Applied</TableHead>
+                                        <TableHead className="text-xs">Unfunded</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -376,7 +457,7 @@ export function ProjectionDashboard({
                       );
                     }) : (
                       <TableRow>
-                        <TableCell colSpan={6} className="py-6 text-center text-slate-500">No projected event rows are available.</TableCell>
+                        <TableCell colSpan={6} className="py-6 text-center text-slate-500">No upcoming projected transactions are available.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>

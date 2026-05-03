@@ -45,6 +45,8 @@ export default function App() {
       s.disabledAccountIds.length +
       s.disabledPostingIds.length,
   );
+  const isEditing = useStore((s) => s.isEditing);
+  const isDirty = useStore((s) => s.isDirty);
 
   const targetNetWorthInput = useStore((s) => s.targetNetWorthInput);
   const setTargetNetWorthInput = useStore((s) => s.setTargetNetWorthInput);
@@ -125,15 +127,30 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8 md:py-8">
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={() => refetchScenario()} disabled={isLoading}>
-            {isLoading ? "Loading..." : "Reload"}
-          </Button>
-          {pack ? (
-            <Button type="button" variant="secondary" size="sm" onClick={() => setShowWizard(true)}>
-              Templates
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs text-slate-500">
+            {pack ? (
+              <span>
+                Baseline loaded from <span className="font-mono text-slate-600">/scenario</span>
+                {activeOverrideCount > 0 ? ` · ${activeOverrideCount} temporary scenario override${activeOverrideCount === 1 ? "" : "s"}` : ""}
+                {isEditing && isDirty ? " · Unsaved baseline edits" : ""}
+                {isEditing && !isDirty ? " · Editing baseline" : ""}
+                {activeOverrideCount === 0 && !isEditing ? " · Projection settings are session-only" : ""}
+              </span>
+            ) : (
+              <span>Waiting for scenario data...</span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={() => refetchScenario()} disabled={isLoading}>
+              {isLoading ? "Loading..." : "Reload source data"}
             </Button>
-          ) : null}
+            {pack ? (
+              <Button type="button" variant="secondary" size="sm" onClick={() => setShowWizard(true)}>
+                Templates
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         {isProjecting ? (

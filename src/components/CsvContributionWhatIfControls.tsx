@@ -106,7 +106,7 @@ export function ContributionWhatIfControls({
       title="Scenario overrides"
       description={activeOverrideCount > 0
         ? `${activeOverrideCount} temporary change${activeOverrideCount === 1 ? "" : "s"} active.`
-        : `Temporarily add trial accounts, postings, and checkpoints.`}
+          : `Temporarily add trial accounts, scheduled transactions, and balance checkpoints.`}
       badge={activeOverrideCount > 0 ? `${activeOverrideCount} active` : undefined}
     >
       <div className="mt-5 space-y-6">
@@ -183,11 +183,11 @@ export function ContributionWhatIfControls({
             ))}
           </div>
 
-          {/* Postings */}
+          {/* Scheduled transactions */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                Postings {whatIfState.addedPostings.length > 0 ? `(${whatIfState.addedPostings.length})` : ""}
+                Scheduled transactions {whatIfState.addedPostings.length > 0 ? `(${whatIfState.addedPostings.length})` : ""}
               </span>
               {!addingPosting ? (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setAddingPosting(emptyPosting())}>
@@ -351,11 +351,11 @@ export function ContributionWhatIfControls({
             ))}
           </div>
 
-          {/* Checkpoints */}
+          {/* Balance checkpoints */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                Checkpoints {whatIfState.addedCheckpoints.length > 0 ? `(${whatIfState.addedCheckpoints.length})` : ""}
+                Balance checkpoints {whatIfState.addedCheckpoints.length > 0 ? `(${whatIfState.addedCheckpoints.length})` : ""}
               </span>
               {!addingCheckpoint ? (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setAddingCheckpoint(emptyCheckpoint())}>

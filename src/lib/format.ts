@@ -14,7 +14,27 @@ export const integer = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0
 export const decimal = new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 });
 
 export function formatChartCurrencyTick(value: number): string {
-  return `$${Math.round(value / 1000)}k`;
+  if (value === 0) return "$0";
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1_000_000) {
+    return `${sign}$${(abs / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  }
+  if (abs >= 1_000) {
+    return `${sign}$${(abs / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
+  }
+  return `${sign}$${abs}`;
+}
+
+export function formatDate(isoDate: string): string {
+  if (!isoDate || isoDate.length < 10) return isoDate;
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function formatTooltipCurrency(value: unknown): string {
