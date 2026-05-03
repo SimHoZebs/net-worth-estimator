@@ -1,4 +1,5 @@
 import type {
+  ProjectionResult,
   ScenarioPack,
   ScenarioWhatIfState,
   ProjectionRuntimeSettings,
@@ -66,6 +67,48 @@ function runAndExtract(
   }));
 }
 
+function computeResult(
+  snapshotsByRun: NetWorthSnapshot[][],
+  config: StochasticConfig,
+  deterministic: ProjectionResult,
+  projectionSettings: ProjectionRuntimeSettings,
+): StochasticProjectionResult {
+  const sortedDates = deterministic.timeline.rows.map((r) => r.date);
+  const bands = buildBands(snapshotsByRun, sortedDates);
+  const finalRowBands = bands[bands.length - 1];
+  const finalNetWorthPercentiles = finalRowBands?.netWorth ?? { p10: 0, p25: 0, p50: 0, p75: 0, p90: 0 };
+
+  let medianHitDate: string | null = null;
+  let worstCaseHitDate: string | null = null;
+
+  bands.forEach((band) => {
+    if (band.isHistorical) return;
+    if (medianHitDate === null && band.netWorth.p50 >= projectionSettings.targetNetWorth) {
+      medianHitDate = band.date;
+    }
+    if (worstCaseHitDate === null && band.netWorth.p10 >= projectionSettings.targetNetWorth) {
+      worstCaseHitDate = band.date;
+    }
+  });
+
+  const hitCount = snapshotsByRun.filter((snapshots) =>
+    snapshots.some((s) => s.hitTarget)
+  ).length;
+  const hitTargetProbability = snapshotsByRun.length > 0 ? hitCount / snapshotsByRun.length : 0;
+
+  return {
+    config,
+    deterministic,
+    bands,
+    milestones: {
+      hitTargetProbability,
+      medianHitTargetDate: medianHitDate,
+      worstCaseHitTargetDate: worstCaseHitDate,
+      finalNetWorthPercentiles,
+    },
+  };
+}
+
 function buildBands(snapshotsByRun: NetWorthSnapshot[][], sortedDates: string[]): StochasticBandRow[] {
   const netWorthsByDate = new Map<string, number[]>();
   const isHistoricalByDate = new Map<string, boolean>();
@@ -105,7 +148,7 @@ export function stochasticProject(
   projectionSettings: ProjectionRuntimeSettings,
   whatIfState: ScenarioWhatIfState,
   config: StochasticConfig,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number, partial: StochasticProjectionResult) => void
 ): StochasticProjectionResult {
   reseed(config.seed);
   const deterministic = projectScenarioPack(pack, projectionSettings, whatIfState);
@@ -120,51 +163,9 @@ export function stochasticProject(
       const snapshots = runAndExtract(cloned, projectionSettings, whatIfState, rates);
       snapshotsByRun.push(snapshots);
     }
-    onProgress?.(batchEnd / config.runCount);
+    const partial = computeResult(snapshotsByRun, config, deterministic, projectionSettings);
+    onProgress?.(batchEnd / config.runCount, partial);
   }
 
-  const dateSet = new Set<string>();
-  snapshotsByRun.forEach((snapshots) => {
-    snapshots.forEach((s) => dateSet.add(s.date));
-  });
-  const sortedDates = Array.from(dateSet).sort();
-
-  const bands = buildBands(snapshotsByRun, sortedDates);
-
-  const finalRowBands = bands[bands.length - 1];
-  const finalNetWorthPercentiles = finalRowBands?.netWorth ?? { p10: 0, p25: 0, p50: 0, p75: 0, p90: 0 };
-
-  let medianHitDate: string | null = null;
-  let worstCaseHitDate: string | null = null;
-
-  bands.forEach((band) => {
-    if (band.isHistorical) {
-      return;
-    }
-
-    if (medianHitDate === null && band.netWorth.p50 >= projectionSettings.targetNetWorth) {
-      medianHitDate = band.date;
-    }
-
-    if (worstCaseHitDate === null && band.netWorth.p10 >= projectionSettings.targetNetWorth) {
-      worstCaseHitDate = band.date;
-    }
-  });
-
-  const hitCount = snapshotsByRun.filter((snapshots) =>
-    snapshots.some((s) => s.hitTarget)
-  ).length;
-  const hitTargetProbability = snapshotsByRun.length > 0 ? hitCount / snapshotsByRun.length : 0;
-
-  return {
-    config,
-    deterministic,
-    bands,
-    milestones: {
-      hitTargetProbability,
-      medianHitTargetDate: medianHitDate,
-      worstCaseHitTargetDate: worstCaseHitDate,
-      finalNetWorthPercentiles,
-    },
-  };
+  return computeResult(snapshotsByRun, config, deterministic, projectionSettings);
 }

@@ -14,8 +14,8 @@ self.onmessage = (event: MessageEvent<StochasticWorkerRequest>) => {
       projectionSettings,
       whatIfState,
       config,
-      (progress) => {
-        const msg: StochasticWorkerProgress = { id, progress, type: "progress" };
+      (progress, partial) => {
+        const msg: StochasticWorkerProgress = { id, progress, type: "progress", partial };
         self.postMessage(msg);
       }
     );

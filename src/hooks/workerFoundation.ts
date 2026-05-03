@@ -42,6 +42,7 @@ export function useWorkerProjection<TResult>({
         id: number;
         type?: string;
         progress?: number;
+        partial?: TResult;
         result?: TResult | null;
         runtimeError?: string | null;
       };
@@ -53,6 +54,7 @@ export function useWorkerProjection<TResult>({
         setState((current) => ({
           ...current,
           progress: payload.progress!,
+          result: payload.partial ?? current.result,
         }));
         return;
       }

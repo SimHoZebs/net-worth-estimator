@@ -31,6 +31,7 @@ export interface StochasticWorkerProgress {
   id: number;
   progress: number;
   type: "progress";
+  partial?: StochasticProjectionResult;
 }
 
 export interface StochasticWorkerResponse {

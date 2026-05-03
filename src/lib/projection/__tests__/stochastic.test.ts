@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { StochasticProjectionResult } from "../types/stochastic";
 import {
   computePercentiles,
   parseCsvScenarioPack,
@@ -233,5 +234,57 @@ describe("stochastic progress streaming", () => {
     expect(progressValues[0]).toBeCloseTo(100 / 250, 5);
     expect(progressValues[1]).toBeCloseTo(200 / 250, 5);
     expect(progressValues[2]).toBe(1);
+  });
+
+  it("each partial result has valid band structure", () => {
+    const { data: pack } = parseCsvScenarioPack(validCsvFiles);
+    expect(pack).not.toBeNull();
+
+    const partials: StochasticProjectionResult[] = [];
+    const final = stochasticProject(
+      pack!,
+      { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 10 },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
+      { runCount: 250, seed: 42 },
+      (_p, partial) => partials.push(partial)
+    );
+
+    for (const partial of partials) {
+      expect(partial.bands.length).toBeGreaterThan(0);
+      for (const band of partial.bands) {
+        expect(band.netWorth.p10).toBeLessThanOrEqual(band.netWorth.p50);
+        expect(band.netWorth.p50).toBeLessThanOrEqual(band.netWorth.p90);
+      }
+      expect(partial.milestones.hitTargetProbability).toBeGreaterThanOrEqual(0);
+      expect(partial.milestones.hitTargetProbability).toBeLessThanOrEqual(1);
+    }
+
+    const lastPartial = partials[partials.length - 1];
+    expect(lastPartial.bands[0].netWorth.p50).toBe(final.bands[0].netWorth.p50);
+    expect(lastPartial.milestones.hitTargetProbability).toBe(final.milestones.hitTargetProbability);
+  });
+
+  it("last partial result matches the final return value", () => {
+    const { data: pack } = parseCsvScenarioPack(validCsvFiles);
+    expect(pack).not.toBeNull();
+
+    const partials: StochasticProjectionResult[] = [];
+    const final = stochasticProject(
+      pack!,
+      { targetNetWorth: 1_000_000, fallbackProjectionStartDate: "2026-04-01", horizonYears: 10 },
+      { addedAccounts: [], addedPostings: [], addedCheckpoints: [], disabledAccountIds: [], disabledPostingIds: [] },
+      { runCount: 250, seed: 42 },
+      (_p, partial) => partials.push(partial)
+    );
+
+    expect(partials.length).toBeGreaterThanOrEqual(1);
+    const last = partials[partials.length - 1];
+    expect(last.bands.length).toBe(final.bands.length);
+    for (let i = 0; i < final.bands.length; i++) {
+      expect(last.bands[i].netWorth.p50).toBe(final.bands[i].netWorth.p50);
+      expect(last.bands[i].netWorth.p90 - last.bands[i].netWorth.p10).toBe(
+        final.bands[i].netWorth.p90 - final.bands[i].netWorth.p10
+      );
+    }
   });
 });
