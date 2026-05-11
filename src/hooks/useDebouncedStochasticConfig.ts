@@ -7,12 +7,15 @@ export function useDebouncedStochasticConfig(
   config: StochasticConfig,
   onConfigChange: (config: StochasticConfig) => void,
 ) {
-  const [runCountInput, setRunCountInput] = useState(String(config.runCount));
-  const [seedInput, setSeedInput] = useState(config.seed !== null ? String(config.seed) : "");
+  const [draftRunCount, setDraftRunCount] = useState(String(config.runCount));
+  const [draftSeed, setDraftSeed] = useState(config.seed !== null ? String(config.seed) : "");
   const [pendingConfig, setPendingConfig] = useState<StochasticConfig | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasPendingChanges = pendingConfig !== null;
+
+  const runCountInput = pendingConfig !== null ? draftRunCount : String(config.runCount);
+  const seedInput = pendingConfig !== null ? draftSeed : (config.seed !== null ? String(config.seed) : "");
 
   const parsedRunCount = Number.isFinite(Number(runCountInput))
     ? Math.max(1, Math.min(10000, Number(runCountInput)))
@@ -51,7 +54,7 @@ export function useDebouncedStochasticConfig(
   }
 
   function updateRunCountInput(value: string) {
-    setRunCountInput(value);
+    setDraftRunCount(value);
     scheduleConfigChange({
       runCount: Number.isFinite(Number(value))
         ? Math.max(1, Math.min(10000, Number(value)))
@@ -61,7 +64,7 @@ export function useDebouncedStochasticConfig(
   }
 
   function updateSeedInput(value: string) {
-    setSeedInput(value);
+    setDraftSeed(value);
     scheduleConfigChange({
       runCount: parsedRunCount,
       seed: value.trim().length > 0 && Number.isFinite(Number(value))
@@ -69,13 +72,6 @@ export function useDebouncedStochasticConfig(
         : null,
     });
   }
-
-  useEffect(() => {
-    if (pendingConfig === null) {
-      setRunCountInput(String(config.runCount));
-      setSeedInput(config.seed !== null ? String(config.seed) : "");
-    }
-  }, [config, pendingConfig]);
 
   useEffect(() => {
     return () => {

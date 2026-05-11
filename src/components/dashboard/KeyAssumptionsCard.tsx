@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useState } from "react";
 import type { ScenarioPack, ProjectionRuntimeSettings } from "@/lib/projection";
 import { formatDate, formatCurrencyInput } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,19 +26,10 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
   const [isTargetFocused, setIsTargetFocused] = useState(false);
   const [targetDraft, setTargetDraft] = useState(String(projectionSettings.targetNetWorth));
 
-  useEffect(() => {
-    if (!isTargetFocused) {
-      setTargetDraft(String(projectionSettings.targetNetWorth));
-    }
-  }, [isTargetFocused, projectionSettings.targetNetWorth]);
-
   const commitTargetNetWorth = () => {
     const nextTarget = Number(targetDraft);
     if (Number.isFinite(nextTarget)) {
       onTargetNetWorthChange(nextTarget);
-      setTargetDraft(String(nextTarget));
-    } else {
-      setTargetDraft(String(projectionSettings.targetNetWorth));
     }
     setIsTargetFocused(false);
   };
@@ -76,10 +67,13 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
             ) : (
               <button
                 type="button"
-                onClick={() => setIsTargetFocused(true)}
+                onClick={() => {
+                  setTargetDraft(String(projectionSettings.targetNetWorth));
+                  setIsTargetFocused(true);
+                }}
                 className="mt-2 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-left text-xl font-semibold text-slate-900 dark:text-slate-100 shadow-sm dark:shadow-slate-900/30 outline-none transition hover:border-slate-300 dark:hover:border-slate-600 focus:border-slate-400 dark:focus:border-slate-500"
               >
-                {formatCurrencyInput(targetDraft)}
+                {formatCurrencyInput(String(projectionSettings.targetNetWorth))}
               </button>
             )}
             <div className="mt-1 text-xs text-slate-400 dark:text-slate-500">Nominal dollars</div>

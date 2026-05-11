@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 
 interface CollapsibleContextValue {
   open: boolean;
@@ -40,12 +40,14 @@ function CollapsibleRoot({
   const [internalOpen, setInternalOpen] = useState(
     defaultOpen || autoOpenWhen,
   );
+  const prevAutoOpenWhenRef = useRef(autoOpenWhen);
 
-  useEffect(() => {
-    if (!isControlled && autoOpenWhen) {
-      setInternalOpen(true);
-    }
-  }, [autoOpenWhen, isControlled]);
+  if (!isControlled && autoOpenWhen && !prevAutoOpenWhenRef.current) {
+    prevAutoOpenWhenRef.current = true;
+    setInternalOpen(true);
+  } else {
+    prevAutoOpenWhenRef.current = autoOpenWhen;
+  }
 
   const isOpen = isControlled ? controlledOpen : internalOpen;
 
