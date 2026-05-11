@@ -6,8 +6,17 @@ export interface ScenarioParseResult {
   issues: ScenarioValidationIssue[];
 }
 
+export interface DataSourceAction<TArgs extends unknown[] = []> {
+  readonly label: string;
+  readonly description: string;
+  run(...args: TArgs): Promise<ScenarioParseResult>;
+}
+
 export interface DataSource {
   readonly sourceType: string;
+  readonly label: string;
+  readonly description: string;
   loadPack(): Promise<ScenarioParseResult>;
-  savePack(pack: ScenarioPack): Promise<ScenarioParseResult>;
+  readonly save?: DataSourceAction<[ScenarioPack]>;
+  readonly reset?: DataSourceAction;
 }

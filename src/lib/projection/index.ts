@@ -1,4 +1,5 @@
 export { fetchCsvScenarioFiles, loadCsvScenarioPack, parseCsvScenarioPack } from "./sources/csv/csvLoader";
+export { createBrowserCsvDataSource } from "./sources/csv/browserCsvDataSource";
 export { createCsvDataSource } from "./sources/csv/csvDataSource";
 export { projectScenarioPack } from "./engine/scenarioProject";
 export { stochasticProject } from "./engine/stochasticProject";
@@ -30,7 +31,7 @@ export type {
   ScenarioValidationIssue,
   ScenarioValidationSeverity,
 } from "./types/validation";
-export type { DataSource, ScenarioParseResult } from "./dataSource";
+export type { DataSource, DataSourceAction, ScenarioParseResult } from "./dataSource";
 export type {
   Account,
   AccountDelta,

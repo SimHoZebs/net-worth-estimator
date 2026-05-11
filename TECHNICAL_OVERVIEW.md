@@ -15,12 +15,12 @@ The Net Worth Estimator is a single-page React application that projects net wor
 
 ## 2. High-Level Architecture & Data Flow
 
-The application loads canonical CSV files from `public/scenario/` via a Vite server plugin, validates them server-side, and runs projections in dedicated Web Workers. Temporary what-if overrides and target-net-worth changes exist only in browser memory via Zustand for the current session. A `DataSource` interface (strategy pattern) abstracts data loading, allowing the backend to be swapped without touching the UI.
+The application loads a scenario pack through a capability-based `DataSource` abstraction, validates it, and runs projections in dedicated Web Workers. Local development uses a Vite server plugin to read/write repo CSV files, while static/serverless production loads bundled `/scenario/*.csv` files and saves user edits in browser storage. Temporary what-if overrides and target-net-worth changes exist only in browser memory via Zustand for the current session.
 
 ### Data Flow Execution
 
-1. A Vite plugin (`plugins/csvFilePlugin.ts`) provides `GET/PUT /api/scenario/pack` endpoints. It reads/writes CSV files from the filesystem and handles parsing, validation, and serialization server-side using Papa Parse + Zod.
-2. `src/hooks/useScenario.ts` wraps TanStack Query (`useScenarioQuery`, `useScenarioMutation`) around the `DataSource` interface, which is created once in `App.tsx` via `useMemo` and passed via dependency injection.
+1. `App.tsx` creates one `DataSource`: Vite dev uses `createCsvDataSource()` for `GET/PUT /api/scenario/pack`; production uses `createBrowserCsvDataSource()` to fetch `/scenario/*.csv` and persist edits in browser storage.
+2. `src/hooks/useScenario.ts` wraps TanStack Query (`useScenarioQuery`, `useScenarioMutation`, `useScenarioResetMutation`) around the `DataSource` interface, which is created once in `App.tsx` via `useMemo` and passed via dependency injection.
 3. Zod-based parsing plus cross-reference validation rejects invalid packs before projection.
 4. What-if state (temporary postings, accounts, checkpoints, disable toggles) is stored in Zustand with immutable-style updates.
 5. Deterministic projection runs in `src/workers/projectionWorker.ts` off the main thread.
@@ -116,9 +116,9 @@ This is genuinely incremental — projection runs happen once, and percentile co
 
 ## 6. Technical Highlights
 
-- Repo-backed source of truth: canonical financial data is plain CSV in the repo.
-- Full CRUD: the Vite plugin writes edited scenario data back to the CSV files on disk via `fs.writeFile`. No browser storage involved.
-- Dependency-injected data source: `DataSource` interface decouples data access from the UI. The current implementation (`csvDataSource.ts`) is a thin client calling the Vite plugin API — swapping to a remote backend requires only implementing the interface.
+- Repo-backed local source: local development can edit plain CSV files in the repo through the Vite middleware.
+- Serverless-safe browser source: production/static deployments load bundled CSV assets and save edits to browser storage instead of writing to the deployed filesystem.
+- Capability-injected data source: `DataSource` decouples data access from the UI through optional actions like `save` and `reset`, so new backends do not require growing central mode conditionals.
 - TanStack Query manages scenario data: `useScenarioQuery` (with `staleTime: Infinity`) and `useScenarioMutation` replace manual loading and stale-request tracking.
 - Two Web Workers: deterministic projection and Monte Carlo simulation both run off the main thread.
 - Progressive streaming: Monte Carlo results appear in the chart as they compute — wide bands narrow in real time toward final percentiles.

@@ -14,15 +14,19 @@ import { useStochastic } from "./hooks/useStochastic";
 import { summarizeValidationIssues } from "./lib/projection";
 import { useStore, selectWhatIfState, selectActiveOverrideCount } from "./store";
 import { useShallow } from "zustand/shallow";
-import { createCsvDataSource, type ProjectionRuntimeSettings } from "@/lib/projection";
-import { useScenarioQuery, useScenarioMutation } from "./hooks/useScenario";
+import { createBrowserCsvDataSource, createCsvDataSource, type ProjectionRuntimeSettings } from "@/lib/projection";
+import { useScenarioQuery, useScenarioMutation, useScenarioResetMutation } from "./hooks/useScenario";
 
 function formatTodayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function createScenarioDataSource() {
+  return import.meta.env.DEV ? createCsvDataSource() : createBrowserCsvDataSource();
+}
+
 export default function App() {
-  const dataSource = useMemo(() => createCsvDataSource(), []);
+  const dataSource = useMemo(() => createScenarioDataSource(), []);
   const {
     data: scenarioData,
     isLoading: isScenarioLoading,
@@ -31,10 +35,12 @@ export default function App() {
     dataUpdatedAt,
   } = useScenarioQuery(dataSource);
   const scenarioMutation = useScenarioMutation(dataSource);
+  const scenarioResetMutation = useScenarioResetMutation(dataSource);
 
   const pack = scenarioData?.pack ?? null;
   const issues = scenarioData?.issues ?? [];
   const loadError = scenarioError?.message ?? null;
+  const sourceActionError = scenarioMutation.error?.message ?? scenarioResetMutation.error?.message ?? null;
   const isLoading = isScenarioLoading;
 
   const whatIfState = useStore(useShallow(selectWhatIfState));
@@ -104,7 +110,7 @@ export default function App() {
 
   const handleSave = useCallback(() => {
     const store = useStore.getState();
-    if (!store.workingPack || scenarioMutation.isPending) return;
+    if (!store.workingPack || scenarioMutation.isPending || !dataSource.save) return;
 
     scenarioMutation.mutate(store.workingPack, {
       onSuccess: () => {
@@ -115,7 +121,21 @@ export default function App() {
         });
       },
     });
-  }, [scenarioMutation]);
+  }, [dataSource.save, scenarioMutation]);
+
+  const handleResetSource = useCallback(() => {
+    if (!dataSource.reset || scenarioResetMutation.isPending) return;
+
+    scenarioResetMutation.mutate(undefined, {
+      onSuccess: () => {
+        useStore.setState({
+          isDirty: false,
+          isEditing: false,
+          workingPack: null,
+        });
+      },
+    });
+  }, [dataSource.reset, scenarioResetMutation]);
 
   const [showWizard, setShowWizard] = useState(false);
   const handleCloseWizard = useCallback(() => setShowWizard(false), []);
@@ -160,7 +180,7 @@ export default function App() {
             <div className="text-xs text-slate-500">
               {pack ? (
                 <span>
-                  Baseline loaded from <span className="font-mono text-slate-600">/scenario</span>
+                  Baseline loaded from <span className="font-medium text-slate-600">{dataSource.label}</span>
                   {activeOverrideCount > 0 ? ` · ${activeOverrideCount} temporary scenario override${activeOverrideCount === 1 ? "" : "s"}` : ""}
                   {isEditing && isDirty ? " · Unsaved baseline edits" : ""}
                   {isEditing && !isDirty ? " · Editing baseline" : ""}
@@ -272,11 +292,16 @@ export default function App() {
             projectionStartDate={result?.milestones.projectionStartDate ?? projectionStartDate}
             pack={pack}
             issues={issues}
+            dataSource={dataSource}
             isLoading={isLoading}
             loadError={loadError}
+            sourceActionError={sourceActionError}
             dataUpdatedAt={dataUpdatedAt}
             onReload={handleReload}
             onSave={handleSave}
+            onResetSource={dataSource.reset ? handleResetSource : undefined}
+            isSaving={scenarioMutation.isPending}
+            isResetting={scenarioResetMutation.isPending}
           />
           </LazySection>
         </section>

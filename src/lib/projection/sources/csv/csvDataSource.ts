@@ -11,7 +11,9 @@ export function createCsvDataSource(options?: CsvDataSourceOptions): DataSource 
   const fetchImpl = options?.fetchImpl ?? fetch;
 
   return {
-    sourceType: "csv",
+    sourceType: "csv-api",
+    label: "Repo CSV files",
+    description: "Loaded through the Vite dev server; saved edits write back to public/scenario/*.csv in this checkout.",
     loadPack: async (): Promise<ScenarioParseResult> => {
       const response = await fetchImpl(`${apiPath}/pack`);
 
@@ -21,18 +23,22 @@ export function createCsvDataSource(options?: CsvDataSourceOptions): DataSource 
 
       return response.json() as Promise<ScenarioParseResult>;
     },
-    savePack: async (pack: ScenarioPack): Promise<ScenarioParseResult> => {
-      const response = await fetchImpl(`${apiPath}/pack`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pack),
-      });
+    save: {
+      label: "Save to CSV files",
+      description: "Writes the edited scenario to public/scenario/*.csv through the local Vite dev server.",
+      run: async (pack: ScenarioPack): Promise<ScenarioParseResult> => {
+        const response = await fetchImpl(`${apiPath}/pack`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pack),
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to save scenario pack (${response.status} ${response.statusText}).`);
-      }
+        if (!response.ok) {
+          throw new Error(`Failed to save scenario pack (${response.status} ${response.statusText}).`);
+        }
 
-      return response.json() as Promise<ScenarioParseResult>;
+        return response.json() as Promise<ScenarioParseResult>;
+      },
     },
   };
 }

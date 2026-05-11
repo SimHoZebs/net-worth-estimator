@@ -9,9 +9,9 @@ The current product model is intentionally simple:
 - A posting can be an external inflow, an external outflow, or an account-to-account transfer.
 - `amountMode` is `fixed` or `percent_of_base`, where base rows reference the latest realized amount of another posting.
 - Annual caps are generic and source-funded rows clamp to the source account's available positive balance.
-- Canonical data lives in `public/scenario/*.csv`.
-- Runtime projection settings live in the app, not in CSV: target net worth is editable in-session, horizon is fixed at 50 years, and projection starts from the latest checkpoint date or today if none exist.
-- The UI is read-only for persistent data and supports temporary session-only what-if multipliers for scheduled postings.
+- The bundled starter data lives in `public/scenario/*.csv`.
+- Runtime projection settings live in the app, not in CSV: target net worth and horizon are editable in-session, and projection starts from the latest checkpoint date or today if none exist.
+- Baseline edits are persisted by the active data source, while what-if overrides remain session-only.
 
 The current product-model summary lives in `REDESIGN_PLAN.md`.
 
@@ -22,6 +22,13 @@ The app expects these files under `public/scenario/`:
 - `accounts.csv`
 - `checkpoints.csv`
 - `postings.csv`
+
+## Persistence Modes
+
+- Local development (`npm run dev`) uses the Vite middleware at `/api/scenario/pack`; saving writes back to `public/scenario/*.csv` in your checkout.
+- Static/serverless production, including Vercel, loads the bundled `/scenario/*.csv` files and saves baseline edits in the user's browser storage.
+- Serverless deployments should not rely on writing files in the deployed app. Use a real backend data source if users need cross-device or shared persistence.
+- Do not deploy private real financial CSV files publicly in `public/scenario/`; those files are served as static assets.
 
 ## Run
 
@@ -40,10 +47,10 @@ npm run build
 
 ## Current Architecture
 
-- `src/App.tsx`: app shell that loads the CSV pack, applies session-only what-if state, and renders the inspector plus dashboard
-- `src/hooks/useCsvScenarioPack.ts`: repo-backed CSV loading and refresh state
-- `src/hooks/useCsvWhatIfState.ts`: temporary posting override state
-- `src/hooks/useCsvProjectionWorker.ts`: worker-backed projection execution
+- `src/App.tsx`: app shell that chooses the active data source, applies session-only what-if state, and renders the inspector plus dashboard
+- `src/hooks/useScenario.ts`: TanStack Query wrappers around the data source load/save/reset capabilities
+- `src/store.ts`: temporary what-if state, scenario editor state, and runtime projection settings
+- `src/engine/WorkerProjectionEngine.ts`: worker-backed projection execution
 - `src/components/CsvScenarioInspector.tsx`: read-only CSV data inspection and validation display
 - `src/components/CsvContributionWhatIfControls.tsx`: slider-based posting what-if overrides
 - `src/components/CsvProjectionDashboard.tsx`: net worth and posting projection dashboard

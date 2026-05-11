@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { CSV_SCENARIO_PUBLIC_PATH } from "@/lib/projection";
-import type { ProjectionRuntimeSettings, ScenarioPack } from "@/lib/projection";
+import type { DataSource, ProjectionRuntimeSettings, ScenarioPack } from "@/lib/projection";
 import type { ScenarioValidationIssue } from "@/lib/projection";
 import { ScenarioValidationPanel } from "./ScenarioValidationPanel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -22,11 +21,16 @@ interface ScenarioInspectorProps {
   projectionStartDate: string;
   pack: ScenarioPack | null;
   issues: ScenarioValidationIssue[];
+  dataSource: DataSource;
   isLoading: boolean;
   loadError: string | null;
+  sourceActionError: string | null;
   dataUpdatedAt: number;
   onReload: () => void;
   onSave: () => void;
+  onResetSource?: () => void;
+  isSaving: boolean;
+  isResetting: boolean;
 }
 
 function formatLoadedAt(dataUpdatedAt: number) {
@@ -34,7 +38,7 @@ function formatLoadedAt(dataUpdatedAt: number) {
 }
 
 export function ScenarioInspector({
-  projectionSettings, projectionStartDate, pack, issues, isLoading, loadError, dataUpdatedAt, onReload, onSave,
+  projectionSettings, projectionStartDate, pack, issues, dataSource, isLoading, loadError, sourceActionError, dataUpdatedAt, onReload, onSave, onResetSource, isSaving, isResetting,
 }: ScenarioInspectorProps) {
   const disabledAccountIds = useStore((s) => s.disabledAccountIds);
   const disabledPostingIds = useStore((s) => s.disabledPostingIds);
@@ -67,8 +71,8 @@ export function ScenarioInspector({
 
   const errorCount = issues.filter((i) => i.severity === "error").length;
   const warningCount = issues.filter((i) => i.severity === "warning").length;
-  const shouldOpen = loadError !== null || issues.length > 0;
-  const loadStatus = isLoading ? "Loading" : loadError ? "Load failed" : pack ? "Loaded" : "Waiting";
+  const shouldOpen = loadError !== null || sourceActionError !== null || issues.length > 0;
+  const loadStatus = isLoading ? "Loading" : loadError ? "Load failed" : sourceActionError ? "Action failed" : pack ? "Loaded" : "Waiting";
   const validationSummary = errorCount > 0 ? pluralize(errorCount, "error")
     : warningCount > 0 ? pluralize(warningCount, "warning")
     : pack ? "Clean" : "Pending";
@@ -86,17 +90,26 @@ export function ScenarioInspector({
           {isEditing ? (
             <>
               <Button type="button" variant="secondary" size="sm" onClick={cancelEditing}>Cancel</Button>
-              <Button type="button" size="sm" onClick={onSave} disabled={!isDirty}>Save changes</Button>
+              <Button type="button" size="sm" onClick={onSave} disabled={!isDirty || !dataSource.save || isSaving}>
+                {isSaving ? "Saving..." : dataSource.save?.label ?? "Save unavailable"}
+              </Button>
             </>
           ) : (
             <>
+              {dataSource.reset && onResetSource ? (
+                <Button type="button" variant="ghost" size="sm" onClick={onResetSource} disabled={isLoading || isResetting}>
+                  {isResetting ? "Resetting..." : dataSource.reset.label}
+                </Button>
+              ) : null}
               <Button type="button" variant="secondary" size="sm" onClick={onReload} disabled={isLoading}>
                 {isLoading ? "Loading..." : "Reload"}
               </Button>
-              {pack ? <Button type="button" variant="secondary" size="sm" onClick={() => startEditing(pack)}>Edit</Button> : null}
+              {pack && dataSource.save ? <Button type="button" variant="secondary" size="sm" onClick={() => startEditing(pack)}>Edit</Button> : null}
             </>
           )}
         </div>
+
+        <p className="text-xs text-slate-500">{dataSource.description}</p>
 
         {loadError ? (
           <Alert variant="destructive" className="rounded-[1.6rem]">
@@ -105,10 +118,17 @@ export function ScenarioInspector({
           </Alert>
         ) : null}
 
+        {sourceActionError ? (
+          <Alert variant="destructive" className="rounded-[1.6rem]">
+            <AlertTitle>Source action failed</AlertTitle>
+            <AlertDescription>{sourceActionError}</AlertDescription>
+          </Alert>
+        ) : null}
+
         {issues.length > 0 ? <ScenarioValidationPanel issues={issues} /> : null}
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard label="Source path" value={CSV_SCENARIO_PUBLIC_PATH} />
+          <SummaryCard label="Source" value={dataSource.label} />
           <SummaryCard label="Last loaded" value={formatLoadedAt(dataUpdatedAt)} />
           <SummaryCard label="Projection start" value={projectionStartDate} />
           <SummaryCard label="Target" value={currency.format(projectionSettings.targetNetWorth)} />
