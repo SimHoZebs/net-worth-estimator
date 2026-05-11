@@ -25,8 +25,9 @@ The application loads a scenario pack through a capability-based `DataSource` ab
 4. What-if state (temporary postings, accounts, checkpoints, disable toggles) is stored in Zustand with immutable-style updates.
 5. Deterministic projection runs in `src/workers/projectionWorker.ts` off the main thread.
 6. Monte Carlo simulation runs in `src/workers/stochasticWorker.ts` — streaming partial results progressively to the UI.
-7. The `useWorkerProjection` generic hook (`src/hooks/workerFoundation.ts`) manages worker lifecycle, request IDs, and message handling for both workers.
-8. The inspector and dashboard render the validated pack and projected results.
+7. A Dependency Injection pattern (`ProjectionEngineProvider` context) provides a `ProjectionEngine` instance to the React tree. `WorkerProjectionEngine` implements this interface, creating and destroying Web Workers per call.
+8. The `useProjection` and `useStochastic` hooks consume this engine to trigger computation and manage loading/error state.
+9. The inspector and dashboard render the validated pack and projected results.
 
 ## 3. Core Concepts
 
@@ -109,10 +110,12 @@ This is genuinely incremental — projection runs happen once, and percentile co
 ## 5. UI Structure and Components
 
 - `App.tsx`: creates the `DataSource` via DI, uses TanStack Query for scenario loading/mutation, orchestrates what-if overrides, deterministic projection, and stochastic simulation
-- `CsvScenarioInspector.tsx`: shows read-only CSV-backed data tables plus validation issues; accepts scenario data as props
-- `CsvContributionWhatIfControls.tsx`: lets the user apply temporary overrides (add/remove/disable postings, accounts, checkpoints)
-- `CsvProjectionDashboard.tsx`: renders current and projected net worth, signed account balances, dated posting rows, and posting utilization
+- `ScenarioInspector` (in `CsvScenarioInspector.tsx`): shows read-only CSV-backed data tables plus validation issues; accepts scenario data as props
+- `ContributionWhatIfControls` (in `CsvContributionWhatIfControls.tsx`): lets the user apply temporary overrides (add/remove/disable postings, accounts, checkpoints)
+- `ProjectionDashboard` (in `CsvProjectionDashboard.tsx`): renders current and projected net worth, signed account balances, dated posting rows, and posting utilization
 - `StochasticControls.tsx`: Monte Carlo toggle, run count, seed input, progress bar, and milestone stat cards (hit probability, P50/P10 hit dates, final P50)
+- `TemplateWizard` (in `patterns/TemplateWizard.tsx`): Guides users through generating common financial patterns (like `IncomeForm`) and previews them before saving.
+- `src/store.ts`: A Zustand store with 5 slices managing: `WhatIf` (temporary session overrides), `Editor` (CRUD for working copy), `Settings` (target net worth, horizon, stochastic configs), `Snapshot` (named scenario snapshots), and `Theme` (light/dark/system).
 
 ## 6. Technical Highlights
 
