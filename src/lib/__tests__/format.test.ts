@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatChartCurrencyTick, formatDate, formatFrequency } from "../format";
+import { formatChartCurrencyTick, formatDate, formatElapsedTime, formatFrequency } from "../format";
 
 describe("formatChartCurrencyTick", () => {
   it("formats zero as $0", () => {
@@ -40,6 +40,24 @@ describe("formatDate", () => {
     expect(formatDate("")).toBe("");
     expect(formatDate("2026")).toBe("2026");
     expect(formatDate("2026-05")).toBe("2026-05");
+  });
+});
+
+describe("formatElapsedTime", () => {
+  it("formats elapsed years and months", () => {
+    expect(formatElapsedTime("2026-05-10", "2030-08-10")).toBe("4y 3m");
+    expect(formatElapsedTime("2026-05-10", "2027-05-10")).toBe("1y");
+    expect(formatElapsedTime("2026-05-10", "2026-08-10")).toBe("3m");
+  });
+
+  it("uses days for sub-month durations", () => {
+    expect(formatElapsedTime("2026-05-10", "2026-05-20")).toBe("10d");
+    expect(formatElapsedTime("2026-05-10", "2026-05-10")).toBe("Now");
+  });
+
+  it("rounds down incomplete months", () => {
+    expect(formatElapsedTime("2026-05-31", "2026-06-30")).toBe("30d");
+    expect(formatElapsedTime("2026-05-31", "2026-07-01")).toBe("1m");
   });
 });
 

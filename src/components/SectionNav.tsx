@@ -8,9 +8,10 @@ interface Section {
 const sections: Section[] = [
   { id: "overview", label: "Overview" },
   { id: "projection-chart", label: "Chart" },
-  { id: "cash-flow-debt", label: "Cash Flow" },
-  { id: "monte-carlo", label: "Monte Carlo" },
-  { id: "source-data", label: "Data" },
+  { id: "projected-shortfalls", label: "Shortfalls" },
+  { id: "model-inputs", label: "Inputs" },
+  { id: "scenario-snapshots", label: "Scenarios" },
+  { id: "projection-settings", label: "Settings" },
 ];
 
 export function SectionNav() {
@@ -50,7 +51,7 @@ export function SectionNav() {
 
   return (
     <nav className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80 no-print">
-      <div className="mx-auto flex max-w-7xl items-center gap-1 px-3 py-0 md:px-8">
+      <div className="mx-auto flex max-w-[106rem] items-center gap-1 px-3 py-0 md:px-8">
         <span className="hidden text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 md:mr-4 md:inline">
           Net Worth
         </span>

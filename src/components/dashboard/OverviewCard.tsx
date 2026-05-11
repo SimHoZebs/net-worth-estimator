@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { currency, formatDate, pct } from "@/lib/format";
+import { currency, formatDate, formatElapsedTime, pct } from "@/lib/format";
 import type { ProjectionResult, StochasticProjectionResult, ProjectionRuntimeSettings } from "@/lib/projection";
 
 interface OverviewCardProps {
@@ -44,19 +44,19 @@ export const OverviewCard = memo(function OverviewCard({
           </div>
 
           <div className="space-y-1 lg:col-span-1">
-            <div className="text-xs font-medium text-slate-500">Target date</div>
+            <div className="text-xs font-medium text-slate-500">Time to target</div>
             <div className="text-2xl font-semibold tracking-tight text-slate-900">
               {hasStochasticData && stochasticResult?.milestones.medianHitTargetDate
-                ? formatDate(stochasticResult.milestones.medianHitTargetDate)
+                ? formatElapsedTime(result.milestones.projectionStartDate, stochasticResult.milestones.medianHitTargetDate)
                 : hitDate
-                  ? formatDate(hitDate)
+                  ? formatElapsedTime(result.milestones.projectionStartDate, hitDate)
                   : "Beyond horizon"}
             </div>
             <div className="text-sm text-slate-500">
-              {hasStochasticData && stochasticResult
-                ? `Median across ${stochasticResult.config?.runCount ?? "simulated"} runs`
-                : goalReached
-                  ? "Deterministic projection"
+              {hasStochasticData && stochasticResult?.milestones.medianHitTargetDate
+                ? `Median target date: ${formatDate(stochasticResult.milestones.medianHitTargetDate)}`
+                : hitDate
+                  ? `Target date: ${formatDate(hitDate)}`
                   : `Misses by ${currency.format(Math.abs(target - final))}`}
             </div>
           </div>

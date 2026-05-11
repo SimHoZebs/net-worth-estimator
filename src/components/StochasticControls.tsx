@@ -11,6 +11,7 @@ interface StochasticControlsProps {
   isRunning: boolean;
   progress: number | null;
   stochasticResult: StochasticProjectionResult | null;
+  compact?: boolean;
 }
 
 export function StochasticControls({
@@ -18,6 +19,7 @@ export function StochasticControls({
   isRunning,
   progress,
   stochasticResult,
+  compact = false,
 }: StochasticControlsProps) {
   const stochasticPreference = useStore((s) => s.stochasticPreference);
   const config = useStore((s) => s.stochasticConfig);
@@ -93,7 +95,7 @@ export function StochasticControls({
 
         {simulationActive ? (
           <>
-            <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
+            <div className={compact ? "grid gap-3" : "grid gap-4 sm:grid-cols-[1fr_1fr_auto]"}>
               <div className="space-y-1">
                 <label className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Run count</label>
                 <input
@@ -141,20 +143,26 @@ export function StochasticControls({
               </div>
             ) : null}
 
-            <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-              <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">How the simulation works</div>
-              <ul className="mt-1.5 space-y-1 text-xs text-slate-600">
-                <li>Each run samples a sequence of yearly investment returns for every volatile posting using a log-normal distribution.</li>
-                <li>The expected return is the posting&apos;s annual rate; the volatility controls the spread of possible outcomes.</li>
-                <li>Only postings with volatility &gt; 0 are randomized — all other values remain fixed across runs.</li>
-                <li>Loan rates, salary, expenses, and tax rates are treated as deterministic unless separately modeled with volatility.</li>
-                <li>Returns across different accounts and years are treated as independent — no correlation or market-crash scenarios are modeled.</li>
-                <li>The simulation does not model inflation, mean reversion, or sequence-of-return risk beyond what volatility captures.</li>
-              </ul>
-            </div>
+            {compact ? (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                Randomizes only postings with volatility configured; deterministic values stay fixed across runs.
+              </div>
+            ) : (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                <div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">How the simulation works</div>
+                <ul className="mt-1.5 space-y-1 text-xs text-slate-600">
+                  <li>Each run samples a sequence of yearly investment returns for every volatile posting using a log-normal distribution.</li>
+                  <li>The expected return is the posting&apos;s annual rate; the volatility controls the spread of possible outcomes.</li>
+                  <li>Only postings with volatility &gt; 0 are randomized — all other values remain fixed across runs.</li>
+                  <li>Loan rates, salary, expenses, and tax rates are treated as deterministic unless separately modeled with volatility.</li>
+                  <li>Returns across different accounts and years are treated as independent — no correlation or market-crash scenarios are modeled.</li>
+                  <li>The simulation does not model inflation, mean reversion, or sequence-of-return risk beyond what volatility captures.</li>
+                </ul>
+              </div>
+            )}
 
             {stochasticResult ? (
-              <div className="grid gap-3 sm:grid-cols-4">
+              <div className={compact ? "grid gap-3" : "grid gap-3 sm:grid-cols-4"}>
                 <StochasticResultCard
                   label="Modeled success rate"
                   value={pct.format(stochasticResult.milestones.hitTargetProbability)}

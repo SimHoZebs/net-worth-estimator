@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState, type ReactNode } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import type {
   ProjectionResult,
   ScenarioPack,
@@ -14,9 +14,8 @@ import { OverviewCard } from "./dashboard/OverviewCard";
 import { CashFlowWaterfall } from "./dashboard/CashFlowWaterfall";
 import { NetWorthReconciliation } from "./dashboard/NetWorthReconciliation";
 import { DebtSummary } from "./dashboard/DebtSummary";
-import { KeyAssumptionsCard } from "./dashboard/KeyAssumptionsCard";
 import { TransactionCompletionTable } from "./dashboard/tables/TransactionCompletionTable";
-import { ProjectedShortfalls } from "./dashboard/ProjectedShortfalls";
+import { ShortfallCalendar } from "./dashboard/ShortfallCalendar";
 import { buildAccountDiagnosticChartData } from "@/chart/chartData";
 import { useStore, selectActiveOverrideCount } from "@/store";
 import { useDashboardDerivedValues } from "./dashboard/useDashboardDerivedValues";
@@ -25,20 +24,14 @@ interface ProjectionDashboardProps {
   pack: ScenarioPack;
   result: ProjectionResult;
   projectionSettings: ProjectionRuntimeSettings;
-  onTargetNetWorthChange: (value: number) => void;
-  onProjectionSettingsChange?: (partial: Partial<ProjectionRuntimeSettings>) => void;
   stochasticResult?: StochasticProjectionResult | null;
-  children?: ReactNode;
 }
 
 export const ProjectionDashboard = memo(function ProjectionDashboard({
   pack,
   result,
   projectionSettings,
-  onTargetNetWorthChange,
-  onProjectionSettingsChange,
   stochasticResult,
-  children,
 }: ProjectionDashboardProps) {
   const [isPostingTablesOpen, setIsPostingTablesOpen] = useState(false);
   const hasStochasticData = stochasticResult !== undefined && stochasticResult !== null;
@@ -53,7 +46,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
     firstShortfall: derived.firstShortfallRow?.date ?? undefined,
   }), [result.milestones.hitTargetDate, derived.firstShortfallRow?.date]);
   const scrollToSourceData = useCallback(() => {
-    const el = document.getElementById("source-data");
+    const el = document.getElementById("model-inputs");
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
@@ -91,18 +84,6 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
         ) : null}
       </section>
 
-      <section id="assumptions">
-        <KeyAssumptionsCard
-          pack={pack}
-          onTargetNetWorthChange={onTargetNetWorthChange}
-          projectionSettings={projectionSettings}
-          onProjectionSettingsChange={onProjectionSettingsChange}
-          activeOverrideCount={activeOverrideCount}
-          projectionStartDate={result.milestones.projectionStartDate}
-          hasStochasticData={hasStochasticData}
-        />
-      </section>
-
       <section id="cash-flow-debt">
         <LazySection>
           <CollapsibleSection
@@ -132,7 +113,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
             onClick={scrollToSourceData}
             className="no-print w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
           >
-            Explore fixes
+            Explore model inputs
           </button>
         </div>
         <DriverCard
@@ -151,22 +132,12 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
       </section>
 
       <section id="projected-shortfalls">
-        <ProjectedShortfalls
+        <ShortfallCalendar
           rows={result.timeline.rows}
           postings={pack.postings}
           accounts={pack.accounts}
         />
       </section>
-
-      {children ? (
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight text-slate-900">Scenario overrides</h2>
-            <p className="text-sm text-slate-500">Change scheduled postings only after checking the baseline answer above.</p>
-          </div>
-          {children}
-        </section>
-      ) : null}
 
       <CollapsibleSection
         open={isPostingTablesOpen}

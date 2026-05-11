@@ -37,6 +37,35 @@ export function formatDate(isoDate: string): string {
   });
 }
 
+export function formatElapsedTime(startIsoDate: string, endIsoDate: string): string {
+  if (!startIsoDate || !endIsoDate || startIsoDate.length < 10 || endIsoDate.length < 10) {
+    return "Unknown";
+  }
+
+  const [startYear, startMonth, startDay] = startIsoDate.split("-").map(Number);
+  const [endYear, endMonth, endDay] = endIsoDate.split("-").map(Number);
+
+  if (![startYear, startMonth, startDay, endYear, endMonth, endDay].every(Number.isFinite)) {
+    return "Unknown";
+  }
+
+  let totalMonths = (endYear - startYear) * 12 + (endMonth - startMonth);
+  if (endDay < startDay) totalMonths -= 1;
+
+  if (totalMonths > 0) {
+    const years = Math.floor(totalMonths / 12);
+    const months = totalMonths % 12;
+    if (years > 0 && months > 0) return `${years}y ${months}m`;
+    if (years > 0) return `${years}y`;
+    return `${months}m`;
+  }
+
+  const startDate = new Date(startYear, startMonth - 1, startDay);
+  const endDate = new Date(endYear, endMonth - 1, endDay);
+  const days = Math.round((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000));
+  return days <= 0 ? "Now" : `${days}d`;
+}
+
 export function formatTooltipCurrency(value: unknown): string {
   return currency.format(Number(value ?? 0));
 }

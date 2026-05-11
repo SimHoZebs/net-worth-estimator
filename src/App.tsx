@@ -2,8 +2,8 @@ import { useCallback, useMemo, useState } from "react";
 import { ScenarioInspector } from "./components/CsvScenarioInspector";
 import { ProjectionDashboard } from "./components/CsvProjectionDashboard";
 import { ContributionWhatIfControls } from "./components/CsvContributionWhatIfControls";
-import { StochasticControls } from "./components/StochasticControls";
 import { ScenarioComparison } from "./components/ScenarioComparison";
+import { ProjectionConfigSidebar } from "./components/sidebar/ProjectionConfigSidebar";
 import { TemplateWizard } from "./components/patterns/TemplateWizard";
 import { SectionNav } from "./components/SectionNav";
 import { LazySection } from "./components/ui/lazy-section";
@@ -165,8 +165,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="mx-auto max-w-7xl space-y-0 px-0 md:px-0">
-        <div className="px-4 py-4 md:px-8">
+      <div className="space-y-0 px-0 md:px-0">
+        <div className="mx-auto max-w-[106rem] px-4 py-4 md:px-8">
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs text-slate-500">
               {pack ? (
@@ -202,7 +202,7 @@ export default function App() {
 
         <SectionNav />
 
-        <div className="space-y-6 px-4 py-6 md:px-8">
+        <div className="mx-auto max-w-[106rem] space-y-6 px-4 py-6 md:px-8">
         {isLoading && !pack ? (
           <div className="grid gap-4 md:grid-cols-3">
             {[1, 2, 3].map((i) => (
@@ -252,49 +252,83 @@ export default function App() {
         ) : null}
 
         {pack && validation.isValid && result ? (
-          <ProjectionDashboard
-            pack={pack}
-            result={result}
-            projectionSettings={projectionSettings}
-            onTargetNetWorthChange={setTargetNetWorth}
-            onProjectionSettingsChange={onProjectionSettingsChange}
-            stochasticResult={stochasticResult}
-          >
-            {whatIfControls}
-          </ProjectionDashboard>
-        ) : null}
+          <div className="grid items-start gap-6 min-[110rem]:grid-cols-[minmax(0,80rem)_24rem] min-[110rem]:justify-center">
+            <main className="min-w-0 space-y-6">
+              <ProjectionDashboard
+                pack={pack}
+                result={result}
+                projectionSettings={projectionSettings}
+                stochasticResult={stochasticResult}
+              />
 
-        {pack && validation.isValid && result ? (
-          <section id="monte-carlo">
-            <StochasticControls hasStochasticAccounts={hasStochasticAccounts} stochasticResult={stochasticResult} isRunning={isStochasticRunning} progress={stochasticProgress} />
+              <section id="model-inputs">
+                <LazySection>
+                  <ScenarioInspector
+                    projectionStartDate={result.milestones.projectionStartDate}
+                    pack={pack}
+                    issues={issues}
+                    dataSource={dataSource}
+                    isLoading={isLoading}
+                    loadError={loadError}
+                    sourceActionError={sourceActionError}
+                    onReload={handleReload}
+                    onSave={handleSave}
+                    isSaving={scenarioMutation.isPending}
+                    overridesSlot={whatIfControls}
+                  />
+                </LazySection>
+              </section>
+
+              <section id="scenario-snapshots">
+                <ScenarioComparison
+                  currentMetrics={currentMetrics}
+                  currentOverrideCount={activeOverrideCount}
+                />
+              </section>
+            </main>
+
+            <aside id="projection-settings" className="space-y-4">
+              <ProjectionConfigSidebar
+                pack={pack}
+                projectionSettings={projectionSettings}
+                projectionStartDate={result.milestones.projectionStartDate}
+                activeOverrideCount={activeOverrideCount}
+                hasStochasticAccounts={hasStochasticAccounts}
+                stochasticResult={stochasticResult}
+                isStochasticRunning={isStochasticRunning}
+                stochasticProgress={stochasticProgress}
+                dataSource={dataSource}
+                dataUpdatedAt={dataUpdatedAt}
+                isLoading={isLoading}
+                loadError={loadError}
+                sourceActionError={sourceActionError}
+                onTargetNetWorthChange={setTargetNetWorth}
+                onProjectionSettingsChange={onProjectionSettingsChange}
+                onReload={handleReload}
+                onResetSource={dataSource.reset ? handleResetSource : undefined}
+                isResetting={scenarioResetMutation.isPending}
+              />
+            </aside>
+          </div>
+        ) : (
+          <section id="model-inputs">
+            <LazySection>
+              <ScenarioInspector
+                projectionStartDate={result?.milestones.projectionStartDate ?? projectionStartDate}
+                pack={pack}
+                issues={issues}
+                dataSource={dataSource}
+                isLoading={isLoading}
+                loadError={loadError}
+                sourceActionError={sourceActionError}
+                onReload={handleReload}
+                onSave={handleSave}
+                isSaving={scenarioMutation.isPending}
+                overridesSlot={whatIfControls}
+              />
+            </LazySection>
           </section>
-        ) : null}
-
-        <ScenarioComparison
-          currentMetrics={currentMetrics}
-          currentOverrideCount={activeOverrideCount}
-        />
-
-        <section id="source-data">
-          <LazySection>
-            <ScenarioInspector
-            projectionSettings={projectionSettings}
-            projectionStartDate={result?.milestones.projectionStartDate ?? projectionStartDate}
-            pack={pack}
-            issues={issues}
-            dataSource={dataSource}
-            isLoading={isLoading}
-            loadError={loadError}
-            sourceActionError={sourceActionError}
-            dataUpdatedAt={dataUpdatedAt}
-            onReload={handleReload}
-            onSave={handleSave}
-            onResetSource={dataSource.reset ? handleResetSource : undefined}
-            isSaving={scenarioMutation.isPending}
-            isResetting={scenarioResetMutation.isPending}
-          />
-          </LazySection>
-        </section>
+        )}
 
         {showWizard && pack ? (
           <TemplateWizard
