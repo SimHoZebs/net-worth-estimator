@@ -47,8 +47,8 @@ export const AccountLinesChart = memo(function AccountLinesChart({
       const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       const dateStr = formatDate(iso);
 
-      let html = `<div class="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm max-w-xs">`;
-      html += `<div class="text-xs font-medium text-slate-500">${dateStr}</div>`;
+      let html = `<div class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 shadow-sm dark:shadow-slate-900/30 max-w-xs">`;
+      html += `<div class="text-xs font-medium text-slate-500 dark:text-slate-400">${dateStr}</div>`;
       html += `<div class="mt-1 space-y-0.5">`;
 
       const rawRow = cd[idx] as Record<string, number> | undefined;
@@ -66,17 +66,17 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 
       for (const acct of nonZero) {
         html += `<div class="flex justify-between gap-3 text-xs">`;
-        html += `<span class="inline-flex items-center gap-1.5 text-slate-700">`;
+        html += `<span class="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-300">`;
         html += `<span class="inline-block h-2 w-2 rounded-full" style="background-color:${acct.color ?? "#64748b"}"></span>`;
         html += `${acct.label}</span>`;
-        html += `<span class="tabular-nums text-slate-700">${currency.format(acct.val)}</span>`;
+        html += `<span class="tabular-nums text-slate-700 dark:text-slate-300">${currency.format(acct.val)}</span>`;
         html += `</div>`;
       }
 
       if (zeroCount > 0) {
-        html += `<div class="flex justify-between gap-3 text-xs text-slate-400">`;
+        html += `<div class="flex justify-between gap-3 text-xs text-slate-400 dark:text-slate-500">`;
         html += `<span class="inline-flex items-center gap-1.5">`;
-        html += `<span class="inline-block h-2 w-2 rounded-full bg-slate-300"></span>`;
+        html += `<span class="inline-block h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-600"></span>`;
         html += `${zeroCount} ${zeroCount === 1 ? "account" : "accounts"} at $0`;
         html += `</span>`;
         html += `<span class="tabular-nums">$0</span>`;
@@ -127,7 +127,7 @@ export const AccountLinesChart = memo(function AccountLinesChart({
       <div className="min-w-0">
         <UPlotChart options={options} data={data} tooltipContent={tooltipContent} />
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 text-xs text-slate-600">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 text-xs text-slate-600 dark:text-slate-400">
         {enabledAccounts.map((a) => (
           <span key={a.id} className="inline-flex items-center gap-1.5">
             <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: a.color ?? "#334155" }} />

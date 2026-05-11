@@ -36,7 +36,7 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({ pac
   const liabilities = rows.filter((r) => r.balance < 0);
 
   return (
-    <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
+    <Card className="rounded-[1.6rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
       <CardHeader>
         <div>
           <CardTitle>Current net worth reconciliation</CardTitle>
@@ -46,7 +46,7 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({ pac
       <CardContent>
         <div className="grid gap-6 md:grid-cols-2">
           <div>
-            <h4 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Assets</h4>
+            <h4 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Assets</h4>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -58,13 +58,13 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({ pac
               <TableBody>
                 {assets.length > 0 ? assets.map((r) => (
                   <TableRow key={r.accountId}>
-                    <TableCell className="text-sm text-slate-700">{r.label}</TableCell>
-                    <TableCell className="text-right text-sm font-medium text-slate-900">{currency.format(r.balance)}</TableCell>
-                    <TableCell className="text-sm text-slate-500">{formatDate(r.checkpointDate)}{r.isLatest ? " · latest" : ""}</TableCell>
+                    <TableCell className="text-sm text-slate-700 dark:text-slate-300">{r.label}</TableCell>
+                    <TableCell className="text-right text-sm font-medium text-slate-900 dark:text-slate-100">{currency.format(r.balance)}</TableCell>
+                    <TableCell className="text-sm text-slate-500 dark:text-slate-400">{formatDate(r.checkpointDate)}{r.isLatest ? " · latest" : ""}</TableCell>
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={3} className="py-4 text-center text-sm text-slate-400">No asset checkpoints.</TableCell>
+                    <TableCell colSpan={3} className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">No asset checkpoints.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -72,7 +72,7 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({ pac
           </div>
 
           <div>
-            <h4 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Liabilities</h4>
+            <h4 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Liabilities</h4>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -84,13 +84,13 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({ pac
               <TableBody>
                 {liabilities.length > 0 ? liabilities.map((r) => (
                   <TableRow key={r.accountId}>
-                    <TableCell className="text-sm text-slate-700">{r.label}</TableCell>
-                    <TableCell className="text-right text-sm font-medium text-slate-900">{currency.format(r.balance)}</TableCell>
-                    <TableCell className="text-sm text-slate-500">{formatDate(r.checkpointDate)}{r.isLatest ? " · latest" : ""}</TableCell>
+                    <TableCell className="text-sm text-slate-700 dark:text-slate-300">{r.label}</TableCell>
+                    <TableCell className="text-right text-sm font-medium text-slate-900 dark:text-slate-100">{currency.format(r.balance)}</TableCell>
+                    <TableCell className="text-sm text-slate-500 dark:text-slate-400">{formatDate(r.checkpointDate)}{r.isLatest ? " · latest" : ""}</TableCell>
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={3} className="py-4 text-center text-sm text-slate-400">No liability checkpoints.</TableCell>
+                    <TableCell colSpan={3} className="py-4 text-center text-sm text-slate-400 dark:text-slate-500">No liability checkpoints.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -98,12 +98,12 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({ pac
           </div>
         </div>
 
-        <div className="mt-4 border-t border-slate-100 pt-4">
+        <div className="mt-4 border-t border-slate-100 dark:border-slate-700 pt-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-slate-900">Net worth</span>
-            <span className="font-semibold text-slate-900">{currency.format(result.summary.currentNetWorth)}</span>
+            <span className="font-medium text-slate-900 dark:text-slate-100">Net worth</span>
+            <span className="font-semibold text-slate-900 dark:text-slate-100">{currency.format(result.summary.currentNetWorth)}</span>
           </div>
-          <div className="text-xs text-slate-400">Computed from the latest checkpoint per account.</div>
+          <div className="text-xs text-slate-400 dark:text-slate-500">Computed from the latest checkpoint per account.</div>
         </div>
       </CardContent>
     </Card>

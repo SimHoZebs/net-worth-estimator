@@ -1,28 +1,122 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-interface CollapsibleSectionBaseProps {
-  title: string;
-  description: string;
-  badge?: string;
-  children: ReactNode;
+interface CollapsibleContextValue {
+  open: boolean;
+  onToggle: () => void;
 }
 
-type CollapsibleSectionProps = CollapsibleSectionBaseProps & (
-  | {
-      open: boolean;
-      onOpenChange: (open: boolean) => void;
-      defaultOpen?: never;
-      autoOpenWhen?: never;
-    }
-  | {
-      defaultOpen?: boolean;
-      autoOpenWhen?: boolean;
-      open?: never;
-      onOpenChange?: never;
-    }
-);
+const CollapsibleContext = createContext<CollapsibleContextValue | null>(null);
 
-function Chevron({ open }: { open: boolean }) {
+function useCollapsible() {
+  const ctx = useContext(CollapsibleContext);
+  if (!ctx) {
+    throw new Error(
+      "Collapsible compound components must be used within <Collapsible>",
+    );
+  }
+  return ctx;
+}
+
+/* ── Root ── */
+
+interface CollapsibleRootProps {
+  children: ReactNode;
+  defaultOpen?: boolean;
+  autoOpenWhen?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  className?: string;
+}
+
+function CollapsibleRoot({
+  children,
+  defaultOpen = false,
+  autoOpenWhen = false,
+  open: controlledOpen,
+  onOpenChange,
+  className = "",
+}: CollapsibleRootProps) {
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(
+    defaultOpen || autoOpenWhen,
+  );
+
+  useEffect(() => {
+    if (!isControlled && autoOpenWhen) {
+      setInternalOpen(true);
+    }
+  }, [autoOpenWhen, isControlled]);
+
+  const isOpen = isControlled ? controlledOpen : internalOpen;
+
+  const toggle = () => {
+    const next = !isOpen;
+    if (isControlled) {
+      onOpenChange?.(next);
+    } else {
+      setInternalOpen(next);
+    }
+  };
+
+  return (
+    <CollapsibleContext.Provider value={{ open: isOpen, onToggle: toggle }}>
+      <details
+        open={isOpen}
+        className={`rounded-[1.8rem] border border-slate-200 bg-white px-5 py-5 shadow-sm open:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:shadow-slate-900/30 dark:open:border-slate-600 ${className}`}
+      >
+        {children}
+      </details>
+    </CollapsibleContext.Provider>
+  );
+}
+
+/* ── Trigger ── */
+
+interface CollapsibleTriggerProps {
+  children: ReactNode;
+  className?: string;
+}
+
+function CollapsibleTrigger({
+  children,
+  className = "",
+}: CollapsibleTriggerProps) {
+  const { onToggle } = useCollapsible();
+  return (
+    <summary
+      className={`group cursor-pointer list-none select-none ${className}`}
+      onClick={(e) => {
+        e.preventDefault();
+        onToggle();
+      }}
+    >
+      {children}
+    </summary>
+  );
+}
+
+/* ── Content ── */
+
+interface CollapsibleContentProps {
+  children: ReactNode;
+  className?: string;
+}
+
+function CollapsibleContent({
+  children,
+  className = "",
+}: CollapsibleContentProps) {
+  return <div className={`mt-5 ${className}`}>{children}</div>;
+}
+
+/* ── Chevron ── */
+
+interface CollapsibleChevronProps {
+  className?: string;
+}
+
+function CollapsibleChevron({ className = "" }: CollapsibleChevronProps) {
+  const { open } = useCollapsible();
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -34,77 +128,15 @@ function Chevron({ open }: { open: boolean }) {
       strokeWidth="2.5"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={`shrink-0 text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+      className={`shrink-0 text-slate-400 transition-transform duration-200 dark:text-slate-500 ${open ? "rotate-180" : ""} ${className}`}
     >
       <polyline points="6 9 12 15 18 9" />
     </svg>
   );
 }
 
-export function CollapsibleSection({
-  title,
-  description,
-  defaultOpen = false,
-  autoOpenWhen = false,
-  open,
-  onOpenChange,
-  badge,
-  children,
-}: CollapsibleSectionProps) {
-  const isControlled = open !== undefined;
-  const [internalOpen, setInternalOpen] = useState(defaultOpen || autoOpenWhen);
-  const isOpen = isControlled ? open : internalOpen;
-
-  useEffect(() => {
-    if (!isControlled && autoOpenWhen) {
-      setInternalOpen(true);
-    }
-  }, [autoOpenWhen, isControlled]);
-
-  const toggleOpen = () => {
-    const nextOpen = !isOpen;
-    if (isControlled) {
-      onOpenChange(nextOpen);
-    } else {
-      setInternalOpen(nextOpen);
-    }
-  };
-
-  return (
-    <details
-      open={isOpen}
-      className="rounded-[1.8rem] border border-slate-200 bg-white px-5 py-5 shadow-sm open:border-slate-300"
-    >
-      <summary
-        className="group cursor-pointer list-none select-none"
-        onClick={(event) => {
-          event.preventDefault();
-          toggleOpen();
-        }}
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="mt-1">
-              <Chevron open={isOpen} />
-            </div>
-            <div>
-              <div className="text-base font-semibold text-slate-900">{title}</div>
-              <div className="text-sm text-slate-500">{description}</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {badge ? (
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                {badge}
-              </span>
-            ) : null}
-            <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400 group-hover:text-slate-500 transition-colors">
-              {isOpen ? "Hide details" : "Show details"}
-            </span>
-          </div>
-        </div>
-      </summary>
-      <div className="mt-5">{children}</div>
-    </details>
-  );
-}
+export const Collapsible = Object.assign(CollapsibleRoot, {
+  Trigger: CollapsibleTrigger,
+  Content: CollapsibleContent,
+  Chevron: CollapsibleChevron,
+});

@@ -11,7 +11,7 @@ interface TransactionCompletionTableProps {
 
 export const TransactionCompletionTable = memo(function TransactionCompletionTable({ postingSummaries }: TransactionCompletionTableProps) {
   return (
-    <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
+    <Card className="rounded-[1.6rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
       <CardHeader>
         <div>
           <CardTitle>Transaction completion</CardTitle>
@@ -38,27 +38,27 @@ export const TransactionCompletionTable = memo(function TransactionCompletionTab
               return (
                 <TableRow key={summary.postingId}>
                   <TableCell>
-                    <span className={hasShortfall ? "font-semibold text-amber-700" : undefined}>{summary.label}</span>
+                    <span className={hasShortfall ? "font-semibold text-amber-700 dark:text-amber-400" : undefined}>{summary.label}</span>
                   </TableCell>
                   <TableCell>
-                    <span className={hasShortfall ? "text-amber-700" : undefined}>{formatRoute(summary.sourceAccountLabel, summary.destinations)}</span>
+                    <span className={hasShortfall ? "text-amber-700 dark:text-amber-400" : undefined}>{formatRoute(summary.sourceAccountLabel, summary.destinations)}</span>
                   </TableCell>
                   <TableCell>{summary.priority}</TableCell>
                   <TableCell>{currency.format(summary.requestedAmount)}</TableCell>
                   <TableCell>
-                    <span className={hasShortfall ? "text-amber-700" : undefined}>{currency.format(summary.realizedAmount)}</span>
+                    <span className={hasShortfall ? "text-amber-700 dark:text-amber-400" : undefined}>{currency.format(summary.realizedAmount)}</span>
                   </TableCell>
                   <TableCell>
-                    <span className={hasShortfall ? "font-semibold text-amber-700" : undefined}>{pct.format(summary.utilizationRate)}</span>
+                    <span className={hasShortfall ? "font-semibold text-amber-700 dark:text-amber-400" : undefined}>{pct.format(summary.utilizationRate)}</span>
                   </TableCell>
                   <TableCell>
-                    <span className={hasShortfall ? "font-medium text-amber-700" : "text-slate-400"}>{hasShortfall ? formatDate(summary.firstShortfallDate!) : "-"}</span>
+                    <span className={hasShortfall ? "font-medium text-amber-700 dark:text-amber-400" : "text-slate-400 dark:text-slate-500"}>{hasShortfall ? formatDate(summary.firstShortfallDate!) : "-"}</span>
                   </TableCell>
                 </TableRow>
               );
             }) : (
               <TableRow>
-                <TableCell colSpan={7} className="py-6 text-center text-slate-500">No scheduled transactions are defined.</TableCell>
+                <TableCell colSpan={7} className="py-6 text-center text-slate-500 dark:text-slate-400">No scheduled transactions are defined.</TableCell>
               </TableRow>
             )}
           </TableBody>

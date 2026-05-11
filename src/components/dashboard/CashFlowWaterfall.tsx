@@ -36,7 +36,7 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({ pack }: CashF
   const remaining = totalInflow - totalOutflow;
 
   return (
-    <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
+    <Card className="rounded-[1.6rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
       <CardHeader>
         <div>
           <CardTitle>Monthly cash flow</CardTitle>
@@ -58,29 +58,29 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({ pack }: CashF
               <>
                 {items.map((item, i) => (
                   <TableRow key={i}>
-                    <TableCell className="text-xs font-medium uppercase tracking-wider text-slate-500">{item.category}</TableCell>
-                    <TableCell className="text-sm text-slate-700">{item.label}</TableCell>
-                    <TableCell className="text-sm font-medium text-slate-900">
+                    <TableCell className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">{item.category}</TableCell>
+                    <TableCell className="text-sm text-slate-700 dark:text-slate-300">{item.label}</TableCell>
+                    <TableCell className="text-sm font-medium text-slate-900 dark:text-slate-100">
                       {item.isNumeric ? currency.format(item.amount ?? 0) : item.arithmetic}
                     </TableCell>
-                    <TableCell className="text-sm text-slate-500">{formatFrequency(item.frequency)}</TableCell>
+                    <TableCell className="text-sm text-slate-500 dark:text-slate-400">{formatFrequency(item.frequency)}</TableCell>
                   </TableRow>
                 ))}
-                <TableRow className="border-t-2 border-slate-200">
-                  <TableCell colSpan={2} className="text-sm font-semibold text-slate-900">Remaining cash / investment capacity</TableCell>
-                  <TableCell className="text-sm font-semibold text-slate-900">{currency.format(remaining)}</TableCell>
+                <TableRow className="border-t-2 border-slate-200 dark:border-slate-700">
+                  <TableCell colSpan={2} className="text-sm font-semibold text-slate-900 dark:text-slate-100">Remaining cash / investment capacity</TableCell>
+                  <TableCell className="text-sm font-semibold text-slate-900 dark:text-slate-100">{currency.format(remaining)}</TableCell>
                   <TableCell />
                 </TableRow>
               </>
             ) : (
               <TableRow>
-                <TableCell colSpan={4} className="py-6 text-center text-slate-500">No scheduled transactions are enabled.</TableCell>
+                <TableCell colSpan={4} className="py-6 text-center text-slate-500 dark:text-slate-400">No scheduled transactions are enabled.</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
         {numericItems.length < items.length ? (
-          <div className="mt-3 text-xs text-slate-400">
+          <div className="mt-3 text-xs text-slate-400 dark:text-slate-500">
             Some transactions use formulas rather than fixed amounts. Exact monthly totals depend on account balances and other dynamic values.
           </div>
         ) : null}

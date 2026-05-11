@@ -103,7 +103,7 @@ export function ShortfallDetailPanel({
 
   return (
     <div className="space-y-3">
-      <div className="text-sm font-semibold text-slate-700">Cash flow for {periodLabel}</div>
+      <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">Cash flow for {periodLabel}</div>
 
       {cascadeAccounts.map((account) => {
         const steps = cascadeStepsByAccount.get(account.id) ?? [];
@@ -115,8 +115,8 @@ export function ShortfallDetailPanel({
         const hasShortfall = steps.some((step) => step.isShortfall);
 
         return (
-          <details key={account.id} open={hasShortfall} className="rounded-lg border border-slate-100 bg-white">
-            <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+          <details key={account.id} open={hasShortfall} className="rounded-lg border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <span className="flex items-center gap-2">
                 {account.color ? <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: account.color }} /> : null}
                 {account.label}
@@ -128,34 +128,34 @@ export function ShortfallDetailPanel({
                     <span className={changeColor}>{change > 0 ? "+" : ""}{currency.format(change)}</span>
                   </>
                 ) : (
-                  <span className="text-slate-400">{currency.format(endBalance)}</span>
+                  <span className="text-slate-400 dark:text-slate-500">{currency.format(endBalance)}</span>
                 )}
-                <svg className="h-3 w-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <svg className="h-3 w-3 text-slate-400 dark:text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
               </span>
             </summary>
             {accountsWithSteps ? (
-              <div className="border-t border-slate-100 px-3 pb-2 pt-1">
+              <div className="border-t border-slate-100 dark:border-slate-700 px-3 pb-2 pt-1">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-b border-slate-100 hover:bg-transparent">
-                      <TableHead className="w-4 text-xs text-slate-400"></TableHead>
-                      <TableHead className="text-xs text-slate-500">Flow</TableHead>
-                      <TableHead className="text-right text-xs text-slate-500">Requested</TableHead>
-                      <TableHead className="text-right text-xs text-slate-500">Applied</TableHead>
-                      <TableHead className="text-right text-xs text-slate-500">Impact</TableHead>
-                      <TableHead className="text-right text-xs text-slate-500">Running balance</TableHead>
+                    <TableRow className="border-b border-slate-100 dark:border-slate-700 hover:bg-transparent">
+                      <TableHead className="w-4 text-xs text-slate-400 dark:text-slate-500"></TableHead>
+                      <TableHead className="text-xs text-slate-500 dark:text-slate-400">Flow</TableHead>
+                      <TableHead className="text-right text-xs text-slate-500 dark:text-slate-400">Requested</TableHead>
+                      <TableHead className="text-right text-xs text-slate-500 dark:text-slate-400">Applied</TableHead>
+                      <TableHead className="text-right text-xs text-slate-500 dark:text-slate-400">Impact</TableHead>
+                      <TableHead className="text-right text-xs text-slate-500 dark:text-slate-400">Running balance</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     <TableRow className="border-b-0">
-                      <TableCell className="w-4 text-xs text-slate-400"></TableCell>
-                      <TableCell className="text-xs font-medium text-slate-500">Start</TableCell>
-                      <TableCell className="text-xs text-right text-slate-400"></TableCell>
-                      <TableCell className="text-xs text-right text-slate-400"></TableCell>
-                      <TableCell className="text-xs text-right text-slate-400"></TableCell>
-                      <TableCell className="text-xs text-right font-medium text-slate-700">{currency.format(startBalance)}</TableCell>
+                      <TableCell className="w-4 text-xs text-slate-400 dark:text-slate-500"></TableCell>
+                      <TableCell className="text-xs font-medium text-slate-500 dark:text-slate-400">Start</TableCell>
+                      <TableCell className="text-xs text-right text-slate-400 dark:text-slate-500"></TableCell>
+                      <TableCell className="text-xs text-right text-slate-400 dark:text-slate-500"></TableCell>
+                      <TableCell className="text-xs text-right text-slate-400 dark:text-slate-500"></TableCell>
+                      <TableCell className="text-xs text-right font-medium text-slate-700 dark:text-slate-300">{currency.format(startBalance)}</TableCell>
                     </TableRow>
                     {steps.map((step, index) => {
                       const signColor = step.delta > 0 ? "text-emerald-600" : "text-red-600";
@@ -167,7 +167,7 @@ export function ShortfallDetailPanel({
                           <TableCell className={`text-xs ${signColor}`}>
                             {step.label}
                             {step.isShortfall ? (
-                              <span className="ml-2 inline-flex items-center gap-1 font-medium text-amber-700">Shortfall {currency.format(step.shortfallAmount)}</span>
+                              <span className="ml-2 inline-flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">Shortfall {currency.format(step.shortfallAmount)}</span>
                             ) : null}
                           </TableCell>
                           <TableCell className={`text-xs text-right ${signColor}`}>{currency.format(step.requested)}</TableCell>

@@ -33,7 +33,7 @@ export function WhatIfAccountForm({ accounts, onAdd, onRemove }: WhatIfAccountFo
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
           Accounts {accounts.length > 0 ? `(${accounts.length})` : ""}
         </span>
         {!adding ? (
@@ -43,30 +43,30 @@ export function WhatIfAccountForm({ accounts, onAdd, onRemove }: WhatIfAccountFo
         ) : null}
       </div>
       {adding ? (
-        <div className="space-y-2 rounded-2xl border border-slate-200 p-3">
+        <div className="space-y-2 rounded-2xl border border-slate-200 dark:border-slate-700 p-3">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs text-slate-500">ID</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400">ID</label>
               <input
-                className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
                 value={adding.id}
                 onChange={(e) => setAdding({ ...adding, id: e.target.value })}
                 placeholder="e.g. savings"
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-500">Label</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400">Label</label>
               <input
-                className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
                 value={adding.label}
                 onChange={(e) => setAdding({ ...adding, label: e.target.value })}
                 placeholder="Savings"
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-500">Color (hex)</label>
+              <label className="block text-xs text-slate-500 dark:text-slate-400">Color (hex)</label>
               <input
-                className="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
                 value={adding.color ?? ""}
                 onChange={(e) => setAdding({ ...adding, color: e.target.value || null })}
                 placeholder="#64748b"
@@ -80,11 +80,11 @@ export function WhatIfAccountForm({ accounts, onAdd, onRemove }: WhatIfAccountFo
         </div>
       ) : null}
       {accounts.map((account) => (
-        <div key={`tmp-acc-${account.id}`} className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-2">
+        <div key={`tmp-acc-${account.id}`} className="flex items-center justify-between rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-2">
           <div className="flex items-center gap-2">
             <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: account.color ?? "#eab308" }} />
-            <span className="text-sm font-medium text-amber-900">{account.label}</span>
-            <span className="text-xs text-amber-700">{account.id}</span>
+            <span className="text-sm font-medium text-amber-900 dark:text-amber-200">{account.label}</span>
+            <span className="text-xs text-amber-700 dark:text-amber-400">{account.id}</span>
           </div>
           <Button type="button" variant="ghost" size="sm" onClick={() => onRemove(account.id)}>
             Remove

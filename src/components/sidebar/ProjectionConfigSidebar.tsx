@@ -62,7 +62,6 @@ export const ProjectionConfigSidebar = memo(function ProjectionConfigSidebar({
       />
 
       <StochasticControls
-        compact
         hasStochasticAccounts={hasStochasticAccounts}
         stochasticResult={stochasticResult}
         isRunning={isStochasticRunning}

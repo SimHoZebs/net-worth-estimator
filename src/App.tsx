@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ScenarioInspector } from "./components/CsvScenarioInspector";
 import { ProjectionDashboard } from "./components/CsvProjectionDashboard";
 import { ContributionWhatIfControls } from "./components/CsvContributionWhatIfControls";
@@ -54,6 +54,9 @@ export default function App() {
     setHorizonYears,
     stochasticPreference,
     stochasticConfig,
+    theme,
+    resolvedTheme,
+    setTheme,
   } = useStore(useShallow((s) => ({
     activeOverrideCount: selectActiveOverrideCount(s),
     isEditing: s.isEditing,
@@ -64,7 +67,23 @@ export default function App() {
     setHorizonYears: s.setHorizonYears,
     stochasticPreference: s.stochasticPreference,
     stochasticConfig: s.stochasticConfig,
+    theme: s.theme,
+    resolvedTheme: s.resolvedTheme,
+    setTheme: s.setTheme,
   })));
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => {
+      if (useStore.getState().theme === "system") {
+        const resolved = mq.matches ? "dark" : "light";
+        document.documentElement.classList.toggle("dark", resolved === "dark");
+        useStore.setState({ resolvedTheme: resolved });
+      }
+    };
+    mq.addEventListener("change", handleChange);
+    return () => mq.removeEventListener("change", handleChange);
+  }, []);
 
   const validation = summarizeValidationIssues(issues);
   const fallbackProjectionStartDate = useMemo(() => formatTodayIsoDate(), []);
@@ -164,27 +183,28 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
       <div className="space-y-0 px-0 md:px-0">
         <div className="mx-auto max-w-[106rem] px-4 py-4 md:px-8">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-slate-500 dark:text-slate-400">
               {pack ? (
                 <span>
-                  Baseline loaded from <span className="font-medium text-slate-600">{dataSource.label}</span>
+                  Baseline loaded from <span className="font-medium text-slate-600 dark:text-slate-300">{dataSource.label}</span>
                   {activeOverrideCount > 0 ? ` · ${activeOverrideCount} temporary scenario override${activeOverrideCount === 1 ? "" : "s"}` : ""}
                   {isEditing && isDirty ? " · Unsaved baseline edits" : ""}
                   {isEditing && !isDirty ? " · Editing baseline" : ""}
                   {activeOverrideCount === 0 && !isEditing ? " · Projection settings are session-only" : ""}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-2">
-                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-slate-400" />
+                  <span className="inline-flex items-center gap-2">
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-slate-400 dark:bg-slate-500" />
                   Loading scenario data...
                 </span>
               )}
             </div>
             <div className="flex gap-2 no-print">
+              <ThemeToggle theme={theme} setTheme={setTheme} />
               <Button type="button" variant="ghost" size="sm" onClick={() => window.print()} disabled={!pack}>
                 Print
               </Button>
@@ -206,10 +226,10 @@ export default function App() {
         {isLoading && !pack ? (
           <div className="grid gap-4 md:grid-cols-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse rounded-[1.8rem] border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="mb-2 h-3 w-20 rounded bg-slate-200" />
-                <div className="h-6 w-32 rounded bg-slate-200" />
-                <div className="mt-2 h-3 w-24 rounded bg-slate-200" />
+              <div key={i} className="animate-pulse rounded-[1.8rem] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-sm dark:shadow-slate-900/30">
+                <div className="mb-2 h-3 w-20 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="h-6 w-32 rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="mt-2 h-3 w-24 rounded bg-slate-200 dark:bg-slate-700" />
               </div>
             ))}
           </div>
@@ -340,5 +360,54 @@ export default function App() {
       </div>
     </div>
   </div>
+  );
+}
+
+function ThemeToggle({
+  theme,
+  setTheme,
+}: {
+  theme: "light" | "dark" | "system";
+  setTheme: (t: "light" | "dark" | "system") => void;
+}) {
+  return (
+    <div className="flex rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
+      <button
+        type="button"
+        aria-label="Light theme"
+        onClick={() => setTheme("light")}
+        className={`rounded-md px-2 py-1 text-xs transition-colors ${
+          theme === "light"
+            ? "bg-slate-200 text-slate-900 dark:bg-slate-600 dark:text-slate-100"
+            : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+        }`}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </button>
+      <button
+        type="button"
+        aria-label="Dark theme"
+        onClick={() => setTheme("dark")}
+        className={`rounded-md px-2 py-1 text-xs transition-colors ${
+          theme === "dark"
+            ? "bg-slate-200 text-slate-900 dark:bg-slate-600 dark:text-slate-100"
+            : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+        }`}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <button
+        type="button"
+        aria-label="System theme"
+        onClick={() => setTheme("system")}
+        className={`rounded-md px-2 py-1 text-xs transition-colors ${
+          theme === "system"
+            ? "bg-slate-200 text-slate-900 dark:bg-slate-600 dark:text-slate-100"
+            : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+        }`}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </button>
+    </div>
   );
 }

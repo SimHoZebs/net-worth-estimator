@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 function inputStyle(isDirty: boolean) {
-  const dirty = isDirty ? "border-amber-300 bg-amber-50" : "border-slate-200";
+  const dirty = isDirty ? "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950" : "border-slate-200 dark:border-slate-700";
   return `w-full rounded-lg ${dirty} px-2 py-1 text-sm outline-none font-mono text-xs`;
 }
 
@@ -21,7 +21,7 @@ export function EditableCheckpointsTable({
   displayPack, isDirty, projectionStartDate, updateCheckpoint, deleteCheckpoint, addCheckpoint,
 }: EditableCheckpointsTableProps) {
   return (
-    <Card className="rounded-[1.8rem] border-slate-200 shadow-sm">
+    <Card className="rounded-[1.8rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
       <CardHeader><CardTitle>Balance history</CardTitle><CardDescription>Edit, add, or remove balance checkpoint rows.</CardDescription></CardHeader>
       <CardContent>
         <Table>

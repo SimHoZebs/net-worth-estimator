@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Net Worth Estimator</title>
+    <script>
+      const t = localStorage.theme;
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (t === "dark" || (!t && prefersDark)) {
+        document.documentElement.classList.add("dark");
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

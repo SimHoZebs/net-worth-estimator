@@ -43,9 +43,9 @@ export const DebtSummary = memo(function DebtSummary({ pack, result }: DebtSumma
 
   if (allDebts.length === 0) {
     return (
-      <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
+      <Card className="rounded-[1.6rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
         <CardContent className="p-5">
-          <div className="text-sm text-slate-500">No debt accounts are currently tracked.</div>
+          <div className="text-sm text-slate-500 dark:text-slate-400">No debt accounts are currently tracked.</div>
         </CardContent>
       </Card>
     );
@@ -65,7 +65,7 @@ export const DebtSummary = memo(function DebtSummary({ pack, result }: DebtSumma
   }, 0);
 
   return (
-    <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
+    <Card className="rounded-[1.6rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
       <CardHeader>
         <div>
           <CardTitle>Debt summary</CardTitle>
@@ -96,35 +96,35 @@ export const DebtSummary = memo(function DebtSummary({ pack, result }: DebtSumma
                 : null;
               return (
                 <TableRow key={d.account.id}>
-                  <TableCell className="text-sm text-slate-700">{d.account.label}</TableCell>
-                  <TableCell className="text-right text-sm font-medium text-slate-900">{currency.format(d.balance)}</TableCell>
-                  <TableCell className="text-right text-sm text-slate-700">
+                  <TableCell className="text-sm text-slate-700 dark:text-slate-300">{d.account.label}</TableCell>
+                  <TableCell className="text-right text-sm font-medium text-slate-900 dark:text-slate-100">{currency.format(d.balance)}</TableCell>
+                  <TableCell className="text-right text-sm text-slate-700 dark:text-slate-300">
                     {d.paymentPosting ? d.paymentPosting.arithmetic : "—"}
                   </TableCell>
-                  <TableCell className="text-sm text-slate-500">
+                  <TableCell className="text-sm text-slate-500 dark:text-slate-400">
                     {d.paymentPosting ? d.paymentPosting.frequency : "—"}
                   </TableCell>
-                  <TableCell className="text-sm text-slate-600">
+                  <TableCell className="text-sm text-slate-600 dark:text-slate-400">
                     {payoffDate ? formatDate(payoffDate) : "Beyond 100 yr"}
                   </TableCell>
-                  <TableCell className="text-right text-sm tabular-nums text-slate-600">
+                  <TableCell className="text-right text-sm tabular-nums text-slate-600 dark:text-slate-400">
                     {d.paymentPosting?.priority ?? "—"}
                   </TableCell>
                 </TableRow>
               );
             })}
-            <TableRow className="border-t-2 border-slate-200">
-              <TableCell className="text-sm font-semibold text-slate-900">Total debt</TableCell>
-              <TableCell className="text-right text-sm font-semibold text-slate-900">{currency.format(-totalDebt)}</TableCell>
+            <TableRow className="border-t-2 border-slate-200 dark:border-slate-700">
+              <TableCell className="text-sm font-semibold text-slate-900 dark:text-slate-100">Total debt</TableCell>
+              <TableCell className="text-right text-sm font-semibold text-slate-900 dark:text-slate-100">{currency.format(-totalDebt)}</TableCell>
               <TableCell colSpan={4} />
             </TableRow>
           </TableBody>
         </Table>
         {estimatedTotalInterest > 0 ? (
-          <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
-            <div className="text-xs font-medium text-amber-800">Estimated interest over loan life</div>
-            <div className="mt-0.5 text-lg font-semibold text-amber-900">{currency.format(estimatedTotalInterest)}</div>
-            <div className="text-xs text-amber-700">Rough estimate based on current balance and payment schedule.</div>
+          <div className="mt-3 rounded-xl border border-amber-100 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-3">
+            <div className="text-xs font-medium text-amber-800 dark:text-amber-300">Estimated interest over loan life</div>
+            <div className="mt-0.5 text-lg font-semibold text-amber-900 dark:text-amber-200">{currency.format(estimatedTotalInterest)}</div>
+            <div className="text-xs text-amber-700 dark:text-amber-400">Rough estimate based on current balance and payment schedule.</div>
           </div>
         ) : null}
       </CardContent>

@@ -135,12 +135,12 @@ export const StackedContributionChart = memo(function StackedContributionChart({
       const p25 = (self.data[bi + 2] as number[])[idx];
       const p75 = (self.data[bi + 3] as number[])[idx];
 
-      let html = `<div class="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm max-w-xs">`;
-      html += `<div class="text-xs font-medium text-slate-500">${dateStr}</div>`;
-      html += `<div class="mt-2 border-b border-slate-100 pb-1">`;
-      html += `<div class="text-sm font-semibold text-slate-900">Net worth: ${currency.format(displayNw)}</div>`;
+      let html = `<div class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 shadow-sm dark:shadow-slate-900/30 max-w-xs">`;
+      html += `<div class="text-xs font-medium text-slate-500 dark:text-slate-400">${dateStr}</div>`;
+      html += `<div class="mt-2 border-b border-slate-100 dark:border-slate-700 pb-1">`;
+      html += `<div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Net worth: ${currency.format(displayNw)}</div>`;
       if (hasStochasticData) {
-        html += `<div class="mt-0.5 text-[10px] text-slate-500 leading-tight">`;
+        html += `<div class="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 leading-tight">`;
         html += `P10–P90: ${currency.format(p10)} – ${currency.format(p90)}<br />`;
         html += `P25–P75: ${currency.format(p25)} – ${currency.format(p75)}`;
         html += `</div>`;
@@ -153,10 +153,10 @@ export const StackedContributionChart = memo(function StackedContributionChart({
         for (const a of group) {
           const val = rawRow?.[a.id] ?? 0;
           html += `<div class="flex justify-between gap-3 text-xs">`;
-          html += `<span class="inline-flex items-center gap-1.5 text-slate-700">`;
+          html += `<span class="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-300">`;
           html += `<span class="inline-block h-2 w-2 rounded-full" style="background-color:${a.color ?? "#64748b"}"></span>`;
           html += `${a.label}</span>`;
-          html += `<span class="tabular-nums text-slate-700">${currency.format(val)}</span>`;
+          html += `<span class="tabular-nums text-slate-700 dark:text-slate-300">${currency.format(val)}</span>`;
           html += `</div>`;
         }
       }
@@ -256,7 +256,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
       <div className="min-w-0">
         <UPlotChart options={options} data={data} tooltipContent={tooltipContent} />
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 text-xs text-slate-600">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 text-xs text-slate-600 dark:text-slate-400">
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#0f172a]" />
           {hasStochasticData ? "Net worth (median simulation)" : "Net worth"}

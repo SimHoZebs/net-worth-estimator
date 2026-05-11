@@ -33,7 +33,7 @@ export function ReadOnlyCheckpointsTable({
                 label: "Account",
                 render: (_v: unknown, row: object) => {
                   const accountId = (row as Checkpoint).AccountId;
-                  return <span className="text-slate-700">{accountLabelById.get(accountId) ?? accountId}</span>;
+                  return <span className="text-slate-700 dark:text-slate-300">{accountLabelById.get(accountId) ?? accountId}</span>;
                 },
               }]),
           { key: "Balance" as never, label: "Balance", format: (v: unknown) => formatCurrency(v) },

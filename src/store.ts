@@ -259,6 +259,53 @@ const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (set, get
 });
 
 /* ------------------------------------------------------------------ */
+/*  Theme slice                                                        */
+/* ------------------------------------------------------------------ */
+
+type Theme = "light" | "dark" | "system";
+
+function resolveTheme(theme: Theme): "light" | "dark" {
+  if (theme === "system") {
+    if (typeof window !== "undefined") {
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    return "light";
+  }
+  return theme;
+}
+
+function applyThemeToDOM(theme: Theme) {
+  if (typeof window === "undefined") return;
+  const resolved = resolveTheme(theme);
+  document.documentElement.classList.toggle("dark", resolved === "dark");
+  if (theme === "light") {
+    localStorage.theme = "light";
+  } else if (theme === "dark") {
+    localStorage.theme = "dark";
+  } else {
+    localStorage.removeItem("theme");
+  }
+}
+
+interface ThemeSlice {
+  theme: Theme;
+  resolvedTheme: "light" | "dark";
+  setTheme: (theme: Theme) => void;
+}
+
+const createThemeSlice: StateCreator<AppStore, [], [], ThemeSlice> = (set) => {
+  const initial = typeof window !== "undefined" ? (localStorage.theme as Theme | undefined) : undefined;
+  return {
+    theme: initial ?? "system",
+    resolvedTheme: resolveTheme(initial ?? "system"),
+    setTheme: (theme) => {
+      applyThemeToDOM(theme);
+      set({ theme, resolvedTheme: resolveTheme(theme) });
+    },
+  };
+};
+
+/* ------------------------------------------------------------------ */
 /*  Settings slice                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -298,13 +345,14 @@ const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (set)
 /*  Composed store                                                     */
 /* ------------------------------------------------------------------ */
 
-export type AppStore = WhatIfSlice & EditorSlice & SettingsSlice & SnapshotSlice;
+export type AppStore = WhatIfSlice & EditorSlice & SettingsSlice & SnapshotSlice & ThemeSlice;
 
 export const useStore = create<AppStore>()((...args) => ({
   ...createWhatIfSlice(...args),
   ...createEditorSlice(...args),
   ...createSettingsSlice(...args),
   ...createSnapshotSlice(...args),
+  ...createThemeSlice(...args),
 }));
 
 /* ------------------------------------------------------------------ */

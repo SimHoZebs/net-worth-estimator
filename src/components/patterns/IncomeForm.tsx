@@ -5,8 +5,8 @@ interface IncomeFormProps {
   onChange: (value: IncomeTemplateInput) => void;
 }
 
-const FIELD_CLASS = "w-full rounded-lg border border-slate-200 px-2 py-1 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300";
-const LABEL_CLASS = "block text-xs font-medium text-slate-500 mb-1";
+const FIELD_CLASS = "w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm outline-none focus:border-slate-400 dark:focus:border-slate-500 focus:ring-1 focus:ring-slate-300 dark:focus:ring-slate-600";
+const LABEL_CLASS = "block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1";
 
 const presets = [
   { label: "22% bracket", taxRate: 22, k401: 4, match: 50, cap: 23000, auto: 10 },
@@ -21,7 +21,7 @@ export function IncomeForm({ value, onChange }: IncomeFormProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Quick presets</span>
+        <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Quick presets</span>
         <div className="flex gap-1.5 flex-wrap">
           {presets.map((p) => (
             <button
@@ -37,7 +37,7 @@ export function IncomeForm({ value, onChange }: IncomeFormProps) {
                   autoInvestRate: p.auto / 100,
                 })
               }
-              className="rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:bg-slate-100 transition-colors"
+              className="rounded-full border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/80 transition-colors"
             >
               {p.label}
             </button>

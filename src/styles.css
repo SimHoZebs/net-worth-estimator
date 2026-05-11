@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 body {
   margin: 0;
   min-width: 320px;
@@ -16,7 +18,7 @@ body {
 @media print {
   nav { display: none; }
   .no-print { display: none !important; }
-  body { background: white; }
+  body { background: white !important; color: black !important; }
   .max-w-7xl { max-width: 100% !important; padding-left: 0 !important; padding-right: 0 !important; }
   .space-y-6 > * { break-inside: avoid; }
 }

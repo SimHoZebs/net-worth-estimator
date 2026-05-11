@@ -98,7 +98,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
     : undefined;
 
   return (
-    <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
+    <Card className="rounded-[1.6rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
       <CardHeader>
         <div>
           <CardTitle>Shortfall calendar</CardTitle>
@@ -108,7 +108,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
       <CardContent>
         {shortfallDays.length > 0 ? (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-3">
               <Calendar
                 mode="single"
                 selected={selectedDay ? parseIsoDateLocal(selectedDay.date) : undefined}
@@ -119,7 +119,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
                 disabled={(date) => !shortfallDayByDate.has(formatIsoDateLocal(date))}
                 modifiers={{ shortfall: shortfallDates }}
                 modifiersClassNames={{
-                  shortfall: "[&_button]:border [&_button]:border-amber-300 [&_button]:bg-amber-50 [&_button]:font-semibold [&_button]:text-amber-900 [&_button]:hover:bg-amber-100",
+                  shortfall: "[&_button]:border [&_button]:border-amber-300 dark:[&_button]:border-amber-700 [&_button]:bg-amber-50 dark:[&_button]:bg-amber-950 [&_button]:font-semibold [&_button]:text-amber-900 dark:[&_button]:text-amber-300 [&_button]:hover:bg-amber-100 dark:[&_button]:hover:bg-amber-900/50",
                 }}
                 onDayClick={(date, modifiers) => {
                   if (modifiers.disabled) return;
@@ -129,11 +129,11 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
               />
             </div>
 
-            <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+            <div className="space-y-3 rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/70 p-4">
               <div>
-                <div className="text-xs font-medium uppercase tracking-[0.16em] text-amber-800">Shortfall dates</div>
-                <div className="mt-1 text-2xl font-semibold text-amber-950">{currency.format(totalShortfall)}</div>
-                <div className="text-xs text-amber-800">Total unfunded across {shortfallDays.length} date{shortfallDays.length === 1 ? "" : "s"}</div>
+                <div className="text-xs font-medium uppercase tracking-[0.16em] text-amber-800 dark:text-amber-300">Shortfall dates</div>
+                <div className="mt-1 text-2xl font-semibold text-amber-950 dark:text-amber-200">{currency.format(totalShortfall)}</div>
+                <div className="text-xs text-amber-800 dark:text-amber-300">Total unfunded across {shortfallDays.length} date{shortfallDays.length === 1 ? "" : "s"}</div>
               </div>
 
               <div className="space-y-2">
@@ -142,13 +142,13 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
                     key={day.date}
                     type="button"
                     onClick={() => setSelectedDateIso(day.date)}
-                    className="w-full rounded-xl border border-white/80 bg-white px-3 py-2 text-left shadow-sm transition hover:border-amber-300 hover:bg-amber-50"
+                    className="w-full rounded-xl border border-white/80 dark:border-slate-500/80 bg-white dark:bg-slate-800 px-3 py-2 text-left shadow-sm dark:shadow-slate-900/30 transition hover:border-amber-300 dark:hover:border-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-amber-950">{day.label}</span>
-                      <span className="text-xs font-semibold text-amber-800">{currency.format(day.clampedPostingShortfallAmount)}</span>
+                      <span className="text-sm font-medium text-amber-950 dark:text-amber-200">{day.label}</span>
+                      <span className="text-xs font-semibold text-amber-800 dark:text-amber-300">{currency.format(day.clampedPostingShortfallAmount)}</span>
                     </div>
-                    <div className="mt-1 text-xs text-amber-900/70">
+                    <div className="mt-1 text-xs text-amber-900/70 dark:text-amber-300/70">
                       Requested {currency.format(day.requestedPostingAmount)}; applied {currency.format(day.realizedPostingAmount)}
                     </div>
                   </button>
@@ -156,12 +156,12 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
               </div>
 
               {shortfallDays.length > 8 ? (
-                <div className="text-xs text-amber-900/70">Showing the first 8 shortfall dates. Use the calendar for later dates.</div>
+                <div className="text-xs text-amber-900/70 dark:text-amber-300/70">Showing the first 8 shortfall dates. Use the calendar for later dates.</div>
               ) : null}
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-6 text-sm text-emerald-900">
+          <div className="rounded-2xl border border-emerald-100 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 px-4 py-6 text-sm text-emerald-900 dark:text-emerald-300">
             No projected shortfalls are scheduled within the horizon.
           </div>
         )}
@@ -176,21 +176,21 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
           onClick={() => setSelectedDateIso(null)}
         >
           <div
-            className="max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-[1.6rem] bg-white p-5 shadow-2xl"
+            className="max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-[1.6rem] bg-white dark:bg-slate-800 p-5 shadow-2xl dark:shadow-slate-900/50"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
-                <div className="text-xs font-medium uppercase tracking-[0.16em] text-amber-700">Projected shortfall</div>
-                <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">{selectedDay.label}</h3>
-                <p className="mt-1 text-sm text-slate-500">
+                <div className="text-xs font-medium uppercase tracking-[0.16em] text-amber-700 dark:text-amber-400">Projected shortfall</div>
+                <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{selectedDay.label}</h3>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   {currency.format(selectedDay.clampedPostingShortfallAmount)} unfunded on this date.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedDateIso(null)}
-                className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                className="rounded-full border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 transition hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-slate-100"
               >
                 Close
               </button>
