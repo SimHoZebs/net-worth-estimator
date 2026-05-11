@@ -147,6 +147,33 @@ describe("Selectors", () => {
 });
 
 /* ------------------------------------------------------------------ */
+/*  Snapshot slice tests                                               */
+/* ------------------------------------------------------------------ */
+
+describe("Snapshot slice", () => {
+  beforeEach(() => {
+    useStore.getState().clearSnapshots();
+    useStore.getState().resetAllOverrides();
+  });
+
+  it("stores only the current what-if state in snapshots", () => {
+    useStore.getState().addTemporaryAccount(makeAccount());
+    useStore.getState().addSnapshotFromCurrentScenario("Trial", {
+      currentNetWorth: 100,
+      finalNetWorth: 200,
+      hitTargetDate: null,
+      shortfallAmount: 0,
+      overrideCount: 1,
+    });
+
+    const snapshot = useStore.getState().snapshots[0];
+    expect(snapshot.label).toBe("Trial");
+    expect(snapshot.whatIfState).toEqual(selectWhatIfState(useStore.getState()));
+    expect(snapshot.whatIfState).not.toHaveProperty("setTargetNetWorth");
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /*  Reference stability                                                */
 /* ------------------------------------------------------------------ */
 
@@ -338,18 +365,24 @@ describe("Editor slice", () => {
 /* ------------------------------------------------------------------ */
 
 describe("Settings slice", () => {
-  it("setTargetNetWorthInput updates", () => {
-    useStore.getState().setTargetNetWorthInput("500000");
-    expect(useStore.getState().targetNetWorthInput).toBe("500000");
+  it("setTargetNetWorth updates", () => {
+    useStore.getState().setTargetNetWorth(500000);
+    expect(useStore.getState().targetNetWorth).toBe(500000);
   });
 
-  it("defaults stochasticEnabled to false", () => {
-    expect(useStore.getState().stochasticEnabled).toBe(false);
+  it("setTargetNetWorth ignores invalid values", () => {
+    useStore.getState().setTargetNetWorth(500000);
+    useStore.getState().setTargetNetWorth(Number.NaN);
+    expect(useStore.getState().targetNetWorth).toBe(500000);
   });
 
-  it("setStochasticEnabled toggles", () => {
-    useStore.getState().setStochasticEnabled(true);
-    expect(useStore.getState().stochasticEnabled).toBe(true);
+  it("defaults stochasticPreference to auto", () => {
+    expect(useStore.getState().stochasticPreference).toBe("auto");
+  });
+
+  it("setStochasticPreference updates preference", () => {
+    useStore.getState().setStochasticPreference("disabled");
+    expect(useStore.getState().stochasticPreference).toBe("disabled");
   });
 
   it("defaults stochasticConfig", () => {

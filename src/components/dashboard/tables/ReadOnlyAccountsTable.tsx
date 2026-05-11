@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Account } from "@/lib/projection";
 import { NO_FLOOR, NO_CEILING } from "@/lib/projection/constants";
 import { DataTable, formatCurrency } from "@/components/ui/data-table";
@@ -9,16 +10,16 @@ interface ReadOnlyAccountsTableProps {
   showAdvanced: boolean;
   disabledAccountSet: Set<string>;
   onToggle: (id: string) => void;
-  search: string;
-  onSearchChange: (value: string) => void;
 }
 
 export function ReadOnlyAccountsTable({
-  accounts, showAdvanced, disabledAccountSet, onToggle, search, onSearchChange,
+  accounts, showAdvanced, disabledAccountSet, onToggle,
 }: ReadOnlyAccountsTableProps) {
+  const [search, setSearch] = useState("");
+
   return (
     <div>
-      <TableSearch value={search} onChange={onSearchChange} placeholder="Search accounts..." />
+      <TableSearch value={search} onChange={setSearch} placeholder="Search accounts..." />
       <DataTable
         title="Accounts"
         description="Tracked signed balances. Checkbox toggles what-if disable (immediate)."

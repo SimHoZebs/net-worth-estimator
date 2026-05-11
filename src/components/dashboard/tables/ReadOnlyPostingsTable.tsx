@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Posting } from "@/lib/projection";
 import { DataTable } from "@/components/ui/data-table";
 import { TableSearch } from "@/components/ui/table-search";
@@ -9,16 +10,16 @@ interface ReadOnlyPostingsTableProps {
   showAdvanced: boolean;
   disabledPostingSet: Set<string>;
   onToggle: (id: string) => void;
-  search: string;
-  onSearchChange: (value: string) => void;
 }
 
 export function ReadOnlyPostingsTable({
-  postings, showAdvanced, disabledPostingSet, onToggle, search, onSearchChange,
+  postings, showAdvanced, disabledPostingSet, onToggle,
 }: ReadOnlyPostingsTableProps) {
+  const [search, setSearch] = useState("");
+
   return (
     <div>
-      <TableSearch value={search} onChange={onSearchChange} placeholder="Search transactions..." />
+      <TableSearch value={search} onChange={setSearch} placeholder="Search transactions..." />
       <DataTable
         title="Postings"
         description="Scheduled flows. Checkbox toggles what-if disable (immediate)."

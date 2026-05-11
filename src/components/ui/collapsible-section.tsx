@@ -1,14 +1,26 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
-interface CollapsibleSectionProps {
+interface CollapsibleSectionBaseProps {
   title: string;
   description: string;
-  defaultOpen?: boolean;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
   badge?: string;
   children: ReactNode;
 }
+
+type CollapsibleSectionProps = CollapsibleSectionBaseProps & (
+  | {
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+      defaultOpen?: never;
+      autoOpenWhen?: never;
+    }
+  | {
+      defaultOpen?: boolean;
+      autoOpenWhen?: boolean;
+      open?: never;
+      onOpenChange?: never;
+    }
+);
 
 function Chevron({ open }: { open: boolean }) {
   return (
@@ -33,13 +45,30 @@ export function CollapsibleSection({
   title,
   description,
   defaultOpen = false,
+  autoOpenWhen = false,
   open,
   onOpenChange,
   badge,
   children,
 }: CollapsibleSectionProps) {
-  const isControlled = onOpenChange !== undefined;
-  const isOpen = open ?? defaultOpen;
+  const isControlled = open !== undefined;
+  const [internalOpen, setInternalOpen] = useState(defaultOpen || autoOpenWhen);
+  const isOpen = isControlled ? open : internalOpen;
+
+  useEffect(() => {
+    if (!isControlled && autoOpenWhen) {
+      setInternalOpen(true);
+    }
+  }, [autoOpenWhen, isControlled]);
+
+  const toggleOpen = () => {
+    const nextOpen = !isOpen;
+    if (isControlled) {
+      onOpenChange(nextOpen);
+    } else {
+      setInternalOpen(nextOpen);
+    }
+  };
 
   return (
     <details
@@ -48,14 +77,10 @@ export function CollapsibleSection({
     >
       <summary
         className="group cursor-pointer list-none select-none"
-        {...(isControlled
-          ? {
-              onClick: (event: React.MouseEvent) => {
-                event.preventDefault();
-                onOpenChange(!open);
-              },
-            }
-          : {})}
+        onClick={(event) => {
+          event.preventDefault();
+          toggleOpen();
+        }}
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
@@ -74,7 +99,7 @@ export function CollapsibleSection({
               </span>
             ) : null}
             <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400 group-hover:text-slate-500 transition-colors">
-              {isControlled ? (isOpen ? "Hide details" : "Show details") : "Show details"}
+              {isOpen ? "Hide details" : "Show details"}
             </span>
           </div>
         </div>

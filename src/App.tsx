@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ScenarioInspector } from "./components/CsvScenarioInspector";
 import { ProjectionDashboard } from "./components/CsvProjectionDashboard";
 import { ContributionWhatIfControls } from "./components/CsvContributionWhatIfControls";
@@ -48,29 +48,26 @@ export default function App() {
     activeOverrideCount,
     isEditing,
     isDirty,
-    targetNetWorthInput,
-    setTargetNetWorthInput,
+    targetNetWorth,
+    setTargetNetWorth,
     horizonYears,
     setHorizonYears,
-    stochasticEnabled,
+    stochasticPreference,
     stochasticConfig,
-    setStochasticEnabled,
   } = useStore(useShallow((s) => ({
     activeOverrideCount: selectActiveOverrideCount(s),
     isEditing: s.isEditing,
     isDirty: s.isDirty,
-    targetNetWorthInput: s.targetNetWorthInput,
-    setTargetNetWorthInput: s.setTargetNetWorthInput,
+    targetNetWorth: s.targetNetWorth,
+    setTargetNetWorth: s.setTargetNetWorth,
     horizonYears: s.horizonYears,
     setHorizonYears: s.setHorizonYears,
-    stochasticEnabled: s.stochasticEnabled,
+    stochasticPreference: s.stochasticPreference,
     stochasticConfig: s.stochasticConfig,
-    setStochasticEnabled: s.setStochasticEnabled,
   })));
 
   const validation = summarizeValidationIssues(issues);
   const fallbackProjectionStartDate = useMemo(() => formatTodayIsoDate(), []);
-  const targetNetWorth = Number.isFinite(Number(targetNetWorthInput)) ? Number(targetNetWorthInput) : 0;
   const projectionSettings = useMemo(
     () => ({
       targetNetWorth,
@@ -94,13 +91,7 @@ export default function App() {
   const hasStochasticAccounts =
     pack !== null && pack.postings.some((p) => p.volatility > 0 && p.enabled);
 
-  useEffect(() => {
-    if (hasStochasticAccounts && validation.isValid) {
-      setStochasticEnabled(true);
-    }
-  }, [hasStochasticAccounts, validation.isValid, setStochasticEnabled]);
-
-  const stochasticWorkerEnabled = stochasticEnabled && hasStochasticAccounts && validation.isValid;
+  const stochasticWorkerEnabled = stochasticPreference !== "disabled" && hasStochasticAccounts && validation.isValid;
   const {
     result: stochasticResult,
     runtimeError: stochasticError,
@@ -265,8 +256,7 @@ export default function App() {
             pack={pack}
             result={result}
             projectionSettings={projectionSettings}
-            targetNetWorthInput={targetNetWorthInput}
-            onTargetNetWorthInputChange={setTargetNetWorthInput}
+            onTargetNetWorthChange={setTargetNetWorth}
             onProjectionSettingsChange={onProjectionSettingsChange}
             stochasticResult={stochasticResult}
           >

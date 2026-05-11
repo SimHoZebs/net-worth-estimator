@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
-import { useStore, type ScenarioSnapshot, type SnapshotMetrics } from "@/store";
+import { useStore, type SnapshotMetrics } from "@/store";
 import { currency, pct, formatDate } from "@/lib/format";
 
 interface ScenarioComparisonProps {
@@ -11,7 +11,7 @@ interface ScenarioComparisonProps {
 
 export function ScenarioComparison({ currentMetrics, currentOverrideCount }: ScenarioComparisonProps) {
   const snapshots = useStore((s) => s.snapshots);
-  const addSnapshot = useStore((s) => s.addSnapshot);
+  const addSnapshotFromCurrentScenario = useStore((s) => s.addSnapshotFromCurrentScenario);
   const removeSnapshot = useStore((s) => s.removeSnapshot);
   const clearSnapshots = useStore((s) => s.clearSnapshots);
   const [labelInput, setLabelInput] = useState("");
@@ -38,13 +38,7 @@ export function ScenarioComparison({ currentMetrics, currentOverrideCount }: Sce
             size="sm"
             disabled={!labelInput.trim()}
             onClick={() => {
-              addSnapshot({
-                id: "snap-" + Date.now(),
-                label: labelInput.trim(),
-                timestamp: Date.now(),
-                whatIfState: useStore.getState(),
-                metrics: { ...currentMetrics },
-              });
+              addSnapshotFromCurrentScenario(labelInput.trim(), currentMetrics);
               setLabelInput("");
             }}
           >

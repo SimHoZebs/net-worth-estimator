@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Checkpoint } from "@/lib/projection";
 import { DataTable, formatCurrency } from "@/components/ui/data-table";
 import { TableSearch } from "@/components/ui/table-search";
@@ -6,16 +7,16 @@ interface ReadOnlyCheckpointsTableProps {
   checkpoints: Checkpoint[];
   showAdvanced: boolean;
   accountLabelById: Map<string, string>;
-  search: string;
-  onSearchChange: (value: string) => void;
 }
 
 export function ReadOnlyCheckpointsTable({
-  checkpoints, showAdvanced, accountLabelById, search, onSearchChange,
+  checkpoints, showAdvanced, accountLabelById,
 }: ReadOnlyCheckpointsTableProps) {
+  const [search, setSearch] = useState("");
+
   return (
     <div>
-      <TableSearch value={search} onChange={onSearchChange} placeholder="Search checkpoints..." />
+      <TableSearch value={search} onChange={setSearch} placeholder="Search checkpoints..." />
       <DataTable
         title="Balance history"
         description="Historical account balance checkpoints."

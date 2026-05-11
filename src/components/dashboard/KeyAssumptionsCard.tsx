@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type { ScenarioPack, ProjectionRuntimeSettings } from "@/lib/projection";
 import { formatDate, formatCurrencyInput } from "@/lib/format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,8 +6,7 @@ import { AssumptionList } from "@/components/dashboard/AssumptionList";
 
 interface KeyAssumptionsCardProps {
   pack: ScenarioPack;
-  targetNetWorthInput: string;
-  onTargetNetWorthInputChange: (value: string) => void;
+  onTargetNetWorthChange: (value: number) => void;
   projectionSettings: ProjectionRuntimeSettings;
   onProjectionSettingsChange?: (partial: Partial<ProjectionRuntimeSettings>) => void;
   activeOverrideCount: number;
@@ -17,8 +16,7 @@ interface KeyAssumptionsCardProps {
 
 export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
   pack,
-  targetNetWorthInput,
-  onTargetNetWorthInputChange,
+  onTargetNetWorthChange,
   projectionSettings,
   onProjectionSettingsChange,
   activeOverrideCount,
@@ -26,6 +24,24 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
   hasStochasticData,
 }: KeyAssumptionsCardProps) {
   const [isTargetFocused, setIsTargetFocused] = useState(false);
+  const [targetDraft, setTargetDraft] = useState(String(projectionSettings.targetNetWorth));
+
+  useEffect(() => {
+    if (!isTargetFocused) {
+      setTargetDraft(String(projectionSettings.targetNetWorth));
+    }
+  }, [isTargetFocused, projectionSettings.targetNetWorth]);
+
+  const commitTargetNetWorth = () => {
+    const nextTarget = Number(targetDraft);
+    if (Number.isFinite(nextTarget)) {
+      onTargetNetWorthChange(nextTarget);
+      setTargetDraft(String(nextTarget));
+    } else {
+      setTargetDraft(String(projectionSettings.targetNetWorth));
+    }
+    setIsTargetFocused(false);
+  };
 
   return (
     <Card className="rounded-[1.6rem] border-slate-200 shadow-sm">
@@ -45,9 +61,16 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
                 inputMode="numeric"
                 step={1000}
                 autoFocus
-                value={targetNetWorthInput}
-                onChange={(event) => onTargetNetWorthInputChange(event.currentTarget.value)}
-                onBlur={() => setIsTargetFocused(false)}
+                value={targetDraft}
+                onChange={(event) => setTargetDraft(event.currentTarget.value)}
+                onBlur={commitTargetNetWorth}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") commitTargetNetWorth();
+                  if (event.key === "Escape") {
+                    setTargetDraft(String(projectionSettings.targetNetWorth));
+                    setIsTargetFocused(false);
+                  }
+                }}
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xl font-semibold text-slate-900 shadow-sm outline-none transition focus:border-slate-400"
               />
             ) : (
@@ -56,7 +79,7 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
                 onClick={() => setIsTargetFocused(true)}
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-xl font-semibold text-slate-900 shadow-sm outline-none transition hover:border-slate-300 focus:border-slate-400"
               >
-                {formatCurrencyInput(targetNetWorthInput)}
+                {formatCurrencyInput(targetDraft)}
               </button>
             )}
             <div className="mt-1 text-xs text-slate-400">Nominal dollars</div>

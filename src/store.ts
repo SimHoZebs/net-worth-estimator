@@ -22,16 +22,33 @@ export interface ScenarioSnapshot {
   metrics: SnapshotMetrics;
 }
 
+export type StochasticPreference = "auto" | "enabled" | "disabled";
+
 interface SnapshotSlice {
   snapshots: ScenarioSnapshot[];
-  addSnapshot: (snapshot: ScenarioSnapshot) => void;
+  addSnapshotFromCurrentScenario: (label: string, metrics: SnapshotMetrics) => void;
   removeSnapshot: (id: string) => void;
   clearSnapshots: () => void;
 }
 
-const createSnapshotSlice: StateCreator<AppStore, [], [], SnapshotSlice> = (set) => ({
+const createSnapshotSlice: StateCreator<AppStore, [], [], SnapshotSlice> = (set, get) => ({
   snapshots: [],
-  addSnapshot: (snapshot) => set((s) => ({ snapshots: [...s.snapshots, snapshot] })),
+  addSnapshotFromCurrentScenario: (label, metrics) => {
+    const state = get();
+    const timestamp = Date.now();
+    set({
+      snapshots: [
+        ...state.snapshots,
+        {
+          id: `snap-${timestamp}`,
+          label,
+          timestamp,
+          whatIfState: selectWhatIfState(state),
+          metrics: { ...metrics },
+        },
+      ],
+    });
+  },
   removeSnapshot: (id) => set((s) => ({ snapshots: s.snapshots.filter((sn) => sn.id !== id) })),
   clearSnapshots: () => set({ snapshots: [] }),
 });
@@ -249,12 +266,12 @@ const DEFAULT_TARGET_NET_WORTH = 1_000_000;
 const DEFAULT_STOCHASTIC_RUN_COUNT = 1000;
 
 interface SettingsSlice {
-  targetNetWorthInput: string;
-  setTargetNetWorthInput: (value: string) => void;
+  targetNetWorth: number;
+  setTargetNetWorth: (value: number) => void;
   horizonYears: number;
   setHorizonYears: (years: number) => void;
-  stochasticEnabled: boolean;
-  setStochasticEnabled: (enabled: boolean) => void;
+  stochasticPreference: StochasticPreference;
+  setStochasticPreference: (preference: StochasticPreference) => void;
   stochasticConfig: StochasticConfig;
   setStochasticConfig: (config: StochasticConfig) => void;
 }
@@ -262,14 +279,16 @@ interface SettingsSlice {
 const DEFAULT_HORIZON_YEARS = 15;
 
 const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (set) => ({
-  targetNetWorthInput: String(DEFAULT_TARGET_NET_WORTH),
-  setTargetNetWorthInput: (value) => set({ targetNetWorthInput: value }),
+  targetNetWorth: DEFAULT_TARGET_NET_WORTH,
+  setTargetNetWorth: (value) => {
+    if (Number.isFinite(value)) set({ targetNetWorth: value });
+  },
 
   horizonYears: DEFAULT_HORIZON_YEARS,
   setHorizonYears: (years) => set({ horizonYears: years }),
 
-  stochasticEnabled: false,
-  setStochasticEnabled: (enabled) => set({ stochasticEnabled: enabled }),
+  stochasticPreference: "auto",
+  setStochasticPreference: (preference) => set({ stochasticPreference: preference }),
 
   stochasticConfig: { runCount: DEFAULT_STOCHASTIC_RUN_COUNT, seed: null },
   setStochasticConfig: (config) => set({ stochasticConfig: config }),
@@ -305,6 +324,26 @@ export const selectWhatIfState = (s: AppStore): ScenarioWhatIfState => ({
   addedCheckpoints: s.addedCheckpoints,
   disabledAccountIds: s.disabledAccountIds,
   disabledPostingIds: s.disabledPostingIds,
+});
+
+export const selectEditorState = (s: AppStore) => ({
+  isEditing: s.isEditing,
+  isDirty: s.isDirty,
+  workingPack: s.workingPack,
+});
+
+export const selectEditorActions = (s: AppStore) => ({
+  startEditing: s.startEditing,
+  cancelEditing: s.cancelEditing,
+  updateAccount: s.updateAccount,
+  deleteAccount: s.deleteAccount,
+  addAccount: s.addAccount,
+  updatePosting: s.updatePosting,
+  deletePosting: s.deletePosting,
+  addPosting: s.addPosting,
+  addCheckpoint: s.addCheckpoint,
+  deleteCheckpoint: s.deleteCheckpoint,
+  updateCheckpoint: s.updateCheckpoint,
 });
 
 /* ------------------------------------------------------------------ */

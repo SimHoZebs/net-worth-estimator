@@ -14,7 +14,8 @@ import { ReadOnlyPostingsTable } from "@/components/dashboard/tables/ReadOnlyPos
 import { ReadOnlyAccountsTable } from "@/components/dashboard/tables/ReadOnlyAccountsTable";
 import { ReadOnlyCheckpointsTable } from "@/components/dashboard/tables/ReadOnlyCheckpointsTable";
 import { currency, integer, pluralize } from "@/lib/format";
-import { useStore } from "@/store";
+import { useStore, selectEditorActions, selectEditorState } from "@/store";
+import { useShallow } from "zustand/shallow";
 
 interface ScenarioInspectorProps {
   projectionSettings: ProjectionRuntimeSettings;
@@ -44,28 +45,25 @@ export function ScenarioInspector({
   const disabledPostingIds = useStore((s) => s.disabledPostingIds);
   const toggleAccountDisabled = useStore((s) => s.toggleAccountDisabled);
   const togglePostingDisabled = useStore((s) => s.togglePostingDisabled);
-  const isEditing = useStore((s) => s.isEditing);
-  const isDirty = useStore((s) => s.isDirty);
-  const workingPack = useStore((s) => s.workingPack);
-  const startEditing = useStore((s) => s.startEditing);
-  const cancelEditing = useStore((s) => s.cancelEditing);
-  const updateAccount = useStore((s) => s.updateAccount);
-  const deleteAccount = useStore((s) => s.deleteAccount);
-  const addAccount = useStore((s) => s.addAccount);
-  const updatePosting = useStore((s) => s.updatePosting);
-  const deletePosting = useStore((s) => s.deletePosting);
-  const addPosting = useStore((s) => s.addPosting);
-  const addCheckpoint = useStore((s) => s.addCheckpoint);
-  const deleteCheckpoint = useStore((s) => s.deleteCheckpoint);
-  const updateCheckpoint = useStore((s) => s.updateCheckpoint);
+  const { isEditing, isDirty, workingPack } = useStore(useShallow(selectEditorState));
+  const {
+    startEditing,
+    cancelEditing,
+    updateAccount,
+    deleteAccount,
+    addAccount,
+    updatePosting,
+    deletePosting,
+    addPosting,
+    addCheckpoint,
+    deleteCheckpoint,
+    updateCheckpoint,
+  } = useStore(useShallow(selectEditorActions));
   const disabledAccountSet = new Set(disabledAccountIds);
   const disabledPostingSet = new Set(disabledPostingIds);
   const displayPack = isEditing && workingPack ? workingPack : pack;
 
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [postingSearch, setPostingSearch] = useState("");
-  const [accountSearch, setAccountSearch] = useState("");
-  const [checkpointSearch, setCheckpointSearch] = useState("");
 
   const accountLabelById = new Map(pack?.accounts.map((a) => [a.id, a.label]) ?? []);
 
@@ -79,7 +77,7 @@ export function ScenarioInspector({
 
   return (
     <CollapsibleSection
-      open={shouldOpen}
+      autoOpenWhen={shouldOpen}
       title="Source data and validation"
       description="Secondary inspection area for data health, runtime settings, and raw source tables."
       badge={`${loadStatus} • ${validationSummary}`}
@@ -189,8 +187,6 @@ export function ScenarioInspector({
                       showAdvanced={showAdvanced}
                       disabledPostingSet={disabledPostingSet}
                       onToggle={togglePostingDisabled}
-                      search={postingSearch}
-                      onSearchChange={setPostingSearch}
                     />
                   )
                 ) : null}
@@ -216,8 +212,6 @@ export function ScenarioInspector({
                       showAdvanced={showAdvanced}
                       disabledAccountSet={disabledAccountSet}
                       onToggle={toggleAccountDisabled}
-                      search={accountSearch}
-                      onSearchChange={setAccountSearch}
                     />
                   )
                 ) : null}
@@ -237,8 +231,6 @@ export function ScenarioInspector({
                       checkpoints={pack.checkpoints}
                       showAdvanced={showAdvanced}
                       accountLabelById={accountLabelById}
-                      search={checkpointSearch}
-                      onSearchChange={setCheckpointSearch}
                     />
                   )
                 ) : null}

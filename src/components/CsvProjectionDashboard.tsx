@@ -25,8 +25,7 @@ interface ProjectionDashboardProps {
   pack: ScenarioPack;
   result: ProjectionResult;
   projectionSettings: ProjectionRuntimeSettings;
-  targetNetWorthInput: string;
-  onTargetNetWorthInputChange: (value: string) => void;
+  onTargetNetWorthChange: (value: number) => void;
   onProjectionSettingsChange?: (partial: Partial<ProjectionRuntimeSettings>) => void;
   stochasticResult?: StochasticProjectionResult | null;
   children?: ReactNode;
@@ -36,8 +35,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
   pack,
   result,
   projectionSettings,
-  targetNetWorthInput,
-  onTargetNetWorthInputChange,
+  onTargetNetWorthChange,
   onProjectionSettingsChange,
   stochasticResult,
   children,
@@ -96,8 +94,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
       <section id="assumptions">
         <KeyAssumptionsCard
           pack={pack}
-          targetNetWorthInput={targetNetWorthInput}
-          onTargetNetWorthInputChange={onTargetNetWorthInputChange}
+          onTargetNetWorthChange={onTargetNetWorthChange}
           projectionSettings={projectionSettings}
           onProjectionSettingsChange={onProjectionSettingsChange}
           activeOverrideCount={activeOverrideCount}

@@ -30,7 +30,7 @@ export function ContributionWhatIfControls({
 
   return (
     <CollapsibleSection
-      open={activeOverrideCount > 0}
+      autoOpenWhen={activeOverrideCount > 0}
       title="Scenario overrides"
       description={activeOverrideCount > 0
         ? `${activeOverrideCount} temporary change${activeOverrideCount === 1 ? "" : "s"} active.`

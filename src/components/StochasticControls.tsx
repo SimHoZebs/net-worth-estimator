@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { StochasticProjectionResult } from "@/lib/projection";
 import { pct, currency, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -20,25 +19,23 @@ export function StochasticControls({
   progress,
   stochasticResult,
 }: StochasticControlsProps) {
-  const enabled = useStore((s) => s.stochasticEnabled);
+  const stochasticPreference = useStore((s) => s.stochasticPreference);
   const config = useStore((s) => s.stochasticConfig);
-  const onToggle = useStore((s) => s.setStochasticEnabled);
+  const onPreferenceChange = useStore((s) => s.setStochasticPreference);
   const onConfigChange = useStore((s) => s.setStochasticConfig);
-  const [runCountInput, setRunCountInput] = useState(String(config.runCount));
-  const [seedInput, setSeedInput] = useState(config.seed !== null ? String(config.seed) : "");
+  const simulationRequested = stochasticPreference !== "disabled";
+  const simulationActive = simulationRequested && hasStochasticAccounts;
 
-  const parsedRunCount = Number.isFinite(Number(runCountInput))
-    ? Math.max(1, Math.min(10000, Number(runCountInput)))
-    : config.runCount;
-  const parsedSeed = seedInput.trim().length > 0 && Number.isFinite(Number(seedInput))
-    ? Number(seedInput)
-    : null;
-
-  const { hasPendingChanges, scheduleConfigChange, applyImmediately } = useDebouncedStochasticConfig(
+  const {
+    runCountInput,
+    seedInput,
+    hasPendingChanges,
+    updateRunCountInput,
+    updateSeedInput,
+    applyImmediately,
+  } = useDebouncedStochasticConfig(
     config,
     onConfigChange,
-    parsedRunCount,
-    parsedSeed,
   );
 
   const progressPct = progress !== null ? Math.round(progress * 100) : null;
@@ -48,25 +45,27 @@ export function StochasticControls({
       : `Computing ${config.runCount} projections…`
     : stochasticResult
       ? `Ready — ${config.runCount} run${config.runCount === 1 ? "" : "s"}${config.seed !== null ? ` (seed ${config.seed})` : ""}`
-      : enabled
+      : simulationActive
         ? "Waiting to start…"
         : "Disabled";
 
   return (
     <CollapsibleSection
       title="Monte Carlo simulation"
-      description={enabled && hasStochasticAccounts
+      description={simulationActive
         ? statusLabel
-        : enabled && !hasStochasticAccounts
+        : simulationRequested && !hasStochasticAccounts
           ? "No scheduled transactions have volatility configured. Set volatility > 0 to enable simulation."
           : "Stochastic simulation is disabled. Toggle on to see probabilistic bands."}
       badge={isRunning
         ? progressPct !== null
           ? `Running ${progressPct}%`
           : "Running…"
-        : enabled
-          ? "Open"
-          : "Off"}
+        : !simulationRequested
+          ? "Off"
+          : !hasStochasticAccounts
+            ? "Unavailable"
+            : "Open"}
     >
 
       <div className="mt-5 space-y-4">
@@ -84,15 +83,15 @@ export function StochasticControls({
             <input
               type="checkbox"
               className="peer sr-only"
-              checked={enabled}
-              onChange={(e) => onToggle(e.currentTarget.checked)}
+              checked={simulationActive}
+              onChange={(e) => onPreferenceChange(e.currentTarget.checked ? "enabled" : "disabled")}
               disabled={!hasStochasticAccounts}
             />
             <div className="peer h-6 w-11 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:bg-slate-900 peer-checked:after:translate-x-full peer-disabled:opacity-40" />
           </label>
         </div>
 
-        {enabled && hasStochasticAccounts ? (
+        {simulationActive ? (
           <>
             <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
               <div className="space-y-1">
@@ -103,15 +102,7 @@ export function StochasticControls({
                   min={1}
                   max={10000}
                   value={runCountInput}
-                  onChange={(e) => {
-                    setRunCountInput(e.currentTarget.value);
-                    scheduleConfigChange({
-                      runCount: Number.isFinite(Number(e.currentTarget.value))
-                        ? Math.max(1, Math.min(10000, Number(e.currentTarget.value)))
-                        : config.runCount,
-                      seed: parsedSeed,
-                    });
-                  }}
+                  onChange={(e) => updateRunCountInput(e.currentTarget.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400"
                 />
               </div>
@@ -121,16 +112,7 @@ export function StochasticControls({
                   type="number"
                   inputMode="numeric"
                   value={seedInput}
-                  onChange={(e) => {
-                    setSeedInput(e.currentTarget.value);
-                    const nextSeed = e.currentTarget.value.trim().length > 0 && Number.isFinite(Number(e.currentTarget.value))
-                      ? Number(e.currentTarget.value)
-                      : null;
-                    scheduleConfigChange({
-                      runCount: parsedRunCount,
-                      seed: nextSeed,
-                    });
-                  }}
+                  onChange={(e) => updateSeedInput(e.currentTarget.value)}
                   placeholder="Random"
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-400"
                 />
