@@ -8,13 +8,13 @@ Status: **In progress** — Phase 1 (dashboard sub-components) underway.
 
 Four large components violate the Single Responsibility Principle and mix concerns:
 
-| Component | Lines | Problem |
-|-----------|-------|---------|
-| `CsvProjectionDashboard.tsx` | 472 | Computes ~15 derived values inline, renders 8 distinct UI sections monolithically |
-| `CsvScenarioInspector.tsx` | 457 | Doubles JSX via `isEditing` branch for accounts, postings, checkpoints |
-| `CsvContributionWhatIfControls.tsx` | 420 | Three duplicated form-in-a-section patterns (account, posting, checkpoint) |
-| `StochasticControls.tsx` | 236 | Debounce timer logic embedded in component body |
-| `App.tsx` | 231 | Minor: `activeOverrideCount` computed inline instead of using existing `selectActiveOverrideCount` selector |
+| Component                           | Lines | Problem                                                                                                     |
+| ----------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------- |
+| `CsvProjectionDashboard.tsx`        | 472   | Computes ~15 derived values inline, renders 8 distinct UI sections monolithically                           |
+| `CsvScenarioInspector.tsx`          | 457   | Doubles JSX via `isEditing` branch for accounts, postings, checkpoints                                      |
+| `CsvContributionWhatIfControls.tsx` | 420   | Three duplicated form-in-a-section patterns (account, posting, checkpoint)                                  |
+| `StochasticControls.tsx`            | 236   | Debounce timer logic embedded in component body                                                             |
+| `App.tsx`                           | 231   | Minor: `activeOverrideCount` computed inline instead of using existing `selectActiveOverrideCount` selector |
 
 ---
 
@@ -62,15 +62,15 @@ Extract 7 components from `CsvProjectionDashboard.tsx` into `src/components/dash
 
 ### Files to create
 
-| File | Responsibility | Props |
-|------|---------------|-------|
-| `ProjectionHeadline.tsx` | Status badge + headline text + detail text + override badge | `goalReached`, `headline`, `headlineDetail`, `activeOverrideCount` |
-| `OutcomeMetricsRow.tsx` | 3-column grid of OutcomeMetric cards | `currentNetWorth`, `currentDate`, `finalNetWorth`, `finalDate`, `distanceToTarget`, `goalReached` |
-| `TargetNetWorthCard.tsx` | Target input/display with inline editing + CompactDetails | `targetNetWorthInput`, `onChange`, `horizonYears`, `projectionStartDate`, `activeOverrideCount` |
-| `AssumptionsPanel.tsx` | Key assumptions card (income, expenses, counts, disclaimer) | `pack`, `horizonYears`, `hasStochasticData` |
-| `DriverCardsRow.tsx` | 3 DriverCards (constraint, next transaction, completion rate) | `biggestShortfallPosting`, `goalReached`, `firstProjectedRow`, `nextEventDetail`, `postingUtilizationRate`, `realizedPostingAmount`, `requestedPostingAmount`, `enabledPostingCount` |
-| `TransactionCompletionTable.tsx` | Table showing per-posting completion rates | `postingSummaries` |
-| `UpcomingTransactionsTable.tsx` | Expandable table of upcoming projected transactions | `activeFutureRows`, `postingLabelById`, `expandedEventRows`, `onToggleEventRow` |
+| File                             | Responsibility                                                | Props                                                                                                                                                                                |
+| -------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ProjectionHeadline.tsx`         | Status badge + headline text + detail text + override badge   | `goalReached`, `headline`, `headlineDetail`, `activeOverrideCount`                                                                                                                   |
+| `OutcomeMetricsRow.tsx`          | 3-column grid of OutcomeMetric cards                          | `currentNetWorth`, `currentDate`, `finalNetWorth`, `finalDate`, `distanceToTarget`, `goalReached`                                                                                    |
+| `TargetNetWorthCard.tsx`         | Target input/display with inline editing + CompactDetails     | `targetNetWorthInput`, `onChange`, `horizonYears`, `projectionStartDate`, `activeOverrideCount`                                                                                      |
+| `AssumptionsPanel.tsx`           | Key assumptions card (income, expenses, counts, disclaimer)   | `pack`, `horizonYears`, `hasStochasticData`                                                                                                                                          |
+| `DriverCardsRow.tsx`             | 3 DriverCards (constraint, next transaction, completion rate) | `biggestShortfallPosting`, `goalReached`, `firstProjectedRow`, `nextEventDetail`, `postingUtilizationRate`, `realizedPostingAmount`, `requestedPostingAmount`, `enabledPostingCount` |
+| `TransactionCompletionTable.tsx` | Table showing per-posting completion rates                    | `postingSummaries`                                                                                                                                                                   |
+| `UpcomingTransactionsTable.tsx`  | Expandable table of upcoming projected transactions           | `activeFutureRows`, `postingLabelById`, `expandedEventRows`, `onToggleEventRow`                                                                                                      |
 
 ### Files to modify
 
@@ -84,14 +84,14 @@ Extract 6 components from `CsvScenarioInspector.tsx` into `src/components/inspec
 
 ### Files to create
 
-| File | Responsibility |
-|------|---------------|
-| `EditableAccountsTable.tsx` | Inline-editable accounts table (ID, Label, Min, Max, Color, Enabled) |
-| `ReadOnlyAccountsTable.tsx` | Thin wrapper around DataTable for read-only accounts |
-| `EditablePostingsTable.tsx` | Inline-editable postings table (14 columns) |
-| `ReadOnlyPostingsTable.tsx` | Thin wrapper around DataTable for read-only postings |
-| `EditableCheckpointsTable.tsx` | Inline-editable checkpoints table (Date, AccountId, Balance) |
-| `ReadOnlyCheckpointsTable.tsx` | Thin wrapper around DataTable for read-only checkpoints |
+| File                           | Responsibility                                                       |
+| ------------------------------ | -------------------------------------------------------------------- |
+| `EditableAccountsTable.tsx`    | Inline-editable accounts table (ID, Label, Min, Max, Color, Enabled) |
+| `ReadOnlyAccountsTable.tsx`    | Thin wrapper around DataTable for read-only accounts                 |
+| `EditablePostingsTable.tsx`    | Inline-editable postings table (14 columns)                          |
+| `ReadOnlyPostingsTable.tsx`    | Thin wrapper around DataTable for read-only postings                 |
+| `EditableCheckpointsTable.tsx` | Inline-editable checkpoints table (Date, AccountId, Balance)         |
+| `ReadOnlyCheckpointsTable.tsx` | Thin wrapper around DataTable for read-only checkpoints              |
 
 ### Files to move
 
@@ -106,11 +106,11 @@ Extract 3 components from `CsvContributionWhatIfControls.tsx` into `src/componen
 
 ### Files to create
 
-| File | Responsibility |
-|------|---------------|
-| `WhatIfAccountForm.tsx` | Inline add-account form + added accounts list |
-| `WhatIfPostingForm.tsx` | Inline add-posting form (13 fields) + added postings list |
-| `WhatIfCheckpointForm.tsx` | Inline add-checkpoint form + added checkpoints list |
+| File                       | Responsibility                                            |
+| -------------------------- | --------------------------------------------------------- |
+| `WhatIfAccountForm.tsx`    | Inline add-account form + added accounts list             |
+| `WhatIfPostingForm.tsx`    | Inline add-posting form (13 fields) + added postings list |
+| `WhatIfCheckpointForm.tsx` | Inline add-checkpoint form + added checkpoints list       |
 
 ---
 
@@ -118,8 +118,8 @@ Extract 3 components from `CsvContributionWhatIfControls.tsx` into `src/componen
 
 ### Files to create
 
-| File | Responsibility |
-|------|---------------|
+| File                                        | Responsibility                                               |
+| ------------------------------------------- | ------------------------------------------------------------ |
 | `src/hooks/useDebouncedStochasticConfig.ts` | Encapsulates debounce timer, pending config, immediate apply |
 
 ### Files to modify
@@ -137,19 +137,20 @@ Extract 3 components from `CsvContributionWhatIfControls.tsx` into `src/componen
 
 ## File Count Summary
 
-| Category | New files |
-|----------|-----------|
-| `src/components/dashboard/` | 7 |
-| `src/components/inspector/` | 6 |
-| `src/components/what-if/` | 3 |
-| `src/components/ui/` | 2 (moved) |
-| `src/hooks/` | 1 |
-| **Total new files** | **19** |
-| **Files modified** | 5 (`App.tsx`, `CsvProjectionDashboard.tsx`, `CsvScenarioInspector.tsx`, `CsvContributionWhatIfControls.tsx`, `StochasticControls.tsx`) |
+| Category                    | New files                                                                                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/components/dashboard/` | 7                                                                                                                                      |
+| `src/components/inspector/` | 6                                                                                                                                      |
+| `src/components/what-if/`   | 3                                                                                                                                      |
+| `src/components/ui/`        | 2 (moved)                                                                                                                              |
+| `src/hooks/`                | 1                                                                                                                                      |
+| **Total new files**         | **19**                                                                                                                                 |
+| **Files modified**          | 5 (`App.tsx`, `CsvProjectionDashboard.tsx`, `CsvScenarioInspector.tsx`, `CsvContributionWhatIfControls.tsx`, `StochasticControls.tsx`) |
 
 ## Verification
 
 After each phase:
+
 ```
 npm run typecheck
 npm run test

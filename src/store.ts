@@ -1,56 +1,70 @@
-import { create } from "zustand";
 import type { StateCreator } from "zustand";
-import type { Account, Checkpoint, Posting, ScenarioPack, ScenarioWhatIfState, StochasticConfig } from "@/lib/projection";
+import { create } from "zustand";
+import type {
+	Account,
+	Checkpoint,
+	Posting,
+	ScenarioPack,
+	ScenarioWhatIfState,
+	StochasticConfig,
+} from "@/lib/projection";
 
 /* ------------------------------------------------------------------ */
 /*  Snapshot slice                                                     */
 /* ------------------------------------------------------------------ */
 
 export interface SnapshotMetrics {
-  currentNetWorth: number;
-  finalNetWorth: number;
-  hitTargetDate: string | null;
-  shortfallAmount: number;
-  overrideCount: number;
+	currentNetWorth: number;
+	finalNetWorth: number;
+	hitTargetDate: string | null;
+	shortfallAmount: number;
+	overrideCount: number;
 }
 
 export interface ScenarioSnapshot {
-  id: string;
-  label: string;
-  timestamp: number;
-  whatIfState: ScenarioWhatIfState;
-  metrics: SnapshotMetrics;
+	id: string;
+	label: string;
+	timestamp: number;
+	whatIfState: ScenarioWhatIfState;
+	metrics: SnapshotMetrics;
 }
 
 export type StochasticPreference = "auto" | "enabled" | "disabled";
 
 interface SnapshotSlice {
-  snapshots: ScenarioSnapshot[];
-  addSnapshotFromCurrentScenario: (label: string, metrics: SnapshotMetrics) => void;
-  removeSnapshot: (id: string) => void;
-  clearSnapshots: () => void;
+	snapshots: ScenarioSnapshot[];
+	addSnapshotFromCurrentScenario: (
+		label: string,
+		metrics: SnapshotMetrics,
+	) => void;
+	removeSnapshot: (id: string) => void;
+	clearSnapshots: () => void;
 }
 
-const createSnapshotSlice: StateCreator<AppStore, [], [], SnapshotSlice> = (set, get) => ({
-  snapshots: [],
-  addSnapshotFromCurrentScenario: (label, metrics) => {
-    const state = get();
-    const timestamp = Date.now();
-    set({
-      snapshots: [
-        ...state.snapshots,
-        {
-          id: `snap-${timestamp}`,
-          label,
-          timestamp,
-          whatIfState: selectWhatIfState(state),
-          metrics: { ...metrics },
-        },
-      ],
-    });
-  },
-  removeSnapshot: (id) => set((s) => ({ snapshots: s.snapshots.filter((sn) => sn.id !== id) })),
-  clearSnapshots: () => set({ snapshots: [] }),
+const createSnapshotSlice: StateCreator<AppStore, [], [], SnapshotSlice> = (
+	set,
+	get,
+) => ({
+	snapshots: [],
+	addSnapshotFromCurrentScenario: (label, metrics) => {
+		const state = get();
+		const timestamp = Date.now();
+		set({
+			snapshots: [
+				...state.snapshots,
+				{
+					id: `snap-${timestamp}`,
+					label,
+					timestamp,
+					whatIfState: selectWhatIfState(state),
+					metrics: { ...metrics },
+				},
+			],
+		});
+	},
+	removeSnapshot: (id) =>
+		set((s) => ({ snapshots: s.snapshots.filter((sn) => sn.id !== id) })),
+	clearSnapshots: () => set({ snapshots: [] }),
 });
 
 /* ------------------------------------------------------------------ */
@@ -58,61 +72,65 @@ const createSnapshotSlice: StateCreator<AppStore, [], [], SnapshotSlice> = (set,
 /* ------------------------------------------------------------------ */
 
 const initialWhatIfState: ScenarioWhatIfState = {
-  addedAccounts: [],
-  addedPostings: [],
-  addedCheckpoints: [],
-  disabledAccountIds: [],
-  disabledPostingIds: [],
+	addedAccounts: [],
+	addedPostings: [],
+	addedCheckpoints: [],
+	disabledAccountIds: [],
+	disabledPostingIds: [],
 };
 
 interface WhatIfSlice extends ScenarioWhatIfState {
-  addTemporaryAccount: (account: Account) => void;
-  removeTemporaryAccount: (id: string) => void;
-  addTemporaryPosting: (posting: Posting) => void;
-  removeTemporaryPosting: (id: string) => void;
-  addTemporaryCheckpoint: (checkpoint: Checkpoint) => void;
-  removeTemporaryCheckpoint: (index: number) => void;
-  toggleAccountDisabled: (id: string) => void;
-  togglePostingDisabled: (id: string) => void;
-  resetAllOverrides: () => void;
+	addTemporaryAccount: (account: Account) => void;
+	removeTemporaryAccount: (id: string) => void;
+	addTemporaryPosting: (posting: Posting) => void;
+	removeTemporaryPosting: (id: string) => void;
+	addTemporaryCheckpoint: (checkpoint: Checkpoint) => void;
+	removeTemporaryCheckpoint: (index: number) => void;
+	toggleAccountDisabled: (id: string) => void;
+	togglePostingDisabled: (id: string) => void;
+	resetAllOverrides: () => void;
 }
 
-const createWhatIfSlice: StateCreator<AppStore, [], [], WhatIfSlice> = (set) => ({
-  ...initialWhatIfState,
+const createWhatIfSlice: StateCreator<AppStore, [], [], WhatIfSlice> = (
+	set,
+) => ({
+	...initialWhatIfState,
 
-  addTemporaryAccount: (account) =>
-    set((s) => ({ addedAccounts: [...s.addedAccounts, account] })),
+	addTemporaryAccount: (account) =>
+		set((s) => ({ addedAccounts: [...s.addedAccounts, account] })),
 
-  removeTemporaryAccount: (id) =>
-    set((s) => ({ addedAccounts: s.addedAccounts.filter((a) => a.id !== id) })),
+	removeTemporaryAccount: (id) =>
+		set((s) => ({ addedAccounts: s.addedAccounts.filter((a) => a.id !== id) })),
 
-  addTemporaryPosting: (posting) =>
-    set((s) => ({ addedPostings: [...s.addedPostings, posting] })),
+	addTemporaryPosting: (posting) =>
+		set((s) => ({ addedPostings: [...s.addedPostings, posting] })),
 
-  removeTemporaryPosting: (id) =>
-    set((s) => ({ addedPostings: s.addedPostings.filter((p) => p.id !== id) })),
+	removeTemporaryPosting: (id) =>
+		set((s) => ({ addedPostings: s.addedPostings.filter((p) => p.id !== id) })),
 
-  addTemporaryCheckpoint: (checkpoint) =>
-    set((s) => ({ addedCheckpoints: [...s.addedCheckpoints, checkpoint] })),
+	addTemporaryCheckpoint: (checkpoint) =>
+		set((s) => ({ addedCheckpoints: [...s.addedCheckpoints, checkpoint] })),
 
-  removeTemporaryCheckpoint: (index) =>
-    set((s) => ({ addedCheckpoints: s.addedCheckpoints.filter((_, i) => i !== index) })),
+	removeTemporaryCheckpoint: (index) =>
+		set((s) => ({
+			addedCheckpoints: s.addedCheckpoints.filter((_, i) => i !== index),
+		})),
 
-  toggleAccountDisabled: (id) =>
-    set((s) => ({
-      disabledAccountIds: s.disabledAccountIds.includes(id)
-        ? s.disabledAccountIds.filter((did) => did !== id)
-        : [...s.disabledAccountIds, id],
-    })),
+	toggleAccountDisabled: (id) =>
+		set((s) => ({
+			disabledAccountIds: s.disabledAccountIds.includes(id)
+				? s.disabledAccountIds.filter((did) => did !== id)
+				: [...s.disabledAccountIds, id],
+		})),
 
-  togglePostingDisabled: (id) =>
-    set((s) => ({
-      disabledPostingIds: s.disabledPostingIds.includes(id)
-        ? s.disabledPostingIds.filter((did) => did !== id)
-        : [...s.disabledPostingIds, id],
-    })),
+	togglePostingDisabled: (id) =>
+		set((s) => ({
+			disabledPostingIds: s.disabledPostingIds.includes(id)
+				? s.disabledPostingIds.filter((did) => did !== id)
+				: [...s.disabledPostingIds, id],
+		})),
 
-  resetAllOverrides: () => set(initialWhatIfState),
+	resetAllOverrides: () => set(initialWhatIfState),
 });
 
 /* ------------------------------------------------------------------ */
@@ -120,142 +138,151 @@ const createWhatIfSlice: StateCreator<AppStore, [], [], WhatIfSlice> = (set) => 
 /* ------------------------------------------------------------------ */
 
 interface EditorSlice {
-  workingPack: ScenarioPack | null;
-  isDirty: boolean;
-  isEditing: boolean;
-  startEditing: (pack: ScenarioPack) => void;
-  cancelEditing: () => void;
-  updateAccount: (id: string, changes: Partial<Account>) => void;
-  deleteAccount: (id: string) => void;
-  addAccount: (account: Account) => void;
-  updatePosting: (id: string, changes: Partial<Posting>) => void;
-  deletePosting: (id: string) => void;
-  addPosting: (posting: Posting) => void;
-  addCheckpoint: (checkpoint: Checkpoint) => void;
-  deleteCheckpoint: (index: number) => void;
-  updateCheckpoint: (index: number, changes: Partial<Checkpoint>) => void;
+	workingPack: ScenarioPack | null;
+	isDirty: boolean;
+	isEditing: boolean;
+	startEditing: (pack: ScenarioPack) => void;
+	cancelEditing: () => void;
+	updateAccount: (id: string, changes: Partial<Account>) => void;
+	deleteAccount: (id: string) => void;
+	addAccount: (account: Account) => void;
+	updatePosting: (id: string, changes: Partial<Posting>) => void;
+	deletePosting: (id: string) => void;
+	addPosting: (posting: Posting) => void;
+	addCheckpoint: (checkpoint: Checkpoint) => void;
+	deleteCheckpoint: (index: number) => void;
+	updateCheckpoint: (index: number, changes: Partial<Checkpoint>) => void;
 }
 
-const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (set, get) => ({
-  workingPack: null,
-  isDirty: false,
-  isEditing: false,
+const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (
+	set,
+	_get,
+) => ({
+	workingPack: null,
+	isDirty: false,
+	isEditing: false,
 
-  startEditing: (pack: ScenarioPack) => {
-    set({
-      workingPack: clonePack(pack),
-      isDirty: false,
-      isEditing: true,
-    });
-  },
+	startEditing: (pack: ScenarioPack) => {
+		set({
+			workingPack: clonePack(pack),
+			isDirty: false,
+			isEditing: true,
+		});
+	},
 
-  cancelEditing: () =>
-    set({ workingPack: null, isDirty: false, isEditing: false }),
+	cancelEditing: () =>
+		set({ workingPack: null, isDirty: false, isEditing: false }),
 
-  updateAccount: (id, changes) =>
-    set((s) => {
-      if (!s.workingPack) return s;
-      return {
-        isDirty: true,
-        workingPack: {
-          ...s.workingPack,
-          accounts: s.workingPack.accounts.map((a) =>
-            a.id === id ? { ...a, ...changes } : a,
-          ),
-        },
-      };
-    }),
+	updateAccount: (id, changes) =>
+		set((s) => {
+			if (!s.workingPack) return s;
+			return {
+				isDirty: true,
+				workingPack: {
+					...s.workingPack,
+					accounts: s.workingPack.accounts.map((a) =>
+						a.id === id ? { ...a, ...changes } : a,
+					),
+				},
+			};
+		}),
 
-  deleteAccount: (id) =>
-    set((s) => {
-      if (!s.workingPack) return s;
-      return {
-        isDirty: true,
-        workingPack: {
-          ...s.workingPack,
-          accounts: s.workingPack.accounts.filter((a) => a.id !== id),
-        },
-      };
-    }),
+	deleteAccount: (id) =>
+		set((s) => {
+			if (!s.workingPack) return s;
+			return {
+				isDirty: true,
+				workingPack: {
+					...s.workingPack,
+					accounts: s.workingPack.accounts.filter((a) => a.id !== id),
+				},
+			};
+		}),
 
-  addAccount: (account) =>
-    set((s) => {
-      if (!s.workingPack) return s;
-      return {
-        isDirty: true,
-        workingPack: { ...s.workingPack, accounts: [...s.workingPack.accounts, account] },
-      };
-    }),
+	addAccount: (account) =>
+		set((s) => {
+			if (!s.workingPack) return s;
+			return {
+				isDirty: true,
+				workingPack: {
+					...s.workingPack,
+					accounts: [...s.workingPack.accounts, account],
+				},
+			};
+		}),
 
-  updatePosting: (id, changes) =>
-    set((s) => {
-      if (!s.workingPack) return s;
-      return {
-        isDirty: true,
-        workingPack: {
-          ...s.workingPack,
-          postings: s.workingPack.postings.map((p) =>
-            p.id === id ? { ...p, ...changes } : p,
-          ),
-        },
-      };
-    }),
+	updatePosting: (id, changes) =>
+		set((s) => {
+			if (!s.workingPack) return s;
+			return {
+				isDirty: true,
+				workingPack: {
+					...s.workingPack,
+					postings: s.workingPack.postings.map((p) =>
+						p.id === id ? { ...p, ...changes } : p,
+					),
+				},
+			};
+		}),
 
-  deletePosting: (id) =>
-    set((s) => {
-      if (!s.workingPack) return s;
-      return {
-        isDirty: true,
-        workingPack: {
-          ...s.workingPack,
-          postings: s.workingPack.postings.filter((p) => p.id !== id),
-        },
-      };
-    }),
+	deletePosting: (id) =>
+		set((s) => {
+			if (!s.workingPack) return s;
+			return {
+				isDirty: true,
+				workingPack: {
+					...s.workingPack,
+					postings: s.workingPack.postings.filter((p) => p.id !== id),
+				},
+			};
+		}),
 
-  addPosting: (posting) =>
-    set((s) => {
-      if (!s.workingPack) return s;
-      return {
-        isDirty: true,
-        workingPack: { ...s.workingPack, postings: [...s.workingPack.postings, posting] },
-      };
-    }),
+	addPosting: (posting) =>
+		set((s) => {
+			if (!s.workingPack) return s;
+			return {
+				isDirty: true,
+				workingPack: {
+					...s.workingPack,
+					postings: [...s.workingPack.postings, posting],
+				},
+			};
+		}),
 
-  addCheckpoint: (checkpoint) =>
-    set((s) => {
-      if (!s.workingPack) return s;
-      return {
-        isDirty: true,
-        workingPack: {
-          ...s.workingPack,
-          checkpoints: [...s.workingPack.checkpoints, checkpoint],
-        },
-      };
-    }),
+	addCheckpoint: (checkpoint) =>
+		set((s) => {
+			if (!s.workingPack) return s;
+			return {
+				isDirty: true,
+				workingPack: {
+					...s.workingPack,
+					checkpoints: [...s.workingPack.checkpoints, checkpoint],
+				},
+			};
+		}),
 
-  deleteCheckpoint: (index) =>
-    set((s) => {
-      if (!s.workingPack) return s;
-      return {
-        isDirty: true,
-        workingPack: {
-          ...s.workingPack,
-          checkpoints: s.workingPack.checkpoints.filter((_, i) => i !== index),
-        },
-      };
-    }),
+	deleteCheckpoint: (index) =>
+		set((s) => {
+			if (!s.workingPack) return s;
+			return {
+				isDirty: true,
+				workingPack: {
+					...s.workingPack,
+					checkpoints: s.workingPack.checkpoints.filter((_, i) => i !== index),
+				},
+			};
+		}),
 
-  updateCheckpoint: (index, changes) =>
-    set((s) => {
-      if (!s.workingPack) return s;
-      const next = [...s.workingPack.checkpoints];
-      next[index] = { ...next[index], ...changes };
-      return {
-        isDirty: true,
-        workingPack: { ...s.workingPack, checkpoints: next },
-      };
-    }),
+	updateCheckpoint: (index, changes) =>
+		set((s) => {
+			if (!s.workingPack) return s;
+			const next = [...s.workingPack.checkpoints];
+			next[index] = { ...next[index], ...changes };
+			return {
+				isDirty: true,
+				workingPack: { ...s.workingPack, checkpoints: next },
+			};
+		}),
 });
 
 /* ------------------------------------------------------------------ */
@@ -265,44 +292,49 @@ const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (set, get
 type Theme = "light" | "dark" | "system";
 
 function resolveTheme(theme: Theme): "light" | "dark" {
-  if (theme === "system") {
-    if (typeof window !== "undefined") {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    }
-    return "light";
-  }
-  return theme;
+	if (theme === "system") {
+		if (typeof window !== "undefined") {
+			return window.matchMedia("(prefers-color-scheme: dark)").matches
+				? "dark"
+				: "light";
+		}
+		return "light";
+	}
+	return theme;
 }
 
 function applyThemeToDOM(theme: Theme) {
-  if (typeof window === "undefined") return;
-  const resolved = resolveTheme(theme);
-  document.documentElement.classList.toggle("dark", resolved === "dark");
-  if (theme === "light") {
-    localStorage.theme = "light";
-  } else if (theme === "dark") {
-    localStorage.theme = "dark";
-  } else {
-    localStorage.removeItem("theme");
-  }
+	if (typeof window === "undefined") return;
+	const resolved = resolveTheme(theme);
+	document.documentElement.classList.toggle("dark", resolved === "dark");
+	if (theme === "light") {
+		localStorage.theme = "light";
+	} else if (theme === "dark") {
+		localStorage.theme = "dark";
+	} else {
+		localStorage.removeItem("theme");
+	}
 }
 
 interface ThemeSlice {
-  theme: Theme;
-  resolvedTheme: "light" | "dark";
-  setTheme: (theme: Theme) => void;
+	theme: Theme;
+	resolvedTheme: "light" | "dark";
+	setTheme: (theme: Theme) => void;
 }
 
 const createThemeSlice: StateCreator<AppStore, [], [], ThemeSlice> = (set) => {
-  const initial = typeof window !== "undefined" ? (localStorage.theme as Theme | undefined) : undefined;
-  return {
-    theme: initial ?? "system",
-    resolvedTheme: resolveTheme(initial ?? "system"),
-    setTheme: (theme) => {
-      applyThemeToDOM(theme);
-      set({ theme, resolvedTheme: resolveTheme(theme) });
-    },
-  };
+	const initial =
+		typeof window !== "undefined"
+			? (localStorage.theme as Theme | undefined)
+			: undefined;
+	return {
+		theme: initial ?? "system",
+		resolvedTheme: resolveTheme(initial ?? "system"),
+		setTheme: (theme) => {
+			applyThemeToDOM(theme);
+			set({ theme, resolvedTheme: resolveTheme(theme) });
+		},
+	};
 };
 
 /* ------------------------------------------------------------------ */
@@ -313,46 +345,53 @@ const DEFAULT_TARGET_NET_WORTH = 1_000_000;
 const DEFAULT_STOCHASTIC_RUN_COUNT = 1000;
 
 interface SettingsSlice {
-  targetNetWorth: number;
-  setTargetNetWorth: (value: number) => void;
-  horizonYears: number;
-  setHorizonYears: (years: number) => void;
-  stochasticPreference: StochasticPreference;
-  setStochasticPreference: (preference: StochasticPreference) => void;
-  stochasticConfig: StochasticConfig;
-  setStochasticConfig: (config: StochasticConfig) => void;
+	targetNetWorth: number;
+	setTargetNetWorth: (value: number) => void;
+	horizonYears: number;
+	setHorizonYears: (years: number) => void;
+	stochasticPreference: StochasticPreference;
+	setStochasticPreference: (preference: StochasticPreference) => void;
+	stochasticConfig: StochasticConfig;
+	setStochasticConfig: (config: StochasticConfig) => void;
 }
 
 const DEFAULT_HORIZON_YEARS = 15;
 
-const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (set) => ({
-  targetNetWorth: DEFAULT_TARGET_NET_WORTH,
-  setTargetNetWorth: (value) => {
-    if (Number.isFinite(value)) set({ targetNetWorth: value });
-  },
+const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (
+	set,
+) => ({
+	targetNetWorth: DEFAULT_TARGET_NET_WORTH,
+	setTargetNetWorth: (value) => {
+		if (Number.isFinite(value)) set({ targetNetWorth: value });
+	},
 
-  horizonYears: DEFAULT_HORIZON_YEARS,
-  setHorizonYears: (years) => set({ horizonYears: years }),
+	horizonYears: DEFAULT_HORIZON_YEARS,
+	setHorizonYears: (years) => set({ horizonYears: years }),
 
-  stochasticPreference: "auto",
-  setStochasticPreference: (preference) => set({ stochasticPreference: preference }),
+	stochasticPreference: "auto",
+	setStochasticPreference: (preference) =>
+		set({ stochasticPreference: preference }),
 
-  stochasticConfig: { runCount: DEFAULT_STOCHASTIC_RUN_COUNT, seed: null },
-  setStochasticConfig: (config) => set({ stochasticConfig: config }),
+	stochasticConfig: { runCount: DEFAULT_STOCHASTIC_RUN_COUNT, seed: null },
+	setStochasticConfig: (config) => set({ stochasticConfig: config }),
 });
 
 /* ------------------------------------------------------------------ */
 /*  Composed store                                                     */
 /* ------------------------------------------------------------------ */
 
-export type AppStore = WhatIfSlice & EditorSlice & SettingsSlice & SnapshotSlice & ThemeSlice;
+export type AppStore = WhatIfSlice &
+	EditorSlice &
+	SettingsSlice &
+	SnapshotSlice &
+	ThemeSlice;
 
 export const useStore = create<AppStore>()((...args) => ({
-  ...createWhatIfSlice(...args),
-  ...createEditorSlice(...args),
-  ...createSettingsSlice(...args),
-  ...createSnapshotSlice(...args),
-  ...createThemeSlice(...args),
+	...createWhatIfSlice(...args),
+	...createEditorSlice(...args),
+	...createSettingsSlice(...args),
+	...createSnapshotSlice(...args),
+	...createThemeSlice(...args),
 }));
 
 /* ------------------------------------------------------------------ */
@@ -360,38 +399,38 @@ export const useStore = create<AppStore>()((...args) => ({
 /* ------------------------------------------------------------------ */
 
 export const selectActiveOverrideCount = (s: AppStore) =>
-  s.addedAccounts.length +
-  s.addedPostings.length +
-  s.addedCheckpoints.length +
-  s.disabledAccountIds.length +
-  s.disabledPostingIds.length;
+	s.addedAccounts.length +
+	s.addedPostings.length +
+	s.addedCheckpoints.length +
+	s.disabledAccountIds.length +
+	s.disabledPostingIds.length;
 
 export const selectWhatIfState = (s: AppStore): ScenarioWhatIfState => ({
-  addedAccounts: s.addedAccounts,
-  addedPostings: s.addedPostings,
-  addedCheckpoints: s.addedCheckpoints,
-  disabledAccountIds: s.disabledAccountIds,
-  disabledPostingIds: s.disabledPostingIds,
+	addedAccounts: s.addedAccounts,
+	addedPostings: s.addedPostings,
+	addedCheckpoints: s.addedCheckpoints,
+	disabledAccountIds: s.disabledAccountIds,
+	disabledPostingIds: s.disabledPostingIds,
 });
 
 export const selectEditorState = (s: AppStore) => ({
-  isEditing: s.isEditing,
-  isDirty: s.isDirty,
-  workingPack: s.workingPack,
+	isEditing: s.isEditing,
+	isDirty: s.isDirty,
+	workingPack: s.workingPack,
 });
 
 export const selectEditorActions = (s: AppStore) => ({
-  startEditing: s.startEditing,
-  cancelEditing: s.cancelEditing,
-  updateAccount: s.updateAccount,
-  deleteAccount: s.deleteAccount,
-  addAccount: s.addAccount,
-  updatePosting: s.updatePosting,
-  deletePosting: s.deletePosting,
-  addPosting: s.addPosting,
-  addCheckpoint: s.addCheckpoint,
-  deleteCheckpoint: s.deleteCheckpoint,
-  updateCheckpoint: s.updateCheckpoint,
+	startEditing: s.startEditing,
+	cancelEditing: s.cancelEditing,
+	updateAccount: s.updateAccount,
+	deleteAccount: s.deleteAccount,
+	addAccount: s.addAccount,
+	updatePosting: s.updatePosting,
+	deletePosting: s.deletePosting,
+	addPosting: s.addPosting,
+	addCheckpoint: s.addCheckpoint,
+	deleteCheckpoint: s.deleteCheckpoint,
+	updateCheckpoint: s.updateCheckpoint,
 });
 
 /* ------------------------------------------------------------------ */
@@ -399,13 +438,13 @@ export const selectEditorActions = (s: AppStore) => ({
 /* ------------------------------------------------------------------ */
 
 function clonePack(pack: ScenarioPack): ScenarioPack {
-  return {
-    ...pack,
-    accounts: pack.accounts.map((a) => ({ ...a })),
-    checkpoints: pack.checkpoints.map((c) => ({ ...c })),
-    postings: pack.postings.map((p) => ({
-      ...p,
-      destinations: p.destinations ? [...p.destinations] : null,
-    })),
-  };
+	return {
+		...pack,
+		accounts: pack.accounts.map((a) => ({ ...a })),
+		checkpoints: pack.checkpoints.map((c) => ({ ...c })),
+		postings: pack.postings.map((p) => ({
+			...p,
+			destinations: p.destinations ? [...p.destinations] : null,
+		})),
+	};
 }

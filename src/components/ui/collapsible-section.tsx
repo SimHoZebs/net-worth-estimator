@@ -1,144 +1,150 @@
-import { createContext, useContext, useRef, useState, type ReactNode } from "react";
+import {
+	createContext,
+	type ReactNode,
+	useContext,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 
 interface CollapsibleContextValue {
-  open: boolean;
-  onToggle: () => void;
+	open: boolean;
+	onToggle: () => void;
 }
 
 const CollapsibleContext = createContext<CollapsibleContextValue | null>(null);
 
 function useCollapsible() {
-  const ctx = useContext(CollapsibleContext);
-  if (!ctx) {
-    throw new Error(
-      "Collapsible compound components must be used within <Collapsible>",
-    );
-  }
-  return ctx;
+	const ctx = useContext(CollapsibleContext);
+	if (!ctx) {
+		throw new Error(
+			"Collapsible compound components must be used within <Collapsible>",
+		);
+	}
+	return ctx;
 }
 
 /* ── Root ── */
 
 interface CollapsibleRootProps {
-  children: ReactNode;
-  defaultOpen?: boolean;
-  autoOpenWhen?: boolean;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  className?: string;
+	children: ReactNode;
+	defaultOpen?: boolean;
+	autoOpenWhen?: boolean;
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
+	className?: string;
 }
 
 function CollapsibleRoot({
-  children,
-  defaultOpen = false,
-  autoOpenWhen = false,
-  open: controlledOpen,
-  onOpenChange,
-  className = "",
+	children,
+	defaultOpen = false,
+	autoOpenWhen = false,
+	open: controlledOpen,
+	onOpenChange,
+	className = "",
 }: CollapsibleRootProps) {
-  const isControlled = controlledOpen !== undefined;
-  const [internalOpen, setInternalOpen] = useState(
-    defaultOpen || autoOpenWhen,
-  );
-  const prevAutoOpenWhenRef = useRef(autoOpenWhen);
+	const isControlled = controlledOpen !== undefined;
+	const [internalOpen, setInternalOpen] = useState(defaultOpen || autoOpenWhen);
+	const prevAutoOpenWhenRef = useRef(autoOpenWhen);
 
-  if (!isControlled && autoOpenWhen && !prevAutoOpenWhenRef.current) {
-    prevAutoOpenWhenRef.current = true;
-    setInternalOpen(true);
-  } else {
-    prevAutoOpenWhenRef.current = autoOpenWhen;
-  }
+	useEffect(() => {
+		if (!isControlled && autoOpenWhen && !prevAutoOpenWhenRef.current) {
+			setInternalOpen(true);
+		}
+		prevAutoOpenWhenRef.current = autoOpenWhen;
+	}, [autoOpenWhen, isControlled]);
 
-  const isOpen = isControlled ? controlledOpen : internalOpen;
+	const isOpen = isControlled ? controlledOpen : internalOpen;
 
-  const toggle = () => {
-    const next = !isOpen;
-    if (isControlled) {
-      onOpenChange?.(next);
-    } else {
-      setInternalOpen(next);
-    }
-  };
+	const toggle = () => {
+		const next = !isOpen;
+		if (isControlled) {
+			onOpenChange?.(next);
+		} else {
+			setInternalOpen(next);
+		}
+	};
 
-  return (
-    <CollapsibleContext.Provider value={{ open: isOpen, onToggle: toggle }}>
-      <details
-        open={isOpen}
-        className={`rounded-[1.8rem] border border-slate-200 bg-white px-5 py-5 shadow-sm open:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:shadow-slate-900/30 dark:open:border-slate-600 ${className}`}
-      >
-        {children}
-      </details>
-    </CollapsibleContext.Provider>
-  );
+	return (
+		<CollapsibleContext.Provider value={{ open: isOpen, onToggle: toggle }}>
+			<details
+				open={isOpen}
+				className={`rounded-[1.8rem] border border-slate-200 bg-white px-5 py-5 shadow-sm open:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:shadow-slate-900/30 dark:open:border-slate-600 ${className}`}
+			>
+				{children}
+			</details>
+		</CollapsibleContext.Provider>
+	);
 }
 
 /* ── Trigger ── */
 
 interface CollapsibleTriggerProps {
-  children: ReactNode;
-  className?: string;
+	children: ReactNode;
+	className?: string;
 }
 
 function CollapsibleTrigger({
-  children,
-  className = "",
+	children,
+	className = "",
 }: CollapsibleTriggerProps) {
-  const { onToggle } = useCollapsible();
-  return (
-    <summary
-      className={`group cursor-pointer list-none select-none ${className}`}
-      onClick={(e) => {
-        e.preventDefault();
-        onToggle();
-      }}
-    >
-      {children}
-    </summary>
-  );
+	const { onToggle } = useCollapsible();
+	return (
+		<summary
+			className={`group cursor-pointer list-none select-none ${className}`}
+			onClick={(e) => {
+				e.preventDefault();
+				onToggle();
+			}}
+		>
+			{children}
+		</summary>
+	);
 }
 
 /* ── Content ── */
 
 interface CollapsibleContentProps {
-  children: ReactNode;
-  className?: string;
+	children: ReactNode;
+	className?: string;
 }
 
 function CollapsibleContent({
-  children,
-  className = "",
+	children,
+	className = "",
 }: CollapsibleContentProps) {
-  return <div className={`mt-5 ${className}`}>{children}</div>;
+	return <div className={`mt-5 ${className}`}>{children}</div>;
 }
 
 /* ── Chevron ── */
 
 interface CollapsibleChevronProps {
-  className?: string;
+	className?: string;
 }
 
 function CollapsibleChevron({ className = "" }: CollapsibleChevronProps) {
-  const { open } = useCollapsible();
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={`shrink-0 text-slate-400 transition-transform duration-200 dark:text-slate-500 ${open ? "rotate-180" : ""} ${className}`}
-    >
-      <polyline points="6 9 12 15 18 9" />
-    </svg>
-  );
+	const { open } = useCollapsible();
+	return (
+		<svg
+			aria-hidden="true"
+			xmlns="http://www.w3.org/2000/svg"
+			width="16"
+			height="16"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2.5"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={`shrink-0 text-slate-400 transition-transform duration-200 dark:text-slate-500 ${open ? "rotate-180" : ""} ${className}`}
+		>
+			<polyline points="6 9 12 15 18 9" />
+		</svg>
+	);
 }
 
 export const Collapsible = Object.assign(CollapsibleRoot, {
-  Trigger: CollapsibleTrigger,
-  Content: CollapsibleContent,
-  Chevron: CollapsibleChevron,
+	Trigger: CollapsibleTrigger,
+	Content: CollapsibleContent,
+	Chevron: CollapsibleChevron,
 });

@@ -97,15 +97,15 @@ This is genuinely incremental — projection runs happen once, and percentile co
 
 ### Key Files
 
-| File | Role |
-|------|------|
+| File                                             | Role                                                                                                  |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
 | `src/lib/projection/engine/stochasticProject.ts` | Core engine: runs N projections with log-normal rate sampling, builds percentile bands and milestones |
-| `src/lib/projection/utils/stochastic.ts` | LCG PRNG, `sampleLogNormal()` (Box-Muller), `computePercentiles()` |
-| `src/lib/projection/types/stochastic.ts` | Types: `StochasticConfig`, `PercentileBands`, `StochasticBandRow`, `StochasticProjectionResult` |
-| `src/workers/stochasticWorker.ts` | Web Worker: receives request, runs engine with progress callback, posts results |
-| `src/workers/types.ts` | Message types: `StochasticWorkerRequest`, `StochasticWorkerProgress`, `StochasticWorkerResponse` |
-| `src/components/StochasticControls.tsx` | UI: toggle, run count, seed input, progress bar, milestone stat cards |
-| `src/chart/chartData.ts` | Merges stochastic percentile bands into chart data rows for Recharts rendering |
+| `src/lib/projection/utils/stochastic.ts`         | LCG PRNG, `sampleLogNormal()` (Box-Muller), `computePercentiles()`                                    |
+| `src/lib/projection/types/stochastic.ts`         | Types: `StochasticConfig`, `PercentileBands`, `StochasticBandRow`, `StochasticProjectionResult`       |
+| `src/workers/stochasticWorker.ts`                | Web Worker: receives request, runs engine with progress callback, posts results                       |
+| `src/workers/types.ts`                           | Message types: `StochasticWorkerRequest`, `StochasticWorkerProgress`, `StochasticWorkerResponse`      |
+| `src/components/StochasticControls.tsx`          | UI: toggle, run count, seed input, progress bar, milestone stat cards                                 |
+| `src/chart/chartData.ts`                         | Merges stochastic percentile bands into chart data rows for Recharts rendering                        |
 
 ## 5. UI Structure and Components
 

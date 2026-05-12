@@ -1,0 +1,6 @@
+language js
+
+`new Worker($url, ...)` where {
+	not $url <: `new URL($_, import.meta.url)`,
+	register_diagnostic(span=$url, message="Vite requires Web Workers to be instantiated inline using 'new URL(..., import.meta.url)'. Do not extract the URL to a variable or pass a raw string.")
+}

@@ -1,75 +1,77 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
+import { cva, type VariantProps } from "class-variance-authority";
+import type * as React from "react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 const alertVariants = cva(
-  "group/alert relative grid w-full gap-0.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
-  {
-    variants: {
-      variant: {
-        default: "bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100",
-        destructive: "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-400 *:data-[slot=alert-description]:text-red-600 dark:*:data-[slot=alert-description]:text-red-400",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-)
+	"group/alert relative grid w-full gap-0.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
+	{
+		variants: {
+			variant: {
+				default:
+					"bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100",
+				destructive:
+					"border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-400 *:data-[slot=alert-description]:text-red-600 dark:*:data-[slot=alert-description]:text-red-400",
+			},
+		},
+		defaultVariants: {
+			variant: "default",
+		},
+	},
+);
 
 function Alert({
-  className,
-  variant,
-  ...props
+	className,
+	variant,
+	...props
 }: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
-  return (
-    <div
-      data-slot="alert"
-      role="alert"
-      className={cn(alertVariants({ variant }), className)}
-      {...props}
-    />
-  )
+	return (
+		<div
+			data-slot="alert"
+			role="alert"
+			className={cn(alertVariants({ variant }), className)}
+			{...props}
+		/>
+	);
 }
 
 function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="alert-title"
-      className={cn(
-        "font-medium group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-slate-900 dark:[&_a]:hover:text-slate-100",
-        className
-      )}
-      {...props}
-    />
-  )
+	return (
+		<div
+			data-slot="alert-title"
+			className={cn(
+				"font-medium group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-slate-900 dark:[&_a]:hover:text-slate-100",
+				className,
+			)}
+			{...props}
+		/>
+	);
 }
 
 function AlertDescription({
-  className,
-  ...props
+	className,
+	...props
 }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="alert-description"
-      className={cn(
-        "text-sm text-balance text-slate-500 dark:text-slate-400 md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-slate-900 dark:[&_a]:hover:text-slate-100 [&_p:not(:last-child)]:mb-4",
-        className
-      )}
-      {...props}
-    />
-  )
+	return (
+		<div
+			data-slot="alert-description"
+			className={cn(
+				"text-sm text-balance text-slate-500 dark:text-slate-400 md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-slate-900 dark:[&_a]:hover:text-slate-100 [&_p:not(:last-child)]:mb-4",
+				className,
+			)}
+			{...props}
+		/>
+	);
 }
 
 function AlertAction({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="alert-action"
-      className={cn("absolute top-2 right-2", className)}
-      {...props}
-    />
-  )
+	return (
+		<div
+			data-slot="alert-action"
+			className={cn("absolute top-2 right-2", className)}
+			{...props}
+		/>
+	);
 }
 
-export { Alert, AlertTitle, AlertDescription, AlertAction }
+export { Alert, AlertAction, AlertDescription, AlertTitle };
