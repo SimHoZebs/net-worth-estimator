@@ -45,12 +45,35 @@ export function sampleLogNormal(expectedReturn: number, volatility: number): num
   return Math.exp(mu + sigma * standardNormal) - 1;
 }
 
+export function mergeSorted(a: number[], b: number[]): number[] {
+  const result: number[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] <= b[j]) {
+      result.push(a[i++]);
+    } else {
+      result.push(b[j++]);
+    }
+  }
+  while (i < a.length) result.push(a[i++]);
+  while (j < b.length) result.push(b[j++]);
+  return result;
+}
+
 export function computePercentiles(values: number[]): PercentileBands {
   if (values.length === 0) {
     return { p10: 0, p25: 0, p50: 0, p75: 0, p90: 0 };
   }
 
   const sorted = [...values].sort((a, b) => a - b);
+  return computePercentilesFromSorted(sorted);
+}
+
+export function computePercentilesFromSorted(sorted: number[]): PercentileBands {
+  if (sorted.length === 0) {
+    return { p10: 0, p25: 0, p50: 0, p75: 0, p90: 0 };
+  }
 
   return {
     p10: quantile(sorted, 0.1),

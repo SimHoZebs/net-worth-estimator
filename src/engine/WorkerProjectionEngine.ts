@@ -13,19 +13,12 @@ import type {
   StochasticWorkerResponse,
 } from "@/workers/types";
 
-const PROJECTION_WORKER_URL = new URL(
-  "../workers/projectionWorker.ts",
-  import.meta.url,
-);
-
-const STOCHASTIC_WORKER_URL = new URL(
-  "../workers/stochasticWorker.ts",
-  import.meta.url,
-);
-
 export class WorkerProjectionEngine implements ProjectionEngine {
   async project(request: ProjectionRequest): Promise<ProjectionResult> {
-    const worker = new Worker(PROJECTION_WORKER_URL, { type: "module" });
+    const worker = new Worker(
+      new URL("../workers/projectionWorker.ts", import.meta.url),
+      { type: "module" },
+    );
     const { signal } = request;
 
     return new Promise<ProjectionResult>((resolve, reject) => {
@@ -81,7 +74,10 @@ export class WorkerProjectionEngine implements ProjectionEngine {
     request: StochasticRequest,
     onProgress?: ProgressCallback,
   ): Promise<StochasticProjectionResult> {
-    const worker = new Worker(STOCHASTIC_WORKER_URL, { type: "module" });
+    const worker = new Worker(
+      new URL("../workers/stochasticWorker.ts", import.meta.url),
+      { type: "module" },
+    );
     const { signal } = request;
 
     return new Promise<StochasticProjectionResult>((resolve, reject) => {

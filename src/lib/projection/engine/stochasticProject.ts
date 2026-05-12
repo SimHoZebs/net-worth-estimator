@@ -6,7 +6,7 @@ import type {
 } from "../types/scenario";
 import { projectScenarioPack } from "./scenarioProject";
 import type { StochasticBandRow, StochasticConfig, StochasticProjectionResult } from "../types/stochastic";
-import { computePercentiles, reseed, sampleLogNormal } from "../utils/stochastic";
+import { computePercentilesFromSorted, mergeSorted, reseed, sampleLogNormal } from "../utils/stochastic";
 
 function clonePack(pack: ScenarioPack): ScenarioPack {
   return {
@@ -67,14 +67,29 @@ function runAndExtract(
   }));
 }
 
-function computeResult(
-  snapshotsByRun: NetWorthSnapshot[][],
-  config: StochasticConfig,
+function buildBandsFromSorted(
+  sortedValuesByDate: Map<string, number[]>,
+  isHistoricalByDate: Map<string, boolean>,
+  sortedDates: string[]
+): StochasticBandRow[] {
+  return sortedDates.map((date) => {
+    const values = sortedValuesByDate.get(date) ?? [];
+    return {
+      date,
+      isHistorical: isHistoricalByDate.get(date) ?? false,
+      netWorth: computePercentilesFromSorted(values),
+    };
+  });
+}
+
+function buildStochasticResult(
+  bands: StochasticBandRow[],
   deterministic: ProjectionResult,
+  config: StochasticConfig,
   projectionSettings: ProjectionRuntimeSettings,
+  totalHitCount: number,
+  totalRuns: number
 ): StochasticProjectionResult {
-  const sortedDates = deterministic.timeline.rows.map((r) => r.date);
-  const bands = buildBands(snapshotsByRun, sortedDates);
   const finalRowBands = bands[bands.length - 1];
   const finalNetWorthPercentiles = finalRowBands?.netWorth ?? { p10: 0, p25: 0, p50: 0, p75: 0, p90: 0 };
 
@@ -91,10 +106,7 @@ function computeResult(
     }
   });
 
-  const hitCount = snapshotsByRun.filter((snapshots) =>
-    snapshots.some((s) => s.hitTarget)
-  ).length;
-  const hitTargetProbability = snapshotsByRun.length > 0 ? hitCount / snapshotsByRun.length : 0;
+  const hitTargetProbability = totalRuns > 0 ? totalHitCount / totalRuns : 0;
 
   return {
     config,
@@ -109,38 +121,6 @@ function computeResult(
   };
 }
 
-function buildBands(snapshotsByRun: NetWorthSnapshot[][], sortedDates: string[]): StochasticBandRow[] {
-  const netWorthsByDate = new Map<string, number[]>();
-  const isHistoricalByDate = new Map<string, boolean>();
-
-  snapshotsByRun.forEach((snapshots) => {
-    const dateIndex = new Map(snapshots.map((s) => [s.date, s]));
-
-    sortedDates.forEach((date) => {
-      const snapshot = dateIndex.get(date);
-      if (!snapshot) {
-        return;
-      }
-
-      if (!netWorthsByDate.has(date)) {
-        netWorthsByDate.set(date, []);
-        isHistoricalByDate.set(date, snapshot.isHistorical);
-      }
-
-      netWorthsByDate.get(date)!.push(snapshot.netWorth);
-    });
-  });
-
-  return sortedDates.map((date) => {
-    const values = netWorthsByDate.get(date) ?? [];
-    return {
-      date,
-      isHistorical: isHistoricalByDate.get(date) ?? false,
-      netWorth: computePercentiles(values),
-    };
-  });
-}
-
 const STOCHASTIC_PROGRESS_BATCH = 50;
 
 export function stochasticProject(
@@ -152,20 +132,51 @@ export function stochasticProject(
 ): StochasticProjectionResult {
   reseed(config.seed);
   const deterministic = projectScenarioPack(pack, projectionSettings, whatIfState);
+  const sortedDates = deterministic.timeline.rows.map((r) => r.date);
 
-  const snapshotsByRun: NetWorthSnapshot[][] = [];
+  const sortedValuesByDate = new Map<string, number[]>();
+  const isHistoricalByDate = new Map<string, boolean>();
+  let totalHitCount = 0;
 
   for (let i = 0; i < config.runCount; i += STOCHASTIC_PROGRESS_BATCH) {
     const batchEnd = Math.min(i + STOCHASTIC_PROGRESS_BATCH, config.runCount);
+    const newValuesByDate = new Map<string, number[]>();
+
     for (let j = i; j < batchEnd; j++) {
       const cloned = clonePack(pack);
       const rates = buildStochasticRates(cloned, projectionSettings);
       const snapshots = runAndExtract(cloned, projectionSettings, whatIfState, rates);
-      snapshotsByRun.push(snapshots);
+
+      if (snapshots.some((s) => s.hitTarget)) {
+        totalHitCount++;
+      }
+
+      for (const s of snapshots) {
+        if (!newValuesByDate.has(s.date)) {
+          newValuesByDate.set(s.date, []);
+        }
+        newValuesByDate.get(s.date)!.push(s.netWorth);
+
+        if (!isHistoricalByDate.has(s.date)) {
+          isHistoricalByDate.set(s.date, s.isHistorical);
+        }
+      }
     }
-    const partial = computeResult(snapshotsByRun, config, deterministic, projectionSettings);
+
+    for (const [date, newValues] of newValuesByDate) {
+      newValues.sort((a, b) => a - b);
+      const existing = sortedValuesByDate.get(date);
+      sortedValuesByDate.set(
+        date,
+        existing ? mergeSorted(existing, newValues) : newValues
+      );
+    }
+
+    const bands = buildBandsFromSorted(sortedValuesByDate, isHistoricalByDate, sortedDates);
+    const partial = buildStochasticResult(bands, deterministic, config, projectionSettings, totalHitCount, batchEnd);
     onProgress?.(batchEnd / config.runCount, partial);
   }
 
-  return computeResult(snapshotsByRun, config, deterministic, projectionSettings);
+  const bands = buildBandsFromSorted(sortedValuesByDate, isHistoricalByDate, sortedDates);
+  return buildStochasticResult(bands, deterministic, config, projectionSettings, totalHitCount, config.runCount);
 }
