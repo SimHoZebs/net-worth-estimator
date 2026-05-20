@@ -57,7 +57,7 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 	const liabilities = rows.filter((r) => r.balance < 0);
 
 	return (
-		<Card className="rounded-[1.6rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
+		<Card className="rounded-[1.6rem] border-border shadow-sm ">
 			<CardHeader>
 				<div>
 					<CardTitle>Current net worth reconciliation</CardTitle>
@@ -70,9 +70,7 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 			<CardContent>
 				<div className="grid gap-6 md:grid-cols-2">
 					<div>
-						<h4 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-							Assets
-						</h4>
+						<h4 className="mb-2 type-eyebrow">Assets</h4>
 						<Table>
 							<TableHeader>
 								<TableRow>
@@ -85,13 +83,13 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 								{assets.length > 0 ? (
 									assets.map((r) => (
 										<TableRow key={r.accountId}>
-											<TableCell className="text-sm text-slate-700 dark:text-slate-300">
+											<TableCell className="type-body text-foreground/80">
 												{r.label}
 											</TableCell>
-											<TableCell className="text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+											<TableCell className="text-right type-value text-sm">
 												{currency.format(r.balance)}
 											</TableCell>
-											<TableCell className="text-sm text-slate-500 dark:text-slate-400">
+											<TableCell className="type-muted">
 												{formatDate(r.checkpointDate)}
 												{r.isLatest ? " · latest" : ""}
 											</TableCell>
@@ -101,7 +99,7 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 									<TableRow>
 										<TableCell
 											colSpan={3}
-											className="py-4 text-center text-sm text-slate-400 dark:text-slate-500"
+											className="py-4 text-center type-muted text-muted-foreground/70"
 										>
 											No asset checkpoints.
 										</TableCell>
@@ -112,9 +110,7 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 					</div>
 
 					<div>
-						<h4 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-							Liabilities
-						</h4>
+						<h4 className="mb-2 type-eyebrow">Liabilities</h4>
 						<Table>
 							<TableHeader>
 								<TableRow>
@@ -127,13 +123,13 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 								{liabilities.length > 0 ? (
 									liabilities.map((r) => (
 										<TableRow key={r.accountId}>
-											<TableCell className="text-sm text-slate-700 dark:text-slate-300">
+											<TableCell className="type-body text-foreground/80">
 												{r.label}
 											</TableCell>
-											<TableCell className="text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+											<TableCell className="text-right type-value text-sm">
 												{currency.format(r.balance)}
 											</TableCell>
-											<TableCell className="text-sm text-slate-500 dark:text-slate-400">
+											<TableCell className="type-muted">
 												{formatDate(r.checkpointDate)}
 												{r.isLatest ? " · latest" : ""}
 											</TableCell>
@@ -143,7 +139,7 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 									<TableRow>
 										<TableCell
 											colSpan={3}
-											className="py-4 text-center text-sm text-slate-400 dark:text-slate-500"
+											className="py-4 text-center type-muted text-muted-foreground/70"
 										>
 											No liability checkpoints.
 										</TableCell>
@@ -154,16 +150,14 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 					</div>
 				</div>
 
-				<div className="mt-4 border-t border-slate-100 dark:border-slate-700 pt-4">
-					<div className="flex items-center justify-between text-sm">
-						<span className="font-medium text-slate-900 dark:text-slate-100">
-							Net worth
-						</span>
-						<span className="font-semibold text-slate-900 dark:text-slate-100">
+				<div className="mt-4 border-t border-border/70 pt-4">
+					<div className="flex items-center justify-between type-body">
+						<span className="type-value">Net worth</span>
+						<span className="type-value font-semibold">
 							{currency.format(result.summary.currentNetWorth)}
 						</span>
 					</div>
-					<div className="text-xs text-slate-400 dark:text-slate-500">
+					<div className="type-caption text-muted-foreground/70">
 						Computed from the latest checkpoint per account.
 					</div>
 				</div>

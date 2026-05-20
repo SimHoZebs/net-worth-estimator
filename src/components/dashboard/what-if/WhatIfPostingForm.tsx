@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatRoute } from "@/lib/format";
 import type { Posting, ScenarioPack } from "@/lib/projection";
 
@@ -61,7 +62,7 @@ export function WhatIfPostingForm({
 	return (
 		<div className="space-y-2">
 			<div className="flex items-center justify-between">
-				<span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+				<span className="type-eyebrow">
 					Scheduled transactions{" "}
 					{postings.length > 0 ? `(${postings.length})` : ""}
 				</span>
@@ -77,25 +78,21 @@ export function WhatIfPostingForm({
 				) : null}
 			</div>
 			{adding ? (
-				<div className="space-y-2 rounded-2xl border border-slate-200 dark:border-slate-700 p-3">
+				<div className="space-y-2 rounded-2xl border border-border p-3">
 					<div className="grid grid-cols-2 gap-2">
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								ID
-							</label>
-							<input
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+							<label className="block type-caption">ID</label>
+							<Input
+								className="w-full rounded-lg "
 								value={adding.id}
 								onChange={(e) => setAdding({ ...adding, id: e.target.value })}
 								placeholder="e.g. bonus"
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Label
-							</label>
-							<input
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+							<label className="block type-caption">Label</label>
+							<Input
+								className="w-full rounded-lg "
 								value={adding.label}
 								onChange={(e) =>
 									setAdding({ ...adding, label: e.target.value })
@@ -104,11 +101,9 @@ export function WhatIfPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Source Account
-							</label>
-							<input
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+							<label className="block type-caption">Source Account</label>
+							<Input
+								className="w-full rounded-lg "
 								value={adding.sourceAccountId ?? ""}
 								onChange={(e) =>
 									setAdding({
@@ -120,11 +115,11 @@ export function WhatIfPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
+							<label className="block type-caption">
 								Destinations (; separated)
 							</label>
-							<input
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+							<Input
+								className="w-full rounded-lg "
 								value={adding.destinations?.join(";") ?? ""}
 								onChange={(e) => {
 									const raw = e.target.value;
@@ -139,11 +134,9 @@ export function WhatIfPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Arithmetic
-							</label>
-							<input
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+							<label className="block type-caption">Arithmetic</label>
+							<Input
+								className="w-full rounded-lg "
 								value={adding.arithmetic}
 								onChange={(e) =>
 									setAdding({ ...adding, arithmetic: e.target.value })
@@ -152,11 +145,9 @@ export function WhatIfPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Frequency
-							</label>
+							<label className="block type-caption">Frequency</label>
 							<select
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+								className="w-full rounded-lg "
 								value={adding.frequency}
 								onChange={(e) =>
 									setAdding({
@@ -173,13 +164,11 @@ export function WhatIfPostingForm({
 							</select>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Annual Rate
-							</label>
-							<input
+							<label className="block type-caption">Annual Rate</label>
+							<Input
 								type="number"
 								step={0.01}
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+								className="w-full rounded-lg "
 								value={adding.annualRate}
 								onChange={(e) =>
 									setAdding({ ...adding, annualRate: Number(e.target.value) })
@@ -187,13 +176,11 @@ export function WhatIfPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Annual Growth Rate
-							</label>
-							<input
+							<label className="block type-caption">Annual Growth Rate</label>
+							<Input
 								type="number"
 								step={0.01}
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+								className="w-full rounded-lg "
 								value={adding.annualGrowthRate}
 								onChange={(e) =>
 									setAdding({
@@ -204,14 +191,12 @@ export function WhatIfPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Volatility
-							</label>
-							<input
+							<label className="block type-caption">Volatility</label>
+							<Input
 								type="number"
 								min={0}
 								step={0.01}
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+								className="w-full rounded-lg "
 								value={adding.volatility}
 								onChange={(e) =>
 									setAdding({ ...adding, volatility: Number(e.target.value) })
@@ -219,11 +204,9 @@ export function WhatIfPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Start Date
-							</label>
-							<input
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+							<label className="block type-caption">Start Date</label>
+							<Input
+								className="w-full rounded-lg "
 								value={adding.startDate}
 								onChange={(e) =>
 									setAdding({ ...adding, startDate: e.target.value })
@@ -232,11 +215,9 @@ export function WhatIfPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								End Date
-							</label>
-							<input
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+							<label className="block type-caption">End Date</label>
+							<Input
+								className="w-full rounded-lg "
 								value={adding.endDate ?? ""}
 								onChange={(e) =>
 									setAdding({ ...adding, endDate: e.target.value || null })
@@ -245,13 +226,11 @@ export function WhatIfPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Annual Cap
-							</label>
-							<input
+							<label className="block type-caption">Annual Cap</label>
+							<Input
 								type="number"
 								min={0}
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+								className="w-full rounded-lg "
 								value={adding.annualCap ?? ""}
 								onChange={(e) =>
 									setAdding({
@@ -263,13 +242,11 @@ export function WhatIfPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Priority
-							</label>
-							<input
+							<label className="block type-caption">Priority</label>
+							<Input
 								type="number"
 								min={1}
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+								className="w-full rounded-lg "
 								value={adding.priority}
 								onChange={(e) =>
 									setAdding({
@@ -298,16 +275,16 @@ export function WhatIfPostingForm({
 			{postings.map((posting) => (
 				<div
 					key={`tmp-pst-${posting.id}`}
-					className="flex items-center justify-between rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-2"
+					className="flex items-center justify-between rounded-xl border border-tertiary-border bg-tertiary-subtle px-4 py-2"
 				>
 					<div>
-						<span className="text-sm font-medium text-amber-900 dark:text-amber-200">
+						<span className="type-label text-tertiary-foreground">
 							{posting.label}
 						</span>
-						<span className="ml-2 text-xs text-amber-700 dark:text-amber-400">
+						<span className="ml-2 type-caption text-tertiary-foreground/80">
 							{posting.arithmetic}
 						</span>
-						<span className="ml-2 text-xs text-amber-700 dark:text-amber-400">
+						<span className="ml-2 type-caption text-tertiary-foreground/80">
 							{describeRoute(posting, pack)}
 						</span>
 					</div>

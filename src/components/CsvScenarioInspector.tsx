@@ -42,10 +42,10 @@ interface ScenarioInspectorProps {
 }
 
 function tabClassName(isActive: boolean) {
-	return `rounded-full px-3 py-1.5 text-xs font-medium transition ${
+	return `rounded-full px-3 py-1.5 type-caption font-medium transition ${
 		isActive
-			? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm dark:shadow-slate-900/30"
-			: "border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-slate-100"
+			? "bg-primary  text-primary-foreground shadow-sm "
+			: "border border border-border bg-card text-muted-foreground hover:border-ring hover:text-foreground"
 	}`;
 }
 
@@ -127,7 +127,7 @@ export function ScenarioInspector({
 	];
 
 	return (
-		<Card className="rounded-[1.8rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
+		<Card className="rounded-[1.8rem] border-border shadow-sm ">
 			<CardHeader>
 				<CardTitle>Model inputs</CardTitle>
 				<CardDescription>
@@ -219,7 +219,7 @@ export function ScenarioInspector({
 								<button
 									type="button"
 									onClick={() => setShowAdvanced(!showAdvanced)}
-									className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 transition hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-800 dark:hover:text-slate-200"
+									className="rounded-lg border border-border px-3 py-1.5 type-label transition hover:border-ring hover:text-foreground"
 								>
 									{showAdvanced
 										? "Hide raw IDs and formulas"
@@ -291,15 +291,13 @@ export function ScenarioInspector({
 						) : null}
 					</>
 				) : (
-					<div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+					<div className="rounded-2xl border border-dashed border border-border bg-muted px-4 py-8 text-center type-muted">
 						No scenario data loaded yet.
 					</div>
 				)}
 
 				{overridesSlot ? (
-					<div className="border-t border-slate-100 dark:border-slate-700 pt-5">
-						{overridesSlot}
-					</div>
+					<div className="border-t border-border/70 pt-5">{overridesSlot}</div>
 				) : null}
 			</CardContent>
 		</Card>

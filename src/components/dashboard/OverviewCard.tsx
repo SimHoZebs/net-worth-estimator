@@ -35,17 +35,13 @@ export const OverviewCard = memo(function OverviewCard({
 		result.milestones.projectionStartDate;
 
 	return (
-		<Card className="rounded-[1.8rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
+		<Card className="rounded-[1.8rem] border-border shadow-sm ">
 			<CardContent className="p-5 md:p-6">
 				<div className="flex gap-6 lg:justify-evenly">
 					<div className="space-y-1 lg:col-span-1">
-						<div className="text-xs font-medium text-slate-500 dark:text-slate-400">
-							Current net worth
-						</div>
-						<div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-							{currency.format(current)}
-						</div>
-						<div className="text-sm text-slate-500 dark:text-slate-400">
+						<div className="type-label">Current net worth</div>
+						<div className="type-metric">{currency.format(current)}</div>
+						<div className="type-muted">
 							as of{" "}
 							{formatDate(
 								result.milestones.latestHistoricalDate ??
@@ -55,10 +51,8 @@ export const OverviewCard = memo(function OverviewCard({
 					</div>
 
 					<div className="space-y-1 lg:col-span-1">
-						<div className="text-xs font-medium text-slate-500 dark:text-slate-400">
-							Time to target
-						</div>
-						<div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+						<div className="type-label">Time to target</div>
+						<div className="type-metric">
 							{hasStochasticData &&
 							stochasticResult?.milestones.medianHitTargetDate
 								? formatElapsedTime(
@@ -72,7 +66,7 @@ export const OverviewCard = memo(function OverviewCard({
 										)
 									: "Beyond horizon"}
 						</div>
-						<div className="text-sm text-slate-500 dark:text-slate-400">
+						<div className="type-muted">
 							{hasStochasticData &&
 							stochasticResult?.milestones.medianHitTargetDate
 								? `Median target date: ${formatDate(stochasticResult.milestones.medianHitTargetDate)}`
@@ -83,17 +77,15 @@ export const OverviewCard = memo(function OverviewCard({
 					</div>
 
 					<div className="space-y-1 lg:col-span-1">
-						<div className="text-xs font-medium text-slate-500 dark:text-slate-400">
-							Confidence
-						</div>
-						<div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+						<div className="type-label">Confidence</div>
+						<div className="type-metric">
 							{hasStochasticData && stochasticResult
 								? pct.format(stochasticResult.milestones.hitTargetProbability)
 								: goalReached
 									? "On track"
 									: "Off track"}
 						</div>
-						<div className="text-sm text-slate-500 dark:text-slate-400">
+						<div className="type-muted">
 							{hasStochasticData && stochasticResult
 								? "of simulated paths reached target"
 								: goalReached
@@ -103,29 +95,21 @@ export const OverviewCard = memo(function OverviewCard({
 					</div>
 
 					<div className="space-y-1 lg:col-span-1">
-						<div className="text-xs font-medium text-slate-500 dark:text-slate-400">
-							Main constraint
-						</div>
-						<div className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-							{blockerValue}
-						</div>
-						<div className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
-							{blockerDetail}
-						</div>
+						<div className="type-label">Main constraint</div>
+						<div className="type-title">{blockerValue}</div>
+						<div className="type-muted line-clamp-2">{blockerDetail}</div>
 					</div>
 				</div>
 
-				<div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-100 dark:border-slate-700 pt-4 text-sm text-slate-600 dark:text-slate-400">
+				<div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-border/70 pt-4 type-muted">
 					<span>
 						Projected final:{" "}
-						<span className="font-medium text-slate-900 dark:text-slate-100">
-							{currency.format(final)}
-						</span>{" "}
-						on {formatDate(latestDate)}
+						<span className="type-value">{currency.format(final)}</span> on{" "}
+						{formatDate(latestDate)}
 					</span>
 					<span>
 						Horizon:{" "}
-						<span className="font-medium text-slate-900 dark:text-slate-100">
+						<span className="type-value">
 							{projectionSettings.horizonYears} years
 						</span>
 					</span>
@@ -133,7 +117,7 @@ export const OverviewCard = memo(function OverviewCard({
 					stochasticResult?.milestones.worstCaseHitTargetDate ? (
 						<span>
 							Conservative date:{" "}
-							<span className="font-medium text-slate-900 dark:text-slate-100">
+							<span className="type-value">
 								{formatDate(stochasticResult.milestones.worstCaseHitTargetDate)}
 							</span>
 						</span>

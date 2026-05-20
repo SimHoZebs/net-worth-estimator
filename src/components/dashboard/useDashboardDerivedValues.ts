@@ -45,8 +45,8 @@ export function useDashboardDerivedValues(
 				? 1
 				: realizedPostingAmount / requestedPostingAmount;
 		const statusBadgeClassName = goalReached
-			? "border-emerald-200 bg-emerald-50 text-emerald-900"
-			: "border-amber-200 bg-amber-50 text-amber-900";
+			? "border-primary-border bg-primary-subtle text-primary"
+			: "border-tertiary-border bg-tertiary-subtle text-tertiary-foreground";
 		const blockerValue =
 			biggestShortfallPosting?.label ?? "No constraint showing";
 		const blockerDetail = biggestShortfallPosting

@@ -82,13 +82,11 @@ export function TemplateWizard({
 	}, [result, allAccounts]);
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-			<div className="w-full max-w-lg rounded-[1.8rem] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl">
-				<div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700">
-					<h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-						Income Template
-					</h2>
-					<p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+		<div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4">
+			<div className="w-full max-w-lg rounded-[1.8rem] border border border-border bg-card shadow-xl">
+				<div className="px-6 py-4 border-b border-border/70">
+					<h2 className="type-title">Income Template</h2>
+					<p className="type-caption mt-1">
 						Create salary, tax, 401(k), and brokerage postings from one form.
 					</p>
 				</div>
@@ -98,7 +96,7 @@ export function TemplateWizard({
 						<>
 							<IncomeForm value={input} onChange={setInput} />
 							{result && !result.ok && (
-								<div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 p-3 text-sm text-red-700 dark:text-red-400">
+								<div className="rounded-xl border border-destructive/25 bg-destructive-subtle p-3 type-body text-destructive-foreground">
 									{result.error}
 								</div>
 							)}

@@ -54,10 +54,8 @@ export function StochasticControls({
 					<div className="flex items-start gap-3">
 						<Collapsible.Chevron />
 						<div>
-							<div className="text-base font-semibold text-slate-900 dark:text-slate-100">
-								Monte Carlo simulation
-							</div>
-							<div className="text-sm text-slate-500 dark:text-slate-400">
+							<div className="type-title text-base">Monte Carlo simulation</div>
+							<div className="type-muted">
 								{simulationActive
 									? statusLabel
 									: simulationRequested && !hasStochasticAccounts
@@ -66,7 +64,7 @@ export function StochasticControls({
 							</div>
 						</div>
 					</div>
-					<span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400 transition-colors group-hover:text-slate-500 dark:text-slate-500 dark:group-hover:text-slate-300">
+					<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
 						Show details
 					</span>
 				</div>
@@ -74,12 +72,12 @@ export function StochasticControls({
 			<Collapsible.Content>
 				<div className="space-y-4">
 					{/* Toggle row */}
-					<div className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-3">
+					<div className="flex items-center justify-between rounded-xl border border border-border bg-muted px-4 py-3">
 						<div>
-							<div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+							<div className="type-value text-sm">
 								Enable Monte Carlo simulation
 							</div>
-							<div className="text-xs text-slate-500 dark:text-slate-400">
+							<div className="type-caption">
 								{hasStochasticAccounts
 									? "Show probabilistic bands on the trend chart."
 									: "Add volatility to a posting to use this feature."}
@@ -97,7 +95,7 @@ export function StochasticControls({
 								}
 								disabled={!hasStochasticAccounts}
 							/>
-							<div className="peer h-6 w-11 rounded-full bg-slate-300 dark:bg-slate-600 after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white dark:after:bg-slate-200 after:transition-all peer-checked:bg-slate-900 dark:peer-checked:bg-slate-100 peer-checked:after:translate-x-full peer-disabled:opacity-40" />
+							<div className="peer h-6 w-11 rounded-full bg-muted-foreground/50 after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-card after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-disabled:opacity-40" />
 						</label>
 					</div>
 
@@ -105,9 +103,7 @@ export function StochasticControls({
 						<>
 							<div className={"grid gap-3"}>
 								<div className="space-y-1">
-									<label className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-										Run count
-									</label>
+									<label className="type-eyebrow">Run count</label>
 									<input
 										type="number"
 										inputMode="numeric"
@@ -115,20 +111,18 @@ export function StochasticControls({
 										max={10000}
 										value={runCountInput}
 										onChange={(e) => updateRunCountInput(e.currentTarget.value)}
-										className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none focus:border-slate-400"
+										className="w-full rounded-xl border border border-border bg-card px-3 py-2 type-body outline-none focus:border-ring"
 									/>
 								</div>
 								<div className="space-y-1">
-									<label className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-										Seed (optional)
-									</label>
+									<label className="type-eyebrow">Seed (optional)</label>
 									<input
 										type="number"
 										inputMode="numeric"
 										value={seedInput}
 										onChange={(e) => updateSeedInput(e.currentTarget.value)}
 										placeholder="Random"
-										className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400"
+										className="w-full rounded-xl border border border-border bg-card px-3 py-2 type-body outline-none placeholder:text-muted-foreground focus:border-ring"
 									/>
 								</div>
 								<div className="flex items-end">
@@ -149,19 +143,17 @@ export function StochasticControls({
 							</div>
 							{isRunning && progressPct !== null ? (
 								<div className="space-y-1">
-									<div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+									<div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
 										<div
-											className="h-full rounded-full bg-slate-900 transition-[width] duration-300 ease-out"
+											className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
 											style={{ width: `${progressPct}%` }}
 										/>
 									</div>
 								</div>
 							) : null}
-							<div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-3">
-								<div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-									How the simulation works
-								</div>
-								<ul className="mt-1.5 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+							<div className="rounded-xl border border border-border/70 bg-muted/70 px-4 py-3">
+								<div className="type-eyebrow">How the simulation works</div>
+								<ul className="mt-1.5 space-y-1 type-caption">
 									<li>
 										Each run samples a sequence of yearly investment returns for
 										every volatile posting using a log-normal distribution.

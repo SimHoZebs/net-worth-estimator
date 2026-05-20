@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { currency } from "@/lib/format";
 import type { Checkpoint } from "@/lib/projection";
 
@@ -34,7 +35,7 @@ export function WhatIfCheckpointForm({
 	return (
 		<div className="space-y-2">
 			<div className="flex items-center justify-between">
-				<span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+				<span className="type-eyebrow">
 					Balance checkpoints{" "}
 					{checkpoints.length > 0 ? `(${checkpoints.length})` : ""}
 				</span>
@@ -50,25 +51,21 @@ export function WhatIfCheckpointForm({
 				) : null}
 			</div>
 			{adding ? (
-				<div className="space-y-2 rounded-2xl border border-slate-200 dark:border-slate-700 p-3">
+				<div className="space-y-2 rounded-2xl border border-border p-3">
 					<div className="grid grid-cols-2 gap-2">
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Date
-							</label>
-							<input
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+							<label className="block type-caption">Date</label>
+							<Input
+								className="w-full rounded-lg "
 								value={adding.Date}
 								onChange={(e) => setAdding({ ...adding, Date: e.target.value })}
 								placeholder="YYYY-MM-DD"
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Account ID
-							</label>
-							<input
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+							<label className="block type-caption">Account ID</label>
+							<Input
+								className="w-full rounded-lg "
 								value={adding.AccountId}
 								onChange={(e) =>
 									setAdding({ ...adding, AccountId: e.target.value })
@@ -77,12 +74,10 @@ export function WhatIfCheckpointForm({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Balance
-							</label>
-							<input
+							<label className="block type-caption">Balance</label>
+							<Input
 								type="number"
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+								className="w-full rounded-lg "
 								value={adding.Balance}
 								onChange={(e) =>
 									setAdding({ ...adding, Balance: Number(e.target.value) })
@@ -108,16 +103,16 @@ export function WhatIfCheckpointForm({
 			{checkpoints.map((checkpoint, index) => (
 				<div
 					key={`tmp-chk-${index}`}
-					className="flex items-center justify-between rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-2"
+					className="flex items-center justify-between rounded-xl border border-tertiary-border bg-tertiary-subtle px-4 py-2"
 				>
 					<div>
-						<span className="text-sm font-medium text-amber-900 dark:text-amber-200">
+						<span className="type-label text-tertiary-foreground">
 							{checkpoint.Date}
 						</span>
-						<span className="ml-2 text-xs text-amber-700 dark:text-amber-400">
+						<span className="ml-2 type-caption text-tertiary-foreground/80">
 							{checkpoint.AccountId}
 						</span>
-						<span className="ml-2 text-xs text-amber-700 dark:text-amber-400">
+						<span className="ml-2 type-caption text-tertiary-foreground/80">
 							{currency.format(checkpoint.Balance)}
 						</span>
 					</div>

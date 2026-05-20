@@ -20,6 +20,12 @@ interface Classification {
 	liabilities: AccountMeta[];
 }
 
+const NET_WORTH_CHART_MAX_Y = 2_000_000;
+const FALLBACK_ACCOUNT_COLOR = "GrayText";
+const NET_WORTH_SERIES_COLOR = "CanvasText";
+const BAND_SOFT_COLOR = "color-mix(in oklab, CanvasText 15%, transparent)";
+const BAND_COLOR = "color-mix(in oklab, CanvasText 25%, transparent)";
+
 interface StackedContributionChartProps {
 	pack: ScenarioPack;
 	targetNetWorth: number;
@@ -147,12 +153,12 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 			const p25 = (self.data[bi + 2] as number[])[idx];
 			const p75 = (self.data[bi + 3] as number[])[idx];
 
-			let html = `<div class="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 shadow-sm dark:shadow-slate-900/30 max-w-xs">`;
-			html += `<div class="text-xs font-medium text-slate-500 dark:text-slate-400">${dateStr}</div>`;
-			html += `<div class="mt-2 border-b border-slate-100 dark:border-slate-700 pb-1">`;
-			html += `<div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Net worth: ${currency.format(displayNw)}</div>`;
+			let html = `<div class="rounded-lg border border border-border bg-card px-3 py-2 shadow-sm  max-w-xs">`;
+			html += `<div class="type-label">${dateStr}</div>`;
+			html += `<div class="mt-2 border-b border-border/70 pb-1">`;
+			html += `<div class="type-title">Net worth: ${currency.format(displayNw)}</div>`;
 			if (hasStochasticData) {
-				html += `<div class="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 leading-tight">`;
+				html += `<div class="mt-0.5 type-caption text-[10px] leading-tight">`;
 				html += `P10–P90: ${currency.format(p10)} – ${currency.format(p90)}<br />`;
 				html += `P25–P75: ${currency.format(p25)} – ${currency.format(p75)}`;
 				html += `</div>`;
@@ -164,11 +170,11 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 			for (const group of [assets, liabilities]) {
 				for (const a of group) {
 					const val = rawRow?.[a.id] ?? 0;
-					html += `<div class="flex justify-between gap-3 text-xs">`;
-					html += `<span class="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-300">`;
-					html += `<span class="inline-block h-2 w-2 rounded-full" style="background-color:${a.color ?? "#64748b"}"></span>`;
+					html += `<div class="flex justify-between gap-3 type-caption">`;
+					html += `<span class="inline-flex items-center gap-1.5 text-foreground/80">`;
+					html += `<span class="inline-block h-2 w-2 rounded-full" style="background-color:${a.color ?? FALLBACK_ACCOUNT_COLOR}"></span>`;
 					html += `${a.label}</span>`;
-					html += `<span class="tabular-nums text-slate-700 dark:text-slate-300">${currency.format(val)}</span>`;
+					html += `<span class="tabular-nums text-foreground/80">${currency.format(val)}</span>`;
 					html += `</div>`;
 				}
 			}
@@ -188,9 +194,9 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 			fillSeries.push({
 				label: a.label,
 				show: true,
-				stroke: a.color ?? "#334155",
+				stroke: a.color ?? FALLBACK_ACCOUNT_COLOR,
 				width: 1.5,
-				fill: a.color ?? "#334155",
+				fill: a.color ?? FALLBACK_ACCOUNT_COLOR,
 				points: { show: false },
 			});
 		}
@@ -198,9 +204,9 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 			fillSeries.push({
 				label: a.label,
 				show: true,
-				stroke: a.color ?? "#334155",
+				stroke: a.color ?? FALLBACK_ACCOUNT_COLOR,
 				width: 1.5,
-				fill: a.color ?? "#334155",
+				fill: a.color ?? FALLBACK_ACCOUNT_COLOR,
 				points: { show: false },
 			});
 		}
@@ -209,14 +215,14 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 			{
 				label: showP50 ? "Net worth (median simulation)" : undefined,
 				show: showP50,
-				stroke: "#0f172a",
+				stroke: NET_WORTH_SERIES_COLOR,
 				width: 2.5,
 				points: { show: false },
 			},
 			{
 				label: showNw ? "Net worth" : undefined,
 				show: showNw,
-				stroke: "#0f172a",
+				stroke: NET_WORTH_SERIES_COLOR,
 				width: 2.5,
 				points: { show: false },
 			},
@@ -225,25 +231,25 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 		const bandBoundarySeries: uPlot.Series[] = [
 			{
 				show: hasStochasticData,
-				stroke: "rgba(0,0,0,0.01)",
+				stroke: "transparent",
 				width: 0.5,
 				points: { show: false },
 			},
 			{
 				show: hasStochasticData,
-				stroke: "rgba(0,0,0,0.01)",
+				stroke: "transparent",
 				width: 0.5,
 				points: { show: false },
 			},
 			{
 				show: hasStochasticData,
-				stroke: "rgba(0,0,0,0.01)",
+				stroke: "transparent",
 				width: 0.5,
 				points: { show: false },
 			},
 			{
 				show: hasStochasticData,
-				stroke: "rgba(0,0,0,0.01)",
+				stroke: "transparent",
 				width: 0.5,
 				points: { show: false },
 			},
@@ -260,12 +266,12 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 				? [
 						{
 							series: [bi, bi + 1],
-							fill: "rgba(15,23,42,0.15)",
+							fill: BAND_SOFT_COLOR,
 							dir: 1 as const,
 						},
 						{
 							series: [bi + 2, bi + 3],
-							fill: "rgba(15,23,42,0.25)",
+							fill: BAND_COLOR,
 							dir: 1 as const,
 						},
 					]
@@ -273,10 +279,9 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 			scales: {
 				...base.scales,
 				y: {
-					range: (_u: uPlot, min: number, max: number) => {
+					range: (_u: uPlot, min: number) => {
 						const lower = Math.min(min, -500);
-						const upper = Math.max(targetNetWorth * 2, max * 1.15);
-						return [lower, upper];
+						return [lower, NET_WORTH_CHART_MAX_Y];
 					},
 				},
 			},
@@ -303,16 +308,21 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 					tooltipContent={tooltipContent}
 				/>
 			</div>
-			<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 text-xs text-slate-600 dark:text-slate-400">
+			<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 type-caption">
 				<span className="inline-flex items-center gap-1.5">
-					<span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#0f172a]" />
+					<span
+						className="inline-block h-2.5 w-2.5 rounded-sm"
+						style={{ backgroundColor: NET_WORTH_SERIES_COLOR }}
+					/>
 					{hasStochasticData ? "Net worth (median simulation)" : "Net worth"}
 				</span>
 				{assets.map((a) => (
 					<span key={a.id} className="inline-flex items-center gap-1.5">
 						<span
 							className="inline-block h-2.5 w-2.5 rounded-sm"
-							style={{ backgroundColor: a.color ?? "#334155" }}
+							style={{
+								backgroundColor: a.color ?? FALLBACK_ACCOUNT_COLOR,
+							}}
 						/>
 						{a.label}
 					</span>
@@ -321,7 +331,9 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 					<span key={a.id} className="inline-flex items-center gap-1.5">
 						<span
 							className="inline-block h-2.5 w-2.5 rounded-sm"
-							style={{ backgroundColor: a.color ?? "#334155" }}
+							style={{
+								backgroundColor: a.color ?? FALLBACK_ACCOUNT_COLOR,
+							}}
 						/>
 						{a.label}
 					</span>

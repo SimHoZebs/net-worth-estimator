@@ -59,7 +59,7 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({
 	const remaining = totalInflow - totalOutflow;
 
 	return (
-		<Card className="rounded-[1.6rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
+		<Card className="rounded-[1.6rem] border-border shadow-sm ">
 			<CardHeader>
 				<div>
 					<CardTitle>Monthly cash flow</CardTitle>
@@ -83,30 +83,27 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({
 							<>
 								{items.map((item, i) => (
 									<TableRow key={i}>
-										<TableCell className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+										<TableCell className="type-label tracking-wide">
 											{item.category}
 										</TableCell>
-										<TableCell className="text-sm text-slate-700 dark:text-slate-300">
+										<TableCell className="type-body text-foreground/80">
 											{item.label}
 										</TableCell>
-										<TableCell className="text-sm font-medium text-slate-900 dark:text-slate-100">
+										<TableCell className="type-value text-sm">
 											{item.isNumeric
 												? currency.format(item.amount ?? 0)
 												: item.arithmetic}
 										</TableCell>
-										<TableCell className="text-sm text-slate-500 dark:text-slate-400">
+										<TableCell className="type-muted">
 											{formatFrequency(item.frequency)}
 										</TableCell>
 									</TableRow>
 								))}
-								<TableRow className="border-t-2 border-slate-200 dark:border-slate-700">
-									<TableCell
-										colSpan={2}
-										className="text-sm font-semibold text-slate-900 dark:text-slate-100"
-									>
+								<TableRow className="border-t-2 border-border">
+									<TableCell colSpan={2} className="type-title">
 										Remaining cash / investment capacity
 									</TableCell>
-									<TableCell className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+									<TableCell className="type-title">
 										{currency.format(remaining)}
 									</TableCell>
 									<TableCell />
@@ -116,7 +113,7 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({
 							<TableRow>
 								<TableCell
 									colSpan={4}
-									className="py-6 text-center text-slate-500 dark:text-slate-400"
+									className="py-6 text-center text-muted-foreground"
 								>
 									No scheduled transactions are enabled.
 								</TableCell>
@@ -125,7 +122,7 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({
 					</TableBody>
 				</Table>
 				{numericItems.length < items.length ? (
-					<div className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+					<div className="mt-3 type-caption text-muted-foreground/70">
 						Some transactions use formulas rather than fixed amounts. Exact
 						monthly totals depend on account balances and other dynamic values.
 					</div>

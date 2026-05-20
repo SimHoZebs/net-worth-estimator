@@ -50,11 +50,9 @@ export function SectionNav() {
 	};
 
 	return (
-		<nav className="sticky top-0 z-30 border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-800/95 shadow-sm dark:shadow-slate-900/30 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-slate-800/80 no-print">
+		<nav className="sticky top-0 z-30 border-b border-border bg-card/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/80 no-print">
 			<div className="mx-auto flex max-w-[106rem] items-center gap-1 px-3 py-0 md:px-8">
-				<span className="hidden text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500 md:mr-4 md:inline">
-					Net Worth
-				</span>
+				<span className="hidden type-eyebrow md:mr-4 md:inline">Net Worth</span>
 				<div className="flex gap-0.5 overflow-x-auto scrollbar-none">
 					{sections.map((s) => (
 						<button
@@ -63,8 +61,8 @@ export function SectionNav() {
 							onClick={() => handleClick(s.id)}
 							className={`shrink-0 whitespace-nowrap border-b-2 px-2 py-3 text-xs font-medium transition-colors md:px-3 ${
 								activeId === s.id
-									? "border-slate-900 dark:border-slate-100 text-slate-900 dark:text-slate-100"
-									: "border-transparent text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-700 dark:hover:text-slate-200"
+									? "border-primary text-foreground"
+									: "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
 							}`}
 						>
 							{s.label}

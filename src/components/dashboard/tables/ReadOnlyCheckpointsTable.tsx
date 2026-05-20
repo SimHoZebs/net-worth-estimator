@@ -44,7 +44,7 @@ export function ReadOnlyCheckpointsTable({
 									render: (_v: unknown, row: object) => {
 										const accountId = (row as Checkpoint).AccountId;
 										return (
-											<span className="text-slate-700 dark:text-slate-300">
+											<span className="text-foreground/80">
 												{accountLabelById.get(accountId) ?? accountId}
 											</span>
 										);

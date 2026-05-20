@@ -8,17 +8,10 @@ export function SummaryCard({
 	value: string;
 }) {
 	return (
-		<Card
-			size="sm"
-			className="rounded-[1.4rem] border-slate-200 dark:border-slate-700"
-		>
+		<Card size="sm" className="rounded-[1.4rem] border-border">
 			<CardContent className="space-y-1 p-4">
-				<div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-					{label}
-				</div>
-				<div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-					{value}
-				</div>
+				<div className="type-eyebrow">{label}</div>
+				<div className="type-title">{value}</div>
 			</CardContent>
 		</Card>
 	);

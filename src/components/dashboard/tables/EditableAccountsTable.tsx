@@ -19,9 +19,9 @@ import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
 
 function inputStyle(isDirty: boolean) {
 	const dirty = isDirty
-		? "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950"
-		: "border-slate-200 dark:border-slate-700";
-	return `w-full rounded-lg ${dirty} px-2 py-1 text-sm outline-none font-mono text-xs`;
+		? "border-tertiary-border bg-tertiary-subtle"
+		: "border-input bg-card";
+	return `w-full rounded-lg ${dirty} px-2 py-1 type-body outline-none type-code`;
 }
 
 interface EditableAccountsTableProps {
@@ -44,7 +44,7 @@ export function EditableAccountsTable({
 	addAccount,
 }: EditableAccountsTableProps) {
 	return (
-		<Card className="rounded-[1.8rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
+		<Card className="rounded-[1.8rem] border-border shadow-sm ">
 			<CardHeader>
 				<CardTitle>Accounts</CardTitle>
 				<CardDescription>Edit, add, or remove account rows.</CardDescription>

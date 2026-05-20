@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import type { Account } from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
 
@@ -37,7 +38,7 @@ export function WhatIfAccountForm({
 	return (
 		<div className="space-y-2">
 			<div className="flex items-center justify-between">
-				<span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+				<span className="type-eyebrow">
 					Accounts {accounts.length > 0 ? `(${accounts.length})` : ""}
 				</span>
 				{!adding ? (
@@ -52,25 +53,21 @@ export function WhatIfAccountForm({
 				) : null}
 			</div>
 			{adding ? (
-				<div className="space-y-2 rounded-2xl border border-slate-200 dark:border-slate-700 p-3">
+				<div className="space-y-2 rounded-2xl border border-border p-3">
 					<div className="grid grid-cols-2 gap-2">
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								ID
-							</label>
-							<input
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+							<label className="block type-caption">ID</label>
+							<Input
+								className="w-full rounded-lg "
 								value={adding.id}
 								onChange={(e) => setAdding({ ...adding, id: e.target.value })}
 								placeholder="e.g. savings"
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Label
-							</label>
-							<input
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+							<label className="block type-caption">Label</label>
+							<Input
+								className="w-full rounded-lg "
 								value={adding.label}
 								onChange={(e) =>
 									setAdding({ ...adding, label: e.target.value })
@@ -79,16 +76,14 @@ export function WhatIfAccountForm({
 							/>
 						</div>
 						<div>
-							<label className="block text-xs text-slate-500 dark:text-slate-400">
-								Color (hex)
-							</label>
-							<input
-								className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-sm"
+							<label className="block type-caption">Color (hex)</label>
+							<Input
+								className="w-full rounded-lg "
 								value={adding.color ?? ""}
 								onChange={(e) =>
 									setAdding({ ...adding, color: e.target.value || null })
 								}
-								placeholder="#64748b"
+								placeholder="CSS color"
 							/>
 						</div>
 					</div>
@@ -110,17 +105,17 @@ export function WhatIfAccountForm({
 			{accounts.map((account) => (
 				<div
 					key={`tmp-acc-${account.id}`}
-					className="flex items-center justify-between rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-2"
+					className="flex items-center justify-between rounded-xl border border-tertiary-border bg-tertiary-subtle px-4 py-2"
 				>
 					<div className="flex items-center gap-2">
 						<span
 							className="inline-block h-2.5 w-2.5 rounded-full"
-							style={{ backgroundColor: account.color ?? "#eab308" }}
+							style={{ backgroundColor: account.color ?? "GrayText" }}
 						/>
-						<span className="text-sm font-medium text-amber-900 dark:text-amber-200">
+						<span className="type-label text-tertiary-foreground">
 							{account.label}
 						</span>
-						<span className="text-xs text-amber-700 dark:text-amber-400">
+						<span className="type-caption text-tertiary-foreground/80">
 							{account.id}
 						</span>
 					</div>

@@ -14,23 +14,21 @@ export function AssumptionList({ pack }: { pack: ScenarioPack }) {
 	return (
 		<div className="space-y-4">
 			<div className="flex items-center justify-between">
-				<div className="text-sm text-slate-600 dark:text-slate-400">
+				<div className="type-muted">
 					Showing{" "}
 					{showFormulas ? "raw formulas" : "plain-language descriptions"}
 				</div>
 				<button
 					type="button"
 					onClick={() => setShowFormulas(!showFormulas)}
-					className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1 text-xs font-medium text-slate-600 dark:text-slate-400 transition hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-800 dark:hover:text-slate-200"
+					className="rounded-lg border border-border px-3 py-1 type-label transition hover:border-ring hover:text-foreground"
 				>
 					{showFormulas ? "Hide formulas" : "Show formulas"}
 				</button>
 			</div>
 			<div className="grid gap-6 md:grid-cols-2">
 				<div>
-					<h4 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-						Income
-					</h4>
+					<h4 className="mb-2 type-eyebrow">Income</h4>
 					<div className="space-y-1">
 						{incomePostings.length > 0 ? (
 							incomePostings.map((p) => {
@@ -38,7 +36,7 @@ export function AssumptionList({ pack }: { pack: ScenarioPack }) {
 								return (
 									<div
 										key={p.id}
-										className={`flex items-center justify-between rounded-lg px-2 py-1 text-sm transition ${isDisabled ? "opacity-40" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}
+										className={`flex items-center justify-between rounded-lg px-2 py-1 type-body transition ${isDisabled ? "opacity-40" : "hover:bg-muted"}`}
 									>
 										<div className="flex items-center gap-2">
 											<button
@@ -46,8 +44,8 @@ export function AssumptionList({ pack }: { pack: ScenarioPack }) {
 												onClick={() => togglePostingDisabled(p.id)}
 												className={`flex h-4 w-4 items-center justify-center rounded border transition ${
 													isDisabled
-														? "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
-														: "border-slate-900 dark:border-slate-100 bg-slate-900 dark:bg-slate-100"
+														? "border-border bg-card"
+														: "border-primary bg-primary "
 												}`}
 												title={
 													isDisabled
@@ -72,12 +70,12 @@ export function AssumptionList({ pack }: { pack: ScenarioPack }) {
 												)}
 											</button>
 											<span
-												className={`text-slate-700 dark:text-slate-300 ${isDisabled ? "line-through" : ""}`}
+												className={`text-foreground/80 ${isDisabled ? "line-through" : ""}`}
 											>
 												{p.label}
 											</span>
 										</div>
-										<span className="font-medium text-slate-900 dark:text-slate-100">
+										<span className="type-value">
 											{showFormulas
 												? `${p.arithmetic} (${formatFrequency(p.frequency)})`
 												: `${formatFrequency(p.frequency)} inflow${isDisabled ? "" : ""}`}
@@ -86,16 +84,14 @@ export function AssumptionList({ pack }: { pack: ScenarioPack }) {
 								);
 							})
 						) : (
-							<div className="text-sm text-slate-400 dark:text-slate-500">
+							<div className="type-muted text-muted-foreground/70">
 								No external income scheduled.
 							</div>
 						)}
 					</div>
 				</div>
 				<div>
-					<h4 className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-						Expenses & transfers
-					</h4>
+					<h4 className="mb-2 type-eyebrow">Expenses & transfers</h4>
 					<div className="space-y-1">
 						{expensePostings.length > 0 ? (
 							expensePostings.map((p) => {
@@ -103,7 +99,7 @@ export function AssumptionList({ pack }: { pack: ScenarioPack }) {
 								return (
 									<div
 										key={p.id}
-										className={`flex items-center justify-between rounded-lg px-2 py-1 text-sm transition ${isDisabled ? "opacity-40" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}
+										className={`flex items-center justify-between rounded-lg px-2 py-1 type-body transition ${isDisabled ? "opacity-40" : "hover:bg-muted"}`}
 									>
 										<div className="flex items-center gap-2">
 											<button
@@ -111,8 +107,8 @@ export function AssumptionList({ pack }: { pack: ScenarioPack }) {
 												onClick={() => togglePostingDisabled(p.id)}
 												className={`flex h-4 w-4 items-center justify-center rounded border transition ${
 													isDisabled
-														? "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
-														: "border-slate-900 bg-slate-900"
+														? "border-border bg-card"
+														: "border-primary bg-primary"
 												}`}
 												title={
 													isDisabled
@@ -137,12 +133,12 @@ export function AssumptionList({ pack }: { pack: ScenarioPack }) {
 												)}
 											</button>
 											<span
-												className={`text-slate-700 dark:text-slate-300 ${isDisabled ? "line-through" : ""}`}
+												className={`text-foreground/80 ${isDisabled ? "line-through" : ""}`}
 											>
 												{p.label}
 											</span>
 										</div>
-										<span className="font-medium text-slate-900 dark:text-slate-100">
+										<span className="type-value">
 											{showFormulas
 												? `${p.arithmetic} (${formatFrequency(p.frequency)})`
 												: `${formatFrequency(p.frequency)} outflow`}
@@ -151,7 +147,7 @@ export function AssumptionList({ pack }: { pack: ScenarioPack }) {
 								);
 							})
 						) : (
-							<div className="text-sm text-slate-400 dark:text-slate-500">
+							<div className="type-muted text-muted-foreground/70">
 								No outgoing transactions scheduled.
 							</div>
 						)}

@@ -26,7 +26,7 @@ export const TransactionCompletionTable = memo(
 		postingSummaries,
 	}: TransactionCompletionTableProps) {
 		return (
-			<Card className="rounded-[1.6rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
+			<Card className="rounded-[1.6rem] border-border shadow-sm ">
 				<CardHeader>
 					<div>
 						<CardTitle>Transaction completion</CardTitle>
@@ -60,7 +60,7 @@ export const TransactionCompletionTable = memo(
 												<span
 													className={
 														hasShortfall
-															? "font-semibold text-amber-700 dark:text-amber-400"
+															? "type-value font-semibold text-tertiary-foreground"
 															: undefined
 													}
 												>
@@ -71,7 +71,7 @@ export const TransactionCompletionTable = memo(
 												<span
 													className={
 														hasShortfall
-															? "text-amber-700 dark:text-amber-400"
+															? "text-tertiary-foreground"
 															: undefined
 													}
 												>
@@ -89,7 +89,7 @@ export const TransactionCompletionTable = memo(
 												<span
 													className={
 														hasShortfall
-															? "text-amber-700 dark:text-amber-400"
+															? "text-tertiary-foreground"
 															: undefined
 													}
 												>
@@ -100,7 +100,7 @@ export const TransactionCompletionTable = memo(
 												<span
 													className={
 														hasShortfall
-															? "font-semibold text-amber-700 dark:text-amber-400"
+															? "type-value font-semibold text-tertiary-foreground"
 															: undefined
 													}
 												>
@@ -111,8 +111,8 @@ export const TransactionCompletionTable = memo(
 												<span
 													className={
 														hasShortfall
-															? "font-medium text-amber-700 dark:text-amber-400"
-															: "text-slate-400 dark:text-slate-500"
+															? "type-value text-tertiary-foreground"
+															: "text-muted-foreground/70"
 													}
 												>
 													{hasShortfall
@@ -127,7 +127,7 @@ export const TransactionCompletionTable = memo(
 								<TableRow>
 									<TableCell
 										colSpan={7}
-										className="py-6 text-center text-slate-500 dark:text-slate-400"
+										className="py-6 text-center text-muted-foreground"
 									>
 										No scheduled transactions are defined.
 									</TableCell>

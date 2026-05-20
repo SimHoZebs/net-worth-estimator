@@ -69,7 +69,7 @@ function CollapsibleRoot({
 		<CollapsibleContext.Provider value={{ open: isOpen, onToggle: toggle }}>
 			<details
 				open={isOpen}
-				className={`rounded-[1.8rem] border border-slate-200 bg-white px-5 py-5 shadow-sm open:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:shadow-slate-900/30 dark:open:border-slate-600 ${className}`}
+				className={`rounded-[1.8rem] border border-border bg-card px-5 py-5 shadow-sm open:border-ring ${className}`}
 			>
 				{children}
 			</details>
@@ -136,7 +136,7 @@ function CollapsibleChevron({ className = "" }: CollapsibleChevronProps) {
 			strokeWidth="2.5"
 			strokeLinecap="round"
 			strokeLinejoin="round"
-			className={`shrink-0 text-slate-400 transition-transform duration-200 dark:text-slate-500 ${open ? "rotate-180" : ""} ${className}`}
+			className={`shrink-0 text-muted-foreground/70 transition-transform duration-200 ${open ? "rotate-180" : ""} ${className}`}
 		>
 			<polyline points="6 9 12 15 18 9" />
 		</svg>

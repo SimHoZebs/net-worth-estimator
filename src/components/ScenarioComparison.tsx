@@ -30,17 +30,15 @@ export function ScenarioComparison({
 					<div className="flex items-start gap-3">
 						<Collapsible.Chevron />
 						<div>
-							<div className="text-base font-semibold text-slate-900 dark:text-slate-100">
-								Scenario snapshots
-							</div>
-							<div className="text-sm text-slate-500 dark:text-slate-400">
+							<div className="type-title text-base">Scenario snapshots</div>
+							<div className="type-muted">
 								{hasSnapshots
 									? `${snapshots.length} snapshot${snapshots.length === 1 ? "" : "s"} saved. Save the current projection to compare with future changes.`
 									: "Save the current projection to compare with future changes."}
 							</div>
 						</div>
 					</div>
-					<span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400 transition-colors group-hover:text-slate-500 dark:text-slate-500 dark:group-hover:text-slate-300">
+					<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
 						Show details
 					</span>
 				</div>
@@ -53,7 +51,7 @@ export function ScenarioComparison({
 							value={labelInput}
 							onChange={(e) => setLabelInput(e.target.value)}
 							placeholder="Baseline (no overrides)"
-							className="w-full max-w-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400"
+							className="w-full max-w-xs rounded-lg border border border-border bg-card px-3 py-1.5 type-body outline-none placeholder:text-muted-foreground focus:border-ring"
 						/>
 						<Button
 							type="button"
@@ -82,10 +80,10 @@ export function ScenarioComparison({
 					</div>
 
 					{hasSnapshots ? (
-						<div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-							<table className="w-full text-sm">
+						<div className="overflow-x-auto rounded-xl border border-border">
+							<table className="w-full type-body">
 								<thead>
-									<tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-left text-xs font-medium tracking-wide text-slate-500 dark:text-slate-400">
+									<tr className="border-b border border-border bg-muted text-left type-label tracking-wide">
 										<th className="px-4 py-3">Name</th>
 										<th className="px-4 py-3">Current NW</th>
 										<th className="px-4 py-3">Final NW</th>
@@ -104,25 +102,23 @@ export function ScenarioComparison({
 										return (
 											<tr
 												key={sn.id}
-												className="border-b border-slate-100 dark:border-slate-700 last:border-b-0"
+												className="border-b border-border/70 last:border-b-0"
 											>
-												<td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
-													{sn.label}
-												</td>
-												<td className="px-4 py-3 tabular-nums text-slate-900 dark:text-slate-100">
+												<td className="px-4 py-3 type-value">{sn.label}</td>
+												<td className="px-4 py-3 tabular-nums text-foreground">
 													{currency.format(sn.metrics.currentNetWorth)}
 												</td>
 												<td
-													className={`px-4 py-3 tabular-nums ${sameFinal ? "text-slate-400 dark:text-slate-500" : "text-slate-900 dark:text-slate-100"}`}
+													className={`px-4 py-3 tabular-nums ${sameFinal ? "text-muted-foreground/70" : "text-foreground"}`}
 												>
 													{currency.format(sn.metrics.finalNetWorth)}
 												</td>
-												<td className="px-4 py-3 text-slate-900 dark:text-slate-100">
+												<td className="px-4 py-3 text-foreground">
 													{sn.metrics.hitTargetDate
 														? formatDate(sn.metrics.hitTargetDate)
 														: "Beyond horizon"}
 												</td>
-												<td className="px-4 py-3 tabular-nums text-slate-500 dark:text-slate-400">
+												<td className="px-4 py-3 tabular-nums text-muted-foreground">
 													{sn.metrics.overrideCount}
 												</td>
 												<td className="px-4 py-3 text-right">
@@ -130,7 +126,7 @@ export function ScenarioComparison({
 														<button
 															type="button"
 															onClick={() => removeSnapshot(sn.id)}
-															className="text-xs text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400"
+															className="type-caption text-muted-foreground/70 hover:text-destructive"
 														>
 															Remove
 														</button>
@@ -139,29 +135,29 @@ export function ScenarioComparison({
 											</tr>
 										);
 									})}
-									<tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-										<td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
+									<tr className="border-t-2 border border-border bg-muted">
+										<td className="px-4 py-3 type-value font-semibold">
 											Current
 										</td>
-										<td className="px-4 py-3 tabular-nums font-semibold text-slate-900 dark:text-slate-100">
+										<td className="px-4 py-3 tabular-nums type-value font-semibold">
 											{currency.format(currentMetrics.currentNetWorth)}
 										</td>
-										<td className="px-4 py-3 tabular-nums font-semibold text-slate-900 dark:text-slate-100">
+										<td className="px-4 py-3 tabular-nums type-value font-semibold">
 											{currency.format(currentMetrics.finalNetWorth)}
 										</td>
-										<td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
+										<td className="px-4 py-3 type-value font-semibold">
 											{currentMetrics.hitTargetDate
 												? formatDate(currentMetrics.hitTargetDate)
 												: "Beyond horizon"}
 										</td>
-										<td className="px-4 py-3 tabular-nums font-semibold text-slate-900 dark:text-slate-100">
+										<td className="px-4 py-3 tabular-nums type-value font-semibold">
 											{currentOverrideCount}
 										</td>
 										<td />
 									</tr>
 								</tbody>
 							</table>
-							<div className="border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-2 text-xs text-slate-400 dark:text-slate-500">
+							<div className="border-t border border-border/70 bg-muted/70 px-4 py-2 type-caption text-muted-foreground/70">
 								Snapshots store what-if configuration. To restore, manually
 								apply the override counts shown above.
 							</div>

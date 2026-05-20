@@ -127,7 +127,7 @@ export default function App() {
 	} = useProjection(pack, projectionSettings, whatIfState, validation.isValid);
 
 	const hasStochasticAccounts =
-		pack !== null && pack.postings.some((p) => p.volatility > 0 && p.enabled);
+		pack?.postings.some((p) => p.volatility > 0 && p.enabled) ?? false;
 
 	const stochasticWorkerEnabled =
 		stochasticPreference !== "disabled" &&
@@ -228,11 +228,11 @@ export default function App() {
 	);
 
 	return (
-		<div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+		<div className="min-h-screen bg-background text-foreground">
 			<div className="space-y-0 px-0 md:px-0">
 				<div className="mx-auto max-w-[106rem] px-4 py-4 md:px-8">
 					<div className="flex items-center justify-between gap-2">
-						<div className="text-xs text-slate-500 dark:text-slate-400">
+						<div className="type-caption">
 							{pack ? (
 								<span>
 									Baseline loaded from{" "}
@@ -297,20 +297,20 @@ export default function App() {
 							{[1, 2, 3].map((i) => (
 								<div
 									key={i}
-									className="animate-pulse rounded-[1.8rem] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6 shadow-sm dark:shadow-slate-900/30"
+									className="animate-pulse rounded-[1.8rem] border border border-border bg-card p-6 shadow-sm "
 								>
-									<div className="mb-2 h-3 w-20 rounded bg-slate-200 dark:bg-slate-700" />
-									<div className="h-6 w-32 rounded bg-slate-200 dark:bg-slate-700" />
-									<div className="mt-2 h-3 w-24 rounded bg-slate-200 dark:bg-slate-700" />
+									<div className="mb-2 h-3 w-20 rounded bg-muted" />
+									<div className="h-6 w-32 rounded bg-muted" />
+									<div className="mt-2 h-3 w-24 rounded bg-muted" />
 								</div>
 							))}
 						</div>
 					) : null}
 
 					{isProjecting ? (
-						<Alert className="rounded-[1.6rem] border-amber-200 bg-amber-50 text-amber-950">
+						<Alert variant="tertiary" className="rounded-[1.6rem]">
 							<AlertTitle>Updating projection</AlertTitle>
-							<AlertDescription className="text-amber-950/80">
+							<AlertDescription>
 								Recomputing historical and projected balances from the loaded
 								data pack
 								{activeOverrideCount > 0
@@ -457,10 +457,10 @@ function ThemeToggle({
 				type="button"
 				aria-label="Light theme"
 				onClick={() => setTheme("light")}
-				className={`rounded-md px-2 py-1 text-xs transition-colors ${
+				className={`rounded-md px-2 py-1 type-caption transition-colors ${
 					theme === "light"
-						? "bg-slate-200 text-slate-900 dark:bg-slate-600 dark:text-slate-100"
-						: "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+						? "bg-muted text-slate-900 dark:bg-slate-600 dark:text-slate-100"
+						: "text-slate-500 hover:text-slate-900 dark:text-muted-foreground/70 dark:hover:text-slate-100"
 				}`}
 			>
 				<svg
@@ -482,10 +482,10 @@ function ThemeToggle({
 				type="button"
 				aria-label="Dark theme"
 				onClick={() => setTheme("dark")}
-				className={`rounded-md px-2 py-1 text-xs transition-colors ${
+				className={`rounded-md px-2 py-1 type-caption transition-colors ${
 					theme === "dark"
-						? "bg-slate-200 text-slate-900 dark:bg-slate-600 dark:text-slate-100"
-						: "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+						? "bg-muted text-slate-900 dark:bg-slate-600 dark:text-slate-100"
+						: "text-slate-500 hover:text-slate-900 dark:text-muted-foreground/70 dark:hover:text-slate-100"
 				}`}
 			>
 				<svg
@@ -506,10 +506,10 @@ function ThemeToggle({
 				type="button"
 				aria-label="System theme"
 				onClick={() => setTheme("system")}
-				className={`rounded-md px-2 py-1 text-xs transition-colors ${
+				className={`rounded-md px-2 py-1 type-caption transition-colors ${
 					theme === "system"
-						? "bg-slate-200 text-slate-900 dark:bg-slate-600 dark:text-slate-100"
-						: "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+						? "bg-muted text-slate-900 dark:bg-slate-600 dark:text-slate-100"
+						: "text-slate-500 hover:text-slate-900 dark:text-muted-foreground/70 dark:hover:text-slate-100"
 				}`}
 			>
 				<svg

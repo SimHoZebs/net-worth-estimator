@@ -2,6 +2,7 @@ import { memo, useCallback, useMemo, useState } from "react";
 import { buildAccountDiagnosticChartData } from "@/chart/chartData";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { LazySection } from "@/components/ui/lazy-section";
+import { StatusPill } from "@/components/ui/status-pill";
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	ProjectionResult,
@@ -84,7 +85,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 					{derived.goalReached ? "On track" : "Off track"}
 				</div>
 				{activeOverrideCount > 0 ? (
-					<div className="rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-amber-900 dark:text-amber-200">
+					<div className="rounded-full border border-tertiary-border bg-tertiary-subtle px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
 						{activeOverrideCount} temporary override
 						{activeOverrideCount === 1 ? "" : "s"}
 					</div>
@@ -99,16 +100,16 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 								<div className="flex items-start gap-3">
 									<Collapsible.Chevron />
 									<div>
-										<div className="text-base font-semibold text-slate-900 dark:text-slate-100">
+										<div className="type-title text-base">
 											Cash flow, debt, and reconciliation
 										</div>
-										<div className="text-sm text-slate-500 dark:text-slate-400">
+										<div className="type-muted">
 											Monthly cash-flow map, debt summary, and current balance
 											reconciliation.
 										</div>
 									</div>
 								</div>
-								<span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400 transition-colors group-hover:text-slate-500 dark:text-slate-500 dark:group-hover:text-slate-300">
+								<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
 									Show details
 								</span>
 							</div>
@@ -132,16 +133,16 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 						detail={derived.blockerDetail}
 						tone={
 							derived.biggestShortfallPosting
-								? "warning"
+								? "tertiary"
 								: derived.goalReached
-									? "success"
+									? "primary"
 									: "default"
 						}
 					/>
 					<button
 						type="button"
 						onClick={scrollToSourceData}
-						className="no-print w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 shadow-sm dark:shadow-slate-900/30 transition hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+						className="no-print w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm font-medium text-muted-foreground shadow-sm  transition hover:bg-accent hover:text-accent-foreground"
 					>
 						Explore model inputs
 					</button>
@@ -163,7 +164,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 							? `No scheduled transactions are requesting future activity across ${derived.enabledPostingCount} transaction${derived.enabledPostingCount === 1 ? "" : "s"}.`
 							: `The model applied ${currency.format(derived.realizedPostingAmount)} of ${currency.format(derived.requestedPostingAmount)} in planned transactions.`
 					}
-					tone={derived.postingUtilizationRate < 1 ? "warning" : "success"}
+					tone={derived.postingUtilizationRate < 1 ? "tertiary" : "primary"}
 				/>
 			</section>
 
@@ -184,21 +185,19 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 						<div className="flex items-start gap-3">
 							<Collapsible.Chevron />
 							<div>
-								<div className="text-base font-semibold text-slate-900 dark:text-slate-100">
+								<div className="type-title text-base">
 									Scheduled transactions
 								</div>
-								<div className="text-sm text-slate-500 dark:text-slate-400">
-									Transaction completion rates.
-								</div>
+								<div className="type-muted">Transaction completion rates.</div>
 							</div>
 						</div>
 						<div className="flex items-center gap-2">
-							<span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+							<StatusPill>
 								{isPostingTablesOpen
 									? "Close"
 									: `${derived.enabledPostingCount} posting${derived.enabledPostingCount === 1 ? "" : "s"}`}
-							</span>
-							<span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400 transition-colors group-hover:text-slate-500 dark:text-slate-500 dark:group-hover:text-slate-300">
+							</StatusPill>
+							<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
 								{isPostingTablesOpen ? "Hide details" : "Show details"}
 							</span>
 						</div>
@@ -206,17 +205,17 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 				</Collapsible.Trigger>
 				<Collapsible.Content>
 					<div className="grid gap-6">
-						<div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+						<div className="flex flex-wrap items-center gap-4 type-caption">
 							<span className="flex items-center gap-1.5">
-								<span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400" />{" "}
+								<span className="inline-block h-2.5 w-2.5 rounded-full bg-primary" />{" "}
 								On track
 							</span>
 							<span className="flex items-center gap-1.5">
-								<span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />{" "}
+								<span className="inline-block h-2.5 w-2.5 rounded-full bg-tertiary" />{" "}
 								Needs attention
 							</span>
 							<span className="flex items-center gap-1.5">
-								<span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />{" "}
+								<span className="inline-block h-2.5 w-2.5 rounded-full bg-muted-foreground/50" />{" "}
 								Neutral
 							</span>
 						</div>

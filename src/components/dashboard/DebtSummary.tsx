@@ -70,9 +70,9 @@ export const DebtSummary = memo(function DebtSummary({
 
 	if (allDebts.length === 0) {
 		return (
-			<Card className="rounded-[1.6rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
+			<Card className="rounded-[1.6rem] border-border shadow-sm ">
 				<CardContent className="p-5">
-					<div className="text-sm text-slate-500 dark:text-slate-400">
+					<div className="type-muted">
 						No debt accounts are currently tracked.
 					</div>
 				</CardContent>
@@ -94,7 +94,7 @@ export const DebtSummary = memo(function DebtSummary({
 	}, 0);
 
 	return (
-		<Card className="rounded-[1.6rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
+		<Card className="rounded-[1.6rem] border-border shadow-sm ">
 			<CardHeader>
 				<div>
 					<CardTitle>Debt summary</CardTitle>
@@ -133,32 +133,30 @@ export const DebtSummary = memo(function DebtSummary({
 									: null;
 							return (
 								<TableRow key={d.account.id}>
-									<TableCell className="text-sm text-slate-700 dark:text-slate-300">
+									<TableCell className="type-body text-foreground/80">
 										{d.account.label}
 									</TableCell>
-									<TableCell className="text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+									<TableCell className="text-right type-value text-sm">
 										{currency.format(d.balance)}
 									</TableCell>
-									<TableCell className="text-right text-sm text-slate-700 dark:text-slate-300">
+									<TableCell className="text-right type-body text-foreground/80">
 										{d.paymentPosting ? d.paymentPosting.arithmetic : "—"}
 									</TableCell>
-									<TableCell className="text-sm text-slate-500 dark:text-slate-400">
+									<TableCell className="type-muted">
 										{d.paymentPosting ? d.paymentPosting.frequency : "—"}
 									</TableCell>
-									<TableCell className="text-sm text-slate-600 dark:text-slate-400">
+									<TableCell className="type-muted">
 										{payoffDate ? formatDate(payoffDate) : "Beyond 100 yr"}
 									</TableCell>
-									<TableCell className="text-right text-sm tabular-nums text-slate-600 dark:text-slate-400">
+									<TableCell className="text-right type-body tabular-nums text-muted-foreground">
 										{d.paymentPosting?.priority ?? "—"}
 									</TableCell>
 								</TableRow>
 							);
 						})}
-						<TableRow className="border-t-2 border-slate-200 dark:border-slate-700">
-							<TableCell className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-								Total debt
-							</TableCell>
-							<TableCell className="text-right text-sm font-semibold text-slate-900 dark:text-slate-100">
+						<TableRow className="border-t-2 border-border">
+							<TableCell className="type-title">Total debt</TableCell>
+							<TableCell className="text-right type-title">
 								{currency.format(-totalDebt)}
 							</TableCell>
 							<TableCell colSpan={4} />
@@ -166,14 +164,14 @@ export const DebtSummary = memo(function DebtSummary({
 					</TableBody>
 				</Table>
 				{estimatedTotalInterest > 0 ? (
-					<div className="mt-3 rounded-xl border border-amber-100 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-3">
-						<div className="text-xs font-medium text-amber-800 dark:text-amber-300">
+					<div className="mt-3 rounded-xl border border-tertiary-border bg-tertiary-subtle px-4 py-3">
+						<div className="type-caption type-value text-tertiary-foreground">
 							Estimated interest over loan life
 						</div>
-						<div className="mt-0.5 text-lg font-semibold text-amber-900 dark:text-amber-200">
+						<div className="mt-0.5 type-title text-lg text-tertiary-foreground">
 							{currency.format(estimatedTotalInterest)}
 						</div>
-						<div className="text-xs text-amber-700 dark:text-amber-400">
+						<div className="type-caption text-tertiary-foreground/80">
 							Rough estimate based on current balance and payment schedule.
 						</div>
 					</div>

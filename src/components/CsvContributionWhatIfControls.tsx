@@ -4,6 +4,7 @@ import { WhatIfCheckpointForm } from "@/components/dashboard/what-if/WhatIfCheck
 import { WhatIfPostingForm } from "@/components/dashboard/what-if/WhatIfPostingForm";
 import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
+import { StatusPill } from "@/components/ui/status-pill";
 import type { ScenarioPack } from "@/lib/projection";
 import { selectActiveOverrideCount, useStore } from "@/store";
 
@@ -39,10 +40,8 @@ export function ContributionWhatIfControls({
 					<div className="flex items-start gap-3">
 						<Collapsible.Chevron />
 						<div>
-							<div className="text-base font-semibold text-slate-900 dark:text-slate-100">
-								Scenario overrides
-							</div>
-							<div className="text-sm text-slate-500 dark:text-slate-400">
+							<div className="type-title text-base">Scenario overrides</div>
+							<div className="type-muted">
 								{activeOverrideCount > 0
 									? `${activeOverrideCount} temporary change${activeOverrideCount === 1 ? "" : "s"} active.`
 									: "Temporarily add trial accounts, scheduled transactions, and balance checkpoints."}
@@ -51,11 +50,9 @@ export function ContributionWhatIfControls({
 					</div>
 					<div className="flex items-center gap-2">
 						{activeOverrideCount > 0 ? (
-							<span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-								{activeOverrideCount} active
-							</span>
+							<StatusPill>{activeOverrideCount} active</StatusPill>
 						) : null}
-						<span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400 transition-colors group-hover:text-slate-500 dark:text-slate-500 dark:group-hover:text-slate-300">
+						<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
 							Show details
 						</span>
 					</div>
@@ -76,7 +73,7 @@ export function ContributionWhatIfControls({
 					</div>
 
 					<div className="space-y-3">
-						<h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+						<h3 className="type-body type-value font-semibold/80">
 							Temporary additions
 						</h3>
 

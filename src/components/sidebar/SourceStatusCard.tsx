@@ -48,13 +48,13 @@ export const SourceStatusCard = memo(function SourceStatusCard({
 				: "Loaded";
 	const statusClassName =
 		loadError || sourceActionError
-			? "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-400"
+			? "border-destructive/25 bg-destructive-subtle text-destructive-foreground"
 			: isLoading
-				? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400"
-				: "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400";
+				? "border-tertiary-border bg-tertiary-subtle text-tertiary-foreground"
+				: "border-primary-border bg-primary-subtle text-primary";
 
 	return (
-		<Card className="rounded-[1.4rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
+		<Card className="rounded-[1.4rem] shadow-sm ">
 			<CardHeader>
 				<CardTitle>Source</CardTitle>
 				<CardDescription>Load state and low-priority metadata.</CardDescription>
@@ -62,38 +62,34 @@ export const SourceStatusCard = memo(function SourceStatusCard({
 			<CardContent className="space-y-4">
 				<div className="flex items-center justify-between gap-3">
 					<div>
-						<div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-							{dataSource.label}
-						</div>
-						<div className="text-xs text-slate-500 dark:text-slate-400">
+						<div className="type-value text-sm">{dataSource.label}</div>
+						<div className="type-caption">
 							Projection starts {formatDate(projectionStartDate)}
 						</div>
 					</div>
 					<span
-						className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusClassName}`}
+						className={`rounded-full border px-2.5 py-0.5 type-caption font-medium ${statusClassName}`}
 					>
 						{status}
 					</span>
 				</div>
 
-				<dl className="space-y-2 text-xs text-slate-500 dark:text-slate-400">
+				<dl className="space-y-2 type-caption">
 					<div className="flex justify-between gap-3">
 						<dt>Last loaded</dt>
-						<dd className="text-right text-slate-700 dark:text-slate-300">
+						<dd className="text-right text-foreground/80">
 							{formatLoadedAt(dataUpdatedAt)}
 						</dd>
 					</div>
 					<div className="flex justify-between gap-3">
 						<dt>Source type</dt>
-						<dd className="text-right text-slate-700 dark:text-slate-300">
+						<dd className="text-right text-foreground/80">
 							{dataSource.sourceType}
 						</dd>
 					</div>
 				</dl>
 
-				<p className="text-xs text-slate-500 dark:text-slate-400">
-					{dataSource.description}
-				</p>
+				<p className="type-caption">{dataSource.description}</p>
 
 				<div className="flex flex-wrap justify-end gap-2">
 					{dataSource.reset && onResetSource ? (

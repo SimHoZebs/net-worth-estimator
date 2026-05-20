@@ -64,4 +64,23 @@ describe("CSV scenario pack", () => {
 			),
 		).toBe(true);
 	});
+
+	it("warns when enabled accounts are missing chart colors", () => {
+		const result = parseCsvScenarioPack({
+			...validCsvFiles,
+			accounts: validCsvFiles.accounts.replace(
+				"checking,Checking,-Infinity,Infinity,#0f172a,true",
+				"checking,Checking,-Infinity,Infinity,,true",
+			),
+		});
+
+		expect(result.data).not.toBeNull();
+		expect(
+			result.issues.some(
+				(issue) =>
+					issue.severity === "warning" &&
+					issue.code === "account.color.missing",
+			),
+		).toBe(true);
+	});
 });

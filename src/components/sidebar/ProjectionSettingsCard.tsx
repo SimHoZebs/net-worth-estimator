@@ -40,7 +40,7 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 	};
 
 	return (
-		<Card className="rounded-[1.4rem] border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-slate-900/30">
+		<Card className="rounded-[1.4rem] border-border shadow-sm ">
 			<CardHeader>
 				<CardTitle>Projection settings</CardTitle>
 				<CardDescription>
@@ -48,10 +48,8 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
-				<div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4">
-					<div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-						Target net worth
-					</div>
+				<div className="rounded-2xl border border border-border bg-muted p-4">
+					<div className="type-eyebrow">Target net worth</div>
 					{isTargetFocused ? (
 						<input
 							type="number"
@@ -67,7 +65,7 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 									setIsTargetFocused(false);
 								}
 							}}
-							className="mt-2 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xl font-semibold text-slate-900 dark:text-slate-100 shadow-sm dark:shadow-slate-900/30 outline-none transition focus:border-slate-400 dark:focus:border-slate-500"
+							className="mt-2 w-full rounded-xl border border border-border bg-card px-3 py-2 type-title shadow-sm  outline-none transition focus:border-ring"
 						/>
 					) : (
 						<button
@@ -76,22 +74,20 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 								setTargetDraft(String(projectionSettings.targetNetWorth));
 								setIsTargetFocused(true);
 							}}
-							className="mt-2 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-left text-xl font-semibold text-slate-900 dark:text-slate-100 shadow-sm dark:shadow-slate-900/30 outline-none transition hover:border-slate-300 dark:hover:border-slate-600 focus:border-slate-400 dark:focus:border-slate-500"
+							className="mt-2 w-full rounded-xl border border border-border bg-card px-3 py-2 text-left type-title shadow-sm  outline-none transition hover:border-ring focus:border-ring"
 						>
 							{formatCurrencyInput(String(projectionSettings.targetNetWorth))}
 						</button>
 					)}
-					<div className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+					<div className="mt-1 type-caption text-muted-foreground/70">
 						Nominal dollars
 					</div>
 				</div>
 
-				<div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-4">
+				<div className="rounded-2xl border border border-border bg-muted p-4">
 					<div className="flex items-center justify-between">
-						<div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-							Horizon
-						</div>
-						<span className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+						<div className="type-eyebrow">Horizon</div>
+						<span className="type-title">
 							{projectionSettings.horizonYears} yr
 						</span>
 					</div>
@@ -108,23 +104,21 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 						}
 						className="mt-2 w-full accent-slate-900 dark:accent-slate-100"
 					/>
-					<div className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+					<div className="mt-1 type-caption text-muted-foreground/70">
 						From {formatDate(projectionStartDate)}
 					</div>
 				</div>
 
-				<div className="flex items-center justify-between rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3">
+				<div className="flex items-center justify-between rounded-2xl border border border-border bg-card px-4 py-3">
 					<div>
-						<div className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-							Overrides
-						</div>
-						<div className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+						<div className="type-eyebrow">Overrides</div>
+						<div className="mt-0.5 type-caption text-muted-foreground/70">
 							{activeOverrideCount === 0
 								? "Baseline only"
 								: "Temporary scenario changes"}
 						</div>
 					</div>
-					<div className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+					<div className="type-title">
 						{activeOverrideCount === 0 ? "None" : activeOverrideCount}
 					</div>
 				</div>

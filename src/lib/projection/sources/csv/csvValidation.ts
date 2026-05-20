@@ -270,6 +270,16 @@ export function validateCsvScenarioPack(
 				rowPath(CSV_SCENARIO_FILE_NAMES.accounts, index + 2, "id"),
 			);
 		}
+
+		if (account.enabled && account.color === null) {
+			addIssue(
+				issues,
+				"warning",
+				"account.color.missing",
+				`Enabled account '${account.id}' has no chart color. Charts will use a neutral fallback until a color is provided.`,
+				rowPath(CSV_SCENARIO_FILE_NAMES.accounts, index + 2, "color"),
+			);
+		}
 	});
 
 	pack.checkpoints.forEach((checkpoint, index) => {
