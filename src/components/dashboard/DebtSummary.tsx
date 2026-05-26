@@ -31,17 +31,10 @@ export const DebtSummary = memo(function DebtSummary({
 	pack,
 	result,
 }: DebtSummaryProps) {
-	const latestDate =
-		result.milestones.latestHistoricalDate ??
-		result.milestones.projectionStartDate;
-
 	// Get latest checkpoint per account
 	const latestCheckpointByAccount = new Map<string, number>();
-	for (const cp of pack.checkpoints) {
-		const existing = latestCheckpointByAccount.get(cp.AccountId);
-		if (existing === undefined || cp.Date > latestDate) {
-			latestCheckpointByAccount.set(cp.AccountId, cp.Balance);
-		}
+	for (const summary of result.accountSummaries) {
+		latestCheckpointByAccount.set(summary.accountId, summary.startingBalance);
 	}
 
 	const debtAccounts = pack.accounts
