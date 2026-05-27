@@ -45,7 +45,7 @@ function tabClassName(isActive: boolean) {
 	return `rounded-full px-3 py-1.5 type-caption font-medium transition ${
 		isActive
 			? "bg-primary  text-primary-foreground shadow-sm "
-			: "border border border-border bg-card text-muted-foreground hover:border-ring hover:text-foreground"
+			: "border border-border/80 bg-card/85 text-muted-foreground hover:border-ring hover:text-foreground dark:border-white/10"
 	}`;
 }
 
@@ -127,7 +127,7 @@ export function ScenarioInspector({
 	];
 
 	return (
-		<Card className="rounded-[1.8rem] border-border shadow-sm ">
+		<Card className="rounded-[1.8rem] border-border/80">
 			<CardHeader>
 				<CardTitle>Model inputs</CardTitle>
 				<CardDescription>
@@ -291,7 +291,7 @@ export function ScenarioInspector({
 						) : null}
 					</>
 				) : (
-					<div className="rounded-2xl border border-dashed border border-border bg-muted px-4 py-8 text-center type-muted">
+					<div className="rounded-2xl border border-dashed border-border/80 bg-surface/70 px-4 py-8 text-center type-muted dark:border-white/10 dark:bg-surface/50">
 						No scenario data loaded yet.
 					</div>
 				)}

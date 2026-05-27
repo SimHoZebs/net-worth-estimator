@@ -4,11 +4,11 @@ import type * as React from "react";
 import { cn } from "@/lib/utils";
 
 const alertVariants = cva(
-	"group/alert relative grid w-full gap-0.5 rounded-lg border border-border px-3 py-2 text-left type-body has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
+	"group/alert relative grid w-full gap-0.5 rounded-lg border border-border/80 px-3 py-2 text-left type-body shadow-sm backdrop-blur-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 dark:border-white/10 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
 	{
 		variants: {
 			variant: {
-				default: "bg-card text-card-foreground",
+				default: "bg-card/86 text-card-foreground",
 				tertiary:
 					"border-tertiary-border bg-tertiary-subtle text-tertiary-foreground *:data-[slot=alert-description]:text-tertiary-foreground/80",
 				primary:

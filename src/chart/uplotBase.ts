@@ -16,6 +16,15 @@ function formatChartCurrencyTick(value: number): string {
 	return `${sign}$${abs}`;
 }
 
+function cssColor(variableName: string, fallback: string): string {
+	if (typeof window === "undefined") return fallback;
+	const value = window
+		.getComputedStyle(document.documentElement)
+		.getPropertyValue(variableName)
+		.trim();
+	return value || fallback;
+}
+
 export function formatDate(isoDate: string): string {
 	if (!isoDate || isoDate.length < 10) return isoDate;
 	const [year, month, day] = isoDate.split("-").map(Number);
@@ -28,6 +37,9 @@ export function formatDate(isoDate: string): string {
 }
 
 export function createBaseOptions(): Partial<uPlot.Options> {
+	const axisColor = cssColor("--chart-axis", "#334155");
+	const gridColor = cssColor("--chart-grid", "#e2e8f0");
+
 	return {
 		ms: 1,
 		mode: 1,
@@ -38,21 +50,21 @@ export function createBaseOptions(): Partial<uPlot.Options> {
 			{
 				scale: "x",
 				side: 2,
-				stroke: "#334155",
+				stroke: axisColor,
 				font: "12px system-ui, sans-serif",
-				grid: { stroke: "#e2e8f0", width: 1 },
-				ticks: { stroke: "#e2e8f0", width: 1, size: 6 },
+				grid: { stroke: gridColor, width: 1 },
+				ticks: { stroke: gridColor, width: 1, size: 6 },
 				gap: 4,
 				values: "{MMM} '{YY}",
 			},
 			{
 				scale: "y",
 				side: 3,
-				stroke: "#334155",
+				stroke: axisColor,
 				font: "12px system-ui, sans-serif",
 				size: 72,
-				grid: { stroke: "#e2e8f0", width: 1 },
-				ticks: { stroke: "#e2e8f0", width: 1, size: 6 },
+				grid: { stroke: gridColor, width: 1 },
+				ticks: { stroke: gridColor, width: 1, size: 6 },
 				gap: 4,
 				values: (_self: uPlot, ticks: number[]) =>
 					ticks.map((v) => formatChartCurrencyTick(v)),
@@ -71,6 +83,10 @@ export function createReferenceLinesHooks(
 	targetNetWorth: number,
 	milestoneDates?: { hitTarget?: string; firstShortfall?: string },
 ): uPlot.Hooks.Arrays {
+	const targetColor = cssColor("--chart-target", "#334155");
+	const successColor = cssColor("--chart-success", "#059669");
+	const warningColor = cssColor("--chart-warning", "#d97706");
+
 	return {
 		draw: [
 			(self: uPlot) => {
@@ -80,7 +96,7 @@ export function createReferenceLinesHooks(
 					ctx.save();
 
 					const y = self.valToPos(targetNetWorth, "y");
-					ctx.strokeStyle = "#334155";
+					ctx.strokeStyle = targetColor;
 					ctx.lineWidth = 2;
 					ctx.setLineDash([5, 5]);
 					ctx.beginPath();
@@ -89,7 +105,7 @@ export function createReferenceLinesHooks(
 					ctx.stroke();
 					ctx.setLineDash([]);
 
-					ctx.fillStyle = "#334155";
+					ctx.fillStyle = targetColor;
 					ctx.font = "600 12px system-ui, sans-serif";
 					ctx.textAlign = "right";
 					ctx.textBaseline = "bottom";
@@ -109,7 +125,7 @@ export function createReferenceLinesHooks(
 						if (x < bbox.left || x > bbox.left + bbox.width) continue;
 
 						const isHit = ms === milestoneDates?.hitTarget;
-						ctx.strokeStyle = isHit ? "#059669" : "#d97706";
+						ctx.strokeStyle = isHit ? successColor : warningColor;
 						ctx.lineWidth = 1.5;
 						ctx.setLineDash([4, 4]);
 						ctx.beginPath();
@@ -118,7 +134,7 @@ export function createReferenceLinesHooks(
 						ctx.stroke();
 						ctx.setLineDash([]);
 
-						ctx.fillStyle = isHit ? "#059669" : "#d97706";
+						ctx.fillStyle = isHit ? successColor : warningColor;
 						ctx.font = "500 11px system-ui, sans-serif";
 						ctx.textAlign = "left";
 						if (isHit) {

@@ -51,7 +51,7 @@ export function ScenarioComparison({
 							value={labelInput}
 							onChange={(e) => setLabelInput(e.target.value)}
 							placeholder="Baseline (no overrides)"
-							className="w-full max-w-xs rounded-lg border border border-border bg-card px-3 py-1.5 type-body outline-none placeholder:text-muted-foreground focus:border-ring"
+							className="w-full max-w-xs rounded-lg border border-border/80 bg-card/85 px-3 py-1.5 type-body shadow-sm outline-none placeholder:text-muted-foreground focus:border-ring dark:border-white/10"
 						/>
 						<Button
 							type="button"
@@ -80,10 +80,10 @@ export function ScenarioComparison({
 					</div>
 
 					{hasSnapshots ? (
-						<div className="overflow-x-auto rounded-xl border border-border">
+						<div className="overflow-x-auto rounded-xl border border-border/80 dark:border-white/10">
 							<table className="w-full type-body">
 								<thead>
-									<tr className="border-b border border-border bg-muted text-left type-label tracking-wide">
+									<tr className="border-b border-border/80 bg-muted/70 text-left type-label tracking-wide">
 										<th className="px-4 py-3">Name</th>
 										<th className="px-4 py-3">Current NW</th>
 										<th className="px-4 py-3">Final NW</th>
@@ -135,7 +135,7 @@ export function ScenarioComparison({
 											</tr>
 										);
 									})}
-									<tr className="border-t-2 border border-border bg-muted">
+									<tr className="border-t-2 border-border bg-muted/70">
 										<td className="px-4 py-3 type-value font-semibold">
 											Current
 										</td>
@@ -157,7 +157,7 @@ export function ScenarioComparison({
 									</tr>
 								</tbody>
 							</table>
-							<div className="border-t border border-border/70 bg-muted/70 px-4 py-2 type-caption text-muted-foreground/70">
+							<div className="border-t border-border/70 bg-muted/70 px-4 py-2 type-caption text-muted-foreground/70">
 								Snapshots store what-if configuration. To restore, manually
 								apply the override counts shown above.
 							</div>

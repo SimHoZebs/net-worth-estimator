@@ -28,7 +28,7 @@ export const ModelAssumptionsCard = memo(function ModelAssumptionsCard({
 	);
 
 	return (
-		<Card className="rounded-[1.4rem] border-border shadow-sm ">
+		<Card className="rounded-[1.4rem] border-border/80">
 			<CardHeader>
 				<CardTitle>Model assumptions</CardTitle>
 				<CardDescription>
@@ -37,19 +37,19 @@ export const ModelAssumptionsCard = memo(function ModelAssumptionsCard({
 			</CardHeader>
 			<CardContent className="space-y-4">
 				<div className="grid grid-cols-3 gap-2 text-center">
-					<div className="rounded-xl border border border-border/70 bg-muted/70 px-2 py-3">
+					<div className="rounded-xl border border-border/70 bg-surface/70 px-2 py-3 dark:border-white/10 dark:bg-surface/50">
 						<div className="type-title">{enabledAccounts}</div>
 						<div className="text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground/70">
 							Accounts
 						</div>
 					</div>
-					<div className="rounded-xl border border border-border/70 bg-muted/70 px-2 py-3">
+					<div className="rounded-xl border border-border/70 bg-surface/70 px-2 py-3 dark:border-white/10 dark:bg-surface/50">
 						<div className="type-title">{enabledPostings}</div>
 						<div className="text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground/70">
 							Flows
 						</div>
 					</div>
-					<div className="rounded-xl border border border-border/70 bg-muted/70 px-2 py-3">
+					<div className="rounded-xl border border-border/70 bg-surface/70 px-2 py-3 dark:border-white/10 dark:bg-surface/50">
 						<div className="type-title">{pack.checkpoints.length}</div>
 						<div className="text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground/70">
 							History
@@ -57,7 +57,7 @@ export const ModelAssumptionsCard = memo(function ModelAssumptionsCard({
 					</div>
 				</div>
 
-				<details className="rounded-xl border border border-border/70 bg-muted/70 px-4 py-3">
+				<details className="rounded-xl border border-border/70 bg-surface/70 px-4 py-3 dark:border-white/10 dark:bg-surface/50">
 					<summary className="cursor-pointer select-none type-eyebrow">
 						Annual rates
 					</summary>
@@ -88,7 +88,7 @@ export const ModelAssumptionsCard = memo(function ModelAssumptionsCard({
 					)}
 				</details>
 
-				<details className="rounded-xl border border border-border/70 bg-muted/70 px-4 py-3">
+				<details className="rounded-xl border border-border/70 bg-surface/70 px-4 py-3 dark:border-white/10 dark:bg-surface/50">
 					<summary className="cursor-pointer select-none type-eyebrow">
 						Model boundaries
 					</summary>

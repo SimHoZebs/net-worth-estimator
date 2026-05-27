@@ -45,7 +45,7 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
 	};
 
 	return (
-		<Card className="rounded-[1.6rem] border-border shadow-sm ">
+		<Card className="rounded-[1.6rem] border-border/80">
 			<CardHeader>
 				<div>
 					<CardTitle>Key assumptions</CardTitle>
@@ -56,7 +56,7 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
 			</CardHeader>
 			<CardContent>
 				<div className="mb-5 grid gap-4 sm:grid-cols-3">
-					<div className="rounded-2xl border border border-border bg-muted p-4">
+					<div className="rounded-2xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
 						<div className="type-eyebrow">Target net worth</div>
 						{isTargetFocused ? (
 							<input
@@ -73,7 +73,7 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
 										setIsTargetFocused(false);
 									}
 								}}
-								className="mt-2 w-full rounded-xl border border border-border bg-card px-3 py-2 type-title shadow-sm  outline-none transition focus:border-ring"
+								className="mt-2 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 type-title shadow-sm outline-none transition focus:border-ring dark:border-white/10"
 							/>
 						) : (
 							<button
@@ -82,7 +82,7 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
 									setTargetDraft(String(projectionSettings.targetNetWorth));
 									setIsTargetFocused(true);
 								}}
-								className="mt-2 w-full rounded-xl border border border-border bg-card px-3 py-2 text-left type-title shadow-sm  outline-none transition hover:border-ring focus:border-ring"
+								className="mt-2 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 text-left type-title shadow-sm outline-none transition hover:border-ring focus:border-ring dark:border-white/10"
 							>
 								{formatCurrencyInput(String(projectionSettings.targetNetWorth))}
 							</button>
@@ -91,7 +91,7 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
 							Nominal dollars
 						</div>
 					</div>
-					<div className="rounded-2xl border border border-border bg-muted p-4">
+					<div className="rounded-2xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
 						<div className="flex items-center justify-between">
 							<div className="type-eyebrow">Projection horizon</div>
 							<span className="type-title">
@@ -109,13 +109,13 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
 									horizonYears: Number(e.target.value),
 								});
 							}}
-							className="mt-2 w-full accent-slate-900"
+							className="mt-2 w-full accent-primary"
 						/>
 						<div className="mt-1 type-caption text-muted-foreground/70">
 							From {formatDate(projectionStartDate)}
 						</div>
 					</div>
-					<div className="rounded-2xl border border border-border bg-muted p-4">
+					<div className="rounded-2xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
 						<div className="type-eyebrow">Overrides</div>
 						<div className="mt-2 type-title">
 							{activeOverrideCount === 0 ? "None" : String(activeOverrideCount)}
@@ -151,7 +151,7 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
 					</div>
 				</div>
 
-				<div className="mt-4 rounded-xl border border border-border/70 bg-muted/70 px-4 py-3">
+				<div className="mt-4 rounded-xl border border-border/70 bg-surface/70 px-4 py-3 dark:border-white/10 dark:bg-surface/50">
 					<div className="type-label tracking-wide">Annual rates</div>
 					{pack.postings.filter((p) => p.enabled && p.annualRate > 0).length >
 					0 ? (
@@ -181,7 +181,7 @@ export const KeyAssumptionsCard = memo(function KeyAssumptionsCard({
 					)}
 				</div>
 
-				<div className="mt-4 space-y-2 rounded-xl border border border-border/70 bg-muted/70 px-4 py-3">
+				<div className="mt-4 space-y-2 rounded-xl border border-border/70 bg-surface/70 px-4 py-3 dark:border-white/10 dark:bg-surface/50">
 					<div className="type-eyebrow">Model assumptions</div>
 					<ul className="space-y-1 type-caption">
 						<li>

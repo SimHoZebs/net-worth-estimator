@@ -29,7 +29,7 @@ export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
 
 	return (
 		<section>
-			<Card className="min-w-0 rounded-[1.8rem] border-border shadow-sm ">
+			<Card className="min-w-0 rounded-[1.8rem] border-border/80 bg-card/92">
 				<CardHeader>
 					<div className="flex items-start justify-between gap-4">
 						<div>
@@ -45,7 +45,7 @@ export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
 							onClick={() =>
 								setViewMode(viewMode === "stacked" ? "accounts" : "stacked")
 							}
-							className="shrink-0 rounded-lg border border-border px-3 py-1 type-label transition hover:border-ring hover:text-foreground no-print"
+							className="shrink-0 rounded-lg border border-border/80 bg-surface/75 px-3 py-1 type-label shadow-sm transition hover:border-ring hover:bg-accent hover:text-foreground dark:border-white/10 no-print"
 						>
 							{viewMode === "stacked"
 								? "Show account lines"

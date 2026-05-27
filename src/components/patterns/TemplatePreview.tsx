@@ -24,7 +24,7 @@ export function TemplatePreview({
 	const newAccounts = accounts.filter((a) => !existingSet.has(a.id));
 
 	return (
-		<div className="rounded-xl border border border-border bg-muted p-4 space-y-3">
+		<div className="space-y-3 rounded-xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
 			<h4 className="type-eyebrow">
 				Preview: {postings.length} posting{postings.length !== 1 ? "s" : ""}
 				{newAccounts.length > 0
@@ -58,7 +58,7 @@ export function TemplatePreview({
 					{postingDescriptions.map((p) => (
 						<div
 							key={p.id}
-							className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-lg border border border-border bg-card px-3 py-1.5 type-body"
+							className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-lg border border-border/80 bg-card/85 px-3 py-1.5 type-body dark:border-white/10"
 						>
 							<span className="type-value/90">{p.label}</span>
 							<span className="type-caption">{p.route}</span>

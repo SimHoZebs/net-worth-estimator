@@ -142,7 +142,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 					<button
 						type="button"
 						onClick={scrollToSourceData}
-						className="no-print w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm font-medium text-muted-foreground shadow-sm  transition hover:bg-accent hover:text-accent-foreground"
+						className="no-print w-full rounded-2xl border border-border/80 bg-card/85 px-4 py-3 text-sm font-semibold text-muted-foreground shadow-sm transition hover:border-ring/70 hover:bg-accent hover:text-accent-foreground dark:border-white/10"
 					>
 						Explore model inputs
 					</button>

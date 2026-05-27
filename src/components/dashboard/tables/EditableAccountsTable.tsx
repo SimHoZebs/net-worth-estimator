@@ -134,7 +134,7 @@ export function EditableAccountsTable({
 									<TableCell>
 										<input
 											type="checkbox"
-											className="h-4 w-4 rounded accent-slate-700"
+											className="h-4 w-4 rounded accent-primary"
 											checked={a.enabled}
 											onChange={() =>
 												updateAccount(a.id, { enabled: !a.enabled })

@@ -50,16 +50,18 @@ export function SectionNav() {
 	};
 
 	return (
-		<nav className="sticky top-0 z-30 border-b border-border bg-card/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/80 no-print">
+		<nav className="sticky top-0 z-30 border-b border-border/70 bg-card/78 shadow-[0_12px_30px_color-mix(in_oklab,var(--foreground)_7%,transparent)] backdrop-blur-xl supports-[backdrop-filter]:bg-card/68 dark:border-white/10 no-print">
 			<div className="mx-auto flex max-w-[106rem] items-center gap-1 px-3 py-0 md:px-8">
-				<span className="hidden type-eyebrow md:mr-4 md:inline">Net Worth</span>
+				<span className="hidden type-eyebrow md:mr-4 md:inline text-primary">
+					Net Worth
+				</span>
 				<div className="flex gap-0.5 overflow-x-auto scrollbar-none">
 					{sections.map((s) => (
 						<button
 							key={s.id}
 							type="button"
 							onClick={() => handleClick(s.id)}
-							className={`shrink-0 whitespace-nowrap border-b-2 px-2 py-3 text-xs font-medium transition-colors md:px-3 ${
+							className={`shrink-0 whitespace-nowrap border-b-2 px-2 py-3 text-xs font-semibold transition-colors md:px-3 ${
 								activeId === s.id
 									? "border-primary text-foreground"
 									: "border-transparent text-muted-foreground hover:border-border hover:text-foreground"

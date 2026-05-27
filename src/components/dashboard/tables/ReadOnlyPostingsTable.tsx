@@ -79,7 +79,7 @@ export function ReadOnlyPostingsTable({
 							return (
 								<input
 									type="checkbox"
-									className="h-4 w-4 rounded accent-slate-700"
+									className="h-4 w-4 rounded accent-primary"
 									checked={!disabledPostingSet.has(p.id)}
 									onChange={() => onToggle(p.id)}
 								/>

@@ -50,7 +50,7 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 			const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 			const dateStr = formatDate(iso);
 
-			let html = `<div class="rounded-lg border border border-border bg-card px-3 py-2 shadow-sm  max-w-xs">`;
+			let html = `<div class="max-w-xs rounded-lg border border-border/80 bg-card/95 px-3 py-2 shadow-xl backdrop-blur dark:border-white/10">`;
 			html += `<div class="type-label">${dateStr}</div>`;
 			html += `<div class="mt-1 space-y-0.5">`;
 

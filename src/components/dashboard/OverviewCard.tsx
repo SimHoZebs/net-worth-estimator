@@ -35,12 +35,14 @@ export const OverviewCard = memo(function OverviewCard({
 		result.milestones.projectionStartDate;
 
 	return (
-		<Card className="rounded-[1.8rem] border-border shadow-sm ">
+		<Card className="rounded-[1.8rem] border-primary-border/45 bg-gradient-to-br from-card/96 via-card/90 to-primary-subtle/35">
 			<CardContent className="p-5 md:p-6">
-				<div className="flex gap-6 lg:justify-evenly">
-					<div className="space-y-1 lg:col-span-1">
+				<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
 						<div className="type-label">Current net worth</div>
-						<div className="type-metric">{currency.format(current)}</div>
+						<div className="mt-1 type-metric text-foreground">
+							{currency.format(current)}
+						</div>
 						<div className="type-muted">
 							as of{" "}
 							{formatDate(
@@ -50,9 +52,9 @@ export const OverviewCard = memo(function OverviewCard({
 						</div>
 					</div>
 
-					<div className="space-y-1 lg:col-span-1">
+					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
 						<div className="type-label">Time to target</div>
-						<div className="type-metric">
+						<div className="mt-1 type-metric text-foreground">
 							{hasStochasticData &&
 							stochasticResult?.milestones.medianHitTargetDate
 								? formatElapsedTime(
@@ -76,9 +78,9 @@ export const OverviewCard = memo(function OverviewCard({
 						</div>
 					</div>
 
-					<div className="space-y-1 lg:col-span-1">
+					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
 						<div className="type-label">Confidence</div>
-						<div className="type-metric">
+						<div className="mt-1 type-metric text-primary">
 							{hasStochasticData && stochasticResult
 								? pct.format(stochasticResult.milestones.hitTargetProbability)
 								: goalReached
@@ -94,9 +96,9 @@ export const OverviewCard = memo(function OverviewCard({
 						</div>
 					</div>
 
-					<div className="space-y-1 lg:col-span-1">
+					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
 						<div className="type-label">Main constraint</div>
-						<div className="type-title">{blockerValue}</div>
+						<div className="mt-1 type-title">{blockerValue}</div>
 						<div className="type-muted line-clamp-2">{blockerDetail}</div>
 					</div>
 				</div>
