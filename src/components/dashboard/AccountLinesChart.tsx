@@ -4,6 +4,7 @@ import { createBaseOptions, formatDate } from "@/chart/uplotBase";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import { currency } from "@/lib/format";
 import type { ScenarioPack } from "@/lib/projection";
+import { escapeHtml } from "@/lib/utils";
 
 interface AccountLinesChartProps {
 	pack: ScenarioPack;
@@ -74,8 +75,8 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 			for (const acct of nonZero) {
 				html += `<div class="flex justify-between gap-3 type-caption">`;
 				html += `<span class="inline-flex items-center gap-1.5 text-foreground/80">`;
-				html += `<span class="inline-block h-2 w-2 rounded-full" style="background-color:${acct.color ?? FALLBACK_ACCOUNT_COLOR}"></span>`;
-				html += `${acct.label}</span>`;
+				html += `<span class="inline-block h-2 w-2 rounded-full" style="background-color:${escapeHtml(acct.color ?? FALLBACK_ACCOUNT_COLOR)}"></span>`;
+				html += `${escapeHtml(acct.label)}</span>`;
 				html += `<span class="tabular-nums text-foreground/80">${currency.format(acct.val)}</span>`;
 				html += `</div>`;
 			}
