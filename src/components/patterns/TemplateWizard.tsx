@@ -83,7 +83,7 @@ export function TemplateWizard({
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4">
-			<div className="w-full max-w-lg rounded-[1.8rem] border border border-border bg-card shadow-xl">
+			<div className="w-full max-w-lg rounded-[1.8rem] border border-border/80 bg-card shadow-xl dark:border-white/10">
 				<div className="px-6 py-4 border-b border-border/70">
 					<h2 className="type-title">Income Template</h2>
 					<p className="type-caption mt-1">

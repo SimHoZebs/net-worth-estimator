@@ -42,12 +42,12 @@ function Calendar({
 				day: "p-0 text-center align-middle",
 				day_button: cn(
 					buttonVariants({ variant: "ghost", size: "icon" }),
-					"h-9 w-9 rounded-full text-sm font-normal text-foreground/80 text-foreground/80 aria-selected:opacity-100",
+					"h-9 w-9 rounded-full text-sm font-normal text-foreground/80 aria-selected:opacity-100",
 				),
 				today:
-					"[&_button]:border [&_button]:border-border  [&_button]:text-foreground",
+					"[&_button]:border [&_button]:border-ring/60 [&_button]:bg-accent/45 [&_button]:text-foreground",
 				selected:
-					"[&_button]:bg-primary  [&_button]:text-primary-foreground [&_button]:hover:bg-primary ",
+					"[&_button]:bg-primary [&_button]:text-primary-foreground [&_button]:shadow-[0_8px_18px_color-mix(in_oklab,var(--primary)_28%,transparent)] [&_button]:hover:bg-primary",
 				outside: "text-muted-foreground/50 [&_button]:text-muted-foreground/50",
 				disabled:
 					"opacity-30 [&_button]:cursor-not-allowed [&_button]:hover:bg-transparent",

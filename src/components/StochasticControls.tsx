@@ -72,7 +72,7 @@ export function StochasticControls({
 			<Collapsible.Content>
 				<div className="space-y-4">
 					{/* Toggle row */}
-					<div className="flex items-center justify-between rounded-xl border border border-border bg-muted px-4 py-3">
+					<div className="flex items-center justify-between rounded-xl border border-border/80 bg-surface/75 px-4 py-3 dark:border-white/10 dark:bg-surface/55">
 						<div>
 							<div className="type-value text-sm">
 								Enable Monte Carlo simulation
@@ -95,7 +95,7 @@ export function StochasticControls({
 								}
 								disabled={!hasStochasticAccounts}
 							/>
-							<div className="peer h-6 w-11 rounded-full bg-muted-foreground/50 after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-card after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-disabled:opacity-40" />
+							<div className="peer h-6 w-11 rounded-full bg-muted-foreground/35 shadow-inner after:absolute after:left-[2px] after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-card after:shadow-sm after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-disabled:opacity-40" />
 						</label>
 					</div>
 
@@ -111,7 +111,7 @@ export function StochasticControls({
 										max={10000}
 										value={runCountInput}
 										onChange={(e) => updateRunCountInput(e.currentTarget.value)}
-										className="w-full rounded-xl border border border-border bg-card px-3 py-2 type-body outline-none focus:border-ring"
+										className="w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 type-body shadow-sm outline-none focus:border-ring dark:border-white/10"
 									/>
 								</div>
 								<div className="space-y-1">
@@ -122,7 +122,7 @@ export function StochasticControls({
 										value={seedInput}
 										onChange={(e) => updateSeedInput(e.currentTarget.value)}
 										placeholder="Random"
-										className="w-full rounded-xl border border border-border bg-card px-3 py-2 type-body outline-none placeholder:text-muted-foreground focus:border-ring"
+										className="w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 type-body shadow-sm outline-none placeholder:text-muted-foreground focus:border-ring dark:border-white/10"
 									/>
 								</div>
 								<div className="flex items-end">
@@ -151,7 +151,7 @@ export function StochasticControls({
 									</div>
 								</div>
 							) : null}
-							<div className="rounded-xl border border border-border/70 bg-muted/70 px-4 py-3">
+							<div className="rounded-xl border border-border/70 bg-surface/70 px-4 py-3 dark:border-white/10 dark:bg-surface/50">
 								<div className="type-eyebrow">How the simulation works</div>
 								<ul className="mt-1.5 space-y-1 type-caption">
 									<li>
@@ -181,7 +181,6 @@ export function StochasticControls({
 									</li>
 								</ul>
 							</div>
-							)
 							{stochasticResult ? (
 								<div className="grid gap-3">
 									<StochasticResultCard

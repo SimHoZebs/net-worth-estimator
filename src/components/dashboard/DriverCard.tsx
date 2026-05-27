@@ -14,17 +14,17 @@ export const DriverCard = memo(function DriverCard({
 }) {
 	const toneClassName =
 		tone === "primary"
-			? "border-primary-border bg-primary-subtle"
+			? "border-primary-border/70 bg-primary-subtle/80 text-primary"
 			: tone === "tertiary"
-				? "border-tertiary-border bg-tertiary-subtle"
-				: "border-border bg-card";
+				? "border-tertiary-border/80 bg-tertiary-subtle/80 text-tertiary-foreground"
+				: "border-border/80 bg-card/90";
 
 	return (
-		<Card className={`rounded-[1.6rem] shadow-sm ${toneClassName}`}>
+		<Card className={`rounded-[1.6rem] ${toneClassName}`}>
 			<CardContent className="space-y-2 p-5">
 				<div className="type-label">{label}</div>
-				<div className="type-title">{value}</div>
-				<div className="type-muted">{detail}</div>
+				<div className="type-title text-foreground">{value}</div>
+				<div className="type-muted text-current/75">{detail}</div>
 			</CardContent>
 		</Card>
 	);

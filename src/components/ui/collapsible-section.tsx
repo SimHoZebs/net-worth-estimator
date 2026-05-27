@@ -69,7 +69,7 @@ function CollapsibleRoot({
 		<CollapsibleContext.Provider value={{ open: isOpen, onToggle: toggle }}>
 			<details
 				open={isOpen}
-				className={`rounded-[1.8rem] border border-border bg-card px-5 py-5 shadow-sm open:border-ring ${className}`}
+				className={`rounded-[1.8rem] border border-border/80 bg-card/88 px-5 py-5 shadow-[0_16px_48px_color-mix(in_oklab,var(--foreground)_8%,transparent)] backdrop-blur-sm transition-colors open:border-ring/70 dark:border-white/10 dark:bg-card/82 dark:shadow-[0_18px_60px_rgba(0,0,0,0.32)] ${className}`}
 			>
 				{children}
 			</details>

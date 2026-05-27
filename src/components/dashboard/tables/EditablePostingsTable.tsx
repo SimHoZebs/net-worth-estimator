@@ -238,7 +238,7 @@ export function EditablePostingsTable({
 									<TableCell>
 										<input
 											type="checkbox"
-											className="h-4 w-4 rounded accent-slate-700"
+											className="h-4 w-4 rounded accent-primary"
 											checked={p.enabled}
 											onChange={() =>
 												updatePosting(p.id, { enabled: !p.enabled })

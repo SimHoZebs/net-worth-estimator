@@ -115,7 +115,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 		: undefined;
 
 	return (
-		<Card className="rounded-[1.6rem] border-border shadow-sm ">
+		<Card className="rounded-[1.6rem] border-border/80">
 			<CardHeader>
 				<div>
 					<CardTitle>Shortfall calendar</CardTitle>
@@ -128,7 +128,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 			<CardContent>
 				{shortfallDays.length > 0 ? (
 					<div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
-						<div className="rounded-2xl border border border-border bg-muted p-3">
+						<div className="rounded-2xl border border-border/80 bg-surface/75 p-3 dark:border-white/10 dark:bg-surface/55">
 							<Calendar
 								mode="single"
 								selected={
@@ -155,7 +155,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 							/>
 						</div>
 
-						<div className="space-y-3 rounded-2xl border border-tertiary-border bg-tertiary-subtle/70 p-4">
+						<div className="space-y-3 rounded-2xl border border-tertiary-border/80 bg-tertiary-subtle/80 p-4 shadow-inner shadow-white/20 dark:shadow-black/20">
 							<div>
 								<div className="text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
 									Shortfall dates
@@ -175,7 +175,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 										key={day.date}
 										type="button"
 										onClick={() => setSelectedDateIso(day.date)}
-										className="w-full rounded-xl border border-border bg-card px-3 py-2 text-left shadow-sm  transition hover:border-tertiary-border hover:bg-tertiary-subtle"
+										className="w-full rounded-xl border border-border/80 bg-card/82 px-3 py-2 text-left shadow-sm transition hover:border-tertiary-border hover:bg-tertiary-subtle dark:border-white/10"
 									>
 										<div className="flex items-center justify-between gap-2">
 											<span className="type-label text-tertiary-foreground">
@@ -202,7 +202,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 						</div>
 					</div>
 				) : (
-					<div className="rounded-2xl border border-primary-border bg-primary-subtle px-4 py-6 type-body text-primary">
+					<div className="rounded-2xl border border-primary-border/80 bg-primary-subtle/80 px-4 py-6 type-body text-primary">
 						No projected shortfalls are scheduled within the horizon.
 					</div>
 				)}
@@ -217,7 +217,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 					onClick={() => setSelectedDateIso(null)}
 				>
 					<div
-						className="max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-[1.6rem] bg-card p-5 shadow-2xl "
+						className="max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-[1.6rem] border border-border/80 bg-card p-5 shadow-2xl dark:border-white/10"
 						onClick={(event) => event.stopPropagation()}
 					>
 						<div className="mb-4 flex items-start justify-between gap-4">

@@ -40,7 +40,7 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 	};
 
 	return (
-		<Card className="rounded-[1.4rem] border-border shadow-sm ">
+		<Card className="rounded-[1.4rem] border-border/80">
 			<CardHeader>
 				<CardTitle>Projection settings</CardTitle>
 				<CardDescription>
@@ -48,7 +48,7 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
-				<div className="rounded-2xl border border border-border bg-muted p-4">
+				<div className="rounded-2xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
 					<div className="type-eyebrow">Target net worth</div>
 					{isTargetFocused ? (
 						<input
@@ -65,7 +65,7 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 									setIsTargetFocused(false);
 								}
 							}}
-							className="mt-2 w-full rounded-xl border border border-border bg-card px-3 py-2 type-title shadow-sm  outline-none transition focus:border-ring"
+							className="mt-2 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 type-title shadow-sm outline-none transition focus:border-ring dark:border-white/10"
 						/>
 					) : (
 						<button
@@ -74,7 +74,7 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 								setTargetDraft(String(projectionSettings.targetNetWorth));
 								setIsTargetFocused(true);
 							}}
-							className="mt-2 w-full rounded-xl border border border-border bg-card px-3 py-2 text-left type-title shadow-sm  outline-none transition hover:border-ring focus:border-ring"
+							className="mt-2 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 text-left type-title shadow-sm outline-none transition hover:border-ring focus:border-ring dark:border-white/10"
 						>
 							{formatCurrencyInput(String(projectionSettings.targetNetWorth))}
 						</button>
@@ -84,7 +84,7 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 					</div>
 				</div>
 
-				<div className="rounded-2xl border border border-border bg-muted p-4">
+				<div className="rounded-2xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
 					<div className="flex items-center justify-between">
 						<div className="type-eyebrow">Horizon</div>
 						<span className="type-title">
@@ -102,14 +102,14 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 								horizonYears: Number(event.target.value),
 							})
 						}
-						className="mt-2 w-full accent-slate-900 dark:accent-slate-100"
+						className="mt-2 w-full accent-primary"
 					/>
 					<div className="mt-1 type-caption text-muted-foreground/70">
 						From {formatDate(projectionStartDate)}
 					</div>
 				</div>
 
-				<div className="flex items-center justify-between rounded-2xl border border border-border bg-card px-4 py-3">
+				<div className="flex items-center justify-between rounded-2xl border border-border/80 bg-card/85 px-4 py-3 dark:border-white/10">
 					<div>
 						<div className="type-eyebrow">Overrides</div>
 						<div className="mt-0.5 type-caption text-muted-foreground/70">

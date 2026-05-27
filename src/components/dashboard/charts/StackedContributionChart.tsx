@@ -150,7 +150,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 			const p25 = (self.data[bi + 2] as number[])[idx];
 			const p75 = (self.data[bi + 3] as number[])[idx];
 
-			let html = `<div class="rounded-lg border border border-border bg-card px-3 py-2 shadow-sm  max-w-xs">`;
+			let html = `<div class="max-w-xs rounded-lg border border-border/80 bg-card/95 px-3 py-2 shadow-xl backdrop-blur dark:border-white/10">`;
 			html += `<div class="type-label">${dateStr}</div>`;
 			html += `<div class="mt-2 border-b border-border/70 pb-1">`;
 			html += `<div class="type-title">Net worth: ${currency.format(displayNw)}</div>`;

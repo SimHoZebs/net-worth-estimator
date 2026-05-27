@@ -228,7 +228,7 @@ export default function App() {
 	);
 
 	return (
-		<div className="min-h-screen bg-background text-foreground">
+		<div className="app-shell min-h-screen bg-background text-foreground">
 			<div className="space-y-0 px-0 md:px-0">
 				<div className="mx-auto max-w-[106rem] px-4 py-4 md:px-8">
 					<div className="flex items-center justify-between gap-2">
@@ -236,7 +236,7 @@ export default function App() {
 							{pack ? (
 								<span>
 									Baseline loaded from{" "}
-									<span className="font-medium text-slate-600 dark:text-slate-300">
+									<span className="font-medium text-foreground/75">
 										{dataSource.label}
 									</span>
 									{activeOverrideCount > 0
@@ -250,7 +250,7 @@ export default function App() {
 								</span>
 							) : (
 								<span className="inline-flex items-center gap-2">
-									<span className="inline-block h-2 w-2 animate-pulse rounded-full bg-slate-400 dark:bg-slate-500" />
+									<span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary/70" />
 									Loading scenario data...
 								</span>
 							)}
@@ -297,7 +297,7 @@ export default function App() {
 							{[1, 2, 3].map((i) => (
 								<div
 									key={i}
-									className="animate-pulse rounded-[1.8rem] border border border-border bg-card p-6 shadow-sm "
+									className="animate-pulse rounded-[1.8rem] border border-border/80 bg-card/85 p-6 shadow-sm dark:border-white/10"
 								>
 									<div className="mb-2 h-3 w-20 rounded bg-muted" />
 									<div className="h-6 w-32 rounded bg-muted" />
@@ -452,15 +452,15 @@ function ThemeToggle({
 	setTheme: (t: "light" | "dark" | "system") => void;
 }) {
 	return (
-		<div className="flex rounded-lg border border-slate-200 p-0.5 dark:border-slate-700">
+		<div className="flex rounded-xl border border-border/80 bg-card/70 p-0.5 shadow-sm backdrop-blur-sm dark:border-white/10">
 			<button
 				type="button"
 				aria-label="Light theme"
 				onClick={() => setTheme("light")}
-				className={`rounded-md px-2 py-1 type-caption transition-colors ${
+				className={`rounded-lg px-2 py-1 type-caption transition-colors ${
 					theme === "light"
-						? "bg-muted text-slate-900 dark:bg-slate-600 dark:text-slate-100"
-						: "text-slate-500 hover:text-slate-900 dark:text-muted-foreground/70 dark:hover:text-slate-100"
+						? "bg-primary text-primary-foreground shadow-sm"
+						: "text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground"
 				}`}
 			>
 				<svg
@@ -482,10 +482,10 @@ function ThemeToggle({
 				type="button"
 				aria-label="Dark theme"
 				onClick={() => setTheme("dark")}
-				className={`rounded-md px-2 py-1 type-caption transition-colors ${
+				className={`rounded-lg px-2 py-1 type-caption transition-colors ${
 					theme === "dark"
-						? "bg-muted text-slate-900 dark:bg-slate-600 dark:text-slate-100"
-						: "text-slate-500 hover:text-slate-900 dark:text-muted-foreground/70 dark:hover:text-slate-100"
+						? "bg-primary text-primary-foreground shadow-sm"
+						: "text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground"
 				}`}
 			>
 				<svg
@@ -506,10 +506,10 @@ function ThemeToggle({
 				type="button"
 				aria-label="System theme"
 				onClick={() => setTheme("system")}
-				className={`rounded-md px-2 py-1 type-caption transition-colors ${
+				className={`rounded-lg px-2 py-1 type-caption transition-colors ${
 					theme === "system"
-						? "bg-muted text-slate-900 dark:bg-slate-600 dark:text-slate-100"
-						: "text-slate-500 hover:text-slate-900 dark:text-muted-foreground/70 dark:hover:text-slate-100"
+						? "bg-primary text-primary-foreground shadow-sm"
+						: "text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground"
 				}`}
 			>
 				<svg
