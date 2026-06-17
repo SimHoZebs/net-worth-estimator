@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -43,6 +44,34 @@ export function EditableAccountsTable({
 	deleteAccount,
 	addAccount,
 }: EditableAccountsTableProps) {
+	const changedAccountIds = useMemo(() => {
+		const changed = new Set<string>();
+		if (!isDirty || !workingPack) return changed;
+
+		// Map pack accounts by id for O(1) lookup
+		const packAccountsById = new Map<string, Account>();
+		for (const pa of pack.accounts) {
+			packAccountsById.set(pa.id, pa);
+		}
+
+		for (const wa of workingPack.accounts) {
+			const pa = packAccountsById.get(wa.id);
+			if (!pa) {
+				changed.add(wa.id);
+			} else if (
+				wa.label !== pa.label ||
+				wa.minBalance !== pa.minBalance ||
+				wa.maxBalance !== pa.maxBalance ||
+				wa.color !== pa.color ||
+				wa.enabled !== pa.enabled ||
+				wa.id !== pa.id
+			) {
+				changed.add(wa.id);
+			}
+		}
+		return changed;
+	}, [isDirty, workingPack, pack]);
+
 	return (
 		<Card className="rounded-[1.8rem] border-border shadow-sm ">
 			<CardHeader>
@@ -64,21 +93,12 @@ export function EditableAccountsTable({
 					</TableHeader>
 					<TableBody>
 						{displayPack.accounts.map((a) => {
-							const changed =
-								isDirty &&
-								workingPack?.accounts.some(
-									(wa) =>
-										wa.id === a.id &&
-										JSON.stringify(wa) !==
-											JSON.stringify(
-												pack.accounts.find((pa) => pa.id === a.id),
-											),
-								);
+							const changed = changedAccountIds.has(a.id);
 							return (
 								<TableRow key={a.id}>
 									<TableCell>
 										<input
-											className={inputStyle(!!changed)}
+											className={inputStyle(changed)}
 											value={a.id}
 											onChange={(e) =>
 												updateAccount(a.id, { id: e.target.value })
@@ -87,7 +107,7 @@ export function EditableAccountsTable({
 									</TableCell>
 									<TableCell>
 										<input
-											className={inputStyle(!!changed)}
+											className={inputStyle(changed)}
 											value={a.label}
 											onChange={(e) =>
 												updateAccount(a.id, { label: e.target.value })
@@ -96,7 +116,7 @@ export function EditableAccountsTable({
 									</TableCell>
 									<TableCell>
 										<input
-											className={inputStyle(!!changed)}
+											className={inputStyle(changed)}
 											type="number"
 											value={a.minBalance === NO_FLOOR ? "" : a.minBalance}
 											onChange={(e) =>
@@ -110,7 +130,7 @@ export function EditableAccountsTable({
 									</TableCell>
 									<TableCell>
 										<input
-											className={inputStyle(!!changed)}
+											className={inputStyle(changed)}
 											type="number"
 											value={a.maxBalance === NO_CEILING ? "" : a.maxBalance}
 											onChange={(e) =>
@@ -124,7 +144,7 @@ export function EditableAccountsTable({
 									</TableCell>
 									<TableCell>
 										<input
-											className={inputStyle(!!changed)}
+											className={inputStyle(changed)}
 											value={a.color ?? ""}
 											onChange={(e) =>
 												updateAccount(a.id, { color: e.target.value || null })
