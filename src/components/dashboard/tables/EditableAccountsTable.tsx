@@ -43,6 +43,18 @@ export function EditableAccountsTable({
 	deleteAccount,
 	addAccount,
 }: EditableAccountsTableProps) {
+	const packAccountsById = new Map<string, Account>();
+	for (const a of pack.accounts) {
+		packAccountsById.set(a.id, a);
+	}
+
+	const workingAccountsById = new Map<string, Account>();
+	if (workingPack) {
+		for (const a of workingPack.accounts) {
+			workingAccountsById.set(a.id, a);
+		}
+	}
+
 	return (
 		<Card className="rounded-[1.8rem] border-border shadow-sm ">
 			<CardHeader>
@@ -64,16 +76,11 @@ export function EditableAccountsTable({
 					</TableHeader>
 					<TableBody>
 						{displayPack.accounts.map((a) => {
+							const wa = workingAccountsById.get(a.id);
+							const pa = packAccountsById.get(a.id);
 							const changed =
-								isDirty &&
-								workingPack?.accounts.some(
-									(wa) =>
-										wa.id === a.id &&
-										JSON.stringify(wa) !==
-											JSON.stringify(
-												pack.accounts.find((pa) => pa.id === a.id),
-											),
-								);
+								isDirty && wa && JSON.stringify(wa) !== JSON.stringify(pa);
+
 							return (
 								<TableRow key={a.id}>
 									<TableCell>
