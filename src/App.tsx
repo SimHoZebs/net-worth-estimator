@@ -346,7 +346,7 @@ export default function App() {
 					) : null}
 
 					{pack && validation.isValid && result ? (
-						<div className="grid items-start gap-6 min-[110rem]:grid-cols-[minmax(0,80rem)_24rem] min-[110rem]:justify-center">
+						<div className="grid items-start gap-6 min-[90rem]:grid-cols-[minmax(0,1fr)_24rem] min-[90rem]:justify-center">
 							<main className="min-w-0 space-y-6">
 								<ProjectionDashboard
 									pack={pack}
