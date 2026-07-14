@@ -46,12 +46,10 @@ export const DebtSummary = memo(function DebtSummary({
 		}));
 
 	// Also include accounts whose label suggests debt even if balance is 0
+	const debtAccountIds = new Set(debtAccounts.map((d) => d.account.id));
 	const debtByLabel = pack.accounts
 		.filter(
-			(a) =>
-				a.enabled &&
-				isDebtAccount(a.label) &&
-				!debtAccounts.some((d) => d.account.id === a.id),
+			(a) => a.enabled && isDebtAccount(a.label) && !debtAccountIds.has(a.id),
 		)
 		.map((a) => ({
 			account: a,
