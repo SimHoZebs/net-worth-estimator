@@ -87,14 +87,16 @@ export function UPlotChart({ options, data, tooltipContent }: UPlotChartProps) {
 	}, [data]);
 
 	return (
-		<div
-			ref={targetRef}
-			className="relative min-h-[420px] w-full overflow-hidden"
-		>
+		<div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
 			<div
-				ref={tooltipRef}
-				className="pointer-events-none absolute z-50 hidden"
-			/>
+				ref={targetRef}
+				className="relative min-h-[420px] w-full min-w-[700px] overflow-hidden md:min-w-0"
+			>
+				<div
+					ref={tooltipRef}
+					className="pointer-events-none absolute z-50 hidden"
+				/>
+			</div>
 		</div>
 	);
 }
