@@ -1,6 +1,13 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+} from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
+import { calculateTooltipPosition } from "@/chart/tooltipPosition";
 
 interface UPlotChartProps {
 	options: uPlot.Options;
@@ -9,7 +16,6 @@ interface UPlotChartProps {
 	tooltip?: ReactNode;
 	onCursorChange?: (idx: number | null) => void;
 	desktopTooltipOnly?: boolean;
-	className?: string;
 }
 
 export function UPlotChart({
@@ -19,7 +25,6 @@ export function UPlotChart({
 	tooltip,
 	onCursorChange,
 	desktopTooltipOnly = false,
-	className = "h-[320px] md:h-[420px]",
 }: UPlotChartProps) {
 	const targetRef = useRef<HTMLDivElement>(null);
 	const tooltipRef = useRef<HTMLDivElement>(null);
@@ -32,6 +37,22 @@ export function UPlotChart({
 	tooltipContentRef.current = tooltipContent;
 	onCursorChangeRef.current = onCursorChange;
 	hasReactTooltipRef.current = tooltip != null;
+
+	const positionTooltip = useCallback((chart: uPlot) => {
+		const target = targetRef.current;
+		const tooltipElement = tooltipRef.current;
+		if (!target || !tooltipElement) return;
+		const { left, top } = calculateTooltipPosition({
+			cursorLeft: chart.cursor.left ?? 0,
+			cursorTop: chart.cursor.top ?? 0,
+			tooltipWidth: tooltipElement.offsetWidth,
+			tooltipHeight: tooltipElement.offsetHeight,
+			containerWidth: target.clientWidth,
+			containerHeight: target.clientHeight,
+		});
+		tooltipElement.style.left = `${left}px`;
+		tooltipElement.style.top = `${top}px`;
+	}, []);
 
 	useEffect(() => {
 		const target = targetRef.current;
@@ -75,19 +96,7 @@ export function UPlotChart({
 							tooltip.innerHTML = tooltipContentRef.current(self, idx);
 						}
 
-						const cLeft = self.cursor.left ?? 0;
-						const cTop = self.cursor.top ?? 0;
-						const tw = tooltip.offsetWidth;
-						const th = tooltip.offsetHeight;
-						const pw = self.bbox.width;
-						const _ph = self.bbox.height;
-
-						let left = cLeft + 12;
-						let top = cTop - th - 8;
-						if (left + tw > pw - 4) left = pw - tw - 4;
-						if (top < 0) top = cTop + 12;
-						tooltip.style.left = `${left}px`;
-						tooltip.style.top = `${top}px`;
+						positionTooltip(self);
 					},
 				],
 			},
@@ -115,17 +124,22 @@ export function UPlotChart({
 			chartRef.current?.destroy();
 			chartRef.current = null;
 		};
-	}, [options, data, desktopTooltipOnly]);
+	}, [options, data, desktopTooltipOnly, positionTooltip]);
+
+	useLayoutEffect(() => {
+		const chart = chartRef.current;
+		if (tooltip != null && chart?.cursor.idx != null) positionTooltip(chart);
+	}, [tooltip, positionTooltip]);
 
 	useEffect(() => {
 		chartRef.current?.setData(data);
 	}, [data]);
 
 	return (
-		<div className="w-full min-w-0">
+		<div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
 			<div
 				ref={targetRef}
-				className={`relative w-full min-w-0 overflow-hidden ${className}`}
+				className="relative min-h-[420px] w-full min-w-[700px] overflow-hidden md:min-w-0"
 			>
 				<div
 					ref={tooltipRef}
