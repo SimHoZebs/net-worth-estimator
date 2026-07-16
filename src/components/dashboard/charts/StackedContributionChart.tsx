@@ -1,25 +1,22 @@
-import { memo, useCallback, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type uPlot from "uplot";
 import { parseChartDate } from "@/chart/chartData";
 import {
+	buildPointDetails,
+	formatPointDetailsSummary,
+} from "@/chart/pointDetails";
+import {
 	createBaseOptions,
 	createReferenceLinesHooks,
-	formatDate,
 } from "@/chart/uplotBase";
 import { UPlotChart } from "@/components/ui/UPlotChart";
-import { currency } from "@/lib/format";
 import type { ScenarioPack } from "@/lib/projection";
-import { escapeHtml } from "@/lib/utils";
+import { PointDetailsPanel } from "./PointDetailsPanel";
 
 interface AccountMeta {
 	id: string;
 	label: string;
 	color: string | null;
-}
-
-interface Classification {
-	assets: AccountMeta[];
-	liabilities: AccountMeta[];
 }
 
 const NET_WORTH_CHART_MAX_Y = 2_000_000;
@@ -43,299 +40,273 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 	chartData,
 	milestoneDates,
 }: StackedContributionChartProps) {
-	const prevRowCount = useRef(-1);
-	const cache = useRef<Classification | null>(null);
-
+	const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+	const [isExpanded, setIsExpanded] = useState(false);
+	const enabledAccounts = useMemo(
+		() => pack.accounts.filter((account) => account.enabled),
+		[pack.accounts],
+	);
 	const { assets, liabilities } = useMemo(() => {
-		const enabled = pack.accounts.filter((a) => a.enabled);
-		const len = chartData.length;
-		if (len === 0) return { assets: enabled, liabilities: [] as AccountMeta[] };
-		if (len === prevRowCount.current && cache.current) return cache.current;
-		prevRowCount.current = len;
-
-		const avgBal: Record<string, number> = {};
-		for (const a of enabled) avgBal[a.id] = 0;
+		const averageBalances = Object.fromEntries(
+			enabledAccounts.map((account) => [account.id, 0]),
+		);
 		for (const row of chartData) {
-			for (const a of enabled) {
-				avgBal[a.id] += Number(row[a.id] ?? 0) / len;
+			for (const account of enabledAccounts) {
+				averageBalances[account.id] +=
+					Number(row[account.id] ?? 0) / Math.max(chartData.length, 1);
 			}
 		}
-		cache.current = {
-			assets: enabled
-				.filter((a) => avgBal[a.id] >= 0)
-				.sort((a, b) => Math.abs(avgBal[a.id]) - Math.abs(avgBal[b.id])),
-			liabilities: enabled
-				.filter((a) => avgBal[a.id] < 0)
-				.sort((a, b) => Math.abs(avgBal[a.id]) - Math.abs(avgBal[b.id])),
+		const byAscendingMagnitude = (a: AccountMeta, b: AccountMeta) =>
+			Math.abs(averageBalances[a.id]) - Math.abs(averageBalances[b.id]);
+		return {
+			assets: enabledAccounts
+				.filter((account) => averageBalances[account.id] >= 0)
+				.sort(byAscendingMagnitude),
+			liabilities: enabledAccounts
+				.filter((account) => averageBalances[account.id] < 0)
+				.sort(byAscendingMagnitude),
 		};
-		return cache.current;
-	}, [chartData.length, pack.accounts, chartData]);
-
-	const A = assets.length;
-	const L = liabilities.length;
+	}, [chartData, enabledAccounts]);
+	const accountCount = assets.length + liabilities.length;
 
 	const data = useMemo((): uPlot.AlignedData => {
-		const numCols = 1 + A + L + 2 + 4;
-		if (chartData.length === 0)
-			return Array.from({ length: numCols }, () => [
+		const columnCount = 1 + accountCount + 2 + 4;
+		if (chartData.length === 0) {
+			return Array.from({ length: columnCount }, () => [
 				0,
-			]) as unknown as uPlot.AlignedData;
-
+			]) as uPlot.AlignedData;
+		}
 		const timestamps: number[] = [];
-		const assetCums: number[][] = assets.map(() => []);
-		const liabCums: number[][] = liabilities.map(() => []);
-		const p50Arr: number[] = [];
-		const nwArr: number[] = [];
-		const p10Arr: number[] = [];
-		const p90Arr: number[] = [];
-		const p25Arr: number[] = [];
-		const p75Arr: number[] = [];
+		const assetCumulative: number[][] = assets.map(() => []);
+		const liabilityCumulative: number[][] = liabilities.map(() => []);
+		const p50: number[] = [];
+		const netWorth: number[] = [];
+		const p10: number[] = [];
+		const p90: number[] = [];
+		const p25: number[] = [];
+		const p75: number[] = [];
 
 		for (const row of chartData) {
 			timestamps.push(parseChartDate(String(row.date)));
-			const nw = Number(row.netWorth);
-			const p50 = Number(row.p50 ?? nw);
-			p50Arr.push(p50);
-			nwArr.push(nw);
-
-			let cumA = 0;
-			for (let i = 0; i < A; i++) {
-				cumA += Number(row[assets[i].id] ?? 0);
-				assetCums[i].push(cumA);
+			const rowNetWorth = Number(row.netWorth);
+			p50.push(Number(row.p50 ?? rowNetWorth));
+			netWorth.push(rowNetWorth);
+			let assetTotal = 0;
+			for (let index = 0; index < assets.length; index++) {
+				assetTotal += Number(row[assets[index].id] ?? 0);
+				assetCumulative[index].push(assetTotal);
 			}
-			let cumL = 0;
-			for (let i = 0; i < L; i++) {
-				cumL += Number(row[liabilities[i].id] ?? 0);
-				liabCums[i].push(cumL);
+			let liabilityTotal = 0;
+			for (let index = 0; index < liabilities.length; index++) {
+				liabilityTotal += Number(row[liabilities[index].id] ?? 0);
+				liabilityCumulative[index].push(liabilityTotal);
 			}
-			p10Arr.push(Number((row as any)._p10 ?? nw));
-			p90Arr.push(Number((row as any)._p90 ?? nw));
-			p25Arr.push(Number((row as any)._p25 ?? nw));
-			p75Arr.push(Number((row as any)._p75 ?? nw));
+			p10.push(Number(row._p10 ?? rowNetWorth));
+			p90.push(Number(row._p90 ?? rowNetWorth));
+			p25.push(Number(row._p25 ?? rowNetWorth));
+			p75.push(Number(row._p75 ?? rowNetWorth));
 		}
-
 		return [
 			timestamps,
-			...assetCums.slice().reverse(),
-			...liabCums,
-			p50Arr,
-			nwArr,
-			p10Arr,
-			p90Arr,
-			p25Arr,
-			p75Arr,
+			...assetCumulative.slice().reverse(),
+			...liabilityCumulative,
+			p50,
+			netWorth,
+			p10,
+			p90,
+			p25,
+			p75,
 		];
-	}, [chartData, assets, liabilities, A, L]);
-
-	const _bandIdx = 1 + A + L + 2;
-
-	const chartDataRef = useRef(chartData);
-	chartDataRef.current = chartData;
-
-	const tooltipContent = useCallback(
-		(self: uPlot, idx: number) => {
-			const cd = chartDataRef.current;
-			const ts = (self.data[0] as number[])[idx];
-			const d = new Date(ts);
-			const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-			const dateStr = formatDate(iso);
-
-			const p50Arr = self.data[1 + A + L] as number[];
-			const nwArr = self.data[1 + A + L + 1] as number[];
-			const displayNw = hasStochasticData ? p50Arr[idx] : nwArr[idx];
-
-			const bi = 1 + A + L + 2;
-			const p10 = (self.data[bi] as number[])[idx];
-			const p90 = (self.data[bi + 1] as number[])[idx];
-			const p25 = (self.data[bi + 2] as number[])[idx];
-			const p75 = (self.data[bi + 3] as number[])[idx];
-
-			let html = `<div class="max-w-xs rounded-lg border border-border/80 bg-card/95 px-3 py-2 shadow-xl backdrop-blur dark:border-white/10">`;
-			html += `<div class="type-label">${dateStr}</div>`;
-			html += `<div class="mt-2 border-b border-border/70 pb-1">`;
-			html += `<div class="type-title">Net worth: ${currency.format(displayNw)}</div>`;
-			if (hasStochasticData) {
-				html += `<div class="mt-0.5 type-caption text-[10px] leading-tight">`;
-				html += `P10–P90: ${currency.format(p10)} – ${currency.format(p90)}<br />`;
-				html += `P25–P75: ${currency.format(p25)} – ${currency.format(p75)}`;
-				html += `</div>`;
-			}
-			html += `</div>`;
-			html += `<div class="mt-1 max-h-[160px] overflow-y-auto space-y-0.5">`;
-
-			const rawRow = cd[idx] as Record<string, number> | undefined;
-			for (const group of [assets, liabilities]) {
-				for (const a of group) {
-					const val = rawRow?.[a.id] ?? 0;
-					html += `<div class="flex justify-between gap-3 type-caption">`;
-					html += `<span class="inline-flex items-center gap-1.5 text-foreground/80">`;
-					html += `<span class="inline-block h-2 w-2 rounded-full" style="background-color:${escapeHtml(a.color ?? FALLBACK_ACCOUNT_COLOR)}"></span>`;
-					html += `${escapeHtml(a.label)}</span>`;
-					html += `<span class="tabular-nums text-foreground/80">${currency.format(val)}</span>`;
-					html += `</div>`;
-				}
-			}
-			html += `</div></div>`;
-			return html;
-		},
-		[hasStochasticData, assets, liabilities, A, L],
-	);
+	}, [accountCount, assets, chartData, liabilities]);
 
 	const options = useMemo((): uPlot.Options => {
 		const base = createBaseOptions();
-		const showP50 = hasStochasticData;
-		const showNw = !hasStochasticData;
-
-		const fillSeries: uPlot.Series[] = [];
-		for (const a of assets.slice().reverse()) {
-			fillSeries.push({
-				label: a.label,
-				show: true,
-				stroke: a.color ?? FALLBACK_ACCOUNT_COLOR,
-				width: 1.5,
-				fill: a.color ?? FALLBACK_ACCOUNT_COLOR,
-				points: { show: false },
-			});
-		}
-		for (const a of liabilities) {
-			fillSeries.push({
-				label: a.label,
-				show: true,
-				stroke: a.color ?? FALLBACK_ACCOUNT_COLOR,
-				width: 1.5,
-				fill: a.color ?? FALLBACK_ACCOUNT_COLOR,
-				points: { show: false },
-			});
-		}
-
-		const mainLineSeries: uPlot.Series[] = [
-			{
-				label: showP50 ? "Net worth (median simulation)" : undefined,
-				show: showP50,
-				stroke: NET_WORTH_SERIES_COLOR,
-				width: 2.5,
-				points: { show: false },
-			},
-			{
-				label: showNw ? "Net worth" : undefined,
-				show: showNw,
-				stroke: NET_WORTH_SERIES_COLOR,
-				width: 2.5,
-				points: { show: false },
-			},
-		];
-
-		const bandBoundarySeries: uPlot.Series[] = [
-			{
-				show: hasStochasticData,
-				stroke: "transparent",
-				width: 0.5,
-				points: { show: false },
-			},
-			{
-				show: hasStochasticData,
-				stroke: "transparent",
-				width: 0.5,
-				points: { show: false },
-			},
-			{
-				show: hasStochasticData,
-				stroke: "transparent",
-				width: 0.5,
-				points: { show: false },
-			},
-			{
-				show: hasStochasticData,
-				stroke: "transparent",
-				width: 0.5,
-				points: { show: false },
-			},
-		];
-
-		const bi = 1 + A + L + 2;
-
+		const fillSeries: uPlot.Series[] = [
+			...assets.slice().reverse(),
+			...liabilities,
+		].map((account) => ({
+			label: account.label,
+			show: true,
+			stroke: account.color ?? FALLBACK_ACCOUNT_COLOR,
+			width: 1.5,
+			fill: account.color ?? FALLBACK_ACCOUNT_COLOR,
+			points: { show: false },
+		}));
+		const bandIndex = 1 + accountCount + 2;
 		return {
 			...base,
 			width: 0,
 			height: 0,
-			series: [{}, ...fillSeries, ...mainLineSeries, ...bandBoundarySeries],
+			legend: { show: false },
+			series: [
+				{},
+				...fillSeries,
+				{
+					label: "Median net worth",
+					show: hasStochasticData,
+					stroke: NET_WORTH_SERIES_COLOR,
+					width: 2.5,
+					points: { show: false },
+				},
+				{
+					label: "Net worth",
+					show: !hasStochasticData,
+					stroke: NET_WORTH_SERIES_COLOR,
+					width: 2.5,
+					points: { show: false },
+				},
+				...Array.from({ length: 4 }, () => ({
+					show: hasStochasticData,
+					stroke: "transparent",
+					width: 0.5,
+					points: { show: false },
+				})),
+			],
 			bands: hasStochasticData
 				? [
 						{
-							series: [bi, bi + 1],
+							series: [bandIndex, bandIndex + 1],
 							fill: BAND_SOFT_COLOR,
-							dir: 1 as const,
+							dir: 1,
 						},
 						{
-							series: [bi + 2, bi + 3],
+							series: [bandIndex + 2, bandIndex + 3],
 							fill: BAND_COLOR,
-							dir: 1 as const,
+							dir: 1,
 						},
 					]
 				: [],
 			scales: {
 				...base.scales,
 				y: {
-					range: (_u: uPlot, min: number) => {
-						const lower = Math.min(min, -500);
-						return [lower, NET_WORTH_CHART_MAX_Y];
-					},
+					range: (_chart: uPlot, min: number) => [
+						Math.min(min, -500),
+						NET_WORTH_CHART_MAX_Y,
+					],
 				},
 			},
-			hooks: {
-				...createReferenceLinesHooks(targetNetWorth, milestoneDates),
-			},
+			hooks: createReferenceLinesHooks(targetNetWorth, milestoneDates),
 		};
 	}, [
-		targetNetWorth,
-		hasStochasticData,
-		milestoneDates,
+		accountCount,
 		assets,
+		hasStochasticData,
 		liabilities,
-		A,
-		L,
+		milestoneDates,
+		targetNetWorth,
 	]);
 
+	const selectedDetails = useMemo(() => {
+		const row = selectedIndex == null ? undefined : chartData[selectedIndex];
+		return row
+			? buildPointDetails({ row, accounts: enabledAccounts, hasStochasticData })
+			: null;
+	}, [chartData, enabledAccounts, hasStochasticData, selectedIndex]);
+	const handleCursorChange = useCallback((index: number | null) => {
+		setSelectedIndex(index);
+	}, []);
+
+	useEffect(() => {
+		if (!isExpanded) return;
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === "Escape") setIsExpanded(false);
+		};
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, [isExpanded]);
+
 	return (
-		<>
-			<div className="min-w-0">
-				<UPlotChart
-					options={options}
-					data={data}
-					tooltipContent={tooltipContent}
-				/>
+		<div
+			className={
+				isExpanded
+					? "fixed inset-0 z-50 overflow-y-auto bg-background p-3 sm:p-6"
+					: "min-w-0"
+			}
+		>
+			<div className="mb-2 flex justify-end no-print">
+				<button
+					type="button"
+					onClick={() => setIsExpanded((expanded) => !expanded)}
+					className="inline-flex items-center gap-2 rounded-lg border border-border/80 bg-surface/75 px-3 py-1.5 type-label shadow-sm transition hover:bg-accent"
+					aria-label={
+						isExpanded ? "Close expanded chart" : "Expand chart full screen"
+					}
+				>
+					<svg
+						aria-hidden="true"
+						viewBox="0 0 20 20"
+						className="h-3.5 w-3.5 fill-none stroke-current"
+						strokeWidth="1.8"
+					>
+						{isExpanded ? (
+							<path d="M7 3v4H3M13 3v4h4M7 17v-4H3M13 17v-4h4" />
+						) : (
+							<path d="M7 3H3v4M13 3h4v4M7 17H3v-4M13 17h4v-4" />
+						)}
+					</svg>
+					{isExpanded ? "Close" : "Expand"}
+				</button>
 			</div>
-			<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 type-caption">
-				<span className="inline-flex items-center gap-1.5">
-					<span
-						className="inline-block h-2.5 w-2.5 rounded-sm"
-						style={{ backgroundColor: NET_WORTH_SERIES_COLOR }}
+			<UPlotChart
+				options={options}
+				data={data}
+				tooltip={
+					selectedDetails ? (
+						<PointDetailsPanel details={selectedDetails} compact />
+					) : null
+				}
+				onCursorChange={handleCursorChange}
+				desktopTooltipOnly
+				className={isExpanded ? "h-[70dvh] min-h-[360px]" : undefined}
+			/>
+			<ChartEncodingLegend hasStochasticData={hasStochasticData} />
+			{selectedDetails && (
+				<>
+					<PointDetailsPanel
+						key={`${selectedIndex}-${isExpanded}`}
+						details={selectedDetails}
+						onClear={() => setSelectedIndex(null)}
 					/>
-					{hasStochasticData ? "Net worth (median simulation)" : "Net worth"}
-				</span>
-				{assets.map((a) => (
-					<span key={a.id} className="inline-flex items-center gap-1.5">
-						<span
-							className="inline-block h-2.5 w-2.5 rounded-sm"
-							style={{
-								backgroundColor: a.color ?? FALLBACK_ACCOUNT_COLOR,
-							}}
-						/>
-						{a.label}
+					<span className="sr-only" aria-live="polite">
+						{formatPointDetailsSummary(selectedDetails)}
 					</span>
-				))}
-				{liabilities.map((a) => (
-					<span key={a.id} className="inline-flex items-center gap-1.5">
-						<span
-							className="inline-block h-2.5 w-2.5 rounded-sm"
-							style={{
-								backgroundColor: a.color ?? FALLBACK_ACCOUNT_COLOR,
-							}}
-						/>
-						{a.label}
-					</span>
-				))}
-			</div>
-		</>
+				</>
+			)}
+		</div>
 	);
 });
+
+function ChartEncodingLegend({
+	hasStochasticData,
+}: {
+	hasStochasticData: boolean;
+}) {
+	return (
+		<div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-2 type-caption text-muted-foreground">
+			<span className="inline-flex items-center gap-1.5">
+				<span className="h-0.5 w-4 bg-foreground" />
+				{hasStochasticData ? "Median net worth" : "Net worth"}
+			</span>
+			<span className="inline-flex items-center gap-1.5">
+				<span className="flex h-2.5 w-4 overflow-hidden rounded-sm">
+					<span className="w-1/3 bg-sky-500" />
+					<span className="w-1/3 bg-emerald-500" />
+					<span className="w-1/3 bg-amber-500" />
+				</span>
+				Accounts
+			</span>
+			{hasStochasticData && (
+				<>
+					<span className="inline-flex items-center gap-1.5">
+						<span className="h-2.5 w-4 rounded-sm bg-foreground/25" />
+						Likely range <span className="text-[10px]">P25-P75</span>
+					</span>
+					<span className="inline-flex items-center gap-1.5">
+						<span className="h-2.5 w-4 rounded-sm bg-foreground/15" />
+						Wider range <span className="text-[10px]">P10-P90</span>
+					</span>
+				</>
+			)}
+		</div>
+	);
+}
