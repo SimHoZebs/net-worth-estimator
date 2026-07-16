@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import type uPlot from "uplot";
 import { parseChartDate } from "@/chart/chartData";
 import {
@@ -41,7 +41,6 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 	milestoneDates,
 }: StackedContributionChartProps) {
 	const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-	const [isExpanded, setIsExpanded] = useState(false);
 	const enabledAccounts = useMemo(
 		() => pack.accounts.filter((account) => account.enabled),
 		[pack.accounts],
@@ -206,47 +205,8 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 		setSelectedIndex(index);
 	}, []);
 
-	useEffect(() => {
-		if (!isExpanded) return;
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key === "Escape") setIsExpanded(false);
-		};
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [isExpanded]);
-
 	return (
-		<div
-			className={
-				isExpanded
-					? "fixed inset-0 z-50 overflow-y-auto bg-background p-3 sm:p-6"
-					: "min-w-0"
-			}
-		>
-			<div className="mb-2 flex justify-end no-print">
-				<button
-					type="button"
-					onClick={() => setIsExpanded((expanded) => !expanded)}
-					className="inline-flex items-center gap-2 rounded-lg border border-border/80 bg-surface/75 px-3 py-1.5 type-label shadow-sm transition hover:bg-accent"
-					aria-label={
-						isExpanded ? "Close expanded chart" : "Expand chart full screen"
-					}
-				>
-					<svg
-						aria-hidden="true"
-						viewBox="0 0 20 20"
-						className="h-3.5 w-3.5 fill-none stroke-current"
-						strokeWidth="1.8"
-					>
-						{isExpanded ? (
-							<path d="M7 3v4H3M13 3v4h4M7 17v-4H3M13 17v-4h4" />
-						) : (
-							<path d="M7 3H3v4M13 3h4v4M7 17H3v-4M13 17h4v-4" />
-						)}
-					</svg>
-					{isExpanded ? "Close" : "Expand"}
-				</button>
-			</div>
+		<div className="min-w-0">
 			<UPlotChart
 				options={options}
 				data={data}
@@ -257,13 +217,12 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 				}
 				onCursorChange={handleCursorChange}
 				desktopTooltipOnly
-				className={isExpanded ? "h-[70dvh] min-h-[360px]" : undefined}
 			/>
 			<ChartEncodingLegend hasStochasticData={hasStochasticData} />
 			{selectedDetails && (
 				<>
 					<PointDetailsPanel
-						key={`${selectedIndex}-${isExpanded}`}
+						key={selectedIndex}
 						details={selectedDetails}
 						onClear={() => setSelectedIndex(null)}
 					/>
