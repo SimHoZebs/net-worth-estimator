@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { evaluateFinancialIndependence } from "../engine/financialIndependence";
+import {
+	buildFinancialIndependenceCandidateDates,
+	evaluateFinancialIndependence,
+} from "../engine/financialIndependence";
 import type {
+	Account,
 	FinancialIndependencePlan,
 	Posting,
+	ProjectionPath,
 	ProjectionRow,
 } from "../types/scenario";
+import { SCENARIO_MODEL_VERSION } from "../types/scenario";
 
 function row(
 	date: string,
@@ -32,7 +38,18 @@ function row(
 	};
 }
 
-const posting: Posting = {
+function account(id: string, minBalance = 0): Account {
+	return {
+		id,
+		label: id,
+		minBalance,
+		maxBalance: Number.POSITIVE_INFINITY,
+		color: null,
+		enabled: true,
+	};
+}
+
+const pension: Posting = {
 	id: "pension",
 	label: "Pension",
 	sourceAccountId: null,
@@ -53,20 +70,42 @@ function plan(
 	overrides: Partial<FinancialIndependencePlan> = {},
 ): FinancialIndependencePlan {
 	return {
+		minimumNetWorth: 0,
 		annualExpenseTarget: 1_200,
 		annualExpenseGrowthRate: 0,
 		withdrawalRate: 0.04,
 		evaluationYears: 1,
 		requiredConfidence: 0.9,
 		sources: [],
+		continuingPostingIds: [],
 		principalPolicy: "allow-drawdown",
 		...overrides,
 	};
 }
 
+function path(
+	rows: ProjectionRow[],
+	postings: Posting[] = [],
+	accounts: Account[] = [account("cash")],
+	projectionEndDate = "2027-02-01",
+): ProjectionPath {
+	return {
+		rows,
+		effectivePack: {
+			version: SCENARIO_MODEL_VERSION,
+			sourcePath: "test",
+			accounts,
+			postings,
+			checkpoints: [],
+		},
+		projectionStartDate: "2026-01-01",
+		projectionEndDate,
+	};
+}
+
 describe("evaluateFinancialIndependence", () => {
 	it("annualizes only explicitly selected realized cashflows", () => {
-		const rows = Array.from({ length: 13 }, (_, month) => {
+		const rows = Array.from({ length: 14 }, (_, month) => {
 			const year = 2026 + Math.floor(month / 12);
 			const monthOfYear = (month % 12) + 1;
 			return row(
@@ -76,13 +115,11 @@ describe("evaluateFinancialIndependence", () => {
 			);
 		});
 		const result = evaluateFinancialIndependence({
-			rows,
-			postings: [posting],
+			path: path(rows, [pension]),
 			plan: plan({
 				sources: [{ type: "cashflow", postingId: "pension", included: true }],
 			}),
-			projectionStartDate: "2026-01-01",
-			projectionEndDate: "2027-02-01",
+			candidateDates: ["2026-01-01"],
 		});
 
 		expect(result.rows[0].annualDirectIncome).toBe(1_200);
@@ -91,105 +128,213 @@ describe("evaluateFinancialIndependence", () => {
 		expect(result.milestones.firstSelfSustainingDate).toBe("2026-01-01");
 	});
 
-	it("applies per-asset withdrawal-rate overrides without counting debt", () => {
+	it("can evaluate a zero-balance start before the first projected event", () => {
+		const rows = Array.from({ length: 12 }, (_, month) => {
+			const offset = month + 1;
+			const year = 2026 + Math.floor(offset / 12);
+			const monthOfYear = (offset % 12) + 1;
+			return row(
+				`${year}-${String(monthOfYear).padStart(2, "0")}-01`,
+				{ cash: 0 },
+				{ pension: 100 },
+			);
+		});
 		const result = evaluateFinancialIndependence({
-			rows: [row("2026-01-01", { brokerage: 100_000, debt: -50_000 })],
-			postings: [],
+			path: path(rows, [pension]),
 			plan: plan({
-				annualExpenseTarget: 8_000,
+				sources: [{ type: "cashflow", postingId: "pension", included: true }],
+			}),
+			candidateDates: ["2026-01-01"],
+		});
+
+		expect(result.runOutcomes[0]).toMatchObject({
+			status: "evaluated",
+			cycleEstablished: true,
+		});
+	});
+
+	it("keeps covered candidates ineligible until minimum net worth is met", () => {
+		const result = evaluateFinancialIndependence({
+			path: path(
+				[row("2026-01-01", { brokerage: 100_000 })],
+				[],
+				[account("brokerage")],
+			),
+			plan: plan({
+				minimumNetWorth: 150_000,
+				annualExpenseTarget: 4_000,
+				sources: [{ type: "asset", accountId: "brokerage", included: true }],
+			}),
+			candidateDates: ["2026-01-01"],
+		});
+
+		expect(result.rows[0]).toMatchObject({
+			isCovered: true,
+			minimumNetWorthMet: false,
+			isEligible: false,
+		});
+		expect(result.runOutcomes[0]).toMatchObject({
+			status: "ineligible",
+			cycleEstablished: false,
+		});
+	});
+
+	it("enforces account floors and annual withdrawal capacity", () => {
+		const result = evaluateFinancialIndependence({
+			path: path(
+				[row("2026-01-01", { brokerage: 100_000 })],
+				[],
+				[account("brokerage", 98_000)],
+			),
+			plan: plan({
+				annualExpenseTarget: 4_000,
+				sources: [{ type: "asset", accountId: "brokerage", included: true }],
+			}),
+			candidateDates: ["2026-01-01"],
+		});
+
+		expect(result.runOutcomes[0]).toMatchObject({
+			status: "evaluated",
+			hadWithdrawalShortfall: true,
+			endingSelectedAssetBalance: 98_000,
+			cycleEstablished: false,
+		});
+	});
+
+	it("never withdraws from an asset with a zero-rate override", () => {
+		const result = evaluateFinancialIndependence({
+			path: path(
+				Array.from({ length: 14 }, (_, month) =>
+					row(
+						`202${6 + Math.floor(month / 12)}-${String((month % 12) + 1).padStart(2, "0")}-01`,
+						{ brokerage: 100_000, cash: 0 },
+						{ pension: month < 7 ? 1_000 : 0 },
+					),
+				),
+				[pension],
+				[account("brokerage"), account("cash")],
+			),
+			plan: plan({
+				annualExpenseTarget: 6_000,
 				sources: [
+					{ type: "cashflow", postingId: "pension", included: true },
 					{
 						type: "asset",
 						accountId: "brokerage",
 						included: true,
-						withdrawalRateOverride: 0.08,
+						withdrawalRateOverride: 0,
 					},
-					{ type: "asset", accountId: "debt", included: true },
 				],
 			}),
-			projectionStartDate: "2026-01-01",
-			projectionEndDate: "2027-02-01",
+			candidateDates: ["2026-01-01"],
 		});
 
-		expect(result.rows[0].selectedAssetBalance).toBe(100_000);
-		expect(result.rows[0].annualWithdrawalCapacity).toBe(8_000);
-		expect(result.rows[0].isCovered).toBe(true);
+		expect(result.runOutcomes[0]).toMatchObject({
+			hadWithdrawalShortfall: true,
+			endingSelectedAssetBalance: 100_000,
+		});
 	});
 
-	it("distinguishes initial coverage from principal replenishment", () => {
-		const result = evaluateFinancialIndependence({
-			rows: [row("2026-01-01", { brokerage: 100_000 })],
-			postings: [],
+	it("replays only explicitly selected continuing postings", () => {
+		const growth: Posting = {
+			...pension,
+			id: "growth",
+			label: "Growth",
+			destinations: ["brokerage"],
+			arithmetic: "brokerage * rate",
+			annualRate: 0.12,
+			startDate: "2026-02-01",
+		};
+		const rows = [row("2026-01-01", { brokerage: 100_000, cash: 0 })];
+		const withoutGrowth = evaluateFinancialIndependence({
+			path: path(rows, [growth], [account("brokerage"), account("cash")]),
 			plan: plan({
 				annualExpenseTarget: 4_000,
 				principalPolicy: "preserve-nominal-principal",
 				sources: [{ type: "asset", accountId: "brokerage", included: true }],
 			}),
-			projectionStartDate: "2026-01-01",
-			projectionEndDate: "2027-02-01",
+			candidateDates: ["2026-01-01"],
 		});
-
-		expect(result.milestones.firstCoverageDate).toBe("2026-01-01");
-		expect(result.runOutcomes[0]).toMatchObject({
-			expensesFullyCovered: true,
-			principalReplenished: false,
-			cycleEstablished: false,
-		});
-		expect(result.milestones.firstSelfSustainingDate).toBeNull();
-	});
-
-	it("does not replay growth already included in the candidate balance", () => {
-		const candidate = row("2026-01-01", { brokerage: 100_000 });
-		candidate.accountSnapshots[0].impacts = [
-			{ postingId: "growth", delta: 10_000 },
-		];
-		const result = evaluateFinancialIndependence({
-			rows: [candidate, row("2027-01-01", { brokerage: 100_000 })],
-			postings: [{ ...posting, id: "growth", annualRate: 0.1 }],
+		const withGrowth = evaluateFinancialIndependence({
+			path: path(rows, [growth], [account("brokerage"), account("cash")]),
 			plan: plan({
-				annualExpenseTarget: 10_000,
-				withdrawalRate: 0.1,
+				annualExpenseTarget: 4_000,
 				principalPolicy: "preserve-nominal-principal",
+				continuingPostingIds: ["growth"],
 				sources: [{ type: "asset", accountId: "brokerage", included: true }],
 			}),
-			projectionStartDate: "2026-01-01",
-			projectionEndDate: "2027-02-01",
+			candidateDates: ["2026-01-01"],
 		});
 
-		expect(result.runOutcomes[0]).toMatchObject({
-			endingSelectedAssetBalance: 90_000,
-			principalReplenished: false,
-			cycleEstablished: false,
-		});
+		expect(withoutGrowth.runOutcomes[0].principalReplenished).toBe(false);
+		expect(withGrowth.runOutcomes[0].principalReplenished).toBe(true);
 	});
 
-	it("normalizes fractional evaluation years", () => {
-		expect(() =>
-			evaluateFinancialIndependence({
-				rows: [row("2026-01-01", { brokerage: 100_000 })],
-				postings: [],
-				plan: plan({
-					evaluationYears: 1.5,
-					annualExpenseTarget: 4_000,
-					sources: [{ type: "asset", accountId: "brokerage", included: true }],
-				}),
+	it("carries current-year annual-cap usage into a policy branch", () => {
+		const cappedGrowth: Posting = {
+			...pension,
+			id: "capped-growth",
+			label: "Capped growth",
+			destinations: ["brokerage"],
+			arithmetic: "500",
+			annualCap: 1_000,
+			startDate: "2026-01-01",
+		};
+		const rows = Array.from({ length: 19 }, (_, month) => {
+			const offset = month + 6;
+			const year = 2026 + Math.floor(offset / 12);
+			const monthOfYear = (offset % 12) + 1;
+			return row(
+				`${year}-${String(monthOfYear).padStart(2, "0")}-01`,
+				{ brokerage: 100_000, cash: 0 },
+				month === 0 ? { "capped-growth": 800 } : { pension: 100 },
+			);
+		});
+		const result = evaluateFinancialIndependence({
+			path: {
+				...path(
+					rows,
+					[cappedGrowth, pension],
+					[account("brokerage"), account("cash")],
+					"2027-08-01",
+				),
 				projectionStartDate: "2026-01-01",
-				projectionEndDate: "2027-02-01",
+			},
+			plan: plan({
+				annualExpenseTarget: 1_200,
+				continuingPostingIds: ["capped-growth"],
+				sources: [
+					{ type: "cashflow", postingId: "pension", included: true },
+					{
+						type: "asset",
+						accountId: "brokerage",
+						included: true,
+						withdrawalRateOverride: 0,
+					},
+				],
 			}),
-		).not.toThrow();
+			candidateDates: ["2026-07-01"],
+		});
+
+		// $200 remains on the 2026 cap, followed by a fresh $1,000 cap in 2027.
+		expect(result.runOutcomes[0].endingSelectedAssetBalance).toBe(101_200);
+	});
+
+	it("uses one canonical monthly candidate schedule", () => {
+		expect(
+			buildFinancialIndependenceCandidateDates("2026-01-31", "2027-04-30", 1),
+		).toEqual(["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"]);
 	});
 
 	it("does not report vacuous coverage when no sources are selected", () => {
 		const result = evaluateFinancialIndependence({
-			rows: [row("2026-01-01", { brokerage: 100_000 })],
-			postings: [],
+			path: path([row("2026-01-01", { brokerage: 100_000 })]),
 			plan: plan(),
-			projectionStartDate: "2026-01-01",
-			projectionEndDate: "2027-02-01",
+			candidateDates: ["2026-01-01"],
 		});
 
 		expect(result.rows[0].coverageRatio).toBe(0);
 		expect(result.milestones.firstCoverageDate).toBeNull();
-		expect(result.runOutcomes).toEqual([]);
+		expect(result.runOutcomes[0].status).toBe("ineligible");
 	});
 });

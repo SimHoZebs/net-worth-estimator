@@ -4,6 +4,7 @@ import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	ProjectionResult,
 	ProjectionRuntimeSettings,
+	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 
@@ -11,6 +12,8 @@ interface OverviewCardProps {
 	result: ProjectionResult;
 	projectionSettings: ProjectionRuntimeSettings;
 	stochasticResult?: StochasticProjectionResult | null;
+	stochasticIsProvisional?: boolean;
+	pack: ScenarioPack;
 	blockerValue: string;
 	blockerDetail: string;
 	goalReached: boolean;
@@ -20,24 +23,30 @@ export const OverviewCard = memo(function OverviewCard({
 	result,
 	projectionSettings,
 	stochasticResult,
+	stochasticIsProvisional = false,
+	pack,
 	blockerValue,
 	blockerDetail,
 }: OverviewCardProps) {
 	const analysis = result.financialIndependence;
 	const firstCoverageDate = analysis.milestones.firstCoverageDate;
-	const selfSustainingDate = stochasticResult
-		? stochasticResult.milestones.fiSelfSustainingDate
-		: analysis.milestones.firstSelfSustainingDate;
+	const selfSustainingDate = analysis.milestones.firstSelfSustainingDate;
+	const activePostingIds = new Set(pack.postings.map((posting) => posting.id));
 	const laborDependentSources =
 		projectionSettings.financialIndependencePlan?.sources.filter(
 			(source) =>
-				source.type === "cashflow" && source.included && source.laborDependent,
-		).length ?? 0;
-	const displayDate =
-		stochasticResult?.milestones.medianFiCoverageDate ?? firstCoverageDate;
+				source.type === "cashflow" &&
+				source.included &&
+				source.laborDependent &&
+				activePostingIds.has(source.postingId),
+		).length;
+	const displayDate = firstCoverageDate;
 	const coverageRow =
 		analysis.rows.find((row) => row.date === displayDate) ?? analysis.rows[0];
+	const confidenceDate = stochasticResult?.milestones.fiSelfSustainingDate;
 	const confidence = stochasticResult?.milestones.fiCycleSuccessProbability;
+	const qualifyingConfidence =
+		stochasticResult?.milestones.fiSelfSustainingProbability;
 
 	return (
 		<Card className="rounded-[1.8rem] border-primary-border/45 bg-gradient-to-br from-card/96 via-card/90 to-primary-subtle/35">
@@ -56,7 +65,7 @@ export const OverviewCard = memo(function OverviewCard({
 					</div>
 
 					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
-						<div className="type-label">First coverage date</div>
+						<div className="type-label">Deterministic first coverage</div>
 						<div className="mt-1 type-metric text-foreground">
 							{firstCoverageDate
 								? formatDate(firstCoverageDate)
@@ -68,30 +77,43 @@ export const OverviewCard = memo(function OverviewCard({
 					</div>
 
 					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
-						<div className="type-label">First self-sustaining date</div>
+						<div className="type-label">
+							Deterministic first self-sustaining
+						</div>
 						<div className="mt-1 type-metric text-primary">
 							{selfSustainingDate
 								? formatDate(selfSustainingDate)
 								: "Not established"}
 						</div>
 						<div className="type-muted">
-							{stochasticResult
-								? `Requires ${pct.format(projectionSettings.financialIndependencePlan?.requiredConfidence ?? 1)} confidence`
-								: "Deterministic cycle validation"}
+							Requires at least{" "}
+							{currency.format(
+								projectionSettings.financialIndependencePlan.minimumNetWorth,
+							)}{" "}
+							net worth before cycle evaluation
 						</div>
 					</div>
 
 					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
-						<div className="type-label">FI-cycle confidence</div>
+						<div className="type-label">
+							{stochasticIsProvisional ? "Provisional " : ""}
+							Confidence-qualified FI date
+						</div>
 						<div className="mt-1 type-metric text-primary">
-							{confidence === undefined
+							{confidenceDate === undefined
 								? "Run Monte Carlo"
-								: pct.format(confidence)}
+								: confidenceDate
+									? formatDate(confidenceDate)
+									: "Not established"}
 						</div>
 						<div className="type-muted line-clamp-2">
 							{confidence === undefined
 								? blockerDetail
-								: "Complete runs that fund expenses and satisfy principal policy"}
+								: confidenceDate === null
+									? `${pct.format(confidence)} of runs succeeded at some candidate; no date reached ${pct.format(projectionSettings.financialIndependencePlan.requiredConfidence)}`
+									: stochasticIsProvisional
+										? `${pct.format(qualifyingConfidence ?? 0)} at this date from completed runs; still converging`
+										: `${pct.format(qualifyingConfidence ?? 0)} at this date; requires ${pct.format(projectionSettings.financialIndependencePlan.requiredConfidence)}`}
 						</div>
 					</div>
 				</div>

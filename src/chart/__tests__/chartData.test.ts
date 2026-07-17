@@ -8,14 +8,14 @@ import {
 	projectScenarioPack,
 	stochasticProject,
 } from "@/lib/projection";
-import { validCsvFiles } from "@/lib/projection/__fixtures__";
+import { makeSettings, validCsvFiles } from "@/lib/projection/__fixtures__";
 import { buildAccountDiagnosticChartData } from "../chartData";
 
-const PROJECTION_SETTINGS = {
+const PROJECTION_SETTINGS = makeSettings({
 	targetNetWorth: 500_000,
 	fallbackProjectionStartDate: "2026-04-01",
 	horizonYears: 5,
-} as const;
+});
 
 const EMPTY_WHAT_IF: ScenarioWhatIfState = {
 	addedAccounts: [],
@@ -148,6 +148,7 @@ describe("buildAccountDiagnosticChartData", () => {
 				fiCycleSuccessProbability: 0,
 				medianFiCoverageDate: null,
 				fiSelfSustainingDate: null,
+				fiSelfSustainingProbability: null,
 				finalNetWorthPercentiles: {
 					p10: 300_000,
 					p25: 400_000,

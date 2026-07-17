@@ -29,6 +29,7 @@ interface StackedContributionChartProps {
 	pack: ScenarioPack;
 	targetNetWorth: number;
 	hasStochasticData: boolean;
+	stochasticIsProvisional?: boolean;
 	chartData: Record<string, string | number>[];
 	milestoneDates?: { hitTarget?: string; firstShortfall?: string };
 }
@@ -37,6 +38,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 	pack,
 	targetNetWorth,
 	hasStochasticData,
+	stochasticIsProvisional = false,
 	chartData,
 	milestoneDates,
 }: StackedContributionChartProps) {
@@ -141,7 +143,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 				{},
 				...fillSeries,
 				{
-					label: "Median net worth",
+					label: `${stochasticIsProvisional ? "Provisional " : ""}median net worth`,
 					show: hasStochasticData,
 					stroke: NET_WORTH_SERIES_COLOR,
 					width: 2.5,
@@ -190,6 +192,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 		accountCount,
 		assets,
 		hasStochasticData,
+		stochasticIsProvisional,
 		liabilities,
 		milestoneDates,
 		targetNetWorth,
@@ -218,7 +221,10 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 				onCursorChange={handleCursorChange}
 				desktopTooltipOnly
 			/>
-			<ChartEncodingLegend hasStochasticData={hasStochasticData} />
+			<ChartEncodingLegend
+				hasStochasticData={hasStochasticData}
+				stochasticIsProvisional={stochasticIsProvisional}
+			/>
 			{selectedDetails && (
 				<>
 					<PointDetailsPanel
@@ -237,14 +243,18 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 
 function ChartEncodingLegend({
 	hasStochasticData,
+	stochasticIsProvisional,
 }: {
 	hasStochasticData: boolean;
+	stochasticIsProvisional: boolean;
 }) {
 	return (
 		<div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-2 type-caption text-muted-foreground">
 			<span className="inline-flex items-center gap-1.5">
 				<span className="h-0.5 w-4 bg-foreground" />
-				{hasStochasticData ? "Median net worth" : "Net worth"}
+				{hasStochasticData
+					? `${stochasticIsProvisional ? "Provisional " : ""}median net worth`
+					: "Net worth"}
 			</span>
 			<span className="inline-flex items-center gap-1.5">
 				<span className="flex h-2.5 w-4 overflow-hidden rounded-sm">

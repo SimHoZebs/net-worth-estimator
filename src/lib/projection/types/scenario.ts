@@ -35,12 +35,14 @@ export type FinancialIndependenceSource =
 	  };
 
 export interface FinancialIndependencePlan {
+	minimumNetWorth: number;
 	annualExpenseTarget: number;
 	annualExpenseGrowthRate: number;
 	withdrawalRate: number;
 	evaluationYears: number;
 	requiredConfidence: number;
 	sources: FinancialIndependenceSource[];
+	continuingPostingIds: string[];
 	principalPolicy: FinancialIndependencePrincipalPolicy;
 }
 
@@ -49,7 +51,7 @@ export interface ProjectionRuntimeSettings {
 	targetNetWorth?: number;
 	fallbackProjectionStartDate: IsoDate;
 	horizonYears: number;
-	financialIndependencePlan?: FinancialIndependencePlan;
+	financialIndependencePlan: FinancialIndependencePlan;
 }
 
 export interface Account {
@@ -166,6 +168,9 @@ export interface ProjectionPostingSummary {
 
 export interface FinancialIndependenceRow {
 	date: IsoDate;
+	netWorth: number;
+	minimumNetWorth: number;
+	minimumNetWorthMet: boolean;
 	annualDirectIncome: number;
 	selectedAssetBalance: number;
 	annualWithdrawalCapacity: number;
@@ -173,10 +178,14 @@ export interface FinancialIndependenceRow {
 	annualExpenseTarget: number;
 	coverageRatio: number;
 	isCovered: boolean;
+	isEligible: boolean;
 }
 
 export interface FinancialIndependenceRunOutcome {
 	candidateDate: IsoDate;
+	status: "ineligible" | "evaluated";
+	minimumNetWorthMet: boolean;
+	initialCoverageMet: boolean;
 	expensesFullyCovered: boolean;
 	hadWithdrawalShortfall: boolean;
 	startingSelectedAssetBalance: number;
@@ -185,6 +194,13 @@ export interface FinancialIndependenceRunOutcome {
 	endingRealSelectedAssetBalance: number;
 	principalReplenished: boolean;
 	cycleEstablished: boolean;
+}
+
+export interface ProjectionPath {
+	rows: ProjectionRow[];
+	effectivePack: ScenarioPack;
+	projectionStartDate: IsoDate;
+	projectionEndDate: IsoDate;
 }
 
 export interface FinancialIndependenceAnalysis {
@@ -196,8 +212,7 @@ export interface FinancialIndependenceAnalysis {
 	};
 }
 
-export interface ProjectionResult {
-	financialIndependence: FinancialIndependenceAnalysis;
+export interface ProjectionCoreResult {
 	timeline: {
 		rows: ProjectionRow[];
 		sampledRows: ProjectionRow[];
@@ -213,7 +228,6 @@ export interface ProjectionResult {
 		clampedPostingShortfallAmount: number;
 	};
 	milestones: {
-		hitTargetDate: IsoDate | null;
 		latestCheckpointDate: IsoDate | null;
 		latestHistoricalDate: IsoDate | null;
 		projectionStartDate: IsoDate;
@@ -222,4 +236,16 @@ export interface ProjectionResult {
 		currentNetWorth: number;
 		finalNetWorth: number;
 	};
+}
+
+export type ProjectionResult = Omit<ProjectionCoreResult, "milestones"> & {
+	financialIndependence: FinancialIndependenceAnalysis;
+	milestones: ProjectionCoreResult["milestones"] & {
+		hitTargetDate: IsoDate | null;
+	};
+};
+
+export interface RawProjectionOutput {
+	path: ProjectionPath;
+	result: ProjectionCoreResult;
 }

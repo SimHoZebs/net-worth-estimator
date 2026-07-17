@@ -11,7 +11,7 @@ The current product model is intentionally simple:
 - Annual caps are generic and source-funded rows clamp to the source account's available positive balance.
 - The bundled starter data lives in `public/scenario/*.csv`.
 - Runtime projection settings live in the app, not in CSV: the financial-independence plan, explicit income/asset source selections, and horizon are session-only. Projection starts from the latest checkpoint date or today if none exist.
-- Financial independence is derived from annual expense coverage and a full principal-preservation cycle. Monte Carlo confidence is aggregated from complete run outcomes, never inferred from percentile-band slope.
+- Financial independence is derived from annual expense coverage and a full principal-preservation cycle. A configurable minimum-net-worth rule gates cycle eligibility, while explicit continuing postings and shared account constraints drive reactive withdrawals. Monte Carlo confidence is aggregated from complete run outcomes, never inferred from percentile-band slope.
 - Baseline edits are persisted by the active data source, while what-if overrides remain session-only.
 
 The current product-model summary lives in `REDESIGN_PLAN.md`.

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useProjectionEngine } from "@/engine/ProjectionEngineContext";
 import type {
 	ProjectionResult,
@@ -17,11 +17,18 @@ export function useProjection(
 	enabled: boolean,
 ): ProjectionHookState<ProjectionResult> {
 	const engine = useProjectionEngine();
-	const [state, setState] = useState<ProjectionHookState<ProjectionResult>>({
+	const requestKey = useMemo(
+		() => ({ pack, projectionSettings, whatIfState, enabled }),
+		[pack, projectionSettings, whatIfState, enabled],
+	);
+	const [state, setState] = useState<
+		ProjectionHookState<ProjectionResult> & { requestKey: object | null }
+	>({
 		result: null,
 		runtimeError: null,
 		isRunning: false,
 		progress: null,
+		requestKey: null,
 	});
 
 	useEffect(() => {
@@ -31,12 +38,19 @@ export function useProjection(
 				runtimeError: null,
 				isRunning: false,
 				progress: null,
+				requestKey,
 			});
 			return;
 		}
 
 		const controller = new AbortController();
-		setState((s) => ({ ...s, isRunning: true, runtimeError: null }));
+		setState({
+			result: null,
+			runtimeError: null,
+			isRunning: true,
+			progress: null,
+			requestKey,
+		});
 
 		engine
 			.project({
@@ -46,28 +60,46 @@ export function useProjection(
 				signal: controller.signal,
 			})
 			.then((result) => {
-				setState({
-					result,
-					runtimeError: null,
-					isRunning: false,
-					progress: null,
-				});
+				setState((current) =>
+					current.requestKey === requestKey
+						? {
+								result,
+								runtimeError: null,
+								isRunning: false,
+								progress: null,
+								requestKey,
+							}
+						: current,
+				);
 			})
 			.catch((err: unknown) => {
 				if (err instanceof DOMException && err.name === "AbortError") return;
-				setState({
-					result: null,
-					runtimeError:
-						err instanceof Error ? err.message : "Projection failed.",
-					isRunning: false,
-					progress: null,
-				});
+				setState((current) =>
+					current.requestKey === requestKey
+						? {
+								result: null,
+								runtimeError:
+									err instanceof Error ? err.message : "Projection failed.",
+								isRunning: false,
+								progress: null,
+								requestKey,
+							}
+						: current,
+				);
 			});
 
 		return () => {
 			controller.abort();
 		};
-	}, [pack, projectionSettings, whatIfState, enabled, engine]);
+	}, [pack, projectionSettings, whatIfState, enabled, engine, requestKey]);
 
+	if (state.requestKey !== requestKey) {
+		return {
+			result: null,
+			runtimeError: null,
+			isRunning: enabled && pack !== null,
+			progress: null,
+		};
+	}
 	return state;
 }

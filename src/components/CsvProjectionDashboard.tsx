@@ -27,6 +27,7 @@ interface ProjectionDashboardProps {
 	result: ProjectionResult;
 	projectionSettings: ProjectionRuntimeSettings;
 	stochasticResult?: StochasticProjectionResult | null;
+	stochasticIsProvisional?: boolean;
 }
 
 export const ProjectionDashboard = memo(function ProjectionDashboard({
@@ -34,6 +35,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 	result,
 	projectionSettings,
 	stochasticResult,
+	stochasticIsProvisional = false,
 }: ProjectionDashboardProps) {
 	const [isPostingTablesOpen, setIsPostingTablesOpen] = useState(false);
 	const hasStochasticData =
@@ -62,6 +64,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 					pack={pack}
 					targetNetWorth={0}
 					hasStochasticData={hasStochasticData}
+					stochasticIsProvisional={stochasticIsProvisional}
 					chartData={accountDiagnosticChartData}
 					milestoneDates={milestoneDates}
 				/>
@@ -72,6 +75,8 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 					result={result}
 					projectionSettings={projectionSettings}
 					stochasticResult={stochasticResult}
+					stochasticIsProvisional={stochasticIsProvisional}
+					pack={pack}
 					blockerValue={derived.blockerValue}
 					blockerDetail={derived.blockerDetail}
 					goalReached={derived.goalReached}
@@ -87,13 +92,18 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 					className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${derived.statusBadgeClassName}`}
 				>
 					{derived.goalReached
-						? "FI cycle established"
-						: "FI cycle not established"}
+						? "Deterministic FI cycle established"
+						: "Deterministic FI cycle not established"}
 				</div>
 				{activeOverrideCount > 0 ? (
 					<div className="rounded-full border border-tertiary-border bg-tertiary-subtle px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
 						{activeOverrideCount} temporary override
 						{activeOverrideCount === 1 ? "" : "s"}
+					</div>
+				) : null}
+				{stochasticIsProvisional ? (
+					<div className="rounded-full border border-primary-border bg-primary-subtle px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-primary">
+						Provisional Monte Carlo
 					</div>
 				) : null}
 			</section>

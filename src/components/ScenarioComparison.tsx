@@ -7,11 +7,13 @@ import { type SnapshotMetrics, useStore } from "@/store";
 interface ScenarioComparisonProps {
 	currentMetrics: SnapshotMetrics;
 	currentOverrideCount: number;
+	canTakeSnapshot: boolean;
 }
 
 export function ScenarioComparison({
 	currentMetrics,
 	currentOverrideCount,
+	canTakeSnapshot,
 }: ScenarioComparisonProps) {
 	const snapshots = useStore((s) => s.snapshots);
 	const addSnapshotFromCurrentScenario = useStore(
@@ -38,25 +40,25 @@ export function ScenarioComparison({
 							</div>
 						</div>
 					</div>
-					<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
+					<span className="hidden type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70 sm:inline">
 						Show details
 					</span>
 				</div>
 			</Collapsible.Trigger>
 			<Collapsible.Content>
 				<div className="space-y-4">
-					<div className="flex items-center gap-2">
+					<div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
 						<input
 							type="text"
 							value={labelInput}
 							onChange={(e) => setLabelInput(e.target.value)}
 							placeholder="Baseline (no overrides)"
-							className="w-full max-w-xs rounded-lg border border-border/80 bg-card/85 px-3 py-1.5 type-body shadow-sm outline-none placeholder:text-muted-foreground focus:border-ring dark:border-white/10"
+							className="w-full rounded-lg border border-border/80 bg-card/85 px-3 py-1.5 type-body shadow-sm outline-none placeholder:text-muted-foreground focus:border-ring dark:border-white/10 sm:max-w-xs"
 						/>
 						<Button
 							type="button"
 							size="sm"
-							disabled={!labelInput.trim()}
+							disabled={!labelInput.trim() || !canTakeSnapshot}
 							onClick={() => {
 								addSnapshotFromCurrentScenario(
 									labelInput.trim(),
@@ -81,13 +83,13 @@ export function ScenarioComparison({
 
 					{hasSnapshots ? (
 						<div className="overflow-x-auto rounded-xl border border-border/80 dark:border-white/10">
-							<table className="w-full type-body">
+							<table className="w-full min-w-[42rem] type-body">
 								<thead>
 									<tr className="border-b border-border/80 bg-muted/70 text-left type-label tracking-wide">
 										<th className="px-4 py-3">Name</th>
 										<th className="px-4 py-3">Current NW</th>
 										<th className="px-4 py-3">Final NW</th>
-										<th className="px-4 py-3">FI cycle date</th>
+										<th className="px-4 py-3">Deterministic FI date</th>
 										<th className="px-4 py-3">Overrides</th>
 										<th className="px-4 py-3" />
 									</tr>
@@ -114,8 +116,8 @@ export function ScenarioComparison({
 													{currency.format(sn.metrics.finalNetWorth)}
 												</td>
 												<td className="px-4 py-3 text-foreground">
-													{sn.metrics.fiCycleDate
-														? formatDate(sn.metrics.fiCycleDate)
+													{sn.metrics.deterministicFiCycleDate
+														? formatDate(sn.metrics.deterministicFiCycleDate)
 														: "Beyond horizon"}
 												</td>
 												<td className="px-4 py-3 tabular-nums text-muted-foreground">
@@ -146,8 +148,8 @@ export function ScenarioComparison({
 											{currency.format(currentMetrics.finalNetWorth)}
 										</td>
 										<td className="px-4 py-3 type-value font-semibold">
-											{currentMetrics.fiCycleDate
-												? formatDate(currentMetrics.fiCycleDate)
+											{currentMetrics.deterministicFiCycleDate
+												? formatDate(currentMetrics.deterministicFiCycleDate)
 												: "Beyond horizon"}
 										</td>
 										<td className="px-4 py-3 tabular-nums type-value font-semibold">

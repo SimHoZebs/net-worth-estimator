@@ -4,6 +4,7 @@ export type {
 	ScenarioParseResult,
 } from "./dataSource";
 export { evaluateFinancialIndependence } from "./engine/financialIndependence";
+export { prepareScenarioPack } from "./engine/prepareScenario";
 export { projectScenarioPack } from "./engine/scenarioProject";
 export { stochasticProject } from "./engine/stochasticProject";
 export { createBrowserCsvDataSource } from "./sources/csv/browserCsvDataSource";

@@ -15,7 +15,7 @@ The Net Worth Estimator is a single-page React application that projects net wor
 
 ## 2. High-Level Architecture & Data Flow
 
-The application loads a scenario pack through a capability-based `DataSource` abstraction, validates it, and runs projections in dedicated Web Workers. Local development uses a Vite server plugin to read/write repo CSV files, while static/serverless production loads bundled `/scenario/*.csv` files and saves user edits in browser storage. Temporary what-if overrides and target-net-worth changes exist only in browser memory via Zustand for the current session.
+The application loads a scenario pack through a capability-based `DataSource` abstraction, validates it, and runs projections in dedicated Web Workers. Local development uses a Vite server plugin to read/write repo CSV files, while static/serverless production loads bundled `/scenario/*.csv` files and saves user edits in browser storage. Temporary what-if overrides and the FI analysis plan exist only in browser memory via Zustand for the current session.
 
 ### Data Flow Execution
 
@@ -23,11 +23,12 @@ The application loads a scenario pack through a capability-based `DataSource` ab
 2. `src/hooks/useScenario.ts` wraps TanStack Query (`useScenarioQuery`, `useScenarioMutation`, `useScenarioResetMutation`) around the `DataSource` interface, which is created once in `App.tsx` via `useMemo` and passed via dependency injection.
 3. Zod-based parsing plus cross-reference validation rejects invalid packs before projection.
 4. What-if state (temporary postings, accounts, checkpoints, disable toggles) is stored in Zustand with immutable-style updates.
-5. Deterministic projection runs in `src/workers/projectionWorker.ts` off the main thread.
-6. Monte Carlo simulation runs in `src/workers/stochasticWorker.ts` — streaming partial results progressively to the UI.
-7. A Dependency Injection pattern (`ProjectionEngineProvider` context) provides a `ProjectionEngine` instance to the React tree. `WorkerProjectionEngine` implements this interface, creating and destroying Web Workers per call.
-8. The `useProjection` and `useStochastic` hooks consume this engine to trigger computation and manage loading/error state.
-9. The inspector and dashboard render the validated pack and projected results.
+5. `prepareScenarioPack()` applies temporary overrides once, and `projectRawScenarioPack()` produces an unrounded evaluator-facing path plus the rounded public projection report.
+6. Deterministic projection and path evaluation run in `src/workers/projectionWorker.ts` off the main thread.
+7. Monte Carlo simulation runs in `src/workers/stochasticWorker.ts` — streaming partial results progressively to the UI.
+8. A Dependency Injection pattern (`ProjectionEngineProvider` context) provides a `ProjectionEngine` instance to the React tree. `WorkerProjectionEngine` implements this interface, creating and destroying Web Workers per call.
+9. The `useProjection` and `useStochastic` hooks consume this engine, associate results with the exact request inputs, and hide stale results while replacements run.
+10. The inspector and dashboard render the validated pack and projected results.
 
 ## 3. Core Concepts
 
@@ -55,7 +56,7 @@ The application loads a scenario pack through a capability-based `DataSource` ab
 
 ### Engine Design Philosophy
 
-The projection engine in `src/lib/projection/engine/scenarioProject.ts` is intentionally clueless about the specific meaning of accounts and postings. It processes every account, checkpoint, and posting through the same generic pipeline — there are no special cases for particular IDs, categories, or labels:
+The raw projection engine in `src/lib/projection/engine/rawScenarioProject.ts` is intentionally clueless about the specific meaning of accounts and postings. `scenarioProject.ts` is a composition layer that evaluates the raw path. The raw engine processes every account, checkpoint, and posting through the same generic pipeline — there are no special cases for particular IDs, categories, or labels:
 
 - **No name-based branching**: The engine never inspects `account.id`, `account.category`, `posting.id`, or `posting.label` to choose different behavior. All accounts compound identically; all postings resolve the same way.
 - **Classification is structural, not semantic**: Whether a posting is an inflow, outflow, or transfer is derived entirely from which of `sourceAccountId` / `destinationAccountId` is null — never from interpreting labels or categories.
@@ -68,6 +69,15 @@ The boundary is at `CsvScenarioPack`: the CSV parsing and validation layer (`csv
 
 **Avoid adding special-case logic to the engine unless absolutely unavoidable.** If a feature seems to require engine-level branching, first consider whether it can be expressed within the existing model — additional fields on existing types, new `amountMode` values, or UI-level interpretation of projection outputs. Likewise, the what-if system is intentionally shallow (multiplier overrides only, session-only, never mutating canonical data) to keep the model simple and predictable.
 
+### Evaluation And Reactive Policy Boundary
+
+- Read-only evaluations inspect an immutable `ProjectionPath`; the legacy net-worth threshold is implemented this way.
+- FI coverage is a read-only calculation over canonical monthly candidate dates.
+- FI-cycle sustainability is a reactive policy evaluation. Eligible candidates fork policy-owned balances, replay only explicitly selected continuing postings, and request expense-gap withdrawals.
+- Policy withdrawals use the same generic account movement resolver as scheduled postings, preserving account floors and destination limits.
+- FI never infers growth from a posting ID, label, category, or non-zero rate. Continuing postings are explicit FI-plan configuration.
+- The minimum-net-worth FI gate is a semantic eligibility rule. Ineligible Monte Carlo candidates remain failures in the full-run probability denominator.
+
 ## 4. Monte Carlo / Stochastic Simulation
 
 Postings can carry a `volatility` field (e.g., 0.15 for 15% annual volatility). When any enabled posting has `volatility > 0`, the app enables Monte Carlo mode.
@@ -78,7 +88,8 @@ Postings can carry a `volatility` field (e.g., 0.15 for 15% annual volatility). 
 2. The stochastic engine runs N independent scenarios (default 1000, adjustable 1–10000).
 3. For each run, every volatile posting's `annualRate` is replaced by a log-normal sample drawn per projection year from `sampleLogNormal(expectedReturn, volatility)`.
 4. All N projections produce per-date net worth snapshots. These are collapsed into percentile bands (P10/P25/P50/P75/P90) per date.
-5. FI coverage and the complete evaluation cycle are evaluated inside each run. Run-level booleans are aggregated into FI-cycle probability and confidence-qualified dates; percentile-band slope is never treated as a run outcome.
+5. Every run uses the deterministic projection's canonical monthly FI candidate schedule. FI coverage and reactive policy branches are evaluated inside each complete run.
+6. Dense candidate outcomes are aggregated into FI-cycle probability and confidence-qualified dates; percentile-band slope is never treated as a run outcome.
 
 ### Seeding
 
@@ -86,20 +97,23 @@ The engine uses a Linear Congruential Generator with an optional seed for reprod
 
 ### Streaming Progress
 
-The main loop runs in batches of 100 projections. After each batch, the engine:
+The main loop runs in batches of 50 projections. After each batch, the engine:
 
 1. Calls `onProgress(progress, partialResult)` where `partialResult` is a full `StochasticProjectionResult` computed from accumulated runs so far.
 2. The Web Worker forwards this via `postMessage` as a `StochasticWorkerProgress` message with the partial bands.
 3. The `useWorkerProjection` hook merges the partial result into React state, updating both the progress bar and the chart bands progressively.
 4. The chart's shaded percentile bands start wide (few runs, high variance) and converge toward final tight bands as iterations accumulate.
 
-This is genuinely incremental — projection runs happen once, and percentile computation is a trivial O(k log k) sort on accumulated values per date.
+This is genuinely incremental: projection runs happen once, each new batch is sorted once, and sorted samples are merged into the existing net-worth and FI-coverage distributions.
 
 ### Key Files
 
 | File                                             | Role                                                                                                  |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `src/lib/projection/engine/financialIndependence.ts` | Derived analysis: annual coverage, virtual asset-pool withdrawals, and principal preservation |
+| `src/lib/projection/engine/rawScenarioProject.ts` | Generic raw projection path and public report generation; no goal-specific logic |
+| `src/lib/projection/engine/evaluationRuntime.ts` | Typed evaluation contracts and online dated-sample/success accumulators |
+| `src/lib/projection/engine/policyRuntime.ts` | Generic period-oriented reactive policy lifecycle |
+| `src/lib/projection/engine/financialIndependence.ts` | FI candidate eligibility, explicit continuation replay, withdrawals, and principal preservation |
 | `src/lib/projection/engine/stochasticProject.ts` | Core engine: runs N projections, builds percentile bands, and aggregates per-run FI outcomes |
 | `src/lib/projection/utils/stochastic.ts`         | LCG PRNG, `sampleLogNormal()` (Box-Muller), `computePercentiles()`                                    |
 | `src/lib/projection/types/stochastic.ts`         | Types: `StochasticConfig`, `PercentileBands`, `StochasticBandRow`, `StochasticProjectionResult`       |
