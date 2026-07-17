@@ -10,12 +10,19 @@ import {
 	getHeadroom,
 	getTotalDestinationHeadroom,
 	getWithdrawableAmount,
-} from "./accountEngine";
+} from "./accounts";
 import { evaluateArithmetic } from "./arithmetic";
 
 export interface DatedPostingOccurrence {
 	posting: Posting;
 	index: number;
+}
+
+export interface AccountMovementAction {
+	sourceAccountId: string | null;
+	destinations: string[] | null;
+	requestedAmount: number;
+	limitRemaining?: number;
 }
 
 export function frequencyDivisor(frequency: PostingFrequency): number {
@@ -145,36 +152,49 @@ export function resolvePostingAmount(
 	balances: Record<string, number>,
 	accountById: Map<string, Account>,
 ): number {
-	if (requestedAmount <= 0) {
+	return resolveAccountMovementAmount(
+		{
+			sourceAccountId: posting.sourceAccountId,
+			destinations: posting.destinations,
+			requestedAmount,
+			limitRemaining: annualCapRemaining,
+		},
+		balances,
+		accountById,
+	);
+}
+
+export function resolveAccountMovementAmount(
+	action: AccountMovementAction,
+	balances: Record<string, number>,
+	accountById: Map<string, Account>,
+): number {
+	if (action.requestedAmount <= 0) {
 		return 0;
 	}
 
 	if (
-		posting.sourceAccountId !== null &&
-		!accountById.has(posting.sourceAccountId)
+		action.sourceAccountId !== null &&
+		!accountById.has(action.sourceAccountId)
 	) {
 		return 0;
 	}
 
 	const sourceBalanceLimit =
-		posting.sourceAccountId === null
+		action.sourceAccountId === null
 			? Number.POSITIVE_INFINITY
-			: getWithdrawableAmount(balances, accountById, posting.sourceAccountId);
+			: getWithdrawableAmount(balances, accountById, action.sourceAccountId);
 
 	const destBalanceLimit =
-		posting.destinations === null
+		action.destinations === null
 			? Number.POSITIVE_INFINITY
-			: getTotalDestinationHeadroom(
-					balances,
-					accountById,
-					posting.destinations,
-				);
+			: getTotalDestinationHeadroom(balances, accountById, action.destinations);
 
 	return Math.max(
 		0,
 		Math.min(
-			requestedAmount,
-			annualCapRemaining,
+			action.requestedAmount,
+			action.limitRemaining ?? Number.POSITIVE_INFINITY,
 			sourceBalanceLimit,
 			destBalanceLimit,
 		),
@@ -187,22 +207,40 @@ export function applyPosting(
 	balances: Record<string, number>,
 	accountById: Map<string, Account>,
 ): void {
+	applyAccountMovement(
+		{
+			sourceAccountId: posting.sourceAccountId,
+			destinations: posting.destinations,
+			requestedAmount: realizedAmount,
+		},
+		realizedAmount,
+		balances,
+		accountById,
+	);
+}
+
+export function applyAccountMovement(
+	action: AccountMovementAction,
+	realizedAmount: number,
+	balances: Record<string, number>,
+	accountById: Map<string, Account>,
+): void {
 	if (realizedAmount <= 0) {
 		return;
 	}
 
-	if (posting.sourceAccountId !== null) {
-		balances[posting.sourceAccountId] =
-			(balances[posting.sourceAccountId] ?? 0) - realizedAmount;
+	if (action.sourceAccountId !== null) {
+		balances[action.sourceAccountId] =
+			(balances[action.sourceAccountId] ?? 0) - realizedAmount;
 	}
 
-	if (posting.destinations === null) {
+	if (action.destinations === null) {
 		return;
 	}
 
 	let remaining = realizedAmount;
 
-	for (const destId of posting.destinations) {
+	for (const destId of action.destinations) {
 		if (remaining <= 0) {
 			break;
 		}

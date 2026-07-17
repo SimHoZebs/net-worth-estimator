@@ -1,3 +1,7 @@
+import {
+	CandidateSuccessAccumulator,
+	DatedSamplesAccumulator,
+} from "../evaluation/runtime";
 import type {
 	ProjectionResult,
 	ProjectionRuntimeSettings,
@@ -15,7 +19,7 @@ import {
 	reseed,
 	sampleLogNormal,
 } from "../utils/stochastic";
-import { projectScenarioPack } from "./scenarioProject";
+import { projectScenarioPack } from "./projectScenario";
 
 function clonePack(pack: ScenarioPack): ScenarioPack {
 	return {
@@ -44,20 +48,25 @@ function generateYearlyRates(
 function buildStochasticRates(
 	pack: ScenarioPack,
 	projectionSettings: ProjectionRuntimeSettings,
+	whatIfState: ScenarioWhatIfState,
 ): Map<string, number[]> {
 	const rates = new Map<string, number[]>();
-	pack.postings.forEach((posting) => {
-		if (posting.volatility > 0 && posting.enabled) {
-			rates.set(
-				posting.id,
-				generateYearlyRates(
-					posting.annualRate,
-					posting.volatility,
-					projectionSettings.horizonYears,
-				),
-			);
-		}
-	});
+	const disabledIds = new Set(whatIfState.disabledPostingIds);
+	pack.postings
+		.filter((posting) => !disabledIds.has(posting.id))
+		.concat(whatIfState.addedPostings)
+		.forEach((posting) => {
+			if (posting.volatility > 0 && posting.enabled) {
+				rates.set(
+					posting.id,
+					generateYearlyRates(
+						posting.annualRate,
+						posting.volatility,
+						projectionSettings.horizonYears,
+					),
+				);
+			}
+		});
 	return rates;
 }
 
@@ -65,6 +74,12 @@ interface NetWorthSnapshot {
 	date: string;
 	netWorth: number;
 	isHistorical: boolean;
+}
+
+interface RunExtraction {
+	snapshots: NetWorthSnapshot[];
+	coverageRatiosByDate: Map<string, number>;
+	cycleEstablishedDates: Set<string>;
 	hitTarget: boolean;
 }
 
@@ -73,20 +88,34 @@ function runAndExtract(
 	projectionSettings: ProjectionRuntimeSettings,
 	whatIfState: ScenarioWhatIfState,
 	stochasticRates: Map<string, number[]>,
-): NetWorthSnapshot[] {
+	fiCandidateDates: readonly string[],
+): RunExtraction {
 	const result = projectScenarioPack(
 		pack,
 		projectionSettings,
 		whatIfState,
 		stochasticRates,
+		{ fiCandidateDates },
 	);
-	return result.timeline.rows.map((row) => ({
-		date: row.date,
-		netWorth: row.netWorth,
-		isHistorical: row.isHistorical,
-		hitTarget:
-			!row.isHistorical && row.netWorth >= projectionSettings.targetNetWorth,
-	}));
+	return {
+		snapshots: result.timeline.rows.map((row) => ({
+			date: row.date,
+			netWorth: row.netWorth,
+			isHistorical: row.isHistorical,
+		})),
+		coverageRatiosByDate: new Map(
+			result.financialIndependence.rows.map((row) => [
+				row.date,
+				row.coverageRatio,
+			]),
+		),
+		cycleEstablishedDates: new Set(
+			result.financialIndependence.runOutcomes
+				.filter((outcome) => outcome.cycleEstablished)
+				.map((outcome) => outcome.candidateDate),
+		),
+		hitTarget: result.milestones.hitTargetDate !== null,
+	};
 }
 
 function buildBandsFromSorted(
@@ -111,6 +140,9 @@ function buildStochasticResult(
 	projectionSettings: ProjectionRuntimeSettings,
 	totalHitCount: number,
 	totalRuns: number,
+	coverageRatiosByDate: Map<string, number[]>,
+	fiCycleSuccesses: CandidateSuccessAccumulator,
+	successfulFiCycleRuns: number,
 ): StochasticProjectionResult {
 	const finalRowBands = bands[bands.length - 1];
 	const finalNetWorthPercentiles = finalRowBands?.netWorth ?? {
@@ -127,12 +159,14 @@ function buildStochasticResult(
 	bands.forEach((band) => {
 		if (band.isHistorical) return;
 		if (
+			projectionSettings.targetNetWorth !== undefined &&
 			medianHitDate === null &&
 			band.netWorth.p50 >= projectionSettings.targetNetWorth
 		) {
 			medianHitDate = band.date;
 		}
 		if (
+			projectionSettings.targetNetWorth !== undefined &&
 			worstCaseHitDate === null &&
 			band.netWorth.p10 >= projectionSettings.targetNetWorth
 		) {
@@ -141,6 +175,34 @@ function buildStochasticResult(
 	});
 
 	const hitTargetProbability = totalRuns > 0 ? totalHitCount / totalRuns : 0;
+	let medianFiCoverageDate: string | null = null;
+	let fiSelfSustainingDate: string | null = null;
+	let fiSelfSustainingProbability: number | null = null;
+	const fiCycleSuccessProbability =
+		totalRuns > 0 ? successfulFiCycleRuns / totalRuns : 0;
+	for (const row of deterministic.financialIndependence.rows) {
+		const ratios = coverageRatiosByDate.get(row.date) ?? [];
+		const medianRatio = computePercentilesFromSorted(ratios).p50;
+		if (
+			medianFiCoverageDate === null &&
+			ratios.length > 0 &&
+			medianRatio >= 1
+		) {
+			medianFiCoverageDate = row.date;
+		}
+		const probability = fiCycleSuccesses.probability(
+			deterministic.financialIndependence.rows.indexOf(row),
+			totalRuns,
+		);
+		if (
+			fiSelfSustainingDate === null &&
+			probability >=
+				projectionSettings.financialIndependencePlan.requiredConfidence
+		) {
+			fiSelfSustainingDate = row.date;
+			fiSelfSustainingProbability = probability;
+		}
+	}
 
 	return {
 		config,
@@ -151,6 +213,10 @@ function buildStochasticResult(
 			medianHitTargetDate: medianHitDate,
 			worstCaseHitTargetDate: worstCaseHitDate,
 			finalNetWorthPercentiles,
+			fiCycleSuccessProbability,
+			medianFiCoverageDate,
+			fiSelfSustainingDate,
+			fiSelfSustainingProbability,
 		},
 	};
 }
@@ -170,31 +236,59 @@ export function stochasticProject(
 		projectionSettings,
 		whatIfState,
 	);
+	const fiCandidateDates = deterministic.financialIndependence.rows.map(
+		(row) => row.date,
+	);
 	const sortedDates = deterministic.timeline.rows.map((r) => r.date);
 
 	const sortedValuesByDate = new Map<string, number[]>();
 	const isHistoricalByDate = new Map<string, boolean>();
+	const coverageSamples = new DatedSamplesAccumulator();
+	const fiCycleSuccesses = new CandidateSuccessAccumulator(
+		fiCandidateDates.length,
+	);
 	let totalHitCount = 0;
+	let successfulFiCycleRuns = 0;
 
 	for (let i = 0; i < config.runCount; i += STOCHASTIC_PROGRESS_BATCH) {
 		const batchEnd = Math.min(i + STOCHASTIC_PROGRESS_BATCH, config.runCount);
 		const newValuesByDate = new Map<string, number[]>();
+		const newCoverageByDate = new Map<string, number[]>();
 
 		for (let j = i; j < batchEnd; j++) {
 			const cloned = clonePack(pack);
-			const rates = buildStochasticRates(cloned, projectionSettings);
-			const snapshots = runAndExtract(
+			const rates = buildStochasticRates(
+				cloned,
+				projectionSettings,
+				whatIfState,
+			);
+			const extraction = runAndExtract(
 				cloned,
 				projectionSettings,
 				whatIfState,
 				rates,
+				fiCandidateDates,
 			);
 
-			if (snapshots.some((s) => s.hitTarget)) {
+			if (extraction.hitTarget) {
 				totalHitCount++;
 			}
 
-			for (const s of snapshots) {
+			for (const [date, ratio] of extraction.coverageRatiosByDate) {
+				const ratios = newCoverageByDate.get(date) ?? [];
+				ratios.push(ratio);
+				newCoverageByDate.set(date, ratios);
+			}
+			fiCycleSuccesses.add(
+				fiCandidateDates.map((date) => ({
+					cycleEstablished: extraction.cycleEstablishedDates.has(date),
+				})),
+			);
+			if (extraction.cycleEstablishedDates.size > 0) {
+				successfulFiCycleRuns++;
+			}
+
+			for (const s of extraction.snapshots) {
 				if (!newValuesByDate.has(s.date)) {
 					newValuesByDate.set(s.date, []);
 				}
@@ -214,11 +308,15 @@ export function stochasticProject(
 				existing ? mergeSorted(existing, newValues) : newValues,
 			);
 		}
+		coverageSamples.addBatch(newCoverageByDate);
 
 		const bands = buildBandsFromSorted(
 			sortedValuesByDate,
 			isHistoricalByDate,
 			sortedDates,
+		);
+		const coverageRatiosByDate = new Map(
+			fiCandidateDates.map((date) => [date, [...coverageSamples.get(date)]]),
 		);
 		const partial = buildStochasticResult(
 			bands,
@@ -227,6 +325,9 @@ export function stochasticProject(
 			projectionSettings,
 			totalHitCount,
 			batchEnd,
+			coverageRatiosByDate,
+			fiCycleSuccesses,
+			successfulFiCycleRuns,
 		);
 		onProgress?.(batchEnd / config.runCount, partial);
 	}
@@ -236,6 +337,9 @@ export function stochasticProject(
 		isHistoricalByDate,
 		sortedDates,
 	);
+	const coverageRatiosByDate = new Map(
+		fiCandidateDates.map((date) => [date, [...coverageSamples.get(date)]]),
+	);
 	return buildStochasticResult(
 		bands,
 		deterministic,
@@ -243,5 +347,8 @@ export function stochasticProject(
 		projectionSettings,
 		totalHitCount,
 		config.runCount,
+		coverageRatiosByDate,
+		fiCycleSuccesses,
+		successfulFiCycleRuns,
 	);
 }

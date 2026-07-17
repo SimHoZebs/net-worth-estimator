@@ -1,4 +1,4 @@
-import { ParseError, parseArithmetic } from "../../engine/arithmetic";
+import { ParseError, parseArithmetic } from "../../simulation/arithmetic";
 import type { Posting, ScenarioPack } from "../../types/scenario";
 import { CSV_SCENARIO_FILE_NAMES } from "../../types/scenario";
 import type { ScenarioValidationIssue } from "../../types/validation";

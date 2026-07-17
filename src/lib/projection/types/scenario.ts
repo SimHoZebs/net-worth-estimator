@@ -15,10 +15,43 @@ export type ScenarioFileName =
 
 export type IsoDate = string;
 
+export type FinancialIndependencePrincipalPolicy =
+	| "allow-drawdown"
+	| "preserve-nominal-principal"
+	| "preserve-real-principal";
+
+export type FinancialIndependenceSource =
+	| {
+			type: "cashflow";
+			postingId: string;
+			included: boolean;
+			laborDependent?: boolean;
+	  }
+	| {
+			type: "asset";
+			accountId: string;
+			included: boolean;
+			withdrawalRateOverride?: number;
+	  };
+
+export interface FinancialIndependencePlan {
+	minimumNetWorth: number;
+	annualExpenseTarget: number;
+	annualExpenseGrowthRate: number;
+	withdrawalRate: number;
+	evaluationYears: number;
+	requiredConfidence: number;
+	sources: FinancialIndependenceSource[];
+	continuingPostingIds: string[];
+	principalPolicy: FinancialIndependencePrincipalPolicy;
+}
+
 export interface ProjectionRuntimeSettings {
-	targetNetWorth: number;
+	/** Optional generic savings goal. Financial independence does not use it. */
+	targetNetWorth?: number;
 	fallbackProjectionStartDate: IsoDate;
 	horizonYears: number;
+	financialIndependencePlan: FinancialIndependencePlan;
 }
 
 export interface Account {
@@ -133,7 +166,53 @@ export interface ProjectionPostingSummary {
 	shortfallAmount: number;
 }
 
-export interface ProjectionResult {
+export interface FinancialIndependenceRow {
+	date: IsoDate;
+	netWorth: number;
+	minimumNetWorth: number;
+	minimumNetWorthMet: boolean;
+	annualDirectIncome: number;
+	selectedAssetBalance: number;
+	annualWithdrawalCapacity: number;
+	totalAnnualCapacity: number;
+	annualExpenseTarget: number;
+	coverageRatio: number;
+	isCovered: boolean;
+	isEligible: boolean;
+}
+
+export interface FinancialIndependenceRunOutcome {
+	candidateDate: IsoDate;
+	status: "ineligible" | "evaluated";
+	minimumNetWorthMet: boolean;
+	initialCoverageMet: boolean;
+	expensesFullyCovered: boolean;
+	hadWithdrawalShortfall: boolean;
+	startingSelectedAssetBalance: number;
+	endingSelectedAssetBalance: number;
+	startingRealSelectedAssetBalance: number;
+	endingRealSelectedAssetBalance: number;
+	principalReplenished: boolean;
+	cycleEstablished: boolean;
+}
+
+export interface ProjectionPath {
+	rows: ProjectionRow[];
+	effectivePack: ScenarioPack;
+	projectionStartDate: IsoDate;
+	projectionEndDate: IsoDate;
+}
+
+export interface FinancialIndependenceAnalysis {
+	rows: FinancialIndependenceRow[];
+	runOutcomes: FinancialIndependenceRunOutcome[];
+	milestones: {
+		firstCoverageDate: IsoDate | null;
+		firstSelfSustainingDate: IsoDate | null;
+	};
+}
+
+export interface ProjectionCoreResult {
 	timeline: {
 		rows: ProjectionRow[];
 		sampledRows: ProjectionRow[];
@@ -149,7 +228,6 @@ export interface ProjectionResult {
 		clampedPostingShortfallAmount: number;
 	};
 	milestones: {
-		hitTargetDate: IsoDate | null;
 		latestCheckpointDate: IsoDate | null;
 		latestHistoricalDate: IsoDate | null;
 		projectionStartDate: IsoDate;
@@ -158,4 +236,16 @@ export interface ProjectionResult {
 		currentNetWorth: number;
 		finalNetWorth: number;
 	};
+}
+
+export type ProjectionResult = Omit<ProjectionCoreResult, "milestones"> & {
+	financialIndependence: FinancialIndependenceAnalysis;
+	milestones: ProjectionCoreResult["milestones"] & {
+		hitTargetDate: IsoDate | null;
+	};
+};
+
+export interface RawProjectionOutput {
+	path: ProjectionPath;
+	result: ProjectionCoreResult;
 }

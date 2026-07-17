@@ -7,7 +7,7 @@ import {
 	sampleLogNormal,
 	stochasticProject,
 } from "../";
-import { validCsvFiles } from "../__fixtures__";
+import { makeSettings, validCsvFiles } from "../__fixtures__";
 import type { StochasticProjectionResult } from "../types/stochastic";
 
 describe("stochastic utilities", () => {
@@ -53,6 +53,81 @@ describe("stochastic utilities", () => {
 });
 
 describe("stochastic projection", () => {
+	it("aggregates FI-cycle outcomes from complete seeded runs", () => {
+		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
+		if (!pack) throw new Error("Pack is null");
+		const partials: StochasticProjectionResult[] = [];
+		const result = stochasticProject(
+			pack,
+			makeSettings({
+				fallbackProjectionStartDate: "2026-04-01",
+				horizonYears: 2,
+				financialIndependencePlan: {
+					minimumNetWorth: 0,
+					annualExpenseTarget: 1_000,
+					annualExpenseGrowthRate: 0,
+					withdrawalRate: 0.04,
+					evaluationYears: 1,
+					requiredConfidence: 0.9,
+					principalPolicy: "allow-drawdown",
+					sources: [{ type: "cashflow", postingId: "salary", included: true }],
+					continuingPostingIds: [],
+				},
+			}),
+			{
+				addedAccounts: [],
+				addedPostings: [],
+				addedCheckpoints: [],
+				disabledAccountIds: [],
+				disabledPostingIds: [],
+			},
+			{ runCount: 50, seed: 42 },
+			(_progress, partial) => partials.push(partial),
+		);
+
+		expect(result.milestones.fiCycleSuccessProbability).toBe(1);
+		expect(result.milestones.medianFiCoverageDate).not.toBeNull();
+		expect(result.milestones.fiSelfSustainingDate).not.toBeNull();
+		expect(
+			partials[partials.length - 1]?.milestones.fiCycleSuccessProbability,
+		).toBe(1);
+	});
+
+	it("counts candidates below the semantic net-worth gate as failures", () => {
+		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
+		if (!pack) throw new Error("Pack is null");
+		const result = stochasticProject(
+			pack,
+			makeSettings({
+				fallbackProjectionStartDate: "2026-04-01",
+				horizonYears: 2,
+				financialIndependencePlan: {
+					minimumNetWorth: 1_000_000_000,
+					annualExpenseTarget: 1_000,
+					annualExpenseGrowthRate: 0,
+					withdrawalRate: 0.04,
+					evaluationYears: 1,
+					requiredConfidence: 0.9,
+					principalPolicy: "allow-drawdown",
+					sources: [{ type: "cashflow", postingId: "salary", included: true }],
+					continuingPostingIds: [],
+				},
+			}),
+			{
+				addedAccounts: [],
+				addedPostings: [],
+				addedCheckpoints: [],
+				disabledAccountIds: [],
+				disabledPostingIds: [],
+			},
+			{ runCount: 50, seed: 42 },
+		);
+
+		expect(result.milestones.medianFiCoverageDate).not.toBeNull();
+		expect(result.milestones.fiCycleSuccessProbability).toBe(0);
+		expect(result.milestones.fiSelfSustainingDate).toBeNull();
+	});
+
 	it("returns deterministic baseline alongside stochastic bands", () => {
 		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
 		if (!pack) throw new Error("Pack is null");
@@ -60,11 +135,11 @@ describe("stochastic projection", () => {
 
 		const result = stochasticProject(
 			pack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -89,11 +164,11 @@ describe("stochastic projection", () => {
 
 		const result1 = stochasticProject(
 			pack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -106,11 +181,11 @@ describe("stochastic projection", () => {
 
 		const result2 = stochasticProject(
 			pack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -135,11 +210,11 @@ describe("stochastic projection", () => {
 
 		const result = stochasticProject(
 			pack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 5,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -166,11 +241,11 @@ describe("stochastic projection", () => {
 
 		const result = stochasticProject(
 			deterministicOnlyPack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -183,11 +258,11 @@ describe("stochastic projection", () => {
 
 		const deterministic = projectScenarioPack(
 			deterministicOnlyPack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -213,11 +288,11 @@ describe("stochastic progress streaming", () => {
 		const progressValues: number[] = [];
 		stochasticProject(
 			pack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -245,11 +320,11 @@ describe("stochastic progress streaming", () => {
 
 		const resultWithout = stochasticProject(
 			pack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -262,11 +337,11 @@ describe("stochastic progress streaming", () => {
 
 		const resultWith = stochasticProject(
 			pack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -295,11 +370,11 @@ describe("stochastic progress streaming", () => {
 		const progressValues: number[] = [];
 		stochasticProject(
 			pack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 5,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -323,11 +398,11 @@ describe("stochastic progress streaming", () => {
 		const progressValues: number[] = [];
 		stochasticProject(
 			pack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 5,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -355,11 +430,11 @@ describe("stochastic progress streaming", () => {
 		const partials: StochasticProjectionResult[] = [];
 		const final = stochasticProject(
 			pack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -396,11 +471,11 @@ describe("stochastic progress streaming", () => {
 		const partials: StochasticProjectionResult[] = [];
 		const final = stochasticProject(
 			pack,
-			{
+			makeSettings({
 				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
-			},
+			}),
 			{
 				addedAccounts: [],
 				addedPostings: [],

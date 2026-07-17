@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useProjectionEngine } from "@/engine/ProjectionEngineContext";
 import type {
 	ProjectionRuntimeSettings,
@@ -17,29 +17,42 @@ export function useStochastic(
 	enabled: boolean,
 ): ProjectionHookState<StochasticProjectionResult> {
 	const engine = useProjectionEngine();
+	const requestKey = useMemo(
+		() => ({ pack, projectionSettings, whatIfState, config, enabled }),
+		[pack, projectionSettings, whatIfState, config, enabled],
+	);
 	const [state, setState] = useState<
-		ProjectionHookState<StochasticProjectionResult>
+		ProjectionHookState<StochasticProjectionResult> & {
+			requestKey: object | null;
+		}
 	>({
 		result: null,
 		runtimeError: null,
 		isRunning: false,
 		progress: null,
+		requestKey: null,
 	});
 
 	useEffect(() => {
 		if (!enabled || pack === null || config === null) {
-			setState((s) => ({ ...s, isRunning: false, progress: null }));
+			setState({
+				result: null,
+				runtimeError: null,
+				isRunning: false,
+				progress: null,
+				requestKey,
+			});
 			return;
 		}
 
 		const controller = new AbortController();
-		setState((s) => ({
-			...s,
+		setState({
 			isRunning: true,
 			runtimeError: null,
 			result: null,
 			progress: null,
-		}));
+			requestKey,
+		});
 
 		engine
 			.projectStochastic(
@@ -51,38 +64,67 @@ export function useStochastic(
 					signal: controller.signal,
 				},
 				(progress, partial) => {
-					setState((s) => ({
-						...s,
-						progress,
-						result: partial ?? s.result,
-					}));
+					setState((current) =>
+						current.requestKey === requestKey
+							? {
+									...current,
+									progress,
+									result: partial ?? current.result,
+								}
+							: current,
+					);
 				},
 			)
 			.then((result) => {
-				setState({
-					result,
-					runtimeError: null,
-					isRunning: false,
-					progress: null,
-				});
+				setState((current) =>
+					current.requestKey === requestKey
+						? {
+								result,
+								runtimeError: null,
+								isRunning: false,
+								progress: null,
+								requestKey,
+							}
+						: current,
+				);
 			})
 			.catch((err: unknown) => {
 				if (err instanceof DOMException && err.name === "AbortError") return;
-				setState((s) => ({
-					...s,
-					runtimeError:
-						err instanceof Error
-							? err.message
-							: "Stochastic simulation failed.",
-					isRunning: false,
-					progress: null,
-				}));
+				setState((current) =>
+					current.requestKey === requestKey
+						? {
+								...current,
+								runtimeError:
+									err instanceof Error
+										? err.message
+										: "Stochastic simulation failed.",
+								isRunning: false,
+								progress: null,
+							}
+						: current,
+				);
 			});
 
 		return () => {
 			controller.abort();
 		};
-	}, [pack, projectionSettings, whatIfState, config, enabled, engine]);
+	}, [
+		pack,
+		projectionSettings,
+		whatIfState,
+		config,
+		enabled,
+		engine,
+		requestKey,
+	]);
 
+	if (state.requestKey !== requestKey) {
+		return {
+			result: null,
+			runtimeError: null,
+			isRunning: enabled && pack !== null && config !== null,
+			progress: null,
+		};
+	}
 	return state;
 }

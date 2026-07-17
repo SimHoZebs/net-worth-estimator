@@ -7,7 +7,7 @@ import type {
 	ProjectionEngine,
 	ProjectionRequest,
 	StochasticRequest,
-} from "@/lib/projection/engine/ProjectionEngine";
+} from "@/lib/projection/runtime/ProjectionEngine";
 import type {
 	ProjectionWorkerRequest,
 	ProjectionWorkerResponse,

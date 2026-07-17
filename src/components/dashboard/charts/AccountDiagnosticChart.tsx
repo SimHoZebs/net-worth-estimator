@@ -14,6 +14,7 @@ interface AccountDiagnosticChartProps {
 	pack: ScenarioPack;
 	targetNetWorth: number;
 	hasStochasticData: boolean;
+	stochasticIsProvisional?: boolean;
 	chartData: Record<string, string | number>[];
 	milestoneDates?: { hitTarget?: string; firstShortfall?: string };
 }
@@ -22,6 +23,7 @@ export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
 	pack,
 	targetNetWorth,
 	hasStochasticData,
+	stochasticIsProvisional = false,
 	chartData,
 	milestoneDates,
 }: AccountDiagnosticChartProps) {
@@ -59,6 +61,7 @@ export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
 							pack={pack}
 							targetNetWorth={targetNetWorth}
 							hasStochasticData={hasStochasticData}
+							stochasticIsProvisional={stochasticIsProvisional}
 							chartData={chartData}
 							milestoneDates={milestoneDates}
 						/>

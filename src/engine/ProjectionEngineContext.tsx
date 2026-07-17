@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { ProjectionEngine } from "@/lib/projection/engine/ProjectionEngine";
+import type { ProjectionEngine } from "@/lib/projection/runtime/ProjectionEngine";
 
 const ProjectionEngineContext = createContext<ProjectionEngine | null>(null);
 

@@ -9,7 +9,7 @@ import type {
 } from "@/lib/projection";
 import { projectScenarioPack } from "@/lib/projection";
 import { createBasePack, makeSettings } from "@/lib/projection/__fixtures__";
-import type { ProjectionEngine } from "@/lib/projection/engine/ProjectionEngine";
+import type { ProjectionEngine } from "@/lib/projection/runtime/ProjectionEngine";
 import { wrapperWithEngine } from "./test-helpers";
 
 /* ------------------------------------------------------------------ */

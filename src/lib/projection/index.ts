@@ -1,10 +1,12 @@
+export { projectScenarioPack } from "./analysis/projectScenario";
+export { stochasticProject } from "./analysis/projectStochastic";
 export type {
 	DataSource,
 	DataSourceAction,
 	ScenarioParseResult,
 } from "./dataSource";
-export { projectScenarioPack } from "./engine/scenarioProject";
-export { stochasticProject } from "./engine/stochasticProject";
+export { evaluateFinancialIndependence } from "./evaluation/financialIndependence";
+export { prepareScenarioPack } from "./scenario/prepareScenario";
 export { createBrowserCsvDataSource } from "./sources/csv/browserCsvDataSource";
 export { createCsvDataSource } from "./sources/csv/csvDataSource";
 export {
@@ -30,6 +32,12 @@ export type {
 	AccountDelta,
 	AccountSnapshot,
 	Checkpoint,
+	FinancialIndependenceAnalysis,
+	FinancialIndependencePlan,
+	FinancialIndependencePrincipalPolicy,
+	FinancialIndependenceRow,
+	FinancialIndependenceRunOutcome,
+	FinancialIndependenceSource,
 	IsoDate,
 	Posting,
 	PostingFrequency,

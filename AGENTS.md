@@ -19,7 +19,7 @@ main.tsx → <QueryClientProvider> → <ProjectionEngineProvider> → <App>
 App (src/App.tsx)
 ├── <ProjectionDashboard> (src/components/CsvProjectionDashboard.tsx, 190 lines)
 │   ├── <OverviewCard>, <OutcomeMetric>, <CompactDetail>, <DriverCard>
-│   ├── <KeyAssumptionsCard>, <AssumptionList>
+│   ├── <FinancialIndependenceChart>
 │   ├── <AccountDiagnosticChart> (recharts: ComposedChart)
 │   ├── <TransactionCompletionTable>, <UpcomingTransactionsTable>
 │   └── <ContributionWhatIfControls> (children slot)
@@ -36,7 +36,7 @@ App (src/App.tsx)
 
 | Directory            | Contents                                                                                                                                                                                                                                                       |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dashboard/`         | OverviewCard, OutcomeMetric, CompactDetail, DriverCard, KeyAssumptionsCard, AssumptionList, NetWorthReconciliation, AccountLinesChart, CashFlowWaterfall, DebtSummary, ShortfallCalendar, ShortfallDetailPanel, StackedContributionChart, StochasticResultCard |
+| `dashboard/`         | OverviewCard, OutcomeMetric, CompactDetail, DriverCard, FinancialIndependenceChart, NetWorthReconciliation, AccountLinesChart, CashFlowWaterfall, DebtSummary, ShortfallCalendar, ShortfallDetailPanel, StackedContributionChart, StochasticResultCard |
 | `dashboard/tables/`  | TransactionCompletionTable, EditableAccountsTable, EditablePostingsTable, EditableCheckpointsTable, ReadOnlyAccountsTable, ReadOnlyPostingsTable, ReadOnlyCheckpointsTable                                                                                     |
 | `dashboard/what-if/` | WhatIfAccountForm, WhatIfPostingForm, WhatIfCheckpointForm                                                                                                                                                                                                     |
 | `dashboard/charts/`  | AccountDiagnosticChart, AccountLinesChart, ColorSwatch, StackedContributionChart                                                                                                                                                                               |
@@ -67,7 +67,7 @@ Shared: `ProjectionHookState<T>` (`hooks/types.ts`) — `{ result, runtimeError,
 | ------------ | -------------------------------------------------------------------------------------- |
 | **WhatIf**   | Temporary overrides (add/remove/toggle accounts, postings, checkpoints; reset)         |
 | **Editor**   | CRUD on working copy (start/cancel editing, isDirty/isEditing, update/delete/add rows) |
-| **Settings** | targetNetWorth, horizonYears, stochasticPreference, stochasticConfig                   |
+| **Settings** | financialIndependencePlan, horizonYears, stochasticPreference, stochasticConfig        |
 | **Snapshot** | Named scenario snapshots (label, timestamp, whatIfState, metrics)                      |
 | **Theme**    | light/dark/system theme with DOM application                                           |
 
@@ -86,7 +86,7 @@ Selectors: `selectActiveOverrideCount`, `selectWhatIfState`, `selectEditorState`
 
 1. **CSV Pipeline**: Vite plugin (`plugins/csvFilePlugin.ts`) → `GET/PUT /api/scenario/pack` → `csvLoader.ts` (Papa Parse + Zod via `csvSchema.ts`) → cross-validation (`csvValidation.ts`)
 2. **DI**: `App.tsx` creates `DataSource` (`createCsvDataSource` for dev, `createBrowserCsvDataSource` for production) → passed to hooks via TanStack Query
-3. **Projections**: `useProjection`/`useStochastic` hooks → `WorkerProjectionEngine` → Web Workers (`src/workers/`) → `projectScenarioPack()` / `stochasticProject()`
+3. **Projections**: `useProjection`/`useStochastic` hooks → `WorkerProjectionEngine` → Web Workers (`src/workers/`) → `scenario/prepareScenario.ts` → `simulation/projectPath.ts` → `evaluation/` / `analysis/` aggregation
 4. **What-if**: Zustand session-only overrides (never mutates canonical data)
 5. **Chart data**: `buildAccountDiagnosticChartData(pack, result, stochasticResult?)` in `src/chart/chartData.ts`
 
@@ -96,7 +96,7 @@ Selectors: `selectActiveOverrideCount`, `selectWhatIfState`, `selectEditorState`
 
 - `ProjectionEngineProvider` (context) wraps app with a `ProjectionEngine` instance
 - `WorkerProjectionEngine` implements `ProjectionEngine` — creates/destroys Workers per call
-- Workers: `projectionWorker.ts` (deterministic), `stochasticWorker.ts` (streaming progress in batches of 100)
+- Workers: `projectionWorker.ts` (deterministic), `stochasticWorker.ts` (streaming progress in batches of 50)
 
 ---
 
@@ -108,7 +108,7 @@ Selectors: `selectActiveOverrideCount`, `selectWhatIfState`, `selectEditorState`
 | `ProjectionResult`           | same                                 | Deterministic output (timeline, summaries, milestones)    |
 | `StochasticProjectionResult` | `lib/projection/types/stochastic.ts` | Monte Carlo output (percentile bands, hit probability)    |
 | `ScenarioWhatIfState`        | `lib/projection/types/scenario.ts`   | Temporary overrides (added + disabled ID arrays)          |
-| `ProjectionRuntimeSettings`  | same                                 | targetNetWorth, fallbackProjectionStartDate, horizonYears |
+| `ProjectionRuntimeSettings`  | same                                 | financialIndependencePlan, fallbackProjectionStartDate, horizonYears |
 | `ProjectionHookState<T>`     | `hooks/types.ts`                     | `{ result, runtimeError, isRunning, progress }`           |
 | `DataSource`                 | `lib/projection/dataSource.ts`       | `{ loadPack, savePack, sourceType }`                      |
 | `ScenarioParseResult`        | same                                 | `{ pack, issues }`                                        |
@@ -117,7 +117,10 @@ Selectors: `selectActiveOverrideCount`, `selectWhatIfState`, `selectEditorState`
 
 ## Rules
 
-- Engine logic (`lib/projection/engine/`) must never branch on specific account IDs, posting IDs, or categories. See `TECHNICAL_OVERVIEW.md` §3.
+- Simulation logic (`lib/projection/simulation/`) must never branch on specific account IDs, posting IDs, or categories. See `TECHNICAL_OVERVIEW.md` §3.
+- FI logic is a derived analysis in `evaluation/financialIndependence.ts`; it must not add semantic branches to generic simulation.
+- Reactive policies emit generic account movements and must use shared account constraints instead of mutating balances directly.
+- FI continuing postings are explicitly selected; never infer growth from IDs, labels, categories, or a non-zero annual rate.
 - What-if state is session-only, never mutates canonical data.
 - Use `@/lib/projection` barrel import for all projection types and utilities.
 - Projection and stochastic computation happen in Web Workers (`src/workers/`), never on main thread.

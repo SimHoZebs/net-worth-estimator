@@ -1,4 +1,9 @@
-import type { Account, Checkpoint, Posting } from "@/lib/projection";
+import type {
+	Account,
+	Checkpoint,
+	FinancialIndependencePrincipalPolicy,
+	Posting,
+} from "@/lib/projection";
 
 export interface IncomeTemplateInput {
 	label: string;
@@ -9,6 +14,22 @@ export interface IncomeTemplateInput {
 	k401AnnualCap: number;
 	autoInvestRate: number;
 	startDate: string;
+}
+
+export interface FinancialIndependenceTemplateInput {
+	minimumNetWorth: number;
+	annualExpenseTarget: number;
+	annualExpenseGrowthRate: number;
+	withdrawalRate: number;
+	evaluationYears: number;
+	requiredConfidence: number;
+	directIncomePostingIds: string[];
+	assets: Array<{
+		accountId: string;
+		withdrawalRateOverride?: number;
+	}>;
+	continuingPostingIds: string[];
+	principalPolicy: FinancialIndependencePrincipalPolicy;
 }
 
 export interface TemplateOutput {

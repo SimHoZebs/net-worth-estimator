@@ -1,9 +1,10 @@
 import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { currency, formatDate, formatElapsedTime, pct } from "@/lib/format";
+import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	ProjectionResult,
 	ProjectionRuntimeSettings,
+	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 
@@ -11,6 +12,8 @@ interface OverviewCardProps {
 	result: ProjectionResult;
 	projectionSettings: ProjectionRuntimeSettings;
 	stochasticResult?: StochasticProjectionResult | null;
+	stochasticIsProvisional?: boolean;
+	pack: ScenarioPack;
 	blockerValue: string;
 	blockerDetail: string;
 	goalReached: boolean;
@@ -20,111 +23,131 @@ export const OverviewCard = memo(function OverviewCard({
 	result,
 	projectionSettings,
 	stochasticResult,
+	stochasticIsProvisional = false,
+	pack,
 	blockerValue,
 	blockerDetail,
-	goalReached,
 }: OverviewCardProps) {
-	const hasStochasticData =
-		stochasticResult !== undefined && stochasticResult !== null;
-	const current = result.summary.currentNetWorth;
-	const target = projectionSettings.targetNetWorth;
-	const final = result.summary.finalNetWorth;
-	const hitDate = result.milestones.hitTargetDate;
-	const latestDate =
-		result.timeline.rows[result.timeline.rows.length - 1]?.date ??
-		result.milestones.projectionStartDate;
+	const analysis = result.financialIndependence;
+	const firstCoverageDate = analysis.milestones.firstCoverageDate;
+	const selfSustainingDate = analysis.milestones.firstSelfSustainingDate;
+	const activePostingIds = new Set(pack.postings.map((posting) => posting.id));
+	const laborDependentSources =
+		projectionSettings.financialIndependencePlan?.sources.filter(
+			(source) =>
+				source.type === "cashflow" &&
+				source.included &&
+				source.laborDependent &&
+				activePostingIds.has(source.postingId),
+		).length;
+	const displayDate = firstCoverageDate;
+	const coverageRow =
+		analysis.rows.find((row) => row.date === displayDate) ?? analysis.rows[0];
+	const confidenceDate = stochasticResult?.milestones.fiSelfSustainingDate;
+	const confidence = stochasticResult?.milestones.fiCycleSuccessProbability;
+	const qualifyingConfidence =
+		stochasticResult?.milestones.fiSelfSustainingProbability;
 
 	return (
 		<Card className="rounded-[1.8rem] border-primary-border/45 bg-gradient-to-br from-card/96 via-card/90 to-primary-subtle/35">
 			<CardContent className="p-5 md:p-6">
 				<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
-						<div className="type-label">Current net worth</div>
+						<div className="type-label">FI coverage</div>
 						<div className="mt-1 type-metric text-foreground">
-							{currency.format(current)}
+							{coverageRow ? pct.format(coverageRow.coverageRatio) : "0%"}
 						</div>
 						<div className="type-muted">
-							as of{" "}
-							{formatDate(
-								result.milestones.latestHistoricalDate ??
-									result.milestones.projectionStartDate,
-							)}
+							{coverageRow
+								? `${currency.format(coverageRow.totalAnnualCapacity)} of ${currency.format(coverageRow.annualExpenseTarget)} per year`
+								: "Select at least one FI source"}
 						</div>
 					</div>
 
 					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
-						<div className="type-label">Time to target</div>
+						<div className="type-label">Deterministic first coverage</div>
 						<div className="mt-1 type-metric text-foreground">
-							{hasStochasticData &&
-							stochasticResult?.milestones.medianHitTargetDate
-								? formatElapsedTime(
-										result.milestones.projectionStartDate,
-										stochasticResult.milestones.medianHitTargetDate,
-									)
-								: hitDate
-									? formatElapsedTime(
-											result.milestones.projectionStartDate,
-											hitDate,
-										)
-									: "Beyond horizon"}
+							{firstCoverageDate
+								? formatDate(firstCoverageDate)
+								: "Beyond horizon"}
 						</div>
 						<div className="type-muted">
-							{hasStochasticData &&
-							stochasticResult?.milestones.medianHitTargetDate
-								? `Median target date: ${formatDate(stochasticResult.milestones.medianHitTargetDate)}`
-								: hitDate
-									? `Target date: ${formatDate(hitDate)}`
-									: `Misses by ${currency.format(Math.abs(target - final))}`}
+							Selected capacity first meets annual expenses
 						</div>
 					</div>
 
 					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
-						<div className="type-label">Confidence</div>
+						<div className="type-label">
+							Deterministic first self-sustaining
+						</div>
 						<div className="mt-1 type-metric text-primary">
-							{hasStochasticData && stochasticResult
-								? pct.format(stochasticResult.milestones.hitTargetProbability)
-								: goalReached
-									? "On track"
-									: "Off track"}
+							{selfSustainingDate
+								? formatDate(selfSustainingDate)
+								: "Not established"}
 						</div>
 						<div className="type-muted">
-							{hasStochasticData && stochasticResult
-								? "of simulated paths reached target"
-								: goalReached
-									? "Target reached within horizon"
-									: "Target not reached within horizon"}
+							Requires at least{" "}
+							{currency.format(
+								projectionSettings.financialIndependencePlan.minimumNetWorth,
+							)}{" "}
+							net worth before cycle evaluation
 						</div>
 					</div>
 
 					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
-						<div className="type-label">Main constraint</div>
-						<div className="mt-1 type-title">{blockerValue}</div>
-						<div className="type-muted line-clamp-2">{blockerDetail}</div>
+						<div className="type-label">
+							{stochasticIsProvisional ? "Provisional " : ""}
+							Confidence-qualified FI date
+						</div>
+						<div className="mt-1 type-metric text-primary">
+							{confidenceDate === undefined
+								? "Run Monte Carlo"
+								: confidenceDate
+									? formatDate(confidenceDate)
+									: "Not established"}
+						</div>
+						<div className="type-muted line-clamp-2">
+							{confidence === undefined
+								? blockerDetail
+								: confidenceDate === null
+									? `${pct.format(confidence)} of runs succeeded at some candidate; no date reached ${pct.format(projectionSettings.financialIndependencePlan.requiredConfidence)}`
+									: stochasticIsProvisional
+										? `${pct.format(qualifyingConfidence ?? 0)} at this date from completed runs; still converging`
+										: `${pct.format(qualifyingConfidence ?? 0)} at this date; requires ${pct.format(projectionSettings.financialIndependencePlan.requiredConfidence)}`}
+						</div>
 					</div>
 				</div>
 
-				<div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-border/70 pt-4 type-muted">
+				<div className="mt-5 grid gap-2 border-t border-border/70 pt-4 type-muted sm:grid-cols-2 xl:grid-cols-4">
 					<span>
-						Projected final:{" "}
-						<span className="type-value">{currency.format(final)}</span> on{" "}
-						{formatDate(latestDate)}
+						Direct income:{" "}
+						<b className="type-value">
+							{currency.format(coverageRow?.annualDirectIncome ?? 0)}/yr
+						</b>
 					</span>
 					<span>
-						Horizon:{" "}
-						<span className="type-value">
-							{projectionSettings.horizonYears} years
-						</span>
+						Withdrawal capacity:{" "}
+						<b className="type-value">
+							{currency.format(coverageRow?.annualWithdrawalCapacity ?? 0)}/yr
+						</b>
 					</span>
-					{hasStochasticData &&
-					stochasticResult?.milestones.worstCaseHitTargetDate ? (
-						<span>
-							Conservative date:{" "}
-							<span className="type-value">
-								{formatDate(stochasticResult.milestones.worstCaseHitTargetDate)}
-							</span>
-						</span>
-					) : null}
+					<span>
+						Selected assets:{" "}
+						<b className="type-value">
+							{currency.format(coverageRow?.selectedAssetBalance ?? 0)}
+						</b>
+					</span>
+					<span>
+						Main constraint: <b className="type-value">{blockerValue}</b>
+					</span>
 				</div>
+				{laborDependentSources > 0 ? (
+					<p className="mt-3 rounded-xl border border-tertiary-border bg-tertiary-subtle px-3 py-2 type-caption text-tertiary-foreground">
+						This FI result includes {laborDependentSources} income source
+						{laborDependentSources === 1 ? "" : "s"} that require continued
+						labor.
+					</p>
+				) : null}
 			</CardContent>
 		</Card>
 	);
