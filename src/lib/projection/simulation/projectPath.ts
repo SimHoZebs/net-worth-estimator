@@ -12,7 +12,11 @@ import type {
 	ScenarioPack,
 	ScenarioWhatIfState,
 } from "../types/scenario";
-import { addYearsClamped, compareIsoDates, daysBetween } from "../utils/date";
+import {
+	addYearsClamped,
+	compareIsoDates,
+	projectionYearIndex,
+} from "../utils/date";
 import {
 	computeNetWorth,
 	initAccountBalances,
@@ -250,7 +254,7 @@ export function projectRawScenarioPack(
 			return;
 		}
 
-		const yearIndex = Math.floor(daysBetween(projectionStartDate, date) / 365);
+		const yearIndex = projectionYearIndex(projectionStartDate, date);
 
 		const requestedPostingAmountsById: Record<string, number> = {};
 		const realizedPostingAmountsById: Record<string, number> = {};

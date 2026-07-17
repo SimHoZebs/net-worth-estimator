@@ -25,6 +25,7 @@ import {
 	addYearsClamped,
 	compareIsoDates,
 	daysBetween,
+	projectionYearIndex,
 } from "../utils/date";
 
 const EPSILON = 0.01;
@@ -108,6 +109,28 @@ function selectedCashflowIds(plan: FinancialIndependencePlan) {
 		plan.sources.flatMap((source) =>
 			source.type === "cashflow" && source.included ? [source.postingId] : [],
 		),
+	);
+}
+
+type FiPostingDisposition =
+	| "observe-base-path-realized-occurrence"
+	| "replay-in-branch"
+	| "disabled";
+
+function classifyPostingDispositions(
+	path: ProjectionPath,
+	cashflowIds: ReadonlySet<string>,
+	continuingIds: ReadonlySet<string>,
+) {
+	return new Map<string, FiPostingDisposition>(
+		path.effectivePack.postings.map((posting) => [
+			posting.id,
+			cashflowIds.has(posting.id)
+				? "observe-base-path-realized-occurrence"
+				: continuingIds.has(posting.id)
+					? "replay-in-branch"
+					: "disabled",
+		]),
 	);
 }
 
@@ -206,8 +229,10 @@ function initializeRealizedPostingCaps(
 	return realized;
 }
 
-function applyContinuingPostings({
+function applyBranchPostingEvents({
 	events,
+	baseRowsByDate,
+	dispositions,
 	balances,
 	accountsById,
 	latestPostingAmounts,
@@ -216,6 +241,8 @@ function applyContinuingPostings({
 	stochasticRates,
 }: {
 	events: readonly (readonly [IsoDate, readonly DatedPostingOccurrence[]])[];
+	baseRowsByDate: ReadonlyMap<IsoDate, ProjectionRow>;
+	dispositions: ReadonlyMap<string, FiPostingDisposition>;
 	balances: Record<string, number>;
 	accountsById: Map<string, Account>;
 	latestPostingAmounts: Map<string, number>;
@@ -223,6 +250,7 @@ function applyContinuingPostings({
 	projectionStartDate: IsoDate;
 	stochasticRates?: ReadonlyMap<string, readonly number[]>;
 }) {
+	let observedDirectIncome = 0;
 	for (const [date, occurrences] of events) {
 		const sorted = [...occurrences].sort(
 			(left, right) =>
@@ -231,9 +259,17 @@ function applyContinuingPostings({
 		);
 		for (const occurrence of sorted) {
 			const { posting } = occurrence;
-			const yearIndex = Math.floor(
-				daysBetween(projectionStartDate, date) / 365,
-			);
+			const disposition = dispositions.get(posting.id) ?? "disabled";
+			if (disposition === "disabled") continue;
+			if (disposition === "observe-base-path-realized-occurrence") {
+				const realizedAmount =
+					baseRowsByDate.get(date)?.realizedPostingAmountsById[posting.id] ?? 0;
+				latestPostingAmounts.set(posting.id, realizedAmount);
+				observedDirectIncome += realizedAmount;
+				continue;
+			}
+
+			const yearIndex = projectionYearIndex(projectionStartDate, date);
 			const sampledRate = stochasticRates?.get(posting.id)?.[yearIndex];
 			const requestedAmount = Math.max(
 				0,
@@ -269,6 +305,7 @@ function applyContinuingPostings({
 			);
 		}
 	}
+	return observedDirectIncome;
 }
 
 function evaluateCycle({
@@ -313,18 +350,22 @@ function evaluateCycle({
 	const continuingIds = new Set(
 		plan.continuingPostingIds.filter((id) => !cashflowIds.has(id)),
 	);
-	const continuingPostings = path.effectivePack.postings.filter(
-		(posting) => posting.enabled && continuingIds.has(posting.id),
+	const dispositions = classifyPostingDispositions(
+		path,
+		cashflowIds,
+		continuingIds,
+	);
+	const branchPostings = path.effectivePack.postings.filter(
+		(posting) => posting.enabled && dispositions.get(posting.id) !== "disabled",
+	);
+	const baseRowsByDate = new Map(
+		path.rows
+			.filter((row) => !row.isHistorical)
+			.map((row) => [row.date, row] as const),
 	);
 	const eventDates = new Map<IsoDate, DatedPostingOccurrence[]>();
 	const cycleEnd = addYearsClamped(candidate.date, plan.evaluationYears);
-	addOccurrences(
-		continuingPostings,
-		eventDates,
-		candidate.date,
-		cycleEnd,
-		false,
-	);
+	addOccurrences(branchPostings, eventDates, candidate.date, cycleEnd, false);
 	const periods = Array.from(
 		{ length: plan.evaluationYears * 12 },
 		(_, index) => ({
@@ -378,8 +419,10 @@ function evaluateCycle({
 				);
 			}
 
-			applyContinuingPostings({
+			const directIncome = applyBranchPostingEvents({
 				events: eventsByPeriod[period.index],
+				baseRowsByDate,
+				dispositions,
 				balances,
 				accountsById,
 				latestPostingAmounts: state.latestPostingAmounts,
@@ -387,13 +430,6 @@ function evaluateCycle({
 				projectionStartDate: path.projectionStartDate,
 				stochasticRates,
 			});
-
-			const directIncome = realizedCashflowBetween(
-				path.rows,
-				cashflowIds,
-				period.startDate,
-				period.endDate,
-			);
 			let remainingExpense = Math.max(
 				0,
 				expenseAt(plan, path.projectionStartDate, period.startDate) / 12 -
@@ -426,16 +462,24 @@ function evaluateCycle({
 					requestedExpense * (capacity / totalCapacity),
 				);
 				const action = {
-					sourceAccountId: accountId,
-					destinations: null,
-					requestedAmount,
-					limitRemaining: capacity,
+					type: "replace-expense-withdrawal" as const,
+					movement: {
+						sourceAccountId: accountId,
+						destinations: null,
+						requestedAmount,
+						limitRemaining: capacity,
+					},
 				};
 				const realizedAmount = Math.min(
 					Math.max(0, balances[accountId] ?? 0),
-					resolveAccountMovementAmount(action, balances, accountsById),
+					resolveAccountMovementAmount(action.movement, balances, accountsById),
 				);
-				applyAccountMovement(action, realizedAmount, balances, accountsById);
+				applyAccountMovement(
+					action.movement,
+					realizedAmount,
+					balances,
+					accountsById,
+				);
 				state.remainingWithdrawalByAccount.set(
 					accountId,
 					Math.max(
@@ -496,13 +540,21 @@ export function evaluateFinancialIndependence({
 	const projectedRows = path.rows.filter((row) => !row.isHistorical);
 	const assetRates = selectedAssetRates(normalizedPlan);
 	const cashflowIds = selectedCashflowIds(normalizedPlan);
-	const dates =
+	const requestedDates =
 		candidateDates ??
 		buildFinancialIndependenceCandidateDates(
 			path.projectionStartDate,
 			path.projectionEndDate,
 			normalizedPlan.evaluationYears,
 		);
+	const dates = [...new Set(requestedDates)]
+		.filter(
+			(date) =>
+				date >= path.projectionStartDate &&
+				addYearsClamped(date, normalizedPlan.evaluationYears) <=
+					path.projectionEndDate,
+		)
+		.sort(compareIsoDates);
 	const analysisRows = dates.map((date): FinancialIndependenceRow => {
 		const row = latestRowAtOrBefore(path.rows, date);
 		const annualDirectIncome = realizedCashflowBetween(

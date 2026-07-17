@@ -90,6 +90,15 @@ The boundary is at `CsvScenarioPack`: the CSV parsing and validation layer (`csv
 - FI never infers growth from a posting ID, label, category, or non-zero rate. Continuing postings are explicit FI-plan configuration.
 - The minimum-net-worth FI gate is a semantic eligibility rule. Ineligible Monte Carlo candidates remain failures in the full-run probability denominator.
 
+#### FI Branch Correctness Contract
+
+- Candidate dates are sorted, deduplicated, and retained only when the complete evaluation cycle fits inside the projected path.
+- The candidate snapshot includes every base-path event on the candidate date. Branch processing is strictly after that date, so candidate-date postings are never replayed.
+- Posting disposition is internal and exhaustive: selected direct cashflow observes its base-path realized occurrence, explicitly continuing non-cashflow replays against branch balances, and every other posting is disabled. Expense withdrawal is a behavior replacement action resolved through generic account movement constraints.
+- Observed and replayed occurrences share one date, priority, and file-order stream. Observation updates the inherited latest realized posting amount before dependent replay, contributes direct income, and never mutates branch balances.
+- Branch state inherits latest realized posting amounts through the candidate date, current-calendar-year annual-cap usage, and the same projection-year sampled rate used by the stochastic base path.
+- The compact branch is appropriate while FI only needs a terminal sustainability outcome from one behavior over an existing path. Use a full replay only when a branch consumer requires a complete independent timeline, checkpoint/event reconstruction, or multiple interacting behaviors.
+
 ## 4. Monte Carlo / Stochastic Simulation
 
 Postings can carry a `volatility` field (e.g., 0.15 for 15% annual volatility). When any enabled posting has `volatility > 0`, the app enables Monte Carlo mode.

@@ -24,6 +24,13 @@ export function daysBetween(left: IsoDate, right: IsoDate): number {
 	);
 }
 
+export function projectionYearIndex(
+	projectionStartDate: IsoDate,
+	date: IsoDate,
+): number {
+	return Math.floor(daysBetween(projectionStartDate, date) / 365);
+}
+
 export function addMonthsClamped(date: IsoDate, monthsToAdd: number): IsoDate {
 	const source = parseIsoDate(date);
 	const year = source.getUTCFullYear();
