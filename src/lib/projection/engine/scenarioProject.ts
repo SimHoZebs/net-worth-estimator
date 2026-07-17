@@ -17,6 +17,10 @@ import {
 	initAccountBalances,
 	snapshotBalances,
 } from "./accountEngine";
+import {
+	DEFAULT_FI_PLAN,
+	evaluateFinancialIndependence,
+} from "./financialIndependence";
 import type { DatedPostingOccurrence } from "./postingEngine";
 import {
 	addOccurrences,
@@ -405,10 +409,20 @@ export function projectScenarioPack(
 		latestHistoricalRow?.netWorth ??
 		computeNetWorth(futureStartingBalances, mergedPack.accounts);
 	const hitTargetRow =
-		rows.find(
-			(row) =>
-				!row.isHistorical && row.netWorth >= projectionSettings.targetNetWorth,
-		) ?? null;
+		projectionSettings.targetNetWorth === undefined
+			? null
+			: (rows.find(
+					(row) =>
+						!row.isHistorical &&
+						row.netWorth >= projectionSettings.targetNetWorth!,
+				) ?? null);
+	const financialIndependence = evaluateFinancialIndependence({
+		rows,
+		postings: mergedPack.postings,
+		plan: projectionSettings.financialIndependencePlan ?? DEFAULT_FI_PLAN,
+		projectionStartDate,
+		projectionEndDate,
+	});
 
 	const accountSummaries: ProjectionAccountSummary[] = mergedPack.accounts.map(
 		(account) => {
@@ -462,6 +476,7 @@ export function projectScenarioPack(
 	);
 
 	return {
+		financialIndependence,
 		timeline: {
 			rows: rows.map(roundRow),
 			sampledRows: sampledRows.map(roundRow),

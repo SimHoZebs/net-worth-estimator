@@ -3,6 +3,7 @@ import { create } from "zustand";
 import type {
 	Account,
 	Checkpoint,
+	FinancialIndependencePlan,
 	Posting,
 	ScenarioPack,
 	ScenarioWhatIfState,
@@ -16,7 +17,7 @@ import type {
 export interface SnapshotMetrics {
 	currentNetWorth: number;
 	finalNetWorth: number;
-	hitTargetDate: string | null;
+	fiCycleDate: string | null;
 	shortfallAmount: number;
 	overrideCount: number;
 }
@@ -26,6 +27,7 @@ export interface ScenarioSnapshot {
 	label: string;
 	timestamp: number;
 	whatIfState: ScenarioWhatIfState;
+	financialIndependencePlan: FinancialIndependencePlan;
 	metrics: SnapshotMetrics;
 }
 
@@ -57,6 +59,9 @@ const createSnapshotSlice: StateCreator<AppStore, [], [], SnapshotSlice> = (
 					label,
 					timestamp,
 					whatIfState: selectWhatIfState(state),
+					financialIndependencePlan: structuredClone(
+						state.financialIndependencePlan,
+					),
 					metrics: { ...metrics },
 				},
 			],
@@ -341,12 +346,23 @@ const createThemeSlice: StateCreator<AppStore, [], [], ThemeSlice> = (set) => {
 /*  Settings slice                                                     */
 /* ------------------------------------------------------------------ */
 
-const DEFAULT_TARGET_NET_WORTH = 1_000_000;
 const DEFAULT_STOCHASTIC_RUN_COUNT = 1000;
 
+export const DEFAULT_FINANCIAL_INDEPENDENCE_PLAN: FinancialIndependencePlan = {
+	annualExpenseTarget: 80_000,
+	annualExpenseGrowthRate: 0.025,
+	withdrawalRate: 0.04,
+	evaluationYears: 10,
+	requiredConfidence: 0.9,
+	sources: [],
+	principalPolicy: "preserve-real-principal",
+};
+
 interface SettingsSlice {
-	targetNetWorth: number;
-	setTargetNetWorth: (value: number) => void;
+	financialIndependencePlan: FinancialIndependencePlan;
+	setFinancialIndependencePlan: (
+		changes: Partial<FinancialIndependencePlan>,
+	) => void;
 	horizonYears: number;
 	setHorizonYears: (years: number) => void;
 	stochasticPreference: StochasticPreference;
@@ -360,9 +376,14 @@ const DEFAULT_HORIZON_YEARS = 15;
 const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (
 	set,
 ) => ({
-	targetNetWorth: DEFAULT_TARGET_NET_WORTH,
-	setTargetNetWorth: (value) => {
-		if (Number.isFinite(value)) set({ targetNetWorth: value });
+	financialIndependencePlan: DEFAULT_FINANCIAL_INDEPENDENCE_PLAN,
+	setFinancialIndependencePlan: (changes) => {
+		set((state) => ({
+			financialIndependencePlan: {
+				...state.financialIndependencePlan,
+				...changes,
+			},
+		}));
 	},
 
 	horizonYears: DEFAULT_HORIZON_YEARS,

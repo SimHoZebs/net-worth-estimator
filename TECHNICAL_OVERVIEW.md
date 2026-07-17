@@ -1,6 +1,6 @@
 # Technical Overview: Net Worth Estimator
 
-The Net Worth Estimator is a single-page React application that projects net worth from a CSV-backed data model plus runtime projection settings. It supports both deterministic projections and Monte Carlo simulations with progressive streaming of results.
+The Net Worth Estimator is a single-page React application that projects net worth and analyzes financial independence from a CSV-backed data model plus runtime projection settings. It supports both deterministic projections and Monte Carlo simulations with progressive streaming of results.
 
 ## 1. Tech Stack
 
@@ -34,7 +34,7 @@ The application loads a scenario pack through a capability-based `DataSource` ab
 - `Account`: tracked signed balances with daily-compounded `annualRate`
 - `Checkpoint`: historical truth for account balances on exact dates
 - `Posting`: generic scheduled rules for future inflows, outflows, and transfers. Supports `volatility` for stochastic sampling.
-- `ProjectionRuntimeSettings`: target net worth, fallback start date, and projection horizon
+- `ProjectionRuntimeSettings`: fallback start date, projection horizon, and a session-only financial-independence plan with explicit source selections
 
 ### Posting Semantics
 
@@ -78,7 +78,7 @@ Postings can carry a `volatility` field (e.g., 0.15 for 15% annual volatility). 
 2. The stochastic engine runs N independent scenarios (default 1000, adjustable 1–10000).
 3. For each run, every volatile posting's `annualRate` is replaced by a log-normal sample drawn per projection year from `sampleLogNormal(expectedReturn, volatility)`.
 4. All N projections produce per-date net worth snapshots. These are collapsed into percentile bands (P10/P25/P50/P75/P90) per date.
-5. Milestones are derived: hit-target probability, median (P50) hit date, worst-case (P10) hit date, and final net worth percentiles.
+5. FI coverage and the complete evaluation cycle are evaluated inside each run. Run-level booleans are aggregated into FI-cycle probability and confidence-qualified dates; percentile-band slope is never treated as a run outcome.
 
 ### Seeding
 
@@ -99,7 +99,8 @@ This is genuinely incremental — projection runs happen once, and percentile co
 
 | File                                             | Role                                                                                                  |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `src/lib/projection/engine/stochasticProject.ts` | Core engine: runs N projections with log-normal rate sampling, builds percentile bands and milestones |
+| `src/lib/projection/engine/financialIndependence.ts` | Derived analysis: annual coverage, virtual asset-pool withdrawals, and principal preservation |
+| `src/lib/projection/engine/stochasticProject.ts` | Core engine: runs N projections, builds percentile bands, and aggregates per-run FI outcomes |
 | `src/lib/projection/utils/stochastic.ts`         | LCG PRNG, `sampleLogNormal()` (Box-Muller), `computePercentiles()`                                    |
 | `src/lib/projection/types/stochastic.ts`         | Types: `StochasticConfig`, `PercentileBands`, `StochasticBandRow`, `StochasticProjectionResult`       |
 | `src/workers/stochasticWorker.ts`                | Web Worker: receives request, runs engine with progress callback, posts results                       |
@@ -115,7 +116,7 @@ This is genuinely incremental — projection runs happen once, and percentile co
 - `ProjectionDashboard` (in `CsvProjectionDashboard.tsx`): renders current and projected net worth, signed account balances, dated posting rows, and posting utilization
 - `StochasticControls.tsx`: Monte Carlo toggle, run count, seed input, progress bar, and milestone stat cards (hit probability, P50/P10 hit dates, final P50)
 - `TemplateWizard` (in `patterns/TemplateWizard.tsx`): Guides users through generating common financial patterns (like `IncomeForm`) and previews them before saving.
-- `src/store.ts`: A Zustand store with 5 slices managing: `WhatIf` (temporary session overrides), `Editor` (CRUD for working copy), `Settings` (target net worth, horizon, stochastic configs), `Snapshot` (named scenario snapshots), and `Theme` (light/dark/system).
+- `src/store.ts`: A Zustand store with 5 slices managing: `WhatIf` (temporary session overrides), `Editor` (CRUD for working copy), `Settings` (FI plan, horizon, stochastic configs), `Snapshot` (named scenario snapshots), and `Theme` (light/dark/system).
 
 ## 6. Technical Highlights
 

@@ -213,7 +213,7 @@ describe("Snapshot slice", () => {
 		useStore.getState().addSnapshotFromCurrentScenario("Trial", {
 			currentNetWorth: 100,
 			finalNetWorth: 200,
-			hitTargetDate: null,
+			fiCycleDate: null,
 			shortfallAmount: 0,
 			overrideCount: 1,
 		});
@@ -222,6 +222,9 @@ describe("Snapshot slice", () => {
 		expect(snapshot.label).toBe("Trial");
 		expect(snapshot.whatIfState).toEqual(
 			selectWhatIfState(useStore.getState()),
+		);
+		expect(snapshot.financialIndependencePlan).toEqual(
+			useStore.getState().financialIndependencePlan,
 		);
 		expect(snapshot.whatIfState).not.toHaveProperty("setTargetNetWorth");
 	});
@@ -427,15 +430,22 @@ describe("Editor slice", () => {
 /* ------------------------------------------------------------------ */
 
 describe("Settings slice", () => {
-	it("setTargetNetWorth updates", () => {
-		useStore.getState().setTargetNetWorth(500000);
-		expect(useStore.getState().targetNetWorth).toBe(500000);
+	it("updates the financial independence plan", () => {
+		useStore.getState().setFinancialIndependencePlan({
+			annualExpenseTarget: 50_000,
+		});
+		expect(
+			useStore.getState().financialIndependencePlan.annualExpenseTarget,
+		).toBe(50_000);
 	});
 
-	it("setTargetNetWorth ignores invalid values", () => {
-		useStore.getState().setTargetNetWorth(500000);
-		useStore.getState().setTargetNetWorth(Number.NaN);
-		expect(useStore.getState().targetNetWorth).toBe(500000);
+	it("preserves other financial independence settings on partial update", () => {
+		const before = useStore.getState().financialIndependencePlan;
+		useStore.getState().setFinancialIndependencePlan({ withdrawalRate: 0.05 });
+		expect(useStore.getState().financialIndependencePlan).toEqual({
+			...before,
+			withdrawalRate: 0.05,
+		});
 	});
 
 	it("defaults stochasticPreference to auto", () => {

@@ -145,6 +145,9 @@ describe("buildAccountDiagnosticChartData", () => {
 				hitTargetProbability: 0.5,
 				medianHitTargetDate: null,
 				worstCaseHitTargetDate: null,
+				fiCycleSuccessProbability: 0,
+				medianFiCoverageDate: null,
+				fiSelfSustainingDate: null,
 				finalNetWorthPercentiles: {
 					p10: 300_000,
 					p25: 400_000,

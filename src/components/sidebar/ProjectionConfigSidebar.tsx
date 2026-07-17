@@ -2,6 +2,7 @@ import { memo } from "react";
 import { StochasticControls } from "@/components/StochasticControls";
 import type {
 	DataSource,
+	FinancialIndependencePlan,
 	ProjectionRuntimeSettings,
 	ScenarioPack,
 	StochasticProjectionResult,
@@ -24,7 +25,9 @@ interface ProjectionConfigSidebarProps {
 	isLoading: boolean;
 	loadError: string | null;
 	sourceActionError: string | null;
-	onTargetNetWorthChange: (value: number) => void;
+	onFinancialIndependencePlanChange: (
+		changes: Partial<FinancialIndependencePlan>,
+	) => void;
 	onProjectionSettingsChange?: (
 		partial: Partial<ProjectionRuntimeSettings>,
 	) => void;
@@ -47,7 +50,7 @@ export const ProjectionConfigSidebar = memo(function ProjectionConfigSidebar({
 	isLoading,
 	loadError,
 	sourceActionError,
-	onTargetNetWorthChange,
+	onFinancialIndependencePlanChange,
 	onProjectionSettingsChange,
 	onReload,
 	onResetSource,
@@ -59,7 +62,8 @@ export const ProjectionConfigSidebar = memo(function ProjectionConfigSidebar({
 				projectionSettings={projectionSettings}
 				projectionStartDate={projectionStartDate}
 				activeOverrideCount={activeOverrideCount}
-				onTargetNetWorthChange={onTargetNetWorthChange}
+				pack={pack}
+				onFinancialIndependencePlanChange={onFinancialIndependencePlanChange}
 				onProjectionSettingsChange={onProjectionSettingsChange}
 			/>
 

@@ -65,8 +65,8 @@ export default function App() {
 		activeOverrideCount,
 		isEditing,
 		isDirty,
-		targetNetWorth,
-		setTargetNetWorth,
+		financialIndependencePlan,
+		setFinancialIndependencePlan,
 		horizonYears,
 		setHorizonYears,
 		stochasticPreference,
@@ -78,8 +78,8 @@ export default function App() {
 			activeOverrideCount: selectActiveOverrideCount(s),
 			isEditing: s.isEditing,
 			isDirty: s.isDirty,
-			targetNetWorth: s.targetNetWorth,
-			setTargetNetWorth: s.setTargetNetWorth,
+			financialIndependencePlan: s.financialIndependencePlan,
+			setFinancialIndependencePlan: s.setFinancialIndependencePlan,
 			horizonYears: s.horizonYears,
 			setHorizonYears: s.setHorizonYears,
 			stochasticPreference: s.stochasticPreference,
@@ -106,11 +106,11 @@ export default function App() {
 	const fallbackProjectionStartDate = useMemo(() => formatTodayIsoDate(), []);
 	const projectionSettings = useMemo(
 		() => ({
-			targetNetWorth,
 			fallbackProjectionStartDate,
 			horizonYears,
+			financialIndependencePlan,
 		}),
-		[fallbackProjectionStartDate, targetNetWorth, horizonYears],
+		[fallbackProjectionStartDate, horizonYears, financialIndependencePlan],
 	);
 	const projectionStartDate =
 		pack?.checkpoints.reduce<string | null>(
@@ -125,9 +125,30 @@ export default function App() {
 		runtimeError,
 		isRunning: isProjecting,
 	} = useProjection(pack, projectionSettings, whatIfState, validation.isValid);
+	const effectivePack = useMemo(
+		() =>
+			pack
+				? {
+						...pack,
+						accounts: pack.accounts
+							.filter(
+								(account) =>
+									!whatIfState.disabledAccountIds.includes(account.id),
+							)
+							.concat(whatIfState.addedAccounts),
+						postings: pack.postings
+							.filter(
+								(posting) =>
+									!whatIfState.disabledPostingIds.includes(posting.id),
+							)
+							.concat(whatIfState.addedPostings),
+					}
+				: null,
+		[pack, whatIfState],
+	);
 
 	const hasStochasticAccounts =
-		pack?.postings.some((p) => p.volatility > 0 && p.enabled) ?? false;
+		effectivePack?.postings.some((p) => p.volatility > 0 && p.enabled) ?? false;
 
 	const stochasticWorkerEnabled =
 		stochasticPreference !== "disabled" &&
@@ -209,14 +230,16 @@ export default function App() {
 		() => ({
 			currentNetWorth: result?.summary.currentNetWorth ?? 0,
 			finalNetWorth: result?.summary.finalNetWorth ?? 0,
-			hitTargetDate: result?.milestones.hitTargetDate ?? null,
+			fiCycleDate:
+				result?.financialIndependence.milestones.firstSelfSustainingDate ??
+				null,
 			shortfallAmount: result?.totals.clampedPostingShortfallAmount ?? 0,
 			overrideCount: activeOverrideCount,
 		}),
 		[
 			result?.summary.currentNetWorth,
 			result?.summary.finalNetWorth,
-			result?.milestones.hitTargetDate,
+			result?.financialIndependence.milestones.firstSelfSustainingDate,
 			result?.totals.clampedPostingShortfallAmount,
 			activeOverrideCount,
 		],
@@ -349,7 +372,7 @@ export default function App() {
 						<div className="grid items-start gap-6 min-[90rem]:grid-cols-[minmax(0,1fr)_24rem] min-[90rem]:justify-center">
 							<main className="min-w-0 space-y-6">
 								<ProjectionDashboard
-									pack={pack}
+									pack={effectivePack ?? pack}
 									result={result}
 									projectionSettings={projectionSettings}
 									stochasticResult={stochasticResult}
@@ -398,7 +421,9 @@ export default function App() {
 									isLoading={isLoading}
 									loadError={loadError}
 									sourceActionError={sourceActionError}
-									onTargetNetWorthChange={setTargetNetWorth}
+									onFinancialIndependencePlanChange={
+										setFinancialIndependencePlan
+									}
 									onProjectionSettingsChange={onProjectionSettingsChange}
 									onReload={handleReload}
 									onResetSource={

@@ -34,7 +34,8 @@ export function useDashboardDerivedValues(
 				.sort(
 					(left, right) => right.shortfallAmount - left.shortfallAmount,
 				)[0] ?? null;
-		const goalReached = result.milestones.hitTargetDate !== null;
+		const goalReached =
+			result.financialIndependence.milestones.firstSelfSustainingDate !== null;
 		const enabledPostingCount = pack.postings.filter(
 			(posting) => posting.enabled,
 		).length;
@@ -54,8 +55,8 @@ export function useDashboardDerivedValues(
 				? `Starting ${formatDate(biggestShortfallPosting.firstShortfallDate)}, the model cannot fully fund this scheduled payment from checking. Total unfunded amount across the projection: ${currency.format(biggestShortfallPosting.shortfallAmount)}.`
 				: `The model cannot fully fund this scheduled payment. Total unfunded amount: ${currency.format(biggestShortfallPosting.shortfallAmount)}.`
 			: goalReached
-				? "No scheduled payment is currently limited by available funds, so the plan reaches the target without a visible cash-flow constraint."
-				: "No scheduled payment is currently limited by available funds, so the shortfall is coming from overall cash-flow magnitude or growth assumptions rather than a hard funding constraint.";
+				? "No scheduled payment is currently limited by available funds, and the selected sources sustain the configured FI cycle."
+				: "No scheduled payment is currently limited by available funds. Review selected FI sources, spending, withdrawal rate, and growth assumptions.";
 		const nextEventDetail =
 			firstProjectedRow === null
 				? "No projected transactions are scheduled after the historical balance history."

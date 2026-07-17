@@ -28,5 +28,8 @@ export interface StochasticProjectionResult {
 		medianHitTargetDate: IsoDate | null;
 		worstCaseHitTargetDate: IsoDate | null;
 		finalNetWorthPercentiles: PercentileBands;
+		fiCycleSuccessProbability: number;
+		medianFiCoverageDate: IsoDate | null;
+		fiSelfSustainingDate: IsoDate | null;
 	};
 }

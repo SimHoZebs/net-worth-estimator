@@ -53,6 +53,44 @@ describe("stochastic utilities", () => {
 });
 
 describe("stochastic projection", () => {
+	it("aggregates FI-cycle outcomes from complete seeded runs", () => {
+		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
+		if (!pack) throw new Error("Pack is null");
+		const partials: StochasticProjectionResult[] = [];
+		const result = stochasticProject(
+			pack,
+			{
+				fallbackProjectionStartDate: "2026-04-01",
+				horizonYears: 2,
+				financialIndependencePlan: {
+					annualExpenseTarget: 1_000,
+					annualExpenseGrowthRate: 0,
+					withdrawalRate: 0.04,
+					evaluationYears: 1,
+					requiredConfidence: 0.9,
+					principalPolicy: "allow-drawdown",
+					sources: [{ type: "cashflow", postingId: "salary", included: true }],
+				},
+			},
+			{
+				addedAccounts: [],
+				addedPostings: [],
+				addedCheckpoints: [],
+				disabledAccountIds: [],
+				disabledPostingIds: [],
+			},
+			{ runCount: 50, seed: 42 },
+			(_progress, partial) => partials.push(partial),
+		);
+
+		expect(result.milestones.fiCycleSuccessProbability).toBe(1);
+		expect(result.milestones.medianFiCoverageDate).not.toBeNull();
+		expect(result.milestones.fiSelfSustainingDate).not.toBeNull();
+		expect(
+			partials[partials.length - 1]?.milestones.fiCycleSuccessProbability,
+		).toBe(1);
+	});
+
 	it("returns deterministic baseline alongside stochastic bands", () => {
 		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
 		if (!pack) throw new Error("Pack is null");
