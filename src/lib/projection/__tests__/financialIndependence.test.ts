@@ -320,6 +320,161 @@ describe("evaluateFinancialIndependence", () => {
 		expect(result.runOutcomes[0].endingSelectedAssetBalance).toBe(101_200);
 	});
 
+	it("sorts and deduplicates candidates and excludes incomplete cycles", () => {
+		const result = evaluateFinancialIndependence({
+			path: path(
+				[row("2026-01-01", { brokerage: 100_000 })],
+				[],
+				[account("brokerage")],
+			),
+			plan: plan({
+				sources: [{ type: "asset", accountId: "brokerage", included: true }],
+			}),
+			candidateDates: ["2026-03-01", "2026-02-01", "2026-01-01", "2026-02-01"],
+		});
+
+		expect(result.rows.map((candidate) => candidate.date)).toEqual([
+			"2026-01-01",
+			"2026-02-01",
+		]);
+	});
+
+	it("starts the branch after all candidate-date events", () => {
+		const growth: Posting = {
+			...pension,
+			id: "growth",
+			label: "Growth",
+			destinations: ["brokerage"],
+			arithmetic: "10",
+			frequency: "annual",
+			startDate: "2026-01-01",
+		};
+		const rows = Array.from({ length: 13 }, (_, month) => {
+			const year = 2026 + Math.floor(month / 12);
+			const monthOfYear = (month % 12) + 1;
+			return row(
+				`${year}-${String(monthOfYear).padStart(2, "0")}-01`,
+				{ brokerage: 110, cash: 0 },
+				month === 0 ? { growth: 10, pension: 100 } : { pension: 100 },
+			);
+		});
+		const result = evaluateFinancialIndependence({
+			path: path(
+				rows,
+				[growth, pension],
+				[account("brokerage"), account("cash")],
+			),
+			plan: plan({
+				continuingPostingIds: ["growth"],
+				sources: [
+					{ type: "cashflow", postingId: "pension", included: true },
+					{
+						type: "asset",
+						accountId: "brokerage",
+						included: true,
+						withdrawalRateOverride: 0,
+					},
+				],
+			}),
+			candidateDates: ["2026-01-01"],
+		});
+
+		expect(result.runOutcomes[0].endingSelectedAssetBalance).toBe(120);
+	});
+
+	it("observes base cashflow before dependent replay on the same date", () => {
+		const contribution: Posting = {
+			...pension,
+			id: "contribution",
+			label: "Contribution",
+			destinations: ["brokerage"],
+			arithmetic: "pension * 0.5",
+			startDate: "2026-02-01",
+			priority: 2,
+		};
+		const rows = Array.from({ length: 13 }, (_, month) => {
+			const year = 2026 + Math.floor(month / 12);
+			const monthOfYear = (month % 12) + 1;
+			return row(
+				`${year}-${String(monthOfYear).padStart(2, "0")}-01`,
+				{ brokerage: 100_000, cash: 0 },
+				{ pension: 200 },
+			);
+		});
+		const result = evaluateFinancialIndependence({
+			path: path(
+				rows,
+				[pension, contribution],
+				[account("brokerage"), account("cash")],
+			),
+			plan: plan({
+				annualExpenseTarget: 2_400,
+				continuingPostingIds: ["contribution"],
+				sources: [
+					{ type: "cashflow", postingId: "pension", included: true },
+					{
+						type: "asset",
+						accountId: "brokerage",
+						included: true,
+						withdrawalRateOverride: 0,
+					},
+				],
+			}),
+			candidateDates: ["2026-01-01"],
+		});
+
+		expect(result.runOutcomes[0]).toMatchObject({
+			endingSelectedAssetBalance: 101_200,
+			expensesFullyCovered: true,
+		});
+	});
+
+	it("reuses the base path sampled rate for the same projection year", () => {
+		const growth: Posting = {
+			...pension,
+			id: "sampled-growth",
+			label: "Sampled growth",
+			destinations: ["brokerage"],
+			arithmetic: "brokerage * rate",
+			frequency: "annual",
+			annualRate: 0.1,
+			volatility: 0.2,
+			startDate: "2027-01-01",
+		};
+		const rows = Array.from({ length: 13 }, (_, month) => {
+			const year = 2026 + Math.floor(month / 12);
+			const monthOfYear = (month % 12) + 1;
+			return row(
+				`${year}-${String(monthOfYear).padStart(2, "0")}-01`,
+				{ brokerage: 100, cash: 0 },
+				{ pension: 100 },
+			);
+		});
+		const result = evaluateFinancialIndependence({
+			path: path(
+				rows,
+				[pension, growth],
+				[account("brokerage"), account("cash")],
+			),
+			plan: plan({
+				continuingPostingIds: ["sampled-growth"],
+				sources: [
+					{ type: "cashflow", postingId: "pension", included: true },
+					{
+						type: "asset",
+						accountId: "brokerage",
+						included: true,
+						withdrawalRateOverride: 0,
+					},
+				],
+			}),
+			stochasticRates: new Map([["sampled-growth", [0, 0.5]]]),
+			candidateDates: ["2026-01-01"],
+		});
+
+		expect(result.runOutcomes[0].endingSelectedAssetBalance).toBe(150);
+	});
+
 	it("uses one canonical monthly candidate schedule", () => {
 		expect(
 			buildFinancialIndependenceCandidateDates("2026-01-31", "2027-04-30", 1),
