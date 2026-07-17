@@ -415,7 +415,7 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 				<div className="rounded-2xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
 					<div className="type-eyebrow">Continuing during FI cycle</div>
 					<p className="mt-1 type-caption text-muted-foreground">
-						Explicitly choose postings that continue after the policy starts.
+						Explicitly choose postings that continue after the FI cycle starts.
 					</p>
 					<div className="mt-2 space-y-2">
 						{continuingPostings.length === 0 ? (

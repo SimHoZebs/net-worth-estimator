@@ -58,7 +58,7 @@ npm run build
 - `src/lib/projection/scenario/`: effective-scenario preparation
 - `src/lib/projection/simulation/`: generic account, posting, arithmetic, and path simulation
 - `src/lib/projection/evaluation/`: read-only and path-dependent financial evaluations
-- `src/lib/projection/policy/`: reactive policy runtime
+- `src/lib/projection/behavior/`: reactive behavior runtime
 - `src/lib/projection/analysis/`: deterministic and stochastic orchestration
 - `src/lib/projection.csv.test.ts`: CSV loader and validation tests
 - `src/lib/projection.csvProject.test.ts`: projection engine tests

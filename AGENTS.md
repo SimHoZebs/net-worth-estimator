@@ -119,7 +119,7 @@ Selectors: `selectActiveOverrideCount`, `selectWhatIfState`, `selectEditorState`
 
 - Simulation logic (`lib/projection/simulation/`) must never branch on specific account IDs, posting IDs, or categories. See `TECHNICAL_OVERVIEW.md` §3.
 - FI logic is a derived analysis in `evaluation/financialIndependence.ts`; it must not add semantic branches to generic simulation.
-- Reactive policies emit generic account movements and must use shared account constraints instead of mutating balances directly.
+- Reactive behaviors emit generic account movements and must use shared account constraints instead of mutating balances directly.
 - FI continuing postings are explicitly selected; never infer growth from IDs, labels, categories, or a non-zero annual rate.
 - What-if state is session-only, never mutates canonical data.
 - Use `@/lib/projection` barrel import for all projection types and utilities.

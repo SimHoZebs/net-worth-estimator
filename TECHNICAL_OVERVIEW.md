@@ -69,12 +69,24 @@ The boundary is at `CsvScenarioPack`: the CSV parsing and validation layer (`csv
 
 **Avoid adding special-case logic to the engine unless absolutely unavoidable.** If a feature seems to require engine-level branching, first consider whether it can be expressed within the existing model — additional fields on existing types, new `amountMode` values, or UI-level interpretation of projection outputs. Likewise, the what-if system is intentionally shallow (multiplier overrides only, session-only, never mutating canonical data) to keep the model simple and predictable.
 
-### Evaluation And Reactive Policy Boundary
+### Simulation, Behavior, Evaluation, And Analysis
 
+- **Scenario**: declarative accounts, checkpoints, postings, assumptions, and runtime behavior configuration.
+- **Simulation engine**: generic runtime that advances scenario state, executes postings and strategies, enforces account constraints, and records results.
+- **Strategy**: a narrow algorithm for one operation, such as ordered destination allocation; it does not decide when an operation should occur.
+- **Simulation run**: one deterministic, branch, or Monte Carlo execution.
+- **Projection path**: time-series state and event records produced by a base or Monte Carlo run.
+- **Behavior**: conditional logic that observes branch state and emits generic actions.
+- **Branch simulation**: an independent simulation forked from state on an existing run and controlled by a behavior.
+- **Evaluation**: a question applied to a simulation run or projection path.
+- **Outcome**: one evaluation's result for one run.
+- **Analysis**: aggregation or comparison across runs and outcomes, including probabilities and confidence-qualified dates.
 - Read-only evaluations inspect an immutable `ProjectionPath`; the legacy net-worth threshold is implemented this way.
 - FI coverage is a read-only calculation over canonical monthly candidate dates.
-- FI-cycle sustainability is a reactive policy evaluation. Eligible candidates fork policy-owned balances, replay only explicitly selected continuing postings, and request expense-gap withdrawals.
-- Policy withdrawals use the same generic account movement resolver as scheduled postings, preserving account floors and destination limits.
+- A simulation run executes a scenario or branch. Base and Monte Carlo runs produce a `ProjectionPath`; the current FI branch retains a compact outcome until another branch consumer requires a complete path.
+- A behavior observes branch state and emits generic actions. FI-cycle sustainability uses a behavior after forking balances at an eligible candidate date.
+- Branch simulations replay only explicitly selected continuing postings and request expense-gap withdrawals through the same generic account movement resolver as scheduled postings, preserving account floors and destination limits.
+- Evaluations ask questions of projection paths, regardless of whether a base, branch, or stochastic simulation produced them. Outcomes are per-run evaluation results; analysis aggregates outcomes across runs.
 - FI never infers growth from a posting ID, label, category, or non-zero rate. Continuing postings are explicit FI-plan configuration.
 - The minimum-net-worth FI gate is a semantic eligibility rule. Ineligible Monte Carlo candidates remain failures in the full-run probability denominator.
 
@@ -88,7 +100,7 @@ Postings can carry a `volatility` field (e.g., 0.15 for 15% annual volatility). 
 2. The stochastic engine runs N independent scenarios (default 1000, adjustable 1–10000).
 3. For each run, every volatile posting's `annualRate` is replaced by a log-normal sample drawn per projection year from `sampleLogNormal(expectedReturn, volatility)`.
 4. All N projections produce per-date net worth snapshots. These are collapsed into percentile bands (P10/P25/P50/P75/P90) per date.
-5. Every run uses the deterministic projection's canonical monthly FI candidate schedule. FI coverage and reactive policy branches are evaluated inside each complete run.
+5. Every run uses the deterministic projection's canonical monthly FI candidate schedule. FI coverage and reactive behavior branches are evaluated inside each complete run.
 6. Dense candidate outcomes are aggregated into FI-cycle probability and confidence-qualified dates; percentile-band slope is never treated as a run outcome.
 
 ### Seeding
@@ -114,7 +126,7 @@ This is genuinely incremental: projection runs happen once, each new batch is so
 | `src/lib/projection/simulation/projectPath.ts` | Generic raw projection path and public report generation; no goal-specific logic |
 | `src/lib/projection/evaluation/runtime.ts` | Typed evaluation contracts and online dated-sample/success accumulators |
 | `src/lib/projection/evaluation/financialIndependence.ts` | FI candidate eligibility, explicit continuation replay, withdrawals, and principal preservation |
-| `src/lib/projection/policy/runtime.ts` | Generic period-oriented reactive policy lifecycle |
+| `src/lib/projection/behavior/runtime.ts` | Generic period-oriented reactive behavior lifecycle |
 | `src/lib/projection/analysis/projectStochastic.ts` | Runs N projections, builds percentile bands, and aggregates per-run evaluation outcomes |
 | `src/lib/projection/utils/stochastic.ts`         | LCG PRNG, `sampleLogNormal()` (Box-Muller), `computePercentiles()`                                    |
 | `src/lib/projection/types/stochastic.ts`         | Types: `StochasticConfig`, `PercentileBands`, `StochasticBandRow`, `StochasticProjectionResult`       |
