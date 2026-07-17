@@ -270,7 +270,7 @@ describe("evaluateFinancialIndependence", () => {
 		expect(withGrowth.runOutcomes[0].principalReplenished).toBe(true);
 	});
 
-	it("carries current-year annual-cap usage into a policy branch", () => {
+	it("carries current-year annual-cap usage into a behavior branch", () => {
 		const cappedGrowth: Posting = {
 			...pension,
 			id: "capped-growth",

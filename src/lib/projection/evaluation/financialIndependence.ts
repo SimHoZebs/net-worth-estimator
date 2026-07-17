@@ -1,4 +1,4 @@
-import { runReactivePolicy } from "../policy/runtime";
+import { runReactiveBehavior } from "../behavior/runtime";
 import { EMPTY_WHAT_IF_STATE } from "../scenario/prepareScenario";
 import { getWithdrawableAmount } from "../simulation/accounts";
 import {
@@ -354,7 +354,7 @@ function evaluateCycle({
 		}
 	}
 
-	return runReactivePolicy(periods, {
+	return runReactiveBehavior(periods, {
 		initialize: () => ({
 			hadWithdrawalShortfall: false,
 			remainingWithdrawalByAccount: new Map<string, number>(),
