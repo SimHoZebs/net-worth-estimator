@@ -7,6 +7,17 @@ export function makeSettings(
 		targetNetWorth: 5000,
 		fallbackProjectionStartDate: "2026-01-01",
 		horizonYears: 1,
+		financialIndependencePlan: {
+			minimumNetWorth: 0,
+			annualExpenseTarget: 40_000,
+			annualExpenseGrowthRate: 0.025,
+			withdrawalRate: 0.04,
+			evaluationYears: 1,
+			requiredConfidence: 0.9,
+			sources: [],
+			continuingPostingIds: [],
+			principalPolicy: "preserve-real-principal",
+		},
 		...overrides,
 	};
 }

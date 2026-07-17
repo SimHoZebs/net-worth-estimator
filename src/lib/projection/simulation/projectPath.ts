@@ -1,3 +1,4 @@
+import { prepareScenarioPack } from "../scenario/prepareScenario";
 import type {
 	Account,
 	AccountDelta,
@@ -5,9 +6,9 @@ import type {
 	IsoDate,
 	ProjectionAccountSummary,
 	ProjectionPostingSummary,
-	ProjectionResult,
 	ProjectionRow,
 	ProjectionRuntimeSettings,
+	RawProjectionOutput,
 	ScenarioPack,
 	ScenarioWhatIfState,
 } from "../types/scenario";
@@ -16,14 +17,14 @@ import {
 	computeNetWorth,
 	initAccountBalances,
 	snapshotBalances,
-} from "./accountEngine";
-import type { DatedPostingOccurrence } from "./postingEngine";
+} from "./accounts";
+import type { DatedPostingOccurrence } from "./postings";
 import {
 	addOccurrences,
 	applyPosting,
 	computeRequestedAmount,
 	resolvePostingAmount,
-} from "./postingEngine";
+} from "./postings";
 
 interface NormalizedCheckpoints {
 	dates: Array<{
@@ -157,34 +158,20 @@ function roundRow(row: ProjectionRow): ProjectionRow {
 	};
 }
 
-export function projectScenarioPack(
+export function projectRawScenarioPack(
 	pack: ScenarioPack,
 	projectionSettings: ProjectionRuntimeSettings,
 	whatIfState?: ScenarioWhatIfState,
 	stochasticRates?: Map<string, number[]>,
-): ProjectionResult {
-	const normalizedWhatIfState: ScenarioWhatIfState = whatIfState ?? {
+): RawProjectionOutput {
+	const normalizedWhatIfState = whatIfState ?? {
 		addedAccounts: [],
 		addedPostings: [],
 		addedCheckpoints: [],
 		disabledAccountIds: [],
 		disabledPostingIds: [],
 	};
-	const disabledAccountSet = new Set(normalizedWhatIfState.disabledAccountIds);
-	const disabledPostingSet = new Set(normalizedWhatIfState.disabledPostingIds);
-
-	const mergedPack: ScenarioPack = {
-		...pack,
-		accounts: pack.accounts
-			.filter((a) => !disabledAccountSet.has(a.id))
-			.concat(normalizedWhatIfState.addedAccounts),
-		postings: pack.postings
-			.filter((p) => !disabledPostingSet.has(p.id))
-			.concat(normalizedWhatIfState.addedPostings),
-		checkpoints: pack.checkpoints.concat(
-			normalizedWhatIfState.addedCheckpoints,
-		),
-	};
+	const mergedPack = prepareScenarioPack(pack, normalizedWhatIfState);
 
 	const normalizedCheckpoints = normalizeCheckpoints(mergedPack);
 	const projectionStartDate =
@@ -404,19 +391,12 @@ export function projectScenarioPack(
 	const currentNetWorth =
 		latestHistoricalRow?.netWorth ??
 		computeNetWorth(futureStartingBalances, mergedPack.accounts);
-	const hitTargetRow =
-		rows.find(
-			(row) =>
-				!row.isHistorical && row.netWorth >= projectionSettings.targetNetWorth,
-		) ?? null;
-
 	const endingSnapshotsByAccountId = new Map<string, AccountSnapshot>();
 	if (latestRow) {
-		for (const s of latestRow.accountSnapshots) {
-			endingSnapshotsByAccountId.set(s.accountId, s);
+		for (const snapshot of latestRow.accountSnapshots) {
+			endingSnapshotsByAccountId.set(snapshot.accountId, snapshot);
 		}
 	}
-
 	const accountSummaries: ProjectionAccountSummary[] = mergedPack.accounts.map(
 		(account) => {
 			const endingSnapshot = endingSnapshotsByAccountId.get(account.id);
@@ -467,31 +447,38 @@ export function projectScenarioPack(
 	);
 
 	return {
-		timeline: {
-			rows: rows.map(roundRow),
-			sampledRows: sampledRows.map(roundRow),
-		},
-		accountSummaries,
-		postingSummaries,
-		totals: {
-			externalInflowAmount: roundCurrency(totalExternalInflowAmount),
-			externalOutflowAmount: roundCurrency(totalExternalOutflowAmount),
-			internalTransferAmount: roundCurrency(totalInternalTransferAmount),
-			requestedPostingAmount: roundCurrency(totalRequestedPostingAmount),
-			realizedPostingAmount: roundCurrency(totalRealizedPostingAmount),
-			clampedPostingShortfallAmount: roundCurrency(
-				totalClampedPostingShortfallAmount,
-			),
-		},
-		milestones: {
-			hitTargetDate: hitTargetRow?.date ?? null,
-			latestCheckpointDate: normalizedCheckpoints.latestCheckpointDate,
-			latestHistoricalDate: latestHistoricalRow?.date ?? null,
+		path: {
+			rows,
+			effectivePack: mergedPack,
 			projectionStartDate,
+			projectionEndDate,
 		},
-		summary: {
-			currentNetWorth: roundCurrency(currentNetWorth),
-			finalNetWorth: roundCurrency(latestRow?.netWorth ?? currentNetWorth),
+		result: {
+			timeline: {
+				rows: rows.map(roundRow),
+				sampledRows: sampledRows.map(roundRow),
+			},
+			accountSummaries,
+			postingSummaries,
+			totals: {
+				externalInflowAmount: roundCurrency(totalExternalInflowAmount),
+				externalOutflowAmount: roundCurrency(totalExternalOutflowAmount),
+				internalTransferAmount: roundCurrency(totalInternalTransferAmount),
+				requestedPostingAmount: roundCurrency(totalRequestedPostingAmount),
+				realizedPostingAmount: roundCurrency(totalRealizedPostingAmount),
+				clampedPostingShortfallAmount: roundCurrency(
+					totalClampedPostingShortfallAmount,
+				),
+			},
+			milestones: {
+				latestCheckpointDate: normalizedCheckpoints.latestCheckpointDate,
+				latestHistoricalDate: latestHistoricalRow?.date ?? null,
+				projectionStartDate,
+			},
+			summary: {
+				currentNetWorth: roundCurrency(currentNetWorth),
+				finalNetWorth: roundCurrency(latestRow?.netWorth ?? currentNetWorth),
+			},
 		},
 	};
 }
