@@ -28,7 +28,12 @@ export function useStochastic(
 
 	useEffect(() => {
 		if (!enabled || pack === null || config === null) {
-			setState((s) => ({ ...s, isRunning: false, progress: null }));
+			setState({
+				result: null,
+				runtimeError: null,
+				isRunning: false,
+				progress: null,
+			});
 			return;
 		}
 

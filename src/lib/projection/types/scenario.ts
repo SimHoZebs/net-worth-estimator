@@ -15,10 +15,41 @@ export type ScenarioFileName =
 
 export type IsoDate = string;
 
+export type FinancialIndependencePrincipalPolicy =
+	| "allow-drawdown"
+	| "preserve-nominal-principal"
+	| "preserve-real-principal";
+
+export type FinancialIndependenceSource =
+	| {
+			type: "cashflow";
+			postingId: string;
+			included: boolean;
+			laborDependent?: boolean;
+	  }
+	| {
+			type: "asset";
+			accountId: string;
+			included: boolean;
+			withdrawalRateOverride?: number;
+	  };
+
+export interface FinancialIndependencePlan {
+	annualExpenseTarget: number;
+	annualExpenseGrowthRate: number;
+	withdrawalRate: number;
+	evaluationYears: number;
+	requiredConfidence: number;
+	sources: FinancialIndependenceSource[];
+	principalPolicy: FinancialIndependencePrincipalPolicy;
+}
+
 export interface ProjectionRuntimeSettings {
-	targetNetWorth: number;
+	/** Optional generic savings goal. Financial independence does not use it. */
+	targetNetWorth?: number;
 	fallbackProjectionStartDate: IsoDate;
 	horizonYears: number;
+	financialIndependencePlan?: FinancialIndependencePlan;
 }
 
 export interface Account {
@@ -133,7 +164,40 @@ export interface ProjectionPostingSummary {
 	shortfallAmount: number;
 }
 
+export interface FinancialIndependenceRow {
+	date: IsoDate;
+	annualDirectIncome: number;
+	selectedAssetBalance: number;
+	annualWithdrawalCapacity: number;
+	totalAnnualCapacity: number;
+	annualExpenseTarget: number;
+	coverageRatio: number;
+	isCovered: boolean;
+}
+
+export interface FinancialIndependenceRunOutcome {
+	candidateDate: IsoDate;
+	expensesFullyCovered: boolean;
+	hadWithdrawalShortfall: boolean;
+	startingSelectedAssetBalance: number;
+	endingSelectedAssetBalance: number;
+	startingRealSelectedAssetBalance: number;
+	endingRealSelectedAssetBalance: number;
+	principalReplenished: boolean;
+	cycleEstablished: boolean;
+}
+
+export interface FinancialIndependenceAnalysis {
+	rows: FinancialIndependenceRow[];
+	runOutcomes: FinancialIndependenceRunOutcome[];
+	milestones: {
+		firstCoverageDate: IsoDate | null;
+		firstSelfSustainingDate: IsoDate | null;
+	};
+}
+
 export interface ProjectionResult {
+	financialIndependence: FinancialIndependenceAnalysis;
 	timeline: {
 		rows: ProjectionRow[];
 		sampledRows: ProjectionRow[];

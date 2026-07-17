@@ -67,7 +67,7 @@ Shared: `ProjectionHookState<T>` (`hooks/types.ts`) — `{ result, runtimeError,
 | ------------ | -------------------------------------------------------------------------------------- |
 | **WhatIf**   | Temporary overrides (add/remove/toggle accounts, postings, checkpoints; reset)         |
 | **Editor**   | CRUD on working copy (start/cancel editing, isDirty/isEditing, update/delete/add rows) |
-| **Settings** | targetNetWorth, horizonYears, stochasticPreference, stochasticConfig                   |
+| **Settings** | financialIndependencePlan, horizonYears, stochasticPreference, stochasticConfig        |
 | **Snapshot** | Named scenario snapshots (label, timestamp, whatIfState, metrics)                      |
 | **Theme**    | light/dark/system theme with DOM application                                           |
 
@@ -108,7 +108,7 @@ Selectors: `selectActiveOverrideCount`, `selectWhatIfState`, `selectEditorState`
 | `ProjectionResult`           | same                                 | Deterministic output (timeline, summaries, milestones)    |
 | `StochasticProjectionResult` | `lib/projection/types/stochastic.ts` | Monte Carlo output (percentile bands, hit probability)    |
 | `ScenarioWhatIfState`        | `lib/projection/types/scenario.ts`   | Temporary overrides (added + disabled ID arrays)          |
-| `ProjectionRuntimeSettings`  | same                                 | targetNetWorth, fallbackProjectionStartDate, horizonYears |
+| `ProjectionRuntimeSettings`  | same                                 | financialIndependencePlan, fallbackProjectionStartDate, horizonYears |
 | `ProjectionHookState<T>`     | `hooks/types.ts`                     | `{ result, runtimeError, isRunning, progress }`           |
 | `DataSource`                 | `lib/projection/dataSource.ts`       | `{ loadPack, savePack, sourceType }`                      |
 | `ScenarioParseResult`        | same                                 | `{ pack, issues }`                                        |
@@ -118,6 +118,7 @@ Selectors: `selectActiveOverrideCount`, `selectWhatIfState`, `selectEditorState`
 ## Rules
 
 - Engine logic (`lib/projection/engine/`) must never branch on specific account IDs, posting IDs, or categories. See `TECHNICAL_OVERVIEW.md` §3.
+- FI logic is a derived analysis in `financialIndependence.ts`; it must not add semantic branches to the generic posting engine.
 - What-if state is session-only, never mutates canonical data.
 - Use `@/lib/projection` barrel import for all projection types and utilities.
 - Projection and stochastic computation happen in Web Workers (`src/workers/`), never on main thread.

@@ -10,7 +10,8 @@ The current product model is intentionally simple:
 - `amountMode` is `fixed` or `percent_of_base`, where base rows reference the latest realized amount of another posting.
 - Annual caps are generic and source-funded rows clamp to the source account's available positive balance.
 - The bundled starter data lives in `public/scenario/*.csv`.
-- Runtime projection settings live in the app, not in CSV: target net worth and horizon are editable in-session, and projection starts from the latest checkpoint date or today if none exist.
+- Runtime projection settings live in the app, not in CSV: the financial-independence plan, explicit income/asset source selections, and horizon are session-only. Projection starts from the latest checkpoint date or today if none exist.
+- Financial independence is derived from annual expense coverage and a full principal-preservation cycle. Monte Carlo confidence is aggregated from complete run outcomes, never inferred from percentile-band slope.
 - Baseline edits are persisted by the active data source, while what-if overrides remain session-only.
 
 The current product-model summary lives in `REDESIGN_PLAN.md`.
@@ -54,6 +55,6 @@ npm run build
 - `src/components/CsvScenarioInspector.tsx`: read-only CSV data inspection and validation display
 - `src/components/CsvContributionWhatIfControls.tsx`: slider-based posting what-if overrides
 - `src/components/CsvProjectionDashboard.tsx`: net worth and posting projection dashboard
-- `src/lib/projection/`: CSV schemas, validation, loading, projection logic, and shared types
+- `src/lib/projection/`: CSV schemas, validation, loading, generic projection logic, FI analysis, and shared types
 - `src/lib/projection.csv.test.ts`: CSV loader and validation tests
 - `src/lib/projection.csvProject.test.ts`: projection engine tests

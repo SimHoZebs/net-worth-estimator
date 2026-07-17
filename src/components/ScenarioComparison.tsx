@@ -87,7 +87,7 @@ export function ScenarioComparison({
 										<th className="px-4 py-3">Name</th>
 										<th className="px-4 py-3">Current NW</th>
 										<th className="px-4 py-3">Final NW</th>
-										<th className="px-4 py-3">Target date</th>
+										<th className="px-4 py-3">FI cycle date</th>
 										<th className="px-4 py-3">Overrides</th>
 										<th className="px-4 py-3" />
 									</tr>
@@ -114,8 +114,8 @@ export function ScenarioComparison({
 													{currency.format(sn.metrics.finalNetWorth)}
 												</td>
 												<td className="px-4 py-3 text-foreground">
-													{sn.metrics.hitTargetDate
-														? formatDate(sn.metrics.hitTargetDate)
+													{sn.metrics.fiCycleDate
+														? formatDate(sn.metrics.fiCycleDate)
 														: "Beyond horizon"}
 												</td>
 												<td className="px-4 py-3 tabular-nums text-muted-foreground">
@@ -146,8 +146,8 @@ export function ScenarioComparison({
 											{currency.format(currentMetrics.finalNetWorth)}
 										</td>
 										<td className="px-4 py-3 type-value font-semibold">
-											{currentMetrics.hitTargetDate
-												? formatDate(currentMetrics.hitTargetDate)
+											{currentMetrics.fiCycleDate
+												? formatDate(currentMetrics.fiCycleDate)
 												: "Beyond horizon"}
 										</td>
 										<td className="px-4 py-3 tabular-nums type-value font-semibold">

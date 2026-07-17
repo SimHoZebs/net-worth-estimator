@@ -184,33 +184,33 @@ export function StochasticControls({
 							{stochasticResult ? (
 								<div className="grid gap-3">
 									<StochasticResultCard
-										label="Modeled success rate"
+										label="FI-cycle success probability"
 										value={pct.format(
-											stochasticResult.milestones.hitTargetProbability,
+											stochasticResult.milestones.fiCycleSuccessProbability,
 										)}
-										detail="of simulated paths reached target"
+										detail="complete runs funded expenses and met principal policy"
 									/>
 									<StochasticResultCard
-										label="Median simulated target date"
+										label="Median coverage date"
 										value={
-											stochasticResult.milestones.medianHitTargetDate
+											stochasticResult.milestones.medianFiCoverageDate
 												? formatDate(
-														stochasticResult.milestones.medianHitTargetDate,
+														stochasticResult.milestones.medianFiCoverageDate,
 													)
 												: "Never"
 										}
-										detail="50th percentile across runs"
+										detail="median annual capacity first covers expenses"
 									/>
 									<StochasticResultCard
-										label="Conservative target date"
+										label="Confidence-qualified FI date"
 										value={
-											stochasticResult.milestones.worstCaseHitTargetDate
+											stochasticResult.milestones.fiSelfSustainingDate
 												? formatDate(
-														stochasticResult.milestones.worstCaseHitTargetDate,
+														stochasticResult.milestones.fiSelfSustainingDate,
 													)
 												: "Never"
 										}
-										detail="10th percentile (worst case)"
+										detail="first candidate meeting required confidence"
 									/>
 									<StochasticResultCard
 										label="Median simulated final net worth"
