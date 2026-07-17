@@ -410,11 +410,16 @@ export function projectScenarioPack(
 				!row.isHistorical && row.netWorth >= projectionSettings.targetNetWorth,
 		) ?? null;
 
+	const endingSnapshotsByAccountId = new Map<string, AccountSnapshot>();
+	if (latestRow) {
+		for (const s of latestRow.accountSnapshots) {
+			endingSnapshotsByAccountId.set(s.accountId, s);
+		}
+	}
+
 	const accountSummaries: ProjectionAccountSummary[] = mergedPack.accounts.map(
 		(account) => {
-			const endingSnapshot = latestRow?.accountSnapshots.find(
-				(s) => s.accountId === account.id,
-			);
+			const endingSnapshot = endingSnapshotsByAccountId.get(account.id);
 			const endingBalance =
 				endingSnapshot?.balance ?? futureStartingBalances[account.id] ?? 0;
 			const startingBalance = futureStartingBalances[account.id] ?? 0;
