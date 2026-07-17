@@ -27,7 +27,12 @@ interface ProjectionSettingsCardProps {
 }
 
 const inputClassName =
-	"mt-1 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 text-sm shadow-sm outline-none transition focus:border-ring dark:border-white/10";
+	"mt-1 min-w-0 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 text-sm shadow-sm outline-none transition focus:border-ring dark:border-white/10";
+
+function finiteInput(value: string, fallback: number) {
+	const parsed = Number(value);
+	return Number.isFinite(parsed) ? parsed : fallback;
+}
 
 export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 	pack,
@@ -37,7 +42,7 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 	onFinancialIndependencePlanChange,
 	onProjectionSettingsChange,
 }: ProjectionSettingsCardProps) {
-	const plan = projectionSettings.financialIndependencePlan!;
+	const plan = projectionSettings.financialIndependencePlan;
 	const selectedCashflows = new Set<string>();
 	const selectedAssets = new Set<string>();
 	for (const source of plan.sources) {
@@ -52,10 +57,21 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 		(posting) =>
 			posting.enabled &&
 			posting.sourceAccountId === null &&
-			posting.destinations !== null &&
-			posting.annualRate === 0,
+			posting.destinations !== null,
 	);
 	const assetAccounts = pack.accounts.filter((account) => account.enabled);
+	const continuingPostings = pack.postings.filter(
+		(posting) =>
+			posting.enabled &&
+			((posting.sourceAccountId !== null &&
+				selectedAssets.has(posting.sourceAccountId)) ||
+				posting.destinations?.some((id) => selectedAssets.has(id)) === true),
+	);
+	const selectedAssetLinkedCashflowCount = directIncomePostings.filter(
+		(posting) =>
+			selectedCashflows.has(posting.id) &&
+			posting.destinations?.some((id) => selectedAssets.has(id)) === true,
+	).length;
 
 	const toggleCashflow = (postingId: string) => {
 		const existing = plan.sources.find(
@@ -120,6 +136,14 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 		});
 	};
 
+	const toggleContinuingPosting = (postingId: string) => {
+		onFinancialIndependencePlanChange({
+			continuingPostingIds: plan.continuingPostingIds.includes(postingId)
+				? plan.continuingPostingIds.filter((id) => id !== postingId)
+				: [...plan.continuingPostingIds, postingId],
+		});
+	};
+
 	return (
 		<Card className="rounded-[1.4rem] border-border/80">
 			<CardHeader>
@@ -129,8 +153,26 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
-				<div className="grid grid-cols-2 gap-3">
-					<label className="type-caption">
+				<div className="grid gap-3 sm:grid-cols-2">
+					<label className="min-w-0 type-caption">
+						Minimum net worth
+						<input
+							type="number"
+							min={0}
+							step={50_000}
+							value={plan.minimumNetWorth}
+							onChange={(event) =>
+								onFinancialIndependencePlanChange({
+									minimumNetWorth: Math.max(
+										0,
+										finiteInput(event.target.value, plan.minimumNetWorth),
+									),
+								})
+							}
+							className={inputClassName}
+						/>
+					</label>
+					<label className="min-w-0 type-caption">
 						Annual expenses
 						<input
 							type="number"
@@ -139,13 +181,16 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 							value={plan.annualExpenseTarget}
 							onChange={(event) =>
 								onFinancialIndependencePlanChange({
-									annualExpenseTarget: Math.max(0, Number(event.target.value)),
+									annualExpenseTarget: Math.max(
+										0,
+										finiteInput(event.target.value, plan.annualExpenseTarget),
+									),
 								})
 							}
 							className={inputClassName}
 						/>
 					</label>
-					<label className="type-caption">
+					<label className="min-w-0 type-caption">
 						Expense growth
 						<input
 							type="number"
@@ -156,14 +201,17 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 								onFinancialIndependencePlanChange({
 									annualExpenseGrowthRate: Math.max(
 										0,
-										Number(event.target.value) / 100,
+										finiteInput(
+											event.target.value,
+											plan.annualExpenseGrowthRate * 100,
+										) / 100,
 									),
 								})
 							}
 							className={inputClassName}
 						/>
 					</label>
-					<label className="type-caption">
+					<label className="min-w-0 type-caption">
 						Withdrawal rate
 						<input
 							type="number"
@@ -172,13 +220,22 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 							value={plan.withdrawalRate * 100}
 							onChange={(event) =>
 								onFinancialIndependencePlanChange({
-									withdrawalRate: Math.max(0, Number(event.target.value) / 100),
+									withdrawalRate: Math.min(
+										1,
+										Math.max(
+											0,
+											finiteInput(
+												event.target.value,
+												plan.withdrawalRate * 100,
+											) / 100,
+										),
+									),
 								})
 							}
 							className={inputClassName}
 						/>
 					</label>
-					<label className="type-caption">
+					<label className="min-w-0 type-caption">
 						Cycle length
 						<input
 							type="number"
@@ -189,14 +246,16 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 								onFinancialIndependencePlanChange({
 									evaluationYears: Math.max(
 										1,
-										Math.floor(Number(event.target.value)),
+										Math.floor(
+											finiteInput(event.target.value, plan.evaluationYears),
+										),
 									),
 								})
 							}
 							className={inputClassName}
 						/>
 					</label>
-					<label className="type-caption">
+					<label className="min-w-0 type-caption">
 						Required confidence
 						<input
 							type="number"
@@ -207,14 +266,20 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 								onFinancialIndependencePlanChange({
 									requiredConfidence: Math.min(
 										1,
-										Math.max(0.01, Number(event.target.value) / 100),
+										Math.max(
+											0.01,
+											finiteInput(
+												event.target.value,
+												plan.requiredConfidence * 100,
+											) / 100,
+										),
 									),
 								})
 							}
 							className={inputClassName}
 						/>
 					</label>
-					<label className="type-caption">
+					<label className="min-w-0 type-caption">
 						Principal policy
 						<select
 							value={plan.principalPolicy}
@@ -285,11 +350,17 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 							})
 						)}
 					</div>
+					{selectedAssetLinkedCashflowCount > 0 ? (
+						<p className="mt-2 rounded-xl border border-tertiary-border bg-tertiary-subtle px-3 py-2 type-caption text-tertiary-foreground">
+							Asset-linked income is treated as spendable distributed yield and
+							is not replayed as a continuing posting.
+						</p>
+					) : null}
 				</div>
 
 				<div className="rounded-2xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
 					<div className="type-eyebrow">Withdrawable assets</div>
-					<div className="mt-2 grid grid-cols-2 gap-2">
+					<div className="mt-2 grid gap-2 sm:grid-cols-2">
 						{assetAccounts.map((account) => {
 							const source = plan.sources.find(
 								(item) =>
@@ -298,7 +369,7 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 							return (
 								<div
 									key={account.id}
-									className="rounded-xl border border-border/60 bg-card/60 p-2"
+									className="min-w-0 rounded-xl border border-border/60 bg-card/60 p-2"
 								>
 									<label className="flex items-start gap-2 type-caption">
 										<input
@@ -338,6 +409,35 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 								</div>
 							);
 						})}
+					</div>
+				</div>
+
+				<div className="rounded-2xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
+					<div className="type-eyebrow">Continuing during FI cycle</div>
+					<p className="mt-1 type-caption text-muted-foreground">
+						Explicitly choose postings that continue after the policy starts.
+					</p>
+					<div className="mt-2 space-y-2">
+						{continuingPostings.length === 0 ? (
+							<p className="type-caption text-muted-foreground">
+								Select an asset to see related postings.
+							</p>
+						) : (
+							continuingPostings.map((posting) => (
+								<label
+									key={posting.id}
+									className="flex items-start gap-2 rounded-xl border border-border/60 bg-card/60 p-2 type-caption"
+								>
+									<input
+										type="checkbox"
+										checked={plan.continuingPostingIds.includes(posting.id)}
+										onChange={() => toggleContinuingPosting(posting.id)}
+										className="mt-0.5 accent-primary"
+									/>
+									<span>{posting.label}</span>
+								</label>
+							))
+						)}
 					</div>
 				</div>
 

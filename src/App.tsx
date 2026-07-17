@@ -4,6 +4,7 @@ import {
 	createBrowserCsvDataSource,
 	createCsvDataSource,
 	type ProjectionRuntimeSettings,
+	prepareScenarioPack,
 } from "@/lib/projection";
 import { ContributionWhatIfControls } from "./components/CsvContributionWhatIfControls";
 import { ProjectionDashboard } from "./components/CsvProjectionDashboard";
@@ -44,6 +45,7 @@ export default function App() {
 	const {
 		data: scenarioData,
 		isLoading: isScenarioLoading,
+		isFetching: isScenarioFetching,
 		error: scenarioError,
 		refetch: refetchScenario,
 		dataUpdatedAt,
@@ -58,7 +60,9 @@ export default function App() {
 		scenarioMutation.error?.message ??
 		scenarioResetMutation.error?.message ??
 		null;
-	const isLoading = isScenarioLoading;
+	const isSourceUpdating =
+		isScenarioFetching || scenarioResetMutation.isPending;
+	const isLoading = isScenarioLoading || isSourceUpdating;
 
 	const whatIfState = useStore(useShallow(selectWhatIfState));
 	const {
@@ -112,8 +116,12 @@ export default function App() {
 		}),
 		[fallbackProjectionStartDate, horizonYears, financialIndependencePlan],
 	);
+	const effectivePack = useMemo(
+		() => (pack ? prepareScenarioPack(pack, whatIfState) : null),
+		[pack, whatIfState],
+	);
 	const projectionStartDate =
-		pack?.checkpoints.reduce<string | null>(
+		effectivePack?.checkpoints.reduce<string | null>(
 			(latestDate, checkpoint) =>
 				latestDate === null || checkpoint.Date > latestDate
 					? checkpoint.Date
@@ -125,27 +133,6 @@ export default function App() {
 		runtimeError,
 		isRunning: isProjecting,
 	} = useProjection(pack, projectionSettings, whatIfState, validation.isValid);
-	const effectivePack = useMemo(
-		() =>
-			pack
-				? {
-						...pack,
-						accounts: pack.accounts
-							.filter(
-								(account) =>
-									!whatIfState.disabledAccountIds.includes(account.id),
-							)
-							.concat(whatIfState.addedAccounts),
-						postings: pack.postings
-							.filter(
-								(posting) =>
-									!whatIfState.disabledPostingIds.includes(posting.id),
-							)
-							.concat(whatIfState.addedPostings),
-					}
-				: null,
-		[pack, whatIfState],
-	);
 
 	const hasStochasticAccounts =
 		effectivePack?.postings.some((p) => p.volatility > 0 && p.enabled) ?? false;
@@ -166,6 +153,8 @@ export default function App() {
 		stochasticConfig,
 		stochasticWorkerEnabled,
 	);
+	const stochasticIsProvisional =
+		isStochasticRunning && stochasticResult !== null;
 
 	const handleSave = useCallback(() => {
 		const store = useStore.getState();
@@ -230,7 +219,7 @@ export default function App() {
 		() => ({
 			currentNetWorth: result?.summary.currentNetWorth ?? 0,
 			finalNetWorth: result?.summary.finalNetWorth ?? 0,
-			fiCycleDate:
+			deterministicFiCycleDate:
 				result?.financialIndependence.milestones.firstSelfSustainingDate ??
 				null,
 			shortfallAmount: result?.totals.clampedPostingShortfallAmount ?? 0,
@@ -254,7 +243,7 @@ export default function App() {
 		<div className="app-shell min-h-screen bg-background text-foreground">
 			<div className="space-y-0 px-0 md:px-0">
 				<div className="mx-auto max-w-[106rem] px-4 py-4 md:px-8">
-					<div className="flex items-center justify-between gap-2">
+					<div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<div className="type-caption">
 							{pack ? (
 								<span>
@@ -278,7 +267,7 @@ export default function App() {
 								</span>
 							)}
 						</div>
-						<div className="flex gap-2 no-print">
+						<div className="flex flex-wrap gap-2 no-print">
 							<ThemeToggle theme={theme} setTheme={setTheme} />
 							<Button
 								type="button"
@@ -376,6 +365,7 @@ export default function App() {
 									result={result}
 									projectionSettings={projectionSettings}
 									stochasticResult={stochasticResult}
+									stochasticIsProvisional={stochasticIsProvisional}
 								/>
 
 								<section id="model-inputs">
@@ -402,13 +392,14 @@ export default function App() {
 									<ScenarioComparison
 										currentMetrics={currentMetrics}
 										currentOverrideCount={activeOverrideCount}
+										canTakeSnapshot={!isProjecting && !isSourceUpdating}
 									/>
 								</section>
 							</main>
 
 							<aside id="projection-settings" className="space-y-4">
 								<ProjectionConfigSidebar
-									pack={pack}
+									pack={effectivePack ?? pack}
 									projectionSettings={projectionSettings}
 									projectionStartDate={result.milestones.projectionStartDate}
 									activeOverrideCount={activeOverrideCount}

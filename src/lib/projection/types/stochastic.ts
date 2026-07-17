@@ -31,5 +31,6 @@ export interface StochasticProjectionResult {
 		fiCycleSuccessProbability: number;
 		medianFiCoverageDate: IsoDate | null;
 		fiSelfSustainingDate: IsoDate | null;
+		fiSelfSustainingProbability: number | null;
 	};
 }

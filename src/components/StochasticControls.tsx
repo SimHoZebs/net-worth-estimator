@@ -26,6 +26,7 @@ export function StochasticControls({
 	const onConfigChange = useStore((s) => s.setStochasticConfig);
 	const simulationRequested = stochasticPreference !== "disabled";
 	const simulationActive = simulationRequested && hasStochasticAccounts;
+	const isProvisional = isRunning && stochasticResult !== null;
 
 	const {
 		runCountInput,
@@ -183,15 +184,21 @@ export function StochasticControls({
 							</div>
 							{stochasticResult ? (
 								<div className="grid gap-3">
+									{isProvisional ? (
+										<p className="rounded-xl border border-primary-border bg-primary-subtle px-3 py-2 type-caption text-primary">
+											Provisional results from completed runs. Values may change
+											until all runs finish.
+										</p>
+									) : null}
 									<StochasticResultCard
-										label="FI-cycle success probability"
+										label={`${isProvisional ? "Provisional " : ""}FI-cycle success probability`}
 										value={pct.format(
 											stochasticResult.milestones.fiCycleSuccessProbability,
 										)}
 										detail="complete runs funded expenses and met principal policy"
 									/>
 									<StochasticResultCard
-										label="Median coverage date"
+										label={`${isProvisional ? "Provisional " : ""}Median coverage date`}
 										value={
 											stochasticResult.milestones.medianFiCoverageDate
 												? formatDate(
@@ -202,7 +209,7 @@ export function StochasticControls({
 										detail="median annual capacity first covers expenses"
 									/>
 									<StochasticResultCard
-										label="Confidence-qualified FI date"
+										label={`${isProvisional ? "Provisional " : ""}Confidence-qualified FI date`}
 										value={
 											stochasticResult.milestones.fiSelfSustainingDate
 												? formatDate(
@@ -213,7 +220,7 @@ export function StochasticControls({
 										detail="first candidate meeting required confidence"
 									/>
 									<StochasticResultCard
-										label="Median simulated final net worth"
+										label={`${isProvisional ? "Provisional " : ""}Median simulated final net worth`}
 										value={currency.format(
 											stochasticResult.milestones.finalNetWorthPercentiles.p50,
 										)}

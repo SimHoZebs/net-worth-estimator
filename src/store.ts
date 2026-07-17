@@ -17,7 +17,7 @@ import type {
 export interface SnapshotMetrics {
 	currentNetWorth: number;
 	finalNetWorth: number;
-	fiCycleDate: string | null;
+	deterministicFiCycleDate: string | null;
 	shortfallAmount: number;
 	overrideCount: number;
 }
@@ -349,12 +349,14 @@ const createThemeSlice: StateCreator<AppStore, [], [], ThemeSlice> = (set) => {
 const DEFAULT_STOCHASTIC_RUN_COUNT = 1000;
 
 export const DEFAULT_FINANCIAL_INDEPENDENCE_PLAN: FinancialIndependencePlan = {
+	minimumNetWorth: 1_500_000,
 	annualExpenseTarget: 80_000,
 	annualExpenseGrowthRate: 0.025,
 	withdrawalRate: 0.04,
 	evaluationYears: 10,
 	requiredConfidence: 0.9,
 	sources: [],
+	continuingPostingIds: [],
 	principalPolicy: "preserve-real-principal",
 };
 
@@ -378,10 +380,15 @@ const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (
 ) => ({
 	financialIndependencePlan: DEFAULT_FINANCIAL_INDEPENDENCE_PLAN,
 	setFinancialIndependencePlan: (changes) => {
+		const finiteChanges = Object.fromEntries(
+			Object.entries(changes).filter(
+				([, value]) => typeof value !== "number" || Number.isFinite(value),
+			),
+		) as Partial<FinancialIndependencePlan>;
 		set((state) => ({
 			financialIndependencePlan: {
 				...state.financialIndependencePlan,
-				...changes,
+				...finiteChanges,
 			},
 		}));
 	},

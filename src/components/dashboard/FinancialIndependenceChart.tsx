@@ -41,7 +41,7 @@ export const FinancialIndependenceChart = memo(
 
 		return (
 			<Card className="overflow-hidden rounded-[1.8rem] border-border/80">
-				<CardHeader className="flex-row items-start justify-between gap-4">
+				<CardHeader className="flex-col items-start gap-3 sm:flex-row sm:justify-between">
 					<div>
 						<CardTitle id={titleId}>FI capacity corridor</CardTitle>
 						<p className="mt-1 type-muted">
@@ -120,10 +120,14 @@ export const FinancialIndependenceChart = memo(
 									strokeLinejoin="round"
 								/>
 							</svg>
-							<div className="mt-2 flex justify-between type-caption text-muted-foreground">
+							<div className="mt-2 grid grid-cols-2 gap-2 type-caption text-muted-foreground">
 								<span>{formatDate(rows[0].date)}</span>
-								<span>Peak scale {currency.format(maxValue)}/yr</span>
-								<span>{formatDate(rows[rows.length - 1].date)}</span>
+								<span className="text-right">
+									{formatDate(rows[rows.length - 1].date)}
+								</span>
+								<span className="col-span-2 text-center">
+									Peak scale {currency.format(maxValue)}/yr
+								</span>
 							</div>
 						</>
 					)}
