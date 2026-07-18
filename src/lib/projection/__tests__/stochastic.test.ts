@@ -82,6 +82,39 @@ describe("stochastic utilities", () => {
 });
 
 describe("stochastic projection", () => {
+	it("normalizes invalid run counts before simulation", () => {
+		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
+		if (!pack) throw new Error("Pack is null");
+
+		const fractional = stochasticProject(
+			pack,
+			makeSettings(),
+			{
+				addedAccounts: [],
+				addedPostings: [],
+				addedCheckpoints: [],
+				disabledAccountIds: [],
+				disabledPostingIds: [],
+			},
+			{ runCount: 2.9, seed: 1 },
+		);
+		const nonPositive = stochasticProject(
+			pack,
+			makeSettings(),
+			{
+				addedAccounts: [],
+				addedPostings: [],
+				addedCheckpoints: [],
+				disabledAccountIds: [],
+				disabledPostingIds: [],
+			},
+			{ runCount: 0, seed: 1 },
+		);
+
+		expect(fractional.config.runCount).toBe(2);
+		expect(nonPositive.config.runCount).toBe(1);
+	});
+
 	it("aggregates FI-cycle outcomes from complete seeded runs", () => {
 		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
 		if (!pack) throw new Error("Pack is null");
