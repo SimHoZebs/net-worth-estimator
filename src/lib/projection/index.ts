@@ -16,6 +16,7 @@ export {
 export {
 	evaluateFinancialIndependence,
 	FINANCIAL_INDEPENDENCE_DEFINITION_ID,
+	type FinancialIndependenceCandidateWithdrawalDiagnostic,
 	type FinancialIndependenceProbabilisticResult,
 	validateFinancialIndependencePlan,
 } from "./evaluation/financialIndependence";
@@ -35,6 +36,13 @@ export {
 	EvaluationRuntimeSet,
 } from "./evaluation/runtime";
 export { prepareScenarioPack } from "./scenario/prepareScenario";
+export {
+	type AccountMovementAction,
+	type AccountMovementConstraint,
+	type AccountMovementResult,
+	resolveAccountMovement,
+	resolveAccountMovementAmount,
+} from "./simulation/postings";
 export { createBrowserCsvDataSource } from "./sources/csv/browserCsvDataSource";
 export { createCsvDataSource } from "./sources/csv/csvDataSource";
 export {
@@ -58,6 +66,7 @@ export {
 export type {
 	Account,
 	AccountDelta,
+	AccountMovementConstraintType,
 	AccountSnapshot,
 	Checkpoint,
 	ConfiguredEvaluation,
@@ -71,6 +80,8 @@ export type {
 	FinancialIndependenceRow,
 	FinancialIndependenceRunOutcome,
 	FinancialIndependenceSource,
+	FinancialIndependenceWithdrawalAccountSummary,
+	FinancialIndependenceWithdrawalSummary,
 	IsoDate,
 	JsonPrimitive,
 	JsonValue,

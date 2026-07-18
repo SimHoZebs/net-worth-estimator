@@ -15,6 +15,12 @@ export type ScenarioFileName =
 
 export type IsoDate = string;
 
+export type AccountMovementConstraintType =
+	| "source-unavailable"
+	| "source-floor"
+	| "destination-ceiling"
+	| "action-limit";
+
 export type JsonPrimitive = boolean | number | string | null;
 export type JsonValue =
 	| JsonPrimitive
@@ -236,6 +242,41 @@ export interface FinancialIndependenceRunOutcome {
 	endingRealSelectedAssetBalance: number;
 	principalReplenished: boolean;
 	cycleEstablished: boolean;
+	withdrawals: FinancialIndependenceWithdrawalSummary;
+}
+
+export interface FinancialIndependenceWithdrawalAccountSummary {
+	accountId: string;
+	requestedAmount: number;
+	realizedAmount: number;
+	shortfallAmount: number;
+	constraints: Array<{
+		type: AccountMovementConstraintType;
+		count: number;
+	}>;
+}
+
+export interface FinancialIndependenceWithdrawalSummary {
+	requestedAmount: number;
+	realizedAmount: number;
+	shortfallAmount: number;
+	firstShortfallDate: IsoDate | null;
+	lastShortfallDate: IsoDate | null;
+	shortfallOccurrenceCount: number;
+	constraints: Array<{
+		type: AccountMovementConstraintType;
+		count: number;
+	}>;
+	relatedAccountIds: string[];
+	accounts: FinancialIndependenceWithdrawalAccountSummary[];
+	firstShortfall: {
+		date: IsoDate;
+		requestedAmount: number;
+		realizedAmount: number;
+		shortfallAmount: number;
+		constraints: AccountMovementConstraintType[];
+		relatedAccountIds: string[];
+	} | null;
 }
 
 export interface ProjectionPath {

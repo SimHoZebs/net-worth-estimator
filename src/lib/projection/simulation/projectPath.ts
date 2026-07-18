@@ -27,7 +27,7 @@ import {
 	addOccurrences,
 	applyPosting,
 	computeRequestedAmount,
-	resolvePostingAmount,
+	resolvePostingMovement,
 } from "./postings";
 
 interface NormalizedCheckpoints {
@@ -303,14 +303,14 @@ export function projectRawScenarioPack(
 							posting.annualCap -
 								(realizedPostingAmountByIdAndYear.get(capKey) ?? 0),
 						);
-			const realizedAmount = resolvePostingAmount(
+			const movement = resolvePostingMovement(
 				posting,
 				requestedAmount,
 				annualCapRemaining,
 				balances,
 				accountById,
 			);
-			const shortfallAmount = requestedAmount - realizedAmount;
+			const { realizedAmount, shortfallAmount } = movement;
 
 			if (shortfallAmount > 0 && !firstShortfallDateById.has(posting.id)) {
 				firstShortfallDateById.set(posting.id, date);

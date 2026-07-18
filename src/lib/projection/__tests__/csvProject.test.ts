@@ -155,6 +155,19 @@ describe("CSV projection engine", () => {
 		expect(result.timeline.rows[1]?.requestedPostingAmount).toBe(400);
 		expect(result.timeline.rows[1]?.realizedPostingAmount).toBe(250);
 		expect(result.timeline.rows[1]?.clampedPostingShortfallAmount).toBe(150);
+		expect(result.postingSummaries[0]).toMatchObject({
+			postingId: "loan_payment",
+			requestedAmount: 400,
+			realizedAmount: 250,
+			utilizationRate: 0.625,
+			firstShortfallDate: "2026-01-10",
+			shortfallAmount: 150,
+		});
+		expect(result.totals).toMatchObject({
+			requestedPostingAmount: 400,
+			realizedPostingAmount: 250,
+			clampedPostingShortfallAmount: 150,
+		});
 		expect(getBalance(result.timeline.rows[1], "checking")).toBe(0);
 		expect(getBalance(result.timeline.rows[1], "loan")).toBe(-50);
 		expect(result.timeline.rows[1]?.netWorth).toBe(-50);

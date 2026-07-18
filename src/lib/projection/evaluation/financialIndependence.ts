@@ -2,24 +2,29 @@ import { runReactiveBehavior } from "../behavior/runtime";
 import { EMPTY_WHAT_IF_STATE } from "../scenario/prepareScenario";
 import { getWithdrawableAmount } from "../simulation/accounts";
 import {
+	type AccountMovementConstraint,
+	type AccountMovementResult,
 	addOccurrences,
 	applyAccountMovement,
 	applyPosting,
 	computeRequestedAmount,
 	type DatedPostingOccurrence,
-	resolveAccountMovementAmount,
-	resolvePostingAmount,
+	resolveAccountMovement,
+	resolvePostingMovement,
 } from "../simulation/postings";
 import type {
 	Account,
+	AccountMovementConstraintType,
 	FinancialIndependenceAnalysis,
 	FinancialIndependencePlan,
 	FinancialIndependenceRow,
 	FinancialIndependenceRunOutcome,
+	FinancialIndependenceWithdrawalSummary,
 	IsoDate,
 	ProjectionPath,
 	ProjectionRow,
 } from "../types/scenario";
+import type { PercentileBands } from "../types/stochastic";
 import {
 	addMonthsClamped,
 	addYearsClamped,
@@ -27,9 +32,166 @@ import {
 	daysBetween,
 	projectionYearIndex,
 } from "../utils/date";
+import { computePercentiles } from "../utils/stochastic";
 import type { EvaluationDefinition } from "./runtime";
 
 const EPSILON = 0.01;
+
+interface WithdrawalAttempt {
+	date: IsoDate;
+	accountId: string | null;
+	result: AccountMovementResult;
+}
+
+function constraintAccountIds(constraint: AccountMovementConstraint): string[] {
+	switch (constraint.type) {
+		case "source-unavailable":
+		case "source-floor":
+			return [constraint.accountId];
+		case "destination-ceiling":
+			return constraint.accountIds;
+		case "action-limit":
+			return [];
+	}
+}
+
+function countConstraints(attempts: readonly WithdrawalAttempt[]) {
+	const counts = new Map<AccountMovementConstraintType, number>();
+	for (const attempt of attempts) {
+		for (const constraint of attempt.result.bindingConstraints) {
+			counts.set(constraint.type, (counts.get(constraint.type) ?? 0) + 1);
+		}
+	}
+	return [...counts].map(([type, count]) => ({ type, count }));
+}
+
+function summarizeWithdrawals(
+	attempts: readonly WithdrawalAttempt[],
+): FinancialIndependenceWithdrawalSummary {
+	const roundAmount = (amount: number) => Math.round(amount * 100) / 100;
+	const requestedAmount = roundAmount(
+		attempts.reduce((sum, attempt) => sum + attempt.result.requestedAmount, 0),
+	);
+	const realizedAmount = roundAmount(
+		attempts.reduce((sum, attempt) => sum + attempt.result.realizedAmount, 0),
+	);
+	const shortfallAmount =
+		requestedAmount - realizedAmount > EPSILON
+			? roundAmount(requestedAmount - realizedAmount)
+			: 0;
+	const shortfallPeriods = new Map<IsoDate, WithdrawalAttempt[]>();
+	for (const attempt of attempts) {
+		if (attempt.result.shortfallAmount <= EPSILON) continue;
+		const period = shortfallPeriods.get(attempt.date) ?? [];
+		period.push(attempt);
+		shortfallPeriods.set(attempt.date, period);
+	}
+	const shortfallDates = [...shortfallPeriods.keys()].sort(compareIsoDates);
+	const relatedAccountIds = [
+		...new Set(
+			attempts.flatMap((attempt) => [
+				...(attempt.accountId === null ? [] : [attempt.accountId]),
+				...attempt.result.bindingConstraints.flatMap(constraintAccountIds),
+			]),
+		),
+	];
+	const accountIds = [
+		...new Set(
+			attempts.flatMap((attempt) =>
+				attempt.accountId === null ? [] : [attempt.accountId],
+			),
+		),
+	];
+	const firstAttempts = attempts.filter(
+		(attempt) => attempt.date === shortfallDates[0],
+	);
+	const firstRequested = roundAmount(
+		firstAttempts.reduce(
+			(sum, attempt) => sum + attempt.result.requestedAmount,
+			0,
+		),
+	);
+	const firstRealized = roundAmount(
+		firstAttempts.reduce(
+			(sum, attempt) => sum + attempt.result.realizedAmount,
+			0,
+		),
+	);
+
+	return {
+		requestedAmount,
+		realizedAmount,
+		shortfallAmount,
+		firstShortfallDate: shortfallDates[0] ?? null,
+		lastShortfallDate: shortfallDates[shortfallDates.length - 1] ?? null,
+		shortfallOccurrenceCount: shortfallDates.length,
+		constraints: countConstraints(
+			attempts.filter((attempt) => attempt.result.shortfallAmount > EPSILON),
+		),
+		relatedAccountIds,
+		accounts: accountIds.map((accountId) => {
+			const accountAttempts = attempts.filter(
+				(attempt) => attempt.accountId === accountId,
+			);
+			const accountRequested = roundAmount(
+				accountAttempts.reduce(
+					(sum, attempt) => sum + attempt.result.requestedAmount,
+					0,
+				),
+			);
+			const accountRealized = roundAmount(
+				accountAttempts.reduce(
+					(sum, attempt) => sum + attempt.result.realizedAmount,
+					0,
+				),
+			);
+			const accountShortfall = accountRequested - accountRealized;
+			return {
+				accountId,
+				requestedAmount: accountRequested,
+				realizedAmount: accountRealized,
+				shortfallAmount:
+					accountShortfall > EPSILON ? roundAmount(accountShortfall) : 0,
+				constraints: countConstraints(
+					accountAttempts.filter(
+						(attempt) => attempt.result.shortfallAmount > EPSILON,
+					),
+				),
+			};
+		}),
+		firstShortfall:
+			firstAttempts.length === 0
+				? null
+				: {
+						date: shortfallDates[0]!,
+						requestedAmount: firstRequested,
+						realizedAmount: firstRealized,
+						shortfallAmount:
+							firstRequested - firstRealized > EPSILON
+								? roundAmount(firstRequested - firstRealized)
+								: 0,
+						constraints: [
+							...new Set(
+								firstAttempts.flatMap((attempt) =>
+									attempt.result.bindingConstraints.map(
+										(constraint) => constraint.type,
+									),
+								),
+							),
+						],
+						relatedAccountIds: [
+							...new Set(
+								firstAttempts.flatMap((attempt) => [
+									...(attempt.accountId === null ? [] : [attempt.accountId]),
+									...attempt.result.bindingConstraints.flatMap(
+										constraintAccountIds,
+									),
+								]),
+							),
+						],
+					},
+	};
+}
 
 export const DEFAULT_FI_PLAN: FinancialIndependencePlan = {
 	minimumNetWorth: 0,
@@ -50,12 +212,27 @@ export interface FinancialIndependenceProbabilisticResult {
 	medianCoverageDate: IsoDate | null;
 	selfSustainingDate: IsoDate | null;
 	selfSustainingProbability: number | null;
+	candidateWithdrawalDiagnostics: FinancialIndependenceCandidateWithdrawalDiagnostic[];
+}
+
+export interface FinancialIndependenceCandidateWithdrawalDiagnostic {
+	candidateDate: IsoDate;
+	totalRunCount: number;
+	diagnosticRunCount: number;
+	shortfallRunCount: number;
+	shortfallProbability: number;
+	medianFirstShortfallDate: IsoDate | null;
+	shortfallAmountPercentiles: PercentileBands;
 }
 
 interface FinancialIndependenceAccumulator {
 	candidateDates: IsoDate[];
 	coverageRatios: number[][];
 	cycleSuccessCounts: number[];
+	diagnosticRunCounts: number[];
+	shortfallRunCounts: number[];
+	firstShortfallDates: IsoDate[][];
+	shortfallAmounts: number[][];
 	requiredConfidence: number;
 	successfulRunCount: number;
 	runCount: number;
@@ -309,13 +486,14 @@ function applyBranchPostingEvents({
 							0,
 							posting.annualCap - (realizedByPostingAndYear.get(capKey) ?? 0),
 						);
-			const realizedAmount = resolvePostingAmount(
+			const movement = resolvePostingMovement(
 				posting,
 				requestedAmount,
 				capRemaining,
 				balances,
 				accountsById,
 			);
+			const realizedAmount = movement.realizedAmount;
 			applyPosting(posting, realizedAmount, balances, accountsById);
 			latestPostingAmounts.set(posting.id, realizedAmount);
 			realizedByPostingAndYear.set(
@@ -353,6 +531,7 @@ function evaluateCycle({
 			endingRealSelectedAssetBalance: candidate.selectedAssetBalance,
 			principalReplenished: false,
 			cycleEstablished: false,
+			withdrawals: summarizeWithdrawals([]),
 		};
 	}
 
@@ -417,6 +596,7 @@ function evaluateCycle({
 	return runReactiveBehavior(periods, {
 		initialize: () => ({
 			hadWithdrawalShortfall: false,
+			withdrawalAttempts: [] as WithdrawalAttempt[],
 			remainingWithdrawalByAccount: new Map<string, number>(),
 			latestPostingAmounts: initializeLatestPostingAmounts(
 				path.rows,
@@ -455,18 +635,19 @@ function evaluateCycle({
 					directIncome,
 			);
 			const capacities = [...assetRates.keys()].map((accountId) => {
-				const account = accountsById.get(accountId);
-				const positiveBalance = Math.max(0, balances[accountId] ?? 0);
-				const accountLimit = account
-					? getWithdrawableAmount(balances, accountsById, accountId)
-					: 0;
+				const accountLimit = getWithdrawableAmount(
+					balances,
+					accountsById,
+					accountId,
+				);
+				const actionLimit = Math.min(
+					Math.max(0, balances[accountId] ?? 0),
+					state.remainingWithdrawalByAccount.get(accountId) ?? 0,
+				);
 				return {
 					accountId,
-					capacity: Math.min(
-						positiveBalance,
-						accountLimit,
-						state.remainingWithdrawalByAccount.get(accountId) ?? 0,
-					),
+					actionLimit,
+					capacity: Math.min(accountLimit, actionLimit),
 				};
 			});
 			const totalCapacity = capacities.reduce(
@@ -474,28 +655,41 @@ function evaluateCycle({
 				0,
 			);
 			const requestedExpense = remainingExpense;
-			for (const { accountId, capacity } of capacities) {
-				if (remainingExpense <= EPSILON || totalCapacity <= 0) break;
-				const requestedAmount = Math.min(
-					capacity,
-					requestedExpense * (capacity / totalCapacity),
-				);
+			let allocatedRequest = 0;
+			for (const [
+				index,
+				{ accountId, capacity, actionLimit },
+			] of capacities.entries()) {
+				const requestedAmount =
+					index === capacities.length - 1
+						? requestedExpense - allocatedRequest
+						: requestedExpense *
+							(totalCapacity > 0
+								? capacity / totalCapacity
+								: 1 / capacities.length);
+				allocatedRequest += requestedAmount;
 				const action = {
 					type: "replace-expense-withdrawal" as const,
 					movement: {
 						sourceAccountId: accountId,
 						destinations: null,
 						requestedAmount,
-						limitRemaining: capacity,
+						limitRemaining: actionLimit,
 					},
 				};
-				const realizedAmount = Math.min(
-					Math.max(0, balances[accountId] ?? 0),
-					resolveAccountMovementAmount(action.movement, balances, accountsById),
+				const movement = resolveAccountMovement(
+					action.movement,
+					balances,
+					accountsById,
 				);
+				state.withdrawalAttempts.push({
+					date: period.startDate,
+					accountId,
+					result: movement,
+				});
 				applyAccountMovement(
 					action.movement,
-					realizedAmount,
+					movement.realizedAmount,
 					balances,
 					accountsById,
 				);
@@ -504,10 +698,26 @@ function evaluateCycle({
 					Math.max(
 						0,
 						(state.remainingWithdrawalByAccount.get(accountId) ?? 0) -
-							realizedAmount,
+							movement.realizedAmount,
 					),
 				);
-				remainingExpense -= realizedAmount;
+				remainingExpense -= movement.realizedAmount;
+			}
+			if (capacities.length === 0 && requestedExpense > EPSILON) {
+				state.withdrawalAttempts.push({
+					date: period.startDate,
+					accountId: null,
+					result: resolveAccountMovement(
+						{
+							sourceAccountId: null,
+							destinations: null,
+							requestedAmount: requestedExpense,
+							limitRemaining: 0,
+						},
+						balances,
+						accountsById,
+					),
+				});
 			}
 			if (remainingExpense > EPSILON) state.hadWithdrawalShortfall = true;
 		},
@@ -539,6 +749,7 @@ function evaluateCycle({
 				endingRealSelectedAssetBalance,
 				principalReplenished,
 				cycleEstablished: !state.hadWithdrawalShortfall && principalReplenished,
+				withdrawals: summarizeWithdrawals(state.withdrawalAttempts),
 			};
 		},
 	});
@@ -772,6 +983,10 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 			candidateDates,
 			coverageRatios: candidateDates.map(() => []),
 			cycleSuccessCounts: candidateDates.map(() => 0),
+			diagnosticRunCounts: candidateDates.map(() => 0),
+			shortfallRunCounts: candidateDates.map(() => 0),
+			firstShortfallDates: candidateDates.map(() => []),
+			shortfallAmounts: candidateDates.map(() => []),
 			requiredConfidence: config.requiredConfidence,
 			successfulRunCount: 0,
 			runCount: 0,
@@ -791,7 +1006,20 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 				);
 			}
 			accumulator.coverageRatios[index]?.push(row.coverageRatio);
-			if (pathResult.runOutcomes[index]?.cycleEstablished) {
+			const outcome = pathResult.runOutcomes[index];
+			if (outcome?.status === "evaluated") {
+				accumulator.diagnosticRunCounts[index]++;
+				accumulator.shortfallAmounts[index]?.push(
+					outcome.withdrawals.shortfallAmount,
+				);
+				if (outcome.withdrawals.firstShortfallDate !== null) {
+					accumulator.shortfallRunCounts[index]++;
+					accumulator.firstShortfallDates[index]?.push(
+						outcome.withdrawals.firstShortfallDate,
+					);
+				}
+			}
+			if (outcome?.cycleEstablished) {
 				accumulator.cycleSuccessCounts[index]++;
 				runSucceeded = true;
 			}
@@ -830,6 +1058,33 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 			medianCoverageDate,
 			selfSustainingDate,
 			selfSustainingProbability,
+			candidateWithdrawalDiagnostics: accumulator.candidateDates.map(
+				(candidateDate, index) => {
+					const diagnosticRunCount =
+						accumulator.diagnosticRunCounts[index] ?? 0;
+					const shortfallRunCount = accumulator.shortfallRunCounts[index] ?? 0;
+					const firstDates = [
+						...(accumulator.firstShortfallDates[index] ?? []),
+					].sort(compareIsoDates);
+					return {
+						candidateDate,
+						totalRunCount: accumulator.runCount,
+						diagnosticRunCount,
+						shortfallRunCount,
+						shortfallProbability:
+							diagnosticRunCount > 0
+								? shortfallRunCount / diagnosticRunCount
+								: 0,
+						medianFirstShortfallDate:
+							firstDates.length > 0
+								? (firstDates[Math.floor((firstDates.length - 1) / 2)] ?? null)
+								: null,
+						shortfallAmountPercentiles: computePercentiles(
+							accumulator.shortfallAmounts[index] ?? [],
+						),
+					};
+				},
+			),
 		};
 	},
 	status(deterministic, probabilistic) {
