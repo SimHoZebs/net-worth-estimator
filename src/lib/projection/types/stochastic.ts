@@ -1,4 +1,8 @@
-import type { IsoDate, ProjectionResult } from "./scenario";
+import type {
+	EvaluationResultCollection,
+	IsoDate,
+	ProjectionResult,
+} from "./scenario";
 
 export interface StochasticConfig {
 	runCount: number;
@@ -19,18 +23,11 @@ export interface StochasticBandRow {
 	netWorth: PercentileBands;
 }
 
-export interface StochasticProjectionResult {
+export interface StochasticProjectionResult extends EvaluationResultCollection {
 	config: StochasticConfig;
 	deterministic: ProjectionResult;
 	bands: StochasticBandRow[];
 	milestones: {
-		hitTargetProbability: number;
-		medianHitTargetDate: IsoDate | null;
-		worstCaseHitTargetDate: IsoDate | null;
 		finalNetWorthPercentiles: PercentileBands;
-		fiCycleSuccessProbability: number;
-		medianFiCoverageDate: IsoDate | null;
-		fiSelfSustainingDate: IsoDate | null;
-		fiSelfSustainingProbability: number | null;
 	};
 }

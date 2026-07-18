@@ -67,7 +67,7 @@ Shared: `ProjectionHookState<T>` (`hooks/types.ts`) — `{ result, runtimeError,
 | ------------ | -------------------------------------------------------------------------------------- |
 | **WhatIf**   | Temporary overrides (add/remove/toggle accounts, postings, checkpoints; reset)         |
 | **Editor**   | CRUD on working copy (start/cancel editing, isDirty/isEditing, update/delete/add rows) |
-| **Settings** | financialIndependencePlan, horizonYears, stochasticPreference, stochasticConfig        |
+| **Settings** | ordered configured evaluations, horizonYears, stochasticPreference, stochasticConfig  |
 | **Snapshot** | Named scenario snapshots (label, timestamp, whatIfState, metrics)                      |
 | **Theme**    | light/dark/system theme with DOM application                                           |
 
@@ -105,10 +105,10 @@ Selectors: `selectActiveOverrideCount`, `selectWhatIfState`, `selectEditorState`
 | Type                         | Location                             | Purpose                                                   |
 | ---------------------------- | ------------------------------------ | --------------------------------------------------------- |
 | `ScenarioPack`               | `lib/projection/types/scenario.ts`   | accounts + postings + checkpoints                         |
-| `ProjectionResult`           | same                                 | Deterministic output (timeline, summaries, milestones)    |
-| `StochasticProjectionResult` | `lib/projection/types/stochastic.ts` | Monte Carlo output (percentile bands, hit probability)    |
+| `ProjectionResult`           | same                                 | Projection output plus ordered generic evaluation envelopes |
+| `StochasticProjectionResult` | `lib/projection/types/stochastic.ts` | Monte Carlo bands plus ordered generic evaluation envelopes |
 | `ScenarioWhatIfState`        | `lib/projection/types/scenario.ts`   | Temporary overrides (added + disabled ID arrays)          |
-| `ProjectionRuntimeSettings`  | same                                 | financialIndependencePlan, fallbackProjectionStartDate, horizonYears |
+| `ProjectionRuntimeSettings`  | same                                 | evaluations, fallbackProjectionStartDate, horizonYears |
 | `ProjectionHookState<T>`     | `hooks/types.ts`                     | `{ result, runtimeError, isRunning, progress }`           |
 | `DataSource`                 | `lib/projection/dataSource.ts`       | `{ loadPack, savePack, sourceType }`                      |
 | `ScenarioParseResult`        | same                                 | `{ pack, issues }`                                        |
@@ -121,6 +121,10 @@ Selectors: `selectActiveOverrideCount`, `selectWhatIfState`, `selectEditorState`
 - FI logic is a derived analysis in `evaluation/financialIndependence.ts`; it must not add semantic branches to generic simulation.
 - Reactive behaviors emit generic account movements and must use shared account constraints instead of mutating balances directly.
 - FI continuing postings are explicitly selected; never infer growth from IDs, labels, categories, or a non-zero annual rate.
+- Evaluation definitions register in `evaluation/registry.ts`; central deterministic/stochastic coordinators must not import evaluator-specific logic.
+- Evaluation configuration and results remain ordered and keyed by stable instance IDs. Duplicate definition IDs are invalid; duplicate configured definitions are valid.
+- Configured evaluation configs and public result bodies must remain JSON-serializable; registries, functions, maps, and accumulators stay internal to the worker runtime.
+- React evaluation editors/renderers live outside the projection domain and consume generic envelopes through typed accessors.
 - What-if state is session-only, never mutates canonical data.
 - Use `@/lib/projection` barrel import for all projection types and utilities.
 - Projection and stochastic computation happen in Web Workers (`src/workers/`), never on main thread.

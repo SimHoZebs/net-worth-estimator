@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 import { currency, formatDate } from "@/lib/format";
-import type { ProjectionResult, ScenarioPack } from "@/lib/projection";
+import {
+	getFinancialIndependenceResult,
+	type ProjectionResult,
+	type ScenarioPack,
+} from "@/lib/projection";
 
 export interface DashboardDerivedValues {
 	firstProjectedRow: ProjectionResult["timeline"]["rows"][number] | null;
@@ -35,7 +39,8 @@ export function useDashboardDerivedValues(
 					(left, right) => right.shortfallAmount - left.shortfallAmount,
 				)[0] ?? null;
 		const goalReached =
-			result.financialIndependence.milestones.firstSelfSustainingDate !== null;
+			(getFinancialIndependenceResult(result)?.deterministic?.milestones
+				.firstSelfSustainingDate ?? null) !== null;
 		const enabledPostingCount = pack.postings.filter(
 			(posting) => posting.enabled,
 		).length;

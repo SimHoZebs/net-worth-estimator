@@ -5,7 +5,35 @@ export type {
 	DataSourceAction,
 	ScenarioParseResult,
 } from "./dataSource";
-export { evaluateFinancialIndependence } from "./evaluation/financialIndependence";
+export {
+	getConfiguredEvaluation,
+	getFinancialIndependenceConfig,
+	getFinancialIndependenceResult,
+	getNetWorthThresholdConfig,
+	getNetWorthThresholdResult,
+	type ValidatedConfiguredEvaluation,
+} from "./evaluation/accessors";
+export {
+	evaluateFinancialIndependence,
+	FINANCIAL_INDEPENDENCE_DEFINITION_ID,
+	type FinancialIndependenceProbabilisticResult,
+	validateFinancialIndependencePlan,
+} from "./evaluation/financialIndependence";
+export { isJsonValue } from "./evaluation/json";
+export {
+	NET_WORTH_THRESHOLD_DEFINITION_ID,
+	type NetWorthThresholdConfig,
+	type NetWorthThresholdPathResult,
+	type NetWorthThresholdProbabilisticResult,
+	validateNetWorthThresholdConfig,
+} from "./evaluation/netWorthThreshold";
+export {
+	type EvaluationContext,
+	type EvaluationDefinition,
+	type EvaluationFinalizeContext,
+	EvaluationRegistry,
+	EvaluationRuntimeSet,
+} from "./evaluation/runtime";
 export { prepareScenarioPack } from "./scenario/prepareScenario";
 export { createBrowserCsvDataSource } from "./sources/csv/browserCsvDataSource";
 export { createCsvDataSource } from "./sources/csv/csvDataSource";
@@ -32,6 +60,11 @@ export type {
 	AccountDelta,
 	AccountSnapshot,
 	Checkpoint,
+	ConfiguredEvaluation,
+	EvaluationDiagnostic,
+	EvaluationResultCollection,
+	EvaluationResultEnvelope,
+	EvaluationResultStatus,
 	FinancialIndependenceAnalysis,
 	FinancialIndependencePlan,
 	FinancialIndependencePrincipalPolicy,
@@ -39,6 +72,8 @@ export type {
 	FinancialIndependenceRunOutcome,
 	FinancialIndependenceSource,
 	IsoDate,
+	JsonPrimitive,
+	JsonValue,
 	Posting,
 	PostingFrequency,
 	ProjectionAccountSummary,

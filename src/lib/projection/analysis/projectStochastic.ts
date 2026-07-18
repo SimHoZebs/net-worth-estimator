@@ -1,7 +1,6 @@
-import {
-	CandidateSuccessAccumulator,
-	DatedSamplesAccumulator,
-} from "../evaluation/runtime";
+import { evaluationRegistry } from "../evaluation/registry";
+import { EvaluationRuntimeSet } from "../evaluation/runtime";
+import { projectRawScenarioPack } from "../simulation/projectPath";
 import type {
 	ProjectionResult,
 	ProjectionRuntimeSettings,
@@ -19,30 +18,17 @@ import {
 	reseed,
 	sampleLogNormal,
 } from "../utils/stochastic";
-import { projectScenarioPack } from "./projectScenario";
 
 function clonePack(pack: ScenarioPack): ScenarioPack {
 	return {
 		...pack,
-		accounts: pack.accounts.map((a) => ({ ...a })),
-		checkpoints: pack.checkpoints.map((c) => ({ ...c })),
-		postings: pack.postings.map((p) => ({
-			...p,
-			destinations: p.destinations ? [...p.destinations] : null,
+		accounts: pack.accounts.map((account) => ({ ...account })),
+		checkpoints: pack.checkpoints.map((checkpoint) => ({ ...checkpoint })),
+		postings: pack.postings.map((posting) => ({
+			...posting,
+			destinations: posting.destinations ? [...posting.destinations] : null,
 		})),
 	};
-}
-
-function generateYearlyRates(
-	expectedReturn: number,
-	volatility: number,
-	yearCount: number,
-): number[] {
-	const rates: number[] = [];
-	for (let i = 0; i < yearCount; i++) {
-		rates.push(sampleLogNormal(expectedReturn, volatility));
-	}
-	return rates;
 }
 
 function buildStochasticRates(
@@ -52,172 +38,52 @@ function buildStochasticRates(
 ): Map<string, number[]> {
 	const rates = new Map<string, number[]>();
 	const disabledIds = new Set(whatIfState.disabledPostingIds);
-	pack.postings
-		.filter((posting) => !disabledIds.has(posting.id))
-		.concat(whatIfState.addedPostings)
-		.forEach((posting) => {
-			if (posting.volatility > 0 && posting.enabled) {
-				rates.set(
-					posting.id,
-					generateYearlyRates(
-						posting.annualRate,
-						posting.volatility,
-						projectionSettings.horizonYears,
-					),
-				);
-			}
-		});
+	for (const posting of pack.postings
+		.filter((item) => !disabledIds.has(item.id))
+		.concat(whatIfState.addedPostings)) {
+		if (posting.volatility <= 0 || !posting.enabled) continue;
+		rates.set(
+			posting.id,
+			Array.from({ length: projectionSettings.horizonYears }, () =>
+				sampleLogNormal(posting.annualRate, posting.volatility),
+			),
+		);
+	}
 	return rates;
 }
 
-interface NetWorthSnapshot {
-	date: string;
-	netWorth: number;
-	isHistorical: boolean;
-}
-
-interface RunExtraction {
-	snapshots: NetWorthSnapshot[];
-	coverageRatiosByDate: Map<string, number>;
-	cycleEstablishedDates: Set<string>;
-	hitTarget: boolean;
-}
-
-function runAndExtract(
-	pack: ScenarioPack,
-	projectionSettings: ProjectionRuntimeSettings,
-	whatIfState: ScenarioWhatIfState,
-	stochasticRates: Map<string, number[]>,
-	fiCandidateDates: readonly string[],
-): RunExtraction {
-	const result = projectScenarioPack(
-		pack,
-		projectionSettings,
-		whatIfState,
-		stochasticRates,
-		{ fiCandidateDates },
-	);
-	return {
-		snapshots: result.timeline.rows.map((row) => ({
-			date: row.date,
-			netWorth: row.netWorth,
-			isHistorical: row.isHistorical,
-		})),
-		coverageRatiosByDate: new Map(
-			result.financialIndependence.rows.map((row) => [
-				row.date,
-				row.coverageRatio,
-			]),
-		),
-		cycleEstablishedDates: new Set(
-			result.financialIndependence.runOutcomes
-				.filter((outcome) => outcome.cycleEstablished)
-				.map((outcome) => outcome.candidateDate),
-		),
-		hitTarget: result.milestones.hitTargetDate !== null,
-	};
-}
-
-function buildBandsFromSorted(
-	sortedValuesByDate: Map<string, number[]>,
-	isHistoricalByDate: Map<string, boolean>,
-	sortedDates: string[],
+function buildBands(
+	sortedValuesByDate: ReadonlyMap<string, number[]>,
+	isHistoricalByDate: ReadonlyMap<string, boolean>,
+	sortedDates: readonly string[],
 ): StochasticBandRow[] {
-	return sortedDates.map((date) => {
-		const values = sortedValuesByDate.get(date) ?? [];
-		return {
-			date,
-			isHistorical: isHistoricalByDate.get(date) ?? false,
-			netWorth: computePercentilesFromSorted(values),
-		};
-	});
+	return sortedDates.map((date) => ({
+		date,
+		isHistorical: isHistoricalByDate.get(date) ?? false,
+		netWorth: computePercentilesFromSorted(sortedValuesByDate.get(date) ?? []),
+	}));
 }
 
-function buildStochasticResult(
-	bands: StochasticBandRow[],
-	deterministic: ProjectionResult,
+function buildResult(
 	config: StochasticConfig,
-	projectionSettings: ProjectionRuntimeSettings,
-	totalHitCount: number,
-	totalRuns: number,
-	coverageRatiosByDate: Map<string, number[]>,
-	fiCycleSuccesses: CandidateSuccessAccumulator,
-	successfulFiCycleRuns: number,
+	deterministic: ProjectionResult,
+	bands: StochasticBandRow[],
+	runtimes: EvaluationRuntimeSet,
 ): StochasticProjectionResult {
-	const finalRowBands = bands[bands.length - 1];
-	const finalNetWorthPercentiles = finalRowBands?.netWorth ?? {
-		p10: 0,
-		p25: 0,
-		p50: 0,
-		p75: 0,
-		p90: 0,
-	};
-
-	let medianHitDate: string | null = null;
-	let worstCaseHitDate: string | null = null;
-
-	bands.forEach((band) => {
-		if (band.isHistorical) return;
-		if (
-			projectionSettings.targetNetWorth !== undefined &&
-			medianHitDate === null &&
-			band.netWorth.p50 >= projectionSettings.targetNetWorth
-		) {
-			medianHitDate = band.date;
-		}
-		if (
-			projectionSettings.targetNetWorth !== undefined &&
-			worstCaseHitDate === null &&
-			band.netWorth.p10 >= projectionSettings.targetNetWorth
-		) {
-			worstCaseHitDate = band.date;
-		}
-	});
-
-	const hitTargetProbability = totalRuns > 0 ? totalHitCount / totalRuns : 0;
-	let medianFiCoverageDate: string | null = null;
-	let fiSelfSustainingDate: string | null = null;
-	let fiSelfSustainingProbability: number | null = null;
-	const fiCycleSuccessProbability =
-		totalRuns > 0 ? successfulFiCycleRuns / totalRuns : 0;
-	for (const row of deterministic.financialIndependence.rows) {
-		const ratios = coverageRatiosByDate.get(row.date) ?? [];
-		const medianRatio = computePercentilesFromSorted(ratios).p50;
-		if (
-			medianFiCoverageDate === null &&
-			ratios.length > 0 &&
-			medianRatio >= 1
-		) {
-			medianFiCoverageDate = row.date;
-		}
-		const probability = fiCycleSuccesses.probability(
-			deterministic.financialIndependence.rows.indexOf(row),
-			totalRuns,
-		);
-		if (
-			fiSelfSustainingDate === null &&
-			probability >=
-				projectionSettings.financialIndependencePlan.requiredConfidence
-		) {
-			fiSelfSustainingDate = row.date;
-			fiSelfSustainingProbability = probability;
-		}
-	}
-
 	return {
 		config,
 		deterministic,
 		bands,
 		milestones: {
-			hitTargetProbability,
-			medianHitTargetDate: medianHitDate,
-			worstCaseHitTargetDate: worstCaseHitDate,
-			finalNetWorthPercentiles,
-			fiCycleSuccessProbability,
-			medianFiCoverageDate,
-			fiSelfSustainingDate,
-			fiSelfSustainingProbability,
+			finalNetWorthPercentiles: bands[bands.length - 1]?.netWorth ?? {
+				p10: 0,
+				p25: 0,
+				p50: 0,
+				p75: 0,
+				p90: 0,
+			},
 		},
+		...runtimes.result(),
 	};
 }
 
@@ -231,124 +97,98 @@ export function stochasticProject(
 	onProgress?: (progress: number, partial: StochasticProjectionResult) => void,
 ): StochasticProjectionResult {
 	reseed(config.seed);
-	const deterministic = projectScenarioPack(
+	const deterministicRaw = projectRawScenarioPack(
 		pack,
 		projectionSettings,
 		whatIfState,
 	);
-	const fiCandidateDates = deterministic.financialIndependence.rows.map(
-		(row) => row.date,
+	const runtimes = new EvaluationRuntimeSet(
+		projectionSettings.evaluations,
+		evaluationRegistry,
 	);
-	const sortedDates = deterministic.timeline.rows.map((r) => r.date);
-
+	runtimes.evaluateDeterministic({
+		path: deterministicRaw.path,
+		scenario: deterministicRaw.path.effectivePack,
+	});
+	runtimes.startStochastic();
+	const deterministic: ProjectionResult = {
+		...deterministicRaw.result,
+		...runtimes.result(),
+	};
+	const sortedDates = deterministic.timeline.rows.map((row) => row.date);
 	const sortedValuesByDate = new Map<string, number[]>();
 	const isHistoricalByDate = new Map<string, boolean>();
-	const coverageSamples = new DatedSamplesAccumulator();
-	const fiCycleSuccesses = new CandidateSuccessAccumulator(
-		fiCandidateDates.length,
-	);
-	let totalHitCount = 0;
-	let successfulFiCycleRuns = 0;
 
-	for (let i = 0; i < config.runCount; i += STOCHASTIC_PROGRESS_BATCH) {
-		const batchEnd = Math.min(i + STOCHASTIC_PROGRESS_BATCH, config.runCount);
-		const newValuesByDate = new Map<string, number[]>();
-		const newCoverageByDate = new Map<string, number[]>();
-
-		for (let j = i; j < batchEnd; j++) {
+	for (
+		let batchStart = 0;
+		batchStart < config.runCount;
+		batchStart += STOCHASTIC_PROGRESS_BATCH
+	) {
+		const batchEnd = Math.min(
+			batchStart + STOCHASTIC_PROGRESS_BATCH,
+			config.runCount,
+		);
+		const batchValues = new Map<string, number[]>();
+		for (let run = batchStart; run < batchEnd; run++) {
 			const cloned = clonePack(pack);
 			const rates = buildStochasticRates(
 				cloned,
 				projectionSettings,
 				whatIfState,
 			);
-			const extraction = runAndExtract(
+			const raw = projectRawScenarioPack(
 				cloned,
 				projectionSettings,
 				whatIfState,
 				rates,
-				fiCandidateDates,
 			);
-
-			if (extraction.hitTarget) {
-				totalHitCount++;
-			}
-
-			for (const [date, ratio] of extraction.coverageRatiosByDate) {
-				const ratios = newCoverageByDate.get(date) ?? [];
-				ratios.push(ratio);
-				newCoverageByDate.set(date, ratios);
-			}
-			fiCycleSuccesses.add(
-				fiCandidateDates.map((date) => ({
-					cycleEstablished: extraction.cycleEstablishedDates.has(date),
-				})),
-			);
-			if (extraction.cycleEstablishedDates.size > 0) {
-				successfulFiCycleRuns++;
-			}
-
-			for (const s of extraction.snapshots) {
-				if (!newValuesByDate.has(s.date)) {
-					newValuesByDate.set(s.date, []);
-				}
-				newValuesByDate.get(s.date)?.push(s.netWorth);
-
-				if (!isHistoricalByDate.has(s.date)) {
-					isHistoricalByDate.set(s.date, s.isHistorical);
+			runtimes.consume({
+				path: raw.path,
+				scenario: raw.path.effectivePack,
+				stochasticRates: rates,
+			});
+			for (const row of raw.result.timeline.rows) {
+				const values = batchValues.get(row.date) ?? [];
+				values.push(row.netWorth);
+				batchValues.set(row.date, values);
+				if (!isHistoricalByDate.has(row.date)) {
+					isHistoricalByDate.set(row.date, row.isHistorical);
 				}
 			}
 		}
-
-		for (const [date, newValues] of newValuesByDate) {
-			newValues.sort((a, b) => a - b);
+		for (const [date, values] of batchValues) {
+			values.sort((left, right) => left - right);
 			const existing = sortedValuesByDate.get(date);
 			sortedValuesByDate.set(
 				date,
-				existing ? mergeSorted(existing, newValues) : newValues,
+				existing ? mergeSorted(existing, values) : values,
 			);
 		}
-		coverageSamples.addBatch(newCoverageByDate);
-
-		const bands = buildBandsFromSorted(
-			sortedValuesByDate,
-			isHistoricalByDate,
-			sortedDates,
+		runtimes.finalize({
+			scenario: deterministicRaw.path.effectivePack,
+			deterministicPath: deterministicRaw.path,
+			runCount: batchEnd,
+		});
+		onProgress?.(
+			batchEnd / config.runCount,
+			buildResult(
+				config,
+				deterministic,
+				buildBands(sortedValuesByDate, isHistoricalByDate, sortedDates),
+				runtimes,
+			),
 		);
-		const coverageRatiosByDate = new Map(
-			fiCandidateDates.map((date) => [date, [...coverageSamples.get(date)]]),
-		);
-		const partial = buildStochasticResult(
-			bands,
-			deterministic,
-			config,
-			projectionSettings,
-			totalHitCount,
-			batchEnd,
-			coverageRatiosByDate,
-			fiCycleSuccesses,
-			successfulFiCycleRuns,
-		);
-		onProgress?.(batchEnd / config.runCount, partial);
 	}
 
-	const bands = buildBandsFromSorted(
-		sortedValuesByDate,
-		isHistoricalByDate,
-		sortedDates,
-	);
-	const coverageRatiosByDate = new Map(
-		fiCandidateDates.map((date) => [date, [...coverageSamples.get(date)]]),
-	);
-	return buildStochasticResult(
-		bands,
-		deterministic,
+	runtimes.finalize({
+		scenario: deterministicRaw.path.effectivePack,
+		deterministicPath: deterministicRaw.path,
+		runCount: config.runCount,
+	});
+	return buildResult(
 		config,
-		projectionSettings,
-		totalHitCount,
-		config.runCount,
-		coverageRatiosByDate,
-		fiCycleSuccesses,
-		successfulFiCycleRuns,
+		deterministic,
+		buildBands(sortedValuesByDate, isHistoricalByDate, sortedDates),
+		runtimes,
 	);
 }

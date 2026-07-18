@@ -10,6 +10,11 @@ import type {
 	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
+import {
+	getFinancialIndependenceResult,
+	getNetWorthThresholdConfig,
+	getNetWorthThresholdResult,
+} from "@/lib/projection";
 import { selectActiveOverrideCount, useStore } from "@/store";
 import { CashFlowWaterfall } from "./dashboard/CashFlowWaterfall";
 import { AccountDiagnosticChart } from "./dashboard/charts/AccountDiagnosticChart";
@@ -46,11 +51,25 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 	);
 	const activeOverrideCount = useStore(selectActiveOverrideCount);
 	const derived = useDashboardDerivedValues(result, pack);
+	const financialIndependence =
+		getFinancialIndependenceResult(result)?.deterministic ?? null;
+	const threshold = getNetWorthThresholdResult(result);
+	const thresholdConfig = threshold
+		? getNetWorthThresholdConfig(
+				projectionSettings.evaluations,
+				result,
+				threshold.instanceId,
+			)
+		: null;
 	const milestoneDates = useMemo(
 		() => ({
+			hitTarget: threshold?.deterministic?.firstReachedDate ?? undefined,
 			firstShortfall: derived.firstShortfallRow?.date ?? undefined,
 		}),
-		[derived.firstShortfallRow?.date],
+		[
+			derived.firstShortfallRow?.date,
+			threshold?.deterministic?.firstReachedDate,
+		],
 	);
 	const scrollToSourceData = useCallback(() => {
 		const el = document.getElementById("model-inputs");
@@ -62,7 +81,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 			<section id="projection-chart">
 				<AccountDiagnosticChart
 					pack={pack}
-					targetNetWorth={0}
+					targetNetWorth={thresholdConfig?.config.target ?? 0}
 					hasStochasticData={hasStochasticData}
 					stochasticIsProvisional={stochasticIsProvisional}
 					chartData={accountDiagnosticChartData}
@@ -83,9 +102,11 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 				/>
 			</section>
 
-			<section id="fi-capacity">
-				<FinancialIndependenceChart analysis={result.financialIndependence} />
-			</section>
+			{financialIndependence ? (
+				<section id="fi-capacity">
+					<FinancialIndependenceChart analysis={financialIndependence} />
+				</section>
+			) : null}
 
 			<section className="flex flex-wrap items-center gap-2">
 				<div

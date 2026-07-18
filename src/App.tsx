@@ -3,6 +3,8 @@ import { useShallow } from "zustand/shallow";
 import {
 	createBrowserCsvDataSource,
 	createCsvDataSource,
+	getFinancialIndependenceConfig,
+	getFinancialIndependenceResult,
 	type ProjectionRuntimeSettings,
 	prepareScenarioPack,
 } from "@/lib/projection";
@@ -69,8 +71,8 @@ export default function App() {
 		activeOverrideCount,
 		isEditing,
 		isDirty,
-		financialIndependencePlan,
-		setFinancialIndependencePlan,
+		evaluations,
+		updateEvaluationConfig,
 		horizonYears,
 		setHorizonYears,
 		stochasticPreference,
@@ -82,8 +84,8 @@ export default function App() {
 			activeOverrideCount: selectActiveOverrideCount(s),
 			isEditing: s.isEditing,
 			isDirty: s.isDirty,
-			financialIndependencePlan: s.financialIndependencePlan,
-			setFinancialIndependencePlan: s.setFinancialIndependencePlan,
+			evaluations: s.evaluations,
+			updateEvaluationConfig: s.updateEvaluationConfig,
 			horizonYears: s.horizonYears,
 			setHorizonYears: s.setHorizonYears,
 			stochasticPreference: s.stochasticPreference,
@@ -112,9 +114,9 @@ export default function App() {
 		() => ({
 			fallbackProjectionStartDate,
 			horizonYears,
-			financialIndependencePlan,
+			evaluations,
 		}),
-		[fallbackProjectionStartDate, horizonYears, financialIndependencePlan],
+		[fallbackProjectionStartDate, horizonYears, evaluations],
 	);
 	const effectivePack = useMemo(
 		() => (pack ? prepareScenarioPack(pack, whatIfState) : null),
@@ -215,23 +217,23 @@ export default function App() {
 
 	const handleReload = useCallback(() => refetchScenario(), [refetchScenario]);
 
-	const currentMetrics = useMemo(
-		() => ({
+	const currentMetrics = useMemo(() => {
+		const fi = getFinancialIndependenceResult(result)?.deterministic;
+		return {
 			currentNetWorth: result?.summary.currentNetWorth ?? 0,
 			finalNetWorth: result?.summary.finalNetWorth ?? 0,
-			deterministicFiCycleDate:
-				result?.financialIndependence.milestones.firstSelfSustainingDate ??
-				null,
+			deterministicFiCycleDate: fi?.milestones.firstSelfSustainingDate ?? null,
 			shortfallAmount: result?.totals.clampedPostingShortfallAmount ?? 0,
 			overrideCount: activeOverrideCount,
-		}),
-		[
-			result?.summary.currentNetWorth,
-			result?.summary.finalNetWorth,
-			result?.financialIndependence.milestones.firstSelfSustainingDate,
-			result?.totals.clampedPostingShortfallAmount,
-			activeOverrideCount,
-		],
+		};
+	}, [result, activeOverrideCount]);
+
+	const handleFinancialIndependencePlanChange = useCallback(
+		(changes: object) => {
+			const fi = getFinancialIndependenceConfig(evaluations, result);
+			if (fi) updateEvaluationConfig(fi.instanceId, changes);
+		},
+		[evaluations, result, updateEvaluationConfig],
 	);
 
 	const whatIfControls = useMemo(
@@ -400,6 +402,7 @@ export default function App() {
 							<aside id="projection-settings" className="space-y-4">
 								<ProjectionConfigSidebar
 									pack={effectivePack ?? pack}
+									projectionResult={result}
 									projectionSettings={projectionSettings}
 									projectionStartDate={result.milestones.projectionStartDate}
 									activeOverrideCount={activeOverrideCount}
@@ -413,7 +416,7 @@ export default function App() {
 									loadError={loadError}
 									sourceActionError={sourceActionError}
 									onFinancialIndependencePlanChange={
-										setFinancialIndependencePlan
+										handleFinancialIndependencePlanChange
 									}
 									onProjectionSettingsChange={onProjectionSettingsChange}
 									onReload={handleReload}

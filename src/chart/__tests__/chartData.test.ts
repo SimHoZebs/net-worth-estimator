@@ -12,7 +12,6 @@ import { makeSettings, validCsvFiles } from "@/lib/projection/__fixtures__";
 import { buildAccountDiagnosticChartData } from "../chartData";
 
 const PROJECTION_SETTINGS = makeSettings({
-	targetNetWorth: 500_000,
 	fallbackProjectionStartDate: "2026-04-01",
 	horizonYears: 5,
 });
@@ -142,13 +141,6 @@ describe("buildAccountDiagnosticChartData", () => {
 				},
 			],
 			milestones: {
-				hitTargetProbability: 0.5,
-				medianHitTargetDate: null,
-				worstCaseHitTargetDate: null,
-				fiCycleSuccessProbability: 0,
-				medianFiCoverageDate: null,
-				fiSelfSustainingDate: null,
-				fiSelfSustainingProbability: null,
 				finalNetWorthPercentiles: {
 					p10: 300_000,
 					p25: 400_000,
@@ -157,6 +149,8 @@ describe("buildAccountDiagnosticChartData", () => {
 					p90: 700_000,
 				},
 			},
+			evaluationOrder: [],
+			evaluations: {},
 		};
 
 		const data = buildAccountDiagnosticChartData(pack, result, fakeStochastic);

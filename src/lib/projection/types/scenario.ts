@@ -15,6 +15,12 @@ export type ScenarioFileName =
 
 export type IsoDate = string;
 
+export type JsonPrimitive = boolean | number | string | null;
+export type JsonValue =
+	| JsonPrimitive
+	| JsonValue[]
+	| { [key: string]: JsonValue };
+
 export type FinancialIndependencePrincipalPolicy =
 	| "allow-drawdown"
 	| "preserve-nominal-principal"
@@ -47,11 +53,47 @@ export interface FinancialIndependencePlan {
 }
 
 export interface ProjectionRuntimeSettings {
-	/** Optional generic savings goal. Financial independence does not use it. */
-	targetNetWorth?: number;
 	fallbackProjectionStartDate: IsoDate;
 	horizonYears: number;
-	financialIndependencePlan: FinancialIndependencePlan;
+	evaluations: ConfiguredEvaluation[];
+}
+
+export type EvaluationResultStatus =
+	| "satisfied"
+	| "not-satisfied"
+	| "warning"
+	| "indeterminate";
+
+export interface ConfiguredEvaluation {
+	definitionId: string;
+	instanceId: string;
+	label: string;
+	enabled: boolean;
+	config: JsonValue;
+}
+
+export interface EvaluationDiagnostic {
+	code: string;
+	severity: "info" | "warning" | "error";
+	message: string;
+	date?: IsoDate;
+	relatedAccountIds?: string[];
+	relatedPostingIds?: string[];
+}
+
+export interface EvaluationResultEnvelope {
+	definitionId: string;
+	instanceId: string;
+	label: string;
+	status: EvaluationResultStatus;
+	deterministic: JsonValue | null;
+	probabilistic: JsonValue | null;
+	diagnostics: EvaluationDiagnostic[];
+}
+
+export interface EvaluationResultCollection {
+	evaluationOrder: string[];
+	evaluations: Record<string, EvaluationResultEnvelope>;
 }
 
 export interface Account {
@@ -238,12 +280,8 @@ export interface ProjectionCoreResult {
 	};
 }
 
-export type ProjectionResult = Omit<ProjectionCoreResult, "milestones"> & {
-	financialIndependence: FinancialIndependenceAnalysis;
-	milestones: ProjectionCoreResult["milestones"] & {
-		hitTargetDate: IsoDate | null;
-	};
-};
+export type ProjectionResult = ProjectionCoreResult &
+	EvaluationResultCollection;
 
 export interface RawProjectionOutput {
 	path: ProjectionPath;
