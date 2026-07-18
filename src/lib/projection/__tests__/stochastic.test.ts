@@ -159,6 +159,12 @@ describe("stochastic projection", () => {
 		expect(fiResult(result)?.medianCoverageDate).not.toBeNull();
 		expect(fiResult(result)?.fiCycleSuccessProbability).toBe(0);
 		expect(fiResult(result)?.selfSustainingDate).toBeNull();
+		expect(fiResult(result)?.candidateWithdrawalDiagnostics[0]).toMatchObject({
+			totalRunCount: 50,
+			diagnosticRunCount: 0,
+			shortfallRunCount: 0,
+			shortfallProbability: 0,
+		});
 	});
 
 	it("returns deterministic baseline alongside stochastic bands", () => {
@@ -479,6 +485,9 @@ describe("stochastic progress streaming", () => {
 		expect(lastPartial.bands[0].netWorth.p50).toBe(final.bands[0].netWorth.p50);
 		expect(thresholdProbability(lastPartial)).toBe(thresholdProbability(final));
 		expect(lastPartial.evaluations).toEqual(final.evaluations);
+		expect(fiResult(lastPartial)?.candidateWithdrawalDiagnostics).toEqual(
+			fiResult(final)?.candidateWithdrawalDiagnostics,
+		);
 	});
 
 	it("last partial result matches the final return value", () => {

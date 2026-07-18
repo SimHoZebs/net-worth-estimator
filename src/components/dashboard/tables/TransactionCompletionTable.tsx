@@ -52,7 +52,9 @@ export const TransactionCompletionTable = memo(
 						<TableBody>
 							{postingSummaries.length > 0 ? (
 								postingSummaries.map((summary) => {
-									const hasShortfall = summary.utilizationRate < 1;
+									const hasShortfall = summary.shortfallAmount > 0;
+									const completionRate =
+										summary.requestedAmount > 0 ? summary.utilizationRate : 1;
 
 									return (
 										<TableRow key={summary.postingId}>
@@ -104,7 +106,7 @@ export const TransactionCompletionTable = memo(
 															: undefined
 													}
 												>
-													{pct.format(summary.utilizationRate)}
+													{pct.format(completionRate)}
 												</span>
 											</TableCell>
 											<TableCell>

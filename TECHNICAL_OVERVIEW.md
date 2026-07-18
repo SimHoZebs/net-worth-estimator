@@ -89,9 +89,11 @@ The boundary is at `CsvScenarioPack`: the CSV parsing and validation layer (`csv
 - A simulation run executes a scenario or branch. Base and Monte Carlo runs produce a `ProjectionPath`; the current FI branch retains a compact outcome until another branch consumer requires a complete path.
 - A behavior observes branch state and emits generic actions. FI-cycle sustainability uses a behavior after forking balances at an eligible candidate date.
 - Branch simulations replay only explicitly selected continuing postings and request expense-gap withdrawals through the same generic account movement resolver as scheduled postings, preserving account floors and destination limits.
+- Generic account movement resolution returns requested, realized, and shortfall amounts plus all tied binding constraints. Constraint types distinguish an unavailable source, a source floor, aggregate destination ceilings, and a caller-supplied action limit; posting and FI origin metadata remains caller-owned.
 - Evaluations ask questions of projection paths, regardless of whether a base, branch, or stochastic simulation produced them. Outcomes are per-run evaluation results; analysis aggregates outcomes across runs.
 - FI never infers growth from a posting ID, label, category, or non-zero rate. Continuing postings are explicit FI-plan configuration.
 - The minimum-net-worth FI gate is a semantic eligibility rule. Ineligible Monte Carlo candidates remain failures in the full-run probability denominator.
+- Every FI candidate outcome includes a compact withdrawal summary with first/last shortfall dates, occurrence and constraint counts, related accounts, and per-account amounts. Stochastic FI diagnostics remain candidate-aligned: shortfall probability uses evaluated (eligible) candidate runs as its explicit diagnostic denominator, while FI-cycle success continues to use all runs.
 
 #### FI Branch Correctness Contract
 

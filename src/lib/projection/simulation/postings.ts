@@ -1,5 +1,6 @@
 import type {
 	Account,
+	AccountMovementConstraintType,
 	IsoDate,
 	Posting,
 	PostingFrequency,
@@ -23,6 +24,28 @@ export interface AccountMovementAction {
 	destinations: string[] | null;
 	requestedAmount: number;
 	limitRemaining?: number;
+}
+
+export type AccountMovementConstraint =
+	| {
+			type: Extract<AccountMovementConstraintType, "source-unavailable">;
+			accountId: string;
+	  }
+	| {
+			type: Extract<AccountMovementConstraintType, "source-floor">;
+			accountId: string;
+	  }
+	| {
+			type: Extract<AccountMovementConstraintType, "destination-ceiling">;
+			accountIds: string[];
+	  }
+	| { type: Extract<AccountMovementConstraintType, "action-limit"> };
+
+export interface AccountMovementResult {
+	requestedAmount: number;
+	realizedAmount: number;
+	shortfallAmount: number;
+	bindingConstraints: AccountMovementConstraint[];
 }
 
 export function frequencyDivisor(frequency: PostingFrequency): number {
@@ -152,7 +175,23 @@ export function resolvePostingAmount(
 	balances: Record<string, number>,
 	accountById: Map<string, Account>,
 ): number {
-	return resolveAccountMovementAmount(
+	return resolvePostingMovement(
+		posting,
+		requestedAmount,
+		annualCapRemaining,
+		balances,
+		accountById,
+	).realizedAmount;
+}
+
+export function resolvePostingMovement(
+	posting: Posting,
+	requestedAmount: number,
+	annualCapRemaining: number,
+	balances: Record<string, number>,
+	accountById: Map<string, Account>,
+): AccountMovementResult {
+	return resolveAccountMovement(
 		{
 			sourceAccountId: posting.sourceAccountId,
 			destinations: posting.destinations,
@@ -169,15 +208,36 @@ export function resolveAccountMovementAmount(
 	balances: Record<string, number>,
 	accountById: Map<string, Account>,
 ): number {
-	if (action.requestedAmount <= 0) {
-		return 0;
+	return resolveAccountMovement(action, balances, accountById).realizedAmount;
+}
+
+export function resolveAccountMovement(
+	action: AccountMovementAction,
+	balances: Record<string, number>,
+	accountById: Map<string, Account>,
+): AccountMovementResult {
+	const requestedAmount = Math.max(0, action.requestedAmount);
+	if (requestedAmount === 0) {
+		return {
+			requestedAmount,
+			realizedAmount: 0,
+			shortfallAmount: 0,
+			bindingConstraints: [],
+		};
 	}
 
 	if (
 		action.sourceAccountId !== null &&
 		!accountById.has(action.sourceAccountId)
 	) {
-		return 0;
+		return {
+			requestedAmount,
+			realizedAmount: 0,
+			shortfallAmount: requestedAmount,
+			bindingConstraints: [
+				{ type: "source-unavailable", accountId: action.sourceAccountId },
+			],
+		};
 	}
 
 	const sourceBalanceLimit =
@@ -190,15 +250,44 @@ export function resolveAccountMovementAmount(
 			? Number.POSITIVE_INFINITY
 			: getTotalDestinationHeadroom(balances, accountById, action.destinations);
 
-	return Math.max(
+	const actionLimit = action.limitRemaining ?? Number.POSITIVE_INFINITY;
+	const realizedAmount = Math.max(
 		0,
 		Math.min(
-			action.requestedAmount,
-			action.limitRemaining ?? Number.POSITIVE_INFINITY,
+			requestedAmount,
+			actionLimit,
 			sourceBalanceLimit,
 			destBalanceLimit,
 		),
 	);
+	const shortfallAmount = requestedAmount - realizedAmount;
+	const bindingConstraints: AccountMovementConstraint[] = [];
+	if (shortfallAmount > 0) {
+		const isBinding = (limit: number) =>
+			Number.isFinite(limit) && Math.abs(limit - realizedAmount) < 1e-9;
+		if (action.sourceAccountId !== null && isBinding(sourceBalanceLimit)) {
+			bindingConstraints.push({
+				type: "source-floor",
+				accountId: action.sourceAccountId,
+			});
+		}
+		if (action.destinations !== null && isBinding(destBalanceLimit)) {
+			bindingConstraints.push({
+				type: "destination-ceiling",
+				accountIds: [...action.destinations],
+			});
+		}
+		if (isBinding(actionLimit)) {
+			bindingConstraints.push({ type: "action-limit" });
+		}
+	}
+
+	return {
+		requestedAmount,
+		realizedAmount,
+		shortfallAmount,
+		bindingConstraints,
+	};
 }
 
 export function applyPosting(

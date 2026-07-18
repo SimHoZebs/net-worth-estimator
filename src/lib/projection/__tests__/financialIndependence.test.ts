@@ -176,6 +176,12 @@ describe("evaluateFinancialIndependence", () => {
 		expect(result.runOutcomes[0]).toMatchObject({
 			status: "ineligible",
 			cycleEstablished: false,
+			withdrawals: {
+				requestedAmount: 0,
+				realizedAmount: 0,
+				shortfallAmount: 0,
+				firstShortfallDate: null,
+			},
 		});
 	});
 
@@ -198,6 +204,15 @@ describe("evaluateFinancialIndependence", () => {
 			hadWithdrawalShortfall: true,
 			endingSelectedAssetBalance: 98_000,
 			cycleEstablished: false,
+			withdrawals: {
+				shortfallAmount: 2_000,
+				firstShortfallDate: "2026-07-01",
+				relatedAccountIds: ["brokerage"],
+			},
+		});
+		expect(result.runOutcomes[0].withdrawals.constraints).toContainEqual({
+			type: "source-floor",
+			count: 6,
 		});
 	});
 
@@ -233,6 +248,50 @@ describe("evaluateFinancialIndependence", () => {
 			hadWithdrawalShortfall: true,
 			endingSelectedAssetBalance: 100_000,
 		});
+		expect(result.runOutcomes[0].withdrawals).toMatchObject({
+			firstShortfallDate: "2026-07-01",
+			shortfallOccurrenceCount: 6,
+			accounts: [{ accountId: "brokerage" }],
+			firstShortfall: {
+				requestedAmount: 500,
+				realizedAmount: 0,
+				shortfallAmount: 500,
+				constraints: ["action-limit"],
+			},
+		});
+		expect(result.runOutcomes[0].withdrawals.constraints).toContainEqual({
+			type: "action-limit",
+			count: 6,
+		});
+	});
+
+	it("summarizes source-floor and action constraints across multiple assets", () => {
+		const result = evaluateFinancialIndependence({
+			path: path(
+				[row("2026-01-01", { first: 50_000, second: 50_000 })],
+				[],
+				[account("first", 49_000), account("second", 48_000)],
+			),
+			plan: plan({
+				annualExpenseTarget: 4_000,
+				sources: [
+					{ type: "asset", accountId: "first", included: true },
+					{ type: "asset", accountId: "second", included: true },
+				],
+			}),
+			candidateDates: ["2026-01-01"],
+		});
+
+		const summary = result.runOutcomes[0].withdrawals;
+		expect(summary.requestedAmount).toBe(4_000);
+		expect(summary.realizedAmount).toBe(3_000);
+		expect(summary.shortfallAmount).toBe(1_000);
+		expect(summary.accounts).toHaveLength(2);
+		expect(summary.relatedAccountIds).toEqual(["first", "second"]);
+		expect(summary.constraints.map((constraint) => constraint.type)).toEqual([
+			"source-floor",
+			"action-limit",
+		]);
 	});
 
 	it("replays only explicitly selected continuing postings", () => {

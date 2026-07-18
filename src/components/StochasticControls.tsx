@@ -32,6 +32,18 @@ export function StochasticControls({
 	const isProvisional = isRunning && stochasticResult !== null;
 	const financialIndependence =
 		getFinancialIndependenceResult(stochasticResult)?.probabilistic ?? null;
+	const deterministicFinancialIndependence = getFinancialIndependenceResult(
+		stochasticResult?.deterministic,
+	)?.deterministic;
+	const relevantCandidateDate =
+		financialIndependence?.selfSustainingDate ??
+		deterministicFinancialIndependence?.milestones.firstSelfSustainingDate ??
+		deterministicFinancialIndependence?.milestones.firstCoverageDate ??
+		null;
+	const withdrawalDiagnostic =
+		financialIndependence?.candidateWithdrawalDiagnostics.find(
+			(diagnostic) => diagnostic.candidateDate === relevantCandidateDate,
+		) ?? financialIndependence?.candidateWithdrawalDiagnostics[0];
 
 	const {
 		runCountInput,
@@ -204,6 +216,15 @@ export function StochasticControls({
 												)}
 												detail="complete runs funded expenses and met principal policy"
 											/>
+											{withdrawalDiagnostic ? (
+												<StochasticResultCard
+													label={`${isProvisional ? "Provisional " : ""}FI withdrawal shortfall probability`}
+													value={pct.format(
+														withdrawalDiagnostic.shortfallProbability,
+													)}
+													detail={`${formatDate(withdrawalDiagnostic.candidateDate)} candidate; ${withdrawalDiagnostic.shortfallRunCount} of ${withdrawalDiagnostic.diagnosticRunCount} eligible diagnostic runs${withdrawalDiagnostic.totalRunCount === withdrawalDiagnostic.diagnosticRunCount ? "" : ` (${withdrawalDiagnostic.totalRunCount} total FI runs)`}`}
+												/>
+											) : null}
 											<StochasticResultCard
 												label={`${isProvisional ? "Provisional " : ""}Median coverage date`}
 												value={
