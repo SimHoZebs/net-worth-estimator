@@ -3,8 +3,6 @@ import { useShallow } from "zustand/shallow";
 import {
 	createBrowserCsvDataSource,
 	createCsvDataSource,
-	getFinancialIndependenceConfig,
-	getFinancialIndependenceResult,
 	type ProjectionRuntimeSettings,
 	prepareScenarioPack,
 } from "@/lib/projection";
@@ -72,7 +70,6 @@ export default function App() {
 		isEditing,
 		isDirty,
 		evaluations,
-		updateEvaluationConfig,
 		horizonYears,
 		setHorizonYears,
 		stochasticPreference,
@@ -85,7 +82,6 @@ export default function App() {
 			isEditing: s.isEditing,
 			isDirty: s.isDirty,
 			evaluations: s.evaluations,
-			updateEvaluationConfig: s.updateEvaluationConfig,
 			horizonYears: s.horizonYears,
 			setHorizonYears: s.setHorizonYears,
 			stochasticPreference: s.stochasticPreference,
@@ -218,23 +214,27 @@ export default function App() {
 	const handleReload = useCallback(() => refetchScenario(), [refetchScenario]);
 
 	const currentMetrics = useMemo(() => {
-		const fi = getFinancialIndependenceResult(result)?.deterministic;
+		const evaluationResults = stochasticResult ?? result;
 		return {
 			currentNetWorth: result?.summary.currentNetWorth ?? 0,
 			finalNetWorth: result?.summary.finalNetWorth ?? 0,
-			deterministicFiCycleDate: fi?.milestones.firstSelfSustainingDate ?? null,
+			evaluationOutcomes:
+				evaluationResults?.evaluationOrder.flatMap((instanceId) => {
+					const envelope = evaluationResults.evaluations[instanceId];
+					return envelope
+						? [
+								{
+									instanceId,
+									label: envelope.label,
+									status: envelope.status,
+								},
+							]
+						: [];
+				}) ?? [],
 			shortfallAmount: result?.totals.clampedPostingShortfallAmount ?? 0,
 			overrideCount: activeOverrideCount,
 		};
-	}, [result, activeOverrideCount]);
-
-	const handleFinancialIndependencePlanChange = useCallback(
-		(changes: object) => {
-			const fi = getFinancialIndependenceConfig(evaluations, result);
-			if (fi) updateEvaluationConfig(fi.instanceId, changes);
-		},
-		[evaluations, result, updateEvaluationConfig],
-	);
+	}, [result, stochasticResult, activeOverrideCount]);
 
 	const whatIfControls = useMemo(
 		() => (pack ? <ContributionWhatIfControls pack={pack} /> : null),
@@ -365,7 +365,6 @@ export default function App() {
 								<ProjectionDashboard
 									pack={effectivePack ?? pack}
 									result={result}
-									projectionSettings={projectionSettings}
 									stochasticResult={stochasticResult}
 									stochasticIsProvisional={stochasticIsProvisional}
 								/>
@@ -394,7 +393,9 @@ export default function App() {
 									<ScenarioComparison
 										currentMetrics={currentMetrics}
 										currentOverrideCount={activeOverrideCount}
-										canTakeSnapshot={!isProjecting && !isSourceUpdating}
+										canTakeSnapshot={
+											!isProjecting && !isStochasticRunning && !isSourceUpdating
+										}
 									/>
 								</section>
 							</main>
@@ -402,7 +403,6 @@ export default function App() {
 							<aside id="projection-settings" className="space-y-4">
 								<ProjectionConfigSidebar
 									pack={effectivePack ?? pack}
-									projectionResult={result}
 									projectionSettings={projectionSettings}
 									projectionStartDate={result.milestones.projectionStartDate}
 									activeOverrideCount={activeOverrideCount}
@@ -415,9 +415,6 @@ export default function App() {
 									isLoading={isLoading}
 									loadError={loadError}
 									sourceActionError={sourceActionError}
-									onFinancialIndependencePlanChange={
-										handleFinancialIndependencePlanChange
-									}
 									onProjectionSettingsChange={onProjectionSettingsChange}
 									onReload={handleReload}
 									onResetSource={

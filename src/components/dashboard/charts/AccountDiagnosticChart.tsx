@@ -12,7 +12,6 @@ import { StackedContributionChart } from "./StackedContributionChart";
 
 interface AccountDiagnosticChartProps {
 	pack: ScenarioPack;
-	targetNetWorth: number;
 	hasStochasticData: boolean;
 	stochasticIsProvisional?: boolean;
 	chartData: Record<string, string | number>[];
@@ -21,7 +20,6 @@ interface AccountDiagnosticChartProps {
 
 export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
 	pack,
-	targetNetWorth,
 	hasStochasticData,
 	stochasticIsProvisional = false,
 	chartData,
@@ -59,7 +57,6 @@ export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
 					{viewMode === "stacked" ? (
 						<StackedContributionChart
 							pack={pack}
-							targetNetWorth={targetNetWorth}
 							hasStochasticData={hasStochasticData}
 							stochasticIsProvisional={stochasticIsProvisional}
 							chartData={chartData}
