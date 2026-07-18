@@ -1,13 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { useDebouncedStochasticConfig } from "@/hooks/useDebouncedStochasticConfig";
-import { currency, formatDate, pct } from "@/lib/format";
-import {
-	getFinancialIndependenceResult,
-	type StochasticProjectionResult,
-} from "@/lib/projection";
+import type { StochasticProjectionResult } from "@/lib/projection";
 import { useStore } from "@/store";
-import { StochasticResultCard } from "./dashboard/StochasticResultCard";
 
 interface StochasticControlsProps {
 	hasStochasticAccounts: boolean;
@@ -29,21 +24,6 @@ export function StochasticControls({
 	const onConfigChange = useStore((s) => s.setStochasticConfig);
 	const simulationRequested = stochasticPreference !== "disabled";
 	const simulationActive = simulationRequested && hasStochasticAccounts;
-	const isProvisional = isRunning && stochasticResult !== null;
-	const financialIndependence =
-		getFinancialIndependenceResult(stochasticResult)?.probabilistic ?? null;
-	const deterministicFinancialIndependence = getFinancialIndependenceResult(
-		stochasticResult?.deterministic,
-	)?.deterministic;
-	const relevantCandidateDate =
-		financialIndependence?.selfSustainingDate ??
-		deterministicFinancialIndependence?.milestones.firstSelfSustainingDate ??
-		deterministicFinancialIndependence?.milestones.firstCoverageDate ??
-		null;
-	const withdrawalDiagnostic =
-		financialIndependence?.candidateWithdrawalDiagnostics.find(
-			(diagnostic) => diagnostic.candidateDate === relevantCandidateDate,
-		) ?? financialIndependence?.candidateWithdrawalDiagnostics[0];
 
 	const {
 		runCountInput,
@@ -199,65 +179,6 @@ export function StochasticControls({
 									</li>
 								</ul>
 							</div>
-							{stochasticResult ? (
-								<div className="grid gap-3">
-									{isProvisional ? (
-										<p className="rounded-xl border border-primary-border bg-primary-subtle px-3 py-2 type-caption text-primary">
-											Provisional results from completed runs. Values may change
-											until all runs finish.
-										</p>
-									) : null}
-									{financialIndependence ? (
-										<>
-											<StochasticResultCard
-												label={`${isProvisional ? "Provisional " : ""}FI-cycle success probability`}
-												value={pct.format(
-													financialIndependence.fiCycleSuccessProbability,
-												)}
-												detail="complete runs funded expenses and met principal policy"
-											/>
-											{withdrawalDiagnostic ? (
-												<StochasticResultCard
-													label={`${isProvisional ? "Provisional " : ""}FI withdrawal shortfall probability`}
-													value={pct.format(
-														withdrawalDiagnostic.shortfallProbability,
-													)}
-													detail={`${formatDate(withdrawalDiagnostic.candidateDate)} candidate; ${withdrawalDiagnostic.shortfallRunCount} of ${withdrawalDiagnostic.diagnosticRunCount} eligible diagnostic runs${withdrawalDiagnostic.totalRunCount === withdrawalDiagnostic.diagnosticRunCount ? "" : ` (${withdrawalDiagnostic.totalRunCount} total FI runs)`}`}
-												/>
-											) : null}
-											<StochasticResultCard
-												label={`${isProvisional ? "Provisional " : ""}Median coverage date`}
-												value={
-													financialIndependence.medianCoverageDate
-														? formatDate(
-																financialIndependence.medianCoverageDate,
-															)
-														: "Never"
-												}
-												detail="median annual capacity first covers expenses"
-											/>
-											<StochasticResultCard
-												label={`${isProvisional ? "Provisional " : ""}Confidence-qualified FI date`}
-												value={
-													financialIndependence.selfSustainingDate
-														? formatDate(
-																financialIndependence.selfSustainingDate,
-															)
-														: "Never"
-												}
-												detail="first candidate meeting required confidence"
-											/>
-										</>
-									) : null}
-									<StochasticResultCard
-										label={`${isProvisional ? "Provisional " : ""}Median simulated final net worth`}
-										value={currency.format(
-											stochasticResult.milestones.finalNetWorthPercentiles.p50,
-										)}
-										detail={`range ${currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p10)}–${currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p90)}`}
-									/>
-								</div>
-							) : null}
 						</>
 					) : null}
 				</div>

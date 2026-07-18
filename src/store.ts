@@ -4,6 +4,7 @@ import type {
 	Account,
 	Checkpoint,
 	ConfiguredEvaluation,
+	EvaluationResultStatus,
 	FinancialIndependencePlan,
 	JsonValue,
 	Posting,
@@ -20,7 +21,11 @@ import { isJsonValue } from "@/lib/projection";
 export interface SnapshotMetrics {
 	currentNetWorth: number;
 	finalNetWorth: number;
-	deterministicFiCycleDate: string | null;
+	evaluationOutcomes: Array<{
+		instanceId: string;
+		label: string;
+		status: EvaluationResultStatus;
+	}>;
 	shortfallAmount: number;
 	overrideCount: number;
 }

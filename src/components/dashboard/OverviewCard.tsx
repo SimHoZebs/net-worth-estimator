@@ -2,50 +2,42 @@ import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
+	FinancialIndependencePlan,
 	ProjectionResult,
-	ProjectionRuntimeSettings,
 	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
-import {
-	type AccountMovementConstraintType,
-	getFinancialIndependenceConfig,
-	getFinancialIndependenceResult,
-} from "@/lib/projection";
-import { DEFAULT_FINANCIAL_INDEPENDENCE_PLAN } from "@/store";
+import { getFinancialIndependenceResult } from "@/lib/projection";
 
 interface OverviewCardProps {
 	result: ProjectionResult;
-	projectionSettings: ProjectionRuntimeSettings;
+	instanceId: string;
+	plan: FinancialIndependencePlan;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
 	pack: ScenarioPack;
 	blockerValue: string;
 	blockerDetail: string;
-	goalReached: boolean;
 }
-
-const constraintLabels: Record<AccountMovementConstraintType, string> = {
-	"source-unavailable": "source unavailable",
-	"source-floor": "account floor",
-	"destination-ceiling": "destination ceiling",
-	"action-limit": "withdrawal action limit",
-};
 
 export const OverviewCard = memo(function OverviewCard({
 	result,
-	projectionSettings,
+	instanceId,
+	plan,
 	stochasticResult,
 	stochasticIsProvisional = false,
 	pack,
 	blockerValue,
 	blockerDetail,
 }: OverviewCardProps) {
-	const analysis = getFinancialIndependenceResult(result)?.deterministic;
-	const stochasticAnalysis = getFinancialIndependenceResult(stochasticResult);
-	const plan =
-		getFinancialIndependenceConfig(projectionSettings.evaluations, result)
-			?.config ?? DEFAULT_FINANCIAL_INDEPENDENCE_PLAN;
+	const analysis = getFinancialIndependenceResult(
+		result,
+		instanceId,
+	)?.deterministic;
+	const stochasticAnalysis = getFinancialIndependenceResult(
+		stochasticResult,
+		instanceId,
+	);
 	const firstCoverageDate = analysis?.milestones.firstCoverageDate ?? null;
 	const selfSustainingDate =
 		analysis?.milestones.firstSelfSustainingDate ?? null;
@@ -65,17 +57,6 @@ export const OverviewCard = memo(function OverviewCard({
 		stochasticAnalysis?.probabilistic?.fiCycleSuccessProbability;
 	const qualifyingConfidence =
 		stochasticAnalysis?.probabilistic?.selfSustainingProbability;
-	const withdrawalOutcome =
-		analysis?.runOutcomes.find(
-			(outcome) =>
-				outcome.status === "evaluated" && outcome.candidateDate === displayDate,
-		) ??
-		analysis?.runOutcomes.find((outcome) => outcome.status === "evaluated");
-	const firstWithdrawalShortfall =
-		withdrawalOutcome?.withdrawals.firstShortfall;
-	const accountLabels = new Map(
-		pack.accounts.map((account) => [account.id, account.label]),
-	);
 
 	return (
 		<Card className="rounded-[1.8rem] border-primary-border/45 bg-gradient-to-br from-card/96 via-card/90 to-primary-subtle/35">
@@ -172,20 +153,6 @@ export const OverviewCard = memo(function OverviewCard({
 						This FI result includes {laborDependentSources} income source
 						{laborDependentSources === 1 ? "" : "s"} that require continued
 						labor.
-					</p>
-				) : null}
-				{withdrawalOutcome ? (
-					<p
-						className={`mt-3 rounded-xl border px-3 py-2 type-caption ${
-							firstWithdrawalShortfall
-								? "border-tertiary-border bg-tertiary-subtle text-tertiary-foreground"
-								: "border-primary-border bg-primary-subtle text-primary"
-						}`}
-					>
-						<b>FI behavior withdrawal:</b>{" "}
-						{firstWithdrawalShortfall
-							? `${formatDate(firstWithdrawalShortfall.date)} first requested ${currency.format(firstWithdrawalShortfall.requestedAmount)}, realized ${currency.format(firstWithdrawalShortfall.realizedAmount)}, and left ${currency.format(firstWithdrawalShortfall.shortfallAmount)} unfunded. Accounts: ${firstWithdrawalShortfall.relatedAccountIds.map((id) => accountLabels.get(id) ?? id).join(", ") || "none selected"}. Binding constraint: ${firstWithdrawalShortfall.constraints.map((constraint) => constraintLabels[constraint]).join(" + ") || "unclassified"}. Total cycle shortfall: ${currency.format(withdrawalOutcome.withdrawals.shortfallAmount)}.`
-							: `${currency.format(withdrawalOutcome.withdrawals.requestedAmount)} requested and ${currency.format(withdrawalOutcome.withdrawals.realizedAmount)} realized across the evaluated cycle, with no unfunded FI behavior withdrawals.`}
 					</p>
 				) : null}
 			</CardContent>

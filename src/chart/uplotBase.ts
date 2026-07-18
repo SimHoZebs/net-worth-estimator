@@ -79,53 +79,39 @@ export function createBaseOptions(): Partial<uPlot.Options> {
 	};
 }
 
+type ReferenceMilestones = { hitTarget?: string; firstShortfall?: string };
+
 export function createReferenceLinesHooks(
-	targetNetWorth: number,
-	milestoneDates?: { hitTarget?: string; firstShortfall?: string },
+	milestoneDates?: ReferenceMilestones,
+): uPlot.Hooks.Arrays;
+export function createReferenceLinesHooks(
+	_legacyTarget: number,
+	milestoneDates?: ReferenceMilestones,
+): uPlot.Hooks.Arrays;
+export function createReferenceLinesHooks(
+	targetOrMilestones?: number | ReferenceMilestones,
+	legacyMilestones?: ReferenceMilestones,
 ): uPlot.Hooks.Arrays {
-	const targetColor = cssColor("--chart-target", "#334155");
-	const successColor = cssColor("--chart-success", "#059669");
+	const milestoneDates =
+		typeof targetOrMilestones === "number"
+			? legacyMilestones
+			: targetOrMilestones;
 	const warningColor = cssColor("--chart-warning", "#d97706");
 
 	return {
 		draw: [
 			(self: uPlot) => {
 				try {
-					if (targetNetWorth <= 0) return;
 					const { ctx, bbox } = self;
 					ctx.save();
 
-					const y = self.valToPos(targetNetWorth, "y");
-					ctx.strokeStyle = targetColor;
-					ctx.lineWidth = 2;
-					ctx.setLineDash([5, 5]);
-					ctx.beginPath();
-					ctx.moveTo(bbox.left, y);
-					ctx.lineTo(bbox.left + bbox.width, y);
-					ctx.stroke();
-					ctx.setLineDash([]);
-
-					ctx.fillStyle = targetColor;
-					ctx.font = "600 12px system-ui, sans-serif";
-					ctx.textAlign = "right";
-					ctx.textBaseline = "bottom";
-					ctx.fillText(
-						`Target: ${formatChartCurrencyTick(targetNetWorth)}`,
-						bbox.left + bbox.width - 4,
-						y - 4,
-					);
-
-					for (const ms of [
-						milestoneDates?.hitTarget,
-						milestoneDates?.firstShortfall,
-					]) {
+					for (const ms of [milestoneDates?.firstShortfall]) {
 						if (!ms) continue;
 						const ts = parseIsoDate(ms).getTime();
 						const x = self.valToPos(ts, "x");
 						if (x < bbox.left || x > bbox.left + bbox.width) continue;
 
-						const isHit = ms === milestoneDates?.hitTarget;
-						ctx.strokeStyle = isHit ? successColor : warningColor;
+						ctx.strokeStyle = warningColor;
 						ctx.lineWidth = 1.5;
 						ctx.setLineDash([4, 4]);
 						ctx.beginPath();
@@ -134,20 +120,11 @@ export function createReferenceLinesHooks(
 						ctx.stroke();
 						ctx.setLineDash([]);
 
-						ctx.fillStyle = isHit ? successColor : warningColor;
+						ctx.fillStyle = warningColor;
 						ctx.font = "500 11px system-ui, sans-serif";
 						ctx.textAlign = "left";
-						if (isHit) {
-							ctx.textBaseline = "top";
-							ctx.fillText("Target reached", x + 4, bbox.top + 4);
-						} else {
-							ctx.textBaseline = "bottom";
-							ctx.fillText(
-								"First shortfall",
-								x + 4,
-								bbox.top + bbox.height - 4,
-							);
-						}
+						ctx.textBaseline = "bottom";
+						ctx.fillText("First shortfall", x + 4, bbox.top + bbox.height - 4);
 					}
 
 					ctx.restore();

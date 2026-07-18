@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
-import { currency, formatDate } from "@/lib/format";
+import { currency } from "@/lib/format";
 import { type SnapshotMetrics, useStore } from "@/store";
 
 interface ScenarioComparisonProps {
@@ -89,7 +89,7 @@ export function ScenarioComparison({
 										<th className="px-4 py-3">Name</th>
 										<th className="px-4 py-3">Current NW</th>
 										<th className="px-4 py-3">Final NW</th>
-										<th className="px-4 py-3">Deterministic FI date</th>
+										<th className="px-4 py-3">Evaluation outcomes</th>
 										<th className="px-4 py-3">Overrides</th>
 										<th className="px-4 py-3" />
 									</tr>
@@ -116,9 +116,9 @@ export function ScenarioComparison({
 													{currency.format(sn.metrics.finalNetWorth)}
 												</td>
 												<td className="px-4 py-3 text-foreground">
-													{sn.metrics.deterministicFiCycleDate
-														? formatDate(sn.metrics.deterministicFiCycleDate)
-														: "Beyond horizon"}
+													<EvaluationOutcomes
+														outcomes={sn.metrics.evaluationOutcomes}
+													/>
 												</td>
 												<td className="px-4 py-3 tabular-nums text-muted-foreground">
 													{sn.metrics.overrideCount}
@@ -148,9 +148,9 @@ export function ScenarioComparison({
 											{currency.format(currentMetrics.finalNetWorth)}
 										</td>
 										<td className="px-4 py-3 type-value font-semibold">
-											{currentMetrics.deterministicFiCycleDate
-												? formatDate(currentMetrics.deterministicFiCycleDate)
-												: "Beyond horizon"}
+											<EvaluationOutcomes
+												outcomes={currentMetrics.evaluationOutcomes}
+											/>
 										</td>
 										<td className="px-4 py-3 tabular-nums type-value font-semibold">
 											{currentOverrideCount}
@@ -168,5 +168,29 @@ export function ScenarioComparison({
 				</div>
 			</Collapsible.Content>
 		</Collapsible>
+	);
+}
+
+function EvaluationOutcomes({
+	outcomes,
+}: {
+	outcomes: SnapshotMetrics["evaluationOutcomes"];
+}) {
+	return outcomes.length > 0 ? (
+		<div className="flex min-w-48 flex-col gap-1.5">
+			{outcomes.map((outcome) => (
+				<div
+					key={outcome.instanceId}
+					className="flex items-center justify-between gap-3 type-caption"
+				>
+					<span className="truncate">{outcome.label}</span>
+					<span className="shrink-0 rounded-full border border-border/70 px-2 py-0.5 uppercase tracking-[0.1em]">
+						{outcome.status}
+					</span>
+				</div>
+			))}
+		</div>
+	) : (
+		<span className="type-caption text-muted-foreground">No evaluations</span>
 	);
 }

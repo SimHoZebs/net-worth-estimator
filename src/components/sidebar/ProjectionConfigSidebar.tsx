@@ -1,22 +1,18 @@
 import { memo } from "react";
-import { EvaluationList } from "@/components/evaluations/EvaluationList";
 import { StochasticControls } from "@/components/StochasticControls";
 import type {
 	DataSource,
-	FinancialIndependencePlan,
-	ProjectionResult,
 	ProjectionRuntimeSettings,
 	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import { ModelAssumptionsCard } from "./ModelAssumptionsCard";
-import { ProjectionSettingsCard } from "./ProjectionSettingsCard";
+import { SimulationSettingsCard } from "./SimulationSettingsCard";
 import { SourceStatusCard } from "./SourceStatusCard";
 
 interface ProjectionConfigSidebarProps {
 	pack: ScenarioPack;
 	projectionSettings: ProjectionRuntimeSettings;
-	projectionResult: ProjectionResult;
 	projectionStartDate: string;
 	activeOverrideCount: number;
 	hasStochasticAccounts: boolean;
@@ -28,9 +24,6 @@ interface ProjectionConfigSidebarProps {
 	isLoading: boolean;
 	loadError: string | null;
 	sourceActionError: string | null;
-	onFinancialIndependencePlanChange: (
-		changes: Partial<FinancialIndependencePlan>,
-	) => void;
 	onProjectionSettingsChange?: (
 		partial: Partial<ProjectionRuntimeSettings>,
 	) => void;
@@ -42,7 +35,6 @@ interface ProjectionConfigSidebarProps {
 export const ProjectionConfigSidebar = memo(function ProjectionConfigSidebar({
 	pack,
 	projectionSettings,
-	projectionResult,
 	projectionStartDate,
 	activeOverrideCount,
 	hasStochasticAccounts,
@@ -54,7 +46,6 @@ export const ProjectionConfigSidebar = memo(function ProjectionConfigSidebar({
 	isLoading,
 	loadError,
 	sourceActionError,
-	onFinancialIndependencePlanChange,
 	onProjectionSettingsChange,
 	onReload,
 	onResetSource,
@@ -62,15 +53,11 @@ export const ProjectionConfigSidebar = memo(function ProjectionConfigSidebar({
 }: ProjectionConfigSidebarProps) {
 	return (
 		<div className="space-y-4">
-			<EvaluationList results={stochasticResult ?? projectionResult} />
-			<ProjectionSettingsCard
+			<SimulationSettingsCard
 				projectionSettings={projectionSettings}
-				projectionResult={projectionResult}
 				projectionStartDate={projectionStartDate}
 				activeOverrideCount={activeOverrideCount}
-				pack={pack}
-				onFinancialIndependencePlanChange={onFinancialIndependencePlanChange}
-				onProjectionSettingsChange={onProjectionSettingsChange}
+				onChange={onProjectionSettingsChange}
 			/>
 
 			<StochasticControls

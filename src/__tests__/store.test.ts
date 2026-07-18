@@ -214,7 +214,7 @@ describe("Snapshot slice", () => {
 		useStore.getState().addSnapshotFromCurrentScenario("Trial", {
 			currentNetWorth: 100,
 			finalNetWorth: 200,
-			deterministicFiCycleDate: null,
+			evaluationOutcomes: [],
 			shortfallAmount: 0,
 			overrideCount: 1,
 		});

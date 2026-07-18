@@ -1,21 +1,15 @@
 import { useMemo } from "react";
 import { currency, formatDate } from "@/lib/format";
-import {
-	getFinancialIndependenceResult,
-	type ProjectionResult,
-	type ScenarioPack,
-} from "@/lib/projection";
+import type { ProjectionResult, ScenarioPack } from "@/lib/projection";
 
 export interface DashboardDerivedValues {
 	firstProjectedRow: ProjectionResult["timeline"]["rows"][number] | null;
 	firstShortfallRow: ProjectionResult["timeline"]["rows"][number] | null;
 	biggestShortfallPosting: ProjectionResult["postingSummaries"][number] | null;
-	goalReached: boolean;
 	enabledPostingCount: number;
 	requestedPostingAmount: number;
 	realizedPostingAmount: number;
 	postingUtilizationRate: number;
-	statusBadgeClassName: string;
 	blockerValue: string;
 	blockerDetail: string;
 	nextEventDetail: string;
@@ -38,9 +32,6 @@ export function useDashboardDerivedValues(
 				.sort(
 					(left, right) => right.shortfallAmount - left.shortfallAmount,
 				)[0] ?? null;
-		const goalReached =
-			(getFinancialIndependenceResult(result)?.deterministic?.milestones
-				.firstSelfSustainingDate ?? null) !== null;
 		const enabledPostingCount = pack.postings.filter(
 			(posting) => posting.enabled,
 		).length;
@@ -50,18 +41,13 @@ export function useDashboardDerivedValues(
 			requestedPostingAmount === 0
 				? 1
 				: realizedPostingAmount / requestedPostingAmount;
-		const statusBadgeClassName = goalReached
-			? "border-primary-border bg-primary-subtle text-primary"
-			: "border-tertiary-border bg-tertiary-subtle text-tertiary-foreground";
 		const blockerValue =
 			biggestShortfallPosting?.label ?? "No constraint showing";
 		const blockerDetail = biggestShortfallPosting
 			? biggestShortfallPosting.firstShortfallDate
 				? `Starting ${formatDate(biggestShortfallPosting.firstShortfallDate)}, the model cannot fully fund this scheduled payment from checking. Total unfunded amount across the projection: ${currency.format(biggestShortfallPosting.shortfallAmount)}.`
 				: `The model cannot fully fund this scheduled payment. Total unfunded amount: ${currency.format(biggestShortfallPosting.shortfallAmount)}.`
-			: goalReached
-				? "No scheduled payment is currently limited by available funds, and the selected sources sustain the configured FI cycle."
-				: "No scheduled payment is currently limited by available funds. Review selected FI sources, spending, withdrawal rate, and growth assumptions.";
+			: "No scheduled transaction is currently limited by account constraints.";
 		const nextEventDetail =
 			firstProjectedRow === null
 				? "No projected transactions are scheduled after the historical balance history."
@@ -71,12 +57,10 @@ export function useDashboardDerivedValues(
 			firstProjectedRow,
 			firstShortfallRow,
 			biggestShortfallPosting,
-			goalReached,
 			enabledPostingCount,
 			requestedPostingAmount,
 			realizedPostingAmount,
 			postingUtilizationRate,
-			statusBadgeClassName,
 			blockerValue,
 			blockerDetail,
 			nextEventDetail,

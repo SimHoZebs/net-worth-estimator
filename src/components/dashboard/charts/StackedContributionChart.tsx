@@ -27,7 +27,6 @@ const BAND_COLOR = "color-mix(in oklab, CanvasText 25%, transparent)";
 
 interface StackedContributionChartProps {
 	pack: ScenarioPack;
-	targetNetWorth: number;
 	hasStochasticData: boolean;
 	stochasticIsProvisional?: boolean;
 	chartData: Record<string, string | number>[];
@@ -36,7 +35,6 @@ interface StackedContributionChartProps {
 
 export const StackedContributionChart = memo(function StackedContributionChart({
 	pack,
-	targetNetWorth,
 	hasStochasticData,
 	stochasticIsProvisional = false,
 	chartData,
@@ -186,7 +184,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 					],
 				},
 			},
-			hooks: createReferenceLinesHooks(targetNetWorth, milestoneDates),
+			hooks: createReferenceLinesHooks(milestoneDates),
 		};
 	}, [
 		accountCount,
@@ -195,7 +193,6 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 		stochasticIsProvisional,
 		liabilities,
 		milestoneDates,
-		targetNetWorth,
 	]);
 
 	const selectedDetails = useMemo(() => {
