@@ -96,7 +96,13 @@ export function stochasticProject(
 	config: StochasticConfig,
 	onProgress?: (progress: number, partial: StochasticProjectionResult) => void,
 ): StochasticProjectionResult {
-	reseed(config.seed);
+	const normalizedConfig = {
+		...config,
+		runCount: Number.isFinite(config.runCount)
+			? Math.max(1, Math.min(10_000, Math.trunc(config.runCount)))
+			: 1,
+	};
+	reseed(normalizedConfig.seed);
 	const deterministicRaw = projectRawScenarioPack(
 		pack,
 		projectionSettings,
@@ -121,12 +127,12 @@ export function stochasticProject(
 
 	for (
 		let batchStart = 0;
-		batchStart < config.runCount;
+		batchStart < normalizedConfig.runCount;
 		batchStart += STOCHASTIC_PROGRESS_BATCH
 	) {
 		const batchEnd = Math.min(
 			batchStart + STOCHASTIC_PROGRESS_BATCH,
-			config.runCount,
+			normalizedConfig.runCount,
 		);
 		const batchValues = new Map<string, number[]>();
 		for (let run = batchStart; run < batchEnd; run++) {
@@ -170,9 +176,9 @@ export function stochasticProject(
 			runCount: batchEnd,
 		});
 		onProgress?.(
-			batchEnd / config.runCount,
+			batchEnd / normalizedConfig.runCount,
 			buildResult(
-				config,
+				normalizedConfig,
 				deterministic,
 				buildBands(sortedValuesByDate, isHistoricalByDate, sortedDates),
 				runtimes,
@@ -183,10 +189,10 @@ export function stochasticProject(
 	runtimes.finalize({
 		scenario: deterministicRaw.path.effectivePack,
 		deterministicPath: deterministicRaw.path,
-		runCount: config.runCount,
+		runCount: normalizedConfig.runCount,
 	});
 	return buildResult(
-		config,
+		normalizedConfig,
 		deterministic,
 		buildBands(sortedValuesByDate, isHistoricalByDate, sortedDates),
 		runtimes,

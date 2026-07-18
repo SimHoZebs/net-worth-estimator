@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	buildFinancialIndependenceCandidateDates,
 	evaluateFinancialIndependence,
+	validateFinancialIndependencePlan,
 } from "../evaluation/financialIndependence";
 import type {
 	Account,
@@ -104,6 +105,35 @@ function path(
 }
 
 describe("evaluateFinancialIndependence", () => {
+	it("rejects malformed optional source properties", () => {
+		expect(() =>
+			validateFinancialIndependencePlan({
+				...plan(),
+				sources: [
+					{
+						type: "asset",
+						accountId: "brokerage",
+						included: true,
+						withdrawalRateOverride: Number.POSITIVE_INFINITY,
+					},
+				],
+			}),
+		).toThrow("Financial independence configuration is invalid.");
+		expect(() =>
+			validateFinancialIndependencePlan({
+				...plan(),
+				sources: [
+					{
+						type: "cashflow",
+						postingId: "pension",
+						included: true,
+						laborDependent: "yes",
+					},
+				],
+			}),
+		).toThrow("Financial independence configuration is invalid.");
+	});
+
 	it("annualizes only explicitly selected realized cashflows", () => {
 		const rows = Array.from({ length: 14 }, (_, month) => {
 			const year = 2026 + Math.floor(month / 12);

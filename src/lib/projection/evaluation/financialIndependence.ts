@@ -865,10 +865,15 @@ export function validateFinancialIndependencePlan(
 				typeof source.included === "boolean" &&
 				((source.type === "asset" &&
 					"accountId" in source &&
-					typeof source.accountId === "string") ||
+					typeof source.accountId === "string" &&
+					(!("withdrawalRateOverride" in source) ||
+						(typeof source.withdrawalRateOverride === "number" &&
+							Number.isFinite(source.withdrawalRateOverride)))) ||
 					(source.type === "cashflow" &&
 						"postingId" in source &&
-						typeof source.postingId === "string")),
+						typeof source.postingId === "string" &&
+						(!("laborDependent" in source) ||
+							typeof source.laborDependent === "boolean"))),
 		) ||
 		!("continuingPostingIds" in config) ||
 		!Array.isArray(config.continuingPostingIds) ||

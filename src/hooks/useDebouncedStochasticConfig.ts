@@ -28,7 +28,7 @@ export function useDebouncedStochasticConfig(
 				: "";
 
 	const parsedRunCount = Number.isFinite(Number(runCountInput))
-		? Math.max(1, Math.min(10000, Number(runCountInput)))
+		? Math.max(1, Math.min(10000, Math.trunc(Number(runCountInput))))
 		: config.runCount;
 	const parsedSeed =
 		seedInput.trim().length > 0 && Number.isFinite(Number(seedInput))
@@ -68,7 +68,7 @@ export function useDebouncedStochasticConfig(
 		setDraftRunCount(value);
 		scheduleConfigChange({
 			runCount: Number.isFinite(Number(value))
-				? Math.max(1, Math.min(10000, Number(value)))
+				? Math.max(1, Math.min(10000, Math.trunc(Number(value))))
 				: config.runCount,
 			seed: parsedSeed,
 		});
