@@ -1,8 +1,10 @@
 import { memo } from "react";
+import { EvaluationList } from "@/components/evaluations/EvaluationList";
 import { StochasticControls } from "@/components/StochasticControls";
 import type {
 	DataSource,
 	FinancialIndependencePlan,
+	ProjectionResult,
 	ProjectionRuntimeSettings,
 	ScenarioPack,
 	StochasticProjectionResult,
@@ -14,6 +16,7 @@ import { SourceStatusCard } from "./SourceStatusCard";
 interface ProjectionConfigSidebarProps {
 	pack: ScenarioPack;
 	projectionSettings: ProjectionRuntimeSettings;
+	projectionResult: ProjectionResult;
 	projectionStartDate: string;
 	activeOverrideCount: number;
 	hasStochasticAccounts: boolean;
@@ -39,6 +42,7 @@ interface ProjectionConfigSidebarProps {
 export const ProjectionConfigSidebar = memo(function ProjectionConfigSidebar({
 	pack,
 	projectionSettings,
+	projectionResult,
 	projectionStartDate,
 	activeOverrideCount,
 	hasStochasticAccounts,
@@ -58,8 +62,10 @@ export const ProjectionConfigSidebar = memo(function ProjectionConfigSidebar({
 }: ProjectionConfigSidebarProps) {
 	return (
 		<div className="space-y-4">
+			<EvaluationList results={stochasticResult ?? projectionResult} />
 			<ProjectionSettingsCard
 				projectionSettings={projectionSettings}
+				projectionResult={projectionResult}
 				projectionStartDate={projectionStartDate}
 				activeOverrideCount={activeOverrideCount}
 				pack={pack}

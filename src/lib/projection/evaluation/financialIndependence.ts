@@ -27,6 +27,7 @@ import {
 	daysBetween,
 	projectionYearIndex,
 } from "../utils/date";
+import type { EvaluationDefinition } from "./runtime";
 
 const EPSILON = 0.01;
 
@@ -41,6 +42,24 @@ export const DEFAULT_FI_PLAN: FinancialIndependencePlan = {
 	continuingPostingIds: [],
 	principalPolicy: "allow-drawdown",
 };
+
+export const FINANCIAL_INDEPENDENCE_DEFINITION_ID = "financial-independence";
+
+export interface FinancialIndependenceProbabilisticResult {
+	fiCycleSuccessProbability: number;
+	medianCoverageDate: IsoDate | null;
+	selfSustainingDate: IsoDate | null;
+	selfSustainingProbability: number | null;
+}
+
+interface FinancialIndependenceAccumulator {
+	candidateDates: IsoDate[];
+	coverageRatios: number[][];
+	cycleSuccessCounts: number[];
+	requiredConfidence: number;
+	successfulRunCount: number;
+	runCount: number;
+}
 
 function finiteNonNegative(value: number, fallback = 0): number {
 	return Number.isFinite(value) ? Math.max(0, value) : fallback;
@@ -617,3 +636,209 @@ export function evaluateFinancialIndependence({
 		},
 	};
 }
+
+export function validateFinancialIndependencePlan(
+	config: unknown,
+): FinancialIndependencePlan {
+	if (
+		typeof config !== "object" ||
+		config === null ||
+		!("sources" in config) ||
+		!Array.isArray(config.sources) ||
+		!config.sources.every(
+			(source) =>
+				typeof source === "object" &&
+				source !== null &&
+				"type" in source &&
+				"included" in source &&
+				typeof source.included === "boolean" &&
+				((source.type === "asset" &&
+					"accountId" in source &&
+					typeof source.accountId === "string") ||
+					(source.type === "cashflow" &&
+						"postingId" in source &&
+						typeof source.postingId === "string")),
+		) ||
+		!("continuingPostingIds" in config) ||
+		!Array.isArray(config.continuingPostingIds) ||
+		!config.continuingPostingIds.every((id) => typeof id === "string") ||
+		!("principalPolicy" in config) ||
+		!(
+			[
+				"allow-drawdown",
+				"preserve-nominal-principal",
+				"preserve-real-principal",
+			] as unknown[]
+		).includes(config.principalPolicy)
+	) {
+		throw new Error("Financial independence configuration is invalid.");
+	}
+	const numericKeys = [
+		"minimumNetWorth",
+		"annualExpenseTarget",
+		"annualExpenseGrowthRate",
+		"withdrawalRate",
+		"evaluationYears",
+		"requiredConfidence",
+	] as const;
+	const record = config as Record<string, unknown>;
+	for (const key of numericKeys) {
+		if (typeof record[key] !== "number" || !Number.isFinite(record[key])) {
+			throw new Error(`Financial independence ${key} must be a finite number.`);
+		}
+	}
+	return normalizeFinancialIndependencePlan(
+		config as unknown as FinancialIndependencePlan,
+	);
+}
+
+function median(values: readonly number[]) {
+	if (values.length === 0) return 0;
+	const sorted = [...values].sort((left, right) => left - right);
+	const middle = Math.floor(sorted.length / 2);
+	return sorted.length % 2 === 0
+		? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2
+		: (sorted[middle] ?? 0);
+}
+
+function availableFinancialIndependencePlan(
+	path: ProjectionPath,
+	config: FinancialIndependencePlan,
+) {
+	const accountIds = new Set(
+		path.effectivePack.accounts.map((account) => account.id),
+	);
+	const postingIds = new Set(
+		path.effectivePack.postings.map((posting) => posting.id),
+	);
+	return {
+		...config,
+		sources: config.sources.filter((source) =>
+			source.type === "asset"
+				? accountIds.has(source.accountId)
+				: postingIds.has(source.postingId),
+		),
+		continuingPostingIds: config.continuingPostingIds.filter((id) =>
+			postingIds.has(id),
+		),
+	};
+}
+
+export const financialIndependenceEvaluation: EvaluationDefinition<
+	FinancialIndependencePlan,
+	FinancialIndependenceAnalysis,
+	FinancialIndependenceAccumulator,
+	FinancialIndependenceProbabilisticResult
+> = {
+	id: FINANCIAL_INDEPENDENCE_DEFINITION_ID,
+	label: "Financial independence",
+	validateConfig: validateFinancialIndependencePlan,
+	diagnoseConfig({ path }, config) {
+		const accountIds = new Set(
+			path.effectivePack.accounts.map((account) => account.id),
+		);
+		const postingIds = new Set(
+			path.effectivePack.postings.map((posting) => posting.id),
+		);
+		return config.sources.flatMap((source) => {
+			if (!source.included) return [];
+			const missing =
+				source.type === "asset"
+					? !accountIds.has(source.accountId)
+					: !postingIds.has(source.postingId);
+			if (!missing) return [];
+			return [
+				{
+					code: "missing-financial-independence-source",
+					severity: "warning" as const,
+					message: "An enabled FI source is unavailable and was ignored.",
+					...(source.type === "asset"
+						? { relatedAccountIds: [source.accountId] }
+						: { relatedPostingIds: [source.postingId] }),
+				},
+			];
+		});
+	},
+	evaluatePath({ path, stochasticRates }, config) {
+		return evaluateFinancialIndependence({
+			path,
+			plan: availableFinancialIndependencePlan(path, config),
+			stochasticRates,
+		});
+	},
+	createAccumulator(config, deterministicResult) {
+		const candidateDates = deterministicResult.rows.map((row) => row.date);
+		return {
+			candidateDates,
+			coverageRatios: candidateDates.map(() => []),
+			cycleSuccessCounts: candidateDates.map(() => 0),
+			requiredConfidence: config.requiredConfidence,
+			successfulRunCount: 0,
+			runCount: 0,
+		};
+	},
+	accumulate(accumulator, pathResult) {
+		if (pathResult.rows.length !== accumulator.candidateDates.length) {
+			throw new Error(
+				"FI evaluation returned an inconsistent candidate count.",
+			);
+		}
+		let runSucceeded = false;
+		pathResult.rows.forEach((row, index) => {
+			if (row.date !== accumulator.candidateDates[index]) {
+				throw new Error(
+					"FI evaluation returned an inconsistent candidate schedule.",
+				);
+			}
+			accumulator.coverageRatios[index]?.push(row.coverageRatio);
+			if (pathResult.runOutcomes[index]?.cycleEstablished) {
+				accumulator.cycleSuccessCounts[index]++;
+				runSucceeded = true;
+			}
+		});
+		accumulator.runCount++;
+		if (runSucceeded) accumulator.successfulRunCount++;
+	},
+	finalize(accumulator) {
+		let medianCoverageDate: IsoDate | null = null;
+		let selfSustainingDate: IsoDate | null = null;
+		let selfSustainingProbability: number | null = null;
+		for (let index = 0; index < accumulator.candidateDates.length; index++) {
+			if (
+				medianCoverageDate === null &&
+				median(accumulator.coverageRatios[index] ?? []) >= 1
+			) {
+				medianCoverageDate = accumulator.candidateDates[index] ?? null;
+			}
+			const probability =
+				accumulator.runCount > 0
+					? (accumulator.cycleSuccessCounts[index] ?? 0) / accumulator.runCount
+					: 0;
+			if (
+				selfSustainingDate === null &&
+				probability >= accumulator.requiredConfidence
+			) {
+				selfSustainingDate = accumulator.candidateDates[index] ?? null;
+				selfSustainingProbability = probability;
+			}
+		}
+		return {
+			fiCycleSuccessProbability:
+				accumulator.runCount > 0
+					? accumulator.successfulRunCount / accumulator.runCount
+					: 0,
+			medianCoverageDate,
+			selfSustainingDate,
+			selfSustainingProbability,
+		};
+	},
+	status(deterministic, probabilistic) {
+		return probabilistic
+			? probabilistic.selfSustainingDate
+				? "satisfied"
+				: "not-satisfied"
+			: deterministic?.milestones.firstSelfSustainingDate
+				? "satisfied"
+				: "not-satisfied";
+	},
+};

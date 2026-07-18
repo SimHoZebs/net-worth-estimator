@@ -7,6 +7,11 @@ import type {
 	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
+import {
+	getFinancialIndependenceConfig,
+	getFinancialIndependenceResult,
+} from "@/lib/projection";
+import { DEFAULT_FINANCIAL_INDEPENDENCE_PLAN } from "@/store";
 
 interface OverviewCardProps {
 	result: ProjectionResult;
@@ -28,25 +33,30 @@ export const OverviewCard = memo(function OverviewCard({
 	blockerValue,
 	blockerDetail,
 }: OverviewCardProps) {
-	const analysis = result.financialIndependence;
-	const firstCoverageDate = analysis.milestones.firstCoverageDate;
-	const selfSustainingDate = analysis.milestones.firstSelfSustainingDate;
+	const analysis = getFinancialIndependenceResult(result)?.deterministic;
+	const stochasticAnalysis = getFinancialIndependenceResult(stochasticResult);
+	const plan =
+		getFinancialIndependenceConfig(projectionSettings.evaluations, result)
+			?.config ?? DEFAULT_FINANCIAL_INDEPENDENCE_PLAN;
+	const firstCoverageDate = analysis?.milestones.firstCoverageDate ?? null;
+	const selfSustainingDate =
+		analysis?.milestones.firstSelfSustainingDate ?? null;
 	const activePostingIds = new Set(pack.postings.map((posting) => posting.id));
-	const laborDependentSources =
-		projectionSettings.financialIndependencePlan?.sources.filter(
-			(source) =>
-				source.type === "cashflow" &&
-				source.included &&
-				source.laborDependent &&
-				activePostingIds.has(source.postingId),
-		).length;
+	const laborDependentSources = plan.sources.filter(
+		(source) =>
+			source.type === "cashflow" &&
+			source.included &&
+			source.laborDependent &&
+			activePostingIds.has(source.postingId),
+	).length;
 	const displayDate = firstCoverageDate;
 	const coverageRow =
-		analysis.rows.find((row) => row.date === displayDate) ?? analysis.rows[0];
-	const confidenceDate = stochasticResult?.milestones.fiSelfSustainingDate;
-	const confidence = stochasticResult?.milestones.fiCycleSuccessProbability;
+		analysis?.rows.find((row) => row.date === displayDate) ?? analysis?.rows[0];
+	const confidenceDate = stochasticAnalysis?.probabilistic?.selfSustainingDate;
+	const confidence =
+		stochasticAnalysis?.probabilistic?.fiCycleSuccessProbability;
 	const qualifyingConfidence =
-		stochasticResult?.milestones.fiSelfSustainingProbability;
+		stochasticAnalysis?.probabilistic?.selfSustainingProbability;
 
 	return (
 		<Card className="rounded-[1.8rem] border-primary-border/45 bg-gradient-to-br from-card/96 via-card/90 to-primary-subtle/35">
@@ -86,11 +96,8 @@ export const OverviewCard = memo(function OverviewCard({
 								: "Not established"}
 						</div>
 						<div className="type-muted">
-							Requires at least{" "}
-							{currency.format(
-								projectionSettings.financialIndependencePlan.minimumNetWorth,
-							)}{" "}
-							net worth before cycle evaluation
+							Requires at least {currency.format(plan.minimumNetWorth)} net
+							worth before cycle evaluation
 						</div>
 					</div>
 
@@ -110,10 +117,10 @@ export const OverviewCard = memo(function OverviewCard({
 							{confidence === undefined
 								? blockerDetail
 								: confidenceDate === null
-									? `${pct.format(confidence)} of runs succeeded at some candidate; no date reached ${pct.format(projectionSettings.financialIndependencePlan.requiredConfidence)}`
+									? `${pct.format(confidence)} of runs succeeded at some candidate; no date reached ${pct.format(plan.requiredConfidence)}`
 									: stochasticIsProvisional
 										? `${pct.format(qualifyingConfidence ?? 0)} at this date from completed runs; still converging`
-										: `${pct.format(qualifyingConfidence ?? 0)} at this date; requires ${pct.format(projectionSettings.financialIndependencePlan.requiredConfidence)}`}
+										: `${pct.format(qualifyingConfidence ?? 0)} at this date; requires ${pct.format(plan.requiredConfidence)}`}
 						</div>
 					</div>
 				</div>

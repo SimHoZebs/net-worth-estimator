@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
 import {
+	DEFAULT_EVALUATIONS,
 	selectActiveOverrideCount,
 	selectWhatIfState,
 	useStore,
@@ -223,9 +224,8 @@ describe("Snapshot slice", () => {
 		expect(snapshot.whatIfState).toEqual(
 			selectWhatIfState(useStore.getState()),
 		);
-		expect(snapshot.financialIndependencePlan).toEqual(
-			useStore.getState().financialIndependencePlan,
-		);
+		expect(snapshot.evaluations).toEqual(useStore.getState().evaluations);
+		expect(snapshot.evaluations).not.toBe(useStore.getState().evaluations);
 		expect(snapshot.whatIfState).not.toHaveProperty("setTargetNetWorth");
 	});
 });
@@ -430,22 +430,52 @@ describe("Editor slice", () => {
 /* ------------------------------------------------------------------ */
 
 describe("Settings slice", () => {
-	it("updates the financial independence plan", () => {
-		useStore.getState().setFinancialIndependencePlan({
-			annualExpenseTarget: 50_000,
-		});
-		expect(
-			useStore.getState().financialIndependencePlan.annualExpenseTarget,
-		).toBe(50_000);
+	beforeEach(() => {
+		useStore.setState({ evaluations: structuredClone(DEFAULT_EVALUATIONS) });
 	});
 
-	it("preserves other financial independence settings on partial update", () => {
-		const before = useStore.getState().financialIndependencePlan;
-		useStore.getState().setFinancialIndependencePlan({ withdrawalRate: 0.05 });
-		expect(useStore.getState().financialIndependencePlan).toEqual({
-			...before,
-			withdrawalRate: 0.05,
+	it("updates an evaluation config without changing its stable ID", () => {
+		const evaluation = useStore.getState().evaluations[0];
+		useStore.getState().updateEvaluationConfig(evaluation.instanceId, {
+			annualExpenseTarget: 50_000,
 		});
+		const updated = useStore.getState().evaluations[0];
+		expect(updated.instanceId).toBe(evaluation.instanceId);
+		expect(updated.config).toMatchObject({ annualExpenseTarget: 50_000 });
+	});
+
+	it("duplicates and reorders evaluation instances with unique stable IDs", () => {
+		const source = useStore.getState().evaluations[0];
+		useStore.getState().duplicateEvaluation(source.instanceId);
+		const current = useStore.getState().evaluations;
+		const duplicate = current[current.length - 1];
+		expect(duplicate?.definitionId).toBe(source.definitionId);
+		expect(duplicate?.instanceId).not.toBe(source.instanceId);
+		if (duplicate) useStore.getState().moveEvaluation(duplicate.instanceId, -1);
+		const reordered = useStore.getState().evaluations;
+		expect(reordered[reordered.length - 2]?.instanceId).toBe(
+			duplicate?.instanceId,
+		);
+	});
+
+	it("rejects add and rename collisions without mutating evaluation order", () => {
+		const before = structuredClone(useStore.getState().evaluations);
+		useStore.getState().addEvaluation(structuredClone(before[0]));
+		expect(useStore.getState().evaluations).toEqual(before);
+		useStore.getState().updateEvaluation(before[0].instanceId, {
+			instanceId: before[1].instanceId,
+		});
+		expect(useStore.getState().evaluations).toEqual(before);
+	});
+
+	it("removes only the selected stable evaluation instance", () => {
+		const before = useStore.getState().evaluations;
+		useStore.getState().removeEvaluation(before[0].instanceId);
+		expect(
+			useStore
+				.getState()
+				.evaluations.map((evaluation) => evaluation.instanceId),
+		).toEqual(before.slice(1).map((evaluation) => evaluation.instanceId));
 	});
 
 	it("defaults stochasticPreference to auto", () => {

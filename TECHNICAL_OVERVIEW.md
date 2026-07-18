@@ -15,7 +15,7 @@ The Net Worth Estimator is a single-page React application that projects net wor
 
 ## 2. High-Level Architecture & Data Flow
 
-The application loads a scenario pack through a capability-based `DataSource` abstraction, validates it, and runs projections in dedicated Web Workers. Local development uses a Vite server plugin to read/write repo CSV files, while static/serverless production loads bundled `/scenario/*.csv` files and saves user edits in browser storage. Temporary what-if overrides and the FI analysis plan exist only in browser memory via Zustand for the current session.
+The application loads a scenario pack through a capability-based `DataSource` abstraction, validates it, and runs projections in dedicated Web Workers. Local development uses a Vite server plugin to read/write repo CSV files, while static/serverless production loads bundled `/scenario/*.csv` files and saves user edits in browser storage. Temporary what-if overrides and ordered evaluation instances exist only in browser memory via Zustand for the current session.
 
 ### Data Flow Execution
 
@@ -35,7 +35,10 @@ The application loads a scenario pack through a capability-based `DataSource` ab
 - `Account`: tracked signed balances with daily-compounded `annualRate`
 - `Checkpoint`: historical truth for account balances on exact dates
 - `Posting`: generic scheduled rules for future inflows, outflows, and transfers. Supports `volatility` for stochastic sampling.
-- `ProjectionRuntimeSettings`: fallback start date, projection horizon, and a session-only financial-independence plan with explicit source selections
+- `ProjectionRuntimeSettings`: fallback start date, projection horizon, and ordered session-only configured evaluations with stable instance IDs
+- `ConfiguredEvaluation`: serializable definition ID, stable instance ID, label, enabled state, and definition-owned configuration. Multiple instances may use the same definition.
+- `EvaluationResultCollection`: ordered instance IDs plus generic result envelopes keyed by instance ID; evaluator-specific bodies remain behind typed accessors.
+- Configured evaluation configs and public result bodies are finite JSON values. Registries, functions, maps, accumulators, and projection paths remain worker-internal.
 
 ### Posting Semantics
 
@@ -81,7 +84,7 @@ The boundary is at `CsvScenarioPack`: the CSV parsing and validation layer (`csv
 - **Evaluation**: a question applied to a simulation run or projection path.
 - **Outcome**: one evaluation's result for one run.
 - **Analysis**: aggregation or comparison across runs and outcomes, including probabilities and confidence-qualified dates.
-- Read-only evaluations inspect an immutable `ProjectionPath`; the legacy net-worth threshold is implemented this way.
+- Read-only evaluations inspect an immutable `ProjectionPath`; the net-worth-threshold definition is implemented this way.
 - FI coverage is a read-only calculation over canonical monthly candidate dates.
 - A simulation run executes a scenario or branch. Base and Monte Carlo runs produce a `ProjectionPath`; the current FI branch retains a compact outcome until another branch consumer requires a complete path.
 - A behavior observes branch state and emits generic actions. FI-cycle sustainability uses a behavior after forking balances at an eligible candidate date.
@@ -120,12 +123,12 @@ The engine uses a Linear Congruential Generator with an optional seed for reprod
 
 The main loop runs in batches of 50 projections. After each batch, the engine:
 
-1. Calls `onProgress(progress, partialResult)` where `partialResult` is a full `StochasticProjectionResult` computed from accumulated runs so far.
+1. Calls `onProgress(progress, partialResult)` where `partialResult` is a full `StochasticProjectionResult` computed from accumulated projection distributions and evaluator-owned trackers.
 2. The Web Worker forwards this via `postMessage` as a `StochasticWorkerProgress` message with the partial bands.
 3. The `useWorkerProjection` hook merges the partial result into React state, updating both the progress bar and the chart bands progressively.
 4. The chart's shaded percentile bands start wide (few runs, high variance) and converge toward final tight bands as iterations accumulate.
 
-This is genuinely incremental: projection runs happen once, each new batch is sorted once, and sorted samples are merged into the existing net-worth and FI-coverage distributions.
+This is genuinely incremental: each path is generated once, consumed by the projection distribution accumulator and every enabled evaluation tracker, then discarded. Evaluators own their stochastic accumulation and finalization.
 
 ### Key Files
 
@@ -133,7 +136,9 @@ This is genuinely incremental: projection runs happen once, each new batch is so
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
 | `src/lib/projection/scenario/prepareScenario.ts` | Applies temporary changes to produce the effective scenario |
 | `src/lib/projection/simulation/projectPath.ts` | Generic raw projection path and public report generation; no goal-specific logic |
-| `src/lib/projection/evaluation/runtime.ts` | Typed evaluation contracts and online dated-sample/success accumulators |
+| `src/lib/projection/evaluation/runtime.ts` | Registry, configured-instance lifecycle, isolated diagnostics, and generic stochastic trackers |
+| `src/lib/projection/evaluation/registry.ts` | Domain registration for net-worth-threshold and financial-independence definitions |
+| `src/lib/projection/evaluation/accessors.ts` | Typed FI and threshold accessors over generic result envelopes |
 | `src/lib/projection/evaluation/financialIndependence.ts` | FI candidate eligibility, explicit continuation replay, withdrawals, and principal preservation |
 | `src/lib/projection/behavior/runtime.ts` | Generic period-oriented reactive behavior lifecycle |
 | `src/lib/projection/analysis/projectStochastic.ts` | Runs N projections, builds percentile bands, and aggregates per-run evaluation outcomes |
@@ -152,7 +157,7 @@ This is genuinely incremental: projection runs happen once, each new batch is so
 - `ProjectionDashboard` (in `CsvProjectionDashboard.tsx`): renders current and projected net worth, signed account balances, dated posting rows, and posting utilization
 - `StochasticControls.tsx`: Monte Carlo toggle, run count, seed input, progress bar, and milestone stat cards (hit probability, P50/P10 hit dates, final P50)
 - `TemplateWizard` (in `patterns/TemplateWizard.tsx`): Guides users through generating common financial patterns (like `IncomeForm`) and previews them before saving.
-- `src/store.ts`: A Zustand store with 5 slices managing: `WhatIf` (temporary session overrides), `Editor` (CRUD for working copy), `Settings` (FI plan, horizon, stochastic configs), `Snapshot` (named scenario snapshots), and `Theme` (light/dark/system).
+- `src/store.ts`: A Zustand store with 5 slices managing: `WhatIf` (temporary session overrides), `Editor` (CRUD for working copy), `Settings` (ordered evaluations, horizon, stochastic config), `Snapshot` (named scenario and evaluation snapshots), and `Theme` (light/dark/system).
 
 ## 6. Technical Highlights
 
@@ -166,3 +171,6 @@ This is genuinely incremental: projection runs happen once, each new batch is so
 - Dated event engine: future projections run on exact checkpoint and scheduled posting dates with daily compounding between dates.
 - Real-account cash model: future inflows, outflows, and transfers all post directly into tracked accounts.
 - Generic engine: the projection engine treats all accounts and postings uniformly — no special-case logic by ID or category.
+- Generic evaluation orchestration: deterministic projection creates one base path, while stochastic projection feeds each generated path through registry-created trackers without importing FI or threshold logic.
+- Isolated evaluator failures: unknown definitions, invalid configs, duplicate instance IDs, and evaluator exceptions become per-instance diagnostics and do not block peer evaluations.
+- Healthy-instance selection: definition-specific accessors skip disabled, malformed, duplicate, and failed defaults; explicit instance lookups remain exact and suppress failed probabilistic bodies.

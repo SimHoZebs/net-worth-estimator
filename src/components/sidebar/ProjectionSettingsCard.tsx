@@ -7,15 +7,19 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { formatDate } from "@/lib/format";
-import type {
-	FinancialIndependencePlan,
-	ProjectionRuntimeSettings,
-	ScenarioPack,
+import {
+	type FinancialIndependencePlan,
+	getFinancialIndependenceConfig,
+	type ProjectionResult,
+	type ProjectionRuntimeSettings,
+	type ScenarioPack,
 } from "@/lib/projection";
+import { DEFAULT_FINANCIAL_INDEPENDENCE_PLAN } from "@/store";
 
 interface ProjectionSettingsCardProps {
 	pack: ScenarioPack;
 	projectionSettings: ProjectionRuntimeSettings;
+	projectionResult: ProjectionResult;
 	projectionStartDate: string;
 	activeOverrideCount: number;
 	onFinancialIndependencePlanChange: (
@@ -37,12 +41,17 @@ function finiteInput(value: string, fallback: number) {
 export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 	pack,
 	projectionSettings,
+	projectionResult,
 	projectionStartDate,
 	activeOverrideCount,
 	onFinancialIndependencePlanChange,
 	onProjectionSettingsChange,
 }: ProjectionSettingsCardProps) {
-	const plan = projectionSettings.financialIndependencePlan;
+	const plan =
+		getFinancialIndependenceConfig(
+			projectionSettings.evaluations,
+			projectionResult,
+		)?.config ?? DEFAULT_FINANCIAL_INDEPENDENCE_PLAN;
 	const selectedCashflows = new Set<string>();
 	const selectedAssets = new Set<string>();
 	for (const source of plan.sources) {
@@ -86,7 +95,9 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 			postingId,
 			included: !selectedCashflows.has(postingId),
 			laborDependent:
-				existing?.type === "cashflow" ? existing.laborDependent : false,
+				existing?.type === "cashflow"
+					? (existing.laborDependent ?? false)
+					: false,
 		});
 		onFinancialIndependencePlanChange({ sources });
 	};
@@ -111,14 +122,15 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 		const sources = plan.sources.filter(
 			(source) => !(source.type === "asset" && source.accountId === accountId),
 		);
+		const withdrawalRateOverride =
+			existing?.type === "asset" ? existing.withdrawalRateOverride : undefined;
 		sources.push({
 			type: "asset",
 			accountId,
 			included: !selectedAssets.has(accountId),
-			withdrawalRateOverride:
-				existing?.type === "asset"
-					? existing.withdrawalRateOverride
-					: undefined,
+			...(withdrawalRateOverride === undefined
+				? {}
+				: { withdrawalRateOverride }),
 		});
 		onFinancialIndependencePlanChange({ sources });
 	};
@@ -128,11 +140,16 @@ export const ProjectionSettingsCard = memo(function ProjectionSettingsCard({
 		withdrawalRateOverride: number | undefined,
 	) => {
 		onFinancialIndependencePlanChange({
-			sources: plan.sources.map((source) =>
-				source.type === "asset" && source.accountId === accountId
-					? { ...source, withdrawalRateOverride }
-					: source,
-			),
+			sources: plan.sources.map((source) => {
+				if (source.type !== "asset" || source.accountId !== accountId) {
+					return source;
+				}
+				if (withdrawalRateOverride !== undefined) {
+					return { ...source, withdrawalRateOverride };
+				}
+				const { withdrawalRateOverride: _removed, ...rest } = source;
+				return rest;
+			}),
 		});
 	};
 

@@ -3,12 +3,15 @@ import { create } from "zustand";
 import type {
 	Account,
 	Checkpoint,
+	ConfiguredEvaluation,
 	FinancialIndependencePlan,
+	JsonValue,
 	Posting,
 	ScenarioPack,
 	ScenarioWhatIfState,
 	StochasticConfig,
 } from "@/lib/projection";
+import { isJsonValue } from "@/lib/projection";
 
 /* ------------------------------------------------------------------ */
 /*  Snapshot slice                                                     */
@@ -27,7 +30,7 @@ export interface ScenarioSnapshot {
 	label: string;
 	timestamp: number;
 	whatIfState: ScenarioWhatIfState;
-	financialIndependencePlan: FinancialIndependencePlan;
+	evaluations: ConfiguredEvaluation[];
 	metrics: SnapshotMetrics;
 }
 
@@ -59,9 +62,7 @@ const createSnapshotSlice: StateCreator<AppStore, [], [], SnapshotSlice> = (
 					label,
 					timestamp,
 					whatIfState: selectWhatIfState(state),
-					financialIndependencePlan: structuredClone(
-						state.financialIndependencePlan,
-					),
+					evaluations: structuredClone(state.evaluations),
 					metrics: { ...metrics },
 				},
 			],
@@ -298,7 +299,10 @@ type Theme = "light" | "dark" | "system";
 
 function resolveTheme(theme: Theme): "light" | "dark" {
 	if (theme === "system") {
-		if (typeof window !== "undefined") {
+		if (
+			typeof window !== "undefined" &&
+			typeof window.matchMedia === "function"
+		) {
 			return window.matchMedia("(prefers-color-scheme: dark)").matches
 				? "dark"
 				: "light";
@@ -360,11 +364,36 @@ export const DEFAULT_FINANCIAL_INDEPENDENCE_PLAN: FinancialIndependencePlan = {
 	principalPolicy: "preserve-real-principal",
 };
 
+export const DEFAULT_EVALUATIONS: ConfiguredEvaluation[] = [
+	{
+		definitionId: "financial-independence",
+		instanceId: "financial-independence",
+		label: "Financial independence",
+		enabled: true,
+		config: structuredClone(
+			DEFAULT_FINANCIAL_INDEPENDENCE_PLAN,
+		) as unknown as JsonValue,
+	},
+	{
+		definitionId: "net-worth-threshold",
+		instanceId: "net-worth-1m",
+		label: "Reach $1,000,000 net worth",
+		enabled: true,
+		config: { target: 1_000_000 },
+	},
+];
+
 interface SettingsSlice {
-	financialIndependencePlan: FinancialIndependencePlan;
-	setFinancialIndependencePlan: (
-		changes: Partial<FinancialIndependencePlan>,
+	evaluations: ConfiguredEvaluation[];
+	addEvaluation: (evaluation: ConfiguredEvaluation) => void;
+	duplicateEvaluation: (instanceId: string) => void;
+	updateEvaluation: (
+		instanceId: string,
+		changes: Partial<ConfiguredEvaluation>,
 	) => void;
+	updateEvaluationConfig: (instanceId: string, changes: object) => void;
+	removeEvaluation: (instanceId: string) => void;
+	moveEvaluation: (instanceId: string, direction: -1 | 1) => void;
 	horizonYears: number;
 	setHorizonYears: (years: number) => void;
 	stochasticPreference: StochasticPreference;
@@ -378,20 +407,110 @@ const DEFAULT_HORIZON_YEARS = 15;
 const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (
 	set,
 ) => ({
-	financialIndependencePlan: DEFAULT_FINANCIAL_INDEPENDENCE_PLAN,
-	setFinancialIndependencePlan: (changes) => {
-		const finiteChanges = Object.fromEntries(
-			Object.entries(changes).filter(
-				([, value]) => typeof value !== "number" || Number.isFinite(value),
-			),
-		) as Partial<FinancialIndependencePlan>;
+	evaluations: structuredClone(DEFAULT_EVALUATIONS),
+	addEvaluation: (evaluation) =>
+		set((state) =>
+			!evaluation.instanceId.trim() ||
+			!isJsonValue(evaluation.config) ||
+			state.evaluations.some(
+				(item) => item.instanceId === evaluation.instanceId,
+			)
+				? state
+				: { evaluations: [...state.evaluations, evaluation] },
+		),
+	duplicateEvaluation: (instanceId) =>
+		set((state) => {
+			const source = state.evaluations.find(
+				(evaluation) => evaluation.instanceId === instanceId,
+			);
+			if (!source) return state;
+			let suffix = 2;
+			let nextId = `${source.instanceId}-${suffix}`;
+			while (state.evaluations.some((item) => item.instanceId === nextId)) {
+				suffix++;
+				nextId = `${source.instanceId}-${suffix}`;
+			}
+			return {
+				evaluations: [
+					...state.evaluations,
+					{
+						...structuredClone(source),
+						instanceId: nextId,
+						label: `${source.label} copy`,
+					},
+				],
+			};
+		}),
+	updateEvaluation: (instanceId, changes) =>
+		set((state) => {
+			if (
+				(changes.config !== undefined && !isJsonValue(changes.config)) ||
+				(changes.instanceId !== undefined &&
+					(changes.instanceId.trim() === "" ||
+						state.evaluations.some(
+							(item) =>
+								item.instanceId === changes.instanceId &&
+								item.instanceId !== instanceId,
+						)))
+			) {
+				return state;
+			}
+			return {
+				evaluations: state.evaluations.map((evaluation) =>
+					evaluation.instanceId === instanceId
+						? { ...evaluation, ...changes }
+						: evaluation,
+				),
+			};
+		}),
+	updateEvaluationConfig: (instanceId, changes) =>
+		set((state) =>
+			!isJsonValue(changes) || Array.isArray(changes)
+				? state
+				: {
+						evaluations: state.evaluations.map((evaluation) =>
+							evaluation.instanceId === instanceId
+								? {
+										...evaluation,
+										config: {
+											...(typeof evaluation.config === "object" &&
+											evaluation.config !== null &&
+											!Array.isArray(evaluation.config)
+												? evaluation.config
+												: {}),
+											...changes,
+										},
+									}
+								: evaluation,
+						),
+					},
+		),
+	removeEvaluation: (instanceId) =>
 		set((state) => ({
-			financialIndependencePlan: {
-				...state.financialIndependencePlan,
-				...finiteChanges,
-			},
-		}));
-	},
+			evaluations: state.evaluations.filter(
+				(evaluation) => evaluation.instanceId !== instanceId,
+			),
+		})),
+	moveEvaluation: (instanceId, direction) =>
+		set((state) => {
+			const index = state.evaluations.findIndex(
+				(evaluation) => evaluation.instanceId === instanceId,
+			);
+			const destination = index + direction;
+			if (
+				index < 0 ||
+				destination < 0 ||
+				destination >= state.evaluations.length
+			) {
+				return state;
+			}
+			const evaluations = [...state.evaluations];
+			[evaluations[index], evaluations[destination]] = [
+				evaluations[destination],
+				evaluations[index],
+			];
+			return { evaluations };
+		}),
 
 	horizonYears: DEFAULT_HORIZON_YEARS,
 	setHorizonYears: (years) => set({ horizonYears: years }),

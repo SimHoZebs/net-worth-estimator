@@ -97,6 +97,18 @@ describe("Mock engine project()", () => {
 		expect(result.summary.currentNetWorth).toBe(1600);
 	});
 
+	it("keeps evaluation settings and results structured-clone safe", () => {
+		const request = {
+			pack: createBasePack(),
+			projectionSettings: makeSettings(),
+			whatIfState: makeDefaultWhatIf(),
+		};
+		const result = makeProjectionResult();
+		expect(structuredClone(request)).toEqual(request);
+		expect(structuredClone(result)).toEqual(result);
+		expect(() => JSON.stringify({ request, result })).not.toThrow();
+	});
+
 	it("passes AbortSignal through to the request", async () => {
 		const controller = new AbortController();
 

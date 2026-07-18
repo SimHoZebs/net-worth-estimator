@@ -1,8 +1,7 @@
-import { evaluateFinancialIndependence } from "../evaluation/financialIndependence";
-import { evaluateNetWorthThreshold } from "../evaluation/netWorthThreshold";
+import { evaluationRegistry } from "../evaluation/registry";
+import { EvaluationRuntimeSet } from "../evaluation/runtime";
 import { projectRawScenarioPack } from "../simulation/projectPath";
 import type {
-	IsoDate,
 	ProjectionResult,
 	ProjectionRuntimeSettings,
 	ScenarioPack,
@@ -14,7 +13,6 @@ export function projectScenarioPack(
 	projectionSettings: ProjectionRuntimeSettings,
 	whatIfState?: ScenarioWhatIfState,
 	stochasticRates?: Map<string, number[]>,
-	evaluationOptions?: { fiCandidateDates?: readonly IsoDate[] },
 ): ProjectionResult {
 	const raw = projectRawScenarioPack(
 		pack,
@@ -22,22 +20,15 @@ export function projectScenarioPack(
 		whatIfState,
 		stochasticRates,
 	);
-	const netWorthThreshold = evaluateNetWorthThreshold(
-		raw.path,
-		projectionSettings.targetNetWorth,
+	const runtimes = new EvaluationRuntimeSet(
+		projectionSettings.evaluations,
+		evaluationRegistry,
 	);
+	runtimes.evaluateDeterministic({
+		path: raw.path,
+		scenario: raw.path.effectivePack,
+		stochasticRates,
+	});
 
-	return {
-		...raw.result,
-		financialIndependence: evaluateFinancialIndependence({
-			path: raw.path,
-			plan: projectionSettings.financialIndependencePlan,
-			stochasticRates,
-			candidateDates: evaluationOptions?.fiCandidateDates,
-		}),
-		milestones: {
-			...raw.result.milestones,
-			hitTargetDate: netWorthThreshold.firstReachedDate,
-		},
-	};
+	return { ...raw.result, ...runtimes.result() };
 }

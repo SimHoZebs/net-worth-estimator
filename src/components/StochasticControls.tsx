@@ -2,7 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { useDebouncedStochasticConfig } from "@/hooks/useDebouncedStochasticConfig";
 import { currency, formatDate, pct } from "@/lib/format";
-import type { StochasticProjectionResult } from "@/lib/projection";
+import {
+	getFinancialIndependenceResult,
+	type StochasticProjectionResult,
+} from "@/lib/projection";
 import { useStore } from "@/store";
 import { StochasticResultCard } from "./dashboard/StochasticResultCard";
 
@@ -27,6 +30,8 @@ export function StochasticControls({
 	const simulationRequested = stochasticPreference !== "disabled";
 	const simulationActive = simulationRequested && hasStochasticAccounts;
 	const isProvisional = isRunning && stochasticResult !== null;
+	const financialIndependence =
+		getFinancialIndependenceResult(stochasticResult)?.probabilistic ?? null;
 
 	const {
 		runCountInput,
@@ -190,35 +195,39 @@ export function StochasticControls({
 											until all runs finish.
 										</p>
 									) : null}
-									<StochasticResultCard
-										label={`${isProvisional ? "Provisional " : ""}FI-cycle success probability`}
-										value={pct.format(
-											stochasticResult.milestones.fiCycleSuccessProbability,
-										)}
-										detail="complete runs funded expenses and met principal policy"
-									/>
-									<StochasticResultCard
-										label={`${isProvisional ? "Provisional " : ""}Median coverage date`}
-										value={
-											stochasticResult.milestones.medianFiCoverageDate
-												? formatDate(
-														stochasticResult.milestones.medianFiCoverageDate,
-													)
-												: "Never"
-										}
-										detail="median annual capacity first covers expenses"
-									/>
-									<StochasticResultCard
-										label={`${isProvisional ? "Provisional " : ""}Confidence-qualified FI date`}
-										value={
-											stochasticResult.milestones.fiSelfSustainingDate
-												? formatDate(
-														stochasticResult.milestones.fiSelfSustainingDate,
-													)
-												: "Never"
-										}
-										detail="first candidate meeting required confidence"
-									/>
+									{financialIndependence ? (
+										<>
+											<StochasticResultCard
+												label={`${isProvisional ? "Provisional " : ""}FI-cycle success probability`}
+												value={pct.format(
+													financialIndependence.fiCycleSuccessProbability,
+												)}
+												detail="complete runs funded expenses and met principal policy"
+											/>
+											<StochasticResultCard
+												label={`${isProvisional ? "Provisional " : ""}Median coverage date`}
+												value={
+													financialIndependence.medianCoverageDate
+														? formatDate(
+																financialIndependence.medianCoverageDate,
+															)
+														: "Never"
+												}
+												detail="median annual capacity first covers expenses"
+											/>
+											<StochasticResultCard
+												label={`${isProvisional ? "Provisional " : ""}Confidence-qualified FI date`}
+												value={
+													financialIndependence.selfSustainingDate
+														? formatDate(
+																financialIndependence.selfSustainingDate,
+															)
+														: "Never"
+												}
+												detail="first candidate meeting required confidence"
+											/>
+										</>
+									) : null}
 									<StochasticResultCard
 										label={`${isProvisional ? "Provisional " : ""}Median simulated final net worth`}
 										value={currency.format(

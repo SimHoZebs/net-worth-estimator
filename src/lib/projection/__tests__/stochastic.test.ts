@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
 	computePercentiles,
+	getFinancialIndependenceResult,
+	getNetWorthThresholdResult,
 	parseCsvScenarioPack,
 	projectScenarioPack,
 	reseed,
@@ -8,7 +10,34 @@ import {
 	stochasticProject,
 } from "../";
 import { makeSettings, validCsvFiles } from "../__fixtures__";
+import type {
+	FinancialIndependencePlan,
+	ProjectionRuntimeSettings,
+} from "../types/scenario";
 import type { StochasticProjectionResult } from "../types/stochastic";
+
+function withFiPlan(
+	overrides: Partial<ProjectionRuntimeSettings>,
+	plan: FinancialIndependencePlan,
+) {
+	const settings = makeSettings(overrides);
+	return {
+		...settings,
+		evaluations: settings.evaluations.map((evaluation) =>
+			evaluation.definitionId === "financial-independence"
+				? { ...evaluation, config: plan as unknown as import("../").JsonValue }
+				: evaluation,
+		),
+	};
+}
+
+function fiResult(result: StochasticProjectionResult) {
+	return getFinancialIndependenceResult(result)?.probabilistic;
+}
+
+function thresholdProbability(result: StochasticProjectionResult) {
+	return getNetWorthThresholdResult(result)?.probabilistic?.probability ?? 0;
+}
 
 describe("stochastic utilities", () => {
 	it("computes correct percentiles", () => {
@@ -59,10 +88,12 @@ describe("stochastic projection", () => {
 		const partials: StochasticProjectionResult[] = [];
 		const result = stochasticProject(
 			pack,
-			makeSettings({
-				fallbackProjectionStartDate: "2026-04-01",
-				horizonYears: 2,
-				financialIndependencePlan: {
+			withFiPlan(
+				{
+					fallbackProjectionStartDate: "2026-04-01",
+					horizonYears: 2,
+				},
+				{
 					minimumNetWorth: 0,
 					annualExpenseTarget: 1_000,
 					annualExpenseGrowthRate: 0,
@@ -73,7 +104,7 @@ describe("stochastic projection", () => {
 					sources: [{ type: "cashflow", postingId: "salary", included: true }],
 					continuingPostingIds: [],
 				},
-			}),
+			),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -85,11 +116,11 @@ describe("stochastic projection", () => {
 			(_progress, partial) => partials.push(partial),
 		);
 
-		expect(result.milestones.fiCycleSuccessProbability).toBe(1);
-		expect(result.milestones.medianFiCoverageDate).not.toBeNull();
-		expect(result.milestones.fiSelfSustainingDate).not.toBeNull();
+		expect(fiResult(result)?.fiCycleSuccessProbability).toBe(1);
+		expect(fiResult(result)?.medianCoverageDate).not.toBeNull();
+		expect(fiResult(result)?.selfSustainingDate).not.toBeNull();
 		expect(
-			partials[partials.length - 1]?.milestones.fiCycleSuccessProbability,
+			fiResult(partials[partials.length - 1])?.fiCycleSuccessProbability,
 		).toBe(1);
 	});
 
@@ -98,10 +129,12 @@ describe("stochastic projection", () => {
 		if (!pack) throw new Error("Pack is null");
 		const result = stochasticProject(
 			pack,
-			makeSettings({
-				fallbackProjectionStartDate: "2026-04-01",
-				horizonYears: 2,
-				financialIndependencePlan: {
+			withFiPlan(
+				{
+					fallbackProjectionStartDate: "2026-04-01",
+					horizonYears: 2,
+				},
+				{
 					minimumNetWorth: 1_000_000_000,
 					annualExpenseTarget: 1_000,
 					annualExpenseGrowthRate: 0,
@@ -112,7 +145,7 @@ describe("stochastic projection", () => {
 					sources: [{ type: "cashflow", postingId: "salary", included: true }],
 					continuingPostingIds: [],
 				},
-			}),
+			),
 			{
 				addedAccounts: [],
 				addedPostings: [],
@@ -123,9 +156,9 @@ describe("stochastic projection", () => {
 			{ runCount: 50, seed: 42 },
 		);
 
-		expect(result.milestones.medianFiCoverageDate).not.toBeNull();
-		expect(result.milestones.fiCycleSuccessProbability).toBe(0);
-		expect(result.milestones.fiSelfSustainingDate).toBeNull();
+		expect(fiResult(result)?.medianCoverageDate).not.toBeNull();
+		expect(fiResult(result)?.fiCycleSuccessProbability).toBe(0);
+		expect(fiResult(result)?.selfSustainingDate).toBeNull();
 	});
 
 	it("returns deterministic baseline alongside stochastic bands", () => {
@@ -136,7 +169,6 @@ describe("stochastic projection", () => {
 		const result = stochasticProject(
 			pack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
 			}),
@@ -153,8 +185,8 @@ describe("stochastic projection", () => {
 		expect(result.deterministic).toBeDefined();
 		expect(result.bands.length).toBeGreaterThan(0);
 		expect(result.config.runCount).toBe(100);
-		expect(result.milestones.hitTargetProbability).toBeGreaterThanOrEqual(0);
-		expect(result.milestones.hitTargetProbability).toBeLessThanOrEqual(1);
+		expect(thresholdProbability(result)).toBeGreaterThanOrEqual(0);
+		expect(thresholdProbability(result)).toBeLessThanOrEqual(1);
 	});
 
 	it("generates same bands with same seed", () => {
@@ -165,7 +197,6 @@ describe("stochastic projection", () => {
 		const result1 = stochasticProject(
 			pack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
 			}),
@@ -182,7 +213,6 @@ describe("stochastic projection", () => {
 		const result2 = stochasticProject(
 			pack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
 			}),
@@ -198,9 +228,7 @@ describe("stochastic projection", () => {
 
 		expect(result1.bands.length).toBe(result2.bands.length);
 		expect(result1.bands[0].netWorth.p50).toBe(result2.bands[0].netWorth.p50);
-		expect(result1.milestones.hitTargetProbability).toBe(
-			result2.milestones.hitTargetProbability,
-		);
+		expect(thresholdProbability(result1)).toBe(thresholdProbability(result2));
 	});
 
 	it("works without onProgress callback (backward compatible)", () => {
@@ -211,7 +239,6 @@ describe("stochastic projection", () => {
 		const result = stochasticProject(
 			pack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 5,
 			}),
@@ -226,7 +253,7 @@ describe("stochastic projection", () => {
 		);
 
 		expect(result.bands.length).toBeGreaterThan(0);
-		expect(result.milestones.hitTargetProbability).toBeGreaterThanOrEqual(0);
+		expect(thresholdProbability(result)).toBeGreaterThanOrEqual(0);
 	});
 
 	it("returns P50 close to deterministic when volatility is zero", () => {
@@ -242,7 +269,6 @@ describe("stochastic projection", () => {
 		const result = stochasticProject(
 			deterministicOnlyPack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
 			}),
@@ -259,7 +285,6 @@ describe("stochastic projection", () => {
 		const deterministic = projectScenarioPack(
 			deterministicOnlyPack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
 			}),
@@ -289,7 +314,6 @@ describe("stochastic progress streaming", () => {
 		stochasticProject(
 			pack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
 			}),
@@ -321,7 +345,6 @@ describe("stochastic progress streaming", () => {
 		const resultWithout = stochasticProject(
 			pack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
 			}),
@@ -338,7 +361,6 @@ describe("stochastic progress streaming", () => {
 		const resultWith = stochasticProject(
 			pack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
 			}),
@@ -357,8 +379,8 @@ describe("stochastic progress streaming", () => {
 		expect(resultWith.bands[0].netWorth.p50).toBe(
 			resultWithout.bands[0].netWorth.p50,
 		);
-		expect(resultWith.milestones.hitTargetProbability).toBe(
-			resultWithout.milestones.hitTargetProbability,
+		expect(thresholdProbability(resultWith)).toBe(
+			thresholdProbability(resultWithout),
 		);
 	});
 
@@ -371,7 +393,6 @@ describe("stochastic progress streaming", () => {
 		stochasticProject(
 			pack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 5,
 			}),
@@ -399,7 +420,6 @@ describe("stochastic progress streaming", () => {
 		stochasticProject(
 			pack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 5,
 			}),
@@ -431,7 +451,6 @@ describe("stochastic progress streaming", () => {
 		const final = stochasticProject(
 			pack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
 			}),
@@ -452,15 +471,14 @@ describe("stochastic progress streaming", () => {
 				expect(band.netWorth.p10).toBeLessThanOrEqual(band.netWorth.p50);
 				expect(band.netWorth.p50).toBeLessThanOrEqual(band.netWorth.p90);
 			}
-			expect(partial.milestones.hitTargetProbability).toBeGreaterThanOrEqual(0);
-			expect(partial.milestones.hitTargetProbability).toBeLessThanOrEqual(1);
+			expect(thresholdProbability(partial)).toBeGreaterThanOrEqual(0);
+			expect(thresholdProbability(partial)).toBeLessThanOrEqual(1);
 		}
 
 		const lastPartial = partials[partials.length - 1];
 		expect(lastPartial.bands[0].netWorth.p50).toBe(final.bands[0].netWorth.p50);
-		expect(lastPartial.milestones.hitTargetProbability).toBe(
-			final.milestones.hitTargetProbability,
-		);
+		expect(thresholdProbability(lastPartial)).toBe(thresholdProbability(final));
+		expect(lastPartial.evaluations).toEqual(final.evaluations);
 	});
 
 	it("last partial result matches the final return value", () => {
@@ -472,7 +490,6 @@ describe("stochastic progress streaming", () => {
 		const final = stochasticProject(
 			pack,
 			makeSettings({
-				targetNetWorth: 1_000_000,
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
 			}),
