@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import {
 	createBrowserCsvDataSource,
@@ -72,6 +72,7 @@ export default function App() {
 		evaluations,
 		horizonYears,
 		setHorizonYears,
+		replaceEvaluations,
 		stochasticPreference,
 		stochasticConfig,
 		theme,
@@ -84,12 +85,35 @@ export default function App() {
 			evaluations: s.evaluations,
 			horizonYears: s.horizonYears,
 			setHorizonYears: s.setHorizonYears,
+			replaceEvaluations: s.replaceEvaluations,
 			stochasticPreference: s.stochasticPreference,
 			stochasticConfig: s.stochasticConfig,
 			theme: s.theme,
 			setTheme: s.setTheme,
 		})),
 	);
+
+	const sourceEvaluationsFingerprint = pack
+		? JSON.stringify(pack.evaluations)
+		: null;
+	const loadedEvaluationsFingerprint = useRef<string | null>(null);
+	useEffect(() => {
+		if (
+			pack &&
+			sourceEvaluationsFingerprint !== loadedEvaluationsFingerprint.current
+		) {
+			replaceEvaluations(pack.evaluations);
+			loadedEvaluationsFingerprint.current = sourceEvaluationsFingerprint;
+		}
+	}, [pack, replaceEvaluations, sourceEvaluationsFingerprint]);
+	const evaluationsAreHydrated =
+		pack === null ||
+		loadedEvaluationsFingerprint.current === sourceEvaluationsFingerprint;
+	const requestEvaluationReload = useCallback(() => {
+		if (!pack) return;
+		replaceEvaluations(pack.evaluations);
+		loadedEvaluationsFingerprint.current = sourceEvaluationsFingerprint;
+	}, [pack, replaceEvaluations, sourceEvaluationsFingerprint]);
 
 	useEffect(() => {
 		const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -130,7 +154,12 @@ export default function App() {
 		result,
 		runtimeError,
 		isRunning: isProjecting,
-	} = useProjection(pack, projectionSettings, whatIfState, validation.isValid);
+	} = useProjection(
+		pack,
+		projectionSettings,
+		whatIfState,
+		validation.isValid && evaluationsAreHydrated,
+	);
 
 	const hasStochasticAccounts =
 		effectivePack?.postings.some((p) => p.volatility > 0 && p.enabled) ?? false;
@@ -138,7 +167,8 @@ export default function App() {
 	const stochasticWorkerEnabled =
 		stochasticPreference !== "disabled" &&
 		hasStochasticAccounts &&
-		validation.isValid;
+		validation.isValid &&
+		evaluationsAreHydrated;
 	const {
 		result: stochasticResult,
 		runtimeError: stochasticError,
@@ -172,6 +202,7 @@ export default function App() {
 
 	const handleResetSource = useCallback(() => {
 		if (!dataSource.reset || scenarioResetMutation.isPending) return;
+		requestEvaluationReload();
 
 		scenarioResetMutation.mutate(undefined, {
 			onSuccess: () => {
@@ -182,7 +213,7 @@ export default function App() {
 				});
 			},
 		});
-	}, [dataSource.reset, scenarioResetMutation]);
+	}, [dataSource.reset, requestEvaluationReload, scenarioResetMutation]);
 
 	const [showWizard, setShowWizard] = useState(false);
 	const handleCloseWizard = useCallback(() => setShowWizard(false), []);
@@ -211,7 +242,10 @@ export default function App() {
 		[setHorizonYears],
 	);
 
-	const handleReload = useCallback(() => refetchScenario(), [refetchScenario]);
+	const handleReload = useCallback(() => {
+		requestEvaluationReload();
+		return refetchScenario();
+	}, [refetchScenario, requestEvaluationReload]);
 
 	const currentMetrics = useMemo(() => {
 		const evaluationResults = stochasticResult ?? result;
@@ -284,7 +318,7 @@ export default function App() {
 								type="button"
 								variant="ghost"
 								size="sm"
-								onClick={() => refetchScenario()}
+								onClick={handleReload}
 								disabled={isLoading}
 							>
 								{isLoading ? "Loading..." : "Reload source data"}

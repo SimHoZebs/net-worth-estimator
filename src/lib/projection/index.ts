@@ -49,10 +49,13 @@ export {
 	fetchCsvScenarioFiles,
 	loadCsvScenarioPack,
 	parseCsvScenarioPack,
+	serializeCsvScenarioPack,
 } from "./sources/csv/csvLoader";
 export {
 	csvAccountSchema,
 	csvAccountsHeaders,
+	csvBehaviorHeaders,
+	csvBehaviorSchema,
 	csvCheckpointSchema,
 	csvCheckpointsHeaders,
 	csvDateSchema,
@@ -68,6 +71,7 @@ export type {
 	AccountDelta,
 	AccountMovementConstraintType,
 	AccountSnapshot,
+	BehaviorCollectionKey,
 	Checkpoint,
 	ConfiguredEvaluation,
 	EvaluationDiagnostic,
@@ -99,6 +103,8 @@ export type {
 	ScenarioWhatIfState,
 } from "./types/scenario";
 export {
+	CSV_BEHAVIOR_DEFINITION_IDS,
+	CSV_BEHAVIOR_FILE_NAMES,
 	CSV_SCENARIO_FILE_NAMES,
 	CSV_SCENARIO_PUBLIC_PATH,
 	CSV_SCENARIO_REPO_PATH,

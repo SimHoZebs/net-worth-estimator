@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { NO_CEILING, NO_FLOOR } from "../../constants";
-import type { Account, Checkpoint } from "../../types/scenario";
+import { isJsonValue } from "../../evaluation/json";
+import type {
+	Account,
+	Checkpoint,
+	ConfiguredEvaluation,
+} from "../../types/scenario";
 
 function parseNumber(value: unknown) {
 	if (typeof value === "number") {
@@ -151,6 +156,18 @@ export const csvAccountsHeaders = [
 	"enabled",
 ] as const;
 export const csvCheckpointsHeaders = ["Date", "AccountId", "Balance"] as const;
+export const csvBehaviorHeaders = [
+	"order",
+	"instanceId",
+	"label",
+	"enabled",
+	"config",
+] as const;
+
+export interface CsvBehaviorRow
+	extends Omit<ConfiguredEvaluation, "definitionId"> {
+	order: number;
+}
 export const csvPostingsHeaders = [
 	"id",
 	"label",
@@ -182,6 +199,33 @@ export const csvCheckpointSchema = z.object({
 	AccountId: trimmedString,
 	Balance: finiteNumber,
 }) satisfies z.ZodType<Checkpoint>;
+
+const jsonValueSchema = z
+	.string()
+	.trim()
+	.min(1)
+	.transform((value, context) => {
+		try {
+			const parsed: unknown = JSON.parse(value);
+			if (isJsonValue(parsed)) return parsed;
+		} catch {
+			// Report one stable CSV validation issue below.
+		}
+
+		context.addIssue({
+			code: "custom",
+			message: "Expected valid JSON configuration.",
+		});
+		return z.NEVER;
+	});
+
+export const csvBehaviorSchema = z.object({
+	order: positiveInteger,
+	instanceId: trimmedString,
+	label: trimmedString,
+	enabled: csvBoolean,
+	config: jsonValueSchema,
+}) satisfies z.ZodType<CsvBehaviorRow>;
 
 const postingFrequencySchema = z.enum([
 	"daily",

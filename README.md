@@ -9,8 +9,8 @@ The current product model is intentionally simple:
 - A posting can be an external inflow, an external outflow, or an account-to-account transfer.
 - `amountMode` is `fixed` or `percent_of_base`, where base rows reference the latest realized amount of another posting.
 - Annual caps are generic and source-funded rows clamp to the source account's available positive balance.
-- The bundled starter data lives in `public/scenario/*.csv`.
-- Runtime projection settings live in the app, not in CSV: the financial-independence plan, explicit income/asset source selections, and horizon are session-only. Projection starts from the latest checkpoint date or today if none exist.
+- The bundled starter data lives in `public/configs/`.
+- Evaluation and behavior-simulation settings load from one CSV per behavior under `public/configs/behavior/`; edits made in the app remain session-only. The projection horizon is also session-only. Projection starts from the latest checkpoint date or today if none exist.
 - Financial independence is derived from annual expense coverage and a full principal-preservation cycle. A configurable minimum-net-worth rule gates cycle eligibility, while explicit continuing postings and shared account constraints drive reactive withdrawals. Monte Carlo confidence is aggregated from complete run outcomes, never inferred from percentile-band slope.
 - Baseline edits are persisted by the active data source, while what-if overrides remain session-only.
 
@@ -18,18 +18,24 @@ The current product-model summary lives in `REDESIGN_PLAN.md`.
 
 ## CSV Pack
 
-The app expects these files under `public/scenario/`:
+The app expects these files under `public/configs/`:
 
 - `accounts.csv`
 - `checkpoints.csv`
 - `postings.csv`
+- `behavior/financial-independence.csv`
+- `behavior/net-worth-threshold.csv`
+
+Each behavior file has the columns `order`, `instanceId`, `label`, `enabled`, and `config`. The behavior definition is inferred from the filename, `order` preserves global evaluation order across files, and `config` is JSON encoded as a CSV value. Both `order` and `instanceId` must be unique across behavior files, while multiple rows in one file configure multiple instances of that behavior.
+
+`financial-independence.csv` configures the branch behavior simulation, including source selections, continuing postings, withdrawal policy, and confidence. `net-worth-threshold.csv` configures a read-only path evaluation. New behavior definitions receive their own file in the same directory rather than adding rows to a shared evaluation file.
 
 ## Persistence Modes
 
-- Local development (`npm run dev`) uses the Vite middleware at `/api/scenario/pack`; saving writes back to `public/scenario/*.csv` in your checkout.
-- Static/serverless production, including Vercel, loads the bundled `/scenario/*.csv` files and saves baseline edits in the user's browser storage.
+- Local development (`npm run dev`) uses the Vite middleware at `/api/scenario/pack`; saving writes back to `public/configs/` in your checkout.
+- Static/serverless production, including Vercel, loads the bundled `/configs/` files and saves baseline edits in the user's browser storage.
 - Serverless deployments should not rely on writing files in the deployed app. Use a real backend data source if users need cross-device or shared persistence.
-- Do not deploy private real financial CSV files publicly in `public/scenario/`; those files are served as static assets.
+- Do not deploy private real financial CSV files publicly in `public/configs/`; those files are served as static assets.
 
 ## Run
 

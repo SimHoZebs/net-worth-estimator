@@ -7,7 +7,12 @@ import {
 	serializeCsvScenarioPack,
 } from "../src/lib/projection/sources/csv/csvLoader";
 import { validateCsvScenarioPack } from "../src/lib/projection/sources/csv/csvValidation";
-import type { ScenarioPack } from "../src/lib/projection/types/scenario";
+import {
+	type BehaviorCollectionKey,
+	CSV_BEHAVIOR_FILE_NAMES,
+	CSV_SCENARIO_FILE_NAMES,
+	type ScenarioPack,
+} from "../src/lib/projection/types/scenario";
 
 export interface CsvFilePluginOptions {
 	csvPath?: string;
@@ -27,12 +32,30 @@ function writeCsvFile(filePath: string, content: string): Promise<void> {
 }
 
 async function loadPack(csvPath: string): Promise<ScenarioParseResult> {
-	const accounts = await readCsvFile(path.join(csvPath, "accounts.csv"));
-	const checkpoints = await readCsvFile(path.join(csvPath, "checkpoints.csv"));
-	const postings = await readCsvFile(path.join(csvPath, "postings.csv"));
+	const accounts = await readCsvFile(
+		path.join(csvPath, CSV_SCENARIO_FILE_NAMES.accounts),
+	);
+	const checkpoints = await readCsvFile(
+		path.join(csvPath, CSV_SCENARIO_FILE_NAMES.checkpoints),
+	);
+	const postings = await readCsvFile(
+		path.join(csvPath, CSV_SCENARIO_FILE_NAMES.postings),
+	);
+	const behaviors = Object.fromEntries(
+		await Promise.all(
+			(
+				Object.entries(CSV_BEHAVIOR_FILE_NAMES) as Array<
+					[BehaviorCollectionKey, string]
+				>
+			).map(async ([key, fileName]) => [
+				key,
+				await readCsvFile(path.join(csvPath, fileName)),
+			]),
+		),
+	) as Record<BehaviorCollectionKey, string>;
 
 	const result = parseCsvScenarioPack(
-		{ accounts, checkpoints, postings },
+		{ accounts, behaviors, checkpoints, postings },
 		{ basePath: csvPath },
 	);
 
@@ -56,9 +79,22 @@ async function savePack(
 
 	const files = serializeCsvScenarioPack(pack);
 
-	await writeCsvFile(path.join(csvPath, "accounts.csv"), files.accounts);
-	await writeCsvFile(path.join(csvPath, "checkpoints.csv"), files.checkpoints);
-	await writeCsvFile(path.join(csvPath, "postings.csv"), files.postings);
+	await Promise.all([
+		...(
+			Object.entries(CSV_SCENARIO_FILE_NAMES) as Array<
+				[keyof typeof CSV_SCENARIO_FILE_NAMES, string]
+			>
+		).map(([key, fileName]) =>
+			writeCsvFile(path.join(csvPath, fileName), files[key]),
+		),
+		...(
+			Object.entries(CSV_BEHAVIOR_FILE_NAMES) as Array<
+				[BehaviorCollectionKey, string]
+			>
+		).map(([key, fileName]) =>
+			writeCsvFile(path.join(csvPath, fileName), files.behaviors[key]),
+		),
+	]);
 
 	return { pack, issues };
 }
@@ -72,7 +108,7 @@ export function csvFilePlugin(options: CsvFilePluginOptions = {}): Plugin {
 		configResolved(config) {
 			resolvedCsvPath = resolveCsvPath(
 				config.root,
-				options.csvPath ?? "public/scenario",
+				options.csvPath ?? "public/configs",
 			);
 		},
 		configureServer(server: ViteDevServer) {

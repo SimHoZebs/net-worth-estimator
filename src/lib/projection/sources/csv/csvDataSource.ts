@@ -16,7 +16,7 @@ export function createCsvDataSource(
 		sourceType: "csv-api",
 		label: "Repo CSV files",
 		description:
-			"Loaded through the Vite dev server; saved edits write back to public/scenario/*.csv in this checkout.",
+			"Loaded through the Vite dev server; saved edits write back to public/configs/ in this checkout.",
 		loadPack: async (): Promise<ScenarioParseResult> => {
 			const response = await fetchImpl(`${apiPath}/pack`);
 
@@ -31,7 +31,7 @@ export function createCsvDataSource(
 		save: {
 			label: "Save to CSV files",
 			description:
-				"Writes the edited scenario to public/scenario/*.csv through the local Vite dev server.",
+				"Writes the edited scenario to public/configs/ through the local Vite dev server.",
 			run: async (pack: ScenarioPack): Promise<ScenarioParseResult> => {
 				const response = await fetchImpl(`${apiPath}/pack`, {
 					method: "PUT",

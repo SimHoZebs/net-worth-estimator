@@ -24,9 +24,13 @@ function createCsvFetch() {
 				? validCsvFiles.accounts
 				: fileName === "checkpoints.csv"
 					? validCsvFiles.checkpoints
-					: fileName === "postings.csv"
-						? validCsvFiles.postings
-						: null;
+					: fileName === "financial-independence.csv"
+						? validCsvFiles.behaviors.financialIndependence
+						: fileName === "net-worth-threshold.csv"
+							? validCsvFiles.behaviors.netWorthThreshold
+							: fileName === "postings.csv"
+								? validCsvFiles.postings
+								: null;
 
 		return new Response(body ?? "", { status: body === null ? 404 : 200 });
 	});
@@ -41,7 +45,7 @@ describe("createBrowserCsvDataSource", () => {
 
 		expect(result.pack?.accounts).toHaveLength(4);
 		expect(result.issues).toEqual([]);
-		expect(fetchImpl).toHaveBeenCalledTimes(3);
+		expect(fetchImpl).toHaveBeenCalledTimes(5);
 		expect(dataSource.save).toBeUndefined();
 		expect(dataSource.reset).toBeUndefined();
 	});
@@ -63,6 +67,62 @@ describe("createBrowserCsvDataSource", () => {
 
 		expect(result.pack).toEqual(savedPack);
 		expect(fetchImpl).not.toHaveBeenCalled();
+	});
+
+	it("migrates a version 8 browser pack with bundled evaluations", async () => {
+		const storageKey = "scenario:test";
+		const currentPack = createBasePack({
+			sourcePath: "browser:local-storage",
+		});
+		const { evaluations: _evaluations, ...legacyPack } = currentPack;
+		const storage = createMemoryStorage({
+			[storageKey]: JSON.stringify({ ...legacyPack, version: 8 }),
+		});
+		const fetchImpl = createCsvFetch();
+		const dataSource = createBrowserCsvDataSource({
+			fetchImpl,
+			storage,
+			storageKey,
+		});
+
+		const result = await dataSource.loadPack();
+
+		expect(result.pack).toMatchObject({
+			version: 9,
+			sourcePath: "browser:local-storage",
+			accounts: currentPack.accounts,
+			evaluations: [{ instanceId: "net-worth-1m" }],
+		});
+		expect(fetchImpl).toHaveBeenCalledTimes(5);
+		expect(JSON.parse(storage.getItem(storageKey)!)).toMatchObject({
+			version: 9,
+			evaluations: [{ instanceId: "net-worth-1m" }],
+		});
+	});
+
+	it("loads a migrated version 8 pack when browser storage is read-only", async () => {
+		const currentPack = createBasePack({
+			sourcePath: "browser:local-storage",
+		});
+		const { evaluations: _evaluations, ...legacyPack } = currentPack;
+		const storage = {
+			getItem: vi.fn(() => JSON.stringify({ ...legacyPack, version: 8 })),
+			setItem: vi.fn(() => {
+				throw new Error("Storage is read-only");
+			}),
+			removeItem: vi.fn(),
+		};
+		const dataSource = createBrowserCsvDataSource({
+			fetchImpl: createCsvFetch(),
+			storage,
+		});
+
+		const result = await dataSource.loadPack();
+
+		expect(result.pack?.version).toBe(9);
+		expect(result.pack?.accounts).toEqual(currentPack.accounts);
+		expect(result.pack?.evaluations).toHaveLength(1);
+		expect(storage.setItem).toHaveBeenCalledOnce();
 	});
 
 	it("saves to browser storage and resets back to bundled CSV files", async () => {
@@ -87,6 +147,6 @@ describe("createBrowserCsvDataSource", () => {
 
 		expect(storage.getItem(storageKey)).toBeNull();
 		expect(result?.pack?.accounts).toHaveLength(4);
-		expect(fetchImpl).toHaveBeenCalledTimes(3);
+		expect(fetchImpl).toHaveBeenCalledTimes(5);
 	});
 });

@@ -8,7 +8,7 @@ export default defineConfig({
 	plugins: [
 		react(),
 		tailwindcss(),
-		csvFilePlugin({ csvPath: "./public/scenario" }),
+		csvFilePlugin({ csvPath: "./public/configs" }),
 	],
 	resolve: {
 		alias: {

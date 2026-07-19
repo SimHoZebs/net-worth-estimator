@@ -390,6 +390,7 @@ export const DEFAULT_EVALUATIONS: ConfiguredEvaluation[] = [
 
 interface SettingsSlice {
 	evaluations: ConfiguredEvaluation[];
+	replaceEvaluations: (evaluations: ConfiguredEvaluation[]) => void;
 	addEvaluation: (evaluation: ConfiguredEvaluation) => void;
 	duplicateEvaluation: (instanceId: string) => void;
 	updateEvaluation: (
@@ -413,6 +414,8 @@ const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (
 	set,
 ) => ({
 	evaluations: structuredClone(DEFAULT_EVALUATIONS),
+	replaceEvaluations: (evaluations) =>
+		set({ evaluations: structuredClone(evaluations) }),
 	addEvaluation: (evaluation) =>
 		set((state) =>
 			!evaluation.instanceId.trim() ||

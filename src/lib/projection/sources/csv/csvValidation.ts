@@ -1,6 +1,10 @@
 import { ParseError, parseArithmetic } from "../../simulation/arithmetic";
 import type { Posting, ScenarioPack } from "../../types/scenario";
-import { CSV_SCENARIO_FILE_NAMES } from "../../types/scenario";
+import {
+	CSV_BEHAVIOR_DEFINITION_IDS,
+	CSV_BEHAVIOR_FILE_NAMES,
+	CSV_SCENARIO_FILE_NAMES,
+} from "../../types/scenario";
 import type { ScenarioValidationIssue } from "../../types/validation";
 import { addIssue, rowPath } from "../../utils/validation";
 
@@ -28,6 +32,7 @@ function validateUniqueIds(
 	fileName: string,
 	codePrefix: string,
 	rows: Array<{ id: string }>,
+	idColumn = "id",
 ) {
 	const firstSeenRowById = new Map<string, number>();
 
@@ -41,12 +46,46 @@ function validateUniqueIds(
 				"error",
 				`${codePrefix}.duplicate`,
 				`ID '${row.id}' is duplicated. First seen on row ${firstSeenRow}.`,
-				rowPath(fileName, rowNumber, "id"),
+				rowPath(fileName, rowNumber, idColumn),
 			);
 			return;
 		}
 
 		firstSeenRowById.set(row.id, rowNumber);
+	});
+}
+
+function validateEvaluationInstanceIds(
+	issues: ScenarioValidationIssue[],
+	pack: ScenarioPack,
+) {
+	const fileNameByDefinitionId = new Map<string, string>(
+		Object.keys(CSV_BEHAVIOR_FILE_NAMES).map((key) => [
+			CSV_BEHAVIOR_DEFINITION_IDS[
+				key as keyof typeof CSV_BEHAVIOR_DEFINITION_IDS
+			],
+			CSV_BEHAVIOR_FILE_NAMES[key as keyof typeof CSV_BEHAVIOR_FILE_NAMES],
+		]),
+	);
+	const seenInstanceIds = new Set<string>();
+
+	pack.evaluations.forEach((evaluation) => {
+		const fileName =
+			fileNameByDefinitionId.get(evaluation.definitionId) ??
+			`behavior/${evaluation.definitionId}.csv`;
+
+		if (seenInstanceIds.has(evaluation.instanceId)) {
+			addIssue(
+				issues,
+				"error",
+				"evaluation.instanceId.duplicate",
+				`ID '${evaluation.instanceId}' is duplicated across behavior configuration files.`,
+				[fileName],
+			);
+			return;
+		}
+
+		seenInstanceIds.add(evaluation.instanceId);
 	});
 }
 
@@ -259,6 +298,7 @@ export function validateCsvScenarioPack(
 		"posting.id",
 		pack.postings,
 	);
+	validateEvaluationInstanceIds(issues, pack);
 
 	pack.accounts.forEach((account, index) => {
 		if (postingIds.has(account.id)) {

@@ -1,7 +1,7 @@
-export const SCENARIO_MODEL_VERSION = 8 as const;
+export const SCENARIO_MODEL_VERSION = 9 as const;
 
-export const CSV_SCENARIO_REPO_PATH = "public/scenario";
-export const CSV_SCENARIO_PUBLIC_PATH = "/scenario";
+export const CSV_SCENARIO_REPO_PATH = "public/configs";
+export const CSV_SCENARIO_PUBLIC_PATH = "/configs";
 
 export const CSV_SCENARIO_FILE_NAMES = {
 	accounts: "accounts.csv",
@@ -9,9 +9,21 @@ export const CSV_SCENARIO_FILE_NAMES = {
 	postings: "postings.csv",
 } as const;
 
+export const CSV_BEHAVIOR_FILE_NAMES = {
+	financialIndependence: "behavior/financial-independence.csv",
+	netWorthThreshold: "behavior/net-worth-threshold.csv",
+} as const;
+
+export const CSV_BEHAVIOR_DEFINITION_IDS = {
+	financialIndependence: "financial-independence",
+	netWorthThreshold: "net-worth-threshold",
+} as const;
+
 export type ScenarioCollectionKey = keyof typeof CSV_SCENARIO_FILE_NAMES;
+export type BehaviorCollectionKey = keyof typeof CSV_BEHAVIOR_FILE_NAMES;
 export type ScenarioFileName =
-	(typeof CSV_SCENARIO_FILE_NAMES)[ScenarioCollectionKey];
+	| (typeof CSV_SCENARIO_FILE_NAMES)[ScenarioCollectionKey]
+	| (typeof CSV_BEHAVIOR_FILE_NAMES)[BehaviorCollectionKey];
 
 export type IsoDate = string;
 
@@ -146,12 +158,14 @@ export interface ScenarioPack {
 	sourcePath: string;
 	accounts: Account[];
 	checkpoints: Checkpoint[];
+	evaluations: ConfiguredEvaluation[];
 	postings: Posting[];
 }
 
 export interface ScenarioFileContents {
 	accounts: string;
 	checkpoints: string;
+	behaviors: Record<BehaviorCollectionKey, string>;
 	postings: string;
 }
 

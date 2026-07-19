@@ -10,6 +10,10 @@ import { validateCsvScenarioPack } from "./csvValidation";
 const DEFAULT_STORAGE_KEY = "net-worth-estimator:scenario-pack:v1";
 const BROWSER_STORAGE_SOURCE_PATH = "browser:local-storage";
 
+type LegacyScenarioPack = Omit<ScenarioPack, "evaluations" | "version"> & {
+	version: 8;
+};
+
 export interface BrowserCsvDataSourceOptions {
 	basePath?: string;
 	fetchImpl?: typeof fetch;
@@ -42,6 +46,19 @@ function isScenarioPack(value: unknown): value is ScenarioPack {
 		typeof value.sourcePath === "string" &&
 		Array.isArray(value.accounts) &&
 		Array.isArray(value.checkpoints) &&
+		Array.isArray(value.evaluations) &&
+		Array.isArray(value.postings)
+	);
+}
+
+function isLegacyScenarioPack(value: unknown): value is LegacyScenarioPack {
+	if (!isRecord(value)) return false;
+
+	return (
+		value.version === 8 &&
+		typeof value.sourcePath === "string" &&
+		Array.isArray(value.accounts) &&
+		Array.isArray(value.checkpoints) &&
 		Array.isArray(value.postings)
 	);
 }
@@ -49,13 +66,17 @@ function isScenarioPack(value: unknown): value is ScenarioPack {
 function readSavedPack(
 	storage: Pick<Storage, "getItem" | "setItem" | "removeItem">,
 	storageKey: string,
-): ScenarioPack | null {
+): LegacyScenarioPack | ScenarioPack | null {
 	try {
 		const serialized = storage.getItem(storageKey);
 		if (!serialized) return null;
 
 		const parsed = JSON.parse(serialized) as unknown;
-		return isScenarioPack(parsed) ? parsed : null;
+		return isScenarioPack(parsed)
+			? parsed
+			: isLegacyScenarioPack(parsed)
+				? parsed
+				: null;
 	} catch {
 		return null;
 	}
@@ -82,15 +103,35 @@ export function createBrowserCsvDataSource(
 		sourceType: "csv-browser",
 		label: "Browser-local scenario",
 		description: storage
-			? "Loads the bundled /scenario CSV files first, then saves edits in this browser's local storage."
-			: "Loads the bundled /scenario CSV files. Browser storage is unavailable, so baseline edits cannot be saved.",
+			? "Loads the bundled /configs CSV files first, then saves edits in this browser's local storage."
+			: "Loads the bundled /configs CSV files. Browser storage is unavailable, so baseline edits cannot be saved.",
 		loadPack: async (): Promise<ScenarioParseResult> => {
 			const savedPack = storage ? readSavedPack(storage, storageKey) : null;
 
-			if (savedPack) {
+			if (savedPack?.version === SCENARIO_MODEL_VERSION) {
 				return {
 					pack: savedPack,
 					issues: validateCsvScenarioPack(savedPack),
+				};
+			}
+
+			if (savedPack?.version === 8 && storage) {
+				const bundled = await loadBundledPack(basePath, fetchImpl);
+				if (!bundled.pack) return bundled;
+
+				const migrated: ScenarioPack = {
+					...savedPack,
+					version: SCENARIO_MODEL_VERSION,
+					evaluations: bundled.pack.evaluations,
+				};
+				try {
+					storage.setItem(storageKey, JSON.stringify(migrated));
+				} catch {
+					// A read-only or full cache must not prevent loading the migrated pack.
+				}
+				return {
+					pack: migrated,
+					issues: validateCsvScenarioPack(migrated),
 				};
 			}
 
@@ -119,7 +160,7 @@ export function createBrowserCsvDataSource(
 			? {
 					label: "Reset to bundled CSV",
 					description:
-						"Deletes the browser-local scenario and reloads the deployed /scenario CSV files.",
+						"Deletes the browser-local scenario and reloads the deployed /configs CSV files.",
 					run: async (): Promise<ScenarioParseResult> => {
 						storage.removeItem(storageKey);
 						return loadBundledPack(basePath, fetchImpl);

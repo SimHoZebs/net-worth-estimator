@@ -2,7 +2,7 @@ import type { FinancialIndependencePlan } from "@/lib/projection";
 import type { FinancialIndependenceTemplateInput } from "./types";
 
 /**
- * Starter FI assumptions for the bundled scenario in public/scenario.
+ * Starter FI assumptions for the bundled configuration in public/configs.
  * IDs are explicit so growth and spendable income are never inferred.
  */
 export const STARTER_FINANCIAL_INDEPENDENCE_TEMPLATE_INPUT: FinancialIndependenceTemplateInput =

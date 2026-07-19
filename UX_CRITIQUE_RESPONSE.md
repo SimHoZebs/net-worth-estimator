@@ -427,7 +427,7 @@ To get actual comparison data, users would need to restore a snapshot, re-run, a
 **Recommendation:** Explicitly separate: Baseline data → Scenario overrides → Projection settings → Diagnostics.
 
 **What was built:** Status bar at top shows:
-- "Baseline loaded from /scenario"
+- "Baseline loaded from /configs"
 - "X temporary scenario override(s)"
 - "Editing baseline" / "Unsaved baseline edits"
 - "Projection settings are session-only"
@@ -445,7 +445,7 @@ To get actual comparison data, users would need to restore a snapshot, re-run, a
 **Not built:**
 - ❌ "Loaded from X, last updated Y, N accounts, M transactions" compact summary line
 
-**Divergence:** The status bar shows a lighter version: "Baseline loaded from /scenario" with account/transaction counts in the assumptions card metadata. The full inspector is one click away.
+**Divergence:** The status bar shows a lighter version: "Baseline loaded from /configs" with account/transaction counts in the assumptions card metadata. The full inspector is one click away.
 
 ---
 

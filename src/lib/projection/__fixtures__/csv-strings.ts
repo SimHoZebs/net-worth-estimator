@@ -19,6 +19,13 @@ export const validCsvFiles: ScenarioFileContents = {
 		"2026-03-31,brokerage,79500",
 		"2026-03-31,student_loan,-12150",
 	].join("\n"),
+	behaviors: {
+		financialIndependence: "order,instanceId,label,enabled,config",
+		netWorthThreshold: [
+			"order,instanceId,label,enabled,config",
+			'1,net-worth-1m,"Reach $1,000,000 net worth",true,"{""target"":1000000}"',
+		].join("\n"),
+	},
 	postings: [
 		postingsHeader,
 		"salary,Salary,,checking,15000,monthly,0,0.03,0,2026-04-01,,,1,true",
@@ -37,6 +44,7 @@ export const nullMinMaxCsvFiles: ScenarioFileContents = {
 	checkpoints: ["Date,AccountId,Balance", "2026-03-31,checking,1000"].join(
 		"\n",
 	),
+	behaviors: validCsvFiles.behaviors,
 	postings: [
 		postingsHeader,
 		"salary,Salary,,checking,1000,monthly,0,0,0,2026-04-01,,,1,true",

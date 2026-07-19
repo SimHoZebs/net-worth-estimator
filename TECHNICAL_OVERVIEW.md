@@ -15,11 +15,11 @@ The Net Worth Estimator is a single-page React application that projects net wor
 
 ## 2. High-Level Architecture & Data Flow
 
-The application loads a scenario pack through a capability-based `DataSource` abstraction, validates it, and runs projections in dedicated Web Workers. Local development uses a Vite server plugin to read/write repo CSV files, while static/serverless production loads bundled `/scenario/*.csv` files and saves user edits in browser storage. Temporary what-if overrides and ordered evaluation instances exist only in browser memory via Zustand for the current session.
+The application loads a scenario pack through a capability-based `DataSource` abstraction, validates it, and runs projections in dedicated Web Workers. Local development uses a Vite server plugin to read/write repo configuration files, while static/serverless production loads bundled `/configs/` files and saves user edits in browser storage. Evaluation instances and their behavior configuration are initialized from one file per definition under `configs/behavior/`; subsequent UI edits and temporary what-if overrides exist only in browser memory for the current session.
 
 ### Data Flow Execution
 
-1. `App.tsx` creates one `DataSource`: Vite dev uses `createCsvDataSource()` for `GET/PUT /api/scenario/pack`; production uses `createBrowserCsvDataSource()` to fetch `/scenario/*.csv` and persist edits in browser storage.
+1. `App.tsx` creates one `DataSource`: Vite dev uses `createCsvDataSource()` for `GET/PUT /api/scenario/pack`; production uses `createBrowserCsvDataSource()` to fetch `/configs/` and persist edits in browser storage.
 2. `src/hooks/useScenario.ts` wraps TanStack Query (`useScenarioQuery`, `useScenarioMutation`, `useScenarioResetMutation`) around the `DataSource` interface, which is created once in `App.tsx` via `useMemo` and passed via dependency injection.
 3. Zod-based parsing plus cross-reference validation rejects invalid packs before projection.
 4. What-if state (temporary postings, accounts, checkpoints, disable toggles) is stored in Zustand with immutable-style updates.
@@ -35,7 +35,7 @@ The application loads a scenario pack through a capability-based `DataSource` ab
 - `Account`: tracked signed balances with daily-compounded `annualRate`
 - `Checkpoint`: historical truth for account balances on exact dates
 - `Posting`: generic scheduled rules for future inflows, outflows, and transfers. Supports `volatility` for stochastic sampling.
-- `ProjectionRuntimeSettings`: fallback start date, projection horizon, and ordered session-only configured evaluations with stable instance IDs
+- `ProjectionRuntimeSettings`: fallback start date, projection horizon, and ordered configured evaluations with stable instance IDs; evaluations initialize from CSV and can then be edited for the session
 - `ConfiguredEvaluation`: serializable definition ID, stable instance ID, label, enabled state, and definition-owned configuration. Multiple instances may use the same definition.
 - `EvaluationResultCollection`: ordered instance IDs plus generic result envelopes keyed by instance ID; evaluator-specific bodies remain behind typed accessors.
 - Configured evaluation configs and public result bodies are finite JSON values. Registries, functions, maps, accumulators, and projection paths remain worker-internal.
