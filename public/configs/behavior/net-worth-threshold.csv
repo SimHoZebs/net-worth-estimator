@@ -1,0 +1,2 @@
+order,instanceId,label,enabled,config
+2,net-worth-1m,"Reach $1,000,000 net worth",true,"{""target"":1000000}"

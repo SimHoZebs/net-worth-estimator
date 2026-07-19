@@ -879,7 +879,7 @@ Explicitly separate:
 
 Add a visible state summary:
 
-> Baseline loaded from `/scenario`. You have 2 unsaved scenario overrides. Projection settings are session-only.
+> Baseline loaded from `/configs`. You have 2 unsaved scenario overrides. Projection settings are session-only.
 
 ---
 
@@ -891,7 +891,7 @@ The source data section consumes significant visual space even when the data is 
 
 Collapse it to a compact status unless there is an issue:
 
-> Data loaded from `/scenario`, last updated May 3, 2026. 10 accounts, 16 scheduled transactions, 14 balance checkpoints. View diagnostics.
+> Data loaded from `/configs`, last updated May 3, 2026. 10 accounts, 16 scheduled transactions, 14 balance checkpoints. View diagnostics.
 
 Show the full source data cards only in diagnostics.
 
@@ -1273,4 +1273,3 @@ The app should lead with:
 * and where to inspect the raw data only when needed.
 
 Right now, the interface is strongest as a developer diagnostic tool. With better hierarchy, clearer language, scenario comparison, and progressive disclosure, it can become a genuinely useful financial decision-support product.
-

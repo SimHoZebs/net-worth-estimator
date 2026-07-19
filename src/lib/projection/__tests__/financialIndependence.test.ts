@@ -98,6 +98,7 @@ function path(
 			accounts,
 			postings,
 			checkpoints: [],
+			evaluations: [],
 		},
 		projectionStartDate: "2026-01-01",
 		projectionEndDate,

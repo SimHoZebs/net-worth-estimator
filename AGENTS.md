@@ -104,7 +104,7 @@ Selectors: `selectActiveOverrideCount`, `selectWhatIfState`, `selectEditorState`
 
 | Type                         | Location                             | Purpose                                                   |
 | ---------------------------- | ------------------------------------ | --------------------------------------------------------- |
-| `ScenarioPack`               | `lib/projection/types/scenario.ts`   | accounts + postings + checkpoints                         |
+| `ScenarioPack`               | `lib/projection/types/scenario.ts`   | accounts + postings + checkpoints + configured evaluations |
 | `ProjectionResult`           | same                                 | Projection output plus ordered generic evaluation envelopes |
 | `StochasticProjectionResult` | `lib/projection/types/stochastic.ts` | Monte Carlo bands plus ordered generic evaluation envelopes |
 | `ScenarioWhatIfState`        | `lib/projection/types/scenario.ts`   | Temporary overrides (added + disabled ID arrays)          |

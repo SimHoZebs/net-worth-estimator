@@ -6,8 +6,8 @@ export function createBasePack(
 	overrides: Partial<ScenarioPack> = {},
 ): ScenarioPack {
 	return {
-		version: 8,
-		sourcePath: "/scenario",
+		version: 9,
+		sourcePath: "/configs",
 		accounts: [
 			makeAccount({ id: "checking" }),
 			makeAccount({ id: "brokerage" }),
@@ -18,6 +18,7 @@ export function createBasePack(
 			{ Date: "2026-01-31", AccountId: "brokerage", Balance: 1200 },
 			{ Date: "2026-01-31", AccountId: "loan", Balance: -400 },
 		],
+		evaluations: [],
 		postings: [
 			makePosting({
 				id: "salary",

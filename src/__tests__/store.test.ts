@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import type { ScenarioPack } from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
 import {
 	DEFAULT_EVALUATIONS,
@@ -45,38 +46,10 @@ function makeCheckpoint(date = "2025-01-01", accountId = "a1", balance = 1000) {
 	return { Date: date, AccountId: accountId, Balance: balance };
 }
 
-function makeScenarioPack(): {
-	version: 8;
-	sourcePath: string;
-	accounts: Array<{
-		id: string;
-		label: string;
-		minBalance: number;
-		maxBalance: number;
-		color: null;
-		enabled: boolean;
-	}>;
-	checkpoints: Array<{ Date: string; AccountId: string; Balance: number }>;
-	postings: Array<{
-		id: string;
-		label: string;
-		sourceAccountId: null;
-		destinations: null;
-		arithmetic: string;
-		frequency: "monthly";
-		annualRate: number;
-		annualGrowthRate: number;
-		volatility: number;
-		startDate: string;
-		endDate: null;
-		annualCap: null;
-		priority: number;
-		enabled: boolean;
-	}>;
-} {
+function makeScenarioPack(): ScenarioPack {
 	return {
-		version: 8,
-		sourcePath: "/scenario",
+		version: 9,
+		sourcePath: "/configs",
 		accounts: [
 			{
 				id: "a1",
@@ -88,6 +61,7 @@ function makeScenarioPack(): {
 			},
 		],
 		checkpoints: [{ Date: "2025-01-01", AccountId: "a1", Balance: 1000 }],
+		evaluations: structuredClone(DEFAULT_EVALUATIONS),
 		postings: [makePosting("p1")],
 	};
 }
@@ -442,6 +416,14 @@ describe("Settings slice", () => {
 		const updated = useStore.getState().evaluations[0];
 		expect(updated.instanceId).toBe(evaluation.instanceId);
 		expect(updated.config).toMatchObject({ annualExpenseTarget: 50_000 });
+	});
+
+	it("replaces evaluation settings from a scenario without retaining references", () => {
+		const evaluations = structuredClone(DEFAULT_EVALUATIONS);
+		useStore.getState().replaceEvaluations(evaluations);
+
+		evaluations[0]!.label = "Changed outside the store";
+		expect(useStore.getState().evaluations).toEqual(DEFAULT_EVALUATIONS);
 	});
 
 	it("duplicates and reorders evaluation instances with unique stable IDs", () => {
