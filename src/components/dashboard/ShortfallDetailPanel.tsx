@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
 	Table,
 	TableBody,
@@ -65,6 +66,26 @@ export function ShortfallDetailPanel({
 
 	const lastPeriodRow = periodRows[periodRows.length - 1];
 
+	const prevRowBalances = useMemo(() => {
+		const map = new Map<string, number>();
+		if (prevRow?.accountSnapshots) {
+			for (const snapshot of prevRow.accountSnapshots) {
+				map.set(snapshot.accountId, snapshot.balance);
+			}
+		}
+		return map;
+	}, [prevRow]);
+
+	const lastPeriodRowBalances = useMemo(() => {
+		const map = new Map<string, number>();
+		if (lastPeriodRow?.accountSnapshots) {
+			for (const snapshot of lastPeriodRow.accountSnapshots) {
+				map.set(snapshot.accountId, snapshot.balance);
+			}
+		}
+		return map;
+	}, [lastPeriodRow]);
+
 	const { cascadeAccounts, cascadeStepsByAccount } = (() => {
 		const map = new Map<string, CascadeStep[]>();
 		const constrainedAccountIds = new Set<string>();
@@ -107,10 +128,7 @@ export function ShortfallDetailPanel({
 					(postingById[left.postingId]?.priority ?? 0) -
 					(postingById[right.postingId]?.priority ?? 0),
 			);
-			const start =
-				prevRow?.accountSnapshots.find(
-					(snapshot) => snapshot.accountId === accountId,
-				)?.balance ?? 0;
+			const start = prevRowBalances.get(accountId) ?? 0;
 			let running = start;
 			for (const step of steps) {
 				running += step.delta;
@@ -139,14 +157,8 @@ export function ShortfallDetailPanel({
 
 			{cascadeAccounts.map((account) => {
 				const steps = cascadeStepsByAccount.get(account.id) ?? [];
-				const startBalance =
-					prevRow?.accountSnapshots.find(
-						(snapshot) => snapshot.accountId === account.id,
-					)?.balance ?? 0;
-				const endBalance =
-					lastPeriodRow?.accountSnapshots.find(
-						(snapshot) => snapshot.accountId === account.id,
-					)?.balance ?? 0;
+				const startBalance = prevRowBalances.get(account.id) ?? 0;
+				const endBalance = lastPeriodRowBalances.get(account.id) ?? 0;
 				const change = endBalance - startBalance;
 				const changeColor =
 					change > 0
