@@ -8,10 +8,16 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { currency, formatDate } from "@/lib/format";
-import type { Account, Posting, ProjectionRow } from "@/lib/projection";
+import type {
+	Account,
+	Posting,
+	PostingFulfillmentPathResult,
+	ProjectionRow,
+} from "@/lib/projection";
 import { ShortfallDetailPanel } from "./ShortfallDetailPanel";
 
 interface ShortfallCalendarProps {
+	fulfillment: PostingFulfillmentPathResult | null;
 	rows: ProjectionRow[];
 	postings: Posting[];
 	accounts: Account[];
@@ -22,7 +28,7 @@ interface ShortfallDay {
 	label: string;
 	requestedPostingAmount: number;
 	realizedPostingAmount: number;
-	clampedPostingShortfallAmount: number;
+	unfulfilledAmount: number;
 	netWorth: number;
 }
 
@@ -39,6 +45,7 @@ function formatIsoDateLocal(date: Date): string {
 }
 
 export const ShortfallCalendar = memo(function ShortfallCalendar({
+	fulfillment,
 	rows,
 	postings,
 	accounts,
@@ -51,41 +58,21 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 		return map;
 	}, [postings]);
 
-	const postingLabelById = useMemo(() => {
-		const map: Record<string, string> = {};
-		for (const posting of postings) map[posting.id] = posting.label;
-		return map;
-	}, [postings]);
-
 	const shortfallDays = useMemo(() => {
-		const data = new Map<string, Omit<ShortfallDay, "date" | "label">>();
-		for (const row of rows) {
-			if (row.isHistorical || row.clampedPostingShortfallAmount <= 0) continue;
-			const existing = data.get(row.date);
-			if (existing) {
-				existing.requestedPostingAmount += row.requestedPostingAmount;
-				existing.realizedPostingAmount += row.realizedPostingAmount;
-				existing.clampedPostingShortfallAmount +=
-					row.clampedPostingShortfallAmount;
-				existing.netWorth = row.netWorth;
-			} else {
-				data.set(row.date, {
-					requestedPostingAmount: row.requestedPostingAmount,
-					realizedPostingAmount: row.realizedPostingAmount,
-					clampedPostingShortfallAmount: row.clampedPostingShortfallAmount,
-					netWorth: row.netWorth,
-				});
-			}
-		}
-
-		return Array.from(data.entries())
-			.map(([date, day]) => ({
-				date,
-				label: formatDate(date),
-				...day,
-			}))
-			.sort((left, right) => left.date.localeCompare(right.date));
-	}, [rows]);
+		if (!fulfillment) return [];
+		return fulfillment.dates
+			.filter((day) => day.unfulfilledAmount > 0)
+			.map(
+				(day): ShortfallDay => ({
+					date: day.date,
+					label: formatDate(day.date),
+					requestedPostingAmount: day.requestedAmount,
+					realizedPostingAmount: day.realizedAmount,
+					unfulfilledAmount: day.unfulfilledAmount,
+					netWorth: rows.find((row) => row.date === day.date)?.netWorth ?? 0,
+				}),
+			);
+	}, [fulfillment, rows]);
 
 	const shortfallDayByDate = useMemo(() => {
 		const map = new Map<string, ShortfallDay>();
@@ -100,11 +87,12 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 	const selectedDay = selectedDateIso
 		? (shortfallDayByDate.get(selectedDateIso) ?? null)
 		: null;
-	const selectedDateRows = selectedDay
-		? rows.filter((row) => !row.isHistorical && row.date === selectedDay.date)
+	const selectedEvents = selectedDay
+		? (fulfillment?.events.filter((event) => event.date === selectedDay.date) ??
+			[])
 		: [];
 	const totalShortfall = shortfallDays.reduce(
-		(total, day) => total + day.clampedPostingShortfallAmount,
+		(total, day) => total + day.unfulfilledAmount,
 		0,
 	);
 	const firstShortfallDate = shortfallDays[0]?.date
@@ -118,15 +106,19 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 		<Card className="rounded-[1.6rem] border-border/80">
 			<CardHeader>
 				<div>
-					<CardTitle>Shortfall calendar</CardTitle>
+					<CardTitle>Underfulfillment calendar</CardTitle>
 					<CardDescription>
-						Dates where scheduled transactions cannot be fully funded. Select a
-						highlighted day for cash-flow detail.
+						Dates where account constraints limit scheduled transactions. Select
+						a highlighted day for movement detail.
 					</CardDescription>
 				</div>
 			</CardHeader>
 			<CardContent>
-				{shortfallDays.length > 0 ? (
+				{!fulfillment ? (
+					<div className="rounded-2xl border border-border/80 bg-muted/40 px-4 py-6 type-body text-muted-foreground">
+						Posting-fulfillment evaluation is unavailable.
+					</div>
+				) : shortfallDays.length > 0 ? (
 					<div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
 						<div className="rounded-2xl border border-border/80 bg-surface/75 p-3 dark:border-white/10 dark:bg-surface/55">
 							<Calendar
@@ -158,7 +150,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 						<div className="space-y-3 rounded-2xl border border-tertiary-border/80 bg-tertiary-subtle/80 p-4 shadow-inner shadow-white/20 dark:shadow-black/20">
 							<div>
 								<div className="text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
-									Shortfall dates
+									Underfulfilled dates
 								</div>
 								<div className="mt-1 type-metric text-tertiary-foreground">
 									{currency.format(totalShortfall)}
@@ -182,7 +174,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 												{day.label}
 											</span>
 											<span className="type-caption type-value font-semibold text-tertiary-foreground">
-												{currency.format(day.clampedPostingShortfallAmount)}
+												{currency.format(day.unfulfilledAmount)}
 											</span>
 										</div>
 										<div className="mt-1 type-caption text-tertiary-foreground/70">
@@ -203,7 +195,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 					</div>
 				) : (
 					<div className="rounded-2xl border border-primary-border/80 bg-primary-subtle/80 px-4 py-6 type-body text-primary">
-						No projected shortfalls are scheduled within the horizon.
+						No posting requests are underfulfilled within the horizon.
 					</div>
 				)}
 			</CardContent>
@@ -223,12 +215,12 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 						<div className="mb-4 flex items-start justify-between gap-4">
 							<div>
 								<div className="text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
-									Projected shortfall
+									Projected underfulfillment
 								</div>
 								<h3 className="mt-1 type-title">{selectedDay.label}</h3>
 								<p className="mt-1 type-muted">
-									{currency.format(selectedDay.clampedPostingShortfallAmount)}{" "}
-									unfunded on this date.
+									{currency.format(selectedDay.unfulfilledAmount)} constrained
+									on this date.
 								</p>
 							</div>
 							<button
@@ -243,10 +235,9 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 						<ShortfallDetailPanel
 							periodStartDate={selectedDay.date}
 							periodLabel={selectedDay.label}
-							periodRows={selectedDateRows}
+							events={selectedEvents}
 							rows={rows}
 							postingById={postingById}
-							postingLabelById={postingLabelById}
 							accounts={accounts}
 						/>
 					</div>

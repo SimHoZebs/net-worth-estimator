@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { projectScenarioPack } from "../";
+import {
+	getPostingFulfillmentResult,
+	type PostingFulfillmentPathResult,
+	type ProjectionResult,
+	projectScenarioPack,
+} from "../";
 import {
 	createBasePack,
 	makeAccount,
@@ -17,6 +22,22 @@ function getBalance(
 ): number {
 	return (
 		row?.accountSnapshots?.find((s) => s.accountId === accountId)?.balance ?? 0
+	);
+}
+
+function fulfillment(result: ProjectionResult): PostingFulfillmentPathResult {
+	const value = getPostingFulfillmentResult(result)?.deterministic;
+	if (!value) throw new Error("Expected posting fulfillment result.");
+	return value;
+}
+
+function postingEvent(
+	result: ProjectionResult,
+	postingId: string,
+	date?: string,
+) {
+	return fulfillment(result).events.find(
+		(event) => event.postingId === postingId && (!date || event.date === date),
 	);
 }
 
@@ -39,8 +60,8 @@ describe("CSV projection engine", () => {
 		expect(getBalance(result.timeline.rows[2], "checking")).toBe(1600);
 		expect(result.timeline.rows[3]?.internalTransferAmount).toBe(900);
 		expect(getBalance(result.timeline.rows[3], "brokerage")).toBe(2100);
-		expect(result.timeline.rows[4]?.requestedPostingAmount).toBe(250);
-		expect(result.timeline.rows[4]?.realizedPostingAmount).toBe(250);
+		expect(postingEvent(result, "paydown")?.requestedAmount).toBe(250);
+		expect(postingEvent(result, "paydown")?.realizedAmount).toBe(250);
 		expect(getBalance(result.timeline.rows[4], "loan")).toBe(-150);
 		expect(result.summary.currentNetWorth).toBe(1600);
 		expect(result.summary.finalNetWorth).toBe(2400);
@@ -74,15 +95,22 @@ describe("CSV projection engine", () => {
 		});
 
 		const result = projectScenarioPack(pack, makeSettings({ horizonYears: 2 }));
-		const rowByDate = new Map(
-			result.timeline.rows.map((row) => [row.date, row]),
-		);
 
-		expect(rowByDate.get("2026-01-15")?.realizedPostingAmount).toBe(200);
-		expect(rowByDate.get("2026-02-15")?.realizedPostingAmount).toBe(200);
-		expect(rowByDate.get("2026-03-15")?.realizedPostingAmount).toBe(100);
-		expect(rowByDate.get("2026-04-15")?.realizedPostingAmount).toBe(0);
-		expect(rowByDate.get("2027-01-15")?.realizedPostingAmount).toBe(200);
+		expect(postingEvent(result, "capped", "2026-01-15")?.realizedAmount).toBe(
+			200,
+		);
+		expect(postingEvent(result, "capped", "2026-02-15")?.realizedAmount).toBe(
+			200,
+		);
+		expect(postingEvent(result, "capped", "2026-03-15")?.realizedAmount).toBe(
+			100,
+		);
+		expect(postingEvent(result, "capped", "2026-04-15")?.realizedAmount).toBe(
+			0,
+		);
+		expect(postingEvent(result, "capped", "2027-01-15")?.realizedAmount).toBe(
+			200,
+		);
 	});
 
 	it("supports same-day percent_of_base chains in priority order", () => {
@@ -118,12 +146,8 @@ describe("CSV projection engine", () => {
 
 		const result = projectScenarioPack(pack, makeSettings());
 
-		expect(
-			result.timeline.rows[0]?.requestedPostingAmountsById.employee_k401,
-		).toBe(100);
-		expect(
-			result.timeline.rows[0]?.requestedPostingAmountsById.employer_match,
-		).toBe(50);
+		expect(postingEvent(result, "employee_k401")?.requestedAmount).toBe(100);
+		expect(postingEvent(result, "employer_match")?.requestedAmount).toBe(50);
 		expect(result.timeline.rows[0]?.externalInflowAmount).toBe(1150);
 		expect(getBalance(result.timeline.rows[0], "checking")).toBe(1000);
 		expect(getBalance(result.timeline.rows[0], "k401")).toBe(150);
@@ -153,21 +177,18 @@ describe("CSV projection engine", () => {
 
 		const result = projectScenarioPack(pack, makeSettings());
 
-		expect(result.timeline.rows[1]?.requestedPostingAmount).toBe(400);
-		expect(result.timeline.rows[1]?.realizedPostingAmount).toBe(250);
-		expect(result.timeline.rows[1]?.clampedPostingShortfallAmount).toBe(150);
-		expect(result.postingSummaries[0]).toMatchObject({
+		expect(fulfillment(result)).toMatchObject({
+			requestedAmount: 400,
+			realizedAmount: 250,
+			unfulfilledAmount: 150,
+		});
+		expect(fulfillment(result).postings[0]).toMatchObject({
 			postingId: "loan_payment",
 			requestedAmount: 400,
 			realizedAmount: 250,
 			utilizationRate: 0.625,
-			firstShortfallDate: "2026-01-10",
-			shortfallAmount: 150,
-		});
-		expect(result.totals).toMatchObject({
-			requestedPostingAmount: 400,
-			realizedPostingAmount: 250,
-			clampedPostingShortfallAmount: 150,
+			firstUnderfulfilledDate: "2026-01-10",
+			unfulfilledAmount: 150,
 		});
 		expect(getBalance(result.timeline.rows[1], "checking")).toBe(0);
 		expect(getBalance(result.timeline.rows[1], "loan")).toBe(-50);
@@ -320,7 +341,7 @@ describe("CSV projection engine", () => {
 		expect(getBalance(row, "loan_interest")).toBeGreaterThan(-100);
 		expect(getBalance(row, "loan_principal")).toBeGreaterThan(-1000);
 		expect(row.netWorth).toBeGreaterThan(-1100);
-		expect(row.realizedPostingAmount).toBe(210);
+		expect(fulfillment(result).realizedAmount).toBe(210);
 		expect(getBalance(row, "checking")).toBe(800);
 	});
 
@@ -348,9 +369,11 @@ describe("CSV projection engine", () => {
 
 		const result = projectScenarioPack(pack, makeSettings());
 
-		expect(result.timeline.rows[1]?.requestedPostingAmount).toBe(400);
-		expect(result.timeline.rows[1]?.realizedPostingAmount).toBe(300);
-		expect(result.timeline.rows[1]?.clampedPostingShortfallAmount).toBe(100);
+		expect(fulfillment(result)).toMatchObject({
+			requestedAmount: 400,
+			realizedAmount: 300,
+			unfulfilledAmount: 100,
+		});
 		expect(getBalance(result.timeline.rows[1], "loan")).toBe(0);
 		expect(getBalance(result.timeline.rows[1], "checking")).toBe(100);
 		expect(result.timeline.rows[1]?.netWorth).toBe(100);
@@ -380,8 +403,10 @@ describe("CSV projection engine", () => {
 		const result = projectScenarioPack(pack, makeSettings());
 		const raw = projectRawScenarioPack(pack, makeSettings());
 
-		expect(result.timeline.rows[1]?.realizedPostingAmount).toBe(200);
-		expect(result.timeline.rows[1]?.clampedPostingShortfallAmount).toBe(200);
+		expect(fulfillment(result)).toMatchObject({
+			realizedAmount: 200,
+			unfulfilledAmount: 200,
+		});
 		expect(getBalance(result.timeline.rows[1], "checking")).toBe(100);
 		expect(raw.path.movementEvents).toEqual([
 			{

@@ -1,11 +1,17 @@
 import { useMemo } from "react";
 import { currency, formatDate } from "@/lib/format";
-import type { ProjectionResult, ScenarioPack } from "@/lib/projection";
+import type {
+	PostingFulfillmentPathResult,
+	PostingFulfillmentPostingSummary,
+	ScenarioPack,
+} from "@/lib/projection";
 
 export interface DashboardDerivedValues {
-	firstProjectedRow: ProjectionResult["timeline"]["rows"][number] | null;
-	firstShortfallRow: ProjectionResult["timeline"]["rows"][number] | null;
-	biggestShortfallPosting: ProjectionResult["postingSummaries"][number] | null;
+	firstProjectedEvent: PostingFulfillmentPathResult["events"][number] | null;
+	firstUnderfulfilledDate: string | null;
+	biggestShortfallPosting: PostingFulfillmentPostingSummary | null;
+	postingSummaries: PostingFulfillmentPostingSummary[] | null;
+	fulfillmentAvailable: boolean;
 	enabledPostingCount: number;
 	requestedPostingAmount: number;
 	realizedPostingAmount: number;
@@ -16,47 +22,48 @@ export interface DashboardDerivedValues {
 }
 
 export function useDashboardDerivedValues(
-	result: ProjectionResult,
 	pack: ScenarioPack,
+	fulfillment: PostingFulfillmentPathResult | null,
 ): DashboardDerivedValues {
 	return useMemo(() => {
-		const firstProjectedRow =
-			result.timeline.rows.find((row) => !row.isHistorical) ?? null;
-		const firstShortfallRow =
-			result.timeline.rows.find(
-				(row) => !row.isHistorical && row.clampedPostingShortfallAmount > 0,
-			) ?? null;
+		const firstProjectedEvent = fulfillment?.events[0] ?? null;
+		const firstUnderfulfilledDate =
+			fulfillment?.firstUnderfulfilledDate ?? null;
 		const biggestShortfallPosting =
-			result.postingSummaries
-				.filter((summary) => summary.shortfallAmount > 0)
+			fulfillment?.postings
+				.filter((summary) => summary.unfulfilledAmount > 0)
 				.sort(
-					(left, right) => right.shortfallAmount - left.shortfallAmount,
+					(left, right) => right.unfulfilledAmount - left.unfulfilledAmount,
 				)[0] ?? null;
 		const enabledPostingCount = pack.postings.filter(
 			(posting) => posting.enabled,
 		).length;
-		const requestedPostingAmount = result.totals.requestedPostingAmount;
-		const realizedPostingAmount = result.totals.realizedPostingAmount;
-		const postingUtilizationRate =
-			requestedPostingAmount === 0
-				? 1
-				: realizedPostingAmount / requestedPostingAmount;
+		const requestedPostingAmount = fulfillment?.requestedAmount ?? 0;
+		const realizedPostingAmount = fulfillment?.realizedAmount ?? 0;
+		const postingUtilizationRate = fulfillment?.completionRate ?? 0;
 		const blockerValue =
-			biggestShortfallPosting?.label ?? "No constraint showing";
+			biggestShortfallPosting?.label ??
+			(fulfillment ? "No constraint showing" : "Evaluation unavailable");
 		const blockerDetail = biggestShortfallPosting
-			? biggestShortfallPosting.firstShortfallDate
-				? `Starting ${formatDate(biggestShortfallPosting.firstShortfallDate)}, the model cannot fully fund this scheduled payment from checking. Total unfunded amount across the projection: ${currency.format(biggestShortfallPosting.shortfallAmount)}.`
-				: `The model cannot fully fund this scheduled payment. Total unfunded amount: ${currency.format(biggestShortfallPosting.shortfallAmount)}.`
-			: "No scheduled transaction is currently limited by account constraints.";
+			? biggestShortfallPosting.firstUnderfulfilledDate
+				? `Starting ${formatDate(biggestShortfallPosting.firstUnderfulfilledDate)}, account constraints limit this scheduled transaction. Total underfulfilled amount: ${currency.format(biggestShortfallPosting.unfulfilledAmount)}.`
+				: `Account constraints limit this scheduled transaction by ${currency.format(biggestShortfallPosting.unfulfilledAmount)}.`
+			: fulfillment
+				? "No scheduled transaction is currently limited by account constraints."
+				: "Enable a healthy posting-fulfillment evaluation to inspect transaction constraints.";
 		const nextEventDetail =
-			firstProjectedRow === null
-				? "No projected transactions are scheduled after the historical balance history."
-				: `${currency.format(firstProjectedRow.requestedPostingAmount)} requested and ${currency.format(firstProjectedRow.realizedPostingAmount)} applied${firstProjectedRow.clampedPostingShortfallAmount > 0 ? `, leaving ${currency.format(firstProjectedRow.clampedPostingShortfallAmount)} unfunded.` : "."}`;
+			fulfillment === null
+				? "Enable a healthy posting-fulfillment evaluation to inspect projected transactions."
+				: firstProjectedEvent === null
+					? "No projected transactions are scheduled after the historical balance history."
+					: `${currency.format(firstProjectedEvent.requestedAmount)} requested and ${currency.format(firstProjectedEvent.realizedAmount)} applied${firstProjectedEvent.unfulfilledAmount > 0 ? `, leaving ${currency.format(firstProjectedEvent.unfulfilledAmount)} underfulfilled.` : "."}`;
 
 		return {
-			firstProjectedRow,
-			firstShortfallRow,
+			firstProjectedEvent,
+			firstUnderfulfilledDate,
 			biggestShortfallPosting,
+			postingSummaries: fulfillment?.postings ?? null,
+			fulfillmentAvailable: fulfillment !== null,
 			enabledPostingCount,
 			requestedPostingAmount,
 			realizedPostingAmount,
@@ -65,5 +72,5 @@ export function useDashboardDerivedValues(
 			blockerDetail,
 			nextEventDetail,
 		};
-	}, [result, pack]);
+	}, [pack, fulfillment]);
 }

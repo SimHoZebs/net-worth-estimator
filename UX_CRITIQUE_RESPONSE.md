@@ -282,7 +282,7 @@ To get actual comparison data, users would need to restore a snapshot, re-run, a
 
 **What was built:** Added a "Reason" column to both the main event rows table and the expanded detail: "Limited by available funds" for shortfalls, "—" otherwise.
 
-**Divergence:** The reason is generic ("Limited by available funds") rather than specific ("Limited by scheduled payment rule" or "Limited by account cap"). The engine currently reports a single shortfall amount without attributing it to a specific constraint type.
+**Resolved:** Ordered movement facts now retain binding constraint types, and the posting-fulfillment evaluation reports underfulfilled amounts without embedding that interpretation in the simulation engine.
 
 ---
 
@@ -588,6 +588,6 @@ Status badges use consistent green/amber/slate semantics.
 
 3. **Formula toggle vs formula translation** — Showing "Monthly inflow" instead of translating "salary * 0.04" into English prose. The translation would require per-formula human descriptions which isn't scalable.
 
-4. **Generic shortfall reason vs specific** — "Limited by available funds" covers most cases but doesn't distinguish between account limits, annual caps, or priority ordering.
+4. **Constraint reporting** — Posting-fulfillment diagnostics now distinguish account floors, destination ceilings, unavailable sources, and action limits from generic movement facts.
 
 5. **No pagination** — Current datasets are small (< 100 rows). Pagination adds complexity without current benefit.

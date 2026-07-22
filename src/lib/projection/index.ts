@@ -31,6 +31,7 @@ export {
 	validateNetWorthThresholdConfig,
 } from "./evaluation/netWorthThreshold";
 export {
+	DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID,
 	evaluatePostingFulfillment,
 	POSTING_FULFILLMENT_DEFINITION_ID,
 	type PostingFulfillmentConfig,
@@ -107,7 +108,6 @@ export type {
 	Posting,
 	PostingFrequency,
 	ProjectionAccountSummary,
-	ProjectionPostingSummary,
 	ProjectionResult,
 	ProjectionRow,
 	ProjectionRuntimeSettings,

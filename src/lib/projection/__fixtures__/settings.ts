@@ -31,6 +31,13 @@ export function makeSettings(
 				enabled: true,
 				config: { target: 5_000 },
 			},
+			{
+				definitionId: "posting-fulfillment",
+				instanceId: "posting-fulfillment",
+				label: "Posting fulfillment",
+				enabled: true,
+				config: { postingIds: null },
+			},
 		],
 		...overrides,
 	};

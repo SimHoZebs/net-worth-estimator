@@ -122,6 +122,7 @@ Selectors: `selectActiveOverrideCount`, `selectWhatIfState`, `selectEditorState`
 - Reactive behaviors emit generic account movements and must use shared account constraints instead of mutating balances directly.
 - FI continuing postings are explicitly selected; never infer growth from IDs, labels, categories, or a non-zero annual rate.
 - Evaluation definitions register in `evaluation/registry.ts`; central deterministic/stochastic coordinators must not import evaluator-specific logic.
+- Base simulation emits ordered generic movement facts; posting underfulfillment detection and reporting belong to the posting-fulfillment evaluation.
 - Evaluation configuration and results remain ordered and keyed by stable instance IDs. Duplicate definition IDs are invalid; duplicate configured definitions are valid.
 - Configured evaluation configs and public result bodies must remain JSON-serializable; registries, functions, maps, and accumulators stay internal to the worker runtime.
 - React evaluation editors/renderers live outside the projection domain and consume generic envelopes through typed accessors.

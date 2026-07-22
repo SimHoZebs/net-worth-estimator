@@ -3,7 +3,7 @@ import { makeAccount } from "../__fixtures__";
 import { resolveAccountMovement } from "../simulation/postings";
 
 describe("account movement resolution", () => {
-	it("reports unavailable sources", () => {
+	it("returns unavailable-source movement facts", () => {
 		const result = resolveAccountMovement(
 			{
 				sourceAccountId: "missing",
@@ -17,7 +17,6 @@ describe("account movement resolution", () => {
 		expect(result).toEqual({
 			requestedAmount: 100,
 			realizedAmount: 0,
-			shortfallAmount: 100,
 			bindingConstraints: [
 				{ type: "source-unavailable", accountId: "missing" },
 			],
@@ -38,7 +37,7 @@ describe("account movement resolution", () => {
 		);
 
 		expect(result.realizedAmount).toBe(50);
-		expect(result.shortfallAmount).toBe(50);
+		expect(result.requestedAmount - result.realizedAmount).toBe(50);
 		expect(result.bindingConstraints).toEqual([
 			{ type: "source-floor", accountId: "cash" },
 			{ type: "action-limit" },
@@ -68,7 +67,7 @@ describe("account movement resolution", () => {
 		]);
 	});
 
-	it("does not classify a zero request as a shortfall", () => {
+	it("does not bind constraints for a zero request", () => {
 		const result = resolveAccountMovement(
 			{
 				sourceAccountId: "missing",
@@ -79,7 +78,7 @@ describe("account movement resolution", () => {
 			new Map(),
 		);
 
-		expect(result.shortfallAmount).toBe(0);
+		expect(result.requestedAmount - result.realizedAmount).toBe(0);
 		expect(result.bindingConstraints).toEqual([]);
 	});
 });

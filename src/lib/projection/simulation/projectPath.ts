@@ -6,7 +6,6 @@ import type {
 	IsoDate,
 	MovementEvent,
 	ProjectionAccountSummary,
-	ProjectionPostingSummary,
 	ProjectionRow,
 	ProjectionRuntimeSettings,
 	RawProjectionOutput,
@@ -87,11 +86,6 @@ function createRow({
 	externalInflowAmount,
 	externalOutflowAmount,
 	internalTransferAmount,
-	requestedPostingAmount,
-	realizedPostingAmount,
-	clampedPostingShortfallAmount,
-	requestedPostingAmountsById,
-	realizedPostingAmountsById,
 }: {
 	date: IsoDate;
 	isHistorical: boolean;
@@ -101,11 +95,6 @@ function createRow({
 	externalInflowAmount: number;
 	externalOutflowAmount: number;
 	internalTransferAmount: number;
-	requestedPostingAmount: number;
-	realizedPostingAmount: number;
-	clampedPostingShortfallAmount: number;
-	requestedPostingAmountsById: Record<string, number>;
-	realizedPostingAmountsById: Record<string, number>;
 }): ProjectionRow {
 	const accountSnapshots: AccountSnapshot[] = accounts.map((account) => ({
 		accountId: account.id,
@@ -122,11 +111,6 @@ function createRow({
 		externalInflowAmount,
 		externalOutflowAmount,
 		internalTransferAmount,
-		requestedPostingAmount,
-		realizedPostingAmount,
-		clampedPostingShortfallAmount,
-		requestedPostingAmountsById,
-		realizedPostingAmountsById,
 	};
 }
 
@@ -137,11 +121,6 @@ function roundRow(row: ProjectionRow): ProjectionRow {
 		externalInflowAmount: roundCurrency(row.externalInflowAmount),
 		externalOutflowAmount: roundCurrency(row.externalOutflowAmount),
 		internalTransferAmount: roundCurrency(row.internalTransferAmount),
-		requestedPostingAmount: roundCurrency(row.requestedPostingAmount),
-		realizedPostingAmount: roundCurrency(row.realizedPostingAmount),
-		clampedPostingShortfallAmount: roundCurrency(
-			row.clampedPostingShortfallAmount,
-		),
 		accountSnapshots: row.accountSnapshots.map((snap) => ({
 			...snap,
 			balance: roundCurrency(snap.balance),
@@ -150,16 +129,6 @@ function roundRow(row: ProjectionRow): ProjectionRow {
 				delta: roundCurrency(impact.delta),
 			})),
 		})),
-		requestedPostingAmountsById: Object.fromEntries(
-			Object.entries(row.requestedPostingAmountsById).map(
-				([postingId, amount]) => [postingId, roundCurrency(amount)],
-			),
-		),
-		realizedPostingAmountsById: Object.fromEntries(
-			Object.entries(row.realizedPostingAmountsById).map(
-				([postingId, amount]) => [postingId, roundCurrency(amount)],
-			),
-		),
 	};
 }
 
@@ -198,19 +167,9 @@ export function projectRawScenarioPack(
 	const futureStartingBalances = initAccountBalances(mergedPack.accounts);
 	const latestRealizedPostingAmountById = new Map<string, number>();
 	const realizedPostingAmountByIdAndYear = new Map<string, number>();
-	const requestedPostingTotalsById = new Map(
-		mergedPack.postings.map((posting) => [posting.id, 0]),
-	);
-	const realizedPostingTotalsById = new Map(
-		mergedPack.postings.map((posting) => [posting.id, 0]),
-	);
-	const firstShortfallDateById = new Map<string, IsoDate>();
 	let totalExternalInflowAmount = 0;
 	let totalExternalOutflowAmount = 0;
 	let totalInternalTransferAmount = 0;
-	let totalRequestedPostingAmount = 0;
-	let totalRealizedPostingAmount = 0;
-	let totalClampedPostingShortfallAmount = 0;
 
 	normalizedCheckpoints.dates.forEach(({ date, checkpoints }) => {
 		checkpoints.forEach((checkpoint) => {
@@ -227,11 +186,6 @@ export function projectRawScenarioPack(
 				externalInflowAmount: 0,
 				externalOutflowAmount: 0,
 				internalTransferAmount: 0,
-				requestedPostingAmount: 0,
-				realizedPostingAmount: 0,
-				clampedPostingShortfallAmount: 0,
-				requestedPostingAmountsById: {},
-				realizedPostingAmountsById: {},
 			}),
 		);
 	});
@@ -259,15 +213,10 @@ export function projectRawScenarioPack(
 
 		const yearIndex = projectionYearIndex(projectionStartDate, date);
 
-		const requestedPostingAmountsById: Record<string, number> = {};
-		const realizedPostingAmountsById: Record<string, number> = {};
 		const accountImpacts: Record<string, AccountDelta[]> = {};
 		let externalInflowAmount = 0;
 		let externalOutflowAmount = 0;
 		let internalTransferAmount = 0;
-		let requestedPostingAmount = 0;
-		let realizedPostingAmount = 0;
-		let clampedPostingShortfallAmount = 0;
 
 		const sortedOccurrences = [...occurrences].sort(
 			(left, right) =>
@@ -313,28 +262,7 @@ export function projectRawScenarioPack(
 				balances,
 				accountById,
 			);
-			const { realizedAmount, shortfallAmount } = movement;
-
-			if (shortfallAmount > 0 && !firstShortfallDateById.has(posting.id)) {
-				firstShortfallDateById.set(posting.id, date);
-			}
-
-			requestedPostingAmountsById[posting.id] = requestedAmount;
-			realizedPostingAmountsById[posting.id] = realizedAmount;
-			requestedPostingAmount += requestedAmount;
-			realizedPostingAmount += realizedAmount;
-			clampedPostingShortfallAmount += shortfallAmount;
-			totalRequestedPostingAmount += requestedAmount;
-			totalRealizedPostingAmount += realizedAmount;
-			totalClampedPostingShortfallAmount += shortfallAmount;
-			requestedPostingTotalsById.set(
-				posting.id,
-				(requestedPostingTotalsById.get(posting.id) ?? 0) + requestedAmount,
-			);
-			realizedPostingTotalsById.set(
-				posting.id,
-				(realizedPostingTotalsById.get(posting.id) ?? 0) + realizedAmount,
-			);
+			const { realizedAmount } = movement;
 			realizedPostingAmountByIdAndYear.set(
 				capKey,
 				(realizedPostingAmountByIdAndYear.get(capKey) ?? 0) + realizedAmount,
@@ -394,11 +322,6 @@ export function projectRawScenarioPack(
 				externalInflowAmount,
 				externalOutflowAmount,
 				internalTransferAmount,
-				requestedPostingAmount,
-				realizedPostingAmount,
-				clampedPostingShortfallAmount,
-				requestedPostingAmountsById,
-				realizedPostingAmountsById,
 			}),
 		);
 	});
@@ -434,37 +357,6 @@ export function projectRawScenarioPack(
 		},
 	);
 
-	const postingSummaries: ProjectionPostingSummary[] = mergedPack.postings.map(
-		(posting) => {
-			const requestedAmount = requestedPostingTotalsById.get(posting.id) ?? 0;
-			const realizedAmount = realizedPostingTotalsById.get(posting.id) ?? 0;
-
-			return {
-				postingId: posting.id,
-				label: posting.label,
-				sourceAccountId: posting.sourceAccountId,
-				sourceAccountLabel: posting.sourceAccountId
-					? (accountById.get(posting.sourceAccountId)?.label ??
-						posting.sourceAccountId)
-					: null,
-				destinations: posting.destinations
-					? posting.destinations.map((destId) => ({
-							accountId: destId,
-							label: accountById.get(destId)?.label ?? destId,
-						}))
-					: null,
-				priority: posting.priority,
-				annualCap: posting.annualCap,
-				requestedAmount: roundCurrency(requestedAmount),
-				realizedAmount: roundCurrency(realizedAmount),
-				utilizationRate:
-					requestedAmount > 0 ? realizedAmount / requestedAmount : 0,
-				firstShortfallDate: firstShortfallDateById.get(posting.id) ?? null,
-				shortfallAmount: roundCurrency(requestedAmount - realizedAmount),
-			};
-		},
-	);
-
 	return {
 		path: {
 			rows,
@@ -479,16 +371,10 @@ export function projectRawScenarioPack(
 				sampledRows: sampledRows.map(roundRow),
 			},
 			accountSummaries,
-			postingSummaries,
 			totals: {
 				externalInflowAmount: roundCurrency(totalExternalInflowAmount),
 				externalOutflowAmount: roundCurrency(totalExternalOutflowAmount),
 				internalTransferAmount: roundCurrency(totalInternalTransferAmount),
-				requestedPostingAmount: roundCurrency(totalRequestedPostingAmount),
-				realizedPostingAmount: roundCurrency(totalRealizedPostingAmount),
-				clampedPostingShortfallAmount: roundCurrency(
-					totalClampedPostingShortfallAmount,
-				),
 			},
 			milestones: {
 				latestCheckpointDate: normalizedCheckpoints.latestCheckpointDate,

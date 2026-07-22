@@ -13,12 +13,17 @@ import type {
 } from "../types/scenario";
 import { SCENARIO_MODEL_VERSION } from "../types/scenario";
 
+const realizedPostingAmountsByRow = new WeakMap<
+	ProjectionRow,
+	Record<string, number>
+>();
+
 function row(
 	date: string,
 	balances: Record<string, number>,
 	realizedPostingAmountsById: Record<string, number> = {},
 ): ProjectionRow {
-	return {
+	const projectionRow: ProjectionRow = {
 		date,
 		isHistorical: false,
 		netWorth: Object.values(balances).reduce((sum, value) => sum + value, 0),
@@ -31,12 +36,9 @@ function row(
 		externalInflowAmount: 0,
 		externalOutflowAmount: 0,
 		internalTransferAmount: 0,
-		requestedPostingAmount: 0,
-		realizedPostingAmount: 0,
-		clampedPostingShortfallAmount: 0,
-		requestedPostingAmountsById: realizedPostingAmountsById,
-		realizedPostingAmountsById,
 	};
+	realizedPostingAmountsByRow.set(projectionRow, realizedPostingAmountsById);
+	return projectionRow;
 }
 
 function account(id: string, minBalance = 0): Account {
@@ -90,9 +92,22 @@ function path(
 	accounts: Account[] = [account("cash")],
 	projectionEndDate = "2027-02-01",
 ): ProjectionPath {
+	let sequence = 0;
 	return {
 		rows,
-		movementEvents: [],
+		movementEvents: rows.flatMap((projectionRow) =>
+			Object.entries(realizedPostingAmountsByRow.get(projectionRow) ?? {}).map(
+				([postingId, amount]) => ({
+					date: projectionRow.date,
+					sequence: sequence++,
+					origin: { type: "posting" as const, postingId },
+					requestedAmount: amount,
+					realizedAmount: amount,
+					bindingConstraints: [],
+					accountDeltas: [],
+				}),
+			),
+		),
 		effectivePack: {
 			version: SCENARIO_MODEL_VERSION,
 			sourcePath: "test",

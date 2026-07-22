@@ -7,15 +7,19 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { currency } from "@/lib/format";
-import type { Account, Posting, ProjectionRow } from "@/lib/projection";
+import type {
+	Account,
+	Posting,
+	PostingFulfillmentEvent,
+	ProjectionRow,
+} from "@/lib/projection";
 
 interface ShortfallDetailPanelProps {
 	periodStartDate: string;
 	periodLabel: string;
-	periodRows: ProjectionRow[];
+	events: PostingFulfillmentEvent[];
 	rows: ProjectionRow[];
 	postingById: Record<string, Posting>;
-	postingLabelById: Record<string, string>;
 	accounts: Account[];
 }
 
@@ -28,15 +32,15 @@ interface CascadeStep {
 	runningBalance: number;
 	shortfallAmount: number;
 	isShortfall: boolean;
+	constraints: string[];
 }
 
 export function ShortfallDetailPanel({
 	periodStartDate,
 	periodLabel,
-	periodRows,
+	events,
 	rows,
 	postingById,
-	postingLabelById,
 	accounts,
 }: ShortfallDetailPanelProps) {
 	let prevRow: ProjectionRow | null = null;
@@ -47,66 +51,64 @@ export function ShortfallDetailPanel({
 		}
 	}
 
-	const periodRequested: Record<string, number> = {};
-	const periodRealized: Record<string, number> = {};
-
-	for (const periodRow of periodRows) {
-		for (const [id, amount] of Object.entries(
-			periodRow.requestedPostingAmountsById,
-		)) {
-			periodRequested[id] = (periodRequested[id] ?? 0) + amount;
-		}
-		for (const [id, amount] of Object.entries(
-			periodRow.realizedPostingAmountsById,
-		)) {
-			periodRealized[id] = (periodRealized[id] ?? 0) + amount;
-		}
-	}
-
-	const lastPeriodRow = periodRows[periodRows.length - 1];
+	const lastPeriodRow = rows.find((row) => row.date === periodStartDate);
 
 	const { cascadeAccounts, cascadeStepsByAccount } = (() => {
 		const map = new Map<string, CascadeStep[]>();
 		const constrainedAccountIds = new Set<string>();
 
-		for (const periodRow of periodRows) {
-			for (const snapshot of periodRow.accountSnapshots) {
-				if (snapshot.impacts.length === 0) continue;
-				for (const impact of snapshot.impacts) {
-					const shortfallAmount = Math.max(
-						0,
-						(periodRequested[impact.postingId] ?? 0) -
-							(periodRealized[impact.postingId] ?? 0),
-					);
-					const isShortfall = shortfallAmount > 0;
-					if (isShortfall && postingById[impact.postingId]?.sourceAccountId) {
-						constrainedAccountIds.add(
-							postingById[impact.postingId]?.sourceAccountId!,
-						);
+		const appendStep = (
+			accountId: string,
+			event: PostingFulfillmentEvent,
+			delta: number,
+		) => {
+			if (!map.has(accountId)) map.set(accountId, []);
+			map.get(accountId)?.push({
+				postingId: event.postingId,
+				label: postingById[event.postingId]?.label ?? event.postingId,
+				delta,
+				requested: event.requestedAmount,
+				realized: event.realizedAmount,
+				runningBalance: 0,
+				shortfallAmount: event.unfulfilledAmount,
+				isShortfall: event.unfulfilledAmount > 0,
+				constraints: event.bindingConstraints.map(({ type }) => type),
+			});
+		};
+
+		for (const event of [...events].sort(
+			(left, right) => left.sequence - right.sequence,
+		)) {
+			const affectedAccountIds = new Set<string>();
+			for (const { accountId, delta } of event.accountDeltas) {
+				affectedAccountIds.add(accountId);
+				appendStep(accountId, event, delta);
+			}
+
+			const constrainedIds = event.bindingConstraints.flatMap((constraint) =>
+				"accountId" in constraint
+					? [constraint.accountId]
+					: "accountIds" in constraint
+						? constraint.accountIds
+						: [],
+			);
+			for (const accountId of constrainedIds) {
+				constrainedAccountIds.add(accountId);
+				if (!affectedAccountIds.has(accountId)) appendStep(accountId, event, 0);
+			}
+
+			if (event.unfulfilledAmount > 0 && constrainedIds.length === 0) {
+				const sourceAccountId = postingById[event.postingId]?.sourceAccountId;
+				if (sourceAccountId) {
+					constrainedAccountIds.add(sourceAccountId);
+					if (!affectedAccountIds.has(sourceAccountId)) {
+						appendStep(sourceAccountId, event, 0);
 					}
-					if (!map.has(snapshot.accountId)) map.set(snapshot.accountId, []);
-					map.get(snapshot.accountId)?.push({
-						postingId: impact.postingId,
-						label: postingLabelById[impact.postingId] ?? impact.postingId,
-						delta: impact.delta,
-						requested:
-							periodRow.requestedPostingAmountsById[impact.postingId] ?? 0,
-						realized:
-							periodRow.realizedPostingAmountsById[impact.postingId] ?? 0,
-						runningBalance: 0,
-						shortfallAmount,
-						isShortfall,
-					});
 				}
 			}
 		}
 
 		for (const [accountId, steps] of map) {
-			steps.sort(
-				(left, right) =>
-					(postingById[left.postingId]?.priority ?? 0) -
-					(postingById[right.postingId]?.priority ?? 0),
-			);
 			const start =
 				prevRow?.accountSnapshots.find(
 					(snapshot) => snapshot.accountId === accountId,
@@ -235,7 +237,11 @@ export function ShortfallDetailPanel({
 										</TableRow>
 										{steps.map((step, index) => {
 											const signColor =
-												step.delta > 0 ? "text-primary" : "text-destructive";
+												step.delta > 0
+													? "text-primary"
+													: step.delta < 0
+														? "text-destructive"
+														: "text-muted-foreground";
 											return (
 												<TableRow
 													key={`${step.postingId}-${index}`}
@@ -244,7 +250,7 @@ export function ShortfallDetailPanel({
 													<TableCell
 														className={`w-4 type-caption ${signColor}`}
 													>
-														{step.delta > 0 ? "+" : "-"}
+														{step.delta > 0 ? "+" : step.delta < 0 ? "-" : "·"}
 													</TableCell>
 													<TableCell className={`type-caption ${signColor}`}>
 														{step.label}
@@ -252,6 +258,9 @@ export function ShortfallDetailPanel({
 															<span className="ml-2 inline-flex items-center gap-1 type-value text-tertiary-foreground">
 																Shortfall{" "}
 																{currency.format(step.shortfallAmount)}
+																{step.constraints.length > 0
+																	? ` · ${step.constraints.join(", ")}`
+																	: ""}
 															</span>
 														) : null}
 													</TableCell>

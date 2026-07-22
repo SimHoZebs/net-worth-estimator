@@ -15,10 +15,10 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { currency, formatDate, formatRoute, pct } from "@/lib/format";
-import type { ProjectionResult } from "@/lib/projection";
+import type { PostingFulfillmentPostingSummary } from "@/lib/projection";
 
 interface TransactionCompletionTableProps {
-	postingSummaries: ProjectionResult["postingSummaries"];
+	postingSummaries: PostingFulfillmentPostingSummary[] | null;
 }
 
 export const TransactionCompletionTable = memo(
@@ -50,9 +50,18 @@ export const TransactionCompletionTable = memo(
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{postingSummaries.length > 0 ? (
+							{postingSummaries === null ? (
+								<TableRow>
+									<TableCell
+										colSpan={7}
+										className="py-6 text-center text-muted-foreground"
+									>
+										Posting-fulfillment evaluation is unavailable.
+									</TableCell>
+								</TableRow>
+							) : postingSummaries.length > 0 ? (
 								postingSummaries.map((summary) => {
-									const hasShortfall = summary.shortfallAmount > 0;
+									const hasShortfall = summary.unfulfilledAmount > 0;
 									const completionRate =
 										summary.requestedAmount > 0 ? summary.utilizationRate : 1;
 
@@ -118,7 +127,7 @@ export const TransactionCompletionTable = memo(
 													}
 												>
 													{hasShortfall
-														? formatDate(summary.firstShortfallDate!)
+														? formatDate(summary.firstUnderfulfilledDate!)
 														: "-"}
 												</span>
 											</TableCell>

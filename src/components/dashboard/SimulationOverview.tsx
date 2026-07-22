@@ -52,9 +52,11 @@ export function SimulationOverview({
 						}
 					/>
 					<Metric
-						label="Transaction shortfall"
-						value={currency.format(result.totals.clampedPostingShortfallAmount)}
-						detail="Scheduled amount blocked by account constraints"
+						label="Projection dates"
+						value={String(
+							result.timeline.rows.filter((row) => !row.isHistorical).length,
+						)}
+						detail="Dated state transitions in the base path"
 					/>
 				</div>
 			</CardContent>

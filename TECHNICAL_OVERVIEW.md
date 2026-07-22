@@ -89,7 +89,7 @@ The boundary is at `CsvScenarioPack`: the CSV parsing and validation layer (`csv
 - A simulation run executes a scenario or branch. Base and Monte Carlo runs produce a `ProjectionPath`; the current FI branch retains a compact outcome until another branch consumer requires a complete path.
 - A behavior observes branch state and emits generic actions. FI-cycle sustainability uses a behavior after forking balances at an eligible candidate date.
 - Branch simulations replay only explicitly selected continuing postings and request expense-gap withdrawals through the same generic account movement resolver as scheduled postings, preserving account floors and destination limits.
-- Generic account movement resolution returns requested, realized, and shortfall amounts plus all tied binding constraints. Constraint types distinguish an unavailable source, a source floor, aggregate destination ceilings, and a caller-supplied action limit; posting and FI origin metadata remains caller-owned.
+- Generic account movement resolution returns requested and realized amounts plus all tied binding constraints. Base simulation records those facts as ordered movement events without classifying them as business failures. The posting-fulfillment evaluation derives underfulfilled amounts, dates, summaries, and stochastic probability from those events. Constraint types distinguish an unavailable source, a source floor, aggregate destination ceilings, and a caller-supplied action limit; posting and FI origin metadata remains caller-owned.
 - Evaluations ask questions of projection paths, regardless of whether a base, branch, or stochastic simulation produced them. Outcomes are per-run evaluation results; analysis aggregates outcomes across runs.
 - FI never infers growth from a posting ID, label, category, or non-zero rate. Continuing postings are explicit FI-plan configuration.
 - The minimum-net-worth FI gate is a semantic eligibility rule. Ineligible Monte Carlo candidates remain failures in the full-run probability denominator.
@@ -142,6 +142,7 @@ This is genuinely incremental: each path is generated once, consumed by the proj
 | `src/lib/projection/evaluation/registry.ts` | Domain registration for net-worth-threshold and financial-independence definitions |
 | `src/lib/projection/evaluation/accessors.ts` | Typed FI and threshold accessors over generic result envelopes |
 | `src/lib/projection/evaluation/financialIndependence.ts` | FI candidate eligibility, explicit continuation replay, withdrawals, and principal preservation |
+| `src/lib/projection/evaluation/postingFulfillment.ts` | Read-only posting fulfillment analysis over generic movement events |
 | `src/lib/projection/behavior/runtime.ts` | Generic period-oriented reactive behavior lifecycle |
 | `src/lib/projection/analysis/projectStochastic.ts` | Runs N projections, builds percentile bands, and aggregates per-run evaluation outcomes |
 | `src/lib/projection/utils/stochastic.ts`         | LCG PRNG, `sampleLogNormal()` (Box-Muller), `computePercentiles()`                                    |

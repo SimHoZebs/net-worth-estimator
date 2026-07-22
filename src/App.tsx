@@ -265,7 +265,6 @@ export default function App() {
 							]
 						: [];
 				}) ?? [],
-			shortfallAmount: result?.totals.clampedPostingShortfallAmount ?? 0,
 			overrideCount: activeOverrideCount,
 		};
 	}, [result, stochasticResult, activeOverrideCount]);

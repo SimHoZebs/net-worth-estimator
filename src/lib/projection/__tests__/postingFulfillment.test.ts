@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+	DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID,
+	getPostingFulfillmentResult,
+	projectScenarioPack,
+} from "../";
+import {
 	createBasePack,
 	makeAccount,
 	makePosting,
@@ -105,6 +110,7 @@ describe("posting fulfillment evaluation", () => {
 		postingFulfillmentEvaluation.accumulate(accumulator, {
 			...deterministic,
 			unfulfilledAmount: 0,
+			firstUnderfulfilledDate: null,
 		});
 		const probabilistic = postingFulfillmentEvaluation.finalize(accumulator, {
 			scenario: constrainedPath().effectivePack,
@@ -118,5 +124,99 @@ describe("posting fulfillment evaluation", () => {
 			fullFulfillmentProbability: 0.5,
 			unfulfilledAmountPercentiles: { p50: 75 },
 		});
+	});
+
+	it("uses whole-dollar reporting precision consistently", () => {
+		const path = constrainedPath();
+		const event = path.movementEvents[0]!;
+		const belowThreshold = evaluatePostingFulfillment(
+			{
+				...path,
+				movementEvents: [
+					{ ...event, requestedAmount: 100, realizedAmount: 99.501 },
+				],
+			},
+			{ postingIds: null },
+		);
+		const atThreshold = evaluatePostingFulfillment(
+			{
+				...path,
+				movementEvents: [
+					{ ...event, requestedAmount: 100, realizedAmount: 99.5 },
+				],
+			},
+			{ postingIds: null },
+		);
+
+		expect(belowThreshold).toMatchObject({
+			requestedAmount: 100,
+			realizedAmount: 100,
+			unfulfilledAmount: 0,
+			completionRate: 1,
+			firstUnderfulfilledDate: null,
+		});
+		expect(atThreshold).toMatchObject({
+			requestedAmount: 100,
+			realizedAmount: 99,
+			unfulfilledAmount: 1,
+			completionRate: 0.99,
+			firstUnderfulfilledDate: event.date,
+		});
+	});
+
+	it("avoids detailed report allocation for stochastic paths", () => {
+		const path = constrainedPath();
+		const result = postingFulfillmentEvaluation.evaluatePath(
+			{
+				path,
+				scenario: path.effectivePack,
+				detailLevel: "summary",
+			},
+			{ postingIds: null },
+		);
+
+		expect(result).toMatchObject({
+			unfulfilledAmount: 150,
+			firstUnderfulfilledDate: "2026-01-10",
+			events: [],
+			dates: [],
+			postings: [],
+		});
+		expect(DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID).toBe("posting-fulfillment");
+	});
+
+	it("supports an explicitly designated all-postings dashboard instance", () => {
+		const pack = constrainedPath().effectivePack;
+		const result = projectScenarioPack(
+			pack,
+			makeSettings({
+				evaluations: [
+					{
+						definitionId: "posting-fulfillment",
+						instanceId: "scoped",
+						label: "Scoped",
+						enabled: true,
+						config: { postingIds: [] },
+					},
+					{
+						definitionId: "posting-fulfillment",
+						instanceId: DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID,
+						label: "All postings",
+						enabled: true,
+						config: { postingIds: null },
+					},
+				],
+			}),
+		);
+
+		expect(
+			getPostingFulfillmentResult(result)?.deterministic?.requestedAmount,
+		).toBe(0);
+		expect(
+			getPostingFulfillmentResult(
+				result,
+				DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID,
+			)?.deterministic?.unfulfilledAmount,
+		).toBe(150);
 	});
 });
