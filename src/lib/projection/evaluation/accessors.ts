@@ -16,6 +16,12 @@ import {
 	type NetWorthThresholdProbabilisticResult,
 	validateNetWorthThresholdConfig,
 } from "./netWorthThreshold";
+import {
+	POSTING_FULFILLMENT_DEFINITION_ID,
+	type PostingFulfillmentPathResult,
+	type PostingFulfillmentProbabilisticResult,
+	validatePostingFulfillmentConfig,
+} from "./postingFulfillment";
 
 type TypedEvaluationResultEnvelope<TDeterministic, TProbabilistic> = Omit<
 	EvaluationResultEnvelope,
@@ -85,6 +91,16 @@ export function getNetWorthThresholdResult(
 	>(collection, NET_WORTH_THRESHOLD_DEFINITION_ID, instanceId);
 }
 
+export function getPostingFulfillmentResult(
+	collection: EvaluationResultCollection | null | undefined,
+	instanceId?: string,
+) {
+	return getEnvelope<
+		PostingFulfillmentPathResult,
+		PostingFulfillmentProbabilisticResult
+	>(collection, POSTING_FULFILLMENT_DEFINITION_ID, instanceId);
+}
+
 export function getConfiguredEvaluation<TConfig>(
 	evaluations: readonly ConfiguredEvaluation[],
 	definitionId: string,
@@ -137,6 +153,20 @@ export function getNetWorthThresholdConfig(
 		evaluations,
 		NET_WORTH_THRESHOLD_DEFINITION_ID,
 		validateNetWorthThresholdConfig,
+		collection,
+		instanceId,
+	);
+}
+
+export function getPostingFulfillmentConfig(
+	evaluations: readonly ConfiguredEvaluation[],
+	collection?: EvaluationResultCollection | null,
+	instanceId?: string,
+) {
+	return getConfiguredEvaluation(
+		evaluations,
+		POSTING_FULFILLMENT_DEFINITION_ID,
+		validatePostingFulfillmentConfig,
 		collection,
 		instanceId,
 	);

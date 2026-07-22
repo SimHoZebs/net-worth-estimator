@@ -1,0 +1,2 @@
+order,instanceId,label,enabled,config
+3,posting-fulfillment,Posting fulfillment,true,"{""postingIds"":null}"

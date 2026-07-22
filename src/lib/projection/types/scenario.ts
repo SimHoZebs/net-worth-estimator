@@ -12,11 +12,13 @@ export const CSV_SCENARIO_FILE_NAMES = {
 export const CSV_BEHAVIOR_FILE_NAMES = {
 	financialIndependence: "behavior/financial-independence.csv",
 	netWorthThreshold: "behavior/net-worth-threshold.csv",
+	postingFulfillment: "behavior/posting-fulfillment.csv",
 } as const;
 
 export const CSV_BEHAVIOR_DEFINITION_IDS = {
 	financialIndependence: "financial-independence",
 	netWorthThreshold: "net-worth-threshold",
+	postingFulfillment: "posting-fulfillment",
 } as const;
 
 export type ScenarioCollectionKey = keyof typeof CSV_SCENARIO_FILE_NAMES;

@@ -11,6 +11,8 @@ export {
 	getFinancialIndependenceResult,
 	getNetWorthThresholdConfig,
 	getNetWorthThresholdResult,
+	getPostingFulfillmentConfig,
+	getPostingFulfillmentResult,
 	type ValidatedConfiguredEvaluation,
 } from "./evaluation/accessors";
 export {
@@ -28,6 +30,18 @@ export {
 	type NetWorthThresholdProbabilisticResult,
 	validateNetWorthThresholdConfig,
 } from "./evaluation/netWorthThreshold";
+export {
+	evaluatePostingFulfillment,
+	POSTING_FULFILLMENT_DEFINITION_ID,
+	type PostingFulfillmentConfig,
+	type PostingFulfillmentDateSummary,
+	type PostingFulfillmentEvent,
+	type PostingFulfillmentPathResult,
+	type PostingFulfillmentPostingSummary,
+	type PostingFulfillmentProbabilisticResult,
+	postingFulfillmentEvaluation,
+	validatePostingFulfillmentConfig,
+} from "./evaluation/postingFulfillment";
 export {
 	type EvaluationContext,
 	type EvaluationDefinition,
