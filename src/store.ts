@@ -26,7 +26,6 @@ export interface SnapshotMetrics {
 		label: string;
 		status: EvaluationResultStatus;
 	}>;
-	shortfallAmount: number;
 	overrideCount: number;
 }
 

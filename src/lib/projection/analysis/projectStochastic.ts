@@ -115,6 +115,7 @@ export function stochasticProject(
 	runtimes.evaluateDeterministic({
 		path: deterministicRaw.path,
 		scenario: deterministicRaw.path.effectivePack,
+		detailLevel: "summary",
 	});
 	runtimes.startStochastic();
 	const deterministic: ProjectionResult = {
@@ -152,6 +153,7 @@ export function stochasticProject(
 				path: raw.path,
 				scenario: raw.path.effectivePack,
 				stochasticRates: rates,
+				detailLevel: "summary",
 			});
 			for (const row of raw.result.timeline.rows) {
 				const values = batchValues.get(row.date) ?? [];

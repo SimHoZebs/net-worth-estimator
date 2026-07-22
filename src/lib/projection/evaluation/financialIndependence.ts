@@ -21,6 +21,7 @@ import type {
 	FinancialIndependenceRunOutcome,
 	FinancialIndependenceWithdrawalSummary,
 	IsoDate,
+	MovementEvent,
 	ProjectionPath,
 	ProjectionRow,
 } from "../types/scenario";
@@ -36,6 +37,10 @@ import { computePercentiles } from "../utils/stochastic";
 import type { EvaluationDefinition } from "./runtime";
 
 const EPSILON = 0.01;
+
+function movementUnfulfilledAmount(result: AccountMovementResult) {
+	return Math.max(0, result.requestedAmount - result.realizedAmount);
+}
 
 interface WithdrawalAttempt {
 	date: IsoDate;
@@ -81,7 +86,7 @@ function summarizeWithdrawals(
 			: 0;
 	const shortfallPeriods = new Map<IsoDate, WithdrawalAttempt[]>();
 	for (const attempt of attempts) {
-		if (attempt.result.shortfallAmount <= EPSILON) continue;
+		if (movementUnfulfilledAmount(attempt.result) <= EPSILON) continue;
 		const period = shortfallPeriods.get(attempt.date) ?? [];
 		period.push(attempt);
 		shortfallPeriods.set(attempt.date, period);
@@ -126,7 +131,9 @@ function summarizeWithdrawals(
 		lastShortfallDate: shortfallDates[shortfallDates.length - 1] ?? null,
 		shortfallOccurrenceCount: shortfallDates.length,
 		constraints: countConstraints(
-			attempts.filter((attempt) => attempt.result.shortfallAmount > EPSILON),
+			attempts.filter(
+				(attempt) => movementUnfulfilledAmount(attempt.result) > EPSILON,
+			),
 		),
 		relatedAccountIds,
 		accounts: accountIds.map((accountId) => {
@@ -154,7 +161,7 @@ function summarizeWithdrawals(
 					accountShortfall > EPSILON ? roundAmount(accountShortfall) : 0,
 				constraints: countConstraints(
 					accountAttempts.filter(
-						(attempt) => attempt.result.shortfallAmount > EPSILON,
+						(attempt) => movementUnfulfilledAmount(attempt.result) > EPSILON,
 					),
 				),
 			};
@@ -374,60 +381,51 @@ function expenseAt(
 }
 
 function realizedCashflowBetween(
-	rows: readonly ProjectionRow[],
+	events: readonly MovementEvent[],
 	cashflowIds: ReadonlySet<string>,
 	startDate: IsoDate,
 	endDate: IsoDate,
 ) {
 	let total = 0;
-	for (const row of rows) {
-		if (row.date <= startDate) continue;
-		if (row.date > endDate) break;
-		for (const postingId of cashflowIds) {
-			total += row.realizedPostingAmountsById[postingId] ?? 0;
-		}
+	for (const event of events) {
+		if (event.date <= startDate) continue;
+		if (event.date > endDate) break;
+		if (cashflowIds.has(event.origin.postingId)) total += event.realizedAmount;
 	}
 	return total;
 }
 
 function initializeLatestPostingAmounts(
-	rows: readonly ProjectionRow[],
+	events: readonly MovementEvent[],
 	candidateDate: IsoDate,
 ) {
 	const latest = new Map<string, number>();
-	for (const row of rows) {
-		if (row.date > candidateDate) break;
-		for (const [postingId, amount] of Object.entries(
-			row.realizedPostingAmountsById,
-		)) {
-			latest.set(postingId, amount);
-		}
+	for (const event of events) {
+		if (event.date > candidateDate) break;
+		latest.set(event.origin.postingId, event.realizedAmount);
 	}
 	return latest;
 }
 
 function initializeRealizedPostingCaps(
-	rows: readonly ProjectionRow[],
+	events: readonly MovementEvent[],
 	candidateDate: IsoDate,
 	postingIds: ReadonlySet<string>,
 ) {
 	const realized = new Map<string, number>();
-	for (const row of rows) {
-		if (row.date > candidateDate) break;
-		for (const [postingId, amount] of Object.entries(
-			row.realizedPostingAmountsById,
-		)) {
-			if (!postingIds.has(postingId)) continue;
-			const key = `${postingId}:${row.date.slice(0, 4)}`;
-			realized.set(key, (realized.get(key) ?? 0) + amount);
-		}
+	for (const event of events) {
+		if (event.date > candidateDate) break;
+		const postingId = event.origin.postingId;
+		if (!postingIds.has(postingId)) continue;
+		const key = `${postingId}:${event.date.slice(0, 4)}`;
+		realized.set(key, (realized.get(key) ?? 0) + event.realizedAmount);
 	}
 	return realized;
 }
 
 function applyBranchPostingEvents({
 	events,
-	baseRowsByDate,
+	baseRealizedByDateAndPosting,
 	dispositions,
 	balances,
 	accountsById,
@@ -437,7 +435,7 @@ function applyBranchPostingEvents({
 	stochasticRates,
 }: {
 	events: readonly (readonly [IsoDate, readonly DatedPostingOccurrence[]])[];
-	baseRowsByDate: ReadonlyMap<IsoDate, ProjectionRow>;
+	baseRealizedByDateAndPosting: ReadonlyMap<string, number>;
 	dispositions: ReadonlyMap<string, FiPostingDisposition>;
 	balances: Record<string, number>;
 	accountsById: Map<string, Account>;
@@ -459,7 +457,7 @@ function applyBranchPostingEvents({
 			if (disposition === "disabled") continue;
 			if (disposition === "observe-base-path-realized-occurrence") {
 				const realizedAmount =
-					baseRowsByDate.get(date)?.realizedPostingAmountsById[posting.id] ?? 0;
+					baseRealizedByDateAndPosting.get(`${date}:${posting.id}`) ?? 0;
 				latestPostingAmounts.set(posting.id, realizedAmount);
 				observedDirectIncome += realizedAmount;
 				continue;
@@ -556,10 +554,14 @@ function evaluateCycle({
 	const branchPostings = path.effectivePack.postings.filter(
 		(posting) => posting.enabled && dispositions.get(posting.id) !== "disabled",
 	);
-	const baseRowsByDate = new Map(
-		path.rows
-			.filter((row) => !row.isHistorical)
-			.map((row) => [row.date, row] as const),
+	const baseRealizedByDateAndPosting = new Map(
+		path.movementEvents.map(
+			(event) =>
+				[
+					`${event.date}:${event.origin.postingId}`,
+					event.realizedAmount,
+				] as const,
+		),
 	);
 	const eventDates = new Map<IsoDate, DatedPostingOccurrence[]>();
 	const cycleEnd = addYearsClamped(candidate.date, plan.evaluationYears);
@@ -599,11 +601,11 @@ function evaluateCycle({
 			withdrawalAttempts: [] as WithdrawalAttempt[],
 			remainingWithdrawalByAccount: new Map<string, number>(),
 			latestPostingAmounts: initializeLatestPostingAmounts(
-				path.rows,
+				path.movementEvents,
 				candidate.date,
 			),
 			realizedByPostingAndYear: initializeRealizedPostingCaps(
-				path.rows,
+				path.movementEvents,
 				candidate.date,
 				continuingIds,
 			),
@@ -620,7 +622,7 @@ function evaluateCycle({
 
 			const directIncome = applyBranchPostingEvents({
 				events: eventsByPeriod[period.index],
-				baseRowsByDate,
+				baseRealizedByDateAndPosting,
 				dispositions,
 				balances,
 				accountsById,
@@ -767,7 +769,6 @@ export function evaluateFinancialIndependence({
 	candidateDates?: readonly IsoDate[];
 }): FinancialIndependenceAnalysis {
 	const normalizedPlan = normalizeFinancialIndependencePlan(plan);
-	const projectedRows = path.rows.filter((row) => !row.isHistorical);
 	const assetRates = selectedAssetRates(normalizedPlan);
 	const cashflowIds = selectedCashflowIds(normalizedPlan);
 	const requestedDates =
@@ -788,7 +789,7 @@ export function evaluateFinancialIndependence({
 	const analysisRows = dates.map((date): FinancialIndependenceRow => {
 		const row = latestRowAtOrBefore(path.rows, date);
 		const annualDirectIncome = realizedCashflowBetween(
-			projectedRows,
+			path.movementEvents,
 			cashflowIds,
 			date,
 			addYearsClamped(date, 1),

@@ -10,6 +10,8 @@ import { computePercentiles } from "../utils/stochastic";
 import type { EvaluationDefinition } from "./runtime";
 
 export const POSTING_FULFILLMENT_DEFINITION_ID = "posting-fulfillment";
+export const DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID = "posting-fulfillment";
+const MIN_REPORTABLE_UNFULFILLED_AMOUNT = 0.5;
 
 export interface PostingFulfillmentConfig {
 	postingIds: string[] | null;
@@ -76,16 +78,31 @@ function roundAmount(value: number) {
 	return Math.round(value);
 }
 
+function reportableUnfulfilledAmount(event: MovementEvent) {
+	const amount = Math.max(0, event.requestedAmount - event.realizedAmount);
+	return amount >= MIN_REPORTABLE_UNFULFILLED_AMOUNT ? amount : 0;
+}
+
+function reportedAmounts(requestedAmount: number, unfulfilledAmount: number) {
+	const requested = roundAmount(requestedAmount);
+	const unfulfilled = roundAmount(unfulfilledAmount);
+	return {
+		requestedAmount: requested,
+		realizedAmount: Math.max(0, requested - unfulfilled),
+		unfulfilledAmount: unfulfilled,
+	};
+}
+
 function toFulfillmentEvent(event: MovementEvent): PostingFulfillmentEvent {
+	const amounts = reportedAmounts(
+		event.requestedAmount,
+		reportableUnfulfilledAmount(event),
+	);
 	return {
 		date: event.date,
 		sequence: event.sequence,
 		postingId: event.origin.postingId,
-		requestedAmount: roundAmount(event.requestedAmount),
-		realizedAmount: roundAmount(event.realizedAmount),
-		unfulfilledAmount: roundAmount(
-			Math.max(0, event.requestedAmount - event.realizedAmount),
-		),
+		...amounts,
 		bindingConstraints: event.bindingConstraints,
 		accountDeltas: event.accountDeltas.map(({ accountId, delta }) => ({
 			accountId,
@@ -118,44 +135,53 @@ export function validatePostingFulfillmentConfig(
 export function evaluatePostingFulfillment(
 	path: ProjectionPath,
 	config: PostingFulfillmentConfig,
+	options: { includeDetails?: boolean } = {},
 ): PostingFulfillmentPathResult {
+	const includeDetails = options.includeDetails ?? true;
 	const selectedIds = config.postingIds ? new Set(config.postingIds) : null;
-	const rawEvents = path.movementEvents.filter(
-		(event) => selectedIds === null || selectedIds.has(event.origin.postingId),
-	);
-	const events = rawEvents.map(toFulfillmentEvent);
-	const accountById = new Map(
-		path.effectivePack.accounts.map((account) => [account.id, account]),
-	);
+	const events: PostingFulfillmentEvent[] = [];
 	const totalsByPostingId = new Map<
 		string,
 		{
 			requestedAmount: number;
-			realizedAmount: number;
+			unfulfilledAmount: number;
 			firstUnderfulfilledDate: IsoDate | null;
 		}
 	>();
 	const totalsByDate = new Map<
 		IsoDate,
-		{ requestedAmount: number; realizedAmount: number }
+		{
+			requestedAmount: number;
+			unfulfilledAmount: number;
+		}
 	>();
 	let requestedAmount = 0;
-	let realizedAmount = 0;
+	let unfulfilledAmount = 0;
+	let firstUnderfulfilledDate: IsoDate | null = null;
 
-	for (const event of rawEvents) {
+	for (const event of path.movementEvents) {
+		if (selectedIds !== null && !selectedIds.has(event.origin.postingId)) {
+			continue;
+		}
+		const eventUnfulfilledAmount = reportableUnfulfilledAmount(event);
 		requestedAmount += event.requestedAmount;
-		realizedAmount += event.realizedAmount;
+		unfulfilledAmount += eventUnfulfilledAmount;
+		if (firstUnderfulfilledDate === null && eventUnfulfilledAmount > 0) {
+			firstUnderfulfilledDate = event.date;
+		}
+		if (!includeDetails) continue;
+		events.push(toFulfillmentEvent(event));
 		const postingId = event.origin.postingId;
 		const postingTotals = totalsByPostingId.get(postingId) ?? {
 			requestedAmount: 0,
-			realizedAmount: 0,
+			unfulfilledAmount: 0,
 			firstUnderfulfilledDate: null,
 		};
 		postingTotals.requestedAmount += event.requestedAmount;
-		postingTotals.realizedAmount += event.realizedAmount;
+		postingTotals.unfulfilledAmount += eventUnfulfilledAmount;
 		if (
 			postingTotals.firstUnderfulfilledDate === null &&
-			event.requestedAmount > event.realizedAmount
+			eventUnfulfilledAmount > 0
 		) {
 			postingTotals.firstUnderfulfilledDate = event.date;
 		}
@@ -163,21 +189,30 @@ export function evaluatePostingFulfillment(
 
 		const dateTotals = totalsByDate.get(event.date) ?? {
 			requestedAmount: 0,
-			realizedAmount: 0,
+			unfulfilledAmount: 0,
 		};
 		dateTotals.requestedAmount += event.requestedAmount;
-		dateTotals.realizedAmount += event.realizedAmount;
+		dateTotals.unfulfilledAmount += eventUnfulfilledAmount;
 		totalsByDate.set(event.date, dateTotals);
 	}
 
-	const postings = path.effectivePack.postings
+	const accountById = includeDetails
+		? new Map(
+				path.effectivePack.accounts.map((account) => [account.id, account]),
+			)
+		: new Map();
+	const postings = (includeDetails ? path.effectivePack.postings : [])
 		.filter((posting) => selectedIds === null || selectedIds.has(posting.id))
 		.map((posting): PostingFulfillmentPostingSummary => {
 			const totals = totalsByPostingId.get(posting.id) ?? {
 				requestedAmount: 0,
-				realizedAmount: 0,
+				unfulfilledAmount: 0,
 				firstUnderfulfilledDate: null,
 			};
+			const amounts = reportedAmounts(
+				totals.requestedAmount,
+				totals.unfulfilledAmount,
+			);
 			return {
 				postingId: posting.id,
 				label: posting.label,
@@ -194,39 +229,33 @@ export function evaluatePostingFulfillment(
 					: null,
 				priority: posting.priority,
 				annualCap: posting.annualCap,
-				requestedAmount: roundAmount(totals.requestedAmount),
-				realizedAmount: roundAmount(totals.realizedAmount),
+				requestedAmount: amounts.requestedAmount,
+				realizedAmount: amounts.realizedAmount,
 				utilizationRate:
-					totals.requestedAmount > 0
-						? totals.realizedAmount / totals.requestedAmount
+					amounts.requestedAmount > 0
+						? amounts.realizedAmount / amounts.requestedAmount
 						: 0,
 				firstUnderfulfilledDate: totals.firstUnderfulfilledDate,
-				unfulfilledAmount: roundAmount(
-					Math.max(0, totals.requestedAmount - totals.realizedAmount),
-				),
+				unfulfilledAmount: amounts.unfulfilledAmount,
 			};
 		});
 	const dates = [...totalsByDate.entries()]
-		.map(
-			([date, totals]): PostingFulfillmentDateSummary => ({
-				date,
-				requestedAmount: roundAmount(totals.requestedAmount),
-				realizedAmount: roundAmount(totals.realizedAmount),
-				unfulfilledAmount: roundAmount(
-					Math.max(0, totals.requestedAmount - totals.realizedAmount),
-				),
-			}),
-		)
+		.map(([date, totals]): PostingFulfillmentDateSummary => {
+			const amounts = reportedAmounts(
+				totals.requestedAmount,
+				totals.unfulfilledAmount,
+			);
+			return { date, ...amounts };
+		})
 		.sort((left, right) => left.date.localeCompare(right.date));
-	const unfulfilledAmount = Math.max(0, requestedAmount - realizedAmount);
-
+	const amounts = reportedAmounts(requestedAmount, unfulfilledAmount);
 	return {
-		requestedAmount: roundAmount(requestedAmount),
-		realizedAmount: roundAmount(realizedAmount),
-		unfulfilledAmount: roundAmount(unfulfilledAmount),
-		completionRate: requestedAmount > 0 ? realizedAmount / requestedAmount : 1,
-		firstUnderfulfilledDate:
-			events.find((event) => event.unfulfilledAmount > 0)?.date ?? null,
+		...amounts,
+		completionRate:
+			amounts.requestedAmount > 0
+				? amounts.realizedAmount / amounts.requestedAmount
+				: 1,
+		firstUnderfulfilledDate,
 		events,
 		dates,
 		postings,
@@ -258,8 +287,10 @@ export const postingFulfillmentEvaluation: EvaluationDefinition<
 	id: POSTING_FULFILLMENT_DEFINITION_ID,
 	label: "Posting fulfillment",
 	validateConfig: validatePostingFulfillmentConfig,
-	evaluatePath({ path }, config) {
-		return evaluatePostingFulfillment(path, config);
+	evaluatePath({ path, detailLevel }, config) {
+		return evaluatePostingFulfillment(path, config, {
+			includeDetails: detailLevel !== "summary",
+		});
 	},
 	diagnoseConfig({ path }, config) {
 		return diagnoseConfig(path, config);
@@ -269,7 +300,9 @@ export const postingFulfillmentEvaluation: EvaluationDefinition<
 	},
 	accumulate(accumulator, pathResult) {
 		accumulator.runCount++;
-		if (pathResult.unfulfilledAmount === 0) accumulator.fulfilledRunCount++;
+		if (pathResult.firstUnderfulfilledDate === null) {
+			accumulator.fulfilledRunCount++;
+		}
 		accumulator.unfulfilledAmounts.push(pathResult.unfulfilledAmount);
 	},
 	finalize(accumulator) {
@@ -290,7 +323,7 @@ export const postingFulfillmentEvaluation: EvaluationDefinition<
 			? probabilistic.fullFulfillmentProbability === 1
 				? "satisfied"
 				: "not-satisfied"
-			: deterministic?.unfulfilledAmount === 0
+			: deterministic?.firstUnderfulfilledDate === null
 				? "satisfied"
 				: "not-satisfied";
 	},

@@ -189,7 +189,6 @@ describe("Snapshot slice", () => {
 			currentNetWorth: 100,
 			finalNetWorth: 200,
 			evaluationOutcomes: [],
-			shortfallAmount: 0,
 			overrideCount: 1,
 		});
 

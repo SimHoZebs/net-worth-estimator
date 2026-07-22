@@ -32,7 +32,6 @@ export interface AccountMovementAction {
 export interface AccountMovementResult {
 	requestedAmount: number;
 	realizedAmount: number;
-	shortfallAmount: number;
 	bindingConstraints: AccountMovementConstraint[];
 }
 
@@ -209,7 +208,6 @@ export function resolveAccountMovement(
 		return {
 			requestedAmount,
 			realizedAmount: 0,
-			shortfallAmount: 0,
 			bindingConstraints: [],
 		};
 	}
@@ -221,7 +219,6 @@ export function resolveAccountMovement(
 		return {
 			requestedAmount,
 			realizedAmount: 0,
-			shortfallAmount: requestedAmount,
 			bindingConstraints: [
 				{ type: "source-unavailable", accountId: action.sourceAccountId },
 			],
@@ -248,9 +245,9 @@ export function resolveAccountMovement(
 			destBalanceLimit,
 		),
 	);
-	const shortfallAmount = requestedAmount - realizedAmount;
+	const unrealizedAmount = requestedAmount - realizedAmount;
 	const bindingConstraints: AccountMovementConstraint[] = [];
-	if (shortfallAmount > 0) {
+	if (unrealizedAmount > 0) {
 		const isBinding = (limit: number) =>
 			Number.isFinite(limit) && Math.abs(limit - realizedAmount) < 1e-9;
 		if (action.sourceAccountId !== null && isBinding(sourceBalanceLimit)) {
@@ -273,7 +270,6 @@ export function resolveAccountMovement(
 	return {
 		requestedAmount,
 		realizedAmount,
-		shortfallAmount,
 		bindingConstraints,
 	};
 }

@@ -224,11 +224,6 @@ export interface ProjectionRow {
 	externalInflowAmount: number;
 	externalOutflowAmount: number;
 	internalTransferAmount: number;
-	requestedPostingAmount: number;
-	realizedPostingAmount: number;
-	clampedPostingShortfallAmount: number;
-	requestedPostingAmountsById: Record<string, number>;
-	realizedPostingAmountsById: Record<string, number>;
 }
 
 export interface ProjectionAccountSummary {
@@ -238,21 +233,6 @@ export interface ProjectionAccountSummary {
 	enabled: boolean;
 	startingBalance: number;
 	endingBalance: number;
-}
-
-export interface ProjectionPostingSummary {
-	postingId: string;
-	label: string;
-	sourceAccountId: string | null;
-	sourceAccountLabel: string | null;
-	destinations: Array<{ accountId: string; label: string }> | null;
-	priority: number;
-	annualCap: number | null;
-	requestedAmount: number;
-	realizedAmount: number;
-	utilizationRate: number;
-	firstShortfallDate: IsoDate | null;
-	shortfallAmount: number;
 }
 
 export interface FinancialIndependenceRow {
@@ -343,14 +323,10 @@ export interface ProjectionCoreResult {
 		sampledRows: ProjectionRow[];
 	};
 	accountSummaries: ProjectionAccountSummary[];
-	postingSummaries: ProjectionPostingSummary[];
 	totals: {
 		externalInflowAmount: number;
 		externalOutflowAmount: number;
 		internalTransferAmount: number;
-		requestedPostingAmount: number;
-		realizedPostingAmount: number;
-		clampedPostingShortfallAmount: number;
 	};
 	milestones: {
 		latestCheckpointDate: IsoDate | null;

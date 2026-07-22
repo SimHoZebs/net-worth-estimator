@@ -14,6 +14,7 @@ export interface EvaluationContext {
 	path: ProjectionPath;
 	scenario: ScenarioPack;
 	stochasticRates?: ReadonlyMap<string, readonly number[]>;
+	detailLevel?: "detailed" | "summary";
 }
 
 export interface EvaluationFinalizeContext {

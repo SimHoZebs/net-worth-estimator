@@ -25,10 +25,11 @@ The app expects these files under `public/configs/`:
 - `postings.csv`
 - `behavior/financial-independence.csv`
 - `behavior/net-worth-threshold.csv`
+- `behavior/posting-fulfillment.csv`
 
 Each behavior file has the columns `order`, `instanceId`, `label`, `enabled`, and `config`. The behavior definition is inferred from the filename, `order` preserves global evaluation order across files, and `config` is JSON encoded as a CSV value. Both `order` and `instanceId` must be unique across behavior files, while multiple rows in one file configure multiple instances of that behavior.
 
-`financial-independence.csv` configures the branch behavior simulation, including source selections, continuing postings, withdrawal policy, and confidence. `net-worth-threshold.csv` configures a read-only path evaluation. New behavior definitions receive their own file in the same directory rather than adding rows to a shared evaluation file.
+`financial-independence.csv` configures the branch behavior simulation, including source selections, continuing postings, withdrawal policy, and confidence. `net-worth-threshold.csv` and `posting-fulfillment.csv` configure read-only path evaluations. New definitions receive their own file rather than adding rows to a shared evaluation file.
 
 ## Persistence Modes
 

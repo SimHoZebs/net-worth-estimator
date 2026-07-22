@@ -10,6 +10,10 @@ import type {
 	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
+import {
+	DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID,
+	getPostingFulfillmentResult,
+} from "@/lib/projection";
 import { selectActiveOverrideCount, useStore } from "@/store";
 import { CashFlowWaterfall } from "./dashboard/CashFlowWaterfall";
 import { AccountDiagnosticChart } from "./dashboard/charts/AccountDiagnosticChart";
@@ -42,12 +46,15 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 		[pack, result, stochasticResult],
 	);
 	const activeOverrideCount = useStore(selectActiveOverrideCount);
-	const derived = useDashboardDerivedValues(result, pack);
+	const fulfillment =
+		getPostingFulfillmentResult(result, DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID)
+			?.deterministic ?? null;
+	const derived = useDashboardDerivedValues(pack, fulfillment);
 	const milestoneDates = useMemo(
 		() => ({
-			firstShortfall: derived.firstShortfallRow?.date ?? undefined,
+			firstShortfall: derived.firstUnderfulfilledDate ?? undefined,
 		}),
-		[derived.firstShortfallRow?.date],
+		[derived.firstUnderfulfilledDate],
 	);
 	const scrollToSourceData = useCallback(() => {
 		const el = document.getElementById("model-inputs");
@@ -152,26 +159,39 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 				<DriverCard
 					label="Next projected transaction"
 					value={
-						derived.firstProjectedRow
-							? formatDate(derived.firstProjectedRow.date)
-							: "No future transactions"
+						!derived.fulfillmentAvailable
+							? "Unavailable"
+							: derived.firstProjectedEvent
+								? formatDate(derived.firstProjectedEvent.date)
+								: "No future transactions"
 					}
 					detail={derived.nextEventDetail}
 				/>
 				<DriverCard
 					label="Planned transaction completion"
-					value={pct.format(derived.postingUtilizationRate)}
-					detail={
-						derived.requestedPostingAmount === 0
-							? `No scheduled transactions are requesting future activity across ${derived.enabledPostingCount} transaction${derived.enabledPostingCount === 1 ? "" : "s"}.`
-							: `The model applied ${currency.format(derived.realizedPostingAmount)} of ${currency.format(derived.requestedPostingAmount)} in planned transactions.`
+					value={
+						derived.fulfillmentAvailable
+							? pct.format(derived.postingUtilizationRate)
+							: "Unavailable"
 					}
-					tone={derived.postingUtilizationRate < 1 ? "tertiary" : "primary"}
+					detail={
+						!derived.fulfillmentAvailable
+							? "Enable a healthy posting-fulfillment evaluation to inspect completion."
+							: derived.requestedPostingAmount === 0
+								? `No scheduled transactions are requesting future activity across ${derived.enabledPostingCount} transaction${derived.enabledPostingCount === 1 ? "" : "s"}.`
+								: `The model applied ${currency.format(derived.realizedPostingAmount)} of ${currency.format(derived.requestedPostingAmount)} in planned transactions.`
+					}
+					tone={
+						derived.fulfillmentAvailable && derived.postingUtilizationRate < 1
+							? "tertiary"
+							: "primary"
+					}
 				/>
 			</section>
 
 			<section id="projected-shortfalls">
 				<ShortfallCalendar
+					fulfillment={fulfillment}
 					rows={result.timeline.rows}
 					postings={pack.postings}
 					accounts={pack.accounts}
@@ -222,7 +242,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 							</span>
 						</div>
 						<TransactionCompletionTable
-							postingSummaries={result.postingSummaries}
+							postingSummaries={derived.postingSummaries}
 						/>
 					</div>
 				</Collapsible.Content>

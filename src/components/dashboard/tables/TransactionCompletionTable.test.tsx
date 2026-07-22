@@ -18,8 +18,8 @@ describe("TransactionCompletionTable", () => {
 						requestedAmount: 0,
 						realizedAmount: 0,
 						utilizationRate: 0,
-						firstShortfallDate: null,
-						shortfallAmount: 0,
+						firstUnderfulfilledDate: null,
+						unfulfilledAmount: 0,
 					},
 				]}
 			/>,
