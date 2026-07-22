@@ -1,11 +1,14 @@
 import type {
 	Account,
-	AccountMovementConstraintType,
+	AccountMovementConstraint,
 	IsoDate,
 	Posting,
 	PostingFrequency,
 	ScenarioWhatIfState,
 } from "../types/scenario";
+
+export type { AccountMovementConstraint } from "../types/scenario";
+
 import { addMonthsClamped, compareIsoDates, daysBetween } from "../utils/date";
 import {
 	getHeadroom,
@@ -25,21 +28,6 @@ export interface AccountMovementAction {
 	requestedAmount: number;
 	limitRemaining?: number;
 }
-
-export type AccountMovementConstraint =
-	| {
-			type: Extract<AccountMovementConstraintType, "source-unavailable">;
-			accountId: string;
-	  }
-	| {
-			type: Extract<AccountMovementConstraintType, "source-floor">;
-			accountId: string;
-	  }
-	| {
-			type: Extract<AccountMovementConstraintType, "destination-ceiling">;
-			accountIds: string[];
-	  }
-	| { type: Extract<AccountMovementConstraintType, "action-limit"> };
 
 export interface AccountMovementResult {
 	requestedAmount: number;

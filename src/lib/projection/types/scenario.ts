@@ -33,6 +33,21 @@ export type AccountMovementConstraintType =
 	| "destination-ceiling"
 	| "action-limit";
 
+export type AccountMovementConstraint =
+	| {
+			type: Extract<AccountMovementConstraintType, "source-unavailable">;
+			accountId: string;
+	  }
+	| {
+			type: Extract<AccountMovementConstraintType, "source-floor">;
+			accountId: string;
+	  }
+	| {
+			type: Extract<AccountMovementConstraintType, "destination-ceiling">;
+			accountIds: string[];
+	  }
+	| { type: Extract<AccountMovementConstraintType, "action-limit"> };
+
 export type JsonPrimitive = boolean | number | string | null;
 export type JsonValue =
 	| JsonPrimitive
@@ -182,6 +197,16 @@ export interface AccountDelta {
 	delta: number;
 }
 
+export interface MovementEvent {
+	date: IsoDate;
+	sequence: number;
+	origin: { type: "posting"; postingId: string };
+	requestedAmount: number;
+	realizedAmount: number;
+	bindingConstraints: AccountMovementConstraint[];
+	accountDeltas: Array<{ accountId: string; delta: number }>;
+}
+
 export interface AccountSnapshot {
 	accountId: string;
 	date: IsoDate;
@@ -295,6 +320,7 @@ export interface FinancialIndependenceWithdrawalSummary {
 
 export interface ProjectionPath {
 	rows: ProjectionRow[];
+	movementEvents: MovementEvent[];
 	effectivePack: ScenarioPack;
 	projectionStartDate: IsoDate;
 	projectionEndDate: IsoDate;
