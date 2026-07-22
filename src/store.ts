@@ -386,6 +386,13 @@ export const DEFAULT_EVALUATIONS: ConfiguredEvaluation[] = [
 		enabled: true,
 		config: { target: 1_000_000 },
 	},
+	{
+		definitionId: "posting-fulfillment",
+		instanceId: "posting-fulfillment",
+		label: "Posting fulfillment",
+		enabled: true,
+		config: { postingIds: null },
+	},
 ];
 
 interface SettingsSlice {

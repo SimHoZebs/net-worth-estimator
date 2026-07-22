@@ -13,10 +13,12 @@ import {
 	isJsonValue,
 	validateFinancialIndependencePlan,
 	validateNetWorthThresholdConfig,
+	validatePostingFulfillmentConfig,
 } from "@/lib/projection";
 import { DEFAULT_FINANCIAL_INDEPENDENCE_PLAN, useStore } from "@/store";
 import { FinancialIndependenceEvaluation } from "./FinancialIndependenceEvaluation";
 import { NetWorthThresholdEvaluation } from "./NetWorthThresholdEvaluation";
+import { PostingFulfillmentEvaluation } from "./PostingFulfillmentEvaluation";
 
 interface ConfigEditorProps {
 	evaluation: ConfiguredEvaluation;
@@ -81,6 +83,15 @@ export const evaluationUiRegistry: readonly EvaluationUiDefinition[] = [
 			validateNetWorthThresholdConfig(config) as unknown as JsonValue,
 		ConfigEditor: ThresholdConfigEditor,
 		ResultRenderer: NetWorthThresholdEvaluation,
+	},
+	{
+		id: "posting-fulfillment",
+		label: "Posting fulfillment",
+		defaultLabel: "Posting fulfillment",
+		createConfig: () => ({ postingIds: null }),
+		validateConfig: (config) =>
+			validatePostingFulfillmentConfig(config) as unknown as JsonValue,
+		ResultRenderer: PostingFulfillmentEvaluation,
 	},
 ];
 

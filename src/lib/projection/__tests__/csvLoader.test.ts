@@ -63,6 +63,7 @@ describe("CSV scenario pack", () => {
 		const result = parseCsvScenarioPack({
 			...validCsvFiles,
 			behaviors: {
+				...validCsvFiles.behaviors,
 				financialIndependence: [
 					"order,instanceId,label,enabled,config",
 					'1,shared,FI,true,"{}"',
@@ -87,6 +88,7 @@ describe("CSV scenario pack", () => {
 		const result = parseCsvScenarioPack({
 			...validCsvFiles,
 			behaviors: {
+				...validCsvFiles.behaviors,
 				financialIndependence: [
 					"order,instanceId,label,enabled,config",
 					'1,fi,FI,true,"{}"',

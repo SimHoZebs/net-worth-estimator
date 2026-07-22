@@ -28,9 +28,11 @@ function createCsvFetch() {
 						? validCsvFiles.behaviors.financialIndependence
 						: fileName === "net-worth-threshold.csv"
 							? validCsvFiles.behaviors.netWorthThreshold
-							: fileName === "postings.csv"
-								? validCsvFiles.postings
-								: null;
+							: fileName === "posting-fulfillment.csv"
+								? validCsvFiles.behaviors.postingFulfillment
+								: fileName === "postings.csv"
+									? validCsvFiles.postings
+									: null;
 
 		return new Response(body ?? "", { status: body === null ? 404 : 200 });
 	});
@@ -45,7 +47,7 @@ describe("createBrowserCsvDataSource", () => {
 
 		expect(result.pack?.accounts).toHaveLength(4);
 		expect(result.issues).toEqual([]);
-		expect(fetchImpl).toHaveBeenCalledTimes(5);
+		expect(fetchImpl).toHaveBeenCalledTimes(6);
 		expect(dataSource.save).toBeUndefined();
 		expect(dataSource.reset).toBeUndefined();
 	});
@@ -91,12 +93,18 @@ describe("createBrowserCsvDataSource", () => {
 			version: 9,
 			sourcePath: "browser:local-storage",
 			accounts: currentPack.accounts,
-			evaluations: [{ instanceId: "net-worth-1m" }],
+			evaluations: [
+				{ instanceId: "net-worth-1m" },
+				{ instanceId: "posting-fulfillment" },
+			],
 		});
-		expect(fetchImpl).toHaveBeenCalledTimes(5);
+		expect(fetchImpl).toHaveBeenCalledTimes(6);
 		expect(JSON.parse(storage.getItem(storageKey)!)).toMatchObject({
 			version: 9,
-			evaluations: [{ instanceId: "net-worth-1m" }],
+			evaluations: [
+				{ instanceId: "net-worth-1m" },
+				{ instanceId: "posting-fulfillment" },
+			],
 		});
 	});
 
@@ -121,7 +129,7 @@ describe("createBrowserCsvDataSource", () => {
 
 		expect(result.pack?.version).toBe(9);
 		expect(result.pack?.accounts).toEqual(currentPack.accounts);
-		expect(result.pack?.evaluations).toHaveLength(1);
+		expect(result.pack?.evaluations).toHaveLength(2);
 		expect(storage.setItem).toHaveBeenCalledOnce();
 	});
 
@@ -147,6 +155,6 @@ describe("createBrowserCsvDataSource", () => {
 
 		expect(storage.getItem(storageKey)).toBeNull();
 		expect(result?.pack?.accounts).toHaveLength(4);
-		expect(fetchImpl).toHaveBeenCalledTimes(5);
+		expect(fetchImpl).toHaveBeenCalledTimes(6);
 	});
 });

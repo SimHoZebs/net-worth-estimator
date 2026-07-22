@@ -25,6 +25,10 @@ export const validCsvFiles: ScenarioFileContents = {
 			"order,instanceId,label,enabled,config",
 			'1,net-worth-1m,"Reach $1,000,000 net worth",true,"{""target"":1000000}"',
 		].join("\n"),
+		postingFulfillment: [
+			"order,instanceId,label,enabled,config",
+			'2,posting-fulfillment,Posting fulfillment,true,"{""postingIds"":null}"',
+		].join("\n"),
 	},
 	postings: [
 		postingsHeader,
