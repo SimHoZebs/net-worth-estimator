@@ -89,6 +89,7 @@ export type {
 	IsoDate,
 	JsonPrimitive,
 	JsonValue,
+	MovementEvent,
 	Posting,
 	PostingFrequency,
 	ProjectionAccountSummary,

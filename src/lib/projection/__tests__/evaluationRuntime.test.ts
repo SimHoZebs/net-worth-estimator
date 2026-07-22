@@ -26,6 +26,7 @@ const scenario = {
 } as unknown as ScenarioPack;
 const path = {
 	rows: [],
+	movementEvents: [],
 	effectivePack: scenario,
 	projectionStartDate: "2026-01-01",
 	projectionEndDate: "2027-01-01",

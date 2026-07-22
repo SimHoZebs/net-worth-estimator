@@ -7,6 +7,7 @@ import {
 	makeSettings,
 } from "../__fixtures__";
 import { NO_CEILING, NO_FLOOR } from "../constants";
+import { projectRawScenarioPack } from "../simulation/projectPath";
 
 function getBalance(
 	row:
@@ -377,9 +378,51 @@ describe("CSV projection engine", () => {
 		});
 
 		const result = projectScenarioPack(pack, makeSettings());
+		const raw = projectRawScenarioPack(pack, makeSettings());
 
 		expect(result.timeline.rows[1]?.realizedPostingAmount).toBe(200);
 		expect(result.timeline.rows[1]?.clampedPostingShortfallAmount).toBe(200);
 		expect(getBalance(result.timeline.rows[1], "checking")).toBe(100);
+		expect(raw.path.movementEvents).toEqual([
+			{
+				date: "2026-01-10",
+				sequence: 0,
+				origin: { type: "posting", postingId: "transfer" },
+				requestedAmount: 400,
+				realizedAmount: 200,
+				bindingConstraints: [{ type: "source-floor", accountId: "checking" }],
+				accountDeltas: [
+					{ accountId: "checking", delta: -200 },
+					{ accountId: "brokerage", delta: 200 },
+				],
+			},
+		]);
+	});
+
+	it("records fully blocked posting attempts without account impacts", () => {
+		const pack = createBasePack({
+			checkpoints: [
+				{ Date: "2026-01-01", AccountId: "checking", Balance: 100 },
+			],
+			accounts: [makeAccount({ id: "checking", minBalance: 100 })],
+			postings: [
+				makePosting({
+					id: "blocked",
+					sourceAccountId: "checking",
+					arithmetic: "50",
+					startDate: "2026-01-10",
+					endDate: "2026-01-10",
+				}),
+			],
+		});
+
+		const { path } = projectRawScenarioPack(pack, makeSettings());
+
+		expect(path.movementEvents[0]).toMatchObject({
+			requestedAmount: 50,
+			realizedAmount: 0,
+			bindingConstraints: [{ type: "source-floor", accountId: "checking" }],
+			accountDeltas: [],
+		});
 	});
 });

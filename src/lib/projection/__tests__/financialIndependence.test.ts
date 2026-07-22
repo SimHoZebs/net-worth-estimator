@@ -92,6 +92,7 @@ function path(
 ): ProjectionPath {
 	return {
 		rows,
+		movementEvents: [],
 		effectivePack: {
 			version: SCENARIO_MODEL_VERSION,
 			sourcePath: "test",

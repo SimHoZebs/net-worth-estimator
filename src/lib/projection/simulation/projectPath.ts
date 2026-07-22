@@ -4,6 +4,7 @@ import type {
 	AccountDelta,
 	AccountSnapshot,
 	IsoDate,
+	MovementEvent,
 	ProjectionAccountSummary,
 	ProjectionPostingSummary,
 	ProjectionRow,
@@ -191,6 +192,8 @@ export function projectRawScenarioPack(
 		mergedPack.accounts.map((account) => [account.id, account]),
 	);
 	const rows: ProjectionRow[] = [];
+	const movementEvents: MovementEvent[] = [];
+	let movementSequence = 0;
 	const balances = initAccountBalances(mergedPack.accounts);
 	const futureStartingBalances = initAccountBalances(mergedPack.accounts);
 	const latestRealizedPostingAmountById = new Map<string, number>();
@@ -339,16 +342,28 @@ export function projectRawScenarioPack(
 
 			const beforeBalances = snapshotBalances(balances);
 			applyPosting(posting, realizedAmount, balances, accountById);
+			const accountDeltas: MovementEvent["accountDeltas"] = [];
 			for (const [accountId, after] of Object.entries(balances)) {
 				const before = beforeBalances[accountId] ?? 0;
 				if (before !== after) {
+					const delta = after - before;
 					if (!accountImpacts[accountId]) accountImpacts[accountId] = [];
 					accountImpacts[accountId].push({
 						postingId: posting.id,
-						delta: after - before,
+						delta,
 					});
+					accountDeltas.push({ accountId, delta });
 				}
 			}
+			movementEvents.push({
+				date,
+				sequence: movementSequence++,
+				origin: { type: "posting", postingId: posting.id },
+				requestedAmount: movement.requestedAmount,
+				realizedAmount: movement.realizedAmount,
+				bindingConstraints: movement.bindingConstraints,
+				accountDeltas,
+			});
 			latestRealizedPostingAmountById.set(posting.id, realizedAmount);
 
 			if (posting.sourceAccountId === null && posting.destinations !== null) {
@@ -453,6 +468,7 @@ export function projectRawScenarioPack(
 	return {
 		path: {
 			rows,
+			movementEvents,
 			effectivePack: mergedPack,
 			projectionStartDate,
 			projectionEndDate,
