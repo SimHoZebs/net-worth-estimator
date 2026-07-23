@@ -1,6 +1,9 @@
-import type { ScenarioPack, ScenarioWhatIfState } from "../types/scenario";
+import type {
+	FinancialModelDocument,
+	ScenarioOverrides,
+} from "../types/scenario";
 
-export const EMPTY_WHAT_IF_STATE: ScenarioWhatIfState = {
+export const EMPTY_SCENARIO_OVERRIDES: ScenarioOverrides = {
 	addedAccounts: [],
 	addedPostings: [],
 	addedCheckpoints: [],
@@ -8,26 +11,35 @@ export const EMPTY_WHAT_IF_STATE: ScenarioWhatIfState = {
 	disabledPostingIds: [],
 };
 
-export function prepareScenarioPack(
-	pack: ScenarioPack,
-	whatIfState: ScenarioWhatIfState = EMPTY_WHAT_IF_STATE,
-): ScenarioPack {
-	const disabledAccountIds = new Set(whatIfState.disabledAccountIds);
-	const disabledPostingIds = new Set(whatIfState.disabledPostingIds);
+export const EMPTY_WHAT_IF_STATE = EMPTY_SCENARIO_OVERRIDES;
 
-	const accounts = pack.accounts
+export function applyScenarioOverrides(
+	document: FinancialModelDocument,
+	overrides: ScenarioOverrides = EMPTY_SCENARIO_OVERRIDES,
+): FinancialModelDocument {
+	const disabledAccountIds = new Set(overrides.disabledAccountIds);
+	const disabledPostingIds = new Set(overrides.disabledPostingIds);
+
+	const accounts = document.accounts
 		.filter((account) => !disabledAccountIds.has(account.id))
-		.concat(whatIfState.addedAccounts);
+		.concat(overrides.addedAccounts);
 	const accountIds = new Set(accounts.map((account) => account.id));
 
 	return {
-		...pack,
+		...document,
 		accounts,
-		postings: pack.postings
+		postings: document.postings
 			.filter((posting) => !disabledPostingIds.has(posting.id))
-			.concat(whatIfState.addedPostings),
-		checkpoints: pack.checkpoints
-			.concat(whatIfState.addedCheckpoints)
+			.concat(overrides.addedPostings),
+		checkpoints: document.checkpoints
+			.concat(overrides.addedCheckpoints)
 			.filter((checkpoint) => accountIds.has(checkpoint.AccountId)),
 	};
+}
+
+export function prepareScenarioPack(
+	pack: FinancialModelDocument,
+	whatIfState: ScenarioOverrides = EMPTY_SCENARIO_OVERRIDES,
+): FinancialModelDocument {
+	return applyScenarioOverrides(pack, whatIfState);
 }

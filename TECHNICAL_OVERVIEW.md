@@ -15,7 +15,7 @@ The Net Worth Estimator is a single-page React application that projects net wor
 
 ## 2. High-Level Architecture & Data Flow
 
-The application loads a scenario pack through a capability-based `DataSource` abstraction, validates it, and runs projections in dedicated Web Workers. Local development uses a Vite server plugin to read/write repo configuration files, while static/serverless production loads bundled `/configs/` files and saves user edits in browser storage. Evaluation instances and their behavior configuration are initialized from one file per definition under `configs/behavior/`; subsequent UI edits and temporary what-if overrides exist only in browser memory for the current session.
+The application loads a financial model document through a capability-based `DataSource` abstraction, validates it, and runs projections in dedicated Web Workers. The existing `ScenarioPack` API name remains as a compatibility alias for this persistence boundary. Local development uses a Vite server plugin to read/write repo configuration files, while static/serverless production loads bundled `/configs/` files and saves user edits in browser storage. Evaluation instances and their behavior configuration are initialized from one file per definition under `configs/behavior/`; subsequent UI edits and temporary scenario overrides exist only in browser memory for the current session.
 
 ### Data Flow Execution
 
@@ -23,8 +23,8 @@ The application loads a scenario pack through a capability-based `DataSource` ab
 2. `src/hooks/useScenario.ts` wraps TanStack Query (`useScenarioQuery`, `useScenarioMutation`, `useScenarioResetMutation`) around the `DataSource` interface, which is created once in `App.tsx` via `useMemo` and passed via dependency injection.
 3. Zod-based parsing plus cross-reference validation rejects invalid packs before projection.
 4. What-if state (temporary postings, accounts, checkpoints, disable toggles) is stored in Zustand with immutable-style updates.
-5. `prepareScenarioPack()` applies temporary overrides once, and `projectRawScenarioPack()` produces an unrounded evaluator-facing path plus the rounded public projection report.
-6. Deterministic projection and path evaluation run in `src/workers/projectionWorker.ts` off the main thread.
+5. Worker-side orchestration applies temporary overrides and resolves checkpoints, dates, and initial state into a complete `SimulationRequest`.
+6. The pure `simulate()` kernel executes that request and returns an exact `SimulationRun`; a compatibility adapter then produces the evaluator-facing path and rounded public report.
 7. Monte Carlo simulation runs in `src/workers/stochasticWorker.ts` — streaming partial results progressively to the UI.
 8. A Dependency Injection pattern (`ProjectionEngineProvider` context) provides a `ProjectionEngine` instance to the React tree. `WorkerProjectionEngine` implements this interface, creating and destroying Web Workers per call.
 9. The `useProjection` and `useStochastic` hooks consume this engine, associate results with the exact request inputs, and hide stale results while replacements run.
@@ -36,6 +36,10 @@ The application loads a scenario pack through a capability-based `DataSource` ab
 - `Checkpoint`: historical truth for account balances on exact dates
 - `Posting`: generic scheduled rules for future inflows, outflows, and transfers. Supports `volatility` for stochastic sampling.
 - `ProjectionRuntimeSettings`: fallback start date, projection horizon, and ordered configured evaluations with stable instance IDs; evaluations initialize from CSV and can then be edited for the session
+- `FinancialModelDocument`: persistence boundary containing model data, checkpoint observations, evaluation configuration, version, and source metadata; `ScenarioPack` is its compatibility alias
+- `ScenarioOverrides`: temporary additions and disable selections applied before simulation; `ScenarioWhatIfState` is its compatibility alias
+- `SimulationRequest`: fully prepared model, initial runtime state, date range, start-date inclusion policy, and optional sampled assumptions
+- `SimulationRun`: exact initial/final runtime state, dated balance snapshots, and every ordered movement attempt produced by the deterministic kernel
 - `ConfiguredEvaluation`: serializable definition ID, stable instance ID, label, enabled state, and definition-owned configuration. Multiple instances may use the same definition.
 - `EvaluationResultCollection`: ordered instance IDs plus generic result envelopes keyed by instance ID; evaluator-specific bodies remain behind typed accessors.
 - Configured evaluation configs and public result bodies are finite JSON values. Registries, functions, maps, accumulators, and projection paths remain worker-internal.
@@ -59,23 +63,25 @@ The application loads a scenario pack through a capability-based `DataSource` ab
 
 ### Engine Design Philosophy
 
-The raw simulator in `src/lib/projection/simulation/projectPath.ts` is intentionally clueless about the specific meaning of accounts and postings. `analysis/projectScenario.ts` composes the raw path with evaluations. The simulator processes every account, checkpoint, and posting through the same generic pipeline — there are no special cases for particular IDs, categories, or labels:
+The deterministic kernel in `src/lib/projection/simulation/simulate.ts` is intentionally clueless about the specific meaning of accounts and postings. Preparation in `scenario/prepareSimulation.ts` resolves persistence and application concerns before execution. `simulation/projectPath.ts` adapts the exact run to the existing path and public report, and `analysis/projectScenario.ts` composes that path with evaluations. The kernel processes every account and posting through the same generic pipeline; it does not receive checkpoints, overrides, evaluation configuration, or horizon settings, and there are no special cases for particular IDs, categories, or labels:
 
 - **No name-based branching**: The engine never inspects `account.id`, `account.category`, `posting.id`, or `posting.label` to choose different behavior. All accounts compound identically; all postings resolve the same way.
 - **Classification is structural, not semantic**: Whether a posting is an inflow, outflow, or transfer is derived entirely from which of `sourceAccountId` / `destinationAccountId` is null — never from interpreting labels or categories.
 - **The `enabled` flag is the only gate**: Disabled accounts are excluded from net worth; disabled postings are skipped. No other property controls engine behavior.
 - **`priority` is just ordering**: The engine sorts by ascending priority; it does not interpret specific priority values.
 - **Account `category` is a UI concern only**: The engine stores and passes through `category` but never inspects or branches on it.
-- **Pure function**: The engine is a deterministic pure function — given the same pack, settings, and what-if state, it always produces identical results. No randomness, no side effects, no external API calls.
+- **Pure function**: The kernel is a deterministic pure function — given the same prepared request, it always produces identical results without mutating the input. No randomness, side effects, or external API calls occur inside it.
 
-The boundary is at `CsvScenarioPack`: the CSV parsing and validation layer (`csvSchema.ts`, `csvValidation.ts`) handles domain-specific concerns (file names, column headers, cross-reference integrity). The engine receives validated, generic data and operates uniformly on it. The Zod schemas in `csvSchema.ts` are forward-compatible — they may validate CSV fields that are not yet wired into the engine types, and the engine simply ignores them.
+The persistence boundary remains the validated CSV document: `csvSchema.ts` and `csvValidation.ts` handle file names, column headers, and cross-reference integrity. Worker-side orchestration turns that document into a `SimulationRequest`; the kernel receives only resolved model and runtime state. The Zod schemas in `csvSchema.ts` are forward-compatible and may validate CSV fields that are not yet wired into the simulation types.
 
 **Avoid adding special-case logic to the engine unless absolutely unavoidable.** If a feature seems to require engine-level branching, first consider whether it can be expressed within the existing model — additional fields on existing types, new `amountMode` values, or UI-level interpretation of projection outputs. Likewise, the what-if system is intentionally shallow (multiplier overrides only, session-only, never mutating canonical data) to keep the model simple and predictable.
 
 ### Simulation, Behavior, Evaluation, And Analysis
 
-- **Scenario**: declarative accounts, checkpoints, postings, assumptions, and runtime behavior configuration.
-- **Simulation engine**: generic runtime that advances scenario state, executes postings and strategies, enforces account constraints, and records results.
+- **Financial model document**: persisted accounts, postings, checkpoint observations, evaluation configuration, and source metadata.
+- **Scenario overrides**: an optional temporary alternative applied to the base document before request preparation.
+- **Projection engine**: worker-backed application facade that orchestrates preparation, deterministic or stochastic execution, evaluations, and public results.
+- **Simulation kernel**: pure internal runtime that advances prepared state, executes postings, enforces account constraints, and records exact results.
 - **Strategy**: a narrow algorithm for one operation, such as ordered destination allocation; it does not decide when an operation should occur.
 - **Simulation run**: one deterministic, branch, or Monte Carlo execution.
 - **Projection path**: time-series state and event records produced by a base or Monte Carlo run.
@@ -136,8 +142,10 @@ This is genuinely incremental: each path is generated once, consumed by the proj
 
 | File                                             | Role                                                                                                  |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `src/lib/projection/scenario/prepareScenario.ts` | Applies temporary changes to produce the effective scenario |
-| `src/lib/projection/simulation/projectPath.ts` | Generic raw projection path and public report generation; no goal-specific logic |
+| `src/lib/projection/scenario/prepareScenario.ts` | Applies temporary overrides to the persisted document |
+| `src/lib/projection/scenario/prepareSimulation.ts` | Resolves checkpoint history, initial state, dates, and sampled assumptions into a prepared request |
+| `src/lib/projection/simulation/simulate.ts` | Pure deterministic kernel over `SimulationRequest` |
+| `src/lib/projection/simulation/projectPath.ts` | Compatibility adapter from `SimulationRun` to the existing path and public report |
 | `src/lib/projection/evaluation/runtime.ts` | Registry, configured-instance lifecycle, isolated diagnostics, and generic stochastic trackers |
 | `src/lib/projection/evaluation/registry.ts` | Domain registration for net-worth-threshold and financial-independence definitions |
 | `src/lib/projection/evaluation/accessors.ts` | Typed FI and threshold accessors over generic result envelopes |

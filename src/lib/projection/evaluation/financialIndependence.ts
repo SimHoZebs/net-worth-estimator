@@ -1,5 +1,4 @@
 import { runReactiveBehavior } from "../behavior/runtime";
-import { EMPTY_WHAT_IF_STATE } from "../scenario/prepareScenario";
 import { getWithdrawableAmount } from "../simulation/accounts";
 import {
 	type AccountMovementConstraint,
@@ -472,7 +471,6 @@ function applyBranchPostingEvents({
 					date,
 					latestPostingAmounts,
 					balances,
-					EMPTY_WHAT_IF_STATE,
 					sampledRate,
 				),
 			);

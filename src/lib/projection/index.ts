@@ -50,7 +50,11 @@ export {
 	EvaluationRegistry,
 	EvaluationRuntimeSet,
 } from "./evaluation/runtime";
-export { prepareScenarioPack } from "./scenario/prepareScenario";
+export {
+	applyScenarioOverrides,
+	prepareScenarioPack,
+} from "./scenario/prepareScenario";
+export { prepareSimulationRequest } from "./scenario/prepareSimulation";
 export {
 	type AccountMovementAction,
 	type AccountMovementConstraint,
@@ -58,6 +62,7 @@ export {
 	resolveAccountMovement,
 	resolveAccountMovementAmount,
 } from "./simulation/postings";
+export { simulate } from "./simulation/simulate";
 export { createBrowserCsvDataSource } from "./sources/csv/browserCsvDataSource";
 export { createCsvDataSource } from "./sources/csv/csvDataSource";
 export {
@@ -101,6 +106,7 @@ export type {
 	FinancialIndependenceSource,
 	FinancialIndependenceWithdrawalAccountSummary,
 	FinancialIndependenceWithdrawalSummary,
+	FinancialModelDocument,
 	IsoDate,
 	JsonPrimitive,
 	JsonValue,
@@ -114,6 +120,7 @@ export type {
 	ScenarioCollectionKey,
 	ScenarioFileContents,
 	ScenarioFileName,
+	ScenarioOverrides,
 	ScenarioPack,
 	ScenarioWhatIfState,
 } from "./types/scenario";
@@ -125,6 +132,16 @@ export {
 	CSV_SCENARIO_REPO_PATH,
 	SCENARIO_MODEL_VERSION,
 } from "./types/scenario";
+export type {
+	FinancialModel,
+	HistoricalObservationSnapshot,
+	PreparedProjection,
+	SampledAssumptions,
+	SimulationRequest,
+	SimulationRun,
+	SimulationSnapshot,
+	SimulationState,
+} from "./types/simulation";
 export type {
 	PercentileBands,
 	StochasticBandRow,

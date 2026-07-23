@@ -4,7 +4,6 @@ import type {
 	IsoDate,
 	Posting,
 	PostingFrequency,
-	ScenarioWhatIfState,
 } from "../types/scenario";
 
 export type { AccountMovementConstraint } from "../types/scenario";
@@ -133,7 +132,6 @@ export function computeRequestedAmount(
 	currentDate: IsoDate,
 	latestRealizedPostingAmountById: Map<string, number>,
 	balances: Record<string, number>,
-	_whatIfState: ScenarioWhatIfState,
 	stochasticRate?: number,
 ): number {
 	const { posting } = occurrence;
