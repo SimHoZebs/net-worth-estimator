@@ -170,7 +170,7 @@ export interface Posting {
 	enabled: boolean;
 }
 
-export interface ScenarioPack {
+export interface FinancialModelDocument {
 	version: typeof SCENARIO_MODEL_VERSION;
 	sourcePath: string;
 	accounts: Account[];
@@ -179,6 +179,8 @@ export interface ScenarioPack {
 	postings: Posting[];
 }
 
+export type ScenarioPack = FinancialModelDocument;
+
 export interface ScenarioFileContents {
 	accounts: string;
 	checkpoints: string;
@@ -186,13 +188,15 @@ export interface ScenarioFileContents {
 	postings: string;
 }
 
-export interface ScenarioWhatIfState {
+export interface ScenarioOverrides {
 	addedAccounts: Account[];
 	addedPostings: Posting[];
 	addedCheckpoints: Checkpoint[];
 	disabledAccountIds: string[];
 	disabledPostingIds: string[];
 }
+
+export type ScenarioWhatIfState = ScenarioOverrides;
 
 export interface AccountDelta {
 	postingId: string;
