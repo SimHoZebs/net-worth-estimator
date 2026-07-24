@@ -1,6 +1,12 @@
 import { evaluationRegistry } from "../evaluation/registry";
 import { EvaluationRuntimeSet } from "../evaluation/runtime";
-import { projectRawScenarioPack } from "../simulation/projectPath";
+import { prepareSimulationRequest } from "../scenario/prepareSimulation";
+import { addOccurrences } from "../simulation/postings";
+import {
+	adaptSimulationRun,
+	buildProjectionPath,
+} from "../simulation/projectPath";
+import { simulate } from "../simulation/simulate";
 import type {
 	ProjectionResult,
 	ProjectionRuntimeSettings,
@@ -12,6 +18,7 @@ import type {
 	StochasticConfig,
 	StochasticProjectionResult,
 } from "../types/stochastic";
+import { projectionYearIndex } from "../utils/date";
 import {
 	computePercentilesFromSorted,
 	mergeSorted,
@@ -19,37 +26,57 @@ import {
 	sampleLogNormal,
 } from "../utils/stochastic";
 
-function clonePack(pack: ScenarioPack): ScenarioPack {
-	return {
-		...pack,
-		accounts: pack.accounts.map((account) => ({ ...account })),
-		checkpoints: pack.checkpoints.map((checkpoint) => ({ ...checkpoint })),
-		postings: pack.postings.map((posting) => ({
-			...posting,
-			destinations: posting.destinations ? [...posting.destinations] : null,
-		})),
-	};
-}
-
 function buildStochasticRates(
-	pack: ScenarioPack,
-	projectionSettings: ProjectionRuntimeSettings,
-	whatIfState: ScenarioWhatIfState,
+	postings: ScenarioPack["postings"],
+	sampleCountsByPostingId: ReadonlyMap<string, number>,
 ): Map<string, number[]> {
 	const rates = new Map<string, number[]>();
-	const disabledIds = new Set(whatIfState.disabledPostingIds);
-	for (const posting of pack.postings
-		.filter((item) => !disabledIds.has(item.id))
-		.concat(whatIfState.addedPostings)) {
+	for (const posting of postings) {
 		if (posting.volatility <= 0 || !posting.enabled) continue;
 		rates.set(
 			posting.id,
-			Array.from({ length: projectionSettings.horizonYears }, () =>
+			Array.from({ length: sampleCountsByPostingId.get(posting.id) ?? 0 }, () =>
 				sampleLogNormal(posting.annualRate, posting.volatility),
 			),
 		);
 	}
 	return rates;
+}
+
+export function buildSampleCountsByPostingId(
+	postings: ScenarioPack["postings"],
+	horizonYears: number,
+	startDate: string,
+	endDate: string,
+	includeStartDateEvents: boolean,
+): Map<string, number> {
+	const sampleCounts = new Map(
+		postings
+			.filter((posting) => posting.enabled && posting.volatility > 0)
+			.map((posting) => [posting.id, horizonYears]),
+	);
+	const occurrencesByDate = new Map<
+		string,
+		Array<{ posting: ScenarioPack["postings"][number]; index: number }>
+	>();
+	addOccurrences(
+		postings,
+		occurrencesByDate,
+		startDate,
+		endDate,
+		includeStartDateEvents,
+	);
+	for (const [date, occurrences] of occurrencesByDate) {
+		const requiredCount = projectionYearIndex(startDate, date) + 1;
+		for (const { posting } of occurrences) {
+			if (posting.volatility <= 0) continue;
+			sampleCounts.set(
+				posting.id,
+				Math.max(sampleCounts.get(posting.id) ?? 0, requiredCount),
+			);
+		}
+	}
+	return sampleCounts;
 }
 
 function buildBands(
@@ -103,10 +130,21 @@ export function stochasticProject(
 			: 1,
 	};
 	reseed(normalizedConfig.seed);
-	const deterministicRaw = projectRawScenarioPack(
+	const prepared = prepareSimulationRequest(
 		pack,
 		projectionSettings,
 		whatIfState,
+	);
+	const deterministicRaw = adaptSimulationRun(
+		prepared,
+		simulate(prepared.request),
+	);
+	const sampleCountsByPostingId = buildSampleCountsByPostingId(
+		prepared.request.model.postings,
+		projectionSettings.horizonYears,
+		prepared.request.startDate,
+		prepared.request.endDate,
+		prepared.request.includeStartDateEvents,
 	);
 	const runtimes = new EvaluationRuntimeSet(
 		projectionSettings.evaluations,
@@ -137,27 +175,26 @@ export function stochasticProject(
 		);
 		const batchValues = new Map<string, number[]>();
 		for (let run = batchStart; run < batchEnd; run++) {
-			const cloned = clonePack(pack);
 			const rates = buildStochasticRates(
-				cloned,
-				projectionSettings,
-				whatIfState,
+				prepared.request.model.postings,
+				sampleCountsByPostingId,
 			);
-			const raw = projectRawScenarioPack(
-				cloned,
-				projectionSettings,
-				whatIfState,
-				rates,
+			const path = buildProjectionPath(
+				prepared,
+				simulate({
+					...prepared.request,
+					sampledAssumptions: { annualRatesByPostingId: rates },
+				}),
 			);
 			runtimes.consume({
-				path: raw.path,
-				scenario: raw.path.effectivePack,
+				path,
+				scenario: path.effectivePack,
 				stochasticRates: rates,
 				detailLevel: "summary",
 			});
-			for (const row of raw.result.timeline.rows) {
+			for (const row of path.rows) {
 				const values = batchValues.get(row.date) ?? [];
-				values.push(row.netWorth);
+				values.push(Math.round(row.netWorth));
 				batchValues.set(row.date, values);
 				if (!isHistoricalByDate.has(row.date)) {
 					isHistoricalByDate.set(row.date, row.isHistorical);
@@ -188,11 +225,6 @@ export function stochasticProject(
 		);
 	}
 
-	runtimes.finalize({
-		scenario: deterministicRaw.path.effectivePack,
-		deterministicPath: deterministicRaw.path,
-		runCount: normalizedConfig.runCount,
-	});
 	return buildResult(
 		normalizedConfig,
 		deterministic,

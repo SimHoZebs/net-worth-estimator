@@ -90,12 +90,17 @@ export function createTransitionRuntime({
 		executePosting(occurrence, date) {
 			const { posting } = occurrence;
 			const yearIndex = projectionYearIndex(projectionStartDate, date);
-			const sampledRate =
-				posting.volatility > 0
-					? sampledAssumptions?.annualRatesByPostingId.get(posting.id)?.[
-							yearIndex
-						]
-					: undefined;
+			let sampledRate: number | undefined;
+			if (posting.volatility > 0 && sampledAssumptions !== undefined) {
+				sampledRate = sampledAssumptions.annualRatesByPostingId.get(
+					posting.id,
+				)?.[yearIndex];
+				if (sampledRate === undefined) {
+					throw new Error(
+						`Missing sampled annual rate for posting "${posting.id}" in projection year ${yearIndex}.`,
+					);
+				}
+			}
 			const requestedAmount = Math.max(
 				0,
 				computeRequestedAmount(

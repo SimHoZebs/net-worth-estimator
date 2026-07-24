@@ -9,7 +9,8 @@ import {
 	sampleLogNormal,
 	stochasticProject,
 } from "../";
-import { makeSettings, validCsvFiles } from "../__fixtures__";
+import { makePosting, makeSettings, validCsvFiles } from "../__fixtures__";
+import { buildSampleCountsByPostingId } from "../analysis/projectStochastic";
 import type {
 	FinancialIndependencePlan,
 	ProjectionRuntimeSettings,
@@ -82,6 +83,90 @@ describe("stochastic utilities", () => {
 });
 
 describe("stochastic projection", () => {
+	it("adds a terminal-year draw only for postings that need it", () => {
+		const regular = makePosting({
+			id: "regular",
+			volatility: 0.2,
+			startDate: "2026-06-01",
+			endDate: "2026-06-01",
+		});
+		const terminal = makePosting({
+			id: "terminal",
+			volatility: 0.2,
+			frequency: "annual",
+			startDate: "2027-01-01",
+			endDate: "2027-01-01",
+		});
+
+		const counts = buildSampleCountsByPostingId(
+			[regular, terminal],
+			1,
+			"2026-01-01",
+			"2027-01-01",
+			true,
+		);
+
+		expect(counts).toEqual(
+			new Map([
+				["regular", 1],
+				["terminal", 2],
+			]),
+		);
+	});
+
+	it("samples a volatile posting on the inclusive projection end date", () => {
+		const pack = {
+			...parseCsvScenarioPack(validCsvFiles).data!,
+			accounts: [
+				{
+					id: "checking",
+					label: "Checking",
+					minBalance: 0,
+					maxBalance: Number.POSITIVE_INFINITY,
+					color: null,
+					enabled: true,
+				},
+			],
+			checkpoints: [],
+			postings: [
+				{
+					id: "terminal-growth",
+					label: "Terminal growth",
+					sourceAccountId: null,
+					destinations: ["checking"],
+					arithmetic: "100 * rate",
+					frequency: "annual" as const,
+					annualRate: 0.1,
+					annualGrowthRate: 0,
+					volatility: 0.5,
+					startDate: "2027-01-01",
+					endDate: "2027-01-01",
+					annualCap: null,
+					priority: 1,
+					enabled: true,
+				},
+			],
+		};
+		const result = stochasticProject(
+			pack,
+			makeSettings({
+				fallbackProjectionStartDate: "2026-01-01",
+				horizonYears: 1,
+			}),
+			{
+				addedAccounts: [],
+				addedPostings: [],
+				addedCheckpoints: [],
+				disabledAccountIds: [],
+				disabledPostingIds: [],
+			},
+			{ runCount: 100, seed: 42 },
+		);
+		const terminal = result.bands.find((row) => row.date === "2027-01-01");
+
+		expect(terminal?.netWorth.p10).not.toBe(terminal?.netWorth.p90);
+	});
+
 	it("normalizes invalid run counts before simulation", () => {
 		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
 		if (!pack) throw new Error("Pack is null");

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 import { renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useProjectionEngine } from "@/engine/ProjectionEngineContext";
+import { WorkerProjectionEngine } from "@/engine/WorkerProjectionEngine";
 import type {
 	ProjectionResult,
 	StochasticProjectionResult,
@@ -38,6 +39,23 @@ function makeMockEngine(
 		projectStochastic: vi.fn(async () => ({}) as StochasticProjectionResult),
 		...overrides,
 	};
+}
+
+class MockWorker {
+	static instances: MockWorker[] = [];
+	static postMessageError: Error | null = null;
+
+	onmessage: ((event: MessageEvent) => void) | null = null;
+	onerror: (() => void) | null = null;
+	onmessageerror: (() => void) | null = null;
+	terminate = vi.fn();
+	postMessage = vi.fn(() => {
+		if (MockWorker.postMessageError) throw MockWorker.postMessageError;
+	});
+
+	constructor() {
+		MockWorker.instances.push(this);
+	}
 }
 
 /* ------------------------------------------------------------------ */
@@ -241,11 +259,127 @@ describe("Mock engine projectStochastic()", () => {
 /* ------------------------------------------------------------------ */
 
 describe("WorkerProjectionEngine", () => {
+	beforeEach(() => {
+		MockWorker.instances = [];
+		MockWorker.postMessageError = null;
+		vi.stubGlobal("Worker", MockWorker);
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
 	it("exports a class that satisfies ProjectionEngine", async () => {
 		const mod = await import("@/engine/WorkerProjectionEngine");
 		expect(mod.WorkerProjectionEngine).toBeDefined();
 		const engine = new mod.WorkerProjectionEngine();
 		expect(typeof engine.project).toBe("function");
 		expect(typeof engine.projectStochastic).toBe("function");
+	});
+
+	it("resolves projection responses and terminates the worker", async () => {
+		const engine = new WorkerProjectionEngine();
+		const expected = makeProjectionResult();
+		const promise = engine.project({
+			pack: createBasePack(),
+			projectionSettings: makeSettings(),
+			whatIfState: makeDefaultWhatIf(),
+		});
+		const worker = MockWorker.instances[0]!;
+
+		worker.onmessage?.({
+			data: { id: 1, result: expected, runtimeError: null },
+		} as MessageEvent);
+
+		await expect(promise).resolves.toBe(expected);
+		expect(worker.terminate).toHaveBeenCalledOnce();
+	});
+
+	it("streams stochastic progress before resolving", async () => {
+		const engine = new WorkerProjectionEngine();
+		const onProgress = vi.fn();
+		const expected = {} as StochasticProjectionResult;
+		const partial = {
+			config: { runCount: 1, seed: 1 },
+		} as StochasticProjectionResult;
+		const promise = engine.projectStochastic(
+			{
+				pack: createBasePack(),
+				projectionSettings: makeSettings(),
+				whatIfState: makeDefaultWhatIf(),
+				config: { runCount: 1, seed: 1 },
+			},
+			onProgress,
+		);
+		const worker = MockWorker.instances[0]!;
+
+		worker.onmessage?.({
+			data: { id: 1, type: "progress", progress: 0.5, partial },
+		} as MessageEvent);
+		worker.onmessage?.({
+			data: { id: 1, type: "result", result: expected, runtimeError: null },
+		} as MessageEvent);
+
+		expect(onProgress).toHaveBeenCalledWith(0.5, partial);
+		await expect(promise).resolves.toBe(expected);
+		expect(worker.terminate).toHaveBeenCalledOnce();
+	});
+
+	it("terminates when posting a worker request fails", async () => {
+		MockWorker.postMessageError = new DOMException(
+			"Could not clone request",
+			"DataCloneError",
+		);
+		const engine = new WorkerProjectionEngine();
+
+		const promise = engine.project({
+			pack: createBasePack(),
+			projectionSettings: makeSettings(),
+			whatIfState: makeDefaultWhatIf(),
+		});
+		const worker = MockWorker.instances[0]!;
+
+		await expect(promise).rejects.toThrow("Could not clone request");
+		expect(worker.terminate).toHaveBeenCalledOnce();
+	});
+
+	it("terminates and rejects unreadable worker messages", async () => {
+		const engine = new WorkerProjectionEngine();
+		const promise = engine.project({
+			pack: createBasePack(),
+			projectionSettings: makeSettings(),
+			whatIfState: makeDefaultWhatIf(),
+		});
+		const worker = MockWorker.instances[0]!;
+
+		worker.onmessageerror?.();
+
+		await expect(promise).rejects.toThrow(
+			"Projection worker returned an unreadable message.",
+		);
+		expect(worker.terminate).toHaveBeenCalledOnce();
+	});
+
+	it("terminates stochastic work when the progress callback fails", async () => {
+		const engine = new WorkerProjectionEngine();
+		const promise = engine.projectStochastic(
+			{
+				pack: createBasePack(),
+				projectionSettings: makeSettings(),
+				whatIfState: makeDefaultWhatIf(),
+				config: { runCount: 1, seed: 1 },
+			},
+			() => {
+				throw new Error("Progress failed");
+			},
+		);
+		const worker = MockWorker.instances[0]!;
+
+		worker.onmessage?.({
+			data: { id: 1, type: "progress", progress: 0.5 },
+		} as MessageEvent);
+
+		await expect(promise).rejects.toThrow("Progress failed");
+		expect(worker.terminate).toHaveBeenCalledOnce();
 	});
 });

@@ -124,4 +124,22 @@ describe("deterministic simulation kernel", () => {
 			accountDeltas: [],
 		});
 	});
+
+	it("reuses a prepared request without cross-run state mutation", () => {
+		const prepared = prepareSimulationRequest(
+			createBasePack(),
+			makeSettings(),
+			undefined,
+			new Map([["salary", [0.1, 0.2]]]),
+		);
+		const originalState = structuredClone(prepared.request.initialState);
+		const originalDocument = structuredClone(prepared.effectiveDocument);
+
+		const first = simulate(prepared.request);
+		const second = simulate(prepared.request);
+
+		expect(second).toEqual(first);
+		expect(prepared.request.initialState).toEqual(originalState);
+		expect(prepared.effectiveDocument).toEqual(originalDocument);
+	});
 });
