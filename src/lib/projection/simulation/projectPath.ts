@@ -5,6 +5,7 @@ import type {
 	AccountSnapshot,
 	MovementEvent,
 	ProjectionAccountSummary,
+	ProjectionPath,
 	ProjectionRow,
 	ProjectionRuntimeSettings,
 	RawProjectionOutput,
@@ -120,49 +121,10 @@ export function adaptSimulationRun(
 	prepared: PreparedProjection,
 	run: SimulationRun,
 ): RawProjectionOutput {
+	const path = buildProjectionPath(prepared, run);
 	const accounts = prepared.effectiveDocument.accounts;
-	const postingsById = new Map(
-		prepared.effectiveDocument.postings.map((posting) => [posting.id, posting]),
-	);
-	const attemptsByDate = new Map<string, MovementEvent[]>();
-	for (const attempt of run.movementAttempts) {
-		const attempts = attemptsByDate.get(attempt.date) ?? [];
-		attempts.push(attempt);
-		attemptsByDate.set(attempt.date, attempts);
-	}
-
-	const historicalRows = prepared.historicalSnapshots.map((snapshot) =>
-		createRow({
-			date: snapshot.date,
-			isHistorical: true,
-			balances: snapshot.balances,
-			accounts,
-			accountImpacts: {},
-			externalInflowAmount: 0,
-			externalOutflowAmount: 0,
-			internalTransferAmount: 0,
-		}),
-	);
-	let totalExternalInflowAmount = 0;
-	let totalExternalOutflowAmount = 0;
-	let totalInternalTransferAmount = 0;
-	const projectedRows = run.snapshots.map((snapshot) => {
-		const classified = classifyAttempts(
-			attemptsByDate.get(snapshot.date) ?? [],
-			postingsById,
-		);
-		totalExternalInflowAmount += classified.externalInflowAmount;
-		totalExternalOutflowAmount += classified.externalOutflowAmount;
-		totalInternalTransferAmount += classified.internalTransferAmount;
-		return createRow({
-			date: snapshot.date,
-			isHistorical: false,
-			balances: snapshot.balances,
-			accounts,
-			...classified,
-		});
-	});
-	const rows = [...historicalRows, ...projectedRows];
+	const { rows } = path;
+	const historicalRows = rows.filter((row) => row.isHistorical);
 	const latestHistoricalRow = historicalRows[historicalRows.length - 1] ?? null;
 	const latestRow = rows[rows.length - 1] ?? null;
 	const currentNetWorth =
@@ -188,15 +150,24 @@ export function adaptSimulationRun(
 			endingBalance: roundCurrency(endingBalances[account.id] ?? 0),
 		}),
 	);
+	const totals = rows.reduce(
+		(result, row) => ({
+			externalInflowAmount:
+				result.externalInflowAmount + row.externalInflowAmount,
+			externalOutflowAmount:
+				result.externalOutflowAmount + row.externalOutflowAmount,
+			internalTransferAmount:
+				result.internalTransferAmount + row.internalTransferAmount,
+		}),
+		{
+			externalInflowAmount: 0,
+			externalOutflowAmount: 0,
+			internalTransferAmount: 0,
+		},
+	);
 
 	return {
-		path: {
-			rows,
-			movementEvents: run.movementAttempts,
-			effectivePack: prepared.effectiveDocument,
-			projectionStartDate: run.request.startDate,
-			projectionEndDate: run.request.endDate,
-		},
+		path,
 		result: {
 			timeline: {
 				rows: rows.map(roundRow),
@@ -204,9 +175,9 @@ export function adaptSimulationRun(
 			},
 			accountSummaries,
 			totals: {
-				externalInflowAmount: roundCurrency(totalExternalInflowAmount),
-				externalOutflowAmount: roundCurrency(totalExternalOutflowAmount),
-				internalTransferAmount: roundCurrency(totalInternalTransferAmount),
+				externalInflowAmount: roundCurrency(totals.externalInflowAmount),
+				externalOutflowAmount: roundCurrency(totals.externalOutflowAmount),
+				internalTransferAmount: roundCurrency(totals.internalTransferAmount),
 			},
 			milestones: {
 				latestCheckpointDate: prepared.latestCheckpointDate,
@@ -218,6 +189,57 @@ export function adaptSimulationRun(
 				finalNetWorth: roundCurrency(latestRow?.netWorth ?? currentNetWorth),
 			},
 		},
+	};
+}
+
+export function buildProjectionPath(
+	prepared: PreparedProjection,
+	run: SimulationRun,
+): ProjectionPath {
+	const accounts = prepared.effectiveDocument.accounts;
+	const postingsById = new Map(
+		prepared.effectiveDocument.postings.map((posting) => [posting.id, posting]),
+	);
+	const attemptsByDate = new Map<string, MovementEvent[]>();
+	for (const attempt of run.movementAttempts) {
+		const attempts = attemptsByDate.get(attempt.date) ?? [];
+		attempts.push(attempt);
+		attemptsByDate.set(attempt.date, attempts);
+	}
+
+	const historicalRows = prepared.historicalSnapshots.map((snapshot) =>
+		createRow({
+			date: snapshot.date,
+			isHistorical: true,
+			balances: snapshot.balances,
+			accounts,
+			accountImpacts: {},
+			externalInflowAmount: 0,
+			externalOutflowAmount: 0,
+			internalTransferAmount: 0,
+		}),
+	);
+	const projectedRows = run.snapshots.map((snapshot) => {
+		const classified = classifyAttempts(
+			attemptsByDate.get(snapshot.date) ?? [],
+			postingsById,
+		);
+		return createRow({
+			date: snapshot.date,
+			isHistorical: false,
+			balances: snapshot.balances,
+			accounts,
+			...classified,
+		});
+	});
+	const rows = [...historicalRows, ...projectedRows];
+
+	return {
+		rows,
+		movementEvents: run.movementAttempts,
+		effectivePack: prepared.effectiveDocument,
+		projectionStartDate: run.request.startDate,
+		projectionEndDate: run.request.endDate,
 	};
 }
 

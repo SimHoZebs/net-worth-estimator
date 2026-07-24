@@ -191,6 +191,27 @@ describe("simulation transitions", () => {
 		expect(deterministic.result.requestedAmount).toBe(1);
 	});
 
+	it("rejects a missing sampled rate for a volatile posting", () => {
+		const posting = makePosting({
+			id: "volatile",
+			destinations: ["brokerage"],
+			arithmetic: "100 * rate",
+			annualRate: 0.12,
+			volatility: 0.2,
+		});
+		const transitions = runtime(
+			state(),
+			[posting],
+			new Map([["volatile", [0.24]]]),
+		);
+
+		expect(() =>
+			transitions.executePosting({ posting, index: 0 }, "2027-01-01"),
+		).toThrow(
+			'Missing sampled annual rate for posting "volatile" in projection year 1.',
+		);
+	});
+
 	it("deeply clones annual-cap state", () => {
 		const original = state({
 			realizedPostingAmountsByYear: new Map([
