@@ -1,187 +1,156 @@
 # Technical Overview: Net Worth Estimator
 
-The Net Worth Estimator is a single-page React application that projects net worth and analyzes financial independence from a CSV-backed data model plus runtime projection settings. It supports both deterministic projections and Monte Carlo simulations with progressive streaming of results.
+The Net Worth Estimator is a React application that loads a CSV-backed `FinancialModelDocument`, validates it, and projects net worth and financial-independence outcomes. Deterministic and Monte Carlo work runs in dedicated Web Workers.
 
 ## 1. Tech Stack
 
-- React 19, Vite, TypeScript
-- Tailwind CSS v4
-- Recharts
-- Zustand (state management)
-- TanStack Query (data fetching)
+- React 19, Vite, and TypeScript
+- Tailwind CSS v4 and Recharts
+- Zustand and TanStack Query
+- Papa Parse and Zod
 - Vitest
-- Papa Parse
-- Zod
 
-## 2. High-Level Architecture & Data Flow
+## 2. Data Flow
 
-The application loads a financial model document through a capability-based `DataSource` abstraction, validates it, and runs projections in dedicated Web Workers. The existing `ScenarioPack` API name remains as a compatibility alias for this persistence boundary. Local development uses a Vite server plugin to read/write repo configuration files, while static/serverless production loads bundled `/configs/` files and saves user edits in browser storage. Evaluation instances and their behavior configuration are initialized from one file per definition under `configs/behavior/`; subsequent UI edits and temporary scenario overrides exist only in browser memory for the current session.
+1. `App.tsx` creates a capability-based `DataSource`. Development uses `createCsvDataSource()`; production uses `createBrowserCsvDataSource()`.
+2. `useFinancialModelQuery` calls `DataSource.loadDocument()`, which returns `{ document, issues }`. Save and reset use `useFinancialModelMutation` and `useFinancialModelResetMutation`.
+3. CSV parsing and cross-reference validation produce a `FinancialModelDocument` plus diagnostics. Invalid or malformed persisted data surfaces diagnostics instead of being silently discarded.
+4. Zustand stores session-only `ModelOverrides`, displayed as current changes. `applyModelOverrides` creates the effective document without mutating canonical data.
+5. `useProjection` and `useStochastic` pass the document, runtime settings, and overrides through `WorkerProjectionEngine` to dedicated workers.
+6. `prepareSimulationRequest` resolves overrides, checkpoint history, initial state, dates, event policy, and optional `MonteCarloSample` into a prepared projection containing a `SimulationRequest`.
+7. The pure `simulate` kernel returns an exact `SimulationRun`. `projectRawFinancialModelDocument` adapts it into a `ProjectionPath` and public result; `projectFinancialModelDocument` adds configured evaluations.
+8. The dashboard, model inspector, validation panel, current-change controls, and comparison view render the loaded document and projection results.
 
-### Data Flow Execution
+## 3. Persistence
 
-1. `App.tsx` creates one `DataSource`: Vite dev uses `createCsvDataSource()` for `GET/PUT /api/scenario/pack`; production uses `createBrowserCsvDataSource()` to fetch `/configs/` and persist edits in browser storage.
-2. `src/hooks/useScenario.ts` wraps TanStack Query (`useScenarioQuery`, `useScenarioMutation`, `useScenarioResetMutation`) around the `DataSource` interface, which is created once in `App.tsx` via `useMemo` and passed via dependency injection.
-3. Zod-based parsing plus cross-reference validation rejects invalid packs before projection.
-4. What-if state (temporary postings, accounts, checkpoints, disable toggles) is stored in Zustand with immutable-style updates.
-5. Worker-side orchestration applies temporary overrides and resolves checkpoints, dates, and initial state into a complete `SimulationRequest`.
-6. The pure `simulate()` kernel executes that request and returns an exact `SimulationRun`; a compatibility adapter then produces the evaluator-facing path and rounded public report.
-7. Monte Carlo simulation runs in `src/workers/stochasticWorker.ts` — streaming partial results progressively to the UI.
-8. A Dependency Injection pattern (`ProjectionEngineProvider` context) provides a `ProjectionEngine` instance to the React tree. `WorkerProjectionEngine` implements this interface, creating and destroying Web Workers per call.
-9. The `useProjection` and `useStochastic` hooks consume this engine, associate results with the exact request inputs, and hide stale results while replacements run.
-10. The inspector and dashboard render the validated pack and projected results.
+The CSV filenames and shapes are unchanged. The persistence boundary is the validated `FinancialModelDocument` represented by `accounts.csv`, `checkpoints.csv`, `postings.csv`, and one CSV per evaluation definition under `configs/behavior/`.
 
-## 3. Core Concepts
+### Development
 
-- `Account`: tracked signed balances with daily-compounded `annualRate`
-- `Checkpoint`: historical truth for account balances on exact dates
-- `Posting`: generic scheduled rules for future inflows, outflows, and transfers. Supports `volatility` for stochastic sampling.
-- `ProjectionRuntimeSettings`: fallback start date, projection horizon, and ordered configured evaluations with stable instance IDs; evaluations initialize from CSV and can then be edited for the session
-- `FinancialModelDocument`: persistence boundary containing model data, checkpoint observations, evaluation configuration, version, and source metadata; `ScenarioPack` is its compatibility alias
-- `ScenarioOverrides`: temporary additions and disable selections applied before simulation; `ScenarioWhatIfState` is its compatibility alias
-- `SimulationRequest`: fully prepared model, initial runtime state, date range, start-date inclusion policy, and optional sampled assumptions
-- `SimulationRun`: exact initial/final runtime state, dated balance snapshots, and every ordered movement attempt produced by the deterministic kernel
-- `ConfiguredEvaluation`: serializable definition ID, stable instance ID, label, enabled state, and definition-owned configuration. Multiple instances may use the same definition.
-- `EvaluationResultCollection`: ordered instance IDs plus generic result envelopes keyed by instance ID; evaluator-specific bodies remain behind typed accessors.
-- Configured evaluation configs and public result bodies are finite JSON values. Registries, functions, maps, accumulators, and projection paths remain worker-internal.
+- Canonical route: `GET/PUT /api/financial-model`
+- Saves write the same CSV files under `public/configs/`.
 
-### Posting Semantics
+### Browser
 
-- Blank `sourceAccountId` plus destination means external inflow.
-- Source plus blank `destinationAccountId` means external outflow.
-- Source plus destination means account-to-account transfer.
-- `amountMode: fixed` uses the row's dollar amount.
+- Canonical key: `net-worth-estimator:financial-model:v1`
+- Legacy key: `net-worth-estimator:scenario-pack:v1`
+- Canonical data wins when both keys exist.
+- When canonical data is absent, valid legacy data is read, migrated to the canonical key, and removed from the legacy key.
+- Malformed persisted data returns parse/validation diagnostics.
+- Reset removes persisted browser data and reloads bundled `/configs/` files.
+
+### Legacy Compatibility
+
+`/api/scenario/pack` and deprecated scenario-named type and function aliases remain compatibility-only. Retain these aliases, the legacy browser key, and the route until downstream consumers have migrated and the compatibility window is deliberately closed.
+
+## 4. Core Types
+
+- `FinancialModelDocument`: canonical persisted accounts, postings, checkpoints, ordered evaluation configuration, version, and source metadata.
+- `ModelOverrides`: session-only additions and disabled account/posting selections applied before preparation.
+- `SimulationRequest`: resolved model, initial state, date range, start-date event policy, and optional `MonteCarloSample`.
+- `SimulationRun`: exact initial/final states, dated balance snapshots, and ordered movement attempts from one kernel execution.
+- `ProjectionPath`: immutable evaluator-facing timeline, effective document, and movement records.
+- `MonteCarloSample`: sampled annual rates by posting ID for one stochastic run.
+- `ComparisonSnapshot`: read-only current/final net-worth and evaluation metrics captured by the UI. It contains no model document or overrides and cannot restore state.
+- `ConfiguredEvaluation`: serializable definition ID, stable instance ID, label, enabled state, and definition-owned config.
+- `EvaluationResultCollection`: ordered instance IDs and generic result envelopes keyed by instance ID.
+
+There is no named-alternative-model feature. Comparisons are metric snapshots only.
+
+## 5. Model Semantics
+
+### Accounts and Postings
+
+- Accounts hold signed balances and compound `annualRate` daily between event dates.
+- Blank `sourceAccountId` plus destinations is an external inflow.
+- A source plus no destinations is an external outflow.
+- A source plus destinations is an account-to-account transfer.
+- `amountMode: fixed` uses the row amount.
 - `amountMode: percent_of_base` uses a percentage of the latest realized amount from `basePostingId`.
-- Rows with a source account clamp to that account's available positive balance.
-- `annualCap` is generic and enforced per calendar year.
-- Rows on the same date are applied by `priority`, then file order.
+- Source-funded rows clamp to available positive balance; `annualCap` is enforced per calendar year.
+- Same-date rows execute by ascending priority, then file order.
 
-### Checkpoint Semantics
+### Checkpoints
 
-- Checkpoints are absolute balance snapshots, not adjustments. Each checkpoint row directly sets an account's balance to the given value — it does not add to or subtract from the current balance.
-- Multiple checkpoints for different accounts on the same date are applied together to form a single historical row.
-- Historical data exists only on exact checkpoint dates; there is no interpolation between checkpoints.
+- A checkpoint is an absolute account balance observation, not an adjustment.
+- Checkpoints for different accounts on the same date form one historical row.
+- Historical values exist only on checkpoint dates; no interpolation occurs.
+- Projection starts from the latest checkpoint or the runtime fallback date when no checkpoint exists.
 
-### Engine Design Philosophy
+## 6. Engine Design
 
-The deterministic kernel in `src/lib/projection/simulation/simulate.ts` is intentionally clueless about the specific meaning of accounts and postings. Preparation in `scenario/prepareSimulation.ts` resolves persistence and application concerns before execution. `simulation/projectPath.ts` adapts the exact run to the existing path and public report, and `analysis/projectScenario.ts` composes that path with evaluations. The kernel processes every account and posting through the same generic pipeline; it does not receive checkpoints, overrides, evaluation configuration, or horizon settings, and there are no special cases for particular IDs, categories, or labels:
+The deterministic kernel in `simulation/simulate.ts` receives only a prepared `SimulationRequest`. It does not receive checkpoints, overrides, evaluation configuration, or horizon settings.
 
-- **No name-based branching**: The engine never inspects `account.id`, `account.category`, `posting.id`, or `posting.label` to choose different behavior. All accounts compound identically; all postings resolve the same way.
-- **Classification is structural, not semantic**: Whether a posting is an inflow, outflow, or transfer is derived entirely from which of `sourceAccountId` / `destinationAccountId` is null — never from interpreting labels or categories.
-- **The `enabled` flag is the only gate**: Disabled accounts are excluded from net worth; disabled postings are skipped. No other property controls engine behavior.
-- **`priority` is just ordering**: The engine sorts by ascending priority; it does not interpret specific priority values.
-- **Account `category` is a UI concern only**: The engine stores and passes through `category` but never inspects or branches on it.
-- **Pure function**: The kernel is a deterministic pure function — given the same prepared request, it always produces identical results without mutating the input. No randomness, side effects, or external API calls occur inside it.
+- No name-based branching: IDs, labels, and categories do not select behavior.
+- Classification is structural: source and destination presence determines inflow, outflow, or transfer behavior.
+- `enabled` gates participation; `priority` only controls order.
+- Account category is a UI concern.
+- Shared transition functions apply growth, movement constraints, and posting execution consistently across deterministic, branch, and Monte Carlo runs.
+- The kernel is pure and deterministic for the same request.
 
-The persistence boundary remains the validated CSV document: `csvSchema.ts` and `csvValidation.ts` handle file names, column headers, and cross-reference integrity. Worker-side orchestration turns that document into a `SimulationRequest`; the kernel receives only resolved model and runtime state. The Zod schemas in `csvSchema.ts` are forward-compatible and may validate CSV fields that are not yet wired into the simulation types.
+Canonical core APIs are:
 
-**Avoid adding special-case logic to the engine unless absolutely unavoidable.** If a feature seems to require engine-level branching, first consider whether it can be expressed within the existing model — additional fields on existing types, new `amountMode` values, or UI-level interpretation of projection outputs. Likewise, the what-if system is intentionally shallow (multiplier overrides only, session-only, never mutating canonical data) to keep the model simple and predictable.
+| API | Role |
+| --- | --- |
+| `applyModelOverrides` | builds an effective document from canonical data and session-only current changes |
+| `prepareSimulationRequest` | resolves persistence/runtime concerns into one prepared request |
+| `projectRawFinancialModelDocument` | runs the kernel and returns the evaluator-facing path plus public projection data |
+| `projectFinancialModelDocument` | adds deterministic configured evaluations |
 
-### Simulation, Behavior, Evaluation, And Analysis
+### Behavior and Evaluation
 
-- **Financial model document**: persisted accounts, postings, checkpoint observations, evaluation configuration, and source metadata.
-- **Scenario overrides**: an optional temporary alternative applied to the base document before request preparation.
-- **Projection engine**: worker-backed application facade that orchestrates preparation, deterministic or stochastic execution, evaluations, and public results.
-- **Simulation kernel**: pure internal runtime that advances prepared state, executes postings, enforces account constraints, and records exact results.
-- **Strategy**: a narrow algorithm for one operation, such as ordered destination allocation; it does not decide when an operation should occur.
-- **Simulation run**: one deterministic, branch, or Monte Carlo execution.
-- **Projection path**: time-series state and event records produced by a base or Monte Carlo run.
-- **Behavior**: conditional logic that observes branch state and emits generic actions.
-- **Branch simulation**: an independent simulation forked from state on an existing run and controlled by a behavior.
-- **Evaluation**: a question applied to a simulation run or projection path.
-- **Outcome**: one evaluation's result for one run.
-- **Analysis**: aggregation or comparison across runs and outcomes, including probabilities and confidence-qualified dates.
-- Read-only evaluations inspect an immutable `ProjectionPath`; the net-worth-threshold definition is implemented this way.
-- FI coverage is a read-only calculation over canonical monthly candidate dates.
-- A simulation run executes a scenario or branch. Base and Monte Carlo runs produce a `ProjectionPath`; the current FI branch retains a compact outcome until another branch consumer requires a complete path.
-- A behavior observes branch state and emits generic actions. FI-cycle sustainability uses a behavior after forking balances at an eligible candidate date.
-- Branch simulations replay only explicitly selected continuing postings and request expense-gap withdrawals through the same generic account movement resolver as scheduled postings, preserving account floors and destination limits.
-- Generic account movement resolution returns requested and realized amounts plus all tied binding constraints. Base simulation records those facts as ordered movement events without classifying them as business failures. The posting-fulfillment evaluation derives underfulfilled amounts, dates, summaries, and stochastic probability from those events. Constraint types distinguish an unavailable source, a source floor, aggregate destination ceilings, and a caller-supplied action limit; posting and FI origin metadata remains caller-owned.
-- Evaluations ask questions of projection paths, regardless of whether a base, branch, or stochastic simulation produced them. Outcomes are per-run evaluation results; analysis aggregates outcomes across runs.
-- FI never infers growth from a posting ID, label, category, or non-zero rate. Continuing postings are explicit FI-plan configuration.
-- The minimum-net-worth FI gate is a semantic eligibility rule. Ineligible Monte Carlo candidates remain failures in the full-run probability denominator.
-- Every FI candidate outcome includes a compact withdrawal summary with first/last shortfall dates, occurrence and constraint counts, related accounts, and per-account amounts. Stochastic FI diagnostics remain candidate-aligned: shortfall probability uses evaluated (eligible) candidate runs as its explicit diagnostic denominator, while FI-cycle success continues to use all runs.
+- Read-only evaluations inspect an immutable `ProjectionPath`.
+- Behaviors observe branch state and emit generic actions through the shared movement resolver.
+- FI coverage uses canonical monthly candidate dates. Eligible candidates fork balances and evaluate a complete principal-preservation cycle.
+- Branches replay only explicitly selected continuing postings. They never infer continuation from IDs, labels, categories, or rates.
+- Candidate state includes all base-path events on the candidate date; branch processing starts strictly afterward.
+- Branch state inherits latest realized posting amounts, current-year cap usage, and the run's sampled rates.
+- Movement attempts record requested and realized amounts plus binding constraints. Posting-fulfillment evaluation derives business diagnostics from those generic facts.
+- Evaluator failures remain isolated in per-instance diagnostics.
 
-#### FI Branch Correctness Contract
+## 7. Monte Carlo
 
-- Candidate dates are sorted, deduplicated, and retained only when the complete evaluation cycle fits inside the projected path.
-- The candidate snapshot includes every base-path event on the candidate date. Branch processing is strictly after that date, so candidate-date postings are never replayed.
-- Posting disposition is internal and exhaustive: selected direct cashflow observes its base-path realized occurrence, explicitly continuing non-cashflow replays against branch balances, and every other posting is disabled. Expense withdrawal is a behavior replacement action resolved through generic account movement constraints.
-- Observed and replayed occurrences share one date, priority, and file-order stream. Observation updates the inherited latest realized posting amount before dependent replay, contributes direct income, and never mutates branch balances.
-- Branch state inherits latest realized posting amounts through the candidate date, current-calendar-year annual-cap usage, and the same projection-year sampled rate used by the stochastic base path.
-- The compact branch is appropriate while FI only needs a terminal sustainability outcome from one behavior over an existing path. Use a full replay only when a branch consumer requires a complete independent timeline, checkpoint/event reconstruction, or multiple interacting behaviors.
+Postings with `volatility > 0` enable Monte Carlo projection. A seedable linear congruential generator and log-normal sampling produce each `MonteCarloSample`.
 
-## 4. Monte Carlo / Stochastic Simulation
+The stochastic coordinator:
 
-Postings can carry a `volatility` field (e.g., 0.15 for 15% annual volatility). When any enabled posting has `volatility > 0`, the app enables Monte Carlo mode.
+1. Calls `prepareSimulationRequest` once and reuses that prepared model, state, dates, and event structure for the deterministic baseline and every sampled run.
+2. Executes path-only samples: each sample produces the `ProjectionPath` required by distribution and evaluation accumulators without building a redundant complete public result.
+3. Uses the deterministic path's monthly FI candidate schedule for every run.
+4. Aggregates complete per-run outcomes for evaluation probabilities.
+5. Maintains exact sorted value distributions and computes P10/P25/P50/P75/P90 with exact percentile aggregation.
+6. Processes runs in worker batches of 50 and emits progressive `StochasticProjectionResult` updates.
+7. Discards each sample path after the distribution and enabled evaluation trackers consume it.
 
-### How It Works
+Percentile-band slope is never interpreted as a run outcome. FI-cycle probability and confidence-qualified dates come from complete candidate outcomes.
 
-1. The deterministic projection runs once to establish the baseline (expected) path.
-2. The stochastic engine runs N independent scenarios (default 1000, adjustable 1–10000).
-3. For each run, every volatile posting's `annualRate` is replaced by a log-normal sample drawn per projection year from `sampleLogNormal(expectedReturn, volatility)`.
-4. All N projections produce per-date net worth snapshots. These are collapsed into percentile bands (P10/P25/P50/P75/P90) per date.
-5. Every run uses the deterministic projection's canonical monthly FI candidate schedule. FI coverage and reactive behavior branches are evaluated inside each complete run.
-6. Dense candidate outcomes are aggregated into FI-cycle probability and confidence-qualified dates; percentile-band slope is never treated as a run outcome.
+## 8. UI and State
 
-### Seeding
+- `ProjectionDashboard`: current/projected metrics, account and contribution charts, reconciliation, cash flow, debt, shortfalls, and evaluation outcomes.
+- `ModelInputsInspector`: read-only and editable model tables.
+- `ModelValidationPanel`: parsing and cross-reference diagnostics.
+- `CurrentChangesControls`: session-only temporary additions and disable toggles.
+- `CurrentChangesComparison`: captures and compares read-only `ComparisonSnapshot` metrics.
+- `ProjectionConfigSidebar`: horizon, evaluations, Monte Carlo controls, and source actions.
+- `TemplateWizard`: generates common accounts and postings into the document editor.
 
-The engine uses a Linear Congruential Generator with an optional seed for reproducible results. When `seed` is `null`, `Math.random()` is used.
+`src/store.ts` composes `ModelOverrides`, editor, settings, comparison, and theme slices. Current changes and projection settings are session-only. Baseline document edits persist only through the active `DataSource`.
 
-### Streaming Progress
+## 9. Key Files
 
-The main loop runs in batches of 50 projections. After each batch, the engine:
-
-1. Calls `onProgress(progress, partialResult)` where `partialResult` is a full `StochasticProjectionResult` computed from accumulated projection distributions and evaluator-owned trackers.
-2. The Web Worker forwards this via `postMessage` as a `StochasticWorkerProgress` message with the partial bands.
-3. The `useWorkerProjection` hook merges the partial result into React state, updating both the progress bar and the chart bands progressively.
-4. The chart's shaded percentile bands start wide (few runs, high variance) and converge toward final tight bands as iterations accumulate.
-
-This is genuinely incremental: each path is generated once, consumed by the projection distribution accumulator and every enabled evaluation tracker, then discarded. Evaluators own their stochastic accumulation and finalization.
-
-### Key Files
-
-| File                                             | Role                                                                                                  |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `src/lib/projection/scenario/prepareScenario.ts` | Applies temporary overrides to the persisted document |
-| `src/lib/projection/scenario/prepareSimulation.ts` | Resolves checkpoint history, initial state, dates, and sampled assumptions into a prepared request |
-| `src/lib/projection/simulation/simulate.ts` | Pure deterministic kernel over `SimulationRequest` |
-| `src/lib/projection/simulation/projectPath.ts` | Compatibility adapter from `SimulationRun` to the existing path and public report |
-| `src/lib/projection/evaluation/runtime.ts` | Registry, configured-instance lifecycle, isolated diagnostics, and generic stochastic trackers |
-| `src/lib/projection/evaluation/registry.ts` | Domain registration for net-worth-threshold and financial-independence definitions |
-| `src/lib/projection/evaluation/accessors.ts` | Typed FI and threshold accessors over generic result envelopes |
-| `src/lib/projection/evaluation/financialIndependence.ts` | FI candidate eligibility, explicit continuation replay, withdrawals, and principal preservation |
-| `src/lib/projection/evaluation/postingFulfillment.ts` | Read-only posting fulfillment analysis over generic movement events |
-| `src/lib/projection/behavior/runtime.ts` | Generic period-oriented reactive behavior lifecycle |
-| `src/lib/projection/analysis/projectStochastic.ts` | Runs N projections, builds percentile bands, and aggregates per-run evaluation outcomes |
-| `src/lib/projection/utils/stochastic.ts`         | LCG PRNG, `sampleLogNormal()` (Box-Muller), `computePercentiles()`                                    |
-| `src/lib/projection/types/stochastic.ts`         | Types: `StochasticConfig`, `PercentileBands`, `StochasticBandRow`, `StochasticProjectionResult`       |
-| `src/workers/stochasticWorker.ts`                | Web Worker: receives request, runs engine with progress callback, posts results                       |
-| `src/workers/types.ts`                           | Message types: `StochasticWorkerRequest`, `StochasticWorkerProgress`, `StochasticWorkerResponse`      |
-| `src/components/StochasticControls.tsx`          | UI: toggle, run count, seed input, progress bar, milestone stat cards                                 |
-| `src/chart/chartData.ts`                         | Merges stochastic percentile bands into chart data rows for Recharts rendering                        |
-
-## 5. UI Structure and Components
-
-- `App.tsx`: creates the `DataSource` via DI, uses TanStack Query for scenario loading/mutation, orchestrates what-if overrides, deterministic projection, and stochastic simulation
-- `ScenarioInspector` (in `CsvScenarioInspector.tsx`): shows read-only CSV-backed data tables plus validation issues; accepts scenario data as props
-- `ContributionWhatIfControls` (in `CsvContributionWhatIfControls.tsx`): lets the user apply temporary overrides (add/remove/disable postings, accounts, checkpoints)
-- `ProjectionDashboard` (in `CsvProjectionDashboard.tsx`): renders current and projected net worth, signed account balances, dated posting rows, and posting utilization
-- `StochasticControls.tsx`: Monte Carlo toggle, run count, seed input, progress bar, and milestone stat cards (hit probability, P50/P10 hit dates, final P50)
-- `TemplateWizard` (in `patterns/TemplateWizard.tsx`): Guides users through generating common financial patterns (like `IncomeForm`) and previews them before saving.
-- `src/store.ts`: A Zustand store with 5 slices managing: `WhatIf` (temporary session overrides), `Editor` (CRUD for working copy), `Settings` (ordered evaluations, horizon, stochastic config), `Snapshot` (named scenario and evaluation snapshots), and `Theme` (light/dark/system).
-
-## 6. Technical Highlights
-
-- Repo-backed local source: local development can edit plain CSV files in the repo through the Vite middleware.
-- Serverless-safe browser source: production/static deployments load bundled CSV assets and save edits to browser storage instead of writing to the deployed filesystem.
-- Capability-injected data source: `DataSource` decouples data access from the UI through optional actions like `save` and `reset`, so new backends do not require growing central mode conditionals.
-- TanStack Query manages scenario data: `useScenarioQuery` (with `staleTime: Infinity`) and `useScenarioMutation` replace manual loading and stale-request tracking.
-- Two Web Workers: deterministic projection and Monte Carlo simulation both run off the main thread.
-- Progressive streaming: Monte Carlo results appear in the chart as they compute — wide bands narrow in real time toward final percentiles.
-- Signed balance model: debt is represented with negative balances, so net worth is the sum of enabled accounts.
-- Dated event engine: future projections run on exact checkpoint and scheduled posting dates with daily compounding between dates.
-- Real-account cash model: future inflows, outflows, and transfers all post directly into tracked accounts.
-- Generic engine: the projection engine treats all accounts and postings uniformly — no special-case logic by ID or category.
-- Generic evaluation orchestration: deterministic projection creates one base path, while stochastic projection feeds each generated path through registry-created trackers without importing FI or threshold logic.
-- Isolated evaluator failures: unknown definitions, invalid configs, duplicate instance IDs, and evaluator exceptions become per-instance diagnostics and do not block peer evaluations.
-- Healthy-instance selection: definition-specific accessors skip disabled, malformed, duplicate, and failed defaults; explicit instance lookups remain exact and suppress failed probabilistic bodies.
+| File | Role |
+| --- | --- |
+| `src/lib/projection/model/applyModelOverrides.ts` | effective-document construction |
+| `src/lib/projection/simulation/prepareSimulation.ts` | checkpoint and request preparation |
+| `src/lib/projection/simulation/transitions.ts` | shared state transitions |
+| `src/lib/projection/simulation/simulate.ts` | pure deterministic kernel |
+| `src/lib/projection/simulation/projectPath.ts` | run-to-path and public-result adaptation |
+| `src/lib/projection/analysis/projectFinancialModel.ts` | deterministic orchestration |
+| `src/lib/projection/analysis/projectStochastic.ts` | prepared-request reuse, sample execution, exact percentiles, and progress batches |
+| `src/lib/projection/evaluation/runtime.ts` | configured evaluation lifecycle and stochastic trackers |
+| `src/lib/projection/evaluation/registry.ts` | evaluation definition registration |
+| `src/workers/projectionWorker.ts` | deterministic worker entry point |
+| `src/workers/stochasticWorker.ts` | stochastic worker and progress streaming |
+| `src/hooks/useFinancialModel.ts` | document query, save, and reset hooks |
+| `src/hooks/useProjection.ts` | deterministic worker hook |
+| `src/hooks/useStochastic.ts` | stochastic worker hook |

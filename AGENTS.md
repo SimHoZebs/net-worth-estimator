@@ -1,133 +1,106 @@
-# AGENTS.md — Net Worth Estimator
+# AGENTS.md - Net Worth Estimator
 
-## Quick start
+## Quick Start
 
-- `npm run dev` — start Vite dev server
-- `npm run test` — run vitest
+- `npm run dev` - start the Vite dev server
+- `npm run test:run` - run Vitest once
+- `npm run typecheck` - run TypeScript checks
 
-## Architecture
-
-Read `TECHNICAL_OVERVIEW.md` for system-level details (tech stack, engine design philosophy, Monte Carlo). This doc covers agent-specific context: component structure, hooks, store, and rules.
-
----
+Read `TECHNICAL_OVERVIEW.md` for system-level details.
 
 ## Component Map
 
-```
-main.tsx → <QueryClientProvider> → <ProjectionEngineProvider> → <App>
+```text
+main.tsx -> <QueryClientProvider> -> <ProjectionEngineProvider> -> <App>
 
 App (src/App.tsx)
-├── <ProjectionDashboard> (src/components/CsvProjectionDashboard.tsx, 190 lines)
-│   ├── <OverviewCard>, <OutcomeMetric>, <CompactDetail>, <DriverCard>
-│   ├── <FinancialIndependenceChart>
-│   ├── <AccountDiagnosticChart> (recharts: ComposedChart)
-│   ├── <TransactionCompletionTable>, <UpcomingTransactionsTable>
-│   └── <ContributionWhatIfControls> (children slot)
-├── <StochasticControls> — toggle, run count, seed, progress, milestone cards
-├── <ScenarioInspector> — packs + tables + validation (read-only & editing modes)
-│   ├── <ScenarioValidationPanel>
-│   ├── <ReadOnlyAccountsTable|EditableAccountsTable>
-│   ├── <ReadOnlyPostingsTable|EditablePostingsTable>
-│   └── <ReadOnlyCheckpointsTable|EditableCheckpointsTable>
-└── <TemplateWizard> — <IncomeForm> → <TemplatePreview> → store
+|-- <ProjectionDashboard>
+|   |-- overview, outcome, driver, reconciliation, debt, cash-flow, and shortfall views
+|   `-- account, contribution, financial-independence, and Monte Carlo charts
+|-- <ModelInputsInspector>
+|   |-- <ModelValidationPanel>
+|   |-- read-only or editable account, posting, and checkpoint tables
+|   `-- <CurrentChangesControls>
+|-- <CurrentChangesComparison>
+|-- <ProjectionConfigSidebar>
+`-- <TemplateWizard> -> <IncomeForm> -> <TemplatePreview> -> store
 ```
 
-### Dashboard sub-components (`src/components/dashboard/`)
+### Dashboard Sub-components
 
-| Directory            | Contents                                                                                                                                                                                                                                                       |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dashboard/`         | OverviewCard, OutcomeMetric, CompactDetail, DriverCard, FinancialIndependenceChart, NetWorthReconciliation, AccountLinesChart, CashFlowWaterfall, DebtSummary, ShortfallCalendar, ShortfallDetailPanel, StackedContributionChart, StochasticResultCard |
-| `dashboard/tables/`  | TransactionCompletionTable, EditableAccountsTable, EditablePostingsTable, EditableCheckpointsTable, ReadOnlyAccountsTable, ReadOnlyPostingsTable, ReadOnlyCheckpointsTable                                                                                     |
-| `dashboard/what-if/` | WhatIfAccountForm, WhatIfPostingForm, WhatIfCheckpointForm                                                                                                                                                                                                     |
-| `dashboard/charts/`  | AccountDiagnosticChart, AccountLinesChart, ColorSwatch, StackedContributionChart                                                                                                                                                                               |
-
-### UI primitives (`src/components/ui/`)
-
-Alert, button, card, collapsible-section, table — pure presentational.
-
----
+| Directory | Contents |
+| --- | --- |
+| `src/components/dashboard/` | overview cards, metrics, reconciliation, cash flow, debt, shortfall, FI, account, contribution, and stochastic views |
+| `src/components/dashboard/tables/` | read-only/editable model tables and transaction completion |
+| `src/components/dashboard/current-changes/` | temporary account, posting, and checkpoint forms |
+| `src/components/dashboard/charts/` | diagnostic, account, contribution, and point-detail chart components |
+| `src/components/ui/` | presentational primitives |
 
 ## Hook Layer
 
-| Hook                           | File                                    | Signature                                                                                          |
-| ------------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `useProjection`                | `hooks/useProjection.ts` (62 lines)     | `(pack, settings, whatIfState, enabled) → ProjectionHookState<ProjectionResult>`                   |
-| `useStochastic`                | `hooks/useStochastic.ts` (78 lines)     | `(pack, settings, whatIfState, config, enabled) → ProjectionHookState<StochasticProjectionResult>` |
-| `useScenarioQuery`             | `hooks/useScenario.ts`                  | `(DataSource) → UseQueryResult` (TanStack Query, staleTime: Infinity)                              |
-| `useScenarioMutation`          | `hooks/useScenario.ts`                  | `(DataSource) → UseMutationResult` (invalidates query on success)                                  |
-| `useDebouncedStochasticConfig` | `hooks/useDebouncedStochasticConfig.ts` | Debounced StochasticConfig for StochasticControls                                                  |
+| Hook | File | Contract |
+| --- | --- | --- |
+| `useFinancialModelQuery` | `hooks/useFinancialModel.ts` | loads `{ document, issues }` from `DataSource.loadDocument`; `staleTime: Infinity` |
+| `useFinancialModelMutation` | `hooks/useFinancialModel.ts` | saves a `FinancialModelDocument` and invalidates the model query |
+| `useFinancialModelResetMutation` | `hooks/useFinancialModel.ts` | resets the source and replaces query data |
+| `useProjection` | `hooks/useProjection.ts` | `(document, settings, overrides, enabled) -> ProjectionHookState<ProjectionResult>` |
+| `useStochastic` | `hooks/useStochastic.ts` | `(document, settings, overrides, config, enabled) -> ProjectionHookState<StochasticProjectionResult>` |
+| `useDebouncedStochasticConfig` | `hooks/useDebouncedStochasticConfig.ts` | debounces Monte Carlo configuration |
 
-Shared: `ProjectionHookState<T>` (`hooks/types.ts`) — `{ result, runtimeError, isRunning, progress }`
+`ProjectionHookState<T>` is `{ result, runtimeError, isRunning, progress }`.
 
----
+## Store
 
-## Store (`src/store.ts`) — zustand, 5 slices
+`src/store.ts` composes five Zustand slices:
 
-| Slice        | Purpose                                                                                |
-| ------------ | -------------------------------------------------------------------------------------- |
-| **WhatIf**   | Temporary overrides (add/remove/toggle accounts, postings, checkpoints; reset)         |
-| **Editor**   | CRUD on working copy (start/cancel editing, isDirty/isEditing, update/delete/add rows) |
-| **Settings** | ordered configured evaluations, horizonYears, stochasticPreference, stochasticConfig  |
-| **Snapshot** | Named scenario snapshots (label, timestamp, whatIfState, metrics)                      |
-| **Theme**    | light/dark/system theme with DOM application                                           |
+| Slice | Purpose |
+| --- | --- |
+| `ModelOverrides` | session-only current changes: added rows, disabled IDs, and reset |
+| `Editor` | CRUD on a working `FinancialModelDocument` and edit/dirty state |
+| `Settings` | ordered evaluations, horizon, stochastic preference, and stochastic config |
+| `Comparison` | read-only `ComparisonSnapshot` metrics; snapshots cannot restore model state |
+| `Theme` | light/dark/system theme and DOM application |
 
-Selectors: `selectActiveOverrideCount`, `selectWhatIfState`, `selectEditorState`, `selectEditorActions`
+Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selectEditorState`, and `selectEditorActions`.
 
----
+## Data Flow
 
-## Pattern / Template System (`src/lib/patterns/`)
-
-- `generateIncomePattern(input, existingAccountIds, existingPostingIds)` — generates accounts (checking, 401k, brokerage) + postings (salary, 401k, taxes, match, auto-invest)
-- Used by `TemplateWizard` → `IncomeForm` → `TemplatePreview` → store
-
----
-
-## Data Flow (condensed — see TECHNICAL_OVERVIEW.md §2, §4)
-
-1. **CSV Pipeline**: Vite plugin (`plugins/csvFilePlugin.ts`) → `GET/PUT /api/scenario/pack` → `csvLoader.ts` (Papa Parse + Zod via `csvSchema.ts`) → cross-validation (`csvValidation.ts`)
-2. **DI**: `App.tsx` creates `DataSource` (`createCsvDataSource` for dev, `createBrowserCsvDataSource` for production) → passed to hooks via TanStack Query
-3. **Projections**: `useProjection`/`useStochastic` hooks → `WorkerProjectionEngine` → Web Workers (`src/workers/`) → `scenario/prepareScenario.ts` → `simulation/projectPath.ts` → `evaluation/` / `analysis/` aggregation
-4. **What-if**: Zustand session-only overrides (never mutates canonical data)
-5. **Chart data**: `buildAccountDiagnosticChartData(pack, result, stochasticResult?)` in `src/chart/chartData.ts`
-
----
-
-## Engine Layer — DI Pattern
-
-- `ProjectionEngineProvider` (context) wraps app with a `ProjectionEngine` instance
-- `WorkerProjectionEngine` implements `ProjectionEngine` — creates/destroys Workers per call
-- Workers: `projectionWorker.ts` (deterministic), `stochasticWorker.ts` (streaming progress in batches of 50)
-
----
+1. **CSV source**: Vite plugin -> `GET/PUT /api/financial-model` -> `csvLoader.ts` -> Zod parsing and cross-validation. CSV filenames and shapes are unchanged.
+2. **Persistence DI**: `App.tsx` creates `createCsvDataSource()` in development or `createBrowserCsvDataSource()` in production. `DataSource.loadDocument()` returns `{ document, issues }`.
+3. **Query layer**: `useFinancialModelQuery`, `useFinancialModelMutation`, and `useFinancialModelResetMutation` connect the source to TanStack Query.
+4. **Current changes**: `ModelOverrides` remain in Zustand and are applied with `applyModelOverrides`; canonical data is not mutated.
+5. **Projection**: `useProjection`/`useStochastic` -> `WorkerProjectionEngine` -> Web Workers -> `prepareSimulationRequest` -> `simulate` -> `ProjectionPath` -> evaluation/analysis aggregation.
+6. **Monte Carlo**: one prepared request is reused, each `MonteCarloSample` produces a path-only run, exact percentiles are aggregated, and progress is emitted in worker batches of 50.
+7. **Compatibility**: `/api/scenario/pack`, the legacy browser key, and deprecated scenario-named aliases remain only for migration. Keep them until downstream consumers have migrated and the compatibility window is deliberately closed.
 
 ## Key Types
 
-| Type                         | Location                             | Purpose                                                   |
-| ---------------------------- | ------------------------------------ | --------------------------------------------------------- |
-| `ScenarioPack`               | `lib/projection/types/scenario.ts`   | accounts + postings + checkpoints + configured evaluations |
-| `ProjectionResult`           | same                                 | Projection output plus ordered generic evaluation envelopes |
-| `StochasticProjectionResult` | `lib/projection/types/stochastic.ts` | Monte Carlo bands plus ordered generic evaluation envelopes |
-| `ScenarioWhatIfState`        | `lib/projection/types/scenario.ts`   | Temporary overrides (added + disabled ID arrays)          |
-| `ProjectionRuntimeSettings`  | same                                 | evaluations, fallbackProjectionStartDate, horizonYears |
-| `ProjectionHookState<T>`     | `hooks/types.ts`                     | `{ result, runtimeError, isRunning, progress }`           |
-| `DataSource`                 | `lib/projection/dataSource.ts`       | `{ loadPack, savePack, sourceType }`                      |
-| `ScenarioParseResult`        | same                                 | `{ pack, issues }`                                        |
-
----
+| Type | Purpose |
+| --- | --- |
+| `FinancialModelDocument` | canonical persisted accounts, postings, checkpoints, evaluations, version, and source metadata |
+| `ModelOverrides` | session-only additions and disabled account/posting IDs |
+| `SimulationRequest` | fully prepared model, runtime state, date range, event policy, and optional sample |
+| `SimulationRun` | exact states, dated balance snapshots, and ordered movement attempts |
+| `ProjectionPath` | immutable evaluator-facing time series and movement events |
+| `MonteCarloSample` | sampled annual posting rates for one run |
+| `ComparisonSnapshot` | read-only captured metrics for UI comparison |
+| `ProjectionResult` | deterministic public result and ordered evaluation envelopes |
+| `StochasticProjectionResult` | deterministic result, exact percentile bands, and stochastic evaluation aggregation |
+| `DataSource` | `loadDocument` plus optional labeled `save` and `reset` capabilities |
+| `FinancialModelParseResult` | `{ document, issues }` |
 
 ## Rules
 
-- Simulation logic (`lib/projection/simulation/`) must never branch on specific account IDs, posting IDs, or categories. See `TECHNICAL_OVERVIEW.md` §3.
-- FI logic is a derived analysis in `evaluation/financialIndependence.ts`; it must not add semantic branches to generic simulation.
-- Reactive behaviors emit generic account movements and must use shared account constraints instead of mutating balances directly.
-- FI continuing postings are explicitly selected; never infer growth from IDs, labels, categories, or a non-zero annual rate.
-- Evaluation definitions register in `evaluation/registry.ts`; central deterministic/stochastic coordinators must not import evaluator-specific logic.
-- Base simulation emits ordered generic movement facts; posting underfulfillment detection and reporting belong to the posting-fulfillment evaluation.
-- Evaluation configuration and results remain ordered and keyed by stable instance IDs. Duplicate definition IDs are invalid; duplicate configured definitions are valid.
-- Configured evaluation configs and public result bodies must remain JSON-serializable; registries, functions, maps, and accumulators stay internal to the worker runtime.
-- React evaluation editors/renderers live outside the projection domain and consume generic envelopes through typed accessors.
-- What-if state is session-only, never mutates canonical data.
-- Use `@/lib/projection` barrel import for all projection types and utilities.
-- Projection and stochastic computation happen in Web Workers (`src/workers/`), never on main thread.
-- New components go in `src/components/` (or `src/components/dashboard/` if sub-components). UI primitives in `src/components/ui/`.
-- Run `npm run test:run` and `npm run typecheck` after changes.
+- Simulation logic must never branch on specific account IDs, posting IDs, labels, or categories.
+- `projectFinancialModelDocument`, `projectRawFinancialModelDocument`, `applyModelOverrides`, and `prepareSimulationRequest` are the canonical core APIs.
+- Shared state transitions belong in `lib/projection/simulation/transitions.ts`; deterministic, branch, and Monte Carlo execution must not duplicate transition semantics.
+- FI logic is a derived evaluation and must not add semantic branches to generic simulation.
+- Reactive behaviors emit generic account movements through shared account constraints instead of mutating balances directly.
+- FI continuing postings are explicitly selected; never infer them from IDs, labels, categories, or non-zero rates.
+- Evaluation definitions register in `evaluation/registry.ts`; central coordinators must not import evaluator-specific logic.
+- Evaluation configuration and results remain ordered and keyed by stable instance IDs. Configs and public bodies must remain JSON-serializable.
+- `ModelOverrides` are session-only and never mutate canonical data.
+- Comparison snapshots contain metrics only; do not add restoration or alternative-model semantics.
+- Use the `@/lib/projection` barrel for projection types and utilities.
+- Deterministic and stochastic computation runs in Web Workers, never on the main thread.
+- Run `npm run test:run` and `npm run typecheck` after code changes.
