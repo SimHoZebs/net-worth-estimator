@@ -4,7 +4,7 @@ import type {
 	IsoDate,
 	MovementEvent,
 	ProjectionPath,
-} from "../types/scenario";
+} from "../types/model";
 import type { PercentileBands } from "../types/stochastic";
 import { computePercentiles } from "../utils/stochastic";
 import type { EvaluationDefinition } from "./runtime";
@@ -198,10 +198,10 @@ export function evaluatePostingFulfillment(
 
 	const accountById = includeDetails
 		? new Map(
-				path.effectivePack.accounts.map((account) => [account.id, account]),
+				path.effectiveDocument.accounts.map((account) => [account.id, account]),
 			)
 		: new Map();
-	const postings = (includeDetails ? path.effectivePack.postings : [])
+	const postings = (includeDetails ? path.effectiveDocument.postings : [])
 		.filter((posting) => selectedIds === null || selectedIds.has(posting.id))
 		.map((posting): PostingFulfillmentPostingSummary => {
 			const totals = totalsByPostingId.get(posting.id) ?? {
@@ -267,7 +267,9 @@ function diagnoseConfig(
 	config: PostingFulfillmentConfig,
 ): EvaluationDiagnostic[] {
 	if (config.postingIds === null) return [];
-	const postingIds = new Set(path.effectivePack.postings.map(({ id }) => id));
+	const postingIds = new Set(
+		path.effectiveDocument.postings.map(({ id }) => id),
+	);
 	return config.postingIds
 		.filter((postingId) => !postingIds.has(postingId))
 		.map((postingId) => ({

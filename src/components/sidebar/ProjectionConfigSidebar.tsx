@@ -2,8 +2,8 @@ import { memo } from "react";
 import { StochasticControls } from "@/components/StochasticControls";
 import type {
 	DataSource,
+	FinancialModelDocument,
 	ProjectionRuntimeSettings,
-	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import { ModelAssumptionsCard } from "./ModelAssumptionsCard";
@@ -11,10 +11,10 @@ import { SimulationSettingsCard } from "./SimulationSettingsCard";
 import { SourceStatusCard } from "./SourceStatusCard";
 
 interface ProjectionConfigSidebarProps {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	projectionSettings: ProjectionRuntimeSettings;
 	projectionStartDate: string;
-	activeOverrideCount: number;
+	currentChangeCount: number;
 	hasStochasticAccounts: boolean;
 	stochasticResult: StochasticProjectionResult | null;
 	isStochasticRunning: boolean;
@@ -33,10 +33,10 @@ interface ProjectionConfigSidebarProps {
 }
 
 export const ProjectionConfigSidebar = memo(function ProjectionConfigSidebar({
-	pack,
+	document,
 	projectionSettings,
 	projectionStartDate,
-	activeOverrideCount,
+	currentChangeCount,
 	hasStochasticAccounts,
 	stochasticResult,
 	isStochasticRunning,
@@ -56,7 +56,7 @@ export const ProjectionConfigSidebar = memo(function ProjectionConfigSidebar({
 			<SimulationSettingsCard
 				projectionSettings={projectionSettings}
 				projectionStartDate={projectionStartDate}
-				activeOverrideCount={activeOverrideCount}
+				currentChangeCount={currentChangeCount}
 				onChange={onProjectionSettingsChange}
 			/>
 
@@ -68,7 +68,7 @@ export const ProjectionConfigSidebar = memo(function ProjectionConfigSidebar({
 			/>
 
 			<ModelAssumptionsCard
-				pack={pack}
+				document={document}
 				hasStochasticData={stochasticResult !== null}
 			/>
 

@@ -1,18 +1,19 @@
 import { evaluationRegistry } from "../evaluation/registry";
 import { EvaluationRuntimeSet } from "../evaluation/runtime";
-import { prepareSimulationRequest } from "../scenario/prepareSimulation";
 import { addOccurrences } from "../simulation/postings";
+import { prepareSimulationRequest } from "../simulation/prepareSimulation";
 import {
 	adaptSimulationRun,
 	buildProjectionPath,
 } from "../simulation/projectPath";
 import { simulate } from "../simulation/simulate";
 import type {
+	FinancialModelDocument,
+	ModelOverrides,
 	ProjectionResult,
 	ProjectionRuntimeSettings,
-	ScenarioPack,
-	ScenarioWhatIfState,
-} from "../types/scenario";
+} from "../types/model";
+import type { MonteCarloSample } from "../types/simulation";
 import type {
 	StochasticBandRow,
 	StochasticConfig,
@@ -27,7 +28,7 @@ import {
 } from "../utils/stochastic";
 
 function buildStochasticRates(
-	postings: ScenarioPack["postings"],
+	postings: FinancialModelDocument["postings"],
 	sampleCountsByPostingId: ReadonlyMap<string, number>,
 ): Map<string, number[]> {
 	const rates = new Map<string, number[]>();
@@ -44,7 +45,7 @@ function buildStochasticRates(
 }
 
 export function buildSampleCountsByPostingId(
-	postings: ScenarioPack["postings"],
+	postings: FinancialModelDocument["postings"],
 	horizonYears: number,
 	startDate: string,
 	endDate: string,
@@ -57,7 +58,10 @@ export function buildSampleCountsByPostingId(
 	);
 	const occurrencesByDate = new Map<
 		string,
-		Array<{ posting: ScenarioPack["postings"][number]; index: number }>
+		Array<{
+			posting: FinancialModelDocument["postings"][number];
+			index: number;
+		}>
 	>();
 	addOccurrences(
 		postings,
@@ -117,9 +121,9 @@ function buildResult(
 const STOCHASTIC_PROGRESS_BATCH = 50;
 
 export function stochasticProject(
-	pack: ScenarioPack,
+	document: FinancialModelDocument,
 	projectionSettings: ProjectionRuntimeSettings,
-	whatIfState: ScenarioWhatIfState,
+	overrides: ModelOverrides,
 	config: StochasticConfig,
 	onProgress?: (progress: number, partial: StochasticProjectionResult) => void,
 ): StochasticProjectionResult {
@@ -131,9 +135,9 @@ export function stochasticProject(
 	};
 	reseed(normalizedConfig.seed);
 	const prepared = prepareSimulationRequest(
-		pack,
+		document,
 		projectionSettings,
-		whatIfState,
+		overrides,
 	);
 	const deterministicRaw = adaptSimulationRun(
 		prepared,
@@ -152,7 +156,7 @@ export function stochasticProject(
 	);
 	runtimes.evaluateDeterministic({
 		path: deterministicRaw.path,
-		scenario: deterministicRaw.path.effectivePack,
+		document: deterministicRaw.path.effectiveDocument,
 		detailLevel: "summary",
 	});
 	runtimes.startStochastic();
@@ -179,17 +183,20 @@ export function stochasticProject(
 				prepared.request.model.postings,
 				sampleCountsByPostingId,
 			);
+			const monteCarloSample: MonteCarloSample = {
+				annualRatesByPostingId: rates,
+			};
 			const path = buildProjectionPath(
 				prepared,
 				simulate({
 					...prepared.request,
-					sampledAssumptions: { annualRatesByPostingId: rates },
+					monteCarloSample,
 				}),
 			);
 			runtimes.consume({
 				path,
-				scenario: path.effectivePack,
-				stochasticRates: rates,
+				document: path.effectiveDocument,
+				monteCarloSample,
 				detailLevel: "summary",
 			});
 			for (const row of path.rows) {
@@ -210,7 +217,7 @@ export function stochasticProject(
 			);
 		}
 		runtimes.finalize({
-			scenario: deterministicRaw.path.effectivePack,
+			document: deterministicRaw.path.effectiveDocument,
 			deterministicPath: deterministicRaw.path,
 			runCount: batchEnd,
 		});

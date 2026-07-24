@@ -1,17 +1,17 @@
 import type {
+	FinancialModelDocument,
+	ModelOverrides,
 	ProjectionResult,
 	ProjectionRuntimeSettings,
-	ScenarioPack,
-	ScenarioWhatIfState,
 	StochasticConfig,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 
 export interface ProjectionWorkerRequest {
 	id: number;
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	projectionSettings: ProjectionRuntimeSettings;
-	whatIfState: ScenarioWhatIfState;
+	overrides: ModelOverrides;
 }
 
 export interface ProjectionWorkerResponse {
@@ -22,9 +22,9 @@ export interface ProjectionWorkerResponse {
 
 export interface StochasticWorkerRequest {
 	id: number;
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	projectionSettings: ProjectionRuntimeSettings;
-	whatIfState: ScenarioWhatIfState;
+	overrides: ModelOverrides;
 	config: StochasticConfig;
 }
 

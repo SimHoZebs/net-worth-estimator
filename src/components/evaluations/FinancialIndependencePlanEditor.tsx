@@ -6,10 +6,13 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import type { FinancialIndependencePlan, ScenarioPack } from "@/lib/projection";
+import type {
+	FinancialIndependencePlan,
+	FinancialModelDocument,
+} from "@/lib/projection";
 
 interface FinancialIndependencePlanEditorProps {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	plan: FinancialIndependencePlan;
 	onChange: (changes: Partial<FinancialIndependencePlan>) => void;
 }
@@ -24,7 +27,7 @@ function finiteInput(value: string, fallback: number) {
 
 export const FinancialIndependencePlanEditor = memo(
 	function FinancialIndependencePlanEditor({
-		pack,
+		document,
 		plan,
 		onChange,
 	}: FinancialIndependencePlanEditorProps) {
@@ -38,14 +41,16 @@ export const FinancialIndependencePlanEditor = memo(
 				selectedAssets.add(source.accountId);
 			}
 		}
-		const directIncomePostings = pack.postings.filter(
+		const directIncomePostings = document.postings.filter(
 			(posting) =>
 				posting.enabled &&
 				posting.sourceAccountId === null &&
 				posting.destinations !== null,
 		);
-		const assetAccounts = pack.accounts.filter((account) => account.enabled);
-		const continuingPostings = pack.postings.filter(
+		const assetAccounts = document.accounts.filter(
+			(account) => account.enabled,
+		);
+		const continuingPostings = document.postings.filter(
 			(posting) =>
 				posting.enabled &&
 				((posting.sourceAccountId !== null &&

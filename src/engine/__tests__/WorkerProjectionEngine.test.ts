@@ -96,30 +96,30 @@ describe("Mock engine project()", () => {
 	});
 
 	it("calls project with correct arguments", async () => {
-		const pack = createBasePack();
+		const document = createBasePack();
 		const settings = makeSettings();
 		const whatIf = makeDefaultWhatIf();
 
 		const result = await engine.project({
-			pack,
+			document,
 			projectionSettings: settings,
-			whatIfState: whatIf,
+			overrides: whatIf,
 		});
 
 		expect(engine.project).toHaveBeenCalledOnce();
 		expect(engine.project).toHaveBeenCalledWith({
-			pack,
+			document,
 			projectionSettings: settings,
-			whatIfState: whatIf,
+			overrides: whatIf,
 		});
 		expect(result.summary.currentNetWorth).toBe(1600);
 	});
 
 	it("keeps evaluation settings and results structured-clone safe", () => {
 		const request = {
-			pack: createBasePack(),
+			document: createBasePack(),
 			projectionSettings: makeSettings(),
-			whatIfState: makeDefaultWhatIf(),
+			overrides: makeDefaultWhatIf(),
 		};
 		const result = makeProjectionResult();
 		expect(structuredClone(request)).toEqual(request);
@@ -131,9 +131,9 @@ describe("Mock engine project()", () => {
 		const controller = new AbortController();
 
 		await engine.project({
-			pack: createBasePack(),
+			document: createBasePack(),
 			projectionSettings: makeSettings(),
-			whatIfState: makeDefaultWhatIf(),
+			overrides: makeDefaultWhatIf(),
 			signal: controller.signal,
 		});
 
@@ -155,9 +155,9 @@ describe("Mock engine project()", () => {
 
 		await expect(
 			engine.project({
-				pack: createBasePack(),
+				document: createBasePack(),
 				projectionSettings: makeSettings(),
-				whatIfState: makeDefaultWhatIf(),
+				overrides: makeDefaultWhatIf(),
 				signal: controller.signal,
 			}),
 		).rejects.toThrow("Aborted");
@@ -181,24 +181,24 @@ describe("Mock engine projectStochastic()", () => {
 	});
 
 	it("calls projectStochastic with correct arguments", async () => {
-		const pack = createBasePack();
+		const document = createBasePack();
 		const settings = makeSettings();
 		const whatIf = makeDefaultWhatIf();
 		const config = { runCount: 10, seed: 42 as number | null };
 
 		await engine.projectStochastic({
-			pack,
+			document,
 			projectionSettings: settings,
-			whatIfState: whatIf,
+			overrides: whatIf,
 			config,
 		});
 
 		expect(engine.projectStochastic).toHaveBeenCalledOnce();
 		const callArgs = engine.projectStochastic.mock.calls[0][0];
 		expect(callArgs).toEqual({
-			pack,
+			document,
 			projectionSettings: settings,
-			whatIfState: whatIf,
+			overrides: whatIf,
 			config,
 		});
 	});
@@ -216,9 +216,9 @@ describe("Mock engine projectStochastic()", () => {
 
 		await engine.projectStochastic(
 			{
-				pack: createBasePack(),
+				document: createBasePack(),
 				projectionSettings: makeSettings(),
-				whatIfState: makeDefaultWhatIf(),
+				overrides: makeDefaultWhatIf(),
 				config: { runCount: 10, seed: null },
 			},
 			onProgress,
@@ -244,9 +244,9 @@ describe("Mock engine projectStochastic()", () => {
 
 		await expect(
 			engine.projectStochastic({
-				pack: createBasePack(),
+				document: createBasePack(),
 				projectionSettings: makeSettings(),
-				whatIfState: makeDefaultWhatIf(),
+				overrides: makeDefaultWhatIf(),
 				config: { runCount: 10, seed: null },
 				signal: controller.signal,
 			}),
@@ -281,9 +281,9 @@ describe("WorkerProjectionEngine", () => {
 		const engine = new WorkerProjectionEngine();
 		const expected = makeProjectionResult();
 		const promise = engine.project({
-			pack: createBasePack(),
+			document: createBasePack(),
 			projectionSettings: makeSettings(),
-			whatIfState: makeDefaultWhatIf(),
+			overrides: makeDefaultWhatIf(),
 		});
 		const worker = MockWorker.instances[0]!;
 
@@ -304,9 +304,9 @@ describe("WorkerProjectionEngine", () => {
 		} as StochasticProjectionResult;
 		const promise = engine.projectStochastic(
 			{
-				pack: createBasePack(),
+				document: createBasePack(),
 				projectionSettings: makeSettings(),
-				whatIfState: makeDefaultWhatIf(),
+				overrides: makeDefaultWhatIf(),
 				config: { runCount: 1, seed: 1 },
 			},
 			onProgress,
@@ -333,9 +333,9 @@ describe("WorkerProjectionEngine", () => {
 		const engine = new WorkerProjectionEngine();
 
 		const promise = engine.project({
-			pack: createBasePack(),
+			document: createBasePack(),
 			projectionSettings: makeSettings(),
-			whatIfState: makeDefaultWhatIf(),
+			overrides: makeDefaultWhatIf(),
 		});
 		const worker = MockWorker.instances[0]!;
 
@@ -346,9 +346,9 @@ describe("WorkerProjectionEngine", () => {
 	it("terminates and rejects unreadable worker messages", async () => {
 		const engine = new WorkerProjectionEngine();
 		const promise = engine.project({
-			pack: createBasePack(),
+			document: createBasePack(),
 			projectionSettings: makeSettings(),
-			whatIfState: makeDefaultWhatIf(),
+			overrides: makeDefaultWhatIf(),
 		});
 		const worker = MockWorker.instances[0]!;
 
@@ -364,9 +364,9 @@ describe("WorkerProjectionEngine", () => {
 		const engine = new WorkerProjectionEngine();
 		const promise = engine.projectStochastic(
 			{
-				pack: createBasePack(),
+				document: createBasePack(),
 				projectionSettings: makeSettings(),
-				whatIfState: makeDefaultWhatIf(),
+				overrides: makeDefaultWhatIf(),
 				config: { runCount: 1, seed: 1 },
 			},
 			() => {

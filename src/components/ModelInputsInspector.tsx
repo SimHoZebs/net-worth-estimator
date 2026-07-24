@@ -19,17 +19,17 @@ import {
 import { pluralize } from "@/lib/format";
 import type {
 	DataSource,
-	ScenarioPack,
+	FinancialModelDocument,
 	ScenarioValidationIssue,
 } from "@/lib/projection";
 import { selectEditorActions, selectEditorState, useStore } from "@/store";
-import { ScenarioValidationPanel } from "./ScenarioValidationPanel";
+import { ModelValidationPanel } from "./ModelValidationPanel";
 
 type InputTab = "postings" | "accounts" | "history";
 
-interface ScenarioInspectorProps {
+interface ModelInputsInspectorProps {
 	projectionStartDate: string;
-	pack: ScenarioPack | null;
+	document: FinancialModelDocument | null;
 	issues: ScenarioValidationIssue[];
 	dataSource: DataSource;
 	isLoading: boolean;
@@ -38,7 +38,7 @@ interface ScenarioInspectorProps {
 	onReload: () => void;
 	onSave: () => void;
 	isSaving: boolean;
-	overridesSlot?: ReactNode;
+	currentChangesSlot?: ReactNode;
 }
 
 function tabClassName(isActive: boolean) {
@@ -49,9 +49,9 @@ function tabClassName(isActive: boolean) {
 	}`;
 }
 
-export function ScenarioInspector({
+export function ModelInputsInspector({
 	projectionStartDate,
-	pack,
+	document,
 	issues,
 	dataSource,
 	isLoading,
@@ -60,13 +60,13 @@ export function ScenarioInspector({
 	onReload,
 	onSave,
 	isSaving,
-	overridesSlot,
-}: ScenarioInspectorProps) {
+	currentChangesSlot,
+}: ModelInputsInspectorProps) {
 	const disabledAccountIds = useStore((s) => s.disabledAccountIds);
 	const disabledPostingIds = useStore((s) => s.disabledPostingIds);
 	const toggleAccountDisabled = useStore((s) => s.toggleAccountDisabled);
 	const togglePostingDisabled = useStore((s) => s.togglePostingDisabled);
-	const { isEditing, isDirty, workingPack } = useStore(
+	const { isEditing, isDirty, workingDocument } = useStore(
 		useShallow(selectEditorState),
 	);
 	const {
@@ -88,9 +88,11 @@ export function ScenarioInspector({
 
 	const disabledAccountSet = new Set(disabledAccountIds);
 	const disabledPostingSet = new Set(disabledPostingIds);
-	const displayPack = isEditing && workingPack ? workingPack : pack;
+	const displayDocument =
+		isEditing && workingDocument ? workingDocument : document;
 	const accountLabelById = new Map(
-		displayPack?.accounts.map((account) => [account.id, account.label]) ?? [],
+		displayDocument?.accounts.map((account) => [account.id, account.label]) ??
+			[],
 	);
 
 	const errorCount = issues.filter(
@@ -104,7 +106,7 @@ export function ScenarioInspector({
 			? pluralize(errorCount, "error")
 			: warningCount > 0
 				? pluralize(warningCount, "warning")
-				: pack
+				: document
 					? "Clean"
 					: "Pending";
 
@@ -112,17 +114,17 @@ export function ScenarioInspector({
 		{
 			id: "postings",
 			label: "Transactions",
-			count: displayPack?.postings.length ?? 0,
+			count: displayDocument?.postings.length ?? 0,
 		},
 		{
 			id: "accounts",
 			label: "Accounts",
-			count: displayPack?.accounts.length ?? 0,
+			count: displayDocument?.accounts.length ?? 0,
 		},
 		{
 			id: "history",
 			label: "Balance history",
-			count: displayPack?.checkpoints.length ?? 0,
+			count: displayDocument?.checkpoints.length ?? 0,
 		},
 	];
 
@@ -167,12 +169,12 @@ export function ScenarioInspector({
 							>
 								{isLoading ? "Loading..." : "Reload"}
 							</Button>
-							{pack && dataSource.save ? (
+							{document && dataSource.save ? (
 								<Button
 									type="button"
 									variant="secondary"
 									size="sm"
-									onClick={() => startEditing(pack)}
+									onClick={() => startEditing(document)}
 								>
 									Edit baseline
 								</Button>
@@ -185,7 +187,7 @@ export function ScenarioInspector({
 			<CardContent className="space-y-5">
 				{loadError ? (
 					<Alert variant="destructive" className="rounded-[1.6rem]">
-						<AlertTitle>Data pack could not be loaded</AlertTitle>
+						<AlertTitle>Financial model could not be loaded</AlertTitle>
 						<AlertDescription>{loadError}</AlertDescription>
 					</Alert>
 				) : null}
@@ -197,9 +199,9 @@ export function ScenarioInspector({
 					</Alert>
 				) : null}
 
-				{issues.length > 0 ? <ScenarioValidationPanel issues={issues} /> : null}
+				{issues.length > 0 ? <ModelValidationPanel issues={issues} /> : null}
 
-				{pack && displayPack ? (
+				{document && displayDocument ? (
 					<>
 						<div className="flex flex-wrap items-center justify-between gap-3">
 							<div className="flex flex-wrap gap-2">
@@ -231,10 +233,10 @@ export function ScenarioInspector({
 						{activeTab === "postings" ? (
 							isEditing ? (
 								<EditablePostingsTable
-									displayPack={displayPack}
-									pack={pack}
+									displayDocument={displayDocument}
+									document={document}
 									isDirty={isDirty}
-									workingPack={workingPack}
+									workingDocument={workingDocument}
 									projectionStartDate={projectionStartDate}
 									updatePosting={updatePosting}
 									deletePosting={deletePosting}
@@ -242,7 +244,7 @@ export function ScenarioInspector({
 								/>
 							) : (
 								<ReadOnlyPostingsTable
-									postings={displayPack.postings}
+									postings={displayDocument.postings}
 									showAdvanced={showAdvanced}
 									disabledPostingSet={disabledPostingSet}
 									onToggle={togglePostingDisabled}
@@ -253,17 +255,17 @@ export function ScenarioInspector({
 						{activeTab === "accounts" ? (
 							isEditing ? (
 								<EditableAccountsTable
-									displayPack={displayPack}
-									pack={pack}
+									displayDocument={displayDocument}
+									document={document}
 									isDirty={isDirty}
-									workingPack={workingPack}
+									workingDocument={workingDocument}
 									updateAccount={updateAccount}
 									deleteAccount={deleteAccount}
 									addAccount={addAccount}
 								/>
 							) : (
 								<ReadOnlyAccountsTable
-									accounts={displayPack.accounts}
+									accounts={displayDocument.accounts}
 									showAdvanced={showAdvanced}
 									disabledAccountSet={disabledAccountSet}
 									onToggle={toggleAccountDisabled}
@@ -274,7 +276,7 @@ export function ScenarioInspector({
 						{activeTab === "history" ? (
 							isEditing ? (
 								<EditableCheckpointsTable
-									displayPack={displayPack}
+									displayDocument={displayDocument}
 									isDirty={isDirty}
 									projectionStartDate={projectionStartDate}
 									updateCheckpoint={updateCheckpoint}
@@ -283,7 +285,7 @@ export function ScenarioInspector({
 								/>
 							) : (
 								<ReadOnlyCheckpointsTable
-									checkpoints={displayPack.checkpoints}
+									checkpoints={displayDocument.checkpoints}
 									showAdvanced={showAdvanced}
 									accountLabelById={accountLabelById}
 								/>
@@ -292,12 +294,14 @@ export function ScenarioInspector({
 					</>
 				) : (
 					<div className="rounded-2xl border border-dashed border-border/80 bg-surface/70 px-4 py-8 text-center type-muted dark:border-white/10 dark:bg-surface/50">
-						No scenario data loaded yet.
+						No financial model loaded yet.
 					</div>
 				)}
 
-				{overridesSlot ? (
-					<div className="border-t border-border/70 pt-5">{overridesSlot}</div>
+				{currentChangesSlot ? (
+					<div className="border-t border-border/70 pt-5">
+						{currentChangesSlot}
+					</div>
 				) : null}
 			</CardContent>
 		</Card>

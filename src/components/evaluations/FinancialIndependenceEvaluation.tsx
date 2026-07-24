@@ -4,8 +4,8 @@ import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	ConfiguredEvaluation,
 	FinancialIndependencePlan,
+	FinancialModelDocument,
 	ProjectionResult,
-	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import {
@@ -17,7 +17,7 @@ import { FinancialIndependencePlanEditor } from "./FinancialIndependencePlanEdit
 
 interface FinancialIndependenceEvaluationProps {
 	evaluation: ConfiguredEvaluation;
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	result: ProjectionResult;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
@@ -27,7 +27,7 @@ interface FinancialIndependenceEvaluationProps {
 
 export function FinancialIndependenceEvaluation({
 	evaluation,
-	pack,
+	document,
 	result,
 	stochasticResult,
 	stochasticIsProvisional = false,
@@ -68,7 +68,7 @@ export function FinancialIndependenceEvaluation({
 	return (
 		<div className="space-y-4">
 			<FinancialIndependencePlanEditor
-				pack={pack}
+				document={document}
 				plan={plan}
 				onChange={(changes) =>
 					updateEvaluationConfig(evaluation.instanceId, changes)
@@ -84,7 +84,7 @@ export function FinancialIndependenceEvaluation({
 							plan={plan}
 							stochasticResult={stochasticResult}
 							stochasticIsProvisional={stochasticIsProvisional}
-							pack={pack}
+							document={document}
 							blockerValue={blockerValue}
 							blockerDetail={blockerDetail}
 						/>
@@ -132,7 +132,7 @@ export function FinancialIndependenceEvaluation({
 								}
 								detail={
 									withdrawalDiagnostic
-										? `${withdrawalDiagnostic.shortfallRunCount} of ${withdrawalDiagnostic.diagnosticRunCount} eligible branch runs`
+										? `${withdrawalDiagnostic.shortfallRunCount} of ${withdrawalDiagnostic.diagnosticRunCount} eligible independent Monte Carlo samples`
 										: "Candidate-aligned behavior diagnostic"
 								}
 							/>

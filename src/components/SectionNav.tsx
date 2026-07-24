@@ -8,8 +8,8 @@ interface Section {
 const sections: Section[] = [
 	{ id: "projection-chart", label: "Simulation" },
 	{ id: "evaluations", label: "Evaluations" },
-	{ id: "model-inputs", label: "Scenario" },
-	{ id: "scenario-snapshots", label: "Compare" },
+	{ id: "model-inputs", label: "Model" },
+	{ id: "comparison-snapshots", label: "Compare" },
 	{ id: "projection-settings", label: "Settings" },
 ];
 

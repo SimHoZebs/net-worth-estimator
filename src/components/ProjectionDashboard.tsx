@@ -6,15 +6,15 @@ import { LazySection } from "@/components/ui/lazy-section";
 import { StatusPill } from "@/components/ui/status-pill";
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
+	FinancialModelDocument,
 	ProjectionResult,
-	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import {
 	DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID,
 	getPostingFulfillmentResult,
 } from "@/lib/projection";
-import { selectActiveOverrideCount, useStore } from "@/store";
+import { selectCurrentChangeCount, useStore } from "@/store";
 import { CashFlowWaterfall } from "./dashboard/CashFlowWaterfall";
 import { AccountDiagnosticChart } from "./dashboard/charts/AccountDiagnosticChart";
 import { DebtSummary } from "./dashboard/DebtSummary";
@@ -26,14 +26,14 @@ import { TransactionCompletionTable } from "./dashboard/tables/TransactionComple
 import { useDashboardDerivedValues } from "./dashboard/useDashboardDerivedValues";
 
 interface ProjectionDashboardProps {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	result: ProjectionResult;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
 }
 
 export const ProjectionDashboard = memo(function ProjectionDashboard({
-	pack,
+	document,
 	result,
 	stochasticResult,
 	stochasticIsProvisional = false,
@@ -42,14 +42,14 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 	const hasStochasticData =
 		stochasticResult !== undefined && stochasticResult !== null;
 	const accountDiagnosticChartData = useMemo(
-		() => buildAccountDiagnosticChartData(pack, result, stochasticResult),
-		[pack, result, stochasticResult],
+		() => buildAccountDiagnosticChartData(document, result, stochasticResult),
+		[document, result, stochasticResult],
 	);
-	const activeOverrideCount = useStore(selectActiveOverrideCount);
+	const currentChangeCount = useStore(selectCurrentChangeCount);
 	const fulfillment =
 		getPostingFulfillmentResult(result, DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID)
 			?.deterministic ?? null;
-	const derived = useDashboardDerivedValues(pack, fulfillment);
+	const derived = useDashboardDerivedValues(document, fulfillment);
 	const milestoneDates = useMemo(
 		() => ({
 			firstShortfall: derived.firstUnderfulfilledDate ?? undefined,
@@ -57,7 +57,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 		[derived.firstUnderfulfilledDate],
 	);
 	const scrollToSourceData = useCallback(() => {
-		const el = document.getElementById("model-inputs");
+		const el = window.document.getElementById("model-inputs");
 		if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
 	}, []);
 
@@ -65,7 +65,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 		<div className="space-y-6">
 			<section id="projection-chart">
 				<AccountDiagnosticChart
-					pack={pack}
+					document={document}
 					hasStochasticData={hasStochasticData}
 					stochasticIsProvisional={stochasticIsProvisional}
 					chartData={accountDiagnosticChartData}
@@ -85,10 +85,10 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 				<div className="rounded-full border border-primary-border bg-primary-subtle px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-primary">
 					Base simulation ready
 				</div>
-				{activeOverrideCount > 0 ? (
+				{currentChangeCount > 0 ? (
 					<div className="rounded-full border border-tertiary-border bg-tertiary-subtle px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
-						{activeOverrideCount} temporary override
-						{activeOverrideCount === 1 ? "" : "s"}
+						{currentChangeCount} temporary change
+						{currentChangeCount === 1 ? "" : "s"}
 					</div>
 				) : null}
 				{stochasticIsProvisional ? (
@@ -99,7 +99,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 			</section>
 
 			<EvaluationList
-				pack={pack}
+				document={document}
 				result={result}
 				stochasticResult={stochasticResult}
 				stochasticIsProvisional={stochasticIsProvisional}
@@ -131,9 +131,9 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 						</Collapsible.Trigger>
 						<Collapsible.Content>
 							<div className="space-y-5">
-								<CashFlowWaterfall pack={pack} />
-								<DebtSummary pack={pack} result={result} />
-								<NetWorthReconciliation pack={pack} result={result} />
+								<CashFlowWaterfall document={document} />
+								<DebtSummary document={document} result={result} />
+								<NetWorthReconciliation document={document} result={result} />
 							</div>
 						</Collapsible.Content>
 					</Collapsible>
@@ -193,8 +193,8 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 				<ShortfallCalendar
 					fulfillment={fulfillment}
 					rows={result.timeline.rows}
-					postings={pack.postings}
-					accounts={pack.accounts}
+					postings={document.postings}
+					accounts={document.accounts}
 				/>
 			</section>
 

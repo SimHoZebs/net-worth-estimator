@@ -20,16 +20,16 @@ import {
 	isNumericArithmetic,
 	parseNumericArithmetic,
 } from "@/lib/posting-categories";
-import type { ScenarioPack } from "@/lib/projection";
+import type { FinancialModelDocument } from "@/lib/projection";
 
 interface CashFlowWaterfallProps {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 }
 
 export const CashFlowWaterfall = memo(function CashFlowWaterfall({
-	pack,
+	document,
 }: CashFlowWaterfallProps) {
-	const enabledPostings = pack.postings.filter((p) => p.enabled);
+	const enabledPostings = document.postings.filter((p) => p.enabled);
 
 	const items = enabledPostings.map((p) => {
 		const { type, category } = categorizePosting(p);

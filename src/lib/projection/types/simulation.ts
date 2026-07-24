@@ -4,7 +4,7 @@ import type {
 	IsoDate,
 	MovementEvent,
 	Posting,
-} from "./scenario";
+} from "./model";
 
 export interface FinancialModel {
 	accounts: Account[];
@@ -17,7 +17,7 @@ export interface SimulationState {
 	realizedPostingAmountsByYear: Map<string, Map<string, number>>;
 }
 
-export interface SampledAssumptions {
+export interface MonteCarloSample {
 	annualRatesByPostingId: ReadonlyMap<string, readonly number[]>;
 }
 
@@ -27,7 +27,7 @@ export interface SimulationRequest {
 	startDate: IsoDate;
 	endDate: IsoDate;
 	includeStartDateEvents: boolean;
-	sampledAssumptions?: SampledAssumptions;
+	monteCarloSample?: MonteCarloSample;
 }
 
 export interface SimulationSnapshot {
@@ -36,12 +36,12 @@ export interface SimulationSnapshot {
 }
 
 export interface SimulationRun {
-	request: Omit<SimulationRequest, "initialState" | "sampledAssumptions">;
+	request: Omit<SimulationRequest, "initialState" | "monteCarloSample">;
 	initialState: SimulationState;
 	finalState: SimulationState;
 	snapshots: SimulationSnapshot[];
 	movementAttempts: MovementEvent[];
-	sampledAssumptions?: SampledAssumptions;
+	monteCarloSample?: MonteCarloSample;
 }
 
 export interface HistoricalObservationSnapshot {
@@ -55,3 +55,6 @@ export interface PreparedProjection {
 	latestCheckpointDate: IsoDate | null;
 	request: SimulationRequest;
 }
+
+/** @deprecated Use MonteCarloSample. */
+export type SampledAssumptions = MonteCarloSample;

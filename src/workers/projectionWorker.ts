@@ -1,11 +1,11 @@
-import { projectScenarioPack } from "@/lib/projection";
+import { projectFinancialModelDocument } from "@/lib/projection";
 import type {
 	ProjectionWorkerRequest,
 	ProjectionWorkerResponse,
 } from "./types";
 
 self.onmessage = (event: MessageEvent<ProjectionWorkerRequest>) => {
-	const { id, pack, projectionSettings, whatIfState } = event.data;
+	const { id, document, projectionSettings, overrides } = event.data;
 
 	const response: ProjectionWorkerResponse = {
 		id,
@@ -14,16 +14,16 @@ self.onmessage = (event: MessageEvent<ProjectionWorkerRequest>) => {
 	};
 
 	try {
-		response.result = projectScenarioPack(
-			pack,
+		response.result = projectFinancialModelDocument(
+			document,
 			projectionSettings,
-			whatIfState,
+			overrides,
 		);
 	} catch (err) {
 		response.runtimeError =
 			err instanceof Error
 				? err.message
-				: "The data pack could not be projected.";
+				: "The financial model could not be projected.";
 	}
 
 	self.postMessage(response);

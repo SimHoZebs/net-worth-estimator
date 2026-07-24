@@ -1,25 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { useProjectionEngine } from "@/engine/ProjectionEngineContext";
 import type {
+	FinancialModelDocument,
+	ModelOverrides,
 	ProjectionRuntimeSettings,
-	ScenarioPack,
-	ScenarioWhatIfState,
 	StochasticConfig,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import type { ProjectionHookState } from "./types";
 
 export function useStochastic(
-	pack: ScenarioPack | null,
+	document: FinancialModelDocument | null,
 	projectionSettings: ProjectionRuntimeSettings,
-	whatIfState: ScenarioWhatIfState,
+	overrides: ModelOverrides,
 	config: StochasticConfig | null,
 	enabled: boolean,
 ): ProjectionHookState<StochasticProjectionResult> {
 	const engine = useProjectionEngine();
 	const requestKey = useMemo(
-		() => ({ pack, projectionSettings, whatIfState, config, enabled }),
-		[pack, projectionSettings, whatIfState, config, enabled],
+		() => ({ document, projectionSettings, overrides, config, enabled }),
+		[document, projectionSettings, overrides, config, enabled],
 	);
 	const [state, setState] = useState<
 		ProjectionHookState<StochasticProjectionResult> & {
@@ -34,7 +34,7 @@ export function useStochastic(
 	});
 
 	useEffect(() => {
-		if (!enabled || pack === null || config === null) {
+		if (!enabled || document === null || config === null) {
 			setState({
 				result: null,
 				runtimeError: null,
@@ -57,9 +57,9 @@ export function useStochastic(
 		engine
 			.projectStochastic(
 				{
-					pack,
+					document,
 					projectionSettings,
-					whatIfState,
+					overrides,
 					config,
 					signal: controller.signal,
 				},
@@ -109,9 +109,9 @@ export function useStochastic(
 			controller.abort();
 		};
 	}, [
-		pack,
+		document,
 		projectionSettings,
-		whatIfState,
+		overrides,
 		config,
 		enabled,
 		engine,
@@ -122,7 +122,7 @@ export function useStochastic(
 		return {
 			result: null,
 			runtimeError: null,
-			isRunning: enabled && pack !== null && config !== null,
+			isRunning: enabled && document !== null && config !== null,
 			progress: null,
 		};
 	}

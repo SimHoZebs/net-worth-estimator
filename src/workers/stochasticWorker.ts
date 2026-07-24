@@ -6,13 +6,13 @@ import type {
 } from "./types";
 
 self.onmessage = (event: MessageEvent<StochasticWorkerRequest>) => {
-	const { id, pack, projectionSettings, whatIfState, config } = event.data;
+	const { id, document, projectionSettings, overrides, config } = event.data;
 
 	try {
 		const result = stochasticProject(
-			pack,
+			document,
 			projectionSettings,
-			whatIfState,
+			overrides,
 			config,
 			(progress, partial) => {
 				const msg: StochasticWorkerProgress = {

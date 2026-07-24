@@ -1,4 +1,4 @@
-import type { Posting } from "../types/scenario";
+import type { Posting } from "../types/model";
 
 export function makePosting(
 	overrides: Partial<Posting> & { id: string },

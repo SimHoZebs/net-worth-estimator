@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { ScenarioPack } from "@/lib/projection";
+import type { FinancialModelDocument } from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
 import {
 	DEFAULT_EVALUATIONS,
-	selectActiveOverrideCount,
-	selectWhatIfState,
+	selectCurrentChangeCount,
+	selectModelOverrides,
 	useStore,
 } from "@/store";
 
@@ -46,7 +46,7 @@ function makeCheckpoint(date = "2025-01-01", accountId = "a1", balance = 1000) {
 	return { Date: date, AccountId: accountId, Balance: balance };
 }
 
-function makeScenarioPack(): ScenarioPack {
+function makeFinancialModelDocument(): FinancialModelDocument {
 	return {
 		version: 9,
 		sourcePath: "/configs",
@@ -67,12 +67,12 @@ function makeScenarioPack(): ScenarioPack {
 }
 
 /* ------------------------------------------------------------------ */
-/*  What-if slice tests                                                */
+/*  Model overrides slice tests                                        */
 /* ------------------------------------------------------------------ */
 
-describe("WhatIf slice", () => {
+describe("Model overrides slice", () => {
 	beforeEach(() => {
-		useStore.getState().resetAllOverrides();
+		useStore.getState().resetCurrentChanges();
 	});
 
 	it("adds a temporary account", () => {
@@ -140,7 +140,7 @@ describe("WhatIf slice", () => {
 		useStore.getState().addTemporaryCheckpoint(makeCheckpoint());
 		useStore.getState().toggleAccountDisabled("a1");
 		useStore.getState().togglePostingDisabled("p1");
-		useStore.getState().resetAllOverrides();
+		useStore.getState().resetCurrentChanges();
 		expect(useStore.getState().addedAccounts).toEqual([]);
 		expect(useStore.getState().addedPostings).toEqual([]);
 		expect(useStore.getState().addedCheckpoints).toEqual([]);
@@ -154,52 +154,49 @@ describe("WhatIf slice", () => {
 /* ------------------------------------------------------------------ */
 
 describe("Selectors", () => {
-	it("selectActiveOverrideCount returns correct count", () => {
-		useStore.getState().resetAllOverrides();
+	it("selectCurrentChangeCount returns correct count", () => {
+		useStore.getState().resetCurrentChanges();
 		useStore.getState().addTemporaryAccount(makeAccount());
 		useStore.getState().addTemporaryAccount(makeAccount("a2", "Checking"));
 		useStore.getState().addTemporaryPosting(makePosting());
 		useStore.getState().toggleAccountDisabled("a1");
-		expect(selectActiveOverrideCount(useStore.getState())).toBe(4);
+		expect(selectCurrentChangeCount(useStore.getState())).toBe(4);
 	});
 
-	it("selectWhatIfState returns a stable snapshot", () => {
-		useStore.getState().resetAllOverrides();
+	it("selectModelOverrides returns the current overrides", () => {
+		useStore.getState().resetCurrentChanges();
 		useStore.getState().addTemporaryAccount(makeAccount());
 		useStore.getState().togglePostingDisabled("p1");
-		const snapshot = selectWhatIfState(useStore.getState());
-		expect(snapshot.addedAccounts).toHaveLength(1);
-		expect(snapshot.disabledPostingIds).toEqual(["p1"]);
+		const modelOverrides = selectModelOverrides(useStore.getState());
+		expect(modelOverrides.addedAccounts).toHaveLength(1);
+		expect(modelOverrides.disabledPostingIds).toEqual(["p1"]);
 	});
 });
 
 /* ------------------------------------------------------------------ */
-/*  Snapshot slice tests                                               */
+/*  Comparison slice tests                                             */
 /* ------------------------------------------------------------------ */
 
-describe("Snapshot slice", () => {
+describe("Comparison slice", () => {
 	beforeEach(() => {
-		useStore.getState().clearSnapshots();
-		useStore.getState().resetAllOverrides();
+		useStore.getState().clearComparisons();
+		useStore.getState().resetCurrentChanges();
 	});
 
-	it("stores only the current what-if state in snapshots", () => {
+	it("captures derived metrics without creating a restorable model", () => {
 		useStore.getState().addTemporaryAccount(makeAccount());
-		useStore.getState().addSnapshotFromCurrentScenario("Trial", {
+		useStore.getState().captureCurrentComparison("Trial", {
 			currentNetWorth: 100,
 			finalNetWorth: 200,
 			evaluationOutcomes: [],
-			overrideCount: 1,
+			currentChangeCount: 1,
 		});
 
-		const snapshot = useStore.getState().snapshots[0];
+		const snapshot = useStore.getState().comparisonSnapshots[0];
 		expect(snapshot.label).toBe("Trial");
-		expect(snapshot.whatIfState).toEqual(
-			selectWhatIfState(useStore.getState()),
-		);
-		expect(snapshot.evaluations).toEqual(useStore.getState().evaluations);
-		expect(snapshot.evaluations).not.toBe(useStore.getState().evaluations);
-		expect(snapshot.whatIfState).not.toHaveProperty("setTargetNetWorth");
+		expect(snapshot.metrics.currentChangeCount).toBe(1);
+		expect(snapshot).not.toHaveProperty("modelOverrides");
+		expect(snapshot).not.toHaveProperty("evaluations");
 	});
 });
 
@@ -209,7 +206,7 @@ describe("Snapshot slice", () => {
 
 describe("Reference stability", () => {
 	beforeEach(() => {
-		useStore.getState().resetAllOverrides();
+		useStore.getState().resetCurrentChanges();
 	});
 
 	it("getState returns identical reference when state is unchanged", () => {
@@ -232,16 +229,16 @@ describe("Reference stability", () => {
 		expect(before).not.toBe(after);
 	});
 
-	it("selectActiveOverrideCount returns stable values for identical state", () => {
-		const a = selectActiveOverrideCount(useStore.getState());
-		const b = selectActiveOverrideCount(useStore.getState());
+	it("selectCurrentChangeCount returns stable values for identical state", () => {
+		const a = selectCurrentChangeCount(useStore.getState());
+		const b = selectCurrentChangeCount(useStore.getState());
 		expect(a).toBe(b);
 	});
 
-	it("selectWhatIfState creates new object each call (plain function, not memoized)", () => {
+	it("selectModelOverrides creates a new object each call", () => {
 		// This is expected behaviour — memoization happens at the useShallow layer.
-		const a = selectWhatIfState(useStore.getState());
-		const b = selectWhatIfState(useStore.getState());
+		const a = selectModelOverrides(useStore.getState());
+		const b = selectModelOverrides(useStore.getState());
 		expect(a).not.toBe(b);
 		// ...but values should be deeply equal
 		expect(a).toEqual(b);
@@ -254,11 +251,11 @@ describe("Reference stability", () => {
 
 describe("Editor slice", () => {
 	beforeEach(() => {
-		useStore.getState().resetAllOverrides();
+		useStore.getState().resetCurrentChanges();
 		useStore.getState().cancelEditing();
 	});
 
-	describe("no-op when workingPack is null", () => {
+	describe("no-op when workingDocument is null", () => {
 		it("updateAccount does nothing", () => {
 			const before = useStore.getState();
 			useStore.getState().updateAccount("a1", { label: "New" });
@@ -314,84 +311,84 @@ describe("Editor slice", () => {
 		});
 	});
 
-	describe("with a canonical pack", () => {
-		const pack = makeScenarioPack();
+	describe("with a financial model document", () => {
+		const document = makeFinancialModelDocument();
 
-		it("startEditing clones the pack and sets isEditing", () => {
-			useStore.getState().startEditing(pack);
+		it("startEditing clones the document and sets isEditing", () => {
+			useStore.getState().startEditing(document);
 			expect(useStore.getState().isEditing).toBe(true);
 			expect(useStore.getState().isDirty).toBe(false);
-			expect(useStore.getState().workingPack).toEqual(pack);
-			expect(useStore.getState().workingPack).not.toBe(pack);
+			expect(useStore.getState().workingDocument).toEqual(document);
+			expect(useStore.getState().workingDocument).not.toBe(document);
 		});
 
 		it("cancelEditing resets state", () => {
-			useStore.getState().startEditing(pack);
+			useStore.getState().startEditing(document);
 			useStore.getState().cancelEditing();
 			expect(useStore.getState().isEditing).toBe(false);
-			expect(useStore.getState().workingPack).toBeNull();
+			expect(useStore.getState().workingDocument).toBeNull();
 		});
 
-		it("updateAccount modifies workingPack and sets isDirty", () => {
-			useStore.getState().startEditing(pack);
+		it("updateAccount modifies workingDocument and sets isDirty", () => {
+			useStore.getState().startEditing(document);
 			useStore.getState().updateAccount("a1", { label: "Investment" });
 			expect(useStore.getState().isDirty).toBe(true);
-			expect(useStore.getState().workingPack?.accounts[0].label).toBe(
+			expect(useStore.getState().workingDocument?.accounts[0].label).toBe(
 				"Investment",
 			);
 		});
 
-		it("deleteAccount removes from workingPack", () => {
-			useStore.getState().startEditing(pack);
+		it("deleteAccount removes from workingDocument", () => {
+			useStore.getState().startEditing(document);
 			useStore.getState().deleteAccount("a1");
-			expect(useStore.getState().workingPack?.accounts).toHaveLength(0);
+			expect(useStore.getState().workingDocument?.accounts).toHaveLength(0);
 		});
 
-		it("addAccount appends to workingPack", () => {
-			useStore.getState().startEditing(pack);
+		it("addAccount appends to workingDocument", () => {
+			useStore.getState().startEditing(document);
 			useStore.getState().addAccount(makeAccount("a2", "Checking"));
-			expect(useStore.getState().workingPack?.accounts).toHaveLength(2);
+			expect(useStore.getState().workingDocument?.accounts).toHaveLength(2);
 		});
 
-		it("updatePosting modifies posting in workingPack", () => {
-			useStore.getState().startEditing(pack);
+		it("updatePosting modifies posting in workingDocument", () => {
+			useStore.getState().startEditing(document);
 			useStore.getState().updatePosting("p1", { annualRate: 10000 });
 			expect(useStore.getState().isDirty).toBe(true);
-			expect(useStore.getState().workingPack?.postings[0].annualRate).toBe(
+			expect(useStore.getState().workingDocument?.postings[0].annualRate).toBe(
 				10000,
 			);
 		});
 
-		it("deletePosting removes from workingPack", () => {
-			useStore.getState().startEditing(pack);
+		it("deletePosting removes from workingDocument", () => {
+			useStore.getState().startEditing(document);
 			useStore.getState().deletePosting("p1");
-			expect(useStore.getState().workingPack?.postings).toHaveLength(0);
+			expect(useStore.getState().workingDocument?.postings).toHaveLength(0);
 		});
 
-		it("addPosting appends to workingPack", () => {
-			useStore.getState().startEditing(pack);
+		it("addPosting appends to workingDocument", () => {
+			useStore.getState().startEditing(document);
 			useStore.getState().addPosting(makePosting("p2"));
-			expect(useStore.getState().workingPack?.postings).toHaveLength(2);
+			expect(useStore.getState().workingDocument?.postings).toHaveLength(2);
 		});
 
-		it("addCheckpoint appends to workingPack", () => {
-			useStore.getState().startEditing(pack);
+		it("addCheckpoint appends to workingDocument", () => {
+			useStore.getState().startEditing(document);
 			useStore
 				.getState()
 				.addCheckpoint(makeCheckpoint("2025-03-01", "a1", 2000));
-			expect(useStore.getState().workingPack?.checkpoints).toHaveLength(2);
+			expect(useStore.getState().workingDocument?.checkpoints).toHaveLength(2);
 		});
 
-		it("deleteCheckpoint removes by index from workingPack", () => {
-			useStore.getState().startEditing(pack);
+		it("deleteCheckpoint removes by index from workingDocument", () => {
+			useStore.getState().startEditing(document);
 			useStore.getState().deleteCheckpoint(0);
-			expect(useStore.getState().workingPack?.checkpoints).toHaveLength(0);
+			expect(useStore.getState().workingDocument?.checkpoints).toHaveLength(0);
 		});
 
-		it("updateCheckpoint modifies checkpoint in workingPack", () => {
-			useStore.getState().startEditing(pack);
+		it("updateCheckpoint modifies checkpoint in workingDocument", () => {
+			useStore.getState().startEditing(document);
 			useStore.getState().updateCheckpoint(0, { Balance: 9999 });
-			expect(useStore.getState().workingPack?.checkpoints[0].Balance).toBe(
+			expect(useStore.getState().workingDocument?.checkpoints[0].Balance).toBe(
 				9999,
 			);
 		});
@@ -417,7 +414,7 @@ describe("Settings slice", () => {
 		expect(updated.config).toMatchObject({ annualExpenseTarget: 50_000 });
 	});
 
-	it("replaces evaluation settings from a scenario without retaining references", () => {
+	it("replaces evaluation settings from a document without retaining references", () => {
 		const evaluations = structuredClone(DEFAULT_EVALUATIONS);
 		useStore.getState().replaceEvaluations(evaluations);
 

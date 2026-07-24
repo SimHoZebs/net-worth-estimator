@@ -2,7 +2,7 @@ import type {
 	EvaluationResultCollection,
 	IsoDate,
 	ProjectionResult,
-} from "./scenario";
+} from "./model";
 
 export interface StochasticConfig {
 	runCount: number;

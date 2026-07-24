@@ -1,19 +1,23 @@
-import { prepareSimulationRequest } from "../scenario/prepareSimulation";
 import type {
 	Account,
 	AccountDelta,
 	AccountSnapshot,
+	FinancialModelDocument,
+	ModelOverrides,
 	MovementEvent,
 	ProjectionAccountSummary,
 	ProjectionPath,
 	ProjectionRow,
 	ProjectionRuntimeSettings,
 	RawProjectionOutput,
-	ScenarioPack,
-	ScenarioWhatIfState,
-} from "../types/scenario";
-import type { PreparedProjection, SimulationRun } from "../types/simulation";
+} from "../types/model";
+import type {
+	MonteCarloSample,
+	PreparedProjection,
+	SimulationRun,
+} from "../types/simulation";
 import { computeNetWorth } from "./accounts";
+import { prepareSimulationRequest } from "./prepareSimulation";
 import { simulate } from "./simulate";
 
 function roundCurrency(value: number): number {
@@ -77,7 +81,7 @@ function roundRow(row: ProjectionRow): ProjectionRow {
 
 function classifyAttempts(
 	attempts: readonly MovementEvent[],
-	postingsById: ReadonlyMap<string, ScenarioPack["postings"][number]>,
+	postingsById: ReadonlyMap<string, FinancialModelDocument["postings"][number]>,
 ) {
 	const accountImpacts: Record<string, AccountDelta[]> = {};
 	let externalInflowAmount = 0;
@@ -237,23 +241,26 @@ export function buildProjectionPath(
 	return {
 		rows,
 		movementEvents: run.movementAttempts,
-		effectivePack: prepared.effectiveDocument,
+		effectiveDocument: prepared.effectiveDocument,
 		projectionStartDate: run.request.startDate,
 		projectionEndDate: run.request.endDate,
 	};
 }
 
-export function projectRawScenarioPack(
-	pack: ScenarioPack,
+export function projectRawFinancialModelDocument(
+	document: FinancialModelDocument,
 	projectionSettings: ProjectionRuntimeSettings,
-	whatIfState?: ScenarioWhatIfState,
-	stochasticRates?: Map<string, number[]>,
+	overrides?: ModelOverrides,
+	monteCarloSample?: MonteCarloSample,
 ): RawProjectionOutput {
 	const prepared = prepareSimulationRequest(
-		pack,
+		document,
 		projectionSettings,
-		whatIfState,
-		stochasticRates,
+		overrides,
+		monteCarloSample,
 	);
 	return adaptSimulationRun(prepared, simulate(prepared.request));
 }
+
+/** @deprecated Use projectRawFinancialModelDocument. */
+export const projectRawScenarioPack = projectRawFinancialModelDocument;

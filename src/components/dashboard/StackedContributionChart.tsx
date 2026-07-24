@@ -7,7 +7,7 @@ import {
 } from "@/chart/uplotBase";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import { currency } from "@/lib/format";
-import type { ScenarioPack } from "@/lib/projection";
+import type { FinancialModelDocument } from "@/lib/projection";
 import { escapeHtml } from "@/lib/utils";
 
 interface AccountMeta {
@@ -28,7 +28,7 @@ const BAND_SOFT_COLOR = "color-mix(in oklab, CanvasText 15%, transparent)";
 const BAND_COLOR = "color-mix(in oklab, CanvasText 25%, transparent)";
 
 interface StackedContributionChartProps {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	targetNetWorth: number;
 	hasStochasticData: boolean;
 	chartData: Record<string, string | number>[];
@@ -36,7 +36,7 @@ interface StackedContributionChartProps {
 }
 
 export const StackedContributionChart = memo(function StackedContributionChart({
-	pack,
+	document,
 	targetNetWorth,
 	hasStochasticData,
 	chartData,
@@ -46,7 +46,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 	const cache = useRef<Classification | null>(null);
 
 	const { assets, liabilities } = useMemo(() => {
-		const enabled = pack.accounts.filter((a) => a.enabled);
+		const enabled = document.accounts.filter((a) => a.enabled);
 		const len = chartData.length;
 		if (len === 0) return { assets: enabled, liabilities: [] as AccountMeta[] };
 		if (len === prevRowCount.current && cache.current) return cache.current;
@@ -68,7 +68,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 				.sort((a, b) => Math.abs(avgBal[a.id]) - Math.abs(avgBal[b.id])),
 		};
 		return cache.current;
-	}, [chartData.length, pack.accounts, chartData]);
+	}, [chartData.length, document.accounts, chartData]);
 
 	const A = assets.length;
 	const L = liabilities.length;

@@ -29,7 +29,7 @@ export function ReadOnlyAccountsTable({
 			/>
 			<DataTable
 				title="Accounts"
-				description="Tracked signed balances. Checkbox toggles what-if disable (immediate)."
+				description="Tracked signed balances. Checkbox applies a temporary change immediately."
 				rows={accounts.filter(
 					(a) =>
 						!search ||

@@ -101,7 +101,9 @@ export function StochasticControls({
 						<>
 							<div className={"grid gap-3"}>
 								<div className="space-y-1">
-									<label className="type-eyebrow">Run count</label>
+									<label className="type-eyebrow">
+										Independent sample count
+									</label>
 									<input
 										type="number"
 										inputMode="numeric"
@@ -132,10 +134,10 @@ export function StochasticControls({
 										variant={hasPendingChanges ? "default" : "secondary"}
 									>
 										{hasPendingChanges
-											? "Re-run now"
+											? "Resample now"
 											: isRunning
 												? "Running…"
-												: "Re-run now"}
+												: "Resample now"}
 									</Button>
 								</div>
 							</div>
@@ -153,8 +155,9 @@ export function StochasticControls({
 								<div className="type-eyebrow">How the simulation works</div>
 								<ul className="mt-1.5 space-y-1 type-caption">
 									<li>
-										Each run samples a sequence of yearly investment returns for
-										every volatile posting using a log-normal distribution.
+										Each independent Monte Carlo sample draws a sequence of
+										yearly investment returns for every volatile posting using a
+										log-normal distribution.
 									</li>
 									<li>
 										The expected return is the posting&apos;s annual rate; the
@@ -162,7 +165,7 @@ export function StochasticControls({
 									</li>
 									<li>
 										Only postings with volatility &gt; 0 are randomized — all
-										other values remain fixed across runs.
+										other values remain fixed across independent samples.
 									</li>
 									<li>
 										Loan rates, salary, expenses, and tax rates are treated as

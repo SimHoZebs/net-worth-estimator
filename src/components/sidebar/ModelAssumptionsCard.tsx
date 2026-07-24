@@ -6,24 +6,24 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import type { ScenarioPack } from "@/lib/projection";
+import type { FinancialModelDocument } from "@/lib/projection";
 
 interface ModelAssumptionsCardProps {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	hasStochasticData: boolean;
 }
 
 export const ModelAssumptionsCard = memo(function ModelAssumptionsCard({
-	pack,
+	document,
 	hasStochasticData,
 }: ModelAssumptionsCardProps) {
-	const enabledAccounts = pack.accounts.filter(
+	const enabledAccounts = document.accounts.filter(
 		(account) => account.enabled,
 	).length;
-	const enabledPostings = pack.postings.filter(
+	const enabledPostings = document.postings.filter(
 		(posting) => posting.enabled,
 	).length;
-	const annualRatePostings = pack.postings.filter(
+	const annualRatePostings = document.postings.filter(
 		(posting) => posting.enabled && posting.annualRate > 0,
 	);
 
@@ -50,7 +50,7 @@ export const ModelAssumptionsCard = memo(function ModelAssumptionsCard({
 						</div>
 					</div>
 					<div className="rounded-xl border border-border/70 bg-surface/70 px-2 py-3 dark:border-white/10 dark:bg-surface/50">
-						<div className="type-title">{pack.checkpoints.length}</div>
+						<div className="type-title">{document.checkpoints.length}</div>
 						<div className="text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground/70">
 							History
 						</div>

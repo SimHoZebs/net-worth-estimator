@@ -48,7 +48,7 @@ export function SimulationOverview({
 						detail={
 							stochasticResult
 								? `P10 ${currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p10)} · P90 ${currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p90)}`
-								: "Distribution across stochastic simulation runs"
+								: "Distribution across independent Monte Carlo samples"
 						}
 					/>
 					<Metric

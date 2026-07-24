@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type {
 	ConfiguredEvaluation,
 	EvaluationResultCollection,
+	FinancialModelDocument,
 	JsonValue,
 	ProjectionResult,
-	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import {
@@ -27,7 +27,7 @@ interface ConfigEditorProps {
 
 interface ResultRendererProps {
 	evaluation: ConfiguredEvaluation;
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	result: ProjectionResult;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
@@ -110,7 +110,7 @@ function nextInstanceId(
 
 export function EvaluationList({
 	results,
-	pack,
+	document,
 	result,
 	stochasticResult,
 	stochasticIsProvisional = false,
@@ -118,7 +118,7 @@ export function EvaluationList({
 	blockerDetail = "No evaluation blocker was identified.",
 }: {
 	results?: EvaluationResultCollection | null;
-	pack?: ScenarioPack;
+	document?: FinancialModelDocument;
 	result?: ProjectionResult;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
@@ -306,11 +306,11 @@ export function EvaluationList({
 							{evaluation.enabled &&
 							normalizedConfig !== null &&
 							ResultRenderer &&
-							pack &&
+							document &&
 							result ? (
 								<ResultRenderer
 									evaluation={{ ...evaluation, config: normalizedConfig }}
-									pack={pack}
+									document={document}
 									result={result}
 									stochasticResult={stochasticResult}
 									stochasticIsProvisional={stochasticIsProvisional}

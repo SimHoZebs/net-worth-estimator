@@ -1,10 +1,10 @@
-import type { Posting, ScenarioPack } from "@/lib/projection";
+import type { FinancialModelDocument, Posting } from "@/lib/projection";
 
 export function findPaymentPosting(
-	pack: ScenarioPack,
+	document: FinancialModelDocument,
 	accountId: string,
 ): Posting | undefined {
-	return pack.postings.find(
+	return document.postings.find(
 		(p) =>
 			p.enabled &&
 			p.destinations?.includes(accountId) &&

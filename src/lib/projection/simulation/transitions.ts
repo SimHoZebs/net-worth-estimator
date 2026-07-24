@@ -1,7 +1,7 @@
-import type { IsoDate, MovementEvent } from "../types/scenario";
+import type { IsoDate, MovementEvent } from "../types/model";
 import type {
 	FinancialModel,
-	SampledAssumptions,
+	MonteCarloSample,
 	SimulationState,
 } from "../types/simulation";
 import { projectionYearIndex } from "../utils/date";
@@ -57,12 +57,12 @@ export function createTransitionRuntime({
 	model,
 	initialState,
 	projectionStartDate,
-	sampledAssumptions,
+	monteCarloSample,
 }: {
 	model: FinancialModel;
 	initialState: SimulationState;
 	projectionStartDate: IsoDate;
-	sampledAssumptions?: SampledAssumptions;
+	monteCarloSample?: MonteCarloSample;
 }): SimulationTransitionRuntime {
 	const state = cloneSimulationState(initialState);
 	const accountById = new Map(
@@ -91,10 +91,10 @@ export function createTransitionRuntime({
 			const { posting } = occurrence;
 			const yearIndex = projectionYearIndex(projectionStartDate, date);
 			let sampledRate: number | undefined;
-			if (posting.volatility > 0 && sampledAssumptions !== undefined) {
-				sampledRate = sampledAssumptions.annualRatesByPostingId.get(
-					posting.id,
-				)?.[yearIndex];
+			if (posting.volatility > 0 && monteCarloSample !== undefined) {
+				sampledRate = monteCarloSample.annualRatesByPostingId.get(posting.id)?.[
+					yearIndex
+				];
 				if (sampledRate === undefined) {
 					throw new Error(
 						`Missing sampled annual rate for posting "${posting.id}" in projection year ${yearIndex}.`,

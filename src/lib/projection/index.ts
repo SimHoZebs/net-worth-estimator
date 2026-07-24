@@ -1,4 +1,7 @@
-export { projectScenarioPack } from "./analysis/projectScenario";
+export {
+	projectFinancialModelDocument,
+	projectScenarioPack,
+} from "./analysis/projectFinancialModel";
 export { stochasticProject } from "./analysis/projectStochastic";
 export type {
 	DataSource,
@@ -51,10 +54,14 @@ export {
 	EvaluationRuntimeSet,
 } from "./evaluation/runtime";
 export {
+	applyModelOverrides,
 	applyScenarioOverrides,
+	EMPTY_MODEL_OVERRIDES,
+	EMPTY_SCENARIO_OVERRIDES,
+	EMPTY_WHAT_IF_STATE,
+	prepareFinancialModelDocument,
 	prepareScenarioPack,
-} from "./scenario/prepareScenario";
-export { prepareSimulationRequest } from "./scenario/prepareSimulation";
+} from "./model/applyModelOverrides";
 export {
 	type AccountMovementAction,
 	type AccountMovementConstraint,
@@ -62,6 +69,11 @@ export {
 	resolveAccountMovement,
 	resolveAccountMovementAmount,
 } from "./simulation/postings";
+export { prepareSimulationRequest } from "./simulation/prepareSimulation";
+export {
+	projectRawFinancialModelDocument,
+	projectRawScenarioPack,
+} from "./simulation/projectPath";
 export { simulate } from "./simulation/simulate";
 export { createBrowserCsvDataSource } from "./sources/csv/browserCsvDataSource";
 export { createCsvDataSource } from "./sources/csv/csvDataSource";
@@ -110,6 +122,10 @@ export type {
 	IsoDate,
 	JsonPrimitive,
 	JsonValue,
+	ModelCollectionKey,
+	ModelFileContents,
+	ModelFileName,
+	ModelOverrides,
 	MovementEvent,
 	Posting,
 	PostingFrequency,
@@ -123,18 +139,23 @@ export type {
 	ScenarioOverrides,
 	ScenarioPack,
 	ScenarioWhatIfState,
-} from "./types/scenario";
+} from "./types/model";
 export {
 	CSV_BEHAVIOR_DEFINITION_IDS,
 	CSV_BEHAVIOR_FILE_NAMES,
+	CSV_MODEL_FILE_NAMES,
+	CSV_MODEL_PUBLIC_PATH,
+	CSV_MODEL_REPO_PATH,
 	CSV_SCENARIO_FILE_NAMES,
 	CSV_SCENARIO_PUBLIC_PATH,
 	CSV_SCENARIO_REPO_PATH,
+	FINANCIAL_MODEL_DOCUMENT_VERSION,
 	SCENARIO_MODEL_VERSION,
-} from "./types/scenario";
+} from "./types/model";
 export type {
 	FinancialModel,
 	HistoricalObservationSnapshot,
+	MonteCarloSample,
 	PreparedProjection,
 	SampledAssumptions,
 	SimulationRequest,

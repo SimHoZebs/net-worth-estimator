@@ -3,8 +3,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	FinancialIndependencePlan,
+	FinancialModelDocument,
 	ProjectionResult,
-	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import { getFinancialIndependenceResult } from "@/lib/projection";
@@ -15,7 +15,7 @@ interface OverviewCardProps {
 	plan: FinancialIndependencePlan;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	blockerValue: string;
 	blockerDetail: string;
 }
@@ -26,7 +26,7 @@ export const OverviewCard = memo(function OverviewCard({
 	plan,
 	stochasticResult,
 	stochasticIsProvisional = false,
-	pack,
+	document,
 	blockerValue,
 	blockerDetail,
 }: OverviewCardProps) {
@@ -41,7 +41,9 @@ export const OverviewCard = memo(function OverviewCard({
 	const firstCoverageDate = analysis?.milestones.firstCoverageDate ?? null;
 	const selfSustainingDate =
 		analysis?.milestones.firstSelfSustainingDate ?? null;
-	const activePostingIds = new Set(pack.postings.map((posting) => posting.id));
+	const activePostingIds = new Set(
+		document.postings.map((posting) => posting.id),
+	);
 	const laborDependentSources = plan.sources.filter(
 		(source) =>
 			source.type === "cashflow" &&
@@ -117,9 +119,9 @@ export const OverviewCard = memo(function OverviewCard({
 							{confidence === undefined
 								? blockerDetail
 								: confidenceDate === null
-									? `${pct.format(confidence)} of runs succeeded at some candidate; no date reached ${pct.format(plan.requiredConfidence)}`
+									? `${pct.format(confidence)} of independent Monte Carlo samples succeeded at some candidate; no date reached ${pct.format(plan.requiredConfidence)}`
 									: stochasticIsProvisional
-										? `${pct.format(qualifyingConfidence ?? 0)} at this date from completed runs; still converging`
+										? `${pct.format(qualifyingConfidence ?? 0)} at this date from completed independent Monte Carlo samples; still converging`
 										: `${pct.format(qualifyingConfidence ?? 0)} at this date; requires ${pct.format(plan.requiredConfidence)}`}
 						</div>
 					</div>

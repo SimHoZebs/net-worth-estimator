@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import {
+	applyModelOverrides,
 	createBrowserCsvDataSource,
 	createCsvDataSource,
 	type ProjectionRuntimeSettings,
-	prepareScenarioPack,
 } from "@/lib/projection";
-import { ContributionWhatIfControls } from "./components/CsvContributionWhatIfControls";
-import { ProjectionDashboard } from "./components/CsvProjectionDashboard";
-import { ScenarioInspector } from "./components/CsvScenarioInspector";
+import { CurrentChangesComparison } from "./components/CurrentChangesComparison";
+import { CurrentChangesControls } from "./components/CurrentChangesControls";
+import { ModelInputsInspector } from "./components/ModelInputsInspector";
+import { ProjectionDashboard } from "./components/ProjectionDashboard";
 import { TemplateWizard } from "./components/patterns/TemplateWizard";
-import { ScenarioComparison } from "./components/ScenarioComparison";
 import { SectionNav } from "./components/SectionNav";
 import { ProjectionConfigSidebar } from "./components/sidebar/ProjectionConfigSidebar";
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
@@ -25,8 +25,8 @@ import {
 import { useStochastic } from "./hooks/useStochastic";
 import { summarizeValidationIssues } from "./lib/projection";
 import {
-	selectActiveOverrideCount,
-	selectWhatIfState,
+	selectCurrentChangeCount,
+	selectModelOverrides,
 	useStore,
 } from "./store";
 
@@ -34,39 +34,36 @@ function formatTodayIsoDate() {
 	return new Date().toISOString().slice(0, 10);
 }
 
-function createScenarioDataSource() {
+function createModelDataSource() {
 	return import.meta.env.DEV
 		? createCsvDataSource()
 		: createBrowserCsvDataSource();
 }
 
 export default function App() {
-	const dataSource = useMemo(() => createScenarioDataSource(), []);
+	const dataSource = useMemo(() => createModelDataSource(), []);
 	const {
-		data: scenarioData,
-		isLoading: isScenarioLoading,
-		isFetching: isScenarioFetching,
-		error: scenarioError,
-		refetch: refetchScenario,
+		data: modelData,
+		isLoading: isModelLoading,
+		isFetching: isModelFetching,
+		error: modelError,
+		refetch: refetchModel,
 		dataUpdatedAt,
 	} = useScenarioQuery(dataSource);
-	const scenarioMutation = useScenarioMutation(dataSource);
-	const scenarioResetMutation = useScenarioResetMutation(dataSource);
+	const modelMutation = useScenarioMutation(dataSource);
+	const modelResetMutation = useScenarioResetMutation(dataSource);
 
-	const pack = scenarioData?.pack ?? null;
-	const issues = scenarioData?.issues ?? [];
-	const loadError = scenarioError?.message ?? null;
+	const document = modelData?.pack ?? null;
+	const issues = modelData?.issues ?? [];
+	const loadError = modelError?.message ?? null;
 	const sourceActionError =
-		scenarioMutation.error?.message ??
-		scenarioResetMutation.error?.message ??
-		null;
-	const isSourceUpdating =
-		isScenarioFetching || scenarioResetMutation.isPending;
-	const isLoading = isScenarioLoading || isSourceUpdating;
+		modelMutation.error?.message ?? modelResetMutation.error?.message ?? null;
+	const isSourceUpdating = isModelFetching || modelResetMutation.isPending;
+	const isLoading = isModelLoading || isSourceUpdating;
 
-	const whatIfState = useStore(useShallow(selectWhatIfState));
+	const modelOverrides = useStore(useShallow(selectModelOverrides));
 	const {
-		activeOverrideCount,
+		currentChangeCount,
 		isEditing,
 		isDirty,
 		evaluations,
@@ -79,7 +76,7 @@ export default function App() {
 		setTheme,
 	} = useStore(
 		useShallow((s) => ({
-			activeOverrideCount: selectActiveOverrideCount(s),
+			currentChangeCount: selectCurrentChangeCount(s),
 			isEditing: s.isEditing,
 			isDirty: s.isDirty,
 			evaluations: s.evaluations,
@@ -93,34 +90,37 @@ export default function App() {
 		})),
 	);
 
-	const sourceEvaluationsFingerprint = pack
-		? JSON.stringify(pack.evaluations)
+	const sourceEvaluationsFingerprint = document
+		? JSON.stringify(document.evaluations)
 		: null;
 	const loadedEvaluationsFingerprint = useRef<string | null>(null);
 	useEffect(() => {
 		if (
-			pack &&
+			document &&
 			sourceEvaluationsFingerprint !== loadedEvaluationsFingerprint.current
 		) {
-			replaceEvaluations(pack.evaluations);
+			replaceEvaluations(document.evaluations);
 			loadedEvaluationsFingerprint.current = sourceEvaluationsFingerprint;
 		}
-	}, [pack, replaceEvaluations, sourceEvaluationsFingerprint]);
+	}, [document, replaceEvaluations, sourceEvaluationsFingerprint]);
 	const evaluationsAreHydrated =
-		pack === null ||
+		document === null ||
 		loadedEvaluationsFingerprint.current === sourceEvaluationsFingerprint;
 	const requestEvaluationReload = useCallback(() => {
-		if (!pack) return;
-		replaceEvaluations(pack.evaluations);
+		if (!document) return;
+		replaceEvaluations(document.evaluations);
 		loadedEvaluationsFingerprint.current = sourceEvaluationsFingerprint;
-	}, [pack, replaceEvaluations, sourceEvaluationsFingerprint]);
+	}, [document, replaceEvaluations, sourceEvaluationsFingerprint]);
 
 	useEffect(() => {
 		const mq = window.matchMedia("(prefers-color-scheme: dark)");
 		const handleChange = () => {
 			if (useStore.getState().theme === "system") {
 				const resolved = mq.matches ? "dark" : "light";
-				document.documentElement.classList.toggle("dark", resolved === "dark");
+				window.document.documentElement.classList.toggle(
+					"dark",
+					resolved === "dark",
+				);
 				useStore.setState({ resolvedTheme: resolved });
 			}
 		};
@@ -138,12 +138,12 @@ export default function App() {
 		}),
 		[fallbackProjectionStartDate, horizonYears, evaluations],
 	);
-	const effectivePack = useMemo(
-		() => (pack ? prepareScenarioPack(pack, whatIfState) : null),
-		[pack, whatIfState],
+	const effectiveDocument = useMemo(
+		() => (document ? applyModelOverrides(document, modelOverrides) : null),
+		[document, modelOverrides],
 	);
 	const projectionStartDate =
-		effectivePack?.checkpoints.reduce<string | null>(
+		effectiveDocument?.checkpoints.reduce<string | null>(
 			(latestDate, checkpoint) =>
 				latestDate === null || checkpoint.Date > latestDate
 					? checkpoint.Date
@@ -155,14 +155,15 @@ export default function App() {
 		runtimeError,
 		isRunning: isProjecting,
 	} = useProjection(
-		pack,
+		document,
 		projectionSettings,
-		whatIfState,
+		modelOverrides,
 		validation.isValid && evaluationsAreHydrated,
 	);
 
 	const hasStochasticAccounts =
-		effectivePack?.postings.some((p) => p.volatility > 0 && p.enabled) ?? false;
+		effectiveDocument?.postings.some((p) => p.volatility > 0 && p.enabled) ??
+		false;
 
 	const stochasticWorkerEnabled =
 		stochasticPreference !== "disabled" &&
@@ -175,9 +176,9 @@ export default function App() {
 		isRunning: isStochasticRunning,
 		progress: stochasticProgress,
 	} = useStochastic(
-		pack,
+		document,
 		projectionSettings,
-		whatIfState,
+		modelOverrides,
 		stochasticConfig,
 		stochasticWorkerEnabled,
 	);
@@ -186,34 +187,34 @@ export default function App() {
 
 	const handleSave = useCallback(() => {
 		const store = useStore.getState();
-		if (!store.workingPack || scenarioMutation.isPending || !dataSource.save)
+		if (!store.workingDocument || modelMutation.isPending || !dataSource.save)
 			return;
 
-		scenarioMutation.mutate(store.workingPack, {
+		modelMutation.mutate(store.workingDocument, {
 			onSuccess: () => {
 				useStore.setState({
 					isDirty: false,
 					isEditing: false,
-					workingPack: null,
+					workingDocument: null,
 				});
 			},
 		});
-	}, [dataSource.save, scenarioMutation]);
+	}, [dataSource.save, modelMutation]);
 
 	const handleResetSource = useCallback(() => {
-		if (!dataSource.reset || scenarioResetMutation.isPending) return;
+		if (!dataSource.reset || modelResetMutation.isPending) return;
 		requestEvaluationReload();
 
-		scenarioResetMutation.mutate(undefined, {
+		modelResetMutation.mutate(undefined, {
 			onSuccess: () => {
 				useStore.setState({
 					isDirty: false,
 					isEditing: false,
-					workingPack: null,
+					workingDocument: null,
 				});
 			},
 		});
-	}, [dataSource.reset, requestEvaluationReload, scenarioResetMutation]);
+	}, [dataSource.reset, requestEvaluationReload, modelResetMutation]);
 
 	const [showWizard, setShowWizard] = useState(false);
 	const handleCloseWizard = useCallback(() => setShowWizard(false), []);
@@ -221,8 +222,8 @@ export default function App() {
 	const handleApplyTemplate = useCallback(
 		(output: import("@/lib/patterns").TemplateOutput) => {
 			const store = useStore.getState();
-			if (!store.isEditing && pack) {
-				store.startEditing(pack);
+			if (!store.isEditing && document) {
+				store.startEditing(document);
 			}
 			for (const account of output.accounts) {
 				store.addAccount(account);
@@ -231,7 +232,7 @@ export default function App() {
 				store.addPosting(posting);
 			}
 		},
-		[pack],
+		[document],
 	);
 
 	const onProjectionSettingsChange = useCallback(
@@ -244,8 +245,8 @@ export default function App() {
 
 	const handleReload = useCallback(() => {
 		requestEvaluationReload();
-		return refetchScenario();
-	}, [refetchScenario, requestEvaluationReload]);
+		return refetchModel();
+	}, [refetchModel, requestEvaluationReload]);
 
 	const currentMetrics = useMemo(() => {
 		const evaluationResults = stochasticResult ?? result;
@@ -265,13 +266,13 @@ export default function App() {
 							]
 						: [];
 				}) ?? [],
-			overrideCount: activeOverrideCount,
+			currentChangeCount,
 		};
-	}, [result, stochasticResult, activeOverrideCount]);
+	}, [result, stochasticResult, currentChangeCount]);
 
-	const whatIfControls = useMemo(
-		() => (pack ? <ContributionWhatIfControls pack={pack} /> : null),
-		[pack],
+	const currentChangesControls = useMemo(
+		() => (document ? <CurrentChangesControls document={document} /> : null),
+		[document],
 	);
 
 	return (
@@ -280,25 +281,25 @@ export default function App() {
 				<div className="mx-auto max-w-[106rem] px-4 py-4 md:px-8">
 					<div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<div className="type-caption">
-							{pack ? (
+							{document ? (
 								<span>
 									Baseline loaded from{" "}
 									<span className="font-medium text-foreground/75">
 										{dataSource.label}
 									</span>
-									{activeOverrideCount > 0
-										? ` · ${activeOverrideCount} temporary scenario override${activeOverrideCount === 1 ? "" : "s"}`
+									{currentChangeCount > 0
+										? ` · ${currentChangeCount} temporary change${currentChangeCount === 1 ? "" : "s"}`
 										: ""}
 									{isEditing && isDirty ? " · Unsaved baseline edits" : ""}
 									{isEditing && !isDirty ? " · Editing baseline" : ""}
-									{activeOverrideCount === 0 && !isEditing
+									{currentChangeCount === 0 && !isEditing
 										? " · Projection settings are session-only"
 										: ""}
 								</span>
 							) : (
 								<span className="inline-flex items-center gap-2">
 									<span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary/70" />
-									Loading scenario data...
+									Loading financial model...
 								</span>
 							)}
 						</div>
@@ -309,7 +310,7 @@ export default function App() {
 								variant="ghost"
 								size="sm"
 								onClick={() => window.print()}
-								disabled={!pack}
+								disabled={!document}
 							>
 								Print
 							</Button>
@@ -322,7 +323,7 @@ export default function App() {
 							>
 								{isLoading ? "Loading..." : "Reload source data"}
 							</Button>
-							{pack ? (
+							{document ? (
 								<Button
 									type="button"
 									variant="secondary"
@@ -339,7 +340,7 @@ export default function App() {
 				<SectionNav />
 
 				<div className="mx-auto max-w-[106rem] space-y-6 px-4 py-6 md:px-8">
-					{isLoading && !pack ? (
+					{isLoading && !document ? (
 						<div className="grid gap-4 md:grid-cols-3">
 							{[1, 2, 3].map((i) => (
 								<div
@@ -359,9 +360,9 @@ export default function App() {
 							<AlertTitle>Updating projection</AlertTitle>
 							<AlertDescription>
 								Recomputing historical and projected balances from the loaded
-								data pack
-								{activeOverrideCount > 0
-									? ` with ${activeOverrideCount} temporary change${activeOverrideCount === 1 ? "" : "s"}`
+								financial model
+								{currentChangeCount > 0
+									? ` with ${currentChangeCount} temporary change${currentChangeCount === 1 ? "" : "s"}`
 									: ""}
 								.
 							</AlertDescription>
@@ -372,8 +373,8 @@ export default function App() {
 						<Alert variant="destructive" className="rounded-[1.6rem]">
 							<AlertTitle>Projection blocked by validation errors</AlertTitle>
 							<AlertDescription>
-								Fix the data pack issues above, then reload the data to resume
-								projection.
+								Fix the financial model issues above, then reload the data to
+								resume projection.
 							</AlertDescription>
 						</Alert>
 					) : null}
@@ -392,11 +393,11 @@ export default function App() {
 						</Alert>
 					) : null}
 
-					{pack && validation.isValid && result ? (
+					{document && validation.isValid && result ? (
 						<div className="grid items-start gap-6 min-[90rem]:grid-cols-[minmax(0,1fr)_24rem] min-[90rem]:justify-center">
 							<main className="min-w-0 space-y-6">
 								<ProjectionDashboard
-									pack={effectivePack ?? pack}
+									document={effectiveDocument ?? document}
 									result={result}
 									stochasticResult={stochasticResult}
 									stochasticIsProvisional={stochasticIsProvisional}
@@ -404,11 +405,11 @@ export default function App() {
 
 								<section id="model-inputs">
 									<LazySection>
-										<ScenarioInspector
+										<ModelInputsInspector
 											projectionStartDate={
 												result.milestones.projectionStartDate
 											}
-											pack={pack}
+											document={document}
 											issues={issues}
 											dataSource={dataSource}
 											isLoading={isLoading}
@@ -416,17 +417,17 @@ export default function App() {
 											sourceActionError={sourceActionError}
 											onReload={handleReload}
 											onSave={handleSave}
-											isSaving={scenarioMutation.isPending}
-											overridesSlot={whatIfControls}
+											isSaving={modelMutation.isPending}
+											currentChangesSlot={currentChangesControls}
 										/>
 									</LazySection>
 								</section>
 
-								<section id="scenario-snapshots">
-									<ScenarioComparison
+								<section id="comparison-snapshots">
+									<CurrentChangesComparison
 										currentMetrics={currentMetrics}
-										currentOverrideCount={activeOverrideCount}
-										canTakeSnapshot={
+										currentChangeCount={currentChangeCount}
+										canCaptureComparison={
 											!isProjecting && !isStochasticRunning && !isSourceUpdating
 										}
 									/>
@@ -435,10 +436,10 @@ export default function App() {
 
 							<aside id="projection-settings" className="space-y-4">
 								<ProjectionConfigSidebar
-									pack={effectivePack ?? pack}
+									document={effectiveDocument ?? document}
 									projectionSettings={projectionSettings}
 									projectionStartDate={result.milestones.projectionStartDate}
-									activeOverrideCount={activeOverrideCount}
+									currentChangeCount={currentChangeCount}
 									hasStochasticAccounts={hasStochasticAccounts}
 									stochasticResult={stochasticResult}
 									isStochasticRunning={isStochasticRunning}
@@ -453,19 +454,19 @@ export default function App() {
 									onResetSource={
 										dataSource.reset ? handleResetSource : undefined
 									}
-									isResetting={scenarioResetMutation.isPending}
+									isResetting={modelResetMutation.isPending}
 								/>
 							</aside>
 						</div>
 					) : (
 						<section id="model-inputs">
 							<LazySection>
-								<ScenarioInspector
+								<ModelInputsInspector
 									projectionStartDate={
 										result?.milestones.projectionStartDate ??
 										projectionStartDate
 									}
-									pack={pack}
+									document={document}
 									issues={issues}
 									dataSource={dataSource}
 									isLoading={isLoading}
@@ -473,16 +474,16 @@ export default function App() {
 									sourceActionError={sourceActionError}
 									onReload={handleReload}
 									onSave={handleSave}
-									isSaving={scenarioMutation.isPending}
-									overridesSlot={whatIfControls}
+									isSaving={modelMutation.isPending}
+									currentChangesSlot={currentChangesControls}
 								/>
 							</LazySection>
 						</section>
 					)}
 
-					{showWizard && pack ? (
+					{showWizard && document ? (
 						<TemplateWizard
-							pack={pack}
+							document={document}
 							onApply={handleApplyTemplate}
 							onClose={handleCloseWizard}
 						/>

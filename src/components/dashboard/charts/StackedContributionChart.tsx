@@ -10,7 +10,7 @@ import {
 	createReferenceLinesHooks,
 } from "@/chart/uplotBase";
 import { UPlotChart } from "@/components/ui/UPlotChart";
-import type { ScenarioPack } from "@/lib/projection";
+import type { FinancialModelDocument } from "@/lib/projection";
 import { PointDetailsPanel } from "./PointDetailsPanel";
 
 interface AccountMeta {
@@ -26,7 +26,7 @@ const BAND_SOFT_COLOR = "color-mix(in oklab, CanvasText 15%, transparent)";
 const BAND_COLOR = "color-mix(in oklab, CanvasText 25%, transparent)";
 
 interface StackedContributionChartProps {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	hasStochasticData: boolean;
 	stochasticIsProvisional?: boolean;
 	chartData: Record<string, string | number>[];
@@ -34,7 +34,7 @@ interface StackedContributionChartProps {
 }
 
 export const StackedContributionChart = memo(function StackedContributionChart({
-	pack,
+	document,
 	hasStochasticData,
 	stochasticIsProvisional = false,
 	chartData,
@@ -42,8 +42,8 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 }: StackedContributionChartProps) {
 	const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 	const enabledAccounts = useMemo(
-		() => pack.accounts.filter((account) => account.enabled),
-		[pack.accounts],
+		() => document.accounts.filter((account) => account.enabled),
+		[document.accounts],
 	);
 	const { assets, liabilities } = useMemo(() => {
 		const averageBalances = Object.fromEntries(

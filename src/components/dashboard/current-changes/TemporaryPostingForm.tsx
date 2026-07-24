@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatRoute } from "@/lib/format";
-import type { Posting, ScenarioPack } from "@/lib/projection";
+import type { FinancialModelDocument, Posting } from "@/lib/projection";
 
 function emptyPosting(): Posting {
 	return {
@@ -23,8 +23,8 @@ function emptyPosting(): Posting {
 	};
 }
 
-function describeRoute(posting: Posting, pack: ScenarioPack) {
-	const accountById = new Map(pack.accounts.map((a) => [a.id, a]));
+function describeRoute(posting: Posting, document: FinancialModelDocument) {
+	const accountById = new Map(document.accounts.map((a) => [a.id, a]));
 	const sourceLabel = posting.sourceAccountId
 		? (accountById.get(posting.sourceAccountId)?.label ??
 			posting.sourceAccountId)
@@ -37,19 +37,19 @@ function describeRoute(posting: Posting, pack: ScenarioPack) {
 	return formatRoute(sourceLabel, destinations);
 }
 
-interface WhatIfPostingFormProps {
+interface TemporaryPostingFormProps {
 	postings: Posting[];
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	onAdd: (posting: Posting) => void;
 	onRemove: (id: string) => void;
 }
 
-export function WhatIfPostingForm({
+export function TemporaryPostingForm({
 	postings,
-	pack,
+	document,
 	onAdd,
 	onRemove,
-}: WhatIfPostingFormProps) {
+}: TemporaryPostingFormProps) {
 	const [adding, setAdding] = useState<Posting | null>(null);
 
 	const commit = () => {
@@ -285,7 +285,7 @@ export function WhatIfPostingForm({
 							{posting.arithmetic}
 						</span>
 						<span className="ml-2 type-caption text-tertiary-foreground/80">
-							{describeRoute(posting, pack)}
+							{describeRoute(posting, document)}
 						</span>
 					</div>
 					<Button

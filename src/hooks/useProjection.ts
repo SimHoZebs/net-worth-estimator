@@ -1,25 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { useProjectionEngine } from "@/engine/ProjectionEngineContext";
 import type {
+	FinancialModelDocument,
+	ModelOverrides,
 	ProjectionResult,
 	ProjectionRuntimeSettings,
-	ScenarioPack,
-	ScenarioWhatIfState,
 } from "@/lib/projection";
 import type { ProjectionHookState } from "./types";
 
 export type { ProjectionHookState };
 
 export function useProjection(
-	pack: ScenarioPack | null,
+	document: FinancialModelDocument | null,
 	projectionSettings: ProjectionRuntimeSettings,
-	whatIfState: ScenarioWhatIfState,
+	overrides: ModelOverrides,
 	enabled: boolean,
 ): ProjectionHookState<ProjectionResult> {
 	const engine = useProjectionEngine();
 	const requestKey = useMemo(
-		() => ({ pack, projectionSettings, whatIfState, enabled }),
-		[pack, projectionSettings, whatIfState, enabled],
+		() => ({ document, projectionSettings, overrides, enabled }),
+		[document, projectionSettings, overrides, enabled],
 	);
 	const [state, setState] = useState<
 		ProjectionHookState<ProjectionResult> & { requestKey: object | null }
@@ -32,7 +32,7 @@ export function useProjection(
 	});
 
 	useEffect(() => {
-		if (!enabled || pack === null) {
+		if (!enabled || document === null) {
 			setState({
 				result: null,
 				runtimeError: null,
@@ -54,9 +54,9 @@ export function useProjection(
 
 		engine
 			.project({
-				pack,
+				document,
 				projectionSettings,
-				whatIfState,
+				overrides,
 				signal: controller.signal,
 			})
 			.then((result) => {
@@ -91,13 +91,13 @@ export function useProjection(
 		return () => {
 			controller.abort();
 		};
-	}, [pack, projectionSettings, whatIfState, enabled, engine, requestKey]);
+	}, [document, projectionSettings, overrides, enabled, engine, requestKey]);
 
 	if (state.requestKey !== requestKey) {
 		return {
 			result: null,
 			runtimeError: null,
-			isRunning: enabled && pack !== null,
+			isRunning: enabled && document !== null,
 			progress: null,
 		};
 	}

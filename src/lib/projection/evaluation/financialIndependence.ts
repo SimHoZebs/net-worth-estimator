@@ -22,8 +22,8 @@ import type {
 	MovementEvent,
 	ProjectionPath,
 	ProjectionRow,
-} from "../types/scenario";
-import type { SimulationState } from "../types/simulation";
+} from "../types/model";
+import type { MonteCarloSample, SimulationState } from "../types/simulation";
 import type { PercentileBands } from "../types/stochastic";
 import {
 	addMonthsClamped,
@@ -324,7 +324,7 @@ function classifyPostingDispositions(
 	continuingIds: ReadonlySet<string>,
 ) {
 	return new Map<string, FiPostingDisposition>(
-		path.effectivePack.postings.map((posting) => [
+		path.effectiveDocument.postings.map((posting) => [
 			posting.id,
 			cashflowIds.has(posting.id)
 				? "observe-base-path-realized-occurrence"
@@ -461,12 +461,12 @@ function evaluateCycle({
 	path,
 	plan,
 	candidate,
-	stochasticRates,
+	monteCarloSample,
 }: {
 	path: ProjectionPath;
 	plan: FinancialIndependencePlan;
 	candidate: FinancialIndependenceRow;
-	stochasticRates?: ReadonlyMap<string, readonly number[]>;
+	monteCarloSample?: MonteCarloSample;
 }): FinancialIndependenceRunOutcome {
 	const candidateRow = latestRowAtOrBefore(path.rows, candidate.date);
 	if (!candidate.isEligible) {
@@ -490,11 +490,11 @@ function evaluateCycle({
 	const assetRates = selectedAssetRates(plan);
 	const cashflowIds = selectedCashflowIds(plan);
 	const accountsById = new Map(
-		path.effectivePack.accounts.map((account) => [account.id, account]),
+		path.effectiveDocument.accounts.map((account) => [account.id, account]),
 	);
 	const candidateBalances = balancesAt(
 		candidateRow,
-		path.effectivePack.accounts,
+		path.effectiveDocument.accounts,
 	);
 	const startingSelectedAssetBalance = [...assetRates.keys()].reduce(
 		(sum, accountId) => sum + Math.max(0, candidateBalances[accountId] ?? 0),
@@ -508,7 +508,7 @@ function evaluateCycle({
 		cashflowIds,
 		continuingIds,
 	);
-	const branchPostings = path.effectivePack.postings.filter(
+	const branchPostings = path.effectiveDocument.postings.filter(
 		(posting) => posting.enabled && dispositions.get(posting.id) !== "disabled",
 	);
 	const baseRealizedByDateAndPosting = new Map(
@@ -522,7 +522,7 @@ function evaluateCycle({
 	);
 	const transitions = createTransitionRuntime({
 		model: {
-			accounts: path.effectivePack.accounts,
+			accounts: path.effectiveDocument.accounts,
 			postings: branchPostings,
 		},
 		initialState: initializeBranchSimulationState(
@@ -532,10 +532,7 @@ function evaluateCycle({
 			continuingIds,
 		),
 		projectionStartDate: path.projectionStartDate,
-		sampledAssumptions:
-			stochasticRates === undefined
-				? undefined
-				: { annualRatesByPostingId: stochasticRates },
+		monteCarloSample,
 	});
 	const { balances } = transitions.state;
 	const eventDates = new Map<IsoDate, DatedPostingOccurrence[]>();
@@ -710,12 +707,12 @@ function evaluateCycle({
 export function evaluateFinancialIndependence({
 	path,
 	plan,
-	stochasticRates,
+	monteCarloSample,
 	candidateDates,
 }: {
 	path: ProjectionPath;
 	plan: FinancialIndependencePlan;
-	stochasticRates?: ReadonlyMap<string, readonly number[]>;
+	monteCarloSample?: MonteCarloSample;
 	candidateDates?: readonly IsoDate[];
 }): FinancialIndependenceAnalysis {
 	const normalizedPlan = normalizeFinancialIndependencePlan(plan);
@@ -782,7 +779,7 @@ export function evaluateFinancialIndependence({
 			path,
 			plan: normalizedPlan,
 			candidate,
-			stochasticRates,
+			monteCarloSample,
 		}),
 	);
 
@@ -873,10 +870,10 @@ function availableFinancialIndependencePlan(
 	config: FinancialIndependencePlan,
 ) {
 	const accountIds = new Set(
-		path.effectivePack.accounts.map((account) => account.id),
+		path.effectiveDocument.accounts.map((account) => account.id),
 	);
 	const postingIds = new Set(
-		path.effectivePack.postings.map((posting) => posting.id),
+		path.effectiveDocument.postings.map((posting) => posting.id),
 	);
 	return {
 		...config,
@@ -902,10 +899,10 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 	validateConfig: validateFinancialIndependencePlan,
 	diagnoseConfig({ path }, config) {
 		const accountIds = new Set(
-			path.effectivePack.accounts.map((account) => account.id),
+			path.effectiveDocument.accounts.map((account) => account.id),
 		);
 		const postingIds = new Set(
-			path.effectivePack.postings.map((posting) => posting.id),
+			path.effectiveDocument.postings.map((posting) => posting.id),
 		);
 		return config.sources.flatMap((source) => {
 			if (!source.included) return [];
@@ -926,11 +923,11 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 			];
 		});
 	},
-	evaluatePath({ path, stochasticRates }, config) {
+	evaluatePath({ path, monteCarloSample }, config) {
 		return evaluateFinancialIndependence({
 			path,
 			plan: availableFinancialIndependencePlan(path, config),
-			stochasticRates,
+			monteCarloSample,
 		});
 	},
 	createAccumulator(config, deterministicResult) {

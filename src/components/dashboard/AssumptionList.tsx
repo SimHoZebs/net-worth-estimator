@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { formatFrequency } from "@/lib/format";
-import type { ScenarioPack } from "@/lib/projection";
+import type { FinancialModelDocument } from "@/lib/projection";
 import { useStore } from "@/store";
 
-export function AssumptionList({ pack }: { pack: ScenarioPack }) {
+export function AssumptionList({
+	document,
+}: {
+	document: FinancialModelDocument;
+}) {
 	const [showFormulas, setShowFormulas] = useState(false);
 	const disabledPostingIds = useStore((s) => s.disabledPostingIds);
 	const togglePostingDisabled = useStore((s) => s.togglePostingDisabled);
 	const disabledSet = new Set(disabledPostingIds);
-	const incomePostings = pack.postings.filter((p) => !p.sourceAccountId);
-	const expensePostings = pack.postings.filter((p) => p.sourceAccountId);
+	const incomePostings = document.postings.filter((p) => !p.sourceAccountId);
+	const expensePostings = document.postings.filter((p) => p.sourceAccountId);
 
 	return (
 		<div className="space-y-4">
@@ -50,7 +54,7 @@ export function AssumptionList({ pack }: { pack: ScenarioPack }) {
 												title={
 													isDisabled
 														? "Enable this posting"
-														: "Disable this posting (what-if)"
+														: "Disable this posting temporarily"
 												}
 											>
 												{isDisabled ? null : (
@@ -113,7 +117,7 @@ export function AssumptionList({ pack }: { pack: ScenarioPack }) {
 												title={
 													isDisabled
 														? "Enable this posting"
-														: "Disable this posting (what-if)"
+														: "Disable this posting temporarily"
 												}
 											>
 												{isDisabled ? null : (

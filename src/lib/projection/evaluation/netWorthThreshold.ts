@@ -1,4 +1,4 @@
-import type { IsoDate, ProjectionPath } from "../types/scenario";
+import type { IsoDate, ProjectionPath } from "../types/model";
 import type { EvaluationDefinition } from "./runtime";
 
 export const NET_WORTH_THRESHOLD_DEFINITION_ID = "net-worth-threshold";

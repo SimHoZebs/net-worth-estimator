@@ -79,9 +79,9 @@ export class WorkerProjectionEngine implements ProjectionEngine {
 
 			const payload: ProjectionWorkerRequest = {
 				id: 1,
-				pack: request.pack,
+				document: request.document,
 				projectionSettings: request.projectionSettings,
-				whatIfState: request.whatIfState,
+				overrides: request.overrides,
 			};
 
 			try {
@@ -169,9 +169,9 @@ export class WorkerProjectionEngine implements ProjectionEngine {
 
 			const payload: StochasticWorkerRequest = {
 				id: 1,
-				pack: request.pack,
+				document: request.document,
 				projectionSettings: request.projectionSettings,
-				whatIfState: request.whatIfState,
+				overrides: request.overrides,
 				config: request.config,
 			};
 
