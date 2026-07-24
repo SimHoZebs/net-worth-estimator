@@ -535,6 +535,39 @@ describe("evaluateFinancialIndependence", () => {
 		});
 	});
 
+	it("does not apply observed cashflow to branch balances a second time", () => {
+		const rows = Array.from({ length: 13 }, (_, month) => {
+			const year = 2026 + Math.floor(month / 12);
+			const monthOfYear = (month % 12) + 1;
+			return row(
+				`${year}-${String(monthOfYear).padStart(2, "0")}-01`,
+				{ cash: 100 },
+				{ pension: 100 },
+			);
+		});
+		const result = evaluateFinancialIndependence({
+			path: path(rows, [pension], [account("cash")]),
+			plan: plan({
+				annualExpenseTarget: 1_200,
+				sources: [
+					{ type: "cashflow", postingId: "pension", included: true },
+					{
+						type: "asset",
+						accountId: "cash",
+						included: true,
+						withdrawalRateOverride: 0,
+					},
+				],
+			}),
+			candidateDates: ["2026-01-01"],
+		});
+
+		expect(result.runOutcomes[0]).toMatchObject({
+			endingSelectedAssetBalance: 100,
+			expensesFullyCovered: true,
+		});
+	});
+
 	it("reuses the base path sampled rate for the same projection year", () => {
 		const growth: Posting = {
 			...pension,

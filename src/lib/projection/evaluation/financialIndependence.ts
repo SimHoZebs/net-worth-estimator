@@ -4,13 +4,12 @@ import {
 	type AccountMovementConstraint,
 	type AccountMovementResult,
 	addOccurrences,
-	applyAccountMovement,
-	applyPosting,
-	computeRequestedAmount,
 	type DatedPostingOccurrence,
-	resolveAccountMovement,
-	resolvePostingMovement,
 } from "../simulation/postings";
+import {
+	createTransitionRuntime,
+	type SimulationTransitionRuntime,
+} from "../simulation/transitions";
 import type {
 	Account,
 	AccountMovementConstraintType,
@@ -24,13 +23,13 @@ import type {
 	ProjectionPath,
 	ProjectionRow,
 } from "../types/scenario";
+import type { SimulationState } from "../types/simulation";
 import type { PercentileBands } from "../types/stochastic";
 import {
 	addMonthsClamped,
 	addYearsClamped,
 	compareIsoDates,
 	daysBetween,
-	projectionYearIndex,
 } from "../utils/date";
 import { computePercentiles } from "../utils/stochastic";
 import type { EvaluationDefinition } from "./runtime";
@@ -394,54 +393,45 @@ function realizedCashflowBetween(
 	return total;
 }
 
-function initializeLatestPostingAmounts(
+function initializeBranchSimulationState(
+	balances: Record<string, number>,
 	events: readonly MovementEvent[],
 	candidateDate: IsoDate,
-) {
-	const latest = new Map<string, number>();
-	for (const event of events) {
-		if (event.date > candidateDate) break;
-		latest.set(event.origin.postingId, event.realizedAmount);
-	}
-	return latest;
-}
-
-function initializeRealizedPostingCaps(
-	events: readonly MovementEvent[],
-	candidateDate: IsoDate,
-	postingIds: ReadonlySet<string>,
-) {
-	const realized = new Map<string, number>();
+	continuingPostingIds: ReadonlySet<string>,
+): SimulationState {
+	const latestRealizedPostingAmounts = new Map<string, number>();
+	const realizedPostingAmountsByYear = new Map<string, Map<string, number>>();
 	for (const event of events) {
 		if (event.date > candidateDate) break;
 		const postingId = event.origin.postingId;
-		if (!postingIds.has(postingId)) continue;
-		const key = `${postingId}:${event.date.slice(0, 4)}`;
-		realized.set(key, (realized.get(key) ?? 0) + event.realizedAmount);
+		latestRealizedPostingAmounts.set(postingId, event.realizedAmount);
+		if (!continuingPostingIds.has(postingId)) continue;
+		const year = event.date.slice(0, 4);
+		const amountsByYear =
+			realizedPostingAmountsByYear.get(postingId) ?? new Map<string, number>();
+		amountsByYear.set(
+			year,
+			(amountsByYear.get(year) ?? 0) + event.realizedAmount,
+		);
+		realizedPostingAmountsByYear.set(postingId, amountsByYear);
 	}
-	return realized;
+	return {
+		balances,
+		latestRealizedPostingAmounts,
+		realizedPostingAmountsByYear,
+	};
 }
 
 function applyBranchPostingEvents({
 	events,
 	baseRealizedByDateAndPosting,
 	dispositions,
-	balances,
-	accountsById,
-	latestPostingAmounts,
-	realizedByPostingAndYear,
-	projectionStartDate,
-	stochasticRates,
+	transitions,
 }: {
 	events: readonly (readonly [IsoDate, readonly DatedPostingOccurrence[]])[];
 	baseRealizedByDateAndPosting: ReadonlyMap<string, number>;
 	dispositions: ReadonlyMap<string, FiPostingDisposition>;
-	balances: Record<string, number>;
-	accountsById: Map<string, Account>;
-	latestPostingAmounts: Map<string, number>;
-	realizedByPostingAndYear: Map<string, number>;
-	projectionStartDate: IsoDate;
-	stochasticRates?: ReadonlyMap<string, readonly number[]>;
+	transitions: SimulationTransitionRuntime;
 }) {
 	let observedDirectIncome = 0;
 	for (const [date, occurrences] of events) {
@@ -457,45 +447,11 @@ function applyBranchPostingEvents({
 			if (disposition === "observe-base-path-realized-occurrence") {
 				const realizedAmount =
 					baseRealizedByDateAndPosting.get(`${date}:${posting.id}`) ?? 0;
-				latestPostingAmounts.set(posting.id, realizedAmount);
+				transitions.observePosting(posting.id, realizedAmount);
 				observedDirectIncome += realizedAmount;
 				continue;
 			}
-
-			const yearIndex = projectionYearIndex(projectionStartDate, date);
-			const sampledRate = stochasticRates?.get(posting.id)?.[yearIndex];
-			const requestedAmount = Math.max(
-				0,
-				computeRequestedAmount(
-					occurrence,
-					date,
-					latestPostingAmounts,
-					balances,
-					sampledRate,
-				),
-			);
-			const capKey = `${posting.id}:${date.slice(0, 4)}`;
-			const capRemaining =
-				posting.annualCap === null
-					? Number.POSITIVE_INFINITY
-					: Math.max(
-							0,
-							posting.annualCap - (realizedByPostingAndYear.get(capKey) ?? 0),
-						);
-			const movement = resolvePostingMovement(
-				posting,
-				requestedAmount,
-				capRemaining,
-				balances,
-				accountsById,
-			);
-			const realizedAmount = movement.realizedAmount;
-			applyPosting(posting, realizedAmount, balances, accountsById);
-			latestPostingAmounts.set(posting.id, realizedAmount);
-			realizedByPostingAndYear.set(
-				capKey,
-				(realizedByPostingAndYear.get(capKey) ?? 0) + realizedAmount,
-			);
+			transitions.executePosting(occurrence, date);
 		}
 	}
 	return observedDirectIncome;
@@ -536,9 +492,12 @@ function evaluateCycle({
 	const accountsById = new Map(
 		path.effectivePack.accounts.map((account) => [account.id, account]),
 	);
-	const balances = balancesAt(candidateRow, path.effectivePack.accounts);
+	const candidateBalances = balancesAt(
+		candidateRow,
+		path.effectivePack.accounts,
+	);
 	const startingSelectedAssetBalance = [...assetRates.keys()].reduce(
-		(sum, accountId) => sum + Math.max(0, balances[accountId] ?? 0),
+		(sum, accountId) => sum + Math.max(0, candidateBalances[accountId] ?? 0),
 		0,
 	);
 	const continuingIds = new Set(
@@ -561,6 +520,24 @@ function evaluateCycle({
 				] as const,
 		),
 	);
+	const transitions = createTransitionRuntime({
+		model: {
+			accounts: path.effectivePack.accounts,
+			postings: branchPostings,
+		},
+		initialState: initializeBranchSimulationState(
+			candidateBalances,
+			path.movementEvents,
+			candidate.date,
+			continuingIds,
+		),
+		projectionStartDate: path.projectionStartDate,
+		sampledAssumptions:
+			stochasticRates === undefined
+				? undefined
+				: { annualRatesByPostingId: stochasticRates },
+	});
+	const { balances } = transitions.state;
 	const eventDates = new Map<IsoDate, DatedPostingOccurrence[]>();
 	const cycleEnd = addYearsClamped(candidate.date, plan.evaluationYears);
 	addOccurrences(branchPostings, eventDates, candidate.date, cycleEnd, false);
@@ -598,15 +575,6 @@ function evaluateCycle({
 			hadWithdrawalShortfall: false,
 			withdrawalAttempts: [] as WithdrawalAttempt[],
 			remainingWithdrawalByAccount: new Map<string, number>(),
-			latestPostingAmounts: initializeLatestPostingAmounts(
-				path.movementEvents,
-				candidate.date,
-			),
-			realizedByPostingAndYear: initializeRealizedPostingCaps(
-				path.movementEvents,
-				candidate.date,
-				continuingIds,
-			),
 		}),
 		react: (state, period) => {
 			if (period.index % 12 === 0) {
@@ -622,12 +590,7 @@ function evaluateCycle({
 				events: eventsByPeriod[period.index],
 				baseRealizedByDateAndPosting,
 				dispositions,
-				balances,
-				accountsById,
-				latestPostingAmounts: state.latestPostingAmounts,
-				realizedByPostingAndYear: state.realizedByPostingAndYear,
-				projectionStartDate: path.projectionStartDate,
-				stochasticRates,
+				transitions,
 			});
 			let remainingExpense = Math.max(
 				0,
@@ -677,22 +640,14 @@ function evaluateCycle({
 						limitRemaining: actionLimit,
 					},
 				};
-				const movement = resolveAccountMovement(
+				const movement = transitions.executeGeneratedMovement(
 					action.movement,
-					balances,
-					accountsById,
-				);
+				).result;
 				state.withdrawalAttempts.push({
 					date: period.startDate,
 					accountId,
 					result: movement,
 				});
-				applyAccountMovement(
-					action.movement,
-					movement.realizedAmount,
-					balances,
-					accountsById,
-				);
 				state.remainingWithdrawalByAccount.set(
 					accountId,
 					Math.max(
@@ -704,19 +659,16 @@ function evaluateCycle({
 				remainingExpense -= movement.realizedAmount;
 			}
 			if (capacities.length === 0 && requestedExpense > EPSILON) {
+				const movement = transitions.executeGeneratedMovement({
+					sourceAccountId: null,
+					destinations: null,
+					requestedAmount: requestedExpense,
+					limitRemaining: 0,
+				}).result;
 				state.withdrawalAttempts.push({
 					date: period.startDate,
 					accountId: null,
-					result: resolveAccountMovement(
-						{
-							sourceAccountId: null,
-							destinations: null,
-							requestedAmount: requestedExpense,
-							limitRemaining: 0,
-						},
-						balances,
-						accountsById,
-					),
+					result: movement,
 				});
 			}
 			if (remainingExpense > EPSILON) state.hadWithdrawalShortfall = true;
