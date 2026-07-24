@@ -1,4 +1,4 @@
-import type { MovementEvent } from "../types/scenario";
+import type { MovementEvent } from "../types/model";
 import type { SimulationRequest, SimulationRun } from "../types/simulation";
 import { compareIsoDates } from "../utils/date";
 import { snapshotBalances } from "./accounts";
@@ -11,7 +11,7 @@ export function simulate(request: SimulationRequest): SimulationRun {
 		model: request.model,
 		initialState: request.initialState,
 		projectionStartDate: request.startDate,
-		sampledAssumptions: request.sampledAssumptions,
+		monteCarloSample: request.monteCarloSample,
 	});
 	const { state } = transitions;
 	const movementAttempts: MovementEvent[] = [];
@@ -62,6 +62,6 @@ export function simulate(request: SimulationRequest): SimulationRun {
 		finalState: cloneSimulationState(state),
 		snapshots,
 		movementAttempts,
-		sampledAssumptions: request.sampledAssumptions,
+		monteCarloSample: request.monteCarloSample,
 	};
 }

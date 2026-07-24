@@ -14,7 +14,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import type { Account, ScenarioPack } from "@/lib/projection";
+import type { Account, FinancialModelDocument } from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
 
 function inputStyle(isDirty: boolean) {
@@ -25,32 +25,32 @@ function inputStyle(isDirty: boolean) {
 }
 
 interface EditableAccountsTableProps {
-	displayPack: ScenarioPack;
-	pack: ScenarioPack;
+	displayDocument: FinancialModelDocument;
+	document: FinancialModelDocument;
 	isDirty: boolean;
-	workingPack: ScenarioPack | null;
+	workingDocument: FinancialModelDocument | null;
 	updateAccount: (id: string, changes: Partial<Account>) => void;
 	deleteAccount: (id: string) => void;
 	addAccount: (account: Account) => void;
 }
 
 export function EditableAccountsTable({
-	displayPack,
-	pack,
+	displayDocument,
+	document,
 	isDirty,
-	workingPack,
+	workingDocument,
 	updateAccount,
 	deleteAccount,
 	addAccount,
 }: EditableAccountsTableProps) {
-	const packAccountsById = new Map<string, Account>();
-	for (const a of pack.accounts) {
-		packAccountsById.set(a.id, a);
+	const documentAccountsById = new Map<string, Account>();
+	for (const account of document.accounts) {
+		documentAccountsById.set(account.id, account);
 	}
 
 	const workingAccountsById = new Map<string, Account>();
-	if (workingPack) {
-		for (const a of workingPack.accounts) {
+	if (workingDocument) {
+		for (const a of workingDocument.accounts) {
 			workingAccountsById.set(a.id, a);
 		}
 	}
@@ -75,9 +75,9 @@ export function EditableAccountsTable({
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{displayPack.accounts.map((a) => {
+						{displayDocument.accounts.map((a) => {
 							const wa = workingAccountsById.get(a.id);
-							const pa = packAccountsById.get(a.id);
+							const pa = documentAccountsById.get(a.id);
 							const changed =
 								isDirty && wa && JSON.stringify(wa) !== JSON.stringify(pa);
 

@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { currency, formatDate } from "@/lib/format";
 import type {
+	FinancialModelDocument,
 	PostingFulfillmentPathResult,
 	PostingFulfillmentPostingSummary,
-	ScenarioPack,
 } from "@/lib/projection";
 
 export interface DashboardDerivedValues {
@@ -22,7 +22,7 @@ export interface DashboardDerivedValues {
 }
 
 export function useDashboardDerivedValues(
-	pack: ScenarioPack,
+	document: FinancialModelDocument,
 	fulfillment: PostingFulfillmentPathResult | null,
 ): DashboardDerivedValues {
 	return useMemo(() => {
@@ -35,7 +35,7 @@ export function useDashboardDerivedValues(
 				.sort(
 					(left, right) => right.unfulfilledAmount - left.unfulfilledAmount,
 				)[0] ?? null;
-		const enabledPostingCount = pack.postings.filter(
+		const enabledPostingCount = document.postings.filter(
 			(posting) => posting.enabled,
 		).length;
 		const requestedPostingAmount = fulfillment?.requestedAmount ?? 0;
@@ -72,5 +72,5 @@ export function useDashboardDerivedValues(
 			blockerDetail,
 			nextEventDetail,
 		};
-	}, [pack, fulfillment]);
+	}, [document, fulfillment]);
 }

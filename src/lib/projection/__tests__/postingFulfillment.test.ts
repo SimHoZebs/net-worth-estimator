@@ -113,7 +113,7 @@ describe("posting fulfillment evaluation", () => {
 			firstUnderfulfilledDate: null,
 		});
 		const probabilistic = postingFulfillmentEvaluation.finalize(accumulator, {
-			scenario: constrainedPath().effectivePack,
+			document: constrainedPath().effectiveDocument,
 			deterministicPath: constrainedPath(),
 			runCount: 2,
 		});
@@ -169,7 +169,7 @@ describe("posting fulfillment evaluation", () => {
 		const result = postingFulfillmentEvaluation.evaluatePath(
 			{
 				path,
-				scenario: path.effectivePack,
+				document: path.effectiveDocument,
 				detailLevel: "summary",
 			},
 			{ postingIds: null },
@@ -186,7 +186,7 @@ describe("posting fulfillment evaluation", () => {
 	});
 
 	it("supports an explicitly designated all-postings dashboard instance", () => {
-		const pack = constrainedPath().effectivePack;
+		const pack = constrainedPath().effectiveDocument;
 		const result = projectScenarioPack(
 			pack,
 			makeSettings({

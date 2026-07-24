@@ -11,12 +11,12 @@ import type { ProjectionRuntimeSettings } from "@/lib/projection";
 export function SimulationSettingsCard({
 	projectionSettings,
 	projectionStartDate,
-	activeOverrideCount,
+	currentChangeCount,
 	onChange,
 }: {
 	projectionSettings: ProjectionRuntimeSettings;
 	projectionStartDate: string;
-	activeOverrideCount: number;
+	currentChangeCount: number;
 	onChange?: (partial: Partial<ProjectionRuntimeSettings>) => void;
 }) {
 	return (
@@ -24,7 +24,7 @@ export function SimulationSettingsCard({
 			<CardHeader>
 				<CardTitle>Simulation plan</CardTitle>
 				<CardDescription>
-					Run-level settings shared by the base path and every evaluation.
+					Simulation settings shared by the base path and every evaluation.
 				</CardDescription>
 			</CardHeader>
 			<CardContent>
@@ -48,8 +48,8 @@ export function SimulationSettingsCard({
 						className="mt-2 w-full accent-primary"
 					/>
 					<div className="mt-1 type-caption text-muted-foreground/70">
-						From {formatDate(projectionStartDate)} · {activeOverrideCount}{" "}
-						temporary override{activeOverrideCount === 1 ? "" : "s"}
+						From {formatDate(projectionStartDate)} · {currentChangeCount}{" "}
+						temporary change{currentChangeCount === 1 ? "" : "s"}
 					</div>
 				</div>
 			</CardContent>

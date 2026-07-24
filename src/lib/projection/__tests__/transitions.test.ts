@@ -30,7 +30,7 @@ function runtime(
 		},
 		initialState,
 		projectionStartDate: "2026-01-01",
-		sampledAssumptions:
+		monteCarloSample:
 			sampledRates === undefined
 				? undefined
 				: { annualRatesByPostingId: sampledRates },

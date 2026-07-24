@@ -1,4 +1,4 @@
-import type { IsoDate } from "../types/scenario";
+import type { IsoDate } from "../types/model";
 
 export interface BehaviorPeriod {
 	index: number;

@@ -2,7 +2,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { pluralize } from "@/lib/format";
 import type { ScenarioValidationIssue } from "@/lib/projection";
 
-export function ScenarioValidationPanel({
+export function ModelValidationPanel({
 	issues,
 }: {
 	issues: ScenarioValidationIssue[];
@@ -17,7 +17,7 @@ export function ScenarioValidationPanel({
 	return (
 		<Alert variant="tertiary" className="space-y-3 rounded-[1.6rem]">
 			<div>
-				<AlertTitle>CSV validation</AlertTitle>
+				<AlertTitle>Model validation</AlertTitle>
 				<AlertDescription>
 					{errors.length > 0 ? pluralize(errors.length, "error") : "No errors"}
 					{warnings.length > 0

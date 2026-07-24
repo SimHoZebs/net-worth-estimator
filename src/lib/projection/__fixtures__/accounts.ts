@@ -1,5 +1,5 @@
 import { NO_CEILING, NO_FLOOR } from "../constants";
-import type { Account } from "../types/scenario";
+import type { Account } from "../types/model";
 
 export function makeAccount(
 	overrides: Partial<Account> & { id: string },

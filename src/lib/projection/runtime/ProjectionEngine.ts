@@ -1,16 +1,16 @@
 import type {
+	FinancialModelDocument,
+	ModelOverrides,
 	ProjectionResult,
 	ProjectionRuntimeSettings,
-	ScenarioPack,
-	ScenarioWhatIfState,
 	StochasticConfig,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 
 export interface ProjectionRequest {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	projectionSettings: ProjectionRuntimeSettings;
-	whatIfState: ScenarioWhatIfState;
+	overrides: ModelOverrides;
 	signal?: AbortSignal;
 }
 

@@ -2,28 +2,26 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { currency } from "@/lib/format";
-import { type SnapshotMetrics, useStore } from "@/store";
+import { type ComparisonMetrics, useStore } from "@/store";
 
-interface ScenarioComparisonProps {
-	currentMetrics: SnapshotMetrics;
-	currentOverrideCount: number;
-	canTakeSnapshot: boolean;
+interface CurrentChangesComparisonProps {
+	currentMetrics: ComparisonMetrics;
+	currentChangeCount: number;
+	canCaptureComparison: boolean;
 }
 
-export function ScenarioComparison({
+export function CurrentChangesComparison({
 	currentMetrics,
-	currentOverrideCount,
-	canTakeSnapshot,
-}: ScenarioComparisonProps) {
-	const snapshots = useStore((s) => s.snapshots);
-	const addSnapshotFromCurrentScenario = useStore(
-		(s) => s.addSnapshotFromCurrentScenario,
-	);
-	const removeSnapshot = useStore((s) => s.removeSnapshot);
-	const clearSnapshots = useStore((s) => s.clearSnapshots);
+	currentChangeCount,
+	canCaptureComparison,
+}: CurrentChangesComparisonProps) {
+	const comparisonSnapshots = useStore((s) => s.comparisonSnapshots);
+	const captureCurrentComparison = useStore((s) => s.captureCurrentComparison);
+	const removeComparison = useStore((s) => s.removeComparison);
+	const clearComparisons = useStore((s) => s.clearComparisons);
 	const [labelInput, setLabelInput] = useState("");
 
-	const hasSnapshots = snapshots.length > 0;
+	const hasComparisons = comparisonSnapshots.length > 0;
 
 	return (
 		<Collapsible defaultOpen={false}>
@@ -32,11 +30,11 @@ export function ScenarioComparison({
 					<div className="flex items-start gap-3">
 						<Collapsible.Chevron />
 						<div>
-							<div className="type-title text-base">Scenario snapshots</div>
+							<div className="type-title text-base">Saved comparisons</div>
 							<div className="type-muted">
-								{hasSnapshots
-									? `${snapshots.length} snapshot${snapshots.length === 1 ? "" : "s"} saved. Save the current projection to compare with future changes.`
-									: "Save the current projection to compare with future changes."}
+								{hasComparisons
+									? `${comparisonSnapshots.length} comparison snapshot${comparisonSnapshots.length === 1 ? "" : "s"} saved. Capture the current projection to compare with future changes.`
+									: "Capture the current projection to compare with future changes."}
 							</div>
 						</div>
 					</div>
@@ -52,36 +50,33 @@ export function ScenarioComparison({
 							type="text"
 							value={labelInput}
 							onChange={(e) => setLabelInput(e.target.value)}
-							placeholder="Baseline (no overrides)"
+							placeholder="Baseline (no temporary changes)"
 							className="w-full rounded-lg border border-border/80 bg-card/85 px-3 py-1.5 type-body shadow-sm outline-none placeholder:text-muted-foreground focus:border-ring dark:border-white/10 sm:max-w-xs"
 						/>
 						<Button
 							type="button"
 							size="sm"
-							disabled={!labelInput.trim() || !canTakeSnapshot}
+							disabled={!labelInput.trim() || !canCaptureComparison}
 							onClick={() => {
-								addSnapshotFromCurrentScenario(
-									labelInput.trim(),
-									currentMetrics,
-								);
+								captureCurrentComparison(labelInput.trim(), currentMetrics);
 								setLabelInput("");
 							}}
 						>
-							Take snapshot
+							Save comparison
 						</Button>
-						{hasSnapshots ? (
+						{hasComparisons ? (
 							<Button
 								type="button"
 								variant="ghost"
 								size="sm"
-								onClick={clearSnapshots}
+								onClick={clearComparisons}
 							>
 								Clear all
 							</Button>
 						) : null}
 					</div>
 
-					{hasSnapshots ? (
+					{hasComparisons ? (
 						<div className="overflow-x-auto rounded-xl border border-border/80 dark:border-white/10">
 							<table className="w-full min-w-[42rem] type-body">
 								<thead>
@@ -90,15 +85,12 @@ export function ScenarioComparison({
 										<th className="px-4 py-3">Current NW</th>
 										<th className="px-4 py-3">Final NW</th>
 										<th className="px-4 py-3">Evaluation outcomes</th>
-										<th className="px-4 py-3">Overrides</th>
+										<th className="px-4 py-3">Temporary changes</th>
 										<th className="px-4 py-3" />
 									</tr>
 								</thead>
 								<tbody>
-									{snapshots.map((sn) => {
-										const _sameCurrent =
-											sn.metrics.currentNetWorth ===
-											currentMetrics.currentNetWorth;
+									{comparisonSnapshots.map((sn) => {
 										const sameFinal =
 											sn.metrics.finalNetWorth === currentMetrics.finalNetWorth;
 										return (
@@ -121,13 +113,13 @@ export function ScenarioComparison({
 													/>
 												</td>
 												<td className="px-4 py-3 tabular-nums text-muted-foreground">
-													{sn.metrics.overrideCount}
+													{sn.metrics.currentChangeCount}
 												</td>
 												<td className="px-4 py-3 text-right">
 													<div className="flex justify-end gap-2">
 														<button
 															type="button"
-															onClick={() => removeSnapshot(sn.id)}
+															onClick={() => removeComparison(sn.id)}
 															className="type-caption text-muted-foreground/70 hover:text-destructive"
 														>
 															Remove
@@ -153,15 +145,15 @@ export function ScenarioComparison({
 											/>
 										</td>
 										<td className="px-4 py-3 tabular-nums type-value font-semibold">
-											{currentOverrideCount}
+											{currentChangeCount}
 										</td>
 										<td />
 									</tr>
 								</tbody>
 							</table>
 							<div className="border-t border-border/70 bg-muted/70 px-4 py-2 type-caption text-muted-foreground/70">
-								Snapshots store what-if configuration. To restore, manually
-								apply the override counts shown above.
+								Comparison snapshots are read-only captures of projection
+								outcomes. They do not save or restore alternative models.
 							</div>
 						</div>
 					) : null}
@@ -174,7 +166,7 @@ export function ScenarioComparison({
 function EvaluationOutcomes({
 	outcomes,
 }: {
-	outcomes: SnapshotMetrics["evaluationOutcomes"];
+	outcomes: ComparisonMetrics["evaluationOutcomes"];
 }) {
 	return outcomes.length > 0 ? (
 		<div className="flex min-w-48 flex-col gap-1.5">

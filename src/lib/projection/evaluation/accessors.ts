@@ -3,7 +3,7 @@ import type {
 	EvaluationResultCollection,
 	EvaluationResultEnvelope,
 	FinancialIndependenceAnalysis,
-} from "../types/scenario";
+} from "../types/model";
 import {
 	FINANCIAL_INDEPENDENCE_DEFINITION_ID,
 	type FinancialIndependenceProbabilisticResult,

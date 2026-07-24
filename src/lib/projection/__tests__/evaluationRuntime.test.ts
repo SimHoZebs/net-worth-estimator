@@ -15,19 +15,19 @@ import {
 } from "../index";
 import type {
 	EvaluationResultCollection,
+	FinancialModelDocument,
 	ProjectionPath,
-	ScenarioPack,
-} from "../types/scenario";
+} from "../types/model";
 
 const scenario = {
 	accounts: [],
 	checkpoints: [],
 	postings: [],
-} as unknown as ScenarioPack;
+} as unknown as FinancialModelDocument;
 const path = {
 	rows: [],
 	movementEvents: [],
-	effectivePack: scenario,
+	effectiveDocument: scenario,
 	projectionStartDate: "2026-01-01",
 	projectionEndDate: "2027-01-01",
 } satisfies ProjectionPath;
@@ -106,7 +106,7 @@ describe("evaluation registry and runtime", () => {
 			],
 			registry,
 		);
-		runtimes.evaluateDeterministic({ path, scenario });
+		runtimes.evaluateDeterministic({ path, document: scenario });
 		expect(runtimes.result().evaluationOrder).toEqual(["second", "first"]);
 		expect(runtimes.result().evaluations.second.deterministic).toBe(2);
 		expect(runtimes.result().evaluations.first.deterministic).toBe(1);
@@ -172,7 +172,7 @@ describe("evaluation registry and runtime", () => {
 			],
 			registry,
 		);
-		runtimes.evaluateDeterministic({ path, scenario });
+		runtimes.evaluateDeterministic({ path, document: scenario });
 		const result = runtimes.result();
 		expect(result.evaluations.healthy.deterministic).toBe(3);
 		expect(result.evaluations.disabled.diagnostics[0]?.code).toBe(
@@ -210,13 +210,21 @@ describe("evaluation registry and runtime", () => {
 			],
 			registry,
 		);
-		runtimes.evaluateDeterministic({ path, scenario });
+		runtimes.evaluateDeterministic({ path, document: scenario });
 		runtimes.startStochastic();
-		runtimes.consume({ path, scenario });
-		runtimes.finalize({ scenario, deterministicPath: path, runCount: 1 });
+		runtimes.consume({ path, document: scenario });
+		runtimes.finalize({
+			document: scenario,
+			deterministicPath: path,
+			runCount: 1,
+		});
 		expect(runtimes.result().evaluations.counter.probabilistic).toBe(2);
-		runtimes.consume({ path, scenario });
-		runtimes.finalize({ scenario, deterministicPath: path, runCount: 2 });
+		runtimes.consume({ path, document: scenario });
+		runtimes.finalize({
+			document: scenario,
+			deterministicPath: path,
+			runCount: 2,
+		});
 		expect(runtimes.result().evaluations.counter.probabilistic).toBe(4);
 	});
 
@@ -237,14 +245,18 @@ describe("evaluation registry and runtime", () => {
 			],
 			registry,
 		);
-		runtimes.evaluateDeterministic({ path, scenario });
+		runtimes.evaluateDeterministic({ path, document: scenario });
 		runtimes.startStochastic();
-		runtimes.consume({ path, scenario });
-		runtimes.finalize({ scenario, deterministicPath: path, runCount: 1 });
+		runtimes.consume({ path, document: scenario });
+		runtimes.finalize({
+			document: scenario,
+			deterministicPath: path,
+			runCount: 1,
+		});
 		expect(runtimes.result().evaluations.late.probabilistic).toBe(2);
 		runtimes.consume({
 			path: { ...path, projectionEndDate: "2028-01-01" },
-			scenario,
+			document: scenario,
 		});
 		const failed = runtimes.result().evaluations.late;
 		expect(failed.status).toBe("warning");

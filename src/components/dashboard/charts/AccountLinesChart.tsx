@@ -4,23 +4,23 @@ import { parseChartDate } from "@/chart/chartData";
 import { createBaseOptions, formatDate } from "@/chart/uplotBase";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import { currency } from "@/lib/format";
-import type { ScenarioPack } from "@/lib/projection";
+import type { FinancialModelDocument } from "@/lib/projection";
 import { escapeHtml } from "@/lib/utils";
 
 interface AccountLinesChartProps {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	chartData: Record<string, string | number>[];
 }
 
 const FALLBACK_ACCOUNT_COLOR = "GrayText";
 
 export const AccountLinesChart = memo(function AccountLinesChart({
-	pack,
+	document,
 	chartData,
 }: AccountLinesChartProps) {
 	const enabledAccounts = useMemo(
-		() => pack.accounts.filter((a) => a.enabled),
-		[pack.accounts],
+		() => document.accounts.filter((a) => a.enabled),
+		[document.accounts],
 	);
 
 	const data = useMemo((): uPlot.AlignedData => {

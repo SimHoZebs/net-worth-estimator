@@ -1,6 +1,6 @@
 import type {
+	FinancialModelDocument,
 	ProjectionResult,
-	ScenarioPack,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 
@@ -23,10 +23,12 @@ function getAccountBalance(
 }
 
 export function buildBalanceChartData(
-	pack: ScenarioPack,
+	document: FinancialModelDocument,
 	result: ProjectionResult,
 ) {
-	const enabledAccounts = pack.accounts.filter((account) => account.enabled);
+	const enabledAccounts = document.accounts.filter(
+		(account) => account.enabled,
+	);
 
 	return result.timeline.sampledRows.map((row) => ({
 		date: row.date,
@@ -40,11 +42,13 @@ export function buildBalanceChartData(
 }
 
 export function buildAccountDiagnosticChartData(
-	pack: ScenarioPack,
+	document: FinancialModelDocument,
 	result: ProjectionResult,
 	stochasticResult?: StochasticProjectionResult | null,
 ) {
-	const enabledAccounts = pack.accounts.filter((a) => a.enabled);
+	const enabledAccounts = document.accounts.filter(
+		(account) => account.enabled,
+	);
 	const hasStochastic = stochasticResult != null;
 
 	const bandByDate = hasStochastic

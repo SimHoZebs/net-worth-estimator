@@ -14,7 +14,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import type { Checkpoint, ScenarioPack } from "@/lib/projection";
+import type { Checkpoint, FinancialModelDocument } from "@/lib/projection";
 
 function inputStyle(isDirty: boolean) {
 	const dirty = isDirty
@@ -24,7 +24,7 @@ function inputStyle(isDirty: boolean) {
 }
 
 interface EditableCheckpointsTableProps {
-	displayPack: ScenarioPack;
+	displayDocument: FinancialModelDocument;
 	isDirty: boolean;
 	projectionStartDate: string;
 	updateCheckpoint: (index: number, changes: Partial<Checkpoint>) => void;
@@ -33,7 +33,7 @@ interface EditableCheckpointsTableProps {
 }
 
 export function EditableCheckpointsTable({
-	displayPack,
+	displayDocument,
 	isDirty,
 	projectionStartDate,
 	updateCheckpoint,
@@ -59,7 +59,7 @@ export function EditableCheckpointsTable({
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{displayPack.checkpoints.map((c, ci) => (
+						{displayDocument.checkpoints.map((c, ci) => (
 							<TableRow key={ci}>
 								<TableCell>
 									<input

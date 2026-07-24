@@ -28,7 +28,7 @@ export function ReadOnlyPostingsTable({
 			/>
 			<DataTable
 				title="Postings"
-				description="Scheduled flows. Checkbox toggles what-if disable (immediate)."
+				description="Scheduled flows. Checkbox applies a temporary change immediately."
 				rows={postings.filter(
 					(p) =>
 						!search ||

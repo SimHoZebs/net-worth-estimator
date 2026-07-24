@@ -14,7 +14,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import type { Posting, ScenarioPack } from "@/lib/projection";
+import type { FinancialModelDocument, Posting } from "@/lib/projection";
 
 function inputStyle(isDirty: boolean) {
 	const dirty = isDirty
@@ -24,10 +24,10 @@ function inputStyle(isDirty: boolean) {
 }
 
 interface EditablePostingsTableProps {
-	displayPack: ScenarioPack;
-	pack: ScenarioPack;
+	displayDocument: FinancialModelDocument;
+	document: FinancialModelDocument;
 	isDirty: boolean;
-	workingPack: ScenarioPack | null;
+	workingDocument: FinancialModelDocument | null;
 	projectionStartDate: string;
 	updatePosting: (id: string, changes: Partial<Posting>) => void;
 	deletePosting: (id: string) => void;
@@ -35,10 +35,10 @@ interface EditablePostingsTableProps {
 }
 
 export function EditablePostingsTable({
-	displayPack,
-	pack,
+	displayDocument,
+	document,
 	isDirty,
-	workingPack,
+	workingDocument,
 	projectionStartDate,
 	updatePosting,
 	deletePosting,
@@ -72,12 +72,12 @@ export function EditablePostingsTable({
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{displayPack.postings.map((p, pi) => {
+						{displayDocument.postings.map((p, pi) => {
 							const changed =
 								isDirty &&
-								workingPack?.postings[pi] &&
-								JSON.stringify(workingPack.postings[pi]) !==
-									JSON.stringify(pack.postings[pi]);
+								workingDocument?.postings[pi] &&
+								JSON.stringify(workingDocument.postings[pi]) !==
+									JSON.stringify(document.postings[pi]);
 							return (
 								<TableRow key={p.id}>
 									<TableCell>

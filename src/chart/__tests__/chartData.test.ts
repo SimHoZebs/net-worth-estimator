@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type {
-	ScenarioWhatIfState,
+	ModelOverrides,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import {
 	parseCsvScenarioPack,
-	projectScenarioPack,
+	projectFinancialModelDocument,
 	stochasticProject,
 } from "@/lib/projection";
 import { makeSettings, validCsvFiles } from "@/lib/projection/__fixtures__";
@@ -16,7 +16,7 @@ const PROJECTION_SETTINGS = makeSettings({
 	horizonYears: 5,
 });
 
-const EMPTY_WHAT_IF: ScenarioWhatIfState = {
+const EMPTY_MODEL_OVERRIDES: ModelOverrides = {
 	addedAccounts: [],
 	addedPostings: [],
 	addedCheckpoints: [],
@@ -26,16 +26,16 @@ const EMPTY_WHAT_IF: ScenarioWhatIfState = {
 
 describe("buildAccountDiagnosticChartData", () => {
 	it("returns per-account balances and deterministic net worth when no stochastic data is provided", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvScenarioPack(validCsvFiles);
+		expect(document).not.toBeNull();
 
-		if (!pack) throw new Error("Pack failed to load");
-		const result = projectScenarioPack(
-			pack,
+		if (!document) throw new Error("Financial model failed to load");
+		const result = projectFinancialModelDocument(
+			document,
 			PROJECTION_SETTINGS,
-			EMPTY_WHAT_IF,
+			EMPTY_MODEL_OVERRIDES,
 		);
-		const data = buildAccountDiagnosticChartData(pack, result);
+		const data = buildAccountDiagnosticChartData(document, result);
 
 		expect(data.length).toBeGreaterThan(0);
 		expect(data[0].date).toBeDefined();
@@ -51,20 +51,20 @@ describe("buildAccountDiagnosticChartData", () => {
 			expect(row.p50).toBe(row.netWorth);
 		}
 
-		for (const account of pack.accounts.filter((a) => a.enabled)) {
+		for (const account of document.accounts.filter((a) => a.enabled)) {
 			expect(typeof data[0][account.id]).toBe("number");
 		}
 	});
 
 	it("merges stochastic band data into rows when stochastic result is provided", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvScenarioPack(validCsvFiles);
+		expect(document).not.toBeNull();
 
-		if (!pack) throw new Error("Pack failed to load");
+		if (!document) throw new Error("Financial model failed to load");
 		const stochasticResult = stochasticProject(
-			pack,
+			document,
 			PROJECTION_SETTINGS,
-			EMPTY_WHAT_IF,
+			EMPTY_MODEL_OVERRIDES,
 			{
 				runCount: 50,
 				seed: 42,
@@ -72,7 +72,7 @@ describe("buildAccountDiagnosticChartData", () => {
 		);
 
 		const data = buildAccountDiagnosticChartData(
-			pack,
+			document,
 			stochasticResult.deterministic,
 			stochasticResult,
 		);
@@ -114,14 +114,14 @@ describe("buildAccountDiagnosticChartData", () => {
 	});
 
 	it("falls back to deterministic net worth for sampled row dates missing from band map", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvScenarioPack(validCsvFiles);
+		expect(document).not.toBeNull();
 
-		if (!pack) throw new Error("Pack failed to load");
-		const result = projectScenarioPack(
-			pack,
+		if (!document) throw new Error("Financial model failed to load");
+		const result = projectFinancialModelDocument(
+			document,
 			PROJECTION_SETTINGS,
-			EMPTY_WHAT_IF,
+			EMPTY_MODEL_OVERRIDES,
 		);
 
 		const fakeStochastic: StochasticProjectionResult = {
@@ -153,7 +153,11 @@ describe("buildAccountDiagnosticChartData", () => {
 			evaluations: {},
 		};
 
-		const data = buildAccountDiagnosticChartData(pack, result, fakeStochastic);
+		const data = buildAccountDiagnosticChartData(
+			document,
+			result,
+			fakeStochastic,
+		);
 
 		expect(data.length).toBeGreaterThan(0);
 

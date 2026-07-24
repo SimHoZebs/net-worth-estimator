@@ -15,17 +15,17 @@ function emptyAccount(): Account {
 	};
 }
 
-interface WhatIfAccountFormProps {
+interface TemporaryAccountFormProps {
 	accounts: Account[];
 	onAdd: (account: Account) => void;
 	onRemove: (id: string) => void;
 }
 
-export function WhatIfAccountForm({
+export function TemporaryAccountForm({
 	accounts,
 	onAdd,
 	onRemove,
-}: WhatIfAccountFormProps) {
+}: TemporaryAccountFormProps) {
 	const [adding, setAdding] = useState<Account | null>(null);
 
 	const commit = () => {

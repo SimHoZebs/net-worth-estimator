@@ -10,8 +10,8 @@ import type {
 	Posting,
 	ProjectionPath,
 	ProjectionRow,
-} from "../types/scenario";
-import { SCENARIO_MODEL_VERSION } from "../types/scenario";
+} from "../types/model";
+import { FINANCIAL_MODEL_DOCUMENT_VERSION } from "../types/model";
 
 const realizedPostingAmountsByRow = new WeakMap<
 	ProjectionRow,
@@ -108,8 +108,8 @@ function path(
 				}),
 			),
 		),
-		effectivePack: {
-			version: SCENARIO_MODEL_VERSION,
+		effectiveDocument: {
+			version: FINANCIAL_MODEL_DOCUMENT_VERSION,
 			sourcePath: "test",
 			accounts,
 			postings,
@@ -607,7 +607,9 @@ describe("evaluateFinancialIndependence", () => {
 					},
 				],
 			}),
-			stochasticRates: new Map([["sampled-growth", [0, 0.5]]]),
+			monteCarloSample: {
+				annualRatesByPostingId: new Map([["sampled-growth", [0, 0.5]]]),
+			},
 			candidateDates: ["2026-01-01"],
 		});
 

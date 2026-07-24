@@ -4,9 +4,9 @@ import type {
 	IsoDate,
 	Posting,
 	PostingFrequency,
-} from "../types/scenario";
+} from "../types/model";
 
-export type { AccountMovementConstraint } from "../types/scenario";
+export type { AccountMovementConstraint } from "../types/model";
 
 import { addMonthsClamped, compareIsoDates, daysBetween } from "../utils/date";
 import {

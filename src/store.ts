@@ -6,19 +6,19 @@ import type {
 	ConfiguredEvaluation,
 	EvaluationResultStatus,
 	FinancialIndependencePlan,
+	FinancialModelDocument,
 	JsonValue,
+	ModelOverrides,
 	Posting,
-	ScenarioPack,
-	ScenarioWhatIfState,
 	StochasticConfig,
 } from "@/lib/projection";
 import { isJsonValue } from "@/lib/projection";
 
 /* ------------------------------------------------------------------ */
-/*  Snapshot slice                                                     */
+/*  Comparison slice                                                   */
 /* ------------------------------------------------------------------ */
 
-export interface SnapshotMetrics {
+export interface ComparisonMetrics {
 	currentNetWorth: number;
 	finalNetWorth: number;
 	evaluationOutcomes: Array<{
@@ -26,62 +26,57 @@ export interface SnapshotMetrics {
 		label: string;
 		status: EvaluationResultStatus;
 	}>;
-	overrideCount: number;
+	currentChangeCount: number;
 }
 
-export interface ScenarioSnapshot {
+export interface ComparisonSnapshot {
 	id: string;
 	label: string;
 	timestamp: number;
-	whatIfState: ScenarioWhatIfState;
-	evaluations: ConfiguredEvaluation[];
-	metrics: SnapshotMetrics;
+	metrics: ComparisonMetrics;
 }
 
 export type StochasticPreference = "auto" | "enabled" | "disabled";
 
-interface SnapshotSlice {
-	snapshots: ScenarioSnapshot[];
-	addSnapshotFromCurrentScenario: (
-		label: string,
-		metrics: SnapshotMetrics,
-	) => void;
-	removeSnapshot: (id: string) => void;
-	clearSnapshots: () => void;
+interface ComparisonSlice {
+	comparisonSnapshots: ComparisonSnapshot[];
+	captureCurrentComparison: (label: string, metrics: ComparisonMetrics) => void;
+	removeComparison: (id: string) => void;
+	clearComparisons: () => void;
 }
 
-const createSnapshotSlice: StateCreator<AppStore, [], [], SnapshotSlice> = (
+const createComparisonSlice: StateCreator<AppStore, [], [], ComparisonSlice> = (
 	set,
-	get,
 ) => ({
-	snapshots: [],
-	addSnapshotFromCurrentScenario: (label, metrics) => {
-		const state = get();
+	comparisonSnapshots: [],
+	captureCurrentComparison: (label, metrics) => {
 		const timestamp = Date.now();
-		set({
-			snapshots: [
-				...state.snapshots,
+		set((state) => ({
+			comparisonSnapshots: [
+				...state.comparisonSnapshots,
 				{
-					id: `snap-${timestamp}`,
+					id: `comparison-${timestamp}`,
 					label,
 					timestamp,
-					whatIfState: selectWhatIfState(state),
-					evaluations: structuredClone(state.evaluations),
-					metrics: { ...metrics },
+					metrics: structuredClone(metrics),
 				},
 			],
-		});
+		}));
 	},
-	removeSnapshot: (id) =>
-		set((s) => ({ snapshots: s.snapshots.filter((sn) => sn.id !== id) })),
-	clearSnapshots: () => set({ snapshots: [] }),
+	removeComparison: (id) =>
+		set((s) => ({
+			comparisonSnapshots: s.comparisonSnapshots.filter(
+				(snapshot) => snapshot.id !== id,
+			),
+		})),
+	clearComparisons: () => set({ comparisonSnapshots: [] }),
 });
 
 /* ------------------------------------------------------------------ */
-/*  What-if slice                                                      */
+/*  Model overrides slice                                              */
 /* ------------------------------------------------------------------ */
 
-const initialWhatIfState: ScenarioWhatIfState = {
+const initialModelOverrides: ModelOverrides = {
 	addedAccounts: [],
 	addedPostings: [],
 	addedCheckpoints: [],
@@ -89,7 +84,7 @@ const initialWhatIfState: ScenarioWhatIfState = {
 	disabledPostingIds: [],
 };
 
-interface WhatIfSlice extends ScenarioWhatIfState {
+export interface ModelOverridesSlice extends ModelOverrides {
 	addTemporaryAccount: (account: Account) => void;
 	removeTemporaryAccount: (id: string) => void;
 	addTemporaryPosting: (posting: Posting) => void;
@@ -98,13 +93,16 @@ interface WhatIfSlice extends ScenarioWhatIfState {
 	removeTemporaryCheckpoint: (index: number) => void;
 	toggleAccountDisabled: (id: string) => void;
 	togglePostingDisabled: (id: string) => void;
-	resetAllOverrides: () => void;
+	resetCurrentChanges: () => void;
 }
 
-const createWhatIfSlice: StateCreator<AppStore, [], [], WhatIfSlice> = (
-	set,
-) => ({
-	...initialWhatIfState,
+const createModelOverridesSlice: StateCreator<
+	AppStore,
+	[],
+	[],
+	ModelOverridesSlice
+> = (set) => ({
+	...initialModelOverrides,
 
 	addTemporaryAccount: (account) =>
 		set((s) => ({ addedAccounts: [...s.addedAccounts, account] })),
@@ -140,7 +138,7 @@ const createWhatIfSlice: StateCreator<AppStore, [], [], WhatIfSlice> = (
 				: [...s.disabledPostingIds, id],
 		})),
 
-	resetAllOverrides: () => set(initialWhatIfState),
+	resetCurrentChanges: () => set(initialModelOverrides),
 });
 
 /* ------------------------------------------------------------------ */
@@ -148,10 +146,10 @@ const createWhatIfSlice: StateCreator<AppStore, [], [], WhatIfSlice> = (
 /* ------------------------------------------------------------------ */
 
 interface EditorSlice {
-	workingPack: ScenarioPack | null;
+	workingDocument: FinancialModelDocument | null;
 	isDirty: boolean;
 	isEditing: boolean;
-	startEditing: (pack: ScenarioPack) => void;
+	startEditing: (document: FinancialModelDocument) => void;
 	cancelEditing: () => void;
 	updateAccount: (id: string, changes: Partial<Account>) => void;
 	deleteAccount: (id: string) => void;
@@ -168,29 +166,29 @@ const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (
 	set,
 	_get,
 ) => ({
-	workingPack: null,
+	workingDocument: null,
 	isDirty: false,
 	isEditing: false,
 
-	startEditing: (pack: ScenarioPack) => {
+	startEditing: (document: FinancialModelDocument) => {
 		set({
-			workingPack: clonePack(pack),
+			workingDocument: cloneDocument(document),
 			isDirty: false,
 			isEditing: true,
 		});
 	},
 
 	cancelEditing: () =>
-		set({ workingPack: null, isDirty: false, isEditing: false }),
+		set({ workingDocument: null, isDirty: false, isEditing: false }),
 
 	updateAccount: (id, changes) =>
 		set((s) => {
-			if (!s.workingPack) return s;
+			if (!s.workingDocument) return s;
 			return {
 				isDirty: true,
-				workingPack: {
-					...s.workingPack,
-					accounts: s.workingPack.accounts.map((a) =>
+				workingDocument: {
+					...s.workingDocument,
+					accounts: s.workingDocument.accounts.map((a) =>
 						a.id === id ? { ...a, ...changes } : a,
 					),
 				},
@@ -199,36 +197,36 @@ const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (
 
 	deleteAccount: (id) =>
 		set((s) => {
-			if (!s.workingPack) return s;
+			if (!s.workingDocument) return s;
 			return {
 				isDirty: true,
-				workingPack: {
-					...s.workingPack,
-					accounts: s.workingPack.accounts.filter((a) => a.id !== id),
+				workingDocument: {
+					...s.workingDocument,
+					accounts: s.workingDocument.accounts.filter((a) => a.id !== id),
 				},
 			};
 		}),
 
 	addAccount: (account) =>
 		set((s) => {
-			if (!s.workingPack) return s;
+			if (!s.workingDocument) return s;
 			return {
 				isDirty: true,
-				workingPack: {
-					...s.workingPack,
-					accounts: [...s.workingPack.accounts, account],
+				workingDocument: {
+					...s.workingDocument,
+					accounts: [...s.workingDocument.accounts, account],
 				},
 			};
 		}),
 
 	updatePosting: (id, changes) =>
 		set((s) => {
-			if (!s.workingPack) return s;
+			if (!s.workingDocument) return s;
 			return {
 				isDirty: true,
-				workingPack: {
-					...s.workingPack,
-					postings: s.workingPack.postings.map((p) =>
+				workingDocument: {
+					...s.workingDocument,
+					postings: s.workingDocument.postings.map((p) =>
 						p.id === id ? { ...p, ...changes } : p,
 					),
 				},
@@ -237,60 +235,62 @@ const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (
 
 	deletePosting: (id) =>
 		set((s) => {
-			if (!s.workingPack) return s;
+			if (!s.workingDocument) return s;
 			return {
 				isDirty: true,
-				workingPack: {
-					...s.workingPack,
-					postings: s.workingPack.postings.filter((p) => p.id !== id),
+				workingDocument: {
+					...s.workingDocument,
+					postings: s.workingDocument.postings.filter((p) => p.id !== id),
 				},
 			};
 		}),
 
 	addPosting: (posting) =>
 		set((s) => {
-			if (!s.workingPack) return s;
+			if (!s.workingDocument) return s;
 			return {
 				isDirty: true,
-				workingPack: {
-					...s.workingPack,
-					postings: [...s.workingPack.postings, posting],
+				workingDocument: {
+					...s.workingDocument,
+					postings: [...s.workingDocument.postings, posting],
 				},
 			};
 		}),
 
 	addCheckpoint: (checkpoint) =>
 		set((s) => {
-			if (!s.workingPack) return s;
+			if (!s.workingDocument) return s;
 			return {
 				isDirty: true,
-				workingPack: {
-					...s.workingPack,
-					checkpoints: [...s.workingPack.checkpoints, checkpoint],
+				workingDocument: {
+					...s.workingDocument,
+					checkpoints: [...s.workingDocument.checkpoints, checkpoint],
 				},
 			};
 		}),
 
 	deleteCheckpoint: (index) =>
 		set((s) => {
-			if (!s.workingPack) return s;
+			if (!s.workingDocument) return s;
 			return {
 				isDirty: true,
-				workingPack: {
-					...s.workingPack,
-					checkpoints: s.workingPack.checkpoints.filter((_, i) => i !== index),
+				workingDocument: {
+					...s.workingDocument,
+					checkpoints: s.workingDocument.checkpoints.filter(
+						(_, i) => i !== index,
+					),
 				},
 			};
 		}),
 
 	updateCheckpoint: (index, changes) =>
 		set((s) => {
-			if (!s.workingPack) return s;
-			const next = [...s.workingPack.checkpoints];
+			if (!s.workingDocument) return s;
+			const next = [...s.workingDocument.checkpoints];
 			next[index] = { ...next[index], ...changes };
 			return {
 				isDirty: true,
-				workingPack: { ...s.workingPack, checkpoints: next },
+				workingDocument: { ...s.workingDocument, checkpoints: next },
 			};
 		}),
 });
@@ -541,17 +541,17 @@ const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (
 /*  Composed store                                                     */
 /* ------------------------------------------------------------------ */
 
-export type AppStore = WhatIfSlice &
+export type AppStore = ModelOverridesSlice &
 	EditorSlice &
 	SettingsSlice &
-	SnapshotSlice &
+	ComparisonSlice &
 	ThemeSlice;
 
 export const useStore = create<AppStore>()((...args) => ({
-	...createWhatIfSlice(...args),
+	...createModelOverridesSlice(...args),
 	...createEditorSlice(...args),
 	...createSettingsSlice(...args),
-	...createSnapshotSlice(...args),
+	...createComparisonSlice(...args),
 	...createThemeSlice(...args),
 }));
 
@@ -559,14 +559,14 @@ export const useStore = create<AppStore>()((...args) => ({
 /*  Selectors                                                          */
 /* ------------------------------------------------------------------ */
 
-export const selectActiveOverrideCount = (s: AppStore) =>
+export const selectCurrentChangeCount = (s: AppStore) =>
 	s.addedAccounts.length +
 	s.addedPostings.length +
 	s.addedCheckpoints.length +
 	s.disabledAccountIds.length +
 	s.disabledPostingIds.length;
 
-export const selectWhatIfState = (s: AppStore): ScenarioWhatIfState => ({
+export const selectModelOverrides = (s: AppStore): ModelOverrides => ({
 	addedAccounts: s.addedAccounts,
 	addedPostings: s.addedPostings,
 	addedCheckpoints: s.addedCheckpoints,
@@ -577,7 +577,7 @@ export const selectWhatIfState = (s: AppStore): ScenarioWhatIfState => ({
 export const selectEditorState = (s: AppStore) => ({
 	isEditing: s.isEditing,
 	isDirty: s.isDirty,
-	workingPack: s.workingPack,
+	workingDocument: s.workingDocument,
 });
 
 export const selectEditorActions = (s: AppStore) => ({
@@ -598,12 +598,14 @@ export const selectEditorActions = (s: AppStore) => ({
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function clonePack(pack: ScenarioPack): ScenarioPack {
+export function cloneDocument(
+	document: FinancialModelDocument,
+): FinancialModelDocument {
 	return {
-		...pack,
-		accounts: pack.accounts.map((a) => ({ ...a })),
-		checkpoints: pack.checkpoints.map((c) => ({ ...c })),
-		postings: pack.postings.map((p) => ({
+		...document,
+		accounts: document.accounts.map((a) => ({ ...a })),
+		checkpoints: document.checkpoints.map((c) => ({ ...c })),
+		postings: document.postings.map((p) => ({
 			...p,
 			destinations: p.destinations ? [...p.destinations] : null,
 		})),

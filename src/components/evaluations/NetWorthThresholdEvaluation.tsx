@@ -61,7 +61,7 @@ export function NetWorthThresholdEvaluation({
 							? pct.format(probabilistic.probability)
 							: "Run Monte Carlo"
 					}
-					detail="Share of complete simulation runs that reached the target"
+					detail="Share of independent Monte Carlo samples that reached the target"
 				/>
 				<Metric
 					label={`${stochasticIsProvisional ? "Provisional " : ""}median date`}
@@ -75,7 +75,7 @@ export function NetWorthThresholdEvaluation({
 					detail={
 						probabilistic
 							? `P10 ${probabilistic.p10ReachedDate ? formatDate(probabilistic.p10ReachedDate) : "never"} · P90 ${probabilistic.p90ReachedDate ? formatDate(probabilistic.p90ReachedDate) : "never"}`
-							: "Reached-date distribution across successful runs"
+							: "Reached-date distribution across successful independent Monte Carlo samples"
 					}
 				/>
 			</div>

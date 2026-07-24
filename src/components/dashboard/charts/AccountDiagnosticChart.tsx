@@ -6,12 +6,12 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import type { ScenarioPack } from "@/lib/projection";
+import type { FinancialModelDocument } from "@/lib/projection";
 import { AccountLinesChart } from "./AccountLinesChart";
 import { StackedContributionChart } from "./StackedContributionChart";
 
 interface AccountDiagnosticChartProps {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	hasStochasticData: boolean;
 	stochasticIsProvisional?: boolean;
 	chartData: Record<string, string | number>[];
@@ -19,7 +19,7 @@ interface AccountDiagnosticChartProps {
 }
 
 export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
-	pack,
+	document,
 	hasStochasticData,
 	stochasticIsProvisional = false,
 	chartData,
@@ -56,14 +56,14 @@ export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
 				<CardContent className="min-w-0">
 					{viewMode === "stacked" ? (
 						<StackedContributionChart
-							pack={pack}
+							document={document}
 							hasStochasticData={hasStochasticData}
 							stochasticIsProvisional={stochasticIsProvisional}
 							chartData={chartData}
 							milestoneDates={milestoneDates}
 						/>
 					) : (
-						<AccountLinesChart pack={pack} chartData={chartData} />
+						<AccountLinesChart document={document} chartData={chartData} />
 					)}
 				</CardContent>
 			</Card>

@@ -15,15 +15,18 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { currency, formatDate } from "@/lib/format";
-import type { ProjectionResult, ScenarioPack } from "@/lib/projection";
+import type {
+	FinancialModelDocument,
+	ProjectionResult,
+} from "@/lib/projection";
 
 interface NetWorthReconciliationProps {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	result: ProjectionResult;
 }
 
 export const NetWorthReconciliation = memo(function NetWorthReconciliation({
-	pack,
+	document,
 	result,
 }: NetWorthReconciliationProps) {
 	const latestDate =
@@ -35,8 +38,8 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 		string,
 		{ label: string; balance: number; checkpointDate: string }
 	>();
-	for (const cp of pack.checkpoints) {
-		const account = pack.accounts.find((a) => a.id === cp.AccountId);
+	for (const cp of document.checkpoints) {
+		const account = document.accounts.find((a) => a.id === cp.AccountId);
 		const existing = accountMap.get(cp.AccountId);
 		if (!existing || cp.Date > existing.checkpointDate) {
 			accountMap.set(cp.AccountId, {

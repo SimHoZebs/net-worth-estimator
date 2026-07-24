@@ -1,10 +1,10 @@
-import type { ScenarioPack } from "../types/scenario";
+import type { FinancialModelDocument } from "../types/model";
 import { makeAccount } from "./accounts";
 import { makePosting } from "./postings";
 
 export function createBasePack(
-	overrides: Partial<ScenarioPack> = {},
-): ScenarioPack {
+	overrides: Partial<FinancialModelDocument> = {},
+): FinancialModelDocument {
 	return {
 		version: 9,
 		sourcePath: "/configs",

@@ -1,4 +1,4 @@
-import type { JsonValue } from "../types/scenario";
+import type { JsonValue } from "../types/model";
 
 export function isJsonValue(value: unknown): value is JsonValue {
 	return isJsonValueInternal(value, new WeakSet<object>());

@@ -20,15 +20,18 @@ import {
 	isDebtAccount,
 } from "@/lib/debt-utils";
 import { currency, formatDate } from "@/lib/format";
-import type { ProjectionResult, ScenarioPack } from "@/lib/projection";
+import type {
+	FinancialModelDocument,
+	ProjectionResult,
+} from "@/lib/projection";
 
 interface DebtSummaryProps {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	result: ProjectionResult;
 }
 
 export const DebtSummary = memo(function DebtSummary({
-	pack,
+	document,
 	result,
 }: DebtSummaryProps) {
 	// Get latest checkpoint per account
@@ -37,24 +40,24 @@ export const DebtSummary = memo(function DebtSummary({
 		latestCheckpointByAccount.set(summary.accountId, summary.startingBalance);
 	}
 
-	const debtAccounts = pack.accounts
+	const debtAccounts = document.accounts
 		.filter((a) => a.enabled && (latestCheckpointByAccount.get(a.id) ?? 0) < 0)
 		.map((a) => ({
 			account: a,
 			balance: latestCheckpointByAccount.get(a.id) ?? 0,
-			paymentPosting: findPaymentPosting(pack, a.id),
+			paymentPosting: findPaymentPosting(document, a.id),
 		}));
 
 	// Also include accounts whose label suggests debt even if balance is 0
 	const debtAccountIds = new Set(debtAccounts.map((d) => d.account.id));
-	const debtByLabel = pack.accounts
+	const debtByLabel = document.accounts
 		.filter(
 			(a) => a.enabled && isDebtAccount(a.label) && !debtAccountIds.has(a.id),
 		)
 		.map((a) => ({
 			account: a,
 			balance: latestCheckpointByAccount.get(a.id) ?? 0,
-			paymentPosting: findPaymentPosting(pack, a.id),
+			paymentPosting: findPaymentPosting(document, a.id),
 		}));
 
 	const allDebts = [...debtAccounts, ...debtByLabel];

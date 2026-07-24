@@ -130,7 +130,7 @@ describe("deterministic simulation kernel", () => {
 			createBasePack(),
 			makeSettings(),
 			undefined,
-			new Map([["salary", [0.1, 0.2]]]),
+			{ annualRatesByPostingId: new Map([["salary", [0.1, 0.2]]]) },
 		);
 		const originalState = structuredClone(prepared.request.initialState);
 		const originalDocument = structuredClone(prepared.effectiveDocument);

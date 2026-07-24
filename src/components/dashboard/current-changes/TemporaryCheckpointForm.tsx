@@ -12,17 +12,17 @@ function emptyCheckpoint(): Checkpoint {
 	};
 }
 
-interface WhatIfCheckpointFormProps {
+interface TemporaryCheckpointFormProps {
 	checkpoints: Checkpoint[];
 	onAdd: (checkpoint: Checkpoint) => void;
 	onRemove: (index: number) => void;
 }
 
-export function WhatIfCheckpointForm({
+export function TemporaryCheckpointForm({
 	checkpoints,
 	onAdd,
 	onRemove,
-}: WhatIfCheckpointFormProps) {
+}: TemporaryCheckpointFormProps) {
 	const [adding, setAdding] = useState<Checkpoint | null>(null);
 
 	const commit = () => {

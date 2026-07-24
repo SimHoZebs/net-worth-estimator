@@ -57,7 +57,7 @@ export function PostingFulfillmentEvaluation({
 				}
 				detail={
 					probabilistic
-						? `${probabilistic.fulfilledRunCount} of ${probabilistic.runCount} runs`
+						? `${probabilistic.fulfilledRunCount} of ${probabilistic.runCount} independent Monte Carlo samples`
 						: "Across stochastic projection paths"
 				}
 			/>

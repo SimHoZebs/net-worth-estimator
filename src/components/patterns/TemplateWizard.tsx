@@ -6,7 +6,7 @@ import type {
 	TemplateOutput,
 } from "@/lib/patterns";
 import { generateIncomePattern } from "@/lib/patterns";
-import type { ScenarioPack } from "@/lib/projection";
+import type { FinancialModelDocument } from "@/lib/projection";
 import { IncomeForm } from "./IncomeForm";
 import {
 	describePostingCap,
@@ -15,7 +15,7 @@ import {
 } from "./TemplatePreview";
 
 interface TemplateWizardProps {
-	pack: ScenarioPack;
+	document: FinancialModelDocument;
 	onApply: (output: TemplateOutput) => void;
 	onClose: () => void;
 }
@@ -34,7 +34,7 @@ function defaultIncomeInput(): IncomeTemplateInput {
 }
 
 export function TemplateWizard({
-	pack,
+	document,
 	onApply,
 	onClose,
 }: TemplateWizardProps) {
@@ -42,8 +42,8 @@ export function TemplateWizard({
 	const [result, setResult] = useState<TemplateGenerationResult | null>(null);
 	const [step, setStep] = useState<"form" | "confirm">("form");
 
-	const existingAccountIds = pack.accounts.map((a) => a.id);
-	const existingPostingIds = pack.postings.map((p) => p.id);
+	const existingAccountIds = document.accounts.map((account) => account.id);
+	const existingPostingIds = document.postings.map((posting) => posting.id);
 
 	const handleGenerate = () => {
 		const r = generateIncomePattern(
@@ -65,9 +65,9 @@ export function TemplateWizard({
 	const allAccounts = useMemo(
 		() =>
 			result?.ok
-				? [...pack.accounts, ...result.output.accounts]
-				: pack.accounts,
-		[result, pack.accounts],
+				? [...document.accounts, ...result.output.accounts]
+				: document.accounts,
+		[result, document.accounts],
 	);
 
 	const postingDescriptions = useMemo(() => {
@@ -132,7 +132,7 @@ export function TemplateWizard({
 									Back
 								</Button>
 								<Button type="button" size="sm" onClick={handleConfirm}>
-									Add to scenario
+									Add to model
 								</Button>
 							</div>
 						</>

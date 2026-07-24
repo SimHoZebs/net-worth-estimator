@@ -4,21 +4,22 @@ import type {
 	EvaluationResultCollection,
 	EvaluationResultEnvelope,
 	EvaluationResultStatus,
+	FinancialModelDocument,
 	JsonValue,
 	ProjectionPath,
-	ScenarioPack,
-} from "../types/scenario";
+} from "../types/model";
+import type { MonteCarloSample } from "../types/simulation";
 import { isJsonValue } from "./json";
 
 export interface EvaluationContext {
 	path: ProjectionPath;
-	scenario: ScenarioPack;
-	stochasticRates?: ReadonlyMap<string, readonly number[]>;
+	document: FinancialModelDocument;
+	monteCarloSample?: MonteCarloSample;
 	detailLevel?: "detailed" | "summary";
 }
 
 export interface EvaluationFinalizeContext {
-	scenario: ScenarioPack;
+	document: FinancialModelDocument;
 	deterministicPath: ProjectionPath;
 	runCount: number;
 }
