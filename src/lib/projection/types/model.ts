@@ -347,23 +347,53 @@ export interface RawProjectionOutput {
 	result: ProjectionCoreResult;
 }
 
-/** @deprecated Use FINANCIAL_MODEL_DOCUMENT_VERSION. */
+/**
+ * @deprecated Use FINANCIAL_MODEL_DOCUMENT_VERSION. Remove after downstream
+ * consumers migrate to the canonical API and the compatibility window closes.
+ */
 export const SCENARIO_MODEL_VERSION = FINANCIAL_MODEL_DOCUMENT_VERSION;
-/** @deprecated Use CSV_MODEL_REPO_PATH. */
+/**
+ * @deprecated Use CSV_MODEL_REPO_PATH. Remove after downstream consumers migrate
+ * to the canonical API and the compatibility window closes.
+ */
 export const CSV_SCENARIO_REPO_PATH = CSV_MODEL_REPO_PATH;
-/** @deprecated Use CSV_MODEL_PUBLIC_PATH. */
+/**
+ * @deprecated Use CSV_MODEL_PUBLIC_PATH. Remove after downstream consumers
+ * migrate to the canonical API and the compatibility window closes.
+ */
 export const CSV_SCENARIO_PUBLIC_PATH = CSV_MODEL_PUBLIC_PATH;
-/** @deprecated Use CSV_MODEL_FILE_NAMES. */
+/**
+ * @deprecated Use CSV_MODEL_FILE_NAMES. Remove after downstream consumers migrate
+ * to the canonical API and the compatibility window closes.
+ */
 export const CSV_SCENARIO_FILE_NAMES = CSV_MODEL_FILE_NAMES;
-/** @deprecated Use ModelCollectionKey. */
+/**
+ * @deprecated Use ModelCollectionKey. Remove after downstream consumers migrate
+ * to the canonical API and the compatibility window closes.
+ */
 export type ScenarioCollectionKey = ModelCollectionKey;
-/** @deprecated Use ModelFileName. */
+/**
+ * @deprecated Use ModelFileName. Remove after downstream consumers migrate to
+ * the canonical API and the compatibility window closes.
+ */
 export type ScenarioFileName = ModelFileName;
-/** @deprecated Use ModelFileContents. */
+/**
+ * @deprecated Use ModelFileContents. Remove after downstream consumers migrate
+ * to the canonical API and the compatibility window closes.
+ */
 export type ScenarioFileContents = ModelFileContents;
-/** @deprecated Use FinancialModelDocument. */
+/**
+ * @deprecated Use FinancialModelDocument. Remove after downstream consumers
+ * migrate to the canonical API and the compatibility window closes.
+ */
 export type ScenarioPack = FinancialModelDocument;
-/** @deprecated Use ModelOverrides. */
+/**
+ * @deprecated Use ModelOverrides. Remove after downstream consumers migrate to
+ * the canonical API and the compatibility window closes.
+ */
 export type ScenarioOverrides = ModelOverrides;
-/** @deprecated Use ModelOverrides. */
+/**
+ * @deprecated Use ModelOverrides. Remove after downstream consumers migrate to
+ * the canonical API and the compatibility window closes.
+ */
 export type ScenarioWhatIfState = ModelOverrides;

@@ -10,8 +10,8 @@ import {
 	getNetWorthThresholdResult,
 	isJsonValue,
 	type JsonValue,
-	parseCsvScenarioPack,
-	projectScenarioPack,
+	parseCsvFinancialModel,
+	projectFinancialModelDocument,
 } from "../index";
 import type {
 	EvaluationResultCollection,
@@ -19,7 +19,7 @@ import type {
 	ProjectionPath,
 } from "../types/model";
 
-const scenario = {
+const document = {
 	accounts: [],
 	checkpoints: [],
 	postings: [],
@@ -27,7 +27,7 @@ const scenario = {
 const path = {
 	rows: [],
 	movementEvents: [],
-	effectiveDocument: scenario,
+	effectiveDocument: document,
 	projectionStartDate: "2026-01-01",
 	projectionEndDate: "2027-01-01",
 } satisfies ProjectionPath;
@@ -106,7 +106,7 @@ describe("evaluation registry and runtime", () => {
 			],
 			registry,
 		);
-		runtimes.evaluateDeterministic({ path, document: scenario });
+		runtimes.evaluateDeterministic({ path, document });
 		expect(runtimes.result().evaluationOrder).toEqual(["second", "first"]);
 		expect(runtimes.result().evaluations.second.deterministic).toBe(2);
 		expect(runtimes.result().evaluations.first.deterministic).toBe(1);
@@ -172,7 +172,7 @@ describe("evaluation registry and runtime", () => {
 			],
 			registry,
 		);
-		runtimes.evaluateDeterministic({ path, document: scenario });
+		runtimes.evaluateDeterministic({ path, document });
 		const result = runtimes.result();
 		expect(result.evaluations.healthy.deterministic).toBe(3);
 		expect(result.evaluations.disabled.diagnostics[0]?.code).toBe(
@@ -210,18 +210,18 @@ describe("evaluation registry and runtime", () => {
 			],
 			registry,
 		);
-		runtimes.evaluateDeterministic({ path, document: scenario });
+		runtimes.evaluateDeterministic({ path, document });
 		runtimes.startStochastic();
-		runtimes.consume({ path, document: scenario });
+		runtimes.consume({ path, document });
 		runtimes.finalize({
-			document: scenario,
+			document,
 			deterministicPath: path,
 			runCount: 1,
 		});
 		expect(runtimes.result().evaluations.counter.probabilistic).toBe(2);
-		runtimes.consume({ path, document: scenario });
+		runtimes.consume({ path, document });
 		runtimes.finalize({
-			document: scenario,
+			document,
 			deterministicPath: path,
 			runCount: 2,
 		});
@@ -245,18 +245,18 @@ describe("evaluation registry and runtime", () => {
 			],
 			registry,
 		);
-		runtimes.evaluateDeterministic({ path, document: scenario });
+		runtimes.evaluateDeterministic({ path, document });
 		runtimes.startStochastic();
-		runtimes.consume({ path, document: scenario });
+		runtimes.consume({ path, document });
 		runtimes.finalize({
-			document: scenario,
+			document,
 			deterministicPath: path,
 			runCount: 1,
 		});
 		expect(runtimes.result().evaluations.late.probabilistic).toBe(2);
 		runtimes.consume({
 			path: { ...path, projectionEndDate: "2028-01-01" },
-			document: scenario,
+			document,
 		});
 		const failed = runtimes.result().evaluations.late;
 		expect(failed.status).toBe("warning");
@@ -292,10 +292,10 @@ describe("evaluation registry and runtime", () => {
 
 describe("configured evaluation integration", () => {
 	it("projects two simultaneous threshold instances independently", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack failed to load.");
-		const result = projectScenarioPack(
-			pack,
+		const { data: loadedDocument } = parseCsvFinancialModel(validCsvFiles);
+		if (!loadedDocument) throw new Error("Document failed to load.");
+		const result = projectFinancialModelDocument(
+			loadedDocument,
 			makeSettings({
 				evaluations: [
 					{
@@ -324,8 +324,8 @@ describe("configured evaluation integration", () => {
 	});
 
 	it("selects healthy FI and threshold instances after disabled and invalid ones", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack failed to load.");
+		const { data: loadedDocument } = parseCsvFinancialModel(validCsvFiles);
+		if (!loadedDocument) throw new Error("Document failed to load.");
 		const defaults = makeSettings().evaluations;
 		const fi = defaults.find(
 			(evaluation) => evaluation.definitionId === "financial-independence",
@@ -346,7 +346,10 @@ describe("configured evaluation integration", () => {
 			{ ...threshold, instanceId: "target-duplicate" },
 			{ ...threshold, instanceId: "target-healthy" },
 		];
-		const result = projectScenarioPack(pack, makeSettings({ evaluations }));
+		const result = projectFinancialModelDocument(
+			loadedDocument,
+			makeSettings({ evaluations }),
+		);
 		expect(getFinancialIndependenceResult(result)?.instanceId).toBe(
 			"fi-healthy",
 		);
@@ -364,9 +367,9 @@ describe("configured evaluation integration", () => {
 		).toBe("target-invalid");
 	});
 
-	it("keeps FI output when an enabled source is disabled by what-if state", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack failed to load.");
+	it("keeps FI output when an enabled source is disabled by overrides", () => {
+		const { data: loadedDocument } = parseCsvFinancialModel(validCsvFiles);
+		if (!loadedDocument) throw new Error("Document failed to load.");
 		const defaults = makeSettings().evaluations;
 		const fi = defaults.find(
 			(evaluation) => evaluation.definitionId === "financial-independence",
@@ -389,7 +392,7 @@ describe("configured evaluation integration", () => {
 				},
 			],
 		});
-		const result = projectScenarioPack(pack, settings, {
+		const result = projectFinancialModelDocument(loadedDocument, settings, {
 			addedAccounts: [],
 			addedPostings: [],
 			addedCheckpoints: [],
@@ -414,10 +417,10 @@ describe("configured evaluation integration", () => {
 	});
 
 	it("keeps settings and results structured-clone and JSON safe", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack failed to load.");
+		const { data: loadedDocument } = parseCsvFinancialModel(validCsvFiles);
+		if (!loadedDocument) throw new Error("Document failed to load.");
 		const settings = makeSettings();
-		const result = projectScenarioPack(pack, settings);
+		const result = projectFinancialModelDocument(loadedDocument, settings);
 		expect(structuredClone(settings)).toEqual(settings);
 		expect(structuredClone(result)).toEqual(result);
 		expect(() => JSON.stringify({ settings, result })).not.toThrow();

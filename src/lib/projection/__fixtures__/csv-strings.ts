@@ -1,10 +1,10 @@
-import type { ScenarioFileContents } from "../types/scenario";
+import type { ModelFileContents } from "../types/model";
 
 const accountsHeader = "id,label,minBalance,maxBalance,color,enabled";
 const postingsHeader =
 	"id,label,sourceAccountId,destinations,arithmetic,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled";
 
-export const validCsvFiles: ScenarioFileContents = {
+export const validCsvFiles: ModelFileContents = {
 	accounts: [
 		accountsHeader,
 		"checking,Checking,-Infinity,Infinity,#0f172a,true",
@@ -43,7 +43,7 @@ export const validCsvFiles: ScenarioFileContents = {
 
 export const postingsHeaderOnly = `${postingsHeader}\n`;
 
-export const nullMinMaxCsvFiles: ScenarioFileContents = {
+export const nullMinMaxCsvFiles: ModelFileContents = {
 	accounts: [accountsHeader, "checking,Checking,,,#0f172a,true"].join("\n"),
 	checkpoints: ["Date,AccountId,Balance", "2026-03-31,checking,1000"].join(
 		"\n",

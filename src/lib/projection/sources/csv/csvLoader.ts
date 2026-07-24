@@ -5,14 +5,14 @@ import {
 	type BehaviorCollectionKey,
 	CSV_BEHAVIOR_DEFINITION_IDS,
 	CSV_BEHAVIOR_FILE_NAMES,
-	CSV_SCENARIO_FILE_NAMES,
-	CSV_SCENARIO_PUBLIC_PATH,
-	SCENARIO_MODEL_VERSION,
-	type ScenarioCollectionKey,
-	type ScenarioFileContents,
-	type ScenarioPack,
-} from "../../types/scenario";
-import type { ScenarioValidationIssue } from "../../types/validation";
+	CSV_MODEL_FILE_NAMES,
+	CSV_MODEL_PUBLIC_PATH,
+	FINANCIAL_MODEL_DOCUMENT_VERSION,
+	type FinancialModelDocument,
+	type ModelCollectionKey,
+	type ModelFileContents,
+} from "../../types/model";
+import type { ModelValidationIssue } from "../../types/validation";
 import { addIssue } from "../../utils/validation";
 import {
 	type CsvBehaviorRow,
@@ -25,21 +25,21 @@ import {
 	csvPostingSchema,
 	csvPostingsHeaders,
 } from "./csvSchema";
-import { validateCsvScenarioPack } from "./csvValidation";
+import { validateCsvFinancialModel } from "./csvValidation";
 
-export interface CsvScenarioParseResult {
-	data: ScenarioPack | null;
-	issues: ScenarioValidationIssue[];
+export interface CsvFinancialModelParseResult {
+	data: FinancialModelDocument | null;
+	issues: ModelValidationIssue[];
 }
 
-export interface CsvScenarioLoadOptions {
+export interface CsvFinancialModelOptions {
 	basePath?: string;
 	fetchImpl?: typeof fetch;
 }
 
 interface ParsedRowsResult<TRow> {
 	rows: TRow[];
-	issues: ScenarioValidationIssue[];
+	issues: ModelValidationIssue[];
 	hasFatalIssue: boolean;
 }
 
@@ -53,7 +53,7 @@ function parseRows<TRow>(
 	requiredHeaders: readonly string[],
 	rowSchema: ZodType<TRow>,
 ): ParsedRowsResult<TRow> {
-	const issues: ScenarioValidationIssue[] = [];
+	const issues: ModelValidationIssue[] = [];
 	const result = Papa.parse<Record<string, unknown>>(csvText, {
 		header: true,
 		skipEmptyLines: "greedy",
@@ -113,24 +113,24 @@ function parseRows<TRow>(
 	};
 }
 
-export function parseCsvScenarioPack(
-	csvFiles: ScenarioFileContents,
-	options: Pick<CsvScenarioLoadOptions, "basePath"> = {},
-): CsvScenarioParseResult {
+export function parseCsvFinancialModel(
+	csvFiles: ModelFileContents,
+	options: Pick<CsvFinancialModelOptions, "basePath"> = {},
+): CsvFinancialModelParseResult {
 	const accountsResult = parseRows(
-		CSV_SCENARIO_FILE_NAMES.accounts,
+		CSV_MODEL_FILE_NAMES.accounts,
 		csvFiles.accounts,
 		csvAccountsHeaders,
 		csvAccountSchema,
 	);
 	const checkpointsResult = parseRows(
-		CSV_SCENARIO_FILE_NAMES.checkpoints,
+		CSV_MODEL_FILE_NAMES.checkpoints,
 		csvFiles.checkpoints,
 		csvCheckpointsHeaders,
 		csvCheckpointSchema,
 	);
 	const postingsResult = parseRows(
-		CSV_SCENARIO_FILE_NAMES.postings,
+		CSV_MODEL_FILE_NAMES.postings,
 		csvFiles.postings,
 		csvPostingsHeaders,
 		csvPostingSchema,
@@ -194,9 +194,9 @@ export function parseCsvScenarioPack(
 		)
 		.sort((a, b) => a.order - b.order)
 		.map(({ evaluation, definitionId }) => ({ ...evaluation, definitionId }));
-	const pack: ScenarioPack = {
-		version: SCENARIO_MODEL_VERSION,
-		sourcePath: options.basePath ?? CSV_SCENARIO_PUBLIC_PATH,
+	const document: FinancialModelDocument = {
+		version: FINANCIAL_MODEL_DOCUMENT_VERSION,
+		sourcePath: options.basePath ?? CSV_MODEL_PUBLIC_PATH,
 		accounts: accountsResult.rows,
 		checkpoints: checkpointsResult.rows,
 		evaluations,
@@ -204,23 +204,21 @@ export function parseCsvScenarioPack(
 	};
 
 	return {
-		data: pack,
-		issues: [...issues, ...validateCsvScenarioPack(pack)],
+		data: document,
+		issues: [...issues, ...validateCsvFinancialModel(document)],
 	};
 }
 
-export async function fetchCsvScenarioFiles(
-	options: CsvScenarioLoadOptions = {},
-): Promise<ScenarioFileContents> {
+export async function fetchCsvFinancialModelFiles(
+	options: CsvFinancialModelOptions = {},
+): Promise<ModelFileContents> {
 	const fetchImpl = options.fetchImpl ?? fetch;
-	const basePath = normalizeBasePath(
-		options.basePath ?? CSV_SCENARIO_PUBLIC_PATH,
-	);
+	const basePath = normalizeBasePath(options.basePath ?? CSV_MODEL_PUBLIC_PATH);
 
-	const scenarioEntries = await Promise.all(
+	const modelEntries = await Promise.all(
 		(
-			Object.entries(CSV_SCENARIO_FILE_NAMES) as Array<
-				[ScenarioCollectionKey, string]
+			Object.entries(CSV_MODEL_FILE_NAMES) as Array<
+				[ModelCollectionKey, string]
 			>
 		).map(async ([key, fileName]) => {
 			const response = await fetchImpl(`${basePath}/${fileName}`);
@@ -252,8 +250,8 @@ export async function fetchCsvScenarioFiles(
 		}),
 	);
 
-	const fileMap = Object.fromEntries(scenarioEntries) as Record<
-		ScenarioCollectionKey,
+	const fileMap = Object.fromEntries(modelEntries) as Record<
+		ModelCollectionKey,
 		string
 	>;
 	const behaviorFileMap = Object.fromEntries(behaviorEntries) as Record<
@@ -269,18 +267,18 @@ export async function fetchCsvScenarioFiles(
 	};
 }
 
-export async function loadCsvScenarioPack(
-	options: CsvScenarioLoadOptions = {},
-): Promise<CsvScenarioParseResult> {
-	const csvFiles = await fetchCsvScenarioFiles(options);
-	return parseCsvScenarioPack(csvFiles, {
-		basePath: options.basePath ?? CSV_SCENARIO_PUBLIC_PATH,
+export async function loadCsvFinancialModel(
+	options: CsvFinancialModelOptions = {},
+): Promise<CsvFinancialModelParseResult> {
+	const csvFiles = await fetchCsvFinancialModelFiles(options);
+	return parseCsvFinancialModel(csvFiles, {
+		basePath: options.basePath ?? CSV_MODEL_PUBLIC_PATH,
 	});
 }
 
-export function serializeCsvScenarioPack(
-	pack: ScenarioPack,
-): ScenarioFileContents {
+export function serializeCsvFinancialModel(
+	document: FinancialModelDocument,
+): ModelFileContents {
 	const accountsHeader = "id,label,minBalance,maxBalance,color,enabled";
 	const postingsHeader =
 		"id,label,sourceAccountId,destinations,arithmetic,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled";
@@ -288,7 +286,7 @@ export function serializeCsvScenarioPack(
 	const knownDefinitionIds = new Set<string>(
 		Object.values(CSV_BEHAVIOR_DEFINITION_IDS),
 	);
-	const unknownEvaluation = pack.evaluations.find(
+	const unknownEvaluation = document.evaluations.find(
 		(evaluation) => !knownDefinitionIds.has(evaluation.definitionId),
 	);
 	if (unknownEvaluation) {
@@ -298,7 +296,7 @@ export function serializeCsvScenarioPack(
 	}
 
 	const serializeBehavior = (definitionId: string) => {
-		const evaluations = pack.evaluations.flatMap((evaluation, index) =>
+		const evaluations = document.evaluations.flatMap((evaluation, index) =>
 			evaluation.definitionId === definitionId
 				? [{ evaluation, order: index + 1 }]
 				: [],
@@ -325,7 +323,7 @@ export function serializeCsvScenarioPack(
 	return {
 		accounts: [accountsHeader]
 			.concat(
-				pack.accounts.map(
+				document.accounts.map(
 					(a) =>
 						`${a.id},${a.label},${a.minBalance === NO_FLOOR ? "-Infinity" : a.minBalance},${a.maxBalance === NO_CEILING ? "Infinity" : a.maxBalance},${a.color ?? ""},${a.enabled}`,
 				),
@@ -333,7 +331,7 @@ export function serializeCsvScenarioPack(
 			.join("\n"),
 		postings: [postingsHeader]
 			.concat(
-				pack.postings.map(
+				document.postings.map(
 					(p) =>
 						`${p.id},${p.label},${p.sourceAccountId ?? ""},${p.destinations?.join(";") ?? ""},${p.arithmetic},${p.frequency},${p.annualRate},${p.annualGrowthRate},${p.volatility},${p.startDate},${p.endDate ?? ""},${p.annualCap ?? ""},${p.priority},${p.enabled}`,
 				),
@@ -341,7 +339,9 @@ export function serializeCsvScenarioPack(
 			.join("\n"),
 		checkpoints: [checkpointsHeader]
 			.concat(
-				pack.checkpoints.map((c) => `${c.Date},${c.AccountId},${c.Balance}`),
+				document.checkpoints.map(
+					(c) => `${c.Date},${c.AccountId},${c.Balance}`,
+				),
 			)
 			.join("\n"),
 		behaviors: Object.fromEntries(
@@ -353,3 +353,34 @@ export function serializeCsvScenarioPack(
 		) as Record<BehaviorCollectionKey, string>,
 	};
 }
+
+/**
+ * @deprecated Use CsvFinancialModelParseResult. Remove after downstream
+ * consumers migrate to the canonical API and the compatibility window closes.
+ */
+export type CsvScenarioParseResult = CsvFinancialModelParseResult;
+/**
+ * @deprecated Use CsvFinancialModelOptions. Remove after downstream consumers
+ * migrate to the canonical API and the compatibility window closes.
+ */
+export type CsvScenarioLoadOptions = CsvFinancialModelOptions;
+/**
+ * @deprecated Use parseCsvFinancialModel. Remove after downstream consumers
+ * migrate to the canonical API and the compatibility window closes.
+ */
+export const parseCsvScenarioPack = parseCsvFinancialModel;
+/**
+ * @deprecated Use fetchCsvFinancialModelFiles. Remove after downstream consumers
+ * migrate to the canonical API and the compatibility window closes.
+ */
+export const fetchCsvScenarioFiles = fetchCsvFinancialModelFiles;
+/**
+ * @deprecated Use loadCsvFinancialModel. Remove after downstream consumers
+ * migrate to the canonical API and the compatibility window closes.
+ */
+export const loadCsvScenarioPack = loadCsvFinancialModel;
+/**
+ * @deprecated Use serializeCsvFinancialModel. Remove after downstream consumers
+ * migrate to the canonical API and the compatibility window closes.
+ */
+export const serializeCsvScenarioPack = serializeCsvFinancialModel;

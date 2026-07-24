@@ -3,16 +3,16 @@ import {
 	getPostingFulfillmentResult,
 	type PostingFulfillmentPathResult,
 	type ProjectionResult,
-	projectScenarioPack,
+	projectFinancialModelDocument,
 } from "../";
 import {
-	createBasePack,
+	createBaseDocument,
 	makeAccount,
 	makePosting,
 	makeSettings,
 } from "../__fixtures__";
 import { NO_CEILING, NO_FLOOR } from "../constants";
-import { projectRawScenarioPack } from "../simulation/projectPath";
+import { projectRawFinancialModelDocument } from "../simulation/projectPath";
 
 function getBalance(
 	row:
@@ -41,9 +41,12 @@ function postingEvent(
 	);
 }
 
-describe("CSV projection engine", () => {
+describe("financial model projection engine", () => {
 	it("builds dated checkpoint rows and future event rows from real postings", () => {
-		const result = projectScenarioPack(createBasePack(), makeSettings());
+		const result = projectFinancialModelDocument(
+			createBaseDocument(),
+			makeSettings(),
+		);
 
 		expect(result.timeline.rows.map((row) => row.date)).toEqual([
 			"2026-01-31",
@@ -69,7 +72,7 @@ describe("CSV projection engine", () => {
 	});
 
 	it("applies annual caps per calendar year on dated postings", () => {
-		const pack = createBasePack({
+		const document = createBaseDocument({
 			checkpoints: [],
 			accounts: [
 				makeAccount({ id: "checking" }),
@@ -94,7 +97,10 @@ describe("CSV projection engine", () => {
 			],
 		});
 
-		const result = projectScenarioPack(pack, makeSettings({ horizonYears: 2 }));
+		const result = projectFinancialModelDocument(
+			document,
+			makeSettings({ horizonYears: 2 }),
+		);
 
 		expect(postingEvent(result, "capped", "2026-01-15")?.realizedAmount).toBe(
 			200,
@@ -114,7 +120,7 @@ describe("CSV projection engine", () => {
 	});
 
 	it("supports same-day percent_of_base chains in priority order", () => {
-		const pack = createBasePack({
+		const document = createBaseDocument({
 			checkpoints: [],
 			accounts: [makeAccount({ id: "checking" }), makeAccount({ id: "k401" })],
 			postings: [
@@ -144,7 +150,7 @@ describe("CSV projection engine", () => {
 			],
 		});
 
-		const result = projectScenarioPack(pack, makeSettings());
+		const result = projectFinancialModelDocument(document, makeSettings());
 
 		expect(postingEvent(result, "employee_k401")?.requestedAmount).toBe(100);
 		expect(postingEvent(result, "employer_match")?.requestedAmount).toBe(50);
@@ -154,7 +160,7 @@ describe("CSV projection engine", () => {
 	});
 
 	it("clamps postings by source balance only", () => {
-		const pack = createBasePack({
+		const document = createBaseDocument({
 			checkpoints: [
 				{ Date: "2026-01-01", AccountId: "checking", Balance: 250 },
 				{ Date: "2026-01-01", AccountId: "loan", Balance: -300 },
@@ -175,7 +181,7 @@ describe("CSV projection engine", () => {
 			],
 		});
 
-		const result = projectScenarioPack(pack, makeSettings());
+		const result = projectFinancialModelDocument(document, makeSettings());
 
 		expect(fulfillment(result)).toMatchObject({
 			requestedAmount: 400,
@@ -196,7 +202,7 @@ describe("CSV projection engine", () => {
 	});
 
 	it("throws when source account has null minBalance (fail-fast)", () => {
-		const pack = createBasePack({
+		const document = createBaseDocument({
 			checkpoints: [
 				{ Date: "2026-01-01", AccountId: "checking", Balance: 300 },
 				{ Date: "2026-01-01", AccountId: "loan", Balance: -200 },
@@ -230,13 +236,13 @@ describe("CSV projection engine", () => {
 			],
 		});
 
-		expect(() => projectScenarioPack(pack, makeSettings())).toThrow(
-			"has no minBalance configured",
-		);
+		expect(() =>
+			projectFinancialModelDocument(document, makeSettings()),
+		).toThrow("has no minBalance configured");
 	});
 
 	it("throws when destination account has null maxBalance (fail-fast)", () => {
-		const pack = createBasePack({
+		const document = createBaseDocument({
 			checkpoints: [
 				{ Date: "2026-01-01", AccountId: "checking", Balance: 300 },
 				{ Date: "2026-01-01", AccountId: "loan", Balance: -200 },
@@ -271,13 +277,13 @@ describe("CSV projection engine", () => {
 			],
 		});
 
-		expect(() => projectScenarioPack(pack, makeSettings())).toThrow(
-			"has no maxBalance configured",
-		);
+		expect(() =>
+			projectFinancialModelDocument(document, makeSettings()),
+		).toThrow("has no maxBalance configured");
 	});
 
 	it("applies interest via postings with rate keyword", () => {
-		const pack = createBasePack({
+		const document = createBaseDocument({
 			checkpoints: [{ Date: "2026-01-01", AccountId: "loan", Balance: -1200 }],
 			accounts: [makeAccount({ id: "loan", minBalance: NO_FLOOR })],
 			postings: [
@@ -293,14 +299,14 @@ describe("CSV projection engine", () => {
 			],
 		});
 
-		const result = projectScenarioPack(pack, makeSettings());
+		const result = projectFinancialModelDocument(document, makeSettings());
 
 		expect(getBalance(result.timeline.rows[1], "loan")).toBe(-1212);
 		expect(result.summary.finalNetWorth).toBe(-1212);
 	});
 
 	it("applies both interest charge and payment on same date", () => {
-		const pack = createBasePack({
+		const document = createBaseDocument({
 			checkpoints: [
 				{ Date: "2026-01-01", AccountId: "checking", Balance: 1000 },
 				{ Date: "2026-01-01", AccountId: "loan_interest", Balance: -100 },
@@ -335,7 +341,7 @@ describe("CSV projection engine", () => {
 			],
 		});
 
-		const result = projectScenarioPack(pack, makeSettings());
+		const result = projectFinancialModelDocument(document, makeSettings());
 		const row = result.timeline.rows[1]!;
 
 		expect(getBalance(row, "loan_interest")).toBeGreaterThan(-100);
@@ -346,7 +352,7 @@ describe("CSV projection engine", () => {
 	});
 
 	it("prevents destination accounts from exceeding maxBalance (overpayment guard)", () => {
-		const pack = createBasePack({
+		const document = createBaseDocument({
 			checkpoints: [
 				{ Date: "2026-01-01", AccountId: "checking", Balance: 400 },
 				{ Date: "2026-01-01", AccountId: "loan", Balance: -300 },
@@ -367,7 +373,7 @@ describe("CSV projection engine", () => {
 			],
 		});
 
-		const result = projectScenarioPack(pack, makeSettings());
+		const result = projectFinancialModelDocument(document, makeSettings());
 
 		expect(fulfillment(result)).toMatchObject({
 			requestedAmount: 400,
@@ -380,7 +386,7 @@ describe("CSV projection engine", () => {
 	});
 
 	it("prevents source accounts from falling below minBalance", () => {
-		const pack = createBasePack({
+		const document = createBaseDocument({
 			checkpoints: [
 				{ Date: "2026-01-01", AccountId: "checking", Balance: 300 },
 			],
@@ -400,8 +406,8 @@ describe("CSV projection engine", () => {
 			],
 		});
 
-		const result = projectScenarioPack(pack, makeSettings());
-		const raw = projectRawScenarioPack(pack, makeSettings());
+		const result = projectFinancialModelDocument(document, makeSettings());
+		const raw = projectRawFinancialModelDocument(document, makeSettings());
 
 		expect(fulfillment(result)).toMatchObject({
 			realizedAmount: 200,
@@ -425,7 +431,7 @@ describe("CSV projection engine", () => {
 	});
 
 	it("records fully blocked posting attempts without account impacts", () => {
-		const pack = createBasePack({
+		const document = createBaseDocument({
 			checkpoints: [
 				{ Date: "2026-01-01", AccountId: "checking", Balance: 100 },
 			],
@@ -441,7 +447,7 @@ describe("CSV projection engine", () => {
 			],
 		});
 
-		const { path } = projectRawScenarioPack(pack, makeSettings());
+		const { path } = projectRawFinancialModelDocument(document, makeSettings());
 
 		expect(path.movementEvents[0]).toMatchObject({
 			requestedAmount: 50,

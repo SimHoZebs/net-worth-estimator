@@ -6,8 +6,11 @@ export { stochasticProject } from "./analysis/projectStochastic";
 export type {
 	DataSource,
 	DataSourceAction,
+	FinancialModelParseResult,
+	LegacyScenarioDataSource,
 	ScenarioParseResult,
 } from "./dataSource";
+export { toScenarioParseResult } from "./dataSource";
 export {
 	getConfiguredEvaluation,
 	getFinancialIndependenceConfig,
@@ -75,12 +78,26 @@ export {
 	projectRawScenarioPack,
 } from "./simulation/projectPath";
 export { simulate } from "./simulation/simulate";
-export { createBrowserCsvDataSource } from "./sources/csv/browserCsvDataSource";
-export { createCsvDataSource } from "./sources/csv/csvDataSource";
 export {
+	createBrowserCsvDataSource,
+	FINANCIAL_MODEL_STORAGE_KEY,
+	LEGACY_SCENARIO_PACK_STORAGE_KEY,
+} from "./sources/csv/browserCsvDataSource";
+export { createCsvDataSource } from "./sources/csv/csvDataSource";
+export type {
+	CsvFinancialModelOptions,
+	CsvFinancialModelParseResult,
+	CsvScenarioLoadOptions,
+	CsvScenarioParseResult,
+} from "./sources/csv/csvLoader";
+export {
+	fetchCsvFinancialModelFiles,
 	fetchCsvScenarioFiles,
+	loadCsvFinancialModel,
 	loadCsvScenarioPack,
+	parseCsvFinancialModel,
 	parseCsvScenarioPack,
+	serializeCsvFinancialModel,
 	serializeCsvScenarioPack,
 } from "./sources/csv/csvLoader";
 export {
@@ -96,6 +113,7 @@ export {
 } from "./sources/csv/csvSchema";
 export {
 	summarizeValidationIssues,
+	validateCsvFinancialModel,
 	validateCsvScenarioPack,
 } from "./sources/csv/csvValidation";
 export type {
@@ -170,6 +188,9 @@ export type {
 	StochasticProjectionResult,
 } from "./types/stochastic";
 export type {
+	ModelPath,
+	ModelValidationIssue,
+	ModelValidationSeverity,
 	ScenarioPath,
 	ScenarioValidationIssue,
 	ScenarioValidationSeverity,

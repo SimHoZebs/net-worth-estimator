@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { createBasePack, makeAccount, makePosting } from "../__fixtures__";
+import { createBaseDocument, makeAccount, makePosting } from "../__fixtures__";
 import {
 	applyModelOverrides,
 	EMPTY_MODEL_OVERRIDES,
 	prepareFinancialModelDocument,
 } from "../model/applyModelOverrides";
-import { prepareScenarioPack } from "../scenario/prepareScenario";
 
 describe("applyModelOverrides", () => {
-	it("applies all what-if collections without mutating the baseline", () => {
-		const baseline = createBasePack();
+	it("applies all override collections without mutating the baseline", () => {
+		const baseline = createBaseDocument();
 		const prepared = applyModelOverrides(baseline, {
 			addedAccounts: [makeAccount({ id: "temporary" })],
 			addedPostings: [makePosting({ id: "temporary-income" })],
@@ -46,11 +45,10 @@ describe("applyModelOverrides", () => {
 		expect(baseline.checkpoints).toHaveLength(3);
 	});
 
-	it("keeps old preparation imports as aliases", () => {
-		const document = createBasePack();
+	it("prepares a document with empty overrides", () => {
+		const document = createBaseDocument();
 
 		expect(prepareFinancialModelDocument(document)).toEqual(document);
-		expect(prepareScenarioPack(document)).toEqual(document);
 		expect(EMPTY_MODEL_OVERRIDES).toEqual({
 			addedAccounts: [],
 			addedPostings: [],

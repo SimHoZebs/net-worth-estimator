@@ -34,5 +34,8 @@ export function projectFinancialModelDocument(
 	return { ...raw.result, ...runtimes.result() };
 }
 
-/** @deprecated Use projectFinancialModelDocument. */
+/**
+ * @deprecated Use projectFinancialModelDocument. Remove after downstream
+ * consumers migrate to the canonical API and the compatibility window closes.
+ */
 export const projectScenarioPack = projectFinancialModelDocument;

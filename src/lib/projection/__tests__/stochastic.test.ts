@@ -3,8 +3,8 @@ import {
 	computePercentiles,
 	getFinancialIndependenceResult,
 	getNetWorthThresholdResult,
-	parseCsvScenarioPack,
-	projectScenarioPack,
+	parseCsvFinancialModel,
+	projectFinancialModelDocument,
 	reseed,
 	sampleLogNormal,
 	stochasticProject,
@@ -14,7 +14,7 @@ import { buildSampleCountsByPostingId } from "../analysis/projectStochastic";
 import type {
 	FinancialIndependencePlan,
 	ProjectionRuntimeSettings,
-} from "../types/scenario";
+} from "../types/model";
 import type { StochasticProjectionResult } from "../types/stochastic";
 
 function withFiPlan(
@@ -115,8 +115,8 @@ describe("stochastic projection", () => {
 	});
 
 	it("samples a volatile posting on the inclusive projection end date", () => {
-		const pack = {
-			...parseCsvScenarioPack(validCsvFiles).data!,
+		const document = {
+			...parseCsvFinancialModel(validCsvFiles).data!,
 			accounts: [
 				{
 					id: "checking",
@@ -148,7 +148,7 @@ describe("stochastic projection", () => {
 			],
 		};
 		const result = stochasticProject(
-			pack,
+			document,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-01-01",
 				horizonYears: 1,
@@ -168,11 +168,11 @@ describe("stochastic projection", () => {
 	});
 
 	it("normalizes invalid run counts before simulation", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
 
 		const fractional = stochasticProject(
-			pack,
+			document,
 			makeSettings(),
 			{
 				addedAccounts: [],
@@ -184,7 +184,7 @@ describe("stochastic projection", () => {
 			{ runCount: 2.9, seed: 1 },
 		);
 		const nonPositive = stochasticProject(
-			pack,
+			document,
 			makeSettings(),
 			{
 				addedAccounts: [],
@@ -201,11 +201,11 @@ describe("stochastic projection", () => {
 	});
 
 	it("aggregates FI-cycle outcomes from complete seeded runs", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
 		const partials: StochasticProjectionResult[] = [];
 		const result = stochasticProject(
-			pack,
+			document,
 			withFiPlan(
 				{
 					fallbackProjectionStartDate: "2026-04-01",
@@ -243,10 +243,10 @@ describe("stochastic projection", () => {
 	});
 
 	it("counts candidates below the semantic net-worth gate as failures", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
 		const result = stochasticProject(
-			pack,
+			document,
 			withFiPlan(
 				{
 					fallbackProjectionStartDate: "2026-04-01",
@@ -286,12 +286,12 @@ describe("stochastic projection", () => {
 	});
 
 	it("returns deterministic baseline alongside stochastic bands", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
+		expect(document).not.toBeNull();
 
 		const result = stochasticProject(
-			pack,
+			document,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
@@ -314,12 +314,12 @@ describe("stochastic projection", () => {
 	});
 
 	it("generates same bands with same seed", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
+		expect(document).not.toBeNull();
 
 		const result1 = stochasticProject(
-			pack,
+			document,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
@@ -335,7 +335,7 @@ describe("stochastic projection", () => {
 		);
 
 		const result2 = stochasticProject(
-			pack,
+			document,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
@@ -356,12 +356,12 @@ describe("stochastic projection", () => {
 	});
 
 	it("works without onProgress callback (backward compatible)", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
+		expect(document).not.toBeNull();
 
 		const result = stochasticProject(
-			pack,
+			document,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 5,
@@ -381,17 +381,17 @@ describe("stochastic projection", () => {
 	});
 
 	it("returns P50 close to deterministic when volatility is zero", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
+		expect(document).not.toBeNull();
 
-		const deterministicOnlyPack = {
-			...pack,
-			postings: pack.postings.map((p) => ({ ...p, volatility: 0 })),
+		const deterministicOnlyDocument = {
+			...document,
+			postings: document.postings.map((p) => ({ ...p, volatility: 0 })),
 		};
 
 		const result = stochasticProject(
-			deterministicOnlyPack,
+			deterministicOnlyDocument,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
@@ -406,8 +406,8 @@ describe("stochastic projection", () => {
 			{ runCount: 100, seed: 42 },
 		);
 
-		const deterministic = projectScenarioPack(
-			deterministicOnlyPack,
+		const deterministic = projectFinancialModelDocument(
+			deterministicOnlyDocument,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
@@ -430,13 +430,13 @@ describe("stochastic projection", () => {
 
 describe("stochastic progress streaming", () => {
 	it("reports progress with ascending values and reaches 1.0", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
+		expect(document).not.toBeNull();
 
 		const progressValues: number[] = [];
 		stochasticProject(
-			pack,
+			document,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
@@ -462,12 +462,12 @@ describe("stochastic progress streaming", () => {
 	});
 
 	it("produces identical results with and without onProgress", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
+		expect(document).not.toBeNull();
 
 		const resultWithout = stochasticProject(
-			pack,
+			document,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
@@ -483,7 +483,7 @@ describe("stochastic progress streaming", () => {
 		);
 
 		const resultWith = stochasticProject(
-			pack,
+			document,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
@@ -509,13 +509,13 @@ describe("stochastic progress streaming", () => {
 	});
 
 	it("reports progress for a small run count (1)", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
+		expect(document).not.toBeNull();
 
 		const progressValues: number[] = [];
 		stochasticProject(
-			pack,
+			document,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 5,
@@ -536,13 +536,13 @@ describe("stochastic progress streaming", () => {
 	});
 
 	it("reports progress in increasing steps up to 100%", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
+		expect(document).not.toBeNull();
 
 		const progressValues: number[] = [];
 		stochasticProject(
-			pack,
+			document,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 5,
@@ -567,13 +567,13 @@ describe("stochastic progress streaming", () => {
 	});
 
 	it("each partial result has valid band structure", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
+		expect(document).not.toBeNull();
 
 		const partials: StochasticProjectionResult[] = [];
 		const final = stochasticProject(
-			pack,
+			document,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,
@@ -609,13 +609,13 @@ describe("stochastic progress streaming", () => {
 	});
 
 	it("last partial result matches the final return value", () => {
-		const { data: pack } = parseCsvScenarioPack(validCsvFiles);
-		if (!pack) throw new Error("Pack is null");
-		expect(pack).not.toBeNull();
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Document is null");
+		expect(document).not.toBeNull();
 
 		const partials: StochasticProjectionResult[] = [];
 		const final = stochasticProject(
-			pack,
+			document,
 			makeSettings({
 				fallbackProjectionStartDate: "2026-04-01",
 				horizonYears: 10,

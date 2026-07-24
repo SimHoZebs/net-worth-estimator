@@ -39,11 +39,23 @@ export function prepareFinancialModelDocument(
 	return applyModelOverrides(document, overrides);
 }
 
-/** @deprecated Use EMPTY_MODEL_OVERRIDES. */
+/**
+ * @deprecated Use EMPTY_MODEL_OVERRIDES. Remove after downstream consumers
+ * migrate to the canonical API and the compatibility window closes.
+ */
 export const EMPTY_SCENARIO_OVERRIDES = EMPTY_MODEL_OVERRIDES;
-/** @deprecated Use EMPTY_MODEL_OVERRIDES. */
+/**
+ * @deprecated Use EMPTY_MODEL_OVERRIDES. Remove after downstream consumers
+ * migrate to the canonical API and the compatibility window closes.
+ */
 export const EMPTY_WHAT_IF_STATE = EMPTY_MODEL_OVERRIDES;
-/** @deprecated Use applyModelOverrides. */
+/**
+ * @deprecated Use applyModelOverrides. Remove after downstream consumers migrate
+ * to the canonical API and the compatibility window closes.
+ */
 export const applyScenarioOverrides = applyModelOverrides;
-/** @deprecated Use prepareFinancialModelDocument. */
+/**
+ * @deprecated Use prepareFinancialModelDocument. Remove after downstream
+ * consumers migrate to the canonical API and the compatibility window closes.
+ */
 export const prepareScenarioPack = prepareFinancialModelDocument;

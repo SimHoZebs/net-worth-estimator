@@ -1,15 +1,15 @@
 import type {
-	ScenarioPath,
-	ScenarioValidationIssue,
-	ScenarioValidationSeverity,
+	ModelPath,
+	ModelValidationIssue,
+	ModelValidationSeverity,
 } from "../types/validation";
 
 export function addIssue(
-	issues: ScenarioValidationIssue[],
-	severity: ScenarioValidationSeverity,
+	issues: ModelValidationIssue[],
+	severity: ModelValidationSeverity,
 	code: string,
 	message: string,
-	path: ScenarioPath,
+	path: ModelPath,
 ) {
 	issues.push({ severity, code, message, path });
 }
@@ -18,7 +18,7 @@ export function rowPath(
 	fileName: string,
 	rowNumber?: number,
 	field?: string,
-): ScenarioPath {
+): ModelPath {
 	const path: Array<string | number> = [fileName];
 
 	if (rowNumber !== undefined) {

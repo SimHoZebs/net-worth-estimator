@@ -1,5 +1,10 @@
-import type { DataSource, ScenarioParseResult } from "../../dataSource";
-import type { ScenarioPack } from "../../types/scenario";
+import {
+	type DataSource,
+	type FinancialModelParseResult,
+	type LegacyScenarioDataSource,
+	toScenarioParseResult,
+} from "../../dataSource";
+import type { FinancialModelDocument } from "../../types/model";
 
 export interface CsvDataSourceOptions {
 	apiPath?: string;
@@ -8,44 +13,49 @@ export interface CsvDataSourceOptions {
 
 export function createCsvDataSource(
 	options?: CsvDataSourceOptions,
-): DataSource {
-	const apiPath = options?.apiPath ?? "/api/scenario";
+): DataSource & LegacyScenarioDataSource {
+	const apiPath = options?.apiPath ?? "/api/financial-model";
 	const fetchImpl = options?.fetchImpl ?? fetch;
+	const loadDocument = async (): Promise<FinancialModelParseResult> => {
+		const response = await fetchImpl(apiPath);
+
+		if (!response.ok) {
+			throw new Error(
+				`Failed to load financial model (${response.status} ${response.statusText}).`,
+			);
+		}
+
+		return response.json() as Promise<FinancialModelParseResult>;
+	};
 
 	return {
 		sourceType: "csv-api",
 		label: "Repo CSV files",
 		description:
 			"Loaded through the Vite dev server; saved edits write back to public/configs/ in this checkout.",
-		loadPack: async (): Promise<ScenarioParseResult> => {
-			const response = await fetchImpl(`${apiPath}/pack`);
-
-			if (!response.ok) {
-				throw new Error(
-					`Failed to load scenario pack (${response.status} ${response.statusText}).`,
-				);
-			}
-
-			return response.json() as Promise<ScenarioParseResult>;
-		},
+		loadDocument,
+		// Deprecated compatibility; remove after concrete callers migrate.
+		loadPack: async () => toScenarioParseResult(await loadDocument()),
 		save: {
 			label: "Save to CSV files",
 			description:
-				"Writes the edited scenario to public/configs/ through the local Vite dev server.",
-			run: async (pack: ScenarioPack): Promise<ScenarioParseResult> => {
-				const response = await fetchImpl(`${apiPath}/pack`, {
+				"Writes the edited model to public/configs/ through the local Vite dev server.",
+			run: async (
+				document: FinancialModelDocument,
+			): Promise<FinancialModelParseResult> => {
+				const response = await fetchImpl(apiPath, {
 					method: "PUT",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(pack),
+					body: JSON.stringify(document),
 				});
 
 				if (!response.ok) {
 					throw new Error(
-						`Failed to save scenario pack (${response.status} ${response.statusText}).`,
+						`Failed to save financial model (${response.status} ${response.statusText}).`,
 					);
 				}
 
-				return response.json() as Promise<ScenarioParseResult>;
+				return response.json() as Promise<FinancialModelParseResult>;
 			},
 		},
 	};

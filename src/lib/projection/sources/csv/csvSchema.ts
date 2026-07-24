@@ -5,7 +5,7 @@ import type {
 	Account,
 	Checkpoint,
 	ConfiguredEvaluation,
-} from "../../types/scenario";
+} from "../../types/model";
 
 function parseNumber(value: unknown) {
 	if (typeof value === "number") {

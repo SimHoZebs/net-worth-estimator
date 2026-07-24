@@ -4,15 +4,18 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ProjectionEngineProvider } from "@/engine/ProjectionEngineContext";
-import type { ScenarioWhatIfState } from "@/lib/projection";
-import { createBasePack, makeSettings } from "@/lib/projection/__fixtures__";
-import { projectScenarioPack } from "@/lib/projection/analysis/projectScenario";
+import type { ModelOverrides } from "@/lib/projection";
+import {
+	createBaseDocument,
+	makeSettings,
+} from "@/lib/projection/__fixtures__";
+import { projectFinancialModelDocument } from "@/lib/projection/analysis/projectFinancialModel";
 import { stochasticProject } from "@/lib/projection/analysis/projectStochastic";
 import type { ProjectionEngine } from "@/lib/projection/runtime/ProjectionEngine";
 import { useProjection } from "../useProjection";
 import { useStochastic } from "../useStochastic";
 
-const whatIfState: ScenarioWhatIfState = {
+const overrides: ModelOverrides = {
 	addedAccounts: [],
 	addedPostings: [],
 	addedCheckpoints: [],
@@ -40,11 +43,11 @@ function wrapper(engine: ProjectionEngine) {
 
 describe("projection hook request provenance", () => {
 	it("never exposes an obsolete deterministic result", async () => {
-		const pack = createBasePack();
+		const document = createBaseDocument();
 		const firstSettings = makeSettings({ horizonYears: 1 });
 		const secondSettings = makeSettings({ horizonYears: 2 });
-		const first = deferred<ReturnType<typeof projectScenarioPack>>();
-		const second = deferred<ReturnType<typeof projectScenarioPack>>();
+		const first = deferred<ReturnType<typeof projectFinancialModelDocument>>();
+		const second = deferred<ReturnType<typeof projectFinancialModelDocument>>();
 		const engine: ProjectionEngine = {
 			project: vi
 				.fn()
@@ -53,7 +56,7 @@ describe("projection hook request provenance", () => {
 			projectStochastic: vi.fn(),
 		};
 		const hook = renderHook(
-			({ settings }) => useProjection(pack, settings, whatIfState, true),
+			({ settings }) => useProjection(document, settings, overrides, true),
 			{
 				initialProps: { settings: firstSettings },
 				wrapper: wrapper(engine),
@@ -64,11 +67,15 @@ describe("projection hook request provenance", () => {
 		hook.rerender({ settings: secondSettings });
 		await waitFor(() => expect(engine.project).toHaveBeenCalledTimes(2));
 		act(() =>
-			first.resolve(projectScenarioPack(pack, firstSettings, whatIfState)),
+			first.resolve(
+				projectFinancialModelDocument(document, firstSettings, overrides),
+			),
 		);
 		expect(hook.result.current.result).toBeNull();
 		act(() =>
-			second.resolve(projectScenarioPack(pack, secondSettings, whatIfState)),
+			second.resolve(
+				projectFinancialModelDocument(document, secondSettings, overrides),
+			),
 		);
 		await waitFor(() =>
 			expect(hook.result.current.result?.timeline.rows.length).toBeGreaterThan(
@@ -78,7 +85,7 @@ describe("projection hook request provenance", () => {
 	});
 
 	it("ignores obsolete stochastic partial callbacks", async () => {
-		const pack = createBasePack();
+		const document = createBaseDocument();
 		const settings = makeSettings({ horizonYears: 2 });
 		const first = deferred<ReturnType<typeof stochasticProject>>();
 		const second = deferred<ReturnType<typeof stochasticProject>>();
@@ -99,7 +106,8 @@ describe("projection hook request provenance", () => {
 				}),
 		};
 		const hook = renderHook(
-			({ config }) => useStochastic(pack, settings, whatIfState, config, true),
+			({ config }) =>
+				useStochastic(document, settings, overrides, config, true),
 			{
 				initialProps: { config: { runCount: 1, seed: 1 } },
 				wrapper: wrapper(engine),
@@ -109,13 +117,13 @@ describe("projection hook request provenance", () => {
 		await waitFor(() => expect(callbacks).toHaveLength(1));
 		hook.rerender({ config: { runCount: 2, seed: 1 } });
 		await waitFor(() => expect(callbacks).toHaveLength(2));
-		const obsolete = stochasticProject(pack, settings, whatIfState, {
+		const obsolete = stochasticProject(document, settings, overrides, {
 			runCount: 1,
 			seed: 1,
 		});
 		act(() => callbacks[0](1, obsolete));
 		expect(hook.result.current.result).toBeNull();
-		const current = stochasticProject(pack, settings, whatIfState, {
+		const current = stochasticProject(document, settings, overrides, {
 			runCount: 2,
 			seed: 1,
 		});
