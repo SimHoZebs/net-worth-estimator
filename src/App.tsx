@@ -16,12 +16,12 @@ import { ProjectionConfigSidebar } from "./components/sidebar/ProjectionConfigSi
 import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
 import { Button } from "./components/ui/button";
 import { LazySection } from "./components/ui/lazy-section";
-import { useProjection } from "./hooks/useProjection";
 import {
-	useScenarioMutation,
-	useScenarioQuery,
-	useScenarioResetMutation,
-} from "./hooks/useScenario";
+	useFinancialModelMutation,
+	useFinancialModelQuery,
+	useFinancialModelResetMutation,
+} from "./hooks/useFinancialModel";
+import { useProjection } from "./hooks/useProjection";
 import { useStochastic } from "./hooks/useStochastic";
 import { summarizeValidationIssues } from "./lib/projection";
 import {
@@ -49,11 +49,11 @@ export default function App() {
 		error: modelError,
 		refetch: refetchModel,
 		dataUpdatedAt,
-	} = useScenarioQuery(dataSource);
-	const modelMutation = useScenarioMutation(dataSource);
-	const modelResetMutation = useScenarioResetMutation(dataSource);
+	} = useFinancialModelQuery(dataSource);
+	const modelMutation = useFinancialModelMutation(dataSource);
+	const modelResetMutation = useFinancialModelResetMutation(dataSource);
 
-	const document = modelData?.pack ?? null;
+	const document = modelData?.document ?? null;
 	const issues = modelData?.issues ?? [];
 	const loadError = modelError?.message ?? null;
 	const sourceActionError =

@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
 	DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID,
 	getPostingFulfillmentResult,
-	projectScenarioPack,
+	projectFinancialModelDocument,
 } from "../";
 import {
-	createBasePack,
+	createBaseDocument,
 	makeAccount,
 	makePosting,
 	makeSettings,
@@ -15,10 +15,10 @@ import {
 	postingFulfillmentEvaluation,
 	validatePostingFulfillmentConfig,
 } from "../evaluation/postingFulfillment";
-import { projectRawScenarioPack } from "../simulation/projectPath";
+import { projectRawFinancialModelDocument } from "../simulation/projectPath";
 
 function constrainedPath() {
-	const pack = createBasePack({
+	const document = createBaseDocument({
 		accounts: [
 			makeAccount({ id: "checking", minBalance: 0 }),
 			makeAccount({ id: "loan", maxBalance: 0 }),
@@ -39,7 +39,7 @@ function constrainedPath() {
 			}),
 		],
 	});
-	return projectRawScenarioPack(pack, makeSettings()).path;
+	return projectRawFinancialModelDocument(document, makeSettings()).path;
 }
 
 describe("posting fulfillment evaluation", () => {
@@ -186,9 +186,9 @@ describe("posting fulfillment evaluation", () => {
 	});
 
 	it("supports an explicitly designated all-postings dashboard instance", () => {
-		const pack = constrainedPath().effectiveDocument;
-		const result = projectScenarioPack(
-			pack,
+		const document = constrainedPath().effectiveDocument;
+		const result = projectFinancialModelDocument(
+			document,
 			makeSettings({
 				evaluations: [
 					{

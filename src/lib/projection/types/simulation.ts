@@ -56,5 +56,8 @@ export interface PreparedProjection {
 	request: SimulationRequest;
 }
 
-/** @deprecated Use MonteCarloSample. */
+/**
+ * @deprecated Use MonteCarloSample. Remove after downstream consumers migrate
+ * to the canonical API and the compatibility window closes.
+ */
 export type SampledAssumptions = MonteCarloSample;

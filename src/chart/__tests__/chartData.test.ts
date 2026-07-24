@@ -4,7 +4,7 @@ import type {
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import {
-	parseCsvScenarioPack,
+	parseCsvFinancialModel,
 	projectFinancialModelDocument,
 	stochasticProject,
 } from "@/lib/projection";
@@ -26,7 +26,7 @@ const EMPTY_MODEL_OVERRIDES: ModelOverrides = {
 
 describe("buildAccountDiagnosticChartData", () => {
 	it("returns per-account balances and deterministic net worth when no stochastic data is provided", () => {
-		const { data: document } = parseCsvScenarioPack(validCsvFiles);
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
 		expect(document).not.toBeNull();
 
 		if (!document) throw new Error("Financial model failed to load");
@@ -57,7 +57,7 @@ describe("buildAccountDiagnosticChartData", () => {
 	});
 
 	it("merges stochastic band data into rows when stochastic result is provided", () => {
-		const { data: document } = parseCsvScenarioPack(validCsvFiles);
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
 		expect(document).not.toBeNull();
 
 		if (!document) throw new Error("Financial model failed to load");
@@ -114,7 +114,7 @@ describe("buildAccountDiagnosticChartData", () => {
 	});
 
 	it("falls back to deterministic net worth for sampled row dates missing from band map", () => {
-		const { data: document } = parseCsvScenarioPack(validCsvFiles);
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
 		expect(document).not.toBeNull();
 
 		if (!document) throw new Error("Financial model failed to load");

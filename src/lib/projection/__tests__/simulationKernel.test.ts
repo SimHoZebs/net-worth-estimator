@@ -1,17 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
-	createBasePack,
+	createBaseDocument,
 	makeAccount,
 	makePosting,
 	makeSettings,
 } from "../__fixtures__";
-import { prepareSimulationRequest } from "../scenario/prepareSimulation";
+import { prepareSimulationRequest } from "../simulation/prepareSimulation";
 import { simulate } from "../simulation/simulate";
 import type { SimulationRequest } from "../types/simulation";
 
 describe("simulation request preparation", () => {
 	it("keeps checkpoint history outside the prepared kernel request", () => {
-		const prepared = prepareSimulationRequest(createBasePack(), makeSettings());
+		const prepared = prepareSimulationRequest(
+			createBaseDocument(),
+			makeSettings(),
+		);
 
 		expect(prepared.historicalSnapshots).toEqual([
 			{
@@ -26,7 +29,7 @@ describe("simulation request preparation", () => {
 	});
 
 	it("includes fallback start-date postings when no checkpoint exists", () => {
-		const pack = createBasePack({
+		const document = createBaseDocument({
 			checkpoints: [],
 			accounts: [makeAccount({ id: "checking" })],
 			postings: [
@@ -40,7 +43,7 @@ describe("simulation request preparation", () => {
 			],
 		});
 		const prepared = prepareSimulationRequest(
-			pack,
+			document,
 			makeSettings({ fallbackProjectionStartDate: "2026-01-01" }),
 		);
 
@@ -93,7 +96,7 @@ describe("deterministic simulation kernel", () => {
 
 	it("records exact dated snapshots and fully blocked attempts", () => {
 		const prepared = prepareSimulationRequest(
-			createBasePack({
+			createBaseDocument({
 				checkpoints: [
 					{ Date: "2026-01-01", AccountId: "checking", Balance: 100 },
 				],
@@ -127,7 +130,7 @@ describe("deterministic simulation kernel", () => {
 
 	it("reuses a prepared request without cross-run state mutation", () => {
 		const prepared = prepareSimulationRequest(
-			createBasePack(),
+			createBaseDocument(),
 			makeSettings(),
 			undefined,
 			{ annualRatesByPostingId: new Map([["salary", [0.1, 0.2]]]) },

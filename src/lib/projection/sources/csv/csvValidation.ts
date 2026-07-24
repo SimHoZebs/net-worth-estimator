@@ -1,11 +1,11 @@
 import { ParseError, parseArithmetic } from "../../simulation/arithmetic";
-import type { Posting, ScenarioPack } from "../../types/scenario";
+import type { FinancialModelDocument, Posting } from "../../types/model";
 import {
 	CSV_BEHAVIOR_DEFINITION_IDS,
 	CSV_BEHAVIOR_FILE_NAMES,
-	CSV_SCENARIO_FILE_NAMES,
-} from "../../types/scenario";
-import type { ScenarioValidationIssue } from "../../types/validation";
+	CSV_MODEL_FILE_NAMES,
+} from "../../types/model";
+import type { ModelValidationIssue } from "../../types/validation";
 import { addIssue, rowPath } from "../../utils/validation";
 
 function hasInvalidDateRange(
@@ -28,7 +28,7 @@ function extractIdentifiers(arithmetic: string): string[] {
 }
 
 function validateUniqueIds(
-	issues: ScenarioValidationIssue[],
+	issues: ModelValidationIssue[],
 	fileName: string,
 	codePrefix: string,
 	rows: Array<{ id: string }>,
@@ -56,8 +56,8 @@ function validateUniqueIds(
 }
 
 function validateEvaluationInstanceIds(
-	issues: ScenarioValidationIssue[],
-	pack: ScenarioPack,
+	issues: ModelValidationIssue[],
+	document: FinancialModelDocument,
 ) {
 	const fileNameByDefinitionId = new Map<string, string>(
 		Object.keys(CSV_BEHAVIOR_FILE_NAMES).map((key) => [
@@ -69,7 +69,7 @@ function validateEvaluationInstanceIds(
 	);
 	const seenInstanceIds = new Set<string>();
 
-	pack.evaluations.forEach((evaluation) => {
+	document.evaluations.forEach((evaluation) => {
 		const fileName =
 			fileNameByDefinitionId.get(evaluation.definitionId) ??
 			`behavior/${evaluation.definitionId}.csv`;
@@ -90,7 +90,7 @@ function validateEvaluationInstanceIds(
 }
 
 function validatePostingArithmetic(
-	issues: ScenarioValidationIssue[],
+	issues: ModelValidationIssue[],
 	postings: Posting[],
 	accountIds: Set<string>,
 ) {
@@ -104,7 +104,7 @@ function validatePostingArithmetic(
 
 	postings.forEach((posting, index) => {
 		const rowNumber = index + 2;
-		const fileName = CSV_SCENARIO_FILE_NAMES.postings;
+		const fileName = CSV_MODEL_FILE_NAMES.postings;
 
 		try {
 			parseArithmetic(posting.arithmetic);
@@ -188,7 +188,7 @@ function validatePostingArithmetic(
 }
 
 function validatePostings(
-	issues: ScenarioValidationIssue[],
+	issues: ModelValidationIssue[],
 	postings: Posting[],
 	accountIds: Set<string>,
 ) {
@@ -204,7 +204,7 @@ function validatePostings(
 				"error",
 				"posting.source.missing",
 				`Posting source account '${posting.sourceAccountId}' does not exist.`,
-				rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber, "sourceAccountId"),
+				rowPath(CSV_MODEL_FILE_NAMES.postings, rowNumber, "sourceAccountId"),
 			);
 		}
 
@@ -218,11 +218,7 @@ function validatePostings(
 						"error",
 						"posting.destination.missing",
 						`Posting destination account '${destinationId}' does not exist.`,
-						rowPath(
-							CSV_SCENARIO_FILE_NAMES.postings,
-							rowNumber,
-							"destinations",
-						),
+						rowPath(CSV_MODEL_FILE_NAMES.postings, rowNumber, "destinations"),
 					);
 				}
 
@@ -232,11 +228,7 @@ function validatePostings(
 						"error",
 						"posting.destinations.duplicate",
 						`Destination account '${destinationId}' appears more than once.`,
-						rowPath(
-							CSV_SCENARIO_FILE_NAMES.postings,
-							rowNumber,
-							"destinations",
-						),
+						rowPath(CSV_MODEL_FILE_NAMES.postings, rowNumber, "destinations"),
 					);
 				}
 
@@ -250,7 +242,7 @@ function validatePostings(
 				"error",
 				"posting.accounts.empty",
 				"Postings must set sourceAccountId, destinations, or both.",
-				rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber),
+				rowPath(CSV_MODEL_FILE_NAMES.postings, rowNumber),
 			);
 		}
 
@@ -263,7 +255,7 @@ function validatePostings(
 				"error",
 				"posting.accounts.same",
 				"Posting sourceAccountId must not appear in destinations.",
-				rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber),
+				rowPath(CSV_MODEL_FILE_NAMES.postings, rowNumber),
 			);
 		}
 
@@ -273,41 +265,41 @@ function validatePostings(
 				"error",
 				"posting.schedule.invalid",
 				"Posting endDate must be the same as or later than startDate.",
-				rowPath(CSV_SCENARIO_FILE_NAMES.postings, rowNumber, "endDate"),
+				rowPath(CSV_MODEL_FILE_NAMES.postings, rowNumber, "endDate"),
 			);
 		}
 	});
 }
 
-export function validateCsvScenarioPack(
-	pack: ScenarioPack,
-): ScenarioValidationIssue[] {
-	const issues: ScenarioValidationIssue[] = [];
-	const accountIds = new Set(pack.accounts.map((account) => account.id));
-	const postingIds = new Set(pack.postings.map((posting) => posting.id));
+export function validateCsvFinancialModel(
+	document: FinancialModelDocument,
+): ModelValidationIssue[] {
+	const issues: ModelValidationIssue[] = [];
+	const accountIds = new Set(document.accounts.map((account) => account.id));
+	const postingIds = new Set(document.postings.map((posting) => posting.id));
 
 	validateUniqueIds(
 		issues,
-		CSV_SCENARIO_FILE_NAMES.accounts,
+		CSV_MODEL_FILE_NAMES.accounts,
 		"account.id",
-		pack.accounts,
+		document.accounts,
 	);
 	validateUniqueIds(
 		issues,
-		CSV_SCENARIO_FILE_NAMES.postings,
+		CSV_MODEL_FILE_NAMES.postings,
 		"posting.id",
-		pack.postings,
+		document.postings,
 	);
-	validateEvaluationInstanceIds(issues, pack);
+	validateEvaluationInstanceIds(issues, document);
 
-	pack.accounts.forEach((account, index) => {
+	document.accounts.forEach((account, index) => {
 		if (postingIds.has(account.id)) {
 			addIssue(
 				issues,
 				"error",
 				"account.id.collision",
 				`Account ID '${account.id}' collides with a posting ID. IDs must be unique across accounts and postings.`,
-				rowPath(CSV_SCENARIO_FILE_NAMES.accounts, index + 2, "id"),
+				rowPath(CSV_MODEL_FILE_NAMES.accounts, index + 2, "id"),
 			);
 		}
 
@@ -317,34 +309,34 @@ export function validateCsvScenarioPack(
 				"warning",
 				"account.color.missing",
 				`Enabled account '${account.id}' has no chart color. Charts will use a neutral fallback until a color is provided.`,
-				rowPath(CSV_SCENARIO_FILE_NAMES.accounts, index + 2, "color"),
+				rowPath(CSV_MODEL_FILE_NAMES.accounts, index + 2, "color"),
 			);
 		}
 	});
 
-	pack.checkpoints.forEach((checkpoint, index) => {
+	document.checkpoints.forEach((checkpoint, index) => {
 		if (!accountIds.has(checkpoint.AccountId)) {
 			addIssue(
 				issues,
 				"error",
 				"checkpoint.account.missing",
 				`Checkpoint account '${checkpoint.AccountId}' does not exist.`,
-				rowPath(CSV_SCENARIO_FILE_NAMES.checkpoints, index + 2, "AccountId"),
+				rowPath(CSV_MODEL_FILE_NAMES.checkpoints, index + 2, "AccountId"),
 			);
 		}
 	});
 
-	validatePostingArithmetic(issues, pack.postings, accountIds);
-	validatePostings(issues, pack.postings, accountIds);
+	validatePostingArithmetic(issues, document.postings, accountIds);
+	validatePostings(issues, document.postings, accountIds);
 
-	pack.accounts.forEach((account, index) => {
+	document.accounts.forEach((account, index) => {
 		if (account.minBalance > account.maxBalance) {
 			addIssue(
 				issues,
 				"error",
 				"account.balance.bounds",
 				`minBalance (${account.minBalance}) must not exceed maxBalance (${account.maxBalance}).`,
-				rowPath(CSV_SCENARIO_FILE_NAMES.accounts, index + 2),
+				rowPath(CSV_MODEL_FILE_NAMES.accounts, index + 2),
 			);
 		}
 	});
@@ -352,7 +344,7 @@ export function validateCsvScenarioPack(
 	return issues;
 }
 
-export function summarizeValidationIssues(issues: ScenarioValidationIssue[]) {
+export function summarizeValidationIssues(issues: ModelValidationIssue[]) {
 	const errors = issues.filter((issue) => issue.severity === "error");
 	const warnings = issues.filter((issue) => issue.severity === "warning");
 
@@ -363,3 +355,9 @@ export function summarizeValidationIssues(issues: ScenarioValidationIssue[]) {
 		isValid: errors.length === 0,
 	};
 }
+
+/**
+ * @deprecated Use validateCsvFinancialModel. Remove after downstream consumers
+ * migrate to the canonical API and the compatibility window closes.
+ */
+export const validateCsvScenarioPack = validateCsvFinancialModel;

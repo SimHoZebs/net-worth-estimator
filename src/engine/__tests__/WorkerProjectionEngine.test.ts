@@ -8,8 +8,11 @@ import type {
 	ProjectionResult,
 	StochasticProjectionResult,
 } from "@/lib/projection";
-import { projectScenarioPack } from "@/lib/projection";
-import { createBasePack, makeSettings } from "@/lib/projection/__fixtures__";
+import { projectFinancialModelDocument } from "@/lib/projection";
+import {
+	createBaseDocument,
+	makeSettings,
+} from "@/lib/projection/__fixtures__";
 import type { ProjectionEngine } from "@/lib/projection/runtime/ProjectionEngine";
 import { wrapperWithEngine } from "./test-helpers";
 
@@ -18,10 +21,10 @@ import { wrapperWithEngine } from "./test-helpers";
 /* ------------------------------------------------------------------ */
 
 function makeProjectionResult(): ProjectionResult {
-	return projectScenarioPack(createBasePack(), makeSettings());
+	return projectFinancialModelDocument(createBaseDocument(), makeSettings());
 }
 
-function makeDefaultWhatIf() {
+function makeDefaultOverrides() {
 	return {
 		addedAccounts: [],
 		addedPostings: [],
@@ -96,30 +99,30 @@ describe("Mock engine project()", () => {
 	});
 
 	it("calls project with correct arguments", async () => {
-		const document = createBasePack();
+		const document = createBaseDocument();
 		const settings = makeSettings();
-		const whatIf = makeDefaultWhatIf();
+		const overrides = makeDefaultOverrides();
 
 		const result = await engine.project({
 			document,
 			projectionSettings: settings,
-			overrides: whatIf,
+			overrides,
 		});
 
 		expect(engine.project).toHaveBeenCalledOnce();
 		expect(engine.project).toHaveBeenCalledWith({
 			document,
 			projectionSettings: settings,
-			overrides: whatIf,
+			overrides,
 		});
 		expect(result.summary.currentNetWorth).toBe(1600);
 	});
 
 	it("keeps evaluation settings and results structured-clone safe", () => {
 		const request = {
-			document: createBasePack(),
+			document: createBaseDocument(),
 			projectionSettings: makeSettings(),
-			overrides: makeDefaultWhatIf(),
+			overrides: makeDefaultOverrides(),
 		};
 		const result = makeProjectionResult();
 		expect(structuredClone(request)).toEqual(request);
@@ -131,9 +134,9 @@ describe("Mock engine project()", () => {
 		const controller = new AbortController();
 
 		await engine.project({
-			document: createBasePack(),
+			document: createBaseDocument(),
 			projectionSettings: makeSettings(),
-			overrides: makeDefaultWhatIf(),
+			overrides: makeDefaultOverrides(),
 			signal: controller.signal,
 		});
 
@@ -155,9 +158,9 @@ describe("Mock engine project()", () => {
 
 		await expect(
 			engine.project({
-				document: createBasePack(),
+				document: createBaseDocument(),
 				projectionSettings: makeSettings(),
-				overrides: makeDefaultWhatIf(),
+				overrides: makeDefaultOverrides(),
 				signal: controller.signal,
 			}),
 		).rejects.toThrow("Aborted");
@@ -181,15 +184,15 @@ describe("Mock engine projectStochastic()", () => {
 	});
 
 	it("calls projectStochastic with correct arguments", async () => {
-		const document = createBasePack();
+		const document = createBaseDocument();
 		const settings = makeSettings();
-		const whatIf = makeDefaultWhatIf();
+		const overrides = makeDefaultOverrides();
 		const config = { runCount: 10, seed: 42 as number | null };
 
 		await engine.projectStochastic({
 			document,
 			projectionSettings: settings,
-			overrides: whatIf,
+			overrides,
 			config,
 		});
 
@@ -198,7 +201,7 @@ describe("Mock engine projectStochastic()", () => {
 		expect(callArgs).toEqual({
 			document,
 			projectionSettings: settings,
-			overrides: whatIf,
+			overrides,
 			config,
 		});
 	});
@@ -216,9 +219,9 @@ describe("Mock engine projectStochastic()", () => {
 
 		await engine.projectStochastic(
 			{
-				document: createBasePack(),
+				document: createBaseDocument(),
 				projectionSettings: makeSettings(),
-				overrides: makeDefaultWhatIf(),
+				overrides: makeDefaultOverrides(),
 				config: { runCount: 10, seed: null },
 			},
 			onProgress,
@@ -244,9 +247,9 @@ describe("Mock engine projectStochastic()", () => {
 
 		await expect(
 			engine.projectStochastic({
-				document: createBasePack(),
+				document: createBaseDocument(),
 				projectionSettings: makeSettings(),
-				overrides: makeDefaultWhatIf(),
+				overrides: makeDefaultOverrides(),
 				config: { runCount: 10, seed: null },
 				signal: controller.signal,
 			}),
@@ -281,9 +284,9 @@ describe("WorkerProjectionEngine", () => {
 		const engine = new WorkerProjectionEngine();
 		const expected = makeProjectionResult();
 		const promise = engine.project({
-			document: createBasePack(),
+			document: createBaseDocument(),
 			projectionSettings: makeSettings(),
-			overrides: makeDefaultWhatIf(),
+			overrides: makeDefaultOverrides(),
 		});
 		const worker = MockWorker.instances[0]!;
 
@@ -304,9 +307,9 @@ describe("WorkerProjectionEngine", () => {
 		} as StochasticProjectionResult;
 		const promise = engine.projectStochastic(
 			{
-				document: createBasePack(),
+				document: createBaseDocument(),
 				projectionSettings: makeSettings(),
-				overrides: makeDefaultWhatIf(),
+				overrides: makeDefaultOverrides(),
 				config: { runCount: 1, seed: 1 },
 			},
 			onProgress,
@@ -333,9 +336,9 @@ describe("WorkerProjectionEngine", () => {
 		const engine = new WorkerProjectionEngine();
 
 		const promise = engine.project({
-			document: createBasePack(),
+			document: createBaseDocument(),
 			projectionSettings: makeSettings(),
-			overrides: makeDefaultWhatIf(),
+			overrides: makeDefaultOverrides(),
 		});
 		const worker = MockWorker.instances[0]!;
 
@@ -346,9 +349,9 @@ describe("WorkerProjectionEngine", () => {
 	it("terminates and rejects unreadable worker messages", async () => {
 		const engine = new WorkerProjectionEngine();
 		const promise = engine.project({
-			document: createBasePack(),
+			document: createBaseDocument(),
 			projectionSettings: makeSettings(),
-			overrides: makeDefaultWhatIf(),
+			overrides: makeDefaultOverrides(),
 		});
 		const worker = MockWorker.instances[0]!;
 
@@ -364,9 +367,9 @@ describe("WorkerProjectionEngine", () => {
 		const engine = new WorkerProjectionEngine();
 		const promise = engine.projectStochastic(
 			{
-				document: createBasePack(),
+				document: createBaseDocument(),
 				projectionSettings: makeSettings(),
-				overrides: makeDefaultWhatIf(),
+				overrides: makeDefaultOverrides(),
 				config: { runCount: 1, seed: 1 },
 			},
 			() => {

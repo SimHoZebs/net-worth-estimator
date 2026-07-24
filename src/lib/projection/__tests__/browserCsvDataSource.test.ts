@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { createBasePack, validCsvFiles } from "../__fixtures__";
-import { createBrowserCsvDataSource } from "../sources/csv/browserCsvDataSource";
+import { createBaseDocument, validCsvFiles } from "../__fixtures__";
+import {
+	createBrowserCsvDataSource,
+	FINANCIAL_MODEL_STORAGE_KEY,
+	LEGACY_SCENARIO_PACK_STORAGE_KEY,
+} from "../sources/csv/browserCsvDataSource";
 
 function createMemoryStorage(initial: Record<string, string> = {}) {
 	const values = new Map(Object.entries(initial));
@@ -43,118 +47,233 @@ describe("createBrowserCsvDataSource", () => {
 		const fetchImpl = createCsvFetch();
 		const dataSource = createBrowserCsvDataSource({ fetchImpl, storage: null });
 
-		const result = await dataSource.loadPack();
+		const result = await dataSource.loadDocument();
 
-		expect(result.pack?.accounts).toHaveLength(4);
+		expect(result.document?.accounts).toHaveLength(4);
 		expect(result.issues).toEqual([]);
 		expect(fetchImpl).toHaveBeenCalledTimes(6);
 		expect(dataSource.save).toBeUndefined();
 		expect(dataSource.reset).toBeUndefined();
 	});
 
-	it("loads the saved browser pack before fetching bundled CSV files", async () => {
-		const storageKey = "scenario:test";
-		const savedPack = createBasePack({ sourcePath: "browser:local-storage" });
+	it("loads the canonical browser key before fetching bundled CSV files", async () => {
+		const document = createBaseDocument({
+			sourcePath: "browser:local-storage",
+		});
 		const storage = createMemoryStorage({
-			[storageKey]: JSON.stringify(savedPack),
+			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify(document),
 		});
 		const fetchImpl = createCsvFetch();
-		const dataSource = createBrowserCsvDataSource({
+
+		const result = await createBrowserCsvDataSource({
 			fetchImpl,
 			storage,
-			storageKey,
-		});
+		}).loadDocument();
 
-		const result = await dataSource.loadPack();
-
-		expect(result.pack).toEqual(savedPack);
+		expect(result.document).toEqual(document);
 		expect(fetchImpl).not.toHaveBeenCalled();
 	});
 
-	it("migrates a version 8 browser pack with bundled evaluations", async () => {
-		const storageKey = "scenario:test";
-		const currentPack = createBasePack({
+	it("migrates a valid legacy key to the canonical key", async () => {
+		const document = createBaseDocument({
 			sourcePath: "browser:local-storage",
 		});
-		const { evaluations: _evaluations, ...legacyPack } = currentPack;
 		const storage = createMemoryStorage({
-			[storageKey]: JSON.stringify({ ...legacyPack, version: 8 }),
+			[LEGACY_SCENARIO_PACK_STORAGE_KEY]: JSON.stringify(document),
+		});
+
+		const result = await createBrowserCsvDataSource({
+			fetchImpl: createCsvFetch(),
+			storage,
+		}).loadDocument();
+
+		expect(result.document).toEqual(document);
+		expect(JSON.parse(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)!)).toEqual(
+			document,
+		);
+		expect(storage.getItem(LEGACY_SCENARIO_PACK_STORAGE_KEY)).toBeNull();
+	});
+
+	it("gives the canonical key precedence over the legacy key", async () => {
+		const canonical = createBaseDocument({ sourcePath: "canonical" });
+		const legacy = createBaseDocument({ sourcePath: "legacy" });
+		const storage = createMemoryStorage({
+			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify(canonical),
+			[LEGACY_SCENARIO_PACK_STORAGE_KEY]: JSON.stringify(legacy),
+		});
+
+		const result = await createBrowserCsvDataSource({
+			fetchImpl: createCsvFetch(),
+			storage,
+		}).loadDocument();
+
+		expect(result.document?.sourcePath).toBe("canonical");
+	});
+
+	it("reports corrupt canonical data without falling back", async () => {
+		const legacy = createBaseDocument({ sourcePath: "legacy" });
+		const storage = createMemoryStorage({
+			[FINANCIAL_MODEL_STORAGE_KEY]: "{invalid",
+			[LEGACY_SCENARIO_PACK_STORAGE_KEY]: JSON.stringify(legacy),
 		});
 		const fetchImpl = createCsvFetch();
-		const dataSource = createBrowserCsvDataSource({
+
+		const result = await createBrowserCsvDataSource({
 			fetchImpl,
 			storage,
-			storageKey,
+		}).loadDocument();
+
+		expect(result.document).toBeNull();
+		expect(result.issues).toMatchObject([
+			{ severity: "error", code: "browser.storage.invalid" },
+		]);
+		expect(fetchImpl).not.toHaveBeenCalled();
+		expect(storage.getItem(LEGACY_SCENARIO_PACK_STORAGE_KEY)).not.toBeNull();
+	});
+
+	it("reports corrupt legacy data instead of silently loading bundled data", async () => {
+		const storage = createMemoryStorage({
+			[LEGACY_SCENARIO_PACK_STORAGE_KEY]: "{invalid",
 		});
+		const fetchImpl = createCsvFetch();
 
-		const result = await dataSource.loadPack();
+		const result = await createBrowserCsvDataSource({
+			fetchImpl,
+			storage,
+		}).loadDocument();
 
-		expect(result.pack).toMatchObject({
-			version: 9,
+		expect(result.document).toBeNull();
+		expect(result.issues).toMatchObject([
+			{ severity: "error", code: "browser.storage.invalid" },
+		]);
+		expect(fetchImpl).not.toHaveBeenCalled();
+	});
+
+	it.each([
+		["canonical", FINANCIAL_MODEL_STORAGE_KEY],
+		["legacy", LEGACY_SCENARIO_PACK_STORAGE_KEY],
+	])("reports malformed nested %s data without throwing", async (_name, key) => {
+		const malformed = createBaseDocument({
+			accounts: [null] as never,
+		});
+		const storage = createMemoryStorage({ [key]: JSON.stringify(malformed) });
+
+		await expect(
+			createBrowserCsvDataSource({
+				fetchImpl: createCsvFetch(),
+				storage,
+			}).loadDocument(),
+		).resolves.toMatchObject({
+			document: null,
+			issues: [{ severity: "error", code: "browser.storage.invalid" }],
+		});
+	});
+
+	it("migrates a version 8 document with bundled evaluations", async () => {
+		const currentDocument = createBaseDocument({
 			sourcePath: "browser:local-storage",
-			accounts: currentPack.accounts,
+		});
+		const { evaluations: _evaluations, ...legacyDocument } = currentDocument;
+		const storage = createMemoryStorage({
+			[LEGACY_SCENARIO_PACK_STORAGE_KEY]: JSON.stringify({
+				...legacyDocument,
+				version: 8,
+			}),
+		});
+		const fetchImpl = createCsvFetch();
+
+		const result = await createBrowserCsvDataSource({
+			fetchImpl,
+			storage,
+		}).loadDocument();
+
+		expect(result.document).toMatchObject({
+			version: 9,
+			accounts: currentDocument.accounts,
 			evaluations: [
 				{ instanceId: "net-worth-1m" },
 				{ instanceId: "posting-fulfillment" },
 			],
 		});
 		expect(fetchImpl).toHaveBeenCalledTimes(6);
-		expect(JSON.parse(storage.getItem(storageKey)!)).toMatchObject({
-			version: 9,
-			evaluations: [
-				{ instanceId: "net-worth-1m" },
-				{ instanceId: "posting-fulfillment" },
-			],
-		});
 	});
 
-	it("loads a migrated version 8 pack when browser storage is read-only", async () => {
-		const currentPack = createBasePack({
-			sourcePath: "browser:local-storage",
+	it("saves canonically, removes legacy data, and resets both keys", async () => {
+		const storage = createMemoryStorage({
+			[LEGACY_SCENARIO_PACK_STORAGE_KEY]: JSON.stringify(createBaseDocument()),
 		});
-		const { evaluations: _evaluations, ...legacyPack } = currentPack;
-		const storage = {
-			getItem: vi.fn(() => JSON.stringify({ ...legacyPack, version: 8 })),
-			setItem: vi.fn(() => {
-				throw new Error("Storage is read-only");
-			}),
-			removeItem: vi.fn(),
+		const fetchImpl = createCsvFetch();
+		const dataSource = createBrowserCsvDataSource({ fetchImpl, storage });
+
+		await dataSource.save?.run(createBaseDocument());
+
+		const saved = JSON.parse(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)!) as {
+			sourcePath: string;
 		};
+		expect(saved.sourcePath).toBe("browser:local-storage");
+		expect(storage.getItem(LEGACY_SCENARIO_PACK_STORAGE_KEY)).toBeNull();
+
+		storage.setItem(
+			LEGACY_SCENARIO_PACK_STORAGE_KEY,
+			JSON.stringify(createBaseDocument()),
+		);
+		const result = await dataSource.reset?.run();
+
+		expect(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)).toBeNull();
+		expect(storage.getItem(LEGACY_SCENARIO_PACK_STORAGE_KEY)).toBeNull();
+		expect(result?.document?.accounts).toHaveLength(4);
+		expect(fetchImpl).toHaveBeenCalledTimes(6);
+	});
+
+	it("preserves both storage keys when save validation fails", async () => {
+		const canonical = JSON.stringify(createBaseDocument({ sourcePath: "old" }));
+		const legacy = JSON.stringify(createBaseDocument({ sourcePath: "legacy" }));
+		const storage = createMemoryStorage({
+			[FINANCIAL_MODEL_STORAGE_KEY]: canonical,
+			[LEGACY_SCENARIO_PACK_STORAGE_KEY]: legacy,
+		});
+		const invalid = createBaseDocument({
+			accounts: [
+				createBaseDocument().accounts[0],
+				createBaseDocument().accounts[0],
+			],
+		});
 		const dataSource = createBrowserCsvDataSource({
 			fetchImpl: createCsvFetch(),
 			storage,
 		});
 
-		const result = await dataSource.loadPack();
-
-		expect(result.pack?.version).toBe(9);
-		expect(result.pack?.accounts).toEqual(currentPack.accounts);
-		expect(result.pack?.evaluations).toHaveLength(2);
-		expect(storage.setItem).toHaveBeenCalledOnce();
+		await expect(dataSource.save?.run(invalid)).rejects.toThrow(
+			"validation errors",
+		);
+		expect(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)).toBe(canonical);
+		expect(storage.getItem(LEGACY_SCENARIO_PACK_STORAGE_KEY)).toBe(legacy);
 	});
 
-	it("saves to browser storage and resets back to bundled CSV files", async () => {
-		const storageKey = "scenario:test";
+	it("saves documents that have warnings", async () => {
 		const storage = createMemoryStorage();
-		const fetchImpl = createCsvFetch();
 		const dataSource = createBrowserCsvDataSource({
-			fetchImpl,
+			fetchImpl: createCsvFetch(),
 			storage,
-			storageKey,
 		});
-		const pack = createBasePack();
 
-		await dataSource.save?.run(pack);
+		const result = await dataSource.save?.run(createBaseDocument());
 
-		const saved = JSON.parse(storage.getItem(storageKey)!) as {
-			sourcePath: string;
-		};
-		expect(saved.sourcePath).toBe("browser:local-storage");
+		expect(result?.issues).toContainEqual(
+			expect.objectContaining({ severity: "warning" }),
+		);
+		expect(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)).not.toBeNull();
+	});
 
-		const result = await dataSource.reset?.run();
+	it("exposes loadPack with a legacy result envelope", async () => {
+		const dataSource = createBrowserCsvDataSource({
+			fetchImpl: createCsvFetch(),
+			storage: null,
+		});
 
-		expect(storage.getItem(storageKey)).toBeNull();
-		expect(result?.pack?.accounts).toHaveLength(4);
-		expect(fetchImpl).toHaveBeenCalledTimes(6);
+		const result = await dataSource.loadPack();
+
+		expect(result.pack?.accounts).toHaveLength(4);
+		expect(result).not.toHaveProperty("document");
 	});
 });

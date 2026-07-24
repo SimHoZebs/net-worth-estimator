@@ -1,11 +1,11 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { pluralize } from "@/lib/format";
-import type { ScenarioValidationIssue } from "@/lib/projection";
+import type { ModelValidationIssue } from "@/lib/projection";
 
 export function ModelValidationPanel({
 	issues,
 }: {
-	issues: ScenarioValidationIssue[];
+	issues: ModelValidationIssue[];
 }) {
 	if (issues.length === 0) {
 		return null;

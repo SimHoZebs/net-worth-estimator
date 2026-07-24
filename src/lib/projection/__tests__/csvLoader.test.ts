@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-	CSV_SCENARIO_PUBLIC_PATH,
-	parseCsvScenarioPack,
-	serializeCsvScenarioPack,
+	CSV_MODEL_PUBLIC_PATH,
+	parseCsvFinancialModel,
+	serializeCsvFinancialModel,
 } from "../";
 import {
 	nullMinMaxCsvFiles,
@@ -10,15 +10,15 @@ import {
 	validCsvFiles,
 } from "../__fixtures__";
 
-describe("CSV scenario pack", () => {
-	it("parses a valid CSV pack", () => {
-		const result = parseCsvScenarioPack(validCsvFiles, {
-			basePath: CSV_SCENARIO_PUBLIC_PATH,
+describe("CSV financial model", () => {
+	it("parses a valid CSV financial model", () => {
+		const result = parseCsvFinancialModel(validCsvFiles, {
+			basePath: CSV_MODEL_PUBLIC_PATH,
 		});
 
 		expect(result.issues).toEqual([]);
 		expect(result.data?.version).toBe(9);
-		expect(result.data?.sourcePath).toBe(CSV_SCENARIO_PUBLIC_PATH);
+		expect(result.data?.sourcePath).toBe(CSV_MODEL_PUBLIC_PATH);
 		expect(result.data?.postings[1]?.arithmetic).toBe("salary * 0.22");
 		expect(result.data?.postings[3]?.annualCap).toBe(23000);
 		expect(result.data?.accounts[3]?.label).toBe("Student Loan");
@@ -26,7 +26,7 @@ describe("CSV scenario pack", () => {
 	});
 
 	it("rejects invalid evaluation JSON and duplicate instance IDs", () => {
-		const invalidJson = parseCsvScenarioPack({
+		const invalidJson = parseCsvFinancialModel({
 			...validCsvFiles,
 			behaviors: {
 				...validCsvFiles.behaviors,
@@ -41,7 +41,7 @@ describe("CSV scenario pack", () => {
 			"behavior/financial-independence.csv",
 		);
 
-		const duplicate = parseCsvScenarioPack({
+		const duplicate = parseCsvFinancialModel({
 			...validCsvFiles,
 			behaviors: {
 				...validCsvFiles.behaviors,
@@ -60,7 +60,7 @@ describe("CSV scenario pack", () => {
 	});
 
 	it("rejects duplicate instance IDs across behavior files", () => {
-		const result = parseCsvScenarioPack({
+		const result = parseCsvFinancialModel({
 			...validCsvFiles,
 			behaviors: {
 				...validCsvFiles.behaviors,
@@ -85,7 +85,7 @@ describe("CSV scenario pack", () => {
 	});
 
 	it("rejects duplicate global order values across behavior files", () => {
-		const result = parseCsvScenarioPack({
+		const result = parseCsvFinancialModel({
 			...validCsvFiles,
 			behaviors: {
 				...validCsvFiles.behaviors,
@@ -110,18 +110,18 @@ describe("CSV scenario pack", () => {
 	});
 
 	it("round-trips evaluation configuration through CSV", () => {
-		const parsed = parseCsvScenarioPack(validCsvFiles);
+		const parsed = parseCsvFinancialModel(validCsvFiles);
 		expect(parsed.data).not.toBeNull();
 
-		const serialized = serializeCsvScenarioPack(parsed.data!);
-		const reparsed = parseCsvScenarioPack(serialized);
+		const serialized = serializeCsvFinancialModel(parsed.data!);
+		const reparsed = parseCsvFinancialModel(serialized);
 
 		expect(reparsed.issues).toEqual([]);
 		expect(reparsed.data?.evaluations).toEqual(parsed.data?.evaluations);
 	});
 
 	it("preserves evaluation order across behavior files", () => {
-		const parsed = parseCsvScenarioPack(validCsvFiles);
+		const parsed = parseCsvFinancialModel(validCsvFiles);
 		expect(parsed.data).not.toBeNull();
 		const mixed = {
 			...parsed.data!,
@@ -144,7 +144,7 @@ describe("CSV scenario pack", () => {
 			],
 		};
 
-		const reparsed = parseCsvScenarioPack(serializeCsvScenarioPack(mixed));
+		const reparsed = parseCsvFinancialModel(serializeCsvFinancialModel(mixed));
 
 		expect(
 			reparsed.data?.evaluations.map(({ instanceId }) => instanceId),
@@ -152,14 +152,14 @@ describe("CSV scenario pack", () => {
 	});
 
 	it("serializes an empty evaluation collection as a valid header-only file", () => {
-		const parsed = parseCsvScenarioPack(validCsvFiles);
+		const parsed = parseCsvFinancialModel(validCsvFiles);
 		expect(parsed.data).not.toBeNull();
 
-		const serialized = serializeCsvScenarioPack({
+		const serialized = serializeCsvFinancialModel({
 			...parsed.data!,
 			evaluations: [],
 		});
-		const reparsed = parseCsvScenarioPack(serialized);
+		const reparsed = parseCsvFinancialModel(serialized);
 
 		expect(serialized.behaviors.financialIndependence).toBe(
 			"order,instanceId,label,enabled,config",
@@ -172,7 +172,7 @@ describe("CSV scenario pack", () => {
 	});
 
 	it("reports circular posting dependency chains", () => {
-		const result = parseCsvScenarioPack({
+		const result = parseCsvFinancialModel({
 			...validCsvFiles,
 			postings: [
 				postingsHeaderOnly.trimEnd(),
@@ -189,7 +189,7 @@ describe("CSV scenario pack", () => {
 	});
 
 	it("rejects accounts with empty minBalance/maxBalance (null is no longer allowed)", () => {
-		const result = parseCsvScenarioPack(nullMinMaxCsvFiles);
+		const result = parseCsvFinancialModel(nullMinMaxCsvFiles);
 
 		expect(result.data).toBeNull();
 		expect(
@@ -201,7 +201,7 @@ describe("CSV scenario pack", () => {
 	});
 
 	it("reports missing posting destination accounts", () => {
-		const result = parseCsvScenarioPack({
+		const result = parseCsvFinancialModel({
 			...validCsvFiles,
 			postings: [
 				postingsHeaderOnly.trimEnd(),
@@ -217,7 +217,7 @@ describe("CSV scenario pack", () => {
 	});
 
 	it("warns when enabled accounts are missing chart colors", () => {
-		const result = parseCsvScenarioPack({
+		const result = parseCsvFinancialModel({
 			...validCsvFiles,
 			accounts: validCsvFiles.accounts.replace(
 				"checking,Checking,-Infinity,Infinity,#0f172a,true",

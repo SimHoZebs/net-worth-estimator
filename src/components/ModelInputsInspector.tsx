@@ -20,7 +20,7 @@ import { pluralize } from "@/lib/format";
 import type {
 	DataSource,
 	FinancialModelDocument,
-	ScenarioValidationIssue,
+	ModelValidationIssue,
 } from "@/lib/projection";
 import { selectEditorActions, selectEditorState, useStore } from "@/store";
 import { ModelValidationPanel } from "./ModelValidationPanel";
@@ -30,7 +30,7 @@ type InputTab = "postings" | "accounts" | "history";
 interface ModelInputsInspectorProps {
 	projectionStartDate: string;
 	document: FinancialModelDocument | null;
-	issues: ScenarioValidationIssue[];
+	issues: ModelValidationIssue[];
 	dataSource: DataSource;
 	isLoading: boolean;
 	loadError: string | null;
