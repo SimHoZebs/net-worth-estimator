@@ -1,9 +1,9 @@
 import { ParseError, parseArithmetic } from "../../simulation/arithmetic";
 import type { FinancialModelDocument, Posting } from "../../types/model";
 import {
-	CSV_BEHAVIOR_DEFINITION_IDS,
 	CSV_BEHAVIOR_FILE_NAMES,
 	CSV_MODEL_FILE_NAMES,
+	EVALUATION_TYPE_ORDER,
 } from "../../types/model";
 import type { ModelValidationIssue } from "../../types/validation";
 import { addIssue, rowPath } from "../../utils/validation";
@@ -59,34 +59,24 @@ function validateEvaluationInstanceIds(
 	issues: ModelValidationIssue[],
 	document: FinancialModelDocument,
 ) {
-	const fileNameByDefinitionId = new Map<string, string>(
-		Object.keys(CSV_BEHAVIOR_FILE_NAMES).map((key) => [
-			CSV_BEHAVIOR_DEFINITION_IDS[
-				key as keyof typeof CSV_BEHAVIOR_DEFINITION_IDS
-			],
-			CSV_BEHAVIOR_FILE_NAMES[key as keyof typeof CSV_BEHAVIOR_FILE_NAMES],
-		]),
-	);
 	const seenInstanceIds = new Set<string>();
 
-	document.evaluations.forEach((evaluation) => {
-		const fileName =
-			fileNameByDefinitionId.get(evaluation.definitionId) ??
-			`behavior/${evaluation.definitionId}.csv`;
+	for (const type of EVALUATION_TYPE_ORDER) {
+		for (const evaluation of document.evaluations[type]) {
+			if (seenInstanceIds.has(evaluation.instanceId)) {
+				addIssue(
+					issues,
+					"error",
+					"evaluation.instanceId.duplicate",
+					`ID '${evaluation.instanceId}' is duplicated across behavior configuration files.`,
+					[CSV_BEHAVIOR_FILE_NAMES[type]],
+				);
+				continue;
+			}
 
-		if (seenInstanceIds.has(evaluation.instanceId)) {
-			addIssue(
-				issues,
-				"error",
-				"evaluation.instanceId.duplicate",
-				`ID '${evaluation.instanceId}' is duplicated across behavior configuration files.`,
-				[fileName],
-			);
-			return;
+			seenInstanceIds.add(evaluation.instanceId);
 		}
-
-		seenInstanceIds.add(evaluation.instanceId);
-	});
+	}
 }
 
 function validatePostingArithmetic(

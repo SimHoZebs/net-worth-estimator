@@ -3,11 +3,12 @@ import { create } from "zustand";
 import type {
 	Account,
 	Checkpoint,
-	ConfiguredEvaluation,
+	EvaluationInstance,
 	EvaluationResultStatus,
+	EvaluationTables,
+	EvaluationType,
 	FinancialIndependencePlan,
 	FinancialModelDocument,
-	JsonValue,
 	ModelOverrides,
 	Posting,
 	StochasticConfig,
@@ -336,10 +337,12 @@ interface ThemeSlice {
 }
 
 const createThemeSlice: StateCreator<AppStore, [], [], ThemeSlice> = (set) => {
-	const initial =
-		typeof window !== "undefined"
-			? (localStorage.theme as Theme | undefined)
-			: undefined;
+	let initial: Theme | undefined;
+	try {
+		initial = window.localStorage?.theme as Theme | undefined;
+	} catch {
+		initial = undefined;
+	}
 	return {
 		theme: initial ?? "system",
 		resolvedTheme: resolveTheme(initial ?? "system"),
@@ -368,44 +371,79 @@ export const DEFAULT_FINANCIAL_INDEPENDENCE_PLAN: FinancialIndependencePlan = {
 	principalPolicy: "preserve-real-principal",
 };
 
-export const DEFAULT_EVALUATIONS: ConfiguredEvaluation[] = [
-	{
-		definitionId: "financial-independence",
-		instanceId: "financial-independence",
-		label: "Financial independence",
-		enabled: true,
-		config: structuredClone(
-			DEFAULT_FINANCIAL_INDEPENDENCE_PLAN,
-		) as unknown as JsonValue,
-	},
-	{
-		definitionId: "net-worth-threshold",
-		instanceId: "net-worth-1m",
-		label: "Reach $1,000,000 net worth",
-		enabled: true,
-		config: { target: 1_000_000 },
-	},
-	{
-		definitionId: "posting-fulfillment",
-		instanceId: "posting-fulfillment",
-		label: "Posting fulfillment",
-		enabled: true,
-		config: { postingIds: null },
-	},
-];
+export const DEFAULT_EVALUATIONS: EvaluationTables = {
+	financialIndependence: [
+		{
+			instanceId: "financial-independence",
+			label: "Financial independence",
+			enabled: true,
+			config: structuredClone(DEFAULT_FINANCIAL_INDEPENDENCE_PLAN),
+		},
+	],
+	netWorthThreshold: [
+		{
+			instanceId: "net-worth-1m",
+			label: "Reach $1,000,000 net worth",
+			enabled: true,
+			config: { target: 1_000_000 },
+		},
+	],
+	postingFulfillment: [
+		{
+			instanceId: "posting-fulfillment",
+			label: "Posting fulfillment",
+			enabled: true,
+			config: { postingIds: null },
+		},
+	],
+};
+
+function evaluationTable(
+	evaluations: EvaluationTables,
+	type: EvaluationType,
+): EvaluationInstance<unknown>[] {
+	return evaluations[type] as EvaluationInstance<unknown>[];
+}
+
+function hasEvaluationInstanceId(
+	evaluations: EvaluationTables,
+	instanceId: string,
+	excludeInstanceId?: string,
+) {
+	return (Object.values(evaluations) as EvaluationInstance<unknown>[][]).some(
+		(table) =>
+			table.some(
+				(evaluation) =>
+					evaluation.instanceId === instanceId &&
+					evaluation.instanceId !== excludeInstanceId,
+			),
+	);
+}
 
 interface SettingsSlice {
-	evaluations: ConfiguredEvaluation[];
-	replaceEvaluations: (evaluations: ConfiguredEvaluation[]) => void;
-	addEvaluation: (evaluation: ConfiguredEvaluation) => void;
-	duplicateEvaluation: (instanceId: string) => void;
-	updateEvaluation: (
-		instanceId: string,
-		changes: Partial<ConfiguredEvaluation>,
+	evaluations: EvaluationTables;
+	replaceEvaluations: (evaluations: EvaluationTables) => void;
+	addEvaluation: (
+		type: EvaluationType,
+		evaluation: EvaluationInstance<unknown>,
 	) => void;
-	updateEvaluationConfig: (instanceId: string, changes: object) => void;
-	removeEvaluation: (instanceId: string) => void;
-	moveEvaluation: (instanceId: string, direction: -1 | 1) => void;
+	duplicateEvaluation: (type: EvaluationType, instanceId: string) => void;
+	updateEvaluation: (
+		type: EvaluationType,
+		instanceId: string,
+		changes: Partial<EvaluationInstance<unknown>>,
+	) => void;
+	updateEvaluationConfig: (
+		type: EvaluationType,
+		instanceId: string,
+		changes: object,
+	) => void;
+	removeEvaluation: (type: EvaluationType, instanceId: string) => void;
+	moveEvaluation: (
+		type: EvaluationType,
+		instanceId: string,
+		direction: -1 | 1,
+	) => void;
 	horizonYears: number;
 	setHorizonYears: (years: number) => void;
 	stochasticPreference: StochasticPreference;
@@ -422,108 +460,119 @@ const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (
 	evaluations: structuredClone(DEFAULT_EVALUATIONS),
 	replaceEvaluations: (evaluations) =>
 		set({ evaluations: structuredClone(evaluations) }),
-	addEvaluation: (evaluation) =>
+	addEvaluation: (type, evaluation) =>
 		set((state) =>
 			!evaluation.instanceId.trim() ||
 			!isJsonValue(evaluation.config) ||
-			state.evaluations.some(
-				(item) => item.instanceId === evaluation.instanceId,
-			)
+			hasEvaluationInstanceId(state.evaluations, evaluation.instanceId)
 				? state
-				: { evaluations: [...state.evaluations, evaluation] },
+				: {
+						evaluations: {
+							...state.evaluations,
+							[type]: [...evaluationTable(state.evaluations, type), evaluation],
+						},
+					},
 		),
-	duplicateEvaluation: (instanceId) =>
+	duplicateEvaluation: (type, instanceId) =>
 		set((state) => {
-			const source = state.evaluations.find(
+			const table = evaluationTable(state.evaluations, type);
+			const sourceIndex = table.findIndex(
 				(evaluation) => evaluation.instanceId === instanceId,
 			);
+			const source = table[sourceIndex];
 			if (!source) return state;
 			let suffix = 2;
 			let nextId = `${source.instanceId}-${suffix}`;
-			while (state.evaluations.some((item) => item.instanceId === nextId)) {
+			while (hasEvaluationInstanceId(state.evaluations, nextId)) {
 				suffix++;
 				nextId = `${source.instanceId}-${suffix}`;
 			}
+			const nextTable = [...table];
+			nextTable.splice(sourceIndex + 1, 0, {
+				...structuredClone(source),
+				instanceId: nextId,
+				label: `${source.label} copy`,
+			});
 			return {
-				evaluations: [
-					...state.evaluations,
-					{
-						...structuredClone(source),
-						instanceId: nextId,
-						label: `${source.label} copy`,
-					},
-				],
+				evaluations: { ...state.evaluations, [type]: nextTable },
 			};
 		}),
-	updateEvaluation: (instanceId, changes) =>
+	updateEvaluation: (type, instanceId, changes) =>
 		set((state) => {
 			if (
 				(changes.config !== undefined && !isJsonValue(changes.config)) ||
 				(changes.instanceId !== undefined &&
 					(changes.instanceId.trim() === "" ||
-						state.evaluations.some(
-							(item) =>
-								item.instanceId === changes.instanceId &&
-								item.instanceId !== instanceId,
+						hasEvaluationInstanceId(
+							state.evaluations,
+							changes.instanceId,
+							instanceId,
 						)))
 			) {
 				return state;
 			}
 			return {
-				evaluations: state.evaluations.map((evaluation) =>
-					evaluation.instanceId === instanceId
-						? { ...evaluation, ...changes }
-						: evaluation,
-				),
+				evaluations: {
+					...state.evaluations,
+					[type]: evaluationTable(state.evaluations, type).map((evaluation) =>
+						evaluation.instanceId === instanceId
+							? { ...evaluation, ...changes }
+							: evaluation,
+					),
+				},
 			};
 		}),
-	updateEvaluationConfig: (instanceId, changes) =>
+	updateEvaluationConfig: (type, instanceId, changes) =>
 		set((state) =>
 			!isJsonValue(changes) || Array.isArray(changes)
 				? state
 				: {
-						evaluations: state.evaluations.map((evaluation) =>
-							evaluation.instanceId === instanceId
-								? {
-										...evaluation,
-										config: {
-											...(typeof evaluation.config === "object" &&
-											evaluation.config !== null &&
-											!Array.isArray(evaluation.config)
-												? evaluation.config
-												: {}),
-											...changes,
-										},
-									}
-								: evaluation,
-						),
+						evaluations: {
+							...state.evaluations,
+							[type]: evaluationTable(state.evaluations, type).map(
+								(evaluation) =>
+									evaluation.instanceId === instanceId
+										? {
+												...evaluation,
+												config: {
+													...(typeof evaluation.config === "object" &&
+													evaluation.config !== null &&
+													!Array.isArray(evaluation.config)
+														? evaluation.config
+														: {}),
+													...changes,
+												},
+											}
+										: evaluation,
+							),
+						},
 					},
 		),
-	removeEvaluation: (instanceId) =>
+	removeEvaluation: (type, instanceId) =>
 		set((state) => ({
-			evaluations: state.evaluations.filter(
-				(evaluation) => evaluation.instanceId !== instanceId,
-			),
+			evaluations: {
+				...state.evaluations,
+				[type]: evaluationTable(state.evaluations, type).filter(
+					(evaluation) => evaluation.instanceId !== instanceId,
+				),
+			},
 		})),
-	moveEvaluation: (instanceId, direction) =>
+	moveEvaluation: (type, instanceId, direction) =>
 		set((state) => {
-			const index = state.evaluations.findIndex(
+			const table = evaluationTable(state.evaluations, type);
+			const index = table.findIndex(
 				(evaluation) => evaluation.instanceId === instanceId,
 			);
 			const destination = index + direction;
-			if (
-				index < 0 ||
-				destination < 0 ||
-				destination >= state.evaluations.length
-			) {
+			if (index < 0 || destination < 0 || destination >= table.length) {
 				return state;
 			}
-			const evaluations = [...state.evaluations];
-			[evaluations[index], evaluations[destination]] = [
-				evaluations[destination],
-				evaluations[index],
+			const nextTable = [...table];
+			[nextTable[index], nextTable[destination]] = [
+				nextTable[destination],
+				nextTable[index],
 			];
-			return { evaluations };
+			return { evaluations: { ...state.evaluations, [type]: nextTable } };
 		}),
 
 	horizonYears: DEFAULT_HORIZON_YEARS,
@@ -609,5 +658,6 @@ export function cloneDocument(
 			...p,
 			destinations: p.destinations ? [...p.destinations] : null,
 		})),
+		evaluations: structuredClone(document.evaluations),
 	};
 }

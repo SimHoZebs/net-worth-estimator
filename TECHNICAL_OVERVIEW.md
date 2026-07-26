@@ -23,7 +23,7 @@ The Net Worth Estimator is a React application that loads a CSV-backed `Financia
 
 ## 3. Persistence
 
-The CSV filenames and shapes are unchanged. The persistence boundary is the validated `FinancialModelDocument` represented by `accounts.csv`, `checkpoints.csv`, `postings.csv`, and one CSV per evaluation definition under `configs/behavior/`.
+The persistence boundary is the validated `FinancialModelDocument` represented by `accounts.csv`, `checkpoints.csv`, `postings.csv`, and one typed CSV table per evaluation type under `configs/behavior/`.
 
 ### Development
 
@@ -45,15 +45,15 @@ The CSV filenames and shapes are unchanged. The persistence boundary is the vali
 
 ## 4. Core Types
 
-- `FinancialModelDocument`: canonical persisted accounts, postings, checkpoints, ordered evaluation configuration, version, and source metadata.
+- `FinancialModelDocument`: canonical persisted accounts, postings, checkpoints, typed evaluation tables, and source metadata.
 - `ModelOverrides`: session-only additions and disabled account/posting selections applied before preparation.
 - `SimulationRequest`: resolved model, initial state, date range, start-date event policy, and optional `MonteCarloSample`.
 - `SimulationRun`: exact initial/final states, dated balance snapshots, and ordered movement attempts from one kernel execution.
 - `ProjectionPath`: immutable evaluator-facing timeline, effective document, and movement records.
 - `MonteCarloSample`: sampled annual rates by posting ID for one stochastic run.
 - `ComparisonSnapshot`: read-only current/final net-worth and evaluation metrics captured by the UI. It contains no model document or overrides and cannot restore state.
-- `ConfiguredEvaluation`: serializable definition ID, stable instance ID, label, enabled state, and definition-owned config.
-- `EvaluationResultCollection`: ordered instance IDs and generic result envelopes keyed by instance ID.
+- `EvaluationTables`: typed tables keyed by evaluation type. `EVALUATION_TYPE_ORDER` controls type order, and each table's array order preserves ingestion order.
+- `EvaluationResultCollection`: locally ordered result tables keyed by evaluation type.
 
 There is no named-alternative-model feature. Comparisons are metric snapshots only.
 

@@ -1,5 +1,3 @@
-export const FINANCIAL_MODEL_DOCUMENT_VERSION = 9 as const;
-
 export const CSV_MODEL_REPO_PATH = "public/configs";
 export const CSV_MODEL_PUBLIC_PATH = "/configs";
 
@@ -15,6 +13,13 @@ export const CSV_BEHAVIOR_FILE_NAMES = {
 	postingFulfillment: "behavior/posting-fulfillment.csv",
 } as const;
 
+export const EVALUATION_TYPE_ORDER = [
+	"financialIndependence",
+	"netWorthThreshold",
+	"postingFulfillment",
+] as const;
+
+/** @deprecated Evaluation type is now identified by its table key. */
 export const CSV_BEHAVIOR_DEFINITION_IDS = {
 	financialIndependence: "financial-independence",
 	netWorthThreshold: "net-worth-threshold",
@@ -23,6 +28,7 @@ export const CSV_BEHAVIOR_DEFINITION_IDS = {
 
 export type ModelCollectionKey = keyof typeof CSV_MODEL_FILE_NAMES;
 export type BehaviorCollectionKey = keyof typeof CSV_BEHAVIOR_FILE_NAMES;
+export type EvaluationType = (typeof EVALUATION_TYPE_ORDER)[number];
 export type ModelFileName =
 	| (typeof CSV_MODEL_FILE_NAMES)[ModelCollectionKey]
 	| (typeof CSV_BEHAVIOR_FILE_NAMES)[BehaviorCollectionKey];
@@ -87,10 +93,41 @@ export interface FinancialIndependencePlan {
 	principalPolicy: FinancialIndependencePrincipalPolicy;
 }
 
+export interface NetWorthThresholdConfig {
+	target: number;
+}
+
+export interface PostingFulfillmentConfig {
+	postingIds: string[] | null;
+}
+
+export interface EvaluationInstance<TConfig> {
+	instanceId: string;
+	label: string;
+	enabled: boolean;
+	config: TConfig;
+}
+
+export type FinancialIndependenceEvaluation =
+	EvaluationInstance<FinancialIndependencePlan>;
+export type NetWorthThresholdEvaluation =
+	EvaluationInstance<NetWorthThresholdConfig>;
+export type PostingFulfillmentEvaluation =
+	EvaluationInstance<PostingFulfillmentConfig>;
+
+export interface EvaluationTables {
+	financialIndependence: FinancialIndependenceEvaluation[];
+	netWorthThreshold: NetWorthThresholdEvaluation[];
+	postingFulfillment: PostingFulfillmentEvaluation[];
+}
+
+export type EvaluationForType<TType extends EvaluationType> =
+	EvaluationTables[TType][number];
+
 export interface ProjectionRuntimeSettings {
 	fallbackProjectionStartDate: IsoDate;
 	horizonYears: number;
-	evaluations: ConfiguredEvaluation[];
+	evaluations: EvaluationTables;
 }
 
 export type EvaluationResultStatus =
@@ -98,14 +135,6 @@ export type EvaluationResultStatus =
 	| "not-satisfied"
 	| "warning"
 	| "indeterminate";
-
-export interface ConfiguredEvaluation {
-	definitionId: string;
-	instanceId: string;
-	label: string;
-	enabled: boolean;
-	config: JsonValue;
-}
 
 export interface EvaluationDiagnostic {
 	code: string;
@@ -117,7 +146,6 @@ export interface EvaluationDiagnostic {
 }
 
 export interface EvaluationResultEnvelope {
-	definitionId: string;
 	instanceId: string;
 	label: string;
 	status: EvaluationResultStatus;
@@ -126,9 +154,14 @@ export interface EvaluationResultEnvelope {
 	diagnostics: EvaluationDiagnostic[];
 }
 
+export interface EvaluationResultTables {
+	financialIndependence: EvaluationResultEnvelope[];
+	netWorthThreshold: EvaluationResultEnvelope[];
+	postingFulfillment: EvaluationResultEnvelope[];
+}
+
 export interface EvaluationResultCollection {
-	evaluationOrder: string[];
-	evaluations: Record<string, EvaluationResultEnvelope>;
+	evaluations: EvaluationResultTables;
 }
 
 export interface Account {
@@ -171,11 +204,10 @@ export interface Posting {
 }
 
 export interface FinancialModelDocument {
-	version: typeof FINANCIAL_MODEL_DOCUMENT_VERSION;
 	sourcePath: string;
 	accounts: Account[];
 	checkpoints: Checkpoint[];
-	evaluations: ConfiguredEvaluation[];
+	evaluations: EvaluationTables;
 	postings: Posting[];
 }
 
@@ -347,11 +379,6 @@ export interface RawProjectionOutput {
 	result: ProjectionCoreResult;
 }
 
-/**
- * @deprecated Use FINANCIAL_MODEL_DOCUMENT_VERSION. Remove after downstream
- * consumers migrate to the canonical API and the compatibility window closes.
- */
-export const SCENARIO_MODEL_VERSION = FINANCIAL_MODEL_DOCUMENT_VERSION;
 /**
  * @deprecated Use CSV_MODEL_REPO_PATH. Remove after downstream consumers migrate
  * to the canonical API and the compatibility window closes.

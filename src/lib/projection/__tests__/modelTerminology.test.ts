@@ -6,12 +6,10 @@ import {
 	CSV_MODEL_FILE_NAMES,
 	CSV_MODEL_PUBLIC_PATH,
 	CSV_MODEL_REPO_PATH,
-	FINANCIAL_MODEL_DOCUMENT_VERSION,
 } from "../types/model";
 
 describe("core model terminology", () => {
 	it("exposes canonical model constants", () => {
-		expect(FINANCIAL_MODEL_DOCUMENT_VERSION).toBe(9);
 		expect(CSV_MODEL_REPO_PATH).toBe("public/configs");
 		expect(CSV_MODEL_PUBLIC_PATH).toBe("/configs");
 		expect(CSV_MODEL_FILE_NAMES).toEqual({

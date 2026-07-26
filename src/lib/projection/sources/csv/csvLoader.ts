@@ -3,11 +3,9 @@ import type { ZodType } from "zod";
 import { NO_CEILING, NO_FLOOR } from "../../constants";
 import {
 	type BehaviorCollectionKey,
-	CSV_BEHAVIOR_DEFINITION_IDS,
 	CSV_BEHAVIOR_FILE_NAMES,
 	CSV_MODEL_FILE_NAMES,
 	CSV_MODEL_PUBLIC_PATH,
-	FINANCIAL_MODEL_DOCUMENT_VERSION,
 	type FinancialModelDocument,
 	type ModelCollectionKey,
 	type ModelFileContents,
@@ -15,13 +13,16 @@ import {
 import type { ModelValidationIssue } from "../../types/validation";
 import { addIssue } from "../../utils/validation";
 import {
-	type CsvBehaviorRow,
 	csvAccountSchema,
 	csvAccountsHeaders,
-	csvBehaviorHeaders,
-	csvBehaviorSchema,
 	csvCheckpointSchema,
 	csvCheckpointsHeaders,
+	csvFinancialIndependenceHeaders,
+	csvFinancialIndependenceSchema,
+	csvNetWorthThresholdHeaders,
+	csvNetWorthThresholdSchema,
+	csvPostingFulfillmentHeaders,
+	csvPostingFulfillmentSchema,
 	csvPostingSchema,
 	csvPostingsHeaders,
 } from "./csvSchema";
@@ -135,67 +136,72 @@ export function parseCsvFinancialModel(
 		csvPostingsHeaders,
 		csvPostingSchema,
 	);
-	const behaviorResults = (
-		Object.keys(CSV_BEHAVIOR_FILE_NAMES) as BehaviorCollectionKey[]
-	).map((key) => ({
-		definitionId: CSV_BEHAVIOR_DEFINITION_IDS[key],
-		fileName: CSV_BEHAVIOR_FILE_NAMES[key],
-		result: parseRows(
-			CSV_BEHAVIOR_FILE_NAMES[key],
-			csvFiles.behaviors[key],
-			csvBehaviorHeaders,
-			csvBehaviorSchema,
-		),
-	}));
+	const financialIndependenceResult = parseRows(
+		CSV_BEHAVIOR_FILE_NAMES.financialIndependence,
+		csvFiles.behaviors.financialIndependence,
+		csvFinancialIndependenceHeaders,
+		csvFinancialIndependenceSchema,
+	);
+	const netWorthThresholdResult = parseRows(
+		CSV_BEHAVIOR_FILE_NAMES.netWorthThreshold,
+		csvFiles.behaviors.netWorthThreshold,
+		csvNetWorthThresholdHeaders,
+		csvNetWorthThresholdSchema,
+	);
+	const postingFulfillmentResult = parseRows(
+		CSV_BEHAVIOR_FILE_NAMES.postingFulfillment,
+		csvFiles.behaviors.postingFulfillment,
+		csvPostingFulfillmentHeaders,
+		csvPostingFulfillmentSchema,
+	);
 
 	const issues = [
 		...accountsResult.issues,
 		...checkpointsResult.issues,
-		...behaviorResults.flatMap(({ result }) => result.issues),
+		...financialIndependenceResult.issues,
+		...netWorthThresholdResult.issues,
+		...postingFulfillmentResult.issues,
 		...postingsResult.issues,
 	];
-	const firstOrderLocation = new Map<
-		number,
-		{ fileName: string; rowNumber: number }
-	>();
-	behaviorResults.forEach(({ fileName, result }) => {
-		result.rows.forEach((row, rowIndex) => {
-			const firstSeen = firstOrderLocation.get(row.order);
-			if (firstSeen) {
-				addIssue(
-					issues,
-					"error",
-					"behavior.order.duplicate",
-					`Order '${row.order}' is duplicated. First seen in ${firstSeen.fileName} on row ${firstSeen.rowNumber}.`,
-					[fileName, rowIndex + 2, "order"],
-				);
-				return;
-			}
-			firstOrderLocation.set(row.order, { fileName, rowNumber: rowIndex + 2 });
-		});
-	});
 
 	if (
 		accountsResult.hasFatalIssue ||
 		checkpointsResult.hasFatalIssue ||
-		behaviorResults.some(({ result }) => result.hasFatalIssue) ||
+		financialIndependenceResult.hasFatalIssue ||
+		netWorthThresholdResult.hasFatalIssue ||
+		postingFulfillmentResult.hasFatalIssue ||
 		postingsResult.hasFatalIssue
 	) {
 		return { data: null, issues };
 	}
 
-	const evaluations = behaviorResults
-		.flatMap(({ definitionId, result }) =>
-			result.rows.map(({ order, ...evaluation }) => ({
-				definitionId,
-				evaluation,
-				order,
-			})),
-		)
-		.sort((a, b) => a.order - b.order)
-		.map(({ evaluation, definitionId }) => ({ ...evaluation, definitionId }));
+	const evaluations = {
+		financialIndependence: financialIndependenceResult.rows.map(
+			({ instanceId, label, enabled, ...config }) => ({
+				instanceId,
+				label,
+				enabled,
+				config,
+			}),
+		),
+		netWorthThreshold: netWorthThresholdResult.rows.map(
+			({ instanceId, label, enabled, ...config }) => ({
+				instanceId,
+				label,
+				enabled,
+				config,
+			}),
+		),
+		postingFulfillment: postingFulfillmentResult.rows.map(
+			({ instanceId, label, enabled, ...config }) => ({
+				instanceId,
+				label,
+				enabled,
+				config,
+			}),
+		),
+	};
 	const document: FinancialModelDocument = {
-		version: FINANCIAL_MODEL_DOCUMENT_VERSION,
 		sourcePath: options.basePath ?? CSV_MODEL_PUBLIC_PATH,
 		accounts: accountsResult.rows,
 		checkpoints: checkpointsResult.rows,
@@ -283,42 +289,13 @@ export function serializeCsvFinancialModel(
 	const postingsHeader =
 		"id,label,sourceAccountId,destinations,arithmetic,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled";
 	const checkpointsHeader = "Date,AccountId,Balance";
-	const knownDefinitionIds = new Set<string>(
-		Object.values(CSV_BEHAVIOR_DEFINITION_IDS),
-	);
-	const unknownEvaluation = document.evaluations.find(
-		(evaluation) => !knownDefinitionIds.has(evaluation.definitionId),
-	);
-	if (unknownEvaluation) {
-		throw new Error(
-			`Cannot serialize unknown evaluation definition '${unknownEvaluation.definitionId}'.`,
-		);
-	}
-
-	const serializeBehavior = (definitionId: string) => {
-		const evaluations = document.evaluations.flatMap((evaluation, index) =>
-			evaluation.definitionId === definitionId
-				? [{ evaluation, order: index + 1 }]
-				: [],
-		);
-		if (evaluations.length === 0) return csvBehaviorHeaders.join(",");
-
-		return Papa.unparse(
-			evaluations.map(
-				({
-					evaluation: { instanceId, label, enabled, config },
-					order,
-				}): CsvBehaviorRow => ({
-					order,
-					instanceId,
-					label,
-					enabled,
-					config: JSON.stringify(config),
-				}),
-			),
-			{ columns: [...csvBehaviorHeaders], newline: "\n" },
-		);
-	};
+	const serializeBehavior = (
+		rows: Record<string, unknown>[],
+		headers: readonly string[],
+	) =>
+		rows.length === 0
+			? headers.join(",")
+			: Papa.unparse(rows, { columns: [...headers], newline: "\n" });
 
 	return {
 		accounts: [accountsHeader]
@@ -344,13 +321,43 @@ export function serializeCsvFinancialModel(
 				),
 			)
 			.join("\n"),
-		behaviors: Object.fromEntries(
-			(
-				Object.entries(CSV_BEHAVIOR_DEFINITION_IDS) as Array<
-					[BehaviorCollectionKey, string]
-				>
-			).map(([key, definitionId]) => [key, serializeBehavior(definitionId)]),
-		) as Record<BehaviorCollectionKey, string>,
+		behaviors: {
+			financialIndependence: serializeBehavior(
+				document.evaluations.financialIndependence.map(
+					({ instanceId, label, enabled, config }) => ({
+						instanceId,
+						label,
+						enabled,
+						...config,
+						sources: JSON.stringify(config.sources),
+						continuingPostingIds: JSON.stringify(config.continuingPostingIds),
+					}),
+				),
+				csvFinancialIndependenceHeaders,
+			),
+			netWorthThreshold: serializeBehavior(
+				document.evaluations.netWorthThreshold.map(
+					({ instanceId, label, enabled, config }) => ({
+						instanceId,
+						label,
+						enabled,
+						target: config.target,
+					}),
+				),
+				csvNetWorthThresholdHeaders,
+			),
+			postingFulfillment: serializeBehavior(
+				document.evaluations.postingFulfillment.map(
+					({ instanceId, label, enabled, config }) => ({
+						instanceId,
+						label,
+						enabled,
+						postingIds: JSON.stringify(config.postingIds),
+					}),
+				),
+				csvPostingFulfillmentHeaders,
+			),
+		},
 	};
 }
 

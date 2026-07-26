@@ -1,11 +1,11 @@
-import type { IsoDate, ProjectionPath } from "../types/model";
+import type {
+	IsoDate,
+	NetWorthThresholdConfig,
+	ProjectionPath,
+} from "../types/model";
 import type { EvaluationDefinition } from "./runtime";
 
 export const NET_WORTH_THRESHOLD_DEFINITION_ID = "net-worth-threshold";
-
-export interface NetWorthThresholdConfig {
-	target: number;
-}
 
 export interface NetWorthThresholdPathResult {
 	reached: boolean;
@@ -63,7 +63,7 @@ export const netWorthThresholdEvaluation: EvaluationDefinition<
 	ThresholdAccumulator,
 	NetWorthThresholdProbabilisticResult
 > = {
-	id: NET_WORTH_THRESHOLD_DEFINITION_ID,
+	type: "netWorthThreshold",
 	label: "Net worth threshold",
 	validateConfig: validateNetWorthThresholdConfig,
 	evaluatePath({ path }, config) {

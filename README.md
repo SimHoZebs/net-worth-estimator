@@ -16,7 +16,7 @@ The product model is intentionally generic:
 
 ## CSV Files
 
-The CSV filenames and shapes are unchanged. The app reads these files under `public/configs/`:
+The app reads these CSV files under `public/configs/`:
 
 - `accounts.csv`
 - `checkpoints.csv`
@@ -25,7 +25,7 @@ The CSV filenames and shapes are unchanged. The app reads these files under `pub
 - `behavior/net-worth-threshold.csv`
 - `behavior/posting-fulfillment.csv`
 
-Each behavior file has the columns `order`, `instanceId`, `label`, `enabled`, and `config`. The definition is inferred from the filename, `order` preserves global evaluation order, and `config` is JSON encoded as a CSV value. Both `order` and `instanceId` must be unique across behavior files; one file may contain multiple configured instances of its definition.
+Each behavior file is a typed table. All tables start with `instanceId`, `label`, and `enabled`, followed by definition-specific columns. Financial independence stores its scalar plan fields directly and uses JSON only for `sources` and `continuingPostingIds`; net-worth threshold adds `target`; posting fulfillment adds `postingIds`. Evaluation types follow the global `EVALUATION_TYPE_ORDER`, while rows within a type retain their physical CSV ingestion order. `instanceId` must be unique across behavior files, and one file may contain multiple instances.
 
 `financial-independence.csv` configures branch simulation, including source selections, continuing postings, withdrawal policy, and confidence. `net-worth-threshold.csv` and `posting-fulfillment.csv` configure read-only path evaluations.
 

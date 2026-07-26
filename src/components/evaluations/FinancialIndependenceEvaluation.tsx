@@ -2,7 +2,7 @@ import { FinancialIndependenceChart } from "@/components/dashboard/FinancialInde
 import { OverviewCard } from "@/components/dashboard/OverviewCard";
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
-	ConfiguredEvaluation,
+	EvaluationInstance,
 	FinancialIndependencePlan,
 	FinancialModelDocument,
 	ProjectionResult,
@@ -16,7 +16,7 @@ import { useStore } from "@/store";
 import { FinancialIndependencePlanEditor } from "./FinancialIndependencePlanEditor";
 
 interface FinancialIndependenceEvaluationProps {
-	evaluation: ConfiguredEvaluation;
+	evaluation: EvaluationInstance<unknown>;
 	document: FinancialModelDocument;
 	result: ProjectionResult;
 	stochasticResult?: StochasticProjectionResult | null;
@@ -71,7 +71,11 @@ export function FinancialIndependenceEvaluation({
 				document={document}
 				plan={plan}
 				onChange={(changes) =>
-					updateEvaluationConfig(evaluation.instanceId, changes)
+					updateEvaluationConfig(
+						"financialIndependence",
+						evaluation.instanceId,
+						changes,
+					)
 				}
 			/>
 			{analysis ? (

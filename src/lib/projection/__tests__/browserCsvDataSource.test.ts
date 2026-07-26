@@ -131,6 +131,22 @@ describe("createBrowserCsvDataSource", () => {
 		expect(storage.getItem(LEGACY_SCENARIO_PACK_STORAGE_KEY)).not.toBeNull();
 	});
 
+	it("rejects stored document version fields", async () => {
+		const storage = createMemoryStorage({
+			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify({
+				...createBaseDocument(),
+				version: 1,
+			}),
+		});
+
+		await expect(
+			createBrowserCsvDataSource({ storage }).loadDocument(),
+		).resolves.toMatchObject({
+			document: null,
+			issues: [{ code: "browser.storage.invalid" }],
+		});
+	});
+
 	it("reports corrupt legacy data instead of silently loading bundled data", async () => {
 		const storage = createMemoryStorage({
 			[LEGACY_SCENARIO_PACK_STORAGE_KEY]: "{invalid",
@@ -169,35 +185,6 @@ describe("createBrowserCsvDataSource", () => {
 		});
 	});
 
-	it("migrates a version 8 document with bundled evaluations", async () => {
-		const currentDocument = createBaseDocument({
-			sourcePath: "browser:local-storage",
-		});
-		const { evaluations: _evaluations, ...legacyDocument } = currentDocument;
-		const storage = createMemoryStorage({
-			[LEGACY_SCENARIO_PACK_STORAGE_KEY]: JSON.stringify({
-				...legacyDocument,
-				version: 8,
-			}),
-		});
-		const fetchImpl = createCsvFetch();
-
-		const result = await createBrowserCsvDataSource({
-			fetchImpl,
-			storage,
-		}).loadDocument();
-
-		expect(result.document).toMatchObject({
-			version: 9,
-			accounts: currentDocument.accounts,
-			evaluations: [
-				{ instanceId: "net-worth-1m" },
-				{ instanceId: "posting-fulfillment" },
-			],
-		});
-		expect(fetchImpl).toHaveBeenCalledTimes(6);
-	});
-
 	it("saves canonically, removes legacy data, and resets both keys", async () => {
 		const storage = createMemoryStorage({
 			[LEGACY_SCENARIO_PACK_STORAGE_KEY]: JSON.stringify(createBaseDocument()),
@@ -205,12 +192,16 @@ describe("createBrowserCsvDataSource", () => {
 		const fetchImpl = createCsvFetch();
 		const dataSource = createBrowserCsvDataSource({ fetchImpl, storage });
 
-		await dataSource.save?.run(createBaseDocument());
+		await dataSource.save?.run({
+			...createBaseDocument(),
+			version: 1,
+		} as never);
 
 		const saved = JSON.parse(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)!) as {
 			sourcePath: string;
 		};
 		expect(saved.sourcePath).toBe("browser:local-storage");
+		expect(saved).not.toHaveProperty("version");
 		expect(storage.getItem(LEGACY_SCENARIO_PACK_STORAGE_KEY)).toBeNull();
 
 		storage.setItem(

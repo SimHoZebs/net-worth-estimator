@@ -149,8 +149,11 @@ describe("buildAccountDiagnosticChartData", () => {
 					p90: 700_000,
 				},
 			},
-			evaluationOrder: [],
-			evaluations: {},
+			evaluations: {
+				financialIndependence: [],
+				netWorthThreshold: [],
+				postingFulfillment: [],
+			},
 		};
 
 		const data = buildAccountDiagnosticChartData(

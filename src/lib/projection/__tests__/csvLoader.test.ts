@@ -17,22 +17,23 @@ describe("CSV financial model", () => {
 		});
 
 		expect(result.issues).toEqual([]);
-		expect(result.data?.version).toBe(9);
 		expect(result.data?.sourcePath).toBe(CSV_MODEL_PUBLIC_PATH);
 		expect(result.data?.postings[1]?.arithmetic).toBe("salary * 0.22");
 		expect(result.data?.postings[3]?.annualCap).toBe(23000);
 		expect(result.data?.accounts[3]?.label).toBe("Student Loan");
-		expect(result.data?.evaluations[0]?.config).toEqual({ target: 1_000_000 });
+		expect(result.data?.evaluations.netWorthThreshold[0]?.config).toEqual({
+			target: 1_000_000,
+		});
 	});
 
-	it("rejects invalid evaluation JSON and duplicate instance IDs", () => {
+	it("rejects invalid typed evaluation fields and duplicate instance IDs", () => {
 		const invalidJson = parseCsvFinancialModel({
 			...validCsvFiles,
 			behaviors: {
 				...validCsvFiles.behaviors,
 				financialIndependence: [
-					"order,instanceId,label,enabled,config",
-					'1,fi,FI,true,"{not-json}"',
+					"instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy",
+					"fi,FI,true,0,40000,0.02,0.04,10,0.9,{not-json},[],preserve-real-principal",
 				].join("\n"),
 			},
 		});
@@ -46,9 +47,9 @@ describe("CSV financial model", () => {
 			behaviors: {
 				...validCsvFiles.behaviors,
 				netWorthThreshold: [
-					"order,instanceId,label,enabled,config",
-					'1,target,First,true,"{""target"":100}"',
-					'2,target,Second,true,"{""target"":200}"',
+					"instanceId,label,enabled,target",
+					"target,First,true,100",
+					"target,Second,true,200",
 				].join("\n"),
 			},
 		});
@@ -64,13 +65,13 @@ describe("CSV financial model", () => {
 			...validCsvFiles,
 			behaviors: {
 				...validCsvFiles.behaviors,
-				financialIndependence: [
-					"order,instanceId,label,enabled,config",
-					'1,shared,FI,true,"{}"',
-				].join("\n"),
 				netWorthThreshold: [
-					"order,instanceId,label,enabled,config",
-					'2,shared,Threshold,true,"{""target"":100}"',
+					"instanceId,label,enabled,target",
+					"shared,Threshold,true,100",
+				].join("\n"),
+				postingFulfillment: [
+					"instanceId,label,enabled,postingIds",
+					"shared,Fulfillment,true,null",
 				].join("\n"),
 			},
 		});
@@ -79,34 +80,29 @@ describe("CSV financial model", () => {
 			result.issues.some(
 				(issue) =>
 					issue.code === "evaluation.instanceId.duplicate" &&
-					issue.path?.[0] === "behavior/net-worth-threshold.csv",
+					issue.path?.[0] === "behavior/posting-fulfillment.csv",
 			),
 		).toBe(true);
 	});
 
-	it("rejects duplicate global order values across behavior files", () => {
+	it("preserves ingestion order within an evaluation table", () => {
 		const result = parseCsvFinancialModel({
 			...validCsvFiles,
 			behaviors: {
 				...validCsvFiles.behaviors,
-				financialIndependence: [
-					"order,instanceId,label,enabled,config",
-					'1,fi,FI,true,"{}"',
-				].join("\n"),
 				netWorthThreshold: [
-					"order,instanceId,label,enabled,config",
-					'1,target,Threshold,true,"{""target"":100}"',
+					"instanceId,label,enabled,target",
+					"second,Second,true,200",
+					"first,First,true,100",
 				].join("\n"),
 			},
 		});
 
 		expect(
-			result.issues.some(
-				(issue) =>
-					issue.code === "behavior.order.duplicate" &&
-					issue.path?.[0] === "behavior/net-worth-threshold.csv",
+			result.data?.evaluations.netWorthThreshold.map(
+				(evaluation) => evaluation.instanceId,
 			),
-		).toBe(true);
+		).toEqual(["second", "first"]);
 	});
 
 	it("round-trips evaluation configuration through CSV", () => {
@@ -120,35 +116,39 @@ describe("CSV financial model", () => {
 		expect(reparsed.data?.evaluations).toEqual(parsed.data?.evaluations);
 	});
 
-	it("preserves evaluation order across behavior files", () => {
+	it("round-trips local table order without a global row order", () => {
 		const parsed = parseCsvFinancialModel(validCsvFiles);
 		expect(parsed.data).not.toBeNull();
-		const mixed = {
+		const document = {
 			...parsed.data!,
-			evaluations: [
-				{
-					definitionId: "financial-independence",
-					instanceId: "fi-1",
-					label: "FI 1",
-					enabled: true,
-					config: {},
-				},
-				parsed.data!.evaluations[0]!,
-				{
-					definitionId: "financial-independence",
-					instanceId: "fi-2",
-					label: "FI 2",
-					enabled: true,
-					config: {},
-				},
-			],
+			evaluations: {
+				...parsed.data!.evaluations,
+				netWorthThreshold: [
+					{
+						instanceId: "second",
+						label: "Second",
+						enabled: true,
+						config: { target: 2 },
+					},
+					{
+						instanceId: "first",
+						label: "First",
+						enabled: true,
+						config: { target: 1 },
+					},
+				],
+			},
 		};
 
-		const reparsed = parseCsvFinancialModel(serializeCsvFinancialModel(mixed));
+		const reparsed = parseCsvFinancialModel(
+			serializeCsvFinancialModel(document),
+		);
 
 		expect(
-			reparsed.data?.evaluations.map(({ instanceId }) => instanceId),
-		).toEqual(["fi-1", "net-worth-1m", "fi-2"]);
+			reparsed.data?.evaluations.netWorthThreshold.map(
+				({ instanceId }) => instanceId,
+			),
+		).toEqual(["second", "first"]);
 	});
 
 	it("serializes an empty evaluation collection as a valid header-only file", () => {
@@ -157,17 +157,25 @@ describe("CSV financial model", () => {
 
 		const serialized = serializeCsvFinancialModel({
 			...parsed.data!,
-			evaluations: [],
+			evaluations: {
+				financialIndependence: [],
+				netWorthThreshold: [],
+				postingFulfillment: [],
+			},
 		});
 		const reparsed = parseCsvFinancialModel(serialized);
 
 		expect(serialized.behaviors.financialIndependence).toBe(
-			"order,instanceId,label,enabled,config",
+			"instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy",
 		);
 		expect(serialized.behaviors.netWorthThreshold).toBe(
-			"order,instanceId,label,enabled,config",
+			"instanceId,label,enabled,target",
 		);
-		expect(reparsed.data?.evaluations).toEqual([]);
+		expect(reparsed.data?.evaluations).toEqual({
+			financialIndependence: [],
+			netWorthThreshold: [],
+			postingFulfillment: [],
+		});
 		expect(reparsed.issues).toEqual([]);
 	});
 

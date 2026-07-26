@@ -48,7 +48,6 @@ function makeCheckpoint(date = "2025-01-01", accountId = "a1", balance = 1000) {
 
 function makeFinancialModelDocument(): FinancialModelDocument {
 	return {
-		version: 9,
 		sourcePath: "/configs",
 		accounts: [
 			{
@@ -405,11 +404,14 @@ describe("Settings slice", () => {
 	});
 
 	it("updates an evaluation config without changing its stable ID", () => {
-		const evaluation = useStore.getState().evaluations[0];
-		useStore.getState().updateEvaluationConfig(evaluation.instanceId, {
-			annualExpenseTarget: 50_000,
-		});
-		const updated = useStore.getState().evaluations[0];
+		const evaluation =
+			useStore.getState().evaluations.financialIndependence[0]!;
+		useStore
+			.getState()
+			.updateEvaluationConfig("financialIndependence", evaluation.instanceId, {
+				annualExpenseTarget: 50_000,
+			});
+		const updated = useStore.getState().evaluations.financialIndependence[0]!;
 		expect(updated.instanceId).toBe(evaluation.instanceId);
 		expect(updated.config).toMatchObject({ annualExpenseTarget: 50_000 });
 	});
@@ -418,41 +420,56 @@ describe("Settings slice", () => {
 		const evaluations = structuredClone(DEFAULT_EVALUATIONS);
 		useStore.getState().replaceEvaluations(evaluations);
 
-		evaluations[0]!.label = "Changed outside the store";
+		evaluations.financialIndependence[0]!.label = "Changed outside the store";
 		expect(useStore.getState().evaluations).toEqual(DEFAULT_EVALUATIONS);
 	});
 
 	it("duplicates and reorders evaluation instances with unique stable IDs", () => {
-		const source = useStore.getState().evaluations[0];
-		useStore.getState().duplicateEvaluation(source.instanceId);
-		const current = useStore.getState().evaluations;
-		const duplicate = current[current.length - 1];
-		expect(duplicate?.definitionId).toBe(source.definitionId);
+		const source = useStore.getState().evaluations.netWorthThreshold[0]!;
+		useStore
+			.getState()
+			.duplicateEvaluation("netWorthThreshold", source.instanceId);
+		const current = useStore.getState().evaluations.netWorthThreshold;
+		const duplicate = current[1];
 		expect(duplicate?.instanceId).not.toBe(source.instanceId);
-		if (duplicate) useStore.getState().moveEvaluation(duplicate.instanceId, -1);
-		const reordered = useStore.getState().evaluations;
-		expect(reordered[reordered.length - 2]?.instanceId).toBe(
-			duplicate?.instanceId,
-		);
+		if (duplicate)
+			useStore
+				.getState()
+				.moveEvaluation("netWorthThreshold", duplicate.instanceId, -1);
+		const reordered = useStore.getState().evaluations.netWorthThreshold;
+		expect(reordered[0]?.instanceId).toBe(duplicate?.instanceId);
 	});
 
 	it("rejects add and rename collisions without mutating evaluation order", () => {
 		const before = structuredClone(useStore.getState().evaluations);
-		useStore.getState().addEvaluation(structuredClone(before[0]));
+		useStore
+			.getState()
+			.addEvaluation(
+				"financialIndependence",
+				structuredClone(before.financialIndependence[0]!),
+			);
 		expect(useStore.getState().evaluations).toEqual(before);
-		useStore.getState().updateEvaluation(before[0].instanceId, {
-			instanceId: before[1].instanceId,
-		});
+		useStore
+			.getState()
+			.updateEvaluation(
+				"financialIndependence",
+				before.financialIndependence[0]!.instanceId,
+				{ instanceId: before.netWorthThreshold[0]!.instanceId },
+			);
 		expect(useStore.getState().evaluations).toEqual(before);
 	});
 
 	it("removes only the selected stable evaluation instance", () => {
-		const before = useStore.getState().evaluations;
-		useStore.getState().removeEvaluation(before[0].instanceId);
+		const before = useStore.getState().evaluations.financialIndependence;
+		useStore
+			.getState()
+			.removeEvaluation("financialIndependence", before[0]!.instanceId);
 		expect(
 			useStore
 				.getState()
-				.evaluations.map((evaluation) => evaluation.instanceId),
+				.evaluations.financialIndependence.map(
+					(evaluation) => evaluation.instanceId,
+				),
 		).toEqual(before.slice(1).map((evaluation) => evaluation.instanceId));
 	});
 

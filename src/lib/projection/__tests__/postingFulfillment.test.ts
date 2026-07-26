@@ -190,22 +190,24 @@ describe("posting fulfillment evaluation", () => {
 		const result = projectFinancialModelDocument(
 			document,
 			makeSettings({
-				evaluations: [
-					{
-						definitionId: "posting-fulfillment",
-						instanceId: "scoped",
-						label: "Scoped",
-						enabled: true,
-						config: { postingIds: [] },
-					},
-					{
-						definitionId: "posting-fulfillment",
-						instanceId: DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID,
-						label: "All postings",
-						enabled: true,
-						config: { postingIds: null },
-					},
-				],
+				evaluations: {
+					financialIndependence: [],
+					netWorthThreshold: [],
+					postingFulfillment: [
+						{
+							instanceId: "scoped",
+							label: "Scoped",
+							enabled: true,
+							config: { postingIds: [] },
+						},
+						{
+							instanceId: DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID,
+							label: "All postings",
+							enabled: true,
+							config: { postingIds: null },
+						},
+					],
+				},
 			}),
 		);
 

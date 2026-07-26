@@ -3,6 +3,7 @@ import type {
 	EvaluationDiagnostic,
 	IsoDate,
 	MovementEvent,
+	PostingFulfillmentConfig,
 	ProjectionPath,
 } from "../types/model";
 import type { PercentileBands } from "../types/stochastic";
@@ -12,10 +13,6 @@ import type { EvaluationDefinition } from "./runtime";
 export const POSTING_FULFILLMENT_DEFINITION_ID = "posting-fulfillment";
 export const DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID = "posting-fulfillment";
 const MIN_REPORTABLE_UNFULFILLED_AMOUNT = 0.5;
-
-export interface PostingFulfillmentConfig {
-	postingIds: string[] | null;
-}
 
 export interface PostingFulfillmentEvent {
 	date: IsoDate;
@@ -286,7 +283,7 @@ export const postingFulfillmentEvaluation: EvaluationDefinition<
 	PostingFulfillmentAccumulator,
 	PostingFulfillmentProbabilisticResult
 > = {
-	id: POSTING_FULFILLMENT_DEFINITION_ID,
+	type: "postingFulfillment",
 	label: "Posting fulfillment",
 	validateConfig: validatePostingFulfillmentConfig,
 	evaluatePath({ path, detailLevel }, config) {

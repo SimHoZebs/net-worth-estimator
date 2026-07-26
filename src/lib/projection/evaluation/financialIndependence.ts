@@ -894,7 +894,7 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 	FinancialIndependenceAccumulator,
 	FinancialIndependenceProbabilisticResult
 > = {
-	id: FINANCIAL_INDEPENDENCE_DEFINITION_ID,
+	type: "financialIndependence",
 	label: "Financial independence",
 	validateConfig: validateFinancialIndependencePlan,
 	diagnoseConfig({ path }, config) {
