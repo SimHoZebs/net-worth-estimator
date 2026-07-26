@@ -1,16 +1,10 @@
-export {
-	projectFinancialModelDocument,
-	projectScenarioPack,
-} from "./analysis/projectFinancialModel";
+export { projectFinancialModelDocument } from "./analysis/projectFinancialModel";
 export { stochasticProject } from "./analysis/projectStochastic";
 export type {
 	DataSource,
 	DataSourceAction,
 	FinancialModelParseResult,
-	LegacyScenarioDataSource,
-	ScenarioParseResult,
 } from "./dataSource";
-export { toScenarioParseResult } from "./dataSource";
 export {
 	getConfiguredEvaluation,
 	getFinancialIndependenceConfig,
@@ -57,12 +51,8 @@ export {
 } from "./evaluation/runtime";
 export {
 	applyModelOverrides,
-	applyScenarioOverrides,
 	EMPTY_MODEL_OVERRIDES,
-	EMPTY_SCENARIO_OVERRIDES,
-	EMPTY_WHAT_IF_STATE,
 	prepareFinancialModelDocument,
-	prepareScenarioPack,
 } from "./model/applyModelOverrides";
 export {
 	type AccountMovementAction,
@@ -72,32 +62,22 @@ export {
 	resolveAccountMovementAmount,
 } from "./simulation/postings";
 export { prepareSimulationRequest } from "./simulation/prepareSimulation";
-export {
-	projectRawFinancialModelDocument,
-	projectRawScenarioPack,
-} from "./simulation/projectPath";
+export { projectRawFinancialModelDocument } from "./simulation/projectPath";
 export { simulate } from "./simulation/simulate";
 export {
 	createBrowserCsvDataSource,
 	FINANCIAL_MODEL_STORAGE_KEY,
-	LEGACY_SCENARIO_PACK_STORAGE_KEY,
 } from "./sources/csv/browserCsvDataSource";
 export { createCsvDataSource } from "./sources/csv/csvDataSource";
 export type {
 	CsvFinancialModelOptions,
 	CsvFinancialModelParseResult,
-	CsvScenarioLoadOptions,
-	CsvScenarioParseResult,
 } from "./sources/csv/csvLoader";
 export {
 	fetchCsvFinancialModelFiles,
-	fetchCsvScenarioFiles,
 	loadCsvFinancialModel,
-	loadCsvScenarioPack,
 	parseCsvFinancialModel,
-	parseCsvScenarioPack,
 	serializeCsvFinancialModel,
-	serializeCsvScenarioPack,
 } from "./sources/csv/csvLoader";
 export {
 	csvAccountSchema,
@@ -117,7 +97,6 @@ export {
 export {
 	summarizeValidationIssues,
 	validateCsvFinancialModel,
-	validateCsvScenarioPack,
 } from "./sources/csv/csvValidation";
 export type {
 	Account,
@@ -163,22 +142,12 @@ export type {
 	ProjectionResult,
 	ProjectionRow,
 	ProjectionRuntimeSettings,
-	ScenarioCollectionKey,
-	ScenarioFileContents,
-	ScenarioFileName,
-	ScenarioOverrides,
-	ScenarioPack,
-	ScenarioWhatIfState,
 } from "./types/model";
 export {
-	CSV_BEHAVIOR_DEFINITION_IDS,
 	CSV_BEHAVIOR_FILE_NAMES,
 	CSV_MODEL_FILE_NAMES,
 	CSV_MODEL_PUBLIC_PATH,
 	CSV_MODEL_REPO_PATH,
-	CSV_SCENARIO_FILE_NAMES,
-	CSV_SCENARIO_PUBLIC_PATH,
-	CSV_SCENARIO_REPO_PATH,
 	EVALUATION_TYPE_ORDER,
 } from "./types/model";
 export type {
@@ -186,7 +155,6 @@ export type {
 	HistoricalObservationSnapshot,
 	MonteCarloSample,
 	PreparedProjection,
-	SampledAssumptions,
 	SimulationRequest,
 	SimulationRun,
 	SimulationSnapshot,
@@ -202,9 +170,6 @@ export type {
 	ModelPath,
 	ModelValidationIssue,
 	ModelValidationSeverity,
-	ScenarioPath,
-	ScenarioValidationIssue,
-	ScenarioValidationSeverity,
 } from "./types/validation";
 export {
 	computePercentiles,

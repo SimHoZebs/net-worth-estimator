@@ -20,16 +20,4 @@ describe("createCsvDataSource", () => {
 			expect.objectContaining({ method: "PUT" }),
 		);
 	});
-
-	it("adapts concrete loadPack calls to the legacy envelope", async () => {
-		const document = createBaseDocument();
-		const dataSource = createCsvDataSource({
-			fetchImpl: vi.fn(async () => Response.json({ document, issues: [] })),
-		});
-
-		await expect(dataSource.loadPack()).resolves.toEqual({
-			pack: document,
-			issues: [],
-		});
-	});
 });

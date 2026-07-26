@@ -6,11 +6,7 @@ import { Readable } from "node:stream";
 import type { Connect, ResolvedConfig, ViteDevServer } from "vite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FinancialModelDocument } from "../src/lib/projection/types/model";
-import {
-	csvFilePlugin,
-	FINANCIAL_MODEL_API_PATH,
-	LEGACY_SCENARIO_PACK_API_PATH,
-} from "./csvFilePlugin";
+import { csvFilePlugin, FINANCIAL_MODEL_API_PATH } from "./csvFilePlugin";
 
 const tempDirectories: string[] = [];
 
@@ -75,16 +71,12 @@ async function createFixtureDirectory() {
 }
 
 describe("csvFilePlugin", () => {
-	it("registers both routes and preserves their distinct GET envelopes", async () => {
+	it("registers the canonical route and returns its GET envelope", async () => {
 		const { handlers, invoke } = await createHarness();
 
-		expect([...handlers.keys()]).toEqual([
-			FINANCIAL_MODEL_API_PATH,
-			LEGACY_SCENARIO_PACK_API_PATH,
-		]);
+		expect([...handlers.keys()]).toEqual([FINANCIAL_MODEL_API_PATH]);
 
 		const canonical = await invoke(FINANCIAL_MODEL_API_PATH, "GET");
-		const legacy = await invoke(LEGACY_SCENARIO_PACK_API_PATH, "GET");
 
 		expect(canonical).toMatchObject({
 			status: 200,
@@ -122,27 +114,17 @@ describe("csvFilePlugin", () => {
 		expect(fi.continuingPostingIds.every((id) => postingIds.has(id))).toBe(
 			true,
 		);
-		expect(legacy).toMatchObject({
-			status: 200,
-			body: { pack: expect.any(Object), issues: [] },
-		});
-		expect(legacy.body).not.toHaveProperty("document");
 	});
 
-	it("preserves the route envelope for load errors", async () => {
+	it("preserves the canonical envelope for load errors", async () => {
 		const missingPath = path.join(os.tmpdir(), "missing-csv-plugin-fixture");
 		const { invoke } = await createHarness(missingPath);
 
 		const canonical = await invoke(FINANCIAL_MODEL_API_PATH, "GET");
-		const legacy = await invoke(LEGACY_SCENARIO_PACK_API_PATH, "GET");
 
 		expect(canonical).toMatchObject({
 			status: 500,
 			body: { document: null, issues: [{ code: "server.load" }] },
-		});
-		expect(legacy).toMatchObject({
-			status: 500,
-			body: { pack: null, issues: [{ code: "server.load" }] },
 		});
 	});
 
@@ -158,20 +140,15 @@ describe("csvFilePlugin", () => {
 			accounts: [...document.accounts, document.accounts[0]],
 		};
 
-		const response = await invoke(
-			LEGACY_SCENARIO_PACK_API_PATH,
-			"PUT",
-			invalid,
-		);
+		const response = await invoke(FINANCIAL_MODEL_API_PATH, "PUT", invalid);
 
 		expect(response).toMatchObject({
 			status: 422,
 			body: {
-				pack: invalid,
+				document: invalid,
 				issues: [{ severity: "error", code: "account.id.duplicate" }],
 			},
 		});
-		expect(response.body).not.toHaveProperty("document");
 		expect(await fs.readFile(accountsPath, "utf-8")).toBe(before);
 	});
 

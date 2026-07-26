@@ -1,10 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Connect, Plugin, ViteDevServer } from "vite";
-import {
-	type FinancialModelParseResult,
-	toScenarioParseResult,
-} from "../src/lib/projection/dataSource";
+import type { FinancialModelParseResult } from "../src/lib/projection/dataSource";
 import {
 	parseCsvFinancialModel,
 	serializeCsvFinancialModel,
@@ -18,7 +15,6 @@ import {
 } from "../src/lib/projection/types/model";
 
 export const FINANCIAL_MODEL_API_PATH = "/api/financial-model";
-export const LEGACY_SCENARIO_PACK_API_PATH = "/api/scenario/pack";
 
 export interface CsvFilePluginOptions {
 	csvPath?: string;
@@ -120,72 +116,64 @@ export function csvFilePlugin(options: CsvFilePluginOptions = {}): Plugin {
 			);
 		},
 		configureServer(server: ViteDevServer) {
-			const createHandler =
-				(legacy: boolean): Connect.NextHandleFunction =>
-				async (req, res, next) => {
-					const send = (status: number, result: FinancialModelParseResult) => {
-						res.writeHead(status, { "Content-Type": "application/json" });
-						res.end(
-							JSON.stringify(legacy ? toScenarioParseResult(result) : result),
-						);
-					};
-
-					if (req.method === "GET") {
-						try {
-							const result = await loadDocument(resolvedCsvPath);
-							send(200, result);
-						} catch (err) {
-							const message =
-								err instanceof Error
-									? err.message
-									: "Failed to load financial model";
-							send(500, {
-								document: null,
-								issues: [
-									{ severity: "error", code: "server.load", message, path: [] },
-								],
-							});
-						}
-						return;
-					}
-
-					if (req.method === "PUT") {
-						try {
-							const chunks: Buffer[] = [];
-							for await (const chunk of req) {
-								chunks.push(Buffer.from(chunk));
-							}
-							const body = JSON.parse(
-								Buffer.concat(chunks).toString(),
-							) as FinancialModelDocument;
-							const result = await saveDocument(resolvedCsvPath, body);
-							const hasErrors = result.issues.some(
-								(issue) => issue.severity === "error",
-							);
-							send(hasErrors ? 422 : 200, result);
-						} catch (err) {
-							const message =
-								err instanceof Error
-									? err.message
-									: "Failed to save financial model";
-							send(500, {
-								document: null,
-								issues: [
-									{ severity: "error", code: "server.save", message, path: [] },
-								],
-							});
-						}
-						return;
-					}
-
-					next();
+			const handler: Connect.NextHandleFunction = async (req, res, next) => {
+				const send = (status: number, result: FinancialModelParseResult) => {
+					res.writeHead(status, { "Content-Type": "application/json" });
+					res.end(JSON.stringify(result));
 				};
 
-			server.middlewares.use(FINANCIAL_MODEL_API_PATH, createHandler(false));
-			server.middlewares.use(
-				LEGACY_SCENARIO_PACK_API_PATH,
-				createHandler(true),
-			);
+				if (req.method === "GET") {
+					try {
+						const result = await loadDocument(resolvedCsvPath);
+						send(200, result);
+					} catch (err) {
+						const message =
+							err instanceof Error
+								? err.message
+								: "Failed to load financial model";
+						send(500, {
+							document: null,
+							issues: [
+								{ severity: "error", code: "server.load", message, path: [] },
+							],
+						});
+					}
+					return;
+				}
+
+				if (req.method === "PUT") {
+					try {
+						const chunks: Buffer[] = [];
+						for await (const chunk of req) {
+							chunks.push(Buffer.from(chunk));
+						}
+						const body = JSON.parse(
+							Buffer.concat(chunks).toString(),
+						) as FinancialModelDocument;
+						const result = await saveDocument(resolvedCsvPath, body);
+						const hasErrors = result.issues.some(
+							(issue) => issue.severity === "error",
+						);
+						send(hasErrors ? 422 : 200, result);
+					} catch (err) {
+						const message =
+							err instanceof Error
+								? err.message
+								: "Failed to save financial model";
+						send(500, {
+							document: null,
+							issues: [
+								{ severity: "error", code: "server.save", message, path: [] },
+							],
+						});
+					}
+					return;
+				}
+
+				next();
+			};
+
+			server.middlewares.use(FINANCIAL_MODEL_API_PATH, handler);
 		},
 	};
 }

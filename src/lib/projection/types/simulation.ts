@@ -55,9 +55,3 @@ export interface PreparedProjection {
 	latestCheckpointDate: IsoDate | null;
 	request: SimulationRequest;
 }
-
-/**
- * @deprecated Use MonteCarloSample. Remove after downstream consumers migrate
- * to the canonical API and the compatibility window closes.
- */
-export type SampledAssumptions = MonteCarloSample;

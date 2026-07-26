@@ -345,9 +345,3 @@ export function summarizeValidationIssues(issues: ModelValidationIssue[]) {
 		isValid: errors.length === 0,
 	};
 }
-
-/**
- * @deprecated Use validateCsvFinancialModel. Remove after downstream consumers
- * migrate to the canonical API and the compatibility window closes.
- */
-export const validateCsvScenarioPack = validateCsvFinancialModel;

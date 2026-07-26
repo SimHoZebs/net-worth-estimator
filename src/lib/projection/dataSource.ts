@@ -20,27 +20,3 @@ export interface DataSource {
 	readonly save?: DataSourceAction<[FinancialModelDocument]>;
 	readonly reset?: DataSourceAction;
 }
-
-/**
- * @deprecated Use FinancialModelParseResult. Remove after all downstream
- * consumers read the canonical document envelope.
- */
-export interface ScenarioParseResult {
-	pack: FinancialModelDocument | null;
-	issues: ModelValidationIssue[];
-}
-
-/**
- * @deprecated Use DataSource.loadDocument. Remove after all concrete factory
- * consumers have migrated from loadPack.
- */
-export interface LegacyScenarioDataSource {
-	loadPack(): Promise<ScenarioParseResult>;
-}
-
-/** @deprecated Remove with ScenarioParseResult. */
-export function toScenarioParseResult(
-	result: FinancialModelParseResult,
-): ScenarioParseResult {
-	return { pack: result.document, issues: result.issues };
-}
