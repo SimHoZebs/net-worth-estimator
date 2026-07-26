@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type {
 	EvaluationResultCollection,
@@ -15,6 +15,22 @@ afterEach(() => {
 });
 
 describe("EvaluationList", () => {
+	it("applies a net-worth target once after editing", () => {
+		render(<EvaluationList />);
+
+		fireEvent.change(screen.getByLabelText("Target net worth"), {
+			target: { value: "1250000" },
+		});
+		expect(
+			useStore.getState().evaluations.netWorthThreshold[0]?.config.target,
+		).toBe(1_000_000);
+
+		fireEvent.click(screen.getByRole("button", { name: "Update analysis" }));
+		expect(
+			useStore.getState().evaluations.netWorthThreshold[0]?.config.target,
+		).toBe(1_250_000);
+	});
+
 	it("renders duplicate evaluation instances in configured order", () => {
 		useStore.setState({
 			evaluations: {

@@ -3,4 +3,5 @@ export interface ProjectionHookState<TResult> {
 	runtimeError: string | null;
 	isRunning: boolean;
 	progress: number | null;
+	resultIsStale: boolean;
 }

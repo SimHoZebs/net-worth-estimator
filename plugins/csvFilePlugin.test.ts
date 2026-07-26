@@ -91,6 +91,37 @@ describe("csvFilePlugin", () => {
 			body: { document: expect.any(Object), issues: [] },
 		});
 		expect(canonical.body).not.toHaveProperty("pack");
+		const document = canonical.body.document as FinancialModelDocument;
+		expect(
+			document.evaluations.financialIndependence[0]?.config.sources,
+		).toEqual([
+			{ type: "asset", accountId: "k401", included: true },
+			{ type: "asset", accountId: "brokerage", included: true },
+			{ type: "asset", accountId: "roth_ira", included: true },
+			{ type: "asset", accountId: "rsu_vested", included: true },
+		]);
+		expect(
+			document.evaluations.financialIndependence[0]?.config
+				.continuingPostingIds,
+		).toEqual([
+			"k401_growth",
+			"brokerage_growth",
+			"roth_ira_growth",
+			"rsu_vested_growth",
+		]);
+		const fi = document.evaluations.financialIndependence[0]!.config;
+		const accountIds = new Set(document.accounts.map(({ id }) => id));
+		const postingIds = new Set(document.postings.map(({ id }) => id));
+		expect(
+			fi.sources.every((source) =>
+				source.type === "asset"
+					? accountIds.has(source.accountId)
+					: postingIds.has(source.postingId),
+			),
+		).toBe(true);
+		expect(fi.continuingPostingIds.every((id) => postingIds.has(id))).toBe(
+			true,
+		);
 		expect(legacy).toMatchObject({
 			status: 200,
 			body: { pack: expect.any(Object), issues: [] },

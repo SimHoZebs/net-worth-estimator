@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { type ComponentType, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type {
@@ -33,6 +33,8 @@ interface ResultRendererProps {
 	result: ProjectionResult;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
+	sourceRevision: number;
+	resultsAreStale?: boolean;
 	blockerValue: string;
 	blockerDetail: string;
 }
@@ -48,17 +50,41 @@ interface EvaluationUiDefinition {
 
 function ThresholdConfigEditor({ evaluation, onChange }: ConfigEditorProps) {
 	const target = validateNetWorthThresholdConfig(evaluation.config).target;
+	const [draftTarget, setDraftTarget] = useState(target);
+	useEffect(() => setDraftTarget(target), [target]);
+	const dirty = draftTarget !== target;
 	return (
-		<label className="block type-caption">
-			Target net worth
-			<input
-				type="number"
-				step={50_000}
-				value={target}
-				onChange={(event) => onChange({ target: Number(event.target.value) })}
-				className="mt-1 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 text-sm shadow-sm outline-none focus:border-ring dark:border-white/10"
-			/>
-		</label>
+		<div className="space-y-2">
+			<label className="block type-caption">
+				Target net worth
+				<input
+					type="number"
+					step={50_000}
+					value={draftTarget}
+					onChange={(event) => setDraftTarget(Number(event.target.value))}
+					className="mt-1 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 text-sm shadow-sm outline-none focus:border-ring dark:border-white/10"
+				/>
+			</label>
+			<div className="flex justify-end gap-2 no-print">
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					disabled={!dirty}
+					onClick={() => setDraftTarget(target)}
+				>
+					Discard
+				</Button>
+				<Button
+					type="button"
+					size="sm"
+					disabled={!dirty || !Number.isFinite(draftTarget)}
+					onClick={() => onChange({ target: draftTarget })}
+				>
+					Update analysis
+				</Button>
+			</div>
+		</div>
 	);
 }
 
@@ -114,6 +140,8 @@ export function EvaluationList({
 	result,
 	stochasticResult,
 	stochasticIsProvisional = false,
+	sourceRevision = 0,
+	resultsAreStale = false,
 	blockerValue = "No blocking constraint",
 	blockerDetail = "No evaluation blocker was identified.",
 }: {
@@ -122,6 +150,8 @@ export function EvaluationList({
 	result?: ProjectionResult;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
+	sourceRevision?: number;
+	resultsAreStale?: boolean;
 	blockerValue?: string;
 	blockerDetail?: string;
 }) {
@@ -134,7 +164,9 @@ export function EvaluationList({
 	);
 	const removeEvaluation = useStore((state) => state.removeEvaluation);
 	const moveEvaluation = useStore((state) => state.moveEvaluation);
-	const resultCollection = stochasticResult ?? results ?? result;
+	const resultCollection = resultsAreStale
+		? null
+		: (stochasticResult ?? results ?? result);
 
 	return (
 		<section id="evaluations" className="space-y-4">
@@ -202,7 +234,9 @@ export function EvaluationList({
 								(candidate) => candidate.instanceId === evaluation.instanceId,
 							);
 							const statusLabel = evaluation.enabled
-								? `${stochasticIsProvisional && stochasticResult ? "provisional " : ""}${envelope?.status ?? "pending"}`
+								? resultsAreStale
+									? "updating"
+									: `${stochasticIsProvisional && stochasticResult ? "provisional " : ""}${envelope?.status ?? "pending"}`
 								: "disabled";
 
 							return (
@@ -334,16 +368,23 @@ export function EvaluationList({
 										normalizedConfig !== null &&
 										ResultRenderer &&
 										document &&
-										result ? (
+										result &&
+										(!resultsAreStale || type === "financialIndependence") ? (
 											<ResultRenderer
 												evaluation={{ ...evaluation, config: normalizedConfig }}
 												document={document}
 												result={result}
 												stochasticResult={stochasticResult}
 												stochasticIsProvisional={stochasticIsProvisional}
+												sourceRevision={sourceRevision}
+												resultsAreStale={resultsAreStale}
 												blockerValue={blockerValue}
 												blockerDetail={blockerDetail}
 											/>
+										) : resultsAreStale && evaluation.enabled ? (
+											<p className="rounded-2xl border border-dashed border-border/80 p-5 type-muted">
+												Updating this evaluation with the current settings.
+											</p>
 										) : null}
 									</CardContent>
 								</Card>
