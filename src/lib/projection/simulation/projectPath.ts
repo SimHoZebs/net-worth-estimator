@@ -261,9 +261,3 @@ export function projectRawFinancialModelDocument(
 	);
 	return adaptSimulationRun(prepared, simulate(prepared.request));
 }
-
-/**
- * @deprecated Use projectRawFinancialModelDocument. Remove after downstream
- * consumers migrate to the canonical API and the compatibility window closes.
- */
-export const projectRawScenarioPack = projectRawFinancialModelDocument;

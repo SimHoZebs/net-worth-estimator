@@ -360,34 +360,3 @@ export function serializeCsvFinancialModel(
 		},
 	};
 }
-
-/**
- * @deprecated Use CsvFinancialModelParseResult. Remove after downstream
- * consumers migrate to the canonical API and the compatibility window closes.
- */
-export type CsvScenarioParseResult = CsvFinancialModelParseResult;
-/**
- * @deprecated Use CsvFinancialModelOptions. Remove after downstream consumers
- * migrate to the canonical API and the compatibility window closes.
- */
-export type CsvScenarioLoadOptions = CsvFinancialModelOptions;
-/**
- * @deprecated Use parseCsvFinancialModel. Remove after downstream consumers
- * migrate to the canonical API and the compatibility window closes.
- */
-export const parseCsvScenarioPack = parseCsvFinancialModel;
-/**
- * @deprecated Use fetchCsvFinancialModelFiles. Remove after downstream consumers
- * migrate to the canonical API and the compatibility window closes.
- */
-export const fetchCsvScenarioFiles = fetchCsvFinancialModelFiles;
-/**
- * @deprecated Use loadCsvFinancialModel. Remove after downstream consumers
- * migrate to the canonical API and the compatibility window closes.
- */
-export const loadCsvScenarioPack = loadCsvFinancialModel;
-/**
- * @deprecated Use serializeCsvFinancialModel. Remove after downstream consumers
- * migrate to the canonical API and the compatibility window closes.
- */
-export const serializeCsvScenarioPack = serializeCsvFinancialModel;

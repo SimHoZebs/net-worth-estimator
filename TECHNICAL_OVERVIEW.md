@@ -5,7 +5,7 @@ The Net Worth Estimator is a React application that loads a CSV-backed `Financia
 ## 1. Tech Stack
 
 - React 19, Vite, and TypeScript
-- Tailwind CSS v4 and Recharts
+- Tailwind CSS v4 and uPlot
 - Zustand and TanStack Query
 - Papa Parse and Zod
 - Vitest
@@ -33,15 +33,8 @@ The persistence boundary is the validated `FinancialModelDocument` represented b
 ### Browser
 
 - Canonical key: `net-worth-estimator:financial-model:v1`
-- Legacy key: `net-worth-estimator:scenario-pack:v1`
-- Canonical data wins when both keys exist.
-- When canonical data is absent, valid legacy data is read, migrated to the canonical key, and removed from the legacy key.
-- Malformed persisted data returns parse/validation diagnostics.
-- Reset removes persisted browser data and reloads bundled `/configs/` files.
-
-### Legacy Compatibility
-
-`/api/scenario/pack` and deprecated scenario-named type and function aliases remain compatibility-only. Retain these aliases, the legacy browser key, and the route until downstream consumers have migrated and the compatibility window is deliberately closed.
+- Malformed canonical persisted data returns parse/validation diagnostics instead of falling back to bundled data.
+- Reset removes the canonical key and reloads bundled `/configs/` files.
 
 ## 4. Core Types
 
@@ -55,13 +48,14 @@ The persistence boundary is the validated `FinancialModelDocument` represented b
 - `EvaluationTables`: typed tables keyed by evaluation type. `EVALUATION_TYPE_ORDER` controls type order, and each table's array order preserves ingestion order.
 - `EvaluationResultCollection`: locally ordered result tables keyed by evaluation type.
 
-There is no named-alternative-model feature. Comparisons are metric snapshots only.
+There is no named alternative-model domain or persistence API. Comparisons are metric snapshots only.
 
 ## 5. Model Semantics
 
 ### Accounts and Postings
 
-- Accounts hold signed balances and compound `annualRate` daily between event dates.
+- Accounts hold signed balances with generic minimum and maximum constraints.
+- Postings carry annual rates and growth assumptions used by scheduled and Monte Carlo execution.
 - Blank `sourceAccountId` plus destinations is an external inflow.
 - A source plus no destinations is an external outflow.
 - A source plus destinations is an account-to-account transfer.

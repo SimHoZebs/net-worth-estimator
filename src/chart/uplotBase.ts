@@ -83,19 +83,7 @@ type ReferenceMilestones = { hitTarget?: string; firstShortfall?: string };
 
 export function createReferenceLinesHooks(
 	milestoneDates?: ReferenceMilestones,
-): uPlot.Hooks.Arrays;
-export function createReferenceLinesHooks(
-	_legacyTarget: number,
-	milestoneDates?: ReferenceMilestones,
-): uPlot.Hooks.Arrays;
-export function createReferenceLinesHooks(
-	targetOrMilestones?: number | ReferenceMilestones,
-	legacyMilestones?: ReferenceMilestones,
 ): uPlot.Hooks.Arrays {
-	const milestoneDates =
-		typeof targetOrMilestones === "number"
-			? legacyMilestones
-			: targetOrMilestones;
 	const warningColor = cssColor("--chart-warning", "#d97706");
 
 	return {

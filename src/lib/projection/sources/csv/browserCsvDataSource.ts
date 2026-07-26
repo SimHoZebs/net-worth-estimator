@@ -1,9 +1,4 @@
-import {
-	type DataSource,
-	type FinancialModelParseResult,
-	type LegacyScenarioDataSource,
-	toScenarioParseResult,
-} from "../../dataSource";
+import type { DataSource, FinancialModelParseResult } from "../../dataSource";
 import {
 	CSV_MODEL_PUBLIC_PATH,
 	type FinancialModelDocument,
@@ -14,8 +9,6 @@ import { validateCsvFinancialModel } from "./csvValidation";
 
 export const FINANCIAL_MODEL_STORAGE_KEY =
 	"net-worth-estimator:financial-model:v1";
-export const LEGACY_SCENARIO_PACK_STORAGE_KEY =
-	"net-worth-estimator:scenario-pack:v1";
 
 const BROWSER_STORAGE_SOURCE_PATH = "browser:local-storage";
 
@@ -122,24 +115,9 @@ async function loadBundledDocument(
 	return { document: result.data, issues: result.issues };
 }
 
-function persistLegacyDocument(
-	storage: Pick<Storage, "setItem" | "removeItem">,
-	storageKey: string,
-	document: FinancialModelDocument,
-): void {
-	try {
-		storage.setItem(storageKey, JSON.stringify(document));
-		if (storageKey !== LEGACY_SCENARIO_PACK_STORAGE_KEY) {
-			storage.removeItem(LEGACY_SCENARIO_PACK_STORAGE_KEY);
-		}
-	} catch {
-		// A read-only or full cache must not prevent loading a valid document.
-	}
-}
-
 export function createBrowserCsvDataSource(
 	options: BrowserCsvDataSourceOptions = {},
-): DataSource & LegacyScenarioDataSource {
+): DataSource {
 	const basePath = options.basePath ?? CSV_MODEL_PUBLIC_PATH;
 	const fetchImpl = options.fetchImpl ?? fetch;
 	const storage =
@@ -155,36 +133,15 @@ export function createBrowserCsvDataSource(
 		loadDocument: async (): Promise<FinancialModelParseResult> => {
 			if (!storage) return loadBundledDocument(basePath, fetchImpl);
 
-			const canonical = readStoredDocument(storage, storageKey);
-			if (canonical.status === "invalid") {
-				return { document: null, issues: [canonical.issue] };
+			const stored = readStoredDocument(storage, storageKey);
+			if (stored.status === "invalid") {
+				return { document: null, issues: [stored.issue] };
 			}
-			if (canonical.status === "found") {
-				return validateStoredDocument(canonical.document, storageKey);
-			}
-
-			const legacy = readStoredDocument(
-				storage,
-				LEGACY_SCENARIO_PACK_STORAGE_KEY,
-			);
-			if (legacy.status === "invalid") {
-				return { document: null, issues: [legacy.issue] };
-			}
-			if (legacy.status === "absent") {
-				return loadBundledDocument(basePath, fetchImpl);
+			if (stored.status === "found") {
+				return validateStoredDocument(stored.document, storageKey);
 			}
 
-			const result = validateStoredDocument(
-				legacy.document,
-				LEGACY_SCENARIO_PACK_STORAGE_KEY,
-			);
-			if (
-				result.document &&
-				!result.issues.some((issue) => issue.severity === "error")
-			) {
-				persistLegacyDocument(storage, storageKey, result.document);
-			}
-			return result;
+			return loadBundledDocument(basePath, fetchImpl);
 		},
 		save: storage
 			? {
@@ -213,9 +170,6 @@ export function createBrowserCsvDataSource(
 							);
 						}
 						storage.setItem(storageKey, JSON.stringify(savedDocument));
-						if (storageKey !== LEGACY_SCENARIO_PACK_STORAGE_KEY) {
-							storage.removeItem(LEGACY_SCENARIO_PACK_STORAGE_KEY);
-						}
 
 						return {
 							document: savedDocument,
@@ -231,17 +185,11 @@ export function createBrowserCsvDataSource(
 						"Deletes the browser-local model and reloads the deployed /configs CSV files.",
 					run: async (): Promise<FinancialModelParseResult> => {
 						storage.removeItem(storageKey);
-						storage.removeItem(LEGACY_SCENARIO_PACK_STORAGE_KEY);
 						return loadBundledDocument(basePath, fetchImpl);
 					},
 				}
 			: undefined,
 	};
 
-	return {
-		...dataSource,
-		// Deprecated compatibility; remove after concrete callers migrate.
-		loadPack: async () =>
-			toScenarioParseResult(await dataSource.loadDocument()),
-	};
+	return dataSource;
 }

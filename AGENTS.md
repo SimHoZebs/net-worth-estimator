@@ -65,13 +65,13 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 
 ## Data Flow
 
-1. **CSV source**: Vite plugin -> `GET/PUT /api/financial-model` -> `csvLoader.ts` -> Zod parsing and cross-validation. CSV filenames and shapes are unchanged.
+1. **CSV source**: Vite plugin -> `GET/PUT /api/financial-model` -> `csvLoader.ts` -> Zod parsing and cross-validation. CSV filenames and shapes are unchanged; documents are versionless.
 2. **Persistence DI**: `App.tsx` creates `createCsvDataSource()` in development or `createBrowserCsvDataSource()` in production. `DataSource.loadDocument()` returns `{ document, issues }`.
 3. **Query layer**: `useFinancialModelQuery`, `useFinancialModelMutation`, and `useFinancialModelResetMutation` connect the source to TanStack Query.
 4. **Current changes**: `ModelOverrides` remain in Zustand and are applied with `applyModelOverrides`; canonical data is not mutated.
 5. **Projection**: `useProjection`/`useStochastic` -> `WorkerProjectionEngine` -> Web Workers -> `prepareSimulationRequest` -> `simulate` -> `ProjectionPath` -> evaluation/analysis aggregation.
 6. **Monte Carlo**: one prepared request is reused, each `MonteCarloSample` produces a path-only run, exact percentiles are aggregated, and progress is emitted in worker batches of 50.
-7. **Compatibility**: `/api/scenario/pack`, the legacy browser key, and deprecated scenario-named aliases remain only for migration. Keep them until downstream consumers have migrated and the compatibility window is deliberately closed.
+7. **Browser persistence**: `net-worth-estimator:financial-model:v1` is the only browser key. Malformed canonical data surfaces diagnostics; reset removes that key and reloads bundled CSV data.
 
 ## Key Types
 
@@ -101,6 +101,7 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 - Evaluation configuration and results remain grouped by type. `EVALUATION_TYPE_ORDER` controls type order, table arrays preserve ingestion order, and instances retain stable globally unique IDs. Configs and public bodies must remain JSON-serializable.
 - `ModelOverrides` are session-only and never mutate canonical data.
 - Comparison snapshots contain metrics only; do not add restoration or alternative-model semantics.
+- Keep the domain canonical-only: no named alternative models, compatibility APIs, alternate readers, or additional persistence routes.
 - Use the `@/lib/projection` barrel for projection types and utilities.
 - Deterministic and stochastic computation runs in Web Workers, never on the main thread.
 - Run `npm run test:run` and `npm run typecheck` after code changes.

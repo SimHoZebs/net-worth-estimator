@@ -33,14 +33,10 @@ Each behavior file is a typed table. All tables start with `instanceId`, `label`
 
 - Local development (`npm run dev`) uses `GET/PUT /api/financial-model`; saves write to `public/configs/` in the checkout.
 - Static/serverless production loads bundled `/configs/` files and saves the canonical `FinancialModelDocument` under `net-worth-estimator:financial-model:v1` in browser storage.
-- If canonical browser data exists, it wins. Otherwise, `net-worth-estimator:scenario-pack:v1` is read, migrated to the canonical key, and removed.
 - Malformed persisted data is not silently replaced; parsing and validation diagnostics are returned to the UI.
+- Browser reset removes `net-worth-estimator:financial-model:v1` and reloads the bundled `/configs/` files.
 - Serverless deployments should use a real backend `DataSource` for shared or cross-device persistence.
 - Do not deploy private financial CSV files in `public/configs/`; those files are public static assets.
-
-## Compatibility
-
-`/api/scenario/pack` and deprecated scenario-named type/function aliases remain only for legacy consumers. Retain the aliases, legacy browser key, and compatibility route until downstream consumers have migrated and the compatibility window is deliberately closed.
 
 ## Run
 

@@ -1,9 +1,4 @@
-import {
-	type DataSource,
-	type FinancialModelParseResult,
-	type LegacyScenarioDataSource,
-	toScenarioParseResult,
-} from "../../dataSource";
+import type { DataSource, FinancialModelParseResult } from "../../dataSource";
 import type { FinancialModelDocument } from "../../types/model";
 
 export interface CsvDataSourceOptions {
@@ -13,7 +8,7 @@ export interface CsvDataSourceOptions {
 
 export function createCsvDataSource(
 	options?: CsvDataSourceOptions,
-): DataSource & LegacyScenarioDataSource {
+): DataSource {
 	const apiPath = options?.apiPath ?? "/api/financial-model";
 	const fetchImpl = options?.fetchImpl ?? fetch;
 	const loadDocument = async (): Promise<FinancialModelParseResult> => {
@@ -34,8 +29,6 @@ export function createCsvDataSource(
 		description:
 			"Loaded through the Vite dev server; saved edits write back to public/configs/ in this checkout.",
 		loadDocument,
-		// Deprecated compatibility; remove after concrete callers migrate.
-		loadPack: async () => toScenarioParseResult(await loadDocument()),
 		save: {
 			label: "Save to CSV files",
 			description:
