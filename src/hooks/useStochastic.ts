@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useProjectionEngine } from "@/engine/ProjectionEngineContext";
 import type {
 	FinancialModelDocument,
@@ -7,6 +7,14 @@ import type {
 	StochasticConfig,
 	StochasticProjectionResult,
 } from "@/lib/projection";
+import { applyModelOverrides } from "@/lib/projection";
+import { canonicalSerialize } from "@/lib/projection/artifacts";
+import {
+	evaluationComputationDescriptor,
+	projectionComputationSettings,
+	simulationDocument,
+} from "@/lib/projection/runtime/computationIdentity";
+import { normalizeStochasticConfig } from "@/lib/projection/utils/stochastic";
 import {
 	labelStochasticResult,
 	projectionComputationSettingsKey,
@@ -15,8 +23,8 @@ import type { ProjectionHookState } from "./types";
 
 interface StochasticState
 	extends ProjectionHookState<StochasticProjectionResult> {
-	requestKey: object | null;
-	resultBaseKey: object | null;
+	requestKey: string | null;
+	resultBaseKey: string | null;
 }
 
 function publicState(
@@ -44,26 +52,36 @@ export function useStochastic(
 	const engine = useProjectionEngine();
 	const computationSettingsKey =
 		projectionComputationSettingsKey(projectionSettings);
-	const computationSettings = useMemo(
-		() => JSON.parse(computationSettingsKey) as ProjectionRuntimeSettings,
-		[computationSettingsKey],
-	);
+	const computationSettingsRef = useRef<{
+		key: string;
+		value: ProjectionRuntimeSettings;
+	} | null>(null);
+	if (computationSettingsRef.current?.key !== computationSettingsKey) {
+		computationSettingsRef.current = {
+			key: computationSettingsKey,
+			value: projectionComputationSettings(projectionSettings),
+		};
+	}
+	const computationSettings = computationSettingsRef.current.value;
 	const runCount = config?.runCount ?? null;
 	const seed = config?.seed ?? null;
 	const stableConfig = useMemo(
-		() => (runCount === null ? null : { runCount, seed }),
+		() =>
+			runCount === null ? null : normalizeStochasticConfig({ runCount, seed }),
 		[runCount, seed],
 	);
 	const baseKey = useMemo(
-		() => ({
-			document,
-			fallbackProjectionStartDate:
-				computationSettings.fallbackProjectionStartDate,
-			horizonYears: computationSettings.horizonYears,
-			overrides,
-			config: stableConfig,
-			enabled,
-		}),
+		() =>
+			canonicalSerialize({
+				document: document
+					? simulationDocument(applyModelOverrides(document, overrides))
+					: null,
+				fallbackProjectionStartDate:
+					computationSettings.fallbackProjectionStartDate,
+				horizonYears: computationSettings.horizonYears,
+				config: stableConfig,
+				enabled,
+			}),
 		[
 			document,
 			computationSettings.fallbackProjectionStartDate,
@@ -74,9 +92,17 @@ export function useStochastic(
 		],
 	);
 	const requestKey = useMemo(
-		() => ({ baseKey, evaluations: computationSettings.evaluations }),
+		() =>
+			canonicalSerialize({
+				baseKey,
+				evaluations: evaluationComputationDescriptor(
+					computationSettings.evaluations,
+				),
+			}),
 		[baseKey, computationSettings.evaluations],
 	);
+	const inputRef = useRef({ document, overrides, enabled, stableConfig });
+	inputRef.current = { document, overrides, enabled, stableConfig };
 	const [state, setState] = useState<StochasticState>({
 		result: null,
 		runtimeError: null,
@@ -88,7 +114,12 @@ export function useStochastic(
 	});
 
 	useEffect(() => {
-		if (!enabled || document === null || stableConfig === null) {
+		const input = inputRef.current;
+		if (
+			!input.enabled ||
+			input.document === null ||
+			input.stableConfig === null
+		) {
 			setState({
 				result: null,
 				runtimeError: null,
@@ -119,10 +150,10 @@ export function useStochastic(
 		engine
 			.projectStochastic(
 				{
-					document,
+					document: input.document,
 					projectionSettings: computationSettings,
-					overrides,
-					config: stableConfig,
+					overrides: input.overrides,
+					config: input.stableConfig,
 					signal: controller.signal,
 				},
 				(progress, partial) => {
@@ -173,16 +204,7 @@ export function useStochastic(
 			});
 
 		return () => controller.abort();
-	}, [
-		baseKey,
-		computationSettings,
-		document,
-		enabled,
-		engine,
-		overrides,
-		requestKey,
-		stableConfig,
-	]);
+	}, [baseKey, computationSettings, engine, requestKey]);
 
 	if (state.requestKey !== requestKey) {
 		const retainBaseResult =

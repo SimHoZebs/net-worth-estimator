@@ -5,7 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useProjectionEngine } from "@/engine/ProjectionEngineContext";
 import { WorkerProjectionEngine } from "@/engine/WorkerProjectionEngine";
 import type {
+	EvaluationResultCollection,
+	ProjectionPath,
 	ProjectionResult,
+	RawProjectionOutput,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import { projectFinancialModelDocument } from "@/lib/projection";
@@ -291,7 +294,12 @@ describe("WorkerProjectionEngine", () => {
 		const worker = MockWorker.instances[0]!;
 
 		worker.onmessage?.({
-			data: { id: 1, result: expected, runtimeError: null },
+			data: {
+				id: 1,
+				type: "complete",
+				result: expected,
+				runtimeError: null,
+			},
 		} as MessageEvent);
 
 		await expect(promise).resolves.toBe(expected);
@@ -326,6 +334,63 @@ describe("WorkerProjectionEngine", () => {
 		expect(onProgress).toHaveBeenCalledWith(0.5, partial);
 		await expect(promise).resolves.toBe(expected);
 		expect(worker.terminate).toHaveBeenCalledOnce();
+	});
+
+	it("supports staged base projection worker requests", async () => {
+		const engine = new WorkerProjectionEngine();
+		const expected = { path: {}, result: {} } as RawProjectionOutput;
+		const promise = engine.projectBase({
+			document: createBaseDocument(),
+			projectionSettings: makeSettings(),
+			overrides: makeDefaultOverrides(),
+		});
+		const worker = MockWorker.instances[0]!;
+
+		expect(worker.postMessage).toHaveBeenCalledWith(
+			expect.objectContaining({ id: 1, type: "base" }),
+		);
+		worker.onmessage?.({
+			data: { id: 1, type: "base", result: expected, runtimeError: null },
+		} as MessageEvent);
+
+		await expect(promise).resolves.toBe(expected);
+	});
+
+	it("supports generic path evaluation worker requests", async () => {
+		const engine = new WorkerProjectionEngine();
+		const projected = projectFinancialModelDocument(
+			createBaseDocument(),
+			makeSettings(),
+		);
+		const expected = {
+			evaluations: projected.evaluations,
+		} as EvaluationResultCollection;
+		const path: ProjectionPath = {
+			rows: [],
+			movementEvents: [],
+			effectiveDocument: createBaseDocument(),
+			projectionStartDate: "2025-01-01",
+			projectionEndDate: "2026-01-01",
+		};
+		const promise = engine.evaluateProjection({
+			path,
+			evaluations: makeSettings().evaluations,
+		});
+		const worker = MockWorker.instances[0]!;
+
+		expect(worker.postMessage).toHaveBeenCalledWith(
+			expect.objectContaining({ id: 1, type: "evaluation", path }),
+		);
+		worker.onmessage?.({
+			data: {
+				id: 1,
+				type: "evaluation",
+				result: expected,
+				runtimeError: null,
+			},
+		} as MessageEvent);
+
+		await expect(promise).resolves.toBe(expected);
 	});
 
 	it("terminates when posting a worker request fails", async () => {

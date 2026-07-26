@@ -16,7 +16,7 @@ The Net Worth Estimator is a React application that loads a CSV-backed `Financia
 2. `useFinancialModelQuery` calls `DataSource.loadDocument()`, which returns `{ document, issues }`. Save and reset use `useFinancialModelMutation` and `useFinancialModelResetMutation`.
 3. CSV parsing and cross-reference validation produce a `FinancialModelDocument` plus diagnostics. Invalid or malformed persisted data surfaces diagnostics instead of being silently discarded.
 4. Zustand stores session-only `ModelOverrides`, displayed as current changes. `applyModelOverrides` creates the effective document without mutating canonical data.
-5. `useProjection` and `useStochastic` pass the document, runtime settings, and overrides through `WorkerProjectionEngine` to dedicated workers.
+5. `useProjection` and `useStochastic` pass the document, runtime settings, and overrides through a content-addressed `CachedProjectionEngine`. Cache misses delegate to `WorkerProjectionEngine` and dedicated workers.
 6. `prepareSimulationRequest` resolves overrides, checkpoint history, initial state, dates, event policy, and optional `MonteCarloSample` into a prepared projection containing a `SimulationRequest`.
 7. The pure `simulate` kernel returns an exact `SimulationRun`. `projectRawFinancialModelDocument` adapts it into a `ProjectionPath` and public result; `projectFinancialModelDocument` adds configured evaluations.
 8. The dashboard, model inspector, validation panel, current-change controls, and comparison view render the loaded document and projection results.
@@ -35,6 +35,16 @@ The persistence boundary is the validated `FinancialModelDocument` represented b
 - Canonical key: `net-worth-estimator:financial-model:v1`
 - Malformed canonical persisted data returns parse/validation diagnostics instead of falling back to bundled data.
 - Reset removes the canonical key and reloads bundled `/configs/` files.
+
+### Projection Artifacts
+
+- Derived projection artifacts are separate from the canonical `DataSource` and use the backend-agnostic `ProjectionArtifactStore` contract.
+- The browser implementation stores immutable artifacts in IndexedDB under `net-worth-estimator:projection-artifacts` and prunes the oldest entries beyond its configured bound.
+- Canonical semantic descriptors are serialized with sorted object keys and order-preserving arrays, then addressed by SHA-256. Artifact envelopes carry independent schema and algorithm versions.
+- Deterministic base paths and evaluation results are stored separately. Evaluation-only changes reuse the base simulation, while label-only changes relabel cached results without computation.
+- Completed stochastic results are cached by effective simulation inputs, normalized run count, seed intent, and evaluation configuration. A first unseeded cache miss materializes a concrete seed; later identical requests reuse that persisted outcome.
+- Progressive stochastic results are never persisted. A stochastic evaluation cache miss replays samples because individual sample paths are intentionally not retained.
+- IndexedDB, hashing, validation, and quota failures fail open: workers still compute the requested projection.
 
 ## 4. Core Types
 

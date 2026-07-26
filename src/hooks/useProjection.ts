@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useProjectionEngine } from "@/engine/ProjectionEngineContext";
 import type {
 	FinancialModelDocument,
@@ -6,6 +6,13 @@ import type {
 	ProjectionResult,
 	ProjectionRuntimeSettings,
 } from "@/lib/projection";
+import { applyModelOverrides } from "@/lib/projection";
+import { canonicalSerialize } from "@/lib/projection/artifacts";
+import {
+	evaluationComputationDescriptor,
+	projectionComputationSettings,
+	simulationDocument,
+} from "@/lib/projection/runtime/computationIdentity";
 import {
 	labelProjectionResult,
 	projectionComputationSettingsKey,
@@ -15,8 +22,8 @@ import type { ProjectionHookState } from "./types";
 export type { ProjectionHookState };
 
 interface ProjectionState extends ProjectionHookState<ProjectionResult> {
-	requestKey: object | null;
-	resultBaseKey: object | null;
+	requestKey: string | null;
+	resultBaseKey: string | null;
 }
 
 function publicState(
@@ -43,19 +50,28 @@ export function useProjection(
 	const engine = useProjectionEngine();
 	const computationSettingsKey =
 		projectionComputationSettingsKey(projectionSettings);
-	const computationSettings = useMemo(
-		() => JSON.parse(computationSettingsKey) as ProjectionRuntimeSettings,
-		[computationSettingsKey],
-	);
+	const computationSettingsRef = useRef<{
+		key: string;
+		value: ProjectionRuntimeSettings;
+	} | null>(null);
+	if (computationSettingsRef.current?.key !== computationSettingsKey) {
+		computationSettingsRef.current = {
+			key: computationSettingsKey,
+			value: projectionComputationSettings(projectionSettings),
+		};
+	}
+	const computationSettings = computationSettingsRef.current.value;
 	const baseKey = useMemo(
-		() => ({
-			document,
-			fallbackProjectionStartDate:
-				computationSettings.fallbackProjectionStartDate,
-			horizonYears: computationSettings.horizonYears,
-			overrides,
-			enabled,
-		}),
+		() =>
+			canonicalSerialize({
+				document: document
+					? simulationDocument(applyModelOverrides(document, overrides))
+					: null,
+				fallbackProjectionStartDate:
+					computationSettings.fallbackProjectionStartDate,
+				horizonYears: computationSettings.horizonYears,
+				enabled,
+			}),
 		[
 			document,
 			computationSettings.fallbackProjectionStartDate,
@@ -65,9 +81,17 @@ export function useProjection(
 		],
 	);
 	const requestKey = useMemo(
-		() => ({ baseKey, evaluations: computationSettings.evaluations }),
+		() =>
+			canonicalSerialize({
+				baseKey,
+				evaluations: evaluationComputationDescriptor(
+					computationSettings.evaluations,
+				),
+			}),
 		[baseKey, computationSettings.evaluations],
 	);
+	const inputRef = useRef({ document, overrides, enabled });
+	inputRef.current = { document, overrides, enabled };
 	const [state, setState] = useState<ProjectionState>({
 		result: null,
 		runtimeError: null,
@@ -79,7 +103,8 @@ export function useProjection(
 	});
 
 	useEffect(() => {
-		if (!enabled || document === null) {
+		const input = inputRef.current;
+		if (!input.enabled || input.document === null) {
 			setState({
 				result: null,
 				runtimeError: null,
@@ -109,9 +134,9 @@ export function useProjection(
 
 		engine
 			.project({
-				document,
+				document: input.document,
 				projectionSettings: computationSettings,
-				overrides,
+				overrides: input.overrides,
 				signal: controller.signal,
 			})
 			.then((result) => {
@@ -146,15 +171,7 @@ export function useProjection(
 			});
 
 		return () => controller.abort();
-	}, [
-		baseKey,
-		computationSettings,
-		document,
-		enabled,
-		engine,
-		overrides,
-		requestKey,
-	]);
+	}, [baseKey, computationSettings, engine, requestKey]);
 
 	if (state.requestKey !== requestKey) {
 		const retainBaseResult =

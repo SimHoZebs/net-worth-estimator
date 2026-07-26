@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
 	computePercentiles,
+	createStochasticSampler,
 	getFinancialIndependenceResult,
 	getNetWorthThresholdResult,
+	normalizeStochasticConfig,
 	parseCsvFinancialModel,
 	projectFinancialModelDocument,
 	reseed,
@@ -71,7 +73,43 @@ describe("stochastic utilities", () => {
 		const second = sampleLogNormal(0.07, 0.15);
 
 		expect(first).toBe(second);
+		expect(first).toBe(0.14432693544999387);
 		expect(first).not.toBe(0.07);
+	});
+
+	it("keeps seeded samplers independent when draws are interleaved", () => {
+		const baseline = createStochasticSampler(42);
+		const expected = [baseline(0.07, 0.15), baseline(0.07, 0.15)];
+		const sampler = createStochasticSampler(42);
+		const otherSampler = createStochasticSampler(7);
+
+		const actual = [sampler(0.07, 0.15)];
+		otherSampler(0.07, 0.15);
+		actual.push(sampler(0.07, 0.15));
+
+		expect(actual).toEqual(expected);
+	});
+
+	it("normalizes run counts with simulation semantics", () => {
+		expect(normalizeStochasticConfig({ runCount: 2.9, seed: 42 })).toEqual({
+			runCount: 2,
+			seed: 42,
+		});
+		expect(
+			normalizeStochasticConfig({ runCount: 0, seed: null }).runCount,
+		).toBe(1);
+		expect(
+			normalizeStochasticConfig({ runCount: 20_000, seed: null }).runCount,
+		).toBe(10_000);
+		expect(
+			normalizeStochasticConfig({ runCount: Number.NaN, seed: null }).runCount,
+		).toBe(1);
+		expect(
+			normalizeStochasticConfig({
+				runCount: Number.POSITIVE_INFINITY,
+				seed: null,
+			}).runCount,
+		).toBe(1);
 	});
 
 	it("produces different draws without seed", () => {

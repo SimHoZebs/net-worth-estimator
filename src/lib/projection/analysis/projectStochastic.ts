@@ -22,14 +22,16 @@ import type {
 import { projectionYearIndex } from "../utils/date";
 import {
 	computePercentilesFromSorted,
+	createStochasticSampler,
 	mergeSorted,
-	reseed,
-	sampleLogNormal,
+	normalizeStochasticConfig,
+	type StochasticSampler,
 } from "../utils/stochastic";
 
 function buildStochasticRates(
 	postings: FinancialModelDocument["postings"],
 	sampleCountsByPostingId: ReadonlyMap<string, number>,
+	sampleLogNormal: StochasticSampler,
 ): Map<string, number[]> {
 	const rates = new Map<string, number[]>();
 	for (const posting of postings) {
@@ -127,13 +129,8 @@ export function stochasticProject(
 	config: StochasticConfig,
 	onProgress?: (progress: number, partial: StochasticProjectionResult) => void,
 ): StochasticProjectionResult {
-	const normalizedConfig = {
-		...config,
-		runCount: Number.isFinite(config.runCount)
-			? Math.max(1, Math.min(10_000, Math.trunc(config.runCount)))
-			: 1,
-	};
-	reseed(normalizedConfig.seed);
+	const normalizedConfig = normalizeStochasticConfig(config);
+	const sampleLogNormal = createStochasticSampler(normalizedConfig.seed);
 	const prepared = prepareSimulationRequest(
 		document,
 		projectionSettings,
@@ -182,6 +179,7 @@ export function stochasticProject(
 			const rates = buildStochasticRates(
 				prepared.request.model.postings,
 				sampleCountsByPostingId,
+				sampleLogNormal,
 			);
 			const monteCarloSample: MonteCarloSample = {
 				annualRatesByPostingId: rates,

@@ -2,12 +2,32 @@ import { evaluationRegistry } from "../evaluation/registry";
 import { EvaluationRuntimeSet } from "../evaluation/runtime";
 import { projectRawFinancialModelDocument } from "../simulation/projectPath";
 import type {
+	EvaluationResultCollection,
+	EvaluationTables,
 	FinancialModelDocument,
 	ModelOverrides,
+	ProjectionPath,
 	ProjectionResult,
 	ProjectionRuntimeSettings,
 } from "../types/model";
 import type { MonteCarloSample } from "../types/simulation";
+
+export function evaluateProjectionPath(
+	path: ProjectionPath,
+	evaluations: EvaluationTables,
+	options: {
+		monteCarloSample?: MonteCarloSample;
+		detailLevel?: "detailed" | "summary";
+	} = {},
+): EvaluationResultCollection {
+	const runtimes = new EvaluationRuntimeSet(evaluations, evaluationRegistry);
+	runtimes.evaluateDeterministic({
+		path,
+		document: path.effectiveDocument,
+		...options,
+	});
+	return runtimes.result();
+}
 
 export function projectFinancialModelDocument(
 	document: FinancialModelDocument,
@@ -21,15 +41,10 @@ export function projectFinancialModelDocument(
 		overrides,
 		monteCarloSample,
 	);
-	const runtimes = new EvaluationRuntimeSet(
-		projectionSettings.evaluations,
-		evaluationRegistry,
-	);
-	runtimes.evaluateDeterministic({
-		path: raw.path,
-		document: raw.path.effectiveDocument,
-		monteCarloSample,
-	});
-
-	return { ...raw.result, ...runtimes.result() };
+	return {
+		...raw.result,
+		...evaluateProjectionPath(raw.path, projectionSettings.evaluations, {
+			monteCarloSample,
+		}),
+	};
 }

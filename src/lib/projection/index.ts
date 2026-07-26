@@ -1,4 +1,7 @@
-export { projectFinancialModelDocument } from "./analysis/projectFinancialModel";
+export {
+	evaluateProjectionPath,
+	projectFinancialModelDocument,
+} from "./analysis/projectFinancialModel";
 export { stochasticProject } from "./analysis/projectStochastic";
 export type {
 	DataSource,
@@ -139,9 +142,12 @@ export type {
 	PostingFulfillmentConfig,
 	PostingFulfillmentEvaluation,
 	ProjectionAccountSummary,
+	ProjectionCoreResult,
+	ProjectionPath,
 	ProjectionResult,
 	ProjectionRow,
 	ProjectionRuntimeSettings,
+	RawProjectionOutput,
 } from "./types/model";
 export {
 	CSV_BEHAVIOR_FILE_NAMES,
@@ -173,6 +179,9 @@ export type {
 } from "./types/validation";
 export {
 	computePercentiles,
+	createStochasticSampler,
+	normalizeStochasticConfig,
 	reseed,
+	type StochasticSampler,
 	sampleLogNormal,
 } from "./utils/stochastic";
