@@ -42,6 +42,106 @@ function wrapper(engine: ProjectionEngine) {
 }
 
 describe("projection hook request provenance", () => {
+	it("does not restart either worker for presentation-only label edits", async () => {
+		const document = createBaseDocument();
+		const settings = makeSettings();
+		const deterministic = projectFinancialModelDocument(
+			document,
+			settings,
+			overrides,
+		);
+		const stochastic = stochasticProject(document, settings, overrides, {
+			runCount: 1,
+			seed: 1,
+		});
+		const engine: ProjectionEngine = {
+			project: vi.fn().mockResolvedValue(deterministic),
+			projectStochastic: vi.fn().mockResolvedValue(stochastic),
+		};
+		const hook = renderHook(
+			({ currentSettings }) => ({
+				deterministic: useProjection(
+					document,
+					currentSettings,
+					overrides,
+					true,
+				),
+				stochastic: useStochastic(
+					document,
+					currentSettings,
+					overrides,
+					{ runCount: 1, seed: 1 },
+					true,
+				),
+			}),
+			{
+				initialProps: { currentSettings: settings },
+				wrapper: wrapper(engine),
+			},
+		);
+
+		await waitFor(() => {
+			expect(engine.project).toHaveBeenCalledTimes(1);
+			expect(engine.projectStochastic).toHaveBeenCalledTimes(1);
+		});
+		const labelOnlySettings = structuredClone(settings);
+		labelOnlySettings.evaluations.financialIndependence[0]!.label =
+			"Retirement readiness";
+		hook.rerender({ currentSettings: labelOnlySettings });
+
+		await act(async () => Promise.resolve());
+		expect(engine.project).toHaveBeenCalledTimes(1);
+		expect(engine.projectStochastic).toHaveBeenCalledTimes(1);
+		expect(
+			hook.result.current.deterministic.result?.evaluations
+				.financialIndependence[0]?.label,
+		).toBe("Retirement readiness");
+		expect(
+			hook.result.current.stochastic.result?.evaluations
+				.financialIndependence[0]?.label,
+		).toBe("Retirement readiness");
+	});
+
+	it("retains base results but marks evaluation-only replacements stale", async () => {
+		const document = createBaseDocument();
+		const firstSettings = makeSettings();
+		const secondSettings = structuredClone(firstSettings);
+		secondSettings.evaluations
+			.financialIndependence[0]!.config.annualExpenseTarget = 50_000;
+		const firstResult = projectFinancialModelDocument(
+			document,
+			firstSettings,
+			overrides,
+		);
+		const replacement =
+			deferred<ReturnType<typeof projectFinancialModelDocument>>();
+		const engine: ProjectionEngine = {
+			project: vi
+				.fn()
+				.mockResolvedValueOnce(firstResult)
+				.mockReturnValueOnce(replacement.promise),
+			projectStochastic: vi.fn(),
+		};
+		const hook = renderHook(
+			({ settings }) => useProjection(document, settings, overrides, true),
+			{
+				initialProps: { settings: firstSettings },
+				wrapper: wrapper(engine),
+			},
+		);
+
+		await waitFor(() =>
+			expect(hook.result.current.result?.timeline).toEqual(
+				firstResult.timeline,
+			),
+		);
+		hook.rerender({ settings: secondSettings });
+
+		expect(hook.result.current.result?.timeline).toEqual(firstResult.timeline);
+		expect(hook.result.current.resultIsStale).toBe(true);
+		await waitFor(() => expect(engine.project).toHaveBeenCalledTimes(2));
+	});
+
 	it("never exposes an obsolete deterministic result", async () => {
 		const document = createBaseDocument();
 		const firstSettings = makeSettings({ horizonYears: 1 });
@@ -128,6 +228,6 @@ describe("projection hook request provenance", () => {
 			seed: 1,
 		});
 		act(() => callbacks[1](0.5, current));
-		expect(hook.result.current.result).toBe(current);
+		expect(hook.result.current.result?.bands).toEqual(current.bands);
 	});
 });

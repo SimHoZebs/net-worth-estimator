@@ -3,7 +3,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	FinancialIndependencePlan,
-	FinancialModelDocument,
 	ProjectionResult,
 	StochasticProjectionResult,
 } from "@/lib/projection";
@@ -15,7 +14,6 @@ interface OverviewCardProps {
 	plan: FinancialIndependencePlan;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
-	document: FinancialModelDocument;
 	blockerValue: string;
 	blockerDetail: string;
 }
@@ -26,7 +24,6 @@ export const OverviewCard = memo(function OverviewCard({
 	plan,
 	stochasticResult,
 	stochasticIsProvisional = false,
-	document,
 	blockerValue,
 	blockerDetail,
 }: OverviewCardProps) {
@@ -41,16 +38,6 @@ export const OverviewCard = memo(function OverviewCard({
 	const firstCoverageDate = analysis?.milestones.firstCoverageDate ?? null;
 	const selfSustainingDate =
 		analysis?.milestones.firstSelfSustainingDate ?? null;
-	const activePostingIds = new Set(
-		document.postings.map((posting) => posting.id),
-	);
-	const laborDependentSources = plan.sources.filter(
-		(source) =>
-			source.type === "cashflow" &&
-			source.included &&
-			source.laborDependent &&
-			activePostingIds.has(source.postingId),
-	).length;
 	const displayDate = firstCoverageDate;
 	const coverageRow =
 		analysis?.rows.find((row) => row.date === displayDate) ?? analysis?.rows[0];
@@ -150,13 +137,6 @@ export const OverviewCard = memo(function OverviewCard({
 						Main constraint: <b className="type-value">{blockerValue}</b>
 					</span>
 				</div>
-				{laborDependentSources > 0 ? (
-					<p className="mt-3 rounded-xl border border-tertiary-border bg-tertiary-subtle px-3 py-2 type-caption text-tertiary-foreground">
-						This FI result includes {laborDependentSources} income source
-						{laborDependentSources === 1 ? "" : "s"} that require continued
-						labor.
-					</p>
-				) : null}
 			</CardContent>
 		</Card>
 	);

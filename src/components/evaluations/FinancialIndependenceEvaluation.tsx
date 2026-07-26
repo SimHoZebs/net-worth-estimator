@@ -21,6 +21,8 @@ interface FinancialIndependenceEvaluationProps {
 	result: ProjectionResult;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
+	sourceRevision: number;
+	resultsAreStale?: boolean;
 	blockerValue: string;
 	blockerDetail: string;
 }
@@ -31,6 +33,8 @@ export function FinancialIndependenceEvaluation({
 	result,
 	stochasticResult,
 	stochasticIsProvisional = false,
+	sourceRevision,
+	resultsAreStale = false,
 	blockerValue,
 	blockerDetail,
 }: FinancialIndependenceEvaluationProps) {
@@ -43,14 +47,14 @@ export function FinancialIndependenceEvaluation({
 	} catch {
 		return null;
 	}
-	const analysis = getFinancialIndependenceResult(
-		result,
-		evaluation.instanceId,
-	)?.deterministic;
-	const probabilistic = getFinancialIndependenceResult(
-		stochasticResult,
-		evaluation.instanceId,
-	)?.probabilistic;
+	const analysis = resultsAreStale
+		? undefined
+		: getFinancialIndependenceResult(result, evaluation.instanceId)
+				?.deterministic;
+	const probabilistic = resultsAreStale
+		? undefined
+		: getFinancialIndependenceResult(stochasticResult, evaluation.instanceId)
+				?.probabilistic;
 	const behaviorOutcome =
 		analysis?.runOutcomes.find(
 			(outcome) =>
@@ -70,7 +74,8 @@ export function FinancialIndependenceEvaluation({
 			<FinancialIndependencePlanEditor
 				document={document}
 				plan={plan}
-				onChange={(changes) =>
+				sourceRevision={sourceRevision}
+				onApply={(changes) =>
 					updateEvaluationConfig(
 						"financialIndependence",
 						evaluation.instanceId,
@@ -78,7 +83,11 @@ export function FinancialIndependenceEvaluation({
 					)
 				}
 			/>
-			{analysis ? (
+			{resultsAreStale ? (
+				<p className="rounded-2xl border border-dashed border-primary-border/70 bg-primary-subtle/20 p-5 type-muted">
+					Updating FI outcomes. The base projection remains available above.
+				</p>
+			) : analysis ? (
 				<>
 					<div>
 						<div className="mb-2 type-eyebrow">Outcome and analysis</div>
@@ -88,7 +97,6 @@ export function FinancialIndependenceEvaluation({
 							plan={plan}
 							stochasticResult={stochasticResult}
 							stochasticIsProvisional={stochasticIsProvisional}
-							document={document}
 							blockerValue={blockerValue}
 							blockerDetail={blockerDetail}
 						/>

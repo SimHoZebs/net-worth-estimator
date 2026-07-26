@@ -153,6 +153,24 @@ describe("evaluateFinancialIndependence", () => {
 		).toThrow("Financial independence configuration is invalid.");
 	});
 
+	it("accepts but removes legacy labor-dependence metadata", () => {
+		const normalized = validateFinancialIndependencePlan({
+			...plan(),
+			sources: [
+				{
+					type: "cashflow",
+					postingId: "pension",
+					included: true,
+					laborDependent: true,
+				},
+			],
+		});
+
+		expect(normalized.sources).toEqual([
+			{ type: "cashflow", postingId: "pension", included: true },
+		]);
+	});
+
 	it("annualizes only explicitly selected realized cashflows", () => {
 		const rows = Array.from({ length: 14 }, (_, month) => {
 			const year = 2026 + Math.floor(month / 12);

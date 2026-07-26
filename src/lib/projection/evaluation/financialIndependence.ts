@@ -264,17 +264,24 @@ export function normalizeFinancialIndependencePlan(
 			1,
 			Math.max(0.01, finiteNonNegative(plan.requiredConfidence, 1)),
 		),
-		sources: plan.sources.map((source) =>
-			source.type === "asset" && source.withdrawalRateOverride !== undefined
-				? {
+		sources: plan.sources.map((source) => {
+			if (source.type === "cashflow") {
+				return {
+					type: "cashflow" as const,
+					postingId: source.postingId,
+					included: source.included,
+				};
+			}
+			return source.withdrawalRateOverride === undefined
+				? source
+				: {
 						...source,
 						withdrawalRateOverride: Math.min(
 							1,
 							finiteNonNegative(source.withdrawalRateOverride),
 						),
-					}
-				: source,
-		),
+					};
+		}),
 		continuingPostingIds: [...new Set(plan.continuingPostingIds)],
 	};
 }

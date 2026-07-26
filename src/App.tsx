@@ -155,6 +155,7 @@ export default function App() {
 		result,
 		runtimeError,
 		isRunning: isProjecting,
+		resultIsStale: projectionResultIsStale,
 	} = useProjection(
 		document,
 		projectionSettings,
@@ -176,6 +177,7 @@ export default function App() {
 		runtimeError: stochasticError,
 		isRunning: isStochasticRunning,
 		progress: stochasticProgress,
+		resultIsStale: stochasticResultIsStale,
 	} = useStochastic(
 		document,
 		projectionSettings,
@@ -184,7 +186,9 @@ export default function App() {
 		stochasticWorkerEnabled,
 	);
 	const stochasticIsProvisional =
-		isStochasticRunning && stochasticResult !== null;
+		isStochasticRunning &&
+		stochasticResult !== null &&
+		!stochasticResultIsStale;
 
 	const handleSave = useCallback(() => {
 		const store = useStore.getState();
@@ -250,7 +254,12 @@ export default function App() {
 	}, [refetchModel, requestEvaluationReload]);
 
 	const currentMetrics = useMemo(() => {
-		const evaluationResults = stochasticResult ?? result;
+		const evaluationResults =
+			stochasticResult && !stochasticResultIsStale
+				? stochasticResult
+				: projectionResultIsStale
+					? null
+					: result;
 		return {
 			currentNetWorth: result?.summary.currentNetWorth ?? 0,
 			finalNetWorth: result?.summary.finalNetWorth ?? 0,
@@ -261,13 +270,23 @@ export default function App() {
 							(type) =>
 								evaluationResults?.evaluations[type].map((envelope) => ({
 									instanceId: envelope.instanceId,
-									label: envelope.label,
+									label:
+										evaluations[type].find(
+											(item) => item.instanceId === envelope.instanceId,
+										)?.label ?? envelope.label,
 									status: envelope.status,
 								})) ?? [],
 						),
 			currentChangeCount,
 		};
-	}, [result, stochasticResult, currentChangeCount]);
+	}, [
+		result,
+		stochasticResult,
+		stochasticResultIsStale,
+		projectionResultIsStale,
+		evaluations,
+		currentChangeCount,
+	]);
 
 	const currentChangesControls = useMemo(
 		() => (document ? <CurrentChangesControls document={document} /> : null),
@@ -400,6 +419,9 @@ export default function App() {
 									result={result}
 									stochasticResult={stochasticResult}
 									stochasticIsProvisional={stochasticIsProvisional}
+									evaluationResultsAreStale={projectionResultIsStale}
+									stochasticEvaluationResultsAreStale={stochasticResultIsStale}
+									sourceRevision={dataUpdatedAt}
 								/>
 
 								<section id="model-inputs">

@@ -26,6 +26,7 @@ export {
 	FINANCIAL_INDEPENDENCE_DEFINITION_ID,
 	type FinancialIndependenceCandidateWithdrawalDiagnostic,
 	type FinancialIndependenceProbabilisticResult,
+	normalizeFinancialIndependencePlan,
 	validateFinancialIndependencePlan,
 } from "./evaluation/financialIndependence";
 export { isJsonValue } from "./evaluation/json";

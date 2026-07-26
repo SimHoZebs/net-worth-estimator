@@ -30,6 +30,9 @@ interface ProjectionDashboardProps {
 	result: ProjectionResult;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
+	sourceRevision: number;
+	evaluationResultsAreStale?: boolean;
+	stochasticEvaluationResultsAreStale?: boolean;
 }
 
 export const ProjectionDashboard = memo(function ProjectionDashboard({
@@ -37,6 +40,9 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 	result,
 	stochasticResult,
 	stochasticIsProvisional = false,
+	sourceRevision,
+	evaluationResultsAreStale = false,
+	stochasticEvaluationResultsAreStale = false,
 }: ProjectionDashboardProps) {
 	const [isPostingTablesOpen, setIsPostingTablesOpen] = useState(false);
 	const hasStochasticData =
@@ -101,8 +107,12 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 			<EvaluationList
 				document={document}
 				result={result}
-				stochasticResult={stochasticResult}
+				stochasticResult={
+					stochasticEvaluationResultsAreStale ? null : stochasticResult
+				}
 				stochasticIsProvisional={stochasticIsProvisional}
+				sourceRevision={sourceRevision}
+				resultsAreStale={evaluationResultsAreStale}
 				blockerValue={derived.blockerValue}
 				blockerDetail={derived.blockerDetail}
 			/>

@@ -6,9 +6,33 @@ import type {
 	ProjectionResult,
 	ProjectionRuntimeSettings,
 } from "@/lib/projection";
+import {
+	labelProjectionResult,
+	projectionComputationSettingsKey,
+} from "./projectionComputationSettings";
 import type { ProjectionHookState } from "./types";
 
 export type { ProjectionHookState };
+
+interface ProjectionState extends ProjectionHookState<ProjectionResult> {
+	requestKey: object | null;
+	resultBaseKey: object | null;
+}
+
+function publicState(
+	state: ProjectionState,
+	evaluations: ProjectionRuntimeSettings["evaluations"],
+): ProjectionHookState<ProjectionResult> {
+	return {
+		result: state.result
+			? labelProjectionResult(state.result, evaluations)
+			: null,
+		runtimeError: state.runtimeError,
+		isRunning: state.isRunning,
+		progress: state.progress,
+		resultIsStale: state.resultIsStale,
+	};
+}
 
 export function useProjection(
 	document: FinancialModelDocument | null,
@@ -17,18 +41,41 @@ export function useProjection(
 	enabled: boolean,
 ): ProjectionHookState<ProjectionResult> {
 	const engine = useProjectionEngine();
-	const requestKey = useMemo(
-		() => ({ document, projectionSettings, overrides, enabled }),
-		[document, projectionSettings, overrides, enabled],
+	const computationSettingsKey =
+		projectionComputationSettingsKey(projectionSettings);
+	const computationSettings = useMemo(
+		() => JSON.parse(computationSettingsKey) as ProjectionRuntimeSettings,
+		[computationSettingsKey],
 	);
-	const [state, setState] = useState<
-		ProjectionHookState<ProjectionResult> & { requestKey: object | null }
-	>({
+	const baseKey = useMemo(
+		() => ({
+			document,
+			fallbackProjectionStartDate:
+				computationSettings.fallbackProjectionStartDate,
+			horizonYears: computationSettings.horizonYears,
+			overrides,
+			enabled,
+		}),
+		[
+			document,
+			computationSettings.fallbackProjectionStartDate,
+			computationSettings.horizonYears,
+			overrides,
+			enabled,
+		],
+	);
+	const requestKey = useMemo(
+		() => ({ baseKey, evaluations: computationSettings.evaluations }),
+		[baseKey, computationSettings.evaluations],
+	);
+	const [state, setState] = useState<ProjectionState>({
 		result: null,
 		runtimeError: null,
 		isRunning: false,
 		progress: null,
+		resultIsStale: false,
 		requestKey: null,
+		resultBaseKey: null,
 	});
 
 	useEffect(() => {
@@ -38,24 +85,32 @@ export function useProjection(
 				runtimeError: null,
 				isRunning: false,
 				progress: null,
+				resultIsStale: false,
 				requestKey,
+				resultBaseKey: null,
 			});
 			return;
 		}
 
 		const controller = new AbortController();
-		setState({
-			result: null,
-			runtimeError: null,
-			isRunning: true,
-			progress: null,
-			requestKey,
+		setState((current) => {
+			const retainBaseResult =
+				current.result !== null && current.resultBaseKey === baseKey;
+			return {
+				result: retainBaseResult ? current.result : null,
+				runtimeError: null,
+				isRunning: true,
+				progress: null,
+				resultIsStale: retainBaseResult,
+				requestKey,
+				resultBaseKey: retainBaseResult ? baseKey : null,
+			};
 		});
 
 		engine
 			.project({
 				document,
-				projectionSettings,
+				projectionSettings: computationSettings,
 				overrides,
 				signal: controller.signal,
 			})
@@ -67,7 +122,9 @@ export function useProjection(
 								runtimeError: null,
 								isRunning: false,
 								progress: null,
+								resultIsStale: false,
 								requestKey,
+								resultBaseKey: baseKey,
 							}
 						: current,
 				);
@@ -77,29 +134,40 @@ export function useProjection(
 				setState((current) =>
 					current.requestKey === requestKey
 						? {
-								result: null,
+								...current,
 								runtimeError:
 									err instanceof Error ? err.message : "Projection failed.",
 								isRunning: false,
 								progress: null,
-								requestKey,
+								resultIsStale: current.result !== null,
 							}
 						: current,
 				);
 			});
 
-		return () => {
-			controller.abort();
-		};
-	}, [document, projectionSettings, overrides, enabled, engine, requestKey]);
+		return () => controller.abort();
+	}, [
+		baseKey,
+		computationSettings,
+		document,
+		enabled,
+		engine,
+		overrides,
+		requestKey,
+	]);
 
 	if (state.requestKey !== requestKey) {
+		const retainBaseResult =
+			enabled && state.result !== null && state.resultBaseKey === baseKey;
 		return {
-			result: null,
+			result: retainBaseResult
+				? labelProjectionResult(state.result!, projectionSettings.evaluations)
+				: null,
 			runtimeError: null,
 			isRunning: enabled && document !== null,
 			progress: null,
+			resultIsStale: retainBaseResult,
 		};
 	}
-	return state;
+	return publicState(state, projectionSettings.evaluations);
 }
