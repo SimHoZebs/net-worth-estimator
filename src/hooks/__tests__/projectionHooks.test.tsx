@@ -42,6 +42,63 @@ function wrapper(engine: ProjectionEngine) {
 }
 
 describe("projection hook request provenance", () => {
+	it("does not restart workers for structurally equal cloned inputs", async () => {
+		const document = createBaseDocument();
+		const settings = makeSettings();
+		const engine: ProjectionEngine = {
+			project: vi
+				.fn()
+				.mockResolvedValue(
+					projectFinancialModelDocument(document, settings, overrides),
+				),
+			projectStochastic: vi.fn().mockResolvedValue(
+				stochasticProject(document, settings, overrides, {
+					runCount: 1,
+					seed: 1,
+				}),
+			),
+		};
+		const hook = renderHook(
+			({ currentDocument, currentSettings, currentOverrides }) => ({
+				deterministic: useProjection(
+					currentDocument,
+					currentSettings,
+					currentOverrides,
+					true,
+				),
+				stochastic: useStochastic(
+					currentDocument,
+					currentSettings,
+					currentOverrides,
+					{ runCount: 1, seed: 1 },
+					true,
+				),
+			}),
+			{
+				initialProps: {
+					currentDocument: document,
+					currentSettings: settings,
+					currentOverrides: overrides,
+				},
+				wrapper: wrapper(engine),
+			},
+		);
+
+		await waitFor(() => {
+			expect(engine.project).toHaveBeenCalledOnce();
+			expect(engine.projectStochastic).toHaveBeenCalledOnce();
+		});
+		hook.rerender({
+			currentDocument: structuredClone(document),
+			currentSettings: structuredClone(settings),
+			currentOverrides: structuredClone(overrides),
+		});
+		await act(async () => Promise.resolve());
+
+		expect(engine.project).toHaveBeenCalledOnce();
+		expect(engine.projectStochastic).toHaveBeenCalledOnce();
+	});
+
 	it("does not restart either worker for presentation-only label edits", async () => {
 		const document = createBaseDocument();
 		const settings = makeSettings();

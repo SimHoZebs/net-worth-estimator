@@ -1,4 +1,4 @@
-import type { PercentileBands } from "../types/stochastic";
+import type { PercentileBands, StochasticConfig } from "../types/stochastic";
 
 class LCG {
 	private state: number;
@@ -13,40 +13,54 @@ class LCG {
 	}
 }
 
-let sharedLcg: LCG | null = null;
+export type StochasticSampler = (
+	expectedReturn: number,
+	volatility: number,
+) => number;
 
-export function reseed(seed: number | null): void {
-	if (seed === null) {
-		sharedLcg = null;
-		return;
-	}
+export function createStochasticSampler(
+	seed: number | null,
+): StochasticSampler {
+	const lcg = seed === null ? null : new LCG(seed);
+	const randomUniform = () => (lcg === null ? Math.random() : lcg.next());
 
-	sharedLcg = new LCG(seed);
+	return (expectedReturn, volatility) => {
+		if (volatility <= 0) {
+			return expectedReturn;
+		}
+
+		const u = randomUniform();
+		const v = randomUniform();
+		const standardNormal =
+			Math.sqrt(-2 * Math.log(Math.max(u, 1e-10))) * Math.cos(2 * Math.PI * v);
+		const sigma = volatility;
+		const mu = Math.log(1 + expectedReturn) - (sigma * sigma) / 2;
+		return Math.exp(mu + sigma * standardNormal) - 1;
+	};
 }
 
-function randomUniform(): number {
-	if (sharedLcg !== null) {
-		return sharedLcg.next();
-	}
+let sharedSampler = createStochasticSampler(null);
 
-	return Math.random();
+export function reseed(seed: number | null): void {
+	sharedSampler = createStochasticSampler(seed);
 }
 
 export function sampleLogNormal(
 	expectedReturn: number,
 	volatility: number,
 ): number {
-	if (volatility <= 0) {
-		return expectedReturn;
-	}
+	return sharedSampler(expectedReturn, volatility);
+}
 
-	const u = randomUniform();
-	const v = randomUniform();
-	const standardNormal =
-		Math.sqrt(-2 * Math.log(Math.max(u, 1e-10))) * Math.cos(2 * Math.PI * v);
-	const sigma = volatility;
-	const mu = Math.log(1 + expectedReturn) - (sigma * sigma) / 2;
-	return Math.exp(mu + sigma * standardNormal) - 1;
+export function normalizeStochasticConfig(
+	config: StochasticConfig,
+): StochasticConfig {
+	return {
+		...config,
+		runCount: Number.isFinite(config.runCount)
+			? Math.max(1, Math.min(10_000, Math.trunc(config.runCount)))
+			: 1,
+	};
 }
 
 export function mergeSorted(a: number[], b: number[]): number[] {

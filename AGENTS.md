@@ -69,9 +69,10 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 2. **Persistence DI**: `App.tsx` creates `createCsvDataSource()` in development or `createBrowserCsvDataSource()` in production. `DataSource.loadDocument()` returns `{ document, issues }`.
 3. **Query layer**: `useFinancialModelQuery`, `useFinancialModelMutation`, and `useFinancialModelResetMutation` connect the source to TanStack Query.
 4. **Current changes**: `ModelOverrides` remain in Zustand and are applied with `applyModelOverrides`; canonical data is not mutated.
-5. **Projection**: `useProjection`/`useStochastic` -> `WorkerProjectionEngine` -> Web Workers -> `prepareSimulationRequest` -> `simulate` -> `ProjectionPath` -> evaluation/analysis aggregation.
+5. **Projection**: `useProjection`/`useStochastic` -> `CachedProjectionEngine` -> `WorkerProjectionEngine` on misses -> Web Workers -> `prepareSimulationRequest` -> `simulate` -> `ProjectionPath` -> evaluation/analysis aggregation.
 6. **Monte Carlo**: one prepared request is reused, each `MonteCarloSample` produces a path-only run, exact percentiles are aggregated, and progress is emitted in worker batches of 50.
 7. **Browser persistence**: `net-worth-estimator:financial-model:v1` is the only browser key. Malformed canonical data surfaces diagnostics; reset removes that key and reloads bundled CSV data.
+8. **Derived artifacts**: `ProjectionArtifactStore` is separate from `DataSource`; browser artifacts use versioned content-addressed IndexedDB entries and remain disposable.
 
 ## Key Types
 

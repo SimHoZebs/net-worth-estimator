@@ -1,10 +1,13 @@
 import type {
+	EvaluationResultCollection,
 	ProjectionResult,
+	RawProjectionOutput,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import type {
 	ProgressCallback,
-	ProjectionEngine,
+	ProjectionComputationEngine,
+	ProjectionEvaluationRequest,
 	ProjectionRequest,
 	StochasticRequest,
 } from "@/lib/projection/runtime/ProjectionEngine";
@@ -21,17 +24,21 @@ function toError(error: unknown, fallback: string): Error {
 	return error instanceof Error ? error : new Error(fallback);
 }
 
-export class WorkerProjectionEngine implements ProjectionEngine {
-	async project(request: ProjectionRequest): Promise<ProjectionResult> {
+type WithoutId<T> = T extends { id: number } ? Omit<T, "id"> : never;
+type ProjectionWorkerPayload = WithoutId<ProjectionWorkerRequest>;
+
+export class WorkerProjectionEngine implements ProjectionComputationEngine {
+	private runProjectionWorker<T>(
+		payload: ProjectionWorkerPayload,
+		signal: AbortSignal | undefined,
+	): Promise<T> {
 		const worker = new Worker(
 			new URL("../workers/projectionWorker.ts", import.meta.url),
 			{
 				type: "module",
 			},
 		);
-		const { signal } = request;
-
-		return new Promise<ProjectionResult>((resolve, reject) => {
+		return new Promise<T>((resolve, reject) => {
 			let abortHandler: (() => void) | undefined;
 			const cleanup = () => {
 				if (abortHandler) signal?.removeEventListener("abort", abortHandler);
@@ -56,13 +63,17 @@ export class WorkerProjectionEngine implements ProjectionEngine {
 					return;
 				}
 
-				const { result, runtimeError } = event.data;
+				const { result, runtimeError, type } = event.data;
 				cleanup();
 
-				if (runtimeError) {
+				if (type !== payload.type) {
+					reject(
+						new Error("Projection worker returned the wrong result type."),
+					);
+				} else if (runtimeError) {
 					reject(new Error(runtimeError));
 				} else if (result) {
-					resolve(result);
+					resolve(result as T);
 				} else {
 					reject(new Error("No result returned"));
 				}
@@ -77,20 +88,50 @@ export class WorkerProjectionEngine implements ProjectionEngine {
 				reject(new Error("Projection worker returned an unreadable message."));
 			};
 
-			const payload: ProjectionWorkerRequest = {
-				id: 1,
-				document: request.document,
-				projectionSettings: request.projectionSettings,
-				overrides: request.overrides,
-			};
-
 			try {
-				worker.postMessage(payload);
+				worker.postMessage({ ...payload, id: 1 } as ProjectionWorkerRequest);
 			} catch (error) {
 				cleanup();
 				reject(toError(error, "Could not send projection worker request."));
 			}
 		});
+	}
+
+	async project(request: ProjectionRequest): Promise<ProjectionResult> {
+		return this.runProjectionWorker<ProjectionResult>(
+			{
+				type: "complete",
+				document: request.document,
+				projectionSettings: request.projectionSettings,
+				overrides: request.overrides,
+			},
+			request.signal,
+		);
+	}
+
+	async projectBase(request: ProjectionRequest): Promise<RawProjectionOutput> {
+		return this.runProjectionWorker<RawProjectionOutput>(
+			{
+				type: "base",
+				document: request.document,
+				projectionSettings: request.projectionSettings,
+				overrides: request.overrides,
+			},
+			request.signal,
+		);
+	}
+
+	async evaluateProjection(
+		request: ProjectionEvaluationRequest,
+	): Promise<EvaluationResultCollection> {
+		return this.runProjectionWorker<EvaluationResultCollection>(
+			{
+				type: "evaluation",
+				path: request.path,
+				evaluations: request.evaluations,
+			},
+			request.signal,
+		);
 	}
 
 	async projectStochastic(
