@@ -11,7 +11,6 @@ import type {
 	ProjectionPath,
 	ProjectionRow,
 } from "../types/model";
-import { FINANCIAL_MODEL_DOCUMENT_VERSION } from "../types/model";
 
 const realizedPostingAmountsByRow = new WeakMap<
 	ProjectionRow,
@@ -109,12 +108,15 @@ function path(
 			),
 		),
 		effectiveDocument: {
-			version: FINANCIAL_MODEL_DOCUMENT_VERSION,
 			sourcePath: "test",
 			accounts,
 			postings,
 			checkpoints: [],
-			evaluations: [],
+			evaluations: {
+				financialIndependence: [],
+				netWorthThreshold: [],
+				postingFulfillment: [],
+			},
 		},
 		projectionStartDate: "2026-01-01",
 		projectionEndDate,

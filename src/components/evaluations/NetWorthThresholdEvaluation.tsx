@@ -1,6 +1,6 @@
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
-	ConfiguredEvaluation,
+	EvaluationInstance,
 	NetWorthThresholdConfig,
 	ProjectionResult,
 	StochasticProjectionResult,
@@ -16,7 +16,7 @@ export function NetWorthThresholdEvaluation({
 	stochasticResult,
 	stochasticIsProvisional = false,
 }: {
-	evaluation: ConfiguredEvaluation;
+	evaluation: EvaluationInstance<unknown>;
 	result: ProjectionResult;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;

@@ -2,7 +2,10 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { EvaluationResultCollection } from "@/lib/projection";
+import type {
+	EvaluationResultCollection,
+	EvaluationTables,
+} from "@/lib/projection";
 import { DEFAULT_EVALUATIONS, useStore } from "@/store";
 import { EvaluationList } from "./EvaluationList";
 
@@ -14,22 +17,24 @@ afterEach(() => {
 describe("EvaluationList", () => {
 	it("renders duplicate evaluation instances in configured order", () => {
 		useStore.setState({
-			evaluations: [
-				{
-					definitionId: "net-worth-threshold",
-					instanceId: "first-target",
-					label: "First target",
-					enabled: true,
-					config: { target: 500_000 },
-				},
-				{
-					definitionId: "net-worth-threshold",
-					instanceId: "second-target",
-					label: "Second target",
-					enabled: true,
-					config: { target: 1_000_000 },
-				},
-			],
+			evaluations: {
+				financialIndependence: [],
+				netWorthThreshold: [
+					{
+						instanceId: "first-target",
+						label: "First target",
+						enabled: true,
+						config: { target: 500_000 },
+					},
+					{
+						instanceId: "second-target",
+						label: "Second target",
+						enabled: true,
+						config: { target: 1_000_000 },
+					},
+				],
+				postingFulfillment: [],
+			},
 		});
 
 		render(<EvaluationList />);
@@ -44,34 +49,39 @@ describe("EvaluationList", () => {
 
 	it("renders malformed config and runtime diagnostics without opening an editor", () => {
 		useStore.setState({
-			evaluations: [
-				{
-					definitionId: "net-worth-threshold",
-					instanceId: "broken-target",
-					label: "Broken target",
-					enabled: true,
-					config: null,
-				},
-			],
+			evaluations: {
+				financialIndependence: [],
+				netWorthThreshold: [
+					{
+						instanceId: "broken-target",
+						label: "Broken target",
+						enabled: true,
+						config: null,
+					},
+				],
+				postingFulfillment: [],
+			} as unknown as EvaluationTables,
 		});
 		const results: EvaluationResultCollection = {
-			evaluationOrder: ["broken-target"],
 			evaluations: {
-				"broken-target": {
-					definitionId: "net-worth-threshold",
-					instanceId: "broken-target",
-					label: "Broken target",
-					status: "warning",
-					deterministic: null,
-					probabilistic: null,
-					diagnostics: [
-						{
-							code: "invalid-evaluation-config",
-							severity: "error",
-							message: "Threshold config is invalid.",
-						},
-					],
-				},
+				financialIndependence: [],
+				netWorthThreshold: [
+					{
+						instanceId: "broken-target",
+						label: "Broken target",
+						status: "warning",
+						deterministic: null,
+						probabilistic: null,
+						diagnostics: [
+							{
+								code: "invalid-evaluation-config",
+								severity: "error",
+								message: "Threshold config is invalid.",
+							},
+						],
+					},
+				],
+				postingFulfillment: [],
 			},
 		};
 

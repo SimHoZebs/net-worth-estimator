@@ -4,6 +4,7 @@ import {
 	applyModelOverrides,
 	createBrowserCsvDataSource,
 	createCsvDataSource,
+	EVALUATION_TYPE_ORDER,
 	type ProjectionRuntimeSettings,
 } from "@/lib/projection";
 import { CurrentChangesComparison } from "./components/CurrentChangesComparison";
@@ -254,18 +255,16 @@ export default function App() {
 			currentNetWorth: result?.summary.currentNetWorth ?? 0,
 			finalNetWorth: result?.summary.finalNetWorth ?? 0,
 			evaluationOutcomes:
-				evaluationResults?.evaluationOrder.flatMap((instanceId) => {
-					const envelope = evaluationResults.evaluations[instanceId];
-					return envelope
-						? [
-								{
-									instanceId,
+				evaluationResults === null
+					? []
+					: EVALUATION_TYPE_ORDER.flatMap(
+							(type) =>
+								evaluationResults?.evaluations[type].map((envelope) => ({
+									instanceId: envelope.instanceId,
 									label: envelope.label,
 									status: envelope.status,
-								},
-							]
-						: [];
-				}) ?? [],
+								})) ?? [],
+						),
 			currentChangeCount,
 		};
 	}, [result, stochasticResult, currentChangeCount]);

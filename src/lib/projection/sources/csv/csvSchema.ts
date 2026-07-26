@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { NO_CEILING, NO_FLOOR } from "../../constants";
-import { isJsonValue } from "../../evaluation/json";
 import type {
 	Account,
 	Checkpoint,
-	ConfiguredEvaluation,
+	FinancialIndependenceEvaluation,
+	FinancialIndependencePlan,
+	NetWorthThresholdEvaluation,
+	PostingFulfillmentEvaluation,
 } from "../../types/model";
 
 function parseNumber(value: unknown) {
@@ -99,6 +101,15 @@ function parseNullableString(value: unknown) {
 	return trimmed.length > 0 ? trimmed : null;
 }
 
+function parseJson(value: unknown) {
+	if (typeof value !== "string") return value;
+	try {
+		return JSON.parse(value) as unknown;
+	} catch {
+		return undefined;
+	}
+}
+
 function parseDestinationsArray(value: unknown): string[] | null {
 	if (typeof value !== "string") {
 		return null;
@@ -156,18 +167,44 @@ export const csvAccountsHeaders = [
 	"enabled",
 ] as const;
 export const csvCheckpointsHeaders = ["Date", "AccountId", "Balance"] as const;
-export const csvBehaviorHeaders = [
-	"order",
-	"instanceId",
-	"label",
-	"enabled",
-	"config",
+const csvEvaluationHeaders = ["instanceId", "label", "enabled"] as const;
+
+export const csvFinancialIndependenceHeaders = [
+	...csvEvaluationHeaders,
+	"minimumNetWorth",
+	"annualExpenseTarget",
+	"annualExpenseGrowthRate",
+	"withdrawalRate",
+	"evaluationYears",
+	"requiredConfidence",
+	"sources",
+	"continuingPostingIds",
+	"principalPolicy",
+] as const;
+export const csvNetWorthThresholdHeaders = [
+	...csvEvaluationHeaders,
+	"target",
+] as const;
+export const csvPostingFulfillmentHeaders = [
+	...csvEvaluationHeaders,
+	"postingIds",
 ] as const;
 
-export interface CsvBehaviorRow
-	extends Omit<ConfiguredEvaluation, "definitionId"> {
-	order: number;
-}
+export type CsvFinancialIndependenceRow = Omit<
+	FinancialIndependenceEvaluation,
+	"config"
+> &
+	FinancialIndependencePlan;
+export type CsvNetWorthThresholdRow = Omit<
+	NetWorthThresholdEvaluation,
+	"config"
+> &
+	NetWorthThresholdEvaluation["config"];
+export type CsvPostingFulfillmentRow = Omit<
+	PostingFulfillmentEvaluation,
+	"config"
+> &
+	PostingFulfillmentEvaluation["config"];
 export const csvPostingsHeaders = [
 	"id",
 	"label",
@@ -200,32 +237,53 @@ export const csvCheckpointSchema = z.object({
 	Balance: finiteNumber,
 }) satisfies z.ZodType<Checkpoint>;
 
-const jsonValueSchema = z
-	.string()
-	.trim()
-	.min(1)
-	.transform((value, context) => {
-		try {
-			const parsed: unknown = JSON.parse(value);
-			if (isJsonValue(parsed)) return parsed;
-		} catch {
-			// Report one stable CSV validation issue below.
-		}
-
-		context.addIssue({
-			code: "custom",
-			message: "Expected valid JSON configuration.",
-		});
-		return z.NEVER;
-	});
-
-export const csvBehaviorSchema = z.object({
-	order: positiveInteger,
+const evaluationFields = {
 	instanceId: trimmedString,
 	label: trimmedString,
 	enabled: csvBoolean,
-	config: jsonValueSchema,
-}) satisfies z.ZodType<CsvBehaviorRow>;
+};
+
+const financialIndependenceSourceSchema = z.discriminatedUnion("type", [
+	z.object({
+		type: z.literal("cashflow"),
+		postingId: trimmedString,
+		included: z.boolean(),
+		laborDependent: z.boolean().optional(),
+	}),
+	z.object({
+		type: z.literal("asset"),
+		accountId: trimmedString,
+		included: z.boolean(),
+		withdrawalRateOverride: z.number().finite().optional(),
+	}),
+]);
+
+export const csvFinancialIndependenceSchema = z.object({
+	...evaluationFields,
+	minimumNetWorth: finiteNumber,
+	annualExpenseTarget: finiteNumber,
+	annualExpenseGrowthRate: finiteNumber,
+	withdrawalRate: finiteNumber,
+	evaluationYears: finiteNumber,
+	requiredConfidence: finiteNumber,
+	sources: z.preprocess(parseJson, z.array(financialIndependenceSourceSchema)),
+	continuingPostingIds: z.preprocess(parseJson, z.array(trimmedString)),
+	principalPolicy: z.enum([
+		"allow-drawdown",
+		"preserve-nominal-principal",
+		"preserve-real-principal",
+	]),
+}) satisfies z.ZodType<CsvFinancialIndependenceRow>;
+
+export const csvNetWorthThresholdSchema = z.object({
+	...evaluationFields,
+	target: finiteNumber,
+}) satisfies z.ZodType<CsvNetWorthThresholdRow>;
+
+export const csvPostingFulfillmentSchema = z.object({
+	...evaluationFields,
+	postingIds: z.preprocess(parseJson, z.array(trimmedString).nullable()),
+}) satisfies z.ZodType<CsvPostingFulfillmentRow>;
 
 const postingFrequencySchema = z.enum([
 	"daily",

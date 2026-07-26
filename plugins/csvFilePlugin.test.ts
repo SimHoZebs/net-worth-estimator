@@ -88,12 +88,12 @@ describe("csvFilePlugin", () => {
 
 		expect(canonical).toMatchObject({
 			status: 200,
-			body: { document: { version: 9 }, issues: [] },
+			body: { document: expect.any(Object), issues: [] },
 		});
 		expect(canonical.body).not.toHaveProperty("pack");
 		expect(legacy).toMatchObject({
 			status: 200,
-			body: { pack: { version: 9 }, issues: [] },
+			body: { pack: expect.any(Object), issues: [] },
 		});
 		expect(legacy.body).not.toHaveProperty("document");
 	});

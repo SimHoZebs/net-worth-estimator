@@ -24,11 +24,12 @@ function withFiPlan(
 	const settings = makeSettings(overrides);
 	return {
 		...settings,
-		evaluations: settings.evaluations.map((evaluation) =>
-			evaluation.definitionId === "financial-independence"
-				? { ...evaluation, config: plan as unknown as import("../").JsonValue }
-				: evaluation,
-		),
+		evaluations: {
+			...settings.evaluations,
+			financialIndependence: settings.evaluations.financialIndependence.map(
+				(evaluation) => ({ ...evaluation, config: plan }),
+			),
+		},
 	};
 }
 

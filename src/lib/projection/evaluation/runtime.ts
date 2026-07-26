@@ -1,13 +1,16 @@
 import type {
-	ConfiguredEvaluation,
 	EvaluationDiagnostic,
+	EvaluationInstance,
 	EvaluationResultCollection,
 	EvaluationResultEnvelope,
 	EvaluationResultStatus,
+	EvaluationTables,
+	EvaluationType,
 	FinancialModelDocument,
 	JsonValue,
 	ProjectionPath,
 } from "../types/model";
+import { EVALUATION_TYPE_ORDER } from "../types/model";
 import type { MonteCarloSample } from "../types/simulation";
 import { isJsonValue } from "./json";
 
@@ -30,7 +33,7 @@ export interface EvaluationDefinition<
 	TAccumulator = unknown,
 	TProbabilisticResult = unknown,
 > {
-	id: string;
+	type: EvaluationType;
 	label: string;
 	validateConfig(config: unknown): TConfig;
 	evaluatePath(context: EvaluationContext, config: TConfig): TPathResult;
@@ -61,28 +64,28 @@ type RuntimeDefinition = EvaluationDefinition<
 >;
 
 export class EvaluationRegistry {
-	private readonly definitions = new Map<string, RuntimeDefinition>();
+	private readonly definitions = new Map<EvaluationType, RuntimeDefinition>();
 
 	constructor(definitions: readonly EvaluationDefinition[] = []) {
 		for (const definition of definitions) this.register(definition);
 	}
 
 	register(definition: EvaluationDefinition): void {
-		if (this.definitions.has(definition.id)) {
+		if (this.definitions.has(definition.type)) {
 			throw new Error(
-				`Evaluation definition "${definition.id}" is already registered.`,
+				`Evaluation definition "${definition.type}" is already registered.`,
 			);
 		}
-		this.definitions.set(definition.id, definition as RuntimeDefinition);
+		this.definitions.set(definition.type, definition as RuntimeDefinition);
 	}
 
-	get(id: string): RuntimeDefinition | undefined {
-		return this.definitions.get(id);
+	get(type: EvaluationType): RuntimeDefinition | undefined {
+		return this.definitions.get(type);
 	}
 
-	list(): Array<{ id: string; label: string }> {
-		return [...this.definitions.values()].map(({ id, label }) => ({
-			id,
+	list(): Array<{ type: EvaluationType; label: string }> {
+		return [...this.definitions.values()].map(({ type, label }) => ({
+			type,
 			label,
 		}));
 	}
@@ -104,7 +107,8 @@ class EvaluationInstanceRuntime {
 	private readonly diagnostics: EvaluationDiagnostic[];
 
 	constructor(
-		private readonly configured: ConfiguredEvaluation,
+		readonly type: EvaluationType,
+		private readonly configured: EvaluationInstance<unknown>,
 		private readonly definition: RuntimeDefinition | null,
 		diagnostics: EvaluationDiagnostic[] = [],
 	) {
@@ -204,7 +208,6 @@ class EvaluationInstanceRuntime {
 			}
 		}
 		return {
-			definitionId: this.configured.definitionId,
 			instanceId: this.configured.instanceId,
 			label: this.configured.label,
 			status,
@@ -221,61 +224,81 @@ class EvaluationInstanceRuntime {
 
 export class EvaluationRuntimeSet {
 	private readonly runtimes: EvaluationInstanceRuntime[];
-	readonly evaluationOrder: string[];
 
-	constructor(
-		configured: readonly ConfiguredEvaluation[],
-		registry: EvaluationRegistry,
-	) {
+	constructor(configured: EvaluationTables, registry: EvaluationRegistry) {
 		const idCounts = new Map<string, number>();
-		for (const item of configured) {
-			idCounts.set(item.instanceId, (idCounts.get(item.instanceId) ?? 0) + 1);
+		for (const type of EVALUATION_TYPE_ORDER) {
+			for (const item of configured[type]) {
+				idCounts.set(item.instanceId, (idCounts.get(item.instanceId) ?? 0) + 1);
+			}
 		}
 
 		const seenIds = new Set<string>();
-		this.runtimes = configured.flatMap((item) => {
-			if (seenIds.has(item.instanceId)) return [];
-			seenIds.add(item.instanceId);
-			const diagnostics: EvaluationDiagnostic[] = [];
-			if (!item.instanceId.trim() || (idCounts.get(item.instanceId) ?? 0) > 1) {
-				diagnostics.push({
-					code: "duplicate-evaluation-instance-id",
-					severity: "error",
-					message: item.instanceId.trim()
-						? `Evaluation instance ID "${item.instanceId}" is duplicated.`
-						: "Evaluation instance ID is required.",
-				});
-				return [new EvaluationInstanceRuntime(item, null, diagnostics)];
-			}
-			if (!item.enabled) {
-				diagnostics.push({
-					code: "evaluation-disabled",
-					severity: "info",
-					message: "Evaluation is disabled.",
-				});
-				return [new EvaluationInstanceRuntime(item, null, diagnostics)];
-			}
-			const definition = registry.get(item.definitionId);
-			if (!definition) {
-				diagnostics.push({
-					code: "unknown-evaluation-definition",
-					severity: "error",
-					message: `Unknown evaluation definition "${item.definitionId}".`,
-				});
-				return [new EvaluationInstanceRuntime(item, null, diagnostics)];
-			}
-			try {
-				const config = definition.validateConfig(item.config);
-				if (!isJsonValue(config)) {
-					throw new Error("Evaluation config must be JSON-serializable.");
+		this.runtimes = [];
+		for (const type of EVALUATION_TYPE_ORDER) {
+			for (const item of configured[type]) {
+				if (seenIds.has(item.instanceId)) continue;
+				seenIds.add(item.instanceId);
+				const diagnostics: EvaluationDiagnostic[] = [];
+				if (
+					!item.instanceId.trim() ||
+					(idCounts.get(item.instanceId) ?? 0) > 1
+				) {
+					diagnostics.push({
+						code: "duplicate-evaluation-instance-id",
+						severity: "error",
+						message: item.instanceId.trim()
+							? `Evaluation instance ID "${item.instanceId}" is duplicated.`
+							: "Evaluation instance ID is required.",
+					});
+					this.runtimes.push(
+						new EvaluationInstanceRuntime(type, item, null, diagnostics),
+					);
+					continue;
 				}
-				return [new EvaluationInstanceRuntime({ ...item, config }, definition)];
-			} catch (error) {
-				diagnostics.push(errorDiagnostic("invalid-evaluation-config", error));
-				return [new EvaluationInstanceRuntime(item, null, diagnostics)];
+				if (!item.enabled) {
+					diagnostics.push({
+						code: "evaluation-disabled",
+						severity: "info",
+						message: "Evaluation is disabled.",
+					});
+					this.runtimes.push(
+						new EvaluationInstanceRuntime(type, item, null, diagnostics),
+					);
+					continue;
+				}
+				const definition = registry.get(type);
+				if (!definition) {
+					diagnostics.push({
+						code: "unknown-evaluation-definition",
+						severity: "error",
+						message: `No evaluator is registered for "${type}".`,
+					});
+					this.runtimes.push(
+						new EvaluationInstanceRuntime(type, item, null, diagnostics),
+					);
+					continue;
+				}
+				try {
+					const config = definition.validateConfig(item.config);
+					if (!isJsonValue(config)) {
+						throw new Error("Evaluation config must be JSON-serializable.");
+					}
+					this.runtimes.push(
+						new EvaluationInstanceRuntime(
+							type,
+							{ ...item, config },
+							definition,
+						),
+					);
+				} catch (error) {
+					diagnostics.push(errorDiagnostic("invalid-evaluation-config", error));
+					this.runtimes.push(
+						new EvaluationInstanceRuntime(type, item, null, diagnostics),
+					);
+				}
 			}
-		});
-		this.evaluationOrder = this.runtimes.map((runtime) => runtime.instanceId);
+		}
 	}
 
 	evaluateDeterministic(context: EvaluationContext): void {
@@ -295,11 +318,14 @@ export class EvaluationRuntimeSet {
 	}
 
 	result(): EvaluationResultCollection {
-		const evaluations: Record<string, EvaluationResultEnvelope> = {};
+		const evaluations: EvaluationResultCollection["evaluations"] = {
+			financialIndependence: [],
+			netWorthThreshold: [],
+			postingFulfillment: [],
+		};
 		for (const runtime of this.runtimes) {
-			const envelope = runtime.envelope();
-			evaluations[envelope.instanceId] = envelope;
+			evaluations[runtime.type].push(runtime.envelope());
 		}
-		return { evaluationOrder: [...this.evaluationOrder], evaluations };
+		return { evaluations };
 	}
 }

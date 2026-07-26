@@ -1,6 +1,6 @@
 import { currency, pct } from "@/lib/format";
 import type {
-	ConfiguredEvaluation,
+	EvaluationInstance,
 	ProjectionResult,
 	StochasticProjectionResult,
 } from "@/lib/projection";
@@ -12,7 +12,7 @@ export function PostingFulfillmentEvaluation({
 	stochasticResult,
 	stochasticIsProvisional = false,
 }: {
-	evaluation: ConfiguredEvaluation;
+	evaluation: EvaluationInstance<unknown>;
 	result: ProjectionResult;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;

@@ -57,7 +57,7 @@ App (src/App.tsx)
 | --- | --- |
 | `ModelOverrides` | session-only current changes: added rows, disabled IDs, and reset |
 | `Editor` | CRUD on a working `FinancialModelDocument` and edit/dirty state |
-| `Settings` | ordered evaluations, horizon, stochastic preference, and stochastic config |
+| `Settings` | typed evaluation tables, horizon, stochastic preference, and stochastic config |
 | `Comparison` | read-only `ComparisonSnapshot` metrics; snapshots cannot restore model state |
 | `Theme` | light/dark/system theme and DOM application |
 
@@ -77,14 +77,14 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 
 | Type | Purpose |
 | --- | --- |
-| `FinancialModelDocument` | canonical persisted accounts, postings, checkpoints, evaluations, version, and source metadata |
+| `FinancialModelDocument` | canonical persisted accounts, postings, checkpoints, evaluations, and source metadata |
 | `ModelOverrides` | session-only additions and disabled account/posting IDs |
 | `SimulationRequest` | fully prepared model, runtime state, date range, event policy, and optional sample |
 | `SimulationRun` | exact states, dated balance snapshots, and ordered movement attempts |
 | `ProjectionPath` | immutable evaluator-facing time series and movement events |
 | `MonteCarloSample` | sampled annual posting rates for one run |
 | `ComparisonSnapshot` | read-only captured metrics for UI comparison |
-| `ProjectionResult` | deterministic public result and ordered evaluation envelopes |
+| `ProjectionResult` | deterministic public result and evaluation result tables |
 | `StochasticProjectionResult` | deterministic result, exact percentile bands, and stochastic evaluation aggregation |
 | `DataSource` | `loadDocument` plus optional labeled `save` and `reset` capabilities |
 | `FinancialModelParseResult` | `{ document, issues }` |
@@ -98,7 +98,7 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 - Reactive behaviors emit generic account movements through shared account constraints instead of mutating balances directly.
 - FI continuing postings are explicitly selected; never infer them from IDs, labels, categories, or non-zero rates.
 - Evaluation definitions register in `evaluation/registry.ts`; central coordinators must not import evaluator-specific logic.
-- Evaluation configuration and results remain ordered and keyed by stable instance IDs. Configs and public bodies must remain JSON-serializable.
+- Evaluation configuration and results remain grouped by type. `EVALUATION_TYPE_ORDER` controls type order, table arrays preserve ingestion order, and instances retain stable globally unique IDs. Configs and public bodies must remain JSON-serializable.
 - `ModelOverrides` are session-only and never mutate canonical data.
 - Comparison snapshots contain metrics only; do not add restoration or alternative-model semantics.
 - Use the `@/lib/projection` barrel for projection types and utilities.

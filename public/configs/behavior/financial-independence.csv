@@ -1,2 +1,2 @@
-order,instanceId,label,enabled,config
-1,financial-independence,Financial independence,true,"{""minimumNetWorth"":1500000,""annualExpenseTarget"":80000,""annualExpenseGrowthRate"":0.025,""withdrawalRate"":0.04,""evaluationYears"":10,""requiredConfidence"":0.9,""sources"":[],""continuingPostingIds"":[],""principalPolicy"":""preserve-real-principal""}"
+instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy
+financial-independence,Financial independence,true,1500000,80000,0.025,0.04,10,0.9,[],[],preserve-real-principal

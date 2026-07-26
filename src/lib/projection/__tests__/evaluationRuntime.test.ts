@@ -9,12 +9,13 @@ import {
 	getNetWorthThresholdConfig,
 	getNetWorthThresholdResult,
 	isJsonValue,
-	type JsonValue,
 	parseCsvFinancialModel,
 	projectFinancialModelDocument,
 } from "../index";
 import type {
+	EvaluationInstance,
 	EvaluationResultCollection,
+	EvaluationTables,
 	FinancialModelDocument,
 	ProjectionPath,
 } from "../types/model";
@@ -33,11 +34,10 @@ const path = {
 } satisfies ProjectionPath;
 
 function countingDefinition(
-	id = "counting",
 	options: { throwOnEvaluate?: boolean; failOnEndDate?: string } = {},
 ): EvaluationDefinition<number, number, { total: number }, number> {
 	return {
-		id,
+		type: "netWorthThreshold",
 		label: "Counting",
 		validateConfig(config) {
 			if (typeof config !== "number") throw new Error("Expected a number.");
@@ -67,6 +67,24 @@ function countingDefinition(
 	};
 }
 
+function testTables(
+	evaluations: EvaluationInstance<unknown>[],
+): EvaluationTables {
+	return {
+		financialIndependence: [],
+		netWorthThreshold: evaluations,
+		postingFulfillment: [],
+	} as unknown as EvaluationTables;
+}
+
+function resultFor(runtimes: EvaluationRuntimeSet, instanceId: string) {
+	return runtimes
+		.result()
+		.evaluations.netWorthThreshold.find(
+			(evaluation) => evaluation.instanceId === instanceId,
+		);
+}
+
 describe("evaluation registry and runtime", () => {
 	it("rejects duplicate definition IDs", () => {
 		const registry = new EvaluationRegistry();
@@ -88,126 +106,119 @@ describe("evaluation registry and runtime", () => {
 		const registry = new EvaluationRegistry();
 		registry.register(countingDefinition());
 		const runtimes = new EvaluationRuntimeSet(
-			[
+			testTables([
 				{
-					definitionId: "counting",
 					instanceId: "second",
 					label: "Second",
 					enabled: true,
 					config: 2,
 				},
 				{
-					definitionId: "counting",
 					instanceId: "first",
 					label: "First",
 					enabled: true,
 					config: 1,
 				},
-			],
+			]),
 			registry,
 		);
 		runtimes.evaluateDeterministic({ path, document });
-		expect(runtimes.result().evaluationOrder).toEqual(["second", "first"]);
-		expect(runtimes.result().evaluations.second.deterministic).toBe(2);
-		expect(runtimes.result().evaluations.first.deterministic).toBe(1);
+		expect(
+			runtimes
+				.result()
+				.evaluations.netWorthThreshold.map(
+					(evaluation) => evaluation.instanceId,
+				),
+		).toEqual(["second", "first"]);
+		expect(resultFor(runtimes, "second")?.deterministic).toBe(2);
+		expect(resultFor(runtimes, "first")?.deterministic).toBe(1);
 	});
 
-	it("isolates disabled, duplicate, unknown, invalid, and throwing instances", () => {
+	it("isolates disabled, duplicate, and invalid instances", () => {
 		const registry = new EvaluationRegistry();
 		registry.register(countingDefinition());
-		registry.register(
-			countingDefinition("throwing", { throwOnEvaluate: true }),
-		);
 		const runtimes = new EvaluationRuntimeSet(
-			[
+			testTables([
 				{
-					definitionId: "counting",
 					instanceId: "healthy",
 					label: "Healthy",
 					enabled: true,
 					config: 3,
 				},
 				{
-					definitionId: "counting",
 					instanceId: "disabled",
 					label: "Disabled",
 					enabled: false,
 					config: 1,
 				},
 				{
-					definitionId: "missing",
-					instanceId: "unknown",
-					label: "Unknown",
-					enabled: true,
-					config: 1,
-				},
-				{
-					definitionId: "counting",
 					instanceId: "invalid",
 					label: "Invalid",
 					enabled: true,
 					config: "bad",
 				},
 				{
-					definitionId: "throwing",
-					instanceId: "throws",
-					label: "Throws",
-					enabled: true,
-					config: 1,
-				},
-				{
-					definitionId: "counting",
 					instanceId: "duplicate",
 					label: "Duplicate A",
 					enabled: true,
 					config: 1,
 				},
 				{
-					definitionId: "counting",
 					instanceId: "duplicate",
 					label: "Duplicate B",
 					enabled: true,
 					config: 2,
 				},
-			],
+			]),
 			registry,
 		);
 		runtimes.evaluateDeterministic({ path, document });
 		const result = runtimes.result();
-		expect(result.evaluations.healthy.deterministic).toBe(3);
-		expect(result.evaluations.disabled.diagnostics[0]?.code).toBe(
+		expect(resultFor(runtimes, "healthy")?.deterministic).toBe(3);
+		expect(resultFor(runtimes, "disabled")?.diagnostics[0]?.code).toBe(
 			"evaluation-disabled",
 		);
-		expect(result.evaluations.unknown.diagnostics[0]?.code).toBe(
-			"unknown-evaluation-definition",
-		);
-		expect(result.evaluations.invalid.diagnostics[0]?.code).toBe(
+		expect(resultFor(runtimes, "invalid")?.diagnostics[0]?.code).toBe(
 			"invalid-evaluation-config",
 		);
-		expect(result.evaluations.throws.diagnostics[0]?.code).toBe(
-			"evaluation-runtime-error",
-		);
-		expect(result.evaluations.duplicate.diagnostics[0]?.code).toBe(
+		expect(resultFor(runtimes, "duplicate")?.diagnostics[0]?.code).toBe(
 			"duplicate-evaluation-instance-id",
 		);
-		expect(result.evaluationOrder.filter((id) => id === "duplicate")).toEqual([
-			"duplicate",
+		expect(
+			result.evaluations.netWorthThreshold.filter(
+				(evaluation) => evaluation.instanceId === "duplicate",
+			),
+		).toHaveLength(1);
+	});
+
+	it("isolates evaluator failures", () => {
+		const registry = new EvaluationRegistry([
+			countingDefinition({ throwOnEvaluate: true }),
 		]);
+		const runtimes = new EvaluationRuntimeSet(
+			testTables([
+				{ instanceId: "throws", label: "Throws", enabled: true, config: 1 },
+			]),
+			registry,
+		);
+		runtimes.evaluateDeterministic({ path, document });
+		expect(resultFor(runtimes, "throws")?.diagnostics[0]?.code).toBe(
+			"evaluation-runtime-error",
+		);
 	});
 
 	it("uses the same generic lifecycle for partial and final stochastic results", () => {
 		const registry = new EvaluationRegistry();
 		registry.register(countingDefinition());
 		const runtimes = new EvaluationRuntimeSet(
-			[
+			testTables([
 				{
-					definitionId: "counting",
 					instanceId: "counter",
 					label: "Counter",
 					enabled: true,
 					config: 2,
 				},
-			],
+			]),
 			registry,
 		);
 		runtimes.evaluateDeterministic({ path, document });
@@ -218,31 +229,28 @@ describe("evaluation registry and runtime", () => {
 			deterministicPath: path,
 			runCount: 1,
 		});
-		expect(runtimes.result().evaluations.counter.probabilistic).toBe(2);
+		expect(resultFor(runtimes, "counter")?.probabilistic).toBe(2);
 		runtimes.consume({ path, document });
 		runtimes.finalize({
 			document,
 			deterministicPath: path,
 			runCount: 2,
 		});
-		expect(runtimes.result().evaluations.counter.probabilistic).toBe(4);
+		expect(resultFor(runtimes, "counter")?.probabilistic).toBe(4);
 	});
 
 	it("clears an earlier partial when a later stochastic path fails", () => {
 		const registry = new EvaluationRegistry();
-		registry.register(
-			countingDefinition("late-failure", { failOnEndDate: "2028-01-01" }),
-		);
+		registry.register(countingDefinition({ failOnEndDate: "2028-01-01" }));
 		const runtimes = new EvaluationRuntimeSet(
-			[
+			testTables([
 				{
-					definitionId: "late-failure",
 					instanceId: "late",
 					label: "Late failure",
 					enabled: true,
 					config: 2,
 				},
-			],
+			]),
 			registry,
 		);
 		runtimes.evaluateDeterministic({ path, document });
@@ -253,34 +261,36 @@ describe("evaluation registry and runtime", () => {
 			deterministicPath: path,
 			runCount: 1,
 		});
-		expect(runtimes.result().evaluations.late.probabilistic).toBe(2);
+		expect(resultFor(runtimes, "late")?.probabilistic).toBe(2);
 		runtimes.consume({
 			path: { ...path, projectionEndDate: "2028-01-01" },
 			document,
 		});
-		const failed = runtimes.result().evaluations.late;
+		const failed = resultFor(runtimes, "late")!;
 		expect(failed.status).toBe("warning");
 		expect(failed.probabilistic).toBeNull();
 	});
 
 	it("never exposes probabilistic data from a failed envelope", () => {
 		const collection: EvaluationResultCollection = {
-			evaluationOrder: ["failed"],
 			evaluations: {
-				failed: {
-					definitionId: "net-worth-threshold",
-					instanceId: "failed",
-					label: "Failed",
-					status: "warning",
-					deterministic: { reached: true, firstReachedDate: "2026-01-01" },
-					probabilistic: {
-						probability: 1,
-						p10ReachedDate: "2026-01-01",
-						medianReachedDate: "2026-01-01",
-						p90ReachedDate: "2026-01-01",
+				financialIndependence: [],
+				netWorthThreshold: [
+					{
+						instanceId: "failed",
+						label: "Failed",
+						status: "warning",
+						deterministic: { reached: true, firstReachedDate: "2026-01-01" },
+						probabilistic: {
+							probability: 1,
+							p10ReachedDate: "2026-01-01",
+							medianReachedDate: "2026-01-01",
+							p90ReachedDate: "2026-01-01",
+						},
+						diagnostics: [],
 					},
-					diagnostics: [],
-				},
+				],
+				postingFulfillment: [],
 			},
 		};
 		expect(getNetWorthThresholdResult(collection)).toBeNull();
@@ -297,22 +307,24 @@ describe("configured evaluation integration", () => {
 		const result = projectFinancialModelDocument(
 			loadedDocument,
 			makeSettings({
-				evaluations: [
-					{
-						definitionId: "net-worth-threshold",
-						instanceId: "low",
-						label: "Low",
-						enabled: true,
-						config: { target: 1 },
-					},
-					{
-						definitionId: "net-worth-threshold",
-						instanceId: "high",
-						label: "High",
-						enabled: true,
-						config: { target: 1_000_000_000 },
-					},
-				],
+				evaluations: {
+					financialIndependence: [],
+					netWorthThreshold: [
+						{
+							instanceId: "low",
+							label: "Low",
+							enabled: true,
+							config: { target: 1 },
+						},
+						{
+							instanceId: "high",
+							label: "High",
+							enabled: true,
+							config: { target: 1_000_000_000 },
+						},
+					],
+					postingFulfillment: [],
+				},
 			}),
 		);
 		expect(
@@ -327,25 +339,26 @@ describe("configured evaluation integration", () => {
 		const { data: loadedDocument } = parseCsvFinancialModel(validCsvFiles);
 		if (!loadedDocument) throw new Error("Document failed to load.");
 		const defaults = makeSettings().evaluations;
-		const fi = defaults.find(
-			(evaluation) => evaluation.definitionId === "financial-independence",
-		);
-		const threshold = defaults.find(
-			(evaluation) => evaluation.definitionId === "net-worth-threshold",
-		);
+		const fi = defaults.financialIndependence[0];
+		const threshold = defaults.netWorthThreshold[0];
 		if (!fi || !threshold) throw new Error("Missing default evaluations.");
-		const evaluations = [
-			{ ...fi, instanceId: "fi-disabled", enabled: false },
-			{ ...fi, instanceId: "fi-invalid", config: null },
-			{ ...fi, instanceId: "fi-duplicate" },
-			{ ...fi, instanceId: "fi-duplicate" },
-			{ ...fi, instanceId: "fi-healthy" },
-			{ ...threshold, instanceId: "target-disabled", enabled: false },
-			{ ...threshold, instanceId: "target-invalid", config: null },
-			{ ...threshold, instanceId: "target-duplicate" },
-			{ ...threshold, instanceId: "target-duplicate" },
-			{ ...threshold, instanceId: "target-healthy" },
-		];
+		const evaluations = {
+			financialIndependence: [
+				{ ...fi, instanceId: "fi-disabled", enabled: false },
+				{ ...fi, instanceId: "fi-invalid", config: null },
+				{ ...fi, instanceId: "fi-duplicate" },
+				{ ...fi, instanceId: "fi-duplicate" },
+				{ ...fi, instanceId: "fi-healthy" },
+			],
+			netWorthThreshold: [
+				{ ...threshold, instanceId: "target-disabled", enabled: false },
+				{ ...threshold, instanceId: "target-invalid", config: null },
+				{ ...threshold, instanceId: "target-duplicate" },
+				{ ...threshold, instanceId: "target-duplicate" },
+				{ ...threshold, instanceId: "target-healthy" },
+			],
+			postingFulfillment: [],
+		} as unknown as EvaluationTables;
 		const result = projectFinancialModelDocument(
 			loadedDocument,
 			makeSettings({ evaluations }),
@@ -371,26 +384,28 @@ describe("configured evaluation integration", () => {
 		const { data: loadedDocument } = parseCsvFinancialModel(validCsvFiles);
 		if (!loadedDocument) throw new Error("Document failed to load.");
 		const defaults = makeSettings().evaluations;
-		const fi = defaults.find(
-			(evaluation) => evaluation.definitionId === "financial-independence",
-		);
+		const fi = defaults.financialIndependence[0];
 		if (!fi || typeof fi.config !== "object" || fi.config === null) {
 			throw new Error("Missing FI evaluation.");
 		}
 		const settings = makeSettings({
-			evaluations: [
-				{
-					...fi,
-					config: {
-						...fi.config,
-						sources: [
-							{ type: "cashflow", postingId: "salary", included: true },
-							{ type: "cashflow", postingId: "deleted", included: false },
-						],
-						continuingPostingIds: ["deleted"],
-					} as JsonValue,
-				},
-			],
+			evaluations: {
+				financialIndependence: [
+					{
+						...fi,
+						config: {
+							...fi.config,
+							sources: [
+								{ type: "cashflow", postingId: "salary", included: true },
+								{ type: "cashflow", postingId: "deleted", included: false },
+							],
+							continuingPostingIds: ["deleted"],
+						},
+					},
+				],
+				netWorthThreshold: [],
+				postingFulfillment: [],
+			},
 		});
 		const result = projectFinancialModelDocument(loadedDocument, settings, {
 			addedAccounts: [],

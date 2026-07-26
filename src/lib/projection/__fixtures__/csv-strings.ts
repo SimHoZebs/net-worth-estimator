@@ -20,14 +20,15 @@ export const validCsvFiles: ModelFileContents = {
 		"2026-03-31,student_loan,-12150",
 	].join("\n"),
 	behaviors: {
-		financialIndependence: "order,instanceId,label,enabled,config",
+		financialIndependence:
+			"instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy",
 		netWorthThreshold: [
-			"order,instanceId,label,enabled,config",
-			'1,net-worth-1m,"Reach $1,000,000 net worth",true,"{""target"":1000000}"',
+			"instanceId,label,enabled,target",
+			'net-worth-1m,"Reach $1,000,000 net worth",true,1000000',
 		].join("\n"),
 		postingFulfillment: [
-			"order,instanceId,label,enabled,config",
-			'2,posting-fulfillment,Posting fulfillment,true,"{""postingIds"":null}"',
+			"instanceId,label,enabled,postingIds",
+			"posting-fulfillment,Posting fulfillment,true,null",
 		].join("\n"),
 	},
 	postings: [

@@ -6,7 +6,6 @@ export function createBaseDocument(
 	overrides: Partial<FinancialModelDocument> = {},
 ): FinancialModelDocument {
 	return {
-		version: 9,
 		sourcePath: "/configs",
 		accounts: [
 			makeAccount({ id: "checking" }),
@@ -18,7 +17,11 @@ export function createBaseDocument(
 			{ Date: "2026-01-31", AccountId: "brokerage", Balance: 1200 },
 			{ Date: "2026-01-31", AccountId: "loan", Balance: -400 },
 		],
-		evaluations: [],
+		evaluations: {
+			financialIndependence: [],
+			netWorthThreshold: [],
+			postingFulfillment: [],
+		},
 		postings: [
 			makePosting({
 				id: "salary",

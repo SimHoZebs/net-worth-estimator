@@ -6,7 +6,6 @@ import {
 } from "../../dataSource";
 import {
 	CSV_MODEL_PUBLIC_PATH,
-	FINANCIAL_MODEL_DOCUMENT_VERSION,
 	type FinancialModelDocument,
 } from "../../types/model";
 import type { ModelValidationIssue } from "../../types/validation";
@@ -20,19 +19,12 @@ export const LEGACY_SCENARIO_PACK_STORAGE_KEY =
 
 const BROWSER_STORAGE_SOURCE_PATH = "browser:local-storage";
 
-type LegacyScenarioPack = Omit<
-	FinancialModelDocument,
-	"evaluations" | "version"
-> & {
-	version: 8;
-};
-
 type StoredDocumentRead =
 	| { status: "absent" }
 	| { status: "invalid"; issue: ModelValidationIssue }
 	| {
 			status: "found";
-			document: FinancialModelDocument | LegacyScenarioPack;
+			document: FinancialModelDocument;
 	  };
 
 export interface BrowserCsvDataSourceOptions {
@@ -63,25 +55,17 @@ function isFinancialModelDocument(
 	value: unknown,
 ): value is FinancialModelDocument {
 	if (!isRecord(value)) return false;
+	const evaluations = value.evaluations;
 
 	return (
-		value.version === FINANCIAL_MODEL_DOCUMENT_VERSION &&
+		!("version" in value) &&
 		typeof value.sourcePath === "string" &&
 		Array.isArray(value.accounts) &&
 		Array.isArray(value.checkpoints) &&
-		Array.isArray(value.evaluations) &&
-		Array.isArray(value.postings)
-	);
-}
-
-function isLegacyScenarioPack(value: unknown): value is LegacyScenarioPack {
-	if (!isRecord(value)) return false;
-
-	return (
-		value.version === 8 &&
-		typeof value.sourcePath === "string" &&
-		Array.isArray(value.accounts) &&
-		Array.isArray(value.checkpoints) &&
+		isRecord(evaluations) &&
+		Array.isArray(evaluations.financialIndependence) &&
+		Array.isArray(evaluations.netWorthThreshold) &&
+		Array.isArray(evaluations.postingFulfillment) &&
 		Array.isArray(value.postings)
 	);
 }
@@ -120,7 +104,7 @@ function readStoredDocument(
 
 	try {
 		const parsed = JSON.parse(serialized) as unknown;
-		if (isFinancialModelDocument(parsed) || isLegacyScenarioPack(parsed)) {
+		if (isFinancialModelDocument(parsed)) {
 			return { status: "found", document: parsed };
 		}
 	} catch {
@@ -138,24 +122,7 @@ async function loadBundledDocument(
 	return { document: result.data, issues: result.issues };
 }
 
-async function migrateVersionEightDocument(
-	legacyDocument: LegacyScenarioPack,
-	basePath: string,
-	fetchImpl: typeof fetch,
-	storageKey: string,
-): Promise<FinancialModelParseResult> {
-	const bundled = await loadBundledDocument(basePath, fetchImpl);
-	if (!bundled.document) return bundled;
-
-	const document: FinancialModelDocument = {
-		...legacyDocument,
-		version: FINANCIAL_MODEL_DOCUMENT_VERSION,
-		evaluations: bundled.document.evaluations,
-	};
-	return validateStoredDocument(document, storageKey);
-}
-
-function persistMigratedDocument(
+function persistLegacyDocument(
 	storage: Pick<Storage, "setItem" | "removeItem">,
 	storageKey: string,
 	document: FinancialModelDocument,
@@ -193,22 +160,7 @@ export function createBrowserCsvDataSource(
 				return { document: null, issues: [canonical.issue] };
 			}
 			if (canonical.status === "found") {
-				const result =
-					canonical.document.version === FINANCIAL_MODEL_DOCUMENT_VERSION
-						? validateStoredDocument(canonical.document, storageKey)
-						: await migrateVersionEightDocument(
-								canonical.document,
-								basePath,
-								fetchImpl,
-								storageKey,
-							);
-				if (
-					result.document &&
-					!result.issues.some((issue) => issue.severity === "error")
-				) {
-					persistMigratedDocument(storage, storageKey, result.document);
-				}
-				return result;
+				return validateStoredDocument(canonical.document, storageKey);
 			}
 
 			const legacy = readStoredDocument(
@@ -222,23 +174,15 @@ export function createBrowserCsvDataSource(
 				return loadBundledDocument(basePath, fetchImpl);
 			}
 
-			const result =
-				legacy.document.version === FINANCIAL_MODEL_DOCUMENT_VERSION
-					? validateStoredDocument(
-							legacy.document,
-							LEGACY_SCENARIO_PACK_STORAGE_KEY,
-						)
-					: await migrateVersionEightDocument(
-							legacy.document,
-							basePath,
-							fetchImpl,
-							LEGACY_SCENARIO_PACK_STORAGE_KEY,
-						);
+			const result = validateStoredDocument(
+				legacy.document,
+				LEGACY_SCENARIO_PACK_STORAGE_KEY,
+			);
 			if (
 				result.document &&
 				!result.issues.some((issue) => issue.severity === "error")
 			) {
-				persistMigratedDocument(storage, storageKey, result.document);
+				persistLegacyDocument(storage, storageKey, result.document);
 			}
 			return result;
 		},
@@ -250,9 +194,12 @@ export function createBrowserCsvDataSource(
 					run: async (
 						document: FinancialModelDocument,
 					): Promise<FinancialModelParseResult> => {
-						const savedDocument = {
-							...document,
+						const savedDocument: FinancialModelDocument = {
 							sourcePath: BROWSER_STORAGE_SOURCE_PATH,
+							accounts: document.accounts,
+							checkpoints: document.checkpoints,
+							evaluations: document.evaluations,
+							postings: document.postings,
 						};
 						let issues: ModelValidationIssue[];
 						try {

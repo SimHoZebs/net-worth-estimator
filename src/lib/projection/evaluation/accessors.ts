@@ -1,23 +1,21 @@
 import type {
-	ConfiguredEvaluation,
+	EvaluationInstance,
 	EvaluationResultCollection,
 	EvaluationResultEnvelope,
+	EvaluationTables,
 	FinancialIndependenceAnalysis,
 } from "../types/model";
 import {
-	FINANCIAL_INDEPENDENCE_DEFINITION_ID,
 	type FinancialIndependenceProbabilisticResult,
 	validateFinancialIndependencePlan,
 } from "./financialIndependence";
 import { isJsonValue } from "./json";
 import {
-	NET_WORTH_THRESHOLD_DEFINITION_ID,
 	type NetWorthThresholdPathResult,
 	type NetWorthThresholdProbabilisticResult,
 	validateNetWorthThresholdConfig,
 } from "./netWorthThreshold";
 import {
-	POSTING_FULFILLMENT_DEFINITION_ID,
 	type PostingFulfillmentPathResult,
 	type PostingFulfillmentProbabilisticResult,
 	validatePostingFulfillmentConfig,
@@ -32,7 +30,7 @@ type TypedEvaluationResultEnvelope<TDeterministic, TProbabilistic> = Omit<
 };
 
 export type ValidatedConfiguredEvaluation<TConfig> = Omit<
-	ConfiguredEvaluation,
+	EvaluationInstance<unknown>,
 	"config"
 > & { config: TConfig };
 
@@ -45,23 +43,14 @@ function isSuccessfulEnvelope(envelope: EvaluationResultEnvelope | undefined) {
 }
 
 function getEnvelope<TDeterministic, TProbabilistic>(
-	collection: EvaluationResultCollection | null | undefined,
-	definitionId: string,
+	evaluations: readonly EvaluationResultEnvelope[] | null | undefined,
 	instanceId?: string,
 ) {
-	if (!collection) return null;
-	const id =
-		instanceId ??
-		collection.evaluationOrder.find((candidate) => {
-			const envelope = collection.evaluations[candidate];
-			return (
-				envelope?.definitionId === definitionId &&
-				isSuccessfulEnvelope(envelope)
-			);
-		});
-	if (!id) return null;
-	const envelope = collection.evaluations[id];
-	if (!envelope || envelope.definitionId !== definitionId) return null;
+	if (!evaluations) return null;
+	const envelope = instanceId
+		? evaluations.find((candidate) => candidate.instanceId === instanceId)
+		: evaluations.find(isSuccessfulEnvelope);
+	if (!envelope) return null;
 	const typed = envelope as unknown as TypedEvaluationResultEnvelope<
 		TDeterministic,
 		TProbabilistic
@@ -78,7 +67,7 @@ export function getFinancialIndependenceResult(
 	return getEnvelope<
 		FinancialIndependenceAnalysis,
 		FinancialIndependenceProbabilisticResult
-	>(collection, FINANCIAL_INDEPENDENCE_DEFINITION_ID, instanceId);
+	>(collection?.evaluations.financialIndependence, instanceId);
 }
 
 export function getNetWorthThresholdResult(
@@ -88,7 +77,7 @@ export function getNetWorthThresholdResult(
 	return getEnvelope<
 		NetWorthThresholdPathResult,
 		NetWorthThresholdProbabilisticResult
-	>(collection, NET_WORTH_THRESHOLD_DEFINITION_ID, instanceId);
+	>(collection?.evaluations.netWorthThreshold, instanceId);
 }
 
 export function getPostingFulfillmentResult(
@@ -98,26 +87,26 @@ export function getPostingFulfillmentResult(
 	return getEnvelope<
 		PostingFulfillmentPathResult,
 		PostingFulfillmentProbabilisticResult
-	>(collection, POSTING_FULFILLMENT_DEFINITION_ID, instanceId);
+	>(collection?.evaluations.postingFulfillment, instanceId);
 }
 
 export function getConfiguredEvaluation<TConfig>(
-	evaluations: readonly ConfiguredEvaluation[],
-	definitionId: string,
+	evaluations: readonly EvaluationInstance<TConfig>[],
 	validate: (config: unknown) => TConfig,
-	collection?: EvaluationResultCollection | null,
+	results?: readonly EvaluationResultEnvelope[] | null,
 	instanceId?: string,
 ): ValidatedConfiguredEvaluation<TConfig> | null {
 	const candidates = instanceId
 		? evaluations.filter((item) => item.instanceId === instanceId)
 		: evaluations;
 	for (const evaluation of candidates) {
-		if (evaluation.definitionId !== definitionId) continue;
 		if (instanceId === undefined && !evaluation.enabled) continue;
 		if (
 			instanceId === undefined &&
-			collection &&
-			!isSuccessfulEnvelope(collection.evaluations[evaluation.instanceId])
+			results &&
+			!isSuccessfulEnvelope(
+				results.find((result) => result.instanceId === evaluation.instanceId),
+			)
 		) {
 			continue;
 		}
@@ -131,43 +120,40 @@ export function getConfiguredEvaluation<TConfig>(
 }
 
 export function getFinancialIndependenceConfig(
-	evaluations: readonly ConfiguredEvaluation[],
+	evaluations: EvaluationTables,
 	collection?: EvaluationResultCollection | null,
 	instanceId?: string,
 ) {
 	return getConfiguredEvaluation(
-		evaluations,
-		FINANCIAL_INDEPENDENCE_DEFINITION_ID,
+		evaluations.financialIndependence,
 		validateFinancialIndependencePlan,
-		collection,
+		collection?.evaluations.financialIndependence,
 		instanceId,
 	);
 }
 
 export function getNetWorthThresholdConfig(
-	evaluations: readonly ConfiguredEvaluation[],
+	evaluations: EvaluationTables,
 	collection?: EvaluationResultCollection | null,
 	instanceId?: string,
 ) {
 	return getConfiguredEvaluation(
-		evaluations,
-		NET_WORTH_THRESHOLD_DEFINITION_ID,
+		evaluations.netWorthThreshold,
 		validateNetWorthThresholdConfig,
-		collection,
+		collection?.evaluations.netWorthThreshold,
 		instanceId,
 	);
 }
 
 export function getPostingFulfillmentConfig(
-	evaluations: readonly ConfiguredEvaluation[],
+	evaluations: EvaluationTables,
 	collection?: EvaluationResultCollection | null,
 	instanceId?: string,
 ) {
 	return getConfiguredEvaluation(
-		evaluations,
-		POSTING_FULFILLMENT_DEFINITION_ID,
+		evaluations.postingFulfillment,
 		validatePostingFulfillmentConfig,
-		collection,
+		collection?.evaluations.postingFulfillment,
 		instanceId,
 	);
 }
