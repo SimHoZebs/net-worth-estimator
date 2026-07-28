@@ -11,19 +11,13 @@ Read `TECHNICAL_OVERVIEW.md` for system-level details.
 ## Component Map
 
 ```text
-main.tsx -> <QueryClientProvider> -> <ProjectionEngineProvider> -> <App>
+main.tsx -> providers -> <RouterProvider> -> <App>
 
 App (src/App.tsx)
-|-- <ProjectionDashboard>
-|   |-- overview, outcome, driver, reconciliation, debt, cash-flow, and shortfall views
-|   `-- account, contribution, financial-independence, and Monte Carlo charts
-|-- <ModelInputsInspector>
-|   |-- <ModelValidationPanel>
-|   |-- read-only or editable account, posting, and checkpoint tables
-|   `-- <CurrentChangesControls>
-|-- <CurrentChangesComparison>
-|-- <ProjectionConfigSidebar>
-`-- <TemplateWizard> -> <IncomeForm> -> <TemplatePreview> -> store
+`-- runtime providers -> <AppShell> -> <Outlet>
+    |-- / -> <ResultsPage> -> dashboard, evaluation results, comparisons
+    |-- /settings -> simulation, Monte Carlo, evaluation, and theme settings
+    `-- /model-inputs -> inspector, current changes, templates, and source status
 ```
 
 ### Dashboard Sub-components
@@ -48,6 +42,10 @@ App (src/App.tsx)
 | `useDebouncedStochasticConfig` | `hooks/useDebouncedStochasticConfig.ts` | debounces Monte Carlo configuration |
 
 `ProjectionHookState<T>` is `{ result, runtimeError, isRunning, progress }`.
+
+`App.tsx` owns projection hooks above the route outlet. Do not move them into individual pages; route navigation must not abort or restart unchanged computations.
+
+Route pages should compose feature components rather than forward shared-state prop bundles. Feature components select user-owned state directly from Zustand and consume hook-owned model/projection state from `src/runtime/`. Keep explicit props for presentational component boundaries.
 
 ## Store
 

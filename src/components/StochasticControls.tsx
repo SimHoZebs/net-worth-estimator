@@ -1,23 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { useDebouncedStochasticConfig } from "@/hooks/useDebouncedStochasticConfig";
-import type { StochasticProjectionResult } from "@/lib/projection";
+import {
+	useProjectionCapabilities,
+	useProjectionExecution,
+	useStochasticProgress,
+} from "@/runtime/projectionRuntime";
 import { useStore } from "@/store";
 
-interface StochasticControlsProps {
-	hasStochasticAccounts: boolean;
-	isRunning: boolean;
-	progress: number | null;
-	stochasticResult: StochasticProjectionResult | null;
-	compact?: boolean;
-}
-
-export function StochasticControls({
-	hasStochasticAccounts,
-	isRunning,
-	progress,
-	stochasticResult,
-}: StochasticControlsProps) {
+export function StochasticControls() {
+	const { isStochasticRunning: isRunning } = useProjectionExecution();
+	const progress = useStochasticProgress();
+	const { hasStochasticAccounts, hasStochasticResult } =
+		useProjectionCapabilities();
 	const stochasticPreference = useStore((s) => s.stochasticPreference);
 	const config = useStore((s) => s.stochasticConfig);
 	const onPreferenceChange = useStore((s) => s.setStochasticPreference);
@@ -39,7 +34,7 @@ export function StochasticControls({
 		? progressPct !== null
 			? `Computing ${config.runCount} projections — ${progressPct}%`
 			: `Computing ${config.runCount} projections…`
-		: stochasticResult
+		: hasStochasticResult
 			? `Ready — ${config.runCount} run${config.runCount === 1 ? "" : "s"}${config.seed !== null ? ` (seed ${config.seed})` : ""}`
 			: simulationActive
 				? "Waiting to start…"

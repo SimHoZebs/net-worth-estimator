@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -25,6 +25,7 @@ interface FinancialIndependencePlanEditorProps {
 	plan: FinancialIndependencePlan;
 	sourceRevision: number;
 	onApply: (plan: FinancialIndependencePlan) => void;
+	onDirtyChange?: (dirty: boolean) => void;
 }
 
 function cleanPlan(plan: FinancialIndependencePlan) {
@@ -52,6 +53,7 @@ export const FinancialIndependencePlanEditor = memo(
 		plan,
 		sourceRevision,
 		onApply,
+		onDirtyChange,
 	}: FinancialIndependencePlanEditorProps) {
 		const committedPlan = cleanPlan(plan);
 		const committedFingerprint = planFingerprint(committedPlan);
@@ -106,6 +108,12 @@ export const FinancialIndependencePlanEditor = memo(
 				posting.enabled && postingLinksToAssets(posting, selectedAssets),
 		);
 		const dirty = planFingerprint(draft) !== committedFingerprint;
+		const onDirtyChangeRef = useRef(onDirtyChange);
+		onDirtyChangeRef.current = onDirtyChange;
+		useEffect(() => {
+			onDirtyChangeRef.current?.(dirty);
+			return () => onDirtyChangeRef.current?.(false);
+		}, [dirty]);
 
 		const toggleCashflow = (postingId: string) => {
 			setDraft((current) => {

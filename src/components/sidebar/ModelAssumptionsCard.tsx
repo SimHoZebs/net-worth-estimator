@@ -1,4 +1,3 @@
-import { memo } from "react";
 import {
 	Card,
 	CardContent,
@@ -6,17 +5,15 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import type { FinancialModelDocument } from "@/lib/projection";
+import { useModelRuntime } from "@/runtime/modelRuntime";
+import { useProjectionCapabilities } from "@/runtime/projectionRuntime";
 
-interface ModelAssumptionsCardProps {
-	document: FinancialModelDocument;
-	hasStochasticData: boolean;
-}
-
-export const ModelAssumptionsCard = memo(function ModelAssumptionsCard({
-	document,
-	hasStochasticData,
-}: ModelAssumptionsCardProps) {
+export function ModelAssumptionsCard() {
+	const { document: canonicalDocument, effectiveDocument } = useModelRuntime();
+	const { hasStochasticResult: hasStochasticData } =
+		useProjectionCapabilities();
+	const document = effectiveDocument ?? canonicalDocument;
+	if (!document) return null;
 	const enabledAccounts = document.accounts.filter(
 		(account) => account.enabled,
 	).length;
@@ -117,4 +114,4 @@ export const ModelAssumptionsCard = memo(function ModelAssumptionsCard({
 			</CardContent>
 		</Card>
 	);
-});
+}

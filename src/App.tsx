@@ -1,35 +1,37 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { Outlet } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
+import { AppShell } from "@/components/AppShell";
+import {
+	useFinancialModelMutation,
+	useFinancialModelQuery,
+	useFinancialModelResetMutation,
+} from "@/hooks/useFinancialModel";
+import { useProjection } from "@/hooks/useProjection";
+import { useStochastic } from "@/hooks/useStochastic";
+import type { TemplateOutput } from "@/lib/patterns";
 import {
 	applyModelOverrides,
 	createBrowserCsvDataSource,
 	createCsvDataSource,
 	EVALUATION_TYPE_ORDER,
-	type ProjectionRuntimeSettings,
+	summarizeValidationIssues,
 } from "@/lib/projection";
-import { CurrentChangesComparison } from "./components/CurrentChangesComparison";
-import { CurrentChangesControls } from "./components/CurrentChangesControls";
-import { ModelInputsInspector } from "./components/ModelInputsInspector";
-import { ProjectionDashboard } from "./components/ProjectionDashboard";
-import { TemplateWizard } from "./components/patterns/TemplateWizard";
-import { SectionNav } from "./components/SectionNav";
-import { ProjectionConfigSidebar } from "./components/sidebar/ProjectionConfigSidebar";
-import { Alert, AlertDescription, AlertTitle } from "./components/ui/alert";
-import { Button } from "./components/ui/button";
-import { LazySection } from "./components/ui/lazy-section";
 import {
-	useFinancialModelMutation,
-	useFinancialModelQuery,
-	useFinancialModelResetMutation,
-} from "./hooks/useFinancialModel";
-import { useProjection } from "./hooks/useProjection";
-import { useStochastic } from "./hooks/useStochastic";
-import { summarizeValidationIssues } from "./lib/projection";
+	ModelRuntimeProvider,
+	type ModelSourceInfo,
+} from "@/runtime/modelRuntime";
+import {
+	type ProjectionArtifacts,
+	type ProjectionCapabilities,
+	type ProjectionExecution,
+	ProjectionRuntimeProvider,
+} from "@/runtime/projectionRuntime";
 import {
 	selectCurrentChangeCount,
 	selectModelOverrides,
 	useStore,
-} from "./store";
+} from "@/store";
 
 function formatTodayIsoDate() {
 	return new Date().toISOString().slice(0, 10);
@@ -53,41 +55,33 @@ export default function App() {
 	} = useFinancialModelQuery(dataSource);
 	const modelMutation = useFinancialModelMutation(dataSource);
 	const modelResetMutation = useFinancialModelResetMutation(dataSource);
-
+	const saveModel = modelMutation.mutate;
+	const resetModel = modelResetMutation.mutate;
+	const isSaving = modelMutation.isPending;
+	const isResetting = modelResetMutation.isPending;
 	const document = modelData?.document ?? null;
-	const issues = modelData?.issues ?? [];
+	const issues = useMemo(() => modelData?.issues ?? [], [modelData?.issues]);
 	const loadError = modelError?.message ?? null;
 	const sourceActionError =
 		modelMutation.error?.message ?? modelResetMutation.error?.message ?? null;
 	const isSourceUpdating = isModelFetching || modelResetMutation.isPending;
 	const isLoading = isModelLoading || isSourceUpdating;
-
 	const modelOverrides = useStore(useShallow(selectModelOverrides));
 	const {
 		currentChangeCount,
-		isEditing,
-		isDirty,
 		evaluations,
 		horizonYears,
-		setHorizonYears,
 		replaceEvaluations,
 		stochasticPreference,
 		stochasticConfig,
-		theme,
-		setTheme,
 	} = useStore(
-		useShallow((s) => ({
-			currentChangeCount: selectCurrentChangeCount(s),
-			isEditing: s.isEditing,
-			isDirty: s.isDirty,
-			evaluations: s.evaluations,
-			horizonYears: s.horizonYears,
-			setHorizonYears: s.setHorizonYears,
-			replaceEvaluations: s.replaceEvaluations,
-			stochasticPreference: s.stochasticPreference,
-			stochasticConfig: s.stochasticConfig,
-			theme: s.theme,
-			setTheme: s.setTheme,
+		useShallow((state) => ({
+			currentChangeCount: selectCurrentChangeCount(state),
+			evaluations: state.evaluations,
+			horizonYears: state.horizonYears,
+			replaceEvaluations: state.replaceEvaluations,
+			stochasticPreference: state.stochasticPreference,
+			stochasticConfig: state.stochasticConfig,
 		})),
 	);
 
@@ -114,29 +108,24 @@ export default function App() {
 	}, [document, replaceEvaluations, sourceEvaluationsFingerprint]);
 
 	useEffect(() => {
-		const mq = window.matchMedia("(prefers-color-scheme: dark)");
+		const media = window.matchMedia("(prefers-color-scheme: dark)");
 		const handleChange = () => {
-			if (useStore.getState().theme === "system") {
-				const resolved = mq.matches ? "dark" : "light";
-				window.document.documentElement.classList.toggle(
-					"dark",
-					resolved === "dark",
-				);
-				useStore.setState({ resolvedTheme: resolved });
-			}
+			if (useStore.getState().theme !== "system") return;
+			const resolved = media.matches ? "dark" : "light";
+			window.document.documentElement.classList.toggle(
+				"dark",
+				resolved === "dark",
+			);
+			useStore.setState({ resolvedTheme: resolved });
 		};
-		mq.addEventListener("change", handleChange);
-		return () => mq.removeEventListener("change", handleChange);
+		media.addEventListener("change", handleChange);
+		return () => media.removeEventListener("change", handleChange);
 	}, []);
 
 	const validation = summarizeValidationIssues(issues);
 	const fallbackProjectionStartDate = useMemo(() => formatTodayIsoDate(), []);
 	const projectionSettings = useMemo(
-		() => ({
-			fallbackProjectionStartDate,
-			horizonYears,
-			evaluations,
-		}),
+		() => ({ fallbackProjectionStartDate, horizonYears, evaluations }),
 		[fallbackProjectionStartDate, horizonYears, evaluations],
 	);
 	const effectiveDocument = useMemo(
@@ -145,10 +134,8 @@ export default function App() {
 	);
 	const projectionStartDate =
 		effectiveDocument?.checkpoints.reduce<string | null>(
-			(latestDate, checkpoint) =>
-				latestDate === null || checkpoint.Date > latestDate
-					? checkpoint.Date
-					: latestDate,
+			(latest, checkpoint) =>
+				latest === null || checkpoint.Date > latest ? checkpoint.Date : latest,
 			null,
 		) ?? fallbackProjectionStartDate;
 	const {
@@ -162,11 +149,10 @@ export default function App() {
 		modelOverrides,
 		validation.isValid && evaluationsAreHydrated,
 	);
-
 	const hasStochasticAccounts =
-		effectiveDocument?.postings.some((p) => p.volatility > 0 && p.enabled) ??
-		false;
-
+		effectiveDocument?.postings.some(
+			(posting) => posting.volatility > 0 && posting.enabled,
+		) ?? false;
 	const stochasticWorkerEnabled =
 		stochasticPreference !== "disabled" &&
 		hasStochasticAccounts &&
@@ -189,68 +175,46 @@ export default function App() {
 		isStochasticRunning &&
 		stochasticResult !== null &&
 		!stochasticResultIsStale;
+	const hasStochasticResult = stochasticResult !== null;
 
 	const handleSave = useCallback(() => {
 		const store = useStore.getState();
-		if (!store.workingDocument || modelMutation.isPending || !dataSource.save)
-			return;
-
-		modelMutation.mutate(store.workingDocument, {
-			onSuccess: () => {
+		if (!store.workingDocument || isSaving || !dataSource.save) return;
+		saveModel(store.workingDocument, {
+			onSuccess: () =>
 				useStore.setState({
 					isDirty: false,
 					isEditing: false,
 					workingDocument: null,
-				});
-			},
+				}),
 		});
-	}, [dataSource.save, modelMutation]);
-
+	}, [dataSource.save, isSaving, saveModel]);
 	const handleResetSource = useCallback(() => {
-		if (!dataSource.reset || modelResetMutation.isPending) return;
+		if (!dataSource.reset || isResetting) return;
 		requestEvaluationReload();
-
-		modelResetMutation.mutate(undefined, {
-			onSuccess: () => {
+		resetModel(undefined, {
+			onSuccess: () =>
 				useStore.setState({
 					isDirty: false,
 					isEditing: false,
 					workingDocument: null,
-				});
-			},
+				}),
 		});
-	}, [dataSource.reset, requestEvaluationReload, modelResetMutation]);
-
-	const [showWizard, setShowWizard] = useState(false);
-	const handleCloseWizard = useCallback(() => setShowWizard(false), []);
-
+	}, [dataSource.reset, isResetting, requestEvaluationReload, resetModel]);
 	const handleApplyTemplate = useCallback(
-		(output: import("@/lib/patterns").TemplateOutput) => {
+		(output: TemplateOutput) => {
 			const store = useStore.getState();
-			if (!store.isEditing && document) {
-				store.startEditing(document);
-			}
-			for (const account of output.accounts) {
-				store.addAccount(account);
-			}
-			for (const posting of output.postings) {
-				store.addPosting(posting);
-			}
+			if (!store.isEditing && document) store.startEditing(document);
+			for (const account of output.accounts)
+				useStore.getState().addAccount(account);
+			for (const posting of output.postings)
+				useStore.getState().addPosting(posting);
 		},
 		[document],
 	);
-
-	const onProjectionSettingsChange = useCallback(
-		(partial: Partial<ProjectionRuntimeSettings>) => {
-			if (partial.horizonYears !== undefined)
-				setHorizonYears(partial.horizonYears);
-		},
-		[setHorizonYears],
-	);
-
 	const handleReload = useCallback(() => {
 		requestEvaluationReload();
-		return refetchModel();
+		void refetchModel();
 	}, [refetchModel, requestEvaluationReload]);
 
 	const currentMetrics = useMemo(() => {
@@ -280,325 +244,126 @@ export default function App() {
 			currentChangeCount,
 		};
 	}, [
+		currentChangeCount,
+		evaluations,
+		projectionResultIsStale,
 		result,
 		stochasticResult,
 		stochasticResultIsStale,
-		projectionResultIsStale,
-		evaluations,
-		currentChangeCount,
 	]);
 
-	const currentChangesControls = useMemo(
-		() => (document ? <CurrentChangesControls document={document} /> : null),
-		[document],
+	const source = useMemo<ModelSourceInfo>(
+		() => ({
+			label: dataSource.label,
+			description: dataSource.description,
+			sourceType: dataSource.sourceType,
+			saveLabel: dataSource.save?.label ?? null,
+			resetLabel: dataSource.reset?.label ?? null,
+		}),
+		[dataSource],
+	);
+	const modelRuntime = useMemo(
+		() => ({
+			source,
+			document,
+			effectiveDocument,
+			issues,
+			validationIsValid: validation.isValid,
+			loadError,
+			sourceActionError,
+			isLoading,
+			isSourceUpdating,
+			dataUpdatedAt,
+			projectionStartDate,
+			isSaving,
+			isResetting,
+			reload: handleReload,
+			save: handleSave,
+			reset: dataSource.reset ? handleResetSource : undefined,
+			applyTemplate: handleApplyTemplate,
+		}),
+		[
+			source,
+			document,
+			effectiveDocument,
+			issues,
+			validation.isValid,
+			loadError,
+			sourceActionError,
+			isLoading,
+			isSourceUpdating,
+			dataUpdatedAt,
+			projectionStartDate,
+			isSaving,
+			isResetting,
+			handleReload,
+			handleSave,
+			dataSource.reset,
+			handleResetSource,
+			handleApplyTemplate,
+		],
+	);
+	const projectionArtifacts = useMemo<ProjectionArtifacts>(
+		() => ({
+			result,
+			projectionResultIsStale,
+			stochasticResult,
+			stochasticResultIsStale,
+			stochasticIsProvisional,
+			currentMetrics,
+		}),
+		[
+			result,
+			projectionResultIsStale,
+			stochasticResult,
+			stochasticResultIsStale,
+			stochasticIsProvisional,
+			currentMetrics,
+		],
+	);
+	const projectionExecution = useMemo<ProjectionExecution>(
+		() => ({
+			runtimeError,
+			isProjecting,
+			stochasticError,
+			isStochasticRunning,
+		}),
+		[runtimeError, isProjecting, stochasticError, isStochasticRunning],
+	);
+	const projectionCapabilities = useMemo<ProjectionCapabilities>(
+		() => ({
+			hasStochasticAccounts,
+			hasStochasticResult,
+			canCaptureComparison:
+				!isProjecting && !isStochasticRunning && !isSourceUpdating,
+		}),
+		[
+			hasStochasticAccounts,
+			hasStochasticResult,
+			isProjecting,
+			isStochasticRunning,
+			isSourceUpdating,
+		],
 	);
 
 	return (
-		<div className="app-shell min-h-screen bg-background text-foreground">
-			<div className="space-y-0 px-0 md:px-0">
-				<div className="mx-auto max-w-[106rem] px-4 py-4 md:px-8">
-					<div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-						<div className="type-caption">
-							{document ? (
-								<span>
-									Baseline loaded from{" "}
-									<span className="font-medium text-foreground/75">
-										{dataSource.label}
-									</span>
-									{currentChangeCount > 0
-										? ` · ${currentChangeCount} temporary change${currentChangeCount === 1 ? "" : "s"}`
-										: ""}
-									{isEditing && isDirty ? " · Unsaved baseline edits" : ""}
-									{isEditing && !isDirty ? " · Editing baseline" : ""}
-									{currentChangeCount === 0 && !isEditing
-										? " · Projection settings are session-only"
-										: ""}
-								</span>
-							) : (
-								<span className="inline-flex items-center gap-2">
-									<span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary/70" />
-									Loading financial model...
-								</span>
-							)}
-						</div>
-						<div className="flex flex-wrap gap-2 no-print">
-							<ThemeToggle theme={theme} setTheme={setTheme} />
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								onClick={() => window.print()}
-								disabled={!document}
-							>
-								Print
-							</Button>
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								onClick={handleReload}
-								disabled={isLoading}
-							>
-								{isLoading ? "Loading..." : "Reload source data"}
-							</Button>
-							{document ? (
-								<Button
-									type="button"
-									variant="secondary"
-									size="sm"
-									onClick={() => setShowWizard(true)}
-								>
-									Templates
-								</Button>
-							) : null}
-						</div>
-					</div>
-				</div>
-
-				<SectionNav />
-
-				<div className="mx-auto max-w-[106rem] space-y-6 px-4 py-6 md:px-8">
-					{isLoading && !document ? (
-						<div className="grid gap-4 md:grid-cols-3">
-							{[1, 2, 3].map((i) => (
-								<div
-									key={i}
-									className="animate-pulse rounded-[1.8rem] border border-border/80 bg-card/85 p-6 shadow-sm dark:border-white/10"
-								>
-									<div className="mb-2 h-3 w-20 rounded bg-muted" />
-									<div className="h-6 w-32 rounded bg-muted" />
-									<div className="mt-2 h-3 w-24 rounded bg-muted" />
-								</div>
-							))}
-						</div>
-					) : null}
-
-					{isProjecting ? (
-						<Alert variant="tertiary" className="rounded-[1.6rem]">
-							<AlertTitle>Updating projection</AlertTitle>
-							<AlertDescription>
-								Recomputing historical and projected balances from the loaded
-								financial model
-								{currentChangeCount > 0
-									? ` with ${currentChangeCount} temporary change${currentChangeCount === 1 ? "" : "s"}`
-									: ""}
-								.
-							</AlertDescription>
-						</Alert>
-					) : null}
-
-					{!validation.isValid ? (
-						<Alert variant="destructive" className="rounded-[1.6rem]">
-							<AlertTitle>Projection blocked by validation errors</AlertTitle>
-							<AlertDescription>
-								Fix the financial model issues above, then reload the data to
-								resume projection.
-							</AlertDescription>
-						</Alert>
-					) : null}
-
-					{stochasticError ? (
-						<Alert variant="destructive" className="rounded-[1.6rem]">
-							<AlertTitle>Stochastic simulation failed</AlertTitle>
-							<AlertDescription>{stochasticError}</AlertDescription>
-						</Alert>
-					) : null}
-
-					{runtimeError ? (
-						<Alert variant="destructive" className="rounded-[1.6rem]">
-							<AlertTitle>Projection failed</AlertTitle>
-							<AlertDescription>{runtimeError}</AlertDescription>
-						</Alert>
-					) : null}
-
-					{document && validation.isValid && result ? (
-						<div className="grid items-start gap-6 min-[90rem]:grid-cols-[minmax(0,1fr)_24rem] min-[90rem]:justify-center">
-							<main className="min-w-0 space-y-6">
-								<ProjectionDashboard
-									document={effectiveDocument ?? document}
-									result={result}
-									stochasticResult={stochasticResult}
-									stochasticIsProvisional={stochasticIsProvisional}
-									evaluationResultsAreStale={projectionResultIsStale}
-									stochasticEvaluationResultsAreStale={stochasticResultIsStale}
-									sourceRevision={dataUpdatedAt}
-								/>
-
-								<section id="model-inputs">
-									<LazySection>
-										<ModelInputsInspector
-											projectionStartDate={
-												result.milestones.projectionStartDate
-											}
-											document={document}
-											issues={issues}
-											dataSource={dataSource}
-											isLoading={isLoading}
-											loadError={loadError}
-											sourceActionError={sourceActionError}
-											onReload={handleReload}
-											onSave={handleSave}
-											isSaving={modelMutation.isPending}
-											currentChangesSlot={currentChangesControls}
-										/>
-									</LazySection>
-								</section>
-
-								<section id="comparison-snapshots">
-									<CurrentChangesComparison
-										currentMetrics={currentMetrics}
-										currentChangeCount={currentChangeCount}
-										canCaptureComparison={
-											!isProjecting && !isStochasticRunning && !isSourceUpdating
-										}
-									/>
-								</section>
-							</main>
-
-							<aside id="projection-settings" className="space-y-4">
-								<ProjectionConfigSidebar
-									document={effectiveDocument ?? document}
-									projectionSettings={projectionSettings}
-									projectionStartDate={result.milestones.projectionStartDate}
-									currentChangeCount={currentChangeCount}
-									hasStochasticAccounts={hasStochasticAccounts}
-									stochasticResult={stochasticResult}
-									isStochasticRunning={isStochasticRunning}
-									stochasticProgress={stochasticProgress}
-									dataSource={dataSource}
-									dataUpdatedAt={dataUpdatedAt}
-									isLoading={isLoading}
-									loadError={loadError}
-									sourceActionError={sourceActionError}
-									onProjectionSettingsChange={onProjectionSettingsChange}
-									onReload={handleReload}
-									onResetSource={
-										dataSource.reset ? handleResetSource : undefined
-									}
-									isResetting={modelResetMutation.isPending}
-								/>
-							</aside>
-						</div>
-					) : (
-						<section id="model-inputs">
-							<LazySection>
-								<ModelInputsInspector
-									projectionStartDate={
-										result?.milestones.projectionStartDate ??
-										projectionStartDate
-									}
-									document={document}
-									issues={issues}
-									dataSource={dataSource}
-									isLoading={isLoading}
-									loadError={loadError}
-									sourceActionError={sourceActionError}
-									onReload={handleReload}
-									onSave={handleSave}
-									isSaving={modelMutation.isPending}
-									currentChangesSlot={currentChangesControls}
-								/>
-							</LazySection>
-						</section>
-					)}
-
-					{showWizard && document ? (
-						<TemplateWizard
-							document={document}
-							onApply={handleApplyTemplate}
-							onClose={handleCloseWizard}
-						/>
-					) : null}
-				</div>
-			</div>
-		</div>
+		<ModelRuntimeProvider value={modelRuntime}>
+			<ProjectionRuntimeProvider
+				artifacts={projectionArtifacts}
+				execution={projectionExecution}
+				capabilities={projectionCapabilities}
+				stochasticProgress={stochasticProgress}
+			>
+				<RoutedShell />
+			</ProjectionRuntimeProvider>
+		</ModelRuntimeProvider>
 	);
 }
 
-function ThemeToggle({
-	theme,
-	setTheme,
-}: {
-	theme: "light" | "dark" | "system";
-	setTheme: (t: "light" | "dark" | "system") => void;
-}) {
+const RoutedShell = memo(function RoutedShell() {
 	return (
-		<div className="flex rounded-xl border border-border/80 bg-card/70 p-0.5 shadow-sm backdrop-blur-sm dark:border-white/10">
-			<button
-				type="button"
-				aria-label="Light theme"
-				onClick={() => setTheme("light")}
-				className={`rounded-lg px-2 py-1 type-caption transition-colors ${
-					theme === "light"
-						? "bg-primary text-primary-foreground shadow-sm"
-						: "text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground"
-				}`}
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					width="14"
-					height="14"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth="2"
-					strokeLinecap="round"
-					strokeLinejoin="round"
-				>
-					<circle cx="12" cy="12" r="4" />
-					<path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-				</svg>
-			</button>
-			<button
-				type="button"
-				aria-label="Dark theme"
-				onClick={() => setTheme("dark")}
-				className={`rounded-lg px-2 py-1 type-caption transition-colors ${
-					theme === "dark"
-						? "bg-primary text-primary-foreground shadow-sm"
-						: "text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground"
-				}`}
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					width="14"
-					height="14"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth="2"
-					strokeLinecap="round"
-					strokeLinejoin="round"
-				>
-					<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-				</svg>
-			</button>
-			<button
-				type="button"
-				aria-label="System theme"
-				onClick={() => setTheme("system")}
-				className={`rounded-lg px-2 py-1 type-caption transition-colors ${
-					theme === "system"
-						? "bg-primary text-primary-foreground shadow-sm"
-						: "text-muted-foreground hover:bg-accent/70 hover:text-accent-foreground"
-				}`}
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					width="14"
-					height="14"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth="2"
-					strokeLinecap="round"
-					strokeLinejoin="round"
-				>
-					<rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-					<line x1="8" y1="21" x2="16" y2="21" />
-					<line x1="12" y1="17" x2="12" y2="21" />
-				</svg>
-			</button>
-		</div>
+		<AppShell>
+			<Outlet />
+		</AppShell>
 	);
-}
+});

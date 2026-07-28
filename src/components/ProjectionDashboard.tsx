@@ -1,6 +1,7 @@
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { buildAccountDiagnosticChartData } from "@/chart/chartData";
-import { EvaluationList } from "@/components/evaluations/EvaluationList";
+import { EvaluationResults } from "@/components/evaluations/EvaluationList";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { LazySection } from "@/components/ui/lazy-section";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -14,6 +15,8 @@ import {
 	DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID,
 	getPostingFulfillmentResult,
 } from "@/lib/projection";
+import { useModelRuntime } from "@/runtime/modelRuntime";
+import { useProjectionArtifacts } from "@/runtime/projectionRuntime";
 import { selectCurrentChangeCount, useStore } from "@/store";
 import { CashFlowWaterfall } from "./dashboard/CashFlowWaterfall";
 import { AccountDiagnosticChart } from "./dashboard/charts/AccountDiagnosticChart";
@@ -35,7 +38,35 @@ interface ProjectionDashboardProps {
 	stochasticEvaluationResultsAreStale?: boolean;
 }
 
-export const ProjectionDashboard = memo(function ProjectionDashboard({
+export const ProjectionDashboard = memo(function ProjectionDashboard() {
+	const {
+		document: canonicalDocument,
+		effectiveDocument,
+		dataUpdatedAt,
+	} = useModelRuntime();
+	const {
+		result,
+		stochasticResult,
+		stochasticIsProvisional,
+		projectionResultIsStale,
+		stochasticResultIsStale,
+	} = useProjectionArtifacts();
+	const document = effectiveDocument ?? canonicalDocument;
+	if (!document || !result) return null;
+	return (
+		<ProjectionDashboardContent
+			document={document}
+			result={result}
+			stochasticResult={stochasticResult}
+			stochasticIsProvisional={stochasticIsProvisional}
+			sourceRevision={dataUpdatedAt}
+			evaluationResultsAreStale={projectionResultIsStale}
+			stochasticEvaluationResultsAreStale={stochasticResultIsStale}
+		/>
+	);
+});
+
+const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 	document,
 	result,
 	stochasticResult,
@@ -62,11 +93,6 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 		}),
 		[derived.firstUnderfulfilledDate],
 	);
-	const scrollToSourceData = useCallback(() => {
-		const el = window.document.getElementById("model-inputs");
-		if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-	}, []);
-
 	return (
 		<div className="space-y-6">
 			<section id="projection-chart">
@@ -104,7 +130,7 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 				) : null}
 			</section>
 
-			<EvaluationList
+			<EvaluationResults
 				document={document}
 				result={result}
 				stochasticResult={
@@ -158,13 +184,12 @@ export const ProjectionDashboard = memo(function ProjectionDashboard({
 						detail={derived.blockerDetail}
 						tone={derived.biggestShortfallPosting ? "tertiary" : "primary"}
 					/>
-					<button
-						type="button"
-						onClick={scrollToSourceData}
+					<Link
+						to="/model-inputs"
 						className="no-print w-full rounded-2xl border border-border/80 bg-card/85 px-4 py-3 text-sm font-semibold text-muted-foreground shadow-sm transition hover:border-ring/70 hover:bg-accent hover:text-accent-foreground dark:border-white/10"
 					>
 						Explore model inputs
-					</button>
+					</Link>
 				</div>
 				<DriverCard
 					label="Next projected transaction"

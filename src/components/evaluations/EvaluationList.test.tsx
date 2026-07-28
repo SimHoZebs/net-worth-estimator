@@ -2,21 +2,40 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type {
-	EvaluationResultCollection,
-	EvaluationTables,
-} from "@/lib/projection";
+import type { EvaluationTables } from "@/lib/projection";
 import { DEFAULT_EVALUATIONS, useStore } from "@/store";
-import { EvaluationList } from "./EvaluationList";
+import { RuntimeFixtureProviders } from "@/test/runtimeFixtures";
+import { EvaluationResults, EvaluationSettings } from "./EvaluationList";
+
+const emptyDocument = {
+	accounts: [],
+	postings: [],
+	checkpoints: [],
+	evaluations: structuredClone(DEFAULT_EVALUATIONS),
+	source: { type: "csv", label: "Test" },
+};
+
+function renderSettings() {
+	return render(
+		<RuntimeFixtureProviders
+			model={{
+				document: emptyDocument as never,
+				effectiveDocument: emptyDocument as never,
+			}}
+		>
+			<EvaluationSettings onDraftDirtyChange={() => {}} />
+		</RuntimeFixtureProviders>,
+	);
+}
 
 afterEach(() => {
 	cleanup();
 	useStore.setState({ evaluations: structuredClone(DEFAULT_EVALUATIONS) });
 });
 
-describe("EvaluationList", () => {
+describe("EvaluationSettings", () => {
 	it("applies a net-worth target once after editing", () => {
-		render(<EvaluationList />);
+		renderSettings();
 
 		fireEvent.change(screen.getByLabelText("Target net worth"), {
 			target: { value: "1250000" },
@@ -25,7 +44,11 @@ describe("EvaluationList", () => {
 			useStore.getState().evaluations.netWorthThreshold[0]?.config.target,
 		).toBe(1_000_000);
 
-		fireEvent.click(screen.getByRole("button", { name: "Update analysis" }));
+		const updateButton = screen
+			.getAllByRole("button", { name: "Update analysis" })
+			.find((button) => !(button as HTMLButtonElement).disabled);
+		expect(updateButton).toBeDefined();
+		fireEvent.click(updateButton!);
 		expect(
 			useStore.getState().evaluations.netWorthThreshold[0]?.config.target,
 		).toBe(1_250_000);
@@ -53,7 +76,7 @@ describe("EvaluationList", () => {
 			},
 		});
 
-		render(<EvaluationList />);
+		renderSettings();
 
 		const labels = screen
 			.getAllByRole("textbox")
@@ -63,7 +86,7 @@ describe("EvaluationList", () => {
 		expect(screen.getByText("second-target", { exact: false })).not.toBeNull();
 	});
 
-	it("renders malformed config and runtime diagnostics without opening an editor", () => {
+	it("renders malformed config without opening an editor", () => {
 		useStore.setState({
 			evaluations: {
 				financialIndependence: [],
@@ -78,34 +101,48 @@ describe("EvaluationList", () => {
 				postingFulfillment: [],
 			} as unknown as EvaluationTables,
 		});
-		const results: EvaluationResultCollection = {
-			evaluations: {
-				financialIndependence: [],
-				netWorthThreshold: [
-					{
-						instanceId: "broken-target",
-						label: "Broken target",
-						status: "warning",
-						deterministic: null,
-						probabilistic: null,
-						diagnostics: [
-							{
-								code: "invalid-evaluation-config",
-								severity: "error",
-								message: "Threshold config is invalid.",
-							},
-						],
-					},
-				],
-				postingFulfillment: [],
-			},
-		};
-
-		render(<EvaluationList results={results} />);
+		renderSettings();
 
 		expect(screen.getByLabelText("Enable Broken target")).not.toBeNull();
 		expect(screen.getByLabelText("Label for broken-target")).not.toBeNull();
 		expect(screen.queryByLabelText("Target net worth")).toBeNull();
-		expect(screen.getAllByRole("alert")).toHaveLength(2);
+		expect(screen.getAllByRole("alert")).toHaveLength(1);
+	});
+
+	it("renders result cards without configuration controls", () => {
+		useStore.setState({
+			evaluations: {
+				financialIndependence: [],
+				netWorthThreshold: [
+					{
+						instanceId: "target",
+						label: "Target outcome",
+						enabled: false,
+						config: { target: 1_000_000 },
+					},
+				],
+				postingFulfillment: [],
+			},
+		});
+
+		render(
+			<EvaluationResults
+				document={emptyDocument as never}
+				result={
+					{
+						evaluations: {
+							financialIndependence: [],
+							netWorthThreshold: [],
+							postingFulfillment: [],
+						},
+					} as never
+				}
+			/>,
+		);
+
+		expect(screen.getByText("Target outcome")).not.toBeNull();
+		expect(screen.queryByLabelText("Enable Target outcome")).toBeNull();
+		expect(screen.queryByLabelText("Label for target")).toBeNull();
+		expect(screen.queryByLabelText("Target net worth")).toBeNull();
 	});
 });

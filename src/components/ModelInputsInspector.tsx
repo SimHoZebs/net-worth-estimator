@@ -1,5 +1,6 @@
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { useShallow } from "zustand/shallow";
+import { CurrentChangesControls } from "@/components/CurrentChangesControls";
 import { EditableAccountsTable } from "@/components/dashboard/tables/EditableAccountsTable";
 import { EditableCheckpointsTable } from "@/components/dashboard/tables/EditableCheckpointsTable";
 import { EditablePostingsTable } from "@/components/dashboard/tables/EditablePostingsTable";
@@ -17,29 +18,11 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { pluralize } from "@/lib/format";
-import type {
-	DataSource,
-	FinancialModelDocument,
-	ModelValidationIssue,
-} from "@/lib/projection";
+import { useModelRuntime } from "@/runtime/modelRuntime";
 import { selectEditorActions, selectEditorState, useStore } from "@/store";
 import { ModelValidationPanel } from "./ModelValidationPanel";
 
 type InputTab = "postings" | "accounts" | "history";
-
-interface ModelInputsInspectorProps {
-	projectionStartDate: string;
-	document: FinancialModelDocument | null;
-	issues: ModelValidationIssue[];
-	dataSource: DataSource;
-	isLoading: boolean;
-	loadError: string | null;
-	sourceActionError: string | null;
-	onReload: () => void;
-	onSave: () => void;
-	isSaving: boolean;
-	currentChangesSlot?: ReactNode;
-}
 
 function tabClassName(isActive: boolean) {
 	return `rounded-full px-3 py-1.5 type-caption font-medium transition ${
@@ -49,19 +32,19 @@ function tabClassName(isActive: boolean) {
 	}`;
 }
 
-export function ModelInputsInspector({
-	projectionStartDate,
-	document,
-	issues,
-	dataSource,
-	isLoading,
-	loadError,
-	sourceActionError,
-	onReload,
-	onSave,
-	isSaving,
-	currentChangesSlot,
-}: ModelInputsInspectorProps) {
+export function ModelInputsInspector() {
+	const {
+		document,
+		issues,
+		source,
+		isLoading,
+		loadError,
+		sourceActionError,
+		projectionStartDate,
+		isSaving,
+		reload,
+		save,
+	} = useModelRuntime();
 	const disabledAccountIds = useStore((s) => s.disabledAccountIds);
 	const disabledPostingIds = useStore((s) => s.disabledPostingIds);
 	const toggleAccountDisabled = useStore((s) => s.toggleAccountDisabled);
@@ -150,12 +133,12 @@ export function ModelInputsInspector({
 							<Button
 								type="button"
 								size="sm"
-								onClick={onSave}
-								disabled={!isDirty || !dataSource.save || isSaving}
+								onClick={save}
+								disabled={!isDirty || !source.saveLabel || isSaving}
 							>
 								{isSaving
 									? "Saving..."
-									: (dataSource.save?.label ?? "Save unavailable")}
+									: (source.saveLabel ?? "Save unavailable")}
 							</Button>
 						</>
 					) : (
@@ -164,12 +147,12 @@ export function ModelInputsInspector({
 								type="button"
 								variant="ghost"
 								size="sm"
-								onClick={onReload}
+								onClick={reload}
 								disabled={isLoading}
 							>
 								{isLoading ? "Loading..." : "Reload"}
 							</Button>
-							{document && dataSource.save ? (
+							{document && source.saveLabel ? (
 								<Button
 									type="button"
 									variant="secondary"
@@ -298,9 +281,9 @@ export function ModelInputsInspector({
 					</div>
 				)}
 
-				{currentChangesSlot ? (
+				{document ? (
 					<div className="border-t border-border/70 pt-5">
-						{currentChangesSlot}
+						<CurrentChangesControls document={document} />
 					</div>
 				) : null}
 			</CardContent>
