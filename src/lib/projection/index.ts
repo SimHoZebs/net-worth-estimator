@@ -59,7 +59,6 @@ export {
 } from "./model/applyModelOverrides";
 export {
 	type AccountMovementAction,
-	type AccountMovementConstraint,
 	type AccountMovementResult,
 	resolveAccountMovement,
 	resolveAccountMovementAmount,
@@ -104,6 +103,7 @@ export {
 export type {
 	Account,
 	AccountDelta,
+	AccountMovementConstraint,
 	AccountMovementConstraintType,
 	AccountSnapshot,
 	BehaviorCollectionKey,

@@ -28,7 +28,7 @@ export function PostingFulfillmentEvaluation({
 	if (!deterministic) return null;
 
 	return (
-		<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+		<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
 			<Metric
 				label="Requested"
 				value={currency.format(deterministic.requestedAmount)}
@@ -37,7 +37,12 @@ export function PostingFulfillmentEvaluation({
 			<Metric
 				label="Applied"
 				value={currency.format(deterministic.realizedAmount)}
-				detail={pct.format(deterministic.completionRate)}
+				detail="Transferred by the model"
+			/>
+			<Metric
+				label="Destination-limited"
+				value={currency.format(deterministic.destinationLimitedAmount)}
+				detail={`${pct.format(deterministic.completionRate)} satisfied`}
 			/>
 			<Metric
 				label="Underfulfilled"

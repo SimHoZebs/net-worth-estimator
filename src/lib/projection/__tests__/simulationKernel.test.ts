@@ -87,6 +87,7 @@ describe("deterministic simulation kernel", () => {
 			requestedAmount: 500,
 			realizedAmount: 100,
 		});
+		expect(run.movementAttempts[0]).not.toHaveProperty("bindingConstraints");
 		expect(run.finalState.balances.checking).toBe(150);
 		expect(
 			run.finalState.latestRealizedPostingAmounts.get("capped-dependent"),
@@ -123,7 +124,6 @@ describe("deterministic simulation kernel", () => {
 		});
 		expect(run.movementAttempts[0]).toMatchObject({
 			realizedAmount: 0,
-			bindingConstraints: [{ type: "source-floor", accountId: "checking" }],
 			accountDeltas: [],
 		});
 	});

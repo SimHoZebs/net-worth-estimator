@@ -1,7 +1,6 @@
 import { runReactiveBehavior } from "../behavior/runtime";
 import { getWithdrawableAmount } from "../simulation/accounts";
 import {
-	type AccountMovementConstraint,
 	type AccountMovementResult,
 	addOccurrences,
 	type DatedPostingOccurrence,
@@ -12,6 +11,7 @@ import {
 } from "../simulation/transitions";
 import type {
 	Account,
+	AccountMovementConstraint,
 	AccountMovementConstraintType,
 	FinancialIndependenceAnalysis,
 	FinancialIndependencePlan,
@@ -32,6 +32,7 @@ import {
 	daysBetween,
 } from "../utils/date";
 import { computePercentiles } from "../utils/stochastic";
+import { classifyMovementConstraints } from "./movementConstraints";
 import type { EvaluationDefinition } from "./runtime";
 
 const EPSILON = 0.01;
@@ -44,6 +45,7 @@ interface WithdrawalAttempt {
 	date: IsoDate;
 	accountId: string | null;
 	result: AccountMovementResult;
+	bindingConstraints: AccountMovementConstraint[];
 }
 
 function constraintAccountIds(constraint: AccountMovementConstraint): string[] {
@@ -61,7 +63,7 @@ function constraintAccountIds(constraint: AccountMovementConstraint): string[] {
 function countConstraints(attempts: readonly WithdrawalAttempt[]) {
 	const counts = new Map<AccountMovementConstraintType, number>();
 	for (const attempt of attempts) {
-		for (const constraint of attempt.result.bindingConstraints) {
+		for (const constraint of attempt.bindingConstraints) {
 			counts.set(constraint.type, (counts.get(constraint.type) ?? 0) + 1);
 		}
 	}
@@ -94,7 +96,7 @@ function summarizeWithdrawals(
 		...new Set(
 			attempts.flatMap((attempt) => [
 				...(attempt.accountId === null ? [] : [attempt.accountId]),
-				...attempt.result.bindingConstraints.flatMap(constraintAccountIds),
+				...attempt.bindingConstraints.flatMap(constraintAccountIds),
 			]),
 		),
 	];
@@ -178,7 +180,7 @@ function summarizeWithdrawals(
 						constraints: [
 							...new Set(
 								firstAttempts.flatMap((attempt) =>
-									attempt.result.bindingConstraints.map(
+									attempt.bindingConstraints.map(
 										(constraint) => constraint.type,
 									),
 								),
@@ -188,9 +190,7 @@ function summarizeWithdrawals(
 							...new Set(
 								firstAttempts.flatMap((attempt) => [
 									...(attempt.accountId === null ? [] : [attempt.accountId]),
-									...attempt.result.bindingConstraints.flatMap(
-										constraintAccountIds,
-									),
+									...attempt.bindingConstraints.flatMap(constraintAccountIds),
 								]),
 							),
 						],
@@ -652,6 +652,7 @@ function evaluateCycle({
 						limitRemaining: actionLimit,
 					},
 				};
+				const balancesBefore = { ...balances };
 				const movement = transitions.executeGeneratedMovement(
 					action.movement,
 				).result;
@@ -659,6 +660,15 @@ function evaluateCycle({
 					date: period.startDate,
 					accountId,
 					result: movement,
+					bindingConstraints: classifyMovementConstraints({
+						sourceAccountId: action.movement.sourceAccountId,
+						destinations: action.movement.destinations,
+						requestedAmount: action.movement.requestedAmount,
+						realizedAmount: movement.realizedAmount,
+						balancesBefore,
+						accountsById,
+						limitRemaining: action.movement.limitRemaining,
+					}),
 				});
 				state.remainingWithdrawalByAccount.set(
 					accountId,
@@ -671,16 +681,25 @@ function evaluateCycle({
 				remainingExpense -= movement.realizedAmount;
 			}
 			if (capacities.length === 0 && requestedExpense > EPSILON) {
-				const movement = transitions.executeGeneratedMovement({
+				const movementAction = {
 					sourceAccountId: null,
 					destinations: null,
 					requestedAmount: requestedExpense,
 					limitRemaining: 0,
-				}).result;
+				};
+				const balancesBefore = { ...balances };
+				const movement =
+					transitions.executeGeneratedMovement(movementAction).result;
 				state.withdrawalAttempts.push({
 					date: period.startDate,
 					accountId: null,
 					result: movement,
+					bindingConstraints: classifyMovementConstraints({
+						...movementAction,
+						realizedAmount: movement.realizedAmount,
+						balancesBefore,
+						accountsById,
+					}),
 				});
 			}
 			if (remainingExpense > EPSILON) state.hadWithdrawalShortfall = true;

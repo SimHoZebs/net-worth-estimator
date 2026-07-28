@@ -214,7 +214,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 							? "Enable a healthy posting-fulfillment evaluation to inspect completion."
 							: derived.requestedPostingAmount === 0
 								? `No scheduled transactions are requesting future activity across ${derived.enabledPostingCount} transaction${derived.enabledPostingCount === 1 ? "" : "s"}.`
-								: `The model applied ${currency.format(derived.realizedPostingAmount)} of ${currency.format(derived.requestedPostingAmount)} in planned transactions.`
+								: `The model applied ${currency.format(derived.realizedPostingAmount)} of ${currency.format(derived.requestedPostingAmount)} in planned transactions${derived.destinationLimitedPostingAmount > 0 ? `; ${currency.format(derived.destinationLimitedPostingAmount)} was no longer applicable after destinations reached their limits.` : "."}`
 					}
 					tone={
 						derived.fulfillmentAvailable && derived.postingUtilizationRate < 1

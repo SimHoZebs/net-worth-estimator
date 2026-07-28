@@ -15,6 +15,7 @@ export interface DashboardDerivedValues {
 	enabledPostingCount: number;
 	requestedPostingAmount: number;
 	realizedPostingAmount: number;
+	destinationLimitedPostingAmount: number;
 	postingUtilizationRate: number;
 	blockerValue: string;
 	blockerDetail: string;
@@ -40,6 +41,8 @@ export function useDashboardDerivedValues(
 		).length;
 		const requestedPostingAmount = fulfillment?.requestedAmount ?? 0;
 		const realizedPostingAmount = fulfillment?.realizedAmount ?? 0;
+		const destinationLimitedPostingAmount =
+			fulfillment?.destinationLimitedAmount ?? 0;
 		const postingUtilizationRate = fulfillment?.completionRate ?? 0;
 		const blockerValue =
 			biggestShortfallPosting?.label ??
@@ -56,7 +59,7 @@ export function useDashboardDerivedValues(
 				? "Enable a healthy posting-fulfillment evaluation to inspect projected transactions."
 				: firstProjectedEvent === null
 					? "No projected transactions are scheduled after the historical balance history."
-					: `${currency.format(firstProjectedEvent.requestedAmount)} requested and ${currency.format(firstProjectedEvent.realizedAmount)} applied${firstProjectedEvent.unfulfilledAmount > 0 ? `, leaving ${currency.format(firstProjectedEvent.unfulfilledAmount)} underfulfilled.` : "."}`;
+					: `${currency.format(firstProjectedEvent.requestedAmount)} requested and ${currency.format(firstProjectedEvent.realizedAmount)} applied${firstProjectedEvent.unfulfilledAmount > 0 ? `, leaving ${currency.format(firstProjectedEvent.unfulfilledAmount)} underfulfilled.` : firstProjectedEvent.destinationLimitedAmount > 0 ? `; ${currency.format(firstProjectedEvent.destinationLimitedAmount)} was no longer applicable after the destination reached its limit.` : "."}`;
 
 		return {
 			firstProjectedEvent,
@@ -67,6 +70,7 @@ export function useDashboardDerivedValues(
 			enabledPostingCount,
 			requestedPostingAmount,
 			realizedPostingAmount,
+			destinationLimitedPostingAmount,
 			postingUtilizationRate,
 			blockerValue,
 			blockerDetail,

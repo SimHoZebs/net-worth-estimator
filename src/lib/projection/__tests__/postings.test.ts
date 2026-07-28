@@ -3,7 +3,7 @@ import { makeAccount } from "../__fixtures__";
 import { resolveAccountMovement } from "../simulation/postings";
 
 describe("account movement resolution", () => {
-	it("returns unavailable-source movement facts", () => {
+	it("returns raw unavailable-source movement facts", () => {
 		const result = resolveAccountMovement(
 			{
 				sourceAccountId: "missing",
@@ -17,13 +17,10 @@ describe("account movement resolution", () => {
 		expect(result).toEqual({
 			requestedAmount: 100,
 			realizedAmount: 0,
-			bindingConstraints: [
-				{ type: "source-unavailable", accountId: "missing" },
-			],
 		});
 	});
 
-	it("reports tied source-floor and caller action limits", () => {
+	it("resolves tied source-floor and caller action limits", () => {
 		const source = makeAccount({ id: "cash", minBalance: 50 });
 		const result = resolveAccountMovement(
 			{
@@ -38,13 +35,9 @@ describe("account movement resolution", () => {
 
 		expect(result.realizedAmount).toBe(50);
 		expect(result.requestedAmount - result.realizedAmount).toBe(50);
-		expect(result.bindingConstraints).toEqual([
-			{ type: "source-floor", accountId: "cash" },
-			{ type: "action-limit" },
-		]);
 	});
 
-	it("reports a tied destination ceiling", () => {
+	it("enforces a tied destination ceiling", () => {
 		const source = makeAccount({ id: "cash", minBalance: 0 });
 		const destination = makeAccount({ id: "loan", maxBalance: 0 });
 		const result = resolveAccountMovement(
@@ -61,10 +54,6 @@ describe("account movement resolution", () => {
 		);
 
 		expect(result.realizedAmount).toBe(100);
-		expect(result.bindingConstraints).toEqual([
-			{ type: "source-floor", accountId: "cash" },
-			{ type: "destination-ceiling", accountIds: ["loan"] },
-		]);
 	});
 
 	it("does not bind constraints for a zero request", () => {
@@ -79,6 +68,5 @@ describe("account movement resolution", () => {
 		);
 
 		expect(result.requestedAmount - result.realizedAmount).toBe(0);
-		expect(result.bindingConstraints).toEqual([]);
 	});
 });

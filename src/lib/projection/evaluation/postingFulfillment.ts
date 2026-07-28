@@ -8,6 +8,10 @@ import type {
 } from "../types/model";
 import type { PercentileBands } from "../types/stochastic";
 import { computePercentiles } from "../utils/stochastic";
+import {
+	classifyMovementConstraints,
+	reconstructBalancesBeforeEvents,
+} from "./movementConstraints";
 import type { EvaluationDefinition } from "./runtime";
 
 export const POSTING_FULFILLMENT_DEFINITION_ID = "posting-fulfillment";
@@ -20,6 +24,7 @@ export interface PostingFulfillmentEvent {
 	postingId: string;
 	requestedAmount: number;
 	realizedAmount: number;
+	destinationLimitedAmount: number;
 	unfulfilledAmount: number;
 	bindingConstraints: AccountMovementConstraint[];
 	accountDeltas: Array<{ accountId: string; delta: number }>;
@@ -29,6 +34,7 @@ export interface PostingFulfillmentDateSummary {
 	date: IsoDate;
 	requestedAmount: number;
 	realizedAmount: number;
+	destinationLimitedAmount: number;
 	unfulfilledAmount: number;
 }
 
@@ -42,7 +48,9 @@ export interface PostingFulfillmentPostingSummary {
 	annualCap: number | null;
 	requestedAmount: number;
 	realizedAmount: number;
+	destinationLimitedAmount: number;
 	utilizationRate: number;
+	completionRate: number;
 	firstUnderfulfilledDate: IsoDate | null;
 	unfulfilledAmount: number;
 }
@@ -50,6 +58,7 @@ export interface PostingFulfillmentPostingSummary {
 export interface PostingFulfillmentPathResult {
 	requestedAmount: number;
 	realizedAmount: number;
+	destinationLimitedAmount: number;
 	unfulfilledAmount: number;
 	completionRate: number;
 	firstUnderfulfilledDate: IsoDate | null;
@@ -80,32 +89,103 @@ function reportableUnfulfilledAmount(event: MovementEvent) {
 	return amount >= MIN_REPORTABLE_UNFULFILLED_AMOUNT ? amount : 0;
 }
 
-function reportedAmounts(requestedAmount: number, unfulfilledAmount: number) {
-	const requested = roundAmount(requestedAmount);
-	const unfulfilled = roundAmount(unfulfilledAmount);
+function reportedAmounts(
+	requestedAmount: number,
+	realizedAmount: number,
+	destinationLimitedAmount: number,
+	unfulfilledAmount: number,
+) {
 	return {
-		requestedAmount: requested,
-		realizedAmount: Math.max(0, requested - unfulfilled),
-		unfulfilledAmount: unfulfilled,
+		requestedAmount: roundAmount(requestedAmount),
+		realizedAmount: roundAmount(realizedAmount),
+		destinationLimitedAmount: roundAmount(destinationLimitedAmount),
+		unfulfilledAmount: roundAmount(unfulfilledAmount),
 	};
 }
 
-function toFulfillmentEvent(event: MovementEvent): PostingFulfillmentEvent {
+interface EvaluatedMovementEvent {
+	event: MovementEvent;
+	bindingConstraints: AccountMovementConstraint[];
+	destinationLimitedAmount: number;
+	unfulfilledAmount: number;
+}
+
+function toFulfillmentEvent({
+	event,
+	bindingConstraints,
+	destinationLimitedAmount,
+	unfulfilledAmount,
+}: EvaluatedMovementEvent): PostingFulfillmentEvent {
 	const amounts = reportedAmounts(
 		event.requestedAmount,
-		reportableUnfulfilledAmount(event),
+		event.realizedAmount,
+		destinationLimitedAmount,
+		unfulfilledAmount,
 	);
 	return {
 		date: event.date,
 		sequence: event.sequence,
 		postingId: event.origin.postingId,
 		...amounts,
-		bindingConstraints: event.bindingConstraints,
+		bindingConstraints,
 		accountDeltas: event.accountDeltas.map(({ accountId, delta }) => ({
 			accountId,
 			delta: roundAmount(delta),
 		})),
 	};
+}
+
+function evaluateMovementEvents(
+	path: ProjectionPath,
+): EvaluatedMovementEvent[] {
+	const balancesBeforeBySequence = reconstructBalancesBeforeEvents(path);
+	const accountsById = new Map(
+		path.effectiveDocument.accounts.map((account) => [account.id, account]),
+	);
+	const postingsById = new Map(
+		path.effectiveDocument.postings.map((posting) => [posting.id, posting]),
+	);
+	const realizedByPostingAndYear = new Map<string, number>();
+
+	return [...path.movementEvents]
+		.sort(
+			(left, right) =>
+				left.date.localeCompare(right.date) || left.sequence - right.sequence,
+		)
+		.map((event) => {
+			const posting = postingsById.get(event.origin.postingId);
+			const capKey = `${event.origin.postingId}:${event.date.slice(0, 4)}`;
+			const realizedBefore = realizedByPostingAndYear.get(capKey) ?? 0;
+			const limitRemaining =
+				posting?.annualCap === null || posting?.annualCap === undefined
+					? undefined
+					: Math.max(0, posting.annualCap - realizedBefore);
+			const bindingConstraints = posting
+				? classifyMovementConstraints({
+						sourceAccountId: posting.sourceAccountId,
+						destinations: posting.destinations,
+						requestedAmount: event.requestedAmount,
+						realizedAmount: event.realizedAmount,
+						balancesBefore: balancesBeforeBySequence.get(event.sequence) ?? {},
+						accountsById,
+						limitRemaining,
+					})
+				: [];
+			const reportableResidual = reportableUnfulfilledAmount(event);
+			const destinationLimited = bindingConstraints.some(
+				(constraint) => constraint.type === "destination-ceiling",
+			);
+			realizedByPostingAndYear.set(
+				capKey,
+				realizedBefore + event.realizedAmount,
+			);
+			return {
+				event,
+				bindingConstraints,
+				destinationLimitedAmount: destinationLimited ? reportableResidual : 0,
+				unfulfilledAmount: destinationLimited ? 0 : reportableResidual,
+			};
+		});
 }
 
 export function validatePostingFulfillmentConfig(
@@ -136,11 +216,14 @@ export function evaluatePostingFulfillment(
 ): PostingFulfillmentPathResult {
 	const includeDetails = options.includeDetails ?? true;
 	const selectedIds = config.postingIds ? new Set(config.postingIds) : null;
+	const evaluatedEvents = evaluateMovementEvents(path);
 	const events: PostingFulfillmentEvent[] = [];
 	const totalsByPostingId = new Map<
 		string,
 		{
 			requestedAmount: number;
+			realizedAmount: number;
+			destinationLimitedAmount: number;
 			unfulfilledAmount: number;
 			firstUnderfulfilledDate: IsoDate | null;
 		}
@@ -149,32 +232,44 @@ export function evaluatePostingFulfillment(
 		IsoDate,
 		{
 			requestedAmount: number;
+			realizedAmount: number;
+			destinationLimitedAmount: number;
 			unfulfilledAmount: number;
 		}
 	>();
 	let requestedAmount = 0;
+	let realizedAmount = 0;
+	let destinationLimitedAmount = 0;
 	let unfulfilledAmount = 0;
 	let firstUnderfulfilledDate: IsoDate | null = null;
 
-	for (const event of path.movementEvents) {
+	for (const evaluatedEvent of evaluatedEvents) {
+		const { event } = evaluatedEvent;
 		if (selectedIds !== null && !selectedIds.has(event.origin.postingId)) {
 			continue;
 		}
-		const eventUnfulfilledAmount = reportableUnfulfilledAmount(event);
+		const eventUnfulfilledAmount = evaluatedEvent.unfulfilledAmount;
 		requestedAmount += event.requestedAmount;
+		realizedAmount += event.realizedAmount;
+		destinationLimitedAmount += evaluatedEvent.destinationLimitedAmount;
 		unfulfilledAmount += eventUnfulfilledAmount;
 		if (firstUnderfulfilledDate === null && eventUnfulfilledAmount > 0) {
 			firstUnderfulfilledDate = event.date;
 		}
 		if (!includeDetails) continue;
-		events.push(toFulfillmentEvent(event));
+		events.push(toFulfillmentEvent(evaluatedEvent));
 		const postingId = event.origin.postingId;
 		const postingTotals = totalsByPostingId.get(postingId) ?? {
 			requestedAmount: 0,
+			realizedAmount: 0,
+			destinationLimitedAmount: 0,
 			unfulfilledAmount: 0,
 			firstUnderfulfilledDate: null,
 		};
 		postingTotals.requestedAmount += event.requestedAmount;
+		postingTotals.realizedAmount += event.realizedAmount;
+		postingTotals.destinationLimitedAmount +=
+			evaluatedEvent.destinationLimitedAmount;
 		postingTotals.unfulfilledAmount += eventUnfulfilledAmount;
 		if (
 			postingTotals.firstUnderfulfilledDate === null &&
@@ -186,9 +281,14 @@ export function evaluatePostingFulfillment(
 
 		const dateTotals = totalsByDate.get(event.date) ?? {
 			requestedAmount: 0,
+			realizedAmount: 0,
+			destinationLimitedAmount: 0,
 			unfulfilledAmount: 0,
 		};
 		dateTotals.requestedAmount += event.requestedAmount;
+		dateTotals.realizedAmount += event.realizedAmount;
+		dateTotals.destinationLimitedAmount +=
+			evaluatedEvent.destinationLimitedAmount;
 		dateTotals.unfulfilledAmount += eventUnfulfilledAmount;
 		totalsByDate.set(event.date, dateTotals);
 	}
@@ -203,11 +303,15 @@ export function evaluatePostingFulfillment(
 		.map((posting): PostingFulfillmentPostingSummary => {
 			const totals = totalsByPostingId.get(posting.id) ?? {
 				requestedAmount: 0,
+				realizedAmount: 0,
+				destinationLimitedAmount: 0,
 				unfulfilledAmount: 0,
 				firstUnderfulfilledDate: null,
 			};
 			const amounts = reportedAmounts(
 				totals.requestedAmount,
+				totals.realizedAmount,
+				totals.destinationLimitedAmount,
 				totals.unfulfilledAmount,
 			);
 			return {
@@ -228,10 +332,15 @@ export function evaluatePostingFulfillment(
 				annualCap: posting.annualCap,
 				requestedAmount: amounts.requestedAmount,
 				realizedAmount: amounts.realizedAmount,
+				destinationLimitedAmount: amounts.destinationLimitedAmount,
 				utilizationRate:
-					amounts.requestedAmount > 0
-						? amounts.realizedAmount / amounts.requestedAmount
+					totals.requestedAmount > 0
+						? totals.realizedAmount / totals.requestedAmount
 						: 0,
+				completionRate:
+					totals.requestedAmount > 0
+						? Math.max(0, 1 - totals.unfulfilledAmount / totals.requestedAmount)
+						: 1,
 				firstUnderfulfilledDate: totals.firstUnderfulfilledDate,
 				unfulfilledAmount: amounts.unfulfilledAmount,
 			};
@@ -240,17 +349,24 @@ export function evaluatePostingFulfillment(
 		.map(([date, totals]): PostingFulfillmentDateSummary => {
 			const amounts = reportedAmounts(
 				totals.requestedAmount,
+				totals.realizedAmount,
+				totals.destinationLimitedAmount,
 				totals.unfulfilledAmount,
 			);
 			return { date, ...amounts };
 		})
 		.sort((left, right) => left.date.localeCompare(right.date));
-	const amounts = reportedAmounts(requestedAmount, unfulfilledAmount);
+	const amounts = reportedAmounts(
+		requestedAmount,
+		realizedAmount,
+		destinationLimitedAmount,
+		unfulfilledAmount,
+	);
 	return {
 		...amounts,
 		completionRate:
-			amounts.requestedAmount > 0
-				? amounts.realizedAmount / amounts.requestedAmount
+			requestedAmount > 0
+				? Math.max(0, 1 - unfulfilledAmount / requestedAmount)
 				: 1,
 		firstUnderfulfilledDate,
 		events,
