@@ -171,6 +171,16 @@ describe("evaluateFinancialIndependence", () => {
 		]);
 	});
 
+	it("normalizes overlapping income and continuing posting treatment", () => {
+		const normalized = validateFinancialIndependencePlan({
+			...plan(),
+			sources: [{ type: "cashflow", postingId: "pension", included: true }],
+			continuingPostingIds: ["pension", "portfolio-growth"],
+		});
+
+		expect(normalized.continuingPostingIds).toEqual(["portfolio-growth"]);
+	});
+
 	it("annualizes only explicitly selected realized cashflows", () => {
 		const rows = Array.from({ length: 14 }, (_, month) => {
 			const year = 2026 + Math.floor(month / 12);

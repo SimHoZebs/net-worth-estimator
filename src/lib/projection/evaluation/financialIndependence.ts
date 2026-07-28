@@ -250,6 +250,29 @@ function finiteNonNegative(value: number, fallback = 0): number {
 export function normalizeFinancialIndependencePlan(
 	plan: FinancialIndependencePlan,
 ): FinancialIndependencePlan {
+	const sources = plan.sources.map((source) => {
+		if (source.type === "cashflow") {
+			return {
+				type: "cashflow" as const,
+				postingId: source.postingId,
+				included: source.included,
+			};
+		}
+		return source.withdrawalRateOverride === undefined
+			? source
+			: {
+					...source,
+					withdrawalRateOverride: Math.min(
+						1,
+						finiteNonNegative(source.withdrawalRateOverride),
+					),
+				};
+	});
+	const spendableIncomeIds = new Set(
+		sources.flatMap((source) =>
+			source.type === "cashflow" && source.included ? [source.postingId] : [],
+		),
+	);
 	return {
 		...plan,
 		minimumNetWorth: finiteNonNegative(plan.minimumNetWorth),
@@ -264,25 +287,10 @@ export function normalizeFinancialIndependencePlan(
 			1,
 			Math.max(0.01, finiteNonNegative(plan.requiredConfidence, 1)),
 		),
-		sources: plan.sources.map((source) => {
-			if (source.type === "cashflow") {
-				return {
-					type: "cashflow" as const,
-					postingId: source.postingId,
-					included: source.included,
-				};
-			}
-			return source.withdrawalRateOverride === undefined
-				? source
-				: {
-						...source,
-						withdrawalRateOverride: Math.min(
-							1,
-							finiteNonNegative(source.withdrawalRateOverride),
-						),
-					};
-		}),
-		continuingPostingIds: [...new Set(plan.continuingPostingIds)],
+		sources,
+		continuingPostingIds: [...new Set(plan.continuingPostingIds)].filter(
+			(postingId) => !spendableIncomeIds.has(postingId),
+		),
 	};
 }
 
