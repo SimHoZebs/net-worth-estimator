@@ -1,4 +1,4 @@
-import { type ComponentType, useEffect, useState } from "react";
+import { type ComponentType, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type {
@@ -6,6 +6,7 @@ import type {
 	EvaluationResultCollection,
 	EvaluationTables,
 	EvaluationType,
+	FinancialIndependencePlan,
 	FinancialModelDocument,
 	ProjectionResult,
 	StochasticProjectionResult,
@@ -17,14 +18,17 @@ import {
 	validateNetWorthThresholdConfig,
 	validatePostingFulfillmentConfig,
 } from "@/lib/projection";
+import { useModelRuntime } from "@/runtime/modelRuntime";
 import { DEFAULT_FINANCIAL_INDEPENDENCE_PLAN, useStore } from "@/store";
 import { FinancialIndependenceEvaluation } from "./FinancialIndependenceEvaluation";
+import { FinancialIndependencePlanEditor } from "./FinancialIndependencePlanEditor";
 import { NetWorthThresholdEvaluation } from "./NetWorthThresholdEvaluation";
 import { PostingFulfillmentEvaluation } from "./PostingFulfillmentEvaluation";
 
 interface ConfigEditorProps {
 	evaluation: EvaluationInstance<unknown>;
 	onChange: (changes: object) => void;
+	onDirtyChange?: (dirty: boolean) => void;
 }
 
 interface ResultRendererProps {
@@ -48,11 +52,22 @@ interface EvaluationUiDefinition {
 	ResultRenderer: ComponentType<ResultRendererProps>;
 }
 
-function ThresholdConfigEditor({ evaluation, onChange }: ConfigEditorProps) {
+function ThresholdConfigEditor({
+	evaluation,
+	onChange,
+	onDirtyChange,
+}: ConfigEditorProps) {
 	const target = validateNetWorthThresholdConfig(evaluation.config).target;
 	const [draftTarget, setDraftTarget] = useState(target);
 	useEffect(() => setDraftTarget(target), [target]);
 	const dirty = draftTarget !== target;
+	const onDirtyChangeRef = useRef(onDirtyChange);
+	onDirtyChangeRef.current = onDirtyChange;
+	useEffect(() => {
+		onDirtyChangeRef.current?.(dirty);
+		return () => onDirtyChangeRef.current?.(false);
+	}, [dirty]);
+
 	return (
 		<div className="space-y-2">
 			<label className="block type-caption">
@@ -65,7 +80,7 @@ function ThresholdConfigEditor({ evaluation, onChange }: ConfigEditorProps) {
 					className="mt-1 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 text-sm shadow-sm outline-none focus:border-ring dark:border-white/10"
 				/>
 			</label>
-			<div className="flex justify-end gap-2 no-print">
+			<div className="flex justify-end gap-2">
 				<Button
 					type="button"
 					variant="ghost"
@@ -134,7 +149,33 @@ function nextInstanceId(type: EvaluationType, evaluations: EvaluationTables) {
 	return candidate;
 }
 
-export function EvaluationList({
+function validatedConfig(type: EvaluationType, config: unknown) {
+	try {
+		const normalized = evaluationUiRegistry[type].validateConfig(config);
+		if (!isJsonValue(normalized))
+			throw new Error("Configuration must be JSON-serializable.");
+		return { normalized, error: null };
+	} catch (error) {
+		return {
+			normalized: null,
+			error: error instanceof Error ? error.message : "Invalid configuration.",
+		};
+	}
+}
+
+interface EvaluationResultsProps {
+	results?: EvaluationResultCollection | null;
+	document: FinancialModelDocument;
+	result: ProjectionResult;
+	stochasticResult?: StochasticProjectionResult | null;
+	stochasticIsProvisional?: boolean;
+	sourceRevision?: number;
+	resultsAreStale?: boolean;
+	blockerValue?: string;
+	blockerDetail?: string;
+}
+
+export function EvaluationResults({
 	results,
 	document,
 	result,
@@ -144,17 +185,119 @@ export function EvaluationList({
 	resultsAreStale = false,
 	blockerValue = "No blocking constraint",
 	blockerDetail = "No evaluation blocker was identified.",
-}: {
-	results?: EvaluationResultCollection | null;
-	document?: FinancialModelDocument;
-	result?: ProjectionResult;
-	stochasticResult?: StochasticProjectionResult | null;
-	stochasticIsProvisional?: boolean;
-	sourceRevision?: number;
-	resultsAreStale?: boolean;
-	blockerValue?: string;
-	blockerDetail?: string;
-}) {
+}: EvaluationResultsProps) {
+	const evaluations = useStore((state) => state.evaluations);
+	const resultCollection = resultsAreStale
+		? null
+		: (stochasticResult ?? results ?? result);
+
+	return (
+		<section id="evaluations" className="space-y-4">
+			<div>
+				<div className="type-eyebrow text-primary">Ordered questions</div>
+				<h2 className="mt-1 type-title text-2xl">Evaluations</h2>
+				<p className="mt-1 max-w-2xl type-muted">
+					Outcomes, behavior evidence, diagnostics, and probabilistic analysis
+					for each configured evaluation.
+				</p>
+			</div>
+
+			{EVALUATION_TYPE_ORDER.map((type) => {
+				const definition = evaluationUiRegistry[type];
+				const table = evaluations[type] as EvaluationInstance<unknown>[];
+				return table.length > 0 ? (
+					<div key={type} className="space-y-3">
+						<h3 className="type-eyebrow text-muted-foreground">
+							{definition.label}
+						</h3>
+						{table.map((evaluation) => {
+							const config = validatedConfig(type, evaluation.config);
+							const envelope = resultCollection?.evaluations[type].find(
+								(candidate) => candidate.instanceId === evaluation.instanceId,
+							);
+							const status = evaluation.enabled
+								? resultsAreStale
+									? "updating"
+									: `${stochasticIsProvisional && stochasticResult ? "provisional " : ""}${envelope?.status ?? "pending"}`
+								: "disabled";
+							const ResultRenderer = definition.ResultRenderer;
+							return (
+								<Card
+									key={evaluation.instanceId}
+									className="overflow-hidden rounded-[1.8rem] border-border/80 bg-card/92"
+								>
+									<CardHeader className="border-b border-border/70 bg-surface/45 dark:border-white/10">
+										<div className="flex items-start justify-between gap-4">
+											<div>
+												<div className="type-title text-xl">
+													{evaluation.label}
+												</div>
+												<div className="mt-1 type-caption">
+													{evaluation.instanceId}
+												</div>
+											</div>
+											<span className="rounded-full border border-border/70 px-3 py-1 type-label uppercase tracking-[0.12em]">
+												{status}
+											</span>
+										</div>
+									</CardHeader>
+									<CardContent className="space-y-4 p-4 md:p-6">
+										{config.error ? (
+											<Diagnostic message={config.error} error />
+										) : null}
+										{envelope?.diagnostics.map((diagnostic) => (
+											<Diagnostic
+												key={`${diagnostic.code}-${diagnostic.message}`}
+												message={diagnostic.message}
+												error={diagnostic.severity === "error"}
+											/>
+										))}
+										{evaluation.enabled &&
+										config.normalized !== null &&
+										(!resultsAreStale || type === "financialIndependence") ? (
+											<ResultRenderer
+												evaluation={{
+													...evaluation,
+													config: config.normalized,
+												}}
+												document={document}
+												result={result}
+												stochasticResult={stochasticResult}
+												stochasticIsProvisional={stochasticIsProvisional}
+												sourceRevision={sourceRevision}
+												resultsAreStale={resultsAreStale}
+												blockerValue={blockerValue}
+												blockerDetail={blockerDetail}
+											/>
+										) : resultsAreStale && evaluation.enabled ? (
+											<p className="rounded-2xl border border-dashed border-border/80 p-5 type-muted">
+												Updating this evaluation with the current settings.
+											</p>
+										) : null}
+									</CardContent>
+								</Card>
+							);
+						})}
+					</div>
+				) : null;
+			})}
+		</section>
+	);
+}
+
+interface EvaluationSettingsProps {
+	onDraftDirtyChange: (key: string, dirty: boolean) => void;
+}
+
+export function EvaluationSettings({
+	onDraftDirtyChange,
+}: EvaluationSettingsProps) {
+	const {
+		document: canonicalDocument,
+		effectiveDocument,
+		dataUpdatedAt,
+	} = useModelRuntime();
+	const document = effectiveDocument ?? canonicalDocument;
 	const evaluations = useStore((state) => state.evaluations);
 	const addEvaluation = useStore((state) => state.addEvaluation);
 	const duplicateEvaluation = useStore((state) => state.duplicateEvaluation);
@@ -164,87 +307,56 @@ export function EvaluationList({
 	);
 	const removeEvaluation = useStore((state) => state.removeEvaluation);
 	const moveEvaluation = useStore((state) => state.moveEvaluation);
-	const resultCollection = resultsAreStale
-		? null
-		: (stochasticResult ?? results ?? result);
+	if (!document) return null;
 
 	return (
-		<section id="evaluations" className="space-y-4">
+		<section className="space-y-4">
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 				<div>
-					<div className="type-eyebrow text-primary">Ordered questions</div>
-					<h2 className="mt-1 type-title text-2xl">Evaluations</h2>
-					<p className="mt-1 max-w-2xl type-muted">
-						Configuration, outcomes, behavior evidence, and probabilistic
-						analysis stay together for each configured instance.
+					<h2 className="type-title text-2xl">Evaluations</h2>
+					<p className="mt-1 type-muted">
+						Choose the questions the projection should answer and configure
+						their assumptions.
 					</p>
 				</div>
-				<div className="flex flex-wrap gap-2 no-print">
-					{EVALUATION_TYPE_ORDER.map((type) => {
-						const definition = evaluationUiRegistry[type];
-						return (
-							<Button
-								key={type}
-								type="button"
-								size="sm"
-								variant="secondary"
-								onClick={() =>
-									addEvaluation(type, {
-										instanceId: nextInstanceId(type, evaluations),
-										label: definition.defaultLabel,
-										enabled: true,
-										config: definition.createConfig(),
-									})
-								}
-							>
-								Add {definition.label}
-							</Button>
-						);
-					})}
+				<div className="flex flex-wrap gap-2">
+					{EVALUATION_TYPE_ORDER.map((type) => (
+						<Button
+							key={type}
+							type="button"
+							size="sm"
+							variant="secondary"
+							onClick={() =>
+								addEvaluation(type, {
+									instanceId: nextInstanceId(type, evaluations),
+									label: evaluationUiRegistry[type].defaultLabel,
+									enabled: true,
+									config: evaluationUiRegistry[type].createConfig(),
+								})
+							}
+						>
+							Add {evaluationUiRegistry[type].label}
+						</Button>
+					))}
 				</div>
 			</div>
 
 			{EVALUATION_TYPE_ORDER.map((type) => {
-				const uiDefinition = evaluationUiRegistry[type];
-				const ConfigEditor = uiDefinition.ConfigEditor;
-				const ResultRenderer = uiDefinition.ResultRenderer;
+				const definition = evaluationUiRegistry[type];
+				const ConfigEditor = definition.ConfigEditor;
 				const table = evaluations[type] as EvaluationInstance<unknown>[];
 				return (
 					<div key={type} className="space-y-3">
-						<h3 className="type-eyebrow text-muted-foreground">
-							{uiDefinition.label}
-						</h3>
+						<h3 className="type-eyebrow">{definition.label}</h3>
 						{table.map((evaluation, index) => {
-							let normalizedConfig: unknown = null;
-							let configError: string | null = null;
-							try {
-								normalizedConfig = uiDefinition.validateConfig(
-									evaluation.config,
-								);
-								if (!isJsonValue(normalizedConfig)) {
-									throw new Error("Configuration must be JSON-serializable.");
-								}
-							} catch (error) {
-								configError =
-									error instanceof Error
-										? error.message
-										: "Invalid configuration.";
-							}
-							const envelope = resultCollection?.evaluations[type].find(
-								(candidate) => candidate.instanceId === evaluation.instanceId,
-							);
-							const statusLabel = evaluation.enabled
-								? resultsAreStale
-									? "updating"
-									: `${stochasticIsProvisional && stochasticResult ? "provisional " : ""}${envelope?.status ?? "pending"}`
-								: "disabled";
-
+							const config = validatedConfig(type, evaluation.config);
+							const dirtyKey = `${type}:${evaluation.instanceId}`;
 							return (
 								<Card
 									key={evaluation.instanceId}
-									className="overflow-hidden rounded-[1.8rem] border-border/80 bg-card/92"
+									className="rounded-[1.8rem] border-border/80"
 								>
-									<CardHeader className="border-b border-border/70 bg-surface/45 dark:border-white/10">
+									<CardHeader className="border-b border-border/70">
 										<div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
 											<div className="flex min-w-0 items-start gap-3">
 												<input
@@ -258,7 +370,7 @@ export function EvaluationList({
 													}
 													className="mt-2 accent-primary"
 												/>
-												<div className="min-w-0">
+												<div>
 													<input
 														type="text"
 														value={evaluation.label}
@@ -268,17 +380,14 @@ export function EvaluationList({
 																label: event.target.value,
 															})
 														}
-														className="min-w-0 max-w-full bg-transparent type-title text-xl outline-none focus:text-primary"
+														className="max-w-full bg-transparent type-title text-xl outline-none focus:text-primary"
 													/>
 													<div className="mt-1 type-caption">
 														{evaluation.instanceId}
 													</div>
 												</div>
 											</div>
-											<div className="flex flex-wrap items-center gap-1 no-print">
-												<span className="mr-2 rounded-full border border-border/70 px-3 py-1 type-label uppercase tracking-[0.12em]">
-													{statusLabel}
-												</span>
+											<div className="flex flex-wrap gap-1">
 												<Button
 													type="button"
 													size="sm"
@@ -315,9 +424,10 @@ export function EvaluationList({
 													type="button"
 													size="sm"
 													variant="ghost"
-													onClick={() =>
-														removeEvaluation(type, evaluation.instanceId)
-													}
+													onClick={() => {
+														onDraftDirtyChange(dirtyKey, false);
+														removeEvaluation(type, evaluation.instanceId);
+													}}
 												>
 													Remove
 												</Button>
@@ -325,34 +435,15 @@ export function EvaluationList({
 										</div>
 									</CardHeader>
 									<CardContent className="space-y-4 p-4 md:p-6">
-										{configError ? (
-											<p
-												role="alert"
-												className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 type-caption text-destructive"
-											>
-												{configError}
-											</p>
+										{config.error ? (
+											<Diagnostic message={config.error} error />
 										) : null}
-										{envelope?.diagnostics.map((diagnostic) => (
-											<p
-												key={`${diagnostic.code}-${diagnostic.message}`}
-												role={
-													diagnostic.severity === "error" ? "alert" : "status"
-												}
-												className="rounded-xl border border-border/70 px-3 py-2 type-caption"
-											>
-												{diagnostic.message}
-											</p>
-										))}
-										{ConfigEditor && normalizedConfig !== null ? (
+										{ConfigEditor && config.normalized !== null ? (
 											<div className="max-w-sm">
-												<div className="mb-2 type-eyebrow">
-													Evaluation configuration
-												</div>
 												<ConfigEditor
 													evaluation={{
 														...evaluation,
-														config: normalizedConfig,
+														config: config.normalized,
 													}}
 													onChange={(changes) =>
 														updateEvaluationConfig(
@@ -361,30 +452,31 @@ export function EvaluationList({
 															changes,
 														)
 													}
+													onDirtyChange={(dirty) =>
+														onDraftDirtyChange(dirtyKey, dirty)
+													}
 												/>
 											</div>
 										) : null}
-										{evaluation.enabled &&
-										normalizedConfig !== null &&
-										ResultRenderer &&
-										document &&
-										result &&
-										(!resultsAreStale || type === "financialIndependence") ? (
-											<ResultRenderer
-												evaluation={{ ...evaluation, config: normalizedConfig }}
+										{type === "financialIndependence" &&
+										config.normalized !== null ? (
+											<FinancialIndependencePlanEditor
 												document={document}
-												result={result}
-												stochasticResult={stochasticResult}
-												stochasticIsProvisional={stochasticIsProvisional}
-												sourceRevision={sourceRevision}
-												resultsAreStale={resultsAreStale}
-												blockerValue={blockerValue}
-												blockerDetail={blockerDetail}
+												plan={
+													config.normalized as unknown as FinancialIndependencePlan
+												}
+												sourceRevision={dataUpdatedAt}
+												onApply={(changes) =>
+													updateEvaluationConfig(
+														type,
+														evaluation.instanceId,
+														changes,
+													)
+												}
+												onDirtyChange={(dirty) =>
+													onDraftDirtyChange(dirtyKey, dirty)
+												}
 											/>
-										) : resultsAreStale && evaluation.enabled ? (
-											<p className="rounded-2xl border border-dashed border-border/80 p-5 type-muted">
-												Updating this evaluation with the current settings.
-											</p>
 										) : null}
 									</CardContent>
 								</Card>
@@ -394,5 +486,22 @@ export function EvaluationList({
 				);
 			})}
 		</section>
+	);
+}
+
+function Diagnostic({
+	message,
+	error = false,
+}: {
+	message: string;
+	error?: boolean;
+}) {
+	return (
+		<p
+			role={error ? "alert" : "status"}
+			className={`rounded-xl border px-3 py-2 type-caption ${error ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-border/70"}`}
+		>
+			{message}
+		</p>
 	);
 }

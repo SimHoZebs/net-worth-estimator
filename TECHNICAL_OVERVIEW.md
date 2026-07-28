@@ -19,7 +19,7 @@ The Net Worth Estimator is a React application that loads a CSV-backed `Financia
 5. `useProjection` and `useStochastic` pass the document, runtime settings, and overrides through a content-addressed `CachedProjectionEngine`. Cache misses delegate to `WorkerProjectionEngine` and dedicated workers.
 6. `prepareSimulationRequest` resolves overrides, checkpoint history, initial state, dates, event policy, and optional `MonteCarloSample` into a prepared projection containing a `SimulationRequest`.
 7. The pure `simulate` kernel returns an exact `SimulationRun`. `projectRawFinancialModelDocument` adapts it into a `ProjectionPath` and public result; `projectFinancialModelDocument` adds configured evaluations.
-8. The dashboard, model inspector, validation panel, current-change controls, and comparison view render the loaded document and projection results.
+8. The persistent routed workspace exposes the loaded document and projection state to separate Results, Settings, and Model Inputs pages without restarting worker hooks during navigation.
 
 ## 3. Persistence
 
@@ -130,15 +130,25 @@ Percentile-band slope is never interpreted as a run outcome. FI-cycle probabilit
 
 ## 8. UI and State
 
-- `ProjectionDashboard`: current/projected metrics, account and contribution charts, reconciliation, cash flow, debt, shortfalls, and evaluation outcomes.
+- `/`: read-only current/projected metrics, charts, reconciliation, cash flow, debt, shortfalls, evaluation outcomes, and saved comparisons.
+- `/settings`: session-only horizon, Monte Carlo, evaluation, and appearance configuration. Unapplied evaluation drafts block navigation; pending debounced Monte Carlo values flush when the page unmounts.
+- `/model-inputs`: read-only and editable model tables, validation, temporary changes, templates, and source actions.
+- `App`: persistent data, mutation, deterministic projection, and stochastic projection controller shared by every route.
+- `runtime/modelRuntime`: read-only model/source state and wrapped source actions; executable `DataSource` operations remain private to `App`.
+- `runtime/projectionRuntime`: separate projection-artifact and execution-status providers so Monte Carlo progress does not rerender unrelated model consumers.
+- `ProjectionDashboard`: current/projected metrics, account and contribution charts, reconciliation, cash flow, debt, shortfalls, and read-only evaluation outcomes.
+- `EvaluationSettings`: evaluation collection management and type-specific configuration.
 - `ModelInputsInspector`: read-only and editable model tables.
 - `ModelValidationPanel`: parsing and cross-reference diagnostics.
 - `CurrentChangesControls`: session-only temporary additions and disable toggles.
 - `CurrentChangesComparison`: captures and compares read-only `ComparisonSnapshot` metrics.
-- `ProjectionConfigSidebar`: horizon, evaluations, Monte Carlo controls, and source actions.
 - `TemplateWizard`: generates common accounts and postings into the document editor.
 
 `src/store.ts` composes `ModelOverrides`, editor, settings, comparison, and theme slices. Current changes and projection settings are session-only. Baseline document edits persist only through the active `DataSource`.
+
+Route pages compose feature components. Feature components read user-owned state through Zustand selectors and hook-owned runtime state through the narrow runtime providers; presentational tables and charts continue to receive explicit props.
+
+React Router uses browser paths. Production hosting must serve `index.html` for direct requests to application routes.
 
 ## 9. Key Files
 

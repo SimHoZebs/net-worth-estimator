@@ -12,8 +12,6 @@ import {
 	getFinancialIndependenceResult,
 	validateFinancialIndependencePlan,
 } from "@/lib/projection";
-import { useStore } from "@/store";
-import { FinancialIndependencePlanEditor } from "./FinancialIndependencePlanEditor";
 
 interface FinancialIndependenceEvaluationProps {
 	evaluation: EvaluationInstance<unknown>;
@@ -29,18 +27,13 @@ interface FinancialIndependenceEvaluationProps {
 
 export function FinancialIndependenceEvaluation({
 	evaluation,
-	document,
 	result,
 	stochasticResult,
 	stochasticIsProvisional = false,
-	sourceRevision,
 	resultsAreStale = false,
 	blockerValue,
 	blockerDetail,
 }: FinancialIndependenceEvaluationProps) {
-	const updateEvaluationConfig = useStore(
-		(state) => state.updateEvaluationConfig,
-	);
 	let plan: FinancialIndependencePlan;
 	try {
 		plan = validateFinancialIndependencePlan(evaluation.config);
@@ -71,18 +64,6 @@ export function FinancialIndependenceEvaluation({
 
 	return (
 		<div className="space-y-4">
-			<FinancialIndependencePlanEditor
-				document={document}
-				plan={plan}
-				sourceRevision={sourceRevision}
-				onApply={(changes) =>
-					updateEvaluationConfig(
-						"financialIndependence",
-						evaluation.instanceId,
-						changes,
-					)
-				}
-			/>
 			{resultsAreStale ? (
 				<p className="rounded-2xl border border-dashed border-primary-border/70 bg-primary-subtle/20 p-5 type-muted">
 					Updating FI outcomes. The base projection remains available above.

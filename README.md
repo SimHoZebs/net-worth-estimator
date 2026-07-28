@@ -1,6 +1,6 @@
 # Net Worth Estimator
 
-Single-page React app for inspecting a CSV-backed financial model and projecting net worth with deterministic and Monte Carlo simulation.
+React app for inspecting a CSV-backed financial model and projecting net worth with deterministic and Monte Carlo simulation.
 
 The product model is intentionally generic:
 
@@ -37,6 +37,7 @@ Each behavior file is a typed table. All tables start with `instanceId`, `label`
 - Browser reset removes `net-worth-estimator:financial-model:v1` and reloads the bundled `/configs/` files.
 - Serverless deployments should use a real backend `DataSource` for shared or cross-device persistence.
 - Do not deploy private financial CSV files in `public/configs/`; those files are public static assets.
+- Production hosts must rewrite browser routes such as `/settings` and `/model-inputs` to `index.html`.
 
 ## Run
 
@@ -55,7 +56,11 @@ npm run build
 
 ## Architecture
 
-- `src/App.tsx`: data-source selection and orchestration for document loading, current changes, projections, editing, and comparisons
+- `src/App.tsx`: persistent routed controller for document loading and projection execution
+- `src/runtime/`: narrow model, projection-artifact, and execution-status providers shared across routes
+- `src/pages/ResultsPage.tsx`: read-only projection and evaluation outputs
+- `src/pages/SettingsPage.tsx`: session-only projection and evaluation configuration
+- `src/pages/ModelInputsPage.tsx`: canonical model inputs, temporary changes, templates, and source actions
 - `src/hooks/useFinancialModel.ts`: TanStack Query wrappers for load, save, and reset
 - `src/store.ts`: `ModelOverrides`, document editor, runtime settings, read-only comparison metrics, and theme state
 - `src/engine/WorkerProjectionEngine.ts`: deterministic and stochastic Web Worker facade

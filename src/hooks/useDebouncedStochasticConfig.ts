@@ -15,6 +15,9 @@ export function useDebouncedStochasticConfig(
 		null,
 	);
 	const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const pendingConfigRef = useRef<StochasticConfig | null>(null);
+	const onConfigChangeRef = useRef(onConfigChange);
+	onConfigChangeRef.current = onConfigChange;
 
 	const hasPendingChanges = pendingConfig !== null;
 
@@ -37,6 +40,7 @@ export function useDebouncedStochasticConfig(
 
 	function scheduleConfigChange(nextConfig: StochasticConfig) {
 		setPendingConfig(nextConfig);
+		pendingConfigRef.current = nextConfig;
 
 		if (debounceRef.current !== null) {
 			clearTimeout(debounceRef.current);
@@ -45,6 +49,7 @@ export function useDebouncedStochasticConfig(
 		debounceRef.current = setTimeout(() => {
 			onConfigChange(nextConfig);
 			setPendingConfig(null);
+			pendingConfigRef.current = null;
 			debounceRef.current = null;
 		}, DEBOUNCE_MS);
 	}
@@ -62,6 +67,7 @@ export function useDebouncedStochasticConfig(
 
 		onConfigChange(nextConfig);
 		setPendingConfig(null);
+		pendingConfigRef.current = null;
 	}
 
 	function updateRunCountInput(value: string) {
@@ -89,6 +95,9 @@ export function useDebouncedStochasticConfig(
 		return () => {
 			if (debounceRef.current !== null) {
 				clearTimeout(debounceRef.current);
+			}
+			if (pendingConfigRef.current !== null) {
+				onConfigChangeRef.current(pendingConfigRef.current);
 			}
 		};
 	}, []);

@@ -1,4 +1,3 @@
-import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -8,19 +7,7 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { formatDate } from "@/lib/format";
-import type { DataSource } from "@/lib/projection";
-
-interface SourceStatusCardProps {
-	dataSource: DataSource;
-	dataUpdatedAt: number;
-	projectionStartDate: string;
-	isLoading: boolean;
-	loadError: string | null;
-	sourceActionError: string | null;
-	onReload: () => void;
-	onResetSource?: () => void;
-	isResetting: boolean;
-}
+import { useModelRuntime } from "@/runtime/modelRuntime";
 
 function formatLoadedAt(dataUpdatedAt: number) {
 	return dataUpdatedAt === 0
@@ -28,17 +15,18 @@ function formatLoadedAt(dataUpdatedAt: number) {
 		: new Date(dataUpdatedAt).toLocaleString();
 }
 
-export const SourceStatusCard = memo(function SourceStatusCard({
-	dataSource,
-	dataUpdatedAt,
-	projectionStartDate,
-	isLoading,
-	loadError,
-	sourceActionError,
-	onReload,
-	onResetSource,
-	isResetting,
-}: SourceStatusCardProps) {
+export function SourceStatusCard() {
+	const {
+		source,
+		dataUpdatedAt,
+		projectionStartDate,
+		isLoading,
+		loadError,
+		sourceActionError,
+		reload,
+		reset,
+		isResetting,
+	} = useModelRuntime();
 	const status = isLoading
 		? "Loading"
 		: loadError
@@ -62,7 +50,7 @@ export const SourceStatusCard = memo(function SourceStatusCard({
 			<CardContent className="space-y-4">
 				<div className="flex items-center justify-between gap-3">
 					<div>
-						<div className="type-value text-sm">{dataSource.label}</div>
+						<div className="type-value text-sm">{source.label}</div>
 						<div className="type-caption">
 							Projection starts {formatDate(projectionStartDate)}
 						</div>
@@ -84,30 +72,30 @@ export const SourceStatusCard = memo(function SourceStatusCard({
 					<div className="flex justify-between gap-3">
 						<dt>Source type</dt>
 						<dd className="text-right text-foreground/80">
-							{dataSource.sourceType}
+							{source.sourceType}
 						</dd>
 					</div>
 				</dl>
 
-				<p className="type-caption">{dataSource.description}</p>
+				<p className="type-caption">{source.description}</p>
 
 				<div className="flex flex-wrap justify-end gap-2">
-					{dataSource.reset && onResetSource ? (
+					{source.resetLabel && reset ? (
 						<Button
 							type="button"
 							variant="ghost"
 							size="sm"
-							onClick={onResetSource}
+							onClick={reset}
 							disabled={isLoading || isResetting}
 						>
-							{isResetting ? "Resetting..." : dataSource.reset.label}
+							{isResetting ? "Resetting..." : source.resetLabel}
 						</Button>
 					) : null}
 					<Button
 						type="button"
 						variant="secondary"
 						size="sm"
-						onClick={onReload}
+						onClick={reload}
 						disabled={isLoading}
 					>
 						{isLoading ? "Loading..." : "Reload"}
@@ -116,4 +104,4 @@ export const SourceStatusCard = memo(function SourceStatusCard({
 			</CardContent>
 		</Card>
 	);
-});
+}
