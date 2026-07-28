@@ -166,7 +166,6 @@ describe("stochastic projection", () => {
 					enabled: true,
 				},
 			],
-			checkpoints: [],
 			postings: [
 				{
 					id: "terminal-growth",
@@ -195,7 +194,6 @@ describe("stochastic projection", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -216,7 +214,6 @@ describe("stochastic projection", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -228,7 +225,6 @@ describe("stochastic projection", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -265,7 +261,6 @@ describe("stochastic projection", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -306,7 +301,6 @@ describe("stochastic projection", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -338,7 +332,6 @@ describe("stochastic projection", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -366,7 +359,6 @@ describe("stochastic projection", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -382,7 +374,6 @@ describe("stochastic projection", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -408,7 +399,6 @@ describe("stochastic projection", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -438,7 +428,6 @@ describe("stochastic projection", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -454,7 +443,6 @@ describe("stochastic projection", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -483,7 +471,6 @@ describe("stochastic progress streaming", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -514,7 +501,6 @@ describe("stochastic progress streaming", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -530,7 +516,6 @@ describe("stochastic progress streaming", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -562,7 +547,6 @@ describe("stochastic progress streaming", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -589,7 +573,6 @@ describe("stochastic progress streaming", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -620,7 +603,6 @@ describe("stochastic progress streaming", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},
@@ -662,7 +644,6 @@ describe("stochastic progress streaming", () => {
 			{
 				addedAccounts: [],
 				addedPostings: [],
-				addedCheckpoints: [],
 				disabledAccountIds: [],
 				disabledPostingIds: [],
 			},

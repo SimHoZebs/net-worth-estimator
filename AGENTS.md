@@ -26,7 +26,7 @@ App (src/App.tsx)
 | --- | --- |
 | `src/components/dashboard/` | overview cards, metrics, reconciliation, cash flow, debt, shortfall, FI, account, contribution, and stochastic views |
 | `src/components/dashboard/tables/` | read-only/editable model tables and transaction completion |
-| `src/components/dashboard/current-changes/` | temporary account, posting, and checkpoint forms |
+| `src/components/dashboard/current-changes/` | temporary account and posting forms |
 | `src/components/dashboard/charts/` | diagnostic, account, contribution, and point-detail chart components |
 | `src/components/ui/` | presentational primitives |
 
@@ -63,20 +63,20 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 
 ## Data Flow
 
-1. **CSV source**: Vite plugin -> `GET/PUT /api/financial-model` -> `csvLoader.ts` -> Zod parsing and cross-validation. CSV filenames and shapes are unchanged; documents are versionless.
+1. **CSV source**: Vite plugin -> `GET/PUT /api/financial-model` -> `csvLoader.ts` -> Zod parsing and cross-validation. Documents are versionless.
 2. **Persistence DI**: `App.tsx` creates `createCsvDataSource()` in development or `createBrowserCsvDataSource()` in production. `DataSource.loadDocument()` returns `{ document, issues }`.
 3. **Query layer**: `useFinancialModelQuery`, `useFinancialModelMutation`, and `useFinancialModelResetMutation` connect the source to TanStack Query.
 4. **Current changes**: `ModelOverrides` remain in Zustand and are applied with `applyModelOverrides`; canonical data is not mutated.
 5. **Projection**: `useProjection`/`useStochastic` -> `CachedProjectionEngine` -> `WorkerProjectionEngine` on misses -> Web Workers -> `prepareSimulationRequest` -> `simulate` -> `ProjectionPath` -> evaluation/analysis aggregation.
 6. **Monte Carlo**: one prepared request is reused, each `MonteCarloSample` produces a path-only run, exact percentiles are aggregated, and progress is emitted in worker batches of 50.
-7. **Browser persistence**: `net-worth-estimator:financial-model:v1` is the only browser key. Malformed canonical data surfaces diagnostics; reset removes that key and reloads bundled CSV data.
+7. **Browser persistence**: `net-worth-estimator:financial-model:v1` is the only browser key. Malformed canonical data surfaces diagnostics; the previously shipped checkpoint shape is rewritten once into canonical `once` postings when representable; reset removes that key and reloads bundled CSV data.
 8. **Derived artifacts**: `ProjectionArtifactStore` is separate from `DataSource`; browser artifacts use versioned content-addressed IndexedDB entries and remain disposable.
 
 ## Key Types
 
 | Type | Purpose |
 | --- | --- |
-| `FinancialModelDocument` | canonical persisted accounts, postings, checkpoints, evaluations, and source metadata |
+| `FinancialModelDocument` | canonical persisted accounts, postings, evaluations, and source metadata |
 | `ModelOverrides` | session-only additions and disabled account/posting IDs |
 | `SimulationRequest` | fully prepared model, runtime state, date range, event policy, and optional sample |
 | `SimulationRun` | exact states, dated balance snapshots, and ordered movement attempts |
@@ -103,4 +103,5 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 - Keep the domain canonical-only: no named alternative models, compatibility APIs, alternate readers, or additional persistence routes.
 - Use the `@/lib/projection` barrel for projection types and utilities.
 - Deterministic and stochastic computation runs in Web Workers, never on the main thread.
+- Enabled `once` postings before the projection start establish historical balances through shared transitions. Start-date rows remain projected events; historical replay carries dependency/cap state but emits no projected movements or evaluation events.
 - Run `npm run test:run` and `npm run typecheck` after code changes.

@@ -1,6 +1,5 @@
 import { useShallow } from "zustand/shallow";
 import { TemporaryAccountForm } from "@/components/dashboard/current-changes/TemporaryAccountForm";
-import { TemporaryCheckpointForm } from "@/components/dashboard/current-changes/TemporaryCheckpointForm";
 import { TemporaryPostingForm } from "@/components/dashboard/current-changes/TemporaryPostingForm";
 import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
@@ -19,7 +18,6 @@ export function CurrentChangesControls({
 		useShallow((s) => ({
 			addedAccounts: s.addedAccounts,
 			addedPostings: s.addedPostings,
-			addedCheckpoints: s.addedCheckpoints,
 		})),
 	);
 	const currentChangeCount = useStore(selectCurrentChangeCount);
@@ -28,10 +26,6 @@ export function CurrentChangesControls({
 	const removeTemporaryAccount = useStore((s) => s.removeTemporaryAccount);
 	const addTemporaryPosting = useStore((s) => s.addTemporaryPosting);
 	const removeTemporaryPosting = useStore((s) => s.removeTemporaryPosting);
-	const addTemporaryCheckpoint = useStore((s) => s.addTemporaryCheckpoint);
-	const removeTemporaryCheckpoint = useStore(
-		(s) => s.removeTemporaryCheckpoint,
-	);
 
 	return (
 		<Collapsible autoOpenWhen={currentChangeCount > 0}>
@@ -44,7 +38,7 @@ export function CurrentChangesControls({
 							<div className="type-muted">
 								{currentChangeCount > 0
 									? `${currentChangeCount} temporary change${currentChangeCount === 1 ? "" : "s"} active.`
-									: "Temporarily add trial accounts, scheduled transactions, and balance checkpoints."}
+									: "Temporarily add trial accounts and scheduled transactions."}
 							</div>
 						</div>
 					</div>
@@ -88,12 +82,6 @@ export function CurrentChangesControls({
 							document={document}
 							onAdd={addTemporaryPosting}
 							onRemove={removeTemporaryPosting}
-						/>
-
-						<TemporaryCheckpointForm
-							checkpoints={currentChanges.addedCheckpoints}
-							onAdd={addTemporaryCheckpoint}
-							onRemove={removeTemporaryCheckpoint}
 						/>
 					</div>
 				</div>

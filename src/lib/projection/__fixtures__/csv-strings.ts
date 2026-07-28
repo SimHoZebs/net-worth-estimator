@@ -12,13 +12,6 @@ export const validCsvFiles: ModelFileContents = {
 		"brokerage,Brokerage,-Infinity,Infinity,#16a34a,true",
 		"student_loan,Student Loan,-Infinity,0,#dc2626,true",
 	].join("\n"),
-	checkpoints: [
-		"Date,AccountId,Balance",
-		"2026-03-31,checking,14850",
-		"2026-03-31,k401,119400",
-		"2026-03-31,brokerage,79500",
-		"2026-03-31,student_loan,-12150",
-	].join("\n"),
 	behaviors: {
 		financialIndependence:
 			"instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy",
@@ -33,6 +26,10 @@ export const validCsvFiles: ModelFileContents = {
 	},
 	postings: [
 		postingsHeader,
+		"historical_checking,Historical checking,,checking,14850,once,0,0,0,2026-03-31,,,1,true",
+		"historical_k401,Historical 401(k),,k401,119400,once,0,0,0,2026-03-31,,,2,true",
+		"historical_brokerage,Historical brokerage,,brokerage,79500,once,0,0,0,2026-03-31,,,3,true",
+		"historical_student_loan,Historical student loan,student_loan,,12150,once,0,0,0,2026-03-31,,,4,true",
 		"salary,Salary,,checking,15000,monthly,0,0.03,0,2026-04-01,,,1,true",
 		"taxes,Taxes,checking,,salary * 0.22,monthly,0,0,0,2026-04-01,,,2,true",
 		"housing,Housing,checking,,3200,monthly,0,0.02,0,2026-04-05,,,3,true",
@@ -46,12 +43,10 @@ export const postingsHeaderOnly = `${postingsHeader}\n`;
 
 export const nullMinMaxCsvFiles: ModelFileContents = {
 	accounts: [accountsHeader, "checking,Checking,,,#0f172a,true"].join("\n"),
-	checkpoints: ["Date,AccountId,Balance", "2026-03-31,checking,1000"].join(
-		"\n",
-	),
 	behaviors: validCsvFiles.behaviors,
 	postings: [
 		postingsHeader,
+		"historical_checking,Historical checking,,checking,1000,once,0,0,0,2026-03-31,,,1,true",
 		"salary,Salary,,checking,1000,monthly,0,0,0,2026-04-01,,,1,true",
 	].join("\n"),
 };

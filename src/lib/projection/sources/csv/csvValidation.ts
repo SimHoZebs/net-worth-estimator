@@ -265,6 +265,15 @@ export function validateCsvFinancialModel(
 	document: FinancialModelDocument,
 ): ModelValidationIssue[] {
 	const issues: ModelValidationIssue[] = [];
+	if ("checkpoints" in (document as unknown as Record<string, unknown>)) {
+		addIssue(
+			issues,
+			"error",
+			"document.checkpoints.unsupported",
+			"Checkpoints are not supported in canonical financial model documents.",
+			["checkpoints"],
+		);
+	}
 	const accountIds = new Set(document.accounts.map((account) => account.id));
 	const postingIds = new Set(document.postings.map((posting) => posting.id));
 
@@ -300,18 +309,6 @@ export function validateCsvFinancialModel(
 				"account.color.missing",
 				`Enabled account '${account.id}' has no chart color. Charts will use a neutral fallback until a color is provided.`,
 				rowPath(CSV_MODEL_FILE_NAMES.accounts, index + 2, "color"),
-			);
-		}
-	});
-
-	document.checkpoints.forEach((checkpoint, index) => {
-		if (!accountIds.has(checkpoint.AccountId)) {
-			addIssue(
-				issues,
-				"error",
-				"checkpoint.account.missing",
-				`Checkpoint account '${checkpoint.AccountId}' does not exist.`,
-				rowPath(CSV_MODEL_FILE_NAMES.checkpoints, index + 2, "AccountId"),
 			);
 		}
 	});

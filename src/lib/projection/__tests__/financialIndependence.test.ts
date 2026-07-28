@@ -110,7 +110,6 @@ function path(
 			sourcePath: "test",
 			accounts,
 			postings,
-			checkpoints: [],
 			evaluations: {
 				financialIndependence: [],
 				netWorthThreshold: [],

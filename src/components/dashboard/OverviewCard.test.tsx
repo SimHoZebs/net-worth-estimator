@@ -19,7 +19,6 @@ describe("OverviewCard", () => {
 		const result = projectFinancialModelDocument(document, settings, {
 			addedAccounts: [],
 			addedPostings: [],
-			addedCheckpoints: [],
 			disabledAccountIds: [],
 			disabledPostingIds: [],
 		});

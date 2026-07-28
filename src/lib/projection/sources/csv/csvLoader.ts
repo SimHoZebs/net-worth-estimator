@@ -15,8 +15,6 @@ import { addIssue } from "../../utils/validation";
 import {
 	csvAccountSchema,
 	csvAccountsHeaders,
-	csvCheckpointSchema,
-	csvCheckpointsHeaders,
 	csvFinancialIndependenceHeaders,
 	csvFinancialIndependenceSchema,
 	csvNetWorthThresholdHeaders,
@@ -124,12 +122,6 @@ export function parseCsvFinancialModel(
 		csvAccountsHeaders,
 		csvAccountSchema,
 	);
-	const checkpointsResult = parseRows(
-		CSV_MODEL_FILE_NAMES.checkpoints,
-		csvFiles.checkpoints,
-		csvCheckpointsHeaders,
-		csvCheckpointSchema,
-	);
 	const postingsResult = parseRows(
 		CSV_MODEL_FILE_NAMES.postings,
 		csvFiles.postings,
@@ -157,7 +149,6 @@ export function parseCsvFinancialModel(
 
 	const issues = [
 		...accountsResult.issues,
-		...checkpointsResult.issues,
 		...financialIndependenceResult.issues,
 		...netWorthThresholdResult.issues,
 		...postingFulfillmentResult.issues,
@@ -166,7 +157,6 @@ export function parseCsvFinancialModel(
 
 	if (
 		accountsResult.hasFatalIssue ||
-		checkpointsResult.hasFatalIssue ||
 		financialIndependenceResult.hasFatalIssue ||
 		netWorthThresholdResult.hasFatalIssue ||
 		postingFulfillmentResult.hasFatalIssue ||
@@ -204,7 +194,6 @@ export function parseCsvFinancialModel(
 	const document: FinancialModelDocument = {
 		sourcePath: options.basePath ?? CSV_MODEL_PUBLIC_PATH,
 		accounts: accountsResult.rows,
-		checkpoints: checkpointsResult.rows,
 		evaluations,
 		postings: postingsResult.rows,
 	};
@@ -267,7 +256,6 @@ export async function fetchCsvFinancialModelFiles(
 
 	return {
 		accounts: fileMap.accounts,
-		checkpoints: fileMap.checkpoints,
 		behaviors: behaviorFileMap,
 		postings: fileMap.postings,
 	};
@@ -285,11 +273,7 @@ export async function loadCsvFinancialModel(
 export function serializeCsvFinancialModel(
 	document: FinancialModelDocument,
 ): ModelFileContents {
-	const accountsHeader = "id,label,minBalance,maxBalance,color,enabled";
-	const postingsHeader =
-		"id,label,sourceAccountId,destinations,arithmetic,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled";
-	const checkpointsHeader = "Date,AccountId,Balance";
-	const serializeBehavior = (
+	const serializeRows = (
 		rows: Record<string, unknown>[],
 		headers: readonly string[],
 	) =>
@@ -298,31 +282,29 @@ export function serializeCsvFinancialModel(
 			: Papa.unparse(rows, { columns: [...headers], newline: "\n" });
 
 	return {
-		accounts: [accountsHeader]
-			.concat(
-				document.accounts.map(
-					(a) =>
-						`${a.id},${a.label},${a.minBalance === NO_FLOOR ? "-Infinity" : a.minBalance},${a.maxBalance === NO_CEILING ? "Infinity" : a.maxBalance},${a.color ?? ""},${a.enabled}`,
-				),
-			)
-			.join("\n"),
-		postings: [postingsHeader]
-			.concat(
-				document.postings.map(
-					(p) =>
-						`${p.id},${p.label},${p.sourceAccountId ?? ""},${p.destinations?.join(";") ?? ""},${p.arithmetic},${p.frequency},${p.annualRate},${p.annualGrowthRate},${p.volatility},${p.startDate},${p.endDate ?? ""},${p.annualCap ?? ""},${p.priority},${p.enabled}`,
-				),
-			)
-			.join("\n"),
-		checkpoints: [checkpointsHeader]
-			.concat(
-				document.checkpoints.map(
-					(c) => `${c.Date},${c.AccountId},${c.Balance}`,
-				),
-			)
-			.join("\n"),
+		accounts: serializeRows(
+			document.accounts.map((account) => ({
+				...account,
+				minBalance:
+					account.minBalance === NO_FLOOR ? "-Infinity" : account.minBalance,
+				maxBalance:
+					account.maxBalance === NO_CEILING ? "Infinity" : account.maxBalance,
+				color: account.color ?? "",
+			})),
+			csvAccountsHeaders,
+		),
+		postings: serializeRows(
+			document.postings.map((posting) => ({
+				...posting,
+				sourceAccountId: posting.sourceAccountId ?? "",
+				destinations: posting.destinations?.join(";") ?? "",
+				endDate: posting.endDate ?? "",
+				annualCap: posting.annualCap ?? "",
+			})),
+			csvPostingsHeaders,
+		),
 		behaviors: {
-			financialIndependence: serializeBehavior(
+			financialIndependence: serializeRows(
 				document.evaluations.financialIndependence.map(
 					({ instanceId, label, enabled, config }) => ({
 						instanceId,
@@ -335,7 +317,7 @@ export function serializeCsvFinancialModel(
 				),
 				csvFinancialIndependenceHeaders,
 			),
-			netWorthThreshold: serializeBehavior(
+			netWorthThreshold: serializeRows(
 				document.evaluations.netWorthThreshold.map(
 					({ instanceId, label, enabled, config }) => ({
 						instanceId,
@@ -346,7 +328,7 @@ export function serializeCsvFinancialModel(
 				),
 				csvNetWorthThresholdHeaders,
 			),
-			postingFulfillment: serializeBehavior(
+			postingFulfillment: serializeRows(
 				document.evaluations.postingFulfillment.map(
 					({ instanceId, label, enabled, config }) => ({
 						instanceId,

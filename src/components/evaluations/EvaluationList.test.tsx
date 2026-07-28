@@ -10,7 +10,6 @@ import { EvaluationResults, EvaluationSettings } from "./EvaluationList";
 const emptyDocument = {
 	accounts: [],
 	postings: [],
-	checkpoints: [],
 	evaluations: structuredClone(DEFAULT_EVALUATIONS),
 	source: { type: "csv", label: "Test" },
 };

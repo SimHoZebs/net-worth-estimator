@@ -12,17 +12,33 @@ export function createBaseDocument(
 			makeAccount({ id: "brokerage" }),
 			makeAccount({ id: "loan" }),
 		],
-		checkpoints: [
-			{ Date: "2026-01-31", AccountId: "checking", Balance: 800 },
-			{ Date: "2026-01-31", AccountId: "brokerage", Balance: 1200 },
-			{ Date: "2026-01-31", AccountId: "loan", Balance: -400 },
-		],
 		evaluations: {
 			financialIndependence: [],
 			netWorthThreshold: [],
 			postingFulfillment: [],
 		},
 		postings: [
+			makePosting({
+				id: "historical_checking",
+				destinations: ["checking"],
+				arithmetic: "800",
+				frequency: "once",
+				startDate: "2026-01-31",
+			}),
+			makePosting({
+				id: "historical_brokerage",
+				destinations: ["brokerage"],
+				arithmetic: "1200",
+				frequency: "once",
+				startDate: "2026-01-31",
+			}),
+			makePosting({
+				id: "historical_loan",
+				sourceAccountId: "loan",
+				arithmetic: "400",
+				frequency: "once",
+				startDate: "2026-01-31",
+			}),
 			makePosting({
 				id: "salary",
 				destinations: ["checking"],

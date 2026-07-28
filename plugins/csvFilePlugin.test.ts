@@ -5,6 +5,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import type { Connect, ResolvedConfig, ViteDevServer } from "vite";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { prepareSimulationRequest } from "../src/lib/projection/simulation/prepareSimulation";
 import type { FinancialModelDocument } from "../src/lib/projection/types/model";
 import { csvFilePlugin, FINANCIAL_MODEL_API_PATH } from "./csvFilePlugin";
 
@@ -84,6 +85,7 @@ describe("csvFilePlugin", () => {
 		});
 		expect(canonical.body).not.toHaveProperty("pack");
 		const document = canonical.body.document as FinancialModelDocument;
+		expect(document).not.toHaveProperty("checkpoints");
 		expect(
 			document.evaluations.financialIndependence[0]?.config.sources,
 		).toEqual([
@@ -114,6 +116,41 @@ describe("csvFilePlugin", () => {
 		expect(fi.continuingPostingIds.every((id) => postingIds.has(id))).toBe(
 			true,
 		);
+
+		const prepared = prepareSimulationRequest(document, {
+			fallbackProjectionStartDate: "2026-07-28",
+			horizonYears: 1,
+			evaluations: document.evaluations,
+		});
+		const expectedOpeningBalances = {
+			checking: 397.74,
+			k401: 1260.74,
+			brokerage: 241.16,
+			roth_ira: 1112.57,
+			sofi_loan_principal: -36417.58,
+			sofi_loan_interest: -66.35,
+		};
+		for (const [accountId, expectedBalance] of Object.entries(
+			expectedOpeningBalances,
+		)) {
+			expect(prepared.request.initialState.balances[accountId]).toBeCloseTo(
+				expectedBalance,
+				8,
+			);
+		}
+		const enabledAccountIds = new Set(
+			document.accounts
+				.filter((account) => account.enabled)
+				.map((account) => account.id),
+		);
+		const openingNetWorth = Object.entries(
+			prepared.request.initialState.balances,
+		).reduce(
+			(total, [accountId, balance]) =>
+				total + (enabledAccountIds.has(accountId) ? balance : 0),
+			0,
+		);
+		expect(openingNetWorth).toBeCloseTo(-66132.59, 2);
 	});
 
 	it("preserves the canonical envelope for load errors", async () => {
@@ -182,5 +219,25 @@ describe("csvFilePlugin", () => {
 			"utf-8",
 		);
 		expect(saved).toContain(`${warningDocument.accounts[0].id},`);
+	});
+
+	it("rejects checkpoint fields without writing files", async () => {
+		const directory = await createFixtureDirectory();
+		const { invoke } = await createHarness(directory);
+		const loaded = await invoke(FINANCIAL_MODEL_API_PATH, "GET");
+		const accountsPath = path.join(directory, "accounts.csv");
+		const before = await fs.readFile(accountsPath, "utf-8");
+		const legacy = {
+			...(loaded.body.document as FinancialModelDocument),
+			checkpoints: [],
+		};
+
+		const response = await invoke(FINANCIAL_MODEL_API_PATH, "PUT", legacy);
+
+		expect(response).toMatchObject({
+			status: 422,
+			body: { issues: [{ code: "document.checkpoints.unsupported" }] },
+		});
+		expect(await fs.readFile(accountsPath, "utf-8")).toBe(before);
 	});
 });

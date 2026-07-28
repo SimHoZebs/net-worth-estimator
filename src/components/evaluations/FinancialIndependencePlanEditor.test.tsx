@@ -194,7 +194,7 @@ describe("FinancialIndependencePlanEditor", () => {
 		const onApply = vi.fn();
 		const base = createBaseDocument();
 		const growth = {
-			...base.postings[0]!,
+			...base.postings.find((posting) => posting.frequency !== "once")!,
 			id: "growth",
 			label: "Growth",
 			destinations: ["brokerage"],
@@ -227,6 +227,24 @@ describe("FinancialIndependencePlanEditor", () => {
 			postingId: "growth",
 			included: true,
 		});
+	});
+
+	it("does not offer one-time postings as retirement funding", () => {
+		const base = createBaseDocument();
+		const historical = base.postings.find(
+			(posting) => posting.frequency === "once",
+		)!;
+		render(
+			<FinancialIndependencePlanEditor
+				document={base}
+				plan={DEFAULT_FINANCIAL_INDEPENDENCE_PLAN}
+				sourceRevision={1}
+				onApply={vi.fn()}
+			/>,
+		);
+
+		fireEvent.click(screen.getByText("Model details", { exact: true }));
+		expect(screen.queryByLabelText(historical.label)).toBeNull();
 	});
 
 	it("removes continuing postings hidden by deselecting their last asset", () => {

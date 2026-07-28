@@ -18,7 +18,6 @@ import { useStochastic } from "../useStochastic";
 const overrides: ModelOverrides = {
 	addedAccounts: [],
 	addedPostings: [],
-	addedCheckpoints: [],
 	disabledAccountIds: [],
 	disabledPostingIds: [],
 };

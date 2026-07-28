@@ -32,6 +32,8 @@ export interface AccountMovementResult {
 
 export function frequencyDivisor(frequency: PostingFrequency): number {
 	switch (frequency) {
+		case "once":
+			return 1;
 		case "daily":
 			return 365;
 		case "weekly":
@@ -51,6 +53,8 @@ function advanceDate(
 	periodCount: number,
 ): IsoDate {
 	switch (frequency) {
+		case "once":
+			return date;
 		case "daily":
 		case "weekly": {
 			const daysPerPeriod = frequency === "daily" ? 1 : 7;
@@ -87,6 +91,9 @@ export function addOccurrences(
 				: projectionEndDate;
 
 		for (let periodCount = 0; ; periodCount += 1) {
+			if (posting.frequency === "once" && periodCount > 0) {
+				break;
+			}
 			const occurrenceDate = advanceDate(
 				posting.startDate,
 				posting.frequency,

@@ -55,7 +55,6 @@ export function simulationDocument(
 ): Omit<FinancialModelDocument, "sourcePath" | "evaluations"> {
 	return {
 		accounts: document.accounts,
-		checkpoints: document.checkpoints,
 		postings: document.postings,
 	};
 }

@@ -2,7 +2,6 @@ import { z } from "zod";
 import { NO_CEILING, NO_FLOOR } from "../../constants";
 import type {
 	Account,
-	Checkpoint,
 	FinancialIndependenceEvaluation,
 	FinancialIndependencePlan,
 	NetWorthThresholdEvaluation,
@@ -166,7 +165,6 @@ export const csvAccountsHeaders = [
 	"color",
 	"enabled",
 ] as const;
-export const csvCheckpointsHeaders = ["Date", "AccountId", "Balance"] as const;
 const csvEvaluationHeaders = ["instanceId", "label", "enabled"] as const;
 
 export const csvFinancialIndependenceHeaders = [
@@ -231,12 +229,6 @@ export const csvAccountSchema = z.object({
 	enabled: csvBoolean,
 }) satisfies z.ZodType<Account>;
 
-export const csvCheckpointSchema = z.object({
-	Date: csvDateSchema,
-	AccountId: trimmedString,
-	Balance: finiteNumber,
-}) satisfies z.ZodType<Checkpoint>;
-
 const evaluationFields = {
 	instanceId: trimmedString,
 	label: trimmedString,
@@ -286,6 +278,7 @@ export const csvPostingFulfillmentSchema = z.object({
 }) satisfies z.ZodType<CsvPostingFulfillmentRow>;
 
 const postingFrequencySchema = z.enum([
+	"once",
 	"daily",
 	"weekly",
 	"monthly",

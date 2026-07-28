@@ -1,6 +1,5 @@
 import type {
 	Account,
-	Checkpoint,
 	FinancialIndependencePrincipalPolicy,
 	Posting,
 } from "@/lib/projection";
@@ -35,7 +34,6 @@ export interface FinancialIndependenceTemplateInput {
 export interface TemplateOutput {
 	accounts: Account[];
 	postings: Posting[];
-	checkpoints: Checkpoint[];
 }
 
 export type TemplateGenerationResult =

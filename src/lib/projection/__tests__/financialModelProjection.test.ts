@@ -41,8 +41,20 @@ function postingEvent(
 	);
 }
 
+function historicalBalance(accountId: string, balance: number, priority = 1) {
+	return makePosting({
+		id: `historical_${accountId}`,
+		sourceAccountId: balance < 0 ? accountId : null,
+		destinations: balance > 0 ? [accountId] : null,
+		arithmetic: String(Math.abs(balance)),
+		frequency: "once",
+		startDate: "2025-12-31",
+		priority,
+	});
+}
+
 describe("financial model projection engine", () => {
-	it("builds dated checkpoint rows and future event rows from real postings", () => {
+	it("builds historical replay rows and future event rows from real postings", () => {
 		const result = projectFinancialModelDocument(
 			createBaseDocument(),
 			makeSettings(),
@@ -68,12 +80,12 @@ describe("financial model projection engine", () => {
 		expect(getBalance(result.timeline.rows[4], "loan")).toBe(-150);
 		expect(result.summary.currentNetWorth).toBe(1600);
 		expect(result.summary.finalNetWorth).toBe(2400);
-		expect(result.milestones.projectionStartDate).toBe("2026-01-31");
+		expect(result.milestones.projectionStartDate).toBe("2026-02-01");
+		expect(result.milestones.latestHistoricalDate).toBe("2026-01-31");
 	});
 
 	it("applies annual caps per calendar year on dated postings", () => {
 		const document = createBaseDocument({
-			checkpoints: [],
 			accounts: [
 				makeAccount({ id: "checking" }),
 				makeAccount({ id: "brokerage" }),
@@ -99,7 +111,10 @@ describe("financial model projection engine", () => {
 
 		const result = projectFinancialModelDocument(
 			document,
-			makeSettings({ horizonYears: 2 }),
+			makeSettings({
+				fallbackProjectionStartDate: "2026-01-01",
+				horizonYears: 2,
+			}),
 		);
 
 		expect(postingEvent(result, "capped", "2026-01-15")?.realizedAmount).toBe(
@@ -121,7 +136,6 @@ describe("financial model projection engine", () => {
 
 	it("supports same-day percent_of_base chains in priority order", () => {
 		const document = createBaseDocument({
-			checkpoints: [],
 			accounts: [makeAccount({ id: "checking" }), makeAccount({ id: "k401" })],
 			postings: [
 				makePosting({
@@ -150,7 +164,10 @@ describe("financial model projection engine", () => {
 			],
 		});
 
-		const result = projectFinancialModelDocument(document, makeSettings());
+		const result = projectFinancialModelDocument(
+			document,
+			makeSettings({ fallbackProjectionStartDate: "2026-01-01" }),
+		);
 
 		expect(postingEvent(result, "employee_k401")?.requestedAmount).toBe(100);
 		expect(postingEvent(result, "employer_match")?.requestedAmount).toBe(50);
@@ -161,15 +178,13 @@ describe("financial model projection engine", () => {
 
 	it("clamps postings by source balance only", () => {
 		const document = createBaseDocument({
-			checkpoints: [
-				{ Date: "2026-01-01", AccountId: "checking", Balance: 250 },
-				{ Date: "2026-01-01", AccountId: "loan", Balance: -300 },
-			],
 			accounts: [
 				makeAccount({ id: "checking", minBalance: 0 }),
 				makeAccount({ id: "loan" }),
 			],
 			postings: [
+				historicalBalance("checking", 250),
+				historicalBalance("loan", -300, 2),
 				makePosting({
 					id: "loan_payment",
 					sourceAccountId: "checking",
@@ -181,14 +196,21 @@ describe("financial model projection engine", () => {
 			],
 		});
 
-		const result = projectFinancialModelDocument(document, makeSettings());
+		const result = projectFinancialModelDocument(
+			document,
+			makeSettings({ fallbackProjectionStartDate: "2026-01-01" }),
+		);
 
 		expect(fulfillment(result)).toMatchObject({
 			requestedAmount: 400,
 			realizedAmount: 250,
 			unfulfilledAmount: 150,
 		});
-		expect(fulfillment(result).postings[0]).toMatchObject({
+		expect(
+			fulfillment(result).postings.find(
+				(posting) => posting.postingId === "loan_payment",
+			),
+		).toMatchObject({
 			postingId: "loan_payment",
 			requestedAmount: 400,
 			realizedAmount: 250,
@@ -203,10 +225,6 @@ describe("financial model projection engine", () => {
 
 	it("throws when source account has null minBalance (fail-fast)", () => {
 		const document = createBaseDocument({
-			checkpoints: [
-				{ Date: "2026-01-01", AccountId: "checking", Balance: 300 },
-				{ Date: "2026-01-01", AccountId: "loan", Balance: -200 },
-			],
 			accounts: [
 				{
 					id: "checking",
@@ -226,6 +244,8 @@ describe("financial model projection engine", () => {
 				},
 			],
 			postings: [
+				historicalBalance("checking", 300),
+				historicalBalance("loan", -200, 2),
 				makePosting({
 					id: "interest",
 					sourceAccountId: "loan",
@@ -237,16 +257,15 @@ describe("financial model projection engine", () => {
 		});
 
 		expect(() =>
-			projectFinancialModelDocument(document, makeSettings()),
+			projectFinancialModelDocument(
+				document,
+				makeSettings({ fallbackProjectionStartDate: "2026-01-01" }),
+			),
 		).toThrow("has no minBalance configured");
 	});
 
 	it("throws when destination account has null maxBalance (fail-fast)", () => {
 		const document = createBaseDocument({
-			checkpoints: [
-				{ Date: "2026-01-01", AccountId: "checking", Balance: 300 },
-				{ Date: "2026-01-01", AccountId: "loan", Balance: -200 },
-			],
 			accounts: [
 				{
 					id: "checking",
@@ -266,6 +285,8 @@ describe("financial model projection engine", () => {
 				},
 			],
 			postings: [
+				historicalBalance("checking", 300),
+				historicalBalance("loan", -200, 2),
 				makePosting({
 					id: "payment",
 					sourceAccountId: "loan",
@@ -278,15 +299,18 @@ describe("financial model projection engine", () => {
 		});
 
 		expect(() =>
-			projectFinancialModelDocument(document, makeSettings()),
+			projectFinancialModelDocument(
+				document,
+				makeSettings({ fallbackProjectionStartDate: "2026-01-01" }),
+			),
 		).toThrow("has no maxBalance configured");
 	});
 
 	it("applies interest via postings with rate keyword", () => {
 		const document = createBaseDocument({
-			checkpoints: [{ Date: "2026-01-01", AccountId: "loan", Balance: -1200 }],
 			accounts: [makeAccount({ id: "loan", minBalance: NO_FLOOR })],
 			postings: [
+				historicalBalance("loan", -1200),
 				makePosting({
 					id: "loan_interest",
 					sourceAccountId: "loan",
@@ -307,17 +331,15 @@ describe("financial model projection engine", () => {
 
 	it("applies both interest charge and payment on same date", () => {
 		const document = createBaseDocument({
-			checkpoints: [
-				{ Date: "2026-01-01", AccountId: "checking", Balance: 1000 },
-				{ Date: "2026-01-01", AccountId: "loan_interest", Balance: -100 },
-				{ Date: "2026-01-01", AccountId: "loan_principal", Balance: -1000 },
-			],
 			accounts: [
 				makeAccount({ id: "checking", minBalance: 0 }),
 				makeAccount({ id: "loan_interest", maxBalance: 0 }),
 				makeAccount({ id: "loan_principal", maxBalance: 0 }),
 			],
 			postings: [
+				historicalBalance("checking", 1000),
+				historicalBalance("loan_interest", -100, 2),
+				historicalBalance("loan_principal", -1000, 3),
 				makePosting({
 					id: "interest",
 					sourceAccountId: "loan_interest",
@@ -353,15 +375,13 @@ describe("financial model projection engine", () => {
 
 	it("prevents destination accounts from exceeding maxBalance (overpayment guard)", () => {
 		const document = createBaseDocument({
-			checkpoints: [
-				{ Date: "2026-01-01", AccountId: "checking", Balance: 400 },
-				{ Date: "2026-01-01", AccountId: "loan", Balance: -300 },
-			],
 			accounts: [
 				makeAccount({ id: "checking" }),
 				makeAccount({ id: "loan", maxBalance: 0 }),
 			],
 			postings: [
+				historicalBalance("checking", 400),
+				historicalBalance("loan", -300, 2),
 				makePosting({
 					id: "paydown",
 					sourceAccountId: "checking",
@@ -373,7 +393,10 @@ describe("financial model projection engine", () => {
 			],
 		});
 
-		const result = projectFinancialModelDocument(document, makeSettings());
+		const result = projectFinancialModelDocument(
+			document,
+			makeSettings({ fallbackProjectionStartDate: "2026-01-01" }),
+		);
 
 		expect(fulfillment(result)).toMatchObject({
 			requestedAmount: 400,
@@ -389,14 +412,12 @@ describe("financial model projection engine", () => {
 
 	it("prevents source accounts from falling below minBalance", () => {
 		const document = createBaseDocument({
-			checkpoints: [
-				{ Date: "2026-01-01", AccountId: "checking", Balance: 300 },
-			],
 			accounts: [
 				makeAccount({ id: "checking", minBalance: 100 }),
 				makeAccount({ id: "brokerage" }),
 			],
 			postings: [
+				historicalBalance("checking", 300),
 				makePosting({
 					id: "transfer",
 					sourceAccountId: "checking",
@@ -408,8 +429,11 @@ describe("financial model projection engine", () => {
 			],
 		});
 
-		const result = projectFinancialModelDocument(document, makeSettings());
-		const raw = projectRawFinancialModelDocument(document, makeSettings());
+		const settings = makeSettings({
+			fallbackProjectionStartDate: "2026-01-01",
+		});
+		const result = projectFinancialModelDocument(document, settings);
+		const raw = projectRawFinancialModelDocument(document, settings);
 
 		expect(fulfillment(result)).toMatchObject({
 			realizedAmount: 200,
@@ -433,11 +457,9 @@ describe("financial model projection engine", () => {
 
 	it("records fully blocked posting attempts without account impacts", () => {
 		const document = createBaseDocument({
-			checkpoints: [
-				{ Date: "2026-01-01", AccountId: "checking", Balance: 100 },
-			],
 			accounts: [makeAccount({ id: "checking", minBalance: 100 })],
 			postings: [
+				historicalBalance("checking", 100),
 				makePosting({
 					id: "blocked",
 					sourceAccountId: "checking",
@@ -448,7 +470,10 @@ describe("financial model projection engine", () => {
 			],
 		});
 
-		const { path } = projectRawFinancialModelDocument(document, makeSettings());
+		const { path } = projectRawFinancialModelDocument(
+			document,
+			makeSettings({ fallbackProjectionStartDate: "2026-01-01" }),
+		);
 
 		expect(path.movementEvents[0]).toMatchObject({
 			requestedAmount: 50,

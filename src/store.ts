@@ -2,7 +2,6 @@ import type { StateCreator } from "zustand";
 import { create } from "zustand";
 import type {
 	Account,
-	Checkpoint,
 	EvaluationInstance,
 	EvaluationResultStatus,
 	EvaluationTables,
@@ -80,7 +79,6 @@ const createComparisonSlice: StateCreator<AppStore, [], [], ComparisonSlice> = (
 const initialModelOverrides: ModelOverrides = {
 	addedAccounts: [],
 	addedPostings: [],
-	addedCheckpoints: [],
 	disabledAccountIds: [],
 	disabledPostingIds: [],
 };
@@ -90,8 +88,6 @@ export interface ModelOverridesSlice extends ModelOverrides {
 	removeTemporaryAccount: (id: string) => void;
 	addTemporaryPosting: (posting: Posting) => void;
 	removeTemporaryPosting: (id: string) => void;
-	addTemporaryCheckpoint: (checkpoint: Checkpoint) => void;
-	removeTemporaryCheckpoint: (index: number) => void;
 	toggleAccountDisabled: (id: string) => void;
 	togglePostingDisabled: (id: string) => void;
 	resetCurrentChanges: () => void;
@@ -116,14 +112,6 @@ const createModelOverridesSlice: StateCreator<
 
 	removeTemporaryPosting: (id) =>
 		set((s) => ({ addedPostings: s.addedPostings.filter((p) => p.id !== id) })),
-
-	addTemporaryCheckpoint: (checkpoint) =>
-		set((s) => ({ addedCheckpoints: [...s.addedCheckpoints, checkpoint] })),
-
-	removeTemporaryCheckpoint: (index) =>
-		set((s) => ({
-			addedCheckpoints: s.addedCheckpoints.filter((_, i) => i !== index),
-		})),
 
 	toggleAccountDisabled: (id) =>
 		set((s) => ({
@@ -158,9 +146,6 @@ interface EditorSlice {
 	updatePosting: (id: string, changes: Partial<Posting>) => void;
 	deletePosting: (id: string) => void;
 	addPosting: (posting: Posting) => void;
-	addCheckpoint: (checkpoint: Checkpoint) => void;
-	deleteCheckpoint: (index: number) => void;
-	updateCheckpoint: (index: number, changes: Partial<Checkpoint>) => void;
 }
 
 const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (
@@ -255,43 +240,6 @@ const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (
 					...s.workingDocument,
 					postings: [...s.workingDocument.postings, posting],
 				},
-			};
-		}),
-
-	addCheckpoint: (checkpoint) =>
-		set((s) => {
-			if (!s.workingDocument) return s;
-			return {
-				isDirty: true,
-				workingDocument: {
-					...s.workingDocument,
-					checkpoints: [...s.workingDocument.checkpoints, checkpoint],
-				},
-			};
-		}),
-
-	deleteCheckpoint: (index) =>
-		set((s) => {
-			if (!s.workingDocument) return s;
-			return {
-				isDirty: true,
-				workingDocument: {
-					...s.workingDocument,
-					checkpoints: s.workingDocument.checkpoints.filter(
-						(_, i) => i !== index,
-					),
-				},
-			};
-		}),
-
-	updateCheckpoint: (index, changes) =>
-		set((s) => {
-			if (!s.workingDocument) return s;
-			const next = [...s.workingDocument.checkpoints];
-			next[index] = { ...next[index], ...changes };
-			return {
-				isDirty: true,
-				workingDocument: { ...s.workingDocument, checkpoints: next },
 			};
 		}),
 });
@@ -611,14 +559,12 @@ export const useStore = create<AppStore>()((...args) => ({
 export const selectCurrentChangeCount = (s: AppStore) =>
 	s.addedAccounts.length +
 	s.addedPostings.length +
-	s.addedCheckpoints.length +
 	s.disabledAccountIds.length +
 	s.disabledPostingIds.length;
 
 export const selectModelOverrides = (s: AppStore): ModelOverrides => ({
 	addedAccounts: s.addedAccounts,
 	addedPostings: s.addedPostings,
-	addedCheckpoints: s.addedCheckpoints,
 	disabledAccountIds: s.disabledAccountIds,
 	disabledPostingIds: s.disabledPostingIds,
 });
@@ -638,9 +584,6 @@ export const selectEditorActions = (s: AppStore) => ({
 	updatePosting: s.updatePosting,
 	deletePosting: s.deletePosting,
 	addPosting: s.addPosting,
-	addCheckpoint: s.addCheckpoint,
-	deleteCheckpoint: s.deleteCheckpoint,
-	updateCheckpoint: s.updateCheckpoint,
 });
 
 /* ------------------------------------------------------------------ */
@@ -653,7 +596,6 @@ export function cloneDocument(
 	return {
 		...document,
 		accounts: document.accounts.map((a) => ({ ...a })),
-		checkpoints: document.checkpoints.map((c) => ({ ...c })),
 		postings: document.postings.map((p) => ({
 			...p,
 			destinations: p.destinations ? [...p.destinations] : null,

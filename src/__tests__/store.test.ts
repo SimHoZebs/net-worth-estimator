@@ -42,10 +42,6 @@ function makePosting(id = "p1") {
 	};
 }
 
-function makeCheckpoint(date = "2025-01-01", accountId = "a1", balance = 1000) {
-	return { Date: date, AccountId: accountId, Balance: balance };
-}
-
 function makeFinancialModelDocument(): FinancialModelDocument {
 	return {
 		sourcePath: "/configs",
@@ -59,7 +55,6 @@ function makeFinancialModelDocument(): FinancialModelDocument {
 				enabled: true,
 			},
 		],
-		checkpoints: [{ Date: "2025-01-01", AccountId: "a1", Balance: 1000 }],
 		evaluations: structuredClone(DEFAULT_EVALUATIONS),
 		postings: [makePosting("p1")],
 	};
@@ -100,19 +95,6 @@ describe("Model overrides slice", () => {
 		expect(useStore.getState().addedPostings[0].id).toBe("p2");
 	});
 
-	it("adds a temporary checkpoint", () => {
-		useStore.getState().addTemporaryCheckpoint(makeCheckpoint());
-		expect(useStore.getState().addedCheckpoints).toHaveLength(1);
-	});
-
-	it("removes a temporary checkpoint by index", () => {
-		useStore.getState().addTemporaryCheckpoint(makeCheckpoint("2025-01-01"));
-		useStore.getState().addTemporaryCheckpoint(makeCheckpoint("2025-02-01"));
-		useStore.getState().removeTemporaryCheckpoint(0);
-		expect(useStore.getState().addedCheckpoints).toHaveLength(1);
-		expect(useStore.getState().addedCheckpoints[0].Date).toBe("2025-02-01");
-	});
-
 	it("toggles account disabled state on and off", () => {
 		useStore.getState().toggleAccountDisabled("a1");
 		expect(useStore.getState().disabledAccountIds).toEqual(["a1"]);
@@ -136,13 +118,11 @@ describe("Model overrides slice", () => {
 	it("resets all overrides to initial state", () => {
 		useStore.getState().addTemporaryAccount(makeAccount());
 		useStore.getState().addTemporaryPosting(makePosting());
-		useStore.getState().addTemporaryCheckpoint(makeCheckpoint());
 		useStore.getState().toggleAccountDisabled("a1");
 		useStore.getState().togglePostingDisabled("p1");
 		useStore.getState().resetCurrentChanges();
 		expect(useStore.getState().addedAccounts).toEqual([]);
 		expect(useStore.getState().addedPostings).toEqual([]);
-		expect(useStore.getState().addedCheckpoints).toEqual([]);
 		expect(useStore.getState().disabledAccountIds).toEqual([]);
 		expect(useStore.getState().disabledPostingIds).toEqual([]);
 	});
@@ -290,24 +270,6 @@ describe("Editor slice", () => {
 			useStore.getState().addPosting(makePosting());
 			expect(useStore.getState()).toEqual(before);
 		});
-
-		it("addCheckpoint does nothing", () => {
-			const before = useStore.getState();
-			useStore.getState().addCheckpoint(makeCheckpoint());
-			expect(useStore.getState()).toEqual(before);
-		});
-
-		it("deleteCheckpoint does nothing", () => {
-			const before = useStore.getState();
-			useStore.getState().deleteCheckpoint(0);
-			expect(useStore.getState()).toEqual(before);
-		});
-
-		it("updateCheckpoint does nothing", () => {
-			const before = useStore.getState();
-			useStore.getState().updateCheckpoint(0, { Balance: 999 });
-			expect(useStore.getState()).toEqual(before);
-		});
 	});
 
 	describe("with a financial model document", () => {
@@ -368,28 +330,6 @@ describe("Editor slice", () => {
 			useStore.getState().startEditing(document);
 			useStore.getState().addPosting(makePosting("p2"));
 			expect(useStore.getState().workingDocument?.postings).toHaveLength(2);
-		});
-
-		it("addCheckpoint appends to workingDocument", () => {
-			useStore.getState().startEditing(document);
-			useStore
-				.getState()
-				.addCheckpoint(makeCheckpoint("2025-03-01", "a1", 2000));
-			expect(useStore.getState().workingDocument?.checkpoints).toHaveLength(2);
-		});
-
-		it("deleteCheckpoint removes by index from workingDocument", () => {
-			useStore.getState().startEditing(document);
-			useStore.getState().deleteCheckpoint(0);
-			expect(useStore.getState().workingDocument?.checkpoints).toHaveLength(0);
-		});
-
-		it("updateCheckpoint modifies checkpoint in workingDocument", () => {
-			useStore.getState().startEditing(document);
-			useStore.getState().updateCheckpoint(0, { Balance: 9999 });
-			expect(useStore.getState().workingDocument?.checkpoints[0].Balance).toBe(
-				9999,
-			);
 		});
 	});
 });

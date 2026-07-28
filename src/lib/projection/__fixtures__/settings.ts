@@ -4,7 +4,7 @@ export function makeSettings(
 	overrides: Partial<ProjectionRuntimeSettings> = {},
 ): ProjectionRuntimeSettings {
 	return {
-		fallbackProjectionStartDate: "2026-01-01",
+		fallbackProjectionStartDate: "2026-02-01",
 		horizonYears: 1,
 		evaluations: {
 			financialIndependence: [

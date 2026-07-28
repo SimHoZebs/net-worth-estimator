@@ -97,6 +97,7 @@ export const FinancialIndependencePlanEditor = memo(
 		const retirementIncomePostings = document.postings.filter(
 			(posting) =>
 				posting.enabled &&
+				posting.frequency !== "once" &&
 				posting.sourceAccountId === null &&
 				posting.destinations !== null,
 		);
@@ -105,7 +106,9 @@ export const FinancialIndependencePlanEditor = memo(
 		);
 		const continuingPostings = document.postings.filter(
 			(posting) =>
-				posting.enabled && postingLinksToAssets(posting, selectedAssets),
+				posting.enabled &&
+				posting.frequency !== "once" &&
+				postingLinksToAssets(posting, selectedAssets),
 		);
 		const dirty = planFingerprint(draft) !== committedFingerprint;
 		const onDirtyChangeRef = useRef(onDirtyChange);

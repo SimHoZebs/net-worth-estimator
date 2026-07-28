@@ -29,7 +29,9 @@ interface CashFlowWaterfallProps {
 export const CashFlowWaterfall = memo(function CashFlowWaterfall({
 	document,
 }: CashFlowWaterfallProps) {
-	const enabledPostings = document.postings.filter((p) => p.enabled);
+	const enabledPostings = document.postings.filter(
+		(posting) => posting.enabled && posting.frequency !== "once",
+	);
 
 	const items = enabledPostings.map((p) => {
 		const { type, category } = categorizePosting(p);

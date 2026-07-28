@@ -132,12 +132,7 @@ export default function App() {
 		() => (document ? applyModelOverrides(document, modelOverrides) : null),
 		[document, modelOverrides],
 	);
-	const projectionStartDate =
-		effectiveDocument?.checkpoints.reduce<string | null>(
-			(latest, checkpoint) =>
-				latest === null || checkpoint.Date > latest ? checkpoint.Date : latest,
-			null,
-		) ?? fallbackProjectionStartDate;
+	const projectionStartDate = fallbackProjectionStartDate;
 	const {
 		result,
 		runtimeError,

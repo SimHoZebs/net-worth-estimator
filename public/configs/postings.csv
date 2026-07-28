@@ -29,3 +29,37 @@ rsu_vest_5,RSU Vest 5,rsu,rsu_vested,rsu * 20 / 40,monthly,0,0,0,2029-10-06,2029
 rsu_vest_6,RSU Vest 6,rsu,rsu_vested,rsu * 20 / 20,monthly,0,0,0,2030-04-06,2030-04-06,,15,true
 rsu_growth,RSU Growth,,rsu,rsu * rate,monthly,0.1,0,0.3,2026-04-06,,,20,true
 rsu_vested_growth,RSU Vested Growth,,rsu_vested,rsu_vested * rate,monthly,0.1,0,0.3,2026-04-06,,,20,true
+opening_20260406_rsu,Opening RSU balance,,rsu,140383.66,once,0,0,0,2026-04-06,,,1,true
+opening_20260430_checking,Opening checking balance,,checking,23182.42,once,0,0,0,2026-04-30,,,1,true
+opening_20260430_brokerage,Opening brokerage balance,,brokerage,234.54,once,0,0,0,2026-04-30,,,1,true
+opening_20260430_roth_ira,Opening Roth IRA balance,,roth_ira,1104.53,once,0,0,0,2026-04-30,,,1,true
+opening_20260430_student_loan1_principal,Opening student loan 1 principal,student_loan1_principal,,11000,once,0,0,0,2026-04-30,,,1,true
+opening_20260430_student_loan1_interest,Opening student loan 1 interest,student_loan1_interest,,1901.13,once,0,0,0,2026-04-30,,,1,true
+opening_20260430_student_loan2_principal,Opening student loan 2 principal,student_loan2_principal,,12000,once,0,0,0,2026-04-30,,,1,true
+opening_20260430_student_loan2_interest,Opening student loan 2 interest,student_loan2_interest,,203.44,once,0,0,0,2026-04-30,,,1,true
+opening_20260430_student_loan3_principal,Opening student loan 3 principal,student_loan3_principal,,28788,once,0,0,0,2026-04-30,,,1,true
+opening_20260430_student_loan3_interest,Opening student loan 3 interest,student_loan3_interest,,6714.35,once,0,0,0,2026-04-30,,,1,true
+adjustment_20260501_student_loan3_principal,Student loan 3 principal adjustment,,student_loan3_principal,3259.88,once,0,0,0,2026-05-01,,,1,true
+adjustment_20260501_student_loan3_interest,Student loan 3 interest adjustment,,student_loan3_interest,6693.19,once,0,0,0,2026-05-01,,,1,true
+adjustment_20260501_student_loan2_principal,Student loan 2 principal adjustment,,student_loan2_principal,1082.3,once,0,0,0,2026-05-01,,,1,true
+adjustment_20260501_student_loan2_interest,Student loan 2 interest adjustment,,student_loan2_interest,199.33,once,0,0,0,2026-05-01,,,1,true
+adjustment_20260623_checking,Checking balance adjustment,checking,,21486.53,once,0,0,0,2026-06-23,,,1,true
+adjustment_20260623_k401,401(k) balance adjustment,,k401,640.81,once,0,0,0,2026-06-23,,,1,true
+adjustment_20260623_brokerage,Brokerage balance adjustment,,brokerage,6.62,once,0,0,0,2026-06-23,,,1,true
+adjustment_20260623_roth_ira,Roth IRA balance adjustment,,roth_ira,6.04,once,0,0,0,2026-06-23,,,1,true
+adjustment_20260623_student_loan1_principal,Student loan 1 principal adjustment,,student_loan1_principal,11000,once,0,0,0,2026-06-23,,,1,true
+adjustment_20260623_student_loan1_interest,Student loan 1 interest adjustment,,student_loan1_interest,1901.13,once,0,0,0,2026-06-23,,,1,true
+adjustment_20260623_student_loan2_principal,Student loan 2 principal adjustment,,student_loan2_principal,10917.7,once,0,0,0,2026-06-23,,,1,true
+adjustment_20260623_student_loan2_interest,Student loan 2 interest adjustment,,student_loan2_interest,4.11,once,0,0,0,2026-06-23,,,1,true
+adjustment_20260623_student_loan3_principal,Student loan 3 principal adjustment,,student_loan3_principal,25528.12,once,0,0,0,2026-06-23,,,1,true
+adjustment_20260623_student_loan3_interest,Student loan 3 interest adjustment,,student_loan3_interest,21.16,once,0,0,0,2026-06-23,,,1,true
+opening_20260623_sofi_loan_principal,Opening SoFi loan principal,sofi_loan_principal,,49606.68,once,0,0,0,2026-06-23,,,1,true
+adjustment_20260713_sofi_loan_principal,SoFi loan principal adjustment,,sofi_loan_principal,12399.05,once,0,0,0,2026-07-13,,,1,true
+opening_20260713_sallie_mae_principal,Opening Sallie Mae principal,sallie_mae_principal,,12000,once,0,0,0,2026-07-13,,,1,true
+opening_20260713_sallie_mae_interest,Opening Sallie Mae interest,sallie_mae_interest,,237.54,once,0,0,0,2026-07-13,,,1,true
+opening_20260713_car_loan_principal,Opening car loan principal,car_loan_principal,,20423.33,once,0,0,0,2026-07-13,,,1,true
+adjustment_20260727_sofi_loan_principal,SoFi loan principal adjustment,,sofi_loan_principal,790.05,once,0,0,0,2026-07-27,,,1,true
+opening_20260727_sofi_loan_interest,Opening SoFi loan interest,sofi_loan_interest,,66.35,once,0,0,0,2026-07-27,,,1,true
+adjustment_20260727_checking,Checking balance adjustment,checking,,1298.15,once,0,0,0,2026-07-27,,,1,true
+adjustment_20260727_k401,401(k) balance adjustment,,k401,619.93,once,0,0,0,2026-07-27,,,1,true
+adjustment_20260727_roth_ira,Roth IRA balance adjustment,,roth_ira,2,once,0,0,0,2026-07-27,,,1,true

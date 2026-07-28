@@ -192,6 +192,6 @@ export function generateIncomePattern(
 
 	return {
 		ok: true,
-		output: { accounts, postings, checkpoints: [] },
+		output: { accounts, postings },
 	};
 }
