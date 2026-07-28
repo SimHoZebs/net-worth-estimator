@@ -31,8 +31,8 @@ export const TransactionCompletionTable = memo(
 					<div>
 						<CardTitle>Transaction completion</CardTitle>
 						<CardDescription>
-							Which scheduled transactions were fully applied and which were
-							limited by available funds.
+							Which scheduled transactions were satisfied, destination-limited,
+							or underfunded.
 						</CardDescription>
 					</div>
 				</CardHeader>
@@ -45,6 +45,7 @@ export const TransactionCompletionTable = memo(
 								<TableHead>Priority</TableHead>
 								<TableHead>Requested</TableHead>
 								<TableHead>Applied</TableHead>
+								<TableHead>Destination-limited</TableHead>
 								<TableHead>Completion</TableHead>
 								<TableHead>First unfunded</TableHead>
 							</TableRow>
@@ -53,7 +54,7 @@ export const TransactionCompletionTable = memo(
 							{postingSummaries === null ? (
 								<TableRow>
 									<TableCell
-										colSpan={7}
+										colSpan={8}
 										className="py-6 text-center text-muted-foreground"
 									>
 										Posting-fulfillment evaluation is unavailable.
@@ -62,8 +63,7 @@ export const TransactionCompletionTable = memo(
 							) : postingSummaries.length > 0 ? (
 								postingSummaries.map((summary) => {
 									const hasShortfall = summary.unfulfilledAmount > 0;
-									const completionRate =
-										summary.requestedAmount > 0 ? summary.utilizationRate : 1;
+									const completionRate = summary.completionRate;
 
 									return (
 										<TableRow key={summary.postingId}>
@@ -108,6 +108,9 @@ export const TransactionCompletionTable = memo(
 												</span>
 											</TableCell>
 											<TableCell>
+												{currency.format(summary.destinationLimitedAmount)}
+											</TableCell>
+											<TableCell>
 												<span
 													className={
 														hasShortfall
@@ -137,7 +140,7 @@ export const TransactionCompletionTable = memo(
 							) : (
 								<TableRow>
 									<TableCell
-										colSpan={7}
+										colSpan={8}
 										className="py-6 text-center text-muted-foreground"
 									>
 										No scheduled transactions are defined.

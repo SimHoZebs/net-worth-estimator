@@ -378,7 +378,9 @@ describe("financial model projection engine", () => {
 		expect(fulfillment(result)).toMatchObject({
 			requestedAmount: 400,
 			realizedAmount: 300,
-			unfulfilledAmount: 100,
+			destinationLimitedAmount: 100,
+			unfulfilledAmount: 0,
+			completionRate: 1,
 		});
 		expect(getBalance(result.timeline.rows[1], "loan")).toBe(0);
 		expect(getBalance(result.timeline.rows[1], "checking")).toBe(100);
@@ -421,7 +423,6 @@ describe("financial model projection engine", () => {
 				origin: { type: "posting", postingId: "transfer" },
 				requestedAmount: 400,
 				realizedAmount: 200,
-				bindingConstraints: [{ type: "source-floor", accountId: "checking" }],
 				accountDeltas: [
 					{ accountId: "checking", delta: -200 },
 					{ accountId: "brokerage", delta: 200 },
@@ -452,7 +453,6 @@ describe("financial model projection engine", () => {
 		expect(path.movementEvents[0]).toMatchObject({
 			requestedAmount: 50,
 			realizedAmount: 0,
-			bindingConstraints: [{ type: "source-floor", accountId: "checking" }],
 			accountDeltas: [],
 		});
 	});

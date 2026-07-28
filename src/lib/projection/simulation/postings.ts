@@ -1,12 +1,9 @@
 import type {
 	Account,
-	AccountMovementConstraint,
 	IsoDate,
 	Posting,
 	PostingFrequency,
 } from "../types/model";
-
-export type { AccountMovementConstraint } from "../types/model";
 
 import { addMonthsClamped, compareIsoDates, daysBetween } from "../utils/date";
 import {
@@ -31,7 +28,6 @@ export interface AccountMovementAction {
 export interface AccountMovementResult {
 	requestedAmount: number;
 	realizedAmount: number;
-	bindingConstraints: AccountMovementConstraint[];
 }
 
 export function frequencyDivisor(frequency: PostingFrequency): number {
@@ -206,7 +202,6 @@ export function resolveAccountMovement(
 		return {
 			requestedAmount,
 			realizedAmount: 0,
-			bindingConstraints: [],
 		};
 	}
 
@@ -217,9 +212,6 @@ export function resolveAccountMovement(
 		return {
 			requestedAmount,
 			realizedAmount: 0,
-			bindingConstraints: [
-				{ type: "source-unavailable", accountId: action.sourceAccountId },
-			],
 		};
 	}
 
@@ -243,32 +235,9 @@ export function resolveAccountMovement(
 			destBalanceLimit,
 		),
 	);
-	const unrealizedAmount = requestedAmount - realizedAmount;
-	const bindingConstraints: AccountMovementConstraint[] = [];
-	if (unrealizedAmount > 0) {
-		const isBinding = (limit: number) =>
-			Number.isFinite(limit) && Math.abs(limit - realizedAmount) < 1e-9;
-		if (action.sourceAccountId !== null && isBinding(sourceBalanceLimit)) {
-			bindingConstraints.push({
-				type: "source-floor",
-				accountId: action.sourceAccountId,
-			});
-		}
-		if (action.destinations !== null && isBinding(destBalanceLimit)) {
-			bindingConstraints.push({
-				type: "destination-ceiling",
-				accountIds: [...action.destinations],
-			});
-		}
-		if (isBinding(actionLimit)) {
-			bindingConstraints.push({ type: "action-limit" });
-		}
-	}
-
 	return {
 		requestedAmount,
 		realizedAmount,
-		bindingConstraints,
 	};
 }
 

@@ -43,7 +43,6 @@ export function simulate(request: SimulationRequest): SimulationRun {
 				origin: { type: "posting", postingId: transition.postingId },
 				requestedAmount: transition.result.requestedAmount,
 				realizedAmount: transition.result.realizedAmount,
-				bindingConstraints: transition.result.bindingConstraints,
 				accountDeltas: transition.accountDeltas,
 			});
 		}

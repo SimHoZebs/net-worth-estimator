@@ -101,7 +101,6 @@ describe("simulation transitions", () => {
 		expect(transition).toMatchObject({
 			result: {
 				realizedAmount: 0,
-				bindingConstraints: [{ type: "source-floor", accountId: "checking" }],
 			},
 			accountDeltas: [],
 		});
@@ -151,7 +150,6 @@ describe("simulation transitions", () => {
 		expect(transition).toMatchObject({
 			result: {
 				realizedAmount: 200,
-				bindingConstraints: [{ type: "action-limit" }],
 			},
 			accountDeltas: [{ accountId: "checking", delta: -200 }],
 		});

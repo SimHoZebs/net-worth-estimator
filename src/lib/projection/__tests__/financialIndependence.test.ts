@@ -102,7 +102,6 @@ function path(
 					origin: { type: "posting" as const, postingId },
 					requestedAmount: amount,
 					realizedAmount: amount,
-					bindingConstraints: [],
 					accountDeltas: [],
 				}),
 			),

@@ -230,7 +230,6 @@ export interface MovementEvent {
 	origin: { type: "posting"; postingId: string };
 	requestedAmount: number;
 	realizedAmount: number;
-	bindingConstraints: AccountMovementConstraint[];
 	accountDeltas: Array<{ accountId: string; delta: number }>;
 }
 

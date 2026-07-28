@@ -52,7 +52,7 @@ The persistence boundary is the validated `FinancialModelDocument` represented b
 - `ModelOverrides`: session-only additions and disabled account/posting selections applied before preparation.
 - `SimulationRequest`: resolved model, initial state, date range, start-date event policy, and optional `MonteCarloSample`.
 - `SimulationRun`: exact initial/final states, dated balance snapshots, and ordered movement attempts from one kernel execution.
-- `ProjectionPath`: immutable evaluator-facing timeline, effective document, and movement records.
+- `ProjectionPath`: immutable evaluator-facing timeline, effective document, and raw movement records containing requested amounts, realized amounts, and account deltas.
 - `MonteCarloSample`: sampled annual rates by posting ID for one stochastic run.
 - `ComparisonSnapshot`: read-only current/final net-worth and evaluation metrics captured by the UI. It contains no model document or overrides and cannot restore state.
 - `EvaluationTables`: typed tables keyed by evaluation type. `EVALUATION_TYPE_ORDER` controls type order, and each table's array order preserves ingestion order.
@@ -109,7 +109,7 @@ Canonical core APIs are:
 - Branches replay only explicitly selected continuing postings. They never infer continuation from IDs, labels, categories, or rates.
 - Candidate state includes all base-path events on the candidate date; branch processing starts strictly afterward.
 - Branch state inherits latest realized posting amounts, current-year cap usage, and the run's sampled rates.
-- Movement attempts record requested and realized amounts plus binding constraints. Posting-fulfillment evaluation derives business diagnostics from those generic facts.
+- Movement attempts record requested and realized amounts plus account deltas. Evaluations that need constraint diagnostics derive and own them from those generic facts and the effective model.
 - Evaluator failures remain isolated in per-instance diagnostics.
 
 ## 7. Monte Carlo
