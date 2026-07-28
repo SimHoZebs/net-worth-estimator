@@ -15,8 +15,8 @@ k401_growth,401(k) Growth,,k401,k401 * rate,monthly,0.07,0,0.15,2026-05-30,,,20,
 brokerage_growth,Brokerage Growth,,brokerage,brokerage * rate,monthly,0.08,0,0.18,2026-04-28,,,20,true
 roth_ira_growth,Roth IRA Growth,,roth_ira,roth_ira * rate,monthly,0.03,0,0,2026-04-28,,,20,true
 brokerage_auto,Brokerage Auto,checking,brokerage,(salary - k401_employee - taxes) * 0.1,monthly,0,0,0,2026-04-28,,,10,true
-sofi_loan_interest,SoFi Loan Interest,sofi_loan,,abs(sofi_loan) * rate,monthly,0.0475,0,0,2026-07-13,,,6,true
-sofi_loan_payment,SoFi Loan Payment,checking,sofi_loan,1000,monthly,0,0,0,2026-07-13,,,7,true
+sofi_loan_interest_charge,SoFi Loan Interest,sofi_loan_interest,,abs(sofi_loan_principal) * rate,monthly,0.0475,0,0,2026-07-13,,,6,true
+sofi_loan_payment,SoFi Loan Payment,checking,sofi_loan_interest;sofi_loan_principal,1000,monthly,0,0,0,2026-07-13,,,7,true
 sallie_mae_interest_charge,Sallie Mae Interest,sallie_mae_interest,,abs(sallie_mae_principal) * rate,monthly,0.0399,0,0,2026-07-13,,,6,true
 sallie_mae_payment,Sallie Mae Payment,checking,sallie_mae_interest;sallie_mae_principal,247.95,monthly,0,0,0,2026-07-13,,,7,true
 car_loan_interest_charge,Car Loan Interest,car_loan_interest,,abs(car_loan_principal) * rate,monthly,0.0689,0,0,2026-07-13,,,6,true

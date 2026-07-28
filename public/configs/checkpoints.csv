@@ -24,9 +24,14 @@ Date,AccountId,Balance
 2026-06-23,student_loan2_interest,0
 2026-06-23,student_loan3_principal,0
 2026-06-23,student_loan3_interest,0
-2026-06-23,sofi_loan,-49606.68
-2026-07-13,sofi_loan,-37207.63
+2026-06-23,sofi_loan_principal,-49606.68
+2026-07-13,sofi_loan_principal,-37207.63
 2026-07-13,sallie_mae_principal,-12000
 2026-07-13,sallie_mae_interest,-237.54
 2026-07-13,car_loan_principal,-20423.33
 2026-07-13,car_loan_interest,0
+2026-07-27,sofi_loan_principal,-36417.58
+2026-07-27,sofi_loan_interest,-66.35
+2026-07-27,checking,397.74
+2026-07-27,k401,1260.74
+2026-07-27,roth_ira,1112.57
