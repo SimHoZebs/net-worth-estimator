@@ -10,7 +10,7 @@ import { simulate } from "../simulation/simulate";
 import type { SimulationRequest } from "../types/simulation";
 
 describe("simulation request preparation", () => {
-	it("keeps checkpoint history outside the prepared kernel request", () => {
+	it("replays historical once postings outside the prepared kernel request", () => {
 		const prepared = prepareSimulationRequest(
 			createBaseDocument(),
 			makeSettings(),
@@ -22,23 +22,33 @@ describe("simulation request preparation", () => {
 				balances: { checking: 800, brokerage: 1200, loan: -400 },
 			},
 		]);
-		expect(prepared.request).not.toHaveProperty("checkpoints");
 		expect(prepared.request).not.toHaveProperty("evaluations");
-		expect(prepared.request.startDate).toBe("2026-01-31");
-		expect(prepared.request.includeStartDateEvents).toBe(false);
+		expect(prepared.request.startDate).toBe("2026-02-01");
+		expect(prepared.request.includeStartDateEvents).toBe(true);
+		expect(prepared.request.initialState.balances).toEqual({
+			checking: 800,
+			brokerage: 1200,
+			loan: -400,
+		});
 	});
 
-	it("includes fallback start-date postings when no checkpoint exists", () => {
+	it("includes once postings on and after the fallback start date", () => {
 		const document = createBaseDocument({
-			checkpoints: [],
 			accounts: [makeAccount({ id: "checking" })],
 			postings: [
 				makePosting({
 					id: "start-date-income",
 					destinations: ["checking"],
 					arithmetic: "100",
+					frequency: "once",
 					startDate: "2026-01-01",
-					endDate: "2026-01-01",
+				}),
+				makePosting({
+					id: "future-income",
+					destinations: ["checking"],
+					arithmetic: "50",
+					frequency: "once",
+					startDate: "2026-01-02",
 				}),
 			],
 		});
@@ -48,7 +58,81 @@ describe("simulation request preparation", () => {
 		);
 
 		expect(prepared.request.includeStartDateEvents).toBe(true);
-		expect(simulate(prepared.request).movementAttempts).toHaveLength(1);
+		expect(simulate(prepared.request).movementAttempts).toHaveLength(2);
+	});
+
+	it("replays only enabled once postings in date, priority, and document order", () => {
+		const account = makeAccount({ id: "checking" });
+		const document = createBaseDocument({
+			accounts: [account],
+			postings: [
+				makePosting({
+					id: "second",
+					destinations: [account.id],
+					arithmetic: "first * 2",
+					frequency: "once",
+					startDate: "2026-01-02",
+					priority: 2,
+					annualCap: 100,
+				}),
+				makePosting({
+					id: "first",
+					destinations: [account.id],
+					arithmetic: "25",
+					frequency: "once",
+					startDate: "2026-01-02",
+					priority: 1,
+					volatility: 1,
+					annualCap: 100,
+				}),
+				makePosting({
+					id: "past-recurring",
+					destinations: [account.id],
+					arithmetic: "1000",
+					startDate: "2026-01-01",
+				}),
+				makePosting({
+					id: "disabled",
+					destinations: [account.id],
+					arithmetic: "1000",
+					frequency: "once",
+					startDate: "2026-01-01",
+					enabled: false,
+				}),
+			],
+		});
+
+		const prepared = prepareSimulationRequest(
+			document,
+			makeSettings({ fallbackProjectionStartDate: "2026-02-01" }),
+			undefined,
+			{ annualRatesByPostingId: new Map([["first", [10]]]) },
+		);
+
+		expect(prepared.historicalSnapshots).toEqual([
+			{ date: "2026-01-02", balances: { checking: 75 } },
+		]);
+		expect(prepared.request.initialState.latestRealizedPostingAmounts).toEqual(
+			new Map([
+				["first", 25],
+				["second", 50],
+			]),
+		);
+		expect(prepared.request.initialState.realizedPostingAmountsByYear).toEqual(
+			new Map([
+				["first", new Map([["2026", 25]])],
+				["second", new Map([["2026", 50]])],
+			]),
+		);
+		const projected = simulate(prepared.request).movementAttempts;
+		expect(projected[0]).toMatchObject({
+			date: "2026-02-01",
+			origin: { postingId: "past-recurring" },
+		});
+		expect(projected).toHaveLength(13);
+		expect(projected.map((event) => event.origin.postingId)).not.toContain(
+			"first",
+		);
 	});
 });
 
@@ -98,11 +182,15 @@ describe("deterministic simulation kernel", () => {
 	it("records exact dated snapshots and fully blocked attempts", () => {
 		const prepared = prepareSimulationRequest(
 			createBaseDocument({
-				checkpoints: [
-					{ Date: "2026-01-01", AccountId: "checking", Balance: 100 },
-				],
 				accounts: [makeAccount({ id: "checking", minBalance: 100 })],
 				postings: [
+					makePosting({
+						id: "historical-balance",
+						destinations: ["checking"],
+						arithmetic: "100",
+						frequency: "once",
+						startDate: "2026-01-01",
+					}),
 					makePosting({
 						id: "blocked",
 						sourceAccountId: "checking",
@@ -112,7 +200,7 @@ describe("deterministic simulation kernel", () => {
 					}),
 				],
 			}),
-			makeSettings(),
+			makeSettings({ fallbackProjectionStartDate: "2026-01-05" }),
 		);
 
 		const run = simulate(prepared.request);

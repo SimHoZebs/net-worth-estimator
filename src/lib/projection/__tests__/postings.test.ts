@@ -1,6 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { makeAccount } from "../__fixtures__";
-import { resolveAccountMovement } from "../simulation/postings";
+import { makeAccount, makePosting } from "../__fixtures__";
+import {
+	addOccurrences,
+	frequencyDivisor,
+	resolveAccountMovement,
+} from "../simulation/postings";
+
+describe("posting recurrence", () => {
+	it("adds a once posting exactly once and uses a divisor of one", () => {
+		const eventDates = new Map();
+		addOccurrences(
+			[
+				makePosting({
+					id: "one-time",
+					frequency: "once",
+					startDate: "2026-01-15",
+				}),
+			],
+			eventDates,
+			"2026-01-01",
+			"2030-01-01",
+			true,
+		);
+
+		expect([...eventDates.keys()]).toEqual(["2026-01-15"]);
+		expect(eventDates.get("2026-01-15")).toHaveLength(1);
+		expect(frequencyDivisor("once")).toBe(1);
+	});
+});
 
 describe("account movement resolution", () => {
 	it("returns raw unavailable-source movement facts", () => {

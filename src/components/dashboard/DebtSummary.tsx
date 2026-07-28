@@ -34,17 +34,16 @@ export const DebtSummary = memo(function DebtSummary({
 	document,
 	result,
 }: DebtSummaryProps) {
-	// Get latest checkpoint per account
-	const latestCheckpointByAccount = new Map<string, number>();
+	const openingBalanceByAccount = new Map<string, number>();
 	for (const summary of result.accountSummaries) {
-		latestCheckpointByAccount.set(summary.accountId, summary.startingBalance);
+		openingBalanceByAccount.set(summary.accountId, summary.startingBalance);
 	}
 
 	const debtAccounts = document.accounts
-		.filter((a) => a.enabled && (latestCheckpointByAccount.get(a.id) ?? 0) < 0)
+		.filter((a) => a.enabled && (openingBalanceByAccount.get(a.id) ?? 0) < 0)
 		.map((a) => ({
 			account: a,
-			balance: latestCheckpointByAccount.get(a.id) ?? 0,
+			balance: openingBalanceByAccount.get(a.id) ?? 0,
 			paymentPosting: findPaymentPosting(document, a.id),
 		}));
 
@@ -56,7 +55,7 @@ export const DebtSummary = memo(function DebtSummary({
 		)
 		.map((a) => ({
 			account: a,
-			balance: latestCheckpointByAccount.get(a.id) ?? 0,
+			balance: openingBalanceByAccount.get(a.id) ?? 0,
 			paymentPosting: findPaymentPosting(document, a.id),
 		}));
 

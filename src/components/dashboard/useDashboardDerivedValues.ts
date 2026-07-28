@@ -58,7 +58,7 @@ export function useDashboardDerivedValues(
 			fulfillment === null
 				? "Enable a healthy posting-fulfillment evaluation to inspect projected transactions."
 				: firstProjectedEvent === null
-					? "No projected transactions are scheduled after the historical balance history."
+					? "No projected transactions are scheduled after the projection start."
 					: `${currency.format(firstProjectedEvent.requestedAmount)} requested and ${currency.format(firstProjectedEvent.realizedAmount)} applied${firstProjectedEvent.unfulfilledAmount > 0 ? `, leaving ${currency.format(firstProjectedEvent.unfulfilledAmount)} underfulfilled.` : firstProjectedEvent.destinationLimitedAmount > 0 ? `; ${currency.format(firstProjectedEvent.destinationLimitedAmount)} was no longer applicable after the destination reached its limit.` : "."}`;
 
 		return {

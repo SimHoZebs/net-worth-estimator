@@ -3,7 +3,6 @@ export const CSV_MODEL_PUBLIC_PATH = "/configs";
 
 export const CSV_MODEL_FILE_NAMES = {
 	accounts: "accounts.csv",
-	checkpoints: "checkpoints.csv",
 	postings: "postings.csv",
 } as const;
 
@@ -167,17 +166,12 @@ export interface Account {
 }
 
 export type PostingFrequency =
+	| "once"
 	| "daily"
 	| "weekly"
 	| "monthly"
 	| "quarterly"
 	| "annual";
-
-export interface Checkpoint {
-	Date: IsoDate;
-	AccountId: string;
-	Balance: number;
-}
 
 export interface Posting {
 	id: string;
@@ -199,14 +193,12 @@ export interface Posting {
 export interface FinancialModelDocument {
 	sourcePath: string;
 	accounts: Account[];
-	checkpoints: Checkpoint[];
 	evaluations: EvaluationTables;
 	postings: Posting[];
 }
 
 export interface ModelFileContents {
 	accounts: string;
-	checkpoints: string;
 	behaviors: Record<BehaviorCollectionKey, string>;
 	postings: string;
 }
@@ -214,7 +206,6 @@ export interface ModelFileContents {
 export interface ModelOverrides {
 	addedAccounts: Account[];
 	addedPostings: Posting[];
-	addedCheckpoints: Checkpoint[];
 	disabledAccountIds: string[];
 	disabledPostingIds: string[];
 }
@@ -353,7 +344,6 @@ export interface ProjectionCoreResult {
 		internalTransferAmount: number;
 	};
 	milestones: {
-		latestCheckpointDate: IsoDate | null;
 		latestHistoricalDate: IsoDate | null;
 		projectionStartDate: IsoDate;
 	};

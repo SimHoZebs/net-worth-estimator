@@ -1,10 +1,16 @@
+import { canonicalSerialize } from "../../artifacts/canonical";
 import type { DataSource, FinancialModelParseResult } from "../../dataSource";
 import {
 	CSV_MODEL_PUBLIC_PATH,
 	type FinancialModelDocument,
+	type Posting,
 } from "../../types/model";
 import type { ModelValidationIssue } from "../../types/validation";
-import { loadCsvFinancialModel } from "./csvLoader";
+import {
+	loadCsvFinancialModel,
+	parseCsvFinancialModel,
+	serializeCsvFinancialModel,
+} from "./csvLoader";
 import { validateCsvFinancialModel } from "./csvValidation";
 
 export const FINANCIAL_MODEL_STORAGE_KEY =
@@ -52,9 +58,9 @@ function isFinancialModelDocument(
 
 	return (
 		!("version" in value) &&
+		!("checkpoints" in value) &&
 		typeof value.sourcePath === "string" &&
 		Array.isArray(value.accounts) &&
-		Array.isArray(value.checkpoints) &&
 		isRecord(evaluations) &&
 		Array.isArray(evaluations.financialIndependence) &&
 		Array.isArray(evaluations.netWorthThreshold) &&
@@ -63,11 +69,148 @@ function isFinancialModelDocument(
 	);
 }
 
+interface LegacyCheckpoint {
+	Date: string;
+	AccountId: string;
+	Balance: number;
+}
+
+interface LegacyFinancialModelDocument extends Record<string, unknown> {
+	accounts: FinancialModelDocument["accounts"];
+	checkpoints: LegacyCheckpoint[];
+	evaluations: FinancialModelDocument["evaluations"];
+	postings: FinancialModelDocument["postings"];
+	sourcePath: string;
+}
+
+function isLegacyCheckpoint(value: unknown): value is LegacyCheckpoint {
+	return (
+		isRecord(value) &&
+		typeof value.Date === "string" &&
+		/^\d{4}-\d{2}-\d{2}$/u.test(value.Date) &&
+		!Number.isNaN(Date.parse(value.Date)) &&
+		typeof value.AccountId === "string" &&
+		value.AccountId.length > 0 &&
+		typeof value.Balance === "number" &&
+		Number.isFinite(value.Balance)
+	);
+}
+
+function isLegacyFinancialModelDocument(
+	value: unknown,
+): value is LegacyFinancialModelDocument {
+	if (!isRecord(value) || "version" in value) return false;
+	const evaluations = value.evaluations;
+	return (
+		typeof value.sourcePath === "string" &&
+		Array.isArray(value.accounts) &&
+		Array.isArray(value.checkpoints) &&
+		value.checkpoints.every(isLegacyCheckpoint) &&
+		isRecord(evaluations) &&
+		Array.isArray(evaluations.financialIndependence) &&
+		Array.isArray(evaluations.netWorthThreshold) &&
+		Array.isArray(evaluations.postingFulfillment) &&
+		Array.isArray(value.postings)
+	);
+}
+
+function migrateLegacyDocument(
+	legacy: LegacyFinancialModelDocument,
+): FinancialModelDocument | null {
+	if (
+		legacy.postings.some(
+			(posting) => isRecord(posting) && posting.frequency === "once",
+		)
+	) {
+		return null;
+	}
+	const accountById = new Map(
+		legacy.accounts.map((account) => [account.id, account]),
+	);
+	const accountIds = new Set(accountById.keys());
+	const usedIds = new Set([
+		...accountIds,
+		...legacy.postings.map((posting) => posting.id),
+	]);
+	const balances = new Map<string, number>();
+	const migratedPostings: Posting[] = [];
+	const checkpoints = legacy.checkpoints
+		.map((checkpoint, index) => ({ checkpoint, index }))
+		.sort(
+			(left, right) =>
+				left.checkpoint.Date.localeCompare(right.checkpoint.Date) ||
+				left.index - right.index,
+		);
+
+	for (const { checkpoint, index } of checkpoints) {
+		const account = accountById.get(checkpoint.AccountId);
+		if (!account) return null;
+		const target = checkpoint.Balance;
+		if (target < account.minBalance || target > account.maxBalance) return null;
+		const delta = target - (balances.get(checkpoint.AccountId) ?? 0);
+		balances.set(checkpoint.AccountId, target);
+
+		const idBase = `legacy_checkpoint_${index + 1}`;
+		let id = idBase;
+		let suffix = 2;
+		while (usedIds.has(id)) id = `${idBase}_${suffix++}`;
+		usedIds.add(id);
+		migratedPostings.push({
+			id,
+			label: `Historical balance adjustment for ${checkpoint.AccountId}`,
+			sourceAccountId: delta < 0 ? checkpoint.AccountId : null,
+			destinations: delta < 0 ? null : [checkpoint.AccountId],
+			arithmetic: String(Math.abs(delta)),
+			frequency: "once",
+			annualRate: 0,
+			annualGrowthRate: 0,
+			volatility: 0,
+			startDate: checkpoint.Date,
+			endDate: null,
+			annualCap: null,
+			priority: index + 1,
+			enabled: true,
+		});
+	}
+
+	const migrated: FinancialModelDocument = {
+		sourcePath: BROWSER_STORAGE_SOURCE_PATH,
+		accounts: legacy.accounts,
+		evaluations: legacy.evaluations,
+		postings: [...legacy.postings, ...migratedPostings],
+	};
+	try {
+		const roundTrip = parseCsvFinancialModel(
+			serializeCsvFinancialModel(migrated),
+			{ basePath: BROWSER_STORAGE_SOURCE_PATH },
+		);
+		if (
+			roundTrip.data === null ||
+			roundTrip.issues.some((issue) => issue.severity === "error") ||
+			canonicalSerialize(roundTrip.data) !== canonicalSerialize(migrated)
+		) {
+			return null;
+		}
+		return roundTrip.data;
+	} catch {
+		return null;
+	}
+}
+
 function invalidStorageIssue(storageKey: string): ModelValidationIssue {
 	return {
 		severity: "error",
 		code: "browser.storage.invalid",
 		message: `Saved financial model at '${storageKey}' is corrupt or has an unsupported shape.`,
+		path: [],
+	};
+}
+
+function migrationStorageIssue(storageKey: string): ModelValidationIssue {
+	return {
+		severity: "error",
+		code: "browser.storage.migration.failed",
+		message: `Saved checkpoint-based financial model at '${storageKey}' could not be migrated and was left unchanged.`,
 		path: [],
 	};
 }
@@ -84,7 +227,7 @@ function validateStoredDocument(
 }
 
 function readStoredDocument(
-	storage: Pick<Storage, "getItem">,
+	storage: Pick<Storage, "getItem" | "setItem">,
 	storageKey: string,
 ): StoredDocumentRead {
 	let serialized: string | null;
@@ -99,6 +242,25 @@ function readStoredDocument(
 		const parsed = JSON.parse(serialized) as unknown;
 		if (isFinancialModelDocument(parsed)) {
 			return { status: "found", document: parsed };
+		}
+		if (isLegacyFinancialModelDocument(parsed)) {
+			const migrated = migrateLegacyDocument(parsed);
+			if (!migrated) {
+				return { status: "invalid", issue: migrationStorageIssue(storageKey) };
+			}
+			const result = validateStoredDocument(migrated, storageKey);
+			if (
+				result.document === null ||
+				result.issues.some((issue) => issue.severity === "error")
+			) {
+				return { status: "invalid", issue: migrationStorageIssue(storageKey) };
+			}
+			try {
+				storage.setItem(storageKey, JSON.stringify(migrated));
+			} catch {
+				return { status: "invalid", issue: migrationStorageIssue(storageKey) };
+			}
+			return { status: "found", document: migrated };
 		}
 	} catch {
 		// The issue below deliberately prevents fallback when the canonical key exists.
@@ -151,10 +313,14 @@ export function createBrowserCsvDataSource(
 					run: async (
 						document: FinancialModelDocument,
 					): Promise<FinancialModelParseResult> => {
+						if (
+							"checkpoints" in (document as unknown as Record<string, unknown>)
+						) {
+							throw new Error("Checkpoints are not supported.");
+						}
 						const savedDocument: FinancialModelDocument = {
 							sourcePath: BROWSER_STORAGE_SOURCE_PATH,
 							accounts: document.accounts,
-							checkpoints: document.checkpoints,
 							evaluations: document.evaluations,
 							postings: document.postings,
 						};

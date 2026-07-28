@@ -39,9 +39,6 @@ async function loadDocument(
 	const accounts = await readCsvFile(
 		path.join(csvPath, CSV_MODEL_FILE_NAMES.accounts),
 	);
-	const checkpoints = await readCsvFile(
-		path.join(csvPath, CSV_MODEL_FILE_NAMES.checkpoints),
-	);
 	const postings = await readCsvFile(
 		path.join(csvPath, CSV_MODEL_FILE_NAMES.postings),
 	);
@@ -59,7 +56,7 @@ async function loadDocument(
 	) as Record<BehaviorCollectionKey, string>;
 
 	const result = parseCsvFinancialModel(
-		{ accounts, behaviors, checkpoints, postings },
+		{ accounts, behaviors, postings },
 		{ basePath: csvPath },
 	);
 

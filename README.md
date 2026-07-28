@@ -4,9 +4,9 @@ React app for inspecting a CSV-backed financial model and projecting net worth w
 
 The product model is intentionally generic:
 
-- Historical net worth comes from account balance checkpoints.
-- Future net worth comes from tracked signed balances, scheduled postings, and daily-compounded growth between event dates.
+- Projection-start balances are derived by replaying enabled one-time postings dated before the projection start; net worth then evolves through scheduled postings and daily-compounded growth between event dates.
 - A posting can be an external inflow, an external outflow, or an account-to-account transfer.
+- Posting frequencies include explicit one-time (`once`) transactions.
 - `amountMode` is `fixed` or `percent_of_base`; percentage rows use the latest realized amount of another posting.
 - Annual caps are generic, and source-funded rows clamp to the source account's available positive balance.
 - Financial independence is derived from annual expense coverage and a full principal-preservation cycle. Explicit continuing postings and shared account constraints drive reactive withdrawals.
@@ -19,7 +19,6 @@ The product model is intentionally generic:
 The app reads these CSV files under `public/configs/`:
 
 - `accounts.csv`
-- `checkpoints.csv`
 - `postings.csv`
 - `behavior/financial-independence.csv`
 - `behavior/net-worth-threshold.csv`
@@ -34,6 +33,7 @@ Each behavior file is a typed table. All tables start with `instanceId`, `label`
 - Local development (`npm run dev`) uses `GET/PUT /api/financial-model`; saves write to `public/configs/` in the checkout.
 - Static/serverless production loads bundled `/configs/` files and saves the canonical `FinancialModelDocument` under `net-worth-estimator:financial-model:v1` in browser storage.
 - Malformed persisted data is not silently replaced; parsing and validation diagnostics are returned to the UI.
+- Browser models saved by the former checkpoint-based release are rewritten once into canonical one-time postings when every checkpoint is representable. Failed migrations leave the stored value unchanged and surface a diagnostic.
 - Browser reset removes `net-worth-estimator:financial-model:v1` and reloads the bundled `/configs/` files.
 - Serverless deployments should use a real backend `DataSource` for shared or cross-device persistence.
 - Do not deploy private financial CSV files in `public/configs/`; those files are public static assets.

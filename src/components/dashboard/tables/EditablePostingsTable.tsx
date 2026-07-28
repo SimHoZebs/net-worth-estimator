@@ -136,12 +136,13 @@ export function EditablePostingsTable({
 										<select
 											className={inputStyle(!!changed)}
 											value={p.frequency}
-											onChange={(e) =>
-												updatePosting(p.id, {
-													frequency: e.target.value as Posting["frequency"],
-												})
-											}
+											onChange={(e) => {
+												const frequency = e.target
+													.value as Posting["frequency"];
+												updatePosting(p.id, { frequency });
+											}}
 										>
+											<option value="once">once</option>
 											<option value="daily">daily</option>
 											<option value="weekly">weekly</option>
 											<option value="monthly">monthly</option>
@@ -202,6 +203,7 @@ export function EditablePostingsTable({
 										<input
 											className={inputStyle(!!changed)}
 											value={p.endDate ?? ""}
+											disabled={p.frequency === "once"}
 											onChange={(e) =>
 												updatePosting(p.id, { endDate: e.target.value || null })
 											}

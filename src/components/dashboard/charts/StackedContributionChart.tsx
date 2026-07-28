@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import type uPlot from "uplot";
 import { parseChartDate } from "@/chart/chartData";
 import {
@@ -17,6 +17,11 @@ interface AccountMeta {
 	id: string;
 	label: string;
 	color: string | null;
+}
+
+interface AccountGroups {
+	assets: AccountMeta[];
+	liabilities: AccountMeta[];
 }
 
 const NET_WORTH_CHART_MAX_Y = 2_000_000;
@@ -45,7 +50,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 		() => document.accounts.filter((account) => account.enabled),
 		[document.accounts],
 	);
-	const { assets, liabilities } = useMemo(() => {
+	const nextAccountGroups = useMemo(() => {
 		const averageBalances = Object.fromEntries(
 			enabledAccounts.map((account) => [account.id, 0]),
 		);
@@ -66,7 +71,21 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 				.sort(byAscendingMagnitude),
 		};
 	}, [chartData, enabledAccounts]);
+	const { assets, liabilities } = useStableAccountGroups(nextAccountGroups);
 	const accountCount = assets.length + liabilities.length;
+	const dataTransition = useMemo(() => {
+		const medianIndex = 1 + accountCount;
+		return {
+			seriesIndexes: [
+				medianIndex,
+				medianIndex + 2,
+				medianIndex + 3,
+				medianIndex + 4,
+				medianIndex + 5,
+			],
+			durationMs: 200,
+		};
+	}, [accountCount]);
 
 	const data = useMemo((): uPlot.AlignedData => {
 		const columnCount = 1 + accountCount + 2 + 4;
@@ -210,6 +229,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 			<UPlotChart
 				options={options}
 				data={data}
+				dataTransition={hasStochasticData ? dataTransition : undefined}
 				tooltip={
 					selectedDetails ? (
 						<PointDetailsPanel details={selectedDetails} compact />
@@ -237,6 +257,39 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 		</div>
 	);
 });
+
+function useStableAccountGroups(nextGroups: AccountGroups): AccountGroups {
+	const groupsRef = useRef(nextGroups);
+	if (!accountGroupsMatch(groupsRef.current, nextGroups)) {
+		groupsRef.current = nextGroups;
+	}
+	return groupsRef.current;
+}
+
+function accountGroupsMatch(
+	left: AccountGroups,
+	right: AccountGroups,
+): boolean {
+	return (
+		accountListsMatch(left.assets, right.assets) &&
+		accountListsMatch(left.liabilities, right.liabilities)
+	);
+}
+
+function accountListsMatch(
+	left: readonly AccountMeta[],
+	right: readonly AccountMeta[],
+): boolean {
+	return (
+		left.length === right.length &&
+		left.every(
+			(account, index) =>
+				account.id === right[index].id &&
+				account.label === right[index].label &&
+				account.color === right[index].color,
+		)
+	);
+}
 
 function ChartEncodingLegend({
 	hasStochasticData,

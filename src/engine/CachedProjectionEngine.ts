@@ -32,9 +32,9 @@ import {
 import { normalizeStochasticConfig } from "@/lib/projection/utils/stochastic";
 
 const ARTIFACT_SCHEMA_VERSION = 1;
-const DETERMINISTIC_BASE_VERSION = "deterministic-base-v2";
-const DETERMINISTIC_EVALUATION_VERSION = "deterministic-evaluation-v2";
-const STOCHASTIC_VERSION = "stochastic-v2";
+const DETERMINISTIC_BASE_VERSION = "deterministic-base-v3";
+const DETERMINISTIC_EVALUATION_VERSION = "deterministic-evaluation-v3";
+const STOCHASTIC_VERSION = "stochastic-v3";
 
 type ArtifactPayload =
 	| RawProjectionOutput
@@ -89,7 +89,6 @@ function isFinancialModelDocument(value: unknown): boolean {
 		isRecord(value) &&
 		typeof value.sourcePath === "string" &&
 		Array.isArray(value.accounts) &&
-		Array.isArray(value.checkpoints) &&
 		Array.isArray(value.postings) &&
 		isRecord(value.evaluations)
 	);

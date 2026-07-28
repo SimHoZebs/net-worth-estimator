@@ -33,7 +33,7 @@ export function ModelAssumptionsCard() {
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
-				<div className="grid grid-cols-3 gap-2 text-center">
+				<div className="grid grid-cols-2 gap-2 text-center">
 					<div className="rounded-xl border border-border/70 bg-surface/70 px-2 py-3 dark:border-white/10 dark:bg-surface/50">
 						<div className="type-title">{enabledAccounts}</div>
 						<div className="text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground/70">
@@ -44,12 +44,6 @@ export function ModelAssumptionsCard() {
 						<div className="type-title">{enabledPostings}</div>
 						<div className="text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground/70">
 							Flows
-						</div>
-					</div>
-					<div className="rounded-xl border border-border/70 bg-surface/70 px-2 py-3 dark:border-white/10 dark:bg-surface/50">
-						<div className="type-title">{document.checkpoints.length}</div>
-						<div className="text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground/70">
-							History
 						</div>
 					</div>
 				</div>

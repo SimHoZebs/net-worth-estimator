@@ -22,7 +22,6 @@ import type {
 
 const document = {
 	accounts: [],
-	checkpoints: [],
 	postings: [],
 } as unknown as FinancialModelDocument;
 const path = {
@@ -410,7 +409,6 @@ describe("configured evaluation integration", () => {
 		const result = projectFinancialModelDocument(loadedDocument, settings, {
 			addedAccounts: [],
 			addedPostings: [],
-			addedCheckpoints: [],
 			disabledAccountIds: [],
 			disabledPostingIds: ["salary"],
 		});

@@ -2,10 +2,8 @@ import { useState } from "react";
 import { useShallow } from "zustand/shallow";
 import { CurrentChangesControls } from "@/components/CurrentChangesControls";
 import { EditableAccountsTable } from "@/components/dashboard/tables/EditableAccountsTable";
-import { EditableCheckpointsTable } from "@/components/dashboard/tables/EditableCheckpointsTable";
 import { EditablePostingsTable } from "@/components/dashboard/tables/EditablePostingsTable";
 import { ReadOnlyAccountsTable } from "@/components/dashboard/tables/ReadOnlyAccountsTable";
-import { ReadOnlyCheckpointsTable } from "@/components/dashboard/tables/ReadOnlyCheckpointsTable";
 import { ReadOnlyPostingsTable } from "@/components/dashboard/tables/ReadOnlyPostingsTable";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -22,7 +20,7 @@ import { useModelRuntime } from "@/runtime/modelRuntime";
 import { selectEditorActions, selectEditorState, useStore } from "@/store";
 import { ModelValidationPanel } from "./ModelValidationPanel";
 
-type InputTab = "postings" | "accounts" | "history";
+type InputTab = "postings" | "accounts";
 
 function tabClassName(isActive: boolean) {
 	return `rounded-full px-3 py-1.5 type-caption font-medium transition ${
@@ -61,9 +59,6 @@ export function ModelInputsInspector() {
 		updatePosting,
 		deletePosting,
 		addPosting,
-		addCheckpoint,
-		deleteCheckpoint,
-		updateCheckpoint,
 	} = useStore(useShallow(selectEditorActions));
 
 	const [showAdvanced, setShowAdvanced] = useState(false);
@@ -73,11 +68,6 @@ export function ModelInputsInspector() {
 	const disabledPostingSet = new Set(disabledPostingIds);
 	const displayDocument =
 		isEditing && workingDocument ? workingDocument : document;
-	const accountLabelById = new Map(
-		displayDocument?.accounts.map((account) => [account.id, account.label]) ??
-			[],
-	);
-
 	const errorCount = issues.filter(
 		(issue) => issue.severity === "error",
 	).length;
@@ -104,11 +94,6 @@ export function ModelInputsInspector() {
 			label: "Accounts",
 			count: displayDocument?.accounts.length ?? 0,
 		},
-		{
-			id: "history",
-			label: "Balance history",
-			count: displayDocument?.checkpoints.length ?? 0,
-		},
 	];
 
 	return (
@@ -116,8 +101,8 @@ export function ModelInputsInspector() {
 			<CardHeader>
 				<CardTitle>Model inputs</CardTitle>
 				<CardDescription>
-					Transactions, accounts, and balance history that drive the projection.
-					Validation: {validationSummary}.
+					Transactions and accounts that drive the projection. Validation:{" "}
+					{validationSummary}.
 				</CardDescription>
 				<CardAction className="flex flex-wrap justify-end gap-2">
 					{isEditing ? (
@@ -252,25 +237,6 @@ export function ModelInputsInspector() {
 									showAdvanced={showAdvanced}
 									disabledAccountSet={disabledAccountSet}
 									onToggle={toggleAccountDisabled}
-								/>
-							)
-						) : null}
-
-						{activeTab === "history" ? (
-							isEditing ? (
-								<EditableCheckpointsTable
-									displayDocument={displayDocument}
-									isDirty={isDirty}
-									projectionStartDate={projectionStartDate}
-									updateCheckpoint={updateCheckpoint}
-									deleteCheckpoint={deleteCheckpoint}
-									addCheckpoint={addCheckpoint}
-								/>
-							) : (
-								<ReadOnlyCheckpointsTable
-									checkpoints={displayDocument.checkpoints}
-									showAdvanced={showAdvanced}
-									accountLabelById={accountLabelById}
 								/>
 							)
 						) : null}

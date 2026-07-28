@@ -19,7 +19,6 @@ const PROJECTION_SETTINGS = makeSettings({
 const EMPTY_MODEL_OVERRIDES: ModelOverrides = {
 	addedAccounts: [],
 	addedPostings: [],
-	addedCheckpoints: [],
 	disabledAccountIds: [],
 	disabledPostingIds: [],
 };

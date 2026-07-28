@@ -18,8 +18,10 @@ describe("CSV financial model", () => {
 
 		expect(result.issues).toEqual([]);
 		expect(result.data?.sourcePath).toBe(CSV_MODEL_PUBLIC_PATH);
-		expect(result.data?.postings[1]?.arithmetic).toBe("salary * 0.22");
-		expect(result.data?.postings[3]?.annualCap).toBe(23000);
+		expect(result.data?.postings[0]?.frequency).toBe("once");
+		expect(result.data?.postings[5]?.arithmetic).toBe("salary * 0.22");
+		expect(result.data?.postings[7]?.annualCap).toBe(23000);
+		expect(result.data).not.toHaveProperty("checkpoints");
 		expect(result.data?.accounts[3]?.label).toBe("Student Loan");
 		expect(result.data?.evaluations.netWorthThreshold[0]?.config).toEqual({
 			target: 1_000_000,
@@ -176,6 +178,28 @@ describe("CSV financial model", () => {
 			netWorthThreshold: [],
 			postingFulfillment: [],
 		});
+		expect(reparsed.issues).toEqual([]);
+	});
+
+	it("escapes account and posting text when serializing", () => {
+		const parsed = parseCsvFinancialModel(validCsvFiles);
+		expect(parsed.data).not.toBeNull();
+		const document = {
+			...parsed.data!,
+			accounts: parsed.data!.accounts.map((account, index) =>
+				index === 0 ? { ...account, label: 'Checking, "Primary"' } : account,
+			),
+			postings: parsed.data!.postings.map((posting, index) =>
+				index === 0 ? { ...posting, label: 'Salary, "Gross"' } : posting,
+			),
+		};
+
+		const reparsed = parseCsvFinancialModel(
+			serializeCsvFinancialModel(document),
+		);
+
+		expect(reparsed.data?.accounts[0]?.label).toBe('Checking, "Primary"');
+		expect(reparsed.data?.postings[0]?.label).toBe('Salary, "Gross"');
 		expect(reparsed.issues).toEqual([]);
 	});
 

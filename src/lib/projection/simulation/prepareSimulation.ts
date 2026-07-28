@@ -11,39 +11,50 @@ import type {
 import type { MonteCarloSample, PreparedProjection } from "../types/simulation";
 import { addYearsClamped, compareIsoDates } from "../utils/date";
 import { initAccountBalances, snapshotBalances } from "./accounts";
+import type { DatedPostingOccurrence } from "./postings";
+import { createTransitionRuntime } from "./transitions";
 
-function prepareCheckpointHistory(document: FinancialModelDocument) {
-	const checkpoints = document.checkpoints
-		.map((checkpoint, index) => ({ checkpoint, index }))
+function replayHistoricalPostings(
+	document: FinancialModelDocument,
+	projectionStartDate: IsoDate,
+) {
+	const occurrences = document.postings
+		.map((posting, index): DatedPostingOccurrence => ({ posting, index }))
+		.filter(
+			({ posting }) =>
+				posting.enabled &&
+				posting.frequency === "once" &&
+				compareIsoDates(posting.startDate, projectionStartDate) < 0,
+		)
 		.sort(
 			(left, right) =>
-				compareIsoDates(left.checkpoint.Date, right.checkpoint.Date) ||
+				compareIsoDates(left.posting.startDate, right.posting.startDate) ||
+				left.posting.priority - right.posting.priority ||
 				left.index - right.index,
 		);
-	const groupedByDate = new Map<IsoDate, typeof document.checkpoints>();
+	const transitions = createTransitionRuntime({
+		model: { accounts: document.accounts, postings: document.postings },
+		initialState: {
+			balances: initAccountBalances(document.accounts),
+			latestRealizedPostingAmounts: new Map(),
+			realizedPostingAmountsByYear: new Map(),
+		},
+		projectionStartDate,
+	});
+	const historicalSnapshots: PreparedProjection["historicalSnapshots"] = [];
 
-	for (const { checkpoint } of checkpoints) {
-		const existing = groupedByDate.get(checkpoint.Date);
-		if (existing) existing.push(checkpoint);
-		else groupedByDate.set(checkpoint.Date, [checkpoint]);
+	for (const [index, occurrence] of occurrences.entries()) {
+		const date = occurrence.posting.startDate;
+		transitions.executePosting(occurrence, date);
+		if (occurrences[index + 1]?.posting.startDate !== date) {
+			historicalSnapshots.push({
+				date,
+				balances: snapshotBalances(transitions.state.balances),
+			});
+		}
 	}
 
-	const balances = initAccountBalances(document.accounts);
-	const historicalSnapshots = Array.from(groupedByDate.entries()).map(
-		([date, dateCheckpoints]) => {
-			for (const checkpoint of dateCheckpoints) {
-				balances[checkpoint.AccountId] = checkpoint.Balance;
-			}
-			return { date, balances: snapshotBalances(balances) };
-		},
-	);
-
-	return {
-		balances,
-		historicalSnapshots,
-		latestCheckpointDate:
-			historicalSnapshots[historicalSnapshots.length - 1]?.date ?? null,
-	};
+	return { state: transitions.state, historicalSnapshots };
 }
 
 export function prepareSimulationRequest(
@@ -53,27 +64,20 @@ export function prepareSimulationRequest(
 	monteCarloSample?: MonteCarloSample,
 ): PreparedProjection {
 	const effectiveDocument = applyModelOverrides(document, overrides);
-	const checkpointHistory = prepareCheckpointHistory(effectiveDocument);
-	const startDate =
-		checkpointHistory.latestCheckpointDate ??
-		projectionSettings.fallbackProjectionStartDate;
+	const startDate = projectionSettings.fallbackProjectionStartDate;
+	const history = replayHistoricalPostings(effectiveDocument, startDate);
 	return {
 		effectiveDocument,
-		historicalSnapshots: checkpointHistory.historicalSnapshots,
-		latestCheckpointDate: checkpointHistory.latestCheckpointDate,
+		historicalSnapshots: history.historicalSnapshots,
 		request: {
 			model: {
 				accounts: effectiveDocument.accounts,
 				postings: effectiveDocument.postings,
 			},
-			initialState: {
-				balances: snapshotBalances(checkpointHistory.balances),
-				latestRealizedPostingAmounts: new Map(),
-				realizedPostingAmountsByYear: new Map(),
-			},
+			initialState: history.state,
 			startDate,
 			endDate: addYearsClamped(startDate, projectionSettings.horizonYears),
-			includeStartDateEvents: checkpointHistory.latestCheckpointDate === null,
+			includeStartDateEvents: true,
 			monteCarloSample,
 		},
 	};

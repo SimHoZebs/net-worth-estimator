@@ -49,7 +49,8 @@ export function ReadOnlyPostingsTable({
 					{
 						key: "frequency" as never,
 						label: "Freq",
-						format: (v: unknown) => formatFrequency(String(v)),
+						format: (v: unknown) =>
+							v === "once" ? "Once" : formatFrequency(String(v)),
 					},
 					...(showAdvanced
 						? [

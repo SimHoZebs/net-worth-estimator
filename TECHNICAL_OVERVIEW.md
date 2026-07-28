@@ -17,13 +17,13 @@ The Net Worth Estimator is a React application that loads a CSV-backed `Financia
 3. CSV parsing and cross-reference validation produce a `FinancialModelDocument` plus diagnostics. Invalid or malformed persisted data surfaces diagnostics instead of being silently discarded.
 4. Zustand stores session-only `ModelOverrides`, displayed as current changes. `applyModelOverrides` creates the effective document without mutating canonical data.
 5. `useProjection` and `useStochastic` pass the document, runtime settings, and overrides through a content-addressed `CachedProjectionEngine`. Cache misses delegate to `WorkerProjectionEngine` and dedicated workers.
-6. `prepareSimulationRequest` resolves overrides, checkpoint history, initial state, dates, event policy, and optional `MonteCarloSample` into a prepared projection containing a `SimulationRequest`.
+6. `prepareSimulationRequest` resolves overrides, opening balances, dates, event policy, and optional `MonteCarloSample` into a prepared projection containing a `SimulationRequest`.
 7. The pure `simulate` kernel returns an exact `SimulationRun`. `projectRawFinancialModelDocument` adapts it into a `ProjectionPath` and public result; `projectFinancialModelDocument` adds configured evaluations.
 8. The persistent routed workspace exposes the loaded document and projection state to separate Results, Settings, and Model Inputs pages without restarting worker hooks during navigation.
 
 ## 3. Persistence
 
-The persistence boundary is the validated `FinancialModelDocument` represented by `accounts.csv`, `checkpoints.csv`, `postings.csv`, and one typed CSV table per evaluation type under `configs/behavior/`.
+The persistence boundary is the validated `FinancialModelDocument` represented by `accounts.csv`, `postings.csv`, and one typed CSV table per evaluation type under `configs/behavior/`.
 
 ### Development
 
@@ -48,7 +48,7 @@ The persistence boundary is the validated `FinancialModelDocument` represented b
 
 ## 4. Core Types
 
-- `FinancialModelDocument`: canonical persisted accounts, postings, checkpoints, typed evaluation tables, and source metadata.
+- `FinancialModelDocument`: canonical persisted accounts, postings, typed evaluation tables, and source metadata.
 - `ModelOverrides`: session-only additions and disabled account/posting selections applied before preparation.
 - `SimulationRequest`: resolved model, initial state, date range, start-date event policy, and optional `MonteCarloSample`.
 - `SimulationRun`: exact initial/final states, dated balance snapshots, and ordered movement attempts from one kernel execution.
@@ -66,6 +66,7 @@ There is no named alternative-model domain or persistence API. Comparisons are m
 
 - Accounts hold signed balances with generic minimum and maximum constraints.
 - Postings carry annual rates and growth assumptions used by scheduled and Monte Carlo execution.
+- Posting frequency may be recurring or explicitly `once`; one-time rows execute exactly on their start date regardless of whether the end date is blank or equal to it.
 - Blank `sourceAccountId` plus destinations is an external inflow.
 - A source plus no destinations is an external outflow.
 - A source plus destinations is an account-to-account transfer.
@@ -73,17 +74,16 @@ There is no named alternative-model domain or persistence API. Comparisons are m
 - `amountMode: percent_of_base` uses a percentage of the latest realized amount from `basePostingId`.
 - Source-funded rows clamp to available positive balance; `annualCap` is enforced per calendar year.
 - Same-date rows execute by ascending priority, then file order.
+- During request preparation, enabled `once` postings dated strictly before the projection start are replayed through shared transitions in date, priority, then file order. Their balance snapshots form historical rows, while their dependency and annual-cap state carries into projection execution.
+- A `once` posting on the projection start remains a normal projected event. Historical replay does not emit projected movement, cash-flow, or fulfillment events, and Monte Carlo samples do not resample already-realized history.
 
-### Checkpoints
+### Browser Checkpoint Migration
 
-- A checkpoint is an absolute account balance observation, not an adjustment.
-- Checkpoints for different accounts on the same date form one historical row.
-- Historical values exist only on checkpoint dates; no interpolation occurs.
-- Projection starts from the latest checkpoint or the runtime fallback date when no checkpoint exists.
+The canonical model has no checkpoint type or alternate checkpoint reader. The browser data source recognizes only the previously shipped checkpoint document shape under the existing canonical storage key and rewrites representable observations once into structural `once` postings. The rewrite preserves ordered observation dates, including unchanged balances. Invalid, constrained, mixed-schema, or otherwise unrepresentable documents are left untouched and return a migration diagnostic.
 
 ## 6. Engine Design
 
-The deterministic kernel in `simulation/simulate.ts` receives only a prepared `SimulationRequest`. It does not receive checkpoints, overrides, evaluation configuration, or horizon settings.
+The deterministic kernel in `simulation/simulate.ts` receives only a prepared `SimulationRequest`. It does not receive overrides, evaluation configuration, or horizon settings.
 
 - No name-based branching: IDs, labels, and categories do not select behavior.
 - Classification is structural: source and destination presence determines inflow, outflow, or transfer behavior.
@@ -155,7 +155,7 @@ React Router uses browser paths. Production hosting must serve `index.html` for 
 | File | Role |
 | --- | --- |
 | `src/lib/projection/model/applyModelOverrides.ts` | effective-document construction |
-| `src/lib/projection/simulation/prepareSimulation.ts` | checkpoint and request preparation |
+| `src/lib/projection/simulation/prepareSimulation.ts` | initial state and request preparation |
 | `src/lib/projection/simulation/transitions.ts` | shared state transitions |
 | `src/lib/projection/simulation/simulate.ts` | pure deterministic kernel |
 | `src/lib/projection/simulation/projectPath.ts` | run-to-path and public-result adaptation |

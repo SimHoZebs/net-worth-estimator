@@ -14,7 +14,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { currency, formatDate } from "@/lib/format";
+import { currency } from "@/lib/format";
 import type {
 	FinancialModelDocument,
 	ProjectionResult,
@@ -29,35 +29,39 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 	document,
 	result,
 }: NetWorthReconciliationProps) {
-	const latestDate =
-		result.milestones.latestHistoricalDate ??
-		result.milestones.projectionStartDate;
-
-	// Group checkpoints by account, take the latest one per account
-	const accountMap = new Map<
-		string,
-		{ label: string; balance: number; checkpointDate: string }
-	>();
-	for (const cp of document.checkpoints) {
-		const account = document.accounts.find((a) => a.id === cp.AccountId);
-		const existing = accountMap.get(cp.AccountId);
-		if (!existing || cp.Date > existing.checkpointDate) {
-			accountMap.set(cp.AccountId, {
-				label: account?.label ?? cp.AccountId,
-				balance: cp.Balance,
-				checkpointDate: cp.Date,
-			});
-		}
-	}
-
-	const rows = Array.from(accountMap.entries()).map(([accountId, data]) => ({
-		accountId,
-		...data,
-		isLatest: data.checkpointDate === latestDate,
+	const accountLabels = new Map(
+		document.accounts.map((account) => [account.id, account.label]),
+	);
+	const rows = result.accountSummaries.map((summary) => ({
+		accountId: summary.accountId,
+		label: accountLabels.get(summary.accountId) ?? summary.accountId,
+		balance: summary.startingBalance,
 	}));
+	const assets = rows.filter((row) => row.balance >= 0);
+	const liabilities = rows.filter((row) => row.balance < 0);
 
-	const assets = rows.filter((r) => r.balance >= 0);
-	const liabilities = rows.filter((r) => r.balance < 0);
+	const renderRows = (balances: typeof rows, emptyMessage: string) =>
+		balances.length > 0 ? (
+			balances.map((row) => (
+				<TableRow key={row.accountId}>
+					<TableCell className="type-body text-foreground/80">
+						{row.label}
+					</TableCell>
+					<TableCell className="text-right type-value text-sm">
+						{currency.format(row.balance)}
+					</TableCell>
+				</TableRow>
+			))
+		) : (
+			<TableRow>
+				<TableCell
+					colSpan={2}
+					className="py-4 text-center type-muted text-muted-foreground/70"
+				>
+					{emptyMessage}
+				</TableCell>
+			</TableRow>
+		);
 
 	return (
 		<Card className="rounded-[1.6rem] border-border shadow-sm ">
@@ -65,8 +69,8 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 				<div>
 					<CardTitle>Current net worth reconciliation</CardTitle>
 					<CardDescription>
-						Which balances were used to compute the current net worth of{" "}
-						{currency.format(result.summary.currentNetWorth)}.
+						Projection-start opening balances used to compute the current net
+						worth of {currency.format(result.summary.currentNetWorth)}.
 					</CardDescription>
 				</div>
 			</CardHeader>
@@ -78,36 +82,11 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 							<TableHeader>
 								<TableRow>
 									<TableHead>Account</TableHead>
-									<TableHead className="text-right">Balance</TableHead>
-									<TableHead>As of</TableHead>
+									<TableHead className="text-right">Opening balance</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{assets.length > 0 ? (
-									assets.map((r) => (
-										<TableRow key={r.accountId}>
-											<TableCell className="type-body text-foreground/80">
-												{r.label}
-											</TableCell>
-											<TableCell className="text-right type-value text-sm">
-												{currency.format(r.balance)}
-											</TableCell>
-											<TableCell className="type-muted">
-												{formatDate(r.checkpointDate)}
-												{r.isLatest ? " · latest" : ""}
-											</TableCell>
-										</TableRow>
-									))
-								) : (
-									<TableRow>
-										<TableCell
-											colSpan={3}
-											className="py-4 text-center type-muted text-muted-foreground/70"
-										>
-											No asset checkpoints.
-										</TableCell>
-									</TableRow>
-								)}
+								{renderRows(assets, "No asset opening balances.")}
 							</TableBody>
 						</Table>
 					</div>
@@ -118,36 +97,11 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 							<TableHeader>
 								<TableRow>
 									<TableHead>Account</TableHead>
-									<TableHead className="text-right">Balance</TableHead>
-									<TableHead>As of</TableHead>
+									<TableHead className="text-right">Opening balance</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{liabilities.length > 0 ? (
-									liabilities.map((r) => (
-										<TableRow key={r.accountId}>
-											<TableCell className="type-body text-foreground/80">
-												{r.label}
-											</TableCell>
-											<TableCell className="text-right type-value text-sm">
-												{currency.format(r.balance)}
-											</TableCell>
-											<TableCell className="type-muted">
-												{formatDate(r.checkpointDate)}
-												{r.isLatest ? " · latest" : ""}
-											</TableCell>
-										</TableRow>
-									))
-								) : (
-									<TableRow>
-										<TableCell
-											colSpan={3}
-											className="py-4 text-center type-muted text-muted-foreground/70"
-										>
-											No liability checkpoints.
-										</TableCell>
-									</TableRow>
-								)}
+								{renderRows(liabilities, "No liability opening balances.")}
 							</TableBody>
 						</Table>
 					</div>
@@ -161,7 +115,7 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 						</span>
 					</div>
 					<div className="type-caption text-muted-foreground/70">
-						Computed from the latest checkpoint per account.
+						Computed from projection-start opening balances.
 					</div>
 				</div>
 			</CardContent>

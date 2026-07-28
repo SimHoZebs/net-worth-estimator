@@ -17,17 +17,27 @@ import {
 } from "../evaluation/postingFulfillment";
 import { projectRawFinancialModelDocument } from "../simulation/projectPath";
 
+function historicalBalance(accountId: string, balance: number, priority = 1) {
+	return makePosting({
+		id: `historical_${accountId}`,
+		sourceAccountId: balance < 0 ? accountId : null,
+		destinations: balance > 0 ? [accountId] : null,
+		arithmetic: String(Math.abs(balance)),
+		frequency: "once",
+		startDate: "2025-12-31",
+		priority,
+	});
+}
+
 function constrainedPath() {
 	const document = createBaseDocument({
 		accounts: [
 			makeAccount({ id: "checking", minBalance: 0 }),
 			makeAccount({ id: "loan", maxBalance: 0 }),
 		],
-		checkpoints: [
-			{ Date: "2026-01-01", AccountId: "checking", Balance: 250 },
-			{ Date: "2026-01-01", AccountId: "loan", Balance: -300 },
-		],
 		postings: [
+			historicalBalance("checking", 250),
+			historicalBalance("loan", -300, 2),
 			makePosting({
 				id: "payment",
 				label: "Payment",
@@ -39,7 +49,10 @@ function constrainedPath() {
 			}),
 		],
 	});
-	return projectRawFinancialModelDocument(document, makeSettings()).path;
+	return projectRawFinancialModelDocument(
+		document,
+		makeSettings({ fallbackProjectionStartDate: "2026-01-01" }),
+	).path;
 }
 
 describe("posting fulfillment evaluation", () => {
@@ -62,16 +75,19 @@ describe("posting fulfillment evaluation", () => {
 					unfulfilledAmount: 150,
 				},
 			],
-			postings: [
-				{
-					postingId: "payment",
-					requestedAmount: 400,
-					realizedAmount: 250,
-					firstUnderfulfilledDate: "2026-01-10",
-					unfulfilledAmount: 150,
-				},
-			],
 		});
+		expect(result.postings).toContainEqual(
+			expect.objectContaining({
+				postingId: "payment",
+				requestedAmount: 400,
+				realizedAmount: 250,
+				firstUnderfulfilledDate: "2026-01-10",
+				unfulfilledAmount: 150,
+			}),
+		);
+		expect(result.events.map(({ postingId }) => postingId)).not.toContain(
+			"historical_checking",
+		);
 		expect(result.events[0]).toMatchObject({
 			postingId: "payment",
 			bindingConstraints: [{ type: "source-floor", accountId: "checking" }],
@@ -99,11 +115,9 @@ describe("posting fulfillment evaluation", () => {
 				makeAccount({ id: "checking", minBalance: 0 }),
 				makeAccount({ id: "loan", maxBalance: 0 }),
 			],
-			checkpoints: [
-				{ Date: "2026-01-01", AccountId: "checking", Balance: 400 },
-				{ Date: "2026-01-01", AccountId: "loan", Balance: -300 },
-			],
 			postings: [
+				historicalBalance("checking", 400),
+				historicalBalance("loan", -300, 2),
 				makePosting({
 					id: "payoff",
 					sourceAccountId: "checking",
@@ -116,7 +130,7 @@ describe("posting fulfillment evaluation", () => {
 		});
 		const path = projectRawFinancialModelDocument(
 			document,
-			makeSettings(),
+			makeSettings({ fallbackProjectionStartDate: "2026-01-01" }),
 		).path;
 		const result = evaluatePostingFulfillment(path, { postingIds: null });
 
@@ -140,11 +154,9 @@ describe("posting fulfillment evaluation", () => {
 				makeAccount({ id: "checking", minBalance: 0 }),
 				makeAccount({ id: "loan", maxBalance: 0 }),
 			],
-			checkpoints: [
-				{ Date: "2026-01-01", AccountId: "checking", Balance: 300 },
-				{ Date: "2026-01-01", AccountId: "loan", Balance: -300 },
-			],
 			postings: [
+				historicalBalance("checking", 300),
+				historicalBalance("loan", -300, 2),
 				makePosting({
 					id: "payoff",
 					sourceAccountId: "checking",
@@ -156,7 +168,10 @@ describe("posting fulfillment evaluation", () => {
 			],
 		});
 		const result = evaluatePostingFulfillment(
-			projectRawFinancialModelDocument(document, makeSettings()).path,
+			projectRawFinancialModelDocument(
+				document,
+				makeSettings({ fallbackProjectionStartDate: "2026-01-01" }),
+			).path,
 			{ postingIds: null },
 		);
 
@@ -175,11 +190,9 @@ describe("posting fulfillment evaluation", () => {
 				makeAccount({ id: "loan", maxBalance: 0 }),
 				makeAccount({ id: "brokerage" }),
 			],
-			checkpoints: [
-				{ Date: "2026-01-01", AccountId: "checking", Balance: 1_000 },
-				{ Date: "2026-01-01", AccountId: "loan", Balance: -150 },
-			],
 			postings: [
+				historicalBalance("checking", 1_000),
+				historicalBalance("loan", -150, 2),
 				makePosting({
 					id: "loan-payment-1",
 					sourceAccountId: "checking",
@@ -211,7 +224,10 @@ describe("posting fulfillment evaluation", () => {
 			],
 		});
 		const result = evaluatePostingFulfillment(
-			projectRawFinancialModelDocument(document, makeSettings()).path,
+			projectRawFinancialModelDocument(
+				document,
+				makeSettings({ fallbackProjectionStartDate: "2026-01-01" }),
+			).path,
 			{ postingIds: null },
 		);
 
@@ -329,6 +345,7 @@ describe("posting fulfillment evaluation", () => {
 		const result = projectFinancialModelDocument(
 			document,
 			makeSettings({
+				fallbackProjectionStartDate: "2026-01-01",
 				evaluations: {
 					financialIndependence: [],
 					netWorthThreshold: [],

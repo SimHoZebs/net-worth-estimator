@@ -52,6 +52,5 @@ export interface HistoricalObservationSnapshot {
 export interface PreparedProjection {
 	effectiveDocument: FinancialModelDocument;
 	historicalSnapshots: HistoricalObservationSnapshot[];
-	latestCheckpointDate: IsoDate | null;
 	request: SimulationRequest;
 }

@@ -7,7 +7,19 @@ import {
 } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
+import {
+	canTweenAlignedData,
+	easeOutCubic,
+	hasTweenableChange,
+	interpolateAlignedData,
+} from "@/chart/dataTransition";
 import { calculateTooltipPosition } from "@/chart/tooltipPosition";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+
+interface UPlotDataTransition {
+	seriesIndexes: readonly number[];
+	durationMs?: number;
+}
 
 interface UPlotChartProps {
 	options: uPlot.Options;
@@ -16,6 +28,7 @@ interface UPlotChartProps {
 	tooltip?: ReactNode;
 	onCursorChange?: (idx: number | null) => void;
 	desktopTooltipOnly?: boolean;
+	dataTransition?: UPlotDataTransition;
 }
 
 export function UPlotChart({
@@ -25,6 +38,7 @@ export function UPlotChart({
 	tooltip,
 	onCursorChange,
 	desktopTooltipOnly = false,
+	dataTransition,
 }: UPlotChartProps) {
 	const targetRef = useRef<HTMLDivElement>(null);
 	const tooltipRef = useRef<HTMLDivElement>(null);
@@ -34,9 +48,24 @@ export function UPlotChart({
 	const tooltipContentRef = useRef(tooltipContent);
 	const onCursorChangeRef = useRef(onCursorChange);
 	const hasReactTooltipRef = useRef(tooltip != null);
+	const dataRef = useRef(data);
+	const dataTransitionRef = useRef(dataTransition);
+	const animationFrameRef = useRef<number | null>(null);
+	const prefersReducedMotion = usePrefersReducedMotion();
+	dataRef.current = data;
+	dataTransitionRef.current = dataTransition;
 	tooltipContentRef.current = tooltipContent;
 	onCursorChangeRef.current = onCursorChange;
 	hasReactTooltipRef.current = tooltip != null;
+	const transitionKey = dataTransition
+		? `${dataTransition.durationMs ?? 200}:${dataTransition.seriesIndexes.join(",")}`
+		: "";
+
+	const cancelTransition = useCallback(() => {
+		if (animationFrameRef.current == null) return;
+		cancelAnimationFrame(animationFrameRef.current);
+		animationFrameRef.current = null;
+	}, []);
 
 	const positionTooltip = useCallback((chart: uPlot) => {
 		const target = targetRef.current;
@@ -58,6 +87,7 @@ export function UPlotChart({
 		const target = targetRef.current;
 		if (!target) return;
 
+		cancelTransition();
 		chartRef.current?.destroy();
 
 		const rect = target.getBoundingClientRect();
@@ -102,7 +132,7 @@ export function UPlotChart({
 			},
 		};
 
-		chartRef.current = new uPlot(opts, data, target);
+		chartRef.current = new uPlot(opts, dataRef.current, target);
 		lastWidthRef.current = Math.round(width);
 		lastHeightRef.current = Math.round(height);
 
@@ -120,11 +150,12 @@ export function UPlotChart({
 		ro.observe(target);
 
 		return () => {
+			cancelTransition();
 			ro.disconnect();
 			chartRef.current?.destroy();
 			chartRef.current = null;
 		};
-	}, [options, data, desktopTooltipOnly, positionTooltip]);
+	}, [options, desktopTooltipOnly, positionTooltip, cancelTransition]);
 
 	useLayoutEffect(() => {
 		const chart = chartRef.current;
@@ -132,8 +163,49 @@ export function UPlotChart({
 	}, [tooltip, positionTooltip]);
 
 	useEffect(() => {
-		chartRef.current?.setData(data);
-	}, [data]);
+		const chart = chartRef.current;
+		if (!chart) return;
+
+		cancelTransition();
+		const targetData = data;
+		const transition = transitionKey ? dataTransitionRef.current : undefined;
+		if (
+			prefersReducedMotion ||
+			!transition ||
+			!canTweenAlignedData(chart.data, targetData, transition.seriesIndexes)
+		) {
+			chart.setData(targetData);
+			return;
+		}
+
+		if (!hasTweenableChange(chart.data, targetData, transition.seriesIndexes)) {
+			if (chart.data !== targetData) chart.setData(targetData);
+			return;
+		}
+
+		const startData = chart.data;
+		const startedAt = performance.now();
+		const durationMs = Math.max(1, transition.durationMs ?? 200);
+		const renderFrame = (timestamp: number) => {
+			if (chartRef.current !== chart) return;
+			const progress = Math.min(1, (timestamp - startedAt) / durationMs);
+			if (progress >= 1) {
+				animationFrameRef.current = null;
+				chart.setData(targetData);
+				return;
+			}
+			chart.setData(
+				interpolateAlignedData(
+					startData,
+					targetData,
+					transition.seriesIndexes,
+					easeOutCubic(Math.max(0, progress)),
+				),
+			);
+			animationFrameRef.current = requestAnimationFrame(renderFrame);
+		};
+		animationFrameRef.current = requestAnimationFrame(renderFrame);
+	}, [data, transitionKey, prefersReducedMotion, cancelTransition]);
 
 	return (
 		<div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">

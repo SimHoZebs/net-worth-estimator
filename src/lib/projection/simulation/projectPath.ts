@@ -184,7 +184,6 @@ export function adaptSimulationRun(
 				internalTransferAmount: roundCurrency(totals.internalTransferAmount),
 			},
 			milestones: {
-				latestCheckpointDate: prepared.latestCheckpointDate,
 				latestHistoricalDate: latestHistoricalRow?.date ?? null,
 				projectionStartDate: run.request.startDate,
 			},

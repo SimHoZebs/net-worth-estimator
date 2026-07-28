@@ -54,7 +54,13 @@ export function TemporaryPostingForm({
 
 	const commit = () => {
 		if (adding?.id.trim()) {
-			onAdd(adding);
+			onAdd({
+				...adding,
+				endDate:
+					adding.frequency === "once"
+						? adding.startDate || null
+						: adding.endDate,
+			});
 		}
 		setAdding(null);
 	};
@@ -149,13 +155,12 @@ export function TemporaryPostingForm({
 							<select
 								className="w-full rounded-lg "
 								value={adding.frequency}
-								onChange={(e) =>
-									setAdding({
-										...adding,
-										frequency: e.target.value as Posting["frequency"],
-									})
-								}
+								onChange={(e) => {
+									const frequency = e.target.value as Posting["frequency"];
+									setAdding({ ...adding, frequency });
+								}}
 							>
+								<option value="once">once</option>
 								<option value="daily">daily</option>
 								<option value="weekly">weekly</option>
 								<option value="monthly">monthly</option>
@@ -209,7 +214,10 @@ export function TemporaryPostingForm({
 								className="w-full rounded-lg "
 								value={adding.startDate}
 								onChange={(e) =>
-									setAdding({ ...adding, startDate: e.target.value })
+									setAdding({
+										...adding,
+										startDate: e.target.value,
+									})
 								}
 								placeholder="YYYY-MM-DD"
 							/>
@@ -219,6 +227,7 @@ export function TemporaryPostingForm({
 							<Input
 								className="w-full rounded-lg "
 								value={adding.endDate ?? ""}
+								disabled={adding.frequency === "once"}
 								onChange={(e) =>
 									setAdding({ ...adding, endDate: e.target.value || null })
 								}

@@ -31,7 +31,6 @@ function makeDefaultOverrides() {
 	return {
 		addedAccounts: [],
 		addedPostings: [],
-		addedCheckpoints: [],
 		disabledAccountIds: [],
 		disabledPostingIds: [],
 	};

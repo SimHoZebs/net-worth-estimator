@@ -14,7 +14,6 @@ describe("core model terminology", () => {
 		expect(CSV_MODEL_PUBLIC_PATH).toBe("/configs");
 		expect(CSV_MODEL_FILE_NAMES).toEqual({
 			accounts: "accounts.csv",
-			checkpoints: "checkpoints.csv",
 			postings: "postings.csv",
 		});
 	});
