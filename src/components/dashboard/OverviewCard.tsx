@@ -50,6 +50,15 @@ export const OverviewCard = memo(function OverviewCard({
 	return (
 		<Card className="rounded-[1.8rem] border-primary-border/45 bg-gradient-to-br from-card/96 via-card/90 to-primary-subtle/35">
 			<CardContent className="p-5 md:p-6">
+				<div className="mb-4 flex flex-col gap-1 rounded-2xl border border-primary-border/50 bg-primary-subtle/35 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+					<div>
+						<div className="type-label">Success test</div>
+						<div className="type-muted">{successPolicyDescription(plan)}</div>
+					</div>
+					<div className="type-value text-foreground">
+						{plan.evaluationYears}-year test · {principalPolicyLabel(plan)}
+					</div>
+				</div>
 				<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
 						<div className="type-label">FI coverage</div>
@@ -141,3 +150,25 @@ export const OverviewCard = memo(function OverviewCard({
 		</Card>
 	);
 });
+
+function principalPolicyLabel(plan: FinancialIndependencePlan) {
+	switch (plan.principalPolicy) {
+		case "preserve-real-principal":
+			return "preserve purchasing power";
+		case "preserve-nominal-principal":
+			return "preserve starting dollars";
+		case "allow-drawdown":
+			return "allow portfolio drawdown";
+	}
+}
+
+function successPolicyDescription(plan: FinancialIndependencePlan) {
+	switch (plan.principalPolicy) {
+		case "preserve-real-principal":
+			return "All spending must be funded and selected assets must retain their inflation-adjusted starting value.";
+		case "preserve-nominal-principal":
+			return "All spending must be funded and selected assets must retain their starting dollar value.";
+		case "allow-drawdown":
+			return "All spending must be funded; selected assets may finish below their starting value.";
+	}
+}

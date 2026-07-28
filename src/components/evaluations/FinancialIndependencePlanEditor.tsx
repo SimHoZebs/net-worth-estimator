@@ -1,4 +1,4 @@
-import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -12,20 +12,19 @@ import type {
 	FinancialModelDocument,
 } from "@/lib/projection";
 import { normalizeFinancialIndependencePlan } from "@/lib/projection";
+import {
+	EndingPortfolioPolicy,
+	FI_INPUT_CLASS,
+	FiNumberField,
+	FinancialIndependenceEditorSection,
+	RetirementIncomeField,
+} from "./FinancialIndependencePlanFields";
 
 interface FinancialIndependencePlanEditorProps {
 	document: FinancialModelDocument;
 	plan: FinancialIndependencePlan;
 	sourceRevision: number;
 	onApply: (plan: FinancialIndependencePlan) => void;
-}
-
-const inputClassName =
-	"mt-1 min-w-0 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 text-sm shadow-sm outline-none transition focus:border-ring dark:border-white/10";
-
-function finiteInput(value: string, fallback: number) {
-	const parsed = Number(value);
-	return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function cleanPlan(plan: FinancialIndependencePlan) {
@@ -89,7 +88,11 @@ export const FinancialIndependencePlanEditor = memo(
 				),
 			[draft.sources],
 		);
-		const directIncomePostings = document.postings.filter(
+		const continuingIds = useMemo(
+			() => new Set(draft.continuingPostingIds),
+			[draft.continuingPostingIds],
+		);
+		const retirementIncomePostings = document.postings.filter(
 			(posting) =>
 				posting.enabled &&
 				posting.sourceAccountId === null &&
@@ -112,7 +115,7 @@ export const FinancialIndependencePlanEditor = memo(
 						source.postingId === postingId &&
 						source.included,
 				);
-				return {
+				return cleanPlan({
 					...current,
 					sources: selected
 						? current.sources.filter(
@@ -131,10 +134,7 @@ export const FinancialIndependencePlanEditor = memo(
 								),
 								{ type: "cashflow", postingId, included: true },
 							],
-					continuingPostingIds: selected
-						? current.continuingPostingIds
-						: current.continuingPostingIds.filter((id) => id !== postingId),
-				};
+				});
 			});
 		};
 
@@ -143,12 +143,11 @@ export const FinancialIndependencePlanEditor = memo(
 				const existing = current.sources.find(
 					(source) => source.type === "asset" && source.accountId === accountId,
 				);
-				const selected = existing?.included === true;
 				const sources = current.sources.filter(
 					(source) =>
 						!(source.type === "asset" && source.accountId === accountId),
 				);
-				if (!selected) {
+				if (existing?.included !== true) {
 					sources.push({
 						type: "asset",
 						accountId,
@@ -207,7 +206,7 @@ export const FinancialIndependencePlanEditor = memo(
 		const toggleContinuingPosting = (postingId: string) => {
 			setDraft((current) => {
 				const selected = current.continuingPostingIds.includes(postingId);
-				return {
+				return cleanPlan({
 					...current,
 					continuingPostingIds: selected
 						? current.continuingPostingIds.filter((id) => id !== postingId)
@@ -220,7 +219,7 @@ export const FinancialIndependencePlanEditor = memo(
 										source.type === "cashflow" && source.postingId === postingId
 									),
 							),
-				};
+				});
 			});
 		};
 
@@ -229,200 +228,176 @@ export const FinancialIndependencePlanEditor = memo(
 				<CardHeader>
 					<CardTitle>Financial independence assumptions</CardTitle>
 					<CardDescription>
-						Choose what funds life after work. Changes stay here until you
+						Define the spending goal, how it is funded, and what must be true
+						for the plan to count as successful. Changes stay here until you
 						update the analysis.
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-5">
-					<div className="grid gap-3 sm:grid-cols-2">
-						<label className="min-w-0 type-caption">
-							Annual spending
-							<input
-								type="number"
+					<FinancialIndependenceEditorSection
+						number="1"
+						title="Goal"
+						description="Set the lifestyle this plan must support after work."
+					>
+						<div className="grid gap-3 sm:grid-cols-2">
+							<FiNumberField
+								label="Annual spending"
+								description="Spending required in the first year of FI."
+								value={draft.annualExpenseTarget}
 								min={0}
 								step={1000}
-								value={draft.annualExpenseTarget}
-								onChange={(event) =>
+								onChange={(value) =>
 									setDraft((current) => ({
 										...current,
-										annualExpenseTarget: Math.max(
-											0,
-											finiteInput(
-												event.target.value,
-												current.annualExpenseTarget,
-											),
-										),
+										annualExpenseTarget: Math.max(0, value),
 									}))
 								}
-								className={inputClassName}
 							/>
-						</label>
-						<label className="min-w-0 type-caption">
-							Portfolio withdrawal rate (%)
-							<input
-								type="number"
+							<FiNumberField
+								label="Spending inflation (%)"
+								description="Grows annual spending and adjusts the purchasing-power rule."
+								value={draft.annualExpenseGrowthRate * 100}
 								min={0}
-								max={100}
 								step={0.1}
-								value={draft.withdrawalRate * 100}
-								onChange={(event) =>
+								onChange={(value) =>
 									setDraft((current) => ({
 										...current,
-										withdrawalRate: Math.min(
-											1,
-											Math.max(
-												0,
-												finiteInput(
-													event.target.value,
-													current.withdrawalRate * 100,
-												) / 100,
-											),
-										),
+										annualExpenseGrowthRate: Math.max(0, value) / 100,
 									}))
 								}
-								className={inputClassName}
 							/>
-						</label>
-					</div>
-
-					<SelectionSection
-						title="Withdrawable assets"
-						description="Accounts you are willing to draw from to fund annual spending."
-					>
-						<div className="grid gap-2 sm:grid-cols-2">
-							{assetAccounts.map((account) => (
-								<label
-									key={account.id}
-									className="flex items-start gap-2 rounded-xl border border-border/60 bg-card/60 p-3 type-caption"
-								>
-									<input
-										type="checkbox"
-										checked={selectedAssets.has(account.id)}
-										onChange={() => toggleAsset(account.id)}
-										className="mt-0.5 accent-primary"
-									/>
-									<span>{account.label}</span>
-								</label>
-							))}
 						</div>
-					</SelectionSection>
+					</FinancialIndependenceEditorSection>
 
-					<SelectionSection
-						title="Income that continues after work"
-						description="Select only spendable income that does not require continued employment. Investment growth usually belongs under continuing model postings instead."
+					<FinancialIndependenceEditorSection
+						number="2"
+						title="Funding"
+						description="Choose the portfolio and income available to pay for the goal."
 					>
-						{directIncomePostings.length === 0 ? (
-							<p className="type-caption text-muted-foreground">
-								No eligible inflows.
+						<FiNumberField
+							label="Portfolio withdrawal rate (%)"
+							description="Maximum annual withdrawal from each selected asset, recalculated from its balance at the start of each test year."
+							value={draft.withdrawalRate * 100}
+							min={0}
+							max={100}
+							step={0.1}
+							onChange={(value) =>
+								setDraft((current) => ({
+									...current,
+									withdrawalRate: Math.min(100, Math.max(0, value)) / 100,
+								}))
+							}
+						/>
+						<div>
+							<div className="type-label text-foreground">
+								Withdrawable assets
+							</div>
+							<p className="mt-0.5 type-caption text-muted-foreground">
+								Accounts you are willing to draw from to fund spending.
 							</p>
-						) : (
-							<div className="grid gap-2 sm:grid-cols-2">
-								{directIncomePostings.map((posting) => (
+							<div className="mt-3 grid gap-2 sm:grid-cols-2">
+								{assetAccounts.map((account) => (
 									<label
-										key={posting.id}
+										key={account.id}
 										className="flex items-start gap-2 rounded-xl border border-border/60 bg-card/60 p-3 type-caption"
 									>
 										<input
 											type="checkbox"
-											checked={selectedCashflows.has(posting.id)}
-											onChange={() => toggleCashflow(posting.id)}
+											checked={selectedAssets.has(account.id)}
+											onChange={() => toggleAsset(account.id)}
 											className="mt-0.5 accent-primary"
 										/>
-										<span>{posting.label}</span>
+										<span>{account.label}</span>
 									</label>
 								))}
 							</div>
-						)}
-					</SelectionSection>
+						</div>
+						<RetirementIncomeField
+							postings={retirementIncomePostings}
+							selectedIds={selectedCashflows}
+							continuingIds={continuingIds}
+							onToggle={toggleCashflow}
+						/>
+					</FinancialIndependenceEditorSection>
+
+					<FinancialIndependenceEditorSection
+						number="3"
+						title="Success"
+						description="Define how long the plan must work and how much certainty and portfolio value must remain."
+					>
+						<div className="grid gap-3 sm:grid-cols-2">
+							<FiNumberField
+								label="Test period (years)"
+								description="Every month of spending must be funded for this full period."
+								value={draft.evaluationYears}
+								min={1}
+								max={50}
+								onChange={(value) =>
+									setDraft((current) => ({
+										...current,
+										evaluationYears: Math.max(1, Math.floor(value)),
+									}))
+								}
+							/>
+							<FiNumberField
+								label="Required Monte Carlo confidence (%)"
+								description="Controls the reported confidence-qualified FI date; it does not change individual simulation paths."
+								value={draft.requiredConfidence * 100}
+								min={1}
+								max={100}
+								onChange={(value) =>
+									setDraft((current) => ({
+										...current,
+										requiredConfidence: Math.min(100, Math.max(1, value)) / 100,
+									}))
+								}
+							/>
+						</div>
+						<EndingPortfolioPolicy
+							plan={draft}
+							onChange={(principalPolicy) =>
+								setDraft((current) => ({ ...current, principalPolicy }))
+							}
+						/>
+					</FinancialIndependenceEditorSection>
 
 					<details className="group rounded-2xl border border-border/80 bg-surface/55 p-4 dark:border-white/10">
 						<summary className="cursor-pointer list-none type-label text-foreground marker:hidden">
-							<span className="inline-flex items-center gap-2">
-								<span className="transition group-open:rotate-90">›</span>
-								Advanced simulation policy
+							<span className="flex items-center justify-between gap-3">
+								<span className="inline-flex items-center gap-2">
+									<span className="transition group-open:rotate-90">›</span>
+									Model details
+								</span>
+								<span className="type-caption font-normal text-muted-foreground">
+									{draft.continuingPostingIds.length} portfolio activity rule
+									{draft.continuingPostingIds.length === 1 ? "" : "s"} continue
+								</span>
 							</span>
 						</summary>
-						<div className="mt-4 space-y-4 border-t border-border/70 pt-4">
-							<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-								<NumberField
-									label="Minimum total net worth"
-									value={draft.minimumNetWorth}
-									min={0}
-									step={50_000}
-									onChange={(value) =>
-										setDraft((current) => ({
-											...current,
-											minimumNetWorth: Math.max(0, value),
-										}))
-									}
-								/>
-								<NumberField
-									label="Annual spending growth (%)"
-									value={draft.annualExpenseGrowthRate * 100}
-									min={0}
-									step={0.1}
-									onChange={(value) =>
-										setDraft((current) => ({
-											...current,
-											annualExpenseGrowthRate: Math.max(0, value) / 100,
-										}))
-									}
-								/>
-								<NumberField
-									label="Test period (years)"
-									value={draft.evaluationYears}
-									min={1}
-									max={50}
-									onChange={(value) =>
-										setDraft((current) => ({
-											...current,
-											evaluationYears: Math.max(1, Math.floor(value)),
-										}))
-									}
-								/>
-								<NumberField
-									label="Required confidence (%)"
-									value={draft.requiredConfidence * 100}
-									min={1}
-									max={100}
-									onChange={(value) =>
-										setDraft((current) => ({
-											...current,
-											requiredConfidence:
-												Math.min(100, Math.max(1, value)) / 100,
-										}))
-									}
-								/>
-								<label className="min-w-0 type-caption sm:col-span-2">
-									Ending portfolio policy
-									<select
-										value={draft.principalPolicy}
-										onChange={(event) =>
-											setDraft((current) => ({
-												...current,
-												principalPolicy: event.target
-													.value as FinancialIndependencePlan["principalPolicy"],
-											}))
-										}
-										className={inputClassName}
-									>
-										<option value="preserve-real-principal">
-											Preserve purchasing power
-										</option>
-										<option value="preserve-nominal-principal">
-											Preserve starting dollars
-										</option>
-										<option value="allow-drawdown">Allow drawdown</option>
-									</select>
-								</label>
-							</div>
+						<div className="mt-4 space-y-5 border-t border-border/70 pt-4">
+							<FiNumberField
+								label="Minimum total net worth"
+								description="Candidate dates are ignored until whole-model net worth reaches this gate, before selected funding coverage is tested."
+								value={draft.minimumNetWorth}
+								min={0}
+								step={50_000}
+								onChange={(value) =>
+									setDraft((current) => ({
+										...current,
+										minimumNetWorth: Math.max(0, value),
+									}))
+								}
+							/>
 
 							{selectedAssets.size > 0 ? (
-								<SelectionSection
-									title="Per-account withdrawal rates"
-									description="Leave blank to use the portfolio withdrawal rate above."
-								>
-									<div className="grid gap-2 sm:grid-cols-2">
+								<div>
+									<div className="type-label text-foreground">
+										Per-account withdrawal rates
+									</div>
+									<p className="mt-0.5 type-caption text-muted-foreground">
+										Leave blank to use the portfolio withdrawal rate.
+									</p>
+									<div className="mt-3 grid gap-2 sm:grid-cols-2">
 										{assetAccounts
 											.filter((account) => selectedAssets.has(account.id))
 											.map((account) => {
@@ -457,25 +432,30 @@ export const FinancialIndependencePlanEditor = memo(
 																			),
 																)
 															}
-															className={inputClassName}
+															className={FI_INPUT_CLASS}
 														/>
 													</label>
 												);
 											})}
 									</div>
-								</SelectionSection>
+								</div>
 							) : null}
 
-							<SelectionSection
-								title="Continuing model postings"
-								description="Transactions replayed during each FI test period, such as investment growth. A posting cannot also be counted as spendable income."
-							>
+							<div>
+								<div className="type-label text-foreground">
+									Continuing portfolio activity
+								</div>
+								<p className="mt-0.5 type-caption text-muted-foreground">
+									Explicit model postings replayed during the FI test, such as
+									investment growth. A posting cannot also count as spendable
+									retirement income.
+								</p>
 								{continuingPostings.length === 0 ? (
-									<p className="type-caption text-muted-foreground">
+									<p className="mt-3 type-caption text-muted-foreground">
 										Select an asset to see its related postings.
 									</p>
 								) : (
-									<div className="grid gap-2 sm:grid-cols-2">
+									<div className="mt-3 grid gap-2 sm:grid-cols-2">
 										{continuingPostings.map((posting) => (
 											<label
 												key={posting.id}
@@ -483,9 +463,7 @@ export const FinancialIndependencePlanEditor = memo(
 											>
 												<input
 													type="checkbox"
-													checked={draft.continuingPostingIds.includes(
-														posting.id,
-													)}
+													checked={continuingIds.has(posting.id)}
 													onChange={() => toggleContinuingPosting(posting.id)}
 													className="mt-0.5 accent-primary"
 												/>
@@ -494,7 +472,7 @@ export const FinancialIndependencePlanEditor = memo(
 										))}
 									</div>
 								)}
-							</SelectionSection>
+							</div>
 						</div>
 					</details>
 
@@ -532,54 +510,3 @@ export const FinancialIndependencePlanEditor = memo(
 		);
 	},
 );
-
-function SelectionSection({
-	title,
-	description,
-	children,
-}: {
-	title: string;
-	description: string;
-	children: ReactNode;
-}) {
-	return (
-		<div className="rounded-2xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
-			<div className="type-eyebrow">{title}</div>
-			<p className="mt-1 max-w-3xl type-caption text-muted-foreground">
-				{description}
-			</p>
-			<div className="mt-3">{children}</div>
-		</div>
-	);
-}
-
-function NumberField({
-	label,
-	value,
-	min,
-	max,
-	step,
-	onChange,
-}: {
-	label: string;
-	value: number;
-	min?: number;
-	max?: number;
-	step?: number;
-	onChange: (value: number) => void;
-}) {
-	return (
-		<label className="min-w-0 type-caption">
-			{label}
-			<input
-				type="number"
-				min={min}
-				max={max}
-				step={step}
-				value={value}
-				onChange={(event) => onChange(finiteInput(event.target.value, value))}
-				className={inputClassName}
-			/>
-		</label>
-	);
-}
