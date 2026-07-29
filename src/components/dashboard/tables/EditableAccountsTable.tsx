@@ -134,7 +134,7 @@ export function EditableAccountsTable({
 							<TableHead>Label</TableHead>
 							<TableHead>Min</TableHead>
 							<TableHead>Max</TableHead>
-							<TableHead>Color</TableHead>
+							<TableHead>Chart color</TableHead>
 							<TableHead>Enabled</TableHead>
 							<TableHead />
 						</TableRow>
@@ -192,10 +192,12 @@ export function EditableAccountsTable({
 									</TableCell>
 									<TableCell>
 										<input
-											className={inputStyle(!!changed)}
-											value={a.color ?? ""}
+											type="color"
+											aria-label={`Chart color for ${a.label}`}
+											className="h-8 w-12 cursor-pointer rounded border border-input bg-card p-1"
+											value={a.color?.startsWith("#") ? a.color : "#64748b"}
 											onChange={(e) =>
-												updateAccount(a.id, { color: e.target.value || null })
+												updateAccount(a.id, { color: e.target.value })
 											}
 										/>
 									</TableCell>

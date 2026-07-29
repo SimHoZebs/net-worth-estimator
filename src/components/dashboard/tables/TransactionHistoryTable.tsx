@@ -1,64 +1,68 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { createTableColumn, DataTable } from "@/components/ui/data-table";
 import { TableSearch } from "@/components/ui/table-search";
-import { formatRoute } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import type { Account, Posting } from "@/lib/projection";
-import { PostingAmount } from "./PostingAmount";
+import {
+	TransactionListRow,
+	transactionMatchesSearch,
+} from "./TransactionPresentation";
 
-const PAGE_SIZE = 20;
+const DATE_GROUPS_PER_PAGE = 10;
 
 interface TransactionHistoryTableProps {
 	postings: Posting[];
 	accounts: Account[];
-	disabledPostingSet: Set<string>;
-	onToggle: (id: string) => void;
 }
-
-const postingColumn = createTableColumn<Posting>();
 
 export function TransactionHistoryTable({
 	postings,
 	accounts,
-	disabledPostingSet,
-	onToggle,
 }: TransactionHistoryTableProps) {
 	const [search, setSearch] = useState("");
 	const [page, setPage] = useState(0);
 	const accountById = new Map(accounts.map((account) => [account.id, account]));
-	const filtered = useMemo(() => {
+	const groups = useMemo(() => {
 		const query = search.trim().toLowerCase();
-		return postings
-			.map((posting, index) => ({ posting, index }))
-			.filter(({ posting }) =>
-				query
-					? [
-							posting.id,
-							posting.label,
-							posting.sourceAccountId ?? "",
-							...(posting.destinations ?? []),
-						].some((value) => value.toLowerCase().includes(query))
-					: true,
-			)
-			.sort(
-				(left, right) =>
-					right.posting.startDate.localeCompare(left.posting.startDate) ||
-					left.index - right.index,
-			)
-			.map(({ posting }) => posting);
-	}, [postings, search]);
-	const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+		const byDate = new Map<string, Posting[]>();
+		for (const posting of postings) {
+			if (!transactionMatchesSearch(posting, accountById, query)) {
+				continue;
+			}
+			const dateGroup = byDate.get(posting.startDate) ?? [];
+			dateGroup.push(posting);
+			byDate.set(posting.startDate, dateGroup);
+		}
+		return Array.from(byDate, ([date, transactions]) => ({
+			date,
+			transactions,
+		})).sort((left, right) => right.date.localeCompare(left.date));
+	}, [postings, search, accountById]);
+	const pageCount = Math.max(
+		1,
+		Math.ceil(groups.length / DATE_GROUPS_PER_PAGE),
+	);
 	useEffect(() => {
 		setPage((current) => Math.min(current, pageCount - 1));
 	}, [pageCount]);
 	const currentPage = Math.min(page, pageCount - 1);
-	const rows = filtered.slice(
-		currentPage * PAGE_SIZE,
-		(currentPage + 1) * PAGE_SIZE,
+	const visibleGroups = groups.slice(
+		currentPage * DATE_GROUPS_PER_PAGE,
+		(currentPage + 1) * DATE_GROUPS_PER_PAGE,
+	);
+	const transactionCount = groups.reduce(
+		(total, group) => total + group.transactions.length,
+		0,
 	);
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
+			<div>
+				<h2 className="type-title">Transaction history</h2>
+				<p className="type-caption">
+					Recorded one-time activity, newest first.
+				</p>
+			</div>
 			<TableSearch
 				value={search}
 				onChange={(value) => {
@@ -67,57 +71,40 @@ export function TransactionHistoryTable({
 				}}
 				placeholder="Search transaction history..."
 			/>
-			<DataTable<Posting>
-				title="Transaction history"
-				description="One-time transactions and balance observations, newest first."
-				rows={rows}
-				rowKey={(posting) => posting.id}
-				emptyText="No one-time transactions match this search."
-				variant="flat"
-				columns={[
-					postingColumn({ key: "startDate", label: "Date" }),
-					postingColumn({ key: "label", label: "Description" }),
-					postingColumn({
-						key: "sourceAccountId",
-						label: "Route",
-						render: (_value, posting) => {
-							const sourceLabel = posting.sourceAccountId
-								? (accountById.get(posting.sourceAccountId)?.label ??
-									posting.sourceAccountId)
-								: null;
-							const destinations =
-								posting.destinations?.map((id) => ({
-									label: accountById.get(id)?.label ?? id,
-								})) ?? null;
-							return formatRoute(sourceLabel, destinations);
-						},
-					}),
-					postingColumn({
-						key: "arithmetic",
-						label: "Amount",
-						render: (value) => <PostingAmount arithmetic={value} />,
-					}),
-					postingColumn({
-						key: "enabled",
-						label: "Enabled",
-						render: (_value, posting) => {
-							return (
-								<input
-									type="checkbox"
-									aria-label={`Enable ${posting.label}`}
-									className="h-4 w-4 rounded accent-primary"
-									checked={!disabledPostingSet.has(posting.id)}
-									onChange={() => onToggle(posting.id)}
-								/>
-							);
-						},
-					}),
-				]}
-			/>
+			<div className="space-y-6">
+				{visibleGroups.length > 0 ? (
+					visibleGroups.map((group) => (
+						<section key={group.date} aria-labelledby={`date-${group.date}`}>
+							<div className="mb-2 flex items-baseline gap-3 border-b border-border/70 pb-2">
+								<h3 id={`date-${group.date}`} className="type-title text-base">
+									{formatDate(group.date)}
+								</h3>
+								<span className="type-caption">
+									{group.transactions.length} transaction
+									{group.transactions.length === 1 ? "" : "s"}
+								</span>
+							</div>
+							<div className="divide-y divide-border/60 rounded-2xl border border-border/80 bg-card/70">
+								{group.transactions.map((posting) => (
+									<TransactionListRow
+										key={posting.id}
+										posting={posting}
+										accountById={accountById}
+									/>
+								))}
+							</div>
+						</section>
+					))
+				) : (
+					<div className="rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center type-muted">
+						No transactions match this search.
+					</div>
+				)}
+			</div>
 			<div className="flex flex-wrap items-center justify-between gap-3 type-caption">
 				<span>
-					{filtered.length} transaction{filtered.length === 1 ? "" : "s"} · Page{" "}
-					{currentPage + 1} of {pageCount}
+					{transactionCount} transaction{transactionCount === 1 ? "" : "s"} ·
+					Page {currentPage + 1} of {pageCount}
 				</span>
 				<nav className="flex gap-2" aria-label="Transaction history pagination">
 					<Button

@@ -18,6 +18,8 @@ export function CurrentChangesControls({
 		useShallow((s) => ({
 			addedAccounts: s.addedAccounts,
 			addedPostings: s.addedPostings,
+			disabledAccountIds: s.disabledAccountIds,
+			disabledPostingIds: s.disabledPostingIds,
 		})),
 	);
 	const currentChangeCount = useStore(selectCurrentChangeCount);
@@ -26,6 +28,14 @@ export function CurrentChangesControls({
 	const removeTemporaryAccount = useStore((s) => s.removeTemporaryAccount);
 	const addTemporaryPosting = useStore((s) => s.addTemporaryPosting);
 	const removeTemporaryPosting = useStore((s) => s.removeTemporaryPosting);
+	const toggleAccountDisabled = useStore((s) => s.toggleAccountDisabled);
+	const togglePostingDisabled = useStore((s) => s.togglePostingDisabled);
+	const accountById = new Map(
+		document.accounts.map((account) => [account.id, account]),
+	);
+	const postingById = new Map(
+		document.postings.map((posting) => [posting.id, posting]),
+	);
 
 	return (
 		<Collapsible autoOpenWhen={currentChangeCount > 0}>
@@ -66,6 +76,31 @@ export function CurrentChangesControls({
 						</Button>
 					</div>
 
+					{currentChanges.disabledAccountIds.length > 0 ||
+					currentChanges.disabledPostingIds.length > 0 ? (
+						<div className="space-y-3">
+							<h3 className="type-body type-value font-semibold/80">
+								Excluded from this scenario
+							</h3>
+							{currentChanges.disabledAccountIds.map((id) => (
+								<ExcludedItem
+									key={`excluded-account-${id}`}
+									label={accountById.get(id)?.label ?? id}
+									type="Account"
+									onRestore={() => toggleAccountDisabled(id)}
+								/>
+							))}
+							{currentChanges.disabledPostingIds.map((id) => (
+								<ExcludedItem
+									key={`excluded-posting-${id}`}
+									label={postingById.get(id)?.label ?? id}
+									type="Transaction"
+									onRestore={() => togglePostingDisabled(id)}
+								/>
+							))}
+						</div>
+					) : null}
+
 					<div className="space-y-3">
 						<h3 className="type-body type-value font-semibold/80">
 							Temporary additions
@@ -73,6 +108,11 @@ export function CurrentChangesControls({
 
 						<TemporaryAccountForm
 							accounts={currentChanges.addedAccounts}
+							reservedIds={[
+								...document.accounts.map((account) => account.id),
+								...document.postings.map((posting) => posting.id),
+								...currentChanges.addedPostings.map((posting) => posting.id),
+							]}
 							onAdd={addTemporaryAccount}
 							onRemove={removeTemporaryAccount}
 						/>
@@ -80,6 +120,10 @@ export function CurrentChangesControls({
 						<TemporaryPostingForm
 							postings={currentChanges.addedPostings}
 							document={document}
+							reservedIds={[
+								...document.accounts.map((account) => account.id),
+								...currentChanges.addedAccounts.map((account) => account.id),
+							]}
 							onAdd={addTemporaryPosting}
 							onRemove={removeTemporaryPosting}
 						/>
@@ -87,5 +131,27 @@ export function CurrentChangesControls({
 				</div>
 			</Collapsible.Content>
 		</Collapsible>
+	);
+}
+
+function ExcludedItem({
+	label,
+	type,
+	onRestore,
+}: {
+	label: string;
+	type: string;
+	onRestore: () => void;
+}) {
+	return (
+		<div className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-surface/60 px-4 py-2">
+			<div>
+				<div className="type-label">{label}</div>
+				<div className="type-caption">{type}</div>
+			</div>
+			<Button type="button" variant="ghost" size="sm" onClick={onRestore}>
+				Restore
+			</Button>
+		</div>
 	);
 }

@@ -17,22 +17,33 @@ function emptyAccount(): Account {
 
 interface TemporaryAccountFormProps {
 	accounts: Account[];
+	reservedIds?: string[];
 	onAdd: (account: Account) => void;
 	onRemove: (id: string) => void;
 }
 
 export function TemporaryAccountForm({
 	accounts,
+	reservedIds = [],
 	onAdd,
 	onRemove,
 }: TemporaryAccountFormProps) {
 	const [adding, setAdding] = useState<Account | null>(null);
+	const [error, setError] = useState<string | null>(null);
 
 	const commit = () => {
-		if (adding?.id.trim() && adding.label.trim()) {
-			onAdd(adding);
+		if (!adding?.id.trim() || !adding.label.trim()) return;
+		const id = adding.id.trim();
+		if (
+			reservedIds.includes(id) ||
+			accounts.some((account) => account.id === id)
+		) {
+			setError(`Account ID "${id}" is already in use.`);
+			return;
 		}
+		onAdd({ ...adding, id, label: adding.label.trim() });
 		setAdding(null);
+		setError(null);
 	};
 
 	return (
@@ -46,7 +57,10 @@ export function TemporaryAccountForm({
 						type="button"
 						variant="ghost"
 						size="sm"
-						onClick={() => setAdding(emptyAccount())}
+						onClick={() => {
+							setAdding(emptyAccount());
+							setError(null);
+						}}
 					>
 						+ Add
 					</Button>
@@ -54,10 +68,16 @@ export function TemporaryAccountForm({
 			</div>
 			{adding ? (
 				<div className="space-y-2 rounded-2xl border border-border p-3">
-					<div className="grid grid-cols-2 gap-2">
+					<div className="grid gap-2 sm:grid-cols-2">
 						<div>
-							<label className="block type-caption">ID</label>
+							<label
+								htmlFor="temporary-account-id"
+								className="block type-caption"
+							>
+								ID
+							</label>
 							<Input
+								id="temporary-account-id"
 								className="w-full rounded-lg "
 								value={adding.id}
 								onChange={(e) => setAdding({ ...adding, id: e.target.value })}
@@ -65,8 +85,14 @@ export function TemporaryAccountForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">Label</label>
+							<label
+								htmlFor="temporary-account-label"
+								className="block type-caption"
+							>
+								Label
+							</label>
 							<Input
+								id="temporary-account-label"
 								className="w-full rounded-lg "
 								value={adding.label}
 								onChange={(e) =>
@@ -75,18 +101,12 @@ export function TemporaryAccountForm({
 								placeholder="Savings"
 							/>
 						</div>
-						<div>
-							<label className="block type-caption">Color (hex)</label>
-							<Input
-								className="w-full rounded-lg "
-								value={adding.color ?? ""}
-								onChange={(e) =>
-									setAdding({ ...adding, color: e.target.value || null })
-								}
-								placeholder="CSS color"
-							/>
-						</div>
 					</div>
+					{error ? (
+						<div className="rounded-xl border border-destructive/25 bg-destructive-subtle p-3 type-body text-destructive-foreground">
+							{error}
+						</div>
+					) : null}
 					<div className="flex gap-2">
 						<Button type="button" size="sm" onClick={commit}>
 							Add account
@@ -95,7 +115,10 @@ export function TemporaryAccountForm({
 							type="button"
 							variant="ghost"
 							size="sm"
-							onClick={() => setAdding(null)}
+							onClick={() => {
+								setAdding(null);
+								setError(null);
+							}}
 						>
 							Cancel
 						</Button>

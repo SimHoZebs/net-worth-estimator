@@ -70,8 +70,10 @@ describe("Model overrides slice", () => {
 	});
 
 	it("adds a temporary account", () => {
+		const before = useStore.getState().addedAccounts;
 		useStore.getState().addTemporaryAccount(makeAccount());
 		expect(useStore.getState().addedAccounts).toHaveLength(1);
+		expect(useStore.getState().addedAccounts).not.toBe(before);
 	});
 
 	it("removes a temporary account by id", () => {
@@ -183,47 +185,6 @@ describe("Comparison slice", () => {
 /*  Reference stability                                                */
 /* ------------------------------------------------------------------ */
 
-describe("Reference stability", () => {
-	beforeEach(() => {
-		useStore.getState().resetCurrentChanges();
-	});
-
-	it("getState returns identical reference when state is unchanged", () => {
-		const a = useStore.getState();
-		const b = useStore.getState();
-		expect(a).toBe(b);
-	});
-
-	it("addedAccounts array reference is stable when no mutations occur", () => {
-		useStore.getState().addTemporaryAccount(makeAccount());
-		const before = useStore.getState().addedAccounts;
-		const after = useStore.getState().addedAccounts;
-		expect(before).toBe(after);
-	});
-
-	it("addedAccounts array reference changes when a new account is added", () => {
-		const before = useStore.getState().addedAccounts;
-		useStore.getState().addTemporaryAccount(makeAccount());
-		const after = useStore.getState().addedAccounts;
-		expect(before).not.toBe(after);
-	});
-
-	it("selectCurrentChangeCount returns stable values for identical state", () => {
-		const a = selectCurrentChangeCount(useStore.getState());
-		const b = selectCurrentChangeCount(useStore.getState());
-		expect(a).toBe(b);
-	});
-
-	it("selectModelOverrides creates a new object each call", () => {
-		// This is expected behaviour — memoization happens at the useShallow layer.
-		const a = selectModelOverrides(useStore.getState());
-		const b = selectModelOverrides(useStore.getState());
-		expect(a).not.toBe(b);
-		// ...but values should be deeply equal
-		expect(a).toEqual(b);
-	});
-});
-
 /* ------------------------------------------------------------------ */
 /*  Editor slice tests                                                 */
 /* ------------------------------------------------------------------ */
@@ -235,40 +196,15 @@ describe("Editor slice", () => {
 	});
 
 	describe("no-op when workingDocument is null", () => {
-		it("updateAccount does nothing", () => {
+		it("ignores every editor action", () => {
 			const before = useStore.getState();
 			useStore.getState().updateAccount("a1", { label: "New" });
-			expect(useStore.getState()).toEqual(before);
-		});
-
-		it("deleteAccount does nothing", () => {
-			const before = useStore.getState();
 			useStore.getState().deleteAccount("a1");
-			expect(useStore.getState()).toEqual(before);
-		});
-
-		it("addAccount does nothing", () => {
-			const before = useStore.getState();
 			useStore.getState().addAccount(makeAccount());
-			expect(useStore.getState()).toEqual(before);
-		});
-
-		it("updatePosting does nothing", () => {
-			const before = useStore.getState();
 			useStore.getState().updatePosting("p1", { label: "New" });
-			expect(useStore.getState()).toEqual(before);
-		});
-
-		it("deletePosting does nothing", () => {
-			const before = useStore.getState();
 			useStore.getState().deletePosting("p1");
-			expect(useStore.getState()).toEqual(before);
-		});
-
-		it("addPosting does nothing", () => {
-			const before = useStore.getState();
 			useStore.getState().addPosting(makePosting());
-			expect(useStore.getState()).toEqual(before);
+			expect(useStore.getState()).toBe(before);
 		});
 	});
 

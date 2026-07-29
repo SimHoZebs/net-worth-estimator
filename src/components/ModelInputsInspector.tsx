@@ -19,6 +19,7 @@ import {
 import { pluralize } from "@/lib/format";
 import { partitionPostings } from "@/lib/posting-categories";
 import { useModelRuntime } from "@/runtime/modelRuntime";
+import { useProjectionArtifacts } from "@/runtime/projectionRuntime";
 import { selectEditorActions, selectEditorState, useStore } from "@/store";
 import { ModelValidationPanel } from "./ModelValidationPanel";
 
@@ -46,10 +47,20 @@ export function ModelInputsInspector() {
 		reload,
 		save,
 	} = useModelRuntime();
-	const disabledAccountIds = useStore((s) => s.disabledAccountIds);
-	const disabledPostingIds = useStore((s) => s.disabledPostingIds);
-	const toggleAccountDisabled = useStore((s) => s.toggleAccountDisabled);
-	const togglePostingDisabled = useStore((s) => s.togglePostingDisabled);
+	const { result, projectionResultIsStale } = useProjectionArtifacts();
+	const {
+		disabledAccountIds,
+		disabledPostingIds,
+		addedAccounts,
+		addedPostings,
+	} = useStore(
+		useShallow((s) => ({
+			disabledAccountIds: s.disabledAccountIds,
+			disabledPostingIds: s.disabledPostingIds,
+			addedAccounts: s.addedAccounts,
+			addedPostings: s.addedPostings,
+		})),
+	);
 	const { isEditing, isDirty, workingDocument } = useStore(
 		useShallow(selectEditorState),
 	);
@@ -65,13 +76,40 @@ export function ModelInputsInspector() {
 	} = useStore(useShallow(selectEditorActions));
 
 	const [showAdvanced, setShowAdvanced] = useState(false);
-	const [readTab, setReadTab] = useState<ReadInputTab>("scheduled");
+	const [readTab, setReadTab] = useState<ReadInputTab>("accounts");
 	const [editTab, setEditTab] = useState<EditInputTab>("postings");
 
-	const disabledAccountSet = new Set(disabledAccountIds);
-	const disabledPostingSet = new Set(disabledPostingIds);
+	const readDocument = useMemo(
+		() =>
+			document
+				? {
+						...document,
+						accounts: [
+							...document.accounts.filter(
+								(account) =>
+									account.enabled && !disabledAccountIds.includes(account.id),
+							),
+							...addedAccounts.filter((account) => account.enabled),
+						],
+						postings: [
+							...document.postings.filter(
+								(posting) =>
+									posting.enabled && !disabledPostingIds.includes(posting.id),
+							),
+							...addedPostings.filter((posting) => posting.enabled),
+						],
+					}
+				: null,
+		[
+			document,
+			addedAccounts,
+			addedPostings,
+			disabledAccountIds,
+			disabledPostingIds,
+		],
+	);
 	const displayDocument =
-		isEditing && workingDocument ? workingDocument : document;
+		isEditing && workingDocument ? workingDocument : readDocument;
 	const postingGroups = useMemo(
 		() => partitionPostings(displayDocument?.postings ?? []),
 		[displayDocument?.postings],
@@ -106,14 +144,14 @@ export function ModelInputsInspector() {
 			]
 		: [
 				{
+					id: "accounts" as const,
+					label: "Current position",
+					count: displayDocument?.accounts.length ?? 0,
+				},
+				{
 					id: "scheduled" as const,
 					label: "Scheduled transactions",
 					count: postingGroups.scheduledTransactions.length,
-				},
-				{
-					id: "accounts" as const,
-					label: "Accounts",
-					count: displayDocument?.accounts.length ?? 0,
 				},
 				{
 					id: "history" as const,
@@ -248,9 +286,8 @@ export function ModelInputsInspector() {
 							{!isEditing && activeTab === "scheduled" ? (
 								<ReadOnlyPostingsTable
 									postings={postingGroups.scheduledTransactions}
+									accounts={displayDocument.accounts}
 									showAdvanced={showAdvanced}
-									disabledPostingSet={disabledPostingSet}
-									onToggle={togglePostingDisabled}
 								/>
 							) : null}
 
@@ -269,11 +306,14 @@ export function ModelInputsInspector() {
 									<ReadOnlyAccountsTable
 										accounts={displayDocument.accounts}
 										accountRules={postingGroups.accountRules}
+										accountSummaries={result?.accountSummaries ?? null}
+										currentNetWorth={result?.summary.currentNetWorth ?? null}
+										projectionStartDate={
+											result?.milestones.projectionStartDate ??
+											projectionStartDate
+										}
+										balancesAreStale={projectionResultIsStale}
 										showAdvanced={showAdvanced}
-										disabledAccountSet={disabledAccountSet}
-										disabledPostingSet={disabledPostingSet}
-										onToggleAccount={toggleAccountDisabled}
-										onTogglePosting={togglePostingDisabled}
 									/>
 								)
 							) : null}
@@ -282,8 +322,6 @@ export function ModelInputsInspector() {
 								<TransactionHistoryTable
 									postings={postingGroups.transactionHistory}
 									accounts={displayDocument.accounts}
-									disabledPostingSet={disabledPostingSet}
-									onToggle={togglePostingDisabled}
 								/>
 							) : null}
 						</div>

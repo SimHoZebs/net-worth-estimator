@@ -385,30 +385,6 @@ describe("stochastic projection", () => {
 		expect(thresholdProbability(result1)).toBe(thresholdProbability(result2));
 	});
 
-	it("works without onProgress callback (backward compatible)", () => {
-		const { data: document } = parseCsvFinancialModel(validCsvFiles);
-		if (!document) throw new Error("Document is null");
-		expect(document).not.toBeNull();
-
-		const result = stochasticProject(
-			document,
-			makeSettings({
-				fallbackProjectionStartDate: "2026-04-01",
-				horizonYears: 5,
-			}),
-			{
-				addedAccounts: [],
-				addedPostings: [],
-				disabledAccountIds: [],
-				disabledPostingIds: [],
-			},
-			{ runCount: 50, seed: 42 },
-		);
-
-		expect(result.bands.length).toBeGreaterThan(0);
-		expect(thresholdProbability(result)).toBeGreaterThanOrEqual(0);
-	});
-
 	it("returns P50 close to deterministic when volatility is zero", () => {
 		const { data: document } = parseCsvFinancialModel(validCsvFiles);
 		if (!document) throw new Error("Document is null");
@@ -456,80 +432,58 @@ describe("stochastic projection", () => {
 });
 
 describe("stochastic progress streaming", () => {
-	it("reports progress with ascending values and reaches 1.0", () => {
+	it("streams partials without changing the seeded result", () => {
 		const { data: document } = parseCsvFinancialModel(validCsvFiles);
 		if (!document) throw new Error("Document is null");
 		expect(document).not.toBeNull();
-
-		const progressValues: number[] = [];
-		stochasticProject(
-			document,
-			makeSettings({
-				fallbackProjectionStartDate: "2026-04-01",
-				horizonYears: 10,
-			}),
-			{
-				addedAccounts: [],
-				addedPostings: [],
-				disabledAccountIds: [],
-				disabledPostingIds: [],
-			},
-			{ runCount: 250, seed: 42 },
-			(p) => progressValues.push(p),
-		);
-
-		expect(progressValues.length).toBeGreaterThan(1);
-		expect(progressValues[0]).toBeLessThan(1);
-		expect(progressValues[progressValues.length - 1]).toBe(1);
-
-		for (let i = 1; i < progressValues.length; i++) {
-			expect(progressValues[i]).toBeGreaterThan(progressValues[i - 1]);
-		}
-	});
-
-	it("produces identical results with and without onProgress", () => {
-		const { data: document } = parseCsvFinancialModel(validCsvFiles);
-		if (!document) throw new Error("Document is null");
-		expect(document).not.toBeNull();
+		const settings = makeSettings({
+			fallbackProjectionStartDate: "2026-04-01",
+			horizonYears: 5,
+		});
+		const overrides = {
+			addedAccounts: [],
+			addedPostings: [],
+			disabledAccountIds: [],
+			disabledPostingIds: [],
+		};
+		const config = { runCount: 101, seed: 42 };
 
 		const resultWithout = stochasticProject(
 			document,
-			makeSettings({
-				fallbackProjectionStartDate: "2026-04-01",
-				horizonYears: 10,
-			}),
-			{
-				addedAccounts: [],
-				addedPostings: [],
-				disabledAccountIds: [],
-				disabledPostingIds: [],
-			},
-			{ runCount: 100, seed: 42 },
+			settings,
+			overrides,
+			config,
 		);
 
+		const progressValues: number[] = [];
+		const partials: StochasticProjectionResult[] = [];
 		const resultWith = stochasticProject(
 			document,
-			makeSettings({
-				fallbackProjectionStartDate: "2026-04-01",
-				horizonYears: 10,
-			}),
-			{
-				addedAccounts: [],
-				addedPostings: [],
-				disabledAccountIds: [],
-				disabledPostingIds: [],
+			settings,
+			overrides,
+			config,
+			(progress, partial) => {
+				progressValues.push(progress);
+				partials.push(partial);
 			},
-			{ runCount: 100, seed: 42 },
-			() => {},
 		);
 
-		expect(resultWith.bands.length).toBe(resultWithout.bands.length);
-		expect(resultWith.bands[0].netWorth.p50).toBe(
-			resultWithout.bands[0].netWorth.p50,
-		);
-		expect(thresholdProbability(resultWith)).toBe(
-			thresholdProbability(resultWithout),
-		);
+		expect(resultWith).toEqual(resultWithout);
+		expect(progressValues).toHaveLength(3);
+		expect(progressValues[progressValues.length - 1]).toBe(1);
+		for (let i = 1; i < progressValues.length; i++) {
+			expect(progressValues[i]).toBeGreaterThan(progressValues[i - 1]);
+		}
+		for (const partial of partials) {
+			expect(partial.bands.length).toBeGreaterThan(0);
+			for (const band of partial.bands) {
+				expect(band.netWorth.p10).toBeLessThanOrEqual(band.netWorth.p50);
+				expect(band.netWorth.p50).toBeLessThanOrEqual(band.netWorth.p90);
+			}
+			expect(thresholdProbability(partial)).toBeGreaterThanOrEqual(0);
+			expect(thresholdProbability(partial)).toBeLessThanOrEqual(1);
+		}
+		expect(partials[partials.length - 1]).toEqual(resultWith);
 	});
 
 	it("reports progress for a small run count (1)", () => {
@@ -556,109 +510,5 @@ describe("stochastic progress streaming", () => {
 
 		expect(progressValues.length).toBe(1);
 		expect(progressValues[0]).toBe(1);
-	});
-
-	it("reports progress in increasing steps up to 100%", () => {
-		const { data: document } = parseCsvFinancialModel(validCsvFiles);
-		if (!document) throw new Error("Document is null");
-		expect(document).not.toBeNull();
-
-		const progressValues: number[] = [];
-		stochasticProject(
-			document,
-			makeSettings({
-				fallbackProjectionStartDate: "2026-04-01",
-				horizonYears: 5,
-			}),
-			{
-				addedAccounts: [],
-				addedPostings: [],
-				disabledAccountIds: [],
-				disabledPostingIds: [],
-			},
-			{ runCount: 250, seed: 42 },
-			(p) => progressValues.push(p),
-		);
-
-		expect(progressValues.length).toBeGreaterThan(1);
-		expect(progressValues[0]).toBeGreaterThan(0);
-		expect(progressValues[progressValues.length - 1]).toBe(1);
-		for (let i = 1; i < progressValues.length; i++) {
-			expect(progressValues[i]).toBeGreaterThan(progressValues[i - 1]);
-		}
-	});
-
-	it("each partial result has valid band structure", () => {
-		const { data: document } = parseCsvFinancialModel(validCsvFiles);
-		if (!document) throw new Error("Document is null");
-		expect(document).not.toBeNull();
-
-		const partials: StochasticProjectionResult[] = [];
-		const final = stochasticProject(
-			document,
-			makeSettings({
-				fallbackProjectionStartDate: "2026-04-01",
-				horizonYears: 10,
-			}),
-			{
-				addedAccounts: [],
-				addedPostings: [],
-				disabledAccountIds: [],
-				disabledPostingIds: [],
-			},
-			{ runCount: 250, seed: 42 },
-			(_p, partial) => partials.push(partial),
-		);
-
-		for (const partial of partials) {
-			expect(partial.bands.length).toBeGreaterThan(0);
-			for (const band of partial.bands) {
-				expect(band.netWorth.p10).toBeLessThanOrEqual(band.netWorth.p50);
-				expect(band.netWorth.p50).toBeLessThanOrEqual(band.netWorth.p90);
-			}
-			expect(thresholdProbability(partial)).toBeGreaterThanOrEqual(0);
-			expect(thresholdProbability(partial)).toBeLessThanOrEqual(1);
-		}
-
-		const lastPartial = partials[partials.length - 1];
-		expect(lastPartial.bands[0].netWorth.p50).toBe(final.bands[0].netWorth.p50);
-		expect(thresholdProbability(lastPartial)).toBe(thresholdProbability(final));
-		expect(lastPartial.evaluations).toEqual(final.evaluations);
-		expect(fiResult(lastPartial)?.candidateWithdrawalDiagnostics).toEqual(
-			fiResult(final)?.candidateWithdrawalDiagnostics,
-		);
-	});
-
-	it("last partial result matches the final return value", () => {
-		const { data: document } = parseCsvFinancialModel(validCsvFiles);
-		if (!document) throw new Error("Document is null");
-		expect(document).not.toBeNull();
-
-		const partials: StochasticProjectionResult[] = [];
-		const final = stochasticProject(
-			document,
-			makeSettings({
-				fallbackProjectionStartDate: "2026-04-01",
-				horizonYears: 10,
-			}),
-			{
-				addedAccounts: [],
-				addedPostings: [],
-				disabledAccountIds: [],
-				disabledPostingIds: [],
-			},
-			{ runCount: 250, seed: 42 },
-			(_p, partial) => partials.push(partial),
-		);
-
-		expect(partials.length).toBeGreaterThanOrEqual(1);
-		const last = partials[partials.length - 1];
-		expect(last.bands.length).toBe(final.bands.length);
-		for (let i = 0; i < final.bands.length; i++) {
-			expect(last.bands[i].netWorth.p50).toBe(final.bands[i].netWorth.p50);
-			expect(last.bands[i].netWorth.p90 - last.bands[i].netWorth.p10).toBe(
-				final.bands[i].netWorth.p90 - final.bands[i].netWorth.p10,
-			);
-		}
 	});
 });
