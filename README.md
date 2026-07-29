@@ -65,7 +65,7 @@ npm run build
 - `src/store.ts`: `ModelOverrides`, document editor, runtime settings, read-only comparison metrics, and theme state
 - `src/engine/WorkerProjectionEngine.ts`: deterministic and stochastic Web Worker facade
 - `src/components/ProjectionDashboard.tsx`: projection dashboard
-- `src/components/ModelInputsInspector.tsx`: model tables and editing UI
+- `src/components/ModelInputsInspector.tsx`: scheduled transactions, paginated one-time history, account rules, and canonical editing UI
 - `src/components/ModelValidationPanel.tsx`: parsing and validation diagnostics
 - `src/components/CurrentChangesControls.tsx`: session-only override controls
 - `src/components/CurrentChangesComparison.tsx`: read-only metric snapshots

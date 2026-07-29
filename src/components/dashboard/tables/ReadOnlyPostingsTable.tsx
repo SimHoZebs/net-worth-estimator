@@ -3,6 +3,7 @@ import { DataTable, formatCurrency } from "@/components/ui/data-table";
 import { TableSearch } from "@/components/ui/table-search";
 import { formatFrequency } from "@/lib/format";
 import type { Posting } from "@/lib/projection";
+import { PostingAmount } from "./PostingAmount";
 
 interface ReadOnlyPostingsTableProps {
 	postings: Posting[];
@@ -27,8 +28,8 @@ export function ReadOnlyPostingsTable({
 				placeholder="Search transactions..."
 			/>
 			<DataTable
-				title="Postings"
-				description="Scheduled flows. Checkbox applies a temporary change immediately."
+				title="Scheduled transactions"
+				description="Recurring income, spending, and transfers tied directly to salary or checking."
 				rows={postings.filter(
 					(p) =>
 						!search ||
@@ -43,9 +44,13 @@ export function ReadOnlyPostingsTable({
 						? [{ key: "sourceAccountId" as never, label: "Source" }]
 						: []),
 					{ key: "destinations" as never, label: "To" },
-					...(showAdvanced
-						? [{ key: "arithmetic" as never, label: "Formula" }]
-						: []),
+					{
+						key: "arithmetic" as never,
+						label: "Amount",
+						render: (value: unknown) => (
+							<PostingAmount arithmetic={String(value)} />
+						),
+					},
 					{
 						key: "frequency" as never,
 						label: "Freq",
@@ -80,6 +85,7 @@ export function ReadOnlyPostingsTable({
 							return (
 								<input
 									type="checkbox"
+									aria-label={`Enable ${p.label}`}
 									className="h-4 w-4 rounded accent-primary"
 									checked={!disabledPostingSet.has(p.id)}
 									onChange={() => onToggle(p.id)}

@@ -1,10 +1,9 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { buildAccountDiagnosticChartData } from "@/chart/chartData";
 import { EvaluationResults } from "@/components/evaluations/EvaluationList";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { LazySection } from "@/components/ui/lazy-section";
-import { StatusPill } from "@/components/ui/status-pill";
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	FinancialModelDocument,
@@ -25,7 +24,6 @@ import { DriverCard } from "./dashboard/DriverCard";
 import { NetWorthReconciliation } from "./dashboard/NetWorthReconciliation";
 import { ShortfallCalendar } from "./dashboard/ShortfallCalendar";
 import { SimulationOverview } from "./dashboard/SimulationOverview";
-import { TransactionCompletionTable } from "./dashboard/tables/TransactionCompletionTable";
 import { useDashboardDerivedValues } from "./dashboard/useDashboardDerivedValues";
 
 interface ProjectionDashboardProps {
@@ -75,7 +73,6 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 	evaluationResultsAreStale = false,
 	stochasticEvaluationResultsAreStale = false,
 }: ProjectionDashboardProps) {
-	const [isPostingTablesOpen, setIsPostingTablesOpen] = useState(false);
 	const hasStochasticData =
 		stochasticResult !== undefined && stochasticResult !== null;
 	const accountDiagnosticChartData = useMemo(
@@ -232,56 +229,6 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 					accounts={document.accounts}
 				/>
 			</section>
-
-			<Collapsible
-				open={isPostingTablesOpen}
-				onOpenChange={setIsPostingTablesOpen}
-			>
-				<Collapsible.Trigger>
-					<div className="flex items-start justify-between gap-4">
-						<div className="flex items-start gap-3">
-							<Collapsible.Chevron />
-							<div>
-								<div className="type-title text-base">
-									Scheduled transactions
-								</div>
-								<div className="type-muted">Transaction completion rates.</div>
-							</div>
-						</div>
-						<div className="flex items-center gap-2">
-							<StatusPill>
-								{isPostingTablesOpen
-									? "Close"
-									: `${derived.enabledPostingCount} posting${derived.enabledPostingCount === 1 ? "" : "s"}`}
-							</StatusPill>
-							<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
-								{isPostingTablesOpen ? "Hide details" : "Show details"}
-							</span>
-						</div>
-					</div>
-				</Collapsible.Trigger>
-				<Collapsible.Content>
-					<div className="grid gap-6">
-						<div className="flex flex-wrap items-center gap-4 type-caption">
-							<span className="flex items-center gap-1.5">
-								<span className="inline-block h-2.5 w-2.5 rounded-full bg-primary" />{" "}
-								On track
-							</span>
-							<span className="flex items-center gap-1.5">
-								<span className="inline-block h-2.5 w-2.5 rounded-full bg-tertiary" />{" "}
-								Needs attention
-							</span>
-							<span className="flex items-center gap-1.5">
-								<span className="inline-block h-2.5 w-2.5 rounded-full bg-muted-foreground/50" />{" "}
-								Neutral
-							</span>
-						</div>
-						<TransactionCompletionTable
-							postingSummaries={derived.postingSummaries}
-						/>
-					</div>
-				</Collapsible.Content>
-			</Collapsible>
 		</div>
 	);
 });

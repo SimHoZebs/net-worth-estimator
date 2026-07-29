@@ -69,8 +69,7 @@ export function TemporaryPostingForm({
 		<div className="space-y-2">
 			<div className="flex items-center justify-between">
 				<span className="type-eyebrow">
-					Scheduled transactions{" "}
-					{postings.length > 0 ? `(${postings.length})` : ""}
+					Posting additions {postings.length > 0 ? `(${postings.length})` : ""}
 				</span>
 				{!adding ? (
 					<Button
@@ -140,7 +139,7 @@ export function TemporaryPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">Arithmetic</label>
+							<label className="block type-caption">Amount calculation</label>
 							<Input
 								className="w-full rounded-lg "
 								value={adding.arithmetic}

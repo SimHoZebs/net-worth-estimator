@@ -47,8 +47,10 @@ export function EditablePostingsTable({
 	return (
 		<Card className="rounded-[1.8rem] border-border shadow-sm ">
 			<CardHeader>
-				<CardTitle>Postings</CardTitle>
-				<CardDescription>Edit, add, or remove posting rows.</CardDescription>
+				<CardTitle>Posting definitions</CardTitle>
+				<CardDescription>
+					Edit the canonical amount calculations and scheduling fields.
+				</CardDescription>
 			</CardHeader>
 			<CardContent>
 				<Table>
@@ -58,7 +60,7 @@ export function EditablePostingsTable({
 							<TableHead>Label</TableHead>
 							<TableHead>Source</TableHead>
 							<TableHead>Destinations</TableHead>
-							<TableHead>Arithmetic</TableHead>
+							<TableHead>Amount calculation</TableHead>
 							<TableHead>Freq</TableHead>
 							<TableHead>Rate</TableHead>
 							<TableHead>Growth</TableHead>

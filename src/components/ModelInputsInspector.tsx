@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import { CurrentChangesControls } from "@/components/CurrentChangesControls";
 import { EditableAccountsTable } from "@/components/dashboard/tables/EditableAccountsTable";
 import { EditablePostingsTable } from "@/components/dashboard/tables/EditablePostingsTable";
 import { ReadOnlyAccountsTable } from "@/components/dashboard/tables/ReadOnlyAccountsTable";
 import { ReadOnlyPostingsTable } from "@/components/dashboard/tables/ReadOnlyPostingsTable";
+import { TransactionHistoryTable } from "@/components/dashboard/tables/TransactionHistoryTable";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,11 +17,13 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { pluralize } from "@/lib/format";
+import { partitionPostings } from "@/lib/posting-categories";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import { selectEditorActions, selectEditorState, useStore } from "@/store";
 import { ModelValidationPanel } from "./ModelValidationPanel";
 
-type InputTab = "postings" | "accounts";
+type ReadInputTab = "scheduled" | "accounts" | "history";
+type EditInputTab = "postings" | "accounts";
 
 function tabClassName(isActive: boolean) {
 	return `rounded-full px-3 py-1.5 type-caption font-medium transition ${
@@ -62,12 +65,17 @@ export function ModelInputsInspector() {
 	} = useStore(useShallow(selectEditorActions));
 
 	const [showAdvanced, setShowAdvanced] = useState(false);
-	const [activeTab, setActiveTab] = useState<InputTab>("postings");
+	const [readTab, setReadTab] = useState<ReadInputTab>("scheduled");
+	const [editTab, setEditTab] = useState<EditInputTab>("postings");
 
 	const disabledAccountSet = new Set(disabledAccountIds);
 	const disabledPostingSet = new Set(disabledPostingIds);
 	const displayDocument =
 		isEditing && workingDocument ? workingDocument : document;
+	const postingGroups = useMemo(
+		() => partitionPostings(displayDocument?.postings ?? []),
+		[displayDocument?.postings],
+	);
 	const errorCount = issues.filter(
 		(issue) => issue.severity === "error",
 	).length;
@@ -83,18 +91,37 @@ export function ModelInputsInspector() {
 					? "Clean"
 					: "Pending";
 
-	const tabs: Array<{ id: InputTab; label: string; count: number }> = [
-		{
-			id: "postings",
-			label: "Transactions",
-			count: displayDocument?.postings.length ?? 0,
-		},
-		{
-			id: "accounts",
-			label: "Accounts",
-			count: displayDocument?.accounts.length ?? 0,
-		},
-	];
+	const tabs = isEditing
+		? [
+				{
+					id: "postings" as const,
+					label: "Posting definitions",
+					count: displayDocument?.postings.length ?? 0,
+				},
+				{
+					id: "accounts" as const,
+					label: "Accounts",
+					count: displayDocument?.accounts.length ?? 0,
+				},
+			]
+		: [
+				{
+					id: "scheduled" as const,
+					label: "Scheduled transactions",
+					count: postingGroups.scheduledTransactions.length,
+				},
+				{
+					id: "accounts" as const,
+					label: "Accounts",
+					count: displayDocument?.accounts.length ?? 0,
+				},
+				{
+					id: "history" as const,
+					label: "Transaction history",
+					count: postingGroups.transactionHistory.length,
+				},
+			];
+	const activeTab = isEditing ? editTab : readTab;
 
 	return (
 		<Card className="rounded-[1.8rem] border-border/80">
@@ -172,18 +199,24 @@ export function ModelInputsInspector() {
 				{document && displayDocument ? (
 					<>
 						<div className="flex flex-wrap items-center justify-between gap-3">
-							<div className="flex flex-wrap gap-2">
+							<fieldset className="flex flex-wrap gap-2">
+								<legend className="sr-only">Model input sections</legend>
 								{tabs.map((tab) => (
 									<button
 										key={tab.id}
 										type="button"
-										onClick={() => setActiveTab(tab.id)}
+										aria-pressed={activeTab === tab.id}
+										onClick={() =>
+											isEditing
+												? setEditTab(tab.id as EditInputTab)
+												: setReadTab(tab.id as ReadInputTab)
+										}
 										className={tabClassName(activeTab === tab.id)}
 									>
 										{tab.label} <span className="opacity-70">{tab.count}</span>
 									</button>
 								))}
-							</div>
+							</fieldset>
 
 							{!isEditing ? (
 								<button
@@ -192,14 +225,14 @@ export function ModelInputsInspector() {
 									className="rounded-lg border border-border px-3 py-1.5 type-label transition hover:border-ring hover:text-foreground"
 								>
 									{showAdvanced
-										? "Hide raw IDs and formulas"
-										: "Show raw IDs and formulas"}
+										? "Hide technical fields"
+										: "Show technical fields"}
 								</button>
 							) : null}
 						</div>
 
-						{activeTab === "postings" ? (
-							isEditing ? (
+						<div className="space-y-4">
+							{isEditing && activeTab === "postings" ? (
 								<EditablePostingsTable
 									displayDocument={displayDocument}
 									document={document}
@@ -210,36 +243,50 @@ export function ModelInputsInspector() {
 									deletePosting={deletePosting}
 									addPosting={addPosting}
 								/>
-							) : (
+							) : null}
+
+							{!isEditing && activeTab === "scheduled" ? (
 								<ReadOnlyPostingsTable
-									postings={displayDocument.postings}
+									postings={postingGroups.scheduledTransactions}
 									showAdvanced={showAdvanced}
 									disabledPostingSet={disabledPostingSet}
 									onToggle={togglePostingDisabled}
 								/>
-							)
-						) : null}
+							) : null}
 
-						{activeTab === "accounts" ? (
-							isEditing ? (
-								<EditableAccountsTable
-									displayDocument={displayDocument}
-									document={document}
-									isDirty={isDirty}
-									workingDocument={workingDocument}
-									updateAccount={updateAccount}
-									deleteAccount={deleteAccount}
-									addAccount={addAccount}
-								/>
-							) : (
-								<ReadOnlyAccountsTable
+							{activeTab === "accounts" ? (
+								isEditing ? (
+									<EditableAccountsTable
+										displayDocument={displayDocument}
+										document={document}
+										isDirty={isDirty}
+										workingDocument={workingDocument}
+										updateAccount={updateAccount}
+										deleteAccount={deleteAccount}
+										addAccount={addAccount}
+									/>
+								) : (
+									<ReadOnlyAccountsTable
+										accounts={displayDocument.accounts}
+										accountRules={postingGroups.accountRules}
+										showAdvanced={showAdvanced}
+										disabledAccountSet={disabledAccountSet}
+										disabledPostingSet={disabledPostingSet}
+										onToggleAccount={toggleAccountDisabled}
+										onTogglePosting={togglePostingDisabled}
+									/>
+								)
+							) : null}
+
+							{!isEditing && activeTab === "history" ? (
+								<TransactionHistoryTable
+									postings={postingGroups.transactionHistory}
 									accounts={displayDocument.accounts}
-									showAdvanced={showAdvanced}
-									disabledAccountSet={disabledAccountSet}
-									onToggle={toggleAccountDisabled}
+									disabledPostingSet={disabledPostingSet}
+									onToggle={togglePostingDisabled}
 								/>
-							)
-						) : null}
+							) : null}
+						</div>
 					</>
 				) : (
 					<div className="rounded-2xl border border-dashed border-border/80 bg-surface/70 px-4 py-8 text-center type-muted dark:border-white/10 dark:bg-surface/50">

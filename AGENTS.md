@@ -25,7 +25,7 @@ App (src/App.tsx)
 | Directory | Contents |
 | --- | --- |
 | `src/components/dashboard/` | overview cards, metrics, reconciliation, cash flow, debt, shortfall, FI, account, contribution, and stochastic views |
-| `src/components/dashboard/tables/` | read-only/editable model tables and transaction completion |
+| `src/components/dashboard/tables/` | scheduled transactions, transaction history, account rules, and canonical editors |
 | `src/components/dashboard/current-changes/` | temporary account and posting forms |
 | `src/components/dashboard/charts/` | diagnostic, account, contribution, and point-detail chart components |
 | `src/components/ui/` | presentational primitives |
