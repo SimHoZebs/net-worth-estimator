@@ -10,7 +10,6 @@ export interface DashboardDerivedValues {
 	firstProjectedEvent: PostingFulfillmentPathResult["events"][number] | null;
 	firstUnderfulfilledDate: string | null;
 	biggestShortfallPosting: PostingFulfillmentPostingSummary | null;
-	postingSummaries: PostingFulfillmentPostingSummary[] | null;
 	fulfillmentAvailable: boolean;
 	enabledPostingCount: number;
 	requestedPostingAmount: number;
@@ -65,7 +64,6 @@ export function useDashboardDerivedValues(
 			firstProjectedEvent,
 			firstUnderfulfilledDate,
 			biggestShortfallPosting,
-			postingSummaries: fulfillment?.postings ?? null,
 			fulfillmentAvailable: fulfillment !== null,
 			enabledPostingCount,
 			requestedPostingAmount,

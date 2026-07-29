@@ -132,13 +132,13 @@ Percentile-band slope is never interpreted as a run outcome. FI-cycle probabilit
 
 - `/`: read-only current/projected metrics, charts, reconciliation, cash flow, debt, shortfalls, evaluation outcomes, and saved comparisons.
 - `/settings`: session-only horizon, Monte Carlo, evaluation, and appearance configuration. Unapplied evaluation drafts block navigation; pending debounced Monte Carlo values flush when the page unmounts.
-- `/model-inputs`: read-only and editable model tables, validation, temporary changes, templates, and source actions.
+- `/model-inputs`: scheduled salary/checking transactions, paginated one-time transaction history, account-associated future rules, canonical editing, validation, temporary changes, templates, and source actions.
 - `App`: persistent data, mutation, deterministic projection, and stochastic projection controller shared by every route.
 - `runtime/modelRuntime`: read-only model/source state and wrapped source actions; executable `DataSource` operations remain private to `App`.
 - `runtime/projectionRuntime`: separate projection-artifact and execution-status providers so Monte Carlo progress does not rerender unrelated model consumers.
 - `ProjectionDashboard`: current/projected metrics, account and contribution charts, reconciliation, cash flow, debt, shortfalls, and read-only evaluation outcomes.
 - `EvaluationSettings`: evaluation collection management and type-specific configuration.
-- `ModelInputsInspector`: read-only and editable model tables.
+- `ModelInputsInspector`: presentation-grouped read views plus canonical account and posting editors. Posting grouping is UI-only and does not change model semantics.
 - `ModelValidationPanel`: parsing and cross-reference diagnostics.
 - `CurrentChangesControls`: session-only temporary additions and disable toggles.
 - `CurrentChangesComparison`: captures and compares read-only `ComparisonSnapshot` metrics.
