@@ -357,6 +357,22 @@ describe("evaluateFinancialIndependence", () => {
 			candidateDates: ["2026-01-01"],
 		});
 
+		expect(result.rows[0].assetContributions).toEqual([
+			{
+				accountId: "first",
+				balance: 50_000,
+				withdrawalRate: 0.04,
+				annualWithdrawalCapacity: 2_000,
+			},
+			{
+				accountId: "second",
+				balance: 50_000,
+				withdrawalRate: 0.04,
+				annualWithdrawalCapacity: 2_000,
+			},
+		]);
+		expect(result.rows[0].selectedAssetBalance).toBe(100_000);
+		expect(result.rows[0].annualWithdrawalCapacity).toBe(4_000);
 		const summary = result.runOutcomes[0].withdrawals;
 		expect(summary.requestedAmount).toBe(4_000);
 		expect(summary.realizedAmount).toBe(3_000);
@@ -366,6 +382,43 @@ describe("evaluateFinancialIndependence", () => {
 		expect(summary.constraints.map((constraint) => constraint.type)).toEqual([
 			"source-floor",
 			"action-limit",
+		]);
+	});
+
+	it("reports effective rates and zero-balance selected assets", () => {
+		const result = evaluateFinancialIndependence({
+			path: path(
+				[row("2026-01-01", { brokerage: 100_000, roth: 0 })],
+				[],
+				[account("brokerage"), account("roth")],
+			),
+			plan: plan({
+				sources: [
+					{ type: "asset", accountId: "brokerage", included: true },
+					{
+						type: "asset",
+						accountId: "roth",
+						included: true,
+						withdrawalRateOverride: 0.05,
+					},
+				],
+			}),
+			candidateDates: ["2026-01-01"],
+		});
+
+		expect(result.rows[0].assetContributions).toEqual([
+			{
+				accountId: "brokerage",
+				balance: 100_000,
+				withdrawalRate: 0.04,
+				annualWithdrawalCapacity: 4_000,
+			},
+			{
+				accountId: "roth",
+				balance: 0,
+				withdrawalRate: 0.05,
+				annualWithdrawalCapacity: 0,
+			},
 		]);
 	});
 

@@ -115,6 +115,7 @@ export type {
 	EvaluationTables,
 	EvaluationType,
 	FinancialIndependenceAnalysis,
+	FinancialIndependenceAssetContribution,
 	FinancialIndependenceEvaluation,
 	FinancialIndependencePlan,
 	FinancialIndependencePrincipalPolicy,

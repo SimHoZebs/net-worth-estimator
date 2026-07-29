@@ -3,6 +3,8 @@ import { OverviewCard } from "@/components/dashboard/OverviewCard";
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	EvaluationInstance,
+	FinancialIndependenceAnalysis,
+	FinancialIndependenceCandidateWithdrawalDiagnostic,
 	FinancialIndependencePlan,
 	FinancialModelDocument,
 	ProjectionResult,
@@ -21,18 +23,15 @@ interface FinancialIndependenceEvaluationProps {
 	stochasticIsProvisional?: boolean;
 	sourceRevision: number;
 	resultsAreStale?: boolean;
-	blockerValue: string;
-	blockerDetail: string;
 }
 
 export function FinancialIndependenceEvaluation({
 	evaluation,
+	document,
 	result,
 	stochasticResult,
 	stochasticIsProvisional = false,
 	resultsAreStale = false,
-	blockerValue,
-	blockerDetail,
 }: FinancialIndependenceEvaluationProps) {
 	let plan: FinancialIndependencePlan;
 	try {
@@ -48,19 +47,20 @@ export function FinancialIndependenceEvaluation({
 		? undefined
 		: getFinancialIndependenceResult(stochasticResult, evaluation.instanceId)
 				?.probabilistic;
+	const candidateDate = analysis
+		? selectFinancialIndependenceCandidateDate(analysis)
+		: null;
+	const candidateOutcome = analysis?.runOutcomes.find(
+		(outcome) => outcome.candidateDate === candidateDate,
+	);
 	const behaviorOutcome =
-		analysis?.runOutcomes.find(
-			(outcome) =>
-				outcome.status === "evaluated" &&
-				outcome.candidateDate === analysis.milestones.firstSelfSustainingDate,
-		) ??
-		analysis?.runOutcomes.find((outcome) => outcome.status === "evaluated");
-	const withdrawalDiagnostic = behaviorOutcome
-		? probabilistic?.candidateWithdrawalDiagnostics.find(
-				(diagnostic) =>
-					diagnostic.candidateDate === behaviorOutcome.candidateDate,
-			)
-		: probabilistic?.candidateWithdrawalDiagnostics[0];
+		candidateOutcome?.status === "evaluated" ? candidateOutcome : undefined;
+	const withdrawalDiagnostic =
+		candidateDate === null
+			? undefined
+			: probabilistic?.candidateWithdrawalDiagnostics.find(
+					(diagnostic) => diagnostic.candidateDate === candidateDate,
+				);
 
 	return (
 		<div className="space-y-4">
@@ -74,59 +74,71 @@ export function FinancialIndependenceEvaluation({
 						<div className="mb-2 type-eyebrow">Outcome and analysis</div>
 						<OverviewCard
 							result={result}
+							document={document}
 							instanceId={evaluation.instanceId}
 							plan={plan}
+							candidateDate={candidateDate}
 							stochasticResult={stochasticResult}
 							stochasticIsProvisional={stochasticIsProvisional}
-							blockerValue={blockerValue}
-							blockerDetail={blockerDetail}
 						/>
 					</div>
 					<div>
 						<div className="mb-2 type-eyebrow">Behavior evidence</div>
 						<div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 							<BehaviorMetric
-								label="Evaluated branch"
+								label="Diagnostic candidate"
 								value={
-									behaviorOutcome
-										? formatDate(behaviorOutcome.candidateDate)
-										: "No eligible branch"
+									candidateDate ? formatDate(candidateDate) : "No test window"
 								}
-								detail={
-									behaviorOutcome?.cycleEstablished
-										? "Behavior sustained the complete cycle"
-										: "No evaluated branch established the cycle"
-								}
+								detail={candidateOutcomeDetail(candidateOutcome)}
 							/>
 							<BehaviorMetric
 								label="Requested withdrawals"
-								value={currency.format(
-									behaviorOutcome?.withdrawals.requestedAmount ?? 0,
-								)}
-								detail={`${currency.format(behaviorOutcome?.withdrawals.realizedAmount ?? 0)} realized by account movement constraints`}
+								value={
+									behaviorOutcome
+										? currency.format(
+												behaviorOutcome.withdrawals.requestedAmount,
+											)
+										: "Not evaluated"
+								}
+								detail={
+									behaviorOutcome
+										? `${currency.format(behaviorOutcome.withdrawals.realizedAmount)} realized by account movement constraints`
+										: unavailableBehaviorDetail(candidateOutcome)
+								}
 							/>
 							<BehaviorMetric
 								label="Deterministic shortfall"
-								value={currency.format(
-									behaviorOutcome?.withdrawals.shortfallAmount ?? 0,
-								)}
+								value={
+									behaviorOutcome
+										? currency.format(
+												behaviorOutcome.withdrawals.shortfallAmount,
+											)
+										: "Not evaluated"
+								}
 								detail={
 									behaviorOutcome?.withdrawals.firstShortfallDate
 										? `First on ${formatDate(behaviorOutcome.withdrawals.firstShortfallDate)}`
-										: "No unfunded behavior withdrawals"
+										: behaviorOutcome
+											? "No unfunded behavior withdrawals"
+											: "No behavior branch was run"
 								}
 							/>
 							<BehaviorMetric
 								label={`${stochasticIsProvisional ? "Provisional " : ""}shortfall probability`}
-								value={
-									withdrawalDiagnostic
-										? pct.format(withdrawalDiagnostic.shortfallProbability)
-										: "Run Monte Carlo"
-								}
+								value={shortfallProbabilityValue(
+									candidateDate,
+									probabilistic !== undefined && probabilistic !== null,
+									withdrawalDiagnostic,
+								)}
 								detail={
 									withdrawalDiagnostic
-										? `${withdrawalDiagnostic.shortfallRunCount} of ${withdrawalDiagnostic.diagnosticRunCount} eligible independent Monte Carlo samples`
-										: "Candidate-aligned behavior diagnostic"
+										? withdrawalDiagnostic.diagnosticRunCount > 0
+											? `${withdrawalDiagnostic.shortfallRunCount} of ${withdrawalDiagnostic.diagnosticRunCount} eligible independent Monte Carlo samples`
+											: `0 of ${withdrawalDiagnostic.totalRunCount} independent Monte Carlo samples were eligible`
+										: candidateDate
+											? "Candidate-aligned behavior diagnostic"
+											: "No FI candidate could be tested"
 								}
 							/>
 						</div>
@@ -140,6 +152,54 @@ export function FinancialIndependenceEvaluation({
 			)}
 		</div>
 	);
+}
+
+export function selectFinancialIndependenceCandidateDate(
+	analysis: FinancialIndependenceAnalysis,
+) {
+	const successful = analysis.runOutcomes.find(
+		(outcome) => outcome.cycleEstablished,
+	);
+	if (successful) return successful.candidateDate;
+	for (let index = analysis.runOutcomes.length - 1; index >= 0; index--) {
+		const outcome = analysis.runOutcomes[index];
+		if (outcome?.status === "evaluated") return outcome.candidateDate;
+	}
+	return analysis.rows[analysis.rows.length - 1]?.date ?? null;
+}
+
+function candidateOutcomeDetail(
+	outcome: FinancialIndependenceAnalysis["runOutcomes"][number] | undefined,
+) {
+	if (!outcome) return "No complete behavior cycle fits in the horizon";
+	if (outcome.cycleEstablished) return "Behavior sustained the complete cycle";
+	if (outcome.status === "ineligible")
+		return "Candidate did not pass the net worth and capacity gates";
+	if (!outcome.expensesFullyCovered)
+		return "Behavior produced unfunded withdrawals during the cycle";
+	if (!outcome.principalReplenished)
+		return "Spending was funded, but the principal policy was not met";
+	return "Behavior did not establish the complete cycle";
+}
+
+function unavailableBehaviorDetail(
+	outcome: FinancialIndependenceAnalysis["runOutcomes"][number] | undefined,
+) {
+	return outcome
+		? "Candidate did not pass the initial FI gates"
+		: "No complete FI test fits in the projection horizon";
+}
+
+function shortfallProbabilityValue(
+	candidateDate: string | null,
+	hasProbabilisticResult: boolean,
+	diagnostic: FinancialIndependenceCandidateWithdrawalDiagnostic | undefined,
+) {
+	if (candidateDate === null) return "Not evaluated";
+	if (!hasProbabilisticResult) return "Run Monte Carlo";
+	if (!diagnostic || diagnostic.diagnosticRunCount === 0)
+		return "Not evaluated";
+	return pct.format(diagnostic.shortfallProbability);
 }
 
 function BehaviorMetric({
