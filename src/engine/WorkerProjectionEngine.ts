@@ -13,10 +13,12 @@ import type {
 } from "@/lib/projection/runtime/ProjectionEngine";
 import type {
 	ProjectionWorkerRequest,
-	ProjectionWorkerResponse,
-	StochasticWorkerProgress,
 	StochasticWorkerRequest,
-	StochasticWorkerResponse,
+} from "@/workers/types";
+import {
+	isProjectionWorkerResponseEnvelope,
+	isStochasticWorkerProgressEnvelope,
+	isStochasticWorkerResponseEnvelope,
 } from "@/workers/types";
 
 function toError(error: unknown, fallback: string): Error {
@@ -27,73 +29,126 @@ function toError(error: unknown, fallback: string): Error {
 type WithoutId<T> = T extends { id: number } ? Omit<T, "id"> : never;
 type ProjectionWorkerPayload = WithoutId<ProjectionWorkerRequest>;
 
+type WorkerMessageOutcome<T> =
+	| { type: "continue" }
+	| { type: "resolve"; result: T }
+	| { type: "reject"; error: Error };
+
+interface WorkerTransportOptions<TRequest, TResult> {
+	url: URL;
+	request: TRequest;
+	signal?: AbortSignal;
+	crashMessage: string;
+	unreadableMessage: string;
+	postMessageFallback: string;
+	decodeMessage: (data: unknown) => WorkerMessageOutcome<TResult>;
+}
+
 export class WorkerProjectionEngine implements ProjectionComputationEngine {
+	private runWorker<TRequest, TResult>({
+		url,
+		request,
+		signal,
+		crashMessage,
+		unreadableMessage,
+		postMessageFallback,
+		decodeMessage,
+	}: WorkerTransportOptions<TRequest, TResult>): Promise<TResult> {
+		const worker = new Worker(url, { type: "module" });
+
+		return new Promise<TResult>((resolve, reject) => {
+			let settled = false;
+			const abortHandler = () => {
+				finish(() => reject(new DOMException("Aborted", "AbortError")));
+			};
+			const cleanup = () => {
+				signal?.removeEventListener("abort", abortHandler);
+				worker.onmessage = null;
+				worker.onerror = null;
+				worker.onmessageerror = null;
+				worker.terminate();
+			};
+			const finish = (settle: () => void) => {
+				if (settled) return;
+				settled = true;
+				cleanup();
+				settle();
+			};
+
+			if (signal?.aborted) {
+				abortHandler();
+				return;
+			}
+
+			signal?.addEventListener("abort", abortHandler, { once: true });
+
+			worker.onmessage = (event: MessageEvent<unknown>) => {
+				if (signal?.aborted) {
+					abortHandler();
+					return;
+				}
+
+				const outcome = decodeMessage(event.data);
+				if (outcome.type === "resolve") {
+					finish(() => resolve(outcome.result));
+				} else if (outcome.type === "reject") {
+					finish(() => reject(outcome.error));
+				}
+			};
+			worker.onerror = () => {
+				finish(() => reject(new Error(crashMessage)));
+			};
+			worker.onmessageerror = () => {
+				finish(() => reject(new Error(unreadableMessage)));
+			};
+
+			try {
+				worker.postMessage(request);
+			} catch (error) {
+				finish(() => reject(toError(error, postMessageFallback)));
+			}
+		});
+	}
+
 	private runProjectionWorker<T>(
 		payload: ProjectionWorkerPayload,
 		signal: AbortSignal | undefined,
 	): Promise<T> {
-		const worker = new Worker(
-			new URL("../workers/projectionWorker.ts", import.meta.url),
-			{
-				type: "module",
+		const request = { ...payload, id: 1 } as ProjectionWorkerRequest;
+
+		return this.runWorker<ProjectionWorkerRequest, T>({
+			url: new URL("../workers/projectionWorker.ts", import.meta.url),
+			request,
+			signal,
+			crashMessage: "Projection worker crashed.",
+			unreadableMessage: "Projection worker returned an unreadable message.",
+			postMessageFallback: "Could not send projection worker request.",
+			decodeMessage: (data) => {
+				if (
+					!isProjectionWorkerResponseEnvelope(data) ||
+					data.id !== request.id
+				) {
+					return {
+						type: "reject",
+						error: new Error("Projection worker returned a malformed message."),
+					};
+				}
+				if (data.type !== payload.type) {
+					return {
+						type: "reject",
+						error: new Error(
+							"Projection worker returned the wrong result type.",
+						),
+					};
+				}
+				if (data.runtimeError) {
+					return { type: "reject", error: new Error(data.runtimeError) };
+				}
+				if (data.result) {
+					return { type: "resolve", result: data.result as T };
+				}
+				return { type: "reject", error: new Error("No result returned") };
 			},
-		);
-		return new Promise<T>((resolve, reject) => {
-			let abortHandler: (() => void) | undefined;
-			const cleanup = () => {
-				if (abortHandler) signal?.removeEventListener("abort", abortHandler);
-				worker.terminate();
-			};
-			if (signal?.aborted) {
-				cleanup();
-				reject(new DOMException("Aborted", "AbortError"));
-				return;
-			}
-
-			abortHandler = () => {
-				cleanup();
-				reject(new DOMException("Aborted", "AbortError"));
-			};
-
-			signal?.addEventListener("abort", abortHandler, { once: true });
-
-			worker.onmessage = (event: MessageEvent<ProjectionWorkerResponse>) => {
-				if (signal?.aborted) {
-					cleanup();
-					return;
-				}
-
-				const { result, runtimeError, type } = event.data;
-				cleanup();
-
-				if (type !== payload.type) {
-					reject(
-						new Error("Projection worker returned the wrong result type."),
-					);
-				} else if (runtimeError) {
-					reject(new Error(runtimeError));
-				} else if (result) {
-					resolve(result as T);
-				} else {
-					reject(new Error("No result returned"));
-				}
-			};
-
-			worker.onerror = () => {
-				cleanup();
-				reject(new Error("Projection worker crashed."));
-			};
-			worker.onmessageerror = () => {
-				cleanup();
-				reject(new Error("Projection worker returned an unreadable message."));
-			};
-
-			try {
-				worker.postMessage({ ...payload, id: 1 } as ProjectionWorkerRequest);
-			} catch (error) {
-				cleanup();
-				reject(toError(error, "Could not send projection worker request."));
-			}
 		});
 	}
 
@@ -138,90 +193,65 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 		request: StochasticRequest,
 		onProgress?: ProgressCallback,
 	): Promise<StochasticProjectionResult> {
-		const worker = new Worker(
-			new URL("../workers/stochasticWorker.ts", import.meta.url),
-			{
-				type: "module",
-			},
-		);
-		const { signal } = request;
+		const payload: StochasticWorkerRequest = {
+			id: 1,
+			document: request.document,
+			projectionSettings: request.projectionSettings,
+			overrides: request.overrides,
+			config: request.config,
+		};
 
-		return new Promise<StochasticProjectionResult>((resolve, reject) => {
-			let abortHandler: (() => void) | undefined;
-			const cleanup = () => {
-				if (abortHandler) signal?.removeEventListener("abort", abortHandler);
-				worker.terminate();
-			};
-			if (signal?.aborted) {
-				cleanup();
-				reject(new DOMException("Aborted", "AbortError"));
-				return;
-			}
-
-			abortHandler = () => {
-				cleanup();
-				reject(new DOMException("Aborted", "AbortError"));
-			};
-
-			signal?.addEventListener("abort", abortHandler, { once: true });
-
-			worker.onmessage = (
-				event: MessageEvent<
-					StochasticWorkerProgress | StochasticWorkerResponse
-				>,
-			) => {
-				if (signal?.aborted) {
-					cleanup();
-					return;
-				}
-
-				const payload = event.data;
-
-				if (payload.type === "progress") {
-					try {
-						onProgress?.(payload.progress, payload.partial);
-					} catch (error) {
-						cleanup();
-						reject(toError(error, "Stochastic progress callback failed."));
+		return this.runWorker<StochasticWorkerRequest, StochasticProjectionResult>({
+			url: new URL("../workers/stochasticWorker.ts", import.meta.url),
+			request: payload,
+			signal: request.signal,
+			crashMessage: "Stochastic worker crashed.",
+			unreadableMessage: "Stochastic worker returned an unreadable message.",
+			postMessageFallback: "Could not send stochastic worker request.",
+			decodeMessage: (data) => {
+				if (isStochasticWorkerProgressEnvelope(data)) {
+					if (data.id !== payload.id) {
+						return {
+							type: "reject",
+							error: new Error(
+								"Stochastic worker returned a malformed message.",
+							),
+						};
 					}
-					return;
+					try {
+						onProgress?.(
+							data.progress,
+							data.partial as StochasticProjectionResult | undefined,
+						);
+					} catch (error) {
+						return {
+							type: "reject",
+							error: toError(error, "Stochastic progress callback failed."),
+						};
+					}
+					return { type: "continue" };
 				}
 
-				const { result, runtimeError } = payload;
-				cleanup();
-
-				if (runtimeError) {
-					reject(new Error(runtimeError));
-				} else if (result) {
-					resolve(result);
-				} else {
-					reject(new Error("No result returned"));
+				if (
+					!isStochasticWorkerResponseEnvelope(data) ||
+					data.id !== payload.id
+				) {
+					return {
+						type: "reject",
+						error: new Error("Stochastic worker returned a malformed message."),
+					};
 				}
-			};
-
-			worker.onerror = () => {
-				cleanup();
-				reject(new Error("Stochastic worker crashed."));
-			};
-			worker.onmessageerror = () => {
-				cleanup();
-				reject(new Error("Stochastic worker returned an unreadable message."));
-			};
-
-			const payload: StochasticWorkerRequest = {
-				id: 1,
-				document: request.document,
-				projectionSettings: request.projectionSettings,
-				overrides: request.overrides,
-				config: request.config,
-			};
-
-			try {
-				worker.postMessage(payload);
-			} catch (error) {
-				cleanup();
-				reject(toError(error, "Could not send stochastic worker request."));
-			}
+				if (data.runtimeError) {
+					return { type: "reject", error: new Error(data.runtimeError) };
+				}
+				if (data.result) {
+					return {
+						type: "resolve",
+						result: data.result as StochasticProjectionResult,
+					};
+				}
+				return { type: "reject", error: new Error("No result returned") };
+			},
 		});
 	}
 }

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -14,6 +15,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { parseDecimalDraft } from "@/lib/number-draft";
 import type { FinancialModelDocument, Posting } from "@/lib/projection";
 
 function inputStyle(isDirty: boolean) {
@@ -21,6 +23,84 @@ function inputStyle(isDirty: boolean) {
 		? "border-tertiary-border bg-tertiary-subtle"
 		: "border-input bg-card";
 	return `w-full rounded-lg ${dirty} px-2 py-1 type-body outline-none type-code`;
+}
+
+interface NumericPostingInputProps {
+	label: string;
+	value: number | null;
+	isDirty: boolean;
+	nullable?: boolean;
+	min?: number;
+	step?: number;
+	onCommit: (value: number | null) => void;
+}
+
+function NumericPostingInput({
+	label,
+	value,
+	isDirty,
+	nullable = false,
+	min,
+	step,
+	onCommit,
+}: NumericPostingInputProps) {
+	const committedValue = value === null ? "" : String(value);
+	const [draft, setDraft] = useState(committedValue);
+	const skipBlurCommit = useRef(false);
+
+	useEffect(() => {
+		setDraft(committedValue);
+	}, [committedValue]);
+
+	const commit = () => {
+		const trimmed = draft.trim();
+		if (!trimmed && nullable) {
+			onCommit(null);
+			return;
+		}
+		const parsed = parseDecimalDraft(trimmed);
+		if (parsed === null) {
+			setDraft(committedValue);
+			return;
+		}
+		const nextValue = min === undefined ? parsed : Math.max(min, parsed);
+		setDraft(String(nextValue));
+		onCommit(nextValue);
+	};
+
+	return (
+		<input
+			aria-label={label}
+			className={inputStyle(isDirty)}
+			type="number"
+			min={min}
+			step={step}
+			value={draft}
+			onChange={(event) => {
+				skipBlurCommit.current = false;
+				setDraft(event.target.value);
+			}}
+			onBlur={() => {
+				if (skipBlurCommit.current) {
+					skipBlurCommit.current = false;
+					return;
+				}
+				commit();
+			}}
+			onKeyDown={(event) => {
+				if (event.key === "Enter") {
+					event.preventDefault();
+					commit();
+					skipBlurCommit.current = true;
+				}
+				if (event.key === "Escape") {
+					skipBlurCommit.current = true;
+					setDraft(committedValue);
+					event.currentTarget.blur();
+				}
+			}}
+		/>
+	);
 }
 
 interface EditablePostingsTableProps {
@@ -44,6 +124,13 @@ export function EditablePostingsTable({
 	deletePosting,
 	addPosting,
 }: EditablePostingsTableProps) {
+	const originalPostingById = new Map(
+		document.postings.map((posting) => [posting.id, posting]),
+	);
+	const workingPostingById = new Map(
+		(workingDocument?.postings ?? []).map((posting) => [posting.id, posting]),
+	);
+
 	return (
 		<Card className="rounded-[1.8rem] border-border shadow-sm ">
 			<CardHeader>
@@ -74,12 +161,13 @@ export function EditablePostingsTable({
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{displayDocument.postings.map((p, pi) => {
+						{displayDocument.postings.map((p) => {
+							const workingPosting = workingPostingById.get(p.id);
 							const changed =
 								isDirty &&
-								workingDocument?.postings[pi] &&
-								JSON.stringify(workingDocument.postings[pi]) !==
-									JSON.stringify(document.postings[pi]);
+								workingPosting !== undefined &&
+								JSON.stringify(workingPosting) !==
+									JSON.stringify(originalPostingById.get(p.id));
 							return (
 								<TableRow key={p.id}>
 									<TableCell>
@@ -153,41 +241,42 @@ export function EditablePostingsTable({
 										</select>
 									</TableCell>
 									<TableCell>
-										<input
-											className={inputStyle(!!changed)}
-											type="number"
+										<NumericPostingInput
+											label={`${p.label} annual rate`}
+											isDirty={!!changed}
 											step={0.01}
 											value={p.annualRate}
-											onChange={(e) =>
+											onCommit={(annualRate) =>
 												updatePosting(p.id, {
-													annualRate: Number(e.target.value),
+													annualRate: annualRate ?? p.annualRate,
 												})
 											}
 										/>
 									</TableCell>
 									<TableCell>
-										<input
-											className={inputStyle(!!changed)}
-											type="number"
+										<NumericPostingInput
+											label={`${p.label} annual growth rate`}
+											isDirty={!!changed}
 											step={0.01}
 											value={p.annualGrowthRate}
-											onChange={(e) =>
+											onCommit={(annualGrowthRate) =>
 												updatePosting(p.id, {
-													annualGrowthRate: Number(e.target.value),
+													annualGrowthRate:
+														annualGrowthRate ?? p.annualGrowthRate,
 												})
 											}
 										/>
 									</TableCell>
 									<TableCell>
-										<input
-											className={inputStyle(!!changed)}
-											type="number"
+										<NumericPostingInput
+											label={`${p.label} volatility`}
+											isDirty={!!changed}
 											min={0}
 											step={0.01}
 											value={p.volatility}
-											onChange={(e) =>
+											onCommit={(volatility) =>
 												updatePosting(p.id, {
-													volatility: Number(e.target.value),
+													volatility: volatility ?? p.volatility,
 												})
 											}
 										/>
@@ -212,29 +301,26 @@ export function EditablePostingsTable({
 										/>
 									</TableCell>
 									<TableCell>
-										<input
-											className={inputStyle(!!changed)}
-											type="number"
+										<NumericPostingInput
+											label={`${p.label} annual cap`}
+											isDirty={!!changed}
+											nullable
 											min={0}
-											value={p.annualCap ?? ""}
-											onChange={(e) =>
-												updatePosting(p.id, {
-													annualCap: e.target.value
-														? Number(e.target.value)
-														: null,
-												})
+											value={p.annualCap}
+											onCommit={(annualCap) =>
+												updatePosting(p.id, { annualCap })
 											}
 										/>
 									</TableCell>
 									<TableCell>
-										<input
-											className={inputStyle(!!changed)}
-											type="number"
+										<NumericPostingInput
+											label={`${p.label} priority`}
+											isDirty={!!changed}
 											min={1}
 											value={p.priority}
-											onChange={(e) =>
+											onCommit={(priority) =>
 												updatePosting(p.id, {
-													priority: Math.max(1, Number(e.target.value)),
+													priority: priority ?? p.priority,
 												})
 											}
 										/>

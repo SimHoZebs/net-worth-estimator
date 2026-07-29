@@ -35,14 +35,13 @@ interface CascadeStep {
 	constraints: string[];
 }
 
-export function ShortfallDetailPanel({
+export function buildShortfallCascadeViewModel({
 	periodStartDate,
-	periodLabel,
 	events,
 	rows,
 	postingById,
 	accounts,
-}: ShortfallDetailPanelProps) {
+}: Omit<ShortfallDetailPanelProps, "periodLabel">) {
 	let prevRow: ProjectionRow | null = null;
 	for (let i = rows.length - 1; i >= 0; i--) {
 		if (rows[i].date < periodStartDate) {
@@ -52,86 +51,105 @@ export function ShortfallDetailPanel({
 	}
 
 	const lastPeriodRow = rows.find((row) => row.date === periodStartDate);
+	const map = new Map<string, CascadeStep[]>();
+	const constrainedAccountIds = new Set<string>();
 
-	const { cascadeAccounts, cascadeStepsByAccount } = (() => {
-		const map = new Map<string, CascadeStep[]>();
-		const constrainedAccountIds = new Set<string>();
+	const appendStep = (
+		accountId: string,
+		event: PostingFulfillmentEvent,
+		delta: number,
+	) => {
+		if (!map.has(accountId)) map.set(accountId, []);
+		map.get(accountId)?.push({
+			postingId: event.postingId,
+			label: postingById[event.postingId]?.label ?? event.postingId,
+			delta,
+			requested: event.requestedAmount,
+			realized: event.realizedAmount,
+			runningBalance: 0,
+			shortfallAmount: event.unfulfilledAmount,
+			isShortfall: event.unfulfilledAmount > 0,
+			constraints: event.bindingConstraints.map(({ type }) => type),
+		});
+	};
 
-		const appendStep = (
-			accountId: string,
-			event: PostingFulfillmentEvent,
-			delta: number,
-		) => {
-			if (!map.has(accountId)) map.set(accountId, []);
-			map.get(accountId)?.push({
-				postingId: event.postingId,
-				label: postingById[event.postingId]?.label ?? event.postingId,
-				delta,
-				requested: event.requestedAmount,
-				realized: event.realizedAmount,
-				runningBalance: 0,
-				shortfallAmount: event.unfulfilledAmount,
-				isShortfall: event.unfulfilledAmount > 0,
-				constraints: event.bindingConstraints.map(({ type }) => type),
-			});
-		};
+	for (const event of [...events].sort(
+		(left, right) => left.sequence - right.sequence,
+	)) {
+		const affectedAccountIds = new Set<string>();
+		for (const { accountId, delta } of event.accountDeltas) {
+			affectedAccountIds.add(accountId);
+			appendStep(accountId, event, delta);
+		}
 
-		for (const event of [...events].sort(
-			(left, right) => left.sequence - right.sequence,
-		)) {
-			const affectedAccountIds = new Set<string>();
-			for (const { accountId, delta } of event.accountDeltas) {
-				affectedAccountIds.add(accountId);
-				appendStep(accountId, event, delta);
-			}
+		const constrainedIds = event.bindingConstraints.flatMap((constraint) =>
+			"accountId" in constraint
+				? [constraint.accountId]
+				: "accountIds" in constraint
+					? constraint.accountIds
+					: [],
+		);
+		for (const accountId of constrainedIds) {
+			constrainedAccountIds.add(accountId);
+			if (!affectedAccountIds.has(accountId)) appendStep(accountId, event, 0);
+		}
 
-			const constrainedIds = event.bindingConstraints.flatMap((constraint) =>
-				"accountId" in constraint
-					? [constraint.accountId]
-					: "accountIds" in constraint
-						? constraint.accountIds
-						: [],
-			);
-			for (const accountId of constrainedIds) {
-				constrainedAccountIds.add(accountId);
-				if (!affectedAccountIds.has(accountId)) appendStep(accountId, event, 0);
-			}
-
-			if (event.unfulfilledAmount > 0 && constrainedIds.length === 0) {
-				const sourceAccountId = postingById[event.postingId]?.sourceAccountId;
-				if (sourceAccountId) {
-					constrainedAccountIds.add(sourceAccountId);
-					if (!affectedAccountIds.has(sourceAccountId)) {
-						appendStep(sourceAccountId, event, 0);
-					}
+		if (event.unfulfilledAmount > 0 && constrainedIds.length === 0) {
+			const sourceAccountId = postingById[event.postingId]?.sourceAccountId;
+			if (sourceAccountId) {
+				constrainedAccountIds.add(sourceAccountId);
+				if (!affectedAccountIds.has(sourceAccountId)) {
+					appendStep(sourceAccountId, event, 0);
 				}
 			}
 		}
+	}
 
-		for (const [accountId, steps] of map) {
-			const start =
-				prevRow?.accountSnapshots.find(
-					(snapshot) => snapshot.accountId === accountId,
-				)?.balance ?? 0;
-			let running = start;
-			for (const step of steps) {
-				running += step.delta;
-				step.runningBalance = running;
-			}
+	for (const [accountId, steps] of map) {
+		const start =
+			prevRow?.accountSnapshots.find(
+				(snapshot) => snapshot.accountId === accountId,
+			)?.balance ?? 0;
+		let running = start;
+		for (const step of steps) {
+			running += step.delta;
+			step.runningBalance = running;
 		}
+	}
 
-		const cascadeRows = accounts
-			.filter((account) => account.enabled && map.has(account.id))
-			.sort((left, right) => {
-				const leftConstrained = constrainedAccountIds.has(left.id);
-				const rightConstrained = constrainedAccountIds.has(right.id);
-				if (leftConstrained !== rightConstrained)
-					return leftConstrained ? -1 : 1;
-				return left.label.localeCompare(right.label);
-			});
+	const cascadeAccounts = accounts
+		.filter((account) => account.enabled && map.has(account.id))
+		.sort((left, right) => {
+			const leftConstrained = constrainedAccountIds.has(left.id);
+			const rightConstrained = constrainedAccountIds.has(right.id);
+			if (leftConstrained !== rightConstrained) return leftConstrained ? -1 : 1;
+			return left.label.localeCompare(right.label);
+		});
 
-		return { cascadeAccounts: cascadeRows, cascadeStepsByAccount: map };
-	})();
+	return {
+		prevRow,
+		lastPeriodRow,
+		cascadeAccounts,
+		cascadeStepsByAccount: map,
+	};
+}
+
+export function ShortfallDetailPanel({
+	periodStartDate,
+	periodLabel,
+	events,
+	rows,
+	postingById,
+	accounts,
+}: ShortfallDetailPanelProps) {
+	const { prevRow, lastPeriodRow, cascadeAccounts, cascadeStepsByAccount } =
+		buildShortfallCascadeViewModel({
+			periodStartDate,
+			events,
+			rows,
+			postingById,
+			accounts,
+		});
 
 	return (
 		<div className="space-y-3">

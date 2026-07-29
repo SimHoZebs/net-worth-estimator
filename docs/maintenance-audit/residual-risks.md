@@ -1,25 +1,21 @@
 # Residual Risks
 
-## Runtime Version
+## Runtime Warnings
 
-The observed test failure occurred on Node v26.3.1. It may not reproduce on older CI versions, but the storage access remains insufficiently guarded and accepts malformed persisted values regardless of runtime.
+Node still emits experimental local-storage and module-registration warnings during the test run. Theme initialization now handles unavailable storage correctly, so these warnings do not fail tests, but dependency/runtime upgrades may change their behavior.
 
 ## Performance Measurement
 
-Chart and worker churn were established from active dependency and lifecycle paths, not from browser profiling. Profiling is still required to quantify improvement and detect secondary bottlenecks.
+The maintenance work removed known lifecycle churn and duplication but did not add broad browser profiling. Schedule generation, large-model rendering, and worker payload costs should be optimized only after representative measurement.
 
-## Build Output
+## Hook Similarity
 
-The ignored local `dist/` directory contains stale scenario-era output. It was not tracked or modified during the audit. A clean production build must be part of implementation verification.
+Deterministic and stochastic hooks retain similar latest-request orchestration because their stale-result, progress, and configuration semantics differ. Extract a private shared primitive only if future changes demonstrate concrete drift; do not replace the specialized hooks with a flag-heavy public API.
 
-## Static Orphan Detection
+## Data Scale
 
-The orphan list is based on repository-wide static import and symbol searches. Before deletion, verify there are no external consumers, dynamic imports, documentation examples, or pending branches relying on those exports.
+Editor subscriptions and render-time collection construction may become significant for unusually large financial models. Current correctness tests do not establish a production scale limit.
 
-## Compatibility Surface
+## Worktree Basis
 
-Scenario-named aliases and routes appear locally orphaned but are explicitly retained by `TECHNICAL_OVERVIEW.md`. Their removal requires a deliberate compatibility-window decision and is outside this maintenance cleanup.
-
-## Unmeasured Data Scale
-
-Broad editor subscriptions and render-time map/set construction may become significant for large financial models, but current data size was not profiled. Optimize those paths only after measuring or establishing realistic scale limits.
+The remediation was performed in an isolated worktree containing the staged model-input changes that existed on 2026-07-29. The verification record distinguishes the original committed audit from this integrated worktree result.

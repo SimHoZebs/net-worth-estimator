@@ -392,6 +392,153 @@ describe("WorkerProjectionEngine", () => {
 		await expect(promise).resolves.toBe(expected);
 	});
 
+	it("rejects malformed deterministic worker messages", async () => {
+		const engine = new WorkerProjectionEngine();
+		const promise = engine.project({
+			document: createBaseDocument(),
+			projectionSettings: makeSettings(),
+			overrides: makeDefaultOverrides(),
+		});
+		const worker = MockWorker.instances[0]!;
+
+		worker.onmessage?.({
+			data: { id: 1, type: "complete", runtimeError: null },
+		} as MessageEvent);
+
+		await expect(promise).rejects.toThrow(
+			"Projection worker returned a malformed message.",
+		);
+		expect(worker.terminate).toHaveBeenCalledOnce();
+	});
+
+	it("rejects deterministic responses for the wrong request type", async () => {
+		const engine = new WorkerProjectionEngine();
+		const promise = engine.project({
+			document: createBaseDocument(),
+			projectionSettings: makeSettings(),
+			overrides: makeDefaultOverrides(),
+		});
+		const worker = MockWorker.instances[0]!;
+
+		worker.onmessage?.({
+			data: { id: 1, type: "base", result: {}, runtimeError: null },
+		} as MessageEvent);
+
+		await expect(promise).rejects.toThrow(
+			"Projection worker returned the wrong result type.",
+		);
+		expect(worker.terminate).toHaveBeenCalledOnce();
+	});
+
+	it("rejects malformed stochastic worker messages", async () => {
+		const engine = new WorkerProjectionEngine();
+		const promise = engine.projectStochastic({
+			document: createBaseDocument(),
+			projectionSettings: makeSettings(),
+			overrides: makeDefaultOverrides(),
+			config: { runCount: 1, seed: 1 },
+		});
+		const worker = MockWorker.instances[0]!;
+
+		worker.onmessage?.({
+			data: { id: 1, type: "result", result: {} },
+		} as MessageEvent);
+
+		await expect(promise).rejects.toThrow(
+			"Stochastic worker returned a malformed message.",
+		);
+		expect(worker.terminate).toHaveBeenCalledOnce();
+	});
+
+	it("rejects unknown stochastic message types", async () => {
+		const engine = new WorkerProjectionEngine();
+		const promise = engine.projectStochastic({
+			document: createBaseDocument(),
+			projectionSettings: makeSettings(),
+			overrides: makeDefaultOverrides(),
+			config: { runCount: 1, seed: 1 },
+		});
+		const worker = MockWorker.instances[0]!;
+
+		worker.onmessage?.({
+			data: { id: 1, type: "complete", result: {}, runtimeError: null },
+		} as MessageEvent);
+
+		await expect(promise).rejects.toThrow(
+			"Stochastic worker returned a malformed message.",
+		);
+		expect(worker.terminate).toHaveBeenCalledOnce();
+	});
+
+	it("terminates without posting when already aborted", async () => {
+		const controller = new AbortController();
+		controller.abort();
+		const engine = new WorkerProjectionEngine();
+
+		const promise = engine.project({
+			document: createBaseDocument(),
+			projectionSettings: makeSettings(),
+			overrides: makeDefaultOverrides(),
+			signal: controller.signal,
+		});
+		const worker = MockWorker.instances[0]!;
+
+		await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+		expect(worker.postMessage).not.toHaveBeenCalled();
+		expect(worker.terminate).toHaveBeenCalledOnce();
+	});
+
+	it("terminates stochastic work when aborted in flight", async () => {
+		const controller = new AbortController();
+		const engine = new WorkerProjectionEngine();
+		const promise = engine.projectStochastic({
+			document: createBaseDocument(),
+			projectionSettings: makeSettings(),
+			overrides: makeDefaultOverrides(),
+			config: { runCount: 1, seed: 1 },
+			signal: controller.signal,
+		});
+		const worker = MockWorker.instances[0]!;
+
+		controller.abort();
+
+		await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+		expect(worker.terminate).toHaveBeenCalledOnce();
+		expect(worker.onmessage).toBeNull();
+	});
+
+	it.each([
+		[
+			"deterministic",
+			(engine: WorkerProjectionEngine) =>
+				engine.project({
+					document: createBaseDocument(),
+					projectionSettings: makeSettings(),
+					overrides: makeDefaultOverrides(),
+				}),
+			"Projection worker crashed.",
+		],
+		[
+			"stochastic",
+			(engine: WorkerProjectionEngine) =>
+				engine.projectStochastic({
+					document: createBaseDocument(),
+					projectionSettings: makeSettings(),
+					overrides: makeDefaultOverrides(),
+					config: { runCount: 1, seed: 1 },
+				}),
+			"Stochastic worker crashed.",
+		],
+	])("terminates and rejects %s worker crashes", async (_name, run, message) => {
+		const promise = run(new WorkerProjectionEngine());
+		const worker = MockWorker.instances[0]!;
+
+		worker.onerror?.();
+
+		await expect(promise).rejects.toThrow(message);
+		expect(worker.terminate).toHaveBeenCalledOnce();
+	});
+
 	it("terminates when posting a worker request fails", async () => {
 		MockWorker.postMessageError = new DOMException(
 			"Could not clone request",

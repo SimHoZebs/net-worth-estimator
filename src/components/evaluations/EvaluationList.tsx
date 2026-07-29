@@ -1,6 +1,7 @@
 import { type ComponentType, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { parseDecimalDraft } from "@/lib/number-draft";
 import type {
 	EvaluationInstance,
 	EvaluationResultCollection,
@@ -58,9 +59,11 @@ function ThresholdConfigEditor({
 	onDirtyChange,
 }: ConfigEditorProps) {
 	const target = validateNetWorthThresholdConfig(evaluation.config).target;
-	const [draftTarget, setDraftTarget] = useState(target);
-	useEffect(() => setDraftTarget(target), [target]);
-	const dirty = draftTarget !== target;
+	const committedDraft = String(target);
+	const [draftTarget, setDraftTarget] = useState(committedDraft);
+	useEffect(() => setDraftTarget(committedDraft), [committedDraft]);
+	const parsedTarget = parseDecimalDraft(draftTarget);
+	const dirty = draftTarget !== committedDraft;
 	const onDirtyChangeRef = useRef(onDirtyChange);
 	onDirtyChangeRef.current = onDirtyChange;
 	useEffect(() => {
@@ -73,10 +76,11 @@ function ThresholdConfigEditor({
 			<label className="block type-caption">
 				Target net worth
 				<input
-					type="number"
+					type="text"
+					inputMode="decimal"
 					step={50_000}
 					value={draftTarget}
-					onChange={(event) => setDraftTarget(Number(event.target.value))}
+					onChange={(event) => setDraftTarget(event.target.value)}
 					className="mt-1 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 text-sm shadow-sm outline-none focus:border-ring dark:border-white/10"
 				/>
 			</label>
@@ -86,15 +90,19 @@ function ThresholdConfigEditor({
 					variant="ghost"
 					size="sm"
 					disabled={!dirty}
-					onClick={() => setDraftTarget(target)}
+					onClick={() => setDraftTarget(committedDraft)}
 				>
 					Discard
 				</Button>
 				<Button
 					type="button"
 					size="sm"
-					disabled={!dirty || !Number.isFinite(draftTarget)}
-					onClick={() => onChange({ target: draftTarget })}
+					disabled={!dirty || parsedTarget === null}
+					onClick={() => {
+						if (parsedTarget === null) return;
+						onChange({ target: parsedTarget });
+						setDraftTarget(String(parsedTarget));
+					}}
 				>
 					Update analysis
 				</Button>

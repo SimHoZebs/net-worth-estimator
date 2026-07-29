@@ -1,19 +1,9 @@
 import type uPlot from "uplot";
+import { formatChartCurrencyTick } from "@/lib/format";
 
 function parseIsoDate(date: string): Date {
 	const [year, month, day] = date.split("-").map(Number);
 	return new Date(year, month - 1, day);
-}
-
-function formatChartCurrencyTick(value: number): string {
-	if (value === 0) return "$0";
-	const abs = Math.abs(value);
-	const sign = value < 0 ? "-" : "";
-	if (abs >= 1_000_000)
-		return `${sign}$${(abs / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-	if (abs >= 1_000)
-		return `${sign}$${(abs / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
-	return `${sign}$${abs}`;
 }
 
 function cssColor(variableName: string, fallback: string): string {
@@ -23,17 +13,6 @@ function cssColor(variableName: string, fallback: string): string {
 		.getPropertyValue(variableName)
 		.trim();
 	return value || fallback;
-}
-
-export function formatDate(isoDate: string): string {
-	if (!isoDate || isoDate.length < 10) return isoDate;
-	const [year, month, day] = isoDate.split("-").map(Number);
-	const date = new Date(year, month - 1, day);
-	return date.toLocaleDateString("en-US", {
-		year: "numeric",
-		month: "short",
-		day: "numeric",
-	});
 }
 
 export function createBaseOptions(): Partial<uPlot.Options> {

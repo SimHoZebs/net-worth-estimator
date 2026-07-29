@@ -1,4 +1,4 @@
-import { formatDate } from "@/chart/uplotBase";
+import { formatDate } from "@/lib/format";
 import type { Account } from "@/lib/projection";
 
 export interface PointAccountDetails {

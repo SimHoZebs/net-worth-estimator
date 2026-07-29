@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeAccount } from "@/lib/projection/__fixtures__/accounts";
 import { makePosting } from "@/lib/projection/__fixtures__/postings";
 import { TransactionHistoryTable } from "./TransactionHistoryTable";
@@ -94,5 +94,35 @@ describe("TransactionHistoryTable", () => {
 		rerender(<TransactionHistoryTable postings={makeHistory(41)} {...props} />);
 		expect(screen.getByText(/Page 1 of 3/)).not.toBeNull();
 		expect(screen.getByText("Reload 40")).not.toBeNull();
+	});
+
+	it("toggles a filtered transaction by its stable posting ID", () => {
+		const onToggle = vi.fn();
+		render(
+			<TransactionHistoryTable
+				postings={[
+					makePosting({ id: "older", label: "Older", frequency: "once" }),
+					makePosting({
+						id: "target-id",
+						label: "Target transaction",
+						frequency: "once",
+						startDate: "2026-02-01",
+					}),
+				]}
+				accounts={[]}
+				disabledPostingSet={new Set()}
+				onToggle={onToggle}
+			/>,
+		);
+
+		fireEvent.change(
+			screen.getByPlaceholderText("Search transaction history..."),
+			{ target: { value: "Target" } },
+		);
+		fireEvent.click(
+			screen.getByRole("checkbox", { name: "Enable Target transaction" }),
+		);
+
+		expect(onToggle).toHaveBeenCalledWith("target-id");
 	});
 });

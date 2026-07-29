@@ -1,5 +1,136 @@
+import { z } from "zod";
 import type { DataSource, FinancialModelParseResult } from "../../dataSource";
-import type { FinancialModelDocument } from "../../types/model";
+import type {
+	FinancialIndependenceSource,
+	FinancialModelDocument,
+} from "../../types/model";
+import type { ModelValidationIssue } from "../../types/validation";
+
+const finiteNumber = z.number().finite();
+const evaluationFields = {
+	instanceId: z.string(),
+	label: z.string(),
+	enabled: z.boolean(),
+};
+const financialIndependenceSourceSchema = z.discriminatedUnion("type", [
+	z.object({
+		type: z.literal("cashflow"),
+		postingId: z.string(),
+		included: z.boolean(),
+		laborDependent: z.boolean().optional(),
+	}),
+	z.object({
+		type: z.literal("asset"),
+		accountId: z.string(),
+		included: z.boolean(),
+		withdrawalRateOverride: finiteNumber.optional(),
+	}),
+]) satisfies z.ZodType<FinancialIndependenceSource>;
+const financialModelDocumentSchema = z.object({
+	sourcePath: z.string(),
+	accounts: z.array(
+		z.object({
+			id: z.string(),
+			label: z.string(),
+			minBalance: finiteNumber,
+			maxBalance: finiteNumber,
+			color: z.string().nullable(),
+			enabled: z.boolean(),
+		}),
+	),
+	evaluations: z.object({
+		financialIndependence: z.array(
+			z.object({
+				...evaluationFields,
+				config: z.object({
+					minimumNetWorth: finiteNumber,
+					annualExpenseTarget: finiteNumber,
+					annualExpenseGrowthRate: finiteNumber,
+					withdrawalRate: finiteNumber,
+					evaluationYears: finiteNumber,
+					requiredConfidence: finiteNumber,
+					sources: z.array(financialIndependenceSourceSchema),
+					continuingPostingIds: z.array(z.string()),
+					principalPolicy: z.enum([
+						"allow-drawdown",
+						"preserve-nominal-principal",
+						"preserve-real-principal",
+					]),
+				}),
+			}),
+		),
+		netWorthThreshold: z.array(
+			z.object({
+				...evaluationFields,
+				config: z.object({ target: finiteNumber }),
+			}),
+		),
+		postingFulfillment: z.array(
+			z.object({
+				...evaluationFields,
+				config: z.object({ postingIds: z.array(z.string()).nullable() }),
+			}),
+		),
+	}),
+	postings: z.array(
+		z.object({
+			id: z.string(),
+			label: z.string(),
+			sourceAccountId: z.string().nullable(),
+			destinations: z.array(z.string()).nullable(),
+			arithmetic: z.string(),
+			frequency: z.enum([
+				"once",
+				"daily",
+				"weekly",
+				"monthly",
+				"quarterly",
+				"annual",
+			]),
+			annualRate: finiteNumber,
+			annualGrowthRate: finiteNumber,
+			volatility: finiteNumber,
+			startDate: z.string(),
+			endDate: z.string().nullable(),
+			annualCap: finiteNumber.nullable(),
+			priority: finiteNumber,
+			enabled: z.boolean(),
+		}),
+	),
+}) satisfies z.ZodType<FinancialModelDocument>;
+const modelValidationIssueSchema = z.object({
+	code: z.string(),
+	message: z.string(),
+	path: z.array(z.union([z.string(), z.number()])),
+	severity: z.enum(["error", "warning"]),
+}) satisfies z.ZodType<ModelValidationIssue>;
+const financialModelParseResultSchema = z.object({
+	document: financialModelDocumentSchema.nullable(),
+	issues: z.array(modelValidationIssueSchema),
+}) satisfies z.ZodType<FinancialModelParseResult>;
+
+async function parseApiResponse(
+	response: Response,
+): Promise<FinancialModelParseResult> {
+	let payload: unknown;
+
+	try {
+		payload = await response.json();
+	} catch {
+		throw new Error(
+			"Invalid financial model API response: expected a valid FinancialModelParseResult payload.",
+		);
+	}
+
+	const parsed = financialModelParseResultSchema.safeParse(payload);
+	if (!parsed.success) {
+		throw new Error(
+			"Invalid financial model API response: expected a valid FinancialModelParseResult payload.",
+		);
+	}
+
+	return parsed.data;
+}
 
 export interface CsvDataSourceOptions {
 	apiPath?: string;
@@ -20,7 +151,7 @@ export function createCsvDataSource(
 			);
 		}
 
-		return response.json() as Promise<FinancialModelParseResult>;
+		return parseApiResponse(response);
 	};
 
 	return {
@@ -48,7 +179,7 @@ export function createCsvDataSource(
 					);
 				}
 
-				return response.json() as Promise<FinancialModelParseResult>;
+				return parseApiResponse(response);
 			},
 		},
 	};

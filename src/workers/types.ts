@@ -72,3 +72,70 @@ export interface StochasticWorkerResponse {
 	runtimeError: string | null;
 	type: "result";
 }
+
+type WorkerRecord = Record<string, unknown>;
+
+function isWorkerRecord(value: unknown): value is WorkerRecord {
+	return typeof value === "object" && value !== null;
+}
+
+function hasOwn(value: WorkerRecord, key: string): boolean {
+	return Reflect.apply(Object.prototype.hasOwnProperty, value, [key]);
+}
+
+export type ProjectionWorkerResponseEnvelope = Omit<
+	ProjectionWorkerResponse,
+	"result"
+> & { result: unknown };
+
+export function isProjectionWorkerResponseEnvelope(
+	value: unknown,
+): value is ProjectionWorkerResponseEnvelope {
+	if (!isWorkerRecord(value)) return false;
+
+	return (
+		typeof value.id === "number" &&
+		(value.type === "complete" ||
+			value.type === "base" ||
+			value.type === "evaluation") &&
+		hasOwn(value, "result") &&
+		hasOwn(value, "runtimeError") &&
+		(value.runtimeError === null || typeof value.runtimeError === "string")
+	);
+}
+
+export type StochasticWorkerProgressEnvelope = Omit<
+	StochasticWorkerProgress,
+	"partial"
+> & { partial?: unknown };
+
+export function isStochasticWorkerProgressEnvelope(
+	value: unknown,
+): value is StochasticWorkerProgressEnvelope {
+	if (!isWorkerRecord(value)) return false;
+
+	return (
+		value.type === "progress" &&
+		typeof value.id === "number" &&
+		typeof value.progress === "number"
+	);
+}
+
+export type StochasticWorkerResponseEnvelope = Omit<
+	StochasticWorkerResponse,
+	"result"
+> & { result: unknown };
+
+export function isStochasticWorkerResponseEnvelope(
+	value: unknown,
+): value is StochasticWorkerResponseEnvelope {
+	if (!isWorkerRecord(value)) return false;
+
+	return (
+		value.type === "result" &&
+		typeof value.id === "number" &&
+		hasOwn(value, "result") &&
+		hasOwn(value, "runtimeError") &&
+		(value.runtimeError === null || typeof value.runtimeError === "string")
+	);
+}

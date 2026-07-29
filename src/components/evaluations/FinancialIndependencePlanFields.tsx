@@ -49,11 +49,11 @@ export function FiNumberField({
 }: {
 	label: string;
 	description?: string;
-	value: number;
+	value: string;
 	min?: number;
 	max?: number;
 	step?: number;
-	onChange: (value: number) => void;
+	onChange: (value: string) => void;
 }) {
 	return (
 		<label className="min-w-0 type-caption">
@@ -64,16 +64,14 @@ export function FiNumberField({
 				</span>
 			) : null}
 			<input
-				type="number"
+				type="text"
+				inputMode="decimal"
 				aria-label={label}
 				min={min}
 				max={max}
 				step={step}
 				value={value}
-				onChange={(event) => {
-					const parsed = Number(event.target.value);
-					onChange(Number.isFinite(parsed) ? parsed : value);
-				}}
+				onChange={(event) => onChange(event.target.value)}
 				className={FI_INPUT_CLASS}
 			/>
 		</label>
