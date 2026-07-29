@@ -775,13 +775,23 @@ export function evaluateFinancialIndependence({
 			date,
 			addYearsClamped(date, 1),
 		);
-		let selectedAssetBalance = 0;
-		let annualWithdrawalCapacity = 0;
-		for (const [accountId, rate] of assetRates) {
+		const assetContributions = [...assetRates].map(([accountId, rate]) => {
 			const balance = Math.max(0, row ? balanceAt(row, accountId) : 0);
-			selectedAssetBalance += balance;
-			annualWithdrawalCapacity += balance * rate;
-		}
+			return {
+				accountId,
+				balance,
+				withdrawalRate: rate,
+				annualWithdrawalCapacity: balance * rate,
+			};
+		});
+		const selectedAssetBalance = assetContributions.reduce(
+			(sum, contribution) => sum + contribution.balance,
+			0,
+		);
+		const annualWithdrawalCapacity = assetContributions.reduce(
+			(sum, contribution) => sum + contribution.annualWithdrawalCapacity,
+			0,
+		);
 		const annualExpenseTarget = expenseAt(
 			normalizedPlan,
 			path.projectionStartDate,
@@ -799,6 +809,7 @@ export function evaluateFinancialIndependence({
 			minimumNetWorth: normalizedPlan.minimumNetWorth,
 			minimumNetWorthMet,
 			annualDirectIncome,
+			assetContributions,
 			selectedAssetBalance,
 			annualWithdrawalCapacity,
 			totalAnnualCapacity,

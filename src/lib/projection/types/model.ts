@@ -256,6 +256,7 @@ export interface FinancialIndependenceRow {
 	minimumNetWorth: number;
 	minimumNetWorthMet: boolean;
 	annualDirectIncome: number;
+	assetContributions: FinancialIndependenceAssetContribution[];
 	selectedAssetBalance: number;
 	annualWithdrawalCapacity: number;
 	totalAnnualCapacity: number;
@@ -263,6 +264,13 @@ export interface FinancialIndependenceRow {
 	coverageRatio: number;
 	isCovered: boolean;
 	isEligible: boolean;
+}
+
+export interface FinancialIndependenceAssetContribution {
+	accountId: string;
+	balance: number;
+	withdrawalRate: number;
+	annualWithdrawalCapacity: number;
 }
 
 export interface FinancialIndependenceRunOutcome {

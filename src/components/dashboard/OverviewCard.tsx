@@ -3,6 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	FinancialIndependencePlan,
+	FinancialIndependenceRow,
+	FinancialIndependenceRunOutcome,
+	FinancialModelDocument,
 	ProjectionResult,
 	StochasticProjectionResult,
 } from "@/lib/projection";
@@ -10,22 +13,22 @@ import { getFinancialIndependenceResult } from "@/lib/projection";
 
 interface OverviewCardProps {
 	result: ProjectionResult;
+	document: FinancialModelDocument;
 	instanceId: string;
 	plan: FinancialIndependencePlan;
+	candidateDate: string | null;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
-	blockerValue: string;
-	blockerDetail: string;
 }
 
 export const OverviewCard = memo(function OverviewCard({
 	result,
+	document,
 	instanceId,
 	plan,
+	candidateDate,
 	stochasticResult,
 	stochasticIsProvisional = false,
-	blockerValue,
-	blockerDetail,
 }: OverviewCardProps) {
 	const analysis = getFinancialIndependenceResult(
 		result,
@@ -38,14 +41,18 @@ export const OverviewCard = memo(function OverviewCard({
 	const firstCoverageDate = analysis?.milestones.firstCoverageDate ?? null;
 	const selfSustainingDate =
 		analysis?.milestones.firstSelfSustainingDate ?? null;
-	const displayDate = firstCoverageDate;
-	const coverageRow =
-		analysis?.rows.find((row) => row.date === displayDate) ?? analysis?.rows[0];
+	const coverageRow = analysis?.rows.find((row) => row.date === candidateDate);
+	const candidateOutcome = analysis?.runOutcomes.find(
+		(outcome) => outcome.candidateDate === candidateDate,
+	);
 	const confidenceDate = stochasticAnalysis?.probabilistic?.selfSustainingDate;
 	const confidence =
 		stochasticAnalysis?.probabilistic?.fiCycleSuccessProbability;
 	const qualifyingConfidence =
 		stochasticAnalysis?.probabilistic?.selfSustainingProbability;
+	const accountsById = new Map(
+		document.accounts.map((account) => [account.id, account]),
+	);
 
 	return (
 		<Card className="rounded-[1.8rem] border-primary-border/45 bg-gradient-to-br from-card/96 via-card/90 to-primary-subtle/35">
@@ -55,20 +62,29 @@ export const OverviewCard = memo(function OverviewCard({
 						<div className="type-label">Success test</div>
 						<div className="type-muted">{successPolicyDescription(plan)}</div>
 					</div>
-					<div className="type-value text-foreground">
-						{plan.evaluationYears}-year test · {principalPolicyLabel(plan)}
+					<div className="text-left sm:text-right">
+						<div className="type-value text-foreground">
+							{plan.evaluationYears}-year test · {principalPolicyLabel(plan)}
+						</div>
+						<div className="type-caption">
+							{candidateDate
+								? `Snapshot ${formatDate(candidateDate)}`
+								: "No complete test window"}
+						</div>
 					</div>
 				</div>
 				<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
 						<div className="type-label">FI coverage</div>
 						<div className="mt-1 type-metric text-foreground">
-							{coverageRow ? pct.format(coverageRow.coverageRatio) : "0%"}
+							{coverageRow
+								? pct.format(coverageRow.coverageRatio)
+								: "Not evaluated"}
 						</div>
 						<div className="type-muted">
 							{coverageRow
 								? `${currency.format(coverageRow.totalAnnualCapacity)} of ${currency.format(coverageRow.annualExpenseTarget)} per year`
-								: "Select at least one FI source"}
+								: `A complete ${plan.evaluationYears}-year test does not fit in the projection horizon`}
 						</div>
 					</div>
 
@@ -105,51 +121,134 @@ export const OverviewCard = memo(function OverviewCard({
 							Confidence-qualified FI date
 						</div>
 						<div className="mt-1 type-metric text-primary">
-							{confidenceDate === undefined
-								? "Run Monte Carlo"
-								: confidenceDate
-									? formatDate(confidenceDate)
-									: "Not established"}
+							{candidateDate === null
+								? "Not evaluated"
+								: confidenceDate === undefined
+									? "Run Monte Carlo"
+									: confidenceDate
+										? formatDate(confidenceDate)
+										: "Not established"}
 						</div>
 						<div className="type-muted line-clamp-2">
-							{confidence === undefined
-								? blockerDetail
-								: confidenceDate === null
-									? `${pct.format(confidence)} of independent Monte Carlo samples succeeded at some candidate; no date reached ${pct.format(plan.requiredConfidence)}`
-									: stochasticIsProvisional
-										? `${pct.format(qualifyingConfidence ?? 0)} at this date from completed independent Monte Carlo samples; still converging`
-										: `${pct.format(qualifyingConfidence ?? 0)} at this date; requires ${pct.format(plan.requiredConfidence)}`}
+							{candidateDate === null
+								? "A complete FI test does not fit in the projection horizon"
+								: confidence === undefined
+									? "Run Monte Carlo to evaluate confidence across independent samples"
+									: confidenceDate === null
+										? `${pct.format(confidence)} of independent Monte Carlo samples succeeded at some candidate; no date reached ${pct.format(plan.requiredConfidence)}`
+										: stochasticIsProvisional
+											? `${pct.format(qualifyingConfidence ?? 0)} at this date from completed independent Monte Carlo samples; still converging`
+											: `${pct.format(qualifyingConfidence ?? 0)} at this date; requires ${pct.format(plan.requiredConfidence)}`}
 						</div>
 					</div>
 				</div>
 
 				<div className="mt-5 grid gap-2 border-t border-border/70 pt-4 type-muted sm:grid-cols-2 xl:grid-cols-4">
 					<span>
+						Candidate status:{" "}
+						<b className="type-value">
+							{candidateStatus(coverageRow, candidateOutcome)}
+						</b>
+					</span>
+					<span>
 						Direct income:{" "}
 						<b className="type-value">
-							{currency.format(coverageRow?.annualDirectIncome ?? 0)}/yr
+							{coverageRow
+								? `${currency.format(coverageRow.annualDirectIncome)}/yr`
+								: "Not evaluated"}
 						</b>
 					</span>
 					<span>
 						Withdrawal capacity:{" "}
 						<b className="type-value">
-							{currency.format(coverageRow?.annualWithdrawalCapacity ?? 0)}/yr
+							{coverageRow
+								? `${currency.format(coverageRow.annualWithdrawalCapacity)}/yr`
+								: "Not evaluated"}
 						</b>
 					</span>
 					<span>
 						Selected assets:{" "}
 						<b className="type-value">
-							{currency.format(coverageRow?.selectedAssetBalance ?? 0)}
+							{coverageRow
+								? currency.format(coverageRow.selectedAssetBalance)
+								: "Not evaluated"}
 						</b>
 					</span>
-					<span>
-						Main constraint: <b className="type-value">{blockerValue}</b>
-					</span>
 				</div>
+
+				{coverageRow && coverageRow.assetContributions.length > 0 ? (
+					<div className="mt-5 border-t border-border/70 pt-4">
+						<div className="mb-3">
+							<div className="type-label">Selected asset contributions</div>
+							<div className="type-muted">
+								Balance × effective withdrawal rate at this snapshot
+							</div>
+						</div>
+						<div className="overflow-x-auto">
+							<div className="min-w-[34rem]">
+								<div className="grid grid-cols-[minmax(10rem,1fr)_8rem_6rem_9rem] gap-3 border-b border-border/70 pb-2 type-label">
+									<span>Account</span>
+									<span className="text-right">Balance</span>
+									<span className="text-right">Rate</span>
+									<span className="text-right">Capacity / yr</span>
+								</div>
+								{coverageRow.assetContributions.map((contribution) => {
+									const account = accountsById.get(contribution.accountId);
+									return (
+										<div
+											key={contribution.accountId}
+											className="grid grid-cols-[minmax(10rem,1fr)_8rem_6rem_9rem] gap-3 border-b border-border/45 py-2.5 text-sm last:border-0"
+										>
+											<span className="flex min-w-0 items-center gap-2 text-foreground/85">
+												<span
+													className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground"
+													style={
+														account?.color
+															? { backgroundColor: account.color }
+															: undefined
+													}
+												/>
+												<span className="truncate">
+													{account?.label ?? contribution.accountId}
+												</span>
+											</span>
+											<span className="text-right tabular-nums">
+												{currency.format(contribution.balance)}
+											</span>
+											<span className="text-right tabular-nums">
+												{pct.format(contribution.withdrawalRate)}
+											</span>
+											<span className="text-right type-value tabular-nums">
+												{currency.format(contribution.annualWithdrawalCapacity)}
+											</span>
+										</div>
+									);
+								})}
+							</div>
+						</div>
+					</div>
+				) : null}
 			</CardContent>
 		</Card>
 	);
 });
+
+function candidateStatus(
+	row: FinancialIndependenceRow | undefined,
+	outcome: FinancialIndependenceRunOutcome | undefined,
+) {
+	if (!row || !outcome) return "Not evaluated";
+	if (outcome.cycleEstablished) return "Cycle established";
+	if (outcome.status === "evaluated") {
+		if (!outcome.expensesFullyCovered) return "Withdrawal shortfall";
+		if (!outcome.principalReplenished) return "Principal policy not met";
+		return "Cycle evaluated";
+	}
+	if (!row.minimumNetWorthMet && !row.isCovered)
+		return "Net worth and capacity below gates";
+	if (!row.minimumNetWorthMet) return "Net worth below gate";
+	return "Capacity below expenses";
+}
 
 function principalPolicyLabel(plan: FinancialIndependencePlan) {
 	switch (plan.principalPolicy) {

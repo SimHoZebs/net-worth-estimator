@@ -33,8 +33,8 @@ import { normalizeStochasticConfig } from "@/lib/projection/utils/stochastic";
 
 const ARTIFACT_SCHEMA_VERSION = 1;
 const DETERMINISTIC_BASE_VERSION = "deterministic-base-v3";
-const DETERMINISTIC_EVALUATION_VERSION = "deterministic-evaluation-v3";
-const STOCHASTIC_VERSION = "stochastic-v3";
+const DETERMINISTIC_EVALUATION_VERSION = "deterministic-evaluation-v4";
+const STOCHASTIC_VERSION = "stochastic-v4";
 
 type ArtifactPayload =
 	| RawProjectionOutput
