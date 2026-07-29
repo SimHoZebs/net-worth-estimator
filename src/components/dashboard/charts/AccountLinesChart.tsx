@@ -1,9 +1,9 @@
 import { memo, useCallback, useMemo } from "react";
 import type uPlot from "uplot";
 import { parseChartDate } from "@/chart/chartData";
-import { createBaseOptions, formatDate } from "@/chart/uplotBase";
+import { createBaseOptions } from "@/chart/uplotBase";
 import { UPlotChart } from "@/components/ui/UPlotChart";
-import { currency } from "@/lib/format";
+import { currency, formatDate } from "@/lib/format";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { escapeHtml } from "@/lib/utils";
 

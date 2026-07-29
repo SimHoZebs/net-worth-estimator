@@ -2,9 +2,21 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatRoute } from "@/lib/format";
+import { parseDecimalDraft } from "@/lib/number-draft";
 import type { FinancialModelDocument, Posting } from "@/lib/projection";
 
-function emptyPosting(): Posting {
+type TemporaryPostingDraft = Omit<
+	Posting,
+	"annualRate" | "annualGrowthRate" | "volatility" | "annualCap" | "priority"
+> & {
+	annualRate: string;
+	annualGrowthRate: string;
+	volatility: string;
+	annualCap: string;
+	priority: string;
+};
+
+function emptyPosting(): TemporaryPostingDraft {
 	return {
 		id: "",
 		label: "",
@@ -12,13 +24,13 @@ function emptyPosting(): Posting {
 		destinations: null,
 		arithmetic: "",
 		frequency: "monthly",
-		annualRate: 0,
-		annualGrowthRate: 0,
-		volatility: 0,
+		annualRate: "0",
+		annualGrowthRate: "0",
+		volatility: "0",
 		startDate: "",
 		endDate: null,
-		annualCap: null,
-		priority: 1,
+		annualCap: "",
+		priority: "1",
 		enabled: true,
 	};
 }
@@ -50,19 +62,55 @@ export function TemporaryPostingForm({
 	onAdd,
 	onRemove,
 }: TemporaryPostingFormProps) {
-	const [adding, setAdding] = useState<Posting | null>(null);
+	const [adding, setAdding] = useState<TemporaryPostingDraft | null>(null);
+	const [error, setError] = useState<string | null>(null);
 
 	const commit = () => {
-		if (adding?.id.trim()) {
-			onAdd({
-				...adding,
-				endDate:
-					adding.frequency === "once"
-						? adding.startDate || null
-						: adding.endDate,
-			});
+		if (!adding?.id.trim()) {
+			setAdding(null);
+			return;
 		}
+
+		const errors: string[] = [];
+		const parseNumber = (raw: string, label: string) => {
+			const parsed = parseDecimalDraft(raw);
+			if (parsed === null) {
+				errors.push(`${label} must be a valid number.`);
+				return 0;
+			}
+			return parsed;
+		};
+		const annualRate = parseNumber(adding.annualRate, "Annual rate");
+		const annualGrowthRate = parseNumber(
+			adding.annualGrowthRate,
+			"Annual growth rate",
+		);
+		const volatility = parseNumber(adding.volatility, "Volatility");
+		const priority = parseNumber(adding.priority, "Priority");
+		const annualCap = adding.annualCap.trim()
+			? parseNumber(adding.annualCap, "Annual cap")
+			: null;
+		if (volatility < 0) errors.push("Volatility cannot be negative.");
+		if (annualCap !== null && annualCap < 0)
+			errors.push("Annual cap cannot be negative.");
+		if (priority < 1) errors.push("Priority must be at least 1.");
+		if (errors.length > 0) {
+			setError(errors.join(" "));
+			return;
+		}
+
+		onAdd({
+			...adding,
+			annualRate,
+			annualGrowthRate,
+			volatility,
+			annualCap,
+			priority,
+			endDate:
+				adding.frequency === "once" ? adding.startDate || null : adding.endDate,
+		});
 		setAdding(null);
+		setError(null);
 	};
 
 	return (
@@ -76,7 +124,10 @@ export function TemporaryPostingForm({
 						type="button"
 						variant="ghost"
 						size="sm"
-						onClick={() => setAdding(emptyPosting())}
+						onClick={() => {
+							setAdding(emptyPosting());
+							setError(null);
+						}}
 					>
 						+ Add
 					</Button>
@@ -175,7 +226,7 @@ export function TemporaryPostingForm({
 								className="w-full rounded-lg "
 								value={adding.annualRate}
 								onChange={(e) =>
-									setAdding({ ...adding, annualRate: Number(e.target.value) })
+									setAdding({ ...adding, annualRate: e.target.value })
 								}
 							/>
 						</div>
@@ -189,7 +240,7 @@ export function TemporaryPostingForm({
 								onChange={(e) =>
 									setAdding({
 										...adding,
-										annualGrowthRate: Number(e.target.value),
+										annualGrowthRate: e.target.value,
 									})
 								}
 							/>
@@ -203,7 +254,7 @@ export function TemporaryPostingForm({
 								className="w-full rounded-lg "
 								value={adding.volatility}
 								onChange={(e) =>
-									setAdding({ ...adding, volatility: Number(e.target.value) })
+									setAdding({ ...adding, volatility: e.target.value })
 								}
 							/>
 						</div>
@@ -239,11 +290,11 @@ export function TemporaryPostingForm({
 								type="number"
 								min={0}
 								className="w-full rounded-lg "
-								value={adding.annualCap ?? ""}
+								value={adding.annualCap}
 								onChange={(e) =>
 									setAdding({
 										...adding,
-										annualCap: e.target.value ? Number(e.target.value) : null,
+										annualCap: e.target.value,
 									})
 								}
 								placeholder="Blank for none"
@@ -259,12 +310,17 @@ export function TemporaryPostingForm({
 								onChange={(e) =>
 									setAdding({
 										...adding,
-										priority: Math.max(1, Number(e.target.value)),
+										priority: e.target.value,
 									})
 								}
 							/>
 						</div>
 					</div>
+					{error ? (
+						<div className="rounded-xl border border-destructive/25 bg-destructive-subtle p-3 type-body text-destructive-foreground">
+							{error}
+						</div>
+					) : null}
 					<div className="flex gap-2">
 						<Button type="button" size="sm" onClick={commit}>
 							Add posting
@@ -273,7 +329,10 @@ export function TemporaryPostingForm({
 							type="button"
 							variant="ghost"
 							size="sm"
-							onClick={() => setAdding(null)}
+							onClick={() => {
+								setAdding(null);
+								setError(null);
+							}}
 						>
 							Cancel
 						</Button>

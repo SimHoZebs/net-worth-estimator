@@ -63,6 +63,81 @@ describe("FinancialIndependencePlanEditor", () => {
 		});
 	});
 
+	it("keeps incomplete numeric drafts local until Update analysis", () => {
+		const onApply = vi.fn();
+		render(
+			<FinancialIndependencePlanEditor
+				document={createBaseDocument()}
+				plan={DEFAULT_FINANCIAL_INDEPENDENCE_PLAN}
+				sourceRevision={1}
+				onApply={onApply}
+			/>,
+		);
+		const annualSpending = screen.getByLabelText(
+			"Annual spending",
+		) as HTMLInputElement;
+		const updateButton = screen.getByRole("button", {
+			name: "Update analysis",
+		}) as HTMLButtonElement;
+
+		fireEvent.change(annualSpending, { target: { value: "" } });
+		expect(annualSpending.value).toBe("");
+		expect(updateButton.disabled).toBe(true);
+
+		fireEvent.change(annualSpending, { target: { value: "-" } });
+		expect(annualSpending.value).toBe("-");
+		expect(updateButton.disabled).toBe(true);
+		expect(onApply).not.toHaveBeenCalled();
+
+		fireEvent.change(annualSpending, { target: { value: "0x10" } });
+		expect(annualSpending.value).toBe("0x10");
+		expect(updateButton.disabled).toBe(true);
+
+		fireEvent.change(annualSpending, { target: { value: "72000.5" } });
+		expect(updateButton.disabled).toBe(false);
+		fireEvent.click(updateButton);
+		expect(onApply.mock.calls[0]?.[0].annualExpenseTarget).toBe(72_000.5);
+	});
+
+	it("keeps a withdrawal override draft raw and applies blank as inherited", () => {
+		const onApply = vi.fn();
+		const plan = {
+			...DEFAULT_FINANCIAL_INDEPENDENCE_PLAN,
+			sources: [
+				{
+					type: "asset" as const,
+					accountId: "brokerage",
+					included: true,
+					withdrawalRateOverride: 0.05,
+				},
+			],
+		};
+		render(
+			<FinancialIndependencePlanEditor
+				document={createBaseDocument()}
+				plan={plan}
+				sourceRevision={1}
+				onApply={onApply}
+			/>,
+		);
+		fireEvent.click(screen.getByText("Model details", { exact: true }));
+		const override = screen.getByLabelText("brokerage (%)") as HTMLInputElement;
+		const updateButton = screen.getByRole("button", {
+			name: "Update analysis",
+		}) as HTMLButtonElement;
+
+		fireEvent.change(override, { target: { value: "-" } });
+		expect(override.value).toBe("-");
+		expect(updateButton.disabled).toBe(true);
+
+		fireEvent.change(override, { target: { value: "" } });
+		expect(updateButton.disabled).toBe(false);
+		fireEvent.click(updateButton);
+		expect(onApply.mock.calls[0]?.[0].sources).toEqual([
+			{ type: "asset", accountId: "brokerage", included: true },
+		]);
+	});
+
 	it("discards a dirty draft when the source revision changes", () => {
 		const onApply = vi.fn();
 		const view = render(

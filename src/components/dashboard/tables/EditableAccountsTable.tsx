@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -14,6 +15,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { parseDecimalDraft } from "@/lib/number-draft";
 import type { Account, FinancialModelDocument } from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
 
@@ -22,6 +24,69 @@ function inputStyle(isDirty: boolean) {
 		? "border-tertiary-border bg-tertiary-subtle"
 		: "border-input bg-card";
 	return `w-full rounded-lg ${dirty} px-2 py-1 type-body outline-none type-code`;
+}
+
+function AccountLimitInput({
+	accountId,
+	label,
+	value,
+	emptyValue,
+	isDirty,
+	onCommit,
+}: {
+	accountId: string;
+	label: string;
+	value: number;
+	emptyValue: number;
+	isDirty: boolean;
+	onCommit: (value: number) => void;
+}) {
+	const committedDraft = value === emptyValue ? "" : String(value);
+	const [draft, setDraft] = useState(committedDraft);
+	const skipBlurCommit = useRef(false);
+
+	useEffect(() => setDraft(committedDraft), [committedDraft]);
+
+	const commit = () => {
+		if (draft.trim() === "") {
+			setDraft("");
+			onCommit(emptyValue);
+			return;
+		}
+		const parsed = parseDecimalDraft(draft);
+		if (parsed === null) {
+			setDraft(committedDraft);
+			return;
+		}
+		setDraft(String(parsed));
+		onCommit(parsed);
+	};
+
+	return (
+		<input
+			className={inputStyle(isDirty)}
+			type="text"
+			inputMode="decimal"
+			aria-label={`${label} for ${accountId}`}
+			value={draft}
+			onChange={(event) => setDraft(event.target.value)}
+			onBlur={() => {
+				if (skipBlurCommit.current) {
+					skipBlurCommit.current = false;
+					return;
+				}
+				commit();
+			}}
+			onKeyDown={(event) => {
+				if (event.key === "Enter") commit();
+				if (event.key === "Escape") {
+					skipBlurCommit.current = true;
+					setDraft(committedDraft);
+					event.currentTarget.blur();
+				}
+			}}
+		/>
+	);
 }
 
 interface EditableAccountsTableProps {
@@ -102,30 +167,26 @@ export function EditableAccountsTable({
 										/>
 									</TableCell>
 									<TableCell>
-										<input
-											className={inputStyle(!!changed)}
-											type="number"
-											value={a.minBalance === NO_FLOOR ? "" : a.minBalance}
-											onChange={(e) =>
-												updateAccount(a.id, {
-													minBalance: e.target.value
-														? Number(e.target.value)
-														: NO_FLOOR,
-												})
+										<AccountLimitInput
+											accountId={a.id}
+											label="Minimum balance"
+											value={a.minBalance}
+											emptyValue={NO_FLOOR}
+											isDirty={!!changed}
+											onCommit={(minBalance) =>
+												updateAccount(a.id, { minBalance })
 											}
 										/>
 									</TableCell>
 									<TableCell>
-										<input
-											className={inputStyle(!!changed)}
-											type="number"
-											value={a.maxBalance === NO_CEILING ? "" : a.maxBalance}
-											onChange={(e) =>
-												updateAccount(a.id, {
-													maxBalance: e.target.value
-														? Number(e.target.value)
-														: NO_CEILING,
-												})
+										<AccountLimitInput
+											accountId={a.id}
+											label="Maximum balance"
+											value={a.maxBalance}
+											emptyValue={NO_CEILING}
+											isDirty={!!changed}
+											onCommit={(maxBalance) =>
+												updateAccount(a.id, { maxBalance })
 											}
 										/>
 									</TableCell>

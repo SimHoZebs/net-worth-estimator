@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { Key, ReactNode } from "react";
 import {
 	Card,
 	CardContent,
@@ -16,11 +16,17 @@ import {
 } from "@/components/ui/table";
 import { currency, decimal, integer } from "@/lib/format";
 
+interface TableColumnDefinition<TRow, TKey extends keyof TRow> {
+	key: TKey;
+	label: string;
+	format?: (value: TRow[TKey], row: TRow) => string;
+	render?: (value: TRow[TKey], row: TRow, rowIndex: number) => ReactNode;
+}
+
 export interface TableColumn<TRow> {
 	key: keyof TRow;
 	label: string;
-	format?: (value: TRow[keyof TRow], row: TRow) => string;
-	render?: (value: TRow[keyof TRow], row: TRow, rowIndex: number) => ReactNode;
+	render: (row: TRow, rowIndex: number) => ReactNode;
 }
 
 function formatValue(value: unknown) {
@@ -38,11 +44,30 @@ export function formatCurrency(v: unknown) {
 	return typeof v === "number" ? currency.format(v) : formatValue(v);
 }
 
+export function createTableColumn<TRow extends object>() {
+	return <TKey extends keyof TRow>({
+		key,
+		label,
+		format,
+		render,
+	}: TableColumnDefinition<TRow, TKey>): TableColumn<TRow> => ({
+		key,
+		label,
+		render: (row, rowIndex) => {
+			const value = row[key];
+			if (render) return render(value, row, rowIndex);
+			if (format) return format(value, row);
+			return formatValue(value);
+		},
+	});
+}
+
 export function DataTable<TRow extends object>({
 	title,
 	description,
 	rows,
 	columns,
+	rowKey,
 	emptyText = "No rows.",
 	variant = "card",
 }: {
@@ -50,6 +75,7 @@ export function DataTable<TRow extends object>({
 	description: string;
 	rows: TRow[];
 	columns: TableColumn<TRow>[];
+	rowKey: (row: TRow) => Key;
 	emptyText?: string;
 	variant?: "card" | "flat";
 }) {
@@ -65,19 +91,12 @@ export function DataTable<TRow extends object>({
 			<TableBody>
 				{rows.length > 0 ? (
 					rows.map((row, ri) => (
-						<TableRow key={`${title}-${ri}`}>
-							{columns.map((c) => {
-								const v = row[c.key as keyof TRow];
-								return (
-									<TableCell key={String(c.key)}>
-										{c.render
-											? c.render(v, row, ri)
-											: c.format
-												? c.format(v, row)
-												: formatValue(v)}
-									</TableCell>
-								);
-							})}
+						<TableRow key={rowKey(row)}>
+							{columns.map((column) => (
+								<TableCell key={String(column.key)}>
+									{column.render(row, ri)}
+								</TableCell>
+							))}
 						</TableRow>
 					))
 				) : (

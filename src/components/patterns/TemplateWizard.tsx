@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { parseDecimalDraft } from "@/lib/number-draft";
 import type {
 	IncomeTemplateInput,
 	TemplateGenerationResult,
@@ -7,7 +8,7 @@ import type {
 } from "@/lib/patterns";
 import { generateIncomePattern } from "@/lib/patterns";
 import type { FinancialModelDocument } from "@/lib/projection";
-import { IncomeForm } from "./IncomeForm";
+import { IncomeForm, type IncomeFormValue } from "./IncomeForm";
 import {
 	describePostingCap,
 	describePostingRoute,
@@ -20,16 +21,61 @@ interface TemplateWizardProps {
 	onClose: () => void;
 }
 
-function defaultIncomeInput(): IncomeTemplateInput {
+function defaultIncomeInput(): IncomeFormValue {
 	return {
 		label: "",
-		grossMonthlyIncome: 0,
-		taxRate: 0.22,
-		k401ContributionRate: 0.04,
-		k401EmployerMatchRate: 0.5,
-		k401AnnualCap: 23000,
-		autoInvestRate: 0.1,
+		grossMonthlyIncome: "0",
+		taxRate: "22",
+		k401ContributionRate: "4",
+		k401EmployerMatchRate: "50",
+		k401AnnualCap: "23000",
+		autoInvestRate: "10",
 		startDate: new Date().toISOString().slice(0, 10),
+	};
+}
+
+function parseIncomeInput(
+	input: IncomeFormValue,
+): { ok: true; input: IncomeTemplateInput } | { ok: false; error: string } {
+	const errors: string[] = [];
+	const parseNumber = (raw: string, label: string) => {
+		const parsed = parseDecimalDraft(raw);
+		if (parsed === null) {
+			errors.push(`${label} must be a valid number.`);
+			return 0;
+		}
+		return parsed;
+	};
+
+	const grossMonthlyIncome = parseNumber(
+		input.grossMonthlyIncome,
+		"Gross monthly income",
+	);
+	const taxRate = parseNumber(input.taxRate, "Tax rate");
+	const k401ContributionRate = parseNumber(
+		input.k401ContributionRate,
+		"401(k) contribution rate",
+	);
+	const k401EmployerMatchRate = parseNumber(
+		input.k401EmployerMatchRate,
+		"Employer match rate",
+	);
+	const k401AnnualCap = parseNumber(input.k401AnnualCap, "401(k) annual cap");
+	const autoInvestRate = parseNumber(input.autoInvestRate, "Auto-invest rate");
+	if (k401AnnualCap < 0) errors.push("401(k) annual cap cannot be negative.");
+
+	if (errors.length > 0) return { ok: false, error: errors.join(" ") };
+	return {
+		ok: true,
+		input: {
+			...input,
+			grossMonthlyIncome,
+			taxRate: taxRate / 100,
+			k401ContributionRate: k401ContributionRate / 100,
+			k401EmployerMatchRate: k401EmployerMatchRate / 100,
+			k401AnnualCap,
+			autoInvestRate: autoInvestRate / 100,
+		},
 	};
 }
 
@@ -38,7 +84,7 @@ export function TemplateWizard({
 	onApply,
 	onClose,
 }: TemplateWizardProps) {
-	const [input, setInput] = useState<IncomeTemplateInput>(defaultIncomeInput);
+	const [input, setInput] = useState<IncomeFormValue>(defaultIncomeInput);
 	const [result, setResult] = useState<TemplateGenerationResult | null>(null);
 	const [step, setStep] = useState<"form" | "confirm">("form");
 
@@ -46,8 +92,13 @@ export function TemplateWizard({
 	const existingPostingIds = document.postings.map((posting) => posting.id);
 
 	const handleGenerate = () => {
+		const parsed = parseIncomeInput(input);
+		if (!parsed.ok) {
+			setResult(parsed);
+			return;
+		}
 		const r = generateIncomePattern(
-			input,
+			parsed.input,
 			existingAccountIds,
 			existingPostingIds,
 		);

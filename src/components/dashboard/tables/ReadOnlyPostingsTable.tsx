@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { DataTable, formatCurrency } from "@/components/ui/data-table";
+import {
+	createTableColumn,
+	DataTable,
+	formatCurrency,
+} from "@/components/ui/data-table";
 import { TableSearch } from "@/components/ui/table-search";
 import { formatFrequency } from "@/lib/format";
 import type { Posting } from "@/lib/projection";
@@ -11,6 +15,8 @@ interface ReadOnlyPostingsTableProps {
 	disabledPostingSet: Set<string>;
 	onToggle: (id: string) => void;
 }
+
+const postingColumn = createTableColumn<Posting>();
 
 export function ReadOnlyPostingsTable({
 	postings,
@@ -27,7 +33,7 @@ export function ReadOnlyPostingsTable({
 				onChange={setSearch}
 				placeholder="Search transactions..."
 			/>
-			<DataTable
+			<DataTable<Posting>
 				title="Scheduled transactions"
 				description="Recurring income, spending, and transfers tied directly to salary or checking."
 				rows={postings.filter(
@@ -36,63 +42,61 @@ export function ReadOnlyPostingsTable({
 						p.label.toLowerCase().includes(search.toLowerCase()) ||
 						p.id.toLowerCase().includes(search.toLowerCase()),
 				)}
+				rowKey={(posting) => posting.id}
 				variant="flat"
 				columns={[
-					...(showAdvanced ? [{ key: "id" as never, label: "ID" }] : []),
-					{ key: "label" as never, label: "Transaction" },
+					...(showAdvanced ? [postingColumn({ key: "id", label: "ID" })] : []),
+					postingColumn({ key: "label", label: "Transaction" }),
 					...(showAdvanced
-						? [{ key: "sourceAccountId" as never, label: "Source" }]
+						? [postingColumn({ key: "sourceAccountId", label: "Source" })]
 						: []),
-					{ key: "destinations" as never, label: "To" },
-					{
-						key: "arithmetic" as never,
+					postingColumn({ key: "destinations", label: "To" }),
+					postingColumn({
+						key: "arithmetic",
 						label: "Amount",
-						render: (value: unknown) => (
-							<PostingAmount arithmetic={String(value)} />
-						),
-					},
-					{
-						key: "frequency" as never,
+						render: (value) => <PostingAmount arithmetic={value} />,
+					}),
+					postingColumn({
+						key: "frequency",
 						label: "Freq",
-						format: (v: unknown) =>
-							v === "once" ? "Once" : formatFrequency(String(v)),
-					},
+						format: (value) =>
+							value === "once" ? "Once" : formatFrequency(value),
+					}),
 					...(showAdvanced
 						? [
-								{ key: "annualRate" as never, label: "Rate" },
-								{ key: "annualGrowthRate" as never, label: "Growth" },
-								{ key: "volatility" as never, label: "Vol" },
+								postingColumn({ key: "annualRate", label: "Rate" }),
+								postingColumn({ key: "annualGrowthRate", label: "Growth" }),
+								postingColumn({ key: "volatility", label: "Vol" }),
 							]
 						: []),
-					{ key: "startDate" as never, label: "Start" },
-					{ key: "endDate" as never, label: "End" },
+					postingColumn({ key: "startDate", label: "Start" }),
+					postingColumn({ key: "endDate", label: "End" }),
 					...(showAdvanced
 						? [
-								{
-									key: "annualCap" as never,
+								postingColumn({
+									key: "annualCap",
 									label: "Cap",
-									format: (v: unknown) =>
-										v === null ? "-" : formatCurrency(v),
-								},
-								{ key: "priority" as never, label: "Pri" },
+									format: (value) =>
+										value === null ? "-" : formatCurrency(value),
+								}),
+								postingColumn({ key: "priority", label: "Pri" }),
 							]
 						: []),
-					{
-						key: "enabled" as never,
+					postingColumn({
+						key: "enabled",
 						label: "Enabled",
-						render: (_v: unknown, row: object) => {
-							const p = row as Posting;
+						render: (_value, posting) => {
 							return (
 								<input
 									type="checkbox"
-									aria-label={`Enable ${p.label}`}
+									aria-label={`Enable ${posting.label}`}
 									className="h-4 w-4 rounded accent-primary"
-									checked={!disabledPostingSet.has(p.id)}
-									onChange={() => onToggle(p.id)}
+									checked={!disabledPostingSet.has(posting.id)}
+									onChange={() => onToggle(posting.id)}
 								/>
 							);
 						},
-					},
+					}),
 				]}
 			/>
 		</div>

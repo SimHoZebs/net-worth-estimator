@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
+import { createTableColumn, DataTable } from "@/components/ui/data-table";
 import { TableSearch } from "@/components/ui/table-search";
 import { formatRoute } from "@/lib/format";
 import type { Account, Posting } from "@/lib/projection";
@@ -14,6 +14,8 @@ interface TransactionHistoryTableProps {
 	disabledPostingSet: Set<string>;
 	onToggle: (id: string) => void;
 }
+
+const postingColumn = createTableColumn<Posting>();
 
 export function TransactionHistoryTable({
 	postings,
@@ -65,20 +67,20 @@ export function TransactionHistoryTable({
 				}}
 				placeholder="Search transaction history..."
 			/>
-			<DataTable
+			<DataTable<Posting>
 				title="Transaction history"
 				description="One-time transactions and balance observations, newest first."
 				rows={rows}
+				rowKey={(posting) => posting.id}
 				emptyText="No one-time transactions match this search."
 				variant="flat"
 				columns={[
-					{ key: "startDate" as never, label: "Date" },
-					{ key: "label" as never, label: "Description" },
-					{
-						key: "sourceAccountId" as never,
+					postingColumn({ key: "startDate", label: "Date" }),
+					postingColumn({ key: "label", label: "Description" }),
+					postingColumn({
+						key: "sourceAccountId",
 						label: "Route",
-						render: (_value: unknown, row: object) => {
-							const posting = row as Posting;
+						render: (_value, posting) => {
 							const sourceLabel = posting.sourceAccountId
 								? (accountById.get(posting.sourceAccountId)?.label ??
 									posting.sourceAccountId)
@@ -89,19 +91,16 @@ export function TransactionHistoryTable({
 								})) ?? null;
 							return formatRoute(sourceLabel, destinations);
 						},
-					},
-					{
-						key: "arithmetic" as never,
+					}),
+					postingColumn({
+						key: "arithmetic",
 						label: "Amount",
-						render: (value: unknown) => (
-							<PostingAmount arithmetic={String(value)} />
-						),
-					},
-					{
-						key: "enabled" as never,
+						render: (value) => <PostingAmount arithmetic={value} />,
+					}),
+					postingColumn({
+						key: "enabled",
 						label: "Enabled",
-						render: (_value: unknown, row: object) => {
-							const posting = row as Posting;
+						render: (_value, posting) => {
 							return (
 								<input
 									type="checkbox"
@@ -112,7 +111,7 @@ export function TransactionHistoryTable({
 								/>
 							);
 						},
-					},
+					}),
 				]}
 			/>
 			<div className="flex flex-wrap items-center justify-between gap-3 type-caption">

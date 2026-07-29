@@ -1,9 +1,19 @@
 import { Input } from "@/components/ui/input";
-import type { IncomeTemplateInput } from "@/lib/patterns";
+
+export interface IncomeFormValue {
+	label: string;
+	grossMonthlyIncome: string;
+	taxRate: string;
+	k401ContributionRate: string;
+	k401EmployerMatchRate: string;
+	k401AnnualCap: string;
+	autoInvestRate: string;
+	startDate: string;
+}
 
 interface IncomeFormProps {
-	value: IncomeTemplateInput;
-	onChange: (value: IncomeTemplateInput) => void;
+	value: IncomeFormValue;
+	onChange: (value: IncomeFormValue) => void;
 }
 
 const LABEL_CLASS = "block type-label mb-1";
@@ -44,7 +54,7 @@ const presets = [
 ];
 
 export function IncomeForm({ value, onChange }: IncomeFormProps) {
-	const update = (patch: Partial<IncomeTemplateInput>) =>
+	const update = (patch: Partial<IncomeFormValue>) =>
 		onChange({ ...value, ...patch });
 
 	return (
@@ -59,11 +69,11 @@ export function IncomeForm({ value, onChange }: IncomeFormProps) {
 							onClick={() =>
 								onChange({
 									...value,
-									taxRate: p.taxRate / 100,
-									k401ContributionRate: p.k401 / 100,
-									k401EmployerMatchRate: p.match / 100,
-									k401AnnualCap: p.cap,
-									autoInvestRate: p.auto / 100,
+									taxRate: String(p.taxRate),
+									k401ContributionRate: String(p.k401),
+									k401EmployerMatchRate: String(p.match),
+									k401AnnualCap: String(p.cap),
+									autoInvestRate: String(p.auto),
 								})
 							}
 							className="rounded-full border border-border px-2.5 py-0.5 type-caption hover:bg-muted  transition-colors"
@@ -97,10 +107,8 @@ export function IncomeForm({ value, onChange }: IncomeFormProps) {
 					<Input
 						type="number"
 						min={0}
-						value={value.grossMonthlyIncome || ""}
-						onChange={(e) =>
-							update({ grossMonthlyIncome: Number(e.target.value) })
-						}
+						value={value.grossMonthlyIncome}
+						onChange={(e) => update({ grossMonthlyIncome: e.target.value })}
 						placeholder="10000"
 					/>
 				</div>
@@ -111,8 +119,8 @@ export function IncomeForm({ value, onChange }: IncomeFormProps) {
 						min={0}
 						max={100}
 						step={0.1}
-						value={Math.round(value.taxRate * 1000) / 10 || ""}
-						onChange={(e) => update({ taxRate: Number(e.target.value) / 100 })}
+						value={value.taxRate}
+						onChange={(e) => update({ taxRate: e.target.value })}
 						placeholder="22"
 					/>
 				</div>
@@ -124,10 +132,8 @@ export function IncomeForm({ value, onChange }: IncomeFormProps) {
 						min={0}
 						max={100}
 						step={0.1}
-						value={Math.round(value.k401ContributionRate * 1000) / 10 || ""}
-						onChange={(e) =>
-							update({ k401ContributionRate: Number(e.target.value) / 100 })
-						}
+						value={value.k401ContributionRate}
+						onChange={(e) => update({ k401ContributionRate: e.target.value })}
 						placeholder="4"
 					/>
 				</div>
@@ -138,10 +144,8 @@ export function IncomeForm({ value, onChange }: IncomeFormProps) {
 						min={0}
 						max={100}
 						step={0.1}
-						value={Math.round(value.k401EmployerMatchRate * 1000) / 10 || ""}
-						onChange={(e) =>
-							update({ k401EmployerMatchRate: Number(e.target.value) / 100 })
-						}
+						value={value.k401EmployerMatchRate}
+						onChange={(e) => update({ k401EmployerMatchRate: e.target.value })}
 						placeholder="50"
 					/>
 				</div>
@@ -152,8 +156,8 @@ export function IncomeForm({ value, onChange }: IncomeFormProps) {
 						type="number"
 						min={0}
 						step={500}
-						value={value.k401AnnualCap || ""}
-						onChange={(e) => update({ k401AnnualCap: Number(e.target.value) })}
+						value={value.k401AnnualCap}
+						onChange={(e) => update({ k401AnnualCap: e.target.value })}
 						placeholder="23000"
 					/>
 				</div>
@@ -164,10 +168,8 @@ export function IncomeForm({ value, onChange }: IncomeFormProps) {
 						min={0}
 						max={100}
 						step={0.1}
-						value={Math.round(value.autoInvestRate * 1000) / 10 || ""}
-						onChange={(e) =>
-							update({ autoInvestRate: Number(e.target.value) / 100 })
-						}
+						value={value.autoInvestRate}
+						onChange={(e) => update({ autoInvestRate: e.target.value })}
 						placeholder="10"
 					/>
 				</div>

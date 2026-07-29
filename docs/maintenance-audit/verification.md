@@ -1,38 +1,36 @@
 # Verification Record
 
-Audit environment:
+## Original Audit
 
-- Date: 2026-07-25
+Audit environment on 2026-07-25:
+
 - Node: v26.3.1
 - npm: 11.16.0
+- `npm run typecheck`: passed
+- `npm run test:run`: failed during theme-store import; 25 files and 208 tests otherwise passed
+- `npx biome check src plugins vite.config.ts`: passed
+- `git diff --check`: passed
+- Production build: not run because the audit was read-only
 
-## Commands
+That failure and the original structural counts describe commit `73d2bd4`, before remediation and before the staged model-input changes were incorporated into the maintenance worktree.
+
+## Remediation Revalidation
+
+Integrated worktree environment on 2026-07-29:
+
+- Branch: `maintenance-audit-remediation`
+- Base commit: `73d2bd4`
+- Node: v26.5.0
+- npm: 11.17.0
+- Included the staged changes from the original workspace before maintenance work began
 
 | Command | Result | Notes |
 | --- | --- | --- |
 | `npm run typecheck` | Passed | TypeScript completed with no errors |
-| `npm run test:run` | Failed | 1 suite failed, 25 passed, and 208 tests passed |
-| `npx biome check src plugins vite.config.ts` | Passed | 168 files checked; no fixes applied |
-| `git status --short` | Passed | Worktree was clean at the end of the audit |
+| `npm run test:run` | Passed | 52 files and 341 tests passed |
+| `npm run build` | Passed | Production bundle completed with the existing large-chunk warning |
+| `npx biome check src plugins vite.config.ts` | Passed | 199 files checked with no fixes required |
 | `git diff --check` | Passed | No whitespace errors |
-| Tracked artifact search | Passed | No tracked debug dumps, logs, screenshots, or image artifacts found |
-| `npm run build` | Not run | Build writes to `dist/`, which was excluded by the audit-only constraint |
+| Focused boundary tests | Passed | Theme, stochastic drafts, tables, API, workers, forms, charts, orchestration, and shortfalls |
 
-## Test Failure
-
-`src/components/evaluations/EvaluationList.test.tsx` failed during module import. `src/store.ts:341` attempted to read `localStorage.theme`, but the current runtime reported that local storage was unavailable. See [finding 01](findings/01-theme-storage-initialization.md).
-
-## Post-Implementation Verification
-
-Run:
-
-```sh
-npm run typecheck
-npm run test:run
-npm run build
-npx biome check src plugins vite.config.ts
-git diff --check
-git status --short
-```
-
-Add focused browser checks for progressive stochastic charts, evaluation editing, numeric drafts, row identity, source reload, save, and reset behavior.
+Independent review found and prompted additional regression coverage for same-field stochastic rebasing and decimal-only numeric drafts. A final deleted-link search found no remaining finding references.

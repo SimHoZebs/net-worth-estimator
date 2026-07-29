@@ -7,6 +7,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { parseDecimalDraft } from "@/lib/number-draft";
 import type {
 	FinancialIndependencePlan,
 	FinancialModelDocument,
@@ -36,6 +37,89 @@ function planFingerprint(plan: FinancialIndependencePlan) {
 	return JSON.stringify(plan);
 }
 
+interface FinancialIndependenceNumericDrafts {
+	annualExpenseTarget: string;
+	annualExpenseGrowthRate: string;
+	withdrawalRate: string;
+	evaluationYears: string;
+	requiredConfidence: string;
+	minimumNetWorth: string;
+	assetWithdrawalRates: Record<string, string>;
+}
+
+function numericDraftsForPlan(
+	plan: FinancialIndependencePlan,
+): FinancialIndependenceNumericDrafts {
+	return {
+		annualExpenseTarget: String(plan.annualExpenseTarget),
+		annualExpenseGrowthRate: String(plan.annualExpenseGrowthRate * 100),
+		withdrawalRate: String(plan.withdrawalRate * 100),
+		evaluationYears: String(plan.evaluationYears),
+		requiredConfidence: String(plan.requiredConfidence * 100),
+		minimumNetWorth: String(plan.minimumNetWorth),
+		assetWithdrawalRates: Object.fromEntries(
+			plan.sources.flatMap((source) =>
+				source.type === "asset" && source.withdrawalRateOverride !== undefined
+					? [[source.accountId, String(source.withdrawalRateOverride * 100)]]
+					: [],
+			),
+		),
+	};
+}
+
+function finiteDraft(value: string) {
+	return parseDecimalDraft(value);
+}
+
+function planWithNumericDrafts(
+	plan: FinancialIndependencePlan,
+	drafts: FinancialIndependenceNumericDrafts,
+) {
+	const annualExpenseTarget = finiteDraft(drafts.annualExpenseTarget);
+	const annualExpenseGrowthRate = finiteDraft(drafts.annualExpenseGrowthRate);
+	const withdrawalRate = finiteDraft(drafts.withdrawalRate);
+	const evaluationYears = finiteDraft(drafts.evaluationYears);
+	const requiredConfidence = finiteDraft(drafts.requiredConfidence);
+	const minimumNetWorth = finiteDraft(drafts.minimumNetWorth);
+	if (
+		annualExpenseTarget === null ||
+		annualExpenseGrowthRate === null ||
+		withdrawalRate === null ||
+		evaluationYears === null ||
+		requiredConfidence === null ||
+		minimumNetWorth === null
+	) {
+		return null;
+	}
+
+	const sources = plan.sources.map((source) => {
+		if (source.type !== "asset") return source;
+		const overrideDraft = drafts.assetWithdrawalRates[source.accountId] ?? "";
+		if (overrideDraft.trim() === "") {
+			const { withdrawalRateOverride: _removed, ...rest } = source;
+			return rest;
+		}
+		const override = finiteDraft(overrideDraft);
+		if (override === null) return null;
+		return {
+			...source,
+			withdrawalRateOverride: Math.max(0, override) / 100,
+		};
+	});
+	if (sources.some((source) => source === null)) return null;
+
+	return {
+		...plan,
+		annualExpenseTarget: Math.max(0, annualExpenseTarget),
+		annualExpenseGrowthRate: Math.max(0, annualExpenseGrowthRate) / 100,
+		withdrawalRate: Math.min(100, Math.max(0, withdrawalRate)) / 100,
+		evaluationYears: Math.max(1, Math.floor(evaluationYears)),
+		requiredConfidence: Math.min(100, Math.max(1, requiredConfidence)) / 100,
+		minimumNetWorth: Math.max(0, minimumNetWorth),
+		sources: sources as FinancialIndependencePlan["sources"],
+	};
+}
+
 function postingLinksToAssets(
 	posting: FinancialModelDocument["postings"][number],
 	accountIds: ReadonlySet<string>,
@@ -59,13 +143,16 @@ export const FinancialIndependencePlanEditor = memo(
 		const committedFingerprint = planFingerprint(committedPlan);
 		const draftRevision = `${sourceRevision}\n${committedFingerprint}`;
 		const [draft, setDraft] = useState(committedPlan);
+		const committedNumericDrafts = numericDraftsForPlan(committedPlan);
+		const committedNumericFingerprint = JSON.stringify(committedNumericDrafts);
+		const [numericDrafts, setNumericDrafts] = useState(committedNumericDrafts);
 
 		useEffect(() => {
-			setDraft(
-				JSON.parse(
-					draftRevision.slice(draftRevision.indexOf("\n") + 1),
-				) as FinancialIndependencePlan,
-			);
+			const nextPlan = JSON.parse(
+				draftRevision.slice(draftRevision.indexOf("\n") + 1),
+			) as FinancialIndependencePlan;
+			setDraft(nextPlan);
+			setNumericDrafts(numericDraftsForPlan(nextPlan));
 		}, [draftRevision]);
 
 		const selectedCashflows = useMemo(
@@ -110,7 +197,10 @@ export const FinancialIndependencePlanEditor = memo(
 				posting.frequency !== "once" &&
 				postingLinksToAssets(posting, selectedAssets),
 		);
-		const dirty = planFingerprint(draft) !== committedFingerprint;
+		const parsedDraft = planWithNumericDrafts(draft, numericDrafts);
+		const dirty =
+			planFingerprint(draft) !== committedFingerprint ||
+			JSON.stringify(numericDrafts) !== committedNumericFingerprint;
 		const onDirtyChangeRef = useRef(onDirtyChange);
 		onDirtyChangeRef.current = onDirtyChange;
 		useEffect(() => {
@@ -150,6 +240,12 @@ export const FinancialIndependencePlanEditor = memo(
 		};
 
 		const toggleAsset = (accountId: string) => {
+			const wasSelected = selectedAssets.has(accountId);
+			setNumericDrafts((current) => {
+				const assetWithdrawalRates = { ...current.assetWithdrawalRates };
+				if (wasSelected) delete assetWithdrawalRates[accountId];
+				return { ...current, assetWithdrawalRates };
+			});
 			setDraft((current) => {
 				const existing = current.sources.find(
 					(source) => source.type === "asset" && source.accountId === accountId,
@@ -195,25 +291,6 @@ export const FinancialIndependencePlanEditor = memo(
 			});
 		};
 
-		const updateAssetWithdrawalRate = (
-			accountId: string,
-			withdrawalRateOverride: number | undefined,
-		) => {
-			setDraft((current) => ({
-				...current,
-				sources: current.sources.map((source) => {
-					if (source.type !== "asset" || source.accountId !== accountId) {
-						return source;
-					}
-					if (withdrawalRateOverride !== undefined) {
-						return { ...source, withdrawalRateOverride };
-					}
-					const { withdrawalRateOverride: _removed, ...rest } = source;
-					return rest;
-				}),
-			}));
-		};
-
 		const toggleContinuingPosting = (postingId: string) => {
 			setDraft((current) => {
 				const selected = current.continuingPostingIds.includes(postingId);
@@ -254,26 +331,26 @@ export const FinancialIndependencePlanEditor = memo(
 							<FiNumberField
 								label="Annual spending"
 								description="Spending required in the first year of FI."
-								value={draft.annualExpenseTarget}
+								value={numericDrafts.annualExpenseTarget}
 								min={0}
 								step={1000}
-								onChange={(value) =>
-									setDraft((current) => ({
+								onChange={(annualExpenseTarget) =>
+									setNumericDrafts((current) => ({
 										...current,
-										annualExpenseTarget: Math.max(0, value),
+										annualExpenseTarget,
 									}))
 								}
 							/>
 							<FiNumberField
 								label="Spending inflation (%)"
 								description="Grows annual spending and adjusts the purchasing-power rule."
-								value={draft.annualExpenseGrowthRate * 100}
+								value={numericDrafts.annualExpenseGrowthRate}
 								min={0}
 								step={0.1}
-								onChange={(value) =>
-									setDraft((current) => ({
+								onChange={(annualExpenseGrowthRate) =>
+									setNumericDrafts((current) => ({
 										...current,
-										annualExpenseGrowthRate: Math.max(0, value) / 100,
+										annualExpenseGrowthRate,
 									}))
 								}
 							/>
@@ -288,14 +365,14 @@ export const FinancialIndependencePlanEditor = memo(
 						<FiNumberField
 							label="Portfolio withdrawal rate (%)"
 							description="Maximum annual withdrawal from each selected asset, recalculated from its balance at the start of each test year."
-							value={draft.withdrawalRate * 100}
+							value={numericDrafts.withdrawalRate}
 							min={0}
 							max={100}
 							step={0.1}
-							onChange={(value) =>
-								setDraft((current) => ({
+							onChange={(withdrawalRate) =>
+								setNumericDrafts((current) => ({
 									...current,
-									withdrawalRate: Math.min(100, Math.max(0, value)) / 100,
+									withdrawalRate,
 								}))
 							}
 						/>
@@ -340,26 +417,26 @@ export const FinancialIndependencePlanEditor = memo(
 							<FiNumberField
 								label="Test period (years)"
 								description="Every month of spending must be funded for this full period."
-								value={draft.evaluationYears}
+								value={numericDrafts.evaluationYears}
 								min={1}
 								max={50}
-								onChange={(value) =>
-									setDraft((current) => ({
+								onChange={(evaluationYears) =>
+									setNumericDrafts((current) => ({
 										...current,
-										evaluationYears: Math.max(1, Math.floor(value)),
+										evaluationYears,
 									}))
 								}
 							/>
 							<FiNumberField
 								label="Required Monte Carlo confidence (%)"
 								description="Controls the reported confidence-qualified FI date; it does not change individual simulation paths."
-								value={draft.requiredConfidence * 100}
+								value={numericDrafts.requiredConfidence}
 								min={1}
 								max={100}
-								onChange={(value) =>
-									setDraft((current) => ({
+								onChange={(requiredConfidence) =>
+									setNumericDrafts((current) => ({
 										...current,
-										requiredConfidence: Math.min(100, Math.max(1, value)) / 100,
+										requiredConfidence,
 									}))
 								}
 							/>
@@ -389,13 +466,13 @@ export const FinancialIndependencePlanEditor = memo(
 							<FiNumberField
 								label="Minimum total net worth"
 								description="Candidate dates are ignored until whole-model net worth reaches this gate, before selected funding coverage is tested."
-								value={draft.minimumNetWorth}
+								value={numericDrafts.minimumNetWorth}
 								min={0}
 								step={50_000}
-								onChange={(value) =>
-									setDraft((current) => ({
+								onChange={(minimumNetWorth) =>
+									setNumericDrafts((current) => ({
 										...current,
-										minimumNetWorth: Math.max(0, value),
+										minimumNetWorth,
 									}))
 								}
 							/>
@@ -412,36 +489,29 @@ export const FinancialIndependencePlanEditor = memo(
 										{assetAccounts
 											.filter((account) => selectedAssets.has(account.id))
 											.map((account) => {
-												const source = draft.sources.find(
-													(item) =>
-														item.type === "asset" &&
-														item.accountId === account.id,
-												);
 												return (
 													<label key={account.id} className="type-caption">
 														{account.label} (%)
 														<input
-															type="number"
+															type="text"
+															inputMode="decimal"
 															min={0}
 															max={100}
 															step={0.1}
-															placeholder={String(draft.withdrawalRate * 100)}
+															placeholder={numericDrafts.withdrawalRate}
 															value={
-																source?.type === "asset" &&
-																source.withdrawalRateOverride !== undefined
-																	? source.withdrawalRateOverride * 100
-																	: ""
+																numericDrafts.assetWithdrawalRates[
+																	account.id
+																] ?? ""
 															}
 															onChange={(event) =>
-																updateAssetWithdrawalRate(
-																	account.id,
-																	event.target.value === ""
-																		? undefined
-																		: Math.max(
-																				0,
-																				Number(event.target.value) / 100,
-																			),
-																)
+																setNumericDrafts((current) => ({
+																	...current,
+																	assetWithdrawalRates: {
+																		...current.assetWithdrawalRates,
+																		[account.id]: event.target.value,
+																	},
+																}))
 															}
 															className={FI_INPUT_CLASS}
 														/>
@@ -502,15 +572,24 @@ export const FinancialIndependencePlanEditor = memo(
 								variant="ghost"
 								className="w-full sm:w-auto"
 								disabled={!dirty}
-								onClick={() => setDraft(committedPlan)}
+								onClick={() => {
+									setDraft(committedPlan);
+									setNumericDrafts(committedNumericDrafts);
+								}}
 							>
 								Discard changes
 							</Button>
 							<Button
 								type="button"
 								className="w-full sm:w-auto"
-								disabled={!dirty}
-								onClick={() => onApply(cleanPlan(draft))}
+								disabled={!dirty || parsedDraft === null}
+								onClick={() => {
+									if (!parsedDraft) return;
+									const appliedPlan = cleanPlan(parsedDraft);
+									onApply(appliedPlan);
+									setDraft(appliedPlan);
+									setNumericDrafts(numericDraftsForPlan(appliedPlan));
+								}}
 							>
 								Update analysis
 							</Button>
