@@ -11,6 +11,8 @@ import type {
 	ProjectionRequest,
 	StochasticRequest,
 } from "@/lib/projection/runtime/ProjectionEngine";
+import ProjectionWorker from "@/workers/projectionWorker?worker";
+import StochasticWorker from "@/workers/stochasticWorker?worker";
 import type {
 	ProjectionWorkerRequest,
 	StochasticWorkerRequest,
@@ -35,7 +37,7 @@ type WorkerMessageOutcome<T> =
 	| { type: "reject"; error: Error };
 
 interface WorkerTransportOptions<TRequest, TResult> {
-	url: URL;
+	createWorker: () => Worker;
 	request: TRequest;
 	signal?: AbortSignal;
 	crashMessage: string;
@@ -46,7 +48,7 @@ interface WorkerTransportOptions<TRequest, TResult> {
 
 export class WorkerProjectionEngine implements ProjectionComputationEngine {
 	private runWorker<TRequest, TResult>({
-		url,
+		createWorker,
 		request,
 		signal,
 		crashMessage,
@@ -54,7 +56,7 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 		postMessageFallback,
 		decodeMessage,
 	}: WorkerTransportOptions<TRequest, TResult>): Promise<TResult> {
-		const worker = new Worker(url, { type: "module" });
+		const worker = createWorker();
 
 		return new Promise<TResult>((resolve, reject) => {
 			let settled = false;
@@ -95,8 +97,10 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 					finish(() => reject(outcome.error));
 				}
 			};
-			worker.onerror = () => {
-				finish(() => reject(new Error(crashMessage)));
+			worker.onerror = (event) => {
+				const detail = event?.message?.trim() ?? "";
+				const message = detail ? `${crashMessage} ${detail}` : crashMessage;
+				finish(() => reject(new Error(message)));
 			};
 			worker.onmessageerror = () => {
 				finish(() => reject(new Error(unreadableMessage)));
@@ -117,7 +121,7 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 		const request = { ...payload, id: 1 } as ProjectionWorkerRequest;
 
 		return this.runWorker<ProjectionWorkerRequest, T>({
-			url: new URL("../workers/projectionWorker.ts", import.meta.url),
+			createWorker: () => new ProjectionWorker(),
 			request,
 			signal,
 			crashMessage: "Projection worker crashed.",
@@ -202,7 +206,7 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 		};
 
 		return this.runWorker<StochasticWorkerRequest, StochasticProjectionResult>({
-			url: new URL("../workers/stochasticWorker.ts", import.meta.url),
+			createWorker: () => new StochasticWorker(),
 			request: payload,
 			signal: request.signal,
 			crashMessage: "Stochastic worker crashed.",
