@@ -145,7 +145,9 @@ class Parser {
 				break;
 			}
 		}
-		return this.expr();
+		const expression = this.expr();
+		this.consume("eof", "Unexpected trailing input");
+		return expression;
 	}
 
 	private peek(): Token {

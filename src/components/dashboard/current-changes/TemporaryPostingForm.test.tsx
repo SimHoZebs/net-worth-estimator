@@ -89,4 +89,45 @@ describe("TemporaryPostingForm", () => {
 			}),
 		);
 	});
+
+	it("rejects a posting ID already used by the baseline", () => {
+		const onAdd = vi.fn();
+		render(
+			<TemporaryPostingForm
+				postings={[]}
+				document={createBaseDocument()}
+				onAdd={onAdd}
+				onRemove={() => {}}
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: "+ Add" }));
+		fireEvent.change(inputFor("ID"), { target: { value: "salary" } });
+		fireEvent.click(screen.getByRole("button", { name: "Add posting" }));
+
+		expect(onAdd).not.toHaveBeenCalled();
+		expect(
+			screen.getByText('Posting ID "salary" is already in use.'),
+		).not.toBeNull();
+	});
+
+	it("rejects an ID reserved by an account", () => {
+		const onAdd = vi.fn();
+		render(
+			<TemporaryPostingForm
+				postings={[]}
+				document={createBaseDocument()}
+				reservedIds={["trial-account"]}
+				onAdd={onAdd}
+				onRemove={() => {}}
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: "+ Add" }));
+		fireEvent.change(inputFor("ID"), { target: { value: "trial-account" } });
+		fireEvent.click(screen.getByRole("button", { name: "Add posting" }));
+
+		expect(onAdd).not.toHaveBeenCalled();
+		expect(
+			screen.getByText('Posting ID "trial-account" is already in use.'),
+		).not.toBeNull();
+	});
 });

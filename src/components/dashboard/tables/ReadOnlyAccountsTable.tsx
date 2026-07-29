@@ -1,42 +1,58 @@
-import { Fragment, useMemo, useState } from "react";
-import { ColorSwatch } from "@/components/dashboard/charts/ColorSwatch";
-import { PostingAmount } from "@/components/dashboard/tables/PostingAmount";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
+import { useMemo, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { TableSearch } from "@/components/ui/table-search";
-import { currency, formatFrequency, formatRoute, pct } from "@/lib/format";
+import { currency, formatDate } from "@/lib/format";
 import { associatedAccountIds } from "@/lib/posting-categories";
-import type { Account, Posting } from "@/lib/projection";
-import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
+import type {
+	Account,
+	Posting,
+	ProjectionAccountSummary,
+} from "@/lib/projection";
+import {
+	AccountPositionGroup,
+	type AccountPositionRow,
+} from "./AccountPositionGroup";
+import { AccountRules } from "./AccountRules";
 
 interface ReadOnlyAccountsTableProps {
 	accounts: Account[];
 	accountRules: Posting[];
+	accountSummaries: ProjectionAccountSummary[] | null;
+	currentNetWorth: number | null;
+	projectionStartDate: string;
+	balancesAreStale: boolean;
 	showAdvanced: boolean;
-	disabledAccountSet: Set<string>;
-	disabledPostingSet: Set<string>;
-	onToggleAccount: (id: string) => void;
-	onTogglePosting: (id: string) => void;
 }
 
 export function ReadOnlyAccountsTable({
 	accounts,
 	accountRules,
+	accountSummaries,
+	currentNetWorth,
+	projectionStartDate,
+	balancesAreStale,
 	showAdvanced,
-	disabledAccountSet,
-	disabledPostingSet,
-	onToggleAccount,
-	onTogglePosting,
 }: ReadOnlyAccountsTableProps) {
 	const [search, setSearch] = useState("");
 	const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(
 		new Set(),
+	);
+	const duplicateAccountIds = useMemo(
+		() => duplicateIds(accounts.map((account) => account.id)),
+		[accounts],
+	);
+	const duplicateSummaryIds = useMemo(
+		() =>
+			duplicateIds(accountSummaries?.map((summary) => summary.accountId) ?? []),
+		[accountSummaries],
+	);
+	const ambiguousIds = new Set([
+		...duplicateAccountIds,
+		...duplicateSummaryIds,
+	]);
+	const balancesAvailable = accountSummaries !== null && !balancesAreStale;
+	const summariesById = new Map(
+		(accountSummaries ?? []).map((summary) => [summary.accountId, summary]),
 	);
 	const rulesByAccount = useMemo(() => {
 		const grouped = new Map<string, Posting[]>();
@@ -55,141 +71,155 @@ export function ReadOnlyAccountsTable({
 			),
 		[accountRules, accounts],
 	);
-	const query = search.trim().toLowerCase();
-	const visibleAccounts = accounts.filter((account) => {
-		const rules = rulesByAccount.get(account.id) ?? [];
-		return (
-			!query ||
-			account.label.toLowerCase().includes(query) ||
-			account.id.toLowerCase().includes(query) ||
-			rules.some(
-				(rule) =>
-					rule.label.toLowerCase().includes(query) ||
-					rule.id.toLowerCase().includes(query),
-			)
-		);
+	const rows: AccountPositionRow[] = accounts.map((account) => {
+		const summary = summariesById.get(account.id);
+		return {
+			account,
+			balance:
+				balancesAvailable && !ambiguousIds.has(account.id) && summary?.enabled
+					? summary.startingBalance
+					: null,
+			rules: rulesByAccount.get(account.id) ?? [],
+		};
 	});
+	const assetRows = rows.filter(
+		(row) => row.balance !== null && row.balance >= 0,
+	);
+	const liabilityRows = rows.filter(
+		(row) => row.balance !== null && row.balance < 0,
+	);
+	const unavailableRows = rows.filter((row) => row.balance === null);
+	const assetsTotal = assetRows.reduce(
+		(sum, row) => sum + (row.balance ?? 0),
+		0,
+	);
+	const liabilitiesTotal = liabilityRows.reduce(
+		(sum, row) => sum + (row.balance ?? 0),
+		0,
+	);
+	const query = search.trim().toLowerCase();
+	const matchesSearch = (row: AccountPositionRow) =>
+		!query ||
+		row.account.label.toLowerCase().includes(query) ||
+		row.account.id.toLowerCase().includes(query) ||
+		row.rules.some(
+			(rule) =>
+				rule.label.toLowerCase().includes(query) ||
+				rule.id.toLowerCase().includes(query),
+		);
 	const accountById = new Map(accounts.map((account) => [account.id, account]));
+	const toggleExpanded = (id: string) =>
+		setExpandedIds((current) => {
+			const next = new Set(current);
+			if (next.has(id)) next.delete(id);
+			else next.add(id);
+			return next;
+		});
 
 	return (
-		<div className="space-y-4">
+		<div className="space-y-5">
+			<section className="overflow-hidden rounded-[1.6rem] border border-border/80 bg-gradient-to-br from-card via-card to-surface/70">
+				<div className="border-b border-border/70 p-5 md:flex md:items-end md:justify-between md:gap-6">
+					<div>
+						<div className="type-eyebrow text-primary">Current position</div>
+						<h2 className="mt-1 type-title text-xl">Your accounts</h2>
+						<p className="mt-1 max-w-2xl type-muted">
+							Balances after recorded activity through{" "}
+							{formatDate(projectionStartDate)}.
+						</p>
+					</div>
+					<div className="mt-3 shrink-0 type-caption md:mt-0">
+						As of{" "}
+						<span className="type-value">
+							{formatDate(projectionStartDate)}
+						</span>
+					</div>
+				</div>
+				<div className="grid divide-y divide-border/70 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+					<PositionMetric
+						label="Net worth"
+						value={balancesAvailable ? currentNetWorth : null}
+					/>
+					<PositionMetric
+						label="Assets"
+						value={balancesAvailable ? assetsTotal : null}
+					/>
+					<PositionMetric
+						label="Liabilities"
+						value={balancesAvailable ? liabilitiesTotal : null}
+					/>
+				</div>
+			</section>
+
+			{balancesAreStale ? (
+				<Alert>
+					<AlertTitle>Updating balances</AlertTitle>
+					<AlertDescription>
+						The account list is current. Balances will return when the latest
+						projection finishes.
+					</AlertDescription>
+				</Alert>
+			) : accountSummaries === null ? (
+				<Alert>
+					<AlertTitle>Balances unavailable</AlertTitle>
+					<AlertDescription>
+						Accounts remain available to inspect, but no completed projection
+						can provide balances yet.
+					</AlertDescription>
+				</Alert>
+			) : null}
+			{ambiguousIds.size > 0 ? (
+				<Alert variant="destructive">
+					<AlertTitle>
+						Duplicate account IDs prevent balance matching
+					</AlertTitle>
+					<AlertDescription>
+						Resolve these IDs before relying on balances:{" "}
+						{Array.from(ambiguousIds).join(", ")}.
+					</AlertDescription>
+				</Alert>
+			) : null}
+
 			<TableSearch
 				value={search}
 				onChange={setSearch}
-				placeholder="Search accounts and account rules..."
+				placeholder="Search accounts and rules..."
 			/>
-			<div>
-				<div className="type-title">Accounts</div>
-				<div className="type-caption">
-					Tracked balances and the future rules associated with each account.
-				</div>
+			<div className="grid gap-5 xl:grid-cols-2">
+				<AccountPositionGroup
+					title="Assets"
+					description="Cash, investments, and other positive balances."
+					rows={assetRows.filter(matchesSearch)}
+					emptyText="No assets match this search."
+					{...{ showAdvanced, expandedIds, toggleExpanded, accountById }}
+				/>
+				<AccountPositionGroup
+					title="Liabilities"
+					description="Loans and other balances that reduce net worth."
+					rows={liabilityRows.filter(matchesSearch)}
+					emptyText="No liabilities match this search."
+					{...{ showAdvanced, expandedIds, toggleExpanded, accountById }}
+				/>
 			</div>
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead>Account</TableHead>
-						{showAdvanced ? <TableHead>ID</TableHead> : null}
-						<TableHead>Min</TableHead>
-						<TableHead>Max</TableHead>
-						<TableHead>Color</TableHead>
-						<TableHead>Enabled</TableHead>
-						<TableHead>Account rules</TableHead>
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{visibleAccounts.map((account) => {
-						const rules = rulesByAccount.get(account.id) ?? [];
-						const isExpanded = expandedIds.has(account.id);
-						const regionId = `account-rules-${account.id}`;
-						return (
-							<Fragment key={account.id}>
-								<TableRow>
-									<TableCell className="type-value">{account.label}</TableCell>
-									{showAdvanced ? (
-										<TableCell className="type-code">{account.id}</TableCell>
-									) : null}
-									<TableCell>
-										{account.minBalance === NO_FLOOR
-											? "-"
-											: currency.format(account.minBalance)}
-									</TableCell>
-									<TableCell>
-										{account.maxBalance === NO_CEILING
-											? "-"
-											: currency.format(account.maxBalance)}
-									</TableCell>
-									<TableCell>
-										<ColorSwatch color={account.color} />
-									</TableCell>
-									<TableCell>
-										<input
-											type="checkbox"
-											aria-label={`Enable ${account.label}`}
-											className="h-4 w-4 rounded accent-primary"
-											checked={!disabledAccountSet.has(account.id)}
-											onChange={() => onToggleAccount(account.id)}
-										/>
-									</TableCell>
-									<TableCell>
-										<button
-											type="button"
-											aria-expanded={isExpanded}
-											aria-controls={regionId}
-											disabled={rules.length === 0}
-											onClick={() =>
-												setExpandedIds((current) => {
-													const next = new Set(current);
-													if (next.has(account.id)) next.delete(account.id);
-													else next.add(account.id);
-													return next;
-												})
-											}
-											className="rounded-lg border border-border px-2.5 py-1 type-caption transition hover:border-ring disabled:cursor-default disabled:opacity-60"
-										>
-											{rules.length} rule{rules.length === 1 ? "" : "s"}
-										</button>
-									</TableCell>
-								</TableRow>
-								{isExpanded ? (
-									<TableRow id={regionId}>
-										<TableCell
-											colSpan={showAdvanced ? 7 : 6}
-											className="bg-surface/55 p-4"
-										>
-											<AccountRulesTable
-												accountLabel={account.label}
-												rules={rules}
-												accountById={accountById}
-												showAdvanced={showAdvanced}
-												disabledPostingSet={disabledPostingSet}
-												onToggle={onTogglePosting}
-											/>
-										</TableCell>
-									</TableRow>
-								) : null}
-							</Fragment>
-						);
-					})}
-				</TableBody>
-			</Table>
+			{unavailableRows.some(matchesSearch) ? (
+				<AccountPositionGroup
+					title="Balances unavailable"
+					description="These accounts are current; their balances are waiting for a completed projection."
+					rows={unavailableRows.filter(matchesSearch)}
+					emptyText=""
+					{...{ showAdvanced, expandedIds, toggleExpanded, accountById }}
+				/>
+			) : null}
 			{unassignedRules.length > 0 ? (
-				<section
-					aria-labelledby="unassigned-account-rules"
-					className="rounded-2xl border border-border/80 bg-surface/55 p-4"
-				>
-					<h3 id="unassigned-account-rules" className="type-title text-base">
-						Unassigned account rules
-					</h3>
+				<section className="rounded-2xl border border-border/80 bg-surface/55 p-4">
+					<h3 className="type-title text-base">Other rules</h3>
 					<p className="mb-3 type-caption">
-						Future rules that do not directly identify an account.
+						Rules that are not tied to a specific account.
 					</p>
-					<AccountRulesTable
-						accountLabel="Unassigned account rules"
+					<AccountRules
 						rules={unassignedRules}
 						accountById={accountById}
 						showAdvanced={showAdvanced}
-						disabledPostingSet={disabledPostingSet}
-						onToggle={onTogglePosting}
 					/>
 				</section>
 			) : null}
@@ -197,84 +227,29 @@ export function ReadOnlyAccountsTable({
 	);
 }
 
-function AccountRulesTable({
-	accountLabel,
-	rules,
-	accountById,
-	showAdvanced,
-	disabledPostingSet,
-	onToggle,
+function PositionMetric({
+	label,
+	value,
 }: {
-	accountLabel: string;
-	rules: Posting[];
-	accountById: ReadonlyMap<string, Account>;
-	showAdvanced: boolean;
-	disabledPostingSet: Set<string>;
-	onToggle: (id: string) => void;
+	label: string;
+	value: number | null;
 }) {
 	return (
-		<Table>
-			<TableHeader>
-				<TableRow>
-					<TableHead>Rule</TableHead>
-					{showAdvanced ? <TableHead>ID</TableHead> : null}
-					<TableHead>Route</TableHead>
-					<TableHead>Amount calculation</TableHead>
-					<TableHead>Schedule</TableHead>
-					<TableHead>Rate assumptions</TableHead>
-					<TableHead>Enabled</TableHead>
-				</TableRow>
-			</TableHeader>
-			<TableBody>
-				{rules.map((rule) => {
-					const sourceLabel = rule.sourceAccountId
-						? (accountById.get(rule.sourceAccountId)?.label ??
-							rule.sourceAccountId)
-						: null;
-					const destinations =
-						rule.destinations?.map((id) => ({
-							label: accountById.get(id)?.label ?? id,
-						})) ?? null;
-					const assumptions =
-						[
-							rule.annualRate ? `${pct.format(rule.annualRate)} rate` : null,
-							rule.annualGrowthRate
-								? `${pct.format(rule.annualGrowthRate)} growth`
-								: null,
-							rule.volatility
-								? `${pct.format(rule.volatility)} volatility`
-								: null,
-						]
-							.filter(Boolean)
-							.join(" · ") || "-";
-					return (
-						<TableRow key={rule.id}>
-							<TableCell className="type-value">{rule.label}</TableCell>
-							{showAdvanced ? (
-								<TableCell className="type-code">{rule.id}</TableCell>
-							) : null}
-							<TableCell>{formatRoute(sourceLabel, destinations)}</TableCell>
-							<TableCell>
-								<PostingAmount arithmetic={rule.arithmetic} />
-							</TableCell>
-							<TableCell>
-								{formatFrequency(rule.frequency)} · {rule.startDate}
-								{rule.endDate ? ` to ${rule.endDate}` : ""}
-							</TableCell>
-							<TableCell>{assumptions}</TableCell>
-							<TableCell>
-								<input
-									type="checkbox"
-									aria-label={`Enable ${rule.label} for ${accountLabel}`}
-									className="h-4 w-4 rounded accent-primary"
-									checked={!disabledPostingSet.has(rule.id)}
-									onChange={() => onToggle(rule.id)}
-								/>
-							</TableCell>
-						</TableRow>
-					);
-				})}
-			</TableBody>
-		</Table>
+		<div className="px-5 py-4">
+			<div className="type-label">{label}</div>
+			<div className="mt-1 type-metric text-foreground">
+				{value === null ? "-" : currency.format(value)}
+			</div>
+		</div>
 	);
+}
+
+function duplicateIds(ids: string[]) {
+	const seen = new Set<string>();
+	const duplicates = new Set<string>();
+	for (const id of ids) {
+		if (seen.has(id)) duplicates.add(id);
+		seen.add(id);
+	}
+	return duplicates;
 }

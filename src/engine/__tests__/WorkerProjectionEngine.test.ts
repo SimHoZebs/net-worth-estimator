@@ -87,179 +87,6 @@ describe("ProjectionEngineContext", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/*  Mock engine project() tests                                        */
-/* ------------------------------------------------------------------ */
-
-describe("Mock engine project()", () => {
-	let engine: ProjectionEngine & {
-		project: ReturnType<typeof vi.fn>;
-		projectStochastic: ReturnType<typeof vi.fn>;
-	};
-
-	beforeEach(() => {
-		engine = makeMockEngine() as typeof engine;
-	});
-
-	it("calls project with correct arguments", async () => {
-		const document = createBaseDocument();
-		const settings = makeSettings();
-		const overrides = makeDefaultOverrides();
-
-		const result = await engine.project({
-			document,
-			projectionSettings: settings,
-			overrides,
-		});
-
-		expect(engine.project).toHaveBeenCalledOnce();
-		expect(engine.project).toHaveBeenCalledWith({
-			document,
-			projectionSettings: settings,
-			overrides,
-		});
-		expect(result.summary.currentNetWorth).toBe(1600);
-	});
-
-	it("keeps evaluation settings and results structured-clone safe", () => {
-		const request = {
-			document: createBaseDocument(),
-			projectionSettings: makeSettings(),
-			overrides: makeDefaultOverrides(),
-		};
-		const result = makeProjectionResult();
-		expect(structuredClone(request)).toEqual(request);
-		expect(structuredClone(result)).toEqual(result);
-		expect(() => JSON.stringify({ request, result })).not.toThrow();
-	});
-
-	it("passes AbortSignal through to the request", async () => {
-		const controller = new AbortController();
-
-		await engine.project({
-			document: createBaseDocument(),
-			projectionSettings: makeSettings(),
-			overrides: makeDefaultOverrides(),
-			signal: controller.signal,
-		});
-
-		const callArgs = engine.project.mock.calls[0][0];
-		expect(callArgs.signal).toBeInstanceOf(AbortSignal);
-		expect(callArgs.signal).toBe(controller.signal);
-	});
-
-	it("engine rejects when signal is already aborted", async () => {
-		const controller = new AbortController();
-		controller.abort();
-
-		engine.project = vi.fn(async (request: { signal?: AbortSignal }) => {
-			if (request.signal?.aborted) {
-				throw new DOMException("Aborted", "AbortError");
-			}
-			return makeProjectionResult();
-		});
-
-		await expect(
-			engine.project({
-				document: createBaseDocument(),
-				projectionSettings: makeSettings(),
-				overrides: makeDefaultOverrides(),
-				signal: controller.signal,
-			}),
-		).rejects.toThrow("Aborted");
-
-		expect(engine.project).toHaveBeenCalledTimes(1);
-	});
-});
-
-/* ------------------------------------------------------------------ */
-/*  Mock engine projectStochastic() tests                              */
-/* ------------------------------------------------------------------ */
-
-describe("Mock engine projectStochastic()", () => {
-	let engine: ProjectionEngine & {
-		project: ReturnType<typeof vi.fn>;
-		projectStochastic: ReturnType<typeof vi.fn>;
-	};
-
-	beforeEach(() => {
-		engine = makeMockEngine() as typeof engine;
-	});
-
-	it("calls projectStochastic with correct arguments", async () => {
-		const document = createBaseDocument();
-		const settings = makeSettings();
-		const overrides = makeDefaultOverrides();
-		const config = { runCount: 10, seed: 42 as number | null };
-
-		await engine.projectStochastic({
-			document,
-			projectionSettings: settings,
-			overrides,
-			config,
-		});
-
-		expect(engine.projectStochastic).toHaveBeenCalledOnce();
-		const callArgs = engine.projectStochastic.mock.calls[0][0];
-		expect(callArgs).toEqual({
-			document,
-			projectionSettings: settings,
-			overrides,
-			config,
-		});
-	});
-
-	it("calls onProgress callback", async () => {
-		const onProgress = vi.fn();
-
-		engine.projectStochastic = vi.fn(
-			async (_request, onProgress?: (p: number) => void) => {
-				onProgress?.(0.5);
-				onProgress?.(1.0);
-				return {} as StochasticProjectionResult;
-			},
-		);
-
-		await engine.projectStochastic(
-			{
-				document: createBaseDocument(),
-				projectionSettings: makeSettings(),
-				overrides: makeDefaultOverrides(),
-				config: { runCount: 10, seed: null },
-			},
-			onProgress,
-		);
-
-		expect(onProgress).toHaveBeenCalledTimes(2);
-		expect(onProgress).toHaveBeenNthCalledWith(1, 0.5);
-		expect(onProgress).toHaveBeenNthCalledWith(2, 1.0);
-	});
-
-	it("aborts with AbortError when signal is already aborted", async () => {
-		const controller = new AbortController();
-		controller.abort();
-
-		engine.projectStochastic = vi.fn(
-			async (request: { signal?: AbortSignal }) => {
-				if (request.signal?.aborted) {
-					throw new DOMException("Aborted", "AbortError");
-				}
-				return {} as StochasticProjectionResult;
-			},
-		);
-
-		await expect(
-			engine.projectStochastic({
-				document: createBaseDocument(),
-				projectionSettings: makeSettings(),
-				overrides: makeDefaultOverrides(),
-				config: { runCount: 10, seed: null },
-				signal: controller.signal,
-			}),
-		).rejects.toThrow("Aborted");
-	});
-});
-
-/* ------------------------------------------------------------------ */
 /*  WorkerProjectionEngine contract validation                         */
 /* ------------------------------------------------------------------ */
 
@@ -274,23 +101,25 @@ describe("WorkerProjectionEngine", () => {
 		vi.unstubAllGlobals();
 	});
 
-	it("exports a class that satisfies ProjectionEngine", async () => {
-		const mod = await import("@/engine/WorkerProjectionEngine");
-		expect(mod.WorkerProjectionEngine).toBeDefined();
-		const engine = new mod.WorkerProjectionEngine();
-		expect(typeof engine.project).toBe("function");
-		expect(typeof engine.projectStochastic).toBe("function");
-	});
-
 	it("resolves projection responses and terminates the worker", async () => {
 		const engine = new WorkerProjectionEngine();
 		const expected = makeProjectionResult();
-		const promise = engine.project({
+		const request = {
 			document: createBaseDocument(),
 			projectionSettings: makeSettings(),
 			overrides: makeDefaultOverrides(),
-		});
+		};
+		const promise = engine.project(request);
 		const worker = MockWorker.instances[0]!;
+		expect(worker.postMessage).toHaveBeenCalledWith({
+			id: 1,
+			type: "complete",
+			...request,
+		});
+		expect(structuredClone({ request, expected })).toEqual({
+			request,
+			expected,
+		});
 
 		worker.onmessage?.({
 			data: {
@@ -312,16 +141,15 @@ describe("WorkerProjectionEngine", () => {
 		const partial = {
 			config: { runCount: 1, seed: 1 },
 		} as StochasticProjectionResult;
-		const promise = engine.projectStochastic(
-			{
-				document: createBaseDocument(),
-				projectionSettings: makeSettings(),
-				overrides: makeDefaultOverrides(),
-				config: { runCount: 1, seed: 1 },
-			},
-			onProgress,
-		);
+		const request = {
+			document: createBaseDocument(),
+			projectionSettings: makeSettings(),
+			overrides: makeDefaultOverrides(),
+			config: { runCount: 1, seed: 1 },
+		};
+		const promise = engine.projectStochastic(request, onProgress);
 		const worker = MockWorker.instances[0]!;
+		expect(worker.postMessage).toHaveBeenCalledWith({ id: 1, ...request });
 
 		worker.onmessage?.({
 			data: { id: 1, type: "progress", progress: 0.5, partial },

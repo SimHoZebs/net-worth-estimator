@@ -1,7 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { createBaseDocument, makeSettings } from "../__fixtures__";
-import { projectFinancialModelDocument } from "../analysis/projectFinancialModel";
-import { projectRawFinancialModelDocument } from "../simulation/projectPath";
 import {
 	CSV_MODEL_FILE_NAMES,
 	CSV_MODEL_PUBLIC_PATH,
@@ -16,22 +13,5 @@ describe("core model terminology", () => {
 			accounts: "accounts.csv",
 			postings: "postings.csv",
 		});
-	});
-
-	it("projects through the canonical entry point", () => {
-		const document = createBaseDocument();
-		const settings = makeSettings();
-		const result = projectFinancialModelDocument(document, settings);
-
-		expect(result.summary.currentNetWorth).toBe(1600);
-	});
-
-	it("exposes only the canonical effective document runtime field", () => {
-		const { path } = projectRawFinancialModelDocument(
-			createBaseDocument(),
-			makeSettings(),
-		);
-
-		expect(path.effectiveDocument.accounts.length).toBeGreaterThan(0);
 	});
 });

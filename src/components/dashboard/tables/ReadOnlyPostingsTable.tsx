@@ -1,104 +1,96 @@
-import { useState } from "react";
-import {
-	createTableColumn,
-	DataTable,
-	formatCurrency,
-} from "@/components/ui/data-table";
+import { useMemo, useState } from "react";
 import { TableSearch } from "@/components/ui/table-search";
-import { formatFrequency } from "@/lib/format";
-import type { Posting } from "@/lib/projection";
-import { PostingAmount } from "./PostingAmount";
+import { currency, formatDate, formatFrequency, pct } from "@/lib/format";
+import type { Account, Posting } from "@/lib/projection";
+import {
+	TransactionListRow,
+	transactionMatchesSearch,
+} from "./TransactionPresentation";
 
 interface ReadOnlyPostingsTableProps {
 	postings: Posting[];
+	accounts: Account[];
 	showAdvanced: boolean;
-	disabledPostingSet: Set<string>;
-	onToggle: (id: string) => void;
 }
-
-const postingColumn = createTableColumn<Posting>();
 
 export function ReadOnlyPostingsTable({
 	postings,
+	accounts,
 	showAdvanced,
-	disabledPostingSet,
-	onToggle,
 }: ReadOnlyPostingsTableProps) {
 	const [search, setSearch] = useState("");
+	const accountById = new Map(accounts.map((account) => [account.id, account]));
+	const visiblePostings = useMemo(() => {
+		const query = search.trim().toLowerCase();
+		return postings.filter((posting) =>
+			transactionMatchesSearch(posting, accountById, query),
+		);
+	}, [postings, search, accountById]);
 
 	return (
-		<div>
+		<div className="space-y-4">
+			<div>
+				<h2 className="type-title">Scheduled transactions</h2>
+				<p className="type-caption">
+					Recurring money in, money out, and transfers.
+				</p>
+			</div>
 			<TableSearch
 				value={search}
 				onChange={setSearch}
-				placeholder="Search transactions..."
+				placeholder="Search scheduled transactions..."
 			/>
-			<DataTable<Posting>
-				title="Scheduled transactions"
-				description="Recurring income, spending, and transfers tied directly to salary or checking."
-				rows={postings.filter(
-					(p) =>
-						!search ||
-						p.label.toLowerCase().includes(search.toLowerCase()) ||
-						p.id.toLowerCase().includes(search.toLowerCase()),
-				)}
-				rowKey={(posting) => posting.id}
-				variant="flat"
-				columns={[
-					...(showAdvanced ? [postingColumn({ key: "id", label: "ID" })] : []),
-					postingColumn({ key: "label", label: "Transaction" }),
-					...(showAdvanced
-						? [postingColumn({ key: "sourceAccountId", label: "Source" })]
-						: []),
-					postingColumn({ key: "destinations", label: "To" }),
-					postingColumn({
-						key: "arithmetic",
-						label: "Amount",
-						render: (value) => <PostingAmount arithmetic={value} />,
-					}),
-					postingColumn({
-						key: "frequency",
-						label: "Freq",
-						format: (value) =>
-							value === "once" ? "Once" : formatFrequency(value),
-					}),
-					...(showAdvanced
-						? [
-								postingColumn({ key: "annualRate", label: "Rate" }),
-								postingColumn({ key: "annualGrowthRate", label: "Growth" }),
-								postingColumn({ key: "volatility", label: "Vol" }),
-							]
-						: []),
-					postingColumn({ key: "startDate", label: "Start" }),
-					postingColumn({ key: "endDate", label: "End" }),
-					...(showAdvanced
-						? [
-								postingColumn({
-									key: "annualCap",
-									label: "Cap",
-									format: (value) =>
-										value === null ? "-" : formatCurrency(value),
-								}),
-								postingColumn({ key: "priority", label: "Pri" }),
-							]
-						: []),
-					postingColumn({
-						key: "enabled",
-						label: "Enabled",
-						render: (_value, posting) => {
-							return (
-								<input
-									type="checkbox"
-									aria-label={`Enable ${posting.label}`}
-									className="h-4 w-4 rounded accent-primary"
-									checked={!disabledPostingSet.has(posting.id)}
-									onChange={() => onToggle(posting.id)}
-								/>
-							);
-						},
-					}),
-				]}
-			/>
+			{visiblePostings.length > 0 ? (
+				<div className="divide-y divide-border/60 rounded-2xl border border-border/80 bg-card/70">
+					{visiblePostings.map((posting) => (
+						<TransactionListRow
+							key={posting.id}
+							posting={posting}
+							accountById={accountById}
+							meta={<Schedule posting={posting} />}
+							technical={
+								showAdvanced ? <TechnicalDetails posting={posting} /> : null
+							}
+						/>
+					))}
+				</div>
+			) : (
+				<div className="rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center type-muted">
+					No scheduled transactions match this search.
+				</div>
+			)}
+			<div className="type-caption">
+				{visiblePostings.length} transaction
+				{visiblePostings.length === 1 ? "" : "s"}
+			</div>
 		</div>
+	);
+}
+
+function Schedule({ posting }: { posting: Posting }) {
+	return (
+		<>
+			{formatFrequency(posting.frequency)} from {formatDate(posting.startDate)}
+			{posting.endDate ? ` through ${formatDate(posting.endDate)}` : ""}
+		</>
+	);
+}
+
+function TechnicalDetails({ posting }: { posting: Posting }) {
+	const assumptions = [
+		posting.annualRate ? `${pct.format(posting.annualRate)} rate` : null,
+		posting.annualGrowthRate
+			? `${pct.format(posting.annualGrowthRate)} growth`
+			: null,
+		posting.volatility ? `${pct.format(posting.volatility)} volatility` : null,
+		posting.annualCap !== null
+			? `${currency.format(posting.annualCap)} cap`
+			: null,
+		`priority ${posting.priority}`,
+	].filter(Boolean);
+	return (
+		<>
+			{posting.id} · {assumptions.join(" · ")}
+		</>
 	);
 }

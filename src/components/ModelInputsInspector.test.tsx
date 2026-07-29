@@ -18,6 +18,24 @@ afterEach(() => {
 });
 
 describe("ModelInputsInspector", () => {
+	it("opens on the current position", () => {
+		const document = createBaseDocument();
+		render(
+			<RuntimeFixtureProviders
+				model={{ document, effectiveDocument: document }}
+			>
+				<ModelInputsInspector />
+			</RuntimeFixtureProviders>,
+		);
+
+		expect(
+			screen
+				.getByRole("button", { name: /Current position/ })
+				.getAttribute("aria-pressed"),
+		).toBe("true");
+		expect(screen.getByText("Your accounts")).not.toBeNull();
+	});
+
 	it("keeps separate read and edit tab selections", () => {
 		const document = createBaseDocument({
 			postings: [

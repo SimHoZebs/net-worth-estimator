@@ -52,6 +52,7 @@ function describeRoute(posting: Posting, document: FinancialModelDocument) {
 interface TemporaryPostingFormProps {
 	postings: Posting[];
 	document: FinancialModelDocument;
+	reservedIds?: string[];
 	onAdd: (posting: Posting) => void;
 	onRemove: (id: string) => void;
 }
@@ -59,6 +60,7 @@ interface TemporaryPostingFormProps {
 export function TemporaryPostingForm({
 	postings,
 	document,
+	reservedIds = [],
 	onAdd,
 	onRemove,
 }: TemporaryPostingFormProps) {
@@ -72,6 +74,14 @@ export function TemporaryPostingForm({
 		}
 
 		const errors: string[] = [];
+		const id = adding.id.trim();
+		if (
+			reservedIds.includes(id) ||
+			document.postings.some((posting) => posting.id === id) ||
+			postings.some((posting) => posting.id === id)
+		) {
+			errors.push(`Posting ID "${id}" is already in use.`);
+		}
 		const parseNumber = (raw: string, label: string) => {
 			const parsed = parseDecimalDraft(raw);
 			if (parsed === null) {
@@ -101,6 +111,8 @@ export function TemporaryPostingForm({
 
 		onAdd({
 			...adding,
+			id,
+			label: adding.label.trim(),
 			annualRate,
 			annualGrowthRate,
 			volatility,
@@ -135,7 +147,7 @@ export function TemporaryPostingForm({
 			</div>
 			{adding ? (
 				<div className="space-y-2 rounded-2xl border border-border p-3">
-					<div className="grid grid-cols-2 gap-2">
+					<div className="grid gap-2 sm:grid-cols-2">
 						<div>
 							<label className="block type-caption">ID</label>
 							<Input

@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createBaseDocument } from "@/lib/projection/__fixtures__";
 import { RuntimeFixtureProviders } from "@/test/runtimeFixtures";
 import { ResultsPage } from "./ResultsPage";
 
@@ -42,5 +43,78 @@ describe("ResultsPage", () => {
 		expect(
 			screen.getByRole("link", { name: "Open model inputs" }),
 		).not.toBeNull();
+	});
+
+	it("shows deterministic and stochastic worker activity with progress", () => {
+		const router = createMemoryRouter([
+			{
+				path: "/",
+				element: (
+					<RuntimeFixtureProviders
+						model={{ document: createBaseDocument() }}
+						execution={{
+							isProjecting: true,
+							isStochasticRunning: true,
+						}}
+						stochasticProgress={0.37}
+					>
+						<ResultsPage />
+					</RuntimeFixtureProviders>
+				),
+			},
+		]);
+
+		render(<RouterProvider router={router} />);
+
+		const activity = screen.getByRole("alert");
+		expect(activity.textContent).toContain(
+			"Updating projection and Monte Carlo analysis",
+		);
+		expect(activity.textContent).toContain("37%");
+	});
+
+	it("shows stochastic activity after deterministic evaluation finishes", () => {
+		const router = createMemoryRouter([
+			{
+				path: "/",
+				element: (
+					<RuntimeFixtureProviders
+						model={{ document: createBaseDocument() }}
+						execution={{ isStochasticRunning: true }}
+						stochasticProgress={0.64}
+					>
+						<ResultsPage />
+					</RuntimeFixtureProviders>
+				),
+			},
+		]);
+
+		render(<RouterProvider router={router} />);
+
+		const activity = screen.getByRole("alert");
+		expect(activity.textContent).toContain("Updating Monte Carlo analysis");
+		expect(activity.textContent).toContain("64%");
+	});
+
+	it("shows deterministic activity without Monte Carlo", () => {
+		const router = createMemoryRouter([
+			{
+				path: "/",
+				element: (
+					<RuntimeFixtureProviders
+						model={{ document: createBaseDocument() }}
+						execution={{ isProjecting: true }}
+					>
+						<ResultsPage />
+					</RuntimeFixtureProviders>
+				),
+			},
+		]);
+
+		render(<RouterProvider router={router} />);
+
+		const activity = screen.getByRole("alert");
+		expect(activity.textContent).toContain("Updating projection");
+		expect(activity.textContent).not.toContain("Monte Carlo");
 	});
 });

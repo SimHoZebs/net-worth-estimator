@@ -7,25 +7,113 @@ import {
 } from "../simulation/postings";
 
 describe("posting recurrence", () => {
-	it("adds a once posting exactly once and uses a divisor of one", () => {
+	function occurrenceDates(
+		postingOverrides: Parameters<typeof makePosting>[0],
+		projectionStartDate: string,
+		projectionEndDate: string,
+		includeStartDate = true,
+	) {
 		const eventDates = new Map();
 		addOccurrences(
-			[
-				makePosting({
-					id: "one-time",
-					frequency: "once",
-					startDate: "2026-01-15",
-				}),
-			],
+			[makePosting(postingOverrides)],
 			eventDates,
-			"2026-01-01",
-			"2030-01-01",
-			true,
+			projectionStartDate,
+			projectionEndDate,
+			includeStartDate,
 		);
+		return [...eventDates.keys()];
+	}
 
-		expect([...eventDates.keys()]).toEqual(["2026-01-15"]);
-		expect(eventDates.get("2026-01-15")).toHaveLength(1);
-		expect(frequencyDivisor("once")).toBe(1);
+	it.each([
+		["once", 1],
+		["daily", 365],
+		["weekly", 52],
+		["monthly", 12],
+		["quarterly", 4],
+		["annual", 1],
+	] as const)("uses the %s annual divisor", (frequency, divisor) => {
+		expect(frequencyDivisor(frequency)).toBe(divisor);
+	});
+
+	it.each([
+		["once", "2026-01-15", "2026-02-01", ["2026-01-15"]],
+		[
+			"daily",
+			"2026-01-15",
+			"2026-01-17",
+			["2026-01-15", "2026-01-16", "2026-01-17"],
+		],
+		[
+			"weekly",
+			"2026-01-15",
+			"2026-01-29",
+			["2026-01-15", "2026-01-22", "2026-01-29"],
+		],
+	] as const)("adds inclusive %s occurrences", (frequency, startDate, projectionEndDate, expected) => {
+		expect(
+			occurrenceDates(
+				{ id: `posting-${frequency}`, frequency, startDate },
+				startDate,
+				projectionEndDate,
+			),
+		).toEqual(expected);
+	});
+
+	it.each([
+		[
+			"monthly",
+			"2026-01-31",
+			"2026-03-31",
+			["2026-01-31", "2026-02-28", "2026-03-31"],
+		],
+		[
+			"quarterly",
+			"2026-01-31",
+			"2026-07-31",
+			["2026-01-31", "2026-04-30", "2026-07-31"],
+		],
+		[
+			"annual",
+			"2024-02-29",
+			"2028-02-29",
+			["2024-02-29", "2025-02-28", "2026-02-28", "2027-02-28", "2028-02-29"],
+		],
+	] as const)("anchors clamped %s occurrences to the original start date", (frequency, startDate, projectionEndDate, expected) => {
+		expect(
+			occurrenceDates(
+				{ id: `posting-${frequency}`, frequency, startDate },
+				startDate,
+				projectionEndDate,
+			),
+		).toEqual(expected);
+	});
+
+	it("honors projection-start inclusion, posting end dates, and disabled rows", () => {
+		expect(
+			occurrenceDates(
+				{
+					id: "bounded-monthly",
+					frequency: "monthly",
+					startDate: "2026-01-15",
+					endDate: "2026-03-15",
+				},
+				"2026-02-15",
+				"2026-12-31",
+				false,
+			),
+		).toEqual(["2026-03-15"]);
+		expect(
+			occurrenceDates(
+				{
+					id: "disabled-daily",
+					enabled: false,
+					frequency: "daily",
+					startDate: "2026-01-01",
+				},
+				"2026-01-01",
+				"2026-01-03",
+			),
+		).toEqual([]);
 	});
 });
 
