@@ -53,6 +53,12 @@ export const OverviewCard = memo(function OverviewCard({
 	const accountsById = new Map(
 		document.accounts.map((account) => [account.id, account]),
 	);
+	const selectedAccountLabels =
+		coverageRow?.assetContributions.map(
+			(contribution) =>
+				accountsById.get(contribution.accountId)?.label ??
+				contribution.accountId,
+		) ?? [];
 
 	return (
 		<Card className="rounded-[1.8rem] border-primary-border/45 bg-gradient-to-br from-card/96 via-card/90 to-primary-subtle/35">
@@ -72,6 +78,21 @@ export const OverviewCard = memo(function OverviewCard({
 								: "No complete test window"}
 						</div>
 					</div>
+				</div>
+				<div className="mb-4 rounded-2xl border border-primary-border/60 bg-primary-subtle/55 px-4 py-4 md:px-5">
+					<div className="type-label">What this result means</div>
+					<p className="mt-1 text-pretty text-base leading-relaxed text-foreground">
+						{describeFinancialIndependenceOutcome(
+							plan,
+							coverageRow,
+							candidateOutcome,
+						)}
+					</p>
+					{coverageRow ? (
+						<p className="mt-2 type-muted">
+							{fundingSourceDescription(coverageRow, selectedAccountLabels)}
+						</p>
+					) : null}
 				</div>
 				<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 					<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
@@ -179,9 +200,11 @@ export const OverviewCard = memo(function OverviewCard({
 				{coverageRow && coverageRow.assetContributions.length > 0 ? (
 					<div className="mt-5 border-t border-border/70 pt-4">
 						<div className="mb-3">
-							<div className="type-label">Selected asset contributions</div>
+							<div className="type-label">
+								Withdrawal capacity at this snapshot
+							</div>
 							<div className="type-muted">
-								Balance × effective withdrawal rate at this snapshot
+								Selected account balance × maximum annual withdrawal rate
 							</div>
 						</div>
 						<div className="overflow-x-auto">
@@ -270,4 +293,100 @@ function successPolicyDescription(plan: FinancialIndependencePlan) {
 		case "allow-drawdown":
 			return "All spending must be funded; selected assets may finish below their starting value.";
 	}
+}
+
+export function describeFinancialIndependenceOutcome(
+	plan: FinancialIndependencePlan,
+	row: FinancialIndependenceRow | undefined,
+	outcome: FinancialIndependenceRunOutcome | undefined,
+) {
+	if (!row || !outcome) {
+		return `No complete ${yearTestLabel(plan.evaluationYears)} fits in the projection horizon.`;
+	}
+
+	const target = `spending starting at ${currency.format(row.annualExpenseTarget)} per year${
+		plan.annualExpenseGrowthRate > 0
+			? ` and growing ${pct.format(plan.annualExpenseGrowthRate)} annually`
+			: ""
+	} for ${yearLabel(plan.evaluationYears)}`;
+	const date = formatDate(row.date);
+	if (outcome.status === "ineligible") {
+		const failedGates = [
+			!outcome.minimumNetWorthMet ? "the minimum net worth gate" : null,
+			!outcome.initialCoverageMet ? "the initial funding-capacity gate" : null,
+		].filter((gate): gate is string => gate !== null);
+		return `On ${date}, this plan cannot begin the ${yearTestLabel(plan.evaluationYears)} because it does not meet ${formatList(failedGates)}.`;
+	}
+	if (!outcome.expensesFullyCovered) {
+		return `On ${date}, this plan cannot fully fund ${target}. It leaves ${currency.format(outcome.withdrawals.shortfallAmount)} unfunded across the test, so it does not satisfy the chosen ${principalPolicyStrategyLabel(plan)}.`;
+	}
+	if (!outcome.principalReplenished) {
+		return `On ${date}, this plan can fund ${target}, but ${failedPrincipalPolicyDescription(plan)}`;
+	}
+	return `On ${date}, this plan can fund ${target}. ${successfulPrincipalPolicyDescription(plan)}`;
+}
+
+function fundingSourceDescription(
+	row: FinancialIndependenceRow,
+	accountLabels: string[],
+) {
+	const directIncome =
+		row.annualDirectIncome > 0
+			? `At this snapshot, selected direct income contributes ${currency.format(row.annualDirectIncome)} per year.`
+			: "";
+	const withdrawalSources =
+		accountLabels.length > 0
+			? `The test selects ${formatList(accountLabels)} as withdrawal sources; their maximum annual rates and current capacities are shown below.`
+			: "";
+	return (
+		[directIncome, withdrawalSources].filter(Boolean).join(" ") ||
+		"No selected income or withdrawal sources contribute at this snapshot."
+	);
+}
+
+function successfulPrincipalPolicyDescription(plan: FinancialIndependencePlan) {
+	switch (plan.principalPolicy) {
+		case "preserve-real-principal":
+			return "Selected assets collectively retain their inflation-adjusted starting value.";
+		case "preserve-nominal-principal":
+			return "Selected assets collectively retain their starting dollar value.";
+		case "allow-drawdown":
+			return "Selected assets may finish below their starting balance under the chosen drawdown strategy.";
+	}
+}
+
+function failedPrincipalPolicyDescription(plan: FinancialIndependencePlan) {
+	switch (plan.principalPolicy) {
+		case "preserve-real-principal":
+			return "selected assets collectively do not retain their inflation-adjusted starting value.";
+		case "preserve-nominal-principal":
+			return "selected assets collectively do not retain their starting dollar value.";
+		case "allow-drawdown":
+			return "the selected drawdown strategy is not satisfied.";
+	}
+}
+
+function principalPolicyStrategyLabel(plan: FinancialIndependencePlan) {
+	switch (plan.principalPolicy) {
+		case "preserve-real-principal":
+			return "purchasing-power preservation strategy";
+		case "preserve-nominal-principal":
+			return "starting-dollar preservation strategy";
+		case "allow-drawdown":
+			return "portfolio-drawdown strategy";
+	}
+}
+
+function yearLabel(years: number) {
+	return `${years} ${years === 1 ? "year" : "years"}`;
+}
+
+function yearTestLabel(years: number) {
+	return `${years}-year test`;
+}
+
+function formatList(items: string[]) {
+	if (items.length < 2) return items[0] ?? "the required gates";
+	if (items.length === 2) return `${items[0]} and ${items[1]}`;
+	return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }
