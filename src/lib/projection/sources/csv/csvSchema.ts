@@ -248,18 +248,21 @@ const evaluationFields = {
 };
 
 const financialIndependenceSourceSchema = z.discriminatedUnion("type", [
-	z.object({
-		type: z.literal("cashflow"),
-		postingId: trimmedString,
-		included: z.boolean(),
-		laborDependent: z.boolean().optional(),
-	}),
-	z.object({
-		type: z.literal("asset"),
-		accountId: trimmedString,
-		included: z.boolean(),
-		withdrawalRateOverride: z.number().finite().optional(),
-	}),
+	z
+		.object({
+			type: z.literal("cashflow"),
+			postingId: trimmedString,
+			included: z.boolean(),
+		})
+		.strict(),
+	z
+		.object({
+			type: z.literal("asset"),
+			accountId: trimmedString,
+			included: z.boolean(),
+			withdrawalRateOverride: z.number().finite().optional(),
+		})
+		.strict(),
 ]);
 
 export const csvFinancialIndependenceSchema = z.object({

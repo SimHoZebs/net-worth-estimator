@@ -265,15 +265,6 @@ export function validateCsvFinancialModel(
 	document: FinancialModelDocument,
 ): ModelValidationIssue[] {
 	const issues: ModelValidationIssue[] = [];
-	if ("checkpoints" in (document as unknown as Record<string, unknown>)) {
-		addIssue(
-			issues,
-			"error",
-			"document.checkpoints.unsupported",
-			"Checkpoints are not supported in canonical financial model documents.",
-			["checkpoints"],
-		);
-	}
 	const accountIds = new Set(document.accounts.map((account) => account.id));
 	const postingIds = new Set(document.postings.map((posting) => posting.id));
 

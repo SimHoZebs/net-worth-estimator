@@ -31,10 +31,9 @@ Each behavior file is a typed table. All tables start with `instanceId`, `label`
 ## Persistence
 
 - Local development (`npm run dev`) uses `GET/PUT /api/financial-model`; saves write to `public/configs/` in the checkout.
-- Static/serverless production loads bundled `/configs/` files and saves the canonical `FinancialModelDocument` under `net-worth-estimator:financial-model:v1` in browser storage.
+- Static/serverless production loads bundled `/configs/` files and saves the canonical `FinancialModelDocument` under `net-worth-estimator:financial-model` in browser storage.
 - Malformed persisted data is not silently replaced; parsing and validation diagnostics are returned to the UI.
-- Browser models saved by the former checkpoint-based release are rewritten once into canonical one-time postings when every checkpoint is representable. Failed migrations leave the stored value unchanged and surface a diagnostic.
-- Browser reset removes `net-worth-estimator:financial-model:v1` and reloads the bundled `/configs/` files.
+- Browser reset removes `net-worth-estimator:financial-model` and reloads the bundled `/configs/` files.
 - Serverless deployments should use a real backend `DataSource` for shared or cross-device persistence.
 - Do not deploy private financial CSV files in `public/configs/`; those files are public static assets.
 - Production hosts must rewrite browser routes such as `/settings` and `/model-inputs` to `index.html`.

@@ -32,15 +32,15 @@ The persistence boundary is the validated `FinancialModelDocument` represented b
 
 ### Browser
 
-- Canonical key: `net-worth-estimator:financial-model:v1`
+- Canonical key: `net-worth-estimator:financial-model`
 - Malformed canonical persisted data returns parse/validation diagnostics instead of falling back to bundled data.
 - Reset removes the canonical key and reloads bundled `/configs/` files.
 
 ### Projection Artifacts
 
 - Derived projection artifacts are separate from the canonical `DataSource` and use the backend-agnostic `ProjectionArtifactStore` contract.
-- The browser implementation stores immutable artifacts in IndexedDB under `net-worth-estimator:projection-artifacts` and prunes the oldest entries beyond its configured bound.
-- Canonical semantic descriptors are serialized with sorted object keys and order-preserving arrays, then addressed by SHA-256. Artifact envelopes carry independent schema and algorithm versions.
+- The browser implementation stores immutable artifacts in memory for the current application session.
+- Canonical semantic descriptors are serialized with sorted object keys and order-preserving arrays, then addressed by SHA-256.
 - Deterministic base paths and evaluation results are stored separately. Evaluation-only changes reuse the base simulation, while label-only changes relabel cached results without computation.
 - Completed stochastic results are cached by effective simulation inputs, normalized run count, seed intent, and evaluation configuration. A first unseeded cache miss materializes a concrete seed; later identical requests reuse that persisted outcome.
 - Progressive stochastic results are never persisted. A stochastic evaluation cache miss replays samples because individual sample paths are intentionally not retained.
@@ -76,10 +76,6 @@ There is no named alternative-model domain or persistence API. Comparisons are m
 - Same-date rows execute by ascending priority, then file order.
 - During request preparation, enabled `once` postings dated strictly before the projection start are replayed through shared transitions in date, priority, then file order. Their balance snapshots form historical rows, while their dependency and annual-cap state carries into projection execution.
 - A `once` posting on the projection start remains a normal projected event. Historical replay does not emit projected movement, cash-flow, or fulfillment events, and Monte Carlo samples do not resample already-realized history.
-
-### Browser Checkpoint Migration
-
-The canonical model has no checkpoint type or alternate checkpoint reader. The browser data source recognizes only the previously shipped checkpoint document shape under the existing canonical storage key and rewrites representable observations once into structural `once` postings. The rewrite preserves ordered observation dates, including unchanged balances. Invalid, constrained, mixed-schema, or otherwise unrepresentable documents are left untouched and return a migration diagnostic.
 
 ## 6. Engine Design
 

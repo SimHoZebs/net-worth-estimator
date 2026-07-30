@@ -10,7 +10,7 @@ import App from "./App";
 import { CachedProjectionEngine } from "./engine/CachedProjectionEngine";
 import { ProjectionEngineProvider } from "./engine/ProjectionEngineContext";
 import { WorkerProjectionEngine } from "./engine/WorkerProjectionEngine";
-import { IndexedDbProjectionArtifactStore } from "./lib/projection/artifacts";
+import { InMemoryProjectionArtifactStore } from "./lib/projection/artifacts";
 import "./styles.css";
 import { ModelInputsPage } from "./pages/ModelInputsPage";
 import { ResultsPage } from "./pages/ResultsPage";
@@ -27,7 +27,7 @@ const queryClient = new QueryClient({
 
 const engine = new CachedProjectionEngine(
 	new WorkerProjectionEngine(),
-	new IndexedDbProjectionArtifactStore(),
+	new InMemoryProjectionArtifactStore(),
 );
 
 const router = createBrowserRouter([

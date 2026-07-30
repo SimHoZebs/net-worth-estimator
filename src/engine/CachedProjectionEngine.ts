@@ -31,11 +31,6 @@ import {
 } from "@/lib/projection/runtime/resultLabels";
 import { normalizeStochasticConfig } from "@/lib/projection/utils/stochastic";
 
-const ARTIFACT_SCHEMA_VERSION = 1;
-const DETERMINISTIC_BASE_VERSION = "deterministic-base-v3";
-const DETERMINISTIC_EVALUATION_VERSION = "deterministic-evaluation-v6";
-const STOCHASTIC_VERSION = "stochastic-v6";
-
 type ArtifactPayload =
 	| RawProjectionOutput
 	| EvaluationResultCollection
@@ -43,7 +38,6 @@ type ArtifactPayload =
 
 interface ArtifactIdentity {
 	kind: string;
-	algorithmVersion: string;
 	digest: string;
 	key: string;
 }
@@ -172,7 +166,6 @@ export class CachedProjectionEngine implements ProjectionEngine {
 			prepared = baseDescriptor({ ...request, projectionSettings: settings });
 			baseIdentity = await this.identity(
 				"deterministic-base",
-				DETERMINISTIC_BASE_VERSION,
 				prepared.descriptor,
 			);
 		} catch {
@@ -197,14 +190,10 @@ export class CachedProjectionEngine implements ProjectionEngine {
 
 		let evaluationIdentity: ArtifactIdentity;
 		try {
-			evaluationIdentity = await this.identity(
-				"deterministic-evaluation",
-				DETERMINISTIC_EVALUATION_VERSION,
-				{
-					baseDigest: baseIdentity.digest,
-					evaluations: evaluationComputationDescriptor(settings.evaluations),
-				},
-			);
+			evaluationIdentity = await this.identity("deterministic-evaluation", {
+				baseDigest: baseIdentity.digest,
+				evaluations: evaluationComputationDescriptor(settings.evaluations),
+			});
 		} catch {
 			throwIfAborted(request.signal);
 			const evaluations = await this.compute.evaluateProjection({
@@ -255,7 +244,7 @@ export class CachedProjectionEngine implements ProjectionEngine {
 				...request,
 				projectionSettings: settings,
 			});
-			identity = await this.identity("stochastic", STOCHASTIC_VERSION, {
+			identity = await this.identity("stochastic", {
 				base: prepared.descriptor,
 				evaluations: evaluationComputationDescriptor(settings.evaluations),
 				config: logicalConfig,
@@ -309,21 +298,13 @@ export class CachedProjectionEngine implements ProjectionEngine {
 
 	private async identity(
 		kind: string,
-		algorithmVersion: string,
 		descriptor: unknown,
 	): Promise<ArtifactIdentity> {
-		const digest = await sha256Hex(
-			canonicalSerialize({
-				schemaVersion: ARTIFACT_SCHEMA_VERSION,
-				algorithmVersion,
-				descriptor,
-			}),
-		);
+		const digest = await sha256Hex(canonicalSerialize(descriptor));
 		return {
 			kind,
-			algorithmVersion,
 			digest,
-			key: `${kind}:${ARTIFACT_SCHEMA_VERSION}:${algorithmVersion}:${digest}`,
+			key: `${kind}:${digest}`,
 		};
 	}
 
@@ -338,8 +319,6 @@ export class CachedProjectionEngine implements ProjectionEngine {
 			if (!envelope) return undefined;
 			if (
 				envelope.kind !== identity.kind ||
-				envelope.schemaVersion !== ARTIFACT_SCHEMA_VERSION ||
-				envelope.algorithmVersion !== identity.algorithmVersion ||
 				envelope.inputDigest !== identity.digest ||
 				!isPayload(envelope.payload)
 			) {
@@ -361,8 +340,6 @@ export class CachedProjectionEngine implements ProjectionEngine {
 	): Promise<T> {
 		const envelope: ProjectionArtifactEnvelope<ArtifactPayload> = {
 			kind: identity.kind,
-			schemaVersion: ARTIFACT_SCHEMA_VERSION,
-			algorithmVersion: identity.algorithmVersion,
 			inputDigest: identity.digest,
 			createdAt: new Date().toISOString(),
 			payload,
@@ -371,8 +348,6 @@ export class CachedProjectionEngine implements ProjectionEngine {
 			const winner = await this.store.putIfAbsent(identity.key, envelope);
 			if (
 				winner.kind === identity.kind &&
-				winner.schemaVersion === ARTIFACT_SCHEMA_VERSION &&
-				winner.algorithmVersion === identity.algorithmVersion &&
 				winner.inputDigest === identity.digest &&
 				isPayload(winner.payload)
 			) {

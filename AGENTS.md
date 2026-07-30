@@ -63,14 +63,14 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 
 ## Data Flow
 
-1. **CSV source**: Vite plugin -> `GET/PUT /api/financial-model` -> `csvLoader.ts` -> Zod parsing and cross-validation. Documents are versionless.
+1. **CSV source**: Vite plugin -> `GET/PUT /api/financial-model` -> `csvLoader.ts` -> Zod parsing and cross-validation. Documents contain only canonical fields.
 2. **Persistence DI**: `App.tsx` creates `createCsvDataSource()` in development or `createBrowserCsvDataSource()` in production. `DataSource.loadDocument()` returns `{ document, issues }`.
 3. **Query layer**: `useFinancialModelQuery`, `useFinancialModelMutation`, and `useFinancialModelResetMutation` connect the source to TanStack Query.
 4. **Current changes**: `ModelOverrides` remain in Zustand and are applied with `applyModelOverrides`; canonical data is not mutated.
 5. **Projection**: `useProjection`/`useStochastic` -> `CachedProjectionEngine` -> `WorkerProjectionEngine` on misses -> Web Workers -> `prepareSimulationRequest` -> `simulate` -> `ProjectionPath` -> evaluation/analysis aggregation.
 6. **Monte Carlo**: one prepared request is reused, each `MonteCarloSample` produces a path-only run, exact percentiles are aggregated, and progress is emitted in worker batches of 50.
-7. **Browser persistence**: `net-worth-estimator:financial-model:v1` is the only browser key. Malformed canonical data surfaces diagnostics; the previously shipped checkpoint shape is rewritten once into canonical `once` postings when representable; reset removes that key and reloads bundled CSV data.
-8. **Derived artifacts**: `ProjectionArtifactStore` is separate from `DataSource`; browser artifacts use versioned content-addressed IndexedDB entries and remain disposable.
+7. **Browser persistence**: `net-worth-estimator:financial-model` is the only browser key. Malformed or noncanonical data surfaces diagnostics; reset removes that key and reloads bundled CSV data.
+8. **Derived artifacts**: `ProjectionArtifactStore` is separate from `DataSource`; browser artifacts are content-addressed, session-only, and disposable.
 
 ## Key Types
 

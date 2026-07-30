@@ -13,94 +13,125 @@ const evaluationFields = {
 	enabled: z.boolean(),
 };
 const financialIndependenceSourceSchema = z.discriminatedUnion("type", [
-	z.object({
-		type: z.literal("cashflow"),
-		postingId: z.string(),
-		included: z.boolean(),
-		laborDependent: z.boolean().optional(),
-	}),
-	z.object({
-		type: z.literal("asset"),
-		accountId: z.string(),
-		included: z.boolean(),
-		withdrawalRateOverride: finiteNumber.optional(),
-	}),
+	z
+		.object({
+			type: z.literal("cashflow"),
+			postingId: z.string(),
+			included: z.boolean(),
+		})
+		.strict(),
+	z
+		.object({
+			type: z.literal("asset"),
+			accountId: z.string(),
+			included: z.boolean(),
+			withdrawalRateOverride: finiteNumber.optional(),
+		})
+		.strict(),
 ]) satisfies z.ZodType<FinancialIndependenceSource>;
-const financialModelDocumentSchema = z.object({
-	sourcePath: z.string(),
-	accounts: z.array(
-		z.object({
-			id: z.string(),
-			label: z.string(),
-			minBalance: finiteNumber,
-			maxBalance: finiteNumber,
-			color: z.string().nullable(),
-			enabled: z.boolean(),
-		}),
-	),
-	evaluations: z.object({
-		financialIndependence: z.array(
-			z.object({
-				...evaluationFields,
-				config: z.object({
-					minimumNetWorth: finiteNumber,
-					annualExpenseTarget: finiteNumber,
-					annualExpenseTargetBasis: z
-						.enum(["projection-start-purchasing-power", "fi-date-dollars"])
-						.default("projection-start-purchasing-power"),
-					annualExpenseGrowthRate: finiteNumber,
-					withdrawalRate: finiteNumber,
-					evaluationYears: finiteNumber,
-					requiredConfidence: finiteNumber,
-					sources: z.array(financialIndependenceSourceSchema),
-					continuingPostingIds: z.array(z.string()),
-					principalPolicy: z.enum([
-						"allow-drawdown",
-						"preserve-nominal-principal",
-						"preserve-real-principal",
+export const financialModelDocumentSchema = z
+	.object({
+		sourcePath: z.string(),
+		accounts: z.array(
+			z
+				.object({
+					id: z.string(),
+					label: z.string(),
+					minBalance: finiteNumber,
+					maxBalance: finiteNumber,
+					color: z.string().nullable(),
+					enabled: z.boolean(),
+				})
+				.strict(),
+		),
+		evaluations: z
+			.object({
+				financialIndependence: z.array(
+					z
+						.object({
+							...evaluationFields,
+							config: z
+								.object({
+									minimumNetWorth: finiteNumber,
+									annualExpenseTarget: finiteNumber,
+									annualExpenseTargetBasis: z
+										.enum([
+											"projection-start-purchasing-power",
+											"fi-date-dollars",
+										])
+										.default("projection-start-purchasing-power"),
+									annualExpenseGrowthRate: finiteNumber,
+									withdrawalRate: finiteNumber,
+									evaluationYears: finiteNumber,
+									requiredConfidence: finiteNumber,
+									sources: z.array(financialIndependenceSourceSchema),
+									continuingPostingIds: z.array(z.string()),
+									principalPolicy: z.enum([
+										"allow-drawdown",
+										"preserve-nominal-principal",
+										"preserve-real-principal",
+									]),
+								})
+								.strict(),
+						})
+						.strict(),
+				),
+				netWorthThreshold: z.array(
+					z
+						.object({
+							...evaluationFields,
+							config: z.object({ target: finiteNumber }).strict(),
+						})
+						.strict(),
+				),
+				postingFulfillment: z.array(
+					z
+						.object({
+							...evaluationFields,
+							config: z
+								.object({ postingIds: z.array(z.string()).nullable() })
+								.strict(),
+						})
+						.strict(),
+				),
+			})
+			.strict(),
+		postings: z.array(
+			z
+				.object({
+					id: z.string(),
+					label: z.string(),
+					sourceAccountId: z.string().nullable(),
+					destinations: z.array(z.string()).nullable(),
+					arithmetic: z.string(),
+					frequency: z.enum([
+						"once",
+						"daily",
+						"weekly",
+						"monthly",
+						"quarterly",
+						"annual",
 					]),
-				}),
-			}),
+					annualRate: finiteNumber,
+					annualGrowthRate: finiteNumber,
+					volatility: finiteNumber,
+					startDate: z.string(),
+					endDate: z.string().nullable(),
+					annualCap: finiteNumber.nullable(),
+					priority: finiteNumber,
+					enabled: z.boolean(),
+				})
+				.strict(),
 		),
-		netWorthThreshold: z.array(
-			z.object({
-				...evaluationFields,
-				config: z.object({ target: finiteNumber }),
-			}),
-		),
-		postingFulfillment: z.array(
-			z.object({
-				...evaluationFields,
-				config: z.object({ postingIds: z.array(z.string()).nullable() }),
-			}),
-		),
-	}),
-	postings: z.array(
-		z.object({
-			id: z.string(),
-			label: z.string(),
-			sourceAccountId: z.string().nullable(),
-			destinations: z.array(z.string()).nullable(),
-			arithmetic: z.string(),
-			frequency: z.enum([
-				"once",
-				"daily",
-				"weekly",
-				"monthly",
-				"quarterly",
-				"annual",
-			]),
-			annualRate: finiteNumber,
-			annualGrowthRate: finiteNumber,
-			volatility: finiteNumber,
-			startDate: z.string(),
-			endDate: z.string().nullable(),
-			annualCap: finiteNumber.nullable(),
-			priority: finiteNumber,
-			enabled: z.boolean(),
-		}),
-	),
-}) satisfies z.ZodType<FinancialModelDocument>;
+	})
+	.strict() satisfies z.ZodType<FinancialModelDocument>;
+
+export function parseFinancialModelDocument(
+	value: unknown,
+): FinancialModelDocument | null {
+	const result = financialModelDocumentSchema.safeParse(value);
+	return result.success ? result.data : null;
+}
 const modelValidationIssueSchema = z.object({
 	code: z.string(),
 	message: z.string(),

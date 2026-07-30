@@ -68,7 +68,6 @@ export type FinancialIndependenceSource =
 			type: "cashflow";
 			postingId: string;
 			included: boolean;
-			laborDependent?: boolean;
 	  }
 	| {
 			type: "asset";
