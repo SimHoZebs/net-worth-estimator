@@ -62,10 +62,10 @@ export function FinancialIndependenceEvaluation({
 						row={candidateRow}
 						outcome={detailedOutcome}
 					/>
-					{detailedOutcome?.status === "evaluated" &&
-					(detailedOutcome.balanceTrajectory?.length ?? 0) > 0 ? (
+					{candidateRow && detailedOutcome ? (
 						<FinancialIndependenceChart
 							document={document}
+							row={candidateRow}
 							outcome={detailedOutcome}
 						/>
 					) : null}

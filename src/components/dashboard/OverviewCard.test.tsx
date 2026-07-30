@@ -41,6 +41,8 @@ describe("OverviewCard", () => {
 		expect(screen.getByText("Roth IRA")).not.toBeNull();
 		expect(screen.getByText("4%")).not.toBeNull();
 		expect(screen.getByText("5%")).not.toBeNull();
+		expect(screen.getByText("Total from accounts")).not.toBeNull();
+		expect(screen.getByText("$500")).not.toBeNull();
 		expect(
 			screen.getByText(
 				"This plan can fund spending starting at $300 per year for 1 year. Selected assets may finish below their starting balance under the chosen drawdown strategy.",
@@ -90,11 +92,17 @@ describe("OverviewCard", () => {
 						{ type: "cashflow", postingId: "pension", included: true },
 					],
 				}}
-				row={{ ...row, annualDirectIncome: 12_000 }}
+				row={{
+					...row,
+					annualDirectIncome: 12_000,
+					totalAnnualCapacity: row.annualWithdrawalCapacity + 12_000,
+				}}
 				outcome={outcome}
 			/>,
 		);
 		expect(screen.getByText("$12,000 / year")).not.toBeNull();
+		expect(screen.getByText("Total available / year")).not.toBeNull();
+		expect(screen.getByText("$12,500")).not.toBeNull();
 	});
 
 	it("describes growth, principal failure, shortfall, and no-window states", () => {

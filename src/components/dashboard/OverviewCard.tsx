@@ -116,6 +116,32 @@ export const OverviewCard = memo(function OverviewCard({
 												</div>
 											);
 										})}
+										<div className="grid grid-cols-[minmax(10rem,1fr)_8rem_7rem_9rem] gap-3 border-t-2 border-border/80 py-3 text-sm">
+											<strong className="type-value">
+												Total from accounts
+											</strong>
+											<strong className="text-right type-value tabular-nums">
+												{currency.format(row.selectedAssetBalance)}
+											</strong>
+											<span className="text-right text-muted-foreground">
+												-
+											</span>
+											<strong className="text-right type-value tabular-nums">
+												{currency.format(row.annualWithdrawalCapacity)}
+											</strong>
+										</div>
+										{row.annualDirectIncome > 0 ? (
+											<div className="grid grid-cols-[minmax(10rem,1fr)_8rem_7rem_9rem] gap-3 border-t border-border/60 py-3 text-sm">
+												<strong className="type-value">
+													Total available / year
+												</strong>
+												<span />
+												<span />
+												<strong className="text-right type-value tabular-nums text-primary">
+													{currency.format(row.totalAnnualCapacity)}
+												</strong>
+											</div>
+										) : null}
 									</div>
 								</div>
 							</div>

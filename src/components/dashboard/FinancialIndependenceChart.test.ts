@@ -1,11 +1,27 @@
-import { describe, expect, it } from "vitest";
-import type { FinancialIndependenceDetailedRunOutcome } from "@/lib/projection";
+// @vitest-environment jsdom
+
+import { cleanup, render, screen } from "@testing-library/react";
+import { createElement } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type {
+	FinancialIndependenceDetailedRunOutcome,
+	FinancialIndependenceRow,
+} from "@/lib/projection";
+import { createBaseDocument } from "@/lib/projection/__fixtures__";
 import {
 	buildFinancialIndependenceBalanceData,
 	buildFinancialIndependenceBalanceTooltip,
+	buildFinancialIndependenceCapacityGap,
 	buildFinancialIndependenceChartOptions,
+	FinancialIndependenceChart,
 	type FinancialIndependenceChartAccount,
 } from "./FinancialIndependenceChart";
+
+vi.mock("@/components/ui/UPlotChart", () => ({
+	UPlotChart: () => createElement("div", null, "uPlot account balances"),
+}));
+
+afterEach(cleanup);
 
 const accounts: FinancialIndependenceChartAccount[] = [
 	{ id: "brokerage", label: "Brokerage <main>", color: "#123456" },
@@ -13,6 +29,57 @@ const accounts: FinancialIndependenceChartAccount[] = [
 ];
 
 describe("FinancialIndependenceChart", () => {
+	it("quantifies below-target, above-target, and unconfigured capacity", () => {
+		expect(
+			buildFinancialIndependenceCapacityGap(
+				makeRow({ totalAnnualCapacity: 40_000, annualExpenseTarget: 100_000 }),
+			),
+		).toEqual({ fillPercent: 40, difference: -60_000 });
+		expect(
+			buildFinancialIndependenceCapacityGap(
+				makeRow({ totalAnnualCapacity: 120_000, annualExpenseTarget: 100_000 }),
+			),
+		).toEqual({ fillPercent: 100, difference: 20_000 });
+		expect(
+			buildFinancialIndependenceCapacityGap(
+				makeRow({ totalAnnualCapacity: 40_000, annualExpenseTarget: 0 }),
+			),
+		).toEqual({ fillPercent: 0, difference: 0 });
+	});
+
+	it("always renders the initial funding gap, including ineligible plans", () => {
+		const outcome = {
+			...makeOutcome(),
+			status: "ineligible" as const,
+			minimumNetWorthMet: false,
+			initialCoverageMet: false,
+			cycleEstablished: false,
+		};
+		render(
+			createElement(FinancialIndependenceChart, {
+				document: createBaseDocument(),
+				row: makeRow({
+					totalAnnualCapacity: 40_000,
+					annualExpenseTarget: 100_000,
+					coverageRatio: 0.4,
+					isCovered: false,
+					isEligible: false,
+				}),
+				outcome,
+			}),
+		);
+
+		expect(screen.getByText("$40,000 / year available")).not.toBeNull();
+		expect(screen.getByText("$100,000 / year needed")).not.toBeNull();
+		expect(screen.getByText("$60,000 / year below target")).not.toBeNull();
+		expect(
+			screen.getByText(
+				"Counterfactual diagnostic cycle; it does not establish financial independence.",
+			),
+		).not.toBeNull();
+		expect(screen.getByText("uPlot account balances")).not.toBeNull();
+	});
+
 	it("aligns monthly balances in selected source order", () => {
 		const outcome = makeOutcome();
 		const data = buildFinancialIndependenceBalanceData(outcome, [
@@ -54,6 +121,27 @@ describe("FinancialIndependenceChart", () => {
 		expect(tooltip).not.toContain("Brokerage <main>");
 	});
 });
+
+function makeRow(
+	overrides: Partial<FinancialIndependenceRow> = {},
+): FinancialIndependenceRow {
+	return {
+		date: "2026-01-01",
+		netWorth: 150_000,
+		minimumNetWorth: 0,
+		minimumNetWorthMet: true,
+		annualDirectIncome: 0,
+		assetContributions: [],
+		selectedAssetBalance: 150_000,
+		annualWithdrawalCapacity: 6_000,
+		totalAnnualCapacity: 6_000,
+		annualExpenseTarget: 5_000,
+		coverageRatio: 1.2,
+		isCovered: true,
+		isEligible: true,
+		...overrides,
+	};
+}
 
 function makeOutcome(): FinancialIndependenceDetailedRunOutcome {
 	return {

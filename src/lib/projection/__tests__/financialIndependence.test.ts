@@ -289,8 +289,8 @@ describe("evaluateFinancialIndependence", () => {
 			status: "ineligible",
 			cycleEstablished: false,
 			withdrawals: {
-				requestedAmount: 0,
-				realizedAmount: 0,
+				requestedAmount: 4_000,
+				realizedAmount: 4_000,
 				shortfallAmount: 0,
 				firstShortfallDate: null,
 			},
@@ -993,6 +993,32 @@ describe("evaluateFinancialIndependence", () => {
 		expect(
 			selectFinancialIndependenceOutcomeIndex(allIneligible.runOutcomes),
 		).toBe(1);
+		expect(detailedOutcome(allIneligible, 1)).toMatchObject({
+			status: "ineligible",
+			initialCoverageMet: false,
+			cycleEstablished: false,
+			balanceTrajectory: expect.arrayContaining([
+				expect.objectContaining({ date: "2026-02-01" }),
+			]),
+		});
+
+		const belowNetWorthGate = evaluateFinancialIndependence({
+			path: evaluationPath,
+			plan: plan({
+				minimumNetWorth: 200_000,
+				sources: [{ type: "asset", accountId: "brokerage", included: true }],
+			}),
+			candidateDates: ["2026-01-01"],
+		});
+		expect(detailedOutcome(belowNetWorthGate)).toMatchObject({
+			status: "ineligible",
+			minimumNetWorthMet: false,
+			initialCoverageMet: true,
+			cycleEstablished: false,
+		});
+		expect(detailedOutcome(belowNetWorthGate).balanceTrajectory).toHaveLength(
+			13,
+		);
 
 		const stochastic = evaluateFinancialIndependence({
 			path: evaluationPath,

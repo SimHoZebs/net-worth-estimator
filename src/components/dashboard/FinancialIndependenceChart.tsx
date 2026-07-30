@@ -4,9 +4,10 @@ import { parseChartDate } from "@/chart/chartData";
 import { createBaseOptions } from "@/chart/uplotBase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UPlotChart } from "@/components/ui/UPlotChart";
-import { currency, formatDate } from "@/lib/format";
+import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	FinancialIndependenceDetailedRunOutcome,
+	FinancialIndependenceRow,
 	FinancialModelDocument,
 } from "@/lib/projection";
 import { escapeHtml } from "@/lib/utils";
@@ -15,6 +16,7 @@ const FALLBACK_ACCOUNT_COLOR = "GrayText";
 
 interface FinancialIndependenceChartProps {
 	document: FinancialModelDocument;
+	row: FinancialIndependenceRow;
 	outcome: FinancialIndependenceDetailedRunOutcome;
 }
 
@@ -27,8 +29,10 @@ export interface FinancialIndependenceChartAccount {
 export const FinancialIndependenceChart = memo(
 	function FinancialIndependenceChart({
 		document,
+		row,
 		outcome,
 	}: FinancialIndependenceChartProps) {
+		const capacityGap = buildFinancialIndependenceCapacityGap(row);
 		const accountIds = useMemo(
 			() =>
 				outcome.balanceTrajectory[0]?.accounts.map(
@@ -66,15 +70,67 @@ export const FinancialIndependenceChart = memo(
 		return (
 			<Card className="overflow-hidden rounded-[1.8rem] border-border/80">
 				<CardHeader>
-					<CardTitle>Selected account balances during the FI test</CardTitle>
+					<CardTitle>FI funding gap and account balances</CardTitle>
 					<p className="type-muted">
-						Monthly balances after income, continuing postings, and planned
-						withdrawals. Hover a point for exact values.
+						The bar is the initial annual funding-capacity gate. Account lines
+						show simulated monthly balances during the FI test.
 					</p>
 				</CardHeader>
-				<CardContent>
+				<CardContent className="space-y-5">
+					<div className="rounded-2xl border border-primary-border/50 bg-primary-subtle/35 p-4">
+						<div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+							<div>
+								<div className="type-label">
+									Initial annual funding capacity
+								</div>
+								<div className="mt-1 type-value text-foreground">
+									{currency.format(row.totalAnnualCapacity)} / year available
+								</div>
+							</div>
+							<div className="text-left type-muted sm:text-right">
+								{row.annualExpenseTarget > 0
+									? `${currency.format(row.annualExpenseTarget)} / year needed`
+									: "No annual spending target configured"}
+							</div>
+						</div>
+						{row.annualExpenseTarget > 0 ? (
+							<>
+								<div className="relative mt-3 h-3 overflow-hidden rounded-full bg-border/70">
+									<div
+										className="h-full rounded-full bg-primary transition-[width] duration-300"
+										style={{ width: `${capacityGap.fillPercent}%` }}
+									/>
+									<div className="absolute inset-y-0 right-0 w-0.5 bg-foreground/70" />
+								</div>
+								<div className="mt-2 flex flex-wrap justify-between gap-2 type-caption">
+									<span>{pct.format(row.coverageRatio)} of initial target</span>
+									<strong className="type-value">
+										{capacityGap.difference < 0
+											? `${currency.format(Math.abs(capacityGap.difference))} / year below target`
+											: capacityGap.difference > 0
+												? `${currency.format(capacityGap.difference)} / year above target`
+												: "Initial target met exactly"}
+									</strong>
+								</div>
+							</>
+						) : (
+							<p className="mt-2 type-caption">
+								Set an annual spending target to evaluate the initial capacity
+								gap.
+							</p>
+						)}
+					</div>
+
 					{outcome.balanceTrajectory.length > 0 && accounts.length > 0 ? (
 						<>
+							<div>
+								<div className="type-label">Selected account balances</div>
+								<p className="type-caption">
+									{outcome.status === "ineligible"
+										? "Counterfactual diagnostic cycle; it does not establish financial independence."
+										: "Hover a monthly point for exact post-withdrawal values."}
+								</p>
+							</div>
 							<UPlotChart
 								options={options}
 								data={data}
@@ -96,15 +152,30 @@ export const FinancialIndependenceChart = memo(
 							</div>
 						</>
 					) : (
-						<div className="rounded-2xl border border-dashed border-border p-8 text-center type-muted">
-							No selected-account balance trajectory is available for this test.
-						</div>
+						<p className="type-muted">
+							No selected accounts are included in this FI plan.
+						</p>
 					)}
 				</CardContent>
 			</Card>
 		);
 	},
 );
+
+export function buildFinancialIndependenceCapacityGap(
+	row: FinancialIndependenceRow,
+) {
+	if (row.annualExpenseTarget <= 0) {
+		return { fillPercent: 0, difference: 0 };
+	}
+	return {
+		fillPercent: Math.min(
+			100,
+			Math.max(0, (row.totalAnnualCapacity / row.annualExpenseTarget) * 100),
+		),
+		difference: row.totalAnnualCapacity - row.annualExpenseTarget,
+	};
+}
 
 export function buildFinancialIndependenceBalanceData(
 	outcome: FinancialIndependenceDetailedRunOutcome,

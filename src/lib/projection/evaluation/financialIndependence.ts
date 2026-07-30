@@ -489,7 +489,7 @@ function evaluateCycle({
 	captureBalanceTrajectory?: boolean;
 	summaryOnly?: boolean;
 }): FinancialIndependenceRunOutcome {
-	if (!candidate.isEligible) {
+	if (!candidate.isEligible && !captureBalanceTrajectory) {
 		return {
 			candidateDate: candidate.date,
 			status: "ineligible",
@@ -764,7 +764,9 @@ function evaluateCycle({
 					: endingRealSelectedAssetBalance + EPSILON >=
 						startingSelectedAssetBalance);
 			const cycleEstablished =
-				!state.hadWithdrawalShortfall && principalReplenished;
+				candidate.isEligible &&
+				!state.hadWithdrawalShortfall &&
+				principalReplenished;
 			if (summaryOnly) {
 				return {
 					candidateDate: candidate.date,
@@ -777,9 +779,9 @@ function evaluateCycle({
 			}
 			return {
 				candidateDate: candidate.date,
-				status: "evaluated" as const,
-				minimumNetWorthMet: true,
-				initialCoverageMet: true,
+				status: candidate.isEligible ? "evaluated" : "ineligible",
+				minimumNetWorthMet: candidate.minimumNetWorthMet,
+				initialCoverageMet: candidate.isCovered,
 				expensesFullyCovered: !state.hadWithdrawalShortfall,
 				hadWithdrawalShortfall: state.hadWithdrawalShortfall,
 				startingSelectedAssetBalance,
@@ -906,7 +908,7 @@ export function evaluateFinancialIndependence({
 	if (detailLevel !== "summary") {
 		const selectedIndex = selectFinancialIndependenceOutcomeIndex(runOutcomes);
 		const candidate = analysisRows[selectedIndex];
-		if (candidate && runOutcomes[selectedIndex]?.status !== "ineligible") {
+		if (candidate) {
 			runOutcomes[selectedIndex] = evaluateCycle({
 				path,
 				plan: normalizedPlan,
