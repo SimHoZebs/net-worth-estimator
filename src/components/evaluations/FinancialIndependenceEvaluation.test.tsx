@@ -41,9 +41,7 @@ describe("FinancialIndependenceEvaluation", () => {
 		expect(screen.queryByText("Behavior evidence")).toBeNull();
 		expect(screen.queryByText("Requested withdrawals")).toBeNull();
 		expect(screen.queryByText("shortfall probability")).toBeNull();
-		expect(
-			screen.queryByText("Selected account balances during the FI test"),
-		).toBeNull();
+		expect(screen.getByText("FI balance chart")).not.toBeNull();
 	});
 });
 
