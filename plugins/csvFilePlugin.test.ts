@@ -85,7 +85,6 @@ describe("csvFilePlugin", () => {
 		});
 		expect(canonical.body).not.toHaveProperty("pack");
 		const document = canonical.body.document as FinancialModelDocument;
-		expect(document).not.toHaveProperty("checkpoints");
 		expect(
 			document.evaluations.financialIndependence[0]?.config.sources,
 		).toEqual([
@@ -213,7 +212,7 @@ describe("csvFilePlugin", () => {
 
 		expect(response).toMatchObject({
 			status: 422,
-			body: { issues: [{ code: "evaluation.config.invalid" }] },
+			body: { issues: [{ code: "document.shape.invalid" }] },
 		});
 		expect(await fs.readFile(behaviorPath, "utf-8")).toBe(before);
 	});
@@ -250,22 +249,26 @@ describe("csvFilePlugin", () => {
 		expect(saved).toContain(`${warningDocument.accounts[0].id},`);
 	});
 
-	it("rejects checkpoint fields without writing files", async () => {
+	it("rejects noncanonical document fields without writing files", async () => {
 		const directory = await createFixtureDirectory();
 		const { invoke } = await createHarness(directory);
 		const loaded = await invoke(FINANCIAL_MODEL_API_PATH, "GET");
 		const accountsPath = path.join(directory, "accounts.csv");
 		const before = await fs.readFile(accountsPath, "utf-8");
-		const legacy = {
+		const noncanonical = {
 			...(loaded.body.document as FinancialModelDocument),
-			checkpoints: [],
+			unexpected: true,
 		};
 
-		const response = await invoke(FINANCIAL_MODEL_API_PATH, "PUT", legacy);
+		const response = await invoke(
+			FINANCIAL_MODEL_API_PATH,
+			"PUT",
+			noncanonical,
+		);
 
 		expect(response).toMatchObject({
 			status: 422,
-			body: { issues: [{ code: "document.checkpoints.unsupported" }] },
+			body: { issues: [{ code: "document.shape.invalid" }] },
 		});
 		expect(await fs.readFile(accountsPath, "utf-8")).toBe(before);
 	});

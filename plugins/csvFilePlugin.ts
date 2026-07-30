@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Connect, Plugin, ViteDevServer } from "vite";
 import type { FinancialModelParseResult } from "../src/lib/projection/dataSource";
 import { validateFinancialIndependencePlan } from "../src/lib/projection/evaluation/financialIndependence";
+import { parseFinancialModelDocument } from "../src/lib/projection/sources/csv/csvDataSource";
 import {
 	parseCsvFinancialModel,
 	serializeCsvFinancialModel,
@@ -12,7 +13,6 @@ import {
 	type BehaviorCollectionKey,
 	CSV_BEHAVIOR_FILE_NAMES,
 	CSV_MODEL_FILE_NAMES,
-	type FinancialModelDocument,
 } from "../src/lib/projection/types/model";
 import type { ModelValidationIssue } from "../src/lib/projection/types/validation";
 
@@ -72,8 +72,22 @@ async function loadDocument(
 
 async function saveDocument(
 	csvPath: string,
-	document: FinancialModelDocument,
+	value: unknown,
 ): Promise<FinancialModelParseResult> {
+	const document = parseFinancialModelDocument(value);
+	if (!document) {
+		return {
+			document: null,
+			issues: [
+				{
+					severity: "error",
+					code: "document.shape.invalid",
+					message: "The financial model document is not canonical.",
+					path: [],
+				},
+			],
+		};
+	}
 	const issues: ModelValidationIssue[] = validateCsvFinancialModel(document);
 	document.evaluations.financialIndependence.forEach((evaluation, index) => {
 		try {
@@ -167,7 +181,7 @@ export function csvFilePlugin(options: CsvFilePluginOptions = {}): Plugin {
 						}
 						const body = JSON.parse(
 							Buffer.concat(chunks).toString(),
-						) as FinancialModelDocument;
+						) as unknown;
 						const result = await saveDocument(resolvedCsvPath, body);
 						const hasErrors = result.issues.some(
 							(issue) => issue.severity === "error",
