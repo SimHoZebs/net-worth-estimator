@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useShallow } from "zustand/shallow";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useProjection } from "@/hooks/useProjection";
 import { useStochastic } from "@/hooks/useStochastic";
 import {
@@ -21,6 +22,8 @@ import {
 function formatTodayIsoDate() {
 	return new Date().toISOString().slice(0, 10);
 }
+
+const HORIZON_DEBOUNCE_MS = 200;
 
 export function useProjectionOrchestration({
 	document,
@@ -50,13 +53,17 @@ export function useProjectionOrchestration({
 		})),
 	);
 	const projectionStartDate = useMemo(() => formatTodayIsoDate(), []);
+	const settledHorizonYears = useDebouncedValue(
+		horizonYears,
+		HORIZON_DEBOUNCE_MS,
+	);
 	const projectionSettings = useMemo(
 		() => ({
 			fallbackProjectionStartDate: projectionStartDate,
-			horizonYears,
+			horizonYears: settledHorizonYears,
 			evaluations,
 		}),
-		[projectionStartDate, horizonYears, evaluations],
+		[projectionStartDate, settledHorizonYears, evaluations],
 	);
 	const effectiveDocument = useMemo(
 		() => (document ? applyModelOverrides(document, modelOverrides) : null),
