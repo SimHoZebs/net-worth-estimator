@@ -14,9 +14,11 @@ import type {
 	AccountMovementConstraint,
 	AccountMovementConstraintType,
 	FinancialIndependenceAnalysis,
+	FinancialIndependenceDetailedRunOutcome,
 	FinancialIndependencePlan,
 	FinancialIndependenceRow,
 	FinancialIndependenceRunOutcome,
+	FinancialIndependenceSummaryOutcome,
 	FinancialIndependenceWithdrawalSummary,
 	IsoDate,
 	MovementEvent,
@@ -24,14 +26,12 @@ import type {
 	ProjectionRow,
 } from "../types/model";
 import type { MonteCarloSample, SimulationState } from "../types/simulation";
-import type { PercentileBands } from "../types/stochastic";
 import {
 	addMonthsClamped,
 	addYearsClamped,
 	compareIsoDates,
 	daysBetween,
 } from "../utils/date";
-import { computePercentiles } from "../utils/stochastic";
 import { classifyMovementConstraints } from "./movementConstraints";
 import type { EvaluationDefinition } from "./runtime";
 
@@ -218,29 +218,16 @@ export interface FinancialIndependenceProbabilisticResult {
 	medianCoverageDate: IsoDate | null;
 	selfSustainingDate: IsoDate | null;
 	selfSustainingProbability: number | null;
-	candidateWithdrawalDiagnostics: FinancialIndependenceCandidateWithdrawalDiagnostic[];
-}
-
-export interface FinancialIndependenceCandidateWithdrawalDiagnostic {
-	candidateDate: IsoDate;
-	totalRunCount: number;
-	diagnosticRunCount: number;
-	shortfallRunCount: number;
-	shortfallProbability: number;
-	medianFirstShortfallDate: IsoDate | null;
-	shortfallAmountPercentiles: PercentileBands;
 }
 
 interface FinancialIndependenceAccumulator {
 	candidateDates: IsoDate[];
 	coverageRatios: number[][];
 	cycleSuccessCounts: number[];
-	diagnosticRunCounts: number[];
-	shortfallRunCounts: number[];
-	firstShortfallDates: IsoDate[][];
-	shortfallAmounts: number[][];
 	requiredConfidence: number;
 	successfulRunCount: number;
+	checkedCandidateCount: number;
+	evaluatedCycleCount: number;
 	runCount: number;
 }
 
@@ -493,14 +480,15 @@ function evaluateCycle({
 	candidate,
 	monteCarloSample,
 	captureBalanceTrajectory = false,
+	summaryOnly = false,
 }: {
 	path: ProjectionPath;
 	plan: FinancialIndependencePlan;
 	candidate: FinancialIndependenceRow;
 	monteCarloSample?: MonteCarloSample;
 	captureBalanceTrajectory?: boolean;
+	summaryOnly?: boolean;
 }): FinancialIndependenceRunOutcome {
-	const candidateRow = latestRowAtOrBefore(path.rows, candidate.date);
 	if (!candidate.isEligible) {
 		return {
 			candidateDate: candidate.date,
@@ -519,6 +507,7 @@ function evaluateCycle({
 			balanceTrajectory: [],
 		};
 	}
+	const candidateRow = latestRowAtOrBefore(path.rows, candidate.date);
 
 	const assetRates = selectedAssetRates(plan);
 	const expenseBaseline = expenseBaselineDate(
@@ -616,6 +605,7 @@ function evaluateCycle({
 	return runReactiveBehavior(periods, {
 		initialize: () => ({
 			hadWithdrawalShortfall: false,
+			firstShortfallDate: null as IsoDate | null,
 			withdrawalAttempts: [] as WithdrawalAttempt[],
 			remainingWithdrawalByAccount: new Map<string, number>(),
 			balanceTrajectory: captureBalanceTrajectory
@@ -685,24 +675,26 @@ function evaluateCycle({
 						limitRemaining: actionLimit,
 					},
 				};
-				const balancesBefore = { ...balances };
+				const balancesBefore = summaryOnly ? null : { ...balances };
 				const movement = transitions.executeGeneratedMovement(
 					action.movement,
 				).result;
-				state.withdrawalAttempts.push({
-					date: period.startDate,
-					accountId,
-					result: movement,
-					bindingConstraints: classifyMovementConstraints({
-						sourceAccountId: action.movement.sourceAccountId,
-						destinations: action.movement.destinations,
-						requestedAmount: action.movement.requestedAmount,
-						realizedAmount: movement.realizedAmount,
-						balancesBefore,
-						accountsById,
-						limitRemaining: action.movement.limitRemaining,
-					}),
-				});
+				if (balancesBefore) {
+					state.withdrawalAttempts.push({
+						date: period.startDate,
+						accountId,
+						result: movement,
+						bindingConstraints: classifyMovementConstraints({
+							sourceAccountId: action.movement.sourceAccountId,
+							destinations: action.movement.destinations,
+							requestedAmount: action.movement.requestedAmount,
+							realizedAmount: movement.realizedAmount,
+							balancesBefore,
+							accountsById,
+							limitRemaining: action.movement.limitRemaining,
+						}),
+					});
+				}
 				state.remainingWithdrawalByAccount.set(
 					accountId,
 					Math.max(
@@ -720,27 +712,43 @@ function evaluateCycle({
 					requestedAmount: requestedExpense,
 					limitRemaining: 0,
 				};
-				const balancesBefore = { ...balances };
+				const balancesBefore = summaryOnly ? null : { ...balances };
 				const movement =
 					transitions.executeGeneratedMovement(movementAction).result;
-				state.withdrawalAttempts.push({
-					date: period.startDate,
-					accountId: null,
-					result: movement,
-					bindingConstraints: classifyMovementConstraints({
-						...movementAction,
-						realizedAmount: movement.realizedAmount,
-						balancesBefore,
-						accountsById,
-					}),
-				});
+				if (balancesBefore) {
+					state.withdrawalAttempts.push({
+						date: period.startDate,
+						accountId: null,
+						result: movement,
+						bindingConstraints: classifyMovementConstraints({
+							...movementAction,
+							realizedAmount: movement.realizedAmount,
+							balancesBefore,
+							accountsById,
+						}),
+					});
+				}
 			}
-			if (remainingExpense > EPSILON) state.hadWithdrawalShortfall = true;
+			if (remainingExpense > EPSILON) {
+				state.hadWithdrawalShortfall = true;
+				state.firstShortfallDate ??= period.startDate;
+			}
 			if (captureBalanceTrajectory) {
 				state.balanceTrajectory.push(balanceTrajectoryRow(period.endDate));
 			}
 		},
+		shouldStop: (state) => summaryOnly && state.hadWithdrawalShortfall,
 		finish: (state) => {
+			if (summaryOnly && state.hadWithdrawalShortfall) {
+				return {
+					candidateDate: candidate.date,
+					status: "summary",
+					minimumNetWorthMet: true,
+					initialCoverageMet: true,
+					cycleEstablished: false,
+					firstShortfallDate: state.firstShortfallDate,
+				} satisfies FinancialIndependenceSummaryOutcome;
+			}
 			const endingSelectedAssetBalance = [...assetRates.keys()].reduce(
 				(sum, accountId) => sum + Math.max(0, balances[accountId] ?? 0),
 				0,
@@ -755,6 +763,18 @@ function evaluateCycle({
 					? endingSelectedAssetBalance + EPSILON >= startingSelectedAssetBalance
 					: endingRealSelectedAssetBalance + EPSILON >=
 						startingSelectedAssetBalance);
+			const cycleEstablished =
+				!state.hadWithdrawalShortfall && principalReplenished;
+			if (summaryOnly) {
+				return {
+					candidateDate: candidate.date,
+					status: "summary",
+					minimumNetWorthMet: true,
+					initialCoverageMet: true,
+					cycleEstablished,
+					firstShortfallDate: null,
+				} satisfies FinancialIndependenceSummaryOutcome;
+			}
 			return {
 				candidateDate: candidate.date,
 				status: "evaluated" as const,
@@ -767,10 +787,10 @@ function evaluateCycle({
 				startingRealSelectedAssetBalance: startingSelectedAssetBalance,
 				endingRealSelectedAssetBalance,
 				principalReplenished,
-				cycleEstablished: !state.hadWithdrawalShortfall && principalReplenished,
+				cycleEstablished,
 				withdrawals: summarizeWithdrawals(state.withdrawalAttempts),
 				balanceTrajectory: state.balanceTrajectory,
-			};
+			} satisfies FinancialIndependenceDetailedRunOutcome;
 		},
 	});
 }
@@ -783,7 +803,7 @@ export function selectFinancialIndependenceOutcomeIndex(
 	);
 	if (successfulIndex >= 0) return successfulIndex;
 	for (let index = outcomes.length - 1; index >= 0; index--) {
-		if (outcomes[index]?.status === "evaluated") return index;
+		if (outcomes[index]?.status !== "ineligible") return index;
 	}
 	return outcomes.length - 1;
 }
@@ -793,11 +813,13 @@ export function evaluateFinancialIndependence({
 	plan,
 	monteCarloSample,
 	candidateDates,
+	detailLevel,
 }: {
 	path: ProjectionPath;
 	plan: FinancialIndependencePlan;
 	monteCarloSample?: MonteCarloSample;
 	candidateDates?: readonly IsoDate[];
+	detailLevel?: "detailed" | "summary";
 }): FinancialIndependenceAnalysis {
 	const normalizedPlan = normalizeFinancialIndependencePlan(plan);
 	const assetRates = selectedAssetRates(normalizedPlan);
@@ -869,23 +891,28 @@ export function evaluateFinancialIndependence({
 			isEligible: minimumNetWorthMet && isCovered,
 		};
 	});
-	const runOutcomes = analysisRows.map((candidate) =>
-		evaluateCycle({
+	const runOutcomes: FinancialIndependenceRunOutcome[] = [];
+	for (const candidate of analysisRows) {
+		const outcome = evaluateCycle({
 			path,
 			plan: normalizedPlan,
 			candidate,
 			monteCarloSample,
-		}),
-	);
-	if (monteCarloSample === undefined) {
+			summaryOnly: true,
+		});
+		runOutcomes.push(outcome);
+		if (outcome.cycleEstablished) break;
+	}
+	if (detailLevel !== "summary") {
 		const selectedIndex = selectFinancialIndependenceOutcomeIndex(runOutcomes);
 		const candidate = analysisRows[selectedIndex];
-		if (candidate && runOutcomes[selectedIndex]?.status === "evaluated") {
+		if (candidate && runOutcomes[selectedIndex]?.status !== "ineligible") {
 			runOutcomes[selectedIndex] = evaluateCycle({
 				path,
 				plan: normalizedPlan,
 				candidate,
-				captureBalanceTrajectory: true,
+				monteCarloSample,
+				captureBalanceTrajectory: monteCarloSample === undefined,
 			});
 		}
 	}
@@ -1027,12 +1054,12 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 			unitsPerRun: candidateCount,
 			unitLabel: "monthly start dates",
 			unitAction: "checked",
-			intensiveUnitLabel: `full ${config.evaluationYears}-year sustainability cycles`,
-			intensiveUnitAction: "simulated",
+			intensiveUnitLabel: "candidate sustainability cycles",
+			intensiveUnitAction: "attempted",
 			description:
 				candidateCount === 0
 					? `No complete ${config.evaluationYears}-year FI test fits in this projection horizon.`
-					: `Every start date is checked; eligible dates run the complete ${config.evaluationYears}-year test.`,
+					: `Failed cycles stop at the first shortfall; date checks stop after the first successful ${config.evaluationYears}-year test.`,
 		};
 	},
 	diagnoseConfig({ path }, config) {
@@ -1061,11 +1088,12 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 			];
 		});
 	},
-	evaluatePath({ path, monteCarloSample }, config) {
+	evaluatePath({ path, monteCarloSample, detailLevel }, config) {
 		return evaluateFinancialIndependence({
 			path,
 			plan: availableFinancialIndependencePlan(path, config),
 			monteCarloSample,
+			detailLevel,
 		});
 	},
 	createAccumulator(config, deterministicResult) {
@@ -1074,12 +1102,10 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 			candidateDates,
 			coverageRatios: candidateDates.map(() => []),
 			cycleSuccessCounts: candidateDates.map(() => 0),
-			diagnosticRunCounts: candidateDates.map(() => 0),
-			shortfallRunCounts: candidateDates.map(() => 0),
-			firstShortfallDates: candidateDates.map(() => []),
-			shortfallAmounts: candidateDates.map(() => []),
 			requiredConfidence: config.requiredConfidence,
 			successfulRunCount: 0,
+			checkedCandidateCount: 0,
+			evaluatedCycleCount: 0,
 			runCount: 0,
 		};
 	},
@@ -1089,7 +1115,6 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 				"FI evaluation returned an inconsistent candidate count.",
 			);
 		}
-		let runSucceeded = false;
 		pathResult.rows.forEach((row, index) => {
 			if (row.date !== accumulator.candidateDates[index]) {
 				throw new Error(
@@ -1097,33 +1122,30 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 				);
 			}
 			accumulator.coverageRatios[index]?.push(row.coverageRatio);
-			const outcome = pathResult.runOutcomes[index];
-			if (outcome?.status === "evaluated") {
-				accumulator.diagnosticRunCounts[index]++;
-				accumulator.shortfallAmounts[index]?.push(
-					outcome.withdrawals.shortfallAmount,
-				);
-				if (outcome.withdrawals.firstShortfallDate !== null) {
-					accumulator.shortfallRunCounts[index]++;
-					accumulator.firstShortfallDates[index]?.push(
-						outcome.withdrawals.firstShortfallDate,
-					);
-				}
-			}
-			if (outcome?.cycleEstablished) {
-				accumulator.cycleSuccessCounts[index]++;
-				runSucceeded = true;
-			}
 		});
+		accumulator.checkedCandidateCount += pathResult.runOutcomes.length;
+		accumulator.evaluatedCycleCount += pathResult.runOutcomes.filter(
+			(outcome) => outcome.status !== "ineligible",
+		).length;
+		const firstSuccessIndex = pathResult.runOutcomes.findIndex(
+			(outcome) => outcome.cycleEstablished,
+		);
+		if (firstSuccessIndex >= 0) {
+			for (
+				let index = firstSuccessIndex;
+				index < accumulator.cycleSuccessCounts.length;
+				index++
+			) {
+				accumulator.cycleSuccessCounts[index]++;
+			}
+			accumulator.successfulRunCount++;
+		}
 		accumulator.runCount++;
-		if (runSucceeded) accumulator.successfulRunCount++;
 	},
 	measureStochasticWork(accumulator) {
 		return {
-			intensiveUnitsCompleted: accumulator.diagnosticRunCounts.reduce(
-				(sum, count) => sum + count,
-				0,
-			),
+			unitsCompleted: accumulator.checkedCandidateCount,
+			intensiveUnitsCompleted: accumulator.evaluatedCycleCount,
 		};
 	},
 	finalize(accumulator) {
@@ -1157,33 +1179,6 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 			medianCoverageDate,
 			selfSustainingDate,
 			selfSustainingProbability,
-			candidateWithdrawalDiagnostics: accumulator.candidateDates.map(
-				(candidateDate, index) => {
-					const diagnosticRunCount =
-						accumulator.diagnosticRunCounts[index] ?? 0;
-					const shortfallRunCount = accumulator.shortfallRunCounts[index] ?? 0;
-					const firstDates = [
-						...(accumulator.firstShortfallDates[index] ?? []),
-					].sort(compareIsoDates);
-					return {
-						candidateDate,
-						totalRunCount: accumulator.runCount,
-						diagnosticRunCount,
-						shortfallRunCount,
-						shortfallProbability:
-							diagnosticRunCount > 0
-								? shortfallRunCount / diagnosticRunCount
-								: 0,
-						medianFirstShortfallDate:
-							firstDates.length > 0
-								? (firstDates[Math.floor((firstDates.length - 1) / 2)] ?? null)
-								: null,
-						shortfallAmountPercentiles: computePercentiles(
-							accumulator.shortfallAmounts[index] ?? [],
-						),
-					};
-				},
-			),
 		};
 	},
 	status(deterministic, probabilistic) {

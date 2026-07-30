@@ -9,6 +9,7 @@ export interface BehaviorPeriod {
 export interface ReactiveBehavior<TState, TResult> {
 	initialize(): TState;
 	react(state: TState, period: BehaviorPeriod): void;
+	shouldStop?(state: TState, period: BehaviorPeriod): boolean;
 	finish(state: TState): TResult;
 }
 
@@ -17,6 +18,9 @@ export function runReactiveBehavior<TState, TResult>(
 	behavior: ReactiveBehavior<TState, TResult>,
 ): TResult {
 	const state = behavior.initialize();
-	for (const period of periods) behavior.react(state, period);
+	for (const period of periods) {
+		behavior.react(state, period);
+		if (behavior.shouldStop?.(state, period)) break;
+	}
 	return behavior.finish(state);
 }

@@ -101,7 +101,7 @@ Canonical core APIs are:
 
 - Read-only evaluations inspect an immutable `ProjectionPath`.
 - Behaviors observe branch state and emit generic actions through the shared movement resolver.
-- FI coverage uses canonical monthly candidate dates. Eligible candidates fork balances and evaluate a complete principal-preservation cycle.
+- FI coverage uses canonical monthly candidate dates. Failed summary cycles stop at the first spending shortfall, and candidate scanning stops at the first successful cycle. Only the selected deterministic candidate is rerun with complete diagnostics and balance history.
 - Branches replay only explicitly selected continuing postings. They never infer continuation from IDs, labels, categories, or rates.
 - Candidate state includes all base-path events on the candidate date; branch processing starts strictly afterward.
 - Branch state inherits latest realized posting amounts, current-year cap usage, and the run's sampled rates.
@@ -117,12 +117,12 @@ The stochastic coordinator:
 1. Calls `prepareSimulationRequest` once and reuses that prepared model, state, dates, and event structure for the deterministic baseline and every sampled run.
 2. Executes path-only samples: each sample produces the `ProjectionPath` required by distribution and evaluation accumulators without building a redundant complete public result.
 3. Uses the deterministic path's monthly FI candidate schedule for every run.
-4. Aggregates complete per-run outcomes for evaluation probabilities.
+4. Records each run's first successful FI candidate and aggregates the cumulative probability that FI has been achieved by each candidate date.
 5. Maintains exact sorted value distributions and computes P10/P25/P50/P75/P90 with exact percentile aggregation.
 6. Processes runs in worker batches of 50 and emits progressive `StochasticProjectionResult` updates.
 7. Discards each sample path after the distribution and enabled evaluation trackers consume it.
 
-Percentile-band slope is never interpreted as a run outcome. FI-cycle probability and confidence-qualified dates come from complete candidate outcomes.
+Percentile-band slope is never interpreted as a run outcome. FI confidence dates come from the cumulative distribution of each run's first successful candidate.
 
 ## 8. UI and State
 

@@ -215,6 +215,8 @@ function buildSuccessfulResult() {
 	);
 	const row = analysis.rows[selectedIndex];
 	const outcome = analysis.runOutcomes[selectedIndex];
-	if (!row || !outcome) throw new Error("Missing FI candidate details.");
+	if (!row || !outcome || outcome.status === "summary") {
+		throw new Error("Missing detailed FI candidate details.");
+	}
 	return { document, plan, row, outcome };
 }

@@ -285,7 +285,16 @@ export interface FinancialIndependenceBalanceTrajectoryRow {
 	}>;
 }
 
-export interface FinancialIndependenceRunOutcome {
+export interface FinancialIndependenceSummaryOutcome {
+	candidateDate: IsoDate;
+	status: "summary";
+	minimumNetWorthMet: boolean;
+	initialCoverageMet: boolean;
+	cycleEstablished: boolean;
+	firstShortfallDate: IsoDate | null;
+}
+
+export interface FinancialIndependenceDetailedRunOutcome {
 	candidateDate: IsoDate;
 	status: "ineligible" | "evaluated";
 	minimumNetWorthMet: boolean;
@@ -301,6 +310,10 @@ export interface FinancialIndependenceRunOutcome {
 	withdrawals: FinancialIndependenceWithdrawalSummary;
 	balanceTrajectory: FinancialIndependenceBalanceTrajectoryRow[];
 }
+
+export type FinancialIndependenceRunOutcome =
+	| FinancialIndependenceSummaryOutcome
+	| FinancialIndependenceDetailedRunOutcome;
 
 export interface FinancialIndependenceWithdrawalAccountSummary {
 	accountId: string;

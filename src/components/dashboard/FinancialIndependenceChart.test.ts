@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FinancialIndependenceRunOutcome } from "@/lib/projection";
+import type { FinancialIndependenceDetailedRunOutcome } from "@/lib/projection";
 import {
 	buildFinancialIndependenceBalanceData,
 	buildFinancialIndependenceBalanceTooltip,
@@ -55,7 +55,7 @@ describe("FinancialIndependenceChart", () => {
 	});
 });
 
-function makeOutcome(): FinancialIndependenceRunOutcome {
+function makeOutcome(): FinancialIndependenceDetailedRunOutcome {
 	return {
 		candidateDate: "2026-01-01",
 		status: "evaluated",

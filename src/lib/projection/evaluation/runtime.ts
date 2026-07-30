@@ -38,6 +38,7 @@ export interface EvaluationWorkloadPlan {
 }
 
 export interface EvaluationWorkloadMeasurement {
+	unitsCompleted?: number;
 	intensiveUnitsCompleted?: number;
 }
 
@@ -248,7 +249,9 @@ class EvaluationInstanceRuntime {
 			type: this.type,
 			instanceId: this.instanceId,
 			label: this.configured.label,
-			completedUnits: completedRuns * this.workloadPlan.unitsPerRun,
+			completedUnits:
+				measurement?.unitsCompleted ??
+				completedRuns * this.workloadPlan.unitsPerRun,
 			totalUnits: totalRuns * this.workloadPlan.unitsPerRun,
 			unitLabel: this.workloadPlan.unitLabel,
 			unitAction: this.workloadPlan.unitAction,
@@ -328,6 +331,9 @@ function isEvaluationWorkloadMeasurement(
 ): value is EvaluationWorkloadMeasurement {
 	return Boolean(
 		value &&
+			(value.unitsCompleted === undefined ||
+				(isNonNegativeFinite(value.unitsCompleted) &&
+					Number.isInteger(value.unitsCompleted))) &&
 			(value.intensiveUnitsCompleted === undefined ||
 				(isNonNegativeFinite(value.intensiveUnitsCompleted) &&
 					Number.isInteger(value.intensiveUnitsCompleted))) &&

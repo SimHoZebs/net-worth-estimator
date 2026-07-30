@@ -2,9 +2,9 @@ import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
+	FinancialIndependenceDetailedRunOutcome,
 	FinancialIndependencePlan,
 	FinancialIndependenceRow,
-	FinancialIndependenceRunOutcome,
 	FinancialModelDocument,
 } from "@/lib/projection";
 
@@ -12,7 +12,7 @@ interface OverviewCardProps {
 	document: FinancialModelDocument;
 	plan: FinancialIndependencePlan;
 	row: FinancialIndependenceRow | undefined;
-	outcome: FinancialIndependenceRunOutcome | undefined;
+	outcome: FinancialIndependenceDetailedRunOutcome | undefined;
 }
 
 export const OverviewCard = memo(function OverviewCard({
@@ -150,7 +150,7 @@ function expenseBasisLabel(plan: FinancialIndependencePlan) {
 export function describeFinancialIndependenceOutcome(
 	plan: FinancialIndependencePlan,
 	row: FinancialIndependenceRow | undefined,
-	outcome: FinancialIndependenceRunOutcome | undefined,
+	outcome: FinancialIndependenceDetailedRunOutcome | undefined,
 ) {
 	if (!row || !outcome) {
 		return `No complete ${yearTestLabel(plan.evaluationYears)} fits in the projection horizon.`;
