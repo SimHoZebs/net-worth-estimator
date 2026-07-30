@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { Connect, Plugin, ViteDevServer } from "vite";
 import type { FinancialModelParseResult } from "../src/lib/projection/dataSource";
+import { parseFinancialModelDocument } from "../src/lib/projection/sources/csv/csvDataSource";
 import {
 	parseCsvFinancialModel,
 	serializeCsvFinancialModel,
@@ -11,7 +12,6 @@ import {
 	type BehaviorCollectionKey,
 	CSV_BEHAVIOR_FILE_NAMES,
 	CSV_MODEL_FILE_NAMES,
-	type FinancialModelDocument,
 } from "../src/lib/projection/types/model";
 
 export const FINANCIAL_MODEL_API_PATH = "/api/financial-model";
@@ -70,8 +70,22 @@ async function loadDocument(
 
 async function saveDocument(
 	csvPath: string,
-	document: FinancialModelDocument,
+	value: unknown,
 ): Promise<FinancialModelParseResult> {
+	const document = parseFinancialModelDocument(value);
+	if (!document) {
+		return {
+			document: null,
+			issues: [
+				{
+					severity: "error",
+					code: "document.shape.invalid",
+					message: "The financial model document is not canonical.",
+					path: [],
+				},
+			],
+		};
+	}
 	const issues = validateCsvFinancialModel(document);
 
 	if (issues.some((issue) => issue.severity === "error")) {
@@ -146,7 +160,7 @@ export function csvFilePlugin(options: CsvFilePluginOptions = {}): Plugin {
 						}
 						const body = JSON.parse(
 							Buffer.concat(chunks).toString(),
-						) as FinancialModelDocument;
+						) as unknown;
 						const result = await saveDocument(resolvedCsvPath, body);
 						const hasErrors = result.issues.some(
 							(issue) => issue.severity === "error",

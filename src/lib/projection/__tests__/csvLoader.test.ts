@@ -21,7 +21,6 @@ describe("CSV financial model", () => {
 		expect(result.data?.postings[0]?.frequency).toBe("once");
 		expect(result.data?.postings[5]?.arithmetic).toBe("salary * 0.22");
 		expect(result.data?.postings[7]?.annualCap).toBe(23000);
-		expect(result.data).not.toHaveProperty("checkpoints");
 		expect(result.data?.accounts[3]?.label).toBe("Student Loan");
 		expect(result.data?.evaluations.netWorthThreshold[0]?.config).toEqual({
 			target: 1_000_000,

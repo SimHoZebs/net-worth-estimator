@@ -234,8 +234,6 @@ describe("CachedProjectionEngine", () => {
 		const store = {
 			get: vi.fn().mockResolvedValue({
 				kind: "corrupt",
-				schemaVersion: 1,
-				algorithmVersion: "corrupt",
 				inputDigest: "corrupt",
 				createdAt: new Date().toISOString(),
 				payload: { evaluations: {} },

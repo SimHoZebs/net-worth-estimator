@@ -1,7 +1,5 @@
 export interface ProjectionArtifactEnvelope<TPayload = unknown> {
 	readonly kind: string;
-	readonly schemaVersion: number;
-	readonly algorithmVersion: string;
 	readonly inputDigest: string;
 	readonly createdAt: string;
 	readonly payload: TPayload;
@@ -27,11 +25,6 @@ export function isProjectionArtifactEnvelope<TPayload = unknown>(
 	return (
 		typeof value.kind === "string" &&
 		value.kind.trim().length > 0 &&
-		typeof value.schemaVersion === "number" &&
-		Number.isInteger(value.schemaVersion) &&
-		value.schemaVersion >= 1 &&
-		typeof value.algorithmVersion === "string" &&
-		value.algorithmVersion.trim().length > 0 &&
 		typeof value.inputDigest === "string" &&
 		value.inputDigest.length > 0 &&
 		typeof value.createdAt === "string" &&

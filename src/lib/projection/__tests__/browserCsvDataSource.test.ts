@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-	createBaseDocument,
-	makeSettings,
-	validCsvFiles,
-} from "../__fixtures__";
-import { projectRawFinancialModelDocument } from "../simulation/projectPath";
+import { createBaseDocument, validCsvFiles } from "../__fixtures__";
 import {
 	createBrowserCsvDataSource,
 	FINANCIAL_MODEL_STORAGE_KEY,
@@ -58,7 +53,7 @@ describe("createBrowserCsvDataSource", () => {
 		expect(dataSource.reset).toBeUndefined();
 	});
 
-	it("loads the canonical browser key before fetching bundled CSV files", async () => {
+	it("loads the canonical browser key before bundled CSV files", async () => {
 		const document = createBaseDocument({
 			sourcePath: "browser:local-storage",
 		});
@@ -76,274 +71,47 @@ describe("createBrowserCsvDataSource", () => {
 		expect(fetchImpl).not.toHaveBeenCalled();
 	});
 
-	it("reports corrupt canonical data without falling back", async () => {
-		const storage = createMemoryStorage({
-			[FINANCIAL_MODEL_STORAGE_KEY]: "{invalid",
-		});
-		const fetchImpl = createCsvFetch();
-
-		const result = await createBrowserCsvDataSource({
-			fetchImpl,
-			storage,
-		}).loadDocument();
-
-		expect(result.document).toBeNull();
-		expect(result.issues).toMatchObject([
-			{ severity: "error", code: "browser.storage.invalid" },
-		]);
-		expect(fetchImpl).not.toHaveBeenCalled();
-	});
-
-	it("rejects stored document version fields", async () => {
-		const storage = createMemoryStorage({
-			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify({
-				...createBaseDocument(),
-				version: 1,
+	it("reports corrupt or noncanonical stored data without falling back", async () => {
+		const document = createBaseDocument();
+		for (const stored of [
+			"{invalid",
+			JSON.stringify({ ...document, unexpected: true }),
+			JSON.stringify({
+				...document,
+				accounts: [
+					{ ...document.accounts[0], unexpected: true },
+					...document.accounts.slice(1),
+				],
 			}),
-		});
-
-		await expect(
-			createBrowserCsvDataSource({ storage }).loadDocument(),
-		).resolves.toMatchObject({
-			document: null,
-			issues: [{ code: "browser.storage.invalid" }],
-		});
-	});
-
-	it("migrates legacy checkpoints into ordered structural once postings", async () => {
-		const canonical = createBaseDocument();
-		const legacy = {
-			...canonical,
-			accounts: canonical.accounts.slice(0, 2),
-			postings: [
-				{
-					...canonical.postings.find(
-						(posting) => posting.frequency !== "once",
-					)!,
-					id: "legacy_checkpoint_1",
-				},
-			],
-			checkpoints: [
-				{ Date: "2025-02-01", AccountId: "checking", Balance: 10.005 },
-				{ Date: "2025-01-01", AccountId: "checking", Balance: 4.001 },
-				{ Date: "2025-02-01", AccountId: "brokerage", Balance: -2.345 },
-				{ Date: "2025-03-01", AccountId: "checking", Balance: 10.01 },
-				{ Date: "2025-04-01", AccountId: "checking", Balance: 10.01 },
-			],
-		};
-		const original = JSON.stringify(legacy);
-		const storage = createMemoryStorage({
-			[FINANCIAL_MODEL_STORAGE_KEY]: original,
-		});
-
-		const result = await createBrowserCsvDataSource({ storage }).loadDocument();
-
-		expect(result.document).not.toBeNull();
-		expect(result.document).not.toHaveProperty("checkpoints");
-		const migrated = result.document!.postings.slice(1);
-		expect(migrated).toMatchObject([
-			{
-				id: "legacy_checkpoint_2",
-				frequency: "once",
-				startDate: "2025-01-01",
-				destinations: ["checking"],
-				arithmetic: "4.001",
-			},
-			{
-				id: "legacy_checkpoint_1_2",
-				frequency: "once",
-				startDate: "2025-02-01",
-				destinations: ["checking"],
-				arithmetic: String(10.005 - 4.001),
-			},
-			{
-				id: "legacy_checkpoint_3",
-				frequency: "once",
-				startDate: "2025-02-01",
-				sourceAccountId: "brokerage",
-				destinations: null,
-				arithmetic: "2.345",
-			},
-			{
-				id: "legacy_checkpoint_4",
-				frequency: "once",
-				startDate: "2025-03-01",
-				destinations: ["checking"],
-				arithmetic: String(10.01 - 10.005),
-			},
-			{
-				id: "legacy_checkpoint_5",
-				frequency: "once",
-				startDate: "2025-04-01",
-				destinations: ["checking"],
-				arithmetic: "0",
-			},
-		]);
-		expect(migrated).toHaveLength(5);
-		expect(storage.setItem).toHaveBeenCalledTimes(1);
-		const rewritten = storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)!;
-		expect(rewritten).not.toBe(original);
-		expect(JSON.parse(rewritten)).not.toHaveProperty("checkpoints");
-
-		const projected = projectRawFinancialModelDocument(
-			result.document!,
-			makeSettings({
-				fallbackProjectionStartDate: "2025-05-01",
-				horizonYears: 0,
-			}),
-		);
-		expect(projected.path.movementEvents).toEqual([]);
-		expect(projected.result.totals).toEqual({
-			externalInflowAmount: 0,
-			externalOutflowAmount: 0,
-			internalTransferAmount: 0,
-		});
-		expect(projected.result.accountSummaries).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({ accountId: "checking", startingBalance: 10 }),
-				expect.objectContaining({
-					accountId: "brokerage",
-					startingBalance: -2,
+			JSON.stringify(createBaseDocument({ accounts: [null] as never })),
+		]) {
+			const fetchImpl = createCsvFetch();
+			const result = await createBrowserCsvDataSource({
+				fetchImpl,
+				storage: createMemoryStorage({
+					[FINANCIAL_MODEL_STORAGE_KEY]: stored,
 				}),
-			]),
-		);
-		expect(projected.result.milestones.latestHistoricalDate).toBe("2025-04-01");
+			}).loadDocument();
+
+			expect(result).toMatchObject({
+				document: null,
+				issues: [{ severity: "error", code: "browser.storage.invalid" }],
+			});
+			expect(fetchImpl).not.toHaveBeenCalled();
+		}
 	});
 
-	it("leaves mixed once-posting legacy storage unchanged", async () => {
-		const legacy = {
-			...createBaseDocument(),
-			checkpoints: [{ Date: "2025-01-01", AccountId: "checking", Balance: 10 }],
-		};
-		const original = JSON.stringify(legacy);
-		const storage = createMemoryStorage({
-			[FINANCIAL_MODEL_STORAGE_KEY]: original,
-		});
-
-		const result = await createBrowserCsvDataSource({ storage }).loadDocument();
-
-		expect(result).toMatchObject({
-			document: null,
-			issues: [{ code: "browser.storage.migration.failed" }],
-		});
-		expect(storage.setItem).not.toHaveBeenCalled();
-		expect(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)).toBe(original);
-	});
-
-	it("leaves legacy storage unchanged when migration cannot validate", async () => {
-		const legacy = {
-			...createBaseDocument(),
-			checkpoints: [{ Date: "2025-01-01", AccountId: "missing", Balance: 100 }],
-		};
-		const original = JSON.stringify(legacy);
-		const storage = createMemoryStorage({
-			[FINANCIAL_MODEL_STORAGE_KEY]: original,
-		});
-
-		const result = await createBrowserCsvDataSource({ storage }).loadDocument();
-
-		expect(result).toMatchObject({
-			document: null,
-			issues: [{ code: "browser.storage.migration.failed" }],
-		});
-		expect(storage.setItem).not.toHaveBeenCalled();
-		expect(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)).toBe(original);
-	});
-
-	it("leaves legacy storage unchanged when an adjustment cannot satisfy account bounds", async () => {
-		const canonical = createBaseDocument();
-		const legacy = {
-			...canonical,
-			accounts: canonical.accounts.map((account) =>
-				account.id === "checking" ? { ...account, maxBalance: 5 } : account,
-			),
-			checkpoints: [{ Date: "2025-01-01", AccountId: "checking", Balance: 10 }],
-		};
-		const original = JSON.stringify(legacy);
-		const storage = createMemoryStorage({
-			[FINANCIAL_MODEL_STORAGE_KEY]: original,
-		});
-
-		const result = await createBrowserCsvDataSource({ storage }).loadDocument();
-
-		expect(result).toMatchObject({
-			document: null,
-			issues: [{ code: "browser.storage.migration.failed" }],
-		});
-		expect(storage.setItem).not.toHaveBeenCalled();
-		expect(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)).toBe(original);
-	});
-
-	it("leaves malformed nested legacy data unchanged", async () => {
-		const canonical = createBaseDocument();
-		const legacy = {
-			...canonical,
-			postings: [{ ...canonical.postings[0], enabled: "true" }],
-			checkpoints: [{ Date: "2025-01-01", AccountId: "checking", Balance: 10 }],
-		};
-		const original = JSON.stringify(legacy);
-		const storage = createMemoryStorage({
-			[FINANCIAL_MODEL_STORAGE_KEY]: original,
-		});
-
-		const result = await createBrowserCsvDataSource({ storage }).loadDocument();
-
-		expect(result).toMatchObject({
-			document: null,
-			issues: [{ code: "browser.storage.migration.failed" }],
-		});
-		expect(storage.setItem).not.toHaveBeenCalled();
-		expect(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)).toBe(original);
-	});
-
-	it("rejects checkpoint fields on otherwise canonical stored documents", async () => {
-		const storage = createMemoryStorage({
-			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify({
-				...createBaseDocument(),
-				checkpoints: "not-a-legacy-checkpoint-array",
-			}),
-		});
-
-		await expect(
-			createBrowserCsvDataSource({ storage }).loadDocument(),
-		).resolves.toMatchObject({
-			document: null,
-			issues: [{ code: "browser.storage.invalid" }],
-		});
-	});
-
-	it("reports malformed nested canonical data without throwing", async () => {
-		const malformed = createBaseDocument({ accounts: [null] as never });
-		const storage = createMemoryStorage({
-			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify(malformed),
-		});
-
-		await expect(
-			createBrowserCsvDataSource({
-				fetchImpl: createCsvFetch(),
-				storage,
-			}).loadDocument(),
-		).resolves.toMatchObject({
-			document: null,
-			issues: [{ severity: "error", code: "browser.storage.invalid" }],
-		});
-	});
-
-	it("saves and resets only the canonical key", async () => {
+	it("saves and resets the canonical browser key", async () => {
 		const storage = createMemoryStorage();
 		const fetchImpl = createCsvFetch();
 		const dataSource = createBrowserCsvDataSource({ fetchImpl, storage });
 
-		await dataSource.save?.run({
-			...createBaseDocument(),
-			version: 1,
-		} as never);
+		await dataSource.save?.run(createBaseDocument());
 
 		const saved = JSON.parse(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)!) as {
 			sourcePath: string;
 		};
 		expect(saved.sourcePath).toBe("browser:local-storage");
-		expect(saved).not.toHaveProperty("version");
 
 		const result = await dataSource.reset?.run();
 
@@ -361,10 +129,7 @@ describe("createBrowserCsvDataSource", () => {
 		const invalid = createBaseDocument({
 			accounts: [baseDocument.accounts[0], baseDocument.accounts[0]],
 		});
-		const dataSource = createBrowserCsvDataSource({
-			fetchImpl: createCsvFetch(),
-			storage,
-		});
+		const dataSource = createBrowserCsvDataSource({ storage });
 
 		await expect(dataSource.save?.run(invalid)).rejects.toThrow(
 			"validation errors",
@@ -372,7 +137,7 @@ describe("createBrowserCsvDataSource", () => {
 		expect(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)).toBe(canonical);
 	});
 
-	it("rejects checkpoint fields on save without changing storage", async () => {
+	it("rejects noncanonical save input without changing storage", async () => {
 		const canonical = JSON.stringify(createBaseDocument({ sourcePath: "old" }));
 		const storage = createMemoryStorage({
 			[FINANCIAL_MODEL_STORAGE_KEY]: canonical,
@@ -382,18 +147,15 @@ describe("createBrowserCsvDataSource", () => {
 		await expect(
 			dataSource.save?.run({
 				...createBaseDocument(),
-				checkpoints: [],
+				unexpected: true,
 			} as never),
-		).rejects.toThrow("Checkpoints are not supported");
+		).rejects.toThrow("not canonical");
 		expect(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)).toBe(canonical);
 	});
 
 	it("saves documents that have warnings", async () => {
 		const storage = createMemoryStorage();
-		const dataSource = createBrowserCsvDataSource({
-			fetchImpl: createCsvFetch(),
-			storage,
-		});
+		const dataSource = createBrowserCsvDataSource({ storage });
 
 		const result = await dataSource.save?.run(createBaseDocument());
 

@@ -136,6 +136,9 @@ describe("evaluateFinancialIndependence", () => {
 				],
 			}),
 		).toThrow("Financial independence configuration is invalid.");
+	});
+
+	it("rejects unknown source fields", () => {
 		expect(() =>
 			validateFinancialIndependencePlan({
 				...plan(),
@@ -144,29 +147,11 @@ describe("evaluateFinancialIndependence", () => {
 						type: "cashflow",
 						postingId: "pension",
 						included: true,
-						laborDependent: "yes",
+						unexpected: true,
 					},
 				],
 			}),
 		).toThrow("Financial independence configuration is invalid.");
-	});
-
-	it("accepts but removes legacy labor-dependence metadata", () => {
-		const normalized = validateFinancialIndependencePlan({
-			...plan(),
-			sources: [
-				{
-					type: "cashflow",
-					postingId: "pension",
-					included: true,
-					laborDependent: true,
-				},
-			],
-		});
-
-		expect(normalized.sources).toEqual([
-			{ type: "cashflow", postingId: "pension", included: true },
-		]);
 	});
 
 	it("normalizes overlapping income and continuing posting treatment", () => {

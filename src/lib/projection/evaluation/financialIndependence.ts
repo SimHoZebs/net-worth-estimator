@@ -849,25 +849,34 @@ export function validateFinancialIndependencePlan(
 		config === null ||
 		!("sources" in config) ||
 		!Array.isArray(config.sources) ||
-		!config.sources.every(
-			(source) =>
-				typeof source === "object" &&
-				source !== null &&
-				"type" in source &&
-				"included" in source &&
-				typeof source.included === "boolean" &&
-				((source.type === "asset" &&
-					"accountId" in source &&
-					typeof source.accountId === "string" &&
-					(!("withdrawalRateOverride" in source) ||
-						(typeof source.withdrawalRateOverride === "number" &&
-							Number.isFinite(source.withdrawalRateOverride)))) ||
-					(source.type === "cashflow" &&
-						"postingId" in source &&
-						typeof source.postingId === "string" &&
-						(!("laborDependent" in source) ||
-							typeof source.laborDependent === "boolean"))),
-		) ||
+		!config.sources.every((source) => {
+			if (typeof source !== "object" || source === null) return false;
+			if (!("type" in source) || !("included" in source)) return false;
+			if (typeof source.included !== "boolean") return false;
+
+			if (source.type === "cashflow") {
+				return (
+					Object.keys(source).every((key) =>
+						["type", "postingId", "included"].includes(key),
+					) &&
+					"postingId" in source &&
+					typeof source.postingId === "string"
+				);
+			}
+			return (
+				source.type === "asset" &&
+				Object.keys(source).every((key) =>
+					["type", "accountId", "included", "withdrawalRateOverride"].includes(
+						key,
+					),
+				) &&
+				"accountId" in source &&
+				typeof source.accountId === "string" &&
+				(!("withdrawalRateOverride" in source) ||
+					(typeof source.withdrawalRateOverride === "number" &&
+						Number.isFinite(source.withdrawalRateOverride)))
+			);
+		}) ||
 		!("continuingPostingIds" in config) ||
 		!Array.isArray(config.continuingPostingIds) ||
 		!config.continuingPostingIds.every((id) => typeof id === "string") ||
