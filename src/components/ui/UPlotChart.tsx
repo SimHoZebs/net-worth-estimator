@@ -44,7 +44,6 @@ export function UPlotChart({
 	const tooltipRef = useRef<HTMLDivElement>(null);
 	const chartRef = useRef<uPlot | null>(null);
 	const lastWidthRef = useRef(0);
-	const lastHeightRef = useRef(0);
 	const tooltipContentRef = useRef(tooltipContent);
 	const onCursorChangeRef = useRef(onCursorChange);
 	const hasReactTooltipRef = useRef(tooltip != null);
@@ -134,18 +133,17 @@ export function UPlotChart({
 
 		chartRef.current = new uPlot(opts, dataRef.current, target);
 		lastWidthRef.current = Math.round(width);
-		lastHeightRef.current = Math.round(height);
 
 		const ro = new ResizeObserver((entries) => {
 			const cw = entries[0].contentRect.width;
-			const ch = entries[0].contentRect.height;
 			const w = Math.round(cw);
-			const h = Math.round(ch);
 			if (w <= 0 || !chartRef.current) return;
-			if (w === lastWidthRef.current && h === lastHeightRef.current) return;
+			if (w === lastWidthRef.current) return;
 			lastWidthRef.current = w;
-			lastHeightRef.current = h;
-			chartRef.current.setSize({ width: w, height: h });
+			chartRef.current.setSize({
+				width: w,
+				height: chartRef.current.height,
+			});
 		});
 		ro.observe(target);
 

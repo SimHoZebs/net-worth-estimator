@@ -111,6 +111,7 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 			...base,
 			width: 0,
 			height: 0,
+			legend: { show: false },
 			series,
 			bands: [],
 			scales: {

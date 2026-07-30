@@ -7,8 +7,10 @@ import { UPlotChart } from "./UPlotChart";
 
 interface MockChart {
 	data: uPlot.AlignedData;
+	height: number;
 	destroy: ReturnType<typeof vi.fn>;
 	setData: ReturnType<typeof vi.fn>;
+	setSize: ReturnType<typeof vi.fn>;
 }
 
 const uPlotState = vi.hoisted(() => ({
@@ -18,15 +20,19 @@ const uPlotState = vi.hoisted(() => ({
 vi.mock("uplot", () => ({
 	default: class {
 		data: uPlot.AlignedData;
+		height: number;
 		cursor = { idx: null, left: null, top: null };
 		destroy = vi.fn();
-		setSize = vi.fn();
+		setSize = vi.fn(({ height }: { height: number }) => {
+			this.height = height;
+		});
 		setData = vi.fn((data: uPlot.AlignedData) => {
 			this.data = data;
 		});
 
-		constructor(_options: uPlot.Options, data: uPlot.AlignedData) {
+		constructor(options: uPlot.Options, data: uPlot.AlignedData) {
 			this.data = data;
+			this.height = options.height;
 			uPlotState.instances.push(this);
 		}
 	},
@@ -37,6 +43,7 @@ let nextAnimationFrameId: number;
 let now: number;
 let reducedMotion: boolean;
 let mediaChangeListeners: Set<() => void>;
+let resizeObserverCallbacks: ResizeObserverCallback[];
 
 beforeEach(() => {
 	uPlotState.instances.length = 0;
@@ -45,6 +52,7 @@ beforeEach(() => {
 	now = 0;
 	reducedMotion = false;
 	mediaChangeListeners = new Set();
+	resizeObserverCallbacks = [];
 	vi.spyOn(performance, "now").mockImplementation(() => now);
 	vi.stubGlobal(
 		"requestAnimationFrame",
@@ -61,6 +69,9 @@ beforeEach(() => {
 	vi.stubGlobal(
 		"ResizeObserver",
 		class {
+			constructor(callback: ResizeObserverCallback) {
+				resizeObserverCallbacks.push(callback);
+			}
 			observe() {}
 			disconnect() {}
 		},
@@ -91,6 +102,19 @@ function runNextFrame(timestamp: number) {
 	if (!entry) throw new Error("Expected an animation frame");
 	animationFrames.delete(entry[0]);
 	entry[1](timestamp);
+}
+
+function notifyResize(width: number, height: number) {
+	const callback = resizeObserverCallbacks[0];
+	if (!callback) throw new Error("Expected a resize observer");
+	callback(
+		[
+			{
+				contentRect: { width, height },
+			} as ResizeObserverEntry,
+		],
+		{} as ResizeObserver,
+	);
 }
 
 describe("UPlotChart data transitions", () => {
@@ -208,5 +232,28 @@ describe("UPlotChart data transitions", () => {
 
 		expect(firstChart.destroy).toHaveBeenCalledOnce();
 		expect(uPlotState.instances).toHaveLength(2);
+	});
+
+	it("ignores container height feedback and preserves chart height", () => {
+		render(
+			<UPlotChart
+				options={options}
+				data={[
+					[1, 2],
+					[0, 0],
+				]}
+			/>,
+		);
+		const chart = uPlotState.instances[0];
+
+		act(() => notifyResize(600, 450));
+		expect(chart.setSize).not.toHaveBeenCalled();
+
+		act(() => notifyResize(700, 500));
+		expect(chart.setSize).toHaveBeenLastCalledWith({ width: 700, height: 420 });
+
+		chart.height = 360;
+		act(() => notifyResize(800, 900));
+		expect(chart.setSize).toHaveBeenLastCalledWith({ width: 800, height: 360 });
 	});
 });
