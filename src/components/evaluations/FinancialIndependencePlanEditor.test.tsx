@@ -35,6 +35,8 @@ describe("FinancialIndependencePlanEditor", () => {
 		expect(
 			screen.getByText(/finish 10 years with selected assets worth at least/),
 		).not.toBeNull();
+		expect(screen.getByLabelText("Today's purchasing power")).not.toBeNull();
+		expect(screen.getByLabelText("Dollars at FI start")).not.toBeNull();
 	});
 
 	it("keeps changes local and applies the complete draft once", () => {
@@ -51,6 +53,7 @@ describe("FinancialIndependencePlanEditor", () => {
 		fireEvent.change(screen.getByLabelText("Annual spending"), {
 			target: { value: "72000" },
 		});
+		fireEvent.click(screen.getByLabelText("Today's purchasing power"));
 		fireEvent.click(screen.getByLabelText("brokerage"));
 
 		expect(onApply).not.toHaveBeenCalled();
@@ -59,6 +62,7 @@ describe("FinancialIndependencePlanEditor", () => {
 		expect(onApply).toHaveBeenCalledTimes(1);
 		expect(onApply.mock.calls[0]?.[0]).toMatchObject({
 			annualExpenseTarget: 72_000,
+			annualExpenseTargetBasis: "projection-start-purchasing-power",
 			sources: [{ type: "asset", accountId: "brokerage", included: true }],
 		});
 	});
@@ -260,9 +264,15 @@ describe("FinancialIndependencePlanEditor", () => {
 		const drawdownOptions = screen.getAllByLabelText(
 			"Allow portfolio drawdown",
 		) as HTMLInputElement[];
+		const todayOptions = screen.getAllByLabelText(
+			"Today's purchasing power",
+		) as HTMLInputElement[];
 		fireEvent.click(drawdownOptions[0]!);
+		fireEvent.click(todayOptions[0]!);
 
 		expect(purchasingPowerOptions[1]?.checked).toBe(true);
+		expect(todayOptions[0]?.checked).toBe(true);
+		expect(todayOptions[1]?.checked).toBe(false);
 	});
 
 	it("keeps spendable income and continuing postings mutually exclusive", () => {

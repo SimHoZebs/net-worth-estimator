@@ -9,6 +9,7 @@ export const STARTER_FINANCIAL_INDEPENDENCE_TEMPLATE_INPUT: FinancialIndependenc
 	{
 		minimumNetWorth: 1_500_000,
 		annualExpenseTarget: 70_000,
+		annualExpenseTargetBasis: "fi-date-dollars",
 		annualExpenseGrowthRate: 0.025,
 		withdrawalRate: 0.04,
 		evaluationYears: 10,
@@ -35,6 +36,7 @@ export function createFinancialIndependencePlan(
 	return {
 		minimumNetWorth: input.minimumNetWorth,
 		annualExpenseTarget: input.annualExpenseTarget,
+		annualExpenseTargetBasis: input.annualExpenseTargetBasis,
 		annualExpenseGrowthRate: input.annualExpenseGrowthRate,
 		withdrawalRate: input.withdrawalRate,
 		evaluationYears: input.evaluationYears,

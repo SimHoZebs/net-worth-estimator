@@ -14,7 +14,7 @@ export const validCsvFiles: ModelFileContents = {
 	].join("\n"),
 	behaviors: {
 		financialIndependence:
-			"instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy",
+			"instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy,annualExpenseTargetBasis",
 		netWorthThreshold: [
 			"instanceId,label,enabled,target",
 			'net-worth-1m,"Reach $1,000,000 net worth",true,1000000',

@@ -118,6 +118,38 @@ describe("CSV financial model", () => {
 		expect(reparsed.data?.evaluations).toEqual(parsed.data?.evaluations);
 	});
 
+	it("defaults legacy FI CSVs and serializes an explicit expense basis", () => {
+		const legacy = parseCsvFinancialModel({
+			...validCsvFiles,
+			behaviors: {
+				...validCsvFiles.behaviors,
+				financialIndependence: [
+					"instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy",
+					'fi,FI,true,0,70000,0.025,0.04,10,0.9,"[]","[]",preserve-real-principal',
+				].join("\n"),
+			},
+		});
+		if (!legacy.data) throw new Error("Legacy FI CSV did not parse.");
+		expect(
+			legacy.data.evaluations.financialIndependence[0]?.config
+				.annualExpenseTargetBasis,
+		).toBe("projection-start-purchasing-power");
+		legacy.data.evaluations
+			.financialIndependence[0]!.config.annualExpenseTargetBasis =
+			"projection-start-purchasing-power";
+
+		const serialized = serializeCsvFinancialModel(legacy.data);
+		const reparsed = parseCsvFinancialModel(serialized);
+
+		expect(serialized.behaviors.financialIndependence).toContain(
+			"annualExpenseTargetBasis",
+		);
+		expect(
+			reparsed.data?.evaluations.financialIndependence[0]?.config
+				.annualExpenseTargetBasis,
+		).toBe("projection-start-purchasing-power");
+	});
+
 	it("round-trips local table order without a global row order", () => {
 		const parsed = parseCsvFinancialModel(validCsvFiles);
 		expect(parsed.data).not.toBeNull();
@@ -168,7 +200,7 @@ describe("CSV financial model", () => {
 		const reparsed = parseCsvFinancialModel(serialized);
 
 		expect(serialized.behaviors.financialIndependence).toBe(
-			"instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy",
+			"instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy,annualExpenseTargetBasis",
 		);
 		expect(serialized.behaviors.netWorthThreshold).toBe(
 			"instanceId,label,enabled,target",

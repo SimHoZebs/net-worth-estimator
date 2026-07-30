@@ -69,6 +69,54 @@ function isFinancialModelDocument(
 	);
 }
 
+const financialIndependenceExpenseBases = new Set([
+	"projection-start-purchasing-power",
+	"fi-date-dollars",
+]);
+
+function upgradeFinancialIndependenceExpenseBasis(
+	document: FinancialModelDocument,
+): { document: FinancialModelDocument; changed: boolean } | null {
+	let changed = false;
+	const financialIndependence = document.evaluations.financialIndependence.map(
+		(evaluation) => {
+			if (!isRecord(evaluation) || !isRecord(evaluation.config)) return null;
+			const basis = evaluation.config.annualExpenseTargetBasis;
+			if (basis !== undefined) {
+				return typeof basis === "string" &&
+					financialIndependenceExpenseBases.has(basis)
+					? evaluation
+					: null;
+			}
+			changed = true;
+			return {
+				...evaluation,
+				config: {
+					...evaluation.config,
+					annualExpenseTargetBasis:
+						"projection-start-purchasing-power" as const,
+				},
+			};
+		},
+	);
+	if (financialIndependence.some((evaluation) => evaluation === null))
+		return null;
+	return {
+		changed,
+		document: changed
+			? {
+					...document,
+					evaluations: {
+						...document.evaluations,
+						financialIndependence: financialIndependence.filter(
+							(evaluation) => evaluation !== null,
+						),
+					},
+				}
+			: document,
+	};
+}
+
 interface LegacyCheckpoint {
 	Date: string;
 	AccountId: string;
@@ -173,21 +221,23 @@ function migrateLegacyDocument(
 		});
 	}
 
-	const migrated: FinancialModelDocument = {
+	const migrated = upgradeFinancialIndependenceExpenseBasis({
 		sourcePath: BROWSER_STORAGE_SOURCE_PATH,
 		accounts: legacy.accounts,
 		evaluations: legacy.evaluations,
 		postings: [...legacy.postings, ...migratedPostings],
-	};
+	});
+	if (!migrated) return null;
 	try {
 		const roundTrip = parseCsvFinancialModel(
-			serializeCsvFinancialModel(migrated),
+			serializeCsvFinancialModel(migrated.document),
 			{ basePath: BROWSER_STORAGE_SOURCE_PATH },
 		);
 		if (
 			roundTrip.data === null ||
 			roundTrip.issues.some((issue) => issue.severity === "error") ||
-			canonicalSerialize(roundTrip.data) !== canonicalSerialize(migrated)
+			canonicalSerialize(roundTrip.data) !==
+				canonicalSerialize(migrated.document)
 		) {
 			return null;
 		}
@@ -241,7 +291,18 @@ function readStoredDocument(
 	try {
 		const parsed = JSON.parse(serialized) as unknown;
 		if (isFinancialModelDocument(parsed)) {
-			return { status: "found", document: parsed };
+			const upgraded = upgradeFinancialIndependenceExpenseBasis(parsed);
+			if (!upgraded) {
+				return { status: "invalid", issue: invalidStorageIssue(storageKey) };
+			}
+			if (upgraded.changed) {
+				try {
+					storage.setItem(storageKey, JSON.stringify(upgraded.document));
+				} catch {
+					return { status: "invalid", issue: invalidStorageIssue(storageKey) };
+				}
+			}
+			return { status: "found", document: upgraded.document };
 		}
 		if (isLegacyFinancialModelDocument(parsed)) {
 			const migrated = migrateLegacyDocument(parsed);
@@ -318,11 +379,17 @@ export function createBrowserCsvDataSource(
 						) {
 							throw new Error("Checkpoints are not supported.");
 						}
+						const upgraded = upgradeFinancialIndependenceExpenseBasis(document);
+						if (!upgraded) {
+							throw new Error(
+								"The financial model has an invalid FI expense basis.",
+							);
+						}
 						const savedDocument: FinancialModelDocument = {
 							sourcePath: BROWSER_STORAGE_SOURCE_PATH,
-							accounts: document.accounts,
-							evaluations: document.evaluations,
-							postings: document.postings,
+							accounts: upgraded.document.accounts,
+							evaluations: upgraded.document.evaluations,
+							postings: upgraded.document.postings,
 						};
 						let issues: ModelValidationIssue[];
 						try {

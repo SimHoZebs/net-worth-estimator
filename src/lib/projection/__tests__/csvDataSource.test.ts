@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createBaseDocument } from "../__fixtures__";
+import { createBaseDocument, makeSettings } from "../__fixtures__";
 import { createCsvDataSource } from "../sources/csv/csvDataSource";
 
 describe("createCsvDataSource", () => {
@@ -22,6 +22,30 @@ describe("createCsvDataSource", () => {
 			"/api/financial-model",
 			expect.objectContaining({ method: "PUT" }),
 		);
+	});
+
+	it("defaults a missing FI expense basis in an API response", async () => {
+		const current = makeSettings().evaluations.financialIndependence[0]!;
+		const { annualExpenseTargetBasis: _missing, ...legacyConfig } =
+			current.config;
+		const document = {
+			...createBaseDocument(),
+			evaluations: {
+				financialIndependence: [{ ...current, config: legacyConfig }],
+				netWorthThreshold: [],
+				postingFulfillment: [],
+			},
+		};
+		const fetchImpl = vi.fn(async () =>
+			Response.json({ document, issues: [] }),
+		);
+
+		const result = await createCsvDataSource({ fetchImpl }).loadDocument();
+
+		expect(
+			result.document?.evaluations.financialIndependence[0]?.config
+				.annualExpenseTargetBasis,
+		).toBe("projection-start-purchasing-power");
 	});
 
 	it.each([

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	createBaseDocument,
 	makeAccount,
@@ -9,60 +9,41 @@ import {
 	makeSettings,
 } from "@/lib/projection/__fixtures__";
 import { projectFinancialModelDocument } from "@/lib/projection/analysis/projectFinancialModel";
-import { stochasticProject } from "@/lib/projection/analysis/projectStochastic";
 import { FinancialIndependenceEvaluation } from "./FinancialIndependenceEvaluation";
+
+vi.mock("@/components/dashboard/FinancialIndependenceChart", () => ({
+	FinancialIndependenceChart: () => <div>FI balance chart</div>,
+}));
 
 afterEach(cleanup);
 
 describe("FinancialIndependenceEvaluation", () => {
-	it("aligns an ineligible summary and evidence to the latest candidate", () => {
+	it("shows the structured result for the selected ineligible candidate", () => {
 		const { document, settings, result } = buildIneligibleProjection();
 		const evaluation = settings.evaluations.financialIndependence[0]!;
-		const stochasticResult = stochasticProject(
-			document,
-			settings,
-			emptyOverrides,
-			{ runCount: 2, seed: 42 },
-		);
 
 		render(
 			<FinancialIndependenceEvaluation
 				evaluation={evaluation}
 				document={document}
 				result={result}
-				stochasticResult={stochasticResult}
 				sourceRevision={0}
 			/>,
 		);
 
-		expect(screen.getByText("Snapshot Feb 1, 2027")).not.toBeNull();
+		expect(screen.getByText("On Feb 1, 2027, relying on:")).not.toBeNull();
 		expect(
 			screen.getByText(
-				"On Feb 1, 2027, this plan cannot begin the 1-year test because it does not meet the minimum net worth gate and the initial funding-capacity gate.",
+				"This plan cannot begin the 1-year test because it does not meet the minimum net worth gate and the initial funding-capacity gate.",
 			),
 		).not.toBeNull();
-		const candidateMetric = screen.getByText(
-			"Diagnostic candidate",
-		).parentElement;
-		if (!candidateMetric) throw new Error("Missing candidate metric.");
-		expect(within(candidateMetric).getByText("Feb 1, 2027")).not.toBeNull();
-
-		const withdrawalMetric = screen.getByText(
-			"Requested withdrawals",
-		).parentElement;
-		if (!withdrawalMetric) throw new Error("Missing withdrawal metric.");
-		expect(within(withdrawalMetric).getByText("Not evaluated")).not.toBeNull();
-
-		const probabilityMetric = screen.getByText(
-			"shortfall probability",
-		).parentElement;
-		if (!probabilityMetric) throw new Error("Missing probability metric.");
-		expect(within(probabilityMetric).getByText("Not evaluated")).not.toBeNull();
+		expect(screen.getByText("Brokerage")).not.toBeNull();
+		expect(screen.queryByText("Behavior evidence")).toBeNull();
+		expect(screen.queryByText("Requested withdrawals")).toBeNull();
+		expect(screen.queryByText("shortfall probability")).toBeNull();
 		expect(
-			within(probabilityMetric).getByText(
-				"0 of 2 independent Monte Carlo samples were eligible",
-			),
-		).not.toBeNull();
+			screen.queryByText("Selected account balances during the FI test"),
+		).toBeNull();
 	});
 });
 
@@ -106,6 +87,7 @@ function buildIneligibleProjection() {
 					config: {
 						minimumNetWorth: 1_000_000,
 						annualExpenseTarget: 100_000,
+						annualExpenseTargetBasis: "fi-date-dollars",
 						annualExpenseGrowthRate: 0,
 						withdrawalRate: 0.04,
 						evaluationYears: 1,

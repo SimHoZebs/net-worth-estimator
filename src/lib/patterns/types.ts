@@ -1,5 +1,6 @@
 import type {
 	Account,
+	FinancialIndependenceExpenseBasis,
 	FinancialIndependencePrincipalPolicy,
 	Posting,
 } from "@/lib/projection";
@@ -18,6 +19,7 @@ export interface IncomeTemplateInput {
 export interface FinancialIndependenceTemplateInput {
 	minimumNetWorth: number;
 	annualExpenseTarget: number;
+	annualExpenseTargetBasis: FinancialIndependenceExpenseBasis;
 	annualExpenseGrowthRate: number;
 	withdrawalRate: number;
 	evaluationYears: number;

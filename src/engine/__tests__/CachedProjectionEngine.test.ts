@@ -103,6 +103,25 @@ describe("CachedProjectionEngine", () => {
 		expect(compute.evaluateProjection).toHaveBeenCalledTimes(2);
 	});
 
+	it("recomputes FI evaluations when the expense basis changes", async () => {
+		const compute = createComputationEngine();
+		const engine = new CachedProjectionEngine(
+			compute,
+			new InMemoryProjectionArtifactStore(),
+		);
+		const request = projectionRequest();
+		await engine.project(request);
+
+		const changed = structuredClone(request);
+		changed.projectionSettings.evaluations
+			.financialIndependence[0]!.config.annualExpenseTargetBasis =
+			"projection-start-purchasing-power";
+		await engine.project(changed);
+
+		expect(compute.projectBase).toHaveBeenCalledOnce();
+		expect(compute.evaluateProjection).toHaveBeenCalledTimes(2);
+	});
+
 	it("returns current labels without invalidating cached computation", async () => {
 		const compute = createComputationEngine();
 		const engine = new CachedProjectionEngine(

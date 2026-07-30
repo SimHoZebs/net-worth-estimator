@@ -189,6 +189,35 @@ describe("csvFilePlugin", () => {
 		expect(await fs.readFile(accountsPath, "utf-8")).toBe(before);
 	});
 
+	it("does not write an invalid FI expense basis", async () => {
+		const directory = await createFixtureDirectory();
+		const { invoke } = await createHarness(directory);
+		const loaded = await invoke(FINANCIAL_MODEL_API_PATH, "GET");
+		const document = loaded.body.document as FinancialModelDocument;
+		const behaviorPath = path.join(
+			directory,
+			"behavior",
+			"financial-independence.csv",
+		);
+		const before = await fs.readFile(behaviorPath, "utf-8");
+		const invalid = structuredClone(document) as unknown as {
+			evaluations: {
+				financialIndependence: Array<{ config: Record<string, unknown> }>;
+			};
+		};
+		invalid.evaluations
+			.financialIndependence[0]!.config.annualExpenseTargetBasis =
+			"future-dollars";
+
+		const response = await invoke(FINANCIAL_MODEL_API_PATH, "PUT", invalid);
+
+		expect(response).toMatchObject({
+			status: 422,
+			body: { issues: [{ code: "evaluation.config.invalid" }] },
+		});
+		expect(await fs.readFile(behaviorPath, "utf-8")).toBe(before);
+	});
+
 	it("writes warning-only documents and returns 200", async () => {
 		const directory = await createFixtureDirectory();
 		const { invoke } = await createHarness(directory);

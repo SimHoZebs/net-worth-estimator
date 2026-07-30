@@ -76,6 +76,46 @@ describe("createBrowserCsvDataSource", () => {
 		expect(fetchImpl).not.toHaveBeenCalled();
 	});
 
+	it("upgrades a saved FI plan that predates the expense basis", async () => {
+		const currentConfig =
+			makeSettings().evaluations.financialIndependence[0]!.config;
+		const document = createBaseDocument({
+			sourcePath: "browser:local-storage",
+			evaluations: {
+				financialIndependence: [
+					{
+						instanceId: "fi",
+						label: "Financial independence",
+						enabled: true,
+						config: currentConfig,
+					},
+				],
+				netWorthThreshold: [],
+				postingFulfillment: [],
+			},
+		});
+		delete (
+			document.evaluations.financialIndependence[0]!
+				.config as unknown as Record<string, unknown>
+		).annualExpenseTargetBasis;
+		const storage = createMemoryStorage({
+			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify(document),
+		});
+
+		const result = await createBrowserCsvDataSource({ storage }).loadDocument();
+
+		expect(
+			result.document?.evaluations.financialIndependence[0]?.config
+				.annualExpenseTargetBasis,
+		).toBe("projection-start-purchasing-power");
+		expect(storage.setItem).toHaveBeenCalledWith(
+			FINANCIAL_MODEL_STORAGE_KEY,
+			expect.stringContaining(
+				'"annualExpenseTargetBasis":"projection-start-purchasing-power"',
+			),
+		);
+	});
+
 	it("reports corrupt canonical data without falling back", async () => {
 		const storage = createMemoryStorage({
 			[FINANCIAL_MODEL_STORAGE_KEY]: "{invalid",
@@ -112,8 +152,15 @@ describe("createBrowserCsvDataSource", () => {
 
 	it("migrates legacy checkpoints into ordered structural once postings", async () => {
 		const canonical = createBaseDocument();
+		const currentFi = makeSettings().evaluations.financialIndependence[0]!;
+		const { annualExpenseTargetBasis: _missing, ...legacyFiConfig } =
+			currentFi.config;
 		const legacy = {
 			...canonical,
+			evaluations: {
+				...canonical.evaluations,
+				financialIndependence: [{ ...currentFi, config: legacyFiConfig }],
+			},
 			accounts: canonical.accounts.slice(0, 2),
 			postings: [
 				{
@@ -140,6 +187,10 @@ describe("createBrowserCsvDataSource", () => {
 
 		expect(result.document).not.toBeNull();
 		expect(result.document).not.toHaveProperty("checkpoints");
+		expect(
+			result.document?.evaluations.financialIndependence[0]?.config
+				.annualExpenseTargetBasis,
+		).toBe("projection-start-purchasing-power");
 		const migrated = result.document!.postings.slice(1);
 		expect(migrated).toMatchObject([
 			{

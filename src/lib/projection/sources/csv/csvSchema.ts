@@ -167,7 +167,7 @@ export const csvAccountsHeaders = [
 ] as const;
 const csvEvaluationHeaders = ["instanceId", "label", "enabled"] as const;
 
-export const csvFinancialIndependenceHeaders = [
+export const csvFinancialIndependenceRequiredHeaders = [
 	...csvEvaluationHeaders,
 	"minimumNetWorth",
 	"annualExpenseTarget",
@@ -178,6 +178,10 @@ export const csvFinancialIndependenceHeaders = [
 	"sources",
 	"continuingPostingIds",
 	"principalPolicy",
+] as const;
+export const csvFinancialIndependenceHeaders = [
+	...csvFinancialIndependenceRequiredHeaders,
+	"annualExpenseTargetBasis",
 ] as const;
 export const csvNetWorthThresholdHeaders = [
 	...csvEvaluationHeaders,
@@ -193,6 +197,14 @@ export type CsvFinancialIndependenceRow = Omit<
 	"config"
 > &
 	FinancialIndependencePlan;
+export type CsvFinancialIndependenceInputRow = Omit<
+	CsvFinancialIndependenceRow,
+	"annualExpenseTargetBasis"
+> & {
+	annualExpenseTargetBasis?:
+		| CsvFinancialIndependenceRow["annualExpenseTargetBasis"]
+		| "";
+};
 export type CsvNetWorthThresholdRow = Omit<
 	NetWorthThresholdEvaluation,
 	"config"
@@ -254,6 +266,10 @@ export const csvFinancialIndependenceSchema = z.object({
 	...evaluationFields,
 	minimumNetWorth: finiteNumber,
 	annualExpenseTarget: finiteNumber,
+	annualExpenseTargetBasis: z
+		.enum(["projection-start-purchasing-power", "fi-date-dollars"])
+		.or(z.literal(""))
+		.optional(),
 	annualExpenseGrowthRate: finiteNumber,
 	withdrawalRate: finiteNumber,
 	evaluationYears: finiteNumber,
@@ -265,7 +281,7 @@ export const csvFinancialIndependenceSchema = z.object({
 		"preserve-nominal-principal",
 		"preserve-real-principal",
 	]),
-}) satisfies z.ZodType<CsvFinancialIndependenceRow>;
+}) satisfies z.ZodType<CsvFinancialIndependenceInputRow>;
 
 export const csvNetWorthThresholdSchema = z.object({
 	...evaluationFields,

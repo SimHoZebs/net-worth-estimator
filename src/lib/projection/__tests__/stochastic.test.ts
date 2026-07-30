@@ -249,6 +249,7 @@ describe("stochastic projection", () => {
 				{
 					minimumNetWorth: 0,
 					annualExpenseTarget: 1_000,
+					annualExpenseTargetBasis: "fi-date-dollars",
 					annualExpenseGrowthRate: 0,
 					withdrawalRate: 0.04,
 					evaluationYears: 1,
@@ -289,6 +290,7 @@ describe("stochastic projection", () => {
 				{
 					minimumNetWorth: 1_000_000_000,
 					annualExpenseTarget: 1_000,
+					annualExpenseTargetBasis: "fi-date-dollars",
 					annualExpenseGrowthRate: 0,
 					withdrawalRate: 0.04,
 					evaluationYears: 1,
