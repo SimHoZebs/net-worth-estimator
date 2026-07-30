@@ -36,6 +36,11 @@ describe("FinancialIndependenceEvaluation", () => {
 		);
 
 		expect(screen.getByText("Snapshot Feb 1, 2027")).not.toBeNull();
+		expect(
+			screen.getByText(
+				"On Feb 1, 2027, this plan cannot begin the 1-year test because it does not meet the minimum net worth gate and the initial funding-capacity gate.",
+			),
+		).not.toBeNull();
 		const candidateMetric = screen.getByText(
 			"Diagnostic candidate",
 		).parentElement;

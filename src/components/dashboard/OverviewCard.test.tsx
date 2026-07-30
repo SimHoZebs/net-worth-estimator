@@ -12,7 +12,10 @@ import {
 import { projectFinancialModelDocument } from "@/lib/projection/analysis/projectFinancialModel";
 import { stochasticProject } from "@/lib/projection/analysis/projectStochastic";
 import { getFinancialIndependenceResult } from "@/lib/projection/evaluation/accessors";
-import { OverviewCard } from "./OverviewCard";
+import {
+	describeFinancialIndependenceOutcome,
+	OverviewCard,
+} from "./OverviewCard";
 
 afterEach(cleanup);
 
@@ -93,8 +96,8 @@ describe("OverviewCard", () => {
 						label: "Financial independence",
 						enabled: true,
 						config: {
-							minimumNetWorth: 1_000_000,
-							annualExpenseTarget: 100_000,
+							minimumNetWorth: 0,
+							annualExpenseTarget: 300,
 							annualExpenseGrowthRate: 0,
 							withdrawalRate: 0.04,
 							evaluationYears: 1,
@@ -132,6 +135,12 @@ describe("OverviewCard", () => {
 		)?.deterministic;
 		if (!analysis) throw new Error("Missing FI analysis.");
 		const candidateDate = selectFinancialIndependenceCandidateDate(analysis);
+		const coverageRow = analysis.rows.find((row) => row.date === candidateDate);
+		const candidateOutcome = analysis.runOutcomes.find(
+			(outcome) => outcome.candidateDate === candidateDate,
+		);
+		if (!coverageRow || !candidateOutcome)
+			throw new Error("Missing FI candidate details.");
 
 		render(
 			<OverviewCard
@@ -143,13 +152,61 @@ describe("OverviewCard", () => {
 			/>,
 		);
 
-		expect(candidateDate).toBe("2027-02-01");
-		expect(screen.getByText("Snapshot Feb 1, 2027")).not.toBeNull();
+		expect(candidateDate).toBe("2027-01-01");
+		expect(screen.getByText("Snapshot Jan 1, 2027")).not.toBeNull();
+		expect(
+			screen.getByText(
+				"On Jan 1, 2027, this plan can fund spending starting at $300 per year for 1 year. Selected assets may finish below their starting balance under the chosen drawdown strategy.",
+			),
+		).not.toBeNull();
+		expect(
+			screen.getByText(
+				"The test selects Brokerage and Roth IRA as withdrawal sources; their maximum annual rates and current capacities are shown below.",
+			),
+		).not.toBeNull();
+		expect(
+			screen.getByText("Withdrawal capacity at this snapshot"),
+		).not.toBeNull();
 		expect(screen.getByText("$500/yr")).not.toBeNull();
 		expect(screen.getByText("Brokerage")).not.toBeNull();
 		expect(screen.getByText("Roth IRA")).not.toBeNull();
 		expect(screen.getByText("$400")).not.toBeNull();
 		expect(screen.getByText("$100")).not.toBeNull();
+
+		expect(
+			describeFinancialIndependenceOutcome(
+				{
+					...plan,
+					annualExpenseGrowthRate: 0.025,
+					principalPolicy: "preserve-real-principal",
+				},
+				coverageRow,
+				{ ...candidateOutcome, principalReplenished: true },
+			),
+		).toBe(
+			"On Jan 1, 2027, this plan can fund spending starting at $300 per year and growing 2.5% annually for 1 year. Selected assets collectively retain their inflation-adjusted starting value.",
+		);
+		expect(
+			describeFinancialIndependenceOutcome(
+				{ ...plan, principalPolicy: "preserve-nominal-principal" },
+				coverageRow,
+				{ ...candidateOutcome, principalReplenished: false },
+			),
+		).toBe(
+			"On Jan 1, 2027, this plan can fund spending starting at $300 per year for 1 year, but selected assets collectively do not retain their starting dollar value.",
+		);
+		expect(
+			describeFinancialIndependenceOutcome(plan, coverageRow, {
+				...candidateOutcome,
+				expensesFullyCovered: false,
+				withdrawals: {
+					...candidateOutcome.withdrawals,
+					shortfallAmount: 125,
+				},
+			}),
+		).toBe(
+			"On Jan 1, 2027, this plan cannot fully fund spending starting at $300 per year for 1 year. It leaves $125 unfunded across the test, so it does not satisfy the chosen portfolio-drawdown strategy.",
+		);
 	});
 
 	it("does not present zero values when no complete FI test fits", () => {
@@ -205,6 +262,11 @@ describe("OverviewCard", () => {
 		);
 
 		expect(screen.getByText("No complete test window")).not.toBeNull();
+		expect(
+			screen.getByText(
+				"No complete 2-year test fits in the projection horizon.",
+			),
+		).not.toBeNull();
 		expect(screen.getAllByText("Not evaluated").length).toBeGreaterThan(1);
 		expect(
 			screen.getByText(
