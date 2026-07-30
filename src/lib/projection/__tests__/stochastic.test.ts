@@ -320,12 +320,6 @@ describe("stochastic projection", () => {
 		expect(fiResult(result)?.medianCoverageDate).not.toBeNull();
 		expect(fiResult(result)?.fiCycleSuccessProbability).toBe(0);
 		expect(fiResult(result)?.selfSustainingDate).toBeNull();
-		expect(fiResult(result)?.candidateWithdrawalDiagnostics[0]).toMatchObject({
-			totalRunCount: 50,
-			diagnosticRunCount: 0,
-			shortfallRunCount: 0,
-			shortfallProbability: 0,
-		});
 	});
 
 	it("returns deterministic baseline alongside stochastic bands", () => {
@@ -498,8 +492,8 @@ describe("stochastic progress streaming", () => {
 				totalUnits: 49 * config.runCount,
 				unitLabel: "monthly start dates",
 				unitAction: "checked",
-				intensiveUnitLabel: "full 1-year sustainability cycles",
-				intensiveUnitAction: "simulated",
+				intensiveUnitLabel: "candidate sustainability cycles",
+				intensiveUnitAction: "attempted",
 			}),
 		);
 		const runProgress = progressValues.filter(

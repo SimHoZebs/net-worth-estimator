@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import { currency, formatDate } from "@/lib/format";
 import type {
-	FinancialIndependenceRunOutcome,
+	FinancialIndependenceDetailedRunOutcome,
 	FinancialModelDocument,
 } from "@/lib/projection";
 import { escapeHtml } from "@/lib/utils";
@@ -15,7 +15,7 @@ const FALLBACK_ACCOUNT_COLOR = "GrayText";
 
 interface FinancialIndependenceChartProps {
 	document: FinancialModelDocument;
-	outcome: FinancialIndependenceRunOutcome;
+	outcome: FinancialIndependenceDetailedRunOutcome;
 }
 
 export interface FinancialIndependenceChartAccount {
@@ -107,7 +107,7 @@ export const FinancialIndependenceChart = memo(
 );
 
 export function buildFinancialIndependenceBalanceData(
-	outcome: FinancialIndependenceRunOutcome,
+	outcome: FinancialIndependenceDetailedRunOutcome,
 	accountIds: readonly string[],
 ): uPlot.AlignedData {
 	if (outcome.balanceTrajectory.length === 0) {
@@ -170,7 +170,7 @@ export function buildFinancialIndependenceChartOptions(
 }
 
 export function buildFinancialIndependenceBalanceTooltip(
-	outcome: FinancialIndependenceRunOutcome,
+	outcome: FinancialIndependenceDetailedRunOutcome,
 	accounts: readonly FinancialIndependenceChartAccount[],
 	index: number,
 ) {

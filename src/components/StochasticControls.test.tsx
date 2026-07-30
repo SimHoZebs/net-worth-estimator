@@ -46,8 +46,8 @@ describe("StochasticControls", () => {
 							unitLabel: "monthly start dates",
 							unitAction: "checked",
 							intensiveUnitsCompleted: 400,
-							intensiveUnitLabel: "full 10-year sustainability cycles",
-							intensiveUnitAction: "simulated",
+							intensiveUnitLabel: "candidate sustainability cycles",
+							intensiveUnitAction: "attempted",
 						},
 					],
 				})}
@@ -61,7 +61,7 @@ describe("StochasticControls", () => {
 			screen.getByText("7,625 / 61,000 monthly start dates checked"),
 		).not.toBeNull();
 		expect(
-			screen.getByText("400 full 10-year sustainability cycles simulated"),
+			screen.getByText("400 candidate sustainability cycles attempted"),
 		).not.toBeNull();
 	});
 });

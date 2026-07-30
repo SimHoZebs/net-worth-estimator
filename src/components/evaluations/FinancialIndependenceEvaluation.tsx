@@ -45,6 +45,8 @@ export function FinancialIndependenceEvaluation({
 		: -1;
 	const candidateRow = analysis?.rows[selectedIndex];
 	const candidateOutcome = analysis?.runOutcomes[selectedIndex];
+	const detailedOutcome =
+		candidateOutcome?.status === "summary" ? undefined : candidateOutcome;
 
 	return (
 		<div className="space-y-4">
@@ -58,13 +60,13 @@ export function FinancialIndependenceEvaluation({
 						document={document}
 						plan={plan}
 						row={candidateRow}
-						outcome={candidateOutcome}
+						outcome={detailedOutcome}
 					/>
-					{candidateOutcome?.status === "evaluated" &&
-					(candidateOutcome.balanceTrajectory?.length ?? 0) > 0 ? (
+					{detailedOutcome?.status === "evaluated" &&
+					(detailedOutcome.balanceTrajectory?.length ?? 0) > 0 ? (
 						<FinancialIndependenceChart
 							document={document}
-							outcome={candidateOutcome}
+							outcome={detailedOutcome}
 						/>
 					) : null}
 				</>

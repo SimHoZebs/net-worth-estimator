@@ -72,8 +72,8 @@ describe("ResultsPage", () => {
 									unitLabel: "monthly start dates",
 									unitAction: "checked",
 									intensiveUnitsCompleted: 1_246,
-									intensiveUnitLabel: "full 10-year sustainability cycles",
-									intensiveUnitAction: "simulated",
+									intensiveUnitLabel: "candidate sustainability cycles",
+									intensiveUnitAction: "attempted",
 								},
 							],
 						})}
@@ -96,7 +96,7 @@ describe("ResultsPage", () => {
 			"22,570 / 61,000 monthly start dates checked",
 		);
 		expect(activity.textContent).toContain(
-			"1,246 full 10-year sustainability cycles simulated",
+			"1,246 candidate sustainability cycles attempted",
 		);
 	});
 

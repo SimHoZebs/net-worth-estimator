@@ -21,7 +21,6 @@ export {
 export {
 	evaluateFinancialIndependence,
 	FINANCIAL_INDEPENDENCE_DEFINITION_ID,
-	type FinancialIndependenceCandidateWithdrawalDiagnostic,
 	type FinancialIndependenceProbabilisticResult,
 	normalizeFinancialIndependencePlan,
 	selectFinancialIndependenceOutcomeIndex,
@@ -118,6 +117,7 @@ export type {
 	FinancialIndependenceAnalysis,
 	FinancialIndependenceAssetContribution,
 	FinancialIndependenceBalanceTrajectoryRow,
+	FinancialIndependenceDetailedRunOutcome,
 	FinancialIndependenceEvaluation,
 	FinancialIndependenceExpenseBasis,
 	FinancialIndependencePlan,
@@ -125,6 +125,7 @@ export type {
 	FinancialIndependenceRow,
 	FinancialIndependenceRunOutcome,
 	FinancialIndependenceSource,
+	FinancialIndependenceSummaryOutcome,
 	FinancialIndependenceWithdrawalAccountSummary,
 	FinancialIndependenceWithdrawalSummary,
 	FinancialModelDocument,

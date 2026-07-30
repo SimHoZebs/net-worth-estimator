@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
 	buildFinancialIndependenceCandidateDates,
 	evaluateFinancialIndependence,
+	financialIndependenceEvaluation,
 	selectFinancialIndependenceOutcomeIndex,
 	validateFinancialIndependencePlan,
 } from "../evaluation/financialIndependence";
 import type {
 	Account,
+	FinancialIndependenceAnalysis,
+	FinancialIndependenceDetailedRunOutcome,
 	FinancialIndependencePlan,
 	Posting,
 	ProjectionPath,
@@ -18,6 +21,17 @@ const realizedPostingAmountsByRow = new WeakMap<
 	ProjectionRow,
 	Record<string, number>
 >();
+
+function detailedOutcome(
+	result: FinancialIndependenceAnalysis,
+	index = 0,
+): FinancialIndependenceDetailedRunOutcome {
+	const outcome = result.runOutcomes[index];
+	if (!outcome || outcome.status === "summary") {
+		throw new Error(`Expected detailed FI outcome at index ${index}.`);
+	}
+	return outcome;
+}
 
 function row(
 	date: string,
@@ -308,7 +322,7 @@ describe("evaluateFinancialIndependence", () => {
 				relatedAccountIds: ["brokerage"],
 			},
 		});
-		expect(result.runOutcomes[0].withdrawals.constraints).toContainEqual({
+		expect(detailedOutcome(result).withdrawals.constraints).toContainEqual({
 			type: "source-floor",
 			count: 6,
 		});
@@ -346,7 +360,7 @@ describe("evaluateFinancialIndependence", () => {
 			hadWithdrawalShortfall: true,
 			endingSelectedAssetBalance: 100_000,
 		});
-		expect(result.runOutcomes[0].withdrawals).toMatchObject({
+		expect(detailedOutcome(result).withdrawals).toMatchObject({
 			firstShortfallDate: "2026-07-01",
 			shortfallOccurrenceCount: 6,
 			accounts: [{ accountId: "brokerage" }],
@@ -357,10 +371,52 @@ describe("evaluateFinancialIndependence", () => {
 				constraints: ["action-limit"],
 			},
 		});
-		expect(result.runOutcomes[0].withdrawals.constraints).toContainEqual({
+		expect(detailedOutcome(result).withdrawals.constraints).toContainEqual({
 			type: "action-limit",
 			count: 6,
 		});
+	});
+
+	it("stops a summary cycle at its first shortfall", () => {
+		const result = evaluateFinancialIndependence({
+			path: path(
+				Array.from({ length: 14 }, (_, month) =>
+					row(
+						`202${6 + Math.floor(month / 12)}-${String((month % 12) + 1).padStart(2, "0")}-01`,
+						{ brokerage: 100_000, cash: 0 },
+						{ pension: month < 7 ? 1_000 : 0 },
+					),
+				),
+				[pension],
+				[account("brokerage"), account("cash")],
+			),
+			plan: plan({
+				annualExpenseTarget: 6_000,
+				sources: [
+					{ type: "cashflow", postingId: "pension", included: true },
+					{
+						type: "asset",
+						accountId: "brokerage",
+						included: true,
+						withdrawalRateOverride: 0,
+					},
+				],
+			}),
+			candidateDates: ["2026-01-01"],
+			detailLevel: "summary",
+		});
+
+		expect(result.runOutcomes).toEqual([
+			expect.objectContaining({
+				status: "summary",
+				cycleEstablished: false,
+				firstShortfallDate: "2026-07-01",
+			}),
+		]);
+		expect(result.runOutcomes[0]).not.toHaveProperty("withdrawals");
+		expect(result.runOutcomes[0]).not.toHaveProperty(
+			"endingSelectedAssetBalance",
+		);
 	});
 
 	it("summarizes source-floor and action constraints across multiple assets", () => {
@@ -396,7 +452,7 @@ describe("evaluateFinancialIndependence", () => {
 		]);
 		expect(result.rows[0].selectedAssetBalance).toBe(100_000);
 		expect(result.rows[0].annualWithdrawalCapacity).toBe(4_000);
-		const summary = result.runOutcomes[0].withdrawals;
+		const summary = detailedOutcome(result).withdrawals;
 		expect(summary.requestedAmount).toBe(4_000);
 		expect(summary.realizedAmount).toBe(3_000);
 		expect(summary.shortfallAmount).toBe(1_000);
@@ -464,7 +520,7 @@ describe("evaluateFinancialIndependence", () => {
 			}),
 			candidateDates: [candidateDate],
 		});
-		const outcome = result.runOutcomes[0];
+		const outcome = detailedOutcome(result);
 		const expectedRequested = expectedAnnualRequests(
 			candidateDate,
 			candidateDate,
@@ -510,7 +566,7 @@ describe("evaluateFinancialIndependence", () => {
 		expect(result.rows[0].annualExpenseTarget).toBeCloseTo(
 			annualExpenseTarget * (1 + annualExpenseGrowthRate) ** candidateYears,
 		);
-		expect(result.runOutcomes[0].withdrawals.requestedAmount).toBe(
+		expect(detailedOutcome(result).withdrawals.requestedAmount).toBe(
 			expectedAnnualRequests(
 				projectionStartDate,
 				candidateDate,
@@ -551,8 +607,8 @@ describe("evaluateFinancialIndependence", () => {
 			candidateDates: ["2026-01-01"],
 		});
 
-		expect(withoutGrowth.runOutcomes[0].principalReplenished).toBe(false);
-		expect(withGrowth.runOutcomes[0].principalReplenished).toBe(true);
+		expect(detailedOutcome(withoutGrowth).principalReplenished).toBe(false);
+		expect(detailedOutcome(withGrowth).principalReplenished).toBe(true);
 	});
 
 	it("carries current-year annual-cap usage into a behavior branch", () => {
@@ -602,7 +658,7 @@ describe("evaluateFinancialIndependence", () => {
 		});
 
 		// $200 remains on the 2026 cap, followed by a fresh $1,000 cap in 2027.
-		expect(result.runOutcomes[0].endingSelectedAssetBalance).toBe(101_200);
+		expect(detailedOutcome(result).endingSelectedAssetBalance).toBe(101_200);
 	});
 
 	it("sorts and deduplicates candidates and excludes incomplete cycles", () => {
@@ -664,7 +720,7 @@ describe("evaluateFinancialIndependence", () => {
 			candidateDates: ["2026-01-01"],
 		});
 
-		expect(result.runOutcomes[0].endingSelectedAssetBalance).toBe(120);
+		expect(detailedOutcome(result).endingSelectedAssetBalance).toBe(120);
 	});
 
 	it("observes base cashflow before dependent replay on the same date", () => {
@@ -792,13 +848,72 @@ describe("evaluateFinancialIndependence", () => {
 			candidateDates: ["2026-01-01"],
 		});
 
-		expect(result.runOutcomes[0].endingSelectedAssetBalance).toBe(150);
+		expect(detailedOutcome(result).endingSelectedAssetBalance).toBe(150);
 	});
 
 	it("uses one canonical monthly candidate schedule", () => {
 		expect(
 			buildFinancialIndependenceCandidateDates("2026-01-31", "2027-04-30", 1),
 		).toEqual(["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"]);
+	});
+
+	it("aggregates confidence as FI achieved by each candidate date", () => {
+		const evaluationPath = path(
+			[
+				row("2026-01-01", { brokerage: 100_000 }),
+				row("2026-02-01", { brokerage: 100_000 }),
+				row("2026-03-01", { brokerage: 100_000 }),
+			],
+			[],
+			[account("brokerage")],
+			"2027-04-01",
+		);
+		const fiPlan = plan({
+			requiredConfidence: 0.5,
+			sources: [{ type: "asset", accountId: "brokerage", included: true }],
+		});
+		const deterministic = evaluateFinancialIndependence({
+			path: evaluationPath,
+			plan: fiPlan,
+			candidateDates: ["2026-01-01", "2026-02-01", "2026-03-01"],
+			detailLevel: "summary",
+		});
+		const accumulator = financialIndependenceEvaluation.createAccumulator(
+			fiPlan,
+			deterministic,
+		);
+		const outcome = (candidateDate: string, cycleEstablished: boolean) => ({
+			candidateDate,
+			status: "summary" as const,
+			minimumNetWorthMet: true,
+			initialCoverageMet: true,
+			cycleEstablished,
+			firstShortfallDate: cycleEstablished ? null : candidateDate,
+		});
+		financialIndependenceEvaluation.accumulate(accumulator, {
+			...deterministic,
+			runOutcomes: [outcome("2026-01-01", false), outcome("2026-02-01", true)],
+		});
+		financialIndependenceEvaluation.accumulate(accumulator, {
+			...deterministic,
+			runOutcomes: [
+				outcome("2026-01-01", false),
+				outcome("2026-02-01", false),
+				outcome("2026-03-01", true),
+			],
+		});
+
+		const probabilistic = financialIndependenceEvaluation.finalize(
+			accumulator,
+			{
+				document: evaluationPath.effectiveDocument,
+				deterministicPath: evaluationPath,
+				runCount: 2,
+			},
+		);
+		expect(probabilistic.selfSustainingDate).toBe("2026-02-01");
+		expect(probabilistic.selfSustainingProbability).toBe(0.5);
+		expect(probabilistic.fiCycleSuccessProbability).toBe(1);
 	});
 
 	it("does not report vacuous coverage when no sources are selected", () => {
@@ -830,17 +945,17 @@ describe("evaluateFinancialIndependence", () => {
 		});
 
 		expect(selectFinancialIndependenceOutcomeIndex(result.runOutcomes)).toBe(1);
-		expect(result.runOutcomes[0].balanceTrajectory).toEqual([]);
-		expect(result.runOutcomes[1].balanceTrajectory).toHaveLength(13);
-		expect(result.runOutcomes[1].balanceTrajectory[0]).toEqual({
+		expect(result.runOutcomes[0]?.status).toBe("summary");
+		expect(detailedOutcome(result, 1).balanceTrajectory).toHaveLength(13);
+		expect(detailedOutcome(result, 1).balanceTrajectory[0]).toEqual({
 			date: "2026-02-01",
 			accounts: [{ accountId: "brokerage", balance: 100_000 }],
 		});
-		expect(result.runOutcomes[1].balanceTrajectory[1]).toEqual({
+		expect(detailedOutcome(result, 1).balanceTrajectory[1]).toEqual({
 			date: "2026-03-01",
 			accounts: [{ accountId: "brokerage", balance: 99_900 }],
 		});
-		expect(result.runOutcomes[1].balanceTrajectory[12]).toEqual({
+		expect(detailedOutcome(result, 1).balanceTrajectory[12]).toEqual({
 			date: "2027-02-01",
 			accounts: [{ accountId: "brokerage", balance: 98_800 }],
 		});
@@ -855,8 +970,20 @@ describe("evaluateFinancialIndependence", () => {
 		expect(
 			selectFinancialIndependenceOutcomeIndex(successful.runOutcomes),
 		).toBe(0);
-		expect(successful.runOutcomes[0].balanceTrajectory).toHaveLength(13);
-		expect(successful.runOutcomes[1].balanceTrajectory).toEqual([]);
+		expect(successful.runOutcomes).toHaveLength(1);
+		expect(detailedOutcome(successful).balanceTrajectory).toHaveLength(13);
+
+		const explicitDetailed = evaluateFinancialIndependence({
+			path: evaluationPath,
+			plan: plan({
+				sources: [{ type: "asset", accountId: "brokerage", included: true }],
+			}),
+			candidateDates: ["2026-01-01", "2026-02-01"],
+			detailLevel: "detailed",
+		});
+		expect(detailedOutcome(explicitDetailed).balanceTrajectory).toHaveLength(
+			13,
+		);
 
 		const allIneligible = evaluateFinancialIndependence({
 			path: evaluationPath,
@@ -875,6 +1002,6 @@ describe("evaluateFinancialIndependence", () => {
 			candidateDates: ["2026-01-01"],
 			monteCarloSample: { annualRatesByPostingId: new Map() },
 		});
-		expect(stochastic.runOutcomes[0].balanceTrajectory).toEqual([]);
+		expect(detailedOutcome(stochastic).balanceTrajectory).toEqual([]);
 	});
 });
