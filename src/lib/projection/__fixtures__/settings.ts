@@ -15,6 +15,7 @@ export function makeSettings(
 					config: {
 						minimumNetWorth: 0,
 						annualExpenseTarget: 40_000,
+						annualExpenseTargetBasis: "fi-date-dollars",
 						annualExpenseGrowthRate: 0.025,
 						withdrawalRate: 0.04,
 						evaluationYears: 1,

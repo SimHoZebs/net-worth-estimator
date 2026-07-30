@@ -16,6 +16,7 @@ import {
 	csvAccountSchema,
 	csvAccountsHeaders,
 	csvFinancialIndependenceHeaders,
+	csvFinancialIndependenceRequiredHeaders,
 	csvFinancialIndependenceSchema,
 	csvNetWorthThresholdHeaders,
 	csvNetWorthThresholdSchema,
@@ -131,7 +132,7 @@ export function parseCsvFinancialModel(
 	const financialIndependenceResult = parseRows(
 		CSV_BEHAVIOR_FILE_NAMES.financialIndependence,
 		csvFiles.behaviors.financialIndependence,
-		csvFinancialIndependenceHeaders,
+		csvFinancialIndependenceRequiredHeaders,
 		csvFinancialIndependenceSchema,
 	);
 	const netWorthThresholdResult = parseRows(
@@ -167,11 +168,21 @@ export function parseCsvFinancialModel(
 
 	const evaluations = {
 		financialIndependence: financialIndependenceResult.rows.map(
-			({ instanceId, label, enabled, ...config }) => ({
+			({
 				instanceId,
 				label,
 				enabled,
-				config,
+				annualExpenseTargetBasis,
+				...config
+			}) => ({
+				instanceId,
+				label,
+				enabled,
+				config: {
+					...config,
+					annualExpenseTargetBasis:
+						annualExpenseTargetBasis || "projection-start-purchasing-power",
+				},
 			}),
 		),
 		netWorthThreshold: netWorthThresholdResult.rows.map(

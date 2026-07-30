@@ -2,12 +2,16 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/AppShell";
 import { createBaseDocument } from "@/lib/projection/__fixtures__/documents";
 import { DEFAULT_EVALUATIONS, useStore } from "@/store";
 import { RuntimeFixtureProviders } from "@/test/runtimeFixtures";
 import { SettingsPage } from "./SettingsPage";
+
+vi.mock("@/components/dashboard/FinancialIndependenceChart", () => ({
+	FinancialIndependenceChart: () => null,
+}));
 
 afterEach(() => {
 	cleanup();

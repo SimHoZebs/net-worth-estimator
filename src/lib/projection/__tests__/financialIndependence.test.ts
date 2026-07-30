@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	buildFinancialIndependenceCandidateDates,
 	evaluateFinancialIndependence,
+	selectFinancialIndependenceOutcomeIndex,
 	validateFinancialIndependencePlan,
 } from "../evaluation/financialIndependence";
 import type {
@@ -11,6 +12,7 @@ import type {
 	ProjectionPath,
 	ProjectionRow,
 } from "../types/model";
+import { addMonthsClamped, daysBetween } from "../utils/date";
 
 const realizedPostingAmountsByRow = new WeakMap<
 	ProjectionRow,
@@ -74,6 +76,7 @@ function plan(
 	return {
 		minimumNetWorth: 0,
 		annualExpenseTarget: 1_200,
+		annualExpenseTargetBasis: "fi-date-dollars",
 		annualExpenseGrowthRate: 0,
 		withdrawalRate: 0.04,
 		evaluationYears: 1,
@@ -119,6 +122,27 @@ function path(
 		projectionStartDate: "2026-01-01",
 		projectionEndDate,
 	};
+}
+
+function expectedAnnualRequests(
+	baselineDate: string,
+	candidateDate: string,
+	annualExpenseTarget: number,
+	annualExpenseGrowthRate: number,
+) {
+	return (
+		Math.round(
+			Array.from({ length: 12 }, (_, month) => {
+				const periodStart = addMonthsClamped(candidateDate, month);
+				const years = daysBetween(baselineDate, periodStart) / 365.2425;
+				return (
+					(annualExpenseTarget *
+						(1 + annualExpenseGrowthRate) ** Math.max(0, years)) /
+					12
+				);
+			}).reduce((sum, expense) => sum + expense, 0) * 100,
+		) / 100
+	);
 }
 
 describe("evaluateFinancialIndependence", () => {
@@ -167,6 +191,20 @@ describe("evaluateFinancialIndependence", () => {
 		expect(normalized.sources).toEqual([
 			{ type: "cashflow", postingId: "pension", included: true },
 		]);
+	});
+
+	it("defaults a missing expense basis and rejects invalid explicit values", () => {
+		const { annualExpenseTargetBasis: _missing, ...legacyPlan } = plan();
+
+		expect(
+			validateFinancialIndependencePlan(legacyPlan).annualExpenseTargetBasis,
+		).toBe("projection-start-purchasing-power");
+		expect(() =>
+			validateFinancialIndependencePlan({
+				...plan(),
+				annualExpenseTargetBasis: "future-dollars",
+			}),
+		).toThrow("Financial independence configuration is invalid.");
 	});
 
 	it("normalizes overlapping income and continuing posting treatment", () => {
@@ -420,6 +458,81 @@ describe("evaluateFinancialIndependence", () => {
 				annualWithdrawalCapacity: 0,
 			},
 		]);
+	});
+
+	it("starts spending inflation at each FI candidate", () => {
+		const candidateDate = "2030-01-31";
+		const annualExpenseTarget = 1_200;
+		const annualExpenseGrowthRate = 0.1;
+		const result = evaluateFinancialIndependence({
+			path: path(
+				[row(candidateDate, { brokerage: 100_000 })],
+				[],
+				[account("brokerage")],
+				"2031-01-31",
+			),
+			plan: plan({
+				annualExpenseTarget,
+				annualExpenseGrowthRate,
+				principalPolicy: "preserve-real-principal",
+				sources: [{ type: "asset", accountId: "brokerage", included: true }],
+			}),
+			candidateDates: [candidateDate],
+		});
+		const outcome = result.runOutcomes[0];
+		const expectedRequested = expectedAnnualRequests(
+			candidateDate,
+			candidateDate,
+			annualExpenseTarget,
+			annualExpenseGrowthRate,
+		);
+
+		expect(result.rows[0]).toMatchObject({
+			annualExpenseTarget,
+			isCovered: true,
+			isEligible: true,
+		});
+		expect(outcome.status).toBe("evaluated");
+		expect(outcome.withdrawals.requestedAmount).toBe(expectedRequested);
+		expect(outcome.endingRealSelectedAssetBalance).toBeCloseTo(
+			outcome.endingSelectedAssetBalance / (1 + annualExpenseGrowthRate),
+		);
+	});
+
+	it("can value FI spending in projection-start purchasing power", () => {
+		const projectionStartDate = "2026-01-01";
+		const candidateDate = "2030-01-31";
+		const annualExpenseTarget = 1_200;
+		const annualExpenseGrowthRate = 0.1;
+		const result = evaluateFinancialIndependence({
+			path: path(
+				[row(candidateDate, { brokerage: 100_000 })],
+				[],
+				[account("brokerage")],
+				"2031-01-31",
+			),
+			plan: plan({
+				annualExpenseTarget,
+				annualExpenseTargetBasis: "projection-start-purchasing-power",
+				annualExpenseGrowthRate,
+				sources: [{ type: "asset", accountId: "brokerage", included: true }],
+			}),
+			candidateDates: [candidateDate],
+		});
+		const candidateYears =
+			daysBetween(projectionStartDate, candidateDate) / 365.2425;
+
+		expect(result.rows[0].annualExpenseTarget).toBeCloseTo(
+			annualExpenseTarget * (1 + annualExpenseGrowthRate) ** candidateYears,
+		);
+		expect(result.runOutcomes[0].withdrawals.requestedAmount).toBe(
+			expectedAnnualRequests(
+				projectionStartDate,
+				candidateDate,
+				annualExpenseTarget,
+				annualExpenseGrowthRate,
+			),
+		);
 	});
 
 	it("replays only explicitly selected continuing postings", () => {
@@ -713,5 +826,70 @@ describe("evaluateFinancialIndependence", () => {
 		expect(result.rows[0].coverageRatio).toBe(0);
 		expect(result.milestones.firstCoverageDate).toBeNull();
 		expect(result.runOutcomes[0].status).toBe("ineligible");
+	});
+
+	it("retains monthly account balances only for the selected deterministic cycle", () => {
+		const evaluationPath = path(
+			[row("2026-01-01", { brokerage: 100_000 })],
+			[],
+			[account("brokerage")],
+			"2027-03-01",
+		);
+		const result = evaluateFinancialIndependence({
+			path: evaluationPath,
+			plan: plan({
+				principalPolicy: "preserve-nominal-principal",
+				sources: [{ type: "asset", accountId: "brokerage", included: true }],
+			}),
+			candidateDates: ["2026-01-01", "2026-02-01"],
+		});
+
+		expect(selectFinancialIndependenceOutcomeIndex(result.runOutcomes)).toBe(1);
+		expect(result.runOutcomes[0].balanceTrajectory).toEqual([]);
+		expect(result.runOutcomes[1].balanceTrajectory).toHaveLength(13);
+		expect(result.runOutcomes[1].balanceTrajectory[0]).toEqual({
+			date: "2026-02-01",
+			accounts: [{ accountId: "brokerage", balance: 100_000 }],
+		});
+		expect(result.runOutcomes[1].balanceTrajectory[1]).toEqual({
+			date: "2026-03-01",
+			accounts: [{ accountId: "brokerage", balance: 99_900 }],
+		});
+		expect(result.runOutcomes[1].balanceTrajectory[12]).toEqual({
+			date: "2027-02-01",
+			accounts: [{ accountId: "brokerage", balance: 98_800 }],
+		});
+
+		const successful = evaluateFinancialIndependence({
+			path: evaluationPath,
+			plan: plan({
+				sources: [{ type: "asset", accountId: "brokerage", included: true }],
+			}),
+			candidateDates: ["2026-01-01", "2026-02-01"],
+		});
+		expect(
+			selectFinancialIndependenceOutcomeIndex(successful.runOutcomes),
+		).toBe(0);
+		expect(successful.runOutcomes[0].balanceTrajectory).toHaveLength(13);
+		expect(successful.runOutcomes[1].balanceTrajectory).toEqual([]);
+
+		const allIneligible = evaluateFinancialIndependence({
+			path: evaluationPath,
+			plan: plan(),
+			candidateDates: ["2026-01-01", "2026-02-01"],
+		});
+		expect(
+			selectFinancialIndependenceOutcomeIndex(allIneligible.runOutcomes),
+		).toBe(1);
+
+		const stochastic = evaluateFinancialIndependence({
+			path: evaluationPath,
+			plan: plan({
+				sources: [{ type: "asset", accountId: "brokerage", included: true }],
+			}),
+			candidateDates: ["2026-01-01"],
+			monteCarloSample: { annualRatesByPostingId: new Map() },
+		});
+		expect(stochastic.runOutcomes[0].balanceTrajectory).toEqual([]);
 	});
 });

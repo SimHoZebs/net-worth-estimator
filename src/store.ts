@@ -321,6 +321,7 @@ const DEFAULT_STOCHASTIC_RUN_COUNT = 1000;
 export const DEFAULT_FINANCIAL_INDEPENDENCE_PLAN: FinancialIndependencePlan = {
 	minimumNetWorth: 1_500_000,
 	annualExpenseTarget: 80_000,
+	annualExpenseTargetBasis: "fi-date-dollars",
 	annualExpenseGrowthRate: 0.025,
 	withdrawalRate: 0.04,
 	evaluationYears: 10,

@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { Connect, Plugin, ViteDevServer } from "vite";
 import type { FinancialModelParseResult } from "../src/lib/projection/dataSource";
+import { validateFinancialIndependencePlan } from "../src/lib/projection/evaluation/financialIndependence";
 import {
 	parseCsvFinancialModel,
 	serializeCsvFinancialModel,
@@ -13,6 +14,7 @@ import {
 	CSV_MODEL_FILE_NAMES,
 	type FinancialModelDocument,
 } from "../src/lib/projection/types/model";
+import type { ModelValidationIssue } from "../src/lib/projection/types/validation";
 
 export const FINANCIAL_MODEL_API_PATH = "/api/financial-model";
 
@@ -72,7 +74,26 @@ async function saveDocument(
 	csvPath: string,
 	document: FinancialModelDocument,
 ): Promise<FinancialModelParseResult> {
-	const issues = validateCsvFinancialModel(document);
+	const issues: ModelValidationIssue[] = validateCsvFinancialModel(document);
+	document.evaluations.financialIndependence.forEach((evaluation, index) => {
+		try {
+			validateFinancialIndependencePlan(evaluation.config);
+		} catch (error) {
+			issues.push({
+				severity: "error",
+				code: "evaluation.config.invalid",
+				message:
+					error instanceof Error
+						? error.message
+						: "Financial independence configuration is invalid.",
+				path: [
+					CSV_BEHAVIOR_FILE_NAMES.financialIndependence,
+					index + 2,
+					"annualExpenseTargetBasis",
+				],
+			});
+		}
+	});
 
 	if (issues.some((issue) => issue.severity === "error")) {
 		return { document, issues };

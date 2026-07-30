@@ -12,6 +12,7 @@ describe("financial independence template", () => {
 
 		expect(plan.minimumNetWorth).toBe(1_500_000);
 		expect(plan.annualExpenseTarget).toBe(70_000);
+		expect(plan.annualExpenseTargetBasis).toBe("fi-date-dollars");
 		expect(plan.sources).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({ type: "asset", accountId: "k401" }),

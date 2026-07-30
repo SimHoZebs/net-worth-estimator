@@ -201,6 +201,7 @@ function summarizeWithdrawals(
 export const DEFAULT_FI_PLAN: FinancialIndependencePlan = {
 	minimumNetWorth: 0,
 	annualExpenseTarget: 0,
+	annualExpenseTargetBasis: "fi-date-dollars",
 	annualExpenseGrowthRate: 0,
 	withdrawalRate: 0,
 	evaluationYears: 1,
@@ -277,6 +278,10 @@ export function normalizeFinancialIndependencePlan(
 		...plan,
 		minimumNetWorth: finiteNonNegative(plan.minimumNetWorth),
 		annualExpenseTarget: finiteNonNegative(plan.annualExpenseTarget),
+		annualExpenseTargetBasis:
+			plan.annualExpenseTargetBasis === "fi-date-dollars"
+				? "fi-date-dollars"
+				: "projection-start-purchasing-power",
 		annualExpenseGrowthRate: finiteNonNegative(plan.annualExpenseGrowthRate),
 		withdrawalRate: Math.min(1, finiteNonNegative(plan.withdrawalRate)),
 		evaluationYears: Math.max(
@@ -386,11 +391,21 @@ function balanceAt(row: ProjectionRow, accountId: string) {
 
 function expenseAt(
 	plan: FinancialIndependencePlan,
-	projectionStartDate: IsoDate,
+	baselineDate: IsoDate,
 	date: IsoDate,
 ) {
-	const years = Math.max(0, daysBetween(projectionStartDate, date) / 365.2425);
+	const years = Math.max(0, daysBetween(baselineDate, date) / 365.2425);
 	return plan.annualExpenseTarget * (1 + plan.annualExpenseGrowthRate) ** years;
+}
+
+function expenseBaselineDate(
+	plan: FinancialIndependencePlan,
+	projectionStartDate: IsoDate,
+	candidateDate: IsoDate,
+) {
+	return plan.annualExpenseTargetBasis === "projection-start-purchasing-power"
+		? projectionStartDate
+		: candidateDate;
 }
 
 function realizedCashflowBetween(
@@ -477,11 +492,13 @@ function evaluateCycle({
 	plan,
 	candidate,
 	monteCarloSample,
+	captureBalanceTrajectory = false,
 }: {
 	path: ProjectionPath;
 	plan: FinancialIndependencePlan;
 	candidate: FinancialIndependenceRow;
 	monteCarloSample?: MonteCarloSample;
+	captureBalanceTrajectory?: boolean;
 }): FinancialIndependenceRunOutcome {
 	const candidateRow = latestRowAtOrBefore(path.rows, candidate.date);
 	if (!candidate.isEligible) {
@@ -499,10 +516,16 @@ function evaluateCycle({
 			principalReplenished: false,
 			cycleEstablished: false,
 			withdrawals: summarizeWithdrawals([]),
+			balanceTrajectory: [],
 		};
 	}
 
 	const assetRates = selectedAssetRates(plan);
+	const expenseBaseline = expenseBaselineDate(
+		plan,
+		path.projectionStartDate,
+		candidate.date,
+	);
 	const cashflowIds = selectedCashflowIds(plan);
 	const accountsById = new Map(
 		path.effectiveDocument.accounts.map((account) => [account.id, account]),
@@ -550,6 +573,14 @@ function evaluateCycle({
 		monteCarloSample,
 	});
 	const { balances } = transitions.state;
+	const selectedAccountIds = [...assetRates.keys()];
+	const balanceTrajectoryRow = (date: IsoDate) => ({
+		date,
+		accounts: selectedAccountIds.map((accountId) => ({
+			accountId,
+			balance: balances[accountId] ?? 0,
+		})),
+	});
 	const eventDates = new Map<IsoDate, DatedPostingOccurrence[]>();
 	const cycleEnd = addYearsClamped(candidate.date, plan.evaluationYears);
 	addOccurrences(branchPostings, eventDates, candidate.date, cycleEnd, false);
@@ -587,6 +618,9 @@ function evaluateCycle({
 			hadWithdrawalShortfall: false,
 			withdrawalAttempts: [] as WithdrawalAttempt[],
 			remainingWithdrawalByAccount: new Map<string, number>(),
+			balanceTrajectory: captureBalanceTrajectory
+				? [balanceTrajectoryRow(candidate.date)]
+				: [],
 		}),
 		react: (state, period) => {
 			if (period.index % 12 === 0) {
@@ -606,8 +640,7 @@ function evaluateCycle({
 			});
 			let remainingExpense = Math.max(
 				0,
-				expenseAt(plan, path.projectionStartDate, period.startDate) / 12 -
-					directIncome,
+				expenseAt(plan, expenseBaseline, period.startDate) / 12 - directIncome,
 			);
 			const capacities = [...assetRates.keys()].map((accountId) => {
 				const accountLimit = getWithdrawableAmount(
@@ -703,6 +736,9 @@ function evaluateCycle({
 				});
 			}
 			if (remainingExpense > EPSILON) state.hadWithdrawalShortfall = true;
+			if (captureBalanceTrajectory) {
+				state.balanceTrajectory.push(balanceTrajectoryRow(period.endDate));
+			}
 		},
 		finish: (state) => {
 			const endingSelectedAssetBalance = [...assetRates.keys()].reduce(
@@ -733,9 +769,23 @@ function evaluateCycle({
 				principalReplenished,
 				cycleEstablished: !state.hadWithdrawalShortfall && principalReplenished,
 				withdrawals: summarizeWithdrawals(state.withdrawalAttempts),
+				balanceTrajectory: state.balanceTrajectory,
 			};
 		},
 	});
+}
+
+export function selectFinancialIndependenceOutcomeIndex(
+	outcomes: readonly FinancialIndependenceRunOutcome[],
+) {
+	const successfulIndex = outcomes.findIndex(
+		(outcome) => outcome.cycleEstablished,
+	);
+	if (successfulIndex >= 0) return successfulIndex;
+	for (let index = outcomes.length - 1; index >= 0; index--) {
+		if (outcomes[index]?.status === "evaluated") return index;
+	}
+	return outcomes.length - 1;
 }
 
 export function evaluateFinancialIndependence({
@@ -794,7 +844,7 @@ export function evaluateFinancialIndependence({
 		);
 		const annualExpenseTarget = expenseAt(
 			normalizedPlan,
-			path.projectionStartDate,
+			expenseBaselineDate(normalizedPlan, path.projectionStartDate, date),
 			date,
 		);
 		const totalAnnualCapacity = annualDirectIncome + annualWithdrawalCapacity;
@@ -827,6 +877,18 @@ export function evaluateFinancialIndependence({
 			monteCarloSample,
 		}),
 	);
+	if (monteCarloSample === undefined) {
+		const selectedIndex = selectFinancialIndependenceOutcomeIndex(runOutcomes);
+		const candidate = analysisRows[selectedIndex];
+		if (candidate && runOutcomes[selectedIndex]?.status === "evaluated") {
+			runOutcomes[selectedIndex] = evaluateCycle({
+				path,
+				plan: normalizedPlan,
+				candidate,
+				captureBalanceTrajectory: true,
+			});
+		}
+	}
 
 	return {
 		rows: analysisRows,
@@ -878,7 +940,11 @@ export function validateFinancialIndependencePlan(
 				"preserve-nominal-principal",
 				"preserve-real-principal",
 			] as unknown[]
-		).includes(config.principalPolicy)
+		).includes(config.principalPolicy) ||
+		("annualExpenseTargetBasis" in config &&
+			!(
+				["projection-start-purchasing-power", "fi-date-dollars"] as unknown[]
+			).includes(config.annualExpenseTargetBasis))
 	) {
 		throw new Error("Financial independence configuration is invalid.");
 	}

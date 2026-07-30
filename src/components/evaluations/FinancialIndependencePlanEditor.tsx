@@ -19,6 +19,7 @@ import {
 	FiNumberField,
 	FinancialIndependenceEditorSection,
 	RetirementIncomeField,
+	SpendingValueBasis,
 } from "./FinancialIndependencePlanFields";
 
 interface FinancialIndependencePlanEditorProps {
@@ -330,7 +331,7 @@ export const FinancialIndependencePlanEditor = memo(
 						<div className="grid gap-3 sm:grid-cols-2">
 							<FiNumberField
 								label="Annual spending"
-								description="Spending required in the first year of FI."
+								description="Annualized spending interpreted using the selected value basis."
 								value={numericDrafts.annualExpenseTarget}
 								min={0}
 								step={1000}
@@ -355,6 +356,15 @@ export const FinancialIndependencePlanEditor = memo(
 								}
 							/>
 						</div>
+						<SpendingValueBasis
+							value={draft.annualExpenseTargetBasis}
+							onChange={(annualExpenseTargetBasis) =>
+								setDraft((current) => ({
+									...current,
+									annualExpenseTargetBasis,
+								}))
+							}
+						/>
 					</FinancialIndependenceEditorSection>
 
 					<FinancialIndependenceEditorSection

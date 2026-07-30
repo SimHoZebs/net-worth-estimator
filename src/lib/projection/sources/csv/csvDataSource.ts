@@ -45,6 +45,9 @@ const financialModelDocumentSchema = z.object({
 				config: z.object({
 					minimumNetWorth: finiteNumber,
 					annualExpenseTarget: finiteNumber,
+					annualExpenseTargetBasis: z
+						.enum(["projection-start-purchasing-power", "fi-date-dollars"])
+						.default("projection-start-purchasing-power"),
 					annualExpenseGrowthRate: finiteNumber,
 					withdrawalRate: finiteNumber,
 					evaluationYears: finiteNumber,

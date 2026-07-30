@@ -24,6 +24,7 @@ export {
 	type FinancialIndependenceCandidateWithdrawalDiagnostic,
 	type FinancialIndependenceProbabilisticResult,
 	normalizeFinancialIndependencePlan,
+	selectFinancialIndependenceOutcomeIndex,
 	validateFinancialIndependencePlan,
 } from "./evaluation/financialIndependence";
 export { isJsonValue } from "./evaluation/json";
@@ -116,7 +117,9 @@ export type {
 	EvaluationType,
 	FinancialIndependenceAnalysis,
 	FinancialIndependenceAssetContribution,
+	FinancialIndependenceBalanceTrajectoryRow,
 	FinancialIndependenceEvaluation,
+	FinancialIndependenceExpenseBasis,
 	FinancialIndependencePlan,
 	FinancialIndependencePrincipalPolicy,
 	FinancialIndependenceRow,

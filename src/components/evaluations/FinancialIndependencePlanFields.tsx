@@ -1,6 +1,7 @@
 import { type ReactNode, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type {
+	FinancialIndependenceExpenseBasis,
 	FinancialIndependencePlan,
 	FinancialIndependencePrincipalPolicy,
 	Posting,
@@ -78,55 +79,36 @@ export function FiNumberField({
 	);
 }
 
-const portfolioPolicies: Array<{
-	value: FinancialIndependencePrincipalPolicy;
+interface ChoiceCardOption<TValue extends string> {
+	value: TValue;
 	label: string;
-	badge: string;
-	description: (plan: FinancialIndependencePlan) => string;
-}> = [
-	{
-		value: "preserve-real-principal",
-		label: "Preserve purchasing power",
-		badge: "Strictest",
-		description: (plan) =>
-			`Fund all spending and finish ${plan.evaluationYears} years with selected assets worth at least their starting value after ${formatPercent(plan.annualExpenseGrowthRate)} yearly spending inflation.`,
-	},
-	{
-		value: "preserve-nominal-principal",
-		label: "Preserve starting dollars",
-		badge: "Moderate",
-		description: (plan) =>
-			`Fund all spending and finish ${plan.evaluationYears} years with at least the starting dollar balance in selected assets. Purchasing power may decline.`,
-	},
-	{
-		value: "allow-drawdown",
-		label: "Allow portfolio drawdown",
-		badge: "Most flexible",
-		description: (plan) =>
-			`Fund all spending for ${plan.evaluationYears} years. Selected assets may finish below their starting balance or near zero.`,
-	},
-];
+	badge?: string;
+	description: ReactNode;
+}
 
-export function EndingPortfolioPolicy({
-	plan,
+function FiChoiceCards<TValue extends string>({
+	legend,
+	description,
+	value,
+	options,
 	onChange,
+	columns,
 }: {
-	plan: FinancialIndependencePlan;
-	onChange: (policy: FinancialIndependencePrincipalPolicy) => void;
+	legend: string;
+	description: string;
+	value: TValue;
+	options: Array<ChoiceCardOption<TValue>>;
+	onChange: (value: TValue) => void;
+	columns: string;
 }) {
 	const groupName = useId();
 	return (
 		<fieldset>
-			<legend className="type-label text-foreground">
-				Ending portfolio requirement
-			</legend>
-			<p className="mt-0.5 type-caption text-muted-foreground">
-				This rule is checked after every expense in the FI test period has been
-				funded.
-			</p>
-			<div className="mt-3 grid gap-2 xl:grid-cols-3">
-				{portfolioPolicies.map((option) => {
-					const selected = plan.principalPolicy === option.value;
+			<legend className="type-label text-foreground">{legend}</legend>
+			<p className="mt-0.5 type-caption text-muted-foreground">{description}</p>
+			<div className={`mt-3 grid gap-2 ${columns}`}>
+				{options.map((option) => {
+					const selected = value === option.value;
 					return (
 						<label
 							key={option.value}
@@ -150,19 +132,103 @@ export function EndingPortfolioPolicy({
 									<span className="block type-label text-foreground">
 										{option.label}
 									</span>
-									<span className="mt-1 inline-block rounded-full border border-border/70 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-										{option.badge}
-									</span>
+									{option.badge ? (
+										<span className="mt-1 inline-block rounded-full border border-border/70 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+											{option.badge}
+										</span>
+									) : null}
 								</span>
 							</span>
 							<span className="mt-3 block type-caption leading-relaxed text-muted-foreground">
-								{option.description(plan)}
+								{option.description}
 							</span>
 						</label>
 					);
 				})}
 			</div>
 		</fieldset>
+	);
+}
+
+const spendingBasisOptions: Array<
+	ChoiceCardOption<FinancialIndependenceExpenseBasis>
+> = [
+	{
+		value: "projection-start-purchasing-power",
+		label: "Today's purchasing power",
+		badge: "Inflation-adjusted",
+		description:
+			"Treat the entered amount as purchasing power at the projection start (normally today) and inflate it through each tested FI date.",
+	},
+	{
+		value: "fi-date-dollars",
+		label: "Dollars at FI start",
+		badge: "Fixed target",
+		description:
+			"Use the entered amount as first-year spending for every tested FI date. Inflation begins from that date.",
+	},
+];
+
+export function SpendingValueBasis({
+	value,
+	onChange,
+}: {
+	value: FinancialIndependenceExpenseBasis;
+	onChange: (basis: FinancialIndependenceExpenseBasis) => void;
+}) {
+	return (
+		<FiChoiceCards
+			legend="Spending value"
+			description="Choose when the entered annual spending amount is valued."
+			value={value}
+			options={spendingBasisOptions}
+			onChange={onChange}
+			columns="md:grid-cols-2"
+		/>
+	);
+}
+
+function portfolioPolicies(
+	plan: FinancialIndependencePlan,
+): Array<ChoiceCardOption<FinancialIndependencePrincipalPolicy>> {
+	return [
+		{
+			value: "preserve-real-principal",
+			label: "Preserve purchasing power",
+			badge: "Strictest",
+			description: `Fund all spending and finish ${plan.evaluationYears} years with selected assets worth at least their starting value after ${formatPercent(plan.annualExpenseGrowthRate)} yearly spending inflation.`,
+		},
+		{
+			value: "preserve-nominal-principal",
+			label: "Preserve starting dollars",
+			badge: "Moderate",
+			description: `Fund all spending and finish ${plan.evaluationYears} years with at least the starting dollar balance in selected assets. Purchasing power may decline.`,
+		},
+		{
+			value: "allow-drawdown",
+			label: "Allow portfolio drawdown",
+			badge: "Most flexible",
+			description: `Fund all spending for ${plan.evaluationYears} years. Selected assets may finish below their starting balance or near zero.`,
+		},
+	];
+}
+
+export function EndingPortfolioPolicy({
+	plan,
+	onChange,
+}: {
+	plan: FinancialIndependencePlan;
+	onChange: (policy: FinancialIndependencePrincipalPolicy) => void;
+}) {
+	return (
+		<FiChoiceCards
+			legend="Ending portfolio requirement"
+			description="This rule is checked after every expense in the FI test period has been funded."
+			value={plan.principalPolicy}
+			options={portfolioPolicies(plan)}
+			onChange={onChange}
+			columns="xl:grid-cols-3"
+		/>
 	);
 }
 

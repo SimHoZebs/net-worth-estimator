@@ -59,6 +59,10 @@ export type FinancialIndependencePrincipalPolicy =
 	| "preserve-nominal-principal"
 	| "preserve-real-principal";
 
+export type FinancialIndependenceExpenseBasis =
+	| "projection-start-purchasing-power"
+	| "fi-date-dollars";
+
 export type FinancialIndependenceSource =
 	| {
 			type: "cashflow";
@@ -76,6 +80,7 @@ export type FinancialIndependenceSource =
 export interface FinancialIndependencePlan {
 	minimumNetWorth: number;
 	annualExpenseTarget: number;
+	annualExpenseTargetBasis: FinancialIndependenceExpenseBasis;
 	annualExpenseGrowthRate: number;
 	withdrawalRate: number;
 	evaluationYears: number;
@@ -273,6 +278,14 @@ export interface FinancialIndependenceAssetContribution {
 	annualWithdrawalCapacity: number;
 }
 
+export interface FinancialIndependenceBalanceTrajectoryRow {
+	date: IsoDate;
+	accounts: Array<{
+		accountId: string;
+		balance: number;
+	}>;
+}
+
 export interface FinancialIndependenceRunOutcome {
 	candidateDate: IsoDate;
 	status: "ineligible" | "evaluated";
@@ -287,6 +300,7 @@ export interface FinancialIndependenceRunOutcome {
 	principalReplenished: boolean;
 	cycleEstablished: boolean;
 	withdrawals: FinancialIndependenceWithdrawalSummary;
+	balanceTrajectory: FinancialIndependenceBalanceTrajectoryRow[];
 }
 
 export interface FinancialIndependenceWithdrawalAccountSummary {
