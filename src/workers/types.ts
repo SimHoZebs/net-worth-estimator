@@ -8,6 +8,7 @@ import type {
 	ProjectionRuntimeSettings,
 	RawProjectionOutput,
 	StochasticConfig,
+	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 
@@ -61,7 +62,7 @@ export interface StochasticWorkerRequest {
 
 export interface StochasticWorkerProgress {
 	id: number;
-	progress: number;
+	progress: StochasticProgress;
 	type: "progress";
 	partial?: StochasticProjectionResult;
 }
@@ -117,7 +118,20 @@ export function isStochasticWorkerProgressEnvelope(
 	return (
 		value.type === "progress" &&
 		typeof value.id === "number" &&
-		typeof value.progress === "number"
+		isStochasticProgress(value.progress)
+	);
+}
+
+function isStochasticProgress(value: unknown): value is StochasticProgress {
+	if (!isWorkerRecord(value)) return false;
+	return (
+		(value.phase === "preparing" ||
+			value.phase === "deterministic-evaluations" ||
+			value.phase === "stochastic-runs") &&
+		typeof value.completedRuns === "number" &&
+		typeof value.totalRuns === "number" &&
+		typeof value.fraction === "number" &&
+		Array.isArray(value.evaluationWorkloads)
 	);
 }
 

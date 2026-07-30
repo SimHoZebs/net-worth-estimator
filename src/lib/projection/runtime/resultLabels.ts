@@ -3,7 +3,10 @@ import type {
 	EvaluationTables,
 	ProjectionResult,
 } from "../types/model";
-import type { StochasticProjectionResult } from "../types/stochastic";
+import type {
+	StochasticProgress,
+	StochasticProjectionResult,
+} from "../types/stochastic";
 
 function labelResultCollection<T extends EvaluationResultCollection>(
 	result: T,
@@ -57,5 +60,21 @@ export function labelStochasticResult(
 	return {
 		...labelResultCollection(result, evaluations),
 		deterministic: labelResultCollection(result.deterministic, evaluations),
+	};
+}
+
+export function labelStochasticProgress(
+	progress: StochasticProgress,
+	evaluations: EvaluationTables,
+): StochasticProgress {
+	return {
+		...progress,
+		evaluationWorkloads: progress.evaluationWorkloads.map((workload) => ({
+			...workload,
+			label:
+				evaluations[workload.type].find(
+					(item) => item.instanceId === workload.instanceId,
+				)?.label ?? workload.label,
+		})),
 	};
 }

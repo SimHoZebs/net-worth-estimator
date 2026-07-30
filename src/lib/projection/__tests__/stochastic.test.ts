@@ -12,12 +12,18 @@ import {
 	stochasticProject,
 } from "../";
 import { makePosting, makeSettings, validCsvFiles } from "../__fixtures__";
-import { buildSampleCountsByPostingId } from "../analysis/projectStochastic";
+import {
+	buildSampleCountsByPostingId,
+	getStochasticProgressUpdateRunInterval,
+} from "../analysis/projectStochastic";
 import type {
 	FinancialIndependencePlan,
 	ProjectionRuntimeSettings,
 } from "../types/model";
-import type { StochasticProjectionResult } from "../types/stochastic";
+import type {
+	StochasticProgress,
+	StochasticProjectionResult,
+} from "../types/stochastic";
 
 function withFiPlan(
 	overrides: Partial<ProjectionRuntimeSettings>,
@@ -266,7 +272,9 @@ describe("stochastic projection", () => {
 				disabledPostingIds: [],
 			},
 			{ runCount: 50, seed: 42 },
-			(_progress, partial) => partials.push(partial),
+			(_progress, partial) => {
+				if (partial) partials.push(partial);
+			},
 		);
 
 		expect(fiResult(result)?.fiCycleSuccessProbability).toBe(1);
@@ -434,6 +442,11 @@ describe("stochastic projection", () => {
 });
 
 describe("stochastic progress streaming", () => {
+	it("keeps lightweight progress points inside 50-run result batches", () => {
+		expect(getStochasticProgressUpdateRunInterval(1000)).toBe(5);
+		expect(getStochasticProgressUpdateRunInterval(10_000)).toBe(25);
+	});
+
 	it("streams partials without changing the seeded result", () => {
 		const { data: document } = parseCsvFinancialModel(validCsvFiles);
 		if (!document) throw new Error("Document is null");
@@ -457,7 +470,7 @@ describe("stochastic progress streaming", () => {
 			config,
 		);
 
-		const progressValues: number[] = [];
+		const progressValues: StochasticProgress[] = [];
 		const partials: StochasticProjectionResult[] = [];
 		const resultWith = stochasticProject(
 			document,
@@ -466,16 +479,39 @@ describe("stochastic progress streaming", () => {
 			config,
 			(progress, partial) => {
 				progressValues.push(progress);
-				partials.push(partial);
+				if (partial) partials.push(partial);
 			},
 		);
 
 		expect(resultWith).toEqual(resultWithout);
-		expect(progressValues).toHaveLength(3);
-		expect(progressValues[progressValues.length - 1]).toBe(1);
-		for (let i = 1; i < progressValues.length; i++) {
-			expect(progressValues[i]).toBeGreaterThan(progressValues[i - 1]);
+		expect(progressValues.slice(0, 3).map((item) => item.phase)).toEqual([
+			"preparing",
+			"deterministic-evaluations",
+			"stochastic-runs",
+		]);
+		const plannedFiWorkload = progressValues[1]?.evaluationWorkloads.find(
+			(item) => item.type === "financialIndependence",
+		);
+		expect(plannedFiWorkload).toEqual(
+			expect.objectContaining({
+				instanceId: "fi",
+				totalUnits: 49 * config.runCount,
+				unitLabel: "monthly start dates",
+				unitAction: "checked",
+				intensiveUnitLabel: "full 1-year sustainability cycles",
+				intensiveUnitAction: "simulated",
+			}),
+		);
+		const runProgress = progressValues.filter(
+			(item) => item.phase === "stochastic-runs",
+		);
+		expect(runProgress[runProgress.length - 1]?.fraction).toBe(1);
+		for (let i = 1; i < runProgress.length; i++) {
+			expect(runProgress[i]!.fraction).toBeGreaterThanOrEqual(
+				runProgress[i - 1]!.fraction,
+			);
 		}
+		expect(partials).toHaveLength(3);
 		for (const partial of partials) {
 			expect(partial.bands.length).toBeGreaterThan(0);
 			for (const band of partial.bands) {
@@ -493,7 +529,7 @@ describe("stochastic progress streaming", () => {
 		if (!document) throw new Error("Document is null");
 		expect(document).not.toBeNull();
 
-		const progressValues: number[] = [];
+		const progressValues: StochasticProgress[] = [];
 		stochasticProject(
 			document,
 			makeSettings({
@@ -510,7 +546,12 @@ describe("stochastic progress streaming", () => {
 			(p) => progressValues.push(p),
 		);
 
-		expect(progressValues.length).toBe(1);
-		expect(progressValues[0]).toBe(1);
+		expect(progressValues.map((item) => item.phase)).toEqual([
+			"preparing",
+			"deterministic-evaluations",
+			"stochastic-runs",
+			"stochastic-runs",
+		]);
+		expect(progressValues[3]?.fraction).toBe(1);
 	});
 });

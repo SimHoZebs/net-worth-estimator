@@ -171,6 +171,9 @@ export type {
 	PercentileBands,
 	StochasticBandRow,
 	StochasticConfig,
+	StochasticEvaluationWorkload,
+	StochasticProgress,
+	StochasticProgressPhase,
 	StochasticProjectionResult,
 } from "./types/stochastic";
 export type {

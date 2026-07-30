@@ -8,6 +8,7 @@ import type {
 	ProjectionRuntimeSettings,
 	RawProjectionOutput,
 	StochasticConfig,
+	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 
@@ -29,7 +30,7 @@ export interface ProjectionEvaluationRequest {
 }
 
 export type ProgressCallback = (
-	progress: number,
+	progress: StochasticProgress,
 	partial?: StochasticProjectionResult,
 ) => void;
 

@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useContext } from "react";
 import type {
 	ProjectionResult,
+	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import type { ComparisonMetrics } from "@/store";
@@ -35,9 +36,9 @@ const ProjectionExecutionContext = createContext<ProjectionExecution | null>(
 );
 const ProjectionCapabilitiesContext =
 	createContext<ProjectionCapabilities | null>(null);
-const StochasticProgressContext = createContext<number | null | undefined>(
-	undefined,
-);
+const StochasticProgressContext = createContext<
+	StochasticProgress | null | undefined
+>(undefined);
 
 export function ProjectionRuntimeProvider({
 	artifacts,
@@ -49,7 +50,7 @@ export function ProjectionRuntimeProvider({
 	artifacts: ProjectionArtifacts;
 	execution: ProjectionExecution;
 	capabilities: ProjectionCapabilities;
-	stochasticProgress: number | null;
+	stochasticProgress: StochasticProgress | null;
 	children: ReactNode;
 }) {
 	return (

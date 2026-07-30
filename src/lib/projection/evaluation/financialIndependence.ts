@@ -1017,6 +1017,24 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 	type: "financialIndependence",
 	label: "Financial independence",
 	validateConfig: validateFinancialIndependencePlan,
+	describeStochasticWork({ path }, config) {
+		const candidateCount = buildFinancialIndependenceCandidateDates(
+			path.projectionStartDate,
+			path.projectionEndDate,
+			config.evaluationYears,
+		).length;
+		return {
+			unitsPerRun: candidateCount,
+			unitLabel: "monthly start dates",
+			unitAction: "checked",
+			intensiveUnitLabel: `full ${config.evaluationYears}-year sustainability cycles`,
+			intensiveUnitAction: "simulated",
+			description:
+				candidateCount === 0
+					? `No complete ${config.evaluationYears}-year FI test fits in this projection horizon.`
+					: `Every start date is checked; eligible dates run the complete ${config.evaluationYears}-year test.`,
+		};
+	},
 	diagnoseConfig({ path }, config) {
 		const accountIds = new Set(
 			path.effectiveDocument.accounts.map((account) => account.id),
@@ -1099,6 +1117,14 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 		});
 		accumulator.runCount++;
 		if (runSucceeded) accumulator.successfulRunCount++;
+	},
+	measureStochasticWork(accumulator) {
+		return {
+			intensiveUnitsCompleted: accumulator.diagnosticRunCounts.reduce(
+				(sum, count) => sum + count,
+				0,
+			),
+		};
 	},
 	finalize(accumulator) {
 		let medianCoverageDate: IsoDate | null = null;

@@ -1,3 +1,4 @@
+import { StochasticProgressDetails } from "@/components/StochasticProgressDetails";
 import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { useDebouncedStochasticConfig } from "@/hooks/useDebouncedStochasticConfig";
@@ -29,10 +30,11 @@ export function StochasticControls() {
 		applyImmediately,
 	} = useDebouncedStochasticConfig(config, onConfigChange);
 
-	const progressPct = progress !== null ? Math.round(progress * 100) : null;
+	const progressPct =
+		progress !== null ? Math.round(progress.fraction * 100) : null;
 	const statusLabel = isRunning
 		? progressPct !== null
-			? `Computing ${config.runCount} projections — ${progressPct}%`
+			? `Computing ${config.runCount} projections - ${progressPct}%`
 			: `Computing ${config.runCount} projections…`
 		: hasStochasticResult
 			? `Ready — ${config.runCount} run${config.runCount === 1 ? "" : "s"}${config.seed !== null ? ` (seed ${config.seed})` : ""}`
@@ -144,6 +146,9 @@ export function StochasticControls() {
 											style={{ width: `${progressPct}%` }}
 										/>
 									</div>
+									{progress ? (
+										<StochasticProgressDetails progress={progress} compact />
+									) : null}
 								</div>
 							) : null}
 							<div className="rounded-xl border border-border/70 bg-surface/70 px-4 py-3 dark:border-white/10 dark:bg-surface/50">

@@ -5,6 +5,7 @@ import type {
 	ModelOverrides,
 	ProjectionRuntimeSettings,
 	StochasticConfig,
+	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import { applyModelOverrides } from "@/lib/projection";
@@ -16,13 +17,14 @@ import {
 } from "@/lib/projection/runtime/computationIdentity";
 import { normalizeStochasticConfig } from "@/lib/projection/utils/stochastic";
 import {
+	labelStochasticProgress,
 	labelStochasticResult,
 	projectionComputationSettingsKey,
 } from "./projectionComputationSettings";
 import type { ProjectionHookState } from "./types";
 
 interface StochasticState
-	extends ProjectionHookState<StochasticProjectionResult> {
+	extends ProjectionHookState<StochasticProjectionResult, StochasticProgress> {
 	requestKey: string | null;
 	resultBaseKey: string | null;
 }
@@ -30,14 +32,16 @@ interface StochasticState
 function publicState(
 	state: StochasticState,
 	evaluations: ProjectionRuntimeSettings["evaluations"],
-): ProjectionHookState<StochasticProjectionResult> {
+): ProjectionHookState<StochasticProjectionResult, StochasticProgress> {
 	return {
 		result: state.result
 			? labelStochasticResult(state.result, evaluations)
 			: null,
 		runtimeError: state.runtimeError,
 		isRunning: state.isRunning,
-		progress: state.progress,
+		progress: state.progress
+			? labelStochasticProgress(state.progress, evaluations)
+			: null,
 		resultIsStale: state.resultIsStale,
 	};
 }
@@ -48,7 +52,7 @@ export function useStochastic(
 	overrides: ModelOverrides,
 	config: StochasticConfig | null,
 	enabled: boolean,
-): ProjectionHookState<StochasticProjectionResult> {
+): ProjectionHookState<StochasticProjectionResult, StochasticProgress> {
 	const engine = useProjectionEngine();
 	const computationSettingsKey =
 		projectionComputationSettingsKey(projectionSettings);
