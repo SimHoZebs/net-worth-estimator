@@ -141,6 +141,13 @@ describe("WorkerProjectionEngine", () => {
 		const partial = {
 			config: { runCount: 1, seed: 1 },
 		} as StochasticProjectionResult;
+		const progress = {
+			phase: "stochastic-runs" as const,
+			completedRuns: 1,
+			totalRuns: 2,
+			fraction: 0.5,
+			evaluationWorkloads: [],
+		};
 		const request = {
 			document: createBaseDocument(),
 			projectionSettings: makeSettings(),
@@ -152,13 +159,13 @@ describe("WorkerProjectionEngine", () => {
 		expect(worker.postMessage).toHaveBeenCalledWith({ id: 1, ...request });
 
 		worker.onmessage?.({
-			data: { id: 1, type: "progress", progress: 0.5, partial },
+			data: { id: 1, type: "progress", progress, partial },
 		} as MessageEvent);
 		worker.onmessage?.({
 			data: { id: 1, type: "result", result: expected, runtimeError: null },
 		} as MessageEvent);
 
-		expect(onProgress).toHaveBeenCalledWith(0.5, partial);
+		expect(onProgress).toHaveBeenCalledWith(progress, partial);
 		await expect(promise).resolves.toBe(expected);
 		expect(worker.terminate).toHaveBeenCalledOnce();
 	});
@@ -418,7 +425,17 @@ describe("WorkerProjectionEngine", () => {
 		const worker = MockWorker.instances[0]!;
 
 		worker.onmessage?.({
-			data: { id: 1, type: "progress", progress: 0.5 },
+			data: {
+				id: 1,
+				type: "progress",
+				progress: {
+					phase: "stochastic-runs",
+					completedRuns: 1,
+					totalRuns: 2,
+					fraction: 0.5,
+					evaluationWorkloads: [],
+				},
+			},
 		} as MessageEvent);
 
 		await expect(promise).rejects.toThrow("Progress failed");

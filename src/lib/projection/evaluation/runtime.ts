@@ -12,6 +12,7 @@ import type {
 } from "../types/model";
 import { EVALUATION_TYPE_ORDER } from "../types/model";
 import type { MonteCarloSample } from "../types/simulation";
+import type { StochasticEvaluationWorkload } from "../types/stochastic";
 import { isJsonValue } from "./json";
 
 export interface EvaluationContext {
@@ -25,6 +26,19 @@ export interface EvaluationFinalizeContext {
 	document: FinancialModelDocument;
 	deterministicPath: ProjectionPath;
 	runCount: number;
+}
+
+export interface EvaluationWorkloadPlan {
+	unitsPerRun: number;
+	unitLabel: string;
+	unitAction: string;
+	intensiveUnitLabel?: string;
+	intensiveUnitAction?: string;
+	description?: string;
+}
+
+export interface EvaluationWorkloadMeasurement {
+	intensiveUnitsCompleted?: number;
 }
 
 export interface EvaluationDefinition<
@@ -50,6 +64,13 @@ export interface EvaluationDefinition<
 		deterministic: TPathResult | null,
 		probabilistic: TProbabilisticResult | null,
 	): EvaluationResultStatus;
+	describeStochasticWork?(
+		context: EvaluationContext,
+		config: TConfig,
+	): EvaluationWorkloadPlan | null;
+	measureStochasticWork?(
+		accumulator: TAccumulator,
+	): EvaluationWorkloadMeasurement | null;
 	diagnoseConfig?(
 		context: EvaluationContext,
 		config: TConfig,
@@ -104,6 +125,7 @@ class EvaluationInstanceRuntime {
 	private probabilistic: JsonValue | null = null;
 	private accumulator: unknown = null;
 	private stochasticFailed = false;
+	private workloadPlan: EvaluationWorkloadPlan | null = null;
 	private readonly diagnostics: EvaluationDiagnostic[];
 
 	constructor(
@@ -140,6 +162,19 @@ class EvaluationInstanceRuntime {
 			this.deterministic = result;
 		} catch (error) {
 			this.diagnostics.push(errorDiagnostic("evaluation-runtime-error", error));
+		}
+	}
+
+	prepareStochasticWork(context: EvaluationContext): void {
+		if (!this.definition || this.hasErrors()) return;
+		try {
+			const plan = this.definition.describeStochasticWork?.(
+				context,
+				this.configured.config,
+			);
+			this.workloadPlan = isEvaluationWorkloadPlan(plan) ? plan : null;
+		} catch {
+			this.workloadPlan = null;
 		}
 	}
 
@@ -193,6 +228,47 @@ class EvaluationInstanceRuntime {
 		}
 	}
 
+	workloadProgress(
+		completedRuns: number,
+		totalRuns: number,
+	): StochasticEvaluationWorkload | null {
+		if (this.workloadPlan === null) return null;
+		let measurement: EvaluationWorkloadMeasurement | null = null;
+		if (this.accumulator !== null && !this.stochasticFailed) {
+			try {
+				const candidate = this.definition?.measureStochasticWork?.(
+					this.accumulator,
+				);
+				if (isEvaluationWorkloadMeasurement(candidate)) measurement = candidate;
+			} catch {
+				measurement = null;
+			}
+		}
+		return {
+			type: this.type,
+			instanceId: this.instanceId,
+			label: this.configured.label,
+			completedUnits: completedRuns * this.workloadPlan.unitsPerRun,
+			totalUnits: totalRuns * this.workloadPlan.unitsPerRun,
+			unitLabel: this.workloadPlan.unitLabel,
+			unitAction: this.workloadPlan.unitAction,
+			...(this.workloadPlan.intensiveUnitLabel
+				? { intensiveUnitLabel: this.workloadPlan.intensiveUnitLabel }
+				: {}),
+			...(this.workloadPlan.intensiveUnitAction
+				? { intensiveUnitAction: this.workloadPlan.intensiveUnitAction }
+				: {}),
+			...(measurement?.intensiveUnitsCompleted !== undefined
+				? {
+						intensiveUnitsCompleted: measurement.intensiveUnitsCompleted,
+					}
+				: {}),
+			...(this.workloadPlan.description
+				? { description: this.workloadPlan.description }
+				: {}),
+		};
+	}
+
 	envelope(): EvaluationResultEnvelope {
 		let status: EvaluationResultStatus = "indeterminate";
 		if (this.hasErrors()) {
@@ -220,6 +296,43 @@ class EvaluationInstanceRuntime {
 	private hasErrors(): boolean {
 		return this.diagnostics.some((item) => item.severity === "error");
 	}
+}
+
+function isNonNegativeFinite(value: unknown): value is number {
+	return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isEvaluationWorkloadPlan(
+	value: EvaluationWorkloadPlan | null | undefined,
+): value is EvaluationWorkloadPlan {
+	return Boolean(
+		value &&
+			isNonNegativeFinite(value.unitsPerRun) &&
+			Number.isInteger(value.unitsPerRun) &&
+			typeof value.unitLabel === "string" &&
+			value.unitLabel.trim() &&
+			typeof value.unitAction === "string" &&
+			value.unitAction.trim() &&
+			(value.intensiveUnitLabel === undefined ||
+				typeof value.intensiveUnitLabel === "string") &&
+			(value.intensiveUnitAction === undefined ||
+				typeof value.intensiveUnitAction === "string") &&
+			(value.description === undefined ||
+				typeof value.description === "string") &&
+			isJsonValue(value),
+	);
+}
+
+function isEvaluationWorkloadMeasurement(
+	value: EvaluationWorkloadMeasurement | null | undefined,
+): value is EvaluationWorkloadMeasurement {
+	return Boolean(
+		value &&
+			(value.intensiveUnitsCompleted === undefined ||
+				(isNonNegativeFinite(value.intensiveUnitsCompleted) &&
+					Number.isInteger(value.intensiveUnitsCompleted))) &&
+			isJsonValue(value),
+	);
 }
 
 export class EvaluationRuntimeSet {
@@ -305,6 +418,12 @@ export class EvaluationRuntimeSet {
 		for (const runtime of this.runtimes) runtime.evaluateDeterministic(context);
 	}
 
+	prepareStochasticWork(context: EvaluationContext): void {
+		for (const runtime of this.runtimes) {
+			runtime.prepareStochasticWork(context);
+		}
+	}
+
 	startStochastic(): void {
 		for (const runtime of this.runtimes) runtime.startStochastic();
 	}
@@ -315,6 +434,16 @@ export class EvaluationRuntimeSet {
 
 	finalize(context: EvaluationFinalizeContext): void {
 		for (const runtime of this.runtimes) runtime.finalize(context);
+	}
+
+	workloadProgress(
+		completedRuns: number,
+		totalRuns: number,
+	): StochasticEvaluationWorkload[] {
+		return this.runtimes.flatMap((runtime) => {
+			const progress = runtime.workloadProgress(completedRuns, totalRuns);
+			return progress === null ? [] : [progress];
+		});
 	}
 
 	result(): EvaluationResultCollection {

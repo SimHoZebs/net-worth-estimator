@@ -17,6 +17,8 @@ import type { MonteCarloSample } from "../types/simulation";
 import type {
 	StochasticBandRow,
 	StochasticConfig,
+	StochasticProgress,
+	StochasticProgressPhase,
 	StochasticProjectionResult,
 } from "../types/stochastic";
 import { projectionYearIndex } from "../utils/date";
@@ -121,15 +123,47 @@ function buildResult(
 }
 
 const STOCHASTIC_PROGRESS_BATCH = 50;
+const STOCHASTIC_PROGRESS_TARGET_UPDATES = 200;
+const STOCHASTIC_PROGRESS_MIN_INTERVAL_MS = 250;
+
+export function getStochasticProgressUpdateRunInterval(runCount: number) {
+	return Math.max(
+		1,
+		Math.min(
+			Math.ceil(runCount / STOCHASTIC_PROGRESS_TARGET_UPDATES),
+			STOCHASTIC_PROGRESS_BATCH / 2,
+		),
+	);
+}
 
 export function stochasticProject(
 	document: FinancialModelDocument,
 	projectionSettings: ProjectionRuntimeSettings,
 	overrides: ModelOverrides,
 	config: StochasticConfig,
-	onProgress?: (progress: number, partial: StochasticProjectionResult) => void,
+	onProgress?: (
+		progress: StochasticProgress,
+		partial?: StochasticProjectionResult,
+	) => void,
 ): StochasticProjectionResult {
 	const normalizedConfig = normalizeStochasticConfig(config);
+	const progressUpdateRuns = getStochasticProgressUpdateRunInterval(
+		normalizedConfig.runCount,
+	);
+	const progress = (
+		phase: StochasticProgressPhase,
+		completedRuns: number,
+	): StochasticProgress => ({
+		phase,
+		completedRuns,
+		totalRuns: normalizedConfig.runCount,
+		fraction: completedRuns / normalizedConfig.runCount,
+		evaluationWorkloads:
+			phase === "preparing"
+				? []
+				: runtimes.workloadProgress(completedRuns, normalizedConfig.runCount),
+	});
+	onProgress?.(progress("preparing", 0));
 	const sampleLogNormal = createStochasticSampler(normalizedConfig.seed);
 	const prepared = prepareSimulationRequest(
 		document,
@@ -151,12 +185,19 @@ export function stochasticProject(
 		projectionSettings.evaluations,
 		evaluationRegistry,
 	);
+	runtimes.prepareStochasticWork({
+		path: deterministicRaw.path,
+		document: deterministicRaw.path.effectiveDocument,
+		detailLevel: "summary",
+	});
+	onProgress?.(progress("deterministic-evaluations", 0));
 	runtimes.evaluateDeterministic({
 		path: deterministicRaw.path,
 		document: deterministicRaw.path.effectiveDocument,
 		detailLevel: "summary",
 	});
 	runtimes.startStochastic();
+	onProgress?.(progress("stochastic-runs", 0));
 	const deterministic: ProjectionResult = {
 		...deterministicRaw.result,
 		...runtimes.result(),
@@ -164,6 +205,7 @@ export function stochasticProject(
 	const sortedDates = deterministic.timeline.rows.map((row) => row.date);
 	const sortedValuesByDate = new Map<string, number[]>();
 	const isHistoricalByDate = new Map<string, boolean>();
+	let lastLightweightProgressAt = performance.now();
 
 	for (
 		let batchStart = 0;
@@ -205,6 +247,18 @@ export function stochasticProject(
 					isHistoricalByDate.set(row.date, row.isHistorical);
 				}
 			}
+			const completedRuns = run + 1;
+			const now = performance.now();
+			if (
+				completedRuns < batchEnd &&
+				(completedRuns === 1 ||
+					(completedRuns % progressUpdateRuns === 0 &&
+						now - lastLightweightProgressAt >=
+							STOCHASTIC_PROGRESS_MIN_INTERVAL_MS))
+			) {
+				onProgress?.(progress("stochastic-runs", completedRuns));
+				lastLightweightProgressAt = now;
+			}
 		}
 		for (const [date, values] of batchValues) {
 			values.sort((left, right) => left - right);
@@ -220,7 +274,7 @@ export function stochasticProject(
 			runCount: batchEnd,
 		});
 		onProgress?.(
-			batchEnd / normalizedConfig.runCount,
+			progress("stochastic-runs", batchEnd),
 			buildResult(
 				normalizedConfig,
 				deterministic,

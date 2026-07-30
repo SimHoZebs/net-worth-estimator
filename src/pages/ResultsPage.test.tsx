@@ -4,7 +4,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBaseDocument } from "@/lib/projection/__fixtures__";
-import { RuntimeFixtureProviders } from "@/test/runtimeFixtures";
+import {
+	createStochasticProgressFixture,
+	RuntimeFixtureProviders,
+} from "@/test/runtimeFixtures";
 import { ResultsPage } from "./ResultsPage";
 
 vi.mock("@/components/ProjectionDashboard", () => ({
@@ -56,7 +59,24 @@ describe("ResultsPage", () => {
 							isProjecting: true,
 							isStochasticRunning: true,
 						}}
-						stochasticProgress={0.37}
+						stochasticProgress={createStochasticProgressFixture({
+							completedRuns: 370,
+							fraction: 0.37,
+							evaluationWorkloads: [
+								{
+									type: "financialIndependence",
+									instanceId: "fi",
+									label: "Financial independence",
+									completedUnits: 22_570,
+									totalUnits: 61_000,
+									unitLabel: "monthly start dates",
+									unitAction: "checked",
+									intensiveUnitsCompleted: 1_246,
+									intensiveUnitLabel: "full 10-year sustainability cycles",
+									intensiveUnitAction: "simulated",
+								},
+							],
+						})}
 					>
 						<ResultsPage />
 					</RuntimeFixtureProviders>
@@ -71,6 +91,13 @@ describe("ResultsPage", () => {
 			"Updating projection and Monte Carlo analysis",
 		);
 		expect(activity.textContent).toContain("37%");
+		expect(activity.textContent).toContain("370 / 1,000 Monte Carlo paths");
+		expect(activity.textContent).toContain(
+			"22,570 / 61,000 monthly start dates checked",
+		);
+		expect(activity.textContent).toContain(
+			"1,246 full 10-year sustainability cycles simulated",
+		);
 	});
 
 	it("shows stochastic activity after deterministic evaluation finishes", () => {
@@ -81,7 +108,10 @@ describe("ResultsPage", () => {
 					<RuntimeFixtureProviders
 						model={{ document: createBaseDocument() }}
 						execution={{ isStochasticRunning: true }}
-						stochasticProgress={0.64}
+						stochasticProgress={createStochasticProgressFixture({
+							completedRuns: 640,
+							fraction: 0.64,
+						})}
 					>
 						<ResultsPage />
 					</RuntimeFixtureProviders>

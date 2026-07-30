@@ -1,7 +1,7 @@
-export interface ProjectionHookState<TResult> {
+export interface ProjectionHookState<TResult, TProgress = number> {
 	result: TResult | null;
 	runtimeError: string | null;
 	isRunning: boolean;
-	progress: number | null;
+	progress: TProgress | null;
 	resultIsStale: boolean;
 }

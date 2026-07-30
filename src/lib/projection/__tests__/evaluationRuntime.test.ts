@@ -238,6 +238,71 @@ describe("evaluation registry and runtime", () => {
 		expect(resultFor(runtimes, "counter")?.probabilistic).toBe(4);
 	});
 
+	it("reports evaluator-owned stochastic workload without exposing accumulator details", () => {
+		const definition = countingDefinition();
+		definition.describeStochasticWork = () => ({
+			unitsPerRun: 3,
+			unitLabel: "checks",
+			unitAction: "completed",
+			intensiveUnitLabel: "deep checks",
+			intensiveUnitAction: "completed",
+		});
+		definition.measureStochasticWork = (accumulator) => ({
+			intensiveUnitsCompleted: accumulator.total,
+		});
+		const runtimes = new EvaluationRuntimeSet(
+			testTables([
+				{
+					instanceId: "counter",
+					label: "Counter",
+					enabled: true,
+					config: 2,
+				},
+			]),
+			new EvaluationRegistry([definition]),
+		);
+
+		runtimes.prepareStochasticWork({ path, document });
+		expect(runtimes.workloadProgress(0, 10)).toEqual([
+			expect.objectContaining({
+				instanceId: "counter",
+				completedUnits: 0,
+				totalUnits: 30,
+			}),
+		]);
+		runtimes.evaluateDeterministic({ path, document });
+		runtimes.startStochastic();
+		runtimes.consume({ path, document });
+		expect(runtimes.workloadProgress(1, 10)).toEqual([
+			expect.objectContaining({
+				completedUnits: 3,
+				intensiveUnitsCompleted: 2,
+			}),
+		]);
+	});
+
+	it("omits malformed workload metadata without affecting evaluation", () => {
+		const definition = countingDefinition();
+		definition.describeStochasticWork = () =>
+			({ unitsPerRun: Number.NaN, unitLabel: "bad" }) as never;
+		const runtimes = new EvaluationRuntimeSet(
+			testTables([
+				{
+					instanceId: "counter",
+					label: "Counter",
+					enabled: true,
+					config: 2,
+				},
+			]),
+			new EvaluationRegistry([definition]),
+		);
+
+		runtimes.prepareStochasticWork({ path, document });
+		runtimes.evaluateDeterministic({ path, document });
+		expect(runtimes.workloadProgress(0, 10)).toEqual([]);
+		expect(resultFor(runtimes, "counter")?.deterministic).toBe(2);
+	});
+
 	it("clears an earlier partial when a later stochastic path fails", () => {
 		const registry = new EvaluationRegistry();
 		registry.register(countingDefinition({ failOnEndDate: "2028-01-01" }));

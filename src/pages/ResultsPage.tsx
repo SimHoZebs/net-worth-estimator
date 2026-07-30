@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
 import { CurrentChangesComparison } from "@/components/CurrentChangesComparison";
 import { ProjectionDashboard } from "@/components/ProjectionDashboard";
+import { StochasticProgressDetails } from "@/components/StochasticProgressDetails";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
+import type { StochasticProgress } from "@/lib/projection";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import {
 	useProjectionArtifacts,
@@ -110,11 +112,11 @@ function ProjectionActivity({
 }: {
 	isProjecting: boolean;
 	isStochasticRunning: boolean;
-	stochasticProgress: number | null;
+	stochasticProgress: StochasticProgress | null;
 }) {
 	const progressPct =
 		isStochasticRunning && stochasticProgress !== null
-			? Math.round(stochasticProgress * 100)
+			? Math.round(stochasticProgress.fraction * 100)
 			: null;
 	const title = isProjecting
 		? isStochasticRunning
@@ -142,6 +144,9 @@ function ProjectionActivity({
 						) : null}
 					</div>
 					<AlertDescription>{description}</AlertDescription>
+					{isStochasticRunning && stochasticProgress ? (
+						<StochasticProgressDetails progress={stochasticProgress} />
+					) : null}
 					<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-current/10">
 						<div
 							className={`h-full rounded-full bg-current transition-[width] duration-300 ${progressPct === null ? "animate-pulse" : ""}`}

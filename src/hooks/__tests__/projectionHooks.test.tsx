@@ -4,7 +4,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ProjectionEngineProvider } from "@/engine/ProjectionEngineContext";
-import type { ModelOverrides } from "@/lib/projection";
+import type { ModelOverrides, StochasticProgress } from "@/lib/projection";
 import {
 	createBaseDocument,
 	makeSettings,
@@ -158,6 +158,52 @@ describe("projection hook request provenance", () => {
 		).toBe("Retirement readiness");
 	});
 
+	it("restores presentation labels on stochastic workload progress", async () => {
+		const document = createBaseDocument();
+		const settings = makeSettings();
+		const completion = deferred<ReturnType<typeof stochasticProject>>();
+		const engine: ProjectionEngine = {
+			project: vi.fn(),
+			projectStochastic: vi.fn().mockImplementation((_request, onProgress) => {
+				onProgress({
+					phase: "deterministic-evaluations",
+					completedRuns: 0,
+					totalRuns: 1,
+					fraction: 0,
+					evaluationWorkloads: [
+						{
+							type: "financialIndependence",
+							instanceId: "fi",
+							label: "",
+							completedUnits: 0,
+							totalUnits: 1,
+							unitLabel: "monthly start dates",
+							unitAction: "checked",
+						},
+					],
+				});
+				return completion.promise;
+			}),
+		};
+		const hook = renderHook(
+			() =>
+				useStochastic(
+					document,
+					settings,
+					overrides,
+					{ runCount: 1, seed: 1 },
+					true,
+				),
+			{ wrapper: wrapper(engine) },
+		);
+
+		await waitFor(() =>
+			expect(hook.result.current.progress?.evaluationWorkloads[0]?.label).toBe(
+				"Financial independence",
+			),
+		);
+	});
+
 	it("retains base results but marks evaluation-only replacements stale", async () => {
 		const document = createBaseDocument();
 		const firstSettings = makeSettings();
@@ -246,7 +292,10 @@ describe("projection hook request provenance", () => {
 		const first = deferred<ReturnType<typeof stochasticProject>>();
 		const second = deferred<ReturnType<typeof stochasticProject>>();
 		const callbacks: Array<
-			(progress: number, partial?: ReturnType<typeof stochasticProject>) => void
+			(
+				progress: StochasticProgress,
+				partial?: ReturnType<typeof stochasticProject>,
+			) => void
 		> = [];
 		const engine: ProjectionEngine = {
 			project: vi.fn(),
@@ -277,13 +326,35 @@ describe("projection hook request provenance", () => {
 			runCount: 1,
 			seed: 1,
 		});
-		act(() => callbacks[0](1, obsolete));
+		act(() =>
+			callbacks[0](
+				{
+					phase: "stochastic-runs",
+					completedRuns: 1,
+					totalRuns: 1,
+					fraction: 1,
+					evaluationWorkloads: [],
+				},
+				obsolete,
+			),
+		);
 		expect(hook.result.current.result).toBeNull();
 		const current = stochasticProject(document, settings, overrides, {
 			runCount: 2,
 			seed: 1,
 		});
-		act(() => callbacks[1](0.5, current));
+		act(() =>
+			callbacks[1](
+				{
+					phase: "stochastic-runs",
+					completedRuns: 1,
+					totalRuns: 2,
+					fraction: 0.5,
+					evaluationWorkloads: [],
+				},
+				current,
+			),
+		);
 		expect(hook.result.current.result?.bands).toEqual(current.bands);
 	});
 });

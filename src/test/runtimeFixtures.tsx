@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { StochasticProgress } from "@/lib/projection";
 import {
 	type ModelRuntime,
 	ModelRuntimeProvider,
@@ -83,6 +84,19 @@ export function createProjectionCapabilitiesFixture(
 	};
 }
 
+export function createStochasticProgressFixture(
+	overrides: Partial<StochasticProgress> = {},
+): StochasticProgress {
+	return {
+		phase: "stochastic-runs",
+		completedRuns: 0,
+		totalRuns: 1000,
+		fraction: 0,
+		evaluationWorkloads: [],
+		...overrides,
+	};
+}
+
 export function RuntimeFixtureProviders({
 	children,
 	model,
@@ -96,7 +110,7 @@ export function RuntimeFixtureProviders({
 	artifacts?: Partial<ProjectionArtifacts>;
 	execution?: Partial<ProjectionExecution>;
 	capabilities?: Partial<ProjectionCapabilities>;
-	stochasticProgress?: number | null;
+	stochasticProgress?: StochasticProgress | null;
 }) {
 	return (
 		<ModelRuntimeProvider value={createModelRuntimeFixture(model)}>

@@ -4,6 +4,7 @@ import { projectionComputationSettings } from "@/lib/projection/runtime/computat
 
 export {
 	labelProjectionResult,
+	labelStochasticProgress,
 	labelStochasticResult,
 } from "@/lib/projection/runtime/resultLabels";
 

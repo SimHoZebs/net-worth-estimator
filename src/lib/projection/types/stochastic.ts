@@ -1,5 +1,6 @@
 import type {
 	EvaluationResultCollection,
+	EvaluationType,
 	IsoDate,
 	ProjectionResult,
 } from "./model";
@@ -7,6 +8,33 @@ import type {
 export interface StochasticConfig {
 	runCount: number;
 	seed: number | null;
+}
+
+export type StochasticProgressPhase =
+	| "preparing"
+	| "deterministic-evaluations"
+	| "stochastic-runs";
+
+export interface StochasticEvaluationWorkload {
+	type: EvaluationType;
+	instanceId: string;
+	label: string;
+	completedUnits: number;
+	totalUnits: number;
+	unitLabel: string;
+	unitAction: string;
+	intensiveUnitsCompleted?: number;
+	intensiveUnitLabel?: string;
+	intensiveUnitAction?: string;
+	description?: string;
+}
+
+export interface StochasticProgress {
+	phase: StochasticProgressPhase;
+	completedRuns: number;
+	totalRuns: number;
+	fraction: number;
+	evaluationWorkloads: StochasticEvaluationWorkload[];
 }
 
 export interface PercentileBands {
