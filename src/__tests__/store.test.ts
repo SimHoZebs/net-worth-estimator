@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { FinancialModelDocument } from "@/lib/projection";
+import {
+	createExpressionAmount,
+	type FinancialModelDocument,
+} from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
 import {
 	DEFAULT_EVALUATIONS,
@@ -29,7 +32,7 @@ function makePosting(id = "p1") {
 		label: "Salary",
 		sourceAccountId: null,
 		destinations: null,
-		arithmetic: "5000",
+		amount: createExpressionAmount("5000"),
 		frequency: "monthly" as const,
 		annualRate: 0,
 		annualGrowthRate: 0,

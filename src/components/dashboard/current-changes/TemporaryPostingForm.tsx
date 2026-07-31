@@ -3,12 +3,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatRoute } from "@/lib/format";
 import { parseDecimalDraft } from "@/lib/number-draft";
-import type { FinancialModelDocument, Posting } from "@/lib/projection";
+import {
+	createExpressionAmount,
+	describePostingAmount,
+	type FinancialModelDocument,
+	type Posting,
+} from "@/lib/projection";
 
 type TemporaryPostingDraft = Omit<
 	Posting,
-	"annualRate" | "annualGrowthRate" | "volatility" | "annualCap" | "priority"
+	| "amount"
+	| "annualRate"
+	| "annualGrowthRate"
+	| "volatility"
+	| "annualCap"
+	| "priority"
 > & {
+	arithmetic: string;
 	annualRate: string;
 	annualGrowthRate: string;
 	volatility: string;
@@ -22,7 +33,7 @@ function emptyPosting(): TemporaryPostingDraft {
 		label: "",
 		sourceAccountId: null,
 		destinations: null,
-		arithmetic: "",
+		arithmetic: "0",
 		frequency: "monthly",
 		annualRate: "0",
 		annualGrowthRate: "0",
@@ -104,13 +115,25 @@ export function TemporaryPostingForm({
 		if (annualCap !== null && annualCap < 0)
 			errors.push("Annual cap cannot be negative.");
 		if (priority < 1) errors.push("Priority must be at least 1.");
-		if (errors.length > 0) {
+		let amount: Posting["amount"] | null = null;
+		try {
+			amount = createExpressionAmount(adding.arithmetic);
+		} catch (caught) {
+			errors.push(
+				caught instanceof Error
+					? `Amount calculation is invalid: ${caught.message}`
+					: "Amount calculation is invalid.",
+			);
+		}
+		if (errors.length > 0 || amount === null) {
 			setError(errors.join(" "));
 			return;
 		}
 
+		const { arithmetic, ...posting } = adding;
 		onAdd({
-			...adding,
+			...posting,
+			amount,
 			id,
 			label: adding.label.trim(),
 			annualRate,
@@ -361,7 +384,7 @@ export function TemporaryPostingForm({
 							{posting.label}
 						</span>
 						<span className="ml-2 type-caption text-tertiary-foreground/80">
-							{posting.arithmetic}
+							{describePostingAmount(posting)}
 						</span>
 						<span className="ml-2 type-caption text-tertiary-foreground/80">
 							{describeRoute(posting, document)}

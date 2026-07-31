@@ -124,6 +124,25 @@ describe("EditablePostingsTable", () => {
 		expect(updatePosting).not.toHaveBeenCalled();
 	});
 
+	it("restores an expression draft on Escape without committing it", () => {
+		const posting = makePosting({
+			id: "salary",
+			label: "Salary",
+			arithmetic: "100",
+		});
+		const document = createBaseDocument({ postings: [posting] });
+		const { updatePosting } = renderTable({ document });
+		const expression = screen.getByRole("textbox", {
+			name: "Salary amount expression",
+		}) as HTMLInputElement;
+
+		fireEvent.change(expression, { target: { value: "200" } });
+		fireEvent.keyDown(expression, { key: "Escape" });
+
+		expect(expression.value).toBe("100");
+		expect(updatePosting).not.toHaveBeenCalled();
+	});
+
 	it("commits nullable numeric drafts on blur and clamps minimum values", () => {
 		const posting = makePosting({
 			id: "salary",

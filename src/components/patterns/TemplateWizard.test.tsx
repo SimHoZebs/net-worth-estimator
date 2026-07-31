@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TemplateOutput } from "@/lib/patterns";
+import { getExpression } from "@/lib/projection";
 import { createBaseDocument } from "@/lib/projection/__fixtures__/documents";
 import { TemplateWizard } from "./TemplateWizard";
 
@@ -55,9 +56,11 @@ describe("TemplateWizard", () => {
 
 		expect(onApply).toHaveBeenCalledOnce();
 		const output = onApply.mock.calls[0][0] as TemplateOutput;
-		expect(output.postings[0].arithmetic).toBe("10000.5");
+		expect(getExpression(output.postings[0])).toBe("10000.5");
 		expect(
-			output.postings.find((posting) => posting.id.endsWith("_tax")),
-		).toMatchObject({ arithmetic: "acme_salary * 0" });
+			getExpression(
+				output.postings.find((posting) => posting.id.endsWith("_tax"))!,
+			),
+		).toBe("acme_salary * 0");
 	});
 });

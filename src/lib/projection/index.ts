@@ -58,12 +58,25 @@ export {
 	prepareFinancialModelDocument,
 } from "./model/applyModelOverrides";
 export {
+	amountProviders,
+	amountResolvers,
+	createExpressionAmount,
+	describePostingAmount,
+	getExpression,
+	resolvePostingAmountDescriptor,
+	updateExpressionAmount,
+	validateAmountDescriptor,
+} from "./simulation/amountResolution";
+export {
 	type AccountMovementAction,
 	type AccountMovementResult,
 	resolveAccountMovement,
 	resolveAccountMovementAmount,
 } from "./simulation/postings";
-export { prepareSimulationRequest } from "./simulation/prepareSimulation";
+export {
+	prepareSimulationRequest,
+	SimulationPreparationError,
+} from "./simulation/prepareSimulation";
 export { projectRawFinancialModelDocument } from "./simulation/projectPath";
 export { simulate } from "./simulation/simulate";
 export {
@@ -104,6 +117,7 @@ export type {
 	AccountMovementConstraint,
 	AccountMovementConstraintType,
 	AccountSnapshot,
+	AmountInputBinding,
 	BehaviorCollectionKey,
 	EvaluationDiagnostic,
 	EvaluationForType,
@@ -140,6 +154,7 @@ export type {
 	NetWorthThresholdConfig,
 	NetWorthThresholdEvaluation,
 	Posting,
+	PostingAmountResolution,
 	PostingFrequency,
 	PostingFulfillmentConfig,
 	PostingFulfillmentEvaluation,

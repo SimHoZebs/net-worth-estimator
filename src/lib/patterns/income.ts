@@ -1,4 +1,8 @@
-import type { Account, Posting } from "@/lib/projection";
+import {
+	type Account,
+	createExpressionAmount,
+	type Posting,
+} from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
 import type { IncomeTemplateInput, TemplateGenerationResult } from "./types";
 
@@ -42,7 +46,7 @@ function makePosting(
 		label,
 		sourceAccountId: source,
 		destinations,
-		arithmetic,
+		amount: createExpressionAmount(arithmetic),
 		frequency: "monthly",
 		annualRate: 0,
 		annualGrowthRate: 0,

@@ -107,6 +107,28 @@ describe("createBrowserCsvDataSource", () => {
 		);
 	});
 
+	it("rejects saved legacy arithmetic postings", async () => {
+		const document = createBaseDocument({
+			sourcePath: "browser:local-storage",
+		});
+		const legacy = {
+			...document,
+			postings: document.postings.map(({ amount, ...posting }) => ({
+				...posting,
+				arithmetic: amount.config.expression,
+			})),
+		};
+		const storage = createMemoryStorage({
+			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify(legacy),
+		});
+
+		const result = await createBrowserCsvDataSource({ storage }).loadDocument();
+
+		expect(result.document).toBeNull();
+		expect(result.issues).toHaveLength(1);
+		expect(storage.setItem).not.toHaveBeenCalled();
+	});
+
 	it("reports corrupt or noncanonical stored data without falling back", async () => {
 		const document = createBaseDocument();
 		for (const stored of [

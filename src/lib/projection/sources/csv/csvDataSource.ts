@@ -3,10 +3,53 @@ import type { DataSource, FinancialModelParseResult } from "../../dataSource";
 import type {
 	FinancialIndependenceSource,
 	FinancialModelDocument,
+	Posting,
 } from "../../types/model";
 import type { ModelValidationIssue } from "../../types/validation";
 
 const finiteNumber = z.number().finite();
+const amountBindingSchema = z.discriminatedUnion("source", [
+	z.object({ source: z.literal("literal"), value: z.json() }).strict(),
+	z
+		.object({
+			source: z.literal("provider"),
+			provider: z.string(),
+			arguments: z.record(z.string(), z.json()),
+		})
+		.strict(),
+]);
+const postingAmountSchema = z
+	.object({
+		resolver: z.string(),
+		config: z.record(z.string(), z.json()),
+		inputs: z.record(z.string(), amountBindingSchema),
+	})
+	.strict();
+const postingSchema = z
+	.object({
+		id: z.string(),
+		label: z.string(),
+		sourceAccountId: z.string().nullable(),
+		destinations: z.array(z.string()).nullable(),
+		amount: postingAmountSchema,
+		frequency: z.enum([
+			"once",
+			"daily",
+			"weekly",
+			"monthly",
+			"quarterly",
+			"annual",
+		]),
+		annualRate: finiteNumber,
+		annualGrowthRate: finiteNumber,
+		volatility: finiteNumber,
+		startDate: z.string(),
+		endDate: z.string().nullable(),
+		annualCap: finiteNumber.nullable(),
+		priority: finiteNumber,
+		enabled: z.boolean(),
+	})
+	.strict() satisfies z.ZodType<Posting>;
 const evaluationFields = {
 	instanceId: z.string(),
 	label: z.string(),
@@ -96,33 +139,7 @@ export const financialModelDocumentSchema = z
 				),
 			})
 			.strict(),
-		postings: z.array(
-			z
-				.object({
-					id: z.string(),
-					label: z.string(),
-					sourceAccountId: z.string().nullable(),
-					destinations: z.array(z.string()).nullable(),
-					arithmetic: z.string(),
-					frequency: z.enum([
-						"once",
-						"daily",
-						"weekly",
-						"monthly",
-						"quarterly",
-						"annual",
-					]),
-					annualRate: finiteNumber,
-					annualGrowthRate: finiteNumber,
-					volatility: finiteNumber,
-					startDate: z.string(),
-					endDate: z.string().nullable(),
-					annualCap: finiteNumber.nullable(),
-					priority: finiteNumber,
-					enabled: z.boolean(),
-				})
-				.strict(),
-		),
+		postings: z.array(postingSchema),
 	})
 	.strict() satisfies z.ZodType<FinancialModelDocument>;
 

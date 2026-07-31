@@ -16,6 +16,7 @@ import {
 	buildSampleCountsByPostingId,
 	getStochasticProgressUpdateRunInterval,
 } from "../analysis/projectStochastic";
+import { createExpressionAmount } from "../simulation/amountResolution";
 import type {
 	FinancialIndependencePlan,
 	ProjectionRuntimeSettings,
@@ -178,7 +179,7 @@ describe("stochastic projection", () => {
 					label: "Terminal growth",
 					sourceAccountId: null,
 					destinations: ["checking"],
-					arithmetic: "100 * rate",
+					amount: createExpressionAmount("100 * rate"),
 					frequency: "annual" as const,
 					annualRate: 0.1,
 					annualGrowthRate: 0,

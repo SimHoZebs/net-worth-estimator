@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
 	CSV_MODEL_PUBLIC_PATH,
+	createExpressionAmount,
+	getExpression,
 	parseCsvFinancialModel,
 	serializeCsvFinancialModel,
 } from "../";
@@ -10,7 +12,38 @@ import {
 	validCsvFiles,
 } from "../__fixtures__";
 
+function csvExpressionAmount(expression: string): string {
+	return `"${JSON.stringify(createExpressionAmount(expression)).replace(/"/g, '""')}"`;
+}
+
 describe("CSV financial model", () => {
+	it("rejects legacy and mixed posting schemas", () => {
+		const files = {
+			...validCsvFiles,
+			postings:
+				"id,label,sourceAccountId,destinations,arithmetic,amount,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled\nlegacy,Legacy,,checking,100,{},monthly,0,0,0,2026-01-01,,,1,true",
+		};
+
+		const result = parseCsvFinancialModel(files);
+		expect(result.data).toBeNull();
+		expect(
+			result.issues.some((issue) => issue.code === "csv.headers.unexpected"),
+		).toBe(true);
+	});
+
+	it("rejects malformed canonical amount JSON", () => {
+		const postings = [
+			"id,label,sourceAccountId,destinations,amount,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled",
+			"invalid,Invalid,,checking,{bad,once,0,0,0,2026-01-01,,,1,true",
+		].join("\n");
+		const result = parseCsvFinancialModel({ ...validCsvFiles, postings });
+
+		expect(result.data).toBeNull();
+		expect(
+			result.issues.some((issue) => issue.code === "csv.row.invalid"),
+		).toBe(true);
+	});
+
 	it("parses a valid CSV financial model", () => {
 		const result = parseCsvFinancialModel(validCsvFiles, {
 			basePath: CSV_MODEL_PUBLIC_PATH,
@@ -19,7 +52,9 @@ describe("CSV financial model", () => {
 		expect(result.issues).toEqual([]);
 		expect(result.data?.sourcePath).toBe(CSV_MODEL_PUBLIC_PATH);
 		expect(result.data?.postings[0]?.frequency).toBe("once");
-		expect(result.data?.postings[5]?.arithmetic).toBe("salary * 0.22");
+		expect(
+			result.data?.postings[5] && getExpression(result.data.postings[5]),
+		).toBe("salary * 0.22");
 		expect(result.data?.postings[7]?.annualCap).toBe(23000);
 		expect(result.data?.accounts[3]?.label).toBe("Student Loan");
 		expect(result.data?.evaluations.netWorthThreshold[0]?.config).toEqual({
@@ -113,8 +148,27 @@ describe("CSV financial model", () => {
 		const serialized = serializeCsvFinancialModel(parsed.data!);
 		const reparsed = parseCsvFinancialModel(serialized);
 
+		expect(serialized.postings.split("\n")[0]).toBe(
+			"id,label,sourceAccountId,destinations,amount,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled",
+		);
+		expect(serialized.postings).not.toContain("arithmetic");
 		expect(reparsed.issues).toEqual([]);
 		expect(reparsed.data?.evaluations).toEqual(parsed.data?.evaluations);
+	});
+
+	it("round-trips canonical non-expression amount descriptors", () => {
+		const parsed = parseCsvFinancialModel(validCsvFiles);
+		if (!parsed.data) throw new Error("Document is null");
+		parsed.data.postings[0]!.amount = {
+			resolver: "percentage",
+			config: { rate: 0.125 },
+			inputs: { amount: { source: "literal", value: 80 } },
+		};
+		const serialized = serializeCsvFinancialModel(parsed.data);
+		const reparsed = parseCsvFinancialModel(serialized);
+		expect(reparsed.data?.postings[0]?.amount).toEqual(
+			parsed.data.postings[0]?.amount,
+		);
 	});
 
 	it("defaults legacy FI CSVs and serializes an explicit expense basis", () => {
@@ -239,15 +293,13 @@ describe("CSV financial model", () => {
 			...validCsvFiles,
 			postings: [
 				postingsHeaderOnly.trimEnd(),
-				"salary,Salary,,checking,bonus * 1,monthly,0,0,0,2026-04-01,,,1,true",
-				"bonus,Bonus,,checking,salary * 1,monthly,0,0,0,2026-04-01,,,2,true",
+				`salary,Salary,,checking,${csvExpressionAmount("bonus * 1")},monthly,0,0,0,2026-04-01,,,1,true`,
+				`bonus,Bonus,,checking,${csvExpressionAmount("salary * 1")},monthly,0,0,0,2026-04-01,,,2,true`,
 			].join("\n"),
 		});
 
 		expect(
-			result.issues.some(
-				(issue) => issue.code === "posting.arithmetic.circular",
-			),
+			result.issues.some((issue) => issue.code === "posting.amount.circular"),
 		).toBe(true);
 	});
 
@@ -268,7 +320,7 @@ describe("CSV financial model", () => {
 			...validCsvFiles,
 			postings: [
 				postingsHeaderOnly.trimEnd(),
-				"mystery,Unknown Target,checking,missing_account,500,monthly,0,0,0,2026-04-15,,,1,true",
+				`mystery,Unknown Target,checking,missing_account,${csvExpressionAmount("500")},monthly,0,0,0,2026-04-15,,,1,true`,
 			].join("\n"),
 		});
 

@@ -73,7 +73,13 @@ function readStoredDocument(
 		const document = parseFinancialModelDocument(JSON.parse(serialized));
 		if (document) {
 			const upgraded = JSON.stringify(document);
-			if (upgraded !== serialized) storage.setItem(storageKey, upgraded);
+			if (upgraded !== serialized) {
+				try {
+					storage.setItem(storageKey, upgraded);
+				} catch {
+					// Loading valid data does not depend on persisting its canonical upgrade.
+				}
+			}
 			return { status: "found", document };
 		}
 	} catch {

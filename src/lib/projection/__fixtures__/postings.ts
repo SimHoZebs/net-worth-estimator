@@ -1,13 +1,18 @@
+import { createExpressionAmount } from "../simulation/amountResolution";
 import type { Posting } from "../types/model";
 
-export function makePosting(
-	overrides: Partial<Posting> & { id: string },
-): Posting {
+type PostingOverrides = Partial<Posting> & {
+	id: string;
+	arithmetic?: string;
+};
+
+export function makePosting(overrides: PostingOverrides): Posting {
+	const { arithmetic, ...canonicalOverrides } = overrides;
 	return {
 		label: overrides.id,
 		sourceAccountId: null,
 		destinations: null,
-		arithmetic: "0",
+		amount: createExpressionAmount(arithmetic ?? "0"),
 		frequency: "monthly",
 		annualRate: 0,
 		annualGrowthRate: 0,
@@ -17,6 +22,6 @@ export function makePosting(
 		annualCap: null,
 		priority: 1,
 		enabled: true,
-		...overrides,
+		...canonicalOverrides,
 	};
 }

@@ -7,7 +7,10 @@ import type {
 	TemplateOutput,
 } from "@/lib/patterns";
 import { generateIncomePattern } from "@/lib/patterns";
-import type { FinancialModelDocument } from "@/lib/projection";
+import {
+	describePostingAmount,
+	type FinancialModelDocument,
+} from "@/lib/projection";
 import { IncomeForm, type IncomeFormValue } from "./IncomeForm";
 import {
 	describePostingCap,
@@ -127,7 +130,7 @@ export function TemplateWizard({
 			id: p.id,
 			label: p.label,
 			route: describePostingRoute(p, allAccounts),
-			arithmetic: p.arithmetic,
+			arithmetic: describePostingAmount(p),
 			cap: describePostingCap(p),
 		}));
 	}, [result, allAccounts]);

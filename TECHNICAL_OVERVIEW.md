@@ -65,13 +65,14 @@ There is no named alternative-model domain or persistence API. Comparisons are m
 ### Accounts and Postings
 
 - Accounts hold signed balances with generic minimum and maximum constraints.
-- Postings carry annual rates and growth assumptions used by scheduled and Monte Carlo execution.
+- Postings select an exact amount resolver and bind its required inputs to literals or registered providers.
+- Resolvers receive only validated config and concrete numeric inputs. Providers may read narrowly supplied balances, latest/YTD posting observations, the occurrence date, and the effective occurrence rate.
 - Posting frequency may be recurring or explicitly `once`; one-time rows execute exactly on their start date regardless of whether the end date is blank or equal to it.
 - Blank `sourceAccountId` plus destinations is an external inflow.
 - A source plus no destinations is an external outflow.
 - A source plus destinations is an account-to-account transfer.
-- `amountMode: fixed` uses the row amount.
-- `amountMode: percent_of_base` uses a percentage of the latest realized amount from `basePostingId`.
+- Expression amounts preserve the arithmetic language and may apply annual growth and stochastic occurrence rates. Numeric resolvers reject those posting-level rate fields.
+- Percentage, progressive-bracket, capped-percentage, and threshold-percentage are unrounded composable numeric primitives; they do not encode payroll or tax-table policy.
 - Source-funded rows clamp to available positive balance; `annualCap` is enforced per calendar year.
 - Same-date rows execute by ascending priority, then file order.
 - During request preparation, enabled `once` postings dated strictly before the projection start are replayed through shared transitions in date, priority, then file order. Their balance snapshots form historical rows, while their dependency and annual-cap state carries into projection execution.

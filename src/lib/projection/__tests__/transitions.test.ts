@@ -117,7 +117,7 @@ describe("simulation transitions", () => {
 		});
 		const transitions = runtime(state(), [dependent]);
 
-		transitions.observePosting("income", 200);
+		transitions.observePosting("income", 200, "2026-01-01");
 		const transition = transitions.executePosting(
 			{ posting: dependent, index: 0 },
 			"2026-02-01",
@@ -128,6 +128,28 @@ describe("simulation transitions", () => {
 			brokerage: 100,
 		});
 		expect(transition.result.realizedAmount).toBe(100);
+	});
+
+	it("tracks year-to-date amounts for uncapped postings and resets by year", () => {
+		const posting = makePosting({
+			id: "income",
+			destinations: ["brokerage"],
+			arithmetic: "50",
+		});
+		const transitions = runtime(state(), [posting]);
+
+		transitions.executePosting({ posting, index: 0 }, "2026-01-01");
+		transitions.executePosting({ posting, index: 0 }, "2026-02-01");
+		transitions.executePosting({ posting, index: 0 }, "2027-01-01");
+
+		expect(
+			transitions.state.realizedPostingAmountsByYear.get("income"),
+		).toEqual(
+			new Map([
+				["2026", 100],
+				["2027", 50],
+			]),
+		);
 	});
 
 	it("applies generated movements without changing posting ledgers", () => {

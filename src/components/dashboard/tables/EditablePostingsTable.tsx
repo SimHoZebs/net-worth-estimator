@@ -16,7 +16,14 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { parseDecimalDraft } from "@/lib/number-draft";
-import type { FinancialModelDocument, Posting } from "@/lib/projection";
+import {
+	createExpressionAmount,
+	describePostingAmount,
+	type FinancialModelDocument,
+	getExpression,
+	type Posting,
+	updateExpressionAmount,
+} from "@/lib/projection";
 
 function inputStyle(isDirty: boolean) {
 	const dirty = isDirty
@@ -75,6 +82,61 @@ function NumericPostingInput({
 			type="number"
 			min={min}
 			step={step}
+			value={draft}
+			onChange={(event) => {
+				skipBlurCommit.current = false;
+				setDraft(event.target.value);
+			}}
+			onBlur={() => {
+				if (skipBlurCommit.current) {
+					skipBlurCommit.current = false;
+					return;
+				}
+				commit();
+			}}
+			onKeyDown={(event) => {
+				if (event.key === "Enter") {
+					event.preventDefault();
+					commit();
+					skipBlurCommit.current = true;
+				}
+				if (event.key === "Escape") {
+					skipBlurCommit.current = true;
+					setDraft(committedValue);
+					event.currentTarget.blur();
+				}
+			}}
+		/>
+	);
+}
+
+function ExpressionPostingInput({
+	posting,
+	isDirty,
+	onCommit,
+}: {
+	posting: Posting;
+	isDirty: boolean;
+	onCommit: (amount: Posting["amount"]) => void;
+}) {
+	const committedValue = getExpression(posting) ?? "";
+	const [draft, setDraft] = useState(committedValue);
+	const skipBlurCommit = useRef(false);
+
+	useEffect(() => setDraft(committedValue), [committedValue]);
+
+	const commit = () => {
+		try {
+			onCommit(updateExpressionAmount(posting.amount, draft));
+		} catch {
+			setDraft(committedValue);
+		}
+	};
+
+	return (
+		<input
+			aria-label={`${posting.label} amount expression`}
+			className={inputStyle(isDirty)}
 			value={draft}
 			onChange={(event) => {
 				skipBlurCommit.current = false;
@@ -214,13 +276,17 @@ export function EditablePostingsTable({
 										/>
 									</TableCell>
 									<TableCell>
-										<input
-											className={inputStyle(!!changed)}
-											value={p.arithmetic}
-											onChange={(e) =>
-												updatePosting(p.id, { arithmetic: e.target.value })
-											}
-										/>
+										{getExpression(p) !== null ? (
+											<ExpressionPostingInput
+												posting={p}
+												isDirty={!!changed}
+												onCommit={(amount) => updatePosting(p.id, { amount })}
+											/>
+										) : (
+											<code className="type-caption break-all">
+												{describePostingAmount(p)}
+											</code>
+										)}
 									</TableCell>
 									<TableCell>
 										<select
@@ -361,7 +427,7 @@ export function EditablePostingsTable({
 								label: "New posting",
 								sourceAccountId: null,
 								destinations: null,
-								arithmetic: "0",
+								amount: createExpressionAmount("0"),
 								frequency: "monthly",
 								annualRate: 0,
 								annualGrowthRate: 0,

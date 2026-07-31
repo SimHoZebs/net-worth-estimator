@@ -11,7 +11,7 @@ import {
 	getTotalDestinationHeadroom,
 	getWithdrawableAmount,
 } from "./accounts";
-import { evaluateArithmetic } from "./arithmetic";
+import { resolvePostingAmountDescriptor } from "./amountResolution";
 
 export interface DatedPostingOccurrence {
 	posting: Posting;
@@ -134,6 +134,7 @@ export function computeRequestedAmount(
 	occurrence: DatedPostingOccurrence,
 	currentDate: IsoDate,
 	latestRealizedPostingAmountById: Map<string, number>,
+	realizedPostingAmountsByYear: Map<string, Map<string, number>>,
 	balances: Record<string, number>,
 	stochasticRate?: number,
 ): number {
@@ -147,13 +148,17 @@ export function computeRequestedAmount(
 			? 0
 			: effectiveAnnualRate / frequencyDivisor(posting.frequency);
 
-	const rawAmount = evaluateArithmetic(posting.arithmetic, {
-		postingAmounts: latestRealizedPostingAmountById,
-		accountBalances: balances,
-		rate: ratePerOccurrence,
+	const rawAmount = resolvePostingAmountDescriptor(posting.amount, {
+		latestRealizedPostingAmounts: latestRealizedPostingAmountById,
+		realizedPostingAmountsByYear,
+		balances,
+		date: currentDate,
+		occurrenceRate: ratePerOccurrence,
 	});
 
-	return applyAnnualGrowth(rawAmount, posting.annualGrowthRate, daysElapsed);
+	return posting.amount.resolver === "expression"
+		? applyAnnualGrowth(rawAmount, posting.annualGrowthRate, daysElapsed)
+		: rawAmount;
 }
 
 export function resolvePostingAmount(
