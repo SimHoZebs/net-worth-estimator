@@ -54,6 +54,20 @@ export type JsonValue =
 	| JsonValue[]
 	| { [key: string]: JsonValue };
 
+export type AmountInputBinding =
+	| { source: "literal"; value: JsonValue }
+	| {
+			source: "provider";
+			provider: string;
+			arguments: Record<string, JsonValue>;
+	  };
+
+export interface PostingAmountResolution {
+	resolver: string;
+	config: Record<string, JsonValue>;
+	inputs: Record<string, AmountInputBinding>;
+}
+
 export type FinancialIndependencePrincipalPolicy =
 	| "allow-drawdown"
 	| "preserve-nominal-principal"
@@ -182,7 +196,7 @@ export interface Posting {
 	label: string;
 	sourceAccountId: string | null;
 	destinations: string[] | null;
-	arithmetic: string;
+	amount: PostingAmountResolution;
 	frequency: PostingFrequency;
 	annualRate: number;
 	annualGrowthRate: number;
@@ -353,6 +367,10 @@ export interface ProjectionPath {
 	rows: ProjectionRow[];
 	movementEvents: MovementEvent[];
 	effectiveDocument: FinancialModelDocument;
+	projectionStartPostingState: {
+		latestRealizedPostingAmounts: Map<string, number>;
+		realizedPostingAmountsByYear: Map<string, Map<string, number>>;
+	};
 	projectionStartDate: IsoDate;
 	projectionEndDate: IsoDate;
 }

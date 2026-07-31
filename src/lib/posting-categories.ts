@@ -1,4 +1,4 @@
-import type { Account, Posting } from "@/lib/projection";
+import { type Account, getExpression, type Posting } from "@/lib/projection";
 
 const SALARY_POSTING_ID = "salary";
 const CHECKING_ACCOUNT_ID = "checking";
@@ -35,7 +35,9 @@ export function associatedAccountIds(
 	for (const destination of posting.destinations ?? []) {
 		if (accountIds.has(destination)) associated.add(destination);
 	}
-	for (const identifier of arithmeticIdentifiers(posting.arithmetic)) {
+	for (const identifier of arithmeticIdentifiers(
+		getExpression(posting) ?? "",
+	)) {
 		if (accountIds.has(identifier)) associated.add(identifier);
 	}
 	return Array.from(associated);
@@ -47,7 +49,9 @@ export function isScheduledTransaction(posting: Posting): boolean {
 		posting.id === SALARY_POSTING_ID ||
 		posting.sourceAccountId === CHECKING_ACCOUNT_ID ||
 		posting.destinations?.includes(CHECKING_ACCOUNT_ID) === true ||
-		arithmeticIdentifiers(posting.arithmetic).includes(SALARY_POSTING_ID)
+		arithmeticIdentifiers(getExpression(posting) ?? "").includes(
+			SALARY_POSTING_ID,
+		)
 	);
 }
 
@@ -71,7 +75,7 @@ export function partitionPostings(postings: readonly Posting[]) {
 
 export function categorizePosting(p: Posting): PostingCategory {
 	const label = p.label.toLowerCase();
-	const arithmetic = p.arithmetic.toLowerCase();
+	const arithmetic = (getExpression(p) ?? "").toLowerCase();
 
 	if (!p.sourceAccountId) {
 		if (

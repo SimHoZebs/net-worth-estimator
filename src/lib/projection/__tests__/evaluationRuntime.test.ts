@@ -27,6 +27,10 @@ const document = {
 const path = {
 	rows: [],
 	movementEvents: [],
+	projectionStartPostingState: {
+		latestRealizedPostingAmounts: new Map(),
+		realizedPostingAmountsByYear: new Map(),
+	},
 	effectiveDocument: document,
 	projectionStartDate: "2026-01-01",
 	projectionEndDate: "2027-01-01",
@@ -444,7 +448,7 @@ describe("configured evaluation integration", () => {
 		).toBe("target-invalid");
 	});
 
-	it("keeps FI output when an enabled source is disabled by overrides", () => {
+	it("rejects overrides that remove a required amount provider reference", () => {
 		const { data: loadedDocument } = parseCsvFinancialModel(validCsvFiles);
 		if (!loadedDocument) throw new Error("Document failed to load.");
 		const defaults = makeSettings().evaluations;
@@ -471,27 +475,14 @@ describe("configured evaluation integration", () => {
 				postingFulfillment: [],
 			},
 		});
-		const result = projectFinancialModelDocument(loadedDocument, settings, {
-			addedAccounts: [],
-			addedPostings: [],
-			disabledAccountIds: [],
-			disabledPostingIds: ["salary"],
-		});
-		const envelope = getFinancialIndependenceResult(result);
-		expect(envelope?.deterministic).not.toBeNull();
-		expect(envelope?.diagnostics).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({
-					code: "missing-financial-independence-source",
-					relatedPostingIds: ["salary"],
-				}),
-			]),
-		);
-		expect(envelope?.diagnostics).not.toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({ relatedPostingIds: ["deleted"] }),
-			]),
-		);
+		expect(() =>
+			projectFinancialModelDocument(loadedDocument, settings, {
+				addedAccounts: [],
+				addedPostings: [],
+				disabledAccountIds: [],
+				disabledPostingIds: ["salary"],
+			}),
+		).toThrow(/Cannot prepare an invalid financial model/);
 	});
 
 	it("keeps settings and results structured-clone and JSON safe", () => {

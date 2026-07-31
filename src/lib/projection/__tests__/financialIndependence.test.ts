@@ -6,6 +6,7 @@ import {
 	selectFinancialIndependenceOutcomeIndex,
 	validateFinancialIndependencePlan,
 } from "../evaluation/financialIndependence";
+import { createExpressionAmount } from "../simulation/amountResolution";
 import type {
 	Account,
 	FinancialIndependenceAnalysis,
@@ -72,7 +73,7 @@ const pension: Posting = {
 	label: "Pension",
 	sourceAccountId: null,
 	destinations: ["cash"],
-	arithmetic: "100",
+	amount: createExpressionAmount("100"),
 	frequency: "monthly",
 	annualRate: 0,
 	annualGrowthRate: 0,
@@ -123,6 +124,10 @@ function path(
 				}),
 			),
 		),
+		projectionStartPostingState: {
+			latestRealizedPostingAmounts: new Map(),
+			realizedPostingAmountsByYear: new Map(),
+		},
 		effectiveDocument: {
 			sourcePath: "test",
 			accounts,
@@ -582,7 +587,7 @@ describe("evaluateFinancialIndependence", () => {
 			id: "growth",
 			label: "Growth",
 			destinations: ["brokerage"],
-			arithmetic: "brokerage * rate",
+			amount: createExpressionAmount("brokerage * rate"),
 			annualRate: 0.12,
 			startDate: "2026-02-01",
 		};
@@ -617,7 +622,7 @@ describe("evaluateFinancialIndependence", () => {
 			id: "capped-growth",
 			label: "Capped growth",
 			destinations: ["brokerage"],
-			arithmetic: "500",
+			amount: createExpressionAmount("500"),
 			annualCap: 1_000,
 			startDate: "2026-01-01",
 		};
@@ -686,7 +691,7 @@ describe("evaluateFinancialIndependence", () => {
 			id: "growth",
 			label: "Growth",
 			destinations: ["brokerage"],
-			arithmetic: "10",
+			amount: createExpressionAmount("10"),
 			frequency: "annual",
 			startDate: "2026-01-01",
 		};
@@ -729,7 +734,7 @@ describe("evaluateFinancialIndependence", () => {
 			id: "contribution",
 			label: "Contribution",
 			destinations: ["brokerage"],
-			arithmetic: "pension * 0.5",
+			amount: createExpressionAmount("pension * 0.5"),
 			startDate: "2026-02-01",
 			priority: 2,
 		};
@@ -809,7 +814,7 @@ describe("evaluateFinancialIndependence", () => {
 			id: "sampled-growth",
 			label: "Sampled growth",
 			destinations: ["brokerage"],
-			arithmetic: "brokerage * rate",
+			amount: createExpressionAmount("brokerage * rate"),
 			frequency: "annual",
 			annualRate: 0.1,
 			volatility: 0.2,

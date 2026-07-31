@@ -19,6 +19,7 @@ import type {
 import { computeNetWorth } from "./accounts";
 import { prepareSimulationRequest } from "./prepareSimulation";
 import { simulate } from "./simulate";
+import { cloneSimulationState } from "./transitions";
 
 function roundCurrency(value: number): number {
 	return Math.round(value);
@@ -241,6 +242,13 @@ export function buildProjectionPath(
 		rows,
 		movementEvents: run.movementAttempts,
 		effectiveDocument: prepared.effectiveDocument,
+		projectionStartPostingState: (() => {
+			const state = cloneSimulationState(run.initialState);
+			return {
+				latestRealizedPostingAmounts: state.latestRealizedPostingAmounts,
+				realizedPostingAmountsByYear: state.realizedPostingAmountsByYear,
+			};
+		})(),
 		projectionStartDate: run.request.startDate,
 		projectionEndDate: run.request.endDate,
 	};

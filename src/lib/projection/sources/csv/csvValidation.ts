@@ -1,4 +1,7 @@
-import { ParseError, parseArithmetic } from "../../simulation/arithmetic";
+import {
+	AmountResolutionError,
+	validateAmountDescriptor,
+} from "../../simulation/amountResolution";
 import type { FinancialModelDocument, Posting } from "../../types/model";
 import {
 	CSV_BEHAVIOR_FILE_NAMES,
@@ -13,18 +16,6 @@ function hasInvalidDateRange(
 	endDate: string | null,
 ): boolean {
 	return endDate !== null && Date.parse(endDate) < Date.parse(startDate);
-}
-
-function extractIdentifiers(arithmetic: string): string[] {
-	const ids: string[] = [];
-	const regex = /[a-zA-Z_][a-zA-Z0-9_]*/g;
-	let match: RegExpExecArray | null;
-	while ((match = regex.exec(arithmetic)) !== null) {
-		if (match[0] !== "abs" && match[0] !== "rate") {
-			ids.push(match[0]);
-		}
-	}
-	return ids;
 }
 
 function validateUniqueIds(
@@ -79,101 +70,76 @@ function validateEvaluationInstanceIds(
 	}
 }
 
-function validatePostingArithmetic(
+function validatePostingAmounts(
 	issues: ModelValidationIssue[],
 	postings: Posting[],
 	accountIds: Set<string>,
 ) {
-	const allowedIds = new Set([
-		...postings.map((p) => p.id),
-		...accountIds,
-		"rate",
-	]);
-
-	const postingById = new Map(postings.map((posting) => [posting.id, posting]));
+	const postingIds = new Set(postings.map((posting) => posting.id));
+	const dependencies = new Map<string, readonly string[]>();
 
 	postings.forEach((posting, index) => {
 		const rowNumber = index + 2;
 		const fileName = CSV_MODEL_FILE_NAMES.postings;
 
 		try {
-			parseArithmetic(posting.arithmetic);
+			dependencies.set(
+				posting.id,
+				validateAmountDescriptor(posting.amount, { accountIds, postingIds }),
+			);
 		} catch (err) {
-			if (err instanceof ParseError) {
+			if (err instanceof AmountResolutionError || err instanceof Error) {
 				addIssue(
 					issues,
 					"error",
-					"posting.arithmetic.parse",
-					`Could not parse arithmetic expression: ${err.message}`,
-					rowPath(fileName, rowNumber, "arithmetic"),
+					"posting.amount.invalid",
+					err.message,
+					rowPath(fileName, rowNumber, "amount"),
 				);
 			}
 			return;
 		}
-
-		const identifiers = extractIdentifiers(posting.arithmetic);
-
-		identifiers.forEach((ident) => {
-			if (!allowedIds.has(ident)) {
-				addIssue(
-					issues,
-					"error",
-					"posting.arithmetic.unknown_identifier",
-					`Identifier '${ident}' is not a posting or account ID.`,
-					rowPath(fileName, rowNumber, "arithmetic"),
-				);
-			}
-		});
-
-		const postingsRefd = identifiers.filter(
-			(ident) => !accountIds.has(ident) && postingById.has(ident),
-		);
-
-		if (postingsRefd.includes(posting.id)) {
+		if (
+			posting.amount.resolver !== "expression" &&
+			(posting.annualRate !== 0 ||
+				posting.annualGrowthRate !== 0 ||
+				posting.volatility !== 0)
+		) {
 			addIssue(
 				issues,
 				"error",
-				"posting.arithmetic.self_reference",
-				`Arithmetic expression references the posting's own ID '${posting.id}'.`,
-				rowPath(fileName, rowNumber, "arithmetic"),
+				"posting.amount.non_expression_rates",
+				"Non-expression amount resolvers require annualRate, annualGrowthRate, and volatility to be zero.",
+				rowPath(fileName, rowNumber, "amount"),
 			);
-			return;
 		}
+	});
 
-		for (const refId of postingsRefd) {
-			const visitedIds = new Set<string>([posting.id]);
-			let currentId: string | null = refId;
-
-			while (currentId !== null) {
-				if (visitedIds.has(currentId)) {
-					addIssue(
-						issues,
-						"error",
-						"posting.arithmetic.circular",
-						`Arithmetic expression for '${posting.id}' creates a circular dependency chain.`,
-						rowPath(fileName, rowNumber, "arithmetic"),
-					);
-					return;
-				}
-
-				visitedIds.add(currentId);
-
-				const refPosting = postingById.get(currentId);
-				if (!refPosting) {
-					break;
-				}
-
-				const refIdentifiers = extractIdentifiers(refPosting.arithmetic);
-				currentId = null;
-
-				for (const nextId of refIdentifiers) {
-					if (!accountIds.has(nextId) && postingById.has(nextId)) {
-						currentId = nextId;
-						break;
-					}
-				}
-			}
+	const visiting = new Set<string>();
+	const visited = new Set<string>();
+	const cyclic = new Set<string>();
+	function visit(id: string): boolean {
+		if (visiting.has(id)) return true;
+		if (visited.has(id)) return cyclic.has(id);
+		visiting.add(id);
+		let hasCycle = false;
+		for (const dependency of dependencies.get(id) ?? []) {
+			if (dependency === id || visit(dependency)) hasCycle = true;
 		}
+		visiting.delete(id);
+		visited.add(id);
+		if (hasCycle) cyclic.add(id);
+		return hasCycle;
+	}
+	postings.forEach((posting, index) => {
+		if (!visit(posting.id)) return;
+		addIssue(
+			issues,
+			"error",
+			"posting.amount.circular",
+			`Amount resolution for '${posting.id}' creates a circular posting dependency.`,
+			rowPath(CSV_MODEL_FILE_NAMES.postings, index + 2, "amount"),
+		);
 	});
 }
 
@@ -304,7 +270,7 @@ export function validateCsvFinancialModel(
 		}
 	});
 
-	validatePostingArithmetic(issues, document.postings, accountIds);
+	validatePostingAmounts(issues, document.postings, accountIds);
 	validatePostings(issues, document.postings, accountIds);
 
 	document.accounts.forEach((account, index) => {

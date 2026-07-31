@@ -18,10 +18,16 @@ interface Token {
 	offset: number;
 }
 
-interface Context {
-	postingAmounts: Map<string, number>;
-	accountBalances: Record<string, number>;
+type Context = Readonly<Record<string, number>>;
+interface LegacyContext {
+	postingAmounts: ReadonlyMap<string, number>;
+	accountBalances: Readonly<Record<string, number>>;
 	rate: number;
+}
+
+export interface ParsedArithmetic {
+	evaluate: (values: Context) => number;
+	requirements: readonly string[];
 }
 
 class Lexer {
@@ -135,8 +141,9 @@ export class ParseError extends Error {
 class Parser {
 	private tokens: Token[] = [];
 	private pos = 0;
+	private requirements = new Set<string>();
 
-	parse(input: string): (context: Context) => number {
+	parse(input: string): ParsedArithmetic {
 		const lexer = new Lexer(input);
 		while (true) {
 			const token = lexer.next();
@@ -147,7 +154,7 @@ class Parser {
 		}
 		const expression = this.expr();
 		this.consume("eof", "Unexpected trailing input");
-		return expression;
+		return { evaluate: expression, requirements: [...this.requirements] };
 	}
 
 	private peek(): Token {
@@ -253,23 +260,15 @@ class Parser {
 
 		if (this.check("rate")) {
 			this.advance();
+			this.requirements.add("rate");
 			return (ctx) => ctx.rate;
 		}
 
 		if (this.check("identifier")) {
 			const token = this.advance();
 			const name = token.lexeme;
-			return (ctx) => {
-				const postingVal = ctx.postingAmounts.get(name);
-				if (postingVal !== undefined) {
-					return postingVal;
-				}
-				const accountVal = ctx.accountBalances[name];
-				if (accountVal !== undefined) {
-					return accountVal;
-				}
-				return 0;
-			};
+			this.requirements.add(name);
+			return (ctx) => ctx[name];
 		}
 
 		throw new ParseError(
@@ -286,11 +285,29 @@ export class ArithmeticEvalError extends Error {
 	}
 }
 
-export function parseArithmetic(input: string): (context: Context) => number {
+export function parseArithmetic(input: string): ParsedArithmetic {
 	const parser = new Parser();
 	return parser.parse(input);
 }
 
-export function evaluateArithmetic(input: string, context: Context): number {
-	return parseArithmetic(input)(context);
+export function evaluateArithmetic(
+	input: string,
+	context: Context | LegacyContext,
+): number {
+	const legacy = context as LegacyContext;
+	if (legacy.postingAmounts instanceof Map) {
+		const values: Record<string, number> = {
+			...legacy.accountBalances,
+			rate: legacy.rate,
+		};
+		for (const [id, amount] of legacy.postingAmounts) values[id] = amount;
+		const parsed = parseArithmetic(input);
+		for (const requirement of parsed.requirements) values[requirement] ??= 0;
+		return parsed.evaluate(values);
+	}
+	return parseArithmetic(input).evaluate(context as Context);
+}
+
+export function arithmeticRequirements(input: string): readonly string[] {
+	return parseArithmetic(input).requirements;
 }

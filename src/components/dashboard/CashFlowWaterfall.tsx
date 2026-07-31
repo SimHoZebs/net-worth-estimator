@@ -20,7 +20,11 @@ import {
 	isNumericArithmetic,
 	parseNumericArithmetic,
 } from "@/lib/posting-categories";
-import type { FinancialModelDocument } from "@/lib/projection";
+import {
+	describePostingAmount,
+	type FinancialModelDocument,
+	getExpression,
+} from "@/lib/projection";
 
 interface CashFlowWaterfallProps {
 	document: FinancialModelDocument;
@@ -35,8 +39,9 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({
 
 	const items = enabledPostings.map((p) => {
 		const { type, category } = categorizePosting(p);
-		const isNumeric = isNumericArithmetic(p.arithmetic);
-		const amount = isNumeric ? parseNumericArithmetic(p.arithmetic) : null;
+		const expression = getExpression(p);
+		const isNumeric = expression !== null && isNumericArithmetic(expression);
+		const amount = isNumeric ? parseNumericArithmetic(expression) : null;
 		const sign = type === "income" ? 1 : -1;
 		const signedAmount = amount !== null ? amount * sign : null;
 
@@ -44,7 +49,7 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({
 			label: p.label,
 			category,
 			type,
-			arithmetic: p.arithmetic,
+			arithmetic: describePostingAmount(p),
 			frequency: p.frequency,
 			amount: signedAmount,
 			isNumeric,

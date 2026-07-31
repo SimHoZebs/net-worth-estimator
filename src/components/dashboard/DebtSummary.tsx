@@ -20,9 +20,10 @@ import {
 	isDebtAccount,
 } from "@/lib/debt-utils";
 import { currency, formatDate } from "@/lib/format";
-import type {
-	FinancialModelDocument,
-	ProjectionResult,
+import {
+	describePostingAmount,
+	type FinancialModelDocument,
+	type ProjectionResult,
 } from "@/lib/projection";
 
 interface DebtSummaryProps {
@@ -133,7 +134,9 @@ export const DebtSummary = memo(function DebtSummary({
 										{currency.format(d.balance)}
 									</TableCell>
 									<TableCell className="text-right type-body text-foreground/80">
-										{d.paymentPosting ? d.paymentPosting.arithmetic : "—"}
+										{d.paymentPosting
+											? describePostingAmount(d.paymentPosting)
+											: "—"}
 									</TableCell>
 									<TableCell className="type-muted">
 										{d.paymentPosting ? d.paymentPosting.frequency : "—"}

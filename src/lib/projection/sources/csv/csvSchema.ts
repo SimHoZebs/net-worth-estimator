@@ -5,6 +5,8 @@ import type {
 	FinancialIndependenceEvaluation,
 	FinancialIndependencePlan,
 	NetWorthThresholdEvaluation,
+	Posting,
+	PostingAmountResolution,
 	PostingFulfillmentEvaluation,
 } from "../../types/model";
 
@@ -106,6 +108,16 @@ function parseJson(value: unknown) {
 		return JSON.parse(value) as unknown;
 	} catch {
 		return undefined;
+	}
+}
+
+function parseOptionalJson(value: unknown) {
+	if (typeof value !== "string") return value;
+	if (value.trim() === "") return undefined;
+	try {
+		return JSON.parse(value) as unknown;
+	} catch {
+		return value;
 	}
 }
 
@@ -220,7 +232,7 @@ export const csvPostingsHeaders = [
 	"label",
 	"sourceAccountId",
 	"destinations",
-	"arithmetic",
+	"amount",
 	"frequency",
 	"annualRate",
 	"annualGrowthRate",
@@ -305,22 +317,42 @@ const postingFrequencySchema = z.enum([
 	"annual",
 ]);
 
-export const csvPostingSchema = z.object({
-	id: trimmedString,
-	label: trimmedString,
-	sourceAccountId: nullableTrimmedString,
-	destinations: z.preprocess(
-		parseDestinationsArray,
-		z.array(trimmedString).nullable(),
-	),
-	arithmetic: trimmedString,
-	frequency: postingFrequencySchema,
-	annualRate: finiteNumber,
-	annualGrowthRate: finiteNumber,
-	volatility: nonNegativeNumber,
-	startDate: csvDateSchema,
-	endDate: z.preprocess(parseNullableString, csvDateSchema.nullable()),
-	annualCap: nullableNonNegativeNumber,
-	priority: positiveInteger,
-	enabled: csvBoolean,
-});
+const amountBindingSchema = z.discriminatedUnion("source", [
+	z.object({ source: z.literal("literal"), value: z.json() }).strict(),
+	z
+		.object({
+			source: z.literal("provider"),
+			provider: z.string(),
+			arguments: z.record(z.string(), z.json()),
+		})
+		.strict(),
+]);
+const postingAmountSchema = z
+	.object({
+		resolver: z.string(),
+		config: z.record(z.string(), z.json()),
+		inputs: z.record(z.string(), amountBindingSchema),
+	})
+	.strict() satisfies z.ZodType<PostingAmountResolution>;
+
+export const csvPostingSchema = z
+	.object({
+		id: trimmedString,
+		label: trimmedString,
+		sourceAccountId: nullableTrimmedString,
+		destinations: z.preprocess(
+			parseDestinationsArray,
+			z.array(trimmedString).nullable(),
+		),
+		amount: z.preprocess(parseOptionalJson, postingAmountSchema),
+		frequency: postingFrequencySchema,
+		annualRate: finiteNumber,
+		annualGrowthRate: finiteNumber,
+		volatility: nonNegativeNumber,
+		startDate: csvDateSchema,
+		endDate: z.preprocess(parseNullableString, csvDateSchema.nullable()),
+		annualCap: nullableNonNegativeNumber,
+		priority: positiveInteger,
+		enabled: csvBoolean,
+	})
+	.strict() satisfies z.ZodType<Posting>;

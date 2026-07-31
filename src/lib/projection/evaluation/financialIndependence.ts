@@ -414,15 +414,21 @@ function initializeBranchSimulationState(
 	balances: Record<string, number>,
 	events: readonly MovementEvent[],
 	candidateDate: IsoDate,
-	continuingPostingIds: ReadonlySet<string>,
+	projectionStartPostingState: ProjectionPath["projectionStartPostingState"],
 ): SimulationState {
-	const latestRealizedPostingAmounts = new Map<string, number>();
-	const realizedPostingAmountsByYear = new Map<string, Map<string, number>>();
+	const latestRealizedPostingAmounts = new Map(
+		projectionStartPostingState.latestRealizedPostingAmounts,
+	);
+	const realizedPostingAmountsByYear = new Map(
+		Array.from(
+			projectionStartPostingState.realizedPostingAmountsByYear,
+			([postingId, amounts]) => [postingId, new Map(amounts)],
+		),
+	);
 	for (const event of events) {
 		if (event.date > candidateDate) break;
 		const postingId = event.origin.postingId;
 		latestRealizedPostingAmounts.set(postingId, event.realizedAmount);
-		if (!continuingPostingIds.has(postingId)) continue;
 		const year = event.date.slice(0, 4);
 		const amountsByYear =
 			realizedPostingAmountsByYear.get(postingId) ?? new Map<string, number>();
@@ -464,7 +470,7 @@ function applyBranchPostingEvents({
 			if (disposition === "observe-base-path-realized-occurrence") {
 				const realizedAmount =
 					baseRealizedByDateAndPosting.get(`${date}:${posting.id}`) ?? 0;
-				transitions.observePosting(posting.id, realizedAmount);
+				transitions.observePosting(posting.id, realizedAmount, date);
 				observedDirectIncome += realizedAmount;
 				continue;
 			}
@@ -556,7 +562,7 @@ function evaluateCycle({
 			candidateBalances,
 			path.movementEvents,
 			candidate.date,
-			continuingIds,
+			path.projectionStartPostingState,
 		),
 		projectionStartDate: path.projectionStartDate,
 		monteCarloSample,

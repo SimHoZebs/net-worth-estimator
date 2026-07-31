@@ -1,4 +1,8 @@
-import type { FinancialModelDocument, Posting } from "@/lib/projection";
+import {
+	type FinancialModelDocument,
+	getExpression,
+	type Posting,
+} from "@/lib/projection";
 
 export function findPaymentPosting(
 	document: FinancialModelDocument,
@@ -25,7 +29,8 @@ export function isDebtAccount(label: string): boolean {
 
 export function estimateMonthlyPayment(p: Posting | undefined): number {
 	if (!p) return 0;
-	const num = Number(p.arithmetic);
+	const expression = getExpression(p);
+	const num = expression === null ? Number.NaN : Number(expression);
 	if (!Number.isFinite(num)) return 0;
 	const freq = p.frequency;
 	if (freq === "monthly") return num;

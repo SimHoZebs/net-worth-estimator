@@ -202,6 +202,10 @@ describe("WorkerProjectionEngine", () => {
 		const path: ProjectionPath = {
 			rows: [],
 			movementEvents: [],
+			projectionStartPostingState: {
+				latestRealizedPostingAmounts: new Map(),
+				realizedPostingAmountsByYear: new Map(),
+			},
 			effectiveDocument: createBaseDocument(),
 			projectionStartDate: "2025-01-01",
 			projectionEndDate: "2026-01-01",

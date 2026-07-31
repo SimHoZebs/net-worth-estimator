@@ -3,7 +3,12 @@ import {
 	isNumericArithmetic,
 	parseNumericArithmetic,
 } from "@/lib/posting-categories";
-import type { Account, Posting } from "@/lib/projection";
+import {
+	type Account,
+	describePostingAmount,
+	getExpression,
+	type Posting,
+} from "@/lib/projection";
 import { AccountChip } from "./AccountIdentity";
 
 type TransactionEffect = "inflow" | "outflow" | "transfer";
@@ -116,8 +121,9 @@ export function TransactionAmount({ posting }: { posting: Posting }) {
 				? "text-destructive"
 				: "text-foreground";
 	const prefix = effect === "inflow" ? "+" : effect === "outflow" ? "-" : "";
-	if (isNumericArithmetic(posting.arithmetic)) {
-		const amount = parseNumericArithmetic(posting.arithmetic);
+	const expression = getExpression(posting);
+	if (expression !== null && isNumericArithmetic(expression)) {
+		const amount = parseNumericArithmetic(expression);
 		if (amount <= 0) {
 			return (
 				<div className="text-muted-foreground">
@@ -137,7 +143,7 @@ export function TransactionAmount({ posting }: { posting: Posting }) {
 		<div className={tone}>
 			<div className="type-code break-all whitespace-normal">
 				{prefix}
-				{posting.arithmetic}
+				{describePostingAmount(posting)}
 			</div>
 			<div className="type-caption">Calculated {effect}</div>
 		</div>

@@ -34,7 +34,11 @@ export interface SimulationTransitionRuntime {
 		occurrence: DatedPostingOccurrence,
 		date: IsoDate,
 	): PostingExecutionTransition;
-	observePosting(postingId: string, realizedAmount: number): void;
+	observePosting(
+		postingId: string,
+		realizedAmount: number,
+		date: IsoDate,
+	): void;
 	executeGeneratedMovement(
 		action: AccountMovementAction,
 	): AppliedMovementTransition;
@@ -68,6 +72,20 @@ export function createTransitionRuntime({
 	const accountById = new Map(
 		model.accounts.map((account) => [account.id, account]),
 	);
+
+	function observePosting(
+		postingId: string,
+		realizedAmount: number,
+		date: IsoDate,
+	) {
+		state.latestRealizedPostingAmounts.set(postingId, realizedAmount);
+		const year = date.slice(0, 4);
+		const amountsByYear =
+			state.realizedPostingAmountsByYear.get(postingId) ??
+			new Map<string, number>();
+		amountsByYear.set(year, (amountsByYear.get(year) ?? 0) + realizedAmount);
+		state.realizedPostingAmountsByYear.set(postingId, amountsByYear);
+	}
 
 	function applyAndCollectDeltas(
 		result: AccountMovementResult,
@@ -107,6 +125,7 @@ export function createTransitionRuntime({
 					occurrence,
 					date,
 					state.latestRealizedPostingAmounts,
+					state.realizedPostingAmountsByYear,
 					state.balances,
 					sampledRate,
 				),
@@ -125,18 +144,6 @@ export function createTransitionRuntime({
 				accountById,
 			);
 
-			if (posting.annualCap !== null) {
-				const updatedAmountsByYear = amountsByYear ?? new Map<string, number>();
-				updatedAmountsByYear.set(
-					year,
-					(updatedAmountsByYear.get(year) ?? 0) + result.realizedAmount,
-				);
-				state.realizedPostingAmountsByYear.set(
-					posting.id,
-					updatedAmountsByYear,
-				);
-			}
-
 			const transition = applyAndCollectDeltas(result, () => {
 				applyPosting(
 					posting,
@@ -145,12 +152,10 @@ export function createTransitionRuntime({
 					accountById,
 				);
 			});
-			state.latestRealizedPostingAmounts.set(posting.id, result.realizedAmount);
+			observePosting(posting.id, result.realizedAmount, date);
 			return { ...transition, postingId: posting.id };
 		},
-		observePosting(postingId, realizedAmount) {
-			state.latestRealizedPostingAmounts.set(postingId, realizedAmount);
-		},
+		observePosting,
 		executeGeneratedMovement(action) {
 			const result = resolveAccountMovement(
 				action,

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type {
-	Account,
-	Posting,
-	PostingFulfillmentEvent,
-	ProjectionRow,
+import {
+	type Account,
+	createExpressionAmount,
+	type Posting,
+	type PostingFulfillmentEvent,
+	type ProjectionRow,
 } from "@/lib/projection";
 import { buildShortfallCascadeViewModel } from "./ShortfallDetailPanel";
 
@@ -26,7 +27,7 @@ function posting(id: string, sourceAccountId: string | null = null): Posting {
 		label: `Posting ${id}`,
 		sourceAccountId,
 		destinations: null,
-		arithmetic: "0",
+		amount: createExpressionAmount("0"),
 		frequency: "monthly",
 		annualRate: 0,
 		annualGrowthRate: 0,

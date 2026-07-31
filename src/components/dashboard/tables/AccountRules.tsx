@@ -32,7 +32,7 @@ export function AccountRules({
 								) : null}
 							</div>
 							<div className="min-w-0 max-w-full type-value [&_.type-code]:break-all [&_.type-code]:whitespace-normal">
-								<PostingAmount arithmetic={rule.arithmetic} />
+								<PostingAmount posting={rule} />
 							</div>
 						</div>
 						<div className="mt-3 grid min-w-0 gap-3 type-caption lg:grid-cols-3">

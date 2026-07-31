@@ -52,6 +52,7 @@ function parseRows<TRow>(
 	csvText: string,
 	requiredHeaders: readonly string[],
 	rowSchema: ZodType<TRow>,
+	allowedHeaders?: readonly string[],
 ): ParsedRowsResult<TRow> {
 	const issues: ModelValidationIssue[] = [];
 	const result = Papa.parse<Record<string, unknown>>(csvText, {
@@ -82,9 +83,25 @@ function parseRows<TRow>(
 			[fileName],
 		);
 	}
+	const allowedHeaderSet = allowedHeaders ? new Set(allowedHeaders) : null;
+	const unexpectedHeaders = allowedHeaderSet
+		? fields.filter((header) => !allowedHeaderSet.has(header))
+		: [];
+	if (unexpectedHeaders.length > 0) {
+		addIssue(
+			issues,
+			"error",
+			"csv.headers.unexpected",
+			`Unexpected header${unexpectedHeaders.length === 1 ? "" : "s"}: ${unexpectedHeaders.join(", ")}.`,
+			[fileName],
+		);
+	}
 
 	const rows: TRow[] = [];
-	let hasFatalIssue = result.errors.length > 0 || missingHeaders.length > 0;
+	let hasFatalIssue =
+		result.errors.length > 0 ||
+		missingHeaders.length > 0 ||
+		unexpectedHeaders.length > 0;
 
 	result.data.forEach((row, index) => {
 		const parsedRow = rowSchema.safeParse(row);
@@ -128,6 +145,7 @@ export function parseCsvFinancialModel(
 		csvFiles.postings,
 		csvPostingsHeaders,
 		csvPostingSchema,
+		csvPostingsHeaders,
 	);
 	const financialIndependenceResult = parseRows(
 		CSV_BEHAVIOR_FILE_NAMES.financialIndependence,
@@ -307,6 +325,7 @@ export function serializeCsvFinancialModel(
 		postings: serializeRows(
 			document.postings.map((posting) => ({
 				...posting,
+				amount: JSON.stringify(posting.amount),
 				sourceAccountId: posting.sourceAccountId ?? "",
 				destinations: posting.destinations?.join(";") ?? "",
 				endDate: posting.endDate ?? "",

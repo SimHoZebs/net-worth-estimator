@@ -2,6 +2,7 @@ import {
 	applyModelOverrides,
 	EMPTY_MODEL_OVERRIDES,
 } from "../model/applyModelOverrides";
+import { validateCsvFinancialModel } from "../sources/csv/csvValidation";
 import type {
 	FinancialModelDocument,
 	IsoDate,
@@ -9,10 +10,20 @@ import type {
 	ProjectionRuntimeSettings,
 } from "../types/model";
 import type { MonteCarloSample, PreparedProjection } from "../types/simulation";
+import type { ModelValidationIssue } from "../types/validation";
 import { addYearsClamped, compareIsoDates } from "../utils/date";
 import { initAccountBalances, snapshotBalances } from "./accounts";
 import type { DatedPostingOccurrence } from "./postings";
 import { createTransitionRuntime } from "./transitions";
+
+export class SimulationPreparationError extends Error {
+	constructor(public readonly issues: ModelValidationIssue[]) {
+		super(
+			`Cannot prepare an invalid financial model: ${issues.map((issue) => issue.message).join(" ")}`,
+		);
+		this.name = "SimulationPreparationError";
+	}
+}
 
 function replayHistoricalPostings(
 	document: FinancialModelDocument,
@@ -64,6 +75,11 @@ export function prepareSimulationRequest(
 	monteCarloSample?: MonteCarloSample,
 ): PreparedProjection {
 	const effectiveDocument = applyModelOverrides(document, overrides);
+	const validationErrors = validateCsvFinancialModel(effectiveDocument).filter(
+		(issue) => issue.severity === "error",
+	);
+	if (validationErrors.length > 0)
+		throw new SimulationPreparationError(validationErrors);
 	const startDate = projectionSettings.fallbackProjectionStartDate;
 	const history = replayHistoricalPostings(effectiveDocument, startDate);
 	return {
