@@ -11,10 +11,12 @@ import type {
 	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
+import type { IncomeDataSnapshot } from "@/lib/projection/types/income";
 
 interface ProjectionDocumentWorkerRequest {
 	id: number;
 	document: FinancialModelDocument;
+	incomeData?: IncomeDataSnapshot;
 	projectionSettings: ProjectionRuntimeSettings;
 	overrides: ModelOverrides;
 }
@@ -55,6 +57,7 @@ export interface ProjectionWorkerResponse {
 export interface StochasticWorkerRequest {
 	id: number;
 	document: FinancialModelDocument;
+	incomeData?: IncomeDataSnapshot;
 	projectionSettings: ProjectionRuntimeSettings;
 	overrides: ModelOverrides;
 	config: StochasticConfig;

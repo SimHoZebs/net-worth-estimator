@@ -15,6 +15,7 @@ import {
 	projectionComputationSettings,
 	simulationDocument,
 } from "@/lib/projection/runtime/computationIdentity";
+import type { IncomeDataSnapshot } from "@/lib/projection/types/income";
 import { normalizeStochasticConfig } from "@/lib/projection/utils/stochastic";
 import {
 	labelStochasticProgress,
@@ -52,6 +53,7 @@ export function useStochastic(
 	overrides: ModelOverrides,
 	config: StochasticConfig | null,
 	enabled: boolean,
+	incomeData?: IncomeDataSnapshot,
 ): ProjectionHookState<StochasticProjectionResult, StochasticProgress> {
 	const engine = useProjectionEngine();
 	const computationSettingsKey =
@@ -85,6 +87,7 @@ export function useStochastic(
 				horizonYears: computationSettings.horizonYears,
 				config: stableConfig,
 				enabled,
+				incomeData: incomeData ?? null,
 			}),
 		[
 			document,
@@ -93,6 +96,7 @@ export function useStochastic(
 			overrides,
 			stableConfig,
 			enabled,
+			incomeData,
 		],
 	);
 	const requestKey = useMemo(
@@ -105,8 +109,14 @@ export function useStochastic(
 			}),
 		[baseKey, computationSettings.evaluations],
 	);
-	const inputRef = useRef({ document, overrides, enabled, stableConfig });
-	inputRef.current = { document, overrides, enabled, stableConfig };
+	const inputRef = useRef({
+		document,
+		overrides,
+		enabled,
+		stableConfig,
+		incomeData,
+	});
+	inputRef.current = { document, overrides, enabled, stableConfig, incomeData };
 	const [state, setState] = useState<StochasticState>({
 		result: null,
 		runtimeError: null,
@@ -158,6 +168,7 @@ export function useStochastic(
 					projectionSettings: computationSettings,
 					overrides: input.overrides,
 					config: input.stableConfig,
+					incomeData: input.incomeData,
 					signal: controller.signal,
 				},
 				(progress, partial) => {

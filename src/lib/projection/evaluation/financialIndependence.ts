@@ -448,11 +448,13 @@ function initializeBranchSimulationState(
 function applyBranchPostingEvents({
 	events,
 	baseRealizedByDateAndPosting,
+	baseEventsByDateAndPosting,
 	dispositions,
 	transitions,
 }: {
 	events: readonly (readonly [IsoDate, readonly DatedPostingOccurrence[]])[];
 	baseRealizedByDateAndPosting: ReadonlyMap<string, number>;
+	baseEventsByDateAndPosting: ReadonlyMap<string, MovementEvent>;
 	dispositions: ReadonlyMap<string, FiPostingDisposition>;
 	transitions: SimulationTransitionRuntime;
 }) {
@@ -470,6 +472,26 @@ function applyBranchPostingEvents({
 			if (disposition === "observe-base-path-realized-occurrence") {
 				const realizedAmount =
 					baseRealizedByDateAndPosting.get(`${date}:${posting.id}`) ?? 0;
+				const baseEvent = baseEventsByDateAndPosting.get(
+					`${date}:${posting.id}`,
+				);
+				if (baseEvent?.income) {
+					for (const resolver of baseEvent.income.resolvers) {
+						if (resolver.destinationAccountId === null) continue;
+						transitions.executeGeneratedMovement({
+							sourceAccountId: null,
+							destinations: [resolver.destinationAccountId],
+							requestedAmount: resolver.realizedAmount,
+						});
+						if (resolver.employerMatchRealizedAmount > 0) {
+							transitions.executeGeneratedMovement({
+								sourceAccountId: null,
+								destinations: [resolver.destinationAccountId],
+								requestedAmount: resolver.employerMatchRealizedAmount,
+							});
+						}
+					}
+				}
 				transitions.observePosting(posting.id, realizedAmount, date);
 				observedDirectIncome += realizedAmount;
 				continue;
@@ -553,6 +575,11 @@ function evaluateCycle({
 				] as const,
 		),
 	);
+	const baseEventsByDateAndPosting = new Map(
+		path.movementEvents.map(
+			(event) => [`${event.date}:${event.origin.postingId}`, event] as const,
+		),
+	);
 	const transitions = createTransitionRuntime({
 		model: {
 			accounts: path.effectiveDocument.accounts,
@@ -566,6 +593,7 @@ function evaluateCycle({
 		),
 		projectionStartDate: path.projectionStartDate,
 		monteCarloSample,
+		incomeData: path.incomeData,
 	});
 	const { balances } = transitions.state;
 	const selectedAccountIds = [...assetRates.keys()];
@@ -631,6 +659,7 @@ function evaluateCycle({
 			const directIncome = applyBranchPostingEvents({
 				events: eventsByPeriod[period.index],
 				baseRealizedByDateAndPosting,
+				baseEventsByDateAndPosting,
 				dispositions,
 				transitions,
 			});

@@ -8,6 +8,7 @@ import {
 	EVALUATION_TYPE_ORDER,
 	type FinancialModelDocument,
 } from "@/lib/projection";
+import type { IncomeDataSnapshot } from "@/lib/projection/types/income";
 import type {
 	ProjectionArtifacts,
 	ProjectionCapabilities,
@@ -30,11 +31,15 @@ export function useProjectionOrchestration({
 	validationIsValid,
 	evaluationsAreHydrated,
 	isSourceUpdating,
+	incomeData,
+	incomeDataReady = true,
 }: {
 	document: FinancialModelDocument | null;
 	validationIsValid: boolean;
 	evaluationsAreHydrated: boolean;
 	isSourceUpdating: boolean;
+	incomeData?: IncomeDataSnapshot;
+	incomeDataReady?: boolean;
 }) {
 	const modelOverrides = useStore(useShallow(selectModelOverrides));
 	const {
@@ -78,7 +83,11 @@ export function useProjectionOrchestration({
 		document,
 		projectionSettings,
 		modelOverrides,
-		validationIsValid && evaluationsAreHydrated,
+		validationIsValid &&
+			evaluationsAreHydrated &&
+			incomeDataReady &&
+			!isSourceUpdating,
+		incomeData,
 	);
 	const hasStochasticAccounts =
 		effectiveDocument?.postings.some(
@@ -88,7 +97,9 @@ export function useProjectionOrchestration({
 		stochasticPreference !== "disabled" &&
 		hasStochasticAccounts &&
 		validationIsValid &&
-		evaluationsAreHydrated;
+		evaluationsAreHydrated &&
+		incomeDataReady &&
+		!isSourceUpdating;
 	const {
 		result: stochasticResult,
 		runtimeError: stochasticError,
@@ -101,6 +112,7 @@ export function useProjectionOrchestration({
 		modelOverrides,
 		stochasticConfig,
 		stochasticWorkerEnabled,
+		incomeData,
 	);
 	const stochasticIsProvisional =
 		isStochasticRunning &&

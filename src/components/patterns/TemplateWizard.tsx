@@ -10,6 +10,7 @@ import { generateIncomePattern } from "@/lib/patterns";
 import {
 	describePostingAmount,
 	type FinancialModelDocument,
+	type IncomeDataSnapshot,
 } from "@/lib/projection";
 import { IncomeForm, type IncomeFormValue } from "./IncomeForm";
 import {
@@ -20,15 +21,18 @@ import {
 
 interface TemplateWizardProps {
 	document: FinancialModelDocument;
+	incomeData?: IncomeDataSnapshot | null;
 	onApply: (output: TemplateOutput) => void;
 	onClose: () => void;
 }
 
-function defaultIncomeInput(): IncomeFormValue {
+function defaultIncomeInput(
+	incomeData?: IncomeDataSnapshot | null,
+): IncomeFormValue {
 	return {
 		label: "",
-		grossMonthlyIncome: "0",
-		taxRate: "22",
+		incomeSourceId: incomeData?.incomeSources[0]?.id ?? "",
+		taxProfileId: incomeData?.taxProfiles[0]?.id ?? "",
 		k401ContributionRate: "4",
 		k401EmployerMatchRate: "50",
 		k401AnnualCap: "23000",
@@ -50,11 +54,8 @@ function parseIncomeInput(
 		return parsed;
 	};
 
-	const grossMonthlyIncome = parseNumber(
-		input.grossMonthlyIncome,
-		"Gross monthly income",
-	);
-	const taxRate = parseNumber(input.taxRate, "Tax rate");
+	if (!input.incomeSourceId) errors.push("Income source is required.");
+	if (!input.taxProfileId) errors.push("Tax profile is required.");
 	const k401ContributionRate = parseNumber(
 		input.k401ContributionRate,
 		"401(k) contribution rate",
@@ -72,8 +73,8 @@ function parseIncomeInput(
 		ok: true,
 		input: {
 			...input,
-			grossMonthlyIncome,
-			taxRate: taxRate / 100,
+			incomeSourceId: input.incomeSourceId,
+			taxProfileId: input.taxProfileId,
 			k401ContributionRate: k401ContributionRate / 100,
 			k401EmployerMatchRate: k401EmployerMatchRate / 100,
 			k401AnnualCap,
@@ -84,10 +85,13 @@ function parseIncomeInput(
 
 export function TemplateWizard({
 	document,
+	incomeData = null,
 	onApply,
 	onClose,
 }: TemplateWizardProps) {
-	const [input, setInput] = useState<IncomeFormValue>(defaultIncomeInput);
+	const [input, setInput] = useState<IncomeFormValue>(() =>
+		defaultIncomeInput(incomeData),
+	);
 	const [result, setResult] = useState<TemplateGenerationResult | null>(null);
 	const [step, setStep] = useState<"form" | "confirm">("form");
 
@@ -141,14 +145,20 @@ export function TemplateWizard({
 				<div className="px-6 py-4 border-b border-border/70">
 					<h2 className="type-title">Income Template</h2>
 					<p className="type-caption mt-1">
-						Create salary, tax, 401(k), and brokerage postings from one form.
+						Create a data-backed take-home income posting with payroll
+						deductions.
 					</p>
 				</div>
 
 				<div className="px-6 py-4 space-y-4">
 					{step === "form" ? (
 						<>
-							<IncomeForm value={input} onChange={setInput} />
+							<IncomeForm
+								value={input}
+								onChange={setInput}
+								incomeSources={incomeData?.incomeSources ?? []}
+								taxProfiles={incomeData?.taxProfiles ?? []}
+							/>
 							{result && !result.ok && (
 								<div className="rounded-xl border border-destructive/25 bg-destructive-subtle p-3 type-body text-destructive-foreground">
 									{result.error}

@@ -1,3 +1,4 @@
+import type { IncomeDataSnapshot } from "../types/income";
 import type {
 	Account,
 	AccountDelta,
@@ -98,6 +99,15 @@ function classifyAttempts(
 				postingId: posting.id,
 				delta,
 			});
+		}
+		if (attempt.income) {
+			externalInflowAmount +=
+				attempt.income.netCashRealized +
+				attempt.income.resolvers
+					.filter((resolver) => resolver.destinationAccountId !== null)
+					.reduce((sum, resolver) => sum + resolver.realizedAmount, 0) +
+				attempt.income.employerMatchRealized;
+			continue;
 		}
 		if (posting.sourceAccountId === null && posting.destinations !== null) {
 			externalInflowAmount += attempt.realizedAmount;
@@ -242,6 +252,7 @@ export function buildProjectionPath(
 		rows,
 		movementEvents: run.movementAttempts,
 		effectiveDocument: prepared.effectiveDocument,
+		incomeData: run.request.incomeData,
 		projectionStartPostingState: (() => {
 			const state = cloneSimulationState(run.initialState);
 			return {
@@ -259,12 +270,14 @@ export function projectRawFinancialModelDocument(
 	projectionSettings: ProjectionRuntimeSettings,
 	overrides?: ModelOverrides,
 	monteCarloSample?: MonteCarloSample,
+	incomeData?: IncomeDataSnapshot,
 ): RawProjectionOutput {
 	const prepared = prepareSimulationRequest(
 		document,
 		projectionSettings,
 		overrides,
 		monteCarloSample,
+		incomeData,
 	);
 	return adaptSimulationRun(prepared, simulate(prepared.request));
 }

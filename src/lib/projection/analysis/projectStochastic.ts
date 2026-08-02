@@ -7,6 +7,7 @@ import {
 	buildProjectionPath,
 } from "../simulation/projectPath";
 import { simulate } from "../simulation/simulate";
+import type { IncomeDataSnapshot } from "../types/income";
 import type {
 	FinancialModelDocument,
 	ModelOverrides,
@@ -145,6 +146,7 @@ export function stochasticProject(
 		progress: StochasticProgress,
 		partial?: StochasticProjectionResult,
 	) => void,
+	incomeData?: IncomeDataSnapshot,
 ): StochasticProjectionResult {
 	const normalizedConfig = normalizeStochasticConfig(config);
 	const progressUpdateRuns = getStochasticProgressUpdateRunInterval(
@@ -169,6 +171,8 @@ export function stochasticProject(
 		document,
 		projectionSettings,
 		overrides,
+		undefined,
+		incomeData,
 	);
 	const deterministicRaw = adaptSimulationRun(
 		prepared,

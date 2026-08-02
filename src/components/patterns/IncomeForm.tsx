@@ -1,9 +1,13 @@
 import { Input } from "@/components/ui/input";
+import type {
+	IncomeSourceDefinition,
+	IncomeTaxProfile,
+} from "@/lib/projection";
 
 export interface IncomeFormValue {
 	label: string;
-	grossMonthlyIncome: string;
-	taxRate: string;
+	incomeSourceId: string;
+	taxProfileId: string;
 	k401ContributionRate: string;
 	k401EmployerMatchRate: string;
 	k401AnnualCap: string;
@@ -14,38 +18,36 @@ export interface IncomeFormValue {
 interface IncomeFormProps {
 	value: IncomeFormValue;
 	onChange: (value: IncomeFormValue) => void;
+	incomeSources: IncomeSourceDefinition[];
+	taxProfiles: IncomeTaxProfile[];
 }
 
 const LABEL_CLASS = "block type-label mb-1";
 
 const presets = [
 	{
-		label: "22% bracket",
-		taxRate: 22,
+		label: "Balanced savings",
 		k401: 4,
 		match: 50,
 		cap: 23000,
 		auto: 10,
 	},
 	{
-		label: "24% bracket",
-		taxRate: 24,
+		label: "Higher 401(k)",
 		k401: 6,
 		match: 50,
 		cap: 23000,
 		auto: 15,
 	},
 	{
-		label: "32% bracket",
-		taxRate: 32,
+		label: "Aggressive investing",
 		k401: 8,
 		match: 3,
 		cap: 22500,
 		auto: 20,
 	},
 	{
-		label: "No 401k / low tax",
-		taxRate: 12,
+		label: "No 401(k)",
 		k401: 0,
 		match: 0,
 		cap: 0,
@@ -53,7 +55,12 @@ const presets = [
 	},
 ];
 
-export function IncomeForm({ value, onChange }: IncomeFormProps) {
+export function IncomeForm({
+	value,
+	onChange,
+	incomeSources,
+	taxProfiles,
+}: IncomeFormProps) {
 	const update = (patch: Partial<IncomeFormValue>) =>
 		onChange({ ...value, ...patch });
 
@@ -69,7 +76,6 @@ export function IncomeForm({ value, onChange }: IncomeFormProps) {
 							onClick={() =>
 								onChange({
 									...value,
-									taxRate: String(p.taxRate),
 									k401ContributionRate: String(p.k401),
 									k401EmployerMatchRate: String(p.match),
 									k401AnnualCap: String(p.cap),
@@ -103,26 +109,34 @@ export function IncomeForm({ value, onChange }: IncomeFormProps) {
 				</div>
 
 				<div>
-					<label className={LABEL_CLASS}>Gross Monthly Income</label>
-					<Input
-						type="number"
-						min={0}
-						value={value.grossMonthlyIncome}
-						onChange={(e) => update({ grossMonthlyIncome: e.target.value })}
-						placeholder="10000"
-					/>
+					<label className={LABEL_CLASS}>Income source</label>
+					<select
+						className="h-9 w-full rounded-md border border-input bg-background px-3 type-body"
+						value={value.incomeSourceId}
+						onChange={(e) => update({ incomeSourceId: e.target.value })}
+					>
+						<option value="">Select income source</option>
+						{incomeSources.map((source) => (
+							<option key={source.id} value={source.id}>
+								{source.label}
+							</option>
+						))}
+					</select>
 				</div>
 				<div>
-					<label className={LABEL_CLASS}>Tax Rate (%)</label>
-					<Input
-						type="number"
-						min={0}
-						max={100}
-						step={0.1}
-						value={value.taxRate}
-						onChange={(e) => update({ taxRate: e.target.value })}
-						placeholder="22"
-					/>
+					<label className={LABEL_CLASS}>Tax profile</label>
+					<select
+						className="h-9 w-full rounded-md border border-input bg-background px-3 type-body"
+						value={value.taxProfileId}
+						onChange={(e) => update({ taxProfileId: e.target.value })}
+					>
+						<option value="">Select tax profile</option>
+						{taxProfiles.map((profile) => (
+							<option key={profile.id} value={profile.id}>
+								{profile.label}
+							</option>
+						))}
+					</select>
 				</div>
 
 				<div>

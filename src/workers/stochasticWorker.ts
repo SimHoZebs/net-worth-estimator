@@ -6,7 +6,8 @@ import type {
 } from "./types";
 
 self.onmessage = (event: MessageEvent<StochasticWorkerRequest>) => {
-	const { id, document, projectionSettings, overrides, config } = event.data;
+	const { id, document, projectionSettings, overrides, config, incomeData } =
+		event.data;
 
 	try {
 		const result = stochasticProject(
@@ -23,6 +24,7 @@ self.onmessage = (event: MessageEvent<StochasticWorkerRequest>) => {
 				};
 				self.postMessage(msg);
 			},
+			incomeData,
 		);
 
 		const response: StochasticWorkerResponse = {

@@ -1,6 +1,7 @@
 import { evaluationRegistry } from "../evaluation/registry";
 import { EvaluationRuntimeSet } from "../evaluation/runtime";
 import { projectRawFinancialModelDocument } from "../simulation/projectPath";
+import type { IncomeDataSnapshot } from "../types/income";
 import type {
 	EvaluationResultCollection,
 	EvaluationTables,
@@ -34,12 +35,14 @@ export function projectFinancialModelDocument(
 	projectionSettings: ProjectionRuntimeSettings,
 	overrides?: ModelOverrides,
 	monteCarloSample?: MonteCarloSample,
+	incomeData?: IncomeDataSnapshot,
 ): ProjectionResult {
 	const raw = projectRawFinancialModelDocument(
 		document,
 		projectionSettings,
 		overrides,
 		monteCarloSample,
+		incomeData,
 	);
 	return {
 		...raw.result,

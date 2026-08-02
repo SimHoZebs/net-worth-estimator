@@ -73,8 +73,8 @@ export function generateIncomePattern(
 ): TemplateGenerationResult {
 	const {
 		label,
-		grossMonthlyIncome,
-		taxRate,
+		incomeSourceId,
+		taxProfileId,
 		k401ContributionRate,
 		k401EmployerMatchRate,
 		k401AnnualCap,
@@ -86,10 +86,8 @@ export function generateIncomePattern(
 	if (!label.trim()) errors.push("Label is required.");
 	if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate))
 		errors.push("Start date must be YYYY-MM-DD.");
-	if (grossMonthlyIncome <= 0)
-		errors.push("Gross monthly income must be positive.");
-	if (taxRate < 0 || taxRate > 1)
-		errors.push("Tax rate must be between 0 and 1.");
+	if (!incomeSourceId.trim()) errors.push("Income source is required.");
+	if (!taxProfileId.trim()) errors.push("Tax profile is required.");
 	if (k401ContributionRate < 0 || k401ContributionRate > 1)
 		errors.push("401(k) contribution rate must be between 0 and 1.");
 	if (k401EmployerMatchRate < 0 || k401EmployerMatchRate > 1)
@@ -105,12 +103,6 @@ export function generateIncomePattern(
 	const stem = sanitizeStem(label);
 	const salaryId = uniqueId(stem, existingPostingSet);
 	existingPostingSet.add(salaryId);
-	const k401EmpId = uniqueId(`${stem}_k401_emp`, existingPostingSet);
-	existingPostingSet.add(k401EmpId);
-	const taxId = uniqueId(`${stem}_tax`, existingPostingSet);
-	existingPostingSet.add(taxId);
-	const k401MatchId = uniqueId(`${stem}_k401_match`, existingPostingSet);
-	existingPostingSet.add(k401MatchId);
 	const brokerageAutoId = uniqueId(
 		`${stem}_brokerage_auto`,
 		existingPostingSet,
@@ -127,58 +119,34 @@ export function generateIncomePattern(
 
 	const postings: Posting[] = [];
 
-	postings.push(
-		makePosting(
-			salaryId,
-			label,
-			null,
-			["checking"],
-			String(grossMonthlyIncome),
-			1,
-			startDate,
-		),
-	);
-
+	const incomeResolvers = [];
 	if (k401ContributionRate > 0) {
-		postings.push(
-			makePosting(
-				k401EmpId,
-				`${label} 401(k) Employee`,
-				"checking",
-				["k401"],
-				`${salaryId} * ${k401ContributionRate}`,
-				2,
-				startDate,
-				k401AnnualCap > 0 ? k401AnnualCap : null,
-			),
-		);
+		incomeResolvers.push({
+			resolver: "percentage",
+			config: {
+				rate: k401ContributionRate,
+				annualCap: k401AnnualCap > 0 ? k401AnnualCap : null,
+			},
+			destinationAccountId: "k401",
+			...(k401EmployerMatchRate > 0
+				? { employerMatchRate: k401EmployerMatchRate }
+				: {}),
+		});
 	}
+	incomeResolvers.push({
+		resolver: "progressive-bracket",
+		config: { profileId: taxProfileId },
+		destinationAccountId: null,
+	});
 
-	postings.push(
-		makePosting(
-			taxId,
-			`${label} Taxes`,
-			"checking",
-			null,
-			`${salaryId} * ${taxRate}`,
-			3,
-			startDate,
-		),
-	);
-
-	if (k401EmployerMatchRate > 0 && k401ContributionRate > 0) {
-		postings.push(
-			makePosting(
-				k401MatchId,
-				`${label} 401(k) Match`,
-				null,
-				["k401"],
-				`${k401EmpId} * ${k401EmployerMatchRate}`,
-				5,
-				startDate,
-			),
-		);
-	}
+	postings.push({
+		...makePosting(salaryId, label, null, ["checking"], "0", 1, startDate),
+		amount: {
+			resolver: "income",
+			config: { incomeSourceId, resolvers: incomeResolvers },
+			inputs: {},
+		},
+	});
 
 	if (autoInvestRate > 0) {
 		postings.push(
@@ -187,7 +155,7 @@ export function generateIncomePattern(
 				`${label} Brokerage Auto`,
 				"checking",
 				["brokerage"],
-				`(${salaryId} - ${k401EmpId} - ${taxId}) * ${autoInvestRate}`,
+				`${salaryId} * ${autoInvestRate}`,
 				10,
 				startDate,
 			),

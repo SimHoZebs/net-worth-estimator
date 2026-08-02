@@ -125,6 +125,7 @@ function baseDescriptor(request: ProjectionRequest) {
 		effectiveDocument,
 		descriptor: {
 			document: simulationDocument(effectiveDocument),
+			incomeData: request.incomeData ?? null,
 			fallbackProjectionStartDate:
 				request.projectionSettings.fallbackProjectionStartDate,
 			horizonYears: request.projectionSettings.horizonYears,

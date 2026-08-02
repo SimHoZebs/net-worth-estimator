@@ -23,6 +23,7 @@ export function createModelRuntimeFixture(
 			resetLabel: "Reset",
 		},
 		document: null,
+		incomeData: null,
 		effectiveDocument: null,
 		issues: [],
 		validationIsValid: true,

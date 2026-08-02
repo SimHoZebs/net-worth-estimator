@@ -52,6 +52,10 @@ export {
 	EvaluationRegistry,
 	EvaluationRuntimeSet,
 } from "./evaluation/runtime";
+export type {
+	IncomeDataLoadResult,
+	IncomeDataSource,
+} from "./incomeData";
 export {
 	applyModelOverrides,
 	EMPTY_MODEL_OVERRIDES,
@@ -67,6 +71,12 @@ export {
 	updateExpressionAmount,
 	validateAmountDescriptor,
 } from "./simulation/amountResolution";
+export {
+	executeIncomePosting,
+	type IncomeExecutionResult,
+	progressiveIncomeLiability,
+	validateIncomeAmountConfig,
+} from "./simulation/incomeResolution";
 export {
 	type AccountMovementAction,
 	type AccountMovementResult,
@@ -111,6 +121,21 @@ export {
 	summarizeValidationIssues,
 	validateCsvFinancialModel,
 } from "./sources/csv/csvValidation";
+export {
+	createCsvIncomeDataSource,
+	parseIncomeDataFiles,
+} from "./sources/csv/incomeDataSource";
+export type {
+	IncomeDataSnapshot,
+	IncomeSourceDefinition,
+	IncomeTaxBracket,
+	IncomeTaxProfile,
+} from "./types/income";
+export {
+	EMPTY_INCOME_DATA,
+	INCOME_DATA_FILE_NAMES,
+	INCOME_DATA_PUBLIC_PATH,
+} from "./types/income";
 export type {
 	Account,
 	AccountDelta,
@@ -143,6 +168,9 @@ export type {
 	FinancialIndependenceWithdrawalAccountSummary,
 	FinancialIndependenceWithdrawalSummary,
 	FinancialModelDocument,
+	IncomeAmountConfig,
+	IncomeEvent,
+	IncomeResolverStep,
 	IsoDate,
 	JsonPrimitive,
 	JsonValue,
@@ -205,3 +233,11 @@ export {
 	type StochasticSampler,
 	sampleLogNormal,
 } from "./utils/stochastic";
+export type {
+	FinancialModelValidationOptions,
+	ValidationPaths,
+} from "./validation/types";
+export {
+	summarizeValidationIssues as summarizeModelValidationIssues,
+	validateFinancialModel,
+} from "./validation/validateFinancialModel";

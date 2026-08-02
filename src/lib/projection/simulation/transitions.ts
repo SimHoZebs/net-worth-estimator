@@ -1,3 +1,4 @@
+import { EMPTY_INCOME_DATA, type IncomeDataSnapshot } from "../types/income";
 import type { IsoDate, MovementEvent } from "../types/model";
 import type {
 	FinancialModel,
@@ -6,6 +7,7 @@ import type {
 } from "../types/simulation";
 import { projectionYearIndex } from "../utils/date";
 import { snapshotBalances } from "./accounts";
+import { executeIncomePosting } from "./incomeResolution";
 import type {
 	AccountMovementAction,
 	AccountMovementResult,
@@ -26,6 +28,7 @@ export interface AppliedMovementTransition {
 
 export interface PostingExecutionTransition extends AppliedMovementTransition {
 	postingId: string;
+	income?: MovementEvent["income"];
 }
 
 export interface SimulationTransitionRuntime {
@@ -62,11 +65,13 @@ export function createTransitionRuntime({
 	initialState,
 	projectionStartDate,
 	monteCarloSample,
+	incomeData = EMPTY_INCOME_DATA,
 }: {
 	model: FinancialModel;
 	initialState: SimulationState;
 	projectionStartDate: IsoDate;
 	monteCarloSample?: MonteCarloSample;
+	incomeData?: IncomeDataSnapshot;
 }): SimulationTransitionRuntime {
 	const state = cloneSimulationState(initialState);
 	const accountById = new Map(
@@ -107,6 +112,26 @@ export function createTransitionRuntime({
 		state,
 		executePosting(occurrence, date) {
 			const { posting } = occurrence;
+			if (posting.amount.resolver === "income") {
+				const execution = executeIncomePosting({
+					posting,
+					date,
+					data: incomeData,
+					balances: state.balances,
+					accountById,
+				});
+				const result: AccountMovementResult = {
+					requestedAmount: execution.requestedAmount,
+					realizedAmount: execution.realizedAmount,
+				};
+				observePosting(posting.id, result.realizedAmount, date);
+				return {
+					result,
+					accountDeltas: execution.accountDeltas,
+					postingId: posting.id,
+					income: execution.income,
+				};
+			}
 			const yearIndex = projectionYearIndex(projectionStartDate, date);
 			let sampledRate: number | undefined;
 			if (posting.volatility > 0 && monteCarloSample !== undefined) {

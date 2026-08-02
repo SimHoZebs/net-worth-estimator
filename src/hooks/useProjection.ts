@@ -13,6 +13,7 @@ import {
 	projectionComputationSettings,
 	simulationDocument,
 } from "@/lib/projection/runtime/computationIdentity";
+import type { IncomeDataSnapshot } from "@/lib/projection/types/income";
 import {
 	labelProjectionResult,
 	projectionComputationSettingsKey,
@@ -46,6 +47,7 @@ export function useProjection(
 	projectionSettings: ProjectionRuntimeSettings,
 	overrides: ModelOverrides,
 	enabled: boolean,
+	incomeData?: IncomeDataSnapshot,
 ): ProjectionHookState<ProjectionResult> {
 	const engine = useProjectionEngine();
 	const computationSettingsKey =
@@ -71,6 +73,7 @@ export function useProjection(
 					computationSettings.fallbackProjectionStartDate,
 				horizonYears: computationSettings.horizonYears,
 				enabled,
+				incomeData: incomeData ?? null,
 			}),
 		[
 			document,
@@ -78,6 +81,7 @@ export function useProjection(
 			computationSettings.horizonYears,
 			overrides,
 			enabled,
+			incomeData,
 		],
 	);
 	const requestKey = useMemo(
@@ -90,8 +94,8 @@ export function useProjection(
 			}),
 		[baseKey, computationSettings.evaluations],
 	);
-	const inputRef = useRef({ document, overrides, enabled });
-	inputRef.current = { document, overrides, enabled };
+	const inputRef = useRef({ document, overrides, enabled, incomeData });
+	inputRef.current = { document, overrides, enabled, incomeData };
 	const [state, setState] = useState<ProjectionState>({
 		result: null,
 		runtimeError: null,
@@ -137,6 +141,7 @@ export function useProjection(
 				document: input.document,
 				projectionSettings: computationSettings,
 				overrides: input.overrides,
+				incomeData: input.incomeData,
 				signal: controller.signal,
 			})
 			.then((result) => {

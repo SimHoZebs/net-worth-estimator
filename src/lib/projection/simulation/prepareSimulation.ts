@@ -2,7 +2,7 @@ import {
 	applyModelOverrides,
 	EMPTY_MODEL_OVERRIDES,
 } from "../model/applyModelOverrides";
-import { validateCsvFinancialModel } from "../sources/csv/csvValidation";
+import type { IncomeDataSnapshot } from "../types/income";
 import type {
 	FinancialModelDocument,
 	IsoDate,
@@ -12,6 +12,7 @@ import type {
 import type { MonteCarloSample, PreparedProjection } from "../types/simulation";
 import type { ModelValidationIssue } from "../types/validation";
 import { addYearsClamped, compareIsoDates } from "../utils/date";
+import { validateFinancialModel } from "../validation/validateFinancialModel";
 import { initAccountBalances, snapshotBalances } from "./accounts";
 import type { DatedPostingOccurrence } from "./postings";
 import { createTransitionRuntime } from "./transitions";
@@ -28,6 +29,7 @@ export class SimulationPreparationError extends Error {
 function replayHistoricalPostings(
 	document: FinancialModelDocument,
 	projectionStartDate: IsoDate,
+	incomeData?: IncomeDataSnapshot,
 ) {
 	const occurrences = document.postings
 		.map((posting, index): DatedPostingOccurrence => ({ posting, index }))
@@ -51,6 +53,7 @@ function replayHistoricalPostings(
 			realizedPostingAmountsByYear: new Map(),
 		},
 		projectionStartDate,
+		incomeData,
 	});
 	const historicalSnapshots: PreparedProjection["historicalSnapshots"] = [];
 
@@ -73,15 +76,35 @@ export function prepareSimulationRequest(
 	projectionSettings: ProjectionRuntimeSettings,
 	overrides: ModelOverrides = EMPTY_MODEL_OVERRIDES,
 	monteCarloSample?: MonteCarloSample,
+	incomeData?: IncomeDataSnapshot,
 ): PreparedProjection {
 	const effectiveDocument = applyModelOverrides(document, overrides);
-	const validationErrors = validateCsvFinancialModel(effectiveDocument).filter(
-		(issue) => issue.severity === "error",
-	);
+	if (
+		effectiveDocument.postings.some(
+			(posting) => posting.enabled && posting.amount.resolver === "income",
+		) &&
+		!incomeData
+	) {
+		throw new SimulationPreparationError([
+			{
+				severity: "error",
+				code: "income-data.missing",
+				message: "Income data is required to project an income posting.",
+				path: [],
+			},
+		]);
+	}
+	const validationErrors = validateFinancialModel(effectiveDocument, {
+		incomeData,
+	}).filter((issue) => issue.severity === "error");
 	if (validationErrors.length > 0)
 		throw new SimulationPreparationError(validationErrors);
 	const startDate = projectionSettings.fallbackProjectionStartDate;
-	const history = replayHistoricalPostings(effectiveDocument, startDate);
+	const history = replayHistoricalPostings(
+		effectiveDocument,
+		startDate,
+		incomeData,
+	);
 	return {
 		effectiveDocument,
 		historicalSnapshots: history.historicalSnapshots,
@@ -95,6 +118,7 @@ export function prepareSimulationRequest(
 			endDate: addYearsClamped(startDate, projectionSettings.horizonYears),
 			includeStartDateEvents: true,
 			monteCarloSample,
+			incomeData,
 		},
 	};
 }
