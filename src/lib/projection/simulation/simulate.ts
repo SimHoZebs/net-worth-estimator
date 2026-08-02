@@ -12,6 +12,7 @@ export function simulate(request: SimulationRequest): SimulationRun {
 		initialState: request.initialState,
 		projectionStartDate: request.startDate,
 		monteCarloSample: request.monteCarloSample,
+		incomeData: request.incomeData,
 	});
 	const { state } = transitions;
 	const movementAttempts: MovementEvent[] = [];
@@ -44,6 +45,7 @@ export function simulate(request: SimulationRequest): SimulationRun {
 				requestedAmount: transition.result.requestedAmount,
 				realizedAmount: transition.result.realizedAmount,
 				accountDeltas: transition.accountDeltas,
+				...(transition.income ? { income: transition.income } : {}),
 			});
 		}
 
@@ -56,6 +58,7 @@ export function simulate(request: SimulationRequest): SimulationRun {
 			startDate: request.startDate,
 			endDate: request.endDate,
 			includeStartDateEvents: request.includeStartDateEvents,
+			incomeData: request.incomeData,
 		},
 		initialState: cloneSimulationState(request.initialState),
 		finalState: cloneSimulationState(state),

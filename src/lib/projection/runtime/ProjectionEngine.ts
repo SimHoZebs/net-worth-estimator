@@ -11,9 +11,11 @@ import type {
 	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
+import type { IncomeDataSnapshot } from "@/lib/projection/types/income";
 
 export interface ProjectionRequest {
 	document: FinancialModelDocument;
+	incomeData?: IncomeDataSnapshot;
 	projectionSettings: ProjectionRuntimeSettings;
 	overrides: ModelOverrides;
 	signal?: AbortSignal;

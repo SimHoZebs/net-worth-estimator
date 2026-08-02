@@ -6,6 +6,7 @@ import type {
 	PostingAmountResolution,
 } from "../types/model";
 import { arithmeticRequirements, evaluateArithmetic } from "./arithmetic";
+import { validateIncomeAmountConfig } from "./incomeConfig";
 
 const finiteNumber = z.number().finite();
 const nonNegativeNumber = finiteNumber.min(0);
@@ -25,6 +26,8 @@ export interface AmountProviderContext {
 export interface AmountReferenceContext {
 	accountIds: ReadonlySet<string>;
 	postingIds: ReadonlySet<string>;
+	incomeSourceIds?: ReadonlySet<string>;
+	taxProfileIds?: ReadonlySet<string>;
 }
 
 interface ProviderDefinition<TArguments = unknown> {
@@ -255,6 +258,23 @@ export function validateAmountDescriptor(
 	amount: PostingAmountResolution,
 	references?: AmountReferenceContext,
 ): readonly string[] {
+	if (amount.resolver === "income") {
+		if (Object.keys(amount.inputs).length > 0) {
+			throw new AmountResolutionError(
+				"Income amount descriptors cannot define generic inputs.",
+			);
+		}
+		try {
+			validateIncomeAmountConfig(amount.config, references);
+		} catch (error) {
+			throw new AmountResolutionError(
+				error instanceof Error
+					? error.message
+					: "Invalid income amount config.",
+			);
+		}
+		return [];
+	}
 	const resolver = amountResolvers[amount.resolver];
 	if (!resolver)
 		throw new AmountResolutionError(
@@ -305,6 +325,11 @@ export function resolvePostingAmountDescriptor(
 	amount: PostingAmountResolution,
 	context: AmountProviderContext,
 ): number {
+	if (amount.resolver === "income") {
+		throw new AmountResolutionError(
+			"Income amounts must be resolved by the income transition.",
+		);
+	}
 	const resolver = amountResolvers[amount.resolver];
 	if (!resolver)
 		throw new AmountResolutionError(

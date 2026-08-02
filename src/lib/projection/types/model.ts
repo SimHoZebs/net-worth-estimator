@@ -1,3 +1,5 @@
+import type { IncomeDataSnapshot } from "./income";
+
 export const CSV_MODEL_REPO_PATH = "public/configs";
 export const CSV_MODEL_PUBLIC_PATH = "/configs";
 
@@ -66,6 +68,18 @@ export interface PostingAmountResolution {
 	resolver: string;
 	config: Record<string, JsonValue>;
 	inputs: Record<string, AmountInputBinding>;
+}
+
+export interface IncomeResolverStep {
+	resolver: string;
+	config: Record<string, JsonValue>;
+	destinationAccountId: string | null;
+	employerMatchRate?: number;
+}
+
+export interface IncomeAmountConfig {
+	incomeSourceId: string;
+	resolvers: IncomeResolverStep[];
 }
 
 export type FinancialIndependencePrincipalPolicy =
@@ -240,6 +254,25 @@ export interface MovementEvent {
 	requestedAmount: number;
 	realizedAmount: number;
 	accountDeltas: Array<{ accountId: string; delta: number }>;
+	income?: IncomeEvent;
+}
+
+export interface IncomeEvent {
+	annualGrossIncome: number;
+	grossAmount: number;
+	resolvers: Array<{
+		resolver: string;
+		requestedAmount: number;
+		realizedAmount: number;
+		destinationAccountId: string | null;
+		taxableAmountAfter: number;
+		employerMatchAmount: number;
+		employerMatchRealizedAmount: number;
+	}>;
+	netCashRequested: number;
+	netCashRealized: number;
+	employerMatchRequested: number;
+	employerMatchRealized: number;
 }
 
 export interface AccountSnapshot {
@@ -367,6 +400,7 @@ export interface ProjectionPath {
 	rows: ProjectionRow[];
 	movementEvents: MovementEvent[];
 	effectiveDocument: FinancialModelDocument;
+	incomeData?: IncomeDataSnapshot;
 	projectionStartPostingState: {
 		latestRealizedPostingAmounts: Map<string, number>;
 		realizedPostingAmountsByYear: Map<string, Map<string, number>>;

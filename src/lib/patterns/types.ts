@@ -7,8 +7,8 @@ import type {
 
 export interface IncomeTemplateInput {
 	label: string;
-	grossMonthlyIncome: number;
-	taxRate: number;
+	incomeSourceId: string;
+	taxProfileId: string;
 	k401ContributionRate: number;
 	k401EmployerMatchRate: number;
 	k401AnnualCap: number;

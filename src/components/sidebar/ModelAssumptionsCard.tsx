@@ -84,7 +84,10 @@ export function ModelAssumptionsCard() {
 						Model boundaries
 					</summary>
 					<ul className="mt-3 space-y-1 type-caption">
-						<li>Taxes are modeled as a flat percentage of income.</li>
+						<li>
+							Income uses the configured tax profile and ordered payroll
+							resolvers; the checking deposit is post-tax.
+						</li>
 						<li>
 							Investment returns, loan rates, and expense growth are annual
 							rates converted to monthly.

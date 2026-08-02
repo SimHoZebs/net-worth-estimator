@@ -43,6 +43,7 @@ export function ModelInputsPage() {
 			{showWizard && wizardDocument ? (
 				<TemplateWizard
 					document={wizardDocument}
+					incomeData={model.incomeData}
 					onApply={model.applyTemplate}
 					onClose={handleCloseWizard}
 				/>

@@ -70,8 +70,8 @@ describe("useProjectionOrchestration", () => {
 			}),
 		);
 
-		expect(vi.mocked(useProjection).mock.calls[0]?.[3]).toBe(true);
-		expect(vi.mocked(useStochastic).mock.calls[0]?.[4]).toBe(true);
+		expect(vi.mocked(useProjection).mock.calls[0]?.[3]).toBe(false);
+		expect(vi.mocked(useStochastic).mock.calls[0]?.[4]).toBe(false);
 		expect(result.current.effectiveDocument).toEqual(document);
 		expect(result.current.capabilities).toEqual({
 			hasStochasticAccounts: true,

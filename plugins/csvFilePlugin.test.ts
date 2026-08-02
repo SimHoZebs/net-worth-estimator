@@ -6,6 +6,7 @@ import { Readable } from "node:stream";
 import type { Connect, ResolvedConfig, ViteDevServer } from "vite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { prepareSimulationRequest } from "../src/lib/projection/simulation/prepareSimulation";
+import { parseIncomeDataFiles } from "../src/lib/projection/sources/csv/incomeDataSource";
 import type { FinancialModelDocument } from "../src/lib/projection/types/model";
 import { csvFilePlugin, FINANCIAL_MODEL_API_PATH } from "./csvFilePlugin";
 
@@ -115,12 +116,29 @@ describe("csvFilePlugin", () => {
 		expect(fi.continuingPostingIds.every((id) => postingIds.has(id))).toBe(
 			true,
 		);
+		const incomeData = parseIncomeDataFiles({
+			incomeSources: await fs.readFile(
+				path.resolve("public/data/income/income-sources.csv"),
+				"utf8",
+			),
+			taxProfiles: await fs.readFile(
+				path.resolve("public/data/income/tax-profiles.csv"),
+				"utf8",
+			),
+		}).data;
+		if (!incomeData) throw new Error("Bundled income data is invalid.");
 
-		const prepared = prepareSimulationRequest(document, {
-			fallbackProjectionStartDate: "2026-07-28",
-			horizonYears: 1,
-			evaluations: document.evaluations,
-		});
+		const prepared = prepareSimulationRequest(
+			document,
+			{
+				fallbackProjectionStartDate: "2026-07-28",
+				horizonYears: 1,
+				evaluations: document.evaluations,
+			},
+			undefined,
+			undefined,
+			incomeData,
+		);
 		const expectedOpeningBalances = {
 			checking: 397.74,
 			k401: 1260.74,

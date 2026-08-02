@@ -6,11 +6,14 @@ import {
 	useFinancialModelQuery,
 	useFinancialModelResetMutation,
 } from "@/hooks/useFinancialModel";
+import { useIncomeDataQuery } from "@/hooks/useIncomeData";
 import type { TemplateOutput } from "@/lib/patterns";
 import {
 	createBrowserCsvDataSource,
 	createCsvDataSource,
+	createCsvIncomeDataSource,
 	summarizeValidationIssues,
+	validateCsvFinancialModel,
 } from "@/lib/projection";
 import {
 	ModelRuntimeProvider,
@@ -28,6 +31,7 @@ function createModelDataSource() {
 
 export default function App() {
 	const dataSource = useMemo(() => createModelDataSource(), []);
+	const incomeDataSource = useMemo(() => createCsvIncomeDataSource(), []);
 	const {
 		data: modelData,
 		isLoading: isModelLoading,
@@ -36,6 +40,13 @@ export default function App() {
 		refetch: refetchModel,
 		dataUpdatedAt,
 	} = useFinancialModelQuery(dataSource);
+	const {
+		data: incomeDataResult,
+		isLoading: isIncomeDataLoading,
+		isFetching: isIncomeDataFetching,
+		error: incomeDataError,
+		refetch: refetchIncomeData,
+	} = useIncomeDataQuery(incomeDataSource);
 	const modelMutation = useFinancialModelMutation(dataSource);
 	const modelResetMutation = useFinancialModelResetMutation(dataSource);
 	const saveModel = modelMutation.mutate;
@@ -43,12 +54,23 @@ export default function App() {
 	const isSaving = modelMutation.isPending;
 	const isResetting = modelResetMutation.isPending;
 	const document = modelData?.document ?? null;
-	const issues = useMemo(() => modelData?.issues ?? [], [modelData?.issues]);
-	const loadError = modelError?.message ?? null;
+	const issues = useMemo(() => {
+		const modelIssues = modelData?.issues ?? [];
+		if (!modelData?.document || !incomeDataResult?.data) {
+			return [...modelIssues, ...(incomeDataResult?.issues ?? [])];
+		}
+		return [
+			...modelIssues,
+			...incomeDataResult.issues,
+			...validateCsvFinancialModel(modelData.document, incomeDataResult.data),
+		];
+	}, [incomeDataResult, modelData]);
+	const loadError = modelError?.message ?? incomeDataError?.message ?? null;
 	const sourceActionError =
 		modelMutation.error?.message ?? modelResetMutation.error?.message ?? null;
-	const isSourceUpdating = isModelFetching || modelResetMutation.isPending;
-	const isLoading = isModelLoading || isSourceUpdating;
+	const isSourceUpdating =
+		isModelFetching || isIncomeDataFetching || modelResetMutation.isPending;
+	const isLoading = isModelLoading || isIncomeDataLoading || isSourceUpdating;
 	const replaceEvaluations = useStore((state) => state.replaceEvaluations);
 
 	const sourceEvaluationsFingerprint = document
@@ -101,6 +123,9 @@ export default function App() {
 		validationIsValid: validation.isValid,
 		evaluationsAreHydrated,
 		isSourceUpdating,
+		incomeData: incomeDataResult?.data ?? undefined,
+		incomeDataReady:
+			incomeDataResult?.data !== null && incomeDataResult?.data !== undefined,
 	});
 
 	const handleSave = useCallback(() => {
@@ -141,7 +166,8 @@ export default function App() {
 	const handleReload = useCallback(() => {
 		requestEvaluationReload();
 		void refetchModel();
-	}, [refetchModel, requestEvaluationReload]);
+		void refetchIncomeData();
+	}, [refetchIncomeData, refetchModel, requestEvaluationReload]);
 
 	const source = useMemo<ModelSourceInfo>(
 		() => ({
@@ -157,6 +183,7 @@ export default function App() {
 		() => ({
 			source,
 			document,
+			incomeData: incomeDataResult?.data ?? null,
 			effectiveDocument,
 			issues,
 			validationIsValid: validation.isValid,
@@ -192,6 +219,7 @@ export default function App() {
 			dataSource.reset,
 			handleResetSource,
 			handleApplyTemplate,
+			incomeDataResult?.data,
 		],
 	);
 	return (

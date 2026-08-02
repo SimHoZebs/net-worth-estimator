@@ -1,3 +1,4 @@
+import type { IncomeDataSnapshot } from "./income";
 import type {
 	Account,
 	FinancialModelDocument,
@@ -23,6 +24,7 @@ export interface MonteCarloSample {
 
 export interface SimulationRequest {
 	model: FinancialModel;
+	incomeData?: IncomeDataSnapshot;
 	initialState: SimulationState;
 	startDate: IsoDate;
 	endDate: IsoDate;

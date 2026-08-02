@@ -161,6 +161,7 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 			{
 				type: "complete",
 				document: request.document,
+				incomeData: request.incomeData,
 				projectionSettings: request.projectionSettings,
 				overrides: request.overrides,
 			},
@@ -173,6 +174,7 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 			{
 				type: "base",
 				document: request.document,
+				incomeData: request.incomeData,
 				projectionSettings: request.projectionSettings,
 				overrides: request.overrides,
 			},
@@ -200,6 +202,7 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 		const payload: StochasticWorkerRequest = {
 			id: 1,
 			document: request.document,
+			incomeData: request.incomeData,
 			projectionSettings: request.projectionSettings,
 			overrides: request.overrides,
 			config: request.config,

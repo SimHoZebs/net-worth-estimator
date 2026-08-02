@@ -2,6 +2,7 @@ import { createContext, type ReactNode, useContext } from "react";
 import type { TemplateOutput } from "@/lib/patterns";
 import type {
 	FinancialModelDocument,
+	IncomeDataSnapshot,
 	ModelValidationIssue,
 } from "@/lib/projection";
 
@@ -16,6 +17,7 @@ export interface ModelSourceInfo {
 export interface ModelRuntime {
 	source: ModelSourceInfo;
 	document: FinancialModelDocument | null;
+	incomeData: IncomeDataSnapshot | null;
 	effectiveDocument: FinancialModelDocument | null;
 	issues: ModelValidationIssue[];
 	validationIsValid: boolean;

@@ -168,8 +168,9 @@ export function StochasticControls() {
 										other values remain fixed across independent samples.
 									</li>
 									<li>
-										Loan rates, salary, expenses, and tax rates are treated as
-										deterministic unless separately modeled with volatility.
+										Loan rates, income sources, expenses, and tax profiles are
+										treated as deterministic unless separately modeled with
+										volatility.
 									</li>
 									<li>
 										Returns across different accounts and years are treated as

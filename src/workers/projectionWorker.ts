@@ -29,12 +29,16 @@ self.onmessage = (event: MessageEvent<ProjectionWorkerRequest>) => {
 				request.document,
 				request.projectionSettings,
 				request.overrides,
+				undefined,
+				request.incomeData,
 			);
 		} else {
 			response.result = projectFinancialModelDocument(
 				request.document,
 				request.projectionSettings,
 				request.overrides,
+				undefined,
+				request.incomeData,
 			);
 		}
 	} catch (err) {
