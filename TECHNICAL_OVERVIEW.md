@@ -23,12 +23,13 @@ The Net Worth Estimator is a React application that loads a CSV-backed `Financia
 
 ## 3. Persistence
 
-The persistence boundary is the validated `FinancialModelDocument` represented by `accounts.csv`, `postings.csv`, and one typed CSV table per evaluation type under `configs/behavior/`.
+The persistence boundary is the validated `FinancialModelDocument` represented by `accounts.csv`, `postings.csv`, and one typed CSV table per evaluation type under `configs/behavior/`. Income definitions and tax profiles are separate source data and are never part of the persisted model document.
 
 ### Development
 
 - Canonical route: `GET/PUT /api/financial-model`
-- Saves write the same CSV files under `public/configs/`.
+- Saves write the configured model CSV files. The Vite API defaults to the tracked public files and supports alternate source directories through `NET_WORTH_ESTIMATOR_MODEL_PATH` and `NET_WORTH_ESTIMATOR_INCOME_PATH`.
+- Income CSV files are read through `/api/income-data/*` in development and bundled `/data/income/` files in production.
 
 ### Browser
 

@@ -11,12 +11,16 @@ import type {
 	RawProjectionOutput,
 	StochasticProjectionResult,
 } from "@/lib/projection";
-import { projectFinancialModelDocument } from "@/lib/projection";
+import {
+	projectFinancialModelDocument,
+	projectRawFinancialModelDocument,
+} from "@/lib/projection";
 import {
 	createBaseDocument,
 	makeSettings,
 } from "@/lib/projection/__fixtures__";
 import type { ProjectionEngine } from "@/lib/projection/runtime/ProjectionEngine";
+import { decodeRawProjectionOutput } from "@/workers/types";
 import { wrapperWithEngine } from "./test-helpers";
 
 /* ------------------------------------------------------------------ */
@@ -25,6 +29,40 @@ import { wrapperWithEngine } from "./test-helpers";
 
 function makeProjectionResult(): ProjectionResult {
 	return projectFinancialModelDocument(createBaseDocument(), makeSettings());
+}
+
+function makeRawProjectionOutput(): RawProjectionOutput {
+	return projectRawFinancialModelDocument(
+		createBaseDocument(),
+		makeSettings(),
+		makeDefaultOverrides(),
+	);
+}
+
+function makeStochasticResult(): StochasticProjectionResult {
+	const deterministic = makeProjectionResult();
+	const date = deterministic.timeline.rows[0]?.date ?? "2026-01-01";
+	return {
+		config: { runCount: 1, seed: 1 },
+		deterministic,
+		bands: [
+			{
+				date,
+				isHistorical: false,
+				netWorth: { p10: 1, p25: 1, p50: 1, p75: 1, p90: 1 },
+			},
+		],
+		milestones: {
+			finalNetWorthPercentiles: {
+				p10: 1,
+				p25: 1,
+				p50: 1,
+				p75: 1,
+				p90: 1,
+			},
+		},
+		evaluations: deterministic.evaluations,
+	};
 }
 
 function makeDefaultOverrides() {
@@ -41,7 +79,7 @@ function makeMockEngine(
 ): ProjectionEngine {
 	return {
 		project: vi.fn(async () => makeProjectionResult()),
-		projectStochastic: vi.fn(async () => ({}) as StochasticProjectionResult),
+		projectStochastic: vi.fn(async () => makeStochasticResult()),
 		...overrides,
 	};
 }
@@ -137,10 +175,8 @@ describe("WorkerProjectionEngine", () => {
 	it("streams stochastic progress before resolving", async () => {
 		const engine = new WorkerProjectionEngine();
 		const onProgress = vi.fn();
-		const expected = {} as StochasticProjectionResult;
-		const partial = {
-			config: { runCount: 1, seed: 1 },
-		} as StochasticProjectionResult;
+		const expected = makeStochasticResult();
+		const partial = makeStochasticResult();
 		const progress = {
 			phase: "stochastic-runs" as const,
 			completedRuns: 1,
@@ -172,7 +208,7 @@ describe("WorkerProjectionEngine", () => {
 
 	it("supports staged base projection worker requests", async () => {
 		const engine = new WorkerProjectionEngine();
-		const expected = { path: {}, result: {} } as RawProjectionOutput;
+		const expected = makeRawProjectionOutput();
 		const promise = engine.projectBase({
 			document: createBaseDocument(),
 			projectionSettings: makeSettings(),
@@ -187,7 +223,7 @@ describe("WorkerProjectionEngine", () => {
 			data: { id: 1, type: "base", result: expected, runtimeError: null },
 		} as MessageEvent);
 
-		await expect(promise).resolves.toBe(expected);
+		await expect(promise).resolves.toEqual(expected);
 	});
 
 	it("supports generic path evaluation worker requests", async () => {
@@ -250,6 +286,66 @@ describe("WorkerProjectionEngine", () => {
 		expect(worker.terminate).toHaveBeenCalledOnce();
 	});
 
+	it("rejects deterministic responses with an invalid result payload", async () => {
+		const engine = new WorkerProjectionEngine();
+		const promise = engine.project({
+			document: createBaseDocument(),
+			projectionSettings: makeSettings(),
+			overrides: makeDefaultOverrides(),
+		});
+		const worker = MockWorker.instances[0]!;
+
+		worker.onmessage?.({
+			data: { id: 1, type: "complete", result: {}, runtimeError: null },
+		} as MessageEvent);
+
+		await expect(promise).rejects.toThrow("invalid result");
+	});
+
+	it("rejects raw results with a malformed effective document", () => {
+		const malformed = structuredClone(makeRawProjectionOutput());
+		const posting = malformed.path.effectiveDocument.postings[0]!;
+		posting.destinations = [42] as unknown as string[];
+
+		expect(decodeRawProjectionOutput(malformed)).toBeNull();
+
+		posting.destinations = ["checking"];
+		posting.frequency = "invalid" as typeof posting.frequency;
+		expect(decodeRawProjectionOutput(malformed)).toBeNull();
+	});
+
+	it("returns the canonical document produced by raw result decoding", () => {
+		const result = structuredClone(makeRawProjectionOutput());
+		const account = result.path.effectiveDocument.accounts[0]!;
+		const accountId = account.id;
+		account.id = ` ${accountId} `;
+
+		expect(
+			decodeRawProjectionOutput(result)?.path.effectiveDocument.accounts[0]?.id,
+		).toBe(accountId);
+	});
+
+	it("preserves validated income data when decoding raw results", () => {
+		const result = structuredClone(makeRawProjectionOutput());
+		const incomeData = {
+			incomeSources: [
+				{
+					id: "salary",
+					label: "Salary",
+					effectiveFrom: "2026-01-01",
+					effectiveTo: null,
+					annualGrossIncome: 120_000,
+				},
+			],
+			taxProfiles: [],
+		};
+		result.path.incomeData = incomeData;
+
+		expect(decodeRawProjectionOutput(result)?.path.incomeData).toEqual(
+			incomeData,
+		);
+	});
+
 	it("rejects deterministic responses for the wrong request type", async () => {
 		const engine = new WorkerProjectionEngine();
 		const promise = engine.project({
@@ -287,6 +383,33 @@ describe("WorkerProjectionEngine", () => {
 			"Stochastic worker returned a malformed message.",
 		);
 		expect(worker.terminate).toHaveBeenCalledOnce();
+	});
+
+	it("rejects stochastic progress with an invalid workload", async () => {
+		const engine = new WorkerProjectionEngine();
+		const promise = engine.projectStochastic({
+			document: createBaseDocument(),
+			projectionSettings: makeSettings(),
+			overrides: makeDefaultOverrides(),
+			config: { runCount: 1, seed: 1 },
+		});
+		const worker = MockWorker.instances[0]!;
+
+		worker.onmessage?.({
+			data: {
+				id: 1,
+				type: "progress",
+				progress: {
+					phase: "stochastic-runs",
+					completedRuns: 1,
+					totalRuns: 1,
+					fraction: 1,
+					evaluationWorkloads: [{ type: "financialIndependence" }],
+				},
+			},
+		} as MessageEvent);
+
+		await expect(promise).rejects.toThrow("malformed message");
 	});
 
 	it("rejects unknown stochastic message types", async () => {
@@ -368,15 +491,18 @@ describe("WorkerProjectionEngine", () => {
 				}),
 			"Stochastic worker crashed.",
 		],
-	])("terminates and rejects %s worker crashes", async (_name, run, message) => {
-		const promise = run(new WorkerProjectionEngine());
-		const worker = MockWorker.instances[0]!;
+	])(
+		"terminates and rejects %s worker crashes",
+		async (_name, run, message) => {
+			const promise = run(new WorkerProjectionEngine());
+			const worker = MockWorker.instances[0]!;
 
-		worker.onerror?.();
+			worker.onerror?.();
 
-		await expect(promise).rejects.toThrow(message);
-		expect(worker.terminate).toHaveBeenCalledOnce();
-	});
+			await expect(promise).rejects.toThrow(message);
+			expect(worker.terminate).toHaveBeenCalledOnce();
+		},
+	);
 
 	it("terminates when posting a worker request fails", async () => {
 		MockWorker.postMessageError = new DOMException(

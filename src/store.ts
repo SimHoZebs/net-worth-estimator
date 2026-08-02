@@ -140,6 +140,7 @@ interface EditorSlice {
 	isEditing: boolean;
 	startEditing: (document: FinancialModelDocument) => void;
 	cancelEditing: () => void;
+	finishEditing: () => void;
 	updateAccount: (id: string, changes: Partial<Account>) => void;
 	deleteAccount: (id: string) => void;
 	addAccount: (account: Account) => void;
@@ -165,6 +166,9 @@ const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (
 	},
 
 	cancelEditing: () =>
+		set({ workingDocument: null, isDirty: false, isEditing: false }),
+
+	finishEditing: () =>
 		set({ workingDocument: null, isDirty: false, isEditing: false }),
 
 	updateAccount: (id, changes) =>
@@ -298,9 +302,13 @@ interface ThemeSlice {
 	theme: Theme;
 	resolvedTheme: "light" | "dark";
 	setTheme: (theme: Theme) => void;
+	syncSystemTheme: () => void;
 }
 
-const createThemeSlice: StateCreator<AppStore, [], [], ThemeSlice> = (set) => {
+const createThemeSlice: StateCreator<AppStore, [], [], ThemeSlice> = (
+	set,
+	get,
+) => {
 	const initial = readStoredTheme();
 	return {
 		theme: initial,
@@ -308,6 +316,11 @@ const createThemeSlice: StateCreator<AppStore, [], [], ThemeSlice> = (set) => {
 		setTheme: (theme) => {
 			applyThemeToDOM(theme);
 			set({ theme, resolvedTheme: resolveTheme(theme) });
+		},
+		syncSystemTheme: () => {
+			if (get().theme !== "system") return;
+			applyThemeToDOM("system");
+			set({ resolvedTheme: resolveTheme("system") });
 		},
 	};
 };
@@ -590,6 +603,7 @@ export const selectEditorState = (s: AppStore) => ({
 export const selectEditorActions = (s: AppStore) => ({
 	startEditing: s.startEditing,
 	cancelEditing: s.cancelEditing,
+	finishEditing: s.finishEditing,
 	updateAccount: s.updateAccount,
 	deleteAccount: s.deleteAccount,
 	addAccount: s.addAccount,

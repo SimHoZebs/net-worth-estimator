@@ -1,12 +1,6 @@
-import {
-	type KeyboardEvent,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useBeforeUnload, useBlocker } from "react-router-dom";
-import { EvaluationSettings } from "@/components/evaluations/EvaluationList";
+import { EvaluationSettings } from "@/components/evaluations/EvaluationSettings";
 import { StochasticControls } from "@/components/StochasticControls";
 import { ModelAssumptionsCard } from "@/components/sidebar/ModelAssumptionsCard";
 import { SimulationSettingsCard } from "@/components/sidebar/SimulationSettingsCard";
@@ -18,6 +12,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import { useStore } from "@/store";
 
@@ -28,9 +23,6 @@ export function SettingsPage() {
 	);
 	const hasDirtyDrafts = dirtyDrafts.size > 0;
 	const blocker = useBlocker(hasDirtyDrafts);
-	const dialogRef = useRef<HTMLDivElement | null>(null);
-	const stayButtonRef = useRef<HTMLButtonElement | null>(null);
-	const previousFocusRef = useRef<HTMLElement | null>(null);
 	const handleDraftDirtyChange = useCallback((key: string, dirty: boolean) => {
 		setDirtyDrafts((current) => {
 			const alreadyMatches = current.has(key) === dirty;
@@ -54,11 +46,9 @@ export function SettingsPage() {
 	);
 
 	useEffect(() => {
-		if (blocker.state !== "blocked") return;
-		previousFocusRef.current = document.activeElement as HTMLElement | null;
 		const header = document.querySelector("header");
-		if (header instanceof HTMLElement) header.inert = true;
-		stayButtonRef.current?.focus();
+		if (blocker.state === "blocked" && header instanceof HTMLElement)
+			header.inert = true;
 		return () => {
 			if (header instanceof HTMLElement) header.inert = false;
 		};
@@ -66,35 +56,7 @@ export function SettingsPage() {
 
 	const stayOnSettings = useCallback(() => {
 		blocker.reset?.();
-		requestAnimationFrame(() => previousFocusRef.current?.focus());
 	}, [blocker]);
-
-	const handleDialogKeyDown = useCallback(
-		(event: KeyboardEvent<HTMLDivElement>) => {
-			if (event.key === "Escape") {
-				event.preventDefault();
-				stayOnSettings();
-				return;
-			}
-			if (event.key !== "Tab" || !dialogRef.current) return;
-			const controls = Array.from(
-				dialogRef.current.querySelectorAll<HTMLElement>(
-					"button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
-				),
-			);
-			const first = controls[0];
-			const last = controls[controls.length - 1];
-			if (!first || !last) return;
-			if (event.shiftKey && document.activeElement === first) {
-				event.preventDefault();
-				last.focus();
-			} else if (!event.shiftKey && document.activeElement === last) {
-				event.preventDefault();
-				first.focus();
-			}
-		},
-		[stayOnSettings],
-	);
 
 	return (
 		<>
@@ -148,41 +110,29 @@ export function SettingsPage() {
 				)}
 			</main>
 			{blocker.state === "blocked" ? (
-				<div
-					className="fixed inset-0 z-50 grid place-items-center bg-foreground/30 p-4 backdrop-blur-sm"
-					role="presentation"
+				<Dialog
+					role="alertdialog"
+					ariaLabelledby="discard-settings-title"
+					ariaDescribedby="discard-settings-description"
+					onClose={stayOnSettings}
+					className="max-w-md rounded-[1.8rem] border border-border bg-card p-6 shadow-2xl"
 				>
-					<div
-						ref={dialogRef}
-						onKeyDown={handleDialogKeyDown}
-						role="alertdialog"
-						aria-modal="true"
-						aria-labelledby="discard-settings-title"
-						aria-describedby="discard-settings-description"
-						className="w-full max-w-md rounded-[1.8rem] border border-border bg-card p-6 shadow-2xl"
-					>
-						<h2 id="discard-settings-title" className="type-title text-xl">
-							Discard unapplied changes?
-						</h2>
-						<p id="discard-settings-description" className="mt-2 type-muted">
-							One or more evaluation editors contain changes that have not been
-							applied to the projection.
-						</p>
-						<div className="mt-6 flex justify-end gap-2">
-							<Button
-								ref={stayButtonRef}
-								type="button"
-								variant="secondary"
-								onClick={stayOnSettings}
-							>
-								Stay on Settings
-							</Button>
-							<Button type="button" onClick={() => blocker.proceed()}>
-								Discard and leave
-							</Button>
-						</div>
+					<h2 id="discard-settings-title" className="type-title text-xl">
+						Discard unapplied changes?
+					</h2>
+					<p id="discard-settings-description" className="mt-2 type-muted">
+						One or more evaluation editors contain changes that have not been
+						applied to the projection.
+					</p>
+					<div className="mt-6 flex justify-end gap-2">
+						<Button type="button" variant="secondary" onClick={stayOnSettings}>
+							Stay on Settings
+						</Button>
+						<Button type="button" onClick={() => blocker.proceed()}>
+							Discard and leave
+						</Button>
 					</div>
-				</div>
+				</Dialog>
 			) : null}
 		</>
 	);

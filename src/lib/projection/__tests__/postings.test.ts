@@ -49,15 +49,18 @@ describe("posting recurrence", () => {
 			"2026-01-29",
 			["2026-01-15", "2026-01-22", "2026-01-29"],
 		],
-	] as const)("adds inclusive %s occurrences", (frequency, startDate, projectionEndDate, expected) => {
-		expect(
-			occurrenceDates(
-				{ id: `posting-${frequency}`, frequency, startDate },
-				startDate,
-				projectionEndDate,
-			),
-		).toEqual(expected);
-	});
+	] as const)(
+		"adds inclusive %s occurrences",
+		(frequency, startDate, projectionEndDate, expected) => {
+			expect(
+				occurrenceDates(
+					{ id: `posting-${frequency}`, frequency, startDate },
+					startDate,
+					projectionEndDate,
+				),
+			).toEqual(expected);
+		},
+	);
 
 	it.each([
 		[
@@ -78,15 +81,18 @@ describe("posting recurrence", () => {
 			"2028-02-29",
 			["2024-02-29", "2025-02-28", "2026-02-28", "2027-02-28", "2028-02-29"],
 		],
-	] as const)("anchors clamped %s occurrences to the original start date", (frequency, startDate, projectionEndDate, expected) => {
-		expect(
-			occurrenceDates(
-				{ id: `posting-${frequency}`, frequency, startDate },
-				startDate,
-				projectionEndDate,
-			),
-		).toEqual(expected);
-	});
+	] as const)(
+		"anchors clamped %s occurrences to the original start date",
+		(frequency, startDate, projectionEndDate, expected) => {
+			expect(
+				occurrenceDates(
+					{ id: `posting-${frequency}`, frequency, startDate },
+					startDate,
+					projectionEndDate,
+				),
+			).toEqual(expected);
+		},
+	);
 
 	it("honors projection-start inclusion, posting end dates, and disabled rows", () => {
 		expect(

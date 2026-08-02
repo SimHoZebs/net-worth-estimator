@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
+import { lazy, type ReactNode, StrictMode, Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import {
 	createBrowserRouter,
@@ -7,14 +7,35 @@ import {
 	RouterProvider,
 } from "react-router-dom";
 import App from "./App";
+import {
+	RouteErrorFallback,
+	RouteLoadingFallback,
+} from "./components/RouteErrorFallback";
 import { CachedProjectionEngine } from "./engine/CachedProjectionEngine";
 import { ProjectionEngineProvider } from "./engine/ProjectionEngineContext";
 import { WorkerProjectionEngine } from "./engine/WorkerProjectionEngine";
 import { InMemoryProjectionArtifactStore } from "./lib/projection/artifacts";
 import "./styles.css";
-import { ModelInputsPage } from "./pages/ModelInputsPage";
-import { ResultsPage } from "./pages/ResultsPage";
-import { SettingsPage } from "./pages/SettingsPage";
+
+const ModelInputsPage = lazy(() =>
+	import("./pages/ModelInputsPage").then(({ ModelInputsPage }) => ({
+		default: ModelInputsPage,
+	})),
+);
+const ResultsPage = lazy(() =>
+	import("./pages/ResultsPage").then(({ ResultsPage }) => ({
+		default: ResultsPage,
+	})),
+);
+const SettingsPage = lazy(() =>
+	import("./pages/SettingsPage").then(({ SettingsPage }) => ({
+		default: SettingsPage,
+	})),
+);
+
+function lazyElement(element: ReactNode) {
+	return <Suspense fallback={<RouteLoadingFallback />}>{element}</Suspense>;
+}
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -34,21 +55,22 @@ const router = createBrowserRouter([
 	{
 		path: "/",
 		element: <App />,
+		errorElement: <RouteErrorFallback />,
 		children: [
-			{ index: true, element: <ResultsPage /> },
-			{ path: "settings", element: <SettingsPage /> },
-			{ path: "model-inputs", element: <ModelInputsPage /> },
+			{ index: true, element: lazyElement(<ResultsPage />) },
+			{ path: "settings", element: lazyElement(<SettingsPage />) },
+			{ path: "model-inputs", element: lazyElement(<ModelInputsPage />) },
 			{ path: "*", element: <Navigate to="/" replace /> },
 		],
 	},
 ]);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
-	<React.StrictMode>
+	<StrictMode>
 		<ProjectionEngineProvider engine={engine}>
 			<QueryClientProvider client={queryClient}>
 				<RouterProvider router={router} />
 			</QueryClientProvider>
 		</ProjectionEngineProvider>
-	</React.StrictMode>,
+	</StrictMode>,
 );

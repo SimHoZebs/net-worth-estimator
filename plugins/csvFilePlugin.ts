@@ -2,13 +2,18 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { Connect, Plugin, ViteDevServer } from "vite";
 import type { FinancialModelParseResult } from "../src/lib/projection/dataSource";
-import { validateFinancialIndependencePlan } from "../src/lib/projection/evaluation/financialIndependence";
+import {
+	INCOME_DATA_API_PATH,
+	INCOME_DATA_FILE_NAMES,
+	type IncomeDataLoadResult,
+	parseIncomeDataFiles,
+	validateCsvFinancialModel,
+} from "../src/lib/projection/index";
 import { parseFinancialModelDocument } from "../src/lib/projection/sources/csv/csvDataSource";
 import {
 	parseCsvFinancialModel,
 	serializeCsvFinancialModel,
 } from "../src/lib/projection/sources/csv/csvLoader";
-import { validateCsvFinancialModel } from "../src/lib/projection/sources/csv/csvValidation";
 import {
 	type BehaviorCollectionKey,
 	CSV_BEHAVIOR_FILE_NAMES,
@@ -17,9 +22,16 @@ import {
 import type { ModelValidationIssue } from "../src/lib/projection/types/validation";
 
 export const FINANCIAL_MODEL_API_PATH = "/api/financial-model";
+const DEFAULT_MAX_REQUEST_BYTES = 1_048_576;
+const INCOME_FILE_NAMES: ReadonlySet<string> = new Set(
+	Object.values(INCOME_DATA_FILE_NAMES),
+);
 
 export interface CsvFilePluginOptions {
 	csvPath?: string;
+	incomePath?: string;
+	incomeApiPath?: string;
+	maxRequestBytes?: number;
 }
 
 function resolveCsvPath(projectRoot: string, csvPath: string): string {
@@ -35,8 +47,36 @@ function writeCsvFile(filePath: string, content: string): Promise<void> {
 	return fs.writeFile(filePath, content, "utf-8");
 }
 
+async function loadIncomeData(
+	incomePath: string,
+): Promise<IncomeDataLoadResult> {
+	try {
+		const [incomeSources, taxProfiles] = await Promise.all([
+			readCsvFile(path.join(incomePath, INCOME_DATA_FILE_NAMES.incomeSources)),
+			readCsvFile(path.join(incomePath, INCOME_DATA_FILE_NAMES.taxProfiles)),
+		]);
+		return parseIncomeDataFiles({ incomeSources, taxProfiles });
+	} catch (error) {
+		return {
+			data: null,
+			issues: [
+				{
+					severity: "error",
+					code: "income-data.load.failed",
+					message:
+						error instanceof Error
+							? error.message
+							: "Could not load income data.",
+					path: [],
+				},
+			],
+		};
+	}
+}
+
 async function loadDocument(
 	csvPath: string,
+	incomePath: string,
 ): Promise<FinancialModelParseResult> {
 	const accounts = await readCsvFile(
 		path.join(csvPath, CSV_MODEL_FILE_NAMES.accounts),
@@ -61,17 +101,22 @@ async function loadDocument(
 		{ accounts, behaviors, postings },
 		{ basePath: csvPath },
 	);
+	if (!result.data) return { document: null, issues: result.issues };
 
-	if (result.data) {
-		const issues = validateCsvFinancialModel(result.data);
-		return { document: result.data, issues: [...result.issues, ...issues] };
-	}
-
-	return { document: null, issues: result.issues };
+	const income = await loadIncomeData(incomePath);
+	return {
+		document: result.data,
+		issues: [
+			...result.issues,
+			...income.issues,
+			...validateCsvFinancialModel(result.data, income.data ?? undefined),
+		],
+	};
 }
 
 async function saveDocument(
 	csvPath: string,
+	incomePath: string,
 	value: unknown,
 ): Promise<FinancialModelParseResult> {
 	const document = parseFinancialModelDocument(value);
@@ -88,33 +133,17 @@ async function saveDocument(
 			],
 		};
 	}
-	const issues: ModelValidationIssue[] = validateCsvFinancialModel(document);
-	document.evaluations.financialIndependence.forEach((evaluation, index) => {
-		try {
-			validateFinancialIndependencePlan(evaluation.config);
-		} catch (error) {
-			issues.push({
-				severity: "error",
-				code: "evaluation.config.invalid",
-				message:
-					error instanceof Error
-						? error.message
-						: "Financial independence configuration is invalid.",
-				path: [
-					CSV_BEHAVIOR_FILE_NAMES.financialIndependence,
-					index + 2,
-					"annualExpenseTargetBasis",
-				],
-			});
-		}
-	});
 
+	const income = await loadIncomeData(incomePath);
+	const issues: ModelValidationIssue[] = [
+		...income.issues,
+		...validateCsvFinancialModel(document, income.data ?? undefined),
+	];
 	if (issues.some((issue) => issue.severity === "error")) {
 		return { document, issues };
 	}
 
 	const files = serializeCsvFinancialModel(document);
-
 	await Promise.all([
 		...(
 			Object.entries(CSV_MODEL_FILE_NAMES) as Array<
@@ -135,8 +164,100 @@ async function saveDocument(
 	return { document, issues };
 }
 
+function errorResult(code: string, message: string): FinancialModelParseResult {
+	return {
+		document: null,
+		issues: [{ severity: "error", code, message, path: [] }],
+	};
+}
+
+function sendJson(
+	res: Parameters<Connect.NextHandleFunction>[1],
+	status: number,
+	result: FinancialModelParseResult,
+): void {
+	res.writeHead(status, {
+		"Cache-Control": "no-store",
+		"Content-Type": "application/json; charset=utf-8",
+	});
+	res.end(JSON.stringify(result));
+}
+
+function isJsonContentType(value: string | string[] | undefined): boolean {
+	const contentType = Array.isArray(value) ? value[0] : value;
+	return (
+		contentType?.split(";", 1)[0]?.trim().toLowerCase() === "application/json"
+	);
+}
+
+function isLoopback(hostname: string): boolean {
+	return (
+		hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1"
+	);
+}
+
+function isAllowedOrigin(
+	req: Parameters<Connect.NextHandleFunction>[0],
+): boolean {
+	const origin = req.headers?.origin;
+	if (!origin) return true;
+	try {
+		const originUrl = new URL(origin);
+		const requestHost = req.headers.host;
+		if (!requestHost) return false;
+		if (originUrl.protocol !== "http:" && originUrl.protocol !== "https:")
+			return false;
+		if (originUrl.host === requestHost) return true;
+		const requestUrl = new URL(`http://${requestHost}`);
+		const originPort = originUrl.port || "80";
+		const requestPort = requestUrl.port || "80";
+		return (
+			originPort === requestPort &&
+			isLoopback(originUrl.hostname) &&
+			isLoopback(requestUrl.hostname)
+		);
+	} catch {
+		return false;
+	}
+}
+
+async function readRequestBody(
+	req: Parameters<Connect.NextHandleFunction>[0],
+	maxBytes: number,
+): Promise<string | null> {
+	const contentLength = Number(req.headers?.["content-length"]);
+	if (Number.isFinite(contentLength) && contentLength > maxBytes) return null;
+
+	const chunks: Buffer[] = [];
+	let bytes = 0;
+	for await (const chunk of req) {
+		const buffer = Buffer.from(chunk);
+		bytes += buffer.byteLength;
+		if (bytes > maxBytes) return null;
+		chunks.push(buffer);
+	}
+	return Buffer.concat(chunks).toString();
+}
+
+function incomeFileName(
+	req: Parameters<Connect.NextHandleFunction>[0],
+	apiPath: string,
+) {
+	const requestPath = (req.url ?? "").split("?", 1)[0] ?? "";
+	const relativePath = requestPath.startsWith(apiPath)
+		? requestPath.slice(apiPath.length)
+		: requestPath;
+	return decodeURIComponent(relativePath.replace(/^\/+/, ""));
+}
+
 export function csvFilePlugin(options: CsvFilePluginOptions = {}): Plugin {
 	let resolvedCsvPath: string;
+	let resolvedIncomePath: string;
+	const incomeApiPath = options.incomeApiPath ?? INCOME_DATA_API_PATH;
+	const maxRequestBytes = Math.max(
+		1,
+		options.maxRequestBytes ?? DEFAULT_MAX_REQUEST_BYTES,
+	);
 
 	return {
 		name: "csv-file-plugin",
@@ -146,66 +267,124 @@ export function csvFilePlugin(options: CsvFilePluginOptions = {}): Plugin {
 				config.root,
 				options.csvPath ?? "public/configs",
 			);
+			resolvedIncomePath = resolveCsvPath(
+				config.root,
+				options.incomePath ?? "public/data/income",
+			);
 		},
 		configureServer(server: ViteDevServer) {
 			const handler: Connect.NextHandleFunction = async (req, res, next) => {
-				const send = (status: number, result: FinancialModelParseResult) => {
-					res.writeHead(status, { "Content-Type": "application/json" });
-					res.end(JSON.stringify(result));
-				};
-
 				if (req.method === "GET") {
 					try {
-						const result = await loadDocument(resolvedCsvPath);
-						send(200, result);
-					} catch (err) {
-						const message =
-							err instanceof Error
-								? err.message
-								: "Failed to load financial model";
-						send(500, {
-							document: null,
-							issues: [
-								{ severity: "error", code: "server.load", message, path: [] },
-							],
-						});
-					}
-					return;
-				}
-
-				if (req.method === "PUT") {
-					try {
-						const chunks: Buffer[] = [];
-						for await (const chunk of req) {
-							chunks.push(Buffer.from(chunk));
-						}
-						const body = JSON.parse(
-							Buffer.concat(chunks).toString(),
-						) as unknown;
-						const result = await saveDocument(resolvedCsvPath, body);
-						const hasErrors = result.issues.some(
-							(issue) => issue.severity === "error",
+						const result = await loadDocument(
+							resolvedCsvPath,
+							resolvedIncomePath,
 						);
-						send(hasErrors ? 422 : 200, result);
-					} catch (err) {
-						const message =
-							err instanceof Error
-								? err.message
-								: "Failed to save financial model";
-						send(500, {
-							document: null,
-							issues: [
-								{ severity: "error", code: "server.save", message, path: [] },
-							],
-						});
+						sendJson(res, 200, result);
+					} catch (error) {
+						sendJson(
+							res,
+							500,
+							errorResult(
+								"server.load",
+								error instanceof Error
+									? error.message
+									: "Failed to load financial model.",
+							),
+						);
 					}
 					return;
 				}
 
-				next();
+				if (req.method !== "PUT") {
+					next();
+					return;
+				}
+				if (!isAllowedOrigin(req)) {
+					sendJson(
+						res,
+						403,
+						errorResult("server.origin", "Request origin is not allowed."),
+					);
+					return;
+				}
+				if (!isJsonContentType(req.headers?.["content-type"])) {
+					sendJson(
+						res,
+						415,
+						errorResult("server.content_type", "JSON content is required."),
+					);
+					return;
+				}
+				try {
+					const serialized = await readRequestBody(req, maxRequestBytes);
+					if (serialized === null) {
+						sendJson(
+							res,
+							413,
+							errorResult(
+								"server.body_too_large",
+								"Request body is too large.",
+							),
+						);
+						return;
+					}
+					const result = await saveDocument(
+						resolvedCsvPath,
+						resolvedIncomePath,
+						JSON.parse(serialized) as unknown,
+					);
+					sendJson(
+						res,
+						result.issues.some((issue) => issue.severity === "error")
+							? 422
+							: 200,
+						result,
+					);
+				} catch (error) {
+					sendJson(
+						res,
+						400,
+						errorResult(
+							"server.save",
+							error instanceof Error
+								? error.message
+								: "Failed to save financial model.",
+						),
+					);
+				}
+			};
+
+			const incomeHandler: Connect.NextHandleFunction = async (
+				req,
+				res,
+				next,
+			) => {
+				if (req.method !== "GET") {
+					next();
+					return;
+				}
+				try {
+					const fileName = incomeFileName(req, incomeApiPath);
+					if (!INCOME_FILE_NAMES.has(fileName)) {
+						next();
+						return;
+					}
+					const content = await readCsvFile(
+						path.join(resolvedIncomePath, fileName),
+					);
+					res.writeHead(200, {
+						"Cache-Control": "no-store",
+						"Content-Type": "text/csv; charset=utf-8",
+					});
+					res.end(content);
+				} catch {
+					next();
+				}
 			};
 
 			server.middlewares.use(FINANCIAL_MODEL_API_PATH, handler);
+			server.middlewares.use(incomeApiPath, incomeHandler);
 		},
 	};
 }

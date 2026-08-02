@@ -8,6 +8,7 @@ export type {
 	DataSourceAction,
 	FinancialModelParseResult,
 } from "./dataSource";
+export { FinancialModelValidationError } from "./dataSource";
 export {
 	getConfiguredEvaluation,
 	getFinancialIndependenceConfig,
@@ -93,7 +94,11 @@ export {
 	createBrowserCsvDataSource,
 	FINANCIAL_MODEL_STORAGE_KEY,
 } from "./sources/csv/browserCsvDataSource";
-export { createCsvDataSource } from "./sources/csv/csvDataSource";
+export {
+	createCsvDataSource,
+	FinancialModelApiError,
+	parseFinancialModelDocument,
+} from "./sources/csv/csvDataSource";
 export type {
 	CsvFinancialModelOptions,
 	CsvFinancialModelParseResult,
@@ -133,6 +138,7 @@ export type {
 } from "./types/income";
 export {
 	EMPTY_INCOME_DATA,
+	INCOME_DATA_API_PATH,
 	INCOME_DATA_FILE_NAMES,
 	INCOME_DATA_PUBLIC_PATH,
 } from "./types/income";

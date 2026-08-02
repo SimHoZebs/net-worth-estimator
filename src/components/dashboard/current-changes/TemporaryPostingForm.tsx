@@ -172,8 +172,14 @@ export function TemporaryPostingForm({
 				<div className="space-y-2 rounded-2xl border border-border p-3">
 					<div className="grid gap-2 sm:grid-cols-2">
 						<div>
-							<label className="block type-caption">ID</label>
+							<label
+								htmlFor="temporary-posting-id"
+								className="block type-caption"
+							>
+								ID
+							</label>
 							<Input
+								id="temporary-posting-id"
 								className="w-full rounded-lg "
 								value={adding.id}
 								onChange={(e) => setAdding({ ...adding, id: e.target.value })}
@@ -181,8 +187,14 @@ export function TemporaryPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">Label</label>
+							<label
+								htmlFor="temporary-posting-label"
+								className="block type-caption"
+							>
+								Label
+							</label>
 							<Input
+								id="temporary-posting-label"
 								className="w-full rounded-lg "
 								value={adding.label}
 								onChange={(e) =>
@@ -192,8 +204,14 @@ export function TemporaryPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">Source Account</label>
+							<label
+								htmlFor="temporary-posting-source"
+								className="block type-caption"
+							>
+								Source Account
+							</label>
 							<Input
+								id="temporary-posting-source"
 								className="w-full rounded-lg "
 								value={adding.sourceAccountId ?? ""}
 								onChange={(e) =>
@@ -206,10 +224,14 @@ export function TemporaryPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">
+							<label
+								htmlFor="temporary-posting-destinations"
+								className="block type-caption"
+							>
 								Destinations (; separated)
 							</label>
 							<Input
+								id="temporary-posting-destinations"
 								className="w-full rounded-lg "
 								value={adding.destinations?.join(";") ?? ""}
 								onChange={(e) => {
@@ -225,8 +247,14 @@ export function TemporaryPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">Amount calculation</label>
+							<label
+								htmlFor="temporary-posting-amount"
+								className="block type-caption"
+							>
+								Amount calculation
+							</label>
 							<Input
+								id="temporary-posting-amount"
 								className="w-full rounded-lg "
 								value={adding.arithmetic}
 								onChange={(e) =>
@@ -236,8 +264,14 @@ export function TemporaryPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">Frequency</label>
+							<label
+								htmlFor="temporary-posting-frequency"
+								className="block type-caption"
+							>
+								Frequency
+							</label>
 							<select
+								id="temporary-posting-frequency"
 								className="w-full rounded-lg "
 								value={adding.frequency}
 								onChange={(e) => {
@@ -254,8 +288,14 @@ export function TemporaryPostingForm({
 							</select>
 						</div>
 						<div>
-							<label className="block type-caption">Annual Rate</label>
+							<label
+								htmlFor="temporary-posting-rate"
+								className="block type-caption"
+							>
+								Annual Rate
+							</label>
 							<Input
+								id="temporary-posting-rate"
 								type="number"
 								step={0.01}
 								className="w-full rounded-lg "
@@ -266,8 +306,14 @@ export function TemporaryPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">Annual Growth Rate</label>
+							<label
+								htmlFor="temporary-posting-growth"
+								className="block type-caption"
+							>
+								Annual Growth Rate
+							</label>
 							<Input
+								id="temporary-posting-growth"
 								type="number"
 								step={0.01}
 								className="w-full rounded-lg "
@@ -281,8 +327,14 @@ export function TemporaryPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">Volatility</label>
+							<label
+								htmlFor="temporary-posting-volatility"
+								className="block type-caption"
+							>
+								Volatility
+							</label>
 							<Input
+								id="temporary-posting-volatility"
 								type="number"
 								min={0}
 								step={0.01}
@@ -294,8 +346,14 @@ export function TemporaryPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">Start Date</label>
+							<label
+								htmlFor="temporary-posting-start"
+								className="block type-caption"
+							>
+								Start Date
+							</label>
 							<Input
+								id="temporary-posting-start"
 								className="w-full rounded-lg "
 								value={adding.startDate}
 								onChange={(e) =>
@@ -308,8 +366,14 @@ export function TemporaryPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">End Date</label>
+							<label
+								htmlFor="temporary-posting-end"
+								className="block type-caption"
+							>
+								End Date
+							</label>
 							<Input
+								id="temporary-posting-end"
 								className="w-full rounded-lg "
 								value={adding.endDate ?? ""}
 								disabled={adding.frequency === "once"}
@@ -320,8 +384,14 @@ export function TemporaryPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">Annual Cap</label>
+							<label
+								htmlFor="temporary-posting-cap"
+								className="block type-caption"
+							>
+								Annual Cap
+							</label>
 							<Input
+								id="temporary-posting-cap"
 								type="number"
 								min={0}
 								className="w-full rounded-lg "
@@ -336,8 +406,14 @@ export function TemporaryPostingForm({
 							/>
 						</div>
 						<div>
-							<label className="block type-caption">Priority</label>
+							<label
+								htmlFor="temporary-posting-priority"
+								className="block type-caption"
+							>
+								Priority
+							</label>
 							<Input
+								id="temporary-posting-priority"
 								type="number"
 								min={1}
 								className="w-full rounded-lg "

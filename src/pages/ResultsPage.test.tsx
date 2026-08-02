@@ -86,7 +86,7 @@ describe("ResultsPage", () => {
 
 		render(<RouterProvider router={router} />);
 
-		const activity = screen.getByRole("alert");
+		const activity = screen.getByRole("status");
 		expect(activity.textContent).toContain(
 			"Updating projection and Monte Carlo analysis",
 		);
@@ -121,7 +121,7 @@ describe("ResultsPage", () => {
 
 		render(<RouterProvider router={router} />);
 
-		const activity = screen.getByRole("alert");
+		const activity = screen.getByRole("status");
 		expect(activity.textContent).toContain("Updating Monte Carlo analysis");
 		expect(activity.textContent).toContain("64%");
 	});
@@ -143,7 +143,7 @@ describe("ResultsPage", () => {
 
 		render(<RouterProvider router={router} />);
 
-		const activity = screen.getByRole("alert");
+		const activity = screen.getByRole("status");
 		expect(activity.textContent).toContain("Updating projection");
 		expect(activity.textContent).not.toContain("Monte Carlo");
 	});

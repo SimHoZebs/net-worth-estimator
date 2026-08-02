@@ -6,6 +6,7 @@ import type {
 	Posting,
 } from "../../types/model";
 import type { ModelValidationIssue } from "../../types/validation";
+import { csvDateSchema } from "./csvSchema";
 
 const finiteNumber = z.number().finite();
 const amountBindingSchema = z.discriminatedUnion("source", [
@@ -27,10 +28,10 @@ const postingAmountSchema = z
 	.strict();
 const postingSchema = z
 	.object({
-		id: z.string(),
-		label: z.string(),
-		sourceAccountId: z.string().nullable(),
-		destinations: z.array(z.string()).nullable(),
+		id: z.string().trim().min(1),
+		label: z.string().trim().min(1),
+		sourceAccountId: z.string().trim().min(1).nullable(),
+		destinations: z.array(z.string().trim().min(1)).nullable(),
 		amount: postingAmountSchema,
 		frequency: z.enum([
 			"once",
@@ -43,16 +44,16 @@ const postingSchema = z
 		annualRate: finiteNumber,
 		annualGrowthRate: finiteNumber,
 		volatility: finiteNumber,
-		startDate: z.string(),
-		endDate: z.string().nullable(),
+		startDate: csvDateSchema,
+		endDate: csvDateSchema.nullable(),
 		annualCap: finiteNumber.nullable(),
-		priority: finiteNumber,
+		priority: finiteNumber.int().min(1),
 		enabled: z.boolean(),
 	})
 	.strict() satisfies z.ZodType<Posting>;
 const evaluationFields = {
-	instanceId: z.string(),
-	label: z.string(),
+	instanceId: z.string().trim().min(1),
+	label: z.string().trim().min(1),
 	enabled: z.boolean(),
 };
 const financialIndependenceSourceSchema = z.discriminatedUnion("type", [
@@ -78,11 +79,11 @@ export const financialModelDocumentSchema = z
 		accounts: z.array(
 			z
 				.object({
-					id: z.string(),
-					label: z.string(),
+					id: z.string().trim().min(1),
+					label: z.string().trim().min(1),
 					minBalance: finiteNumber,
 					maxBalance: finiteNumber,
-					color: z.string().nullable(),
+					color: z.string().trim().min(1).nullable(),
 					enabled: z.boolean(),
 				})
 				.strict(),
@@ -183,6 +184,52 @@ async function parseApiResponse(
 	return parsed.data;
 }
 
+export class FinancialModelApiError extends Error {
+	readonly status: number;
+	readonly result: FinancialModelParseResult | null;
+
+	constructor(
+		status: number,
+		message: string,
+		result: FinancialModelParseResult | null,
+	) {
+		super(message);
+		this.name = "FinancialModelApiError";
+		this.status = status;
+		this.result = result;
+	}
+}
+
+async function requestFinancialModel(
+	fetchImpl: typeof fetch,
+	apiPath: string,
+	init?: RequestInit,
+): Promise<FinancialModelParseResult> {
+	const response = init
+		? await fetchImpl(apiPath, init)
+		: await fetchImpl(apiPath);
+	let result: FinancialModelParseResult | null = null;
+	try {
+		result = await parseApiResponse(response);
+	} catch (error) {
+		if (!response.ok) {
+			throw new FinancialModelApiError(
+				response.status,
+				`Failed to access financial model (${response.status} ${response.statusText}).`,
+				null,
+			);
+		}
+		throw error;
+	}
+	if (!response.ok) {
+		const message =
+			result.issues.find((issue) => issue.severity === "error")?.message ??
+			`Financial model request failed (${response.status} ${response.statusText}).`;
+		throw new FinancialModelApiError(response.status, message, result);
+	}
+	return result;
+}
+
 export interface CsvDataSourceOptions {
 	apiPath?: string;
 	fetchImpl?: typeof fetch;
@@ -194,15 +241,7 @@ export function createCsvDataSource(
 	const apiPath = options?.apiPath ?? "/api/financial-model";
 	const fetchImpl = options?.fetchImpl ?? fetch;
 	const loadDocument = async (): Promise<FinancialModelParseResult> => {
-		const response = await fetchImpl(apiPath);
-
-		if (!response.ok) {
-			throw new Error(
-				`Failed to load financial model (${response.status} ${response.statusText}).`,
-			);
-		}
-
-		return parseApiResponse(response);
+		return requestFinancialModel(fetchImpl, apiPath);
 	};
 
 	return {
@@ -218,19 +257,11 @@ export function createCsvDataSource(
 			run: async (
 				document: FinancialModelDocument,
 			): Promise<FinancialModelParseResult> => {
-				const response = await fetchImpl(apiPath, {
+				return requestFinancialModel(fetchImpl, apiPath, {
 					method: "PUT",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify(document),
 				});
-
-				if (!response.ok) {
-					throw new Error(
-						`Failed to save financial model (${response.status} ${response.statusText}).`,
-					);
-				}
-
-				return parseApiResponse(response);
 			},
 		},
 	};

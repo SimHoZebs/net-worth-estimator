@@ -7,7 +7,7 @@ The product model is intentionally generic:
 - Projection-start balances are derived by replaying enabled one-time postings dated before the projection start; net worth then evolves through scheduled postings and daily-compounded growth between event dates.
 - A posting can be an external inflow, an external outflow, or an account-to-account transfer.
 - Posting frequencies include explicit one-time (`once`) transactions.
-- `amountMode` is `fixed` or `percent_of_base`; percentage rows use the latest realized amount of another posting.
+- Postings use explicit amount resolvers with validated inputs; the optional `income` resolver runs an ordered payroll pipeline from separate effective-dated income data.
 - Annual caps are generic, and source-funded rows clamp to the source account's available positive balance.
 - Financial independence is derived from annual expense coverage and a full principal-preservation cycle. Explicit continuing postings and shared account constraints drive reactive withdrawals.
 - Monte Carlo confidence is aggregated from complete run outcomes, never inferred from percentile-band slope.
@@ -24,18 +24,22 @@ The app reads these CSV files under `public/configs/`:
 - `behavior/net-worth-threshold.csv`
 - `behavior/posting-fulfillment.csv`
 
+The bundled `public/` files provide the default model and income data. During development, `NET_WORTH_ESTIMATOR_MODEL_PATH` and `NET_WORTH_ESTIMATOR_INCOME_PATH` can point the Vite API at alternate source directories.
+
 Each behavior file is a typed table. All tables start with `instanceId`, `label`, and `enabled`, followed by definition-specific columns. Financial independence stores its scalar plan fields directly and uses JSON only for `sources` and `continuingPostingIds`; net-worth threshold adds `target`; posting fulfillment adds `postingIds`. Evaluation types follow the global `EVALUATION_TYPE_ORDER`, while rows within a type retain their physical CSV ingestion order. `instanceId` must be unique across behavior files, and one file may contain multiple instances.
 
 `financial-independence.csv` configures branch simulation, including source selections, continuing postings, withdrawal policy, and confidence. `net-worth-threshold.csv` and `posting-fulfillment.csv` configure read-only path evaluations.
 
+Income source definitions and tax profiles are loaded from `public/data/income/` and are served through `/api/income-data/` during local development.
+
 ## Persistence
 
-- Local development (`npm run dev`) uses `GET/PUT /api/financial-model`; saves write to `public/configs/` in the checkout.
+- Local development (`npm run dev`) uses `GET/PUT /api/financial-model` and `/api/income-data/*`; alternate source directories are opt-in through environment variables and the tracked public files are the default.
 - Static/serverless production loads bundled `/configs/` files and saves the canonical `FinancialModelDocument` under `net-worth-estimator:financial-model` in browser storage.
 - Malformed persisted data is not silently replaced; parsing and validation diagnostics are returned to the UI.
 - Browser reset removes `net-worth-estimator:financial-model` and reloads the bundled `/configs/` files.
 - Serverless deployments should use a real backend `DataSource` for shared or cross-device persistence.
-- Do not deploy private financial CSV files in `public/configs/`; those files are public static assets.
+- Files under `public/` are public static assets in deployed builds.
 - Production hosts must rewrite browser routes such as `/settings` and `/model-inputs` to `index.html`.
 
 ## Run

@@ -1,4 +1,9 @@
-import type { DataSource, FinancialModelParseResult } from "../../dataSource";
+import {
+	type DataSource,
+	type FinancialModelParseResult,
+	FinancialModelValidationError,
+} from "../../dataSource";
+import type { IncomeDataSnapshot } from "../../types/income";
 import {
 	CSV_MODEL_PUBLIC_PATH,
 	type FinancialModelDocument,
@@ -7,6 +12,7 @@ import type { ModelValidationIssue } from "../../types/validation";
 import { parseFinancialModelDocument } from "./csvDataSource";
 import { loadCsvFinancialModel } from "./csvLoader";
 import { validateCsvFinancialModel } from "./csvValidation";
+import { createCsvIncomeDataSource } from "./incomeDataSource";
 
 export const FINANCIAL_MODEL_STORAGE_KEY =
 	"net-worth-estimator:financial-model";
@@ -20,6 +26,7 @@ type StoredDocumentRead =
 
 export interface BrowserCsvDataSourceOptions {
 	basePath?: string;
+	incomeBasePath?: string;
 	fetchImpl?: typeof fetch;
 	storage?: Pick<Storage, "getItem" | "setItem" | "removeItem"> | null;
 	storageKey?: string;
@@ -49,9 +56,13 @@ function invalidStorageIssue(storageKey: string): ModelValidationIssue {
 function validateStoredDocument(
 	document: FinancialModelDocument,
 	storageKey: string,
+	incomeData?: IncomeDataSnapshot,
 ): FinancialModelParseResult {
 	try {
-		return { document, issues: validateCsvFinancialModel(document) };
+		return {
+			document,
+			issues: validateCsvFinancialModel(document, incomeData),
+		};
 	} catch {
 		return { document: null, issues: [invalidStorageIssue(storageKey)] };
 	}
@@ -102,6 +113,10 @@ export function createBrowserCsvDataSource(
 ): DataSource {
 	const basePath = options.basePath ?? CSV_MODEL_PUBLIC_PATH;
 	const fetchImpl = options.fetchImpl ?? fetch;
+	const incomeDataSource = createCsvIncomeDataSource({
+		basePath: options.incomeBasePath,
+		fetchImpl,
+	});
 	const storage =
 		options.storage === undefined ? getDefaultStorage() : options.storage;
 	const storageKey = options.storageKey ?? FINANCIAL_MODEL_STORAGE_KEY;
@@ -110,19 +125,46 @@ export function createBrowserCsvDataSource(
 		sourceType: "csv-browser",
 		label: "Browser-local model",
 		description: storage
-			? "Loads the bundled /configs CSV files first, then saves edits in this browser's local storage."
-			: "Loads the bundled /configs CSV files. Browser storage is unavailable, so baseline edits cannot be saved.",
+			? "Loads bundled model and income CSV files first, then saves edits in this browser's local storage."
+			: "Loads bundled model and income CSV files. Browser storage is unavailable, so baseline edits cannot be saved.",
 		loadDocument: async (): Promise<FinancialModelParseResult> => {
-			if (!storage) return loadBundledDocument(basePath, fetchImpl);
-
-			const stored = readStoredDocument(storage, storageKey);
-			if (stored.status === "invalid") {
+			const stored = storage ? readStoredDocument(storage, storageKey) : null;
+			if (stored?.status === "invalid") {
 				return { document: null, issues: [stored.issue] };
 			}
-			if (stored.status === "found") {
-				return validateStoredDocument(stored.document, storageKey);
+
+			const income = await incomeDataSource.load();
+			const withIncomeValidation = (
+				result: FinancialModelParseResult,
+			): FinancialModelParseResult => ({
+				document: result.document,
+				issues: [
+					...result.issues,
+					...income.issues,
+					...(result.document
+						? validateCsvFinancialModel(
+								result.document,
+								income.data ?? undefined,
+							)
+						: []),
+				],
+			});
+			if (!storage) {
+				return withIncomeValidation(
+					await loadBundledDocument(basePath, fetchImpl),
+				);
 			}
-			return loadBundledDocument(basePath, fetchImpl);
+
+			if (stored?.status === "found") {
+				return validateStoredDocument(
+					stored.document,
+					storageKey,
+					income.data ?? undefined,
+				);
+			}
+			return withIncomeValidation(
+				await loadBundledDocument(basePath, fetchImpl),
+			);
 		},
 		save: storage
 			? {
@@ -142,16 +184,24 @@ export function createBrowserCsvDataSource(
 							evaluations: canonical.evaluations,
 							postings: canonical.postings,
 						};
+						const income = await incomeDataSource.load();
 						let issues: ModelValidationIssue[];
 						try {
-							issues = validateCsvFinancialModel(savedDocument);
+							issues = [
+								...income.issues,
+								...validateCsvFinancialModel(
+									savedDocument,
+									income.data ?? undefined,
+								),
+							];
 						} catch {
 							throw new Error("The financial model has an invalid shape.");
 						}
 						if (issues.some((issue) => issue.severity === "error")) {
-							throw new Error(
-								"The financial model contains validation errors.",
-							);
+							throw new FinancialModelValidationError({
+								document: savedDocument,
+								issues,
+							});
 						}
 						storage.setItem(storageKey, JSON.stringify(savedDocument));
 						return { document: savedDocument, issues };

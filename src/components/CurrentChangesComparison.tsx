@@ -50,7 +50,11 @@ export const CurrentChangesComparison = memo(
 				<Collapsible.Content>
 					<div className="space-y-4">
 						<div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+							<label htmlFor="comparison-label" className="sr-only">
+								Comparison label
+							</label>
 							<input
+								id="comparison-label"
 								type="text"
 								value={labelInput}
 								onChange={(e) => setLabelInput(e.target.value)}

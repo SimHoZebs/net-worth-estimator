@@ -29,7 +29,7 @@ function inputStyle(isDirty: boolean) {
 	const dirty = isDirty
 		? "border-tertiary-border bg-tertiary-subtle"
 		: "border-input bg-card";
-	return `w-full rounded-lg ${dirty} px-2 py-1 type-body outline-none type-code`;
+	return `w-full rounded-lg ${dirty} px-2 py-1 type-body type-code outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40`;
 }
 
 interface NumericPostingInputProps {
@@ -234,6 +234,7 @@ export function EditablePostingsTable({
 								<TableRow key={p.id}>
 									<TableCell>
 										<input
+											aria-label={`Posting ID for ${p.label}`}
 											className={inputStyle(!!changed)}
 											value={p.id}
 											onChange={(e) =>
@@ -243,6 +244,7 @@ export function EditablePostingsTable({
 									</TableCell>
 									<TableCell>
 										<input
+											aria-label={`Posting label for ${p.id}`}
 											className={inputStyle(!!changed)}
 											value={p.label}
 											onChange={(e) =>
@@ -252,6 +254,7 @@ export function EditablePostingsTable({
 									</TableCell>
 									<TableCell>
 										<input
+											aria-label={`${p.label} source account`}
 											className={inputStyle(!!changed)}
 											value={p.sourceAccountId ?? ""}
 											onChange={(e) =>
@@ -263,6 +266,7 @@ export function EditablePostingsTable({
 									</TableCell>
 									<TableCell>
 										<input
+											aria-label={`${p.label} destination accounts`}
 											className={inputStyle(!!changed)}
 											value={p.destinations?.join(";") ?? ""}
 											onChange={(e) => {
@@ -290,6 +294,7 @@ export function EditablePostingsTable({
 									</TableCell>
 									<TableCell>
 										<select
+											aria-label={`${p.label} frequency`}
 											className={inputStyle(!!changed)}
 											value={p.frequency}
 											onChange={(e) => {
@@ -349,6 +354,7 @@ export function EditablePostingsTable({
 									</TableCell>
 									<TableCell>
 										<input
+											aria-label={`${p.label} start date`}
 											className={inputStyle(!!changed)}
 											value={p.startDate}
 											onChange={(e) =>
@@ -358,6 +364,7 @@ export function EditablePostingsTable({
 									</TableCell>
 									<TableCell>
 										<input
+											aria-label={`${p.label} end date`}
 											className={inputStyle(!!changed)}
 											value={p.endDate ?? ""}
 											disabled={p.frequency === "once"}
@@ -394,6 +401,7 @@ export function EditablePostingsTable({
 									<TableCell>
 										<input
 											type="checkbox"
+											aria-label={`Enable posting ${p.label}`}
 											className="h-4 w-4 rounded accent-primary"
 											checked={p.enabled}
 											onChange={() =>
@@ -407,6 +415,7 @@ export function EditablePostingsTable({
 											variant="ghost"
 											size="sm"
 											onClick={() => deletePosting(p.id)}
+											aria-label={`Delete posting ${p.label}`}
 										>
 											✕
 										</Button>

@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationTables } from "@/lib/projection";
 import { DEFAULT_EVALUATIONS, useStore } from "@/store";
 import { RuntimeFixtureProviders } from "@/test/runtimeFixtures";
-import { EvaluationResults, EvaluationSettings } from "./EvaluationList";
+import { EvaluationResults } from "./EvaluationResults";
+import { EvaluationSettings } from "./EvaluationSettings";
 
 vi.mock("@/components/dashboard/FinancialIndependenceChart", () => ({
 	FinancialIndependenceChart: () => null,

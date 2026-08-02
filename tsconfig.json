@@ -19,5 +19,10 @@
 		"noEmit": true,
 		"jsx": "react-jsx"
 	},
-	"include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
+	"include": [
+		"src/**/*.ts",
+		"src/**/*.tsx",
+		"plugins/**/*.ts",
+		"vite.config.ts"
+	]
 }

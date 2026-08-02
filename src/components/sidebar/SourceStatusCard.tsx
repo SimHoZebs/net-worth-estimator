@@ -22,14 +22,18 @@ export function SourceStatusCard() {
 		projectionStartDate,
 		isLoading,
 		loadError,
+		issues,
 		sourceActionError,
 		reload,
 		reset,
 		isResetting,
 	} = useModelRuntime();
+	const hasValidationErrors = issues.some(
+		(issue) => issue.severity === "error",
+	);
 	const status = isLoading
 		? "Loading"
-		: loadError
+		: loadError || hasValidationErrors
 			? "Load failed"
 			: sourceActionError
 				? "Action failed"

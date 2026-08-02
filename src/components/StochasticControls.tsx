@@ -81,6 +81,7 @@ export function StochasticControls() {
 						<label className="relative inline-flex cursor-pointer items-center">
 							<input
 								type="checkbox"
+								aria-label="Enable Monte Carlo simulation"
 								className="peer sr-only"
 								checked={simulationActive}
 								onChange={(e) =>
@@ -98,10 +99,14 @@ export function StochasticControls() {
 						<>
 							<div className={"grid gap-3"}>
 								<div className="space-y-1">
-									<label className="type-eyebrow">
+									<label
+										htmlFor="stochastic-run-count"
+										className="type-eyebrow"
+									>
 										Independent sample count
 									</label>
 									<input
+										id="stochastic-run-count"
 										type="number"
 										inputMode="numeric"
 										min={1}
@@ -112,8 +117,11 @@ export function StochasticControls() {
 									/>
 								</div>
 								<div className="space-y-1">
-									<label className="type-eyebrow">Seed (optional)</label>
+									<label htmlFor="stochastic-seed" className="type-eyebrow">
+										Seed (optional)
+									</label>
 									<input
+										id="stochastic-seed"
 										type="number"
 										inputMode="numeric"
 										value={seedInput}
@@ -142,6 +150,11 @@ export function StochasticControls() {
 								<div className="space-y-1">
 									<div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
 										<div
+											role="progressbar"
+											aria-label="Monte Carlo progress"
+											aria-valuemin={0}
+											aria-valuemax={100}
+											aria-valuenow={progressPct}
 											className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
 											style={{ width: `${progressPct}%` }}
 										/>

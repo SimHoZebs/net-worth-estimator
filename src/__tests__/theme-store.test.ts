@@ -35,28 +35,27 @@ afterEach(() => {
 });
 
 describe("theme storage", () => {
-	it.each([
-		"light",
-		"dark",
-		"system",
-	] as const)("initializes from a valid %s theme", async (theme) => {
-		setLocalStorage(createStorage(theme));
+	it.each(["light", "dark", "system"] as const)(
+		"initializes from a valid %s theme",
+		async (theme) => {
+			setLocalStorage(createStorage(theme));
 
-		const store = await loadStore();
+			const store = await loadStore();
 
-		expect(store.getState().theme).toBe(theme);
-	});
+			expect(store.getState().theme).toBe(theme);
+		},
+	);
 
-	it.each([
-		null,
-		"sepia",
-	])("defaults to system for a missing or invalid stored theme", async (theme) => {
-		setLocalStorage(createStorage(theme));
+	it.each([null, "sepia"])(
+		"defaults to system for a missing or invalid stored theme",
+		async (theme) => {
+			setLocalStorage(createStorage(theme));
 
-		const store = await loadStore();
+			const store = await loadStore();
 
-		expect(store.getState().theme).toBe("system");
-	});
+			expect(store.getState().theme).toBe("system");
+		},
+	);
 
 	it("defaults to system when localStorage cannot be read", async () => {
 		Object.defineProperty(window, "localStorage", {

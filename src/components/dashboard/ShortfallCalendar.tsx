@@ -7,6 +7,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
 import { currency, formatDate } from "@/lib/format";
 import type {
 	Account,
@@ -201,47 +202,40 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 			</CardContent>
 
 			{selectedDay ? (
-				<div
-					className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/45 p-4 backdrop-blur-sm"
-					role="dialog"
-					aria-modal="true"
-					aria-label={`Shortfall detail for ${selectedDay.label}`}
-					onClick={() => setSelectedDateIso(null)}
+				<Dialog
+					ariaLabel={`Shortfall detail for ${selectedDay.label}`}
+					onClose={() => setSelectedDateIso(null)}
+					className="max-w-4xl rounded-[1.6rem] border border-border/80 bg-card p-5 shadow-2xl dark:border-white/10"
 				>
-					<div
-						className="max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-[1.6rem] border border-border/80 bg-card p-5 shadow-2xl dark:border-white/10"
-						onClick={(event) => event.stopPropagation()}
-					>
-						<div className="mb-4 flex items-start justify-between gap-4">
-							<div>
-								<div className="text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
-									Projected underfulfillment
-								</div>
-								<h3 className="mt-1 type-title">{selectedDay.label}</h3>
-								<p className="mt-1 type-muted">
-									{currency.format(selectedDay.unfulfilledAmount)} constrained
-									on this date.
-								</p>
+					<div className="mb-4 flex items-start justify-between gap-4">
+						<div>
+							<div className="text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
+								Projected underfulfillment
 							</div>
-							<button
-								type="button"
-								onClick={() => setSelectedDateIso(null)}
-								className="rounded-full border border-border px-3 py-1.5 type-label transition hover:border-ring hover:text-foreground"
-							>
-								Close
-							</button>
+							<h3 className="mt-1 type-title">{selectedDay.label}</h3>
+							<p className="mt-1 type-muted">
+								{currency.format(selectedDay.unfulfilledAmount)} constrained on
+								this date.
+							</p>
 						</div>
-
-						<ShortfallDetailPanel
-							periodStartDate={selectedDay.date}
-							periodLabel={selectedDay.label}
-							events={selectedEvents}
-							rows={rows}
-							postingById={postingById}
-							accounts={accounts}
-						/>
+						<button
+							type="button"
+							onClick={() => setSelectedDateIso(null)}
+							className="rounded-full border border-border px-3 py-1.5 type-label transition hover:border-ring hover:text-foreground"
+						>
+							Close
+						</button>
 					</div>
-				</div>
+
+					<ShortfallDetailPanel
+						periodStartDate={selectedDay.date}
+						periodLabel={selectedDay.label}
+						events={selectedEvents}
+						rows={rows}
+						postingById={postingById}
+						accounts={accounts}
+					/>
+				</Dialog>
 			) : null}
 		</Card>
 	);

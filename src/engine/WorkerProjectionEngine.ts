@@ -18,6 +18,10 @@ import type {
 	StochasticWorkerRequest,
 } from "@/workers/types";
 import {
+	decodeEvaluationResultCollection,
+	decodeProjectionResult,
+	decodeRawProjectionOutput,
+	decodeStochasticProjectionResult,
 	isProjectionWorkerResponseEnvelope,
 	isStochasticWorkerProgressEnvelope,
 	isStochasticWorkerResponseEnvelope,
@@ -117,6 +121,7 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 	private runProjectionWorker<T>(
 		payload: ProjectionWorkerPayload,
 		signal: AbortSignal | undefined,
+		decodeResult: (value: unknown) => T | null,
 	): Promise<T> {
 		const request = { ...payload, id: 1 } as ProjectionWorkerRequest;
 
@@ -148,10 +153,13 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 				if (data.runtimeError) {
 					return { type: "reject", error: new Error(data.runtimeError) };
 				}
-				if (data.result) {
-					return { type: "resolve", result: data.result as T };
-				}
-				return { type: "reject", error: new Error("No result returned") };
+				const result = decodeResult(data.result);
+				return result === null
+					? {
+							type: "reject",
+							error: new Error("Projection worker returned an invalid result."),
+						}
+					: { type: "resolve", result };
 			},
 		});
 	}
@@ -166,6 +174,7 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 				overrides: request.overrides,
 			},
 			request.signal,
+			decodeProjectionResult,
 		);
 	}
 
@@ -179,6 +188,7 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 				overrides: request.overrides,
 			},
 			request.signal,
+			decodeRawProjectionOutput,
 		);
 	}
 
@@ -192,6 +202,7 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 				evaluations: request.evaluations,
 			},
 			request.signal,
+			decodeEvaluationResultCollection,
 		);
 	}
 
@@ -226,10 +237,19 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 						};
 					}
 					try {
-						onProgress?.(
-							data.progress,
-							data.partial as StochasticProjectionResult | undefined,
-						);
+						const partial =
+							data.partial === undefined
+								? undefined
+								: decodeStochasticProjectionResult(data.partial);
+						if (data.partial !== undefined && partial === null) {
+							return {
+								type: "reject",
+								error: new Error(
+									"Stochastic worker returned an invalid partial result.",
+								),
+							};
+						}
+						onProgress?.(data.progress, partial ?? undefined);
 					} catch (error) {
 						return {
 							type: "reject",
@@ -251,13 +271,13 @@ export class WorkerProjectionEngine implements ProjectionComputationEngine {
 				if (data.runtimeError) {
 					return { type: "reject", error: new Error(data.runtimeError) };
 				}
-				if (data.result) {
-					return {
-						type: "resolve",
-						result: data.result as StochasticProjectionResult,
-					};
-				}
-				return { type: "reject", error: new Error("No result returned") };
+				const result = decodeStochasticProjectionResult(data.result);
+				return result === null
+					? {
+							type: "reject",
+							error: new Error("Stochastic worker returned an invalid result."),
+						}
+					: { type: "resolve", result };
 			},
 		});
 	}

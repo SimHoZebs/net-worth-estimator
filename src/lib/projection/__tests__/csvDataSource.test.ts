@@ -107,4 +107,37 @@ describe("createCsvDataSource", () => {
 			createCsvDataSource({ fetchImpl }).loadDocument(),
 		).rejects.toThrow(invalidResponseError);
 	});
+
+	it("preserves structured validation envelopes from non-2xx responses", async () => {
+		const document = createBaseDocument();
+		const fetchImpl = vi.fn(async () =>
+			Response.json(
+				{
+					document,
+					issues: [
+						{
+							severity: "error",
+							code: "posting.invalid",
+							message: "Posting is invalid.",
+							path: ["postings.csv", 2],
+						},
+					],
+				},
+				{ status: 422 },
+			),
+		);
+
+		const error = await createCsvDataSource({ fetchImpl })
+			.save!.run(document)
+			.then(() => null)
+			.catch((caught: unknown) => caught);
+
+		expect(error).toMatchObject({
+			name: "FinancialModelApiError",
+			status: 422,
+			result: {
+				issues: [{ code: "posting.invalid", path: ["postings.csv", 2] }],
+			},
+		});
+	});
 });
