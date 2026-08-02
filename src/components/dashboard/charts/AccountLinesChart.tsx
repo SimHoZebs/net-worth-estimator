@@ -54,7 +54,6 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 			const nonZero: {
 				id: string;
 				label: string;
-				color: string | null;
 				val: number;
 			}[] = [];
 			let zeroCount = 0;
@@ -62,7 +61,7 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 				const a = enabledAccounts[i];
 				const val = rawRow?.[a.id] ?? 0;
 				if (val !== 0) {
-					nonZero.push({ ...a, val });
+					nonZero.push({ id: a.id, label: a.label, val });
 				} else {
 					zeroCount++;
 				}
@@ -71,7 +70,7 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 			for (const acct of nonZero) {
 				html += `<div class="flex justify-between gap-3 type-caption">`;
 				html += `<span class="inline-flex items-center gap-1.5 text-foreground/80">`;
-				html += `<span class="inline-block h-2 w-2 rounded-full" style="background-color:${escapeHtml(acct.color ?? FALLBACK_ACCOUNT_COLOR)}"></span>`;
+				html += `<span class="inline-block h-2 w-2 rounded-full bg-muted-foreground"></span>`;
 				html += `${escapeHtml(acct.label)}</span>`;
 				html += `<span class="tabular-nums text-foreground/80">${currency.format(acct.val)}</span>`;
 				html += `</div>`;

@@ -14,7 +14,8 @@ export const modelValidationPaths: ValidationPaths = {
 	account: (index, field) => append(["accounts", index], field),
 	posting: (index, field) => append(["postings", index], field),
 	postings: () => ["postings"],
-	evaluation: (type) => ["evaluations", type],
+	evaluation: (type, index) =>
+		index === undefined ? ["evaluations", type] : ["evaluations", type, index],
 };
 
 export const csvValidationPaths: ValidationPaths = {
@@ -23,7 +24,10 @@ export const csvValidationPaths: ValidationPaths = {
 	posting: (index, field) =>
 		append([CSV_MODEL_FILE_NAMES.postings, index + 2], field),
 	postings: () => [CSV_MODEL_FILE_NAMES.postings],
-	evaluation: (type: EvaluationType) => [CSV_BEHAVIOR_FILE_NAMES[type]],
+	evaluation: (type: EvaluationType, index) =>
+		index === undefined
+			? [CSV_BEHAVIOR_FILE_NAMES[type]]
+			: [CSV_BEHAVIOR_FILE_NAMES[type], index + 2],
 };
 
 export function evaluationTypes(): readonly EvaluationType[] {

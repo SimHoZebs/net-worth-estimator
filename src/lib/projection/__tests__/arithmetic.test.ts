@@ -39,25 +39,21 @@ describe("posting arithmetic", () => {
 		).toBe(24);
 	});
 
-	it.each([
-		"1 2",
-		"1)",
-		"rate garbage",
-	])("rejects trailing input in %s", (expression) => {
-		expect(() => parseArithmetic(expression)).toThrow(
-			/Unexpected trailing input/,
-		);
-	});
+	it.each(["1 2", "1)", "rate garbage"])(
+		"rejects trailing input in %s",
+		(expression) => {
+			expect(() => parseArithmetic(expression)).toThrow(
+				/Unexpected trailing input/,
+			);
+		},
+	);
 
-	it.each([
-		"",
-		"1 +",
-		"abs(1",
-		"(1 + 2",
-		"1 @ 2",
-	])("rejects malformed expression %s", (expression) => {
-		expect(() => parseArithmetic(expression)).toThrow();
-	});
+	it.each(["", "1 +", "abs(1", "(1 + 2", "1 @ 2"])(
+		"rejects malformed expression %s",
+		(expression) => {
+			expect(() => parseArithmetic(expression)).toThrow();
+		},
+	);
 
 	it("rejects division by zero during evaluation", () => {
 		expect(() => evaluateArithmetic("10 / (2 - 2)", context)).toThrow(

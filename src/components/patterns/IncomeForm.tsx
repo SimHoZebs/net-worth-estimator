@@ -92,16 +92,22 @@ export function IncomeForm({
 
 			<div className="grid grid-cols-2 gap-3">
 				<div>
-					<label className={LABEL_CLASS}>Label</label>
+					<label htmlFor="income-template-label" className={LABEL_CLASS}>
+						Label
+					</label>
 					<Input
+						id="income-template-label"
 						value={value.label}
 						onChange={(e) => update({ label: e.target.value })}
 						placeholder="e.g. Acme Salary"
 					/>
 				</div>
 				<div>
-					<label className={LABEL_CLASS}>Start Date</label>
+					<label htmlFor="income-template-start-date" className={LABEL_CLASS}>
+						Start Date
+					</label>
 					<Input
+						id="income-template-start-date"
 						value={value.startDate}
 						onChange={(e) => update({ startDate: e.target.value })}
 						placeholder="YYYY-MM-DD"
@@ -109,8 +115,11 @@ export function IncomeForm({
 				</div>
 
 				<div>
-					<label className={LABEL_CLASS}>Income source</label>
+					<label htmlFor="income-template-source" className={LABEL_CLASS}>
+						Income source
+					</label>
 					<select
+						id="income-template-source"
 						className="h-9 w-full rounded-md border border-input bg-background px-3 type-body"
 						value={value.incomeSourceId}
 						onChange={(e) => update({ incomeSourceId: e.target.value })}
@@ -124,8 +133,11 @@ export function IncomeForm({
 					</select>
 				</div>
 				<div>
-					<label className={LABEL_CLASS}>Tax profile</label>
+					<label htmlFor="income-template-tax" className={LABEL_CLASS}>
+						Tax profile
+					</label>
 					<select
+						id="income-template-tax"
 						className="h-9 w-full rounded-md border border-input bg-background px-3 type-body"
 						value={value.taxProfileId}
 						onChange={(e) => update({ taxProfileId: e.target.value })}
@@ -140,8 +152,11 @@ export function IncomeForm({
 				</div>
 
 				<div>
-					<label className={LABEL_CLASS}>401(k) Contribution (%)</label>
+					<label htmlFor="income-template-contribution" className={LABEL_CLASS}>
+						401(k) Contribution (%)
+					</label>
 					<Input
+						id="income-template-contribution"
 						type="number"
 						min={0}
 						max={100}
@@ -152,8 +167,11 @@ export function IncomeForm({
 					/>
 				</div>
 				<div>
-					<label className={LABEL_CLASS}>Employer Match (%)</label>
+					<label htmlFor="income-template-match" className={LABEL_CLASS}>
+						Employer Match (%)
+					</label>
 					<Input
+						id="income-template-match"
 						type="number"
 						min={0}
 						max={100}
@@ -165,8 +183,11 @@ export function IncomeForm({
 				</div>
 
 				<div>
-					<label className={LABEL_CLASS}>401(k) Annual Cap ($)</label>
+					<label htmlFor="income-template-cap" className={LABEL_CLASS}>
+						401(k) Annual Cap ($)
+					</label>
 					<Input
+						id="income-template-cap"
 						type="number"
 						min={0}
 						step={500}
@@ -176,8 +197,11 @@ export function IncomeForm({
 					/>
 				</div>
 				<div>
-					<label className={LABEL_CLASS}>Auto-invest After Tax (%)</label>
+					<label htmlFor="income-template-auto-invest" className={LABEL_CLASS}>
+						Auto-invest After Tax (%)
+					</label>
 					<Input
+						id="income-template-auto-invest"
 						type="number"
 						min={0}
 						max={100}

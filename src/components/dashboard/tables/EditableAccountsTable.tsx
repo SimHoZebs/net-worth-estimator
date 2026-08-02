@@ -23,7 +23,7 @@ function inputStyle(isDirty: boolean) {
 	const dirty = isDirty
 		? "border-tertiary-border bg-tertiary-subtle"
 		: "border-input bg-card";
-	return `w-full rounded-lg ${dirty} px-2 py-1 type-body outline-none type-code`;
+	return `w-full rounded-lg ${dirty} px-2 py-1 type-body type-code outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40`;
 }
 
 function AccountLimitInput({
@@ -150,6 +150,7 @@ export function EditableAccountsTable({
 								<TableRow key={a.id}>
 									<TableCell>
 										<input
+											aria-label={`Account ID for ${a.label}`}
 											className={inputStyle(!!changed)}
 											value={a.id}
 											onChange={(e) =>
@@ -159,6 +160,7 @@ export function EditableAccountsTable({
 									</TableCell>
 									<TableCell>
 										<input
+											aria-label={`Account label for ${a.id}`}
 											className={inputStyle(!!changed)}
 											value={a.label}
 											onChange={(e) =>
@@ -204,6 +206,7 @@ export function EditableAccountsTable({
 									<TableCell>
 										<input
 											type="checkbox"
+											aria-label={`Enable account ${a.label}`}
 											className="h-4 w-4 rounded accent-primary"
 											checked={a.enabled}
 											onChange={() =>
@@ -217,6 +220,7 @@ export function EditableAccountsTable({
 											variant="ghost"
 											size="sm"
 											onClick={() => deleteAccount(a.id)}
+											aria-label={`Delete account ${a.label}`}
 										>
 											✕
 										</Button>

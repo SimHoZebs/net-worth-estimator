@@ -1,7 +1,7 @@
 import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { buildAccountDiagnosticChartData } from "@/chart/chartData";
-import { EvaluationResults } from "@/components/evaluations/EvaluationList";
+import { EvaluationResults } from "@/components/evaluations/EvaluationResults";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { LazySection } from "@/components/ui/lazy-section";
 import { currency, formatDate, pct } from "@/lib/format";

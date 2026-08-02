@@ -6,6 +6,24 @@ export interface FinancialModelParseResult {
 	issues: ModelValidationIssue[];
 }
 
+export class FinancialModelValidationError extends Error {
+	readonly result: FinancialModelParseResult;
+
+	constructor(result: FinancialModelParseResult) {
+		const details = result.issues
+			.filter((issue) => issue.severity === "error")
+			.map((issue) => issue.message)
+			.join(" ");
+		super(
+			details
+				? `The financial model contains validation errors: ${details}`
+				: "The financial model contains validation errors.",
+		);
+		this.name = "FinancialModelValidationError";
+		this.result = result;
+	}
+}
+
 export interface DataSourceAction<TArgs extends unknown[] = []> {
 	readonly label: string;
 	readonly description: string;

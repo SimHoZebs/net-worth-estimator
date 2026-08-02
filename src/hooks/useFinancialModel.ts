@@ -4,6 +4,7 @@ import type {
 	FinancialModelDocument,
 	FinancialModelParseResult,
 } from "@/lib/projection";
+import { FinancialModelValidationError } from "@/lib/projection";
 
 export const FINANCIAL_MODEL_QUERY_KEY = ["financial-model"] as const;
 
@@ -14,7 +15,7 @@ function requireSuccessfulMutation(
 		!result.document ||
 		result.issues.some((issue) => issue.severity === "error")
 	) {
-		throw new Error("The financial model contains validation errors.");
+		throw new FinancialModelValidationError(result);
 	}
 	return result;
 }

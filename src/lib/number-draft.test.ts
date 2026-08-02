@@ -11,14 +11,10 @@ describe("parseDecimalDraft", () => {
 		expect(parseDecimalDraft(input)).toBe(expected);
 	});
 
-	it.each([
-		"",
-		"-",
-		"0x10",
-		"0b10",
-		"0o10",
-		"Infinity",
-	])("rejects non-decimal input %s", (input) => {
-		expect(parseDecimalDraft(input)).toBeNull();
-	});
+	it.each(["", "-", "0x10", "0b10", "0o10", "Infinity"])(
+		"rejects non-decimal input %s",
+		(input) => {
+			expect(parseDecimalDraft(input)).toBeNull();
+		},
+	);
 });

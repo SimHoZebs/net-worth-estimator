@@ -1,3 +1,4 @@
+import { evaluationRegistry } from "../../evaluation/registry";
 import type { IncomeDataSnapshot } from "../../types/income";
 import type { FinancialModelDocument } from "../../types/model";
 import { csvValidationPaths } from "../../validation/paths";
@@ -15,6 +16,7 @@ export function validateCsvFinancialModel(
 ) {
 	return validateFinancialModel(document, {
 		incomeData,
+		evaluationRegistry,
 		paths: csvValidationPaths,
 	});
 }

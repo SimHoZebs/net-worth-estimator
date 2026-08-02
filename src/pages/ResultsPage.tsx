@@ -13,7 +13,7 @@ import {
 } from "@/runtime/projectionRuntime";
 
 export function ResultsPage() {
-	const { document, validationIsValid, isLoading, loadError, reload } =
+	const { document, issues, validationIsValid, isLoading, loadError, reload } =
 		useModelRuntime();
 	const { result } = useProjectionArtifacts();
 	const { runtimeError, isProjecting, stochasticError, isStochasticRunning } =
@@ -60,6 +60,18 @@ export function ResultsPage() {
 								Open model inputs
 							</Link>
 						</div>
+					</AlertDescription>
+				</Alert>
+			) : null}
+			{!document && issues.some((issue) => issue.severity === "error") ? (
+				<Alert variant="destructive" className="rounded-[1.6rem]">
+					<AlertTitle>Financial model validation failed</AlertTitle>
+					<AlertDescription>
+						{issues
+							.filter((issue) => issue.severity === "error")
+							.slice(0, 3)
+							.map((issue) => issue.message)
+							.join(" ")}
 					</AlertDescription>
 				</Alert>
 			) : null}
@@ -130,7 +142,12 @@ function ProjectionActivity({
 		: "Recomputing stochastic evaluation outcomes with the current settings. Existing stochastic results may be stale until this finishes.";
 
 	return (
-		<Alert variant="tertiary" className="rounded-[1.6rem] px-4 py-3">
+		<Alert
+			variant="tertiary"
+			role="status"
+			aria-live="polite"
+			className="rounded-[1.6rem] px-4 py-3"
+		>
 			<div className="flex items-start gap-3">
 				<span className="relative mt-1.5 flex size-2.5 shrink-0" aria-hidden>
 					<span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-35" />
@@ -149,6 +166,11 @@ function ProjectionActivity({
 					) : null}
 					<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-current/10">
 						<div
+							role="progressbar"
+							aria-label="Projection progress"
+							aria-valuemin={0}
+							aria-valuemax={100}
+							aria-valuenow={progressPct ?? undefined}
 							className={`h-full rounded-full bg-current transition-[width] duration-300 ${progressPct === null ? "animate-pulse" : ""}`}
 							style={{
 								width: progressPct === null ? "35%" : `${progressPct}%`,

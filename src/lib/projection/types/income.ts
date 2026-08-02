@@ -1,6 +1,7 @@
 import type { IsoDate } from "./model";
 
 export const INCOME_DATA_PUBLIC_PATH = "/data/income";
+export const INCOME_DATA_API_PATH = "/api/income-data";
 
 export const INCOME_DATA_FILE_NAMES = {
 	incomeSources: "income-sources.csv",

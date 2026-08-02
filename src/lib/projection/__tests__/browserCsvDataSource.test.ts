@@ -32,7 +32,11 @@ function createCsvFetch() {
 							? validCsvFiles.behaviors.postingFulfillment
 							: fileName === "postings.csv"
 								? validCsvFiles.postings
-								: null;
+								: fileName === "income-sources.csv"
+									? "id,label,effectiveFrom,effectiveTo,annualGrossIncome\nsalary,Synthetic salary,2026-01-01,,120000"
+									: fileName === "tax-profiles.csv"
+										? 'id,label,deduction,brackets,sourceUrl\nsynthetic-tax,Synthetic tax,10000,"[{""upTo"":null,""rate"":0.2}]",'
+										: null;
 		return new Response(body ?? "", { status: body === null ? 404 : 200 });
 	});
 }
@@ -45,7 +49,7 @@ describe("createBrowserCsvDataSource", () => {
 
 		expect(result.document?.accounts).toHaveLength(4);
 		expect(result.issues).toEqual([]);
-		expect(fetchImpl).toHaveBeenCalledTimes(5);
+		expect(fetchImpl).toHaveBeenCalledTimes(7);
 		expect(dataSource.save).toBeUndefined();
 		expect(dataSource.reset).toBeUndefined();
 	});
@@ -64,7 +68,7 @@ describe("createBrowserCsvDataSource", () => {
 		}).loadDocument();
 
 		expect(result.document).toEqual(document);
-		expect(fetchImpl).not.toHaveBeenCalled();
+		expect(fetchImpl).toHaveBeenCalledTimes(2);
 	});
 
 	it("upgrades a saved FI plan that predates the expense basis", async () => {
@@ -93,7 +97,10 @@ describe("createBrowserCsvDataSource", () => {
 			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify(document),
 		});
 
-		const result = await createBrowserCsvDataSource({ storage }).loadDocument();
+		const result = await createBrowserCsvDataSource({
+			fetchImpl: createCsvFetch(),
+			storage,
+		}).loadDocument();
 
 		expect(
 			result.document?.evaluations.financialIndependence[0]?.config
@@ -173,7 +180,7 @@ describe("createBrowserCsvDataSource", () => {
 		const result = await dataSource.reset?.run();
 		expect(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)).toBeNull();
 		expect(result?.document?.accounts).toHaveLength(4);
-		expect(fetchImpl).toHaveBeenCalledTimes(5);
+		expect(fetchImpl).toHaveBeenCalledTimes(7);
 	});
 
 	it("preserves canonical storage when save validation fails", async () => {
@@ -185,7 +192,10 @@ describe("createBrowserCsvDataSource", () => {
 		const invalid = createBaseDocument({
 			accounts: [baseDocument.accounts[0], baseDocument.accounts[0]],
 		});
-		const dataSource = createBrowserCsvDataSource({ storage });
+		const dataSource = createBrowserCsvDataSource({
+			fetchImpl: createCsvFetch(),
+			storage,
+		});
 
 		await expect(dataSource.save?.run(invalid)).rejects.toThrow(
 			"validation errors",
@@ -211,7 +221,10 @@ describe("createBrowserCsvDataSource", () => {
 
 	it("saves documents that have warnings", async () => {
 		const storage = createMemoryStorage();
-		const dataSource = createBrowserCsvDataSource({ storage });
+		const dataSource = createBrowserCsvDataSource({
+			fetchImpl: createCsvFetch(),
+			storage,
+		});
 		const result = await dataSource.save?.run(createBaseDocument());
 
 		expect(result?.issues).toContainEqual(

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { parseDecimalDraft } from "@/lib/number-draft";
 import type {
 	IncomeTemplateInput,
@@ -140,69 +141,67 @@ export function TemplateWizard({
 	}, [result, allAccounts]);
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 p-4">
-			<div className="w-full max-w-lg rounded-[1.8rem] border border-border/80 bg-card shadow-xl dark:border-white/10">
-				<div className="px-6 py-4 border-b border-border/70">
-					<h2 className="type-title">Income Template</h2>
-					<p className="type-caption mt-1">
-						Create a data-backed take-home income posting with payroll
-						deductions.
-					</p>
-				</div>
-
-				<div className="px-6 py-4 space-y-4">
-					{step === "form" ? (
-						<>
-							<IncomeForm
-								value={input}
-								onChange={setInput}
-								incomeSources={incomeData?.incomeSources ?? []}
-								taxProfiles={incomeData?.taxProfiles ?? []}
-							/>
-							{result && !result.ok && (
-								<div className="rounded-xl border border-destructive/25 bg-destructive-subtle p-3 type-body text-destructive-foreground">
-									{result.error}
-								</div>
-							)}
-							<div className="flex justify-end gap-2 mt-2">
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									onClick={onClose}
-								>
-									Cancel
-								</Button>
-								<Button type="button" size="sm" onClick={handleGenerate}>
-									Generate
-								</Button>
-							</div>
-						</>
-					) : result?.ok ? (
-						<>
-							<TemplatePreview
-								accounts={result.output.accounts}
-								postings={result.output.postings}
-								existingAccountIds={existingAccountIds}
-								postingDescriptions={postingDescriptions}
-							/>
-							<div className="flex justify-end gap-2 mt-2">
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									onClick={() => setStep("form")}
-								>
-									Back
-								</Button>
-								<Button type="button" size="sm" onClick={handleConfirm}>
-									Add to model
-								</Button>
-							</div>
-						</>
-					) : null}
-				</div>
+		<Dialog
+			ariaLabelledby="income-template-title"
+			className="max-w-lg rounded-[1.8rem] border border-border/80 bg-card shadow-xl dark:border-white/10"
+			onClose={onClose}
+		>
+			<div className="px-6 py-4 border-b border-border/70">
+				<h2 id="income-template-title" className="type-title">
+					Income Template
+				</h2>
+				<p className="type-caption mt-1">
+					Create a data-backed take-home income posting with payroll deductions.
+				</p>
 			</div>
-		</div>
+
+			<div className="px-6 py-4 space-y-4">
+				{step === "form" ? (
+					<>
+						<IncomeForm
+							value={input}
+							onChange={setInput}
+							incomeSources={incomeData?.incomeSources ?? []}
+							taxProfiles={incomeData?.taxProfiles ?? []}
+						/>
+						{result && !result.ok && (
+							<div className="rounded-xl border border-destructive/25 bg-destructive-subtle p-3 type-body text-destructive-foreground">
+								{result.error}
+							</div>
+						)}
+						<div className="flex justify-end gap-2 mt-2">
+							<Button type="button" variant="ghost" size="sm" onClick={onClose}>
+								Cancel
+							</Button>
+							<Button type="button" size="sm" onClick={handleGenerate}>
+								Generate
+							</Button>
+						</div>
+					</>
+				) : result?.ok ? (
+					<>
+						<TemplatePreview
+							accounts={result.output.accounts}
+							postings={result.output.postings}
+							existingAccountIds={existingAccountIds}
+							postingDescriptions={postingDescriptions}
+						/>
+						<div className="flex justify-end gap-2 mt-2">
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								onClick={() => setStep("form")}
+							>
+								Back
+							</Button>
+							<Button type="button" size="sm" onClick={handleConfirm}>
+								Add to model
+							</Button>
+						</div>
+					</>
+				) : null}
+			</div>
+		</Dialog>
 	);
 }

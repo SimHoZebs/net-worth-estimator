@@ -7,9 +7,7 @@ export function ModelValidationPanel({
 }: {
 	issues: ModelValidationIssue[];
 }) {
-	if (issues.length === 0) {
-		return null;
-	}
+	if (issues.length === 0) return null;
 
 	const errors = issues.filter((issue) => issue.severity === "error");
 	const warnings = issues.filter((issue) => issue.severity === "warning");
@@ -33,7 +31,7 @@ export function ModelValidationPanel({
 						className={`rounded-2xl p-3 ${issue.severity === "error" ? "bg-destructive-subtle text-destructive-foreground" : "bg-tertiary/15 text-tertiary-foreground"}`}
 					>
 						<div className="font-medium">
-							{issue.severity === "error" ? "Error" : "Tertiary"}:{" "}
+							{issue.severity === "error" ? "Error" : "Warning"}:{" "}
 							{issue.message}
 						</div>
 						<div className="mt-1 type-caption opacity-80">

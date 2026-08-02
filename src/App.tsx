@@ -12,6 +12,7 @@ import {
 	createBrowserCsvDataSource,
 	createCsvDataSource,
 	createCsvIncomeDataSource,
+	INCOME_DATA_API_PATH,
 	summarizeValidationIssues,
 	validateCsvFinancialModel,
 } from "@/lib/projection";
@@ -29,9 +30,15 @@ function createModelDataSource() {
 		: createBrowserCsvDataSource();
 }
 
+function createIncomeDataSource() {
+	return createCsvIncomeDataSource(
+		import.meta.env.DEV ? { basePath: INCOME_DATA_API_PATH } : undefined,
+	);
+}
+
 export default function App() {
 	const dataSource = useMemo(() => createModelDataSource(), []);
-	const incomeDataSource = useMemo(() => createCsvIncomeDataSource(), []);
+	const incomeDataSource = useMemo(() => createIncomeDataSource(), []);
 	const {
 		data: modelData,
 		isLoading: isModelLoading,
@@ -56,14 +63,20 @@ export default function App() {
 	const document = modelData?.document ?? null;
 	const issues = useMemo(() => {
 		const modelIssues = modelData?.issues ?? [];
-		if (!modelData?.document || !incomeDataResult?.data) {
-			return [...modelIssues, ...(incomeDataResult?.issues ?? [])];
-		}
-		return [
+		const candidates = [
 			...modelIssues,
-			...incomeDataResult.issues,
-			...validateCsvFinancialModel(modelData.document, incomeDataResult.data),
+			...(incomeDataResult?.issues ?? []),
+			...(modelData?.document && incomeDataResult?.data
+				? validateCsvFinancialModel(modelData.document, incomeDataResult.data)
+				: []),
 		];
+		const seen = new Set<string>();
+		return candidates.filter((issue) => {
+			const key = `${issue.severity}:${issue.code}:${issue.path.join(".")}:${issue.message}`;
+			if (seen.has(key)) return false;
+			seen.add(key);
+			return true;
+		});
 	}, [incomeDataResult, modelData]);
 	const loadError = modelError?.message ?? incomeDataError?.message ?? null;
 	const sourceActionError =
@@ -72,6 +85,8 @@ export default function App() {
 		isModelFetching || isIncomeDataFetching || modelResetMutation.isPending;
 	const isLoading = isModelLoading || isIncomeDataLoading || isSourceUpdating;
 	const replaceEvaluations = useStore((state) => state.replaceEvaluations);
+	const finishEditing = useStore((state) => state.finishEditing);
+	const syncSystemTheme = useStore((state) => state.syncSystemTheme);
 
 	const sourceEvaluationsFingerprint = document
 		? JSON.stringify(document.evaluations)
@@ -97,18 +112,11 @@ export default function App() {
 
 	useEffect(() => {
 		const media = window.matchMedia("(prefers-color-scheme: dark)");
-		const handleChange = () => {
-			if (useStore.getState().theme !== "system") return;
-			const resolved = media.matches ? "dark" : "light";
-			window.document.documentElement.classList.toggle(
-				"dark",
-				resolved === "dark",
-			);
-			useStore.setState({ resolvedTheme: resolved });
-		};
+		const handleChange = () => syncSystemTheme();
 		media.addEventListener("change", handleChange);
+		syncSystemTheme();
 		return () => media.removeEventListener("change", handleChange);
-	}, []);
+	}, [syncSystemTheme]);
 
 	const validation = summarizeValidationIssues(issues);
 	const {
@@ -132,26 +140,22 @@ export default function App() {
 		const store = useStore.getState();
 		if (!store.workingDocument || isSaving || !dataSource.save) return;
 		saveModel(store.workingDocument, {
-			onSuccess: () =>
-				useStore.setState({
-					isDirty: false,
-					isEditing: false,
-					workingDocument: null,
-				}),
+			onSuccess: finishEditing,
 		});
-	}, [dataSource.save, isSaving, saveModel]);
+	}, [dataSource.save, finishEditing, isSaving, saveModel]);
 	const handleResetSource = useCallback(() => {
 		if (!dataSource.reset || isResetting) return;
 		requestEvaluationReload();
 		resetModel(undefined, {
-			onSuccess: () =>
-				useStore.setState({
-					isDirty: false,
-					isEditing: false,
-					workingDocument: null,
-				}),
+			onSuccess: finishEditing,
 		});
-	}, [dataSource.reset, isResetting, requestEvaluationReload, resetModel]);
+	}, [
+		dataSource.reset,
+		finishEditing,
+		isResetting,
+		requestEvaluationReload,
+		resetModel,
+	]);
 	const handleApplyTemplate = useCallback(
 		(output: TemplateOutput) => {
 			const store = useStore.getState();
