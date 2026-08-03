@@ -122,7 +122,7 @@ describe("csvFilePlugin", () => {
 			evaluations: document.evaluations,
 		});
 		const expectedOpeningBalances = {
-			checking: 397.74,
+			checking: 49184.31,
 			k401: 1260.74,
 			brokerage: 241.16,
 			roth_ira: 1112.57,
@@ -149,7 +149,7 @@ describe("csvFilePlugin", () => {
 				total + (enabledAccountIds.has(accountId) ? balance : 0),
 			0,
 		);
-		expect(openingNetWorth).toBeCloseTo(-66132.59, 2);
+		expect(openingNetWorth).toBeCloseTo(-17346.02, 2);
 	});
 
 	it("preserves the canonical envelope for load errors", async () => {

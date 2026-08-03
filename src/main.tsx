@@ -12,6 +12,7 @@ import { ProjectionEngineProvider } from "./engine/ProjectionEngineContext";
 import { WorkerProjectionEngine } from "./engine/WorkerProjectionEngine";
 import { InMemoryProjectionArtifactStore } from "./lib/projection/artifacts";
 import "./styles.css";
+import { AnalysisPage } from "./pages/AnalysisPage";
 import { ModelInputsPage } from "./pages/ModelInputsPage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -36,6 +37,7 @@ const router = createBrowserRouter([
 		element: <App />,
 		children: [
 			{ index: true, element: <ResultsPage /> },
+			{ path: "analysis", element: <AnalysisPage /> },
 			{ path: "settings", element: <SettingsPage /> },
 			{ path: "model-inputs", element: <ModelInputsPage /> },
 			{ path: "*", element: <Navigate to="/" replace /> },
