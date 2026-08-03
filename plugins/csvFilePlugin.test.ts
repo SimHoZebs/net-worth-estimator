@@ -5,7 +5,14 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import type { Connect, ResolvedConfig, ViteDevServer } from "vite";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { INCOME_DATA_API_PATH } from "../src/lib/projection/types/income";
+import {
+	parseIncomeDataFiles,
+	prepareSimulationRequest,
+} from "../src/lib/projection";
+import {
+	INCOME_DATA_API_PATH,
+	INCOME_DATA_FILE_NAMES,
+} from "../src/lib/projection/types/income";
 import type { FinancialModelDocument } from "../src/lib/projection/types/model";
 import { csvFilePlugin, FINANCIAL_MODEL_API_PATH } from "./csvFilePlugin";
 
@@ -124,6 +131,17 @@ describe("csvFilePlugin", () => {
 		});
 		expect(canonical.body).not.toHaveProperty("pack");
 		const document = canonical.body.document as FinancialModelDocument;
+		const incomeDataResult = parseIncomeDataFiles({
+			incomeSources: await fs.readFile(
+				path.join("public/data/income", INCOME_DATA_FILE_NAMES.incomeSources),
+				"utf-8",
+			),
+			taxProfiles: await fs.readFile(
+				path.join("public/data/income", INCOME_DATA_FILE_NAMES.taxProfiles),
+				"utf-8",
+			),
+		});
+		if (!incomeDataResult.data) throw new Error("Income fixture is invalid.");
 		const fi = document.evaluations.financialIndependence[0]!.config;
 		const accountIds = new Set(document.accounts.map(({ id }) => id));
 		const postingIds = new Set(document.postings.map(({ id }) => id));
@@ -137,6 +155,46 @@ describe("csvFilePlugin", () => {
 		expect(fi.continuingPostingIds.every((id) => postingIds.has(id))).toBe(
 			true,
 		);
+		const prepared = prepareSimulationRequest(
+			document,
+			{
+				fallbackProjectionStartDate: "2026-07-28",
+				horizonYears: 1,
+				evaluations: document.evaluations,
+			},
+			undefined,
+			undefined,
+			incomeDataResult.data,
+		);
+		const expectedOpeningBalances = {
+			checking: 49184.31,
+			k401: 1260.74,
+			brokerage: 241.16,
+			roth_ira: 1112.57,
+			sofi_loan_principal: -36417.58,
+			sofi_loan_interest: -66.35,
+		};
+		for (const [accountId, expectedBalance] of Object.entries(
+			expectedOpeningBalances,
+		)) {
+			expect(prepared.request.initialState.balances[accountId]).toBeCloseTo(
+				expectedBalance,
+				8,
+			);
+		}
+		const enabledAccountIds = new Set(
+			document.accounts
+				.filter((account) => account.enabled)
+				.map((account) => account.id),
+		);
+		const openingNetWorth = Object.entries(
+			prepared.request.initialState.balances,
+		).reduce(
+			(total, [accountId, balance]) =>
+				total + (enabledAccountIds.has(accountId) ? balance : 0),
+			0,
+		);
+		expect(openingNetWorth).toBeCloseTo(-17346.02, 2);
 	});
 
 	it("preserves the canonical envelope for load errors", async () => {

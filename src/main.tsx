@@ -17,6 +17,11 @@ import { WorkerProjectionEngine } from "./engine/WorkerProjectionEngine";
 import { InMemoryProjectionArtifactStore } from "./lib/projection/artifacts";
 import "./styles.css";
 
+const AnalysisPage = lazy(() =>
+	import("./pages/AnalysisPage").then(({ AnalysisPage }) => ({
+		default: AnalysisPage,
+	})),
+);
 const ModelInputsPage = lazy(() =>
 	import("./pages/ModelInputsPage").then(({ ModelInputsPage }) => ({
 		default: ModelInputsPage,
@@ -58,6 +63,7 @@ const router = createBrowserRouter([
 		errorElement: <RouteErrorFallback />,
 		children: [
 			{ index: true, element: lazyElement(<ResultsPage />) },
+			{ path: "analysis", element: lazyElement(<AnalysisPage />) },
 			{ path: "settings", element: lazyElement(<SettingsPage />) },
 			{ path: "model-inputs", element: lazyElement(<ModelInputsPage />) },
 			{ path: "*", element: <Navigate to="/" replace /> },

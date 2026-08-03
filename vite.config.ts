@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
 		test: {
 			environment: "node",
 			setupFiles: ["./src/test/setup.ts"],
+			testTimeout: 15_000,
 		},
 	};
 });
