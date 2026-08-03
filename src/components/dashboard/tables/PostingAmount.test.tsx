@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { makePosting } from "@/lib/projection/__fixtures__/postings";
 import { PostingAmount } from "./PostingAmount";
 
 describe("PostingAmount", () => {
@@ -15,5 +16,39 @@ describe("PostingAmount", () => {
 		);
 		expect(html).toContain("salary * 0.22");
 		expect(html).toContain("Calculated");
+	});
+
+	it("presents arbitrary resolver structure without serializing it", () => {
+		const posting = makePosting({
+			id: "custom",
+			amount: {
+				resolver: "external-pipeline",
+				config: {
+					strategyId: "primary",
+					resolvers: [
+						{
+							resolver: "weighted-step",
+							config: { weight: 0.25 },
+						},
+					],
+				},
+				inputs: {
+					balance: {
+						source: "provider",
+						provider: "remote-value",
+						arguments: { id: "balance" },
+					},
+				},
+			},
+		});
+		const html = renderToStaticMarkup(
+			<PostingAmount posting={posting} showDetails />,
+		);
+
+		expect(html).toContain("External pipeline calculation");
+		expect(html).toContain("Weighted step calculation");
+		expect(html).toContain("Strategy ID");
+		expect(html).toContain("remote-value");
+		expect(html).not.toContain("&quot;resolver&quot;");
 	});
 });

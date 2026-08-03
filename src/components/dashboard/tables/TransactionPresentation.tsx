@@ -10,6 +10,7 @@ import {
 	type Posting,
 } from "@/lib/projection";
 import { AccountChip } from "./AccountIdentity";
+import { PostingCalculationDetails } from "./PostingAmount";
 
 type TransactionEffect = "inflow" | "outflow" | "transfer";
 
@@ -44,11 +45,13 @@ export function TransactionListRow({
 	accountById,
 	meta,
 	technical,
+	showCalculationDetails = false,
 }: {
 	posting: Posting;
 	accountById: ReadonlyMap<string, Account>;
 	meta?: ReactNode;
 	technical?: ReactNode;
+	showCalculationDetails?: boolean;
 }) {
 	return (
 		<div className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,auto)_auto] sm:items-center sm:gap-5">
@@ -65,6 +68,11 @@ export function TransactionListRow({
 			<div className="sm:text-right">
 				<TransactionAmount posting={posting} />
 			</div>
+			{showCalculationDetails && getExpression(posting) === null ? (
+				<div className="sm:col-span-3">
+					<PostingCalculationDetails posting={posting} />
+				</div>
+			) : null}
 		</div>
 	);
 }

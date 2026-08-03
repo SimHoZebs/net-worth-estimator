@@ -143,6 +143,24 @@ describe("EditablePostingsTable", () => {
 		expect(updatePosting).not.toHaveBeenCalled();
 	});
 
+	it("shows structured details for non-expression calculations", () => {
+		const posting = makePosting({
+			id: "custom",
+			label: "Custom",
+			amount: {
+				resolver: "external-source",
+				config: { sourceId: "market-feed", enabled: true },
+				inputs: {},
+			},
+		});
+		renderTable({ document: createBaseDocument({ postings: [posting] }) });
+
+		expect(screen.getByText("External source calculation")).not.toBeNull();
+		expect(screen.getByText("Source ID")).not.toBeNull();
+		expect(screen.getByText("market-feed")).not.toBeNull();
+		expect(screen.getByText("True")).not.toBeNull();
+	});
+
 	it("commits nullable numeric drafts on blur and clamps minimum values", () => {
 		const posting = makePosting({
 			id: "salary",

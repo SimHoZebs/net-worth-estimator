@@ -1,5 +1,6 @@
 import { currency } from "@/lib/format";
 import type { Account, Posting } from "@/lib/projection";
+import { PostingAmount } from "../dashboard/tables/PostingAmount";
 
 interface TemplatePreviewProps {
 	accounts: Account[];
@@ -9,7 +10,6 @@ interface TemplatePreviewProps {
 		id: string;
 		label: string;
 		route: string;
-		arithmetic: string;
 		cap: string;
 	}>;
 }
@@ -22,6 +22,7 @@ export function TemplatePreview({
 }: TemplatePreviewProps) {
 	const existingSet = new Set(existingAccountIds);
 	const newAccounts = accounts.filter((a) => !existingSet.has(a.id));
+	const postingById = new Map(postings.map((posting) => [posting.id, posting]));
 
 	return (
 		<div className="space-y-3 rounded-xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
@@ -62,9 +63,11 @@ export function TemplatePreview({
 						>
 							<span className="type-value/90">{p.label}</span>
 							<span className="type-caption">{p.route}</span>
-							<code className="type-caption bg-muted/80 rounded px-1.5 py-0.5">
-								{p.arithmetic}
-							</code>
+							<div className="rounded bg-muted/80 px-1.5 py-0.5 type-caption">
+								{postingById.get(p.id) ? (
+									<PostingAmount posting={postingById.get(p.id)!} />
+								) : null}
+							</div>
 							{p.cap && (
 								<span className="type-caption text-muted-foreground/70">
 									{p.cap}
