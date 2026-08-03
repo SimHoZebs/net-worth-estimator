@@ -18,12 +18,12 @@ import {
 import { parseDecimalDraft } from "@/lib/number-draft";
 import {
 	createExpressionAmount,
-	describePostingAmount,
 	type FinancialModelDocument,
 	getExpression,
 	type Posting,
 	updateExpressionAmount,
 } from "@/lib/projection";
+import { PostingAmount } from "./PostingAmount";
 
 function inputStyle(isDirty: boolean) {
 	const dirty = isDirty
@@ -287,9 +287,7 @@ export function EditablePostingsTable({
 												onCommit={(amount) => updatePosting(p.id, { amount })}
 											/>
 										) : (
-											<code className="type-caption break-all">
-												{describePostingAmount(p)}
-											</code>
+											<PostingAmount posting={p} showDetails />
 										)}
 									</TableCell>
 									<TableCell>

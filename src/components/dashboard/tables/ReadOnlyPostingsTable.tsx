@@ -47,6 +47,7 @@ export function ReadOnlyPostingsTable({
 							key={posting.id}
 							posting={posting}
 							accountById={accountById}
+							showCalculationDetails
 							meta={<Schedule posting={posting} />}
 							technical={
 								showAdvanced ? <TechnicalDetails posting={posting} /> : null
@@ -89,8 +90,18 @@ function TechnicalDetails({ posting }: { posting: Posting }) {
 		`priority ${posting.priority}`,
 	].filter(Boolean);
 	return (
-		<>
-			{posting.id} · {assumptions.join(" · ")}
-		</>
+		<div>
+			<div>
+				{posting.id} · {assumptions.join(" · ")}
+			</div>
+			<details className="mt-1">
+				<summary className="cursor-pointer select-none type-caption">
+					Raw amount configuration
+				</summary>
+				<pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-muted/70 p-2 type-code">
+					{JSON.stringify(posting.amount, null, 2)}
+				</pre>
+			</details>
+		</div>
 	);
 }

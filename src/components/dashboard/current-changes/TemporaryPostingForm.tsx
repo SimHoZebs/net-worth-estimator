@@ -5,10 +5,10 @@ import { formatRoute } from "@/lib/format";
 import { parseDecimalDraft } from "@/lib/number-draft";
 import {
 	createExpressionAmount,
-	describePostingAmount,
 	type FinancialModelDocument,
 	type Posting,
 } from "@/lib/projection";
+import { PostingAmount } from "../tables/PostingAmount";
 
 type TemporaryPostingDraft = Omit<
 	Posting,
@@ -459,9 +459,9 @@ export function TemporaryPostingForm({
 						<span className="type-label text-tertiary-foreground">
 							{posting.label}
 						</span>
-						<span className="ml-2 type-caption text-tertiary-foreground/80">
-							{describePostingAmount(posting)}
-						</span>
+						<div className="ml-2 inline-block type-caption text-tertiary-foreground/80">
+							<PostingAmount posting={posting} />
+						</div>
 						<span className="ml-2 type-caption text-tertiary-foreground/80">
 							{describeRoute(posting, document)}
 						</span>

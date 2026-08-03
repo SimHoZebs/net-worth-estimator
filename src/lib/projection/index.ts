@@ -58,6 +58,13 @@ export type {
 	IncomeDataSource,
 } from "./incomeData";
 export {
+	type AmountPresentation,
+	type AmountPresentationNode,
+	describePostingAmount,
+	getAmountPresentation,
+	getExpression,
+} from "./model/amountPresentation";
+export {
 	applyModelOverrides,
 	EMPTY_MODEL_OVERRIDES,
 	prepareFinancialModelDocument,
@@ -66,8 +73,6 @@ export {
 	amountProviders,
 	amountResolvers,
 	createExpressionAmount,
-	describePostingAmount,
-	getExpression,
 	resolvePostingAmountDescriptor,
 	updateExpressionAmount,
 	validateAmountDescriptor,

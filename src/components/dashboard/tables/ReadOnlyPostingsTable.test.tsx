@@ -67,4 +67,42 @@ describe("ReadOnlyPostingsTable", () => {
 		expect(screen.getByText("No movement")).not.toBeNull();
 		expect(screen.queryByText("+$100")).toBeNull();
 	});
+
+	it("shows generic resolver details and gates raw configuration", () => {
+		const posting = makePosting({
+			id: "custom",
+			label: "Custom posting",
+			destinations: ["checking"],
+			amount: {
+				resolver: "custom-resolver",
+				config: {
+					mode: "dynamic",
+					steps: [{ resolver: "nested-step", config: { factor: 2 } }],
+				},
+				inputs: {},
+			},
+		});
+		const checking = makeAccount({ id: "checking", label: "Checking" });
+		const { rerender } = render(
+			<ReadOnlyPostingsTable
+				postings={[posting]}
+				accounts={[checking]}
+				showAdvanced={false}
+			/>,
+		);
+
+		expect(screen.getByText(/Custom resolver calculation/)).not.toBeNull();
+		expect(screen.getByText("Nested step calculation")).not.toBeNull();
+		expect(screen.getByText("dynamic")).not.toBeNull();
+		expect(screen.queryByText("Raw amount configuration")).toBeNull();
+
+		rerender(
+			<ReadOnlyPostingsTable
+				postings={[posting]}
+				accounts={[checking]}
+				showAdvanced
+			/>,
+		);
+		expect(screen.getByText("Raw amount configuration")).not.toBeNull();
+	});
 });

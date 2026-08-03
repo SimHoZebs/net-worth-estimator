@@ -2,7 +2,6 @@ import { z } from "zod";
 import type {
 	AmountInputBinding,
 	JsonValue,
-	Posting,
 	PostingAmountResolution,
 } from "../types/model";
 import { arithmeticRequirements, evaluateArithmetic } from "./arithmetic";
@@ -401,17 +400,4 @@ export function updateExpressionAmount(
 		if (amount.inputs[name]) updated.inputs[name] = amount.inputs[name];
 	}
 	return updated;
-}
-
-export function getExpression(posting: Pick<Posting, "amount">): string | null {
-	return posting.amount.resolver === "expression" &&
-		typeof posting.amount.config.expression === "string"
-		? posting.amount.config.expression
-		: null;
-}
-
-export function describePostingAmount(
-	posting: Pick<Posting, "amount">,
-): string {
-	return getExpression(posting) ?? JSON.stringify(posting.amount);
 }
