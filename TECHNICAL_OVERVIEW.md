@@ -20,6 +20,7 @@ The Net Worth Estimator is a React application that loads a CSV-backed `Financia
 6. `prepareSimulationRequest` resolves overrides, opening balances, dates, event policy, and optional `MonteCarloSample` into a prepared projection containing a `SimulationRequest`.
 7. The pure `simulate` kernel returns an exact `SimulationRun`. `projectRawFinancialModelDocument` adapts it into a `ProjectionPath` and public result; `projectFinancialModelDocument` adds configured evaluations.
 8. The persistent routed workspace exposes the loaded document and projection state to separate Results, Settings, and Model Inputs pages without restarting worker hooks during navigation.
+9. The Analysis page derives observations from enabled one-time external-inflow postings and composes independent analyses without changing the financial model or projection lifecycle.
 
 ## 3. Persistence
 
@@ -59,6 +60,13 @@ The persistence boundary is the validated `FinancialModelDocument` represented b
 - `EvaluationResultCollection`: locally ordered result tables keyed by evaluation type.
 
 There is no named alternative-model domain or persistence API. Comparisons are metric snapshots only.
+
+### Independent Transaction Evidence
+
+- Posting observations are derived from enabled `once` postings with no source account and at least one destination. Recurring model rules are not treated as observed pay.
+- Posting observations use the posting label/date/account and resolve numeric expressions when available; unresolved amounts remain source observations but cannot contribute to salary amounts.
+- `AnalysisDefinition<TInput, TOutput>` is the common contract for independent enrichment, inference, map-data, and comparison computations. It is intentionally separate from projection `EvaluationDefinition`.
+- The first composed pipeline classifies posting-derived rows, detects recurring payroll evidence, and estimates observed net pay. Confirmed results can annualize; provisional results expose only per-deposit values when cadence history is weak. It does not read or mutate the modeled salary.
 
 ## 5. Model Semantics
 
@@ -130,6 +138,7 @@ Percentile-band slope is never interpreted as a run outcome. FI confidence dates
 - `/`: read-only current/projected metrics, charts, reconciliation, cash flow, debt, shortfalls, evaluation outcomes, and saved comparisons.
 - `/settings`: session-only horizon, Monte Carlo, evaluation, and appearance configuration. Unapplied evaluation drafts block navigation; pending debounced Monte Carlo values flush when the page unmounts.
 - `/model-inputs`: scheduled salary/checking transactions, paginated one-time transaction history, account-associated future rules, canonical editing, validation, temporary changes, templates, and source actions.
+- `/analysis`: posting-derived payroll evidence and annualized observed net-pay inference.
 - `App`: persistent data, mutation, deterministic projection, and stochastic projection controller shared by every route.
 - `runtime/modelRuntime`: read-only model/source state and wrapped source actions; executable `DataSource` operations remain private to `App`.
 - `runtime/projectionRuntime`: separate projection-artifact and execution-status providers so Monte Carlo progress does not rerender unrelated model consumers.
@@ -165,3 +174,6 @@ React Router uses browser paths. Production hosting must serve `index.html` for 
 | `src/hooks/useFinancialModel.ts` | document query, save, and reset hooks |
 | `src/hooks/useProjection.ts` | deterministic worker hook |
 | `src/hooks/useStochastic.ts` | stochastic worker hook |
+| `src/lib/analysis/postingObservations.ts` | derives analysis observations from one-time external-inflow postings |
+| `src/lib/analysis/` | independent analysis contract, runtime, and definitions |
+| `src/hooks/usePostingAnalyses.ts` | typed posting-classification-to-payroll-to-salary analysis composition |

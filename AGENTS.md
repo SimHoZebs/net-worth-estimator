@@ -16,6 +16,7 @@ main.tsx -> providers -> <RouterProvider> -> <App>
 App (src/App.tsx)
 `-- runtime providers -> <AppShell> -> <Outlet>
     |-- / -> <ResultsPage> -> dashboard, evaluation results, comparisons
+    |-- /analysis -> posting-derived evidence and analyses
     |-- /settings -> simulation, Monte Carlo, evaluation, and theme settings
     `-- /model-inputs -> inspector, current changes, templates, and source status
 ```
@@ -37,6 +38,7 @@ App (src/App.tsx)
 | `useFinancialModelQuery` | `hooks/useFinancialModel.ts` | loads `{ document, issues }` from `DataSource.loadDocument`; `staleTime: Infinity` |
 | `useFinancialModelMutation` | `hooks/useFinancialModel.ts` | saves a `FinancialModelDocument` and invalidates the model query |
 | `useFinancialModelResetMutation` | `hooks/useFinancialModel.ts` | resets the source and replaces query data |
+| `usePostingAnalyses` | `hooks/usePostingAnalyses.ts` | derives observations from model postings and composes classification, payroll detection, and salary estimation analyses |
 | `useProjection` | `hooks/useProjection.ts` | `(document, settings, overrides, enabled) -> ProjectionHookState<ProjectionResult>` |
 | `useStochastic` | `hooks/useStochastic.ts` | `(document, settings, overrides, config, enabled) -> ProjectionHookState<StochasticProjectionResult>` |
 | `useDebouncedStochasticConfig` | `hooks/useDebouncedStochasticConfig.ts` | debounces Monte Carlo configuration |
@@ -69,8 +71,9 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 4. **Current changes**: `ModelOverrides` remain in Zustand and are applied with `applyModelOverrides`; canonical data is not mutated.
 5. **Projection**: `useProjection`/`useStochastic` -> `CachedProjectionEngine` -> `WorkerProjectionEngine` on misses -> Web Workers -> `prepareSimulationRequest` -> `simulate` -> `ProjectionPath` -> evaluation/analysis aggregation.
 6. **Monte Carlo**: one prepared request is reused, each `MonteCarloSample` produces a path-only run, exact percentiles are aggregated, and progress is emitted in worker batches of 50.
-7. **Browser persistence**: `net-worth-estimator:financial-model` is the only browser key. Malformed or noncanonical data surfaces diagnostics; reset removes that key and reloads bundled CSV data.
+7. **Browser persistence**: `net-worth-estimator:financial-model` stores the financial model. Malformed or noncanonical data surfaces diagnostics; reset removes that key and reloads bundled CSV data. Analyses use the canonical model postings and add no separate transaction key.
 8. **Derived artifacts**: `ProjectionArtifactStore` is separate from `DataSource`; browser artifacts are content-addressed, session-only, and disposable.
+9. **Independent analyses**: `AnalysisDefinition` computations run as explicit pipelines over posting-derived observations. The current pipeline is posting classification -> payroll detection -> salary estimation; it does not participate in projection or mutate the financial model.
 
 ## Key Types
 
@@ -87,6 +90,8 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 | `StochasticProjectionResult` | deterministic result, exact percentile bands, and stochastic evaluation aggregation |
 | `DataSource` | `loadDocument` plus optional labeled `save` and `reset` capabilities |
 | `FinancialModelParseResult` | `{ document, issues }` |
+| `PostingObservationDataset` | observations derived from enabled one-time external-inflow postings |
+| `AnalysisDefinition` | typed independent computation from an input value to a diagnosed output |
 
 ## Rules
 
