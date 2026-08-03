@@ -60,6 +60,7 @@ function renderPage() {
 			resetLabel: null,
 		},
 		document: documentModel,
+		incomeData: null,
 		effectiveDocument: null,
 		issues: [],
 		validationIsValid: true,
