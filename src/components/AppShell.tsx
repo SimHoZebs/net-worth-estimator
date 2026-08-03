@@ -10,6 +10,7 @@ interface AppShellProps {
 
 const routes = [
 	{ to: "/", label: "Results", end: true },
+	{ to: "/analysis", label: "Analysis", end: false },
 	{ to: "/settings", label: "Settings", end: false },
 	{ to: "/model-inputs", label: "Model inputs", end: false },
 ];
