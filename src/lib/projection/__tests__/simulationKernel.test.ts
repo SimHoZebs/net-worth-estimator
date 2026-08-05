@@ -134,6 +134,113 @@ describe("simulation request preparation", () => {
 			"first",
 		);
 	});
+
+	it("applies checkpoints after same-date postings and replays later postings", () => {
+		const document = createBaseDocument({
+			accounts: [makeAccount({ id: "checking" })],
+			checkpoints: [
+				{ Date: "2026-01-01", AccountId: "checking", Balance: 100 },
+				{ Date: "2026-02-01", AccountId: "checking", Balance: 200 },
+			],
+			postings: [
+				makePosting({
+					id: "monthly-income",
+					destinations: ["checking"],
+					arithmetic: "10",
+					startDate: "2026-01-01",
+				}),
+				makePosting({
+					id: "one-time-income",
+					destinations: ["checking"],
+					arithmetic: "5",
+					frequency: "once",
+					startDate: "2026-01-15",
+				}),
+			],
+		});
+
+		const prepared = prepareSimulationRequest(
+			document,
+			makeSettings({ fallbackProjectionStartDate: "2026-03-01" }),
+		);
+
+		expect(prepared.historicalSnapshots).toEqual([
+			{
+				date: "2026-01-01",
+				balances: { checking: 100 },
+				checkpointCorrections: [
+					{
+						accountId: "checking",
+						observedBalance: 100,
+						modeledBalance: 10,
+						adjustment: 90,
+					},
+				],
+			},
+			{ date: "2026-01-15", balances: { checking: 105 } },
+			{
+				date: "2026-02-01",
+				balances: { checking: 200 },
+				checkpointCorrections: [
+					{
+						accountId: "checking",
+						observedBalance: 200,
+						modeledBalance: 115,
+						adjustment: 85,
+					},
+				],
+			},
+		]);
+		expect(prepared.request.initialState.balances.checking).toBe(200);
+		expect(simulate(prepared.request).movementAttempts[0]).toMatchObject({
+			date: "2026-03-01",
+			realizedAmount: 10,
+		});
+	});
+
+	it("treats a projection-start checkpoint as end-of-day realized history", () => {
+		const prepared = prepareSimulationRequest(
+			createBaseDocument({
+				accounts: [makeAccount({ id: "checking" })],
+				checkpoints: [
+					{ Date: "2026-02-01", AccountId: "checking", Balance: 100 },
+				],
+				postings: [
+					makePosting({
+						id: "start-income",
+						destinations: ["checking"],
+						arithmetic: "10",
+						startDate: "2026-02-01",
+					}),
+				],
+			}),
+			makeSettings({ fallbackProjectionStartDate: "2026-02-01" }),
+		);
+
+		expect(prepared.request.includeStartDateEvents).toBe(false);
+		expect(prepared.request.initialState.balances.checking).toBe(100);
+		expect(
+			prepared.request.initialState.latestRealizedPostingAmounts.get(
+				"start-income",
+			),
+		).toBe(10);
+		expect(simulate(prepared.request).movementAttempts[0]?.date).toBe(
+			"2026-03-01",
+		);
+	});
+
+	it("rejects checkpoints after the projection start", () => {
+		expect(() =>
+			prepareSimulationRequest(
+				createBaseDocument({
+					checkpoints: [
+						{ Date: "2026-02-02", AccountId: "checking", Balance: 100 },
+					],
+				}),
+				makeSettings({ fallbackProjectionStartDate: "2026-02-01" }),
+			),
+		).toThrow(/dated after the projection start/);
+	});
 });
 
 describe("deterministic simulation kernel", () => {

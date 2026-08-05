@@ -117,6 +117,8 @@ export {
 export {
 	csvAccountSchema,
 	csvAccountsHeaders,
+	csvCheckpointSchema,
+	csvCheckpointsHeaders,
 	csvDateSchema,
 	csvFinancialIndependenceHeaders,
 	csvFinancialIndependenceSchema,
@@ -155,6 +157,8 @@ export type {
 	AccountSnapshot,
 	AmountInputBinding,
 	BehaviorCollectionKey,
+	Checkpoint,
+	CheckpointCorrection,
 	EvaluationDiagnostic,
 	EvaluationForType,
 	EvaluationInstance,

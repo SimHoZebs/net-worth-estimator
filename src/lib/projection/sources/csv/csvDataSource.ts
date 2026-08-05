@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { DataSource, FinancialModelParseResult } from "../../dataSource";
 import type {
+	Checkpoint,
 	FinancialIndependenceSource,
 	FinancialModelDocument,
 	Posting,
@@ -9,6 +10,13 @@ import type { ModelValidationIssue } from "../../types/validation";
 import { csvDateSchema } from "./csvSchema";
 
 const finiteNumber = z.number().finite();
+const checkpointSchema = z
+	.object({
+		Date: csvDateSchema,
+		AccountId: z.string().trim().min(1),
+		Balance: finiteNumber,
+	})
+	.strict() satisfies z.ZodType<Checkpoint>;
 const amountBindingSchema = z.discriminatedUnion("source", [
 	z.object({ source: z.literal("literal"), value: z.json() }).strict(),
 	z
@@ -88,6 +96,7 @@ export const financialModelDocumentSchema = z
 				})
 				.strict(),
 		),
+		checkpoints: z.array(checkpointSchema).default([]),
 		evaluations: z
 			.object({
 				financialIndependence: z.array(

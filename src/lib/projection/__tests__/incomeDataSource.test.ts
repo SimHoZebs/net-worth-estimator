@@ -37,6 +37,7 @@ function makeDocument(): FinancialModelDocument {
 				enabled: true,
 			},
 		],
+		checkpoints: [],
 		evaluations: {
 			financialIndependence: [],
 			netWorthThreshold: [],
@@ -191,6 +192,7 @@ describe("income data source and income posting", () => {
 			readFile(new URL(`../../../../${path}`, import.meta.url), "utf8");
 		const [
 			accounts,
+			checkpoints,
 			postings,
 			financialIndependence,
 			netWorthThreshold,
@@ -199,6 +201,7 @@ describe("income data source and income posting", () => {
 			bundledTaxProfiles,
 		] = await Promise.all([
 			read("public/configs/accounts.csv"),
+			read("public/configs/checkpoints.csv"),
 			read("public/configs/postings.csv"),
 			read("public/configs/behavior/financial-independence.csv"),
 			read("public/configs/behavior/net-worth-threshold.csv"),
@@ -208,6 +211,7 @@ describe("income data source and income posting", () => {
 		]);
 		const modelResult = parseCsvFinancialModel({
 			accounts,
+			checkpoints,
 			postings,
 			behaviors: {
 				financialIndependence,

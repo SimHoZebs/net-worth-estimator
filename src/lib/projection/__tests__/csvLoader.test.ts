@@ -51,6 +51,7 @@ describe("CSV financial model", () => {
 
 		expect(result.issues).toEqual([]);
 		expect(result.data?.sourcePath).toBe(CSV_MODEL_PUBLIC_PATH);
+		expect(result.data?.checkpoints).toEqual([]);
 		expect(result.data?.postings[0]?.frequency).toBe("once");
 		expect(
 			result.data?.postings[5] && getExpression(result.data.postings[5]),
@@ -154,6 +155,80 @@ describe("CSV financial model", () => {
 		expect(serialized.postings).not.toContain("arithmetic");
 		expect(reparsed.issues).toEqual([]);
 		expect(reparsed.data?.evaluations).toEqual(parsed.data?.evaluations);
+		expect(reparsed.data?.checkpoints).toEqual(parsed.data?.checkpoints);
+	});
+
+	it("validates checkpoint account references and account-date uniqueness", () => {
+		const result = parseCsvFinancialModel({
+			...validCsvFiles,
+			checkpoints: [
+				"Date,AccountId,Balance",
+				"2026-03-31,missing,100",
+				"2026-03-31,checking,200",
+				"2026-03-31,checking,300",
+			].join("\n"),
+		});
+
+		expect(result.data).not.toBeNull();
+		expect(result.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: "checkpoint.account.missing" }),
+				expect.objectContaining({
+					code: "checkpoint.account-date.duplicate",
+				}),
+			]),
+		);
+	});
+
+	it("parses absolute balance checkpoints", () => {
+		const result = parseCsvFinancialModel({
+			...validCsvFiles,
+			checkpoints: "Date,AccountId,Balance\n2026-03-31,checking,14850",
+		});
+
+		expect(result.data?.checkpoints).toEqual([
+			{ Date: "2026-03-31", AccountId: "checking", Balance: 14850 },
+		]);
+	});
+
+	it("removes generated posting surrogates when checkpoints are present", () => {
+		const amount = csvExpressionAmount("100");
+		const result = parseCsvFinancialModel({
+			...validCsvFiles,
+			checkpoints: "Date,AccountId,Balance\n2026-03-31,checking,100",
+			postings: [
+				postingsHeaderOnly.trimEnd(),
+				`opening_20260331_checking,Opening checking balance,,checking,${amount},once,0,0,0,2026-03-31,,,1,true`,
+			].join("\n"),
+		});
+
+		expect(result.data?.postings).toEqual([]);
+	});
+
+	it("retains generated-looking postings with non-literal expressions", () => {
+		const amount = csvExpressionAmount("50 + 50");
+		const result = parseCsvFinancialModel({
+			...validCsvFiles,
+			checkpoints: "Date,AccountId,Balance\n2026-03-31,checking,100",
+			postings: [
+				postingsHeaderOnly.trimEnd(),
+				`opening_20260331_checking,User-authored opening,,checking,${amount},once,0,0,0,2026-03-31,,,1,true`,
+			].join("\n"),
+		});
+
+		expect(result.data?.postings).toHaveLength(1);
+	});
+
+	it("rejects impossible checkpoint calendar dates", () => {
+		const result = parseCsvFinancialModel({
+			...validCsvFiles,
+			checkpoints: "Date,AccountId,Balance\n2026-02-31,checking,100",
+		});
+
+		expect(result.data).toBeNull();
+		expect(result.issues).toContainEqual(
+			expect.objectContaining({ code: "csv.row.invalid" }),
+		);
 	});
 
 	it("round-trips canonical non-expression amount descriptors", () => {

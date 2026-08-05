@@ -173,6 +173,7 @@ describe("stochastic projection", () => {
 					enabled: true,
 				},
 			],
+			checkpoints: [],
 			postings: [
 				{
 					id: "terminal-growth",

@@ -7,7 +7,9 @@ import {
 
 describe("applyModelOverrides", () => {
 	it("applies temporary accounts, postings, and disabled IDs immutably", () => {
-		const document = createBaseDocument();
+		const document = createBaseDocument({
+			checkpoints: [{ Date: "2026-01-31", AccountId: "loan", Balance: -400 }],
+		});
 		const prepared = applyModelOverrides(document, {
 			addedAccounts: [makeAccount({ id: "savings" })],
 			addedPostings: [
@@ -24,6 +26,7 @@ describe("applyModelOverrides", () => {
 		expect(prepared.accounts.map(({ id }) => id)).not.toContain("loan");
 		expect(prepared.postings.map(({ id }) => id)).toContain("savings-deposit");
 		expect(prepared.postings.map(({ id }) => id)).not.toContain("spend");
+		expect(prepared.checkpoints).toEqual([]);
 		expect(document.accounts.map(({ id }) => id)).toContain("loan");
 		expect(document.postings.map(({ id }) => id)).toContain("spend");
 	});

@@ -58,6 +58,7 @@ function makeFinancialModelDocument(): FinancialModelDocument {
 				enabled: true,
 			},
 		],
+		checkpoints: [],
 		evaluations: structuredClone(DEFAULT_EVALUATIONS),
 		postings: [makePosting("p1")],
 	};
@@ -269,6 +270,22 @@ describe("Editor slice", () => {
 			useStore.getState().startEditing(document);
 			useStore.getState().addPosting(makePosting("p2"));
 			expect(useStore.getState().workingDocument?.postings).toHaveLength(2);
+		});
+
+		it("adds, updates, and removes canonical checkpoints", () => {
+			useStore.getState().startEditing(document);
+			useStore.getState().addCheckpoint({
+				Date: "2026-01-01",
+				AccountId: "a1",
+				Balance: 100,
+			});
+			useStore.getState().updateCheckpoint(0, { Balance: 125 });
+			expect(useStore.getState().workingDocument?.checkpoints).toEqual([
+				{ Date: "2026-01-01", AccountId: "a1", Balance: 125 },
+			]);
+
+			useStore.getState().deleteCheckpoint(0);
+			expect(useStore.getState().workingDocument?.checkpoints).toEqual([]);
 		});
 	});
 });

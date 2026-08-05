@@ -35,6 +35,7 @@ function createRow({
 	externalInflowAmount,
 	externalOutflowAmount,
 	internalTransferAmount,
+	checkpointCorrections = [],
 }: {
 	date: string;
 	isHistorical: boolean;
@@ -44,6 +45,7 @@ function createRow({
 	externalInflowAmount: number;
 	externalOutflowAmount: number;
 	internalTransferAmount: number;
+	checkpointCorrections?: ProjectionRow["checkpointCorrections"];
 }): ProjectionRow {
 	const accountSnapshots: AccountSnapshot[] = accounts.map((account) => ({
 		accountId: account.id,
@@ -60,6 +62,7 @@ function createRow({
 		externalInflowAmount,
 		externalOutflowAmount,
 		internalTransferAmount,
+		checkpointCorrections,
 	};
 }
 
@@ -77,6 +80,12 @@ function roundRow(row: ProjectionRow): ProjectionRow {
 				...impact,
 				delta: roundCurrency(impact.delta),
 			})),
+		})),
+		checkpointCorrections: row.checkpointCorrections?.map((correction) => ({
+			...correction,
+			observedBalance: roundCurrency(correction.observedBalance),
+			modeledBalance: roundCurrency(correction.modeledBalance),
+			adjustment: roundCurrency(correction.adjustment),
 		})),
 	};
 }
@@ -231,6 +240,7 @@ export function buildProjectionPath(
 			externalInflowAmount: 0,
 			externalOutflowAmount: 0,
 			internalTransferAmount: 0,
+			checkpointCorrections: snapshot.checkpointCorrections,
 		}),
 	);
 	const projectedRows = run.snapshots.map((snapshot) => {

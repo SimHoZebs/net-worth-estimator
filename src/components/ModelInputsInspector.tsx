@@ -2,8 +2,10 @@ import { useMemo, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import { CurrentChangesControls } from "@/components/CurrentChangesControls";
 import { EditableAccountsTable } from "@/components/dashboard/tables/EditableAccountsTable";
+import { EditableCheckpointsTable } from "@/components/dashboard/tables/EditableCheckpointsTable";
 import { EditablePostingsTable } from "@/components/dashboard/tables/EditablePostingsTable";
 import { ReadOnlyAccountsTable } from "@/components/dashboard/tables/ReadOnlyAccountsTable";
+import { ReadOnlyCheckpointsTable } from "@/components/dashboard/tables/ReadOnlyCheckpointsTable";
 import { ReadOnlyPostingsTable } from "@/components/dashboard/tables/ReadOnlyPostingsTable";
 import { TransactionHistoryTable } from "@/components/dashboard/tables/TransactionHistoryTable";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -23,8 +25,8 @@ import { useProjectionArtifacts } from "@/runtime/projectionRuntime";
 import { selectEditorActions, selectEditorState, useStore } from "@/store";
 import { ModelValidationPanel } from "./ModelValidationPanel";
 
-type ReadInputTab = "scheduled" | "accounts" | "history";
-type EditInputTab = "postings" | "accounts";
+type ReadInputTab = "scheduled" | "accounts" | "history" | "checkpoints";
+type EditInputTab = "postings" | "accounts" | "checkpoints";
 
 function tabClassName(isActive: boolean) {
 	return `rounded-full px-3 py-1.5 type-caption font-medium transition ${
@@ -73,6 +75,9 @@ export function ModelInputsInspector() {
 		updatePosting,
 		deletePosting,
 		addPosting,
+		addCheckpoint,
+		deleteCheckpoint,
+		updateCheckpoint,
 	} = useStore(useShallow(selectEditorActions));
 
 	const [showAdvanced, setShowAdvanced] = useState(false);
@@ -114,6 +119,16 @@ export function ModelInputsInspector() {
 		() => partitionPostings(displayDocument?.postings ?? []),
 		[displayDocument?.postings],
 	);
+	const accountLabelById = useMemo(
+		() =>
+			new Map(
+				displayDocument?.accounts.map((account) => [
+					account.id,
+					account.label,
+				]) ?? [],
+			),
+		[displayDocument?.accounts],
+	);
 	const errorCount = issues.filter(
 		(issue) => issue.severity === "error",
 	).length;
@@ -141,6 +156,11 @@ export function ModelInputsInspector() {
 					label: "Accounts",
 					count: displayDocument?.accounts.length ?? 0,
 				},
+				{
+					id: "checkpoints" as const,
+					label: "Balance checkpoints",
+					count: displayDocument?.checkpoints.length ?? 0,
+				},
 			]
 		: [
 				{
@@ -158,6 +178,11 @@ export function ModelInputsInspector() {
 					label: "Transaction history",
 					count: postingGroups.transactionHistory.length,
 				},
+				{
+					id: "checkpoints" as const,
+					label: "Balance checkpoints",
+					count: displayDocument?.checkpoints.length ?? 0,
+				},
 			];
 	const activeTab = isEditing ? editTab : readTab;
 
@@ -166,8 +191,8 @@ export function ModelInputsInspector() {
 			<CardHeader>
 				<CardTitle>Model inputs</CardTitle>
 				<CardDescription>
-					Transactions and accounts that drive the projection. Validation:{" "}
-					{validationSummary}.
+					Posting-derived projection inputs and observed account balances.
+					Validation: {validationSummary}.
 				</CardDescription>
 				<CardAction className="flex flex-wrap justify-end gap-2">
 					{isEditing ? (
@@ -323,6 +348,24 @@ export function ModelInputsInspector() {
 									postings={postingGroups.transactionHistory}
 									accounts={displayDocument.accounts}
 								/>
+							) : null}
+
+							{activeTab === "checkpoints" ? (
+								isEditing ? (
+									<EditableCheckpointsTable
+										displayDocument={displayDocument}
+										projectionStartDate={projectionStartDate}
+										updateCheckpoint={updateCheckpoint}
+										deleteCheckpoint={deleteCheckpoint}
+										addCheckpoint={addCheckpoint}
+									/>
+								) : (
+									<ReadOnlyCheckpointsTable
+										checkpoints={displayDocument.checkpoints}
+										showAdvanced={showAdvanced}
+										accountLabelById={accountLabelById}
+									/>
+								)
 							) : null}
 						</div>
 					</>

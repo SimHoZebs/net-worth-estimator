@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import type { ZodType } from "zod";
 import { NO_CEILING, NO_FLOOR } from "../../constants";
+import { isGeneratedCheckpointSurrogate } from "../../model/checkpointSurrogates";
 import {
 	type BehaviorCollectionKey,
 	CSV_BEHAVIOR_FILE_NAMES,
@@ -15,6 +16,8 @@ import { addIssue } from "../../utils/validation";
 import {
 	csvAccountSchema,
 	csvAccountsHeaders,
+	csvCheckpointSchema,
+	csvCheckpointsHeaders,
 	csvFinancialIndependenceHeaders,
 	csvFinancialIndependenceRequiredHeaders,
 	csvFinancialIndependenceSchema,
@@ -147,6 +150,13 @@ export function parseCsvFinancialModel(
 		csvPostingSchema,
 		csvPostingsHeaders,
 	);
+	const checkpointsResult = parseRows(
+		CSV_MODEL_FILE_NAMES.checkpoints,
+		csvFiles.checkpoints,
+		csvCheckpointsHeaders,
+		csvCheckpointSchema,
+		csvCheckpointsHeaders,
+	);
 	const financialIndependenceResult = parseRows(
 		CSV_BEHAVIOR_FILE_NAMES.financialIndependence,
 		csvFiles.behaviors.financialIndependence,
@@ -168,6 +178,7 @@ export function parseCsvFinancialModel(
 
 	const issues = [
 		...accountsResult.issues,
+		...checkpointsResult.issues,
 		...financialIndependenceResult.issues,
 		...netWorthThresholdResult.issues,
 		...postingFulfillmentResult.issues,
@@ -176,6 +187,7 @@ export function parseCsvFinancialModel(
 
 	if (
 		accountsResult.hasFatalIssue ||
+		checkpointsResult.hasFatalIssue ||
 		financialIndependenceResult.hasFatalIssue ||
 		netWorthThresholdResult.hasFatalIssue ||
 		postingFulfillmentResult.hasFatalIssue ||
@@ -223,8 +235,12 @@ export function parseCsvFinancialModel(
 	const document: FinancialModelDocument = {
 		sourcePath: options.basePath ?? CSV_MODEL_PUBLIC_PATH,
 		accounts: accountsResult.rows,
+		checkpoints: checkpointsResult.rows,
 		evaluations,
-		postings: postingsResult.rows,
+		postings: postingsResult.rows.filter(
+			(posting) =>
+				!isGeneratedCheckpointSurrogate(posting, checkpointsResult.rows),
+		),
 	};
 
 	return {
@@ -285,6 +301,7 @@ export async function fetchCsvFinancialModelFiles(
 
 	return {
 		accounts: fileMap.accounts,
+		checkpoints: fileMap.checkpoints,
 		behaviors: behaviorFileMap,
 		postings: fileMap.postings,
 	};
@@ -302,10 +319,7 @@ export async function loadCsvFinancialModel(
 export function serializeCsvFinancialModel(
 	document: FinancialModelDocument,
 ): ModelFileContents {
-	const serializeRows = (
-		rows: Record<string, unknown>[],
-		headers: readonly string[],
-	) =>
+	const serializeRows = (rows: object[], headers: readonly string[]) =>
 		rows.length === 0
 			? headers.join(",")
 			: Papa.unparse(rows, { columns: [...headers], newline: "\n" });
@@ -322,6 +336,7 @@ export function serializeCsvFinancialModel(
 			})),
 			csvAccountsHeaders,
 		),
+		checkpoints: serializeRows(document.checkpoints, csvCheckpointsHeaders),
 		postings: serializeRows(
 			document.postings.map((posting) => ({
 				...posting,

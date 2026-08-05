@@ -52,9 +52,10 @@ export function evaluationComputationDescriptor(evaluations: EvaluationTables) {
 
 export function simulationDocument(
 	document: FinancialModelDocument,
-): Omit<FinancialModelDocument, "sourcePath" | "evaluations"> {
+): Pick<FinancialModelDocument, "accounts" | "checkpoints" | "postings"> {
 	return {
 		accounts: document.accounts,
+		checkpoints: document.checkpoints,
 		postings: document.postings,
 	};
 }

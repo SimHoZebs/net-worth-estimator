@@ -2,6 +2,7 @@ import type { StateCreator } from "zustand";
 import { create } from "zustand";
 import type {
 	Account,
+	Checkpoint,
 	EvaluationInstance,
 	EvaluationResultStatus,
 	EvaluationTables,
@@ -147,6 +148,9 @@ interface EditorSlice {
 	updatePosting: (id: string, changes: Partial<Posting>) => void;
 	deletePosting: (id: string) => void;
 	addPosting: (posting: Posting) => void;
+	addCheckpoint: (checkpoint: Checkpoint) => void;
+	deleteCheckpoint: (index: number) => void;
+	updateCheckpoint: (index: number, changes: Partial<Checkpoint>) => void;
 }
 
 const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (
@@ -244,6 +248,45 @@ const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (
 					...s.workingDocument,
 					postings: [...s.workingDocument.postings, posting],
 				},
+			};
+		}),
+
+	addCheckpoint: (checkpoint) =>
+		set((state) => {
+			if (!state.workingDocument) return state;
+			return {
+				isDirty: true,
+				workingDocument: {
+					...state.workingDocument,
+					checkpoints: [...state.workingDocument.checkpoints, checkpoint],
+				},
+			};
+		}),
+
+	deleteCheckpoint: (index) =>
+		set((state) => {
+			if (!state.workingDocument) return state;
+			return {
+				isDirty: true,
+				workingDocument: {
+					...state.workingDocument,
+					checkpoints: state.workingDocument.checkpoints.filter(
+						(_, checkpointIndex) => checkpointIndex !== index,
+					),
+				},
+			};
+		}),
+
+	updateCheckpoint: (index, changes) =>
+		set((state) => {
+			if (!state.workingDocument) return state;
+			const checkpoints = [...state.workingDocument.checkpoints];
+			const checkpoint = checkpoints[index];
+			if (!checkpoint) return state;
+			checkpoints[index] = { ...checkpoint, ...changes };
+			return {
+				isDirty: true,
+				workingDocument: { ...state.workingDocument, checkpoints },
 			};
 		}),
 });
@@ -610,6 +653,9 @@ export const selectEditorActions = (s: AppStore) => ({
 	updatePosting: s.updatePosting,
 	deletePosting: s.deletePosting,
 	addPosting: s.addPosting,
+	addCheckpoint: s.addCheckpoint,
+	deleteCheckpoint: s.deleteCheckpoint,
+	updateCheckpoint: s.updateCheckpoint,
 });
 
 /* ------------------------------------------------------------------ */
@@ -622,6 +668,7 @@ export function cloneDocument(
 	return {
 		...document,
 		accounts: document.accounts.map((a) => ({ ...a })),
+		checkpoints: document.checkpoints.map((checkpoint) => ({ ...checkpoint })),
 		postings: document.postings.map((p) => ({
 			...p,
 			destinations: p.destinations ? [...p.destinations] : null,

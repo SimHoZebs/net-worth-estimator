@@ -131,6 +131,7 @@ function path(
 		effectiveDocument: {
 			sourcePath: "test",
 			accounts,
+			checkpoints: [],
 			postings,
 			evaluations: {
 				financialIndependence: [],
