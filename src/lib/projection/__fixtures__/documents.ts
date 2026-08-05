@@ -12,6 +12,7 @@ export function createBaseDocument(
 			makeAccount({ id: "brokerage" }),
 			makeAccount({ id: "loan" }),
 		],
+		checkpoints: [],
 		evaluations: {
 			financialIndependence: [],
 			netWorthThreshold: [],

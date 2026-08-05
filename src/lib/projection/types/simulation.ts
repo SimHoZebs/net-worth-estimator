@@ -1,6 +1,7 @@
 import type { IncomeDataSnapshot } from "./income";
 import type {
 	Account,
+	CheckpointCorrection,
 	FinancialModelDocument,
 	IsoDate,
 	MovementEvent,
@@ -49,6 +50,7 @@ export interface SimulationRun {
 export interface HistoricalObservationSnapshot {
 	date: IsoDate;
 	balances: Record<string, number>;
+	checkpointCorrections?: CheckpointCorrection[];
 }
 
 export interface PreparedProjection {

@@ -79,7 +79,8 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 
 | Type | Purpose |
 | --- | --- |
-| `FinancialModelDocument` | canonical persisted accounts, postings, evaluations, and source metadata |
+| `FinancialModelDocument` | canonical persisted accounts, checkpoints, postings, evaluations, and source metadata |
+| `Checkpoint` | absolute end-of-day observed balance that corrects historical modeled account state |
 | `ModelOverrides` | session-only additions and disabled account/posting IDs |
 | `SimulationRequest` | fully prepared model, runtime state, date range, event policy, and optional sample |
 | `SimulationRun` | exact states, dated balance snapshots, and ordered movement attempts |
@@ -108,5 +109,6 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 - Keep the domain canonical-only: no named alternative models, compatibility APIs, alternate readers, or additional persistence routes.
 - Use the `@/lib/projection` barrel for projection types and utilities.
 - Deterministic and stochastic computation runs in Web Workers, never on the main thread.
+- Historical preparation merges postings and checkpoints chronologically. Same-date postings execute first, checkpoints then overwrite observed accounts, and later postings continue from that corrected state. Checkpoints emit no movement or cash-flow events.
 - Enabled `once` postings before the projection start establish historical balances through shared transitions. Start-date rows remain projected events; historical replay carries dependency/cap state but emits no projected movements or evaluation events.
 - Run `npm run test:run` and `npm run typecheck` after code changes.

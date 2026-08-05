@@ -256,6 +256,7 @@ describe("posting amount resolution", () => {
 		const document: FinancialModelDocument = {
 			sourcePath: "test",
 			accounts: [],
+			checkpoints: [],
 			evaluations: {
 				financialIndependence: [],
 				netWorthThreshold: [],
@@ -300,6 +301,7 @@ describe("posting amount resolution", () => {
 					enabled: true,
 				},
 			],
+			checkpoints: [],
 			evaluations: {
 				financialIndependence: [],
 				netWorthThreshold: [],

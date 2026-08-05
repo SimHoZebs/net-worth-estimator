@@ -5,6 +5,7 @@ React app for inspecting a CSV-backed financial model and projecting net worth w
 The product model is intentionally generic:
 
 - Projection-start balances are derived by replaying enabled one-time postings dated before the projection start; net worth then evolves through scheduled postings and daily-compounded growth between event dates.
+- Balance checkpoints are absolute end-of-day account observations. Historical postings are replayed chronologically, checkpoints correct the modeled balances on their dates, and later postings continue from the corrected state.
 - A posting can be an external inflow, an external outflow, or an account-to-account transfer.
 - Posting frequencies include explicit one-time (`once`) transactions.
 - Postings use explicit amount resolvers with validated inputs; the optional `income` resolver runs an ordered payroll pipeline from separate effective-dated income data.
@@ -19,6 +20,7 @@ The product model is intentionally generic:
 The app reads these CSV files under `public/configs/`:
 
 - `accounts.csv`
+- `checkpoints.csv`
 - `postings.csv`
 - `behavior/financial-independence.csv`
 - `behavior/net-worth-threshold.csv`

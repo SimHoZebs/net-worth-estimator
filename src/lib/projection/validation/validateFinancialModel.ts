@@ -63,6 +63,31 @@ export function validateFinancialModel(
 	}
 	validateAccountIdentity(issues, document.accounts, postingIds, paths);
 
+	const checkpointKeys = new Set<string>();
+	document.checkpoints.forEach((checkpoint, index) => {
+		if (!accountIds.has(checkpoint.AccountId)) {
+			addIssue(
+				issues,
+				"error",
+				"checkpoint.account.missing",
+				`Checkpoint account '${checkpoint.AccountId}' does not exist.`,
+				paths.checkpoint(index, "AccountId"),
+			);
+		}
+
+		const key = `${checkpoint.AccountId}\u0000${checkpoint.Date}`;
+		if (checkpointKeys.has(key)) {
+			addIssue(
+				issues,
+				"error",
+				"checkpoint.account-date.duplicate",
+				`Account '${checkpoint.AccountId}' has more than one checkpoint on ${checkpoint.Date}.`,
+				paths.checkpoint(index),
+			);
+		}
+		checkpointKeys.add(key);
+	});
+
 	const dependencies = validatePostingAmounts(
 		issues,
 		document.postings,

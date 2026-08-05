@@ -5,6 +5,7 @@ export const CSV_MODEL_PUBLIC_PATH = "/configs";
 
 export const CSV_MODEL_FILE_NAMES = {
 	accounts: "accounts.csv",
+	checkpoints: "checkpoints.csv",
 	postings: "postings.csv",
 } as const;
 
@@ -197,6 +198,19 @@ export interface Account {
 	enabled: boolean;
 }
 
+export interface Checkpoint {
+	Date: IsoDate;
+	AccountId: string;
+	Balance: number;
+}
+
+export interface CheckpointCorrection {
+	accountId: string;
+	observedBalance: number;
+	modeledBalance: number;
+	adjustment: number;
+}
+
 export type PostingFrequency =
 	| "once"
 	| "daily"
@@ -225,12 +239,14 @@ export interface Posting {
 export interface FinancialModelDocument {
 	sourcePath: string;
 	accounts: Account[];
+	checkpoints: Checkpoint[];
 	evaluations: EvaluationTables;
 	postings: Posting[];
 }
 
 export interface ModelFileContents {
 	accounts: string;
+	checkpoints: string;
 	behaviors: Record<BehaviorCollectionKey, string>;
 	postings: string;
 }
@@ -290,6 +306,7 @@ export interface ProjectionRow {
 	externalInflowAmount: number;
 	externalOutflowAmount: number;
 	internalTransferAmount: number;
+	checkpointCorrections?: CheckpointCorrection[];
 }
 
 export interface ProjectionAccountSummary {

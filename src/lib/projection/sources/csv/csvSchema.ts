@@ -2,6 +2,7 @@ import { z } from "zod";
 import { NO_CEILING, NO_FLOOR } from "../../constants";
 import type {
 	Account,
+	Checkpoint,
 	FinancialIndependenceEvaluation,
 	FinancialIndependencePlan,
 	NetWorthThresholdEvaluation,
@@ -164,10 +165,15 @@ export const csvDateSchema = z
 		/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/u,
 		"Expected YYYY-MM-DD date.",
 	)
-	.refine(
-		(value) => !Number.isNaN(new Date(value).getTime()),
-		"Expected a valid date.",
-	);
+	.refine((value) => {
+		const [year, month, day] = value.split("-").map(Number);
+		const date = new Date(Date.UTC(year!, month! - 1, day));
+		return (
+			date.getUTCFullYear() === year &&
+			date.getUTCMonth() === month! - 1 &&
+			date.getUTCDate() === day
+		);
+	}, "Expected a valid date.");
 
 export const csvAccountsHeaders = [
 	"id",
@@ -177,6 +183,7 @@ export const csvAccountsHeaders = [
 	"color",
 	"enabled",
 ] as const;
+export const csvCheckpointsHeaders = ["Date", "AccountId", "Balance"] as const;
 const csvEvaluationHeaders = ["instanceId", "label", "enabled"] as const;
 
 export const csvFinancialIndependenceRequiredHeaders = [
@@ -252,6 +259,12 @@ export const csvAccountSchema = z.object({
 	color: nullableTrimmedString,
 	enabled: csvBoolean,
 }) satisfies z.ZodType<Account>;
+
+export const csvCheckpointSchema = z.object({
+	Date: csvDateSchema,
+	AccountId: trimmedString,
+	Balance: finiteNumber,
+}) satisfies z.ZodType<Checkpoint>;
 
 const evaluationFields = {
 	instanceId: trimmedString,

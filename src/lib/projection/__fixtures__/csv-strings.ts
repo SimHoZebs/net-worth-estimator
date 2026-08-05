@@ -17,6 +17,7 @@ export const validCsvFiles: ModelFileContents = {
 		"brokerage,Brokerage,-Infinity,Infinity,#16a34a,true",
 		"student_loan,Student Loan,-Infinity,0,#dc2626,true",
 	].join("\n"),
+	checkpoints: "Date,AccountId,Balance",
 	behaviors: {
 		financialIndependence:
 			"instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy,annualExpenseTargetBasis",
@@ -48,6 +49,7 @@ export const postingsHeaderOnly = `${postingsHeader}\n`;
 
 export const nullMinMaxCsvFiles: ModelFileContents = {
 	accounts: [accountsHeader, "checking,Checking,,,#0f172a,true"].join("\n"),
+	checkpoints: "Date,AccountId,Balance",
 	behaviors: validCsvFiles.behaviors,
 	postings: [
 		postingsHeader,

@@ -5,6 +5,7 @@ import type { ModelPath } from "../types/validation";
 
 export interface ValidationPaths {
 	account(index: number, field?: string): ModelPath;
+	checkpoint(index: number, field?: string): ModelPath;
 	posting(index: number, field?: string): ModelPath;
 	postings(): ModelPath;
 	evaluation(type: EvaluationType, index?: number): ModelPath;

@@ -24,19 +24,21 @@ function createCsvFetch() {
 		const body =
 			fileName === "accounts.csv"
 				? validCsvFiles.accounts
-				: fileName === "financial-independence.csv"
-					? validCsvFiles.behaviors.financialIndependence
-					: fileName === "net-worth-threshold.csv"
-						? validCsvFiles.behaviors.netWorthThreshold
-						: fileName === "posting-fulfillment.csv"
-							? validCsvFiles.behaviors.postingFulfillment
-							: fileName === "postings.csv"
-								? validCsvFiles.postings
-								: fileName === "income-sources.csv"
-									? "id,label,effectiveFrom,effectiveTo,annualGrossIncome\nsalary,Synthetic salary,2026-01-01,,120000"
-									: fileName === "tax-profiles.csv"
-										? 'id,label,deduction,brackets,sourceUrl\nsynthetic-tax,Synthetic tax,10000,"[{""upTo"":null,""rate"":0.2}]",'
-										: null;
+				: fileName === "checkpoints.csv"
+					? validCsvFiles.checkpoints
+					: fileName === "financial-independence.csv"
+						? validCsvFiles.behaviors.financialIndependence
+						: fileName === "net-worth-threshold.csv"
+							? validCsvFiles.behaviors.netWorthThreshold
+							: fileName === "posting-fulfillment.csv"
+								? validCsvFiles.behaviors.postingFulfillment
+								: fileName === "postings.csv"
+									? validCsvFiles.postings
+									: fileName === "income-sources.csv"
+										? "id,label,effectiveFrom,effectiveTo,annualGrossIncome\nsalary,Synthetic salary,2026-01-01,,120000"
+										: fileName === "tax-profiles.csv"
+											? 'id,label,deduction,brackets,sourceUrl\nsynthetic-tax,Synthetic tax,10000,"[{""upTo"":null,""rate"":0.2}]",'
+											: null;
 		return new Response(body ?? "", { status: body === null ? 404 : 200 });
 	});
 }
@@ -49,7 +51,7 @@ describe("createBrowserCsvDataSource", () => {
 
 		expect(result.document?.accounts).toHaveLength(4);
 		expect(result.issues).toEqual([]);
-		expect(fetchImpl).toHaveBeenCalledTimes(7);
+		expect(fetchImpl).toHaveBeenCalledTimes(8);
 		expect(dataSource.save).toBeUndefined();
 		expect(dataSource.reset).toBeUndefined();
 	});
@@ -69,6 +71,72 @@ describe("createBrowserCsvDataSource", () => {
 
 		expect(result.document).toEqual(document);
 		expect(fetchImpl).toHaveBeenCalledTimes(2);
+	});
+
+	it("upgrades checkpoint-less browser documents", async () => {
+		const { checkpoints: _checkpoints, ...legacyDocument } = createBaseDocument(
+			{ sourcePath: "browser:local-storage" },
+		);
+		const storage = createMemoryStorage({
+			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify(legacyDocument),
+		});
+
+		const result = await createBrowserCsvDataSource({
+			fetchImpl: createCsvFetch(),
+			storage,
+		}).loadDocument();
+
+		expect(result.document?.checkpoints).toEqual([]);
+		expect(storage.setItem).toHaveBeenCalledWith(
+			FINANCIAL_MODEL_STORAGE_KEY,
+			expect.stringContaining('"checkpoints":[]'),
+		);
+	});
+
+	it("restores checkpoints from generated browser surrogate postings", async () => {
+		const { checkpoints: _checkpoints, ...legacyDocument } = createBaseDocument(
+			{ sourcePath: "browser:local-storage" },
+		);
+		const surrogatePosting = {
+			...legacyDocument.postings[0]!,
+			id: "opening_20260131_checking",
+			label: "Opening checking balance",
+			sourceAccountId: null,
+			destinations: ["checking"],
+			amount: {
+				resolver: "expression",
+				config: { expression: "800" },
+				inputs: {},
+			},
+			frequency: "once",
+			annualRate: 0,
+			annualGrowthRate: 0,
+			volatility: 0,
+			startDate: "2026-01-31",
+			endDate: null,
+			annualCap: null,
+			priority: 1,
+			enabled: true,
+		};
+		const storage = createMemoryStorage({
+			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify({
+				...legacyDocument,
+				postings: [surrogatePosting, ...legacyDocument.postings.slice(1)],
+			}),
+		});
+
+		const result = await createBrowserCsvDataSource({
+			fetchImpl: createCsvFetch(),
+			storage,
+		}).loadDocument();
+
+		expect(result.document?.checkpoints).toEqual([
+			{ Date: "2026-01-31", AccountId: "checking", Balance: 800 },
+		]);
+		expect(result.document?.postings).not.toContainEqual(
+			expect.objectContaining({ id: surrogatePosting.id }),
+		);
+		expect(storage.setItem).toHaveBeenCalled();
 	});
 
 	it("upgrades a saved FI plan that predates the expense basis", async () => {
@@ -180,7 +248,7 @@ describe("createBrowserCsvDataSource", () => {
 		const result = await dataSource.reset?.run();
 		expect(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)).toBeNull();
 		expect(result?.document?.accounts).toHaveLength(4);
-		expect(fetchImpl).toHaveBeenCalledTimes(7);
+		expect(fetchImpl).toHaveBeenCalledTimes(8);
 	});
 
 	it("preserves canonical storage when save validation fails", async () => {

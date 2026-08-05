@@ -12,6 +12,7 @@ function append(path: readonly (string | number)[], field?: string) {
 
 export const modelValidationPaths: ValidationPaths = {
 	account: (index, field) => append(["accounts", index], field),
+	checkpoint: (index, field) => append(["checkpoints", index], field),
 	posting: (index, field) => append(["postings", index], field),
 	postings: () => ["postings"],
 	evaluation: (type, index) =>
@@ -21,6 +22,8 @@ export const modelValidationPaths: ValidationPaths = {
 export const csvValidationPaths: ValidationPaths = {
 	account: (index, field) =>
 		append([CSV_MODEL_FILE_NAMES.accounts, index + 2], field),
+	checkpoint: (index, field) =>
+		append([CSV_MODEL_FILE_NAMES.checkpoints, index + 2], field),
 	posting: (index, field) =>
 		append([CSV_MODEL_FILE_NAMES.postings, index + 2], field),
 	postings: () => [CSV_MODEL_FILE_NAMES.postings],

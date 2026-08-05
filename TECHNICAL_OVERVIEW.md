@@ -24,7 +24,7 @@ The Net Worth Estimator is a React application that loads a CSV-backed `Financia
 
 ## 3. Persistence
 
-The persistence boundary is the validated `FinancialModelDocument` represented by `accounts.csv`, `postings.csv`, and one typed CSV table per evaluation type under `configs/behavior/`. Income definitions and tax profiles are separate source data and are never part of the persisted model document.
+The persistence boundary is the validated `FinancialModelDocument` represented by `accounts.csv`, `checkpoints.csv`, `postings.csv`, and one typed CSV table per evaluation type under `configs/behavior/`. Checkpoints are absolute end-of-day observed account balances used to correct historical modeled state and reconcile it with posting-derived balances. Income definitions and tax profiles are separate source data and are never part of the persisted model document.
 
 ### Development
 
@@ -50,7 +50,7 @@ The persistence boundary is the validated `FinancialModelDocument` represented b
 
 ## 4. Core Types
 
-- `FinancialModelDocument`: canonical persisted accounts, postings, typed evaluation tables, and source metadata.
+- `FinancialModelDocument`: canonical persisted accounts, balance checkpoints, postings, typed evaluation tables, and source metadata.
 - `ModelOverrides`: session-only additions and disabled account/posting selections applied before preparation.
 - `SimulationRequest`: resolved model, initial state, date range, start-date event policy, and optional `MonteCarloSample`.
 - `SimulationRun`: exact initial/final states, dated balance snapshots, and ordered movement attempts from one kernel execution.
@@ -86,6 +86,7 @@ There is no named alternative-model domain or persistence API. Comparisons are m
 - Percentage, progressive-bracket, capped-percentage, and threshold-percentage are unrounded composable numeric primitives; the income pipeline composes percentage and progressive-bracket steps against the remaining annual amount.
 - Source-funded rows clamp to available positive balance; `annualCap` is enforced per calendar year.
 - Same-date rows execute by ascending priority, then file order.
+- Historical postings and checkpoints are merged chronologically during request preparation. Same-date postings execute first, then checkpoints overwrite only their observed accounts as end-of-day truth. These corrections emit no cash-flow movements, but later postings and projection continue from the corrected state.
 - During request preparation, enabled `once` postings dated strictly before the projection start are replayed through shared transitions in date, priority, then file order. Their balance snapshots form historical rows, while their dependency and annual-cap state carries into projection execution.
 - A `once` posting on the projection start remains a normal projected event. Historical replay does not emit projected movement, cash-flow, or fulfillment events, and Monte Carlo samples do not resample already-realized history.
 

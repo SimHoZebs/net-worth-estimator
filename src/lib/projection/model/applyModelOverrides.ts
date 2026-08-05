@@ -20,6 +20,9 @@ export function applyModelOverrides(
 	return {
 		...document,
 		accounts,
+		checkpoints: document.checkpoints.filter((checkpoint) =>
+			accounts.some((account) => account.id === checkpoint.AccountId),
+		),
 		postings: document.postings
 			.filter((posting) => !disabledPostingIds.has(posting.id))
 			.concat(overrides.addedPostings),

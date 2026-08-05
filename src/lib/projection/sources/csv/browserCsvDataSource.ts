@@ -24,6 +24,14 @@ type StoredDocumentRead =
 	| { status: "invalid"; issue: ModelValidationIssue }
 	| { status: "found"; document: FinancialModelDocument };
 
+interface CheckpointSurrogate {
+	index: number;
+	kind: "opening" | "adjustment";
+	date: string;
+	accountId: string;
+	delta: number;
+}
+
 export interface BrowserCsvDataSourceOptions {
 	basePath?: string;
 	incomeBasePath?: string;
@@ -50,6 +58,101 @@ function invalidStorageIssue(storageKey: string): ModelValidationIssue {
 		code: "browser.storage.invalid",
 		message: `Saved financial model at '${storageKey}' is corrupt or is not canonical.`,
 		path: [],
+	};
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseCheckpointSurrogate(
+	value: unknown,
+	index: number,
+): CheckpointSurrogate | null {
+	if (!isRecord(value) || typeof value.id !== "string") return null;
+	const match = /^(opening|adjustment)_(\d{4})(\d{2})(\d{2})_(.+)$/u.exec(
+		value.id,
+	);
+	if (!match) return null;
+	const [, kind, year, month, day, accountId] = match;
+	const date = `${year}-${month}-${day}`;
+	if (
+		(kind !== "opening" && kind !== "adjustment") ||
+		!accountId ||
+		value.frequency !== "once" ||
+		value.startDate !== date ||
+		value.endDate !== null ||
+		value.annualRate !== 0 ||
+		value.annualGrowthRate !== 0 ||
+		value.volatility !== 0 ||
+		value.annualCap !== null ||
+		value.priority !== 1 ||
+		value.enabled !== true ||
+		!isRecord(value.amount) ||
+		value.amount.resolver !== "expression" ||
+		!isRecord(value.amount.config) ||
+		typeof value.amount.config.expression !== "string" ||
+		!isRecord(value.amount.inputs) ||
+		Object.keys(value.amount.inputs).length !== 0
+	) {
+		return null;
+	}
+	const amount = Number(value.amount.config.expression);
+	if (!Number.isFinite(amount) || amount < 0) return null;
+
+	const isInflow =
+		value.sourceAccountId === null &&
+		Array.isArray(value.destinations) &&
+		value.destinations.length === 1 &&
+		value.destinations[0] === accountId;
+	const isOutflow =
+		value.sourceAccountId === accountId && value.destinations === null;
+	if (!isInflow && !isOutflow) return null;
+
+	return {
+		index,
+		kind,
+		date,
+		accountId,
+		delta: isOutflow ? -amount : amount,
+	};
+}
+
+function upgradeCheckpointSurrogates(value: unknown): unknown {
+	if (!isRecord(value) || !Array.isArray(value.postings)) return value;
+	if (Array.isArray(value.checkpoints) && value.checkpoints.length > 0) {
+		return value;
+	}
+
+	const surrogates = value.postings
+		.map(parseCheckpointSurrogate)
+		.filter((surrogate): surrogate is CheckpointSurrogate => surrogate !== null)
+		.sort(
+			(left, right) =>
+				left.date.localeCompare(right.date) || left.index - right.index,
+		);
+	if (surrogates.length === 0) return value;
+
+	const balances = new Map<string, number>();
+	const checkpoints = surrogates.map((surrogate) => {
+		const balance =
+			surrogate.kind === "opening"
+				? surrogate.delta
+				: (balances.get(surrogate.accountId) ?? 0) + surrogate.delta;
+		balances.set(surrogate.accountId, balance);
+		return {
+			Date: surrogate.date,
+			AccountId: surrogate.accountId,
+			Balance: balance,
+		};
+	});
+	const surrogateIndexes = new Set(
+		surrogates.map((surrogate) => surrogate.index),
+	);
+	return {
+		...value,
+		checkpoints,
+		postings: value.postings.filter((_, index) => !surrogateIndexes.has(index)),
 	};
 }
 
@@ -81,7 +184,9 @@ function readStoredDocument(
 	if (serialized === null) return { status: "absent" };
 
 	try {
-		const document = parseFinancialModelDocument(JSON.parse(serialized));
+		const document = parseFinancialModelDocument(
+			upgradeCheckpointSurrogates(JSON.parse(serialized)),
+		);
 		if (document) {
 			const upgraded = JSON.stringify(document);
 			if (upgraded !== serialized) {
@@ -181,6 +286,7 @@ export function createBrowserCsvDataSource(
 						const savedDocument: FinancialModelDocument = {
 							sourcePath: BROWSER_STORAGE_SOURCE_PATH,
 							accounts: canonical.accounts,
+							checkpoints: canonical.checkpoints,
 							evaluations: canonical.evaluations,
 							postings: canonical.postings,
 						};
