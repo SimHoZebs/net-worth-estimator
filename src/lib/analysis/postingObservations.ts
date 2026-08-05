@@ -1,5 +1,8 @@
 import type { FinancialModelDocument } from "@/lib/projection";
-import { getExpression } from "@/lib/projection";
+import {
+	getExpression,
+	resolvePostingAmountDescriptor,
+} from "@/lib/projection";
 
 export interface PostingObservation {
 	id: string;
@@ -29,10 +32,24 @@ export function buildPostingObservationDataset(
 			posting.destinations.length === 0
 		)
 			continue;
-		const expression = getExpression(posting);
-		const resolvedAmount =
-			expression === null ? Number.NaN : Number(expression);
-		const amount = Number.isFinite(resolvedAmount) ? resolvedAmount : null;
+		let amount: number | null = null;
+		if (
+			getExpression(posting) !== null &&
+			Object.keys(posting.amount.inputs).length === 0
+		) {
+			try {
+				const resolvedAmount = resolvePostingAmountDescriptor(posting.amount, {
+					balances: {},
+					latestRealizedPostingAmounts: new Map(),
+					realizedPostingAmountsByYear: new Map(),
+					date: posting.startDate,
+					occurrenceRate: 0,
+				});
+				amount = Number.isFinite(resolvedAmount) ? resolvedAmount : null;
+			} catch {
+				amount = null;
+			}
+		}
 		postings.push({
 			id: posting.id,
 			postingId: posting.id,
