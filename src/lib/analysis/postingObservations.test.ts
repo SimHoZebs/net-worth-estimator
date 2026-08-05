@@ -16,6 +16,14 @@ describe("posting observations", () => {
 					startDate: "2026-07-31",
 				}),
 				makePosting({
+					id: "computed-history",
+					label: "Computed history",
+					destinations: ["checking"],
+					arithmetic: "1000 + 100",
+					frequency: "once",
+					startDate: "2026-07-30",
+				}),
+				makePosting({
 					id: "recurring-salary",
 					label: "Salary",
 					destinations: ["checking"],
@@ -32,12 +40,13 @@ describe("posting observations", () => {
 			],
 		});
 		const result = buildPostingObservationDataset(document);
-		expect(result.postings).toHaveLength(1);
-		expect(result.postings[0]).toMatchObject({
+		expect(result.postings).toHaveLength(2);
+		expect(result.postings[1]).toMatchObject({
 			id: "history",
 			postingId: "history",
 			amount: 7579.38,
 			accountId: "checking",
 		});
+		expect(result.postings[0]?.amount).toBe(1100);
 	});
 });
