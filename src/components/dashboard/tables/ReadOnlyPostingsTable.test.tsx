@@ -28,6 +28,7 @@ describe("ReadOnlyPostingsTable", () => {
 					}),
 				]}
 				accounts={[checking]}
+				projectionStartDate="2026-01-31"
 				showAdvanced={false}
 			/>,
 		);
@@ -59,6 +60,7 @@ describe("ReadOnlyPostingsTable", () => {
 					}),
 				]}
 				accounts={[checking]}
+				projectionStartDate="2026-01-31"
 				showAdvanced={false}
 			/>,
 		);
@@ -87,6 +89,7 @@ describe("ReadOnlyPostingsTable", () => {
 			<ReadOnlyPostingsTable
 				postings={[posting]}
 				accounts={[checking]}
+				projectionStartDate="2026-01-31"
 				showAdvanced={false}
 			/>,
 		);
@@ -100,9 +103,54 @@ describe("ReadOnlyPostingsTable", () => {
 			<ReadOnlyPostingsTable
 				postings={[posting]}
 				accounts={[checking]}
+				projectionStartDate="2026-01-31"
 				showAdvanced
 			/>,
 		);
 		expect(screen.getByText("Raw amount configuration")).not.toBeNull();
+	});
+
+	it("places ended postings in a subordinate collapsed section", () => {
+		const checking = makeAccount({ id: "checking", label: "Checking" });
+		render(
+			<ReadOnlyPostingsTable
+				postings={[
+					makePosting({
+						id: "ended",
+						label: "Ended posting",
+						destinations: ["checking"],
+						endDate: "2026-01-30",
+					}),
+					makePosting({
+						id: "boundary",
+						label: "Boundary posting",
+						destinations: ["checking"],
+						endDate: "2026-01-31",
+					}),
+					makePosting({
+						id: "ongoing",
+						label: "Ongoing posting",
+						destinations: ["checking"],
+						endDate: null,
+					}),
+				]}
+				accounts={[checking]}
+				projectionStartDate="2026-01-31"
+				showAdvanced={false}
+			/>,
+		);
+
+		const pastSummary = screen.getByText(
+			"Past scheduled transactions · 1 transaction",
+		);
+		expect((pastSummary.closest("details") as HTMLDetailsElement).open).toBe(
+			false,
+		);
+		expect(screen.getByText("2 current transactions")).not.toBeNull();
+		expect(screen.getByText("Boundary posting")).not.toBeNull();
+		expect(screen.getByText("Ongoing posting")).not.toBeNull();
+		expect(screen.getByText("Ended posting").closest("details")).toBe(
+			pastSummary.closest("details"),
+		);
 	});
 });
