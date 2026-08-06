@@ -12,8 +12,8 @@ The Net Worth Estimator is a React application that loads a CSV-backed `Financia
 
 ## 2. Data Flow
 
-1. `App.tsx` creates a capability-based `DataSource`. Development uses `createCsvDataSource()`; production uses `createBrowserCsvDataSource()`.
-2. `useFinancialModelQuery` calls `DataSource.loadDocument()`, which returns `{ document, issues }`. Save and reset use `useFinancialModelMutation` and `useFinancialModelResetMutation`.
+1. `App.tsx` creates a capability-based `FinancialModelRepository`. Development uses the Vite CSV API repository; production uses the browser repository.
+2. Model Inputs and query hooks depend only on `FinancialModelRepository`. In production, a bundled CSV ingestion source and browser storage DAO connect behind that boundary through `FinancialModelIngestionCoordinator`.
 3. CSV parsing and cross-reference validation produce a `FinancialModelDocument` plus diagnostics. Invalid or malformed persisted data surfaces diagnostics instead of being silently discarded.
 4. Zustand stores session-only `ModelOverrides`, displayed as current changes. `applyModelOverrides` creates the effective document without mutating canonical data.
 5. `useProjection` and `useStochastic` pass the document, runtime settings, and overrides through a content-addressed `CachedProjectionEngine`. Cache misses delegate to `WorkerProjectionEngine` and dedicated workers.
@@ -24,7 +24,9 @@ The Net Worth Estimator is a React application that loads a CSV-backed `Financia
 
 ## 3. Persistence
 
-The persistence boundary is the validated `FinancialModelDocument` represented by `accounts.csv`, `checkpoints.csv`, `postings.csv`, and one typed CSV table per evaluation type under `configs/behavior/`. Checkpoints are absolute end-of-day observed account balances used to correct historical modeled state and reconcile it with posting-derived balances. Income definitions and tax profiles are separate source data and are never part of the persisted model document.
+The persistence boundary is the validated `FinancialModelDocument` aggregate. CSV represents an external snapshot of that aggregate through `accounts.csv`, `checkpoints.csv`, `postings.csv`, and one typed table per evaluation type under `configs/behavior/`. Checkpoints are absolute end-of-day observed account balances used to correct historical modeled state and reconcile it with posting-derived balances. Income definitions and tax profiles are separate source data and are never part of the persisted model document.
+
+`FinancialModelIngestionCoordinator` connects a read-only `FinancialModelIngestionSource` to `FinancialModelDao`. Source revisions hash canonical model content without `sourcePath`; object keys are sorted and domain-significant array order is preserved. The coordinator conditionally replaces only the exact source-owned DAO version it observed. It has no storage lifecycle, schema, clear, or delete capability. User saves mark records as user-owned and therefore stop automatic source replacement.
 
 ### Development
 
@@ -36,17 +38,19 @@ The persistence boundary is the validated `FinancialModelDocument` represented b
 
 - Canonical key: `net-worth-estimator:financial-model`
 - Malformed canonical persisted data returns parse/validation diagnostics instead of falling back to bundled data.
-- Reset removes the canonical key and reloads bundled `/configs/` files.
+- Reset is a repository lifecycle action: it clears browser persistence, then asks ingestion to persist a fresh source-owned snapshot from bundled `/configs/` files.
+- Persisted records atomically contain the model, an opaque version, and user/source provenance. Conditional replacement prevents a delayed source synchronization from overwriting a concurrent user save.
+- Browser writes and conditional replacements use a cross-context Web Lock. If writable storage or Web Locks are unavailable, the browser repository exposes bundled CSV as read-only.
 
 ### Projection Artifacts
 
-- Derived projection artifacts are separate from the canonical `DataSource` and use the backend-agnostic `ProjectionArtifactStore` contract.
+- Derived projection artifacts are separate from the canonical `FinancialModelRepository` and use the backend-agnostic `ProjectionArtifactStore` contract.
 - The browser implementation stores immutable artifacts in memory for the current application session.
 - Canonical semantic descriptors are serialized with sorted object keys and order-preserving arrays, then addressed by SHA-256.
 - Deterministic base paths and evaluation results are stored separately. Evaluation-only changes reuse the base simulation, while label-only changes relabel cached results without computation.
 - Completed stochastic results are cached by effective simulation inputs, normalized run count, seed intent, and evaluation configuration. A first unseeded cache miss materializes a concrete seed; later identical requests reuse that persisted outcome.
 - Progressive stochastic results are never persisted. A stochastic evaluation cache miss replays samples because individual sample paths are intentionally not retained.
-- IndexedDB, hashing, validation, and quota failures fail open: workers still compute the requested projection.
+- Hashing, validation, and artifact-store failures fail open: workers still compute the requested projection.
 
 ## 4. Core Types
 
@@ -67,7 +71,8 @@ There is no named alternative-model domain or persistence API. Comparisons are m
 - Posting observations are derived from enabled `once` postings with no source account and at least one destination. Recurring model rules are not treated as observed pay.
 - Posting observations use the posting label/date/account and resolve numeric expressions when available; unresolved amounts remain source observations but cannot contribute to salary amounts.
 - `AnalysisDefinition<TInput, TOutput>` is the common contract for independent enrichment, inference, map-data, and comparison computations. It is intentionally separate from projection `EvaluationDefinition`.
-- The first composed pipeline classifies posting-derived rows, detects recurring payroll evidence, and estimates observed net pay. Confirmed results can annualize; provisional results expose only per-deposit values when cadence history is weak. It does not read or mutate the modeled salary.
+- Posting classification is an independent shared pass. Each analysis declares the classifier definitions it requires; orchestration combines those requirements into one plan, rejects conflicting definitions, and evaluates each selected classifier once per posting.
+- The first composed pipeline consumes shared payer, payroll-language, and payment-rail classifications, detects recurring payroll evidence, and estimates observed net pay. Confirmed results can annualize; provisional results expose only per-deposit values when cadence history is weak. It does not read or mutate the modeled salary.
 
 ## 5. Model Semantics
 
@@ -144,7 +149,7 @@ Percentile-band slope is never interpreted as a run outcome. FI confidence dates
 - `/model-inputs`: scheduled salary/checking transactions, paginated one-time transaction history, account-associated future rules, canonical editing, validation, temporary changes, templates, and source actions.
 - `/analysis`: posting-derived payroll evidence and annualized observed net-pay inference.
 - `App`: persistent data, mutation, deterministic projection, and stochastic projection controller shared by every route.
-- `runtime/modelRuntime`: read-only model/source state and wrapped source actions; executable `DataSource` operations remain private to `App`.
+- `runtime/modelRuntime`: read-only model/repository state and wrapped actions; executable repository operations remain private to `App`.
 - `runtime/projectionRuntime`: separate projection-artifact and execution-status providers so Monte Carlo progress does not rerender unrelated model consumers.
 - `ProjectionDashboard`: current/projected metrics, account and contribution charts, reconciliation, cash flow, debt, shortfalls, and read-only evaluation outcomes.
 - `EvaluationSettings`: evaluation collection management and type-specific configuration.
@@ -154,7 +159,7 @@ Percentile-band slope is never interpreted as a run outcome. FI confidence dates
 - `CurrentChangesComparison`: captures and compares read-only `ComparisonSnapshot` metrics.
 - `TemplateWizard`: generates common accounts and postings into the document editor.
 
-`src/store.ts` composes `ModelOverrides`, editor, settings, comparison, and theme slices. Current changes and projection settings are session-only. Baseline document edits persist only through the active `DataSource`.
+`src/store.ts` composes `ModelOverrides`, editor, settings, comparison, and theme slices. Current changes and projection settings are session-only. Baseline document edits persist only through the active `FinancialModelRepository`.
 
 Route pages compose feature components. Feature components read user-owned state through Zustand selectors and hook-owned runtime state through the narrow runtime providers; presentational tables and charts continue to receive explicit props.
 
@@ -179,5 +184,7 @@ React Router uses browser paths. Production hosting must serve `index.html` for 
 | `src/hooks/useProjection.ts` | deterministic worker hook |
 | `src/hooks/useStochastic.ts` | stochastic worker hook |
 | `src/lib/analysis/postingObservations.ts` | derives analysis observations from one-time external-inflow postings |
+| `src/lib/analysis/classification.ts` | typed classifier definitions, requirement-plan composition, and shared classification pass |
+| `src/lib/analysis/postingClassifiers.ts` | reusable payer, payroll-language, and payment-rail classifiers |
 | `src/lib/analysis/` | independent analysis contract, runtime, and definitions |
 | `src/hooks/usePostingAnalyses.ts` | typed posting-classification-to-payroll-to-salary analysis composition |

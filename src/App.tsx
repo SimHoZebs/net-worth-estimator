@@ -9,8 +9,8 @@ import {
 import { useIncomeDataQuery } from "@/hooks/useIncomeData";
 import type { TemplateOutput } from "@/lib/patterns";
 import {
-	createBrowserCsvDataSource,
-	createCsvDataSource,
+	createBrowserFinancialModelRepository,
+	createCsvApiFinancialModelRepository,
 	createCsvIncomeDataSource,
 	INCOME_DATA_API_PATH,
 	summarizeValidationIssues,
@@ -24,10 +24,10 @@ import { ProjectionRuntimeProvider } from "@/runtime/projectionRuntime";
 import { useProjectionOrchestration } from "@/runtime/useProjectionOrchestration";
 import { useStore } from "@/store";
 
-function createModelDataSource() {
+function createModelRepository() {
 	return import.meta.env.DEV
-		? createCsvDataSource()
-		: createBrowserCsvDataSource();
+		? createCsvApiFinancialModelRepository()
+		: createBrowserFinancialModelRepository();
 }
 
 function createIncomeDataSource() {
@@ -37,7 +37,7 @@ function createIncomeDataSource() {
 }
 
 export default function App() {
-	const dataSource = useMemo(() => createModelDataSource(), []);
+	const modelRepository = useMemo(() => createModelRepository(), []);
 	const incomeDataSource = useMemo(() => createIncomeDataSource(), []);
 	const {
 		data: modelData,
@@ -46,7 +46,7 @@ export default function App() {
 		error: modelError,
 		refetch: refetchModel,
 		dataUpdatedAt,
-	} = useFinancialModelQuery(dataSource);
+	} = useFinancialModelQuery(modelRepository);
 	const {
 		data: incomeDataResult,
 		isLoading: isIncomeDataLoading,
@@ -54,8 +54,8 @@ export default function App() {
 		error: incomeDataError,
 		refetch: refetchIncomeData,
 	} = useIncomeDataQuery(incomeDataSource);
-	const modelMutation = useFinancialModelMutation(dataSource);
-	const modelResetMutation = useFinancialModelResetMutation(dataSource);
+	const modelMutation = useFinancialModelMutation(modelRepository);
+	const modelResetMutation = useFinancialModelResetMutation(modelRepository);
 	const saveModel = modelMutation.mutate;
 	const resetModel = modelResetMutation.mutate;
 	const isSaving = modelMutation.isPending;
@@ -138,19 +138,19 @@ export default function App() {
 
 	const handleSave = useCallback(() => {
 		const store = useStore.getState();
-		if (!store.workingDocument || isSaving || !dataSource.save) return;
+		if (!store.workingDocument || isSaving || !modelRepository.save) return;
 		saveModel(store.workingDocument, {
 			onSuccess: finishEditing,
 		});
-	}, [dataSource.save, finishEditing, isSaving, saveModel]);
+	}, [finishEditing, isSaving, modelRepository.save, saveModel]);
 	const handleResetSource = useCallback(() => {
-		if (!dataSource.reset || isResetting) return;
+		if (!modelRepository.reset || isResetting) return;
 		requestEvaluationReload();
 		resetModel(undefined, {
 			onSuccess: finishEditing,
 		});
 	}, [
-		dataSource.reset,
+		modelRepository.reset,
 		finishEditing,
 		isResetting,
 		requestEvaluationReload,
@@ -175,13 +175,13 @@ export default function App() {
 
 	const source = useMemo<ModelSourceInfo>(
 		() => ({
-			label: dataSource.label,
-			description: dataSource.description,
-			sourceType: dataSource.sourceType,
-			saveLabel: dataSource.save?.label ?? null,
-			resetLabel: dataSource.reset?.label ?? null,
+			label: modelRepository.label,
+			description: modelRepository.description,
+			repositoryType: modelRepository.repositoryType,
+			saveLabel: modelRepository.save?.label ?? null,
+			resetLabel: modelRepository.reset?.label ?? null,
 		}),
-		[dataSource],
+		[modelRepository],
 	);
 	const modelRuntime = useMemo(
 		() => ({
@@ -201,7 +201,7 @@ export default function App() {
 			isResetting,
 			reload: handleReload,
 			save: handleSave,
-			reset: dataSource.reset ? handleResetSource : undefined,
+			reset: modelRepository.reset ? handleResetSource : undefined,
 			applyTemplate: handleApplyTemplate,
 		}),
 		[
@@ -220,7 +220,7 @@ export default function App() {
 			isResetting,
 			handleReload,
 			handleSave,
-			dataSource.reset,
+			modelRepository.reset,
 			handleResetSource,
 			handleApplyTemplate,
 			incomeDataResult?.data,

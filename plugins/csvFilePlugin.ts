@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Connect, Plugin, ViteDevServer } from "vite";
-import type { FinancialModelParseResult } from "../src/lib/projection/dataSource";
 import {
 	INCOME_DATA_API_PATH,
 	INCOME_DATA_FILE_NAMES,
@@ -9,6 +8,7 @@ import {
 	parseIncomeDataFiles,
 	validateCsvFinancialModel,
 } from "../src/lib/projection/index";
+import type { FinancialModelParseResult } from "../src/lib/projection/modelRepository";
 import { parseFinancialModelDocument } from "../src/lib/projection/sources/csv/csvDataSource";
 import {
 	parseCsvFinancialModel,

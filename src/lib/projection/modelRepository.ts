@@ -24,17 +24,17 @@ export class FinancialModelValidationError extends Error {
 	}
 }
 
-export interface DataSourceAction<TArgs extends unknown[] = []> {
+export interface RepositoryAction<TArgs extends unknown[] = []> {
 	readonly label: string;
 	readonly description: string;
 	run(...args: TArgs): Promise<FinancialModelParseResult>;
 }
 
-export interface DataSource {
-	readonly sourceType: string;
+export interface FinancialModelRepository {
+	readonly repositoryType: string;
 	readonly label: string;
 	readonly description: string;
 	loadDocument(): Promise<FinancialModelParseResult>;
-	readonly save?: DataSourceAction<[FinancialModelDocument]>;
-	readonly reset?: DataSourceAction;
+	readonly save?: RepositoryAction<[FinancialModelDocument]>;
+	readonly reset?: RepositoryAction;
 }

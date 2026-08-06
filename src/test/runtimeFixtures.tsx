@@ -18,7 +18,7 @@ export function createModelRuntimeFixture(
 		source: {
 			label: "Test source",
 			description: "Test financial model",
-			sourceType: "test",
+			repositoryType: "test",
 			saveLabel: "Save",
 			resetLabel: "Reset",
 		},

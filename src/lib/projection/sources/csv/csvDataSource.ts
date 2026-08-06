@@ -1,5 +1,8 @@
 import { z } from "zod";
-import type { DataSource, FinancialModelParseResult } from "../../dataSource";
+import type {
+	FinancialModelParseResult,
+	FinancialModelRepository,
+} from "../../modelRepository";
 import type {
 	Checkpoint,
 	FinancialIndependenceSource,
@@ -239,14 +242,14 @@ async function requestFinancialModel(
 	return result;
 }
 
-export interface CsvDataSourceOptions {
+export interface CsvApiFinancialModelRepositoryOptions {
 	apiPath?: string;
 	fetchImpl?: typeof fetch;
 }
 
-export function createCsvDataSource(
-	options?: CsvDataSourceOptions,
-): DataSource {
+export function createCsvApiFinancialModelRepository(
+	options?: CsvApiFinancialModelRepositoryOptions,
+): FinancialModelRepository {
 	const apiPath = options?.apiPath ?? "/api/financial-model";
 	const fetchImpl = options?.fetchImpl ?? fetch;
 	const loadDocument = async (): Promise<FinancialModelParseResult> => {
@@ -254,10 +257,10 @@ export function createCsvDataSource(
 	};
 
 	return {
-		sourceType: "csv-api",
-		label: "Repo CSV files",
+		repositoryType: "csv-api",
+		label: "Development model repository",
 		description:
-			"Loaded through the Vite dev server; saved edits write back to public/configs/ in this checkout.",
+			"Uses the Vite development API, whose server-side adapter ingests and exports the checkout's model CSV files.",
 		loadDocument,
 		save: {
 			label: "Save to CSV files",

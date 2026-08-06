@@ -55,7 +55,7 @@ function renderPage() {
 		source: {
 			label: "Test model",
 			description: "Test model",
-			sourceType: "test",
+			repositoryType: "test",
 			saveLabel: null,
 			resetLabel: null,
 		},

@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
-	DataSource,
 	FinancialModelDocument,
 	FinancialModelParseResult,
+	FinancialModelRepository,
 } from "@/lib/projection";
 import { FinancialModelValidationError } from "@/lib/projection";
 
@@ -20,26 +20,28 @@ function requireSuccessfulMutation(
 	return result;
 }
 
-export function useFinancialModelQuery(dataSource: DataSource) {
+export function useFinancialModelQuery(repository: FinancialModelRepository) {
 	return useQuery({
 		queryKey: FINANCIAL_MODEL_QUERY_KEY,
-		queryFn: () => dataSource.loadDocument(),
+		queryFn: () => repository.loadDocument(),
 		staleTime: Infinity,
 	});
 }
 
-export function useFinancialModelMutation(dataSource: DataSource) {
+export function useFinancialModelMutation(
+	repository: FinancialModelRepository,
+) {
 	const queryClient = useQueryClient();
 
 	return useMutation({
 		mutationFn: (document: FinancialModelDocument) => {
-			if (!dataSource.save) {
+			if (!repository.save) {
 				throw new Error(
 					"This data source does not support saving model edits.",
 				);
 			}
 
-			return dataSource.save.run(document).then(requireSuccessfulMutation);
+			return repository.save.run(document).then(requireSuccessfulMutation);
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: FINANCIAL_MODEL_QUERY_KEY });
@@ -47,18 +49,20 @@ export function useFinancialModelMutation(dataSource: DataSource) {
 	});
 }
 
-export function useFinancialModelResetMutation(dataSource: DataSource) {
+export function useFinancialModelResetMutation(
+	repository: FinancialModelRepository,
+) {
 	const queryClient = useQueryClient();
 
 	return useMutation({
 		mutationFn: () => {
-			if (!dataSource.reset) {
+			if (!repository.reset) {
 				throw new Error(
 					"This data source does not support resetting model edits.",
 				);
 			}
 
-			return dataSource.reset.run().then(requireSuccessfulMutation);
+			return repository.reset.run().then(requireSuccessfulMutation);
 		},
 		onSuccess: (result) => {
 			queryClient.setQueryData(FINANCIAL_MODEL_QUERY_KEY, result);

@@ -35,7 +35,7 @@ App (src/App.tsx)
 
 | Hook | File | Contract |
 | --- | --- | --- |
-| `useFinancialModelQuery` | `hooks/useFinancialModel.ts` | loads `{ document, issues }` from `DataSource.loadDocument`; `staleTime: Infinity` |
+| `useFinancialModelQuery` | `hooks/useFinancialModel.ts` | loads `{ document, issues }` from `FinancialModelRepository.loadDocument`; `staleTime: Infinity` |
 | `useFinancialModelMutation` | `hooks/useFinancialModel.ts` | saves a `FinancialModelDocument` and invalidates the model query |
 | `useFinancialModelResetMutation` | `hooks/useFinancialModel.ts` | resets the source and replaces query data |
 | `usePostingAnalyses` | `hooks/usePostingAnalyses.ts` | derives observations from model postings and composes classification, payroll detection, and salary estimation analyses |
@@ -66,14 +66,14 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 ## Data Flow
 
 1. **CSV source**: Vite plugin -> `GET/PUT /api/financial-model` -> `csvLoader.ts` -> Zod parsing and cross-validation. Documents contain only canonical fields.
-2. **Persistence DI**: `App.tsx` creates `createCsvDataSource()` in development or `createBrowserCsvDataSource()` in production. `DataSource.loadDocument()` returns `{ document, issues }`.
+2. **Persistence DI**: `App.tsx` creates `createCsvApiFinancialModelRepository()` in development or `createBrowserFinancialModelRepository()` in production. Model Inputs use only the repository; browser CSV ingestion and browser storage are connected behind it.
 3. **Query layer**: `useFinancialModelQuery`, `useFinancialModelMutation`, and `useFinancialModelResetMutation` connect the source to TanStack Query.
 4. **Current changes**: `ModelOverrides` remain in Zustand and are applied with `applyModelOverrides`; canonical data is not mutated.
 5. **Projection**: `useProjection`/`useStochastic` -> `CachedProjectionEngine` -> `WorkerProjectionEngine` on misses -> Web Workers -> `prepareSimulationRequest` -> `simulate` -> `ProjectionPath` -> evaluation/analysis aggregation.
 6. **Monte Carlo**: one prepared request is reused, each `MonteCarloSample` produces a path-only run, exact percentiles are aggregated, and progress is emitted in worker batches of 50.
 7. **Browser persistence**: `net-worth-estimator:financial-model` stores the financial model. Malformed or noncanonical data surfaces diagnostics; reset removes that key and reloads bundled CSV data. Analyses use the canonical model postings and add no separate transaction key.
-8. **Derived artifacts**: `ProjectionArtifactStore` is separate from `DataSource`; browser artifacts are content-addressed, session-only, and disposable.
-9. **Independent analyses**: `AnalysisDefinition` computations run as explicit pipelines over posting-derived observations. The current pipeline is posting classification -> payroll detection -> salary estimation; it does not participate in projection or mutate the financial model.
+8. **Derived artifacts**: `ProjectionArtifactStore` is separate from `FinancialModelRepository`; browser artifacts are content-addressed, session-only, and disposable.
+9. **Independent analyses**: `AnalysisDefinition` computations run as explicit pipelines over posting-derived observations. Active analyses contribute classifier requirements to one shared posting-classification plan before payroll detection and salary estimation; the pipeline does not participate in projection or mutate the financial model.
 
 ## Key Types
 
@@ -89,7 +89,9 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 | `ComparisonSnapshot` | read-only captured metrics for UI comparison |
 | `ProjectionResult` | deterministic public result and evaluation result tables |
 | `StochasticProjectionResult` | deterministic result, exact percentile bands, and stochastic evaluation aggregation |
-| `DataSource` | `loadDocument` plus optional labeled `save` and `reset` capabilities |
+| `FinancialModelRepository` | application-facing model reads plus optional labeled save and reset capabilities |
+| `FinancialModelIngestionSource` | read-only external snapshot and semantic revision used by ingestion |
+| `FinancialModelDao` | implementation-neutral persisted-record reads and conditional replacement; no lifecycle methods |
 | `FinancialModelParseResult` | `{ document, issues }` |
 | `PostingObservationDataset` | observations derived from enabled one-time external-inflow postings |
 | `AnalysisDefinition` | typed independent computation from an input value to a diagnosed output |

@@ -12,7 +12,7 @@ The product model is intentionally generic:
 - Annual caps are generic, and source-funded rows clamp to the source account's available positive balance.
 - Financial independence is derived from annual expense coverage and a full principal-preservation cycle. Explicit continuing postings and shared account constraints drive reactive withdrawals.
 - Monte Carlo confidence is aggregated from complete run outcomes, never inferred from percentile-band slope.
-- Baseline edits are persisted by the active `DataSource`. `ModelOverrides`, shown as current changes, are session-only and never mutate the canonical document.
+- Baseline edits are persisted by the active `FinancialModelRepository`. `ModelOverrides`, shown as current changes, are session-only and never mutate the canonical document.
 - `ComparisonSnapshot` records read-only metrics for comparison. It does not store or restore an alternative model.
 
 ## CSV Files
@@ -40,7 +40,7 @@ Income source definitions and tax profiles are loaded from `public/data/income/`
 - Static/serverless production loads bundled `/configs/` files and saves the canonical `FinancialModelDocument` under `net-worth-estimator:financial-model` in browser storage.
 - Malformed persisted data is not silently replaced; parsing and validation diagnostics are returned to the UI.
 - Browser reset removes `net-worth-estimator:financial-model` and reloads the bundled `/configs/` files.
-- Serverless deployments should use a real backend `DataSource` for shared or cross-device persistence.
+- Serverless deployments should use a backend `FinancialModelRepository` for shared or cross-device persistence.
 - Files under `public/` are public static assets in deployed builds.
 - Production hosts must rewrite browser routes such as `/settings` and `/model-inputs` to `index.html`.
 

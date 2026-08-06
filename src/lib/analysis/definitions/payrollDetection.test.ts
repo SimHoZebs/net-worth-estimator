@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
+import {
+	createPostingClassificationAnalysis,
+	createPostingClassificationPlan,
+} from "@/lib/analysis";
 import type { PostingObservation } from "../postingObservations";
 import { payrollDetectionAnalysis } from "./payrollDetection";
-import { transactionClassificationAnalysis } from "./transactionClassification";
+
+const classificationAnalysis = createPostingClassificationAnalysis(
+	createPostingClassificationPlan(
+		payrollDetectionAnalysis.classificationRequirements,
+	),
+);
 
 function posting(
 	id: string,
@@ -22,7 +31,7 @@ function posting(
 }
 
 async function detectPayroll(input: { postings: PostingObservation[] }) {
-	const classified = await transactionClassificationAnalysis.run({ input });
+	const classified = await classificationAnalysis.run({ input });
 	return payrollDetectionAnalysis.run({ input: classified.value });
 }
 
