@@ -312,6 +312,7 @@ export function ModelInputsInspector() {
 								<ReadOnlyPostingsTable
 									postings={postingGroups.scheduledTransactions}
 									accounts={displayDocument.accounts}
+									projectionStartDate={projectionStartDate}
 									showAdvanced={showAdvanced}
 								/>
 							) : null}

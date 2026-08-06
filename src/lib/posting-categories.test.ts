@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { makeAccount } from "@/lib/projection/__fixtures__/accounts";
 import { makePosting } from "@/lib/projection/__fixtures__/postings";
-import { associatedAccountIds, partitionPostings } from "./posting-categories";
+import {
+	associatedAccountIds,
+	isPastScheduledPosting,
+	partitionPostings,
+} from "./posting-categories";
 
 describe("posting presentation categories", () => {
 	it("separates history, direct cash-flow transactions, and account rules", () => {
@@ -60,5 +64,27 @@ describe("posting presentation categories", () => {
 			arithmetic: "abs(brokerage) * rate",
 		});
 		expect(associatedAccountIds(posting, accounts)).toEqual(["brokerage"]);
+	});
+
+	it("treats only postings ending before the projection as past", () => {
+		const projectionStartDate = "2026-02-01";
+		expect(
+			isPastScheduledPosting(
+				makePosting({ id: "ended", endDate: "2026-01-31" }),
+				projectionStartDate,
+			),
+		).toBe(true);
+		expect(
+			isPastScheduledPosting(
+				makePosting({ id: "boundary", endDate: projectionStartDate }),
+				projectionStartDate,
+			),
+		).toBe(false);
+		expect(
+			isPastScheduledPosting(
+				makePosting({ id: "ongoing", endDate: null }),
+				projectionStartDate,
+			),
+		).toBe(false);
 	});
 });

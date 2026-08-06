@@ -55,6 +55,13 @@ export function isScheduledTransaction(posting: Posting): boolean {
 	);
 }
 
+export function isPastScheduledPosting(
+	posting: Posting,
+	projectionStartDate: string,
+): boolean {
+	return posting.endDate !== null && posting.endDate < projectionStartDate;
+}
+
 export function partitionPostings(postings: readonly Posting[]) {
 	const scheduledTransactions: Posting[] = [];
 	const accountRules: Posting[] = [];
