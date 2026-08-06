@@ -3,12 +3,6 @@ export {
 	projectFinancialModelDocument,
 } from "./analysis/projectFinancialModel";
 export { stochasticProject } from "./analysis/projectStochastic";
-export type {
-	DataSource,
-	DataSourceAction,
-	FinancialModelParseResult,
-} from "./dataSource";
-export { FinancialModelValidationError } from "./dataSource";
 export {
 	getConfiguredEvaluation,
 	getFinancialIndependenceConfig,
@@ -69,6 +63,28 @@ export {
 	EMPTY_MODEL_OVERRIDES,
 	prepareFinancialModelDocument,
 } from "./model/applyModelOverrides";
+export type {
+	FinancialModelParseResult,
+	FinancialModelRepository,
+	RepositoryAction,
+} from "./modelRepository";
+export { FinancialModelValidationError } from "./modelRepository";
+export type {
+	FinancialModelDao,
+	FinancialModelDaoRead,
+	FinancialModelIngestionSource,
+	FinancialModelRecord,
+	FinancialModelSourceSnapshot,
+	FinancialModelStorageLifecycle,
+	IngestionSynchronizationResult,
+	SourceProvenance,
+	UserProvenance,
+} from "./persistence/financialModelPersistence";
+export {
+	createFinancialModelRecord,
+	FinancialModelIngestionCoordinator,
+	financialModelSourceRevision,
+} from "./persistence/financialModelPersistence";
 export {
 	amountProviders,
 	amountResolvers,
@@ -96,11 +112,12 @@ export {
 export { projectRawFinancialModelDocument } from "./simulation/projectPath";
 export { simulate } from "./simulation/simulate";
 export {
-	createBrowserCsvDataSource,
+	createBrowserFinancialModelRepository,
 	FINANCIAL_MODEL_STORAGE_KEY,
-} from "./sources/csv/browserCsvDataSource";
+} from "./sources/csv/browserFinancialModelRepository";
+export { createBundledCsvFinancialModelSource } from "./sources/csv/bundledCsvFinancialModelSource";
 export {
-	createCsvDataSource,
+	createCsvApiFinancialModelRepository,
 	FinancialModelApiError,
 	parseFinancialModelDocument,
 } from "./sources/csv/csvDataSource";

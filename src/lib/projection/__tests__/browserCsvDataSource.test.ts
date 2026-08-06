@@ -1,13 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	createBaseDocument,
 	makeSettings,
 	validCsvFiles,
 } from "../__fixtures__";
 import {
-	createBrowserCsvDataSource,
+	createBrowserFinancialModelRepository,
 	FINANCIAL_MODEL_STORAGE_KEY,
-} from "../sources/csv/browserCsvDataSource";
+} from "../sources/csv/browserFinancialModelRepository";
 
 function createMemoryStorage(initial: Record<string, string> = {}) {
 	const values = new Map(Object.entries(initial));
@@ -43,10 +43,17 @@ function createCsvFetch() {
 	});
 }
 
-describe("createBrowserCsvDataSource", () => {
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
+
+describe("createBrowserFinancialModelRepository", () => {
 	it("loads bundled CSV files when no browser save exists", async () => {
 		const fetchImpl = createCsvFetch();
-		const dataSource = createBrowserCsvDataSource({ fetchImpl, storage: null });
+		const dataSource = createBrowserFinancialModelRepository({
+			fetchImpl,
+			storage: null,
+		});
 		const result = await dataSource.loadDocument();
 
 		expect(result.document?.accounts).toHaveLength(4);
@@ -54,6 +61,30 @@ describe("createBrowserCsvDataSource", () => {
 		expect(fetchImpl).toHaveBeenCalledTimes(8);
 		expect(dataSource.save).toBeUndefined();
 		expect(dataSource.reset).toBeUndefined();
+	});
+
+	it("uses a read-only repository when default browser storage is unusable", async () => {
+		vi.stubGlobal("window", {
+			localStorage: {
+				getItem: vi.fn(() => null),
+				setItem: vi.fn(() => {
+					throw new Error("storage denied");
+				}),
+				removeItem: vi.fn(),
+			},
+		});
+		vi.stubGlobal("navigator", {
+			locks: { request: vi.fn() },
+		});
+		const repository = createBrowserFinancialModelRepository({
+			fetchImpl: createCsvFetch(),
+		});
+
+		const result = await repository.loadDocument();
+
+		expect(result.document?.accounts).toHaveLength(4);
+		expect(repository.save).toBeUndefined();
+		expect(repository.reset).toBeUndefined();
 	});
 
 	it("loads the canonical browser key before bundled CSV files", async () => {
@@ -64,7 +95,7 @@ describe("createBrowserCsvDataSource", () => {
 			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify(document),
 		});
 		const fetchImpl = createCsvFetch();
-		const result = await createBrowserCsvDataSource({
+		const result = await createBrowserFinancialModelRepository({
 			fetchImpl,
 			storage,
 		}).loadDocument();
@@ -81,7 +112,7 @@ describe("createBrowserCsvDataSource", () => {
 			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify(legacyDocument),
 		});
 
-		const result = await createBrowserCsvDataSource({
+		const result = await createBrowserFinancialModelRepository({
 			fetchImpl: createCsvFetch(),
 			storage,
 		}).loadDocument();
@@ -125,7 +156,7 @@ describe("createBrowserCsvDataSource", () => {
 			}),
 		});
 
-		const result = await createBrowserCsvDataSource({
+		const result = await createBrowserFinancialModelRepository({
 			fetchImpl: createCsvFetch(),
 			storage,
 		}).loadDocument();
@@ -165,7 +196,7 @@ describe("createBrowserCsvDataSource", () => {
 			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify(document),
 		});
 
-		const result = await createBrowserCsvDataSource({
+		const result = await createBrowserFinancialModelRepository({
 			fetchImpl: createCsvFetch(),
 			storage,
 		}).loadDocument();
@@ -197,7 +228,9 @@ describe("createBrowserCsvDataSource", () => {
 			[FINANCIAL_MODEL_STORAGE_KEY]: JSON.stringify(legacy),
 		});
 
-		const result = await createBrowserCsvDataSource({ storage }).loadDocument();
+		const result = await createBrowserFinancialModelRepository({
+			storage,
+		}).loadDocument();
 
 		expect(result.document).toBeNull();
 		expect(result.issues).toHaveLength(1);
@@ -219,7 +252,7 @@ describe("createBrowserCsvDataSource", () => {
 			JSON.stringify(createBaseDocument({ accounts: [null] as never })),
 		]) {
 			const fetchImpl = createCsvFetch();
-			const result = await createBrowserCsvDataSource({
+			const result = await createBrowserFinancialModelRepository({
 				fetchImpl,
 				storage: createMemoryStorage({
 					[FINANCIAL_MODEL_STORAGE_KEY]: stored,
@@ -237,18 +270,28 @@ describe("createBrowserCsvDataSource", () => {
 	it("saves and resets the canonical browser key", async () => {
 		const storage = createMemoryStorage();
 		const fetchImpl = createCsvFetch();
-		const dataSource = createBrowserCsvDataSource({ fetchImpl, storage });
+		const dataSource = createBrowserFinancialModelRepository({
+			fetchImpl,
+			storage,
+		});
 
 		await dataSource.save?.run(createBaseDocument());
 		const saved = JSON.parse(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)!) as {
-			sourcePath: string;
+			document: { sourcePath: string };
 		};
-		expect(saved.sourcePath).toBe("browser:local-storage");
+		expect(saved.document.sourcePath).toBe("browser:local-storage");
 
 		const result = await dataSource.reset?.run();
-		expect(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)).toBeNull();
+		expect(
+			JSON.parse(storage.getItem(FINANCIAL_MODEL_STORAGE_KEY)!),
+		).toMatchObject({
+			provenance: {
+				type: "source",
+				sourceId: "bundled-csv:/configs",
+			},
+		});
 		expect(result?.document?.accounts).toHaveLength(4);
-		expect(fetchImpl).toHaveBeenCalledTimes(8);
+		expect(fetchImpl).toHaveBeenCalledTimes(10);
 	});
 
 	it("preserves canonical storage when save validation fails", async () => {
@@ -260,7 +303,7 @@ describe("createBrowserCsvDataSource", () => {
 		const invalid = createBaseDocument({
 			accounts: [baseDocument.accounts[0], baseDocument.accounts[0]],
 		});
-		const dataSource = createBrowserCsvDataSource({
+		const dataSource = createBrowserFinancialModelRepository({
 			fetchImpl: createCsvFetch(),
 			storage,
 		});
@@ -276,7 +319,7 @@ describe("createBrowserCsvDataSource", () => {
 		const storage = createMemoryStorage({
 			[FINANCIAL_MODEL_STORAGE_KEY]: canonical,
 		});
-		const dataSource = createBrowserCsvDataSource({ storage });
+		const dataSource = createBrowserFinancialModelRepository({ storage });
 
 		await expect(
 			dataSource.save?.run({
@@ -289,7 +332,7 @@ describe("createBrowserCsvDataSource", () => {
 
 	it("saves documents that have warnings", async () => {
 		const storage = createMemoryStorage();
-		const dataSource = createBrowserCsvDataSource({
+		const dataSource = createBrowserFinancialModelRepository({
 			fetchImpl: createCsvFetch(),
 			storage,
 		});

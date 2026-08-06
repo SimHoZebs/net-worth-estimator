@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
+import {
+	createPostingClassificationAnalysis,
+	createPostingClassificationPlan,
+} from "@/lib/analysis";
 import type { PostingObservationDataset } from "../postingObservations";
 import type { PayrollCandidate } from "./payrollDetection";
 import { payrollDetectionAnalysis } from "./payrollDetection";
 import { salaryEstimateAnalysis } from "./salaryEstimate";
-import { transactionClassificationAnalysis } from "./transactionClassification";
+
+const classificationAnalysis = createPostingClassificationAnalysis(
+	createPostingClassificationPlan(
+		payrollDetectionAnalysis.classificationRequirements,
+	),
+);
 
 function candidate(
 	dates: string[],
@@ -26,7 +35,7 @@ function candidate(
 }
 
 async function detectPayroll(input: PostingObservationDataset) {
-	const classified = await transactionClassificationAnalysis.run({ input });
+	const classified = await classificationAnalysis.run({ input });
 	return payrollDetectionAnalysis.run({ input: classified.value });
 }
 

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createBaseDocument, makeSettings } from "../__fixtures__";
-import { createCsvDataSource } from "../sources/csv/csvDataSource";
+import { createCsvApiFinancialModelRepository } from "../sources/csv/csvDataSource";
 
-describe("createCsvDataSource", () => {
+describe("createCsvApiFinancialModelRepository", () => {
 	const invalidResponseError =
 		"Invalid financial model API response: expected a valid FinancialModelParseResult payload.";
 
@@ -11,7 +11,7 @@ describe("createCsvDataSource", () => {
 		const fetchImpl = vi.fn(async () =>
 			Response.json({ document, issues: [] }),
 		);
-		const dataSource = createCsvDataSource({ fetchImpl });
+		const dataSource = createCsvApiFinancialModelRepository({ fetchImpl });
 
 		await dataSource.loadDocument();
 		await dataSource.save?.run(document);
@@ -40,7 +40,9 @@ describe("createCsvDataSource", () => {
 			Response.json({ document, issues: [] }),
 		);
 
-		const result = await createCsvDataSource({ fetchImpl }).loadDocument();
+		const result = await createCsvApiFinancialModelRepository({
+			fetchImpl,
+		}).loadDocument();
 
 		expect(
 			result.document?.evaluations.financialIndependence[0]?.config
@@ -79,7 +81,7 @@ describe("createCsvDataSource", () => {
 		const fetchImpl = vi.fn(async () => Response.json(payload));
 
 		await expect(
-			createCsvDataSource({ fetchImpl }).loadDocument(),
+			createCsvApiFinancialModelRepository({ fetchImpl }).loadDocument(),
 		).rejects.toThrow(invalidResponseError);
 	});
 
@@ -90,7 +92,7 @@ describe("createCsvDataSource", () => {
 		);
 
 		await expect(
-			createCsvDataSource({ fetchImpl }).save?.run(document),
+			createCsvApiFinancialModelRepository({ fetchImpl }).save?.run(document),
 		).rejects.toThrow(invalidResponseError);
 	});
 
@@ -104,7 +106,7 @@ describe("createCsvDataSource", () => {
 		);
 
 		await expect(
-			createCsvDataSource({ fetchImpl }).loadDocument(),
+			createCsvApiFinancialModelRepository({ fetchImpl }).loadDocument(),
 		).rejects.toThrow(invalidResponseError);
 	});
 
@@ -127,7 +129,7 @@ describe("createCsvDataSource", () => {
 			),
 		);
 
-		const error = await createCsvDataSource({ fetchImpl })
+		const error = await createCsvApiFinancialModelRepository({ fetchImpl })
 			.save!.run(document)
 			.then(() => null)
 			.catch((caught: unknown) => caught);

@@ -76,7 +76,7 @@ export function SourceStatusCard() {
 					<div className="flex justify-between gap-3">
 						<dt>Source type</dt>
 						<dd className="text-right text-foreground/80">
-							{source.sourceType}
+							{source.repositoryType}
 						</dd>
 					</div>
 				</dl>

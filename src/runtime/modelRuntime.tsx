@@ -9,7 +9,7 @@ import type {
 export interface ModelSourceInfo {
 	label: string;
 	description: string;
-	sourceType: string;
+	repositoryType: string;
 	saveLabel: string | null;
 	resetLabel: string | null;
 }

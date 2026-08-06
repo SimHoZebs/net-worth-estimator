@@ -2,6 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import {
 	type AnalysisResult,
 	buildPostingObservationDataset,
+	type ClassifiedPostingDataset,
+	createPostingClassificationAnalysis,
+	createPostingClassificationPlan,
 	type PostingObservationDataset,
 	runAnalysis,
 } from "@/lib/analysis";
@@ -10,15 +13,18 @@ import {
 	payrollDetectionAnalysis,
 	type SalaryEstimateResult,
 	salaryEstimateAnalysis,
-	type TransactionClassificationResult,
-	transactionClassificationAnalysis,
 } from "@/lib/analysis/definitions";
 import type { FinancialModelDocument } from "@/lib/projection";
 
 const ANALYSIS_CACHE_TIME_MS = 5 * 60 * 1000;
+const postingClassificationAnalysis = createPostingClassificationAnalysis(
+	createPostingClassificationPlan(
+		payrollDetectionAnalysis.classificationRequirements,
+	),
+);
 
 export interface PostingAnalysisResults {
-	classification: AnalysisResult<TransactionClassificationResult>;
+	classification: AnalysisResult<ClassifiedPostingDataset>;
 	payroll: AnalysisResult<PayrollDetectionResult> | null;
 	salary: AnalysisResult<SalaryEstimateResult> | null;
 }
@@ -31,7 +37,7 @@ export function usePostingAnalyses(document: FinancialModelDocument | null) {
 		queryKey: ["posting-analyses", observationDataset],
 		queryFn: async ({ signal }): Promise<PostingAnalysisResults> => {
 			const classification = await runAnalysis(
-				transactionClassificationAnalysis,
+				postingClassificationAnalysis,
 				observationDataset!,
 				signal,
 			);
