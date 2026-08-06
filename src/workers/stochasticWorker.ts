@@ -1,16 +1,21 @@
-import { stochasticProject } from "@/lib/projection";
+import { StochasticProjectionSession } from "@/lib/projection/analysis/projectStochastic";
+import StochasticPathWorker from "@/workers/stochasticPathWorker?worker";
+import {
+	getStochasticPathWorkerCount,
+	runStochasticWorkerPool,
+} from "./stochasticWorkerPool";
 import type {
 	StochasticWorkerProgress,
 	StochasticWorkerRequest,
 	StochasticWorkerResponse,
 } from "./types";
 
-self.onmessage = (event: MessageEvent<StochasticWorkerRequest>) => {
+self.onmessage = async (event: MessageEvent<StochasticWorkerRequest>) => {
 	const { id, document, projectionSettings, overrides, config, incomeData } =
 		event.data;
 
 	try {
-		const result = stochasticProject(
+		const session = new StochasticProjectionSession(
 			document,
 			projectionSettings,
 			overrides,
@@ -25,6 +30,15 @@ self.onmessage = (event: MessageEvent<StochasticWorkerRequest>) => {
 				self.postMessage(msg);
 			},
 			incomeData,
+		);
+		const workerCount = getStochasticPathWorkerCount(
+			session.config.runCount,
+			navigator.hardwareConcurrency,
+		);
+		const result = await runStochasticWorkerPool(
+			session,
+			workerCount,
+			() => new StochasticPathWorker(),
 		);
 
 		const response: StochasticWorkerResponse = {
