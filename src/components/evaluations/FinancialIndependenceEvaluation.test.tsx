@@ -31,12 +31,16 @@ describe("FinancialIndependenceEvaluation", () => {
 			/>,
 		);
 
-		expect(screen.getByText("On Feb 1, 2027, relying on:")).not.toBeNull();
+		expect(screen.getByText("Feb 1, 2027")).not.toBeNull();
+		expect(screen.getByText("1-year test")).not.toBeNull();
+		expect(screen.getByText("Not ready")).not.toBeNull();
+		expect(screen.getByRole("region", { name: "Net worth" })).not.toBeNull();
 		expect(
-			screen.getByText(
-				"This plan cannot begin the 1-year test because it does not meet the minimum net worth gate and the initial funding-capacity gate.",
-			),
+			screen.getByRole("region", { name: "FI-date annual capacity" }),
 		).not.toBeNull();
+		expect(
+			screen.queryByText("This plan cannot begin", { exact: false }),
+		).toBeNull();
 		expect(screen.getByText("Brokerage")).not.toBeNull();
 		expect(screen.queryByText("Behavior evidence")).toBeNull();
 		expect(screen.queryByText("Requested withdrawals")).toBeNull();

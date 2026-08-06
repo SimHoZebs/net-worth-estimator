@@ -166,6 +166,19 @@ function expectedAnnualRequests(
 }
 
 describe("evaluateFinancialIndependence", () => {
+	it("omits implementation details from normal stochastic workload copy", () => {
+		const projectionPath = path([]);
+		const workload = financialIndependenceEvaluation.describeStochasticWork?.(
+			{
+				path: projectionPath,
+				document: projectionPath.effectiveDocument,
+			},
+			plan(),
+		);
+
+		expect(workload?.description).toBeUndefined();
+	});
+
 	it("rejects malformed optional source properties", () => {
 		expect(() =>
 			validateFinancialIndependencePlan({

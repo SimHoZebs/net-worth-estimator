@@ -176,4 +176,110 @@ describe("EvaluationSettings", () => {
 		expect(screen.queryByLabelText("Label for target")).toBeNull();
 		expect(screen.queryByLabelText("Target net worth")).toBeNull();
 	});
+
+	it("shows Monte Carlo workload progress inside its evaluation card", () => {
+		render(
+			<EvaluationResults
+				document={emptyDocument as never}
+				result={
+					{
+						evaluations: {
+							financialIndependence: [],
+							netWorthThreshold: [],
+							postingFulfillment: [],
+						},
+					} as never
+				}
+				resultsAreStale
+				stochasticIsRunning
+				stochasticProgress={{
+					phase: "stochastic-runs",
+					completedRuns: 370,
+					totalRuns: 1000,
+					fraction: 0.37,
+					evaluationWorkloads: [
+						{
+							type: "financialIndependence",
+							instanceId: "financial-independence",
+							label: "Financial independence",
+							completedUnits: 10_000,
+							totalUnits: 61_000,
+							unitLabel: "monthly start dates",
+							unitAction: "checked",
+							intensiveUnitsCompleted: 1_246,
+							intensiveUnitLabel: "candidate sustainability cycles",
+							intensiveUnitAction: "attempted",
+							description:
+								"Failed cycles stop at the first shortfall; date checks stop after the first successful 10-year test.",
+						},
+					],
+				}}
+			/>,
+		);
+
+		const progress = screen.getByRole("progressbar", {
+			name: "Financial independence Monte Carlo progress",
+		});
+		expect(progress.getAttribute("aria-valuenow")).toBe("37");
+		const card = screen
+			.getByText("Running FI Monte Carlo")
+			.closest("[data-slot='card']");
+		expect(card?.textContent).toContain(
+			"Previous FI results are hidden until recalculation completes.",
+		);
+		expect(card?.textContent).toContain("10,000 monthly start dates checked");
+		expect(card?.textContent).not.toContain("10,000 / 61,000");
+		expect(card?.textContent).toContain(
+			"1,246 candidate sustainability cycles attempted",
+		);
+		expect(card?.textContent).not.toContain("370 / 1,000 Monte Carlo paths");
+		expect(card?.textContent).not.toContain("Updating FI outcomes");
+		expect(card?.textContent).not.toContain("Failed cycles stop");
+		expect(
+			card?.querySelector("[data-slot='card-header']")?.textContent,
+		).not.toContain("updating");
+		expect(screen.queryByRole("status")).toBeNull();
+	});
+
+	it("identifies the deterministic FI result as current during Monte Carlo", () => {
+		render(
+			<EvaluationResults
+				document={emptyDocument as never}
+				result={
+					{
+						evaluations: {
+							financialIndependence: [],
+							netWorthThreshold: [],
+							postingFulfillment: [],
+						},
+					} as never
+				}
+				stochasticIsRunning
+				stochasticProgress={{
+					phase: "stochastic-runs",
+					completedRuns: 370,
+					totalRuns: 1000,
+					fraction: 0.37,
+					evaluationWorkloads: [
+						{
+							type: "financialIndependence",
+							instanceId: "financial-independence",
+							label: "Financial independence",
+							completedUnits: 22_570,
+							totalUnits: 61_000,
+							unitLabel: "monthly start dates",
+							unitAction: "checked",
+						},
+					],
+				}}
+			/>,
+		);
+
+		expect(
+			screen.getByText(
+				"The deterministic FI result below is current. Monte Carlo confidence is still being calculated.",
+			),
+		).not.toBeNull();
+		expect(screen.getByText("Running FI Monte Carlo")).not.toBeNull();
+	});
 });

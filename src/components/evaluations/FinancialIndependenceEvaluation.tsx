@@ -28,7 +28,6 @@ export function FinancialIndependenceEvaluation({
 	evaluation,
 	document,
 	result,
-	resultsAreStale = false,
 }: FinancialIndependenceEvaluationProps) {
 	let plan: FinancialIndependencePlan;
 	try {
@@ -36,10 +35,10 @@ export function FinancialIndependenceEvaluation({
 	} catch {
 		return null;
 	}
-	const analysis = resultsAreStale
-		? undefined
-		: getFinancialIndependenceResult(result, evaluation.instanceId)
-				?.deterministic;
+	const analysis = getFinancialIndependenceResult(
+		result,
+		evaluation.instanceId,
+	)?.deterministic;
 	const selectedIndex = analysis
 		? selectFinancialIndependenceOutcomeIndex(analysis.runOutcomes)
 		: -1;
@@ -50,11 +49,7 @@ export function FinancialIndependenceEvaluation({
 
 	return (
 		<div className="space-y-4">
-			{resultsAreStale ? (
-				<p className="rounded-2xl border border-dashed border-primary-border/70 bg-primary-subtle/20 p-5 type-muted">
-					Updating FI outcomes. The base projection remains available above.
-				</p>
-			) : analysis ? (
+			{analysis ? (
 				<>
 					<OverviewCard
 						document={document}
@@ -65,7 +60,6 @@ export function FinancialIndependenceEvaluation({
 					{candidateRow && detailedOutcome ? (
 						<FinancialIndependenceChart
 							document={document}
-							row={candidateRow}
 							outcome={detailedOutcome}
 						/>
 					) : null}
