@@ -3,7 +3,7 @@ import { build } from "vite";
 import { describe, expect, it } from "vitest";
 
 describe("WorkerProjectionEngine production build", () => {
-	it("emits executable bundles for both worker entries", async () => {
+	it("emits executable bundles for all worker entries", async () => {
 		const result = await build({
 			configFile: path.resolve(process.cwd(), "vite.config.ts"),
 			build: { write: false },
@@ -34,6 +34,16 @@ describe("WorkerProjectionEngine production build", () => {
 				/stochasticWorker-[^/]+\.js$/.test(fileName),
 			),
 		).toBe(true);
+		expect(
+			javascript.some(({ fileName }) =>
+				/stochasticPathWorker-[^/]+\.js$/.test(fileName),
+			),
+		).toBe(true);
+		const stochasticWorkerBundle = javascript.find(({ fileName }) =>
+			/stochasticWorker-[^/]+\.js$/.test(fileName),
+		)?.content;
+		expect(stochasticWorkerBundle).toMatch(/stochasticPathWorker-[^/]+\.js/);
+		expect(stochasticWorkerBundle).not.toContain("?worker");
 		expect(javascript.map(({ content }) => content).join("\n")).not.toContain(
 			"data:video/mp2t",
 		);

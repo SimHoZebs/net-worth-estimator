@@ -286,7 +286,7 @@ function isIncomeDataSnapshot(value: unknown): value is IncomeDataSnapshot {
 	);
 }
 
-function decodeProjectionPath(value: unknown): ProjectionPath | null {
+export function decodeProjectionPath(value: unknown): ProjectionPath | null {
 	if (!isWorkerRecord(value)) return null;
 	if (!Array.isArray(value.rows) || !Array.isArray(value.movementEvents)) {
 		return null;

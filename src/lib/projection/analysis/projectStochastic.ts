@@ -11,10 +11,11 @@ import type { IncomeDataSnapshot } from "../types/income";
 import type {
 	FinancialModelDocument,
 	ModelOverrides,
+	ProjectionPath,
 	ProjectionResult,
 	ProjectionRuntimeSettings,
 } from "../types/model";
-import type { MonteCarloSample } from "../types/simulation";
+import type { MonteCarloSample, PreparedProjection } from "../types/simulation";
 import type {
 	StochasticBandRow,
 	StochasticConfig,
@@ -137,6 +138,203 @@ export function getStochasticProgressUpdateRunInterval(runCount: number) {
 	);
 }
 
+export class StochasticProjectionSession {
+	readonly config: StochasticConfig;
+	readonly prepared: PreparedProjection;
+	private readonly deterministicRaw: ReturnType<typeof adaptSimulationRun>;
+	private readonly deterministic: ProjectionResult;
+	private readonly runtimes: EvaluationRuntimeSet;
+	private readonly sampleCountsByPostingId: ReadonlyMap<string, number>;
+	private readonly sampleLogNormal: StochasticSampler;
+	private readonly sortedDates: readonly string[];
+	private readonly sortedValuesByDate = new Map<string, number[]>();
+	private readonly pendingValuesByDate = new Map<string, number[]>();
+	private readonly isHistoricalByDate = new Map<string, boolean>();
+	private readonly progressUpdateRuns: number;
+	private completedRuns = 0;
+	private lastLightweightProgressAt = performance.now();
+
+	constructor(
+		document: FinancialModelDocument,
+		projectionSettings: ProjectionRuntimeSettings,
+		overrides: ModelOverrides,
+		config: StochasticConfig,
+		private readonly onProgress?: (
+			progress: StochasticProgress,
+			partial?: StochasticProjectionResult,
+		) => void,
+		incomeData?: IncomeDataSnapshot,
+	) {
+		this.config = normalizeStochasticConfig(config);
+		this.progressUpdateRuns = getStochasticProgressUpdateRunInterval(
+			this.config.runCount,
+		);
+		this.onProgress?.({
+			phase: "preparing",
+			completedRuns: 0,
+			totalRuns: this.config.runCount,
+			fraction: 0,
+			evaluationWorkloads: [],
+		});
+		this.sampleLogNormal = createStochasticSampler(this.config.seed);
+		this.prepared = prepareSimulationRequest(
+			document,
+			projectionSettings,
+			overrides,
+			undefined,
+			incomeData,
+		);
+		this.deterministicRaw = adaptSimulationRun(
+			this.prepared,
+			simulate(this.prepared.request),
+		);
+		this.sampleCountsByPostingId = buildSampleCountsByPostingId(
+			this.prepared.request.model.postings,
+			projectionSettings.horizonYears,
+			this.prepared.request.startDate,
+			this.prepared.request.endDate,
+			this.prepared.request.includeStartDateEvents,
+		);
+		this.runtimes = new EvaluationRuntimeSet(
+			projectionSettings.evaluations,
+			evaluationRegistry,
+		);
+		this.runtimes.prepareStochasticWork({
+			path: this.deterministicRaw.path,
+			document: this.deterministicRaw.path.effectiveDocument,
+			detailLevel: "summary",
+		});
+		this.onProgress?.(this.progress("deterministic-evaluations"));
+		this.runtimes.evaluateDeterministic({
+			path: this.deterministicRaw.path,
+			document: this.deterministicRaw.path.effectiveDocument,
+			detailLevel: "summary",
+		});
+		this.runtimes.startStochastic();
+		this.onProgress?.(this.progress("stochastic-runs"));
+		this.deterministic = {
+			...this.deterministicRaw.result,
+			...this.runtimes.result(),
+		};
+		this.sortedDates = this.deterministic.timeline.rows.map((row) => row.date);
+	}
+
+	createSample(): MonteCarloSample {
+		return {
+			annualRatesByPostingId: buildStochasticRates(
+				this.prepared.request.model.postings,
+				this.sampleCountsByPostingId,
+				this.sampleLogNormal,
+			),
+		};
+	}
+
+	projectSample(monteCarloSample: MonteCarloSample): ProjectionPath {
+		return buildProjectionPath(
+			this.prepared,
+			simulate({ ...this.prepared.request, monteCarloSample }),
+		);
+	}
+
+	consumeSample(
+		path: ProjectionPath,
+		monteCarloSample: MonteCarloSample,
+	): void {
+		if (this.completedRuns >= this.config.runCount) {
+			throw new Error("Stochastic projection received too many paths.");
+		}
+		this.runtimes.consume({
+			path,
+			document: path.effectiveDocument,
+			monteCarloSample,
+			detailLevel: "summary",
+		});
+		for (const row of path.rows) {
+			const values = this.pendingValuesByDate.get(row.date) ?? [];
+			values.push(Math.round(row.netWorth));
+			this.pendingValuesByDate.set(row.date, values);
+			if (!this.isHistoricalByDate.has(row.date)) {
+				this.isHistoricalByDate.set(row.date, row.isHistorical);
+			}
+		}
+
+		this.completedRuns++;
+		const batchComplete =
+			this.completedRuns % STOCHASTIC_PROGRESS_BATCH === 0 ||
+			this.completedRuns === this.config.runCount;
+		if (batchComplete) {
+			this.flushBatch();
+			return;
+		}
+
+		const now = performance.now();
+		if (
+			this.completedRuns === 1 ||
+			(this.completedRuns % this.progressUpdateRuns === 0 &&
+				now - this.lastLightweightProgressAt >=
+					STOCHASTIC_PROGRESS_MIN_INTERVAL_MS)
+		) {
+			this.onProgress?.(this.progress("stochastic-runs"));
+			this.lastLightweightProgressAt = now;
+		}
+	}
+
+	result(): StochasticProjectionResult {
+		if (this.completedRuns !== this.config.runCount) {
+			throw new Error(
+				`Stochastic projection expected ${this.config.runCount} paths but received ${this.completedRuns}.`,
+			);
+		}
+		return this.buildResult();
+	}
+
+	private progress(
+		phase: Exclude<StochasticProgressPhase, "preparing">,
+	): StochasticProgress {
+		return {
+			phase,
+			completedRuns: this.completedRuns,
+			totalRuns: this.config.runCount,
+			fraction: this.completedRuns / this.config.runCount,
+			evaluationWorkloads: this.runtimes.workloadProgress(
+				this.completedRuns,
+				this.config.runCount,
+			),
+		};
+	}
+
+	private flushBatch(): void {
+		for (const [date, values] of this.pendingValuesByDate) {
+			values.sort((left, right) => left - right);
+			const existing = this.sortedValuesByDate.get(date);
+			this.sortedValuesByDate.set(
+				date,
+				existing ? mergeSorted(existing, values) : values,
+			);
+		}
+		this.pendingValuesByDate.clear();
+		this.runtimes.finalize({
+			document: this.deterministicRaw.path.effectiveDocument,
+			deterministicPath: this.deterministicRaw.path,
+			runCount: this.completedRuns,
+		});
+		this.onProgress?.(this.progress("stochastic-runs"), this.buildResult());
+	}
+
+	private buildResult(): StochasticProjectionResult {
+		return buildResult(
+			this.config,
+			this.deterministic,
+			buildBands(
+				this.sortedValuesByDate,
+				this.isHistoricalByDate,
+				this.sortedDates,
+			),
+			this.runtimes,
+		);
+	}
+}
+
 export function stochasticProject(
 	document: FinancialModelDocument,
 	projectionSettings: ProjectionRuntimeSettings,
@@ -148,150 +346,18 @@ export function stochasticProject(
 	) => void,
 	incomeData?: IncomeDataSnapshot,
 ): StochasticProjectionResult {
-	const normalizedConfig = normalizeStochasticConfig(config);
-	const progressUpdateRuns = getStochasticProgressUpdateRunInterval(
-		normalizedConfig.runCount,
-	);
-	const progress = (
-		phase: StochasticProgressPhase,
-		completedRuns: number,
-	): StochasticProgress => ({
-		phase,
-		completedRuns,
-		totalRuns: normalizedConfig.runCount,
-		fraction: completedRuns / normalizedConfig.runCount,
-		evaluationWorkloads:
-			phase === "preparing"
-				? []
-				: runtimes.workloadProgress(completedRuns, normalizedConfig.runCount),
-	});
-	onProgress?.(progress("preparing", 0));
-	const sampleLogNormal = createStochasticSampler(normalizedConfig.seed);
-	const prepared = prepareSimulationRequest(
+	const session = new StochasticProjectionSession(
 		document,
 		projectionSettings,
 		overrides,
-		undefined,
+		config,
+		onProgress,
 		incomeData,
 	);
-	const deterministicRaw = adaptSimulationRun(
-		prepared,
-		simulate(prepared.request),
-	);
-	const sampleCountsByPostingId = buildSampleCountsByPostingId(
-		prepared.request.model.postings,
-		projectionSettings.horizonYears,
-		prepared.request.startDate,
-		prepared.request.endDate,
-		prepared.request.includeStartDateEvents,
-	);
-	const runtimes = new EvaluationRuntimeSet(
-		projectionSettings.evaluations,
-		evaluationRegistry,
-	);
-	runtimes.prepareStochasticWork({
-		path: deterministicRaw.path,
-		document: deterministicRaw.path.effectiveDocument,
-		detailLevel: "summary",
-	});
-	onProgress?.(progress("deterministic-evaluations", 0));
-	runtimes.evaluateDeterministic({
-		path: deterministicRaw.path,
-		document: deterministicRaw.path.effectiveDocument,
-		detailLevel: "summary",
-	});
-	runtimes.startStochastic();
-	onProgress?.(progress("stochastic-runs", 0));
-	const deterministic: ProjectionResult = {
-		...deterministicRaw.result,
-		...runtimes.result(),
-	};
-	const sortedDates = deterministic.timeline.rows.map((row) => row.date);
-	const sortedValuesByDate = new Map<string, number[]>();
-	const isHistoricalByDate = new Map<string, boolean>();
-	let lastLightweightProgressAt = performance.now();
 
-	for (
-		let batchStart = 0;
-		batchStart < normalizedConfig.runCount;
-		batchStart += STOCHASTIC_PROGRESS_BATCH
-	) {
-		const batchEnd = Math.min(
-			batchStart + STOCHASTIC_PROGRESS_BATCH,
-			normalizedConfig.runCount,
-		);
-		const batchValues = new Map<string, number[]>();
-		for (let run = batchStart; run < batchEnd; run++) {
-			const rates = buildStochasticRates(
-				prepared.request.model.postings,
-				sampleCountsByPostingId,
-				sampleLogNormal,
-			);
-			const monteCarloSample: MonteCarloSample = {
-				annualRatesByPostingId: rates,
-			};
-			const path = buildProjectionPath(
-				prepared,
-				simulate({
-					...prepared.request,
-					monteCarloSample,
-				}),
-			);
-			runtimes.consume({
-				path,
-				document: path.effectiveDocument,
-				monteCarloSample,
-				detailLevel: "summary",
-			});
-			for (const row of path.rows) {
-				const values = batchValues.get(row.date) ?? [];
-				values.push(Math.round(row.netWorth));
-				batchValues.set(row.date, values);
-				if (!isHistoricalByDate.has(row.date)) {
-					isHistoricalByDate.set(row.date, row.isHistorical);
-				}
-			}
-			const completedRuns = run + 1;
-			const now = performance.now();
-			if (
-				completedRuns < batchEnd &&
-				(completedRuns === 1 ||
-					(completedRuns % progressUpdateRuns === 0 &&
-						now - lastLightweightProgressAt >=
-							STOCHASTIC_PROGRESS_MIN_INTERVAL_MS))
-			) {
-				onProgress?.(progress("stochastic-runs", completedRuns));
-				lastLightweightProgressAt = now;
-			}
-		}
-		for (const [date, values] of batchValues) {
-			values.sort((left, right) => left - right);
-			const existing = sortedValuesByDate.get(date);
-			sortedValuesByDate.set(
-				date,
-				existing ? mergeSorted(existing, values) : values,
-			);
-		}
-		runtimes.finalize({
-			document: deterministicRaw.path.effectiveDocument,
-			deterministicPath: deterministicRaw.path,
-			runCount: batchEnd,
-		});
-		onProgress?.(
-			progress("stochastic-runs", batchEnd),
-			buildResult(
-				normalizedConfig,
-				deterministic,
-				buildBands(sortedValuesByDate, isHistoricalByDate, sortedDates),
-				runtimes,
-			),
-		);
+	for (let run = 0; run < session.config.runCount; run++) {
+		const sample = session.createSample();
+		session.consumeSample(session.projectSample(sample), sample);
 	}
-
-	return buildResult(
-		normalizedConfig,
-		deterministic,
-		buildBands(sortedValuesByDate, isHistoricalByDate, sortedDates),
-		runtimes,
-	);
+	return session.result();
 }
