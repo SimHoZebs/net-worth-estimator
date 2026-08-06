@@ -86,18 +86,15 @@ describe("ResultsPage", () => {
 
 		render(<RouterProvider router={router} />);
 
-		const activity = screen.getByRole("status");
+		const activity = screen.getByLabelText("Projection activity");
+		expect(activity.textContent).toContain("Updating base projection");
 		expect(activity.textContent).toContain(
-			"Updating projection and Monte Carlo analysis",
+			"Updating Monte Carlo projection ranges",
 		);
 		expect(activity.textContent).toContain("37%");
 		expect(activity.textContent).toContain("370 / 1,000 Monte Carlo paths");
-		expect(activity.textContent).toContain(
-			"22,570 / 61,000 monthly start dates checked",
-		);
-		expect(activity.textContent).toContain(
-			"1,246 candidate sustainability cycles attempted",
-		);
+		expect(activity.textContent).not.toContain("monthly start dates checked");
+		expect(screen.getAllByRole("status")).toHaveLength(1);
 	});
 
 	it("shows stochastic activity after deterministic evaluation finishes", () => {
@@ -122,7 +119,9 @@ describe("ResultsPage", () => {
 		render(<RouterProvider router={router} />);
 
 		const activity = screen.getByRole("status");
-		expect(activity.textContent).toContain("Updating Monte Carlo analysis");
+		expect(activity.textContent).toContain(
+			"Updating Monte Carlo projection ranges",
+		);
 		expect(activity.textContent).toContain("64%");
 	});
 
@@ -144,7 +143,7 @@ describe("ResultsPage", () => {
 		render(<RouterProvider router={router} />);
 
 		const activity = screen.getByRole("status");
-		expect(activity.textContent).toContain("Updating projection");
+		expect(activity.textContent).toContain("Updating base projection");
 		expect(activity.textContent).not.toContain("Monte Carlo");
 	});
 });

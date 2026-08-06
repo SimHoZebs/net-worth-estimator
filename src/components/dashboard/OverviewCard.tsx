@@ -43,18 +43,20 @@ export const OverviewCard = memo(function OverviewCard({
 				{row && outcome ? (
 					<>
 						<div className="border-b border-border/70 pb-5">
-							<div className="type-eyebrow">Financial independence result</div>
+							<div className="type-eyebrow">FI date</div>
 							<h3 className="mt-2 text-balance text-xl font-semibold tracking-tight text-foreground md:text-2xl">
-								On {formatDate(row.date)}, relying on:
+								{formatDate(row.date)}
 							</h3>
 							<div className="mt-1 type-caption">
-								Spending input: {expenseBasisLabel(plan)}
+								Spending target in {expenseBasisLabel(plan)}
 							</div>
 						</div>
 
+						<TestSummary plan={plan} row={row} outcome={outcome} />
+
 						{directIncomeLabels.length > 0 || row.annualDirectIncome > 0 ? (
 							<div className="border-b border-border/70 py-4">
-								<div className="type-label">Selected direct income</div>
+								<div className="type-label">Annual direct income</div>
 								<div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
 									<span className="text-foreground/85">
 										{directIncomeLabels.length > 0
@@ -62,12 +64,9 @@ export const OverviewCard = memo(function OverviewCard({
 											: "Selected cash flow"}
 									</span>
 									<strong className="type-value tabular-nums">
-										{currency.format(row.annualDirectIncome)} / year
+										{currency.format(row.annualDirectIncome)}
 									</strong>
 								</div>
-								<p className="mt-1 type-caption">
-									Initial annualized contribution used by the FI test.
-								</p>
 							</div>
 						) : null}
 
@@ -80,7 +79,7 @@ export const OverviewCard = memo(function OverviewCard({
 											<span>Account</span>
 											<span className="text-right">FI-date balance</span>
 											<span className="text-right">Withdrawal rate</span>
-											<span className="text-right">Available / year</span>
+											<span className="text-right">Annual capacity</span>
 										</div>
 										{row.assetContributions.map((contribution) => {
 											const account = accountsById.get(contribution.accountId);
@@ -116,49 +115,17 @@ export const OverviewCard = memo(function OverviewCard({
 												</div>
 											);
 										})}
-										<div className="grid grid-cols-[minmax(10rem,1fr)_8rem_7rem_9rem] gap-3 border-t-2 border-border/80 py-3 text-sm">
-											<strong className="type-value">
-												Total from accounts
-											</strong>
-											<strong className="text-right type-value tabular-nums">
-												{currency.format(row.selectedAssetBalance)}
-											</strong>
-											<span className="text-right text-muted-foreground">
-												-
-											</span>
-											<strong className="text-right type-value tabular-nums">
-												{currency.format(row.annualWithdrawalCapacity)}
-											</strong>
-										</div>
-										{row.annualDirectIncome > 0 ? (
-											<div className="grid grid-cols-[minmax(10rem,1fr)_8rem_7rem_9rem] gap-3 border-t border-border/60 py-3 text-sm">
-												<strong className="type-value">
-													Total available / year
-												</strong>
-												<span />
-												<span />
-												<strong className="text-right type-value tabular-nums text-primary">
-													{currency.format(row.totalAnnualCapacity)}
-												</strong>
-											</div>
-										) : null}
 									</div>
 								</div>
 							</div>
 						) : null}
-
-						<div className="rounded-2xl border border-primary-border/60 bg-primary-subtle/55 px-4 py-4 md:px-5">
-							<div className="type-label">Result</div>
-							<p className="mt-1 text-pretty text-base leading-relaxed text-foreground">
-								{describeFinancialIndependenceOutcome(plan, row, outcome)}
-							</p>
-						</div>
 					</>
 				) : (
 					<div className="rounded-2xl border border-dashed border-border/80 p-5">
 						<div className="type-eyebrow">Financial independence result</div>
 						<p className="mt-2 text-pretty text-foreground">
-							{describeFinancialIndependenceOutcome(plan, row, outcome)}
+							No complete {yearTestLabel(plan.evaluationYears)} fits in the
+							projection horizon.
 						</p>
 					</div>
 				)}
@@ -167,78 +134,103 @@ export const OverviewCard = memo(function OverviewCard({
 	);
 });
 
+function TestSummary({
+	plan,
+	row,
+	outcome,
+}: {
+	plan: FinancialIndependencePlan;
+	row: FinancialIndependenceRow;
+	outcome: FinancialIndependenceDetailedRunOutcome;
+}) {
+	const status =
+		outcome.status === "ineligible"
+			? "Not ready"
+			: !outcome.expensesFullyCovered
+				? `${currency.format(outcome.withdrawals.shortfallAmount)} short`
+				: !outcome.principalReplenished
+					? "Principal below target"
+					: "Passed";
+	const passed = status === "Passed";
+	return (
+		<div
+			className={`my-4 rounded-2xl border px-4 py-4 md:px-5 ${passed ? "border-primary-border/60 bg-primary-subtle/40" : "border-tertiary-border/70 bg-tertiary-subtle/45"}`}
+		>
+			<div className="flex flex-wrap items-center justify-between gap-2 border-b border-current/15 pb-3">
+				<div className="type-label">{yearTestLabel(plan.evaluationYears)}</div>
+				<strong className="rounded-full border border-current/15 bg-card/55 px-3 py-1 type-label uppercase tracking-[0.12em]">
+					{status}
+				</strong>
+			</div>
+			<div className="grid gap-3 pt-3 sm:grid-cols-2">
+				<SummaryCheck
+					label="Net worth"
+					value={`${currency.format(row.netWorth)} / ${currency.format(row.minimumNetWorth)}`}
+					basis="current / minimum"
+					met={outcome.minimumNetWorthMet}
+				/>
+				<SummaryCheck
+					label="FI-date annual capacity"
+					value={`${currency.format(row.totalAnnualCapacity)} / ${currency.format(row.annualExpenseTarget)}`}
+					basis="capacity / target"
+					met={outcome.initialCoverageMet}
+				/>
+			</div>
+			<div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-current/15 pt-3 type-caption">
+				<span>
+					Spending growth: {pct.format(plan.annualExpenseGrowthRate)} / year
+				</span>
+				<span>Principal target: {principalTargetLabel(plan)}</span>
+			</div>
+		</div>
+	);
+}
+
+function SummaryCheck({
+	label,
+	value,
+	basis,
+	met,
+}: {
+	label: string;
+	value: string;
+	basis: string;
+	met: boolean;
+}) {
+	return (
+		<section
+			aria-label={label}
+			className="rounded-xl border border-border/60 bg-card/55 px-3 py-3"
+		>
+			<div className="flex items-center justify-between gap-3">
+				<div className="type-label text-foreground/75">{label}</div>
+				<span
+					className={`rounded-full px-2 py-0.5 type-label uppercase tracking-[0.1em] ${met ? "bg-primary-subtle text-primary" : "bg-tertiary-subtle text-tertiary-foreground"}`}
+				>
+					{met ? "Met" : "Below"}
+				</span>
+			</div>
+			<div className="mt-2 type-value tabular-nums">{value}</div>
+			<div className="mt-0.5 type-caption">{basis}</div>
+		</section>
+	);
+}
+
 function expenseBasisLabel(plan: FinancialIndependencePlan) {
 	return plan.annualExpenseTargetBasis === "projection-start-purchasing-power"
 		? "projection-start purchasing power"
 		: "dollars at FI start";
 }
 
-export function describeFinancialIndependenceOutcome(
-	plan: FinancialIndependencePlan,
-	row: FinancialIndependenceRow | undefined,
-	outcome: FinancialIndependenceDetailedRunOutcome | undefined,
-) {
-	if (!row || !outcome) {
-		return `No complete ${yearTestLabel(plan.evaluationYears)} fits in the projection horizon.`;
-	}
-
-	if (outcome.status === "ineligible") {
-		const failedGates = [
-			!outcome.minimumNetWorthMet ? "the minimum net worth gate" : null,
-			!outcome.initialCoverageMet ? "the initial funding-capacity gate" : null,
-		].filter((gate): gate is string => gate !== null);
-		return `This plan cannot begin the ${yearTestLabel(plan.evaluationYears)} because it does not meet ${formatList(failedGates)}.`;
-	}
-
-	const target = `spending starting at ${currency.format(row.annualExpenseTarget)} per year${
-		plan.annualExpenseGrowthRate > 0
-			? ` and growing ${pct.format(plan.annualExpenseGrowthRate)} annually`
-			: ""
-	} for ${yearLabel(plan.evaluationYears)}`;
-	if (!outcome.expensesFullyCovered) {
-		return `This plan cannot fully fund ${target}. It leaves ${currency.format(outcome.withdrawals.shortfallAmount)} unfunded across the test, so it does not satisfy the chosen ${principalPolicyStrategyLabel(plan)}.`;
-	}
-	if (!outcome.principalReplenished) {
-		return `This plan can fund ${target}, but ${failedPrincipalPolicyDescription(plan)}`;
-	}
-	return `This plan can fund ${target}. ${successfulPrincipalPolicyDescription(plan)}`;
-}
-
-function successfulPrincipalPolicyDescription(plan: FinancialIndependencePlan) {
+function principalTargetLabel(plan: FinancialIndependencePlan) {
 	switch (plan.principalPolicy) {
 		case "preserve-real-principal":
-			return "Selected assets collectively retain their inflation-adjusted starting value.";
+			return "Purchasing power";
 		case "preserve-nominal-principal":
-			return "Selected assets collectively retain their starting dollar value.";
+			return "Starting dollars";
 		case "allow-drawdown":
-			return "Selected assets may finish below their starting balance under the chosen drawdown strategy.";
+			return "Drawdown allowed";
 	}
-}
-
-function failedPrincipalPolicyDescription(plan: FinancialIndependencePlan) {
-	switch (plan.principalPolicy) {
-		case "preserve-real-principal":
-			return "selected assets collectively do not retain their inflation-adjusted starting value.";
-		case "preserve-nominal-principal":
-			return "selected assets collectively do not retain their starting dollar value.";
-		case "allow-drawdown":
-			return "the selected drawdown strategy is not satisfied.";
-	}
-}
-
-function principalPolicyStrategyLabel(plan: FinancialIndependencePlan) {
-	switch (plan.principalPolicy) {
-		case "preserve-real-principal":
-			return "purchasing-power preservation strategy";
-		case "preserve-nominal-principal":
-			return "starting-dollar preservation strategy";
-		case "allow-drawdown":
-			return "portfolio-drawdown strategy";
-	}
-}
-
-function yearLabel(years: number) {
-	return `${years} ${years === 1 ? "year" : "years"}`;
 }
 
 function yearTestLabel(years: number) {

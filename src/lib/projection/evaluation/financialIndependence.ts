@@ -1093,10 +1093,11 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 			unitAction: "checked",
 			intensiveUnitLabel: "candidate sustainability cycles",
 			intensiveUnitAction: "attempted",
-			description:
-				candidateCount === 0
-					? `No complete ${config.evaluationYears}-year FI test fits in this projection horizon.`
-					: `Failed cycles stop at the first shortfall; date checks stop after the first successful ${config.evaluationYears}-year test.`,
+			...(candidateCount === 0
+				? {
+						description: `No complete ${config.evaluationYears}-year FI test fits in this projection horizon.`,
+					}
+				: {}),
 		};
 	},
 	diagnoseConfig({ path }, config) {

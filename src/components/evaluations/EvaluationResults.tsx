@@ -1,9 +1,12 @@
+import { SimulationProgressPanel } from "@/components/SimulationProgressPanel";
+import { StochasticProgressDetails } from "@/components/StochasticProgressDetails";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type {
 	EvaluationInstance,
 	EvaluationResultCollection,
 	FinancialModelDocument,
 	ProjectionResult,
+	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import { EVALUATION_TYPE_ORDER } from "@/lib/projection";
@@ -18,6 +21,8 @@ interface EvaluationResultsProps {
 	stochasticIsProvisional?: boolean;
 	sourceRevision?: number;
 	resultsAreStale?: boolean;
+	stochasticIsRunning?: boolean;
+	stochasticProgress?: StochasticProgress | null;
 	blockerValue?: string;
 	blockerDetail?: string;
 }
@@ -29,6 +34,8 @@ export function EvaluationResults({
 	stochasticResult,
 	stochasticIsProvisional = false,
 	resultsAreStale = false,
+	stochasticIsRunning = false,
+	stochasticProgress = null,
 	sourceRevision = 0,
 	blockerValue = "No blocking constraint",
 	blockerDetail = "No evaluation blocker was identified.",
@@ -62,12 +69,26 @@ export function EvaluationResults({
 							const envelope = resultCollection?.evaluations[type].find(
 								(candidate) => candidate.instanceId === evaluation.instanceId,
 							);
+							const stochasticWorkload =
+								stochasticProgress?.evaluationWorkloads.find(
+									(workload) =>
+										workload.type === type &&
+										workload.instanceId === evaluation.instanceId,
+								);
+							const hasLocalProgress =
+								evaluation.enabled &&
+								stochasticIsRunning &&
+								stochasticProgress !== null &&
+								stochasticWorkload !== undefined;
 							const status = evaluation.enabled
 								? resultsAreStale
 									? "updating"
 									: `${stochasticIsProvisional && stochasticResult ? "provisional " : ""}${envelope?.status ?? "pending"}`
 								: "disabled";
 							const ResultRenderer = definition.ResultRenderer;
+							const workloadProgressPct = stochasticProgress
+								? Math.round(stochasticProgress.fraction * 100)
+								: null;
 							return (
 								<Card
 									key={evaluation.instanceId}
@@ -83,12 +104,43 @@ export function EvaluationResults({
 													{evaluation.instanceId}
 												</div>
 											</div>
-											<span className="rounded-full border border-border/70 px-3 py-1 type-label uppercase tracking-[0.12em]">
-												{status}
-											</span>
+											{hasLocalProgress ? null : (
+												<span className="rounded-full border border-border/70 px-3 py-1 type-label uppercase tracking-[0.12em]">
+													{status}
+												</span>
+											)}
 										</div>
 									</CardHeader>
 									<CardContent className="space-y-4 p-4 md:p-6">
+										{hasLocalProgress &&
+										stochasticProgress &&
+										stochasticWorkload ? (
+											<SimulationProgressPanel
+												title={
+													type === "financialIndependence"
+														? "Running FI Monte Carlo"
+														: `Updating ${evaluation.label}`
+												}
+												description={
+													type === "financialIndependence"
+														? resultsAreStale
+															? "Previous FI results are hidden until recalculation completes."
+															: "The deterministic FI result below is current. Monte Carlo confidence is still being calculated."
+														: "Monte Carlo analysis is recomputing this evaluation's outcome."
+												}
+												progressPct={workloadProgressPct}
+												progressLabel={`${evaluation.label} Monte Carlo progress`}
+											>
+												<StochasticProgressDetails
+													progress={stochasticProgress}
+													showPhase={false}
+													showWorkloadLabels={false}
+													showWorkloadTotals={false}
+													showDescriptions={false}
+													workloads={[stochasticWorkload]}
+												/>
+											</SimulationProgressPanel>
+										) : null}
 										{config.error ? (
 											<Diagnostic message={config.error} error />
 										) : null}
@@ -101,7 +153,7 @@ export function EvaluationResults({
 										))}
 										{evaluation.enabled &&
 										config.normalized !== null &&
-										(!resultsAreStale || type === "financialIndependence") ? (
+										!resultsAreStale ? (
 											<ResultRenderer
 												evaluation={{
 													...evaluation,
@@ -116,7 +168,9 @@ export function EvaluationResults({
 												blockerValue={blockerValue}
 												blockerDetail={blockerDetail}
 											/>
-										) : resultsAreStale && evaluation.enabled ? (
+										) : resultsAreStale &&
+											evaluation.enabled &&
+											!hasLocalProgress ? (
 											<p className="rounded-2xl border border-dashed border-border/80 p-5 type-muted">
 												Updating this evaluation with the current settings.
 											</p>

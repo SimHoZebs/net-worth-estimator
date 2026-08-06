@@ -8,6 +8,7 @@ import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	FinancialModelDocument,
 	ProjectionResult,
+	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import {
@@ -15,7 +16,11 @@ import {
 	getPostingFulfillmentResult,
 } from "@/lib/projection";
 import { useModelRuntime } from "@/runtime/modelRuntime";
-import { useProjectionArtifacts } from "@/runtime/projectionRuntime";
+import {
+	useProjectionArtifacts,
+	useProjectionExecution,
+	useStochasticProgress,
+} from "@/runtime/projectionRuntime";
 import { selectCurrentChangeCount, useStore } from "@/store";
 import { CashFlowWaterfall } from "./dashboard/CashFlowWaterfall";
 import { AccountDiagnosticChart } from "./dashboard/charts/AccountDiagnosticChart";
@@ -34,6 +39,8 @@ interface ProjectionDashboardProps {
 	sourceRevision: number;
 	evaluationResultsAreStale?: boolean;
 	stochasticEvaluationResultsAreStale?: boolean;
+	stochasticIsRunning?: boolean;
+	stochasticProgress?: StochasticProgress | null;
 }
 
 export const ProjectionDashboard = memo(function ProjectionDashboard() {
@@ -49,6 +56,8 @@ export const ProjectionDashboard = memo(function ProjectionDashboard() {
 		projectionResultIsStale,
 		stochasticResultIsStale,
 	} = useProjectionArtifacts();
+	const { isStochasticRunning } = useProjectionExecution();
+	const stochasticProgress = useStochasticProgress();
 	const document = effectiveDocument ?? canonicalDocument;
 	if (!document || !result) return null;
 	return (
@@ -60,6 +69,8 @@ export const ProjectionDashboard = memo(function ProjectionDashboard() {
 			sourceRevision={dataUpdatedAt}
 			evaluationResultsAreStale={projectionResultIsStale}
 			stochasticEvaluationResultsAreStale={stochasticResultIsStale}
+			stochasticIsRunning={isStochasticRunning}
+			stochasticProgress={stochasticProgress}
 		/>
 	);
 });
@@ -72,6 +83,8 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 	sourceRevision,
 	evaluationResultsAreStale = false,
 	stochasticEvaluationResultsAreStale = false,
+	stochasticIsRunning = false,
+	stochasticProgress = null,
 }: ProjectionDashboardProps) {
 	const hasStochasticData =
 		stochasticResult !== undefined && stochasticResult !== null;
@@ -136,6 +149,8 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 				stochasticIsProvisional={stochasticIsProvisional}
 				sourceRevision={sourceRevision}
 				resultsAreStale={evaluationResultsAreStale}
+				stochasticIsRunning={stochasticIsRunning}
+				stochasticProgress={stochasticProgress}
 				blockerValue={derived.blockerValue}
 				blockerDetail={derived.blockerDetail}
 			/>

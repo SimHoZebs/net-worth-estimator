@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { CurrentChangesComparison } from "@/components/CurrentChangesComparison";
 import { ProjectionDashboard } from "@/components/ProjectionDashboard";
+import { SimulationProgressPanel } from "@/components/SimulationProgressPanel";
 import { StochasticProgressDetails } from "@/components/StochasticProgressDetails";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -75,13 +76,6 @@ export function ResultsPage() {
 					</AlertDescription>
 				</Alert>
 			) : null}
-			{document && (isProjecting || isStochasticRunning) ? (
-				<ProjectionActivity
-					isProjecting={isProjecting}
-					isStochasticRunning={isStochasticRunning}
-					stochasticProgress={stochasticProgress}
-				/>
-			) : null}
 			{!validationIsValid ? (
 				<Alert variant="destructive" className="rounded-[1.6rem]">
 					<AlertTitle>Projection blocked by model errors</AlertTitle>
@@ -106,6 +100,15 @@ export function ResultsPage() {
 			{runtimeError ? (
 				<ErrorAlert title="Projection failed" message={runtimeError} />
 			) : null}
+			{document &&
+			validationIsValid &&
+			(isProjecting || isStochasticRunning) ? (
+				<ProjectionActivity
+					isProjecting={isProjecting}
+					isStochasticRunning={isStochasticRunning}
+					stochasticProgress={stochasticProgress}
+				/>
+			) : null}
 
 			{document && validationIsValid && result ? (
 				<>
@@ -126,60 +129,39 @@ function ProjectionActivity({
 	isStochasticRunning: boolean;
 	stochasticProgress: StochasticProgress | null;
 }) {
-	const progressPct =
+	const stochasticProgressPct =
 		isStochasticRunning && stochasticProgress !== null
 			? Math.round(stochasticProgress.fraction * 100)
 			: null;
-	const title = isProjecting
-		? isStochasticRunning
-			? "Updating projection and Monte Carlo analysis"
-			: "Updating projection"
-		: "Updating Monte Carlo analysis";
-	const description = isProjecting
-		? isStochasticRunning
-			? "Recomputing deterministic evaluations and stochastic outcomes with the current settings. Existing evaluation results may be stale until this finishes."
-			: "Recomputing balances and evaluations with the current model and settings."
-		: "Recomputing stochastic evaluation outcomes with the current settings. Existing stochastic results may be stale until this finishes.";
 
 	return (
-		<Alert
-			variant="tertiary"
-			role="status"
-			aria-live="polite"
-			className="rounded-[1.6rem] px-4 py-3"
-		>
-			<div className="flex items-start gap-3">
-				<span className="relative mt-1.5 flex size-2.5 shrink-0" aria-hidden>
-					<span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-35" />
-					<span className="relative inline-flex size-2.5 rounded-full bg-current" />
-				</span>
-				<div className="min-w-0 flex-1">
-					<div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-						<AlertTitle>{title}</AlertTitle>
-						{progressPct !== null ? (
-							<span className="type-label tabular-nums">{progressPct}%</span>
-						) : null}
-					</div>
-					<AlertDescription>{description}</AlertDescription>
-					{isStochasticRunning && stochasticProgress ? (
-						<StochasticProgressDetails progress={stochasticProgress} />
-					) : null}
-					<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-current/10">
-						<div
-							role="progressbar"
-							aria-label="Projection progress"
-							aria-valuemin={0}
-							aria-valuemax={100}
-							aria-valuenow={progressPct ?? undefined}
-							className={`h-full rounded-full bg-current transition-[width] duration-300 ${progressPct === null ? "animate-pulse" : ""}`}
-							style={{
-								width: progressPct === null ? "35%" : `${progressPct}%`,
-							}}
+		<section className="space-y-3" aria-label="Projection activity">
+			{isProjecting ? (
+				<SimulationProgressPanel
+					title="Updating base projection"
+					description="Recomputing projected balances and deterministic evaluation outcomes."
+					progressPct={null}
+					progressLabel="Base projection progress"
+					live={!isStochasticRunning}
+				/>
+			) : null}
+			{isStochasticRunning ? (
+				<SimulationProgressPanel
+					title="Updating Monte Carlo projection ranges"
+					description="Recomputing the probabilistic ranges shown with the base projection. Evaluation-specific work appears with each evaluation below."
+					progressPct={stochasticProgressPct}
+					progressLabel="Monte Carlo projection progress"
+					live
+				>
+					{stochasticProgress ? (
+						<StochasticProgressDetails
+							progress={stochasticProgress}
+							workloads={[]}
 						/>
-					</div>
-				</div>
-			</div>
-		</Alert>
+					) : null}
+				</SimulationProgressPanel>
+			) : null}
+		</section>
 	);
 }
 
