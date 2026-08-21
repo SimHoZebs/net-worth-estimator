@@ -45,12 +45,12 @@ The persistence boundary is the validated `FinancialModelDocument` aggregate. CS
 ### Projection Artifacts
 
 - Derived projection artifacts are separate from the canonical `FinancialModelRepository` and use the backend-agnostic `ProjectionArtifactStore` contract.
-- The browser implementation stores immutable artifacts in memory for the current application session.
-- Canonical semantic descriptors are serialized with sorted object keys and order-preserving arrays, then addressed by SHA-256.
+- The browser implementation stores immutable artifacts in IndexedDB for reuse across application sessions.
+- Canonical semantic descriptors are serialized with sorted object keys and order-preserving arrays, then addressed by a versioned SHA-256 identity.
 - Deterministic base paths and evaluation results are stored separately. Evaluation-only changes reuse the base simulation, while label-only changes relabel cached results without computation.
 - Completed stochastic results are cached by effective simulation inputs, normalized run count, seed intent, and evaluation configuration. A first unseeded cache miss materializes a concrete seed; later identical requests reuse that persisted outcome.
 - Progressive stochastic results are never persisted. A stochastic evaluation cache miss replays samples because individual sample paths are intentionally not retained.
-- Hashing, validation, and artifact-store failures fail open: workers still compute the requested projection.
+- IndexedDB, hashing, validation, and artifact-store failures fail open: workers still compute the requested projection.
 
 ## 4. Core Types
 

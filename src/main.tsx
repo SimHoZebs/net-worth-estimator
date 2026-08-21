@@ -11,10 +11,8 @@ import {
 	RouteErrorFallback,
 	RouteLoadingFallback,
 } from "./components/RouteErrorFallback";
-import { CachedProjectionEngine } from "./engine/CachedProjectionEngine";
+import { createApplicationProjectionEngine } from "./engine/applicationProjectionEngine";
 import { ProjectionEngineProvider } from "./engine/ProjectionEngineContext";
-import { WorkerProjectionEngine } from "./engine/WorkerProjectionEngine";
-import { InMemoryProjectionArtifactStore } from "./lib/projection/artifacts";
 import "./styles.css";
 
 const AnalysisPage = lazy(() =>
@@ -51,10 +49,7 @@ const queryClient = new QueryClient({
 	},
 });
 
-const engine = new CachedProjectionEngine(
-	new WorkerProjectionEngine(),
-	new InMemoryProjectionArtifactStore(),
-);
+const engine = createApplicationProjectionEngine();
 
 const router = createBrowserRouter([
 	{
