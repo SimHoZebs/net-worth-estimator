@@ -72,7 +72,7 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 5. **Projection**: `useProjection`/`useStochastic` -> `CachedProjectionEngine` -> `WorkerProjectionEngine` on misses -> Web Workers -> `prepareSimulationRequest` -> `simulate` -> `ProjectionPath` -> evaluation/analysis aggregation.
 6. **Monte Carlo**: one prepared request is reused, each `MonteCarloSample` produces a path-only run, exact percentiles are aggregated, and progress is emitted in worker batches of 50.
 7. **Browser persistence**: `net-worth-estimator:financial-model` stores the financial model. Malformed or noncanonical data surfaces diagnostics; reset removes that key and reloads bundled CSV data. Analyses use the canonical model postings and add no separate transaction key.
-8. **Derived artifacts**: `ProjectionArtifactStore` is separate from `FinancialModelRepository`; browser artifacts are content-addressed, session-only, and disposable.
+8. **Derived artifacts**: `ProjectionArtifactStore` is separate from `FinancialModelRepository`; browser artifacts are content-addressed, persisted in IndexedDB, bounded, and disposable.
 9. **Independent analyses**: `AnalysisDefinition` computations run as explicit pipelines over posting-derived observations. Active analyses contribute classifier requirements to one shared posting-classification plan before payroll detection and salary estimation; the pipeline does not participate in projection or mutate the financial model.
 
 ## Key Types

@@ -1,4 +1,6 @@
+import { indexedDB } from "fake-indexeddb";
 import { describe, expect, it, vi } from "vitest";
+import { createApplicationProjectionEngine } from "@/engine/applicationProjectionEngine";
 import { CachedProjectionEngine } from "@/engine/CachedProjectionEngine";
 import {
 	EMPTY_MODEL_OVERRIDES,
@@ -11,7 +13,10 @@ import {
 	createBaseDocument,
 	makeSettings,
 } from "@/lib/projection/__fixtures__";
-import { InMemoryProjectionArtifactStore } from "@/lib/projection/artifacts";
+import {
+	IndexedDbProjectionArtifactStore,
+	InMemoryProjectionArtifactStore,
+} from "@/lib/projection/artifacts";
 import type {
 	ProjectionComputationEngine,
 	ProjectionEvaluationRequest,
@@ -67,7 +72,7 @@ function deferred<T>() {
 }
 
 describe("CachedProjectionEngine", () => {
-	it("reuses deterministic artifacts across fresh engine instances", async () => {
+	it("reuses deterministic artifacts across fresh engines sharing a store", async () => {
 		const store = new InMemoryProjectionArtifactStore();
 		const firstCompute = createComputationEngine();
 		const first = new CachedProjectionEngine(firstCompute, store);
@@ -81,6 +86,50 @@ describe("CachedProjectionEngine", () => {
 		expect(actual).toEqual(expected);
 		expect(firstCompute.projectBase).toHaveBeenCalledOnce();
 		expect(firstCompute.evaluateProjection).toHaveBeenCalledOnce();
+		expect(secondCompute.projectBase).not.toHaveBeenCalled();
+		expect(secondCompute.evaluateProjection).not.toHaveBeenCalled();
+	});
+
+	it("reuses deterministic artifacts across independent persistent stores", async () => {
+		const databaseName = `projection-artifacts-reload-${crypto.randomUUID()}`;
+		const request = projectionRequest();
+		const firstCompute = createComputationEngine();
+		const first = new CachedProjectionEngine(
+			firstCompute,
+			new IndexedDbProjectionArtifactStore({ databaseName, indexedDB }),
+		);
+		const expected = await first.project(request);
+
+		const secondCompute = createComputationEngine();
+		const second = new CachedProjectionEngine(
+			secondCompute,
+			new IndexedDbProjectionArtifactStore({ databaseName, indexedDB }),
+		);
+		const actual = await second.project(structuredClone(request));
+
+		expect(actual).toEqual(expected);
+		expect(firstCompute.projectBase).toHaveBeenCalledOnce();
+		expect(firstCompute.evaluateProjection).toHaveBeenCalledOnce();
+		expect(secondCompute.projectBase).not.toHaveBeenCalled();
+		expect(secondCompute.evaluateProjection).not.toHaveBeenCalled();
+	});
+
+	it("uses persistent artifacts in the application engine composition", async () => {
+		vi.stubGlobal("indexedDB", indexedDB);
+		const request = projectionRequest();
+		const firstCompute = createComputationEngine();
+		const first = createApplicationProjectionEngine({
+			computationEngine: firstCompute,
+		});
+		const expected = await first.project(request);
+
+		const secondCompute = createComputationEngine();
+		const second = createApplicationProjectionEngine({
+			computationEngine: secondCompute,
+		});
+		const actual = await second.project(structuredClone(request));
+
+		expect(actual).toEqual(expected);
 		expect(secondCompute.projectBase).not.toHaveBeenCalled();
 		expect(secondCompute.evaluateProjection).not.toHaveBeenCalled();
 	});
@@ -246,6 +295,24 @@ describe("CachedProjectionEngine", () => {
 		expect(result.timeline.rows.length).toBeGreaterThan(0);
 		expect(compute.projectBase).toHaveBeenCalledOnce();
 		expect(compute.evaluateProjection).toHaveBeenCalledOnce();
+	});
+
+	it("fails open without deleting artifacts when storage reads fail", async () => {
+		const compute = createComputationEngine();
+		const store = {
+			get: vi.fn().mockRejectedValue(new TypeError("invalid artifact")),
+			delete: vi.fn().mockResolvedValue(undefined),
+			putIfAbsent: vi
+				.fn()
+				.mockImplementation(async (_key, artifact) => artifact),
+		};
+
+		await new CachedProjectionEngine(compute, store).project(
+			projectionRequest(),
+		);
+
+		expect(store.delete).not.toHaveBeenCalled();
+		expect(compute.projectBase).toHaveBeenCalledOnce();
 	});
 
 	it("deletes corrupt artifacts and recomputes them", async () => {
