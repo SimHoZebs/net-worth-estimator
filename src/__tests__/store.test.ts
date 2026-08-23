@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-	createExpressionAmount,
-	type FinancialModelDocument,
-} from "@/lib/projection";
-import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
+import type { FinancialModelDocument } from "@/lib/projection";
+import { makeAccount, makePosting } from "@/lib/projection/__fixtures__";
 import {
 	DEFAULT_EVALUATIONS,
 	selectCurrentChangeCount,
@@ -11,56 +8,20 @@ import {
 	useStore,
 } from "@/store";
 
-/* ------------------------------------------------------------------ */
-/*  Test helpers                                                       */
-/* ------------------------------------------------------------------ */
-
-function makeAccount(id = "a1", label = "Savings") {
-	return {
-		id,
-		label,
-		minBalance: NO_FLOOR,
-		maxBalance: NO_CEILING,
-		color: null,
-		enabled: true,
-	};
-}
-
-function makePosting(id = "p1") {
-	return {
-		id,
-		label: "Salary",
-		sourceAccountId: null,
-		destinations: null,
-		amount: createExpressionAmount("5000"),
-		frequency: "monthly" as const,
-		annualRate: 0,
-		annualGrowthRate: 0,
-		volatility: 0,
-		startDate: "2025-01-01",
-		endDate: null,
-		annualCap: null,
-		priority: 1,
-		enabled: true,
-	};
-}
-
 function makeFinancialModelDocument(): FinancialModelDocument {
 	return {
 		sourcePath: "/configs",
-		accounts: [
-			{
-				id: "a1",
-				label: "Savings",
-				minBalance: NO_FLOOR,
-				maxBalance: NO_CEILING,
-				color: null,
-				enabled: true,
-			},
-		],
+		accounts: [makeAccount({ id: "a1", label: "Savings" })],
 		checkpoints: [],
 		evaluations: structuredClone(DEFAULT_EVALUATIONS),
-		postings: [makePosting("p1")],
+		postings: [
+			makePosting({
+				id: "p1",
+				label: "Salary",
+				arithmetic: "5000",
+				startDate: "2025-01-01",
+			}),
+		],
 	};
 }
 
@@ -75,27 +36,27 @@ describe("Model overrides slice", () => {
 
 	it("adds a temporary account", () => {
 		const before = useStore.getState().addedAccounts;
-		useStore.getState().addTemporaryAccount(makeAccount());
+		useStore.getState().addTemporaryAccount(makeAccount({ id: "a1" }));
 		expect(useStore.getState().addedAccounts).toHaveLength(1);
 		expect(useStore.getState().addedAccounts).not.toBe(before);
 	});
 
 	it("removes a temporary account by id", () => {
-		useStore.getState().addTemporaryAccount(makeAccount("a1"));
-		useStore.getState().addTemporaryAccount(makeAccount("a2"));
+		useStore.getState().addTemporaryAccount(makeAccount({ id: "a1" }));
+		useStore.getState().addTemporaryAccount(makeAccount({ id: "a2" }));
 		useStore.getState().removeTemporaryAccount("a1");
 		expect(useStore.getState().addedAccounts).toHaveLength(1);
 		expect(useStore.getState().addedAccounts[0].id).toBe("a2");
 	});
 
 	it("adds a temporary posting", () => {
-		useStore.getState().addTemporaryPosting(makePosting());
+		useStore.getState().addTemporaryPosting(makePosting({ id: "p1" }));
 		expect(useStore.getState().addedPostings).toHaveLength(1);
 	});
 
 	it("removes a temporary posting by id", () => {
-		useStore.getState().addTemporaryPosting(makePosting("p1"));
-		useStore.getState().addTemporaryPosting(makePosting("p2"));
+		useStore.getState().addTemporaryPosting(makePosting({ id: "p1" }));
+		useStore.getState().addTemporaryPosting(makePosting({ id: "p2" }));
 		useStore.getState().removeTemporaryPosting("p1");
 		expect(useStore.getState().addedPostings).toHaveLength(1);
 		expect(useStore.getState().addedPostings[0].id).toBe("p2");
@@ -122,8 +83,8 @@ describe("Model overrides slice", () => {
 	});
 
 	it("resets all overrides to initial state", () => {
-		useStore.getState().addTemporaryAccount(makeAccount());
-		useStore.getState().addTemporaryPosting(makePosting());
+		useStore.getState().addTemporaryAccount(makeAccount({ id: "a1" }));
+		useStore.getState().addTemporaryPosting(makePosting({ id: "p1" }));
 		useStore.getState().toggleAccountDisabled("a1");
 		useStore.getState().togglePostingDisabled("p1");
 		useStore.getState().resetCurrentChanges();
@@ -141,16 +102,18 @@ describe("Model overrides slice", () => {
 describe("Selectors", () => {
 	it("selectCurrentChangeCount returns correct count", () => {
 		useStore.getState().resetCurrentChanges();
-		useStore.getState().addTemporaryAccount(makeAccount());
-		useStore.getState().addTemporaryAccount(makeAccount("a2", "Checking"));
-		useStore.getState().addTemporaryPosting(makePosting());
+		useStore.getState().addTemporaryAccount(makeAccount({ id: "a1" }));
+		useStore
+			.getState()
+			.addTemporaryAccount(makeAccount({ id: "a2", label: "Checking" }));
+		useStore.getState().addTemporaryPosting(makePosting({ id: "p1" }));
 		useStore.getState().toggleAccountDisabled("a1");
 		expect(selectCurrentChangeCount(useStore.getState())).toBe(4);
 	});
 
 	it("selectModelOverrides returns the current overrides", () => {
 		useStore.getState().resetCurrentChanges();
-		useStore.getState().addTemporaryAccount(makeAccount());
+		useStore.getState().addTemporaryAccount(makeAccount({ id: "a1" }));
 		useStore.getState().togglePostingDisabled("p1");
 		const modelOverrides = selectModelOverrides(useStore.getState());
 		expect(modelOverrides.addedAccounts).toHaveLength(1);
@@ -169,7 +132,7 @@ describe("Comparison slice", () => {
 	});
 
 	it("captures derived metrics without creating a restorable model", () => {
-		useStore.getState().addTemporaryAccount(makeAccount());
+		useStore.getState().addTemporaryAccount(makeAccount({ id: "a1" }));
 		useStore.getState().captureCurrentComparison("Trial", {
 			currentNetWorth: 100,
 			finalNetWorth: 200,
@@ -204,16 +167,20 @@ describe("Editor slice", () => {
 			const before = useStore.getState();
 			useStore.getState().updateAccount("a1", { label: "New" });
 			useStore.getState().deleteAccount("a1");
-			useStore.getState().addAccount(makeAccount());
+			useStore.getState().addAccount(makeAccount({ id: "a1" }));
 			useStore.getState().updatePosting("p1", { label: "New" });
 			useStore.getState().deletePosting("p1");
-			useStore.getState().addPosting(makePosting());
+			useStore.getState().addPosting(makePosting({ id: "p1" }));
 			expect(useStore.getState()).toBe(before);
 		});
 	});
 
 	describe("with a financial model document", () => {
-		const document = makeFinancialModelDocument();
+		let document: FinancialModelDocument;
+
+		beforeEach(() => {
+			document = makeFinancialModelDocument();
+		});
 
 		it("startEditing clones the document and sets isEditing", () => {
 			useStore.getState().startEditing(document);
@@ -247,7 +214,9 @@ describe("Editor slice", () => {
 
 		it("addAccount appends to workingDocument", () => {
 			useStore.getState().startEditing(document);
-			useStore.getState().addAccount(makeAccount("a2", "Checking"));
+			useStore
+				.getState()
+				.addAccount(makeAccount({ id: "a2", label: "Checking" }));
 			expect(useStore.getState().workingDocument?.accounts).toHaveLength(2);
 		});
 
@@ -268,7 +237,7 @@ describe("Editor slice", () => {
 
 		it("addPosting appends to workingDocument", () => {
 			useStore.getState().startEditing(document);
-			useStore.getState().addPosting(makePosting("p2"));
+			useStore.getState().addPosting(makePosting({ id: "p2" }));
 			expect(useStore.getState().workingDocument?.postings).toHaveLength(2);
 		});
 
