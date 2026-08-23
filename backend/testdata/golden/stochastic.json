@@ -1,0 +1,2247 @@
+{
+	"document": {
+		"sourcePath": "/configs",
+		"accounts": [
+			{
+				"label": "checking",
+				"minBalance": -10000000000000,
+				"maxBalance": 10000000000000,
+				"color": null,
+				"enabled": true,
+				"id": "checking"
+			},
+			{
+				"label": "brokerage",
+				"minBalance": -10000000000000,
+				"maxBalance": 10000000000000,
+				"color": null,
+				"enabled": true,
+				"id": "brokerage"
+			},
+			{
+				"label": "loan",
+				"minBalance": -10000000000000,
+				"maxBalance": 10000000000000,
+				"color": null,
+				"enabled": true,
+				"id": "loan"
+			}
+		],
+		"checkpoints": [],
+		"evaluations": {
+			"financialIndependence": [],
+			"netWorthThreshold": [],
+			"postingFulfillment": []
+		},
+		"postings": [
+			{
+				"label": "seed_checking",
+				"sourceAccountId": null,
+				"destinations": ["checking"],
+				"amount": {
+					"resolver": "expression",
+					"config": {
+						"expression": "1000"
+					},
+					"inputs": {}
+				},
+				"frequency": "monthly",
+				"annualRate": 0,
+				"annualGrowthRate": 0,
+				"volatility": 0.08,
+				"startDate": "2026-02-01",
+				"endDate": null,
+				"annualCap": null,
+				"priority": 1,
+				"enabled": true,
+				"id": "seed_checking"
+			},
+			{
+				"label": "spend",
+				"sourceAccountId": "checking",
+				"destinations": null,
+				"amount": {
+					"resolver": "expression",
+					"config": {
+						"expression": "400"
+					},
+					"inputs": {}
+				},
+				"frequency": "monthly",
+				"annualRate": 0,
+				"annualGrowthRate": 0,
+				"volatility": 0,
+				"startDate": "2026-02-05",
+				"endDate": null,
+				"annualCap": null,
+				"priority": 1,
+				"enabled": true,
+				"id": "spend"
+			}
+		]
+	},
+	"settings": {
+		"fallbackProjectionStartDate": "2026-02-01",
+		"horizonYears": 1,
+		"evaluations": {
+			"financialIndependence": [],
+			"netWorthThreshold": [
+				{
+					"instanceId": "nw-500",
+					"label": "Net worth 500",
+					"enabled": true,
+					"config": {
+						"target": 500
+					}
+				}
+			],
+			"postingFulfillment": [
+				{
+					"instanceId": "pf-all",
+					"label": "Posting fulfillment",
+					"enabled": true,
+					"config": {
+						"postingIds": null
+					}
+				}
+			]
+		}
+	},
+	"overrides": {
+		"addedAccounts": [],
+		"addedPostings": [],
+		"disabledAccountIds": [],
+		"disabledPostingIds": []
+	},
+	"config": {
+		"runCount": 20,
+		"seed": 42
+	},
+	"result": {
+		"config": {
+			"runCount": 20,
+			"seed": 42
+		},
+		"deterministic": {
+			"timeline": {
+				"rows": [
+					{
+						"date": "2026-02-01",
+						"isHistorical": false,
+						"netWorth": 1000,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-02-01",
+								"balance": 1000,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-02-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-02-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-02-05",
+						"isHistorical": false,
+						"netWorth": 600,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-02-05",
+								"balance": 600,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-02-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-02-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-03-01",
+						"isHistorical": false,
+						"netWorth": 1600,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-03-01",
+								"balance": 1600,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-03-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-03-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-03-05",
+						"isHistorical": false,
+						"netWorth": 1200,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-03-05",
+								"balance": 1200,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-03-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-03-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-04-01",
+						"isHistorical": false,
+						"netWorth": 2200,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-04-01",
+								"balance": 2200,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-04-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-04-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-04-05",
+						"isHistorical": false,
+						"netWorth": 1800,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-04-05",
+								"balance": 1800,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-04-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-04-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-05-01",
+						"isHistorical": false,
+						"netWorth": 2800,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-05-01",
+								"balance": 2800,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-05-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-05-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-05-05",
+						"isHistorical": false,
+						"netWorth": 2400,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-05-05",
+								"balance": 2400,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-05-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-05-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-06-01",
+						"isHistorical": false,
+						"netWorth": 3400,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-06-01",
+								"balance": 3400,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-06-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-06-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-06-05",
+						"isHistorical": false,
+						"netWorth": 3000,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-06-05",
+								"balance": 3000,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-06-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-06-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-07-01",
+						"isHistorical": false,
+						"netWorth": 4000,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-07-01",
+								"balance": 4000,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-07-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-07-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-07-05",
+						"isHistorical": false,
+						"netWorth": 3600,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-07-05",
+								"balance": 3600,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-07-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-07-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-08-01",
+						"isHistorical": false,
+						"netWorth": 4600,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-08-01",
+								"balance": 4600,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-08-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-08-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-08-05",
+						"isHistorical": false,
+						"netWorth": 4200,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-08-05",
+								"balance": 4200,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-08-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-08-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-09-01",
+						"isHistorical": false,
+						"netWorth": 5200,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-09-01",
+								"balance": 5200,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-09-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-09-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-09-05",
+						"isHistorical": false,
+						"netWorth": 4800,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-09-05",
+								"balance": 4800,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-09-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-09-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-10-01",
+						"isHistorical": false,
+						"netWorth": 5800,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-10-01",
+								"balance": 5800,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-10-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-10-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-10-05",
+						"isHistorical": false,
+						"netWorth": 5400,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-10-05",
+								"balance": 5400,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-10-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-10-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-11-01",
+						"isHistorical": false,
+						"netWorth": 6400,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-11-01",
+								"balance": 6400,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-11-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-11-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-11-05",
+						"isHistorical": false,
+						"netWorth": 6000,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-11-05",
+								"balance": 6000,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-11-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-11-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-12-01",
+						"isHistorical": false,
+						"netWorth": 7000,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-12-01",
+								"balance": 7000,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-12-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-12-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-12-05",
+						"isHistorical": false,
+						"netWorth": 6600,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-12-05",
+								"balance": 6600,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-12-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-12-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2027-01-01",
+						"isHistorical": false,
+						"netWorth": 7600,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2027-01-01",
+								"balance": 7600,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2027-01-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2027-01-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2027-01-05",
+						"isHistorical": false,
+						"netWorth": 7200,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2027-01-05",
+								"balance": 7200,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2027-01-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2027-01-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2027-02-01",
+						"isHistorical": false,
+						"netWorth": 8200,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2027-02-01",
+								"balance": 8200,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2027-02-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2027-02-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					}
+				],
+				"sampledRows": [
+					{
+						"date": "2026-02-01",
+						"isHistorical": false,
+						"netWorth": 1000,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-02-01",
+								"balance": 1000,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-02-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-02-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-02-05",
+						"isHistorical": false,
+						"netWorth": 600,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-02-05",
+								"balance": 600,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-02-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-02-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-03-01",
+						"isHistorical": false,
+						"netWorth": 1600,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-03-01",
+								"balance": 1600,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-03-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-03-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-03-05",
+						"isHistorical": false,
+						"netWorth": 1200,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-03-05",
+								"balance": 1200,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-03-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-03-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-04-01",
+						"isHistorical": false,
+						"netWorth": 2200,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-04-01",
+								"balance": 2200,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-04-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-04-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-04-05",
+						"isHistorical": false,
+						"netWorth": 1800,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-04-05",
+								"balance": 1800,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-04-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-04-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-05-01",
+						"isHistorical": false,
+						"netWorth": 2800,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-05-01",
+								"balance": 2800,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-05-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-05-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-05-05",
+						"isHistorical": false,
+						"netWorth": 2400,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-05-05",
+								"balance": 2400,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-05-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-05-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-06-01",
+						"isHistorical": false,
+						"netWorth": 3400,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-06-01",
+								"balance": 3400,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-06-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-06-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-06-05",
+						"isHistorical": false,
+						"netWorth": 3000,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-06-05",
+								"balance": 3000,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-06-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-06-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-07-01",
+						"isHistorical": false,
+						"netWorth": 4000,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-07-01",
+								"balance": 4000,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-07-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-07-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-07-05",
+						"isHistorical": false,
+						"netWorth": 3600,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-07-05",
+								"balance": 3600,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-07-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-07-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-08-01",
+						"isHistorical": false,
+						"netWorth": 4600,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-08-01",
+								"balance": 4600,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-08-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-08-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-08-05",
+						"isHistorical": false,
+						"netWorth": 4200,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-08-05",
+								"balance": 4200,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-08-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-08-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-09-01",
+						"isHistorical": false,
+						"netWorth": 5200,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-09-01",
+								"balance": 5200,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-09-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-09-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-09-05",
+						"isHistorical": false,
+						"netWorth": 4800,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-09-05",
+								"balance": 4800,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-09-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-09-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-10-01",
+						"isHistorical": false,
+						"netWorth": 5800,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-10-01",
+								"balance": 5800,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-10-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-10-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-10-05",
+						"isHistorical": false,
+						"netWorth": 5400,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-10-05",
+								"balance": 5400,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-10-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-10-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-11-01",
+						"isHistorical": false,
+						"netWorth": 6400,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-11-01",
+								"balance": 6400,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-11-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-11-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-11-05",
+						"isHistorical": false,
+						"netWorth": 6000,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-11-05",
+								"balance": 6000,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-11-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-11-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-12-01",
+						"isHistorical": false,
+						"netWorth": 7000,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-12-01",
+								"balance": 7000,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-12-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-12-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2026-12-05",
+						"isHistorical": false,
+						"netWorth": 6600,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2026-12-05",
+								"balance": 6600,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2026-12-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2026-12-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2027-01-01",
+						"isHistorical": false,
+						"netWorth": 7600,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2027-01-01",
+								"balance": 7600,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2027-01-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2027-01-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2027-01-05",
+						"isHistorical": false,
+						"netWorth": 7200,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2027-01-05",
+								"balance": 7200,
+								"impacts": [
+									{
+										"postingId": "spend",
+										"delta": -400
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2027-01-05",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2027-01-05",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 0,
+						"externalOutflowAmount": 400,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					},
+					{
+						"date": "2027-02-01",
+						"isHistorical": false,
+						"netWorth": 8200,
+						"accountSnapshots": [
+							{
+								"accountId": "checking",
+								"date": "2027-02-01",
+								"balance": 8200,
+								"impacts": [
+									{
+										"postingId": "seed_checking",
+										"delta": 1000
+									}
+								]
+							},
+							{
+								"accountId": "brokerage",
+								"date": "2027-02-01",
+								"balance": 0,
+								"impacts": []
+							},
+							{
+								"accountId": "loan",
+								"date": "2027-02-01",
+								"balance": 0,
+								"impacts": []
+							}
+						],
+						"externalInflowAmount": 1000,
+						"externalOutflowAmount": 0,
+						"internalTransferAmount": 0,
+						"checkpointCorrections": []
+					}
+				]
+			},
+			"accountSummaries": [
+				{
+					"accountId": "checking",
+					"label": "checking",
+					"color": null,
+					"enabled": true,
+					"startingBalance": 0,
+					"endingBalance": 8200
+				},
+				{
+					"accountId": "brokerage",
+					"label": "brokerage",
+					"color": null,
+					"enabled": true,
+					"startingBalance": 0,
+					"endingBalance": 0
+				},
+				{
+					"accountId": "loan",
+					"label": "loan",
+					"color": null,
+					"enabled": true,
+					"startingBalance": 0,
+					"endingBalance": 0
+				}
+			],
+			"totals": {
+				"externalInflowAmount": 13000,
+				"externalOutflowAmount": 4800,
+				"internalTransferAmount": 0
+			},
+			"milestones": {
+				"latestHistoricalDate": null,
+				"projectionStartDate": "2026-02-01"
+			},
+			"summary": {
+				"currentNetWorth": 0,
+				"finalNetWorth": 8200
+			},
+			"evaluations": {
+				"financialIndependence": [],
+				"netWorthThreshold": [
+					{
+						"instanceId": "nw-500",
+						"label": "Net worth 500",
+						"status": "satisfied",
+						"deterministic": {
+							"reached": true,
+							"firstReachedDate": "2026-02-01"
+						},
+						"probabilistic": null,
+						"diagnostics": []
+					}
+				],
+				"postingFulfillment": [
+					{
+						"instanceId": "pf-all",
+						"label": "Posting fulfillment",
+						"status": "satisfied",
+						"deterministic": {
+							"requestedAmount": 17800,
+							"realizedAmount": 17800,
+							"destinationLimitedAmount": 0,
+							"unfulfilledAmount": 0,
+							"completionRate": 1,
+							"firstUnderfulfilledDate": null,
+							"events": [],
+							"dates": [],
+							"postings": []
+						},
+						"probabilistic": null,
+						"diagnostics": []
+					}
+				]
+			}
+		},
+		"bands": [
+			{
+				"date": "2026-02-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 1000,
+					"p25": 1000,
+					"p50": 1000,
+					"p75": 1000,
+					"p90": 1000
+				}
+			},
+			{
+				"date": "2026-02-05",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 600,
+					"p25": 600,
+					"p50": 600,
+					"p75": 600,
+					"p90": 600
+				}
+			},
+			{
+				"date": "2026-03-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 1600,
+					"p25": 1600,
+					"p50": 1600,
+					"p75": 1600,
+					"p90": 1600
+				}
+			},
+			{
+				"date": "2026-03-05",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 1200,
+					"p25": 1200,
+					"p50": 1200,
+					"p75": 1200,
+					"p90": 1200
+				}
+			},
+			{
+				"date": "2026-04-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 2200,
+					"p25": 2200,
+					"p50": 2200,
+					"p75": 2200,
+					"p90": 2200
+				}
+			},
+			{
+				"date": "2026-04-05",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 1800,
+					"p25": 1800,
+					"p50": 1800,
+					"p75": 1800,
+					"p90": 1800
+				}
+			},
+			{
+				"date": "2026-05-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 2800,
+					"p25": 2800,
+					"p50": 2800,
+					"p75": 2800,
+					"p90": 2800
+				}
+			},
+			{
+				"date": "2026-05-05",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 2400,
+					"p25": 2400,
+					"p50": 2400,
+					"p75": 2400,
+					"p90": 2400
+				}
+			},
+			{
+				"date": "2026-06-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 3400,
+					"p25": 3400,
+					"p50": 3400,
+					"p75": 3400,
+					"p90": 3400
+				}
+			},
+			{
+				"date": "2026-06-05",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 3000,
+					"p25": 3000,
+					"p50": 3000,
+					"p75": 3000,
+					"p90": 3000
+				}
+			},
+			{
+				"date": "2026-07-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 4000,
+					"p25": 4000,
+					"p50": 4000,
+					"p75": 4000,
+					"p90": 4000
+				}
+			},
+			{
+				"date": "2026-07-05",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 3600,
+					"p25": 3600,
+					"p50": 3600,
+					"p75": 3600,
+					"p90": 3600
+				}
+			},
+			{
+				"date": "2026-08-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 4600,
+					"p25": 4600,
+					"p50": 4600,
+					"p75": 4600,
+					"p90": 4600
+				}
+			},
+			{
+				"date": "2026-08-05",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 4200,
+					"p25": 4200,
+					"p50": 4200,
+					"p75": 4200,
+					"p90": 4200
+				}
+			},
+			{
+				"date": "2026-09-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 5200,
+					"p25": 5200,
+					"p50": 5200,
+					"p75": 5200,
+					"p90": 5200
+				}
+			},
+			{
+				"date": "2026-09-05",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 4800,
+					"p25": 4800,
+					"p50": 4800,
+					"p75": 4800,
+					"p90": 4800
+				}
+			},
+			{
+				"date": "2026-10-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 5800,
+					"p25": 5800,
+					"p50": 5800,
+					"p75": 5800,
+					"p90": 5800
+				}
+			},
+			{
+				"date": "2026-10-05",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 5400,
+					"p25": 5400,
+					"p50": 5400,
+					"p75": 5400,
+					"p90": 5400
+				}
+			},
+			{
+				"date": "2026-11-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 6400,
+					"p25": 6400,
+					"p50": 6400,
+					"p75": 6400,
+					"p90": 6400
+				}
+			},
+			{
+				"date": "2026-11-05",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 6000,
+					"p25": 6000,
+					"p50": 6000,
+					"p75": 6000,
+					"p90": 6000
+				}
+			},
+			{
+				"date": "2026-12-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 7000,
+					"p25": 7000,
+					"p50": 7000,
+					"p75": 7000,
+					"p90": 7000
+				}
+			},
+			{
+				"date": "2026-12-05",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 6600,
+					"p25": 6600,
+					"p50": 6600,
+					"p75": 6600,
+					"p90": 6600
+				}
+			},
+			{
+				"date": "2027-01-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 7600,
+					"p25": 7600,
+					"p50": 7600,
+					"p75": 7600,
+					"p90": 7600
+				}
+			},
+			{
+				"date": "2027-01-05",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 7200,
+					"p25": 7200,
+					"p50": 7200,
+					"p75": 7200,
+					"p90": 7200
+				}
+			},
+			{
+				"date": "2027-02-01",
+				"isHistorical": false,
+				"netWorth": {
+					"p10": 8200,
+					"p25": 8200,
+					"p50": 8200,
+					"p75": 8200,
+					"p90": 8200
+				}
+			}
+		],
+		"milestones": {
+			"finalNetWorthPercentiles": {
+				"p10": 8200,
+				"p25": 8200,
+				"p50": 8200,
+				"p75": 8200,
+				"p90": 8200
+			}
+		},
+		"evaluations": {
+			"financialIndependence": [],
+			"netWorthThreshold": [
+				{
+					"instanceId": "nw-500",
+					"label": "Net worth 500",
+					"status": "satisfied",
+					"deterministic": {
+						"reached": true,
+						"firstReachedDate": "2026-02-01"
+					},
+					"probabilistic": {
+						"probability": 1,
+						"p10ReachedDate": "2026-02-01",
+						"medianReachedDate": "2026-02-01",
+						"p90ReachedDate": "2026-02-01"
+					},
+					"diagnostics": []
+				}
+			],
+			"postingFulfillment": [
+				{
+					"instanceId": "pf-all",
+					"label": "Posting fulfillment",
+					"status": "satisfied",
+					"deterministic": {
+						"requestedAmount": 17800,
+						"realizedAmount": 17800,
+						"destinationLimitedAmount": 0,
+						"unfulfilledAmount": 0,
+						"completionRate": 1,
+						"firstUnderfulfilledDate": null,
+						"events": [],
+						"dates": [],
+						"postings": []
+					},
+					"probabilistic": {
+						"runCount": 20,
+						"fulfilledRunCount": 20,
+						"fullFulfillmentProbability": 1,
+						"unfulfilledAmountPercentiles": {
+							"p10": 0,
+							"p25": 0,
+							"p50": 0,
+							"p75": 0,
+							"p90": 0
+						}
+					},
+					"diagnostics": []
+				}
+			]
+		}
+	}
+}

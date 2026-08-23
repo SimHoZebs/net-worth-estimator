@@ -9,13 +9,11 @@ import {
 import { useIncomeDataQuery } from "@/hooks/useIncomeData";
 import type { TemplateOutput } from "@/lib/patterns";
 import {
-	createBrowserFinancialModelRepository,
-	createCsvApiFinancialModelRepository,
-	createCsvIncomeDataSource,
-	INCOME_DATA_API_PATH,
 	summarizeValidationIssues,
 	validateCsvFinancialModel,
 } from "@/lib/projection";
+import { createHttpFinancialModelRepository } from "@/lib/projection/sources/http/httpFinancialModelRepository";
+import { createHttpIncomeDataSource } from "@/lib/projection/sources/http/httpIncomeDataSource";
 import {
 	ModelRuntimeProvider,
 	type ModelSourceInfo,
@@ -25,15 +23,11 @@ import { useProjectionOrchestration } from "@/runtime/useProjectionOrchestration
 import { useStore } from "@/store";
 
 function createModelRepository() {
-	return import.meta.env.DEV
-		? createCsvApiFinancialModelRepository()
-		: createBrowserFinancialModelRepository();
+	return createHttpFinancialModelRepository();
 }
 
 function createIncomeDataSource() {
-	return createCsvIncomeDataSource(
-		import.meta.env.DEV ? { basePath: INCOME_DATA_API_PATH } : undefined,
-	);
+	return createHttpIncomeDataSource();
 }
 
 export default function App() {

@@ -1,8 +1,5 @@
 import type {
-	EvaluationResultCollection,
-	FinancialModelDocument,
 	ProjectionResult,
-	RawProjectionOutput,
 	StochasticConfig,
 	StochasticProjectionResult,
 } from "@/lib/projection";
@@ -32,19 +29,12 @@ import {
 	labelStochasticResult,
 } from "@/lib/projection/runtime/resultLabels";
 import { normalizeStochasticConfig } from "@/lib/projection/utils/stochastic";
-import {
-	decodeEvaluationResultCollection,
-	decodeRawProjectionOutput,
-	decodeStochasticProjectionResult,
-} from "@/workers/types";
 
 // Bump when projection algorithms or persisted payload semantics change.
-const ARTIFACT_CACHE_VERSION = 1;
 
-type ArtifactPayload =
-	| RawProjectionOutput
-	| EvaluationResultCollection
-	| StochasticProjectionResult;
+const ARTIFACT_CACHE_VERSION = 2;
+
+type ArtifactPayload = ProjectionResult | StochasticProjectionResult;
 
 interface ArtifactIdentity {
 	kind: string;
@@ -56,20 +46,29 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
 	if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 }
 
-function isEvaluationResultCollection(
-	value: unknown,
-): value is EvaluationResultCollection {
-	return decodeEvaluationResultCollection(value) !== null;
-}
+// Structural guards for self-produced cache payloads. The in-memory store only
+// ever holds values this engine published, so light checks suffice.
 
-function isRawProjectionOutput(value: unknown): value is RawProjectionOutput {
-	return decodeRawProjectionOutput(value) !== null;
+function isProjectionResult(value: unknown): value is ProjectionResult {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"timeline" in value &&
+		"evaluations" in value &&
+		"summary" in value
+	);
 }
 
 function isStochasticProjectionResult(
 	value: unknown,
 ): value is StochasticProjectionResult {
-	return decodeStochasticProjectionResult(value) !== null;
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"deterministic" in value &&
+		"bands" in value &&
+		"config" in value
+	);
 }
 
 function baseDescriptor(request: ProjectionRequest) {
@@ -89,19 +88,6 @@ function baseDescriptor(request: ProjectionRequest) {
 	};
 }
 
-function withEffectiveDocument(
-	raw: RawProjectionOutput,
-	effectiveDocument: FinancialModelDocument,
-): RawProjectionOutput {
-	return {
-		result: structuredClone(raw.result),
-		path: {
-			...structuredClone(raw.path),
-			effectiveDocument: structuredClone(effectiveDocument),
-		},
-	};
-}
-
 function createConcreteSeed(): number {
 	const values = new Uint32Array(1);
 	globalThis.crypto.getRandomValues(values);
@@ -117,17 +103,19 @@ export class CachedProjectionEngine implements ProjectionEngine {
 	async project(request: ProjectionRequest): Promise<ProjectionResult> {
 		throwIfAborted(request.signal);
 		const settings = projectionComputationSettings(request.projectionSettings);
-		let prepared: ReturnType<typeof baseDescriptor>;
-		let baseIdentity: ArtifactIdentity;
+		let identity: ArtifactIdentity;
 		try {
-			prepared = baseDescriptor({ ...request, projectionSettings: settings });
-			baseIdentity = await this.identity(
-				"deterministic-base",
-				prepared.descriptor,
-			);
+			const prepared = baseDescriptor({
+				...request,
+				projectionSettings: settings,
+			});
+			identity = await this.identity("deterministic", {
+				base: prepared.descriptor,
+				evaluations: evaluationComputationDescriptor(settings.evaluations),
+			});
 		} catch (error) {
 			traceProjectionCache("cache.identity.error", {
-				kind: "deterministic-base",
+				kind: "deterministic",
 				...projectionCacheErrorDetails(error),
 			});
 			throwIfAborted(request.signal);
@@ -135,97 +123,48 @@ export class CachedProjectionEngine implements ProjectionEngine {
 		}
 		throwIfAborted(request.signal);
 
-		let raw = await this.read(
-			baseIdentity,
-			isRawProjectionOutput,
+		const cached = await this.read(
+			identity,
+			isProjectionResult,
 			request.signal,
 		);
-		if (!raw) {
-			traceProjectionCache("compute.start", {
-				kind: baseIdentity.kind,
-				key: baseIdentity.key,
-			});
-			try {
-				raw = await this.compute.projectBase({
-					...request,
-					projectionSettings: settings,
-				});
-			} catch (error) {
-				traceProjectionCache("compute.error", {
-					kind: baseIdentity.kind,
-					key: baseIdentity.key,
-					...projectionCacheErrorDetails(error),
-				});
-				throw error;
-			}
-			traceProjectionCache("compute.complete", {
-				kind: baseIdentity.kind,
-				key: baseIdentity.key,
-			});
-			raw = await this.publish(baseIdentity, raw, isRawProjectionOutput);
-		}
-		raw = withEffectiveDocument(raw, prepared.effectiveDocument);
-
-		let evaluationIdentity: ArtifactIdentity;
-		try {
-			evaluationIdentity = await this.identity("deterministic-evaluation", {
-				baseDigest: baseIdentity.digest,
-				evaluations: evaluationComputationDescriptor(settings.evaluations),
-			});
-		} catch (error) {
-			traceProjectionCache("cache.identity.error", {
-				kind: "deterministic-evaluation",
-				...projectionCacheErrorDetails(error),
-			});
-			throwIfAborted(request.signal);
-			const evaluations = await this.compute.evaluateProjection({
-				path: raw.path,
-				evaluations: settings.evaluations,
-				signal: request.signal,
+		if (cached) {
+			traceProjectionCache("cache.hit", {
+				kind: identity.kind,
+				key: identity.key,
 			});
 			return labelProjectionResult(
-				{ ...raw.result, ...evaluations },
+				cached,
 				request.projectionSettings.evaluations,
 			);
 		}
 
-		let evaluations = await this.read(
-			evaluationIdentity,
-			isEvaluationResultCollection,
-			request.signal,
-		);
-		if (!evaluations) {
-			traceProjectionCache("compute.start", {
-				kind: evaluationIdentity.kind,
-				key: evaluationIdentity.key,
+		traceProjectionCache("compute.start", {
+			kind: identity.kind,
+			key: identity.key,
+		});
+		let computed: ProjectionResult;
+		try {
+			computed = await this.compute.project({
+				...request,
+				projectionSettings: settings,
 			});
-			try {
-				evaluations = await this.compute.evaluateProjection({
-					path: raw.path,
-					evaluations: settings.evaluations,
-					signal: request.signal,
-				});
-			} catch (error) {
-				traceProjectionCache("compute.error", {
-					kind: evaluationIdentity.kind,
-					key: evaluationIdentity.key,
-					...projectionCacheErrorDetails(error),
-				});
-				throw error;
-			}
-			traceProjectionCache("compute.complete", {
-				kind: evaluationIdentity.kind,
-				key: evaluationIdentity.key,
+		} catch (error) {
+			traceProjectionCache("compute.error", {
+				kind: identity.kind,
+				key: identity.key,
+				...projectionCacheErrorDetails(error),
 			});
-			evaluations = await this.publish(
-				evaluationIdentity,
-				evaluations,
-				isEvaluationResultCollection,
-			);
+			throw error;
 		}
+		traceProjectionCache("compute.complete", {
+			kind: identity.kind,
+			key: identity.key,
+		});
+		const winner = await this.publish(identity, computed, isProjectionResult);
 		throwIfAborted(request.signal);
 		return labelProjectionResult(
-			{ ...raw.result, ...evaluations },
+			winner,
 			request.projectionSettings.evaluations,
 		);
 	}

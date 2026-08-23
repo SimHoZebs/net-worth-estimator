@@ -1,0 +1,261 @@
+{
+	"document": {
+		"sourcePath": "/configs",
+		"accounts": [
+			{
+				"label": "checking",
+				"minBalance": -10000000000000,
+				"maxBalance": 10000000000000,
+				"color": null,
+				"enabled": true,
+				"id": "checking"
+			},
+			{
+				"label": "brokerage",
+				"minBalance": -10000000000000,
+				"maxBalance": 10000000000000,
+				"color": null,
+				"enabled": true,
+				"id": "brokerage"
+			},
+			{
+				"label": "loan",
+				"minBalance": -10000000000000,
+				"maxBalance": 10000000000000,
+				"color": null,
+				"enabled": true,
+				"id": "loan"
+			}
+		],
+		"checkpoints": [],
+		"evaluations": {
+			"financialIndependence": [],
+			"netWorthThreshold": [],
+			"postingFulfillment": []
+		},
+		"postings": [
+			{
+				"id": "salary",
+				"label": "Salary",
+				"sourceAccountId": null,
+				"destinations": ["checking"],
+				"amount": {
+					"resolver": "income",
+					"config": {
+						"incomeSourceId": "salary",
+						"resolvers": [
+							{
+								"resolver": "percentage",
+								"config": {
+									"rate": 0.04,
+									"annualCap": 23000
+								},
+								"destinationAccountId": "brokerage",
+								"employerMatchRate": 0.5
+							},
+							{
+								"resolver": "progressive-bracket",
+								"config": {
+									"profileId": "simple"
+								},
+								"destinationAccountId": null
+							}
+						]
+					},
+					"inputs": {}
+				},
+				"frequency": "monthly",
+				"annualRate": 0,
+				"annualGrowthRate": 0,
+				"volatility": 0,
+				"startDate": "2026-02-05",
+				"endDate": null,
+				"annualCap": null,
+				"priority": 1,
+				"enabled": true
+			},
+			{
+				"label": "spend",
+				"sourceAccountId": "checking",
+				"destinations": null,
+				"amount": {
+					"resolver": "expression",
+					"config": {
+						"expression": "700"
+					},
+					"inputs": {}
+				},
+				"frequency": "monthly",
+				"annualRate": 0,
+				"annualGrowthRate": 0,
+				"volatility": 0,
+				"startDate": "2026-02-06",
+				"endDate": "2026-02-06",
+				"annualCap": null,
+				"priority": 1,
+				"enabled": true,
+				"id": "spend"
+			}
+		]
+	},
+	"settings": {
+		"fallbackProjectionStartDate": "2026-02-01",
+		"horizonYears": 0,
+		"evaluations": {
+			"financialIndependence": [],
+			"netWorthThreshold": [],
+			"postingFulfillment": [
+				{
+					"instanceId": "pf-all",
+					"label": "Posting fulfillment",
+					"enabled": true,
+					"config": {
+						"postingIds": null
+					}
+				}
+			]
+		}
+	},
+	"overrides": {
+		"addedAccounts": [],
+		"addedPostings": [],
+		"disabledAccountIds": [],
+		"disabledPostingIds": []
+	},
+	"incomeData": {
+		"incomeSources": [
+			{
+				"id": "salary",
+				"label": "Salary",
+				"effectiveFrom": "2026-01-01",
+				"effectiveTo": null,
+				"annualGrossIncome": 120000
+			}
+		],
+		"taxProfiles": [
+			{
+				"id": "simple",
+				"label": "Simple",
+				"deduction": 16100,
+				"brackets": [
+					{
+						"upTo": 24800,
+						"rate": 0.1
+					},
+					{
+						"upTo": null,
+						"rate": 0.12
+					}
+				],
+				"sourceUrl": null
+			}
+		]
+	},
+	"result": {
+		"timeline": {
+			"rows": [],
+			"sampledRows": []
+		},
+		"accountSummaries": [
+			{
+				"accountId": "checking",
+				"label": "checking",
+				"color": null,
+				"enabled": true,
+				"startingBalance": 0,
+				"endingBalance": 0
+			},
+			{
+				"accountId": "brokerage",
+				"label": "brokerage",
+				"color": null,
+				"enabled": true,
+				"startingBalance": 0,
+				"endingBalance": 0
+			},
+			{
+				"accountId": "loan",
+				"label": "loan",
+				"color": null,
+				"enabled": true,
+				"startingBalance": 0,
+				"endingBalance": 0
+			}
+		],
+		"totals": {
+			"externalInflowAmount": 0,
+			"externalOutflowAmount": 0,
+			"internalTransferAmount": 0
+		},
+		"milestones": {
+			"latestHistoricalDate": null,
+			"projectionStartDate": "2026-02-01"
+		},
+		"summary": {
+			"currentNetWorth": 0,
+			"finalNetWorth": 0
+		},
+		"evaluations": {
+			"financialIndependence": [],
+			"netWorthThreshold": [],
+			"postingFulfillment": [
+				{
+					"instanceId": "pf-all",
+					"label": "Posting fulfillment",
+					"status": "satisfied",
+					"deterministic": {
+						"requestedAmount": 0,
+						"realizedAmount": 0,
+						"destinationLimitedAmount": 0,
+						"unfulfilledAmount": 0,
+						"completionRate": 1,
+						"firstUnderfulfilledDate": null,
+						"events": [],
+						"dates": [],
+						"postings": [
+							{
+								"postingId": "salary",
+								"label": "Salary",
+								"sourceAccountId": null,
+								"sourceAccountLabel": null,
+								"destinations": [
+									{
+										"accountId": "checking",
+										"label": "checking"
+									}
+								],
+								"priority": 1,
+								"annualCap": null,
+								"requestedAmount": 0,
+								"realizedAmount": 0,
+								"destinationLimitedAmount": 0,
+								"utilizationRate": 0,
+								"completionRate": 1,
+								"firstUnderfulfilledDate": null,
+								"unfulfilledAmount": 0
+							},
+							{
+								"postingId": "spend",
+								"label": "spend",
+								"sourceAccountId": "checking",
+								"sourceAccountLabel": "checking",
+								"destinations": null,
+								"priority": 1,
+								"annualCap": null,
+								"requestedAmount": 0,
+								"realizedAmount": 0,
+								"destinationLimitedAmount": 0,
+								"utilizationRate": 0,
+								"completionRate": 1,
+								"firstUnderfulfilledDate": null,
+								"unfulfilledAmount": 0
+							}
+						]
+					},
+					"probabilistic": null,
+					"diagnostics": []
+				}
+			]
+		}
+	}
+}
