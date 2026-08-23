@@ -4,9 +4,7 @@ import { createApplicationProjectionEngine } from "@/engine/applicationProjectio
 import { CachedProjectionEngine } from "@/engine/CachedProjectionEngine";
 import {
 	EMPTY_MODEL_OVERRIDES,
-	evaluateProjectionPath,
 	projectFinancialModelDocument,
-	projectRawFinancialModelDocument,
 	stochasticProject,
 } from "@/lib/projection";
 import {
@@ -19,7 +17,6 @@ import {
 } from "@/lib/projection/artifacts";
 import type {
 	ProjectionComputationEngine,
-	ProjectionEvaluationRequest,
 	ProjectionRequest,
 	StochasticRequest,
 } from "@/lib/projection/runtime/ProjectionEngine";
@@ -33,16 +30,12 @@ function createComputationEngine(): ProjectionComputationEngine {
 				request.overrides,
 			),
 		),
-		projectBase: vi.fn(async (request: ProjectionRequest) =>
-			projectRawFinancialModelDocument(
-				request.document,
-				request.projectionSettings,
-				request.overrides,
-			),
-		),
-		evaluateProjection: vi.fn(async (request: ProjectionEvaluationRequest) =>
-			evaluateProjectionPath(request.path, request.evaluations),
-		),
+		projectBase: vi.fn(async () => {
+			throw new Error("projectBase is not used by the cached engine.");
+		}),
+		evaluateProjection: vi.fn(async () => {
+			throw new Error("evaluateProjection is not used by the cached engine.");
+		}),
 		projectStochastic: vi.fn(async (request: StochasticRequest, onProgress) =>
 			stochasticProject(
 				request.document,
@@ -84,10 +77,8 @@ describe("CachedProjectionEngine", () => {
 		const actual = await second.project(structuredClone(request));
 
 		expect(actual).toEqual(expected);
-		expect(firstCompute.projectBase).toHaveBeenCalledOnce();
-		expect(firstCompute.evaluateProjection).toHaveBeenCalledOnce();
-		expect(secondCompute.projectBase).not.toHaveBeenCalled();
-		expect(secondCompute.evaluateProjection).not.toHaveBeenCalled();
+		expect(firstCompute.project).toHaveBeenCalledOnce();
+		expect(secondCompute.project).not.toHaveBeenCalled();
 	});
 
 	it("reuses deterministic artifacts across independent persistent stores", async () => {
@@ -108,33 +99,18 @@ describe("CachedProjectionEngine", () => {
 		const actual = await second.project(structuredClone(request));
 
 		expect(actual).toEqual(expected);
-		expect(firstCompute.projectBase).toHaveBeenCalledOnce();
-		expect(firstCompute.evaluateProjection).toHaveBeenCalledOnce();
-		expect(secondCompute.projectBase).not.toHaveBeenCalled();
-		expect(secondCompute.evaluateProjection).not.toHaveBeenCalled();
+		expect(firstCompute.project).toHaveBeenCalledOnce();
+		expect(secondCompute.project).not.toHaveBeenCalled();
 	});
 
-	it("uses persistent artifacts in the application engine composition", async () => {
+	it("composes the backend computation engine with a session-local store", () => {
 		vi.stubGlobal("indexedDB", indexedDB);
-		const request = projectionRequest();
-		const firstCompute = createComputationEngine();
-		const first = createApplicationProjectionEngine({
-			computationEngine: firstCompute,
-		});
-		const expected = await first.project(request);
-
-		const secondCompute = createComputationEngine();
-		const second = createApplicationProjectionEngine({
-			computationEngine: secondCompute,
-		});
-		const actual = await second.project(structuredClone(request));
-
-		expect(actual).toEqual(expected);
-		expect(secondCompute.projectBase).not.toHaveBeenCalled();
-		expect(secondCompute.evaluateProjection).not.toHaveBeenCalled();
+		const engine = createApplicationProjectionEngine();
+		expect(engine).toBeInstanceOf(CachedProjectionEngine);
+		vi.unstubAllGlobals();
 	});
 
-	it("recomputes evaluations without rerunning the deterministic base", async () => {
+	it("recomputes when evaluation configuration changes", async () => {
 		const compute = createComputationEngine();
 		const engine = new CachedProjectionEngine(
 			compute,
@@ -148,8 +124,7 @@ describe("CachedProjectionEngine", () => {
 			.financialIndependence[0]!.config.annualExpenseTarget += 1_000;
 		await engine.project(changed);
 
-		expect(compute.projectBase).toHaveBeenCalledOnce();
-		expect(compute.evaluateProjection).toHaveBeenCalledTimes(2);
+		expect(compute.project).toHaveBeenCalledTimes(2);
 	});
 
 	it("recomputes FI evaluations when the expense basis changes", async () => {
@@ -167,8 +142,7 @@ describe("CachedProjectionEngine", () => {
 			"projection-start-purchasing-power";
 		await engine.project(changed);
 
-		expect(compute.projectBase).toHaveBeenCalledOnce();
-		expect(compute.evaluateProjection).toHaveBeenCalledTimes(2);
+		expect(compute.project).toHaveBeenCalledTimes(2);
 	});
 
 	it("returns current labels without invalidating cached computation", async () => {
@@ -188,8 +162,7 @@ describe("CachedProjectionEngine", () => {
 		expect(result.evaluations.financialIndependence[0]?.label).toBe(
 			"Retirement readiness",
 		);
-		expect(compute.projectBase).toHaveBeenCalledOnce();
-		expect(compute.evaluateProjection).toHaveBeenCalledOnce();
+		expect(compute.project).toHaveBeenCalledOnce();
 	});
 
 	it("ignores configuration changes for disabled evaluations", async () => {
@@ -207,11 +180,10 @@ describe("CachedProjectionEngine", () => {
 			.financialIndependence[0]!.config.annualExpenseTarget += 1_000;
 		await engine.project(changed);
 
-		expect(compute.projectBase).toHaveBeenCalledOnce();
-		expect(compute.evaluateProjection).toHaveBeenCalledOnce();
+		expect(compute.project).toHaveBeenCalledOnce();
 	});
 
-	it("invalidates the base when simulation inputs change", async () => {
+	it("invalidates cached results when simulation inputs change", async () => {
 		const compute = createComputationEngine();
 		const engine = new CachedProjectionEngine(
 			compute,
@@ -223,7 +195,7 @@ describe("CachedProjectionEngine", () => {
 		changed.projectionSettings.horizonYears = 2;
 		await engine.project(changed);
 
-		expect(compute.projectBase).toHaveBeenCalledTimes(2);
+		expect(compute.project).toHaveBeenCalledTimes(2);
 	});
 
 	it("persists one concrete outcome for null-seed requests", async () => {
@@ -293,8 +265,7 @@ describe("CachedProjectionEngine", () => {
 		);
 
 		expect(result.timeline.rows.length).toBeGreaterThan(0);
-		expect(compute.projectBase).toHaveBeenCalledOnce();
-		expect(compute.evaluateProjection).toHaveBeenCalledOnce();
+		expect(compute.project).toHaveBeenCalledOnce();
 	});
 
 	it("fails open without deleting artifacts when storage reads fail", async () => {
@@ -312,7 +283,7 @@ describe("CachedProjectionEngine", () => {
 		);
 
 		expect(store.delete).not.toHaveBeenCalled();
-		expect(compute.projectBase).toHaveBeenCalledOnce();
+		expect(compute.project).toHaveBeenCalledOnce();
 	});
 
 	it("deletes corrupt artifacts and recomputes them", async () => {
@@ -336,7 +307,7 @@ describe("CachedProjectionEngine", () => {
 
 		expect(result.timeline.rows.length).toBeGreaterThan(0);
 		expect(store.delete).toHaveBeenCalled();
-		expect(compute.projectBase).toHaveBeenCalledOnce();
+		expect(compute.project).toHaveBeenCalledOnce();
 	});
 
 	it("does not return a stochastic result aborted during persistence", async () => {

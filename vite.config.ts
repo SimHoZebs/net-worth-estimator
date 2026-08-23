@@ -3,20 +3,18 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
-import { csvFilePlugin } from "./plugins/csvFilePlugin";
 
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, process.cwd(), "");
+	const backendOrigin =
+		env.NET_WORTH_ESTIMATOR_BACKEND ?? "http://localhost:8787";
 	return {
-		plugins: [
-			react(),
-			tailwindcss(),
-			csvFilePlugin({
-				csvPath: env.NET_WORTH_ESTIMATOR_MODEL_PATH ?? "./public/configs",
-				incomePath:
-					env.NET_WORTH_ESTIMATOR_INCOME_PATH ?? "./public/data/income",
-			}),
-		],
+		plugins: [react(), tailwindcss()],
+		server: {
+			proxy: {
+				"/v1": { target: backendOrigin, changeOrigin: true },
+			},
+		},
 		resolve: {
 			alias: {
 				"@": path.resolve(import.meta.dirname, "./src"),
