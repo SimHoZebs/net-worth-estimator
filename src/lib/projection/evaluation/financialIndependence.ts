@@ -32,10 +32,15 @@ import {
 	compareIsoDates,
 	daysBetween,
 } from "../utils/date";
+import {
+	FI_SHORTFALL_TOLERANCE,
+	hasInsufficientOptimisticWithdrawalCapacity,
+	minimumAnnualWithdrawals,
+} from "./financialIndependenceBounds";
 import { classifyMovementConstraints } from "./movementConstraints";
 import type { EvaluationDefinition } from "./runtime";
 
-const EPSILON = 0.01;
+const EPSILON = FI_SHORTFALL_TOLERANCE;
 
 function movementUnfulfilledAmount(result: AccountMovementResult) {
 	return Math.max(0, result.requestedAmount - result.realizedAmount);
@@ -401,6 +406,7 @@ function realizedCashflowBetween(
 	startDate: IsoDate,
 	endDate: IsoDate,
 ) {
+	if (cashflowIds.size === 0) return 0;
 	let total = 0;
 	for (const event of events) {
 		if (event.date <= startDate) continue;
@@ -408,6 +414,49 @@ function realizedCashflowBetween(
 		if (cashflowIds.has(event.origin.postingId)) total += event.realizedAmount;
 	}
 	return total;
+}
+
+function realizedCashflowByMonth(
+	events: readonly MovementEvent[],
+	cashflowIds: ReadonlySet<string>,
+	candidateDate: IsoDate,
+	monthCount: number,
+) {
+	const amounts = Array.from({ length: monthCount }, () => 0);
+	if (cashflowIds.size === 0) return amounts;
+	let month = 0;
+	for (const event of events) {
+		if (event.date <= candidateDate) continue;
+		while (
+			month < monthCount &&
+			event.date > addMonthsClamped(candidateDate, month + 1)
+		) {
+			month++;
+		}
+		if (month >= monthCount) break;
+		if (cashflowIds.has(event.origin.postingId)) {
+			amounts[month] += event.realizedAmount;
+		}
+	}
+	return amounts;
+}
+
+function optimisticLaterYearWithdrawalCapacity(
+	balances: Readonly<Record<string, number>>,
+	assetRates: ReadonlyMap<string, number>,
+	accountsById: ReadonlyMap<string, Account>,
+) {
+	let capacity = 0;
+	for (const [accountId, rate] of assetRates) {
+		if (rate === 0) continue;
+		const account = accountsById.get(accountId);
+		if (!account) continue;
+		const upperBalance = Math.max(balances[accountId] ?? 0, account.maxBalance);
+		const floorCapacity = Math.max(0, upperBalance - account.minBalance);
+		const rateCapacity = Math.max(0, upperBalance) * rate;
+		capacity += Math.min(floorCapacity, rateCapacity);
+	}
+	return capacity;
 }
 
 function initializeBranchSimulationState(
@@ -551,6 +600,41 @@ function evaluateCycle({
 		candidateRow,
 		path.effectiveDocument.accounts,
 	);
+	if (summaryOnly) {
+		const monthCount = plan.evaluationYears * 12;
+		const minimumWithdrawals = minimumAnnualWithdrawals({
+			candidateDate: candidate.date,
+			evaluationYears: plan.evaluationYears,
+			expenseAt: (date) => expenseAt(plan, expenseBaseline, date),
+			directIncomeByMonth: realizedCashflowByMonth(
+				path.movementEvents,
+				cashflowIds,
+				candidate.date,
+				monthCount,
+			),
+		});
+		if (
+			hasInsufficientOptimisticWithdrawalCapacity(
+				minimumWithdrawals,
+				candidate.annualWithdrawalCapacity,
+				optimisticLaterYearWithdrawalCapacity(
+					candidateBalances,
+					assetRates,
+					accountsById,
+				),
+			)
+		) {
+			return {
+				candidateDate: candidate.date,
+				status: "summary",
+				simulationAttempted: false,
+				minimumNetWorthMet: candidate.minimumNetWorthMet,
+				initialCoverageMet: candidate.isCovered,
+				cycleEstablished: false,
+				firstShortfallDate: null,
+			};
+		}
+	}
 	const startingSelectedAssetBalance = [...assetRates.keys()].reduce(
 		(sum, accountId) => sum + Math.max(0, candidateBalances[accountId] ?? 0),
 		0,
@@ -778,6 +862,7 @@ function evaluateCycle({
 				return {
 					candidateDate: candidate.date,
 					status: "summary",
+					simulationAttempted: true,
 					minimumNetWorthMet: true,
 					initialCoverageMet: true,
 					cycleEstablished: false,
@@ -806,6 +891,7 @@ function evaluateCycle({
 				return {
 					candidateDate: candidate.date,
 					status: "summary",
+					simulationAttempted: true,
 					minimumNetWorthMet: true,
 					initialCoverageMet: true,
 					cycleEstablished,
@@ -1163,7 +1249,9 @@ export const financialIndependenceEvaluation: EvaluationDefinition<
 		});
 		accumulator.checkedCandidateCount += pathResult.runOutcomes.length;
 		accumulator.evaluatedCycleCount += pathResult.runOutcomes.filter(
-			(outcome) => outcome.status !== "ineligible",
+			(outcome) =>
+				outcome.status === "evaluated" ||
+				(outcome.status === "summary" && outcome.simulationAttempted),
 		).length;
 		const firstSuccessIndex = pathResult.runOutcomes.findIndex(
 			(outcome) => outcome.cycleEstablished,

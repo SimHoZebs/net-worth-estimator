@@ -352,6 +352,7 @@ export interface FinancialIndependenceBalanceTrajectoryRow {
 export interface FinancialIndependenceSummaryOutcome {
 	candidateDate: IsoDate;
 	status: "summary";
+	simulationAttempted: boolean;
 	minimumNetWorthMet: boolean;
 	initialCoverageMet: boolean;
 	cycleEstablished: boolean;
