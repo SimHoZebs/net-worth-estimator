@@ -57,12 +57,16 @@ function row(
 	return projectionRow;
 }
 
-function account(id: string, minBalance = 0): Account {
+function account(
+	id: string,
+	minBalance = 0,
+	maxBalance = Number.POSITIVE_INFINITY,
+): Account {
 	return {
 		id,
 		label: id,
 		minBalance,
-		maxBalance: Number.POSITIVE_INFINITY,
+		maxBalance,
 		color: null,
 		enabled: true,
 	};
@@ -407,18 +411,13 @@ describe("evaluateFinancialIndependence", () => {
 					),
 				),
 				[pension],
-				[account("brokerage"), account("cash")],
+				[account("brokerage", 100_000), account("cash")],
 			),
 			plan: plan({
 				annualExpenseTarget: 6_000,
 				sources: [
 					{ type: "cashflow", postingId: "pension", included: true },
-					{
-						type: "asset",
-						accountId: "brokerage",
-						included: true,
-						withdrawalRateOverride: 0,
-					},
+					{ type: "asset", accountId: "brokerage", included: true },
 				],
 			}),
 			candidateDates: ["2026-01-01"],
@@ -428,6 +427,7 @@ describe("evaluateFinancialIndependence", () => {
 		expect(result.runOutcomes).toEqual([
 			expect.objectContaining({
 				status: "summary",
+				simulationAttempted: true,
 				cycleEstablished: false,
 				firstShortfallDate: "2026-07-01",
 			}),
@@ -436,6 +436,205 @@ describe("evaluateFinancialIndependence", () => {
 		expect(result.runOutcomes[0]).not.toHaveProperty(
 			"endingSelectedAssetBalance",
 		);
+	});
+
+	it("prunes an eligible cycle when monthly income timing cannot fit its withdrawal cap", () => {
+		const rows = Array.from({ length: 14 }, (_, month) =>
+			row(
+				`202${6 + Math.floor(month / 12)}-${String((month % 12) + 1).padStart(2, "0")}-01`,
+				{ brokerage: 100_000, cash: 0 },
+				{ pension: month < 7 ? 1_000 : 0 },
+			),
+		);
+		const fiPlan = plan({
+			annualExpenseTarget: 6_000,
+			sources: [
+				{ type: "cashflow", postingId: "pension", included: true },
+				{
+					type: "asset",
+					accountId: "brokerage",
+					included: true,
+					withdrawalRateOverride: 0,
+				},
+			],
+		});
+		const evaluationPath = path(
+			rows,
+			[pension],
+			[account("brokerage"), account("cash")],
+		);
+		const summary = evaluateFinancialIndependence({
+			path: evaluationPath,
+			plan: fiPlan,
+			candidateDates: ["2026-01-01"],
+			detailLevel: "summary",
+		});
+
+		expect(summary.rows[0]?.isEligible).toBe(true);
+		expect(summary.runOutcomes[0]).toEqual({
+			candidateDate: "2026-01-01",
+			status: "summary",
+			simulationAttempted: false,
+			minimumNetWorthMet: true,
+			initialCoverageMet: true,
+			cycleEstablished: false,
+			firstShortfallDate: null,
+		});
+		const accumulator = financialIndependenceEvaluation.createAccumulator(
+			fiPlan,
+			summary,
+		);
+		financialIndependenceEvaluation.accumulate(accumulator, summary);
+		expect(
+			financialIndependenceEvaluation.measureStochasticWork?.(accumulator),
+		).toEqual({ unitsCompleted: 1, intensiveUnitsCompleted: 0 });
+
+		const detailed = evaluateFinancialIndependence({
+			path: evaluationPath,
+			plan: fiPlan,
+			candidateDates: ["2026-01-01"],
+		});
+		expect(detailedOutcome(detailed)).toMatchObject({
+			status: "evaluated",
+			hadWithdrawalShortfall: true,
+			withdrawals: { firstShortfallDate: "2026-07-01" },
+		});
+		expect(detailedOutcome(detailed).balanceTrajectory).toHaveLength(13);
+	});
+
+	it("uses a safe later-year capacity bound for accounts with high floors", () => {
+		const result = evaluateFinancialIndependence({
+			path: path(
+				[row("2026-01-01", { brokerage: 100 })],
+				[],
+				[account("brokerage", 90, 100)],
+				"2028-02-01",
+			),
+			plan: plan({
+				annualExpenseTarget: 8,
+				evaluationYears: 2,
+				sources: [
+					{
+						type: "asset",
+						accountId: "brokerage",
+						included: true,
+						withdrawalRateOverride: 0.5,
+					},
+				],
+			}),
+			candidateDates: ["2026-01-01"],
+			detailLevel: "summary",
+		});
+
+		expect(result.runOutcomes[0]).toMatchObject({
+			status: "summary",
+			simulationAttempted: true,
+			cycleEstablished: false,
+		});
+	});
+
+	it("prunes later years only when finite account ceilings prove failure", () => {
+		const fiPlan = plan({
+			annualExpenseTarget: 9,
+			annualExpenseGrowthRate: 0.2,
+			evaluationYears: 2,
+			sources: [
+				{
+					type: "asset",
+					accountId: "brokerage",
+					included: true,
+					withdrawalRateOverride: 0.1,
+				},
+			],
+		});
+		const evaluate = (maxBalance: number) =>
+			evaluateFinancialIndependence({
+				path: path(
+					[row("2026-01-01", { brokerage: 100 })],
+					[],
+					[account("brokerage", 0, maxBalance)],
+					"2028-02-01",
+				),
+				plan: fiPlan,
+				candidateDates: ["2026-01-01"],
+				detailLevel: "summary",
+			});
+
+		expect(evaluate(100).runOutcomes[0]).toMatchObject({
+			simulationAttempted: false,
+			cycleEstablished: false,
+		});
+		expect(evaluate(Number.POSITIVE_INFINITY).runOutcomes[0]).toMatchObject({
+			simulationAttempted: true,
+			cycleEstablished: false,
+		});
+	});
+
+	it("never prunes exact successes at capacity and income boundaries", () => {
+		const cases = [
+			{
+				path: path(
+					[row("2026-01-01", { brokerage: 100 })],
+					[],
+					[account("brokerage", 90, 100)],
+				),
+				plan: plan({
+					annualExpenseTarget: 10,
+					sources: [
+						{
+							type: "asset" as const,
+							accountId: "brokerage",
+							included: true,
+							withdrawalRateOverride: 0.1,
+						},
+					],
+				}),
+			},
+			{
+				path: path(
+					[
+						row("2026-01-01", { brokerage: 1_100, cash: 0 }),
+						row("2026-02-01", { brokerage: 1_100, cash: 0 }, { pension: 100 }),
+					],
+					[pension],
+					[account("brokerage", 0, 1_100), account("cash")],
+				),
+				plan: plan({
+					annualExpenseTarget: 1_200,
+					sources: [
+						{ type: "cashflow" as const, postingId: "pension", included: true },
+						{
+							type: "asset" as const,
+							accountId: "brokerage",
+							included: true,
+							withdrawalRateOverride: 1,
+						},
+					],
+				}),
+			},
+		];
+
+		for (const testCase of cases) {
+			const summary = evaluateFinancialIndependence({
+				...testCase,
+				candidateDates: ["2026-01-01"],
+				detailLevel: "summary",
+			});
+			const detailed = evaluateFinancialIndependence({
+				...testCase,
+				candidateDates: ["2026-01-01"],
+			});
+
+			expect(summary.runOutcomes[0]).toMatchObject({
+				status: "summary",
+				simulationAttempted: true,
+				cycleEstablished: true,
+			});
+			expect(detailedOutcome(detailed).cycleEstablished).toBe(true);
+			expect(summary.milestones.firstSelfSustainingDate).toBe(
+				detailed.milestones.firstSelfSustainingDate,
+			);
+		}
 	});
 
 	it("summarizes source-floor and action constraints across multiple assets", () => {
@@ -904,6 +1103,7 @@ describe("evaluateFinancialIndependence", () => {
 		const outcome = (candidateDate: string, cycleEstablished: boolean) => ({
 			candidateDate,
 			status: "summary" as const,
+			simulationAttempted: true,
 			minimumNetWorthMet: true,
 			initialCoverageMet: true,
 			cycleEstablished,
