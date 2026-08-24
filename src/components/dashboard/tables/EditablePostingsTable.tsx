@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -7,6 +7,10 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import {
+	DraftCommitInput,
+	editableTableCellInputStyle,
+} from "@/components/ui/draft-commit-input";
 import {
 	Table,
 	TableBody,
@@ -25,11 +29,10 @@ import {
 } from "@/lib/projection";
 import { PostingAmount } from "./PostingAmount";
 
+const NO_CHANGED_IDS = new Set<string>();
+
 function inputStyle(isDirty: boolean) {
-	const dirty = isDirty
-		? "border-tertiary-border bg-tertiary-subtle"
-		: "border-input bg-card";
-	return `w-full rounded-lg ${dirty} px-2 py-1 type-body type-code outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40`;
+	return editableTableCellInputStyle(isDirty);
 }
 
 interface NumericPostingInputProps {
@@ -52,59 +55,25 @@ function NumericPostingInput({
 	onCommit,
 }: NumericPostingInputProps) {
 	const committedValue = value === null ? "" : String(value);
-	const [draft, setDraft] = useState(committedValue);
-	const skipBlurCommit = useRef(false);
-
-	useEffect(() => {
-		setDraft(committedValue);
-	}, [committedValue]);
-
-	const commit = () => {
-		const trimmed = draft.trim();
-		if (!trimmed && nullable) {
-			onCommit(null);
-			return;
-		}
-		const parsed = parseDecimalDraft(trimmed);
-		if (parsed === null) {
-			setDraft(committedValue);
-			return;
-		}
-		const nextValue = min === undefined ? parsed : Math.max(min, parsed);
-		setDraft(String(nextValue));
-		onCommit(nextValue);
-	};
-
 	return (
-		<input
+		<DraftCommitInput
 			aria-label={label}
 			className={inputStyle(isDirty)}
 			type="number"
 			min={min}
 			step={step}
-			value={draft}
-			onChange={(event) => {
-				skipBlurCommit.current = false;
-				setDraft(event.target.value);
-			}}
-			onBlur={() => {
-				if (skipBlurCommit.current) {
-					skipBlurCommit.current = false;
-					return;
+			committedValue={committedValue}
+			onCommitDraft={(draft) => {
+				const trimmed = draft.trim();
+				if (!trimmed && nullable) {
+					onCommit(null);
+					return "";
 				}
-				commit();
-			}}
-			onKeyDown={(event) => {
-				if (event.key === "Enter") {
-					event.preventDefault();
-					commit();
-					skipBlurCommit.current = true;
-				}
-				if (event.key === "Escape") {
-					skipBlurCommit.current = true;
-					setDraft(committedValue);
-					event.currentTarget.blur();
-				}
+				const parsed = parseDecimalDraft(trimmed);
+				if (parsed === null) return null;
+				const nextValue = min === undefined ? parsed : Math.max(min, parsed);
+				onCommit(nextValue);
+				return String(nextValue);
 			}}
 		/>
 	);
@@ -120,45 +89,17 @@ function ExpressionPostingInput({
 	onCommit: (amount: Posting["amount"]) => void;
 }) {
 	const committedValue = getExpression(posting) ?? "";
-	const [draft, setDraft] = useState(committedValue);
-	const skipBlurCommit = useRef(false);
-
-	useEffect(() => setDraft(committedValue), [committedValue]);
-
-	const commit = () => {
-		try {
-			onCommit(updateExpressionAmount(posting.amount, draft));
-		} catch {
-			setDraft(committedValue);
-		}
-	};
-
 	return (
-		<input
+		<DraftCommitInput
 			aria-label={`${posting.label} amount expression`}
 			className={inputStyle(isDirty)}
-			value={draft}
-			onChange={(event) => {
-				skipBlurCommit.current = false;
-				setDraft(event.target.value);
-			}}
-			onBlur={() => {
-				if (skipBlurCommit.current) {
-					skipBlurCommit.current = false;
-					return;
-				}
-				commit();
-			}}
-			onKeyDown={(event) => {
-				if (event.key === "Enter") {
-					event.preventDefault();
-					commit();
-					skipBlurCommit.current = true;
-				}
-				if (event.key === "Escape") {
-					skipBlurCommit.current = true;
-					setDraft(committedValue);
-					event.currentTarget.blur();
+			committedValue={committedValue}
+			onCommitDraft={(draft) => {
+				try {
+					onCommit(updateExpressionAmount(posting.amount, draft));
+					return draft;
+				} catch {
+					return null;
 				}
 			}}
 		/>
@@ -186,12 +127,24 @@ export function EditablePostingsTable({
 	deletePosting,
 	addPosting,
 }: EditablePostingsTableProps) {
-	const originalPostingById = new Map(
-		document.postings.map((posting) => [posting.id, posting]),
+	const originalPostingById = useMemo(
+		() => new Map(document.postings.map((posting) => [posting.id, posting])),
+		[document.postings],
 	);
-	const workingPostingById = new Map(
-		(workingDocument?.postings ?? []).map((posting) => [posting.id, posting]),
-	);
+	const changedPostingIds = useMemo(() => {
+		if (!isDirty || workingDocument === null) return NO_CHANGED_IDS;
+		const changed = new Set<string>();
+		for (const posting of workingDocument.postings) {
+			const original = originalPostingById.get(posting.id);
+			if (
+				original === undefined ||
+				JSON.stringify(posting) !== JSON.stringify(original)
+			) {
+				changed.add(posting.id);
+			}
+		}
+		return changed;
+	}, [isDirty, workingDocument, originalPostingById]);
 
 	return (
 		<Card className="rounded-[1.8rem] border-border shadow-sm ">
@@ -224,22 +177,18 @@ export function EditablePostingsTable({
 					</TableHeader>
 					<TableBody>
 						{displayDocument.postings.map((p) => {
-							const workingPosting = workingPostingById.get(p.id);
-							const changed =
-								isDirty &&
-								workingPosting !== undefined &&
-								JSON.stringify(workingPosting) !==
-									JSON.stringify(originalPostingById.get(p.id));
+							const changed = changedPostingIds.has(p.id);
 							return (
 								<TableRow key={p.id}>
 									<TableCell>
-										<input
+										<DraftCommitInput
 											aria-label={`Posting ID for ${p.label}`}
 											className={inputStyle(!!changed)}
-											value={p.id}
-											onChange={(e) =>
-												updatePosting(p.id, { id: e.target.value })
-											}
+											committedValue={p.id}
+											onCommitDraft={(id) => {
+												updatePosting(p.id, { id });
+												return id;
+											}}
 										/>
 									</TableCell>
 									<TableCell>

@@ -3,7 +3,7 @@ import type uPlot from "uplot";
 import { parseChartDate } from "@/chart/chartData";
 import { createBaseOptions } from "@/chart/uplotBase";
 import { UPlotChart } from "@/components/ui/UPlotChart";
-import { currency, formatDate } from "@/lib/format";
+import { currency, formatDate, formatIsoDateLocal } from "@/lib/format";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { escapeHtml } from "@/lib/utils";
 
@@ -42,8 +42,7 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 		(self: uPlot, idx: number) => {
 			const cd = chartData;
 			const ts = (self.data[0] as number[])[idx];
-			const d = new Date(ts);
-			const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+			const iso = formatIsoDateLocal(new Date(ts));
 			const dateStr = formatDate(iso);
 
 			let html = `<div class="max-w-xs rounded-lg border border-border/80 bg-card/95 px-3 py-2 shadow-xl backdrop-blur dark:border-white/10">`;

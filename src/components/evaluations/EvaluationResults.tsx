@@ -9,7 +9,7 @@ import type {
 	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
-import { EVALUATION_TYPE_ORDER } from "@/lib/projection";
+import { EVALUATION_TYPE_ORDER, type EvaluationType } from "@/lib/projection";
 import { useStore } from "@/store";
 import { evaluationUiRegistry, validatedConfig } from "./evaluationUiRegistry";
 
@@ -40,7 +40,6 @@ export function EvaluationResults({
 	blockerValue = "No blocking constraint",
 	blockerDetail = "No evaluation blocker was identified.",
 }: EvaluationResultsProps) {
-	const evaluations = useStore((state) => state.evaluations);
 	const resultCollection = resultsAreStale
 		? null
 		: (stochasticResult ?? results ?? result);
@@ -56,133 +55,177 @@ export function EvaluationResults({
 				</p>
 			</div>
 
-			{EVALUATION_TYPE_ORDER.map((type) => {
-				const definition = evaluationUiRegistry[type];
-				const table = evaluations[type] as EvaluationInstance<unknown>[];
-				return table.length > 0 ? (
-					<div key={type} className="space-y-3">
-						<h3 className="type-eyebrow text-muted-foreground">
-							{definition.label}
-						</h3>
-						{table.map((evaluation) => {
-							const config = validatedConfig(type, evaluation.config);
-							const envelope = resultCollection?.evaluations[type].find(
-								(candidate) => candidate.instanceId === evaluation.instanceId,
-							);
-							const stochasticWorkload =
-								stochasticProgress?.evaluationWorkloads.find(
-									(workload) =>
-										workload.type === type &&
-										workload.instanceId === evaluation.instanceId,
-								);
-							const hasLocalProgress =
-								evaluation.enabled &&
-								stochasticIsRunning &&
-								stochasticProgress !== null &&
-								stochasticWorkload !== undefined;
-							const status = evaluation.enabled
-								? resultsAreStale
-									? "updating"
-									: `${stochasticIsProvisional && stochasticResult ? "provisional " : ""}${envelope?.status ?? "pending"}`
-								: "disabled";
-							const ResultRenderer = definition.ResultRenderer;
-							const workloadProgressPct = stochasticProgress
-								? Math.round(stochasticProgress.fraction * 100)
-								: null;
-							return (
-								<Card
-									key={evaluation.instanceId}
-									className="overflow-hidden rounded-[1.8rem] border-border/80 bg-card/92"
-								>
-									<CardHeader className="border-b border-border/70 bg-surface/45 dark:border-white/10">
-										<div className="flex items-start justify-between gap-4">
-											<div>
-												<div className="type-title text-xl">
-													{evaluation.label}
-												</div>
-												<div className="mt-1 type-caption">
-													{evaluation.instanceId}
-												</div>
-											</div>
-											{hasLocalProgress ? null : (
-												<span className="rounded-full border border-border/70 px-3 py-1 type-label uppercase tracking-[0.12em]">
-													{status}
-												</span>
-											)}
-										</div>
-									</CardHeader>
-									<CardContent className="space-y-4 p-4 md:p-6">
-										{hasLocalProgress &&
-										stochasticProgress &&
-										stochasticWorkload ? (
-											<SimulationProgressPanel
-												title={
-													type === "financialIndependence"
-														? "Running FI Monte Carlo"
-														: `Updating ${evaluation.label}`
-												}
-												description={
-													type === "financialIndependence"
-														? resultsAreStale
-															? "Previous FI results are hidden until recalculation completes."
-															: "The deterministic FI result below is current. Monte Carlo confidence is still being calculated."
-														: "Monte Carlo analysis is recomputing this evaluation's outcome."
-												}
-												progressPct={workloadProgressPct}
-												progressLabel={`${evaluation.label} Monte Carlo progress`}
-											>
-												<StochasticProgressDetails
-													progress={stochasticProgress}
-													showPhase={false}
-													showWorkloadLabels={false}
-													showWorkloadTotals={false}
-													showDescriptions={false}
-													workloads={[stochasticWorkload]}
-												/>
-											</SimulationProgressPanel>
-										) : null}
-										{config.error ? (
-											<Diagnostic message={config.error} error />
-										) : null}
-										{envelope?.diagnostics.map((diagnostic) => (
-											<Diagnostic
-												key={`${diagnostic.code}-${diagnostic.message}`}
-												message={diagnostic.message}
-												error={diagnostic.severity === "error"}
-											/>
-										))}
-										{evaluation.enabled &&
-										config.normalized !== null &&
-										!resultsAreStale ? (
-											<ResultRenderer
-												evaluation={{
-													...evaluation,
-													config: config.normalized,
-												}}
-												document={document}
-												result={result}
-												stochasticResult={stochasticResult}
-												stochasticIsProvisional={stochasticIsProvisional}
-												sourceRevision={sourceRevision}
-												resultsAreStale={resultsAreStale}
-												blockerValue={blockerValue}
-												blockerDetail={blockerDetail}
-											/>
-										) : resultsAreStale &&
-											evaluation.enabled &&
-											!hasLocalProgress ? (
-											<p className="rounded-2xl border border-dashed border-border/80 p-5 type-muted">
-												Updating this evaluation with the current settings.
-											</p>
-										) : null}
-									</CardContent>
-								</Card>
-							);
-						})}
-					</div>
-				) : null;
-			})}
+			{EVALUATION_TYPE_ORDER.map((type) => (
+				<EvaluationTypeSection
+					key={type}
+					type={type}
+					resultCollection={resultCollection}
+					document={document}
+					result={result}
+					stochasticResult={stochasticResult}
+					stochasticIsProvisional={stochasticIsProvisional}
+					resultsAreStale={resultsAreStale}
+					stochasticIsRunning={stochasticIsRunning}
+					stochasticProgress={stochasticProgress}
+					sourceRevision={sourceRevision}
+					blockerValue={blockerValue}
+					blockerDetail={blockerDetail}
+				/>
+			))}
 		</section>
+	);
+}
+
+interface EvaluationTypeSectionProps {
+	type: EvaluationType;
+	resultCollection: EvaluationResultCollection | null;
+	document: FinancialModelDocument;
+	result: ProjectionResult;
+	stochasticResult?: StochasticProjectionResult | null;
+	stochasticIsProvisional: boolean;
+	resultsAreStale: boolean;
+	stochasticIsRunning: boolean;
+	stochasticProgress: StochasticProgress | null;
+	sourceRevision: number;
+	blockerValue: string;
+	blockerDetail: string;
+}
+
+// Subscribes only to its own evaluation table so editing one instance does
+// not rerender unrelated evaluation sections.
+function EvaluationTypeSection({
+	type,
+	resultCollection,
+	document,
+	result,
+	stochasticResult,
+	stochasticIsProvisional,
+	resultsAreStale,
+	stochasticIsRunning,
+	stochasticProgress,
+	sourceRevision,
+	blockerValue,
+	blockerDetail,
+}: EvaluationTypeSectionProps) {
+	const table = useStore(
+		(state) => state.evaluations[type],
+	) as EvaluationInstance<unknown>[];
+	const definition = evaluationUiRegistry[type];
+
+	if (table.length === 0) return null;
+
+	return (
+		<div className="space-y-3">
+			<h3 className="type-eyebrow text-muted-foreground">{definition.label}</h3>
+			{table.map((evaluation) => {
+				const config = validatedConfig(type, evaluation.config);
+				const envelope = resultCollection?.evaluations[type].find(
+					(candidate) => candidate.instanceId === evaluation.instanceId,
+				);
+				const stochasticWorkload = stochasticProgress?.evaluationWorkloads.find(
+					(workload) =>
+						workload.type === type &&
+						workload.instanceId === evaluation.instanceId,
+				);
+				const hasLocalProgress =
+					evaluation.enabled &&
+					stochasticIsRunning &&
+					stochasticProgress !== null &&
+					stochasticWorkload !== undefined;
+				const status = evaluation.enabled
+					? resultsAreStale
+						? "updating"
+						: `${stochasticIsProvisional && stochasticResult ? "provisional " : ""}${envelope?.status ?? "pending"}`
+					: "disabled";
+				const ResultRenderer = definition.ResultRenderer;
+				const workloadProgressPct = stochasticProgress
+					? Math.round(stochasticProgress.fraction * 100)
+					: null;
+				return (
+					<Card
+						key={evaluation.instanceId}
+						className="overflow-hidden rounded-[1.8rem] border-border/80 bg-card/92"
+					>
+						<CardHeader className="border-b border-border/70 bg-surface/45 dark:border-white/10">
+							<div className="flex items-start justify-between gap-4">
+								<div>
+									<div className="type-title text-xl">{evaluation.label}</div>
+									<div className="mt-1 type-caption">
+										{evaluation.instanceId}
+									</div>
+								</div>
+								{hasLocalProgress ? null : (
+									<span className="rounded-full border border-border/70 px-3 py-1 type-label uppercase tracking-[0.12em]">
+										{status}
+									</span>
+								)}
+							</div>
+						</CardHeader>
+						<CardContent className="space-y-4 p-4 md:p-6">
+							{hasLocalProgress && stochasticProgress && stochasticWorkload ? (
+								<SimulationProgressPanel
+									title={
+										type === "financialIndependence"
+											? "Running FI Monte Carlo"
+											: `Updating ${evaluation.label}`
+									}
+									description={
+										type === "financialIndependence"
+											? resultsAreStale
+												? "Previous FI results are hidden until recalculation completes."
+												: "The deterministic FI result below is current. Monte Carlo confidence is still being calculated."
+											: "Monte Carlo analysis is recomputing this evaluation's outcome."
+									}
+									progressPct={workloadProgressPct}
+									progressLabel={`${evaluation.label} Monte Carlo progress`}
+								>
+									<StochasticProgressDetails
+										progress={stochasticProgress}
+										showPhase={false}
+										showWorkloadLabels={false}
+										showWorkloadTotals={false}
+										showDescriptions={false}
+										workloads={[stochasticWorkload]}
+									/>
+								</SimulationProgressPanel>
+							) : null}
+							{config.error ? (
+								<Diagnostic message={config.error} error />
+							) : null}
+							{envelope?.diagnostics.map((diagnostic) => (
+								<Diagnostic
+									key={`${diagnostic.code}-${diagnostic.message}`}
+									message={diagnostic.message}
+									error={diagnostic.severity === "error"}
+								/>
+							))}
+							{evaluation.enabled &&
+							config.normalized !== null &&
+							!resultsAreStale ? (
+								<ResultRenderer
+									evaluation={{
+										...evaluation,
+										config: config.normalized,
+									}}
+									document={document}
+									result={result}
+									stochasticResult={stochasticResult}
+									stochasticIsProvisional={stochasticIsProvisional}
+									sourceRevision={sourceRevision}
+									resultsAreStale={resultsAreStale}
+									blockerValue={blockerValue}
+									blockerDetail={blockerDetail}
+								/>
+							) : resultsAreStale && evaluation.enabled && !hasLocalProgress ? (
+								<p className="rounded-2xl border border-dashed border-border/80 p-5 type-muted">
+									Updating this evaluation with the current settings.
+								</p>
+							) : null}
+						</CardContent>
+					</Card>
+				);
+			})}
+		</div>
 	);
 }
 

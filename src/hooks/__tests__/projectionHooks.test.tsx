@@ -1,9 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { ProjectionEngineProvider } from "@/engine/ProjectionEngineContext";
 import type { ModelOverrides, StochasticProgress } from "@/lib/projection";
 import {
 	createBaseDocument,
@@ -12,6 +10,8 @@ import {
 import { projectFinancialModelDocument } from "@/lib/projection/analysis/projectFinancialModel";
 import { stochasticProject } from "@/lib/projection/analysis/projectStochastic";
 import type { ProjectionEngine } from "@/lib/projection/runtime/ProjectionEngine";
+import { deferred } from "@/test/deferred";
+import { wrapperWithEngine } from "@/test/projectionEngineWrapper";
 import { useProjection } from "../useProjection";
 import { useStochastic } from "../useStochastic";
 
@@ -21,24 +21,6 @@ const overrides: ModelOverrides = {
 	disabledAccountIds: [],
 	disabledPostingIds: [],
 };
-
-function deferred<T>() {
-	let resolve!: (value: T) => void;
-	const promise = new Promise<T>((fulfill) => {
-		resolve = fulfill;
-	});
-	return { promise, resolve };
-}
-
-function wrapper(engine: ProjectionEngine) {
-	return function EngineWrapper({ children }: { children: ReactNode }) {
-		return (
-			<ProjectionEngineProvider engine={engine}>
-				{children}
-			</ProjectionEngineProvider>
-		);
-	};
-}
 
 describe("projection hook request provenance", () => {
 	it("does not restart workers for structurally equal cloned inputs", async () => {
@@ -79,7 +61,7 @@ describe("projection hook request provenance", () => {
 					currentSettings: settings,
 					currentOverrides: overrides,
 				},
-				wrapper: wrapper(engine),
+				wrapper: wrapperWithEngine(engine),
 			},
 		);
 
@@ -132,7 +114,7 @@ describe("projection hook request provenance", () => {
 			}),
 			{
 				initialProps: { currentSettings: settings },
-				wrapper: wrapper(engine),
+				wrapper: wrapperWithEngine(engine),
 			},
 		);
 
@@ -194,7 +176,7 @@ describe("projection hook request provenance", () => {
 					{ runCount: 1, seed: 1 },
 					true,
 				),
-			{ wrapper: wrapper(engine) },
+			{ wrapper: wrapperWithEngine(engine) },
 		);
 
 		await waitFor(() =>
@@ -228,7 +210,7 @@ describe("projection hook request provenance", () => {
 			({ settings }) => useProjection(document, settings, overrides, true),
 			{
 				initialProps: { settings: firstSettings },
-				wrapper: wrapper(engine),
+				wrapper: wrapperWithEngine(engine),
 			},
 		);
 
@@ -261,7 +243,7 @@ describe("projection hook request provenance", () => {
 			({ settings }) => useProjection(document, settings, overrides, true),
 			{
 				initialProps: { settings: firstSettings },
-				wrapper: wrapper(engine),
+				wrapper: wrapperWithEngine(engine),
 			},
 		);
 
@@ -315,7 +297,7 @@ describe("projection hook request provenance", () => {
 				useStochastic(document, settings, overrides, config, true),
 			{
 				initialProps: { config: { runCount: 1, seed: 1 } },
-				wrapper: wrapper(engine),
+				wrapper: wrapperWithEngine(engine),
 			},
 		);
 

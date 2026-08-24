@@ -8,7 +8,12 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
-import { currency, formatDate } from "@/lib/format";
+import {
+	currency,
+	formatDate,
+	formatIsoDateLocal,
+	parseIsoDateLocal,
+} from "@/lib/format";
 import type {
 	Account,
 	Posting,
@@ -31,18 +36,6 @@ interface ShortfallDay {
 	realizedPostingAmount: number;
 	unfulfilledAmount: number;
 	netWorth: number;
-}
-
-function parseIsoDateLocal(isoDate: string): Date {
-	const [year, month, day] = isoDate.split("-").map(Number);
-	return new Date(year, month - 1, day);
-}
-
-function formatIsoDateLocal(date: Date): string {
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, "0");
-	const day = String(date.getDate()).padStart(2, "0");
-	return `${year}-${month}-${day}`;
 }
 
 export const ShortfallCalendar = memo(function ShortfallCalendar({

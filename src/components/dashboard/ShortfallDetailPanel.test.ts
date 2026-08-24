@@ -1,43 +1,33 @@
 import { describe, expect, it } from "vitest";
-import {
-	type Account,
-	createExpressionAmount,
-	type Posting,
-	type PostingFulfillmentEvent,
-	type ProjectionRow,
+import type {
+	Account,
+	Posting,
+	PostingFulfillmentEvent,
+	ProjectionRow,
 } from "@/lib/projection";
+import { makeAccount } from "@/lib/projection/__fixtures__/accounts";
+import { makePosting } from "@/lib/projection/__fixtures__/postings";
 import { buildShortfallCascadeViewModel } from "./ShortfallDetailPanel";
 
 const PERIOD_START = "2026-02-01";
 
 function account(id: string, label = id): Account {
-	return {
+	return makeAccount({
 		id,
 		label,
 		minBalance: 0,
 		maxBalance: Number.POSITIVE_INFINITY,
-		color: null,
-		enabled: true,
-	};
+	});
 }
 
 function posting(id: string, sourceAccountId: string | null = null): Posting {
-	return {
+	return makePosting({
 		id,
 		label: `Posting ${id}`,
 		sourceAccountId,
-		destinations: null,
-		amount: createExpressionAmount("0"),
-		frequency: "monthly",
-		annualRate: 0,
-		annualGrowthRate: 0,
-		volatility: 0,
 		startDate: PERIOD_START,
-		endDate: null,
-		annualCap: null,
 		priority: 0,
-		enabled: true,
-	};
+	});
 }
 
 function event(

@@ -7,6 +7,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Collapsible } from "@/components/ui/collapsible-section";
 import { parseDecimalDraft } from "@/lib/number-draft";
 import type {
 	FinancialIndependencePlan,
@@ -140,21 +141,29 @@ export const FinancialIndependencePlanEditor = memo(
 		onApply,
 		onDirtyChange,
 	}: FinancialIndependencePlanEditorProps) {
-		const committedPlan = cleanPlan(plan);
-		const committedFingerprint = planFingerprint(committedPlan);
+		const committedPlan = useMemo(() => cleanPlan(plan), [plan]);
+		const committedFingerprint = useMemo(
+			() => planFingerprint(committedPlan),
+			[committedPlan],
+		);
 		const draftRevision = `${sourceRevision}\n${committedFingerprint}`;
+		const committedNumericDrafts = useMemo(
+			() => numericDraftsForPlan(committedPlan),
+			[committedPlan],
+		);
+		const committedNumericFingerprint = useMemo(
+			() => JSON.stringify(committedNumericDrafts),
+			[committedNumericDrafts],
+		);
 		const [draft, setDraft] = useState(committedPlan);
-		const committedNumericDrafts = numericDraftsForPlan(committedPlan);
-		const committedNumericFingerprint = JSON.stringify(committedNumericDrafts);
 		const [numericDrafts, setNumericDrafts] = useState(committedNumericDrafts);
+		const [syncedRevision, setSyncedRevision] = useState(draftRevision);
 
-		useEffect(() => {
-			const nextPlan = JSON.parse(
-				draftRevision.slice(draftRevision.indexOf("\n") + 1),
-			) as FinancialIndependencePlan;
-			setDraft(nextPlan);
-			setNumericDrafts(numericDraftsForPlan(nextPlan));
-		}, [draftRevision]);
+		if (syncedRevision !== draftRevision) {
+			setSyncedRevision(draftRevision);
+			setDraft(committedPlan);
+			setNumericDrafts(committedNumericDrafts);
+		}
 
 		const selectedCashflows = useMemo(
 			() =>
@@ -182,23 +191,38 @@ export const FinancialIndependencePlanEditor = memo(
 			() => new Set(draft.continuingPostingIds),
 			[draft.continuingPostingIds],
 		);
-		const retirementIncomePostings = document.postings.filter(
-			(posting) =>
-				posting.enabled &&
-				posting.frequency !== "once" &&
-				posting.sourceAccountId === null &&
-				posting.destinations !== null,
+		const retirementIncomePostings = useMemo(
+			() =>
+				document.postings.filter(
+					(posting) =>
+						posting.enabled &&
+						posting.frequency !== "once" &&
+						posting.sourceAccountId === null &&
+						posting.destinations !== null,
+				),
+			[document.postings],
 		);
-		const assetAccounts = document.accounts.filter(
-			(account) => account.enabled && account.maxBalance > 0,
+		const assetAccounts = useMemo(
+			() =>
+				document.accounts.filter(
+					(account) => account.enabled && account.maxBalance > 0,
+				),
+			[document.accounts],
 		);
-		const continuingPostings = document.postings.filter(
-			(posting) =>
-				posting.enabled &&
-				posting.frequency !== "once" &&
-				postingLinksToAssets(posting, selectedAssets),
+		const continuingPostings = useMemo(
+			() =>
+				document.postings.filter(
+					(posting) =>
+						posting.enabled &&
+						posting.frequency !== "once" &&
+						postingLinksToAssets(posting, selectedAssets),
+				),
+			[document.postings, selectedAssets],
 		);
-		const parsedDraft = planWithNumericDrafts(draft, numericDrafts);
+		const parsedDraft = useMemo(
+			() => planWithNumericDrafts(draft, numericDrafts),
+			[draft, numericDrafts],
+		);
 		const dirty =
 			planFingerprint(draft) !== committedFingerprint ||
 			JSON.stringify(numericDrafts) !== committedNumericFingerprint;
@@ -459,11 +483,14 @@ export const FinancialIndependencePlanEditor = memo(
 						/>
 					</FinancialIndependenceEditorSection>
 
-					<details className="group rounded-2xl border border-border/80 bg-surface/55 p-4 dark:border-white/10">
-						<summary className="cursor-pointer list-none type-label text-foreground marker:hidden">
+					<Collapsible
+						unstyled
+						className="rounded-2xl border border-border/80 bg-surface/55 p-4 dark:border-white/10"
+					>
+						<Collapsible.Trigger className="type-label text-foreground">
 							<span className="flex items-center justify-between gap-3">
 								<span className="inline-flex items-center gap-2">
-									<span className="transition group-open:rotate-90">›</span>
+									<Collapsible.Chevron />
 									Model details
 								</span>
 								<span className="type-caption font-normal text-muted-foreground">
@@ -471,8 +498,8 @@ export const FinancialIndependencePlanEditor = memo(
 									{draft.continuingPostingIds.length === 1 ? "" : "s"} continue
 								</span>
 							</span>
-						</summary>
-						<div className="mt-4 space-y-5 border-t border-border/70 pt-4">
+						</Collapsible.Trigger>
+						<Collapsible.Content className="mt-4 space-y-5 border-t border-border/70 pt-4">
 							<FiNumberField
 								label="Minimum total net worth"
 								description="Candidate dates are ignored until whole-model net worth reaches this gate, before selected funding coverage is tested."
@@ -564,8 +591,8 @@ export const FinancialIndependencePlanEditor = memo(
 									</div>
 								)}
 							</div>
-						</div>
-					</details>
+						</Collapsible.Content>
+					</Collapsible>
 
 					<div className="flex flex-col gap-3 rounded-2xl border border-primary-border/50 bg-primary-subtle/35 p-4 sm:flex-row sm:items-center sm:justify-between">
 						<div>
