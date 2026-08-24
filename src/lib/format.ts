@@ -30,11 +30,31 @@ export function formatChartCurrencyTick(value: number): string {
 	return `${sign}$${abs}`;
 }
 
+// Parses a calendar "YYYY-MM-DD" string into a local-time Date at midnight.
+export function parseIsoDateLocal(isoDate: string): Date {
+	const [year, month, day] = isoDate.split("-").map(Number);
+	return new Date(year, month - 1, day);
+}
+
+// Formats a local-time Date as a "YYYY-MM-DD" calendar string.
+export function formatIsoDateLocal(date: Date): string {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, "0");
+	const day = String(date.getDate()).padStart(2, "0");
+	return `${year}-${month}-${day}`;
+}
+
+// Renders a rate (0.05) as a percentage string ("5.0%") with fixed decimals.
+export function formatPercentRate(value: number, fractionDigits = 1): string {
+	return `${new Intl.NumberFormat("en-US", {
+		minimumFractionDigits: fractionDigits,
+		maximumFractionDigits: fractionDigits,
+	}).format(value * 100)}%`;
+}
+
 export function formatDate(isoDate: string): string {
 	if (!isoDate || isoDate.length < 10) return isoDate;
-	const [year, month, day] = isoDate.split("-").map(Number);
-	const date = new Date(year, month - 1, day);
-	return date.toLocaleDateString("en-US", {
+	return parseIsoDateLocal(isoDate).toLocaleDateString("en-US", {
 		year: "numeric",
 		month: "short",
 		day: "numeric",

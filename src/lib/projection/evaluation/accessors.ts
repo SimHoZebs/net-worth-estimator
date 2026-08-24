@@ -114,7 +114,10 @@ export function getConfiguredEvaluation<TConfig>(
 			const config = validate(evaluation.config);
 			if (!isJsonValue(config)) continue;
 			return { ...evaluation, config };
-		} catch {}
+		} catch {
+			// Intentional probe: an invalid candidate config falls through to the
+			// next result collection instead of failing the whole lookup.
+		}
 	}
 	return null;
 }

@@ -159,23 +159,15 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 				<LazySection>
 					<Collapsible defaultOpen={false}>
 						<Collapsible.Trigger>
-							<div className="flex items-start justify-between gap-4">
-								<div className="flex items-start gap-3">
-									<Collapsible.Chevron />
-									<div>
-										<div className="type-title text-base">
-											Cash flow, debt, and reconciliation
-										</div>
-										<div className="type-muted">
-											Monthly cash-flow map, debt summary, and current balance
-											reconciliation.
-										</div>
-									</div>
-								</div>
-								<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
-									Show details
-								</span>
-							</div>
+							<Collapsible.Header
+								title="Cash flow, debt, and reconciliation"
+								description="Monthly cash-flow map, debt summary, and current balance reconciliation."
+								trailing={
+									<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
+										Show details
+									</span>
+								}
+							/>
 						</Collapsible.Trigger>
 						<Collapsible.Content>
 							<div className="space-y-5">

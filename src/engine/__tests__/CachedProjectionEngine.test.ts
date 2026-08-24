@@ -20,6 +20,7 @@ import type {
 	ProjectionRequest,
 	StochasticRequest,
 } from "@/lib/projection/runtime/ProjectionEngine";
+import { deferred } from "@/test/deferred";
 
 function createComputationEngine(): ProjectionComputationEngine {
 	return {
@@ -54,14 +55,6 @@ function projectionRequest(): ProjectionRequest {
 		projectionSettings: makeSettings({ horizonYears: 1 }),
 		overrides: structuredClone(EMPTY_MODEL_OVERRIDES),
 	};
-}
-
-function deferred<T>() {
-	let resolve!: (value: T) => void;
-	const promise = new Promise<T>((fulfill) => {
-		resolve = fulfill;
-	});
-	return { promise, resolve };
 }
 
 describe("CachedProjectionEngine", () => {

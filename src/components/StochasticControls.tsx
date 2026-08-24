@@ -45,24 +45,21 @@ export function StochasticControls() {
 	return (
 		<Collapsible>
 			<Collapsible.Trigger>
-				<div className="flex items-start justify-between gap-4">
-					<div className="flex items-start gap-3">
-						<Collapsible.Chevron />
-						<div>
-							<div className="type-title text-base">Monte Carlo simulation</div>
-							<div className="type-muted">
-								{simulationActive
-									? statusLabel
-									: simulationRequested && !hasStochasticAccounts
-										? "No scheduled transactions have volatility configured. Set volatility > 0 to enable simulation."
-										: "Stochastic simulation is disabled. Toggle on to see probabilistic bands."}
-							</div>
-						</div>
-					</div>
-					<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
-						Show details
-					</span>
-				</div>
+				<Collapsible.Header
+					title="Monte Carlo simulation"
+					description={
+						simulationActive
+							? statusLabel
+							: simulationRequested && !hasStochasticAccounts
+								? "No scheduled transactions have volatility configured. Set volatility > 0 to enable simulation."
+								: "Stochastic simulation is disabled. Toggle on to see probabilistic bands."
+					}
+					trailing={
+						<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
+							Show details
+						</span>
+					}
+				/>
 			</Collapsible.Trigger>
 			<Collapsible.Content>
 				<div className="space-y-4">

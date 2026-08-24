@@ -2,7 +2,8 @@
 
 ## Quick Start
 
-- `npm run dev` - start the Vite dev server
+- `npm run dev` - start the Vite dev server (proxies `/v1` to the backend)
+- `cd backend && go run ./cmd/server` - start the Go backend on `:8787`
 - `npm run test:run` - run Vitest once
 - `npm run typecheck` - run TypeScript checks
 
@@ -65,14 +66,14 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 
 ## Data Flow
 
-1. **CSV source**: Vite plugin -> `GET/PUT /api/financial-model` -> `csvLoader.ts` -> Zod parsing and cross-validation. Documents contain only canonical fields.
-2. **Persistence DI**: `App.tsx` creates `createCsvApiFinancialModelRepository()` in development or `createBrowserFinancialModelRepository()` in production. Model Inputs use only the repository; browser CSV ingestion and browser storage are connected behind it.
+1. **Model source**: Go backend serves `GET/PUT /v1/financial-model` from imported canonical CSV data. The Vite dev server proxies `/v1` to `NET_WORTH_ESTIMATOR_BACKEND` (default `http://localhost:8787`).
+2. **Persistence DI**: `App.tsx` creates `createHttpFinancialModelRepository()` and `createHttpIncomeDataSource()`. Browser CSV ingestion and browser storage remain available behind the repository abstraction but are not wired.
 3. **Query layer**: `useFinancialModelQuery`, `useFinancialModelMutation`, and `useFinancialModelResetMutation` connect the source to TanStack Query.
 4. **Current changes**: `ModelOverrides` remain in Zustand and are applied with `applyModelOverrides`; canonical data is not mutated.
-5. **Projection**: `useProjection`/`useStochastic` -> `CachedProjectionEngine` -> `WorkerProjectionEngine` on misses -> Web Workers -> `prepareSimulationRequest` -> `simulate` -> `ProjectionPath` -> evaluation/analysis aggregation.
-6. **Monte Carlo**: one prepared request is reused, each `MonteCarloSample` produces a path-only run, exact percentiles are aggregated, and progress is emitted in worker batches of 50.
-7. **Browser persistence**: `net-worth-estimator:financial-model` stores the financial model. Malformed or noncanonical data surfaces diagnostics; reset removes that key and reloads bundled CSV data. Analyses use the canonical model postings and add no separate transaction key.
-8. **Derived artifacts**: `ProjectionArtifactStore` is separate from `FinancialModelRepository`; browser artifacts are content-addressed, persisted in IndexedDB, bounded, and disposable.
+5. **Projection**: `useProjection`/`useStochastic` -> `CachedProjectionEngine` over `BackendProjectionEngine` (`src/engine/`). Deterministic runs POST `/v1/projections/deterministic`; the Go backend computes and returns results.
+6. **Monte Carlo**: `POST /v1/projections/stochastic` streams SSE `progress`/`partial`/`result` events; exact percentiles are aggregated server-side.
+7. **Reset/save**: go through the HTTP repository (`/v1/financial-model`, `/v1/financial-model/reset`); malformed data surfaces diagnostics. Analyses use the canonical model postings.
+8. **Derived artifacts**: the client keeps an in-memory content-addressed artifact store; durable artifact storage lives in the backend. `IndexedDbProjectionArtifactStore` exists but is not wired by default.
 9. **Independent analyses**: `AnalysisDefinition` computations run as explicit pipelines over posting-derived observations. Active analyses contribute classifier requirements to one shared posting-classification plan before payroll detection and salary estimation; the pipeline does not participate in projection or mutate the financial model.
 
 ## Key Types
@@ -110,7 +111,7 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 - Comparison snapshots contain metrics only; do not add restoration or alternative-model semantics.
 - Keep the domain canonical-only: no named alternative models, compatibility APIs, alternate readers, or additional persistence routes.
 - Use the `@/lib/projection` barrel for projection types and utilities.
-- Deterministic and stochastic computation runs in Web Workers, never on the main thread.
+- Deterministic and stochastic computation runs in the Go backend, never in browser JS.
 - Historical preparation merges postings and checkpoints chronologically. Same-date postings execute first, checkpoints then overwrite observed accounts, and later postings continue from that corrected state. Checkpoints emit no movement or cash-flow events.
 - Enabled `once` postings before the projection start establish historical balances through shared transitions. Start-date rows remain projected events; historical replay carries dependency/cap state but emits no projected movements or evaluation events.
 - Run `npm run test:run` and `npm run typecheck` after code changes.

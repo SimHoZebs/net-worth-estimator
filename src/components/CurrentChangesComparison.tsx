@@ -30,22 +30,19 @@ export const CurrentChangesComparison = memo(
 		return (
 			<Collapsible defaultOpen={false}>
 				<Collapsible.Trigger>
-					<div className="flex items-start justify-between gap-4">
-						<div className="flex items-start gap-3">
-							<Collapsible.Chevron />
-							<div>
-								<div className="type-title text-base">Saved comparisons</div>
-								<div className="type-muted">
-									{hasComparisons
-										? `${comparisonSnapshots.length} comparison snapshot${comparisonSnapshots.length === 1 ? "" : "s"} saved. Capture the current projection to compare with future changes.`
-										: "Capture the current projection to compare with future changes."}
-								</div>
-							</div>
-						</div>
-						<span className="hidden type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70 sm:inline">
-							Show details
-						</span>
-					</div>
+					<Collapsible.Header
+						title="Saved comparisons"
+						description={
+							hasComparisons
+								? `${comparisonSnapshots.length} comparison snapshot${comparisonSnapshots.length === 1 ? "" : "s"} saved. Capture the current projection to compare with future changes.`
+								: "Capture the current projection to compare with future changes."
+						}
+						trailing={
+							<span className="hidden type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70 sm:inline">
+								Show details
+							</span>
+						}
+					/>
 				</Collapsible.Trigger>
 				<Collapsible.Content>
 					<div className="space-y-4">

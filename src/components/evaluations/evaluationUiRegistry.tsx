@@ -55,7 +55,12 @@ function ThresholdConfigEditor({
 	const target = validateNetWorthThresholdConfig(evaluation.config).target;
 	const committedDraft = String(target);
 	const [draftTarget, setDraftTarget] = useState(committedDraft);
-	useEffect(() => setDraftTarget(committedDraft), [committedDraft]);
+	const [syncedCommittedDraft, setSyncedCommittedDraft] =
+		useState(committedDraft);
+	if (committedDraft !== syncedCommittedDraft) {
+		setSyncedCommittedDraft(committedDraft);
+		setDraftTarget(committedDraft);
+	}
 	const parsedTarget = parseDecimalDraft(draftTarget);
 	const dirty = draftTarget !== committedDraft;
 	const onDirtyChangeRef = useRef(onDirtyChange);

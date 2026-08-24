@@ -1,10 +1,11 @@
 # Technical Overview: Net Worth Estimator
 
-The Net Worth Estimator is a React application that loads a CSV-backed `FinancialModelDocument`, validates it, and projects net worth and financial-independence outcomes. Deterministic and Monte Carlo work runs in dedicated Web Workers.
+The Net Worth Estimator is a React application that loads a `FinancialModelDocument` from a Go backend, validates it, and projects net worth and financial-independence outcomes. Deterministic and Monte Carlo computation runs in the Go backend; the browser never simulates.
 
 ## 1. Tech Stack
 
 - React 19, Vite, and TypeScript
+- Go backend (chi + huma) for model persistence, projections, and analyses
 - Tailwind CSS v4 and uPlot
 - Zustand and TanStack Query
 - Papa Parse and Zod
@@ -12,14 +13,14 @@ The Net Worth Estimator is a React application that loads a CSV-backed `Financia
 
 ## 2. Data Flow
 
-1. `App.tsx` creates a capability-based `FinancialModelRepository`. Development uses the Vite CSV API repository; production uses the browser repository.
-2. Model Inputs and query hooks depend only on `FinancialModelRepository`. In production, a bundled CSV ingestion source and browser storage DAO connect behind that boundary through `FinancialModelIngestionCoordinator`.
-3. CSV parsing and cross-reference validation produce a `FinancialModelDocument` plus diagnostics. Invalid or malformed persisted data surfaces diagnostics instead of being silently discarded.
+1. `App.tsx` creates `createHttpFinancialModelRepository()` and `createHttpIncomeDataSource()`. The Vite dev server proxies `/v1` to the Go backend (`NET_WORTH_ESTIMATOR_BACKEND`, default `http://localhost:8787`).
+2. Model Inputs and query hooks depend only on `FinancialModelRepository`. Browser CSV ingestion and browser storage remain implemented behind that boundary but are not wired by default.
+3. Parsing and cross-reference validation produce a validated `FinancialModelDocument` plus diagnostics. Invalid or malformed data surfaces diagnostics instead of being silently discarded.
 4. Zustand stores session-only `ModelOverrides`, displayed as current changes. `applyModelOverrides` creates the effective document without mutating canonical data.
-5. `useProjection` and `useStochastic` pass the document, runtime settings, and overrides through a content-addressed `CachedProjectionEngine`. Cache misses delegate to `WorkerProjectionEngine` and dedicated workers.
+5. `useProjection` and `useStochastic` pass the document, runtime settings, and overrides through a content-addressed `CachedProjectionEngine`. Cache misses delegate to `BackendProjectionEngine`, which POSTs to `/v1/projections/deterministic` or streams `/v1/projections/stochastic` over SSE.
 6. `prepareSimulationRequest` resolves overrides, opening balances, dates, event policy, and optional `MonteCarloSample` into a prepared projection containing a `SimulationRequest`.
-7. The pure `simulate` kernel returns an exact `SimulationRun`. `projectRawFinancialModelDocument` adapts it into a `ProjectionPath` and public result; `projectFinancialModelDocument` adds configured evaluations.
-8. The persistent routed workspace exposes the loaded document and projection state to separate Results, Settings, and Model Inputs pages without restarting worker hooks during navigation.
+7. The pure `simulate` kernel returns an exact `SimulationRun`. `projectRawFinancialModelDocument` adapts it into a `ProjectionPath` and public result; `projectFinancialModelDocument` adds configured evaluations. The backend implements this pipeline; the TypeScript kernel remains the parity reference.
+8. The persistent routed workspace exposes the loaded document and projection state to separate Results, Settings, and Model Inputs pages without restarting projection hooks during navigation.
 9. The Analysis page derives observations from enabled one-time external-inflow postings and composes independent analyses without changing the financial model or projection lifecycle.
 
 ## 3. Persistence
@@ -28,29 +29,26 @@ The persistence boundary is the validated `FinancialModelDocument` aggregate. CS
 
 `FinancialModelIngestionCoordinator` connects a read-only `FinancialModelIngestionSource` to `FinancialModelDao`. Source revisions hash canonical model content without `sourcePath`; object keys are sorted and domain-significant array order is preserved. The coordinator conditionally replaces only the exact source-owned DAO version it observed. It has no storage lifecycle, schema, clear, or delete capability. User saves mark records as user-owned and therefore stop automatic source replacement.
 
-### Development
+### Backend
 
-- Canonical route: `GET/PUT /api/financial-model`
-- Saves write the configured model CSV files. The Vite API defaults to the tracked public files and supports alternate source directories through `NET_WORTH_ESTIMATOR_MODEL_PATH` and `NET_WORTH_ESTIMATOR_INCOME_PATH`.
-- Income CSV files are read through `/api/income-data/*` in development and bundled `/data/income/` files in production.
+- Canonical routes: `GET/PUT /v1/financial-model`, `POST /v1/financial-model/reset`
+- The Go server (`backend/cmd/server`) imports canonical CSV data (`NET_WORTH_ESTIMATOR_MODEL_PATH`, default `public/configs`) and income data (`NET_WORTH_ESTIMATOR_INCOME_PATH`, default `public/data/income`) into `NET_WORTH_ESTIMATOR_DB` (SQLite).
+- Income definitions are served through `/v1/income-data`. Posting analyses are also exposed at `/v1/analyses/postings`; the client currently derives analyses locally.
+- Projection endpoints: `POST /v1/projections/deterministic` (JSON) and `POST /v1/projections/stochastic` (SSE stream).
 
 ### Browser
 
-- Canonical key: `net-worth-estimator:financial-model`
-- Malformed canonical persisted data returns parse/validation diagnostics instead of falling back to bundled data.
-- Reset is a repository lifecycle action: it clears browser persistence, then asks ingestion to persist a fresh source-owned snapshot from bundled `/configs/` files.
-- Persisted records atomically contain the model, an opaque version, and user/source provenance. Conditional replacement prevents a delayed source synchronization from overwriting a concurrent user save.
-- Browser writes and conditional replacements use a cross-context Web Lock. If writable storage or Web Locks are unavailable, the browser repository exposes bundled CSV as read-only.
+Browser CSV ingestion and browser storage (`net-worth-estimator:financial-model` via `localStorageFinancialModelDao`) remain implemented behind the repository boundary but are not wired by default. Malformed canonical persisted data returns parse/validation diagnostics instead of falling back to bundled data.
 
 ### Projection Artifacts
 
 - Derived projection artifacts are separate from the canonical `FinancialModelRepository` and use the backend-agnostic `ProjectionArtifactStore` contract.
-- The browser implementation stores immutable artifacts in IndexedDB for reuse across application sessions.
+- The application wires an in-memory store; durable artifact storage lives in the backend, and `IndexedDbProjectionArtifactStore` remains available but is not wired by default.
 - Canonical semantic descriptors are serialized with sorted object keys and order-preserving arrays, then addressed by a versioned SHA-256 identity.
 - Deterministic base paths and evaluation results are stored separately. Evaluation-only changes reuse the base simulation, while label-only changes relabel cached results without computation.
-- Completed stochastic results are cached by effective simulation inputs, normalized run count, seed intent, and evaluation configuration. A first unseeded cache miss materializes a concrete seed; later identical requests reuse that persisted outcome.
+- Completed stochastic results are cached by effective simulation inputs, normalized run count, seed intent, and evaluation configuration. A first unseeded cache miss materializes a concrete seed; later identical requests reuse that outcome.
 - Progressive stochastic results are never persisted. A stochastic evaluation cache miss replays samples because individual sample paths are intentionally not retained.
-- IndexedDB, hashing, validation, and artifact-store failures fail open: workers still compute the requested projection.
+- Hashing, validation, and artifact-store failures fail open: the backend still computes the requested projection.
 
 ## 4. Core Types
 
@@ -82,7 +80,7 @@ There is no named alternative-model domain or persistence API. Comparisons are m
 - Postings select an exact amount resolver and bind its required inputs to literals or registered providers.
 - Resolvers receive only validated config and concrete numeric inputs. Providers may read narrowly supplied balances, latest/YTD posting observations, the occurrence date, and the effective occurrence rate.
 - The `income` resolver is an ordered payroll pipeline. It reads effective-dated annual gross income from the separate income data source, runs its `resolvers` array from left to right, and deposits the remaining post-tax amount into the posting destinations. Resolver steps may settle pre-tax contributions and employer match into their own destination accounts.
-- Income definitions and tax profiles are source data, currently loaded from CSV under `public/data/income/`; they are not application configuration or part of the persisted financial-model document. Their normalized snapshot is passed through projection, workers, and cache identity.
+- Income definitions and tax profiles are source data, served by the backend from CSV under `public/data/income/`; they are not application configuration or part of the persisted financial-model document. Their normalized snapshot is passed through projection requests and cache identity.
 - Posting frequency may be recurring or explicitly `once`; one-time rows execute exactly on their start date regardless of whether the end date is blank or equal to it.
 - Blank `sourceAccountId` plus destinations is an external inflow.
 - A source plus no destinations is an external outflow.
@@ -137,7 +135,7 @@ The stochastic coordinator:
 3. Uses the deterministic path's monthly FI candidate schedule for every run.
 4. Records each run's first successful FI candidate and aggregates the cumulative probability that FI has been achieved by each candidate date.
 5. Maintains exact sorted value distributions and computes P10/P25/P50/P75/P90 with exact percentile aggregation.
-6. Processes runs in worker batches of 50 and emits progressive `StochasticProjectionResult` updates.
+6. Processes runs in server-side batches and streams SSE `progress`/`partial` events; the client renders progressive `StochasticProjectionResult` updates.
 7. Discards each sample path after the distribution and enabled evaluation trackers consume it.
 
 Percentile-band slope is never interpreted as a run outcome. FI confidence dates come from the cumulative distribution of each run's first successful candidate.
@@ -178,11 +176,12 @@ React Router uses browser paths. Production hosting must serve `index.html` for 
 | `src/lib/projection/analysis/projectStochastic.ts` | prepared-request reuse, sample execution, exact percentiles, and progress batches |
 | `src/lib/projection/evaluation/runtime.ts` | configured evaluation lifecycle and stochastic trackers |
 | `src/lib/projection/evaluation/registry.ts` | evaluation definition registration |
-| `src/workers/projectionWorker.ts` | deterministic worker entry point |
-| `src/workers/stochasticWorker.ts` | stochastic worker and progress streaming |
+| `src/engine/BackendProjectionEngine.ts` | HTTP/SSE client for backend deterministic and stochastic projection |
+| `src/engine/CachedProjectionEngine.ts` | content-addressed cache over the computation engine |
+| `src/engine/applicationProjectionEngine.ts` | application wiring: cached backend engine plus in-memory artifacts |
 | `src/hooks/useFinancialModel.ts` | document query, save, and reset hooks |
-| `src/hooks/useProjection.ts` | deterministic worker hook |
-| `src/hooks/useStochastic.ts` | stochastic worker hook |
+| `src/hooks/useProjection.ts` | deterministic projection hook |
+| `src/hooks/useStochastic.ts` | stochastic projection hook |
 | `src/lib/analysis/postingObservations.ts` | derives analysis observations from one-time external-inflow postings |
 | `src/lib/analysis/classification.ts` | typed classifier definitions, requirement-plan composition, and shared classification pass |
 | `src/lib/analysis/postingClassifiers.ts` | reusable payer, payroll-language, and payment-rail classifiers |

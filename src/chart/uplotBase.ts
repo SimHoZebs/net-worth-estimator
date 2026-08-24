@@ -1,10 +1,5 @@
 import type uPlot from "uplot";
-import { formatChartCurrencyTick } from "@/lib/format";
-
-function parseIsoDate(date: string): Date {
-	const [year, month, day] = date.split("-").map(Number);
-	return new Date(year, month - 1, day);
-}
+import { formatChartCurrencyTick, parseIsoDateLocal } from "@/lib/format";
 
 function cssColor(variableName: string, fallback: string): string {
 	if (typeof window === "undefined") return fallback;
@@ -74,7 +69,7 @@ export function createReferenceLinesHooks(
 
 					for (const ms of [milestoneDates?.firstShortfall]) {
 						if (!ms) continue;
-						const ts = parseIsoDate(ms).getTime();
+						const ts = parseIsoDateLocal(ms).getTime();
 						const x = self.valToPos(ts, "x");
 						if (x < bbox.left || x > bbox.left + bbox.width) continue;
 

@@ -8,10 +8,14 @@ import { parseFinancialModelDocument } from "@/lib/projection/sources/csv/csvDat
 
 // Live end-to-end check: fetch the canonical document from the Go backend and
 // drive it through the exact load/parse/project path used by the app.
+// Opt-in: set NET_WORTH_ESTIMATOR_LIVE_TESTS=1 with the dev server (or
+// backend) reachable; skipped otherwise so default runs stay hermetic.
+
+const LIVE_BACKEND = process.env.NET_WORTH_ESTIMATOR_LIVE_TESTS;
 
 const API = "http://127.0.0.1:5173/v1";
 
-describe("live backend parity", () => {
+describe.skipIf(!LIVE_BACKEND)("live backend parity", () => {
 	it("parses the served document with the production parser", async () => {
 		const response = await fetch(`${API}/financial-model`);
 		expect(response.ok).toBe(true);

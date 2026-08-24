@@ -1,5 +1,6 @@
 import { type ReactNode, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { formatPercentRate } from "@/lib/format";
 import type {
 	FinancialIndependenceExpenseBasis,
 	FinancialIndependencePlan,
@@ -196,7 +197,7 @@ function portfolioPolicies(
 			value: "preserve-real-principal",
 			label: "Preserve purchasing power",
 			badge: "Strictest",
-			description: `Fund all spending and finish ${plan.evaluationYears} years with selected assets worth at least their starting value after ${formatPercent(plan.annualExpenseGrowthRate)} yearly spending inflation.`,
+			description: `Fund all spending and finish ${plan.evaluationYears} years with selected assets worth at least their starting value after ${formatPercentRate(plan.annualExpenseGrowthRate, 2)} yearly spending inflation.`,
 		},
 		{
 			value: "preserve-nominal-principal",
@@ -310,10 +311,4 @@ export function RetirementIncomeField({
 			) : null}
 		</div>
 	);
-}
-
-function formatPercent(value: number) {
-	return `${new Intl.NumberFormat("en-US", {
-		maximumFractionDigits: 2,
-	}).format(value * 100)}%`;
 }

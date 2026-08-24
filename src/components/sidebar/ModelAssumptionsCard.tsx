@@ -5,6 +5,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { formatPercentRate } from "@/lib/format";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import { useProjectionCapabilities } from "@/runtime/projectionRuntime";
 
@@ -61,12 +62,12 @@ export function ModelAssumptionsCard() {
 								>
 									<span className="text-foreground/80">{posting.label}</span>
 									<span className="text-right text-muted-foreground">
-										{(posting.annualRate * 100).toFixed(1)}%
+										{formatPercentRate(posting.annualRate)}
 										{posting.annualGrowthRate > 0
-											? `, +${(posting.annualGrowthRate * 100).toFixed(1)}%/yr`
+											? `, +${formatPercentRate(posting.annualGrowthRate)}/yr`
 											: ""}
 										{posting.volatility > 0
-											? `, +/-${(posting.volatility * 100).toFixed(1)}%`
+											? `, +/-${formatPercentRate(posting.volatility)}`
 											: ""}
 									</span>
 								</div>

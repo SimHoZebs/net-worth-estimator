@@ -21,7 +21,10 @@ export function TransactionHistoryTable({
 }: TransactionHistoryTableProps) {
 	const [search, setSearch] = useState("");
 	const [page, setPage] = useState(0);
-	const accountById = new Map(accounts.map((account) => [account.id, account]));
+	const accountById = useMemo(
+		() => new Map(accounts.map((account) => [account.id, account])),
+		[accounts],
+	);
 	const groups = useMemo(() => {
 		const query = search.trim().toLowerCase();
 		const byDate = new Map<string, Posting[]>();

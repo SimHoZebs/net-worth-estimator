@@ -1,6 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
-	"plugins": ["./biome-plugins/vite-worker-url.grit"],
+	"$schema": "https://biomejs.dev/schemas/2.5.6/schema.json",
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",
@@ -12,7 +11,7 @@
 		}
 	},
 	"linter": {
-		"includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.grit"],
+		"includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
 		"rules": {
 			"recommended": true,
 			"suspicious": {
@@ -42,8 +41,7 @@
 			"**/*.js",
 			"**/*.jsx",
 			"**/*.json",
-			"**/*.md",
-			"**/*.grit"
+			"**/*.md"
 		]
 	}
 }

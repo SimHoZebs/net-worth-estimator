@@ -40,27 +40,24 @@ export function CurrentChangesControls({
 	return (
 		<Collapsible autoOpenWhen={currentChangeCount > 0}>
 			<Collapsible.Trigger>
-				<div className="flex items-start justify-between gap-4">
-					<div className="flex items-start gap-3">
-						<Collapsible.Chevron />
-						<div>
-							<div className="type-title text-base">Current changes</div>
-							<div className="type-muted">
-								{currentChangeCount > 0
-									? `${currentChangeCount} temporary change${currentChangeCount === 1 ? "" : "s"} active.`
-									: "Temporarily add trial accounts and scheduled transactions."}
-							</div>
+				<Collapsible.Header
+					title="Current changes"
+					description={
+						currentChangeCount > 0
+							? `${currentChangeCount} temporary change${currentChangeCount === 1 ? "" : "s"} active.`
+							: "Temporarily add trial accounts and scheduled transactions."
+					}
+					trailing={
+						<div className="flex items-center gap-2">
+							{currentChangeCount > 0 ? (
+								<StatusPill>{currentChangeCount} active</StatusPill>
+							) : null}
+							<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
+								Show details
+							</span>
 						</div>
-					</div>
-					<div className="flex items-center gap-2">
-						{currentChangeCount > 0 ? (
-							<StatusPill>{currentChangeCount} active</StatusPill>
-						) : null}
-						<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
-							Show details
-						</span>
-					</div>
-				</div>
+					}
+				/>
 			</Collapsible.Trigger>
 			<Collapsible.Content>
 				<div className="space-y-6">

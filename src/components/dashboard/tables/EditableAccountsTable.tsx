@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -7,6 +7,10 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import {
+	DraftCommitInput,
+	editableTableCellInputStyle,
+} from "@/components/ui/draft-commit-input";
 import {
 	Table,
 	TableBody,
@@ -19,11 +23,10 @@ import { parseDecimalDraft } from "@/lib/number-draft";
 import type { Account, FinancialModelDocument } from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
 
+const NO_CHANGED_IDS = new Set<string>();
+
 function inputStyle(isDirty: boolean) {
-	const dirty = isDirty
-		? "border-tertiary-border bg-tertiary-subtle"
-		: "border-input bg-card";
-	return `w-full rounded-lg ${dirty} px-2 py-1 type-body type-code outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40`;
+	return editableTableCellInputStyle(isDirty);
 }
 
 function AccountLimitInput({
@@ -42,48 +45,22 @@ function AccountLimitInput({
 	onCommit: (value: number) => void;
 }) {
 	const committedDraft = value === emptyValue ? "" : String(value);
-	const [draft, setDraft] = useState(committedDraft);
-	const skipBlurCommit = useRef(false);
-
-	useEffect(() => setDraft(committedDraft), [committedDraft]);
-
-	const commit = () => {
-		if (draft.trim() === "") {
-			setDraft("");
-			onCommit(emptyValue);
-			return;
-		}
-		const parsed = parseDecimalDraft(draft);
-		if (parsed === null) {
-			setDraft(committedDraft);
-			return;
-		}
-		setDraft(String(parsed));
-		onCommit(parsed);
-	};
-
 	return (
-		<input
+		<DraftCommitInput
 			className={inputStyle(isDirty)}
 			type="text"
 			inputMode="decimal"
 			aria-label={`${label} for ${accountId}`}
-			value={draft}
-			onChange={(event) => setDraft(event.target.value)}
-			onBlur={() => {
-				if (skipBlurCommit.current) {
-					skipBlurCommit.current = false;
-					return;
+			committedValue={committedDraft}
+			onCommitDraft={(draft) => {
+				if (draft.trim() === "") {
+					onCommit(emptyValue);
+					return "";
 				}
-				commit();
-			}}
-			onKeyDown={(event) => {
-				if (event.key === "Enter") commit();
-				if (event.key === "Escape") {
-					skipBlurCommit.current = true;
-					setDraft(committedDraft);
-					event.currentTarget.blur();
-				}
+				const parsed = parseDecimalDraft(draft);
+				if (parsed === null) return null;
+				onCommit(parsed);
+				return String(parsed);
 			}}
 		/>
 	);
@@ -108,17 +85,35 @@ export function EditableAccountsTable({
 	deleteAccount,
 	addAccount,
 }: EditableAccountsTableProps) {
-	const documentAccountsById = new Map<string, Account>();
-	for (const account of document.accounts) {
-		documentAccountsById.set(account.id, account);
-	}
+	const documentAccountsById = useMemo(
+		() => new Map(document.accounts.map((account) => [account.id, account])),
+		[document.accounts],
+	);
 
-	const workingAccountsById = new Map<string, Account>();
-	if (workingDocument) {
-		for (const a of workingDocument.accounts) {
-			workingAccountsById.set(a.id, a);
+	const workingAccountsById = useMemo(
+		() =>
+			new Map(
+				(workingDocument?.accounts ?? []).map((account) => [
+					account.id,
+					account,
+				]),
+			),
+		[workingDocument],
+	);
+	const changedAccountIds = useMemo(() => {
+		if (!isDirty || workingDocument === null) return NO_CHANGED_IDS;
+		const changed = new Set<string>();
+		for (const account of workingDocument.accounts) {
+			const original = documentAccountsById.get(account.id);
+			if (
+				original === undefined ||
+				JSON.stringify(account) !== JSON.stringify(original)
+			) {
+				changed.add(account.id);
+			}
 		}
-	}
+		return changed;
+	}, [isDirty, workingDocument, documentAccountsById]);
 
 	return (
 		<Card className="rounded-[1.8rem] border-border shadow-sm ">
@@ -144,18 +139,21 @@ export function EditableAccountsTable({
 							const wa = workingAccountsById.get(a.id);
 							const pa = documentAccountsById.get(a.id);
 							const changed =
-								isDirty && wa && JSON.stringify(wa) !== JSON.stringify(pa);
+								wa !== undefined &&
+								pa !== undefined &&
+								changedAccountIds.has(a.id);
 
 							return (
 								<TableRow key={a.id}>
 									<TableCell>
-										<input
+										<DraftCommitInput
 											aria-label={`Account ID for ${a.label}`}
 											className={inputStyle(!!changed)}
-											value={a.id}
-											onChange={(e) =>
-												updateAccount(a.id, { id: e.target.value })
-											}
+											committedValue={a.id}
+											onCommitDraft={(id) => {
+												updateAccount(a.id, { id });
+												return id;
+											}}
 										/>
 									</TableCell>
 									<TableCell>
