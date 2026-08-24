@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -45,8 +47,9 @@ type projectionRequestBody struct {
 }
 
 type deterministicOutput struct {
-	Cache string `header:"X-Cache"`
-	Body  struct {
+	Status int    `json:"-"`
+	Cache  string `header:"X-Cache"`
+	Body   struct {
 		Result *types.ProjectionResult      `json:"result,omitempty"`
 		Issues []types.ModelValidationIssue `json:"issues,omitempty"`
 		Error  string                       `json:"error,omitempty"`
@@ -70,20 +73,26 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 		"incomeData": incomeData,
 	})
 	if cached, err := lookupArtifact[types.ProjectionResult](s.store, cacheKey); err == nil && cached.hit {
-		output := &deterministicOutput{Cache: "hit"}
+		// huma writes Status verbatim; leaving it zero panics the writer.
+		output := &deterministicOutput{Status: http.StatusOK, Cache: "hit"}
 		cachedCopy := cached.value
 		output.Body.Result = &cachedCopy
 		return output, nil
 	}
 
 	result, err := domain.ProjectFinancialModelDocument(document, &input.Body.Settings, input.Body.Overrides, nil, incomeData)
-	output := &deterministicOutput{Cache: "miss"}
+	// huma writes this status verbatim; default to 200 and only raise it for
+	// unexpected failures.
+	output := &deterministicOutput{Status: http.StatusOK, Cache: "miss"}
 	if err != nil {
 		output.Body.Error = err.Error()
 		if preparationError, ok := err.(*domain.SimulationPreparationError); ok {
+			// Validation failures stay HTTP 200: the client reads the issue
+			// list from the body and surfaces it as model diagnostics.
 			output.Body.Issues = preparationError.Issues
 			return output, nil
 		}
+		output.Status = http.StatusInternalServerError
 		return output, nil
 	}
 	putArtifact(s.store, cacheKey, "deterministic", result)
@@ -94,28 +103,46 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 // ---- Analyses (posting-derived payroll evidence) ----
 
 type analysesOutput struct {
-	Body struct {
-		Error   string         `json:"error,omitempty"`
-		Results map[string]any `json:"results,omitempty"`
+	Status int `json:"-"`
+	Body   struct {
+		Error   string                       `json:"error,omitempty"`
+		Issues  []types.ModelValidationIssue `json:"issues,omitempty"`
+		Results map[string]any               `json:"results,omitempty"`
 	}
 }
 
 func (s *Server) analyzePostings(_ context.Context, input *struct {
 	Body projectionRequestBody
 }) (*analysesOutput, error) {
-	document, _, err := s.resolveDocument(input.Body.Document, input.Body.IncomeData)
+	document, incomeData, err := s.resolveDocument(input.Body.Document, input.Body.IncomeData)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
+	// Posting analyses parse posting dates directly; reject malformed
+	// documents with structured issues instead of panicking into a 500.
+	output := &analysesOutput{Status: http.StatusOK}
+	issues := domainValidate(document, incomeData)
+	for _, issue := range issues {
+		if issue.Severity == types.SeverityError {
+			output.Body.Issues = append(output.Body.Issues, issue)
+		}
+	}
+	if len(output.Body.Issues) > 0 {
+		return output, nil
+	}
 	results, err := domain.RunPostingAnalyses(document)
-	output := &analysesOutput{}
 	if err != nil {
 		output.Body.Error = err.Error()
 		return output, nil
 	}
-	payload, _ := json.Marshal(results)
+	payload, err := json.Marshal(results)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("encode analysis results: %v", err))
+	}
 	decoded := map[string]any{}
-	_ = json.Unmarshal(payload, &decoded)
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		return nil, huma.Error500InternalServerError(fmt.Sprintf("decode analysis results: %v", err))
+	}
 	output.Body.Results = decoded
 	return output, nil
 }

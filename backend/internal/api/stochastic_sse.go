@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
@@ -93,17 +94,25 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 			eventName = "partial"
 			payload["partial"] = partial
 		}
-		_ = writeEvent(eventName, payload)
+		if err := writeEvent(eventName, payload); err != nil {
+			// The request context cancels the projection on client
+			// disconnect; log so stream breakage is never silent.
+			log.Printf("stochastic sse: %s write failed: %v", eventName, err)
+		}
 	}
 
 	ctx := r.Context()
 	result, runErr := domain.StochasticProjection(ctx, document, &body.Settings, body.Overrides, body.Config, progressCallback, incomeData)
 	if runErr != nil {
-		_ = writeEvent("error", map[string]any{"error": runErr.Error()})
+		if err := writeEvent("error", map[string]any{"error": runErr.Error()}); err != nil {
+			log.Printf("stochastic sse: error write failed: %v", err)
+		}
 		return
 	}
 	if cacheEligible {
 		putArtifact(s.store, cacheKey, "stochastic", result)
 	}
-	_ = writeEvent("result", map[string]any{"result": result})
+	if err := writeEvent("result", map[string]any{"result": result}); err != nil {
+		log.Printf("stochastic sse: result write failed: %v", err)
+	}
 }

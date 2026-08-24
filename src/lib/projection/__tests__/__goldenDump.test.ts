@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { describe, it } from "vitest";
+import type { FinancialIndependencePlan } from "@/lib/projection";
 import {
 	projectFinancialModelDocument,
 	projectRawFinancialModelDocument,
@@ -133,6 +134,17 @@ describe("golden dump", () => {
 					frequency: "monthly",
 					startDate: "2026-02-05",
 				}),
+				// Volatile continuing posting so FI branch replay consumes
+				// sampled rates; pins MonteCarloSample plumbing end to end.
+				makePosting({
+					id: "growth",
+					sourceAccountId: "checking",
+					destinations: ["brokerage"],
+					arithmetic: "50",
+					frequency: "monthly",
+					startDate: "2026-02-01",
+					volatility: 0.05,
+				}),
 			],
 			accounts: [
 				makeAccount({ id: "checking" }),
@@ -140,7 +152,33 @@ describe("golden dump", () => {
 				makeAccount({ id: "loan" }),
 			],
 		});
-		const settings = baseSettings(1);
+		const base = baseSettings(4);
+		const fiPlan: FinancialIndependencePlan = {
+			minimumNetWorth: 0,
+			annualExpenseTarget: 12_000,
+			annualExpenseTargetBasis: "fi-date-dollars",
+			annualExpenseGrowthRate: 0.02,
+			withdrawalRate: 0.04,
+			evaluationYears: 2,
+			requiredConfidence: 0.9,
+			sources: [{ type: "asset", accountId: "brokerage", included: true }],
+			continuingPostingIds: ["growth"],
+			principalPolicy: "preserve-real-principal",
+		};
+		const settings = {
+			...base,
+			evaluations: {
+				...base.evaluations,
+				financialIndependence: [
+					{
+						instanceId: "fi-golden",
+						label: "FI golden",
+						enabled: true,
+						config: fiPlan,
+					},
+				],
+			},
+		};
 		const config: StochasticConfig = { runCount: 20, seed: 42 };
 		const { stochasticProject } = await import("../analysis/projectStochastic");
 		const result = stochasticProject(

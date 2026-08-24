@@ -2,8 +2,8 @@ package domain
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -35,79 +35,108 @@ func StochasticProjection(
 		index  int
 	}
 	type pathResult struct {
-		index int
-		path  *types.ProjectionPath
-		err   error
+		index  int
+		path   *types.ProjectionPath
+		sample *types.MonteCarloSample
+		err    error
+	}
+	type pendingRun struct {
+		path   *types.ProjectionPath
+		sample *types.MonteCarloSample
 	}
 
 	jobs := make(chan sampleJob)
 	results := make(chan pathResult, workerCount*2)
 	var workers sync.WaitGroup
+	runCtx, cancel := context.WithCancel(ctx)
+	defer func() {
+		cancel()
+		workers.Wait()
+	}()
+
 	for worker := 0; worker < workerCount; worker++ {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
 			for job := range jobs {
-				if ctx.Err() != nil {
-					results <- pathResult{index: job.index, err: ctx.Err()}
-					continue
+				if runCtx.Err() != nil {
+					return
 				}
 				path, err := session.projectSample(job.sample)
-				results <- pathResult{index: job.index, path: path, err: err}
+				// Never block forever on results: after an early consumer
+				// return the deferred cancel fires and workers must be able
+				// to exit or workers.Wait() deadlocks.
+				select {
+				case results <- pathResult{index: job.index, path: path, sample: job.sample, err: err}:
+				case <-runCtx.Done():
+					return
+				}
 			}
 		}()
 	}
-	defer func() {
-		close(jobs)
-		workers.Wait()
-	}()
 
+	// The producer goroutine owns closing `jobs` so a blocked send can never
+	// race the close ("send on closed channel" would otherwise crash the
+	// process from outside the handler's recover scope). Cancelling the
+	// derived context on early return stops production instead.
 	go func() {
+		defer close(jobs)
 		for run := 0; run < session.config.RunCount; run++ {
 			select {
-			case <-ctx.Done():
+			case <-runCtx.Done():
 				return
-			default:
+			case jobs <- sampleJob{sample: session.createSample(), index: run}:
 			}
-			jobs <- sampleJob{sample: session.createSample(), index: run}
 		}
 	}()
 
-	pending := make(map[int]*types.ProjectionPath)
+	pending := make(map[int]pendingRun)
 	nextIndex := 0
+consumer:
 	for nextIndex < session.config.RunCount {
-		result := <-results
+		var result pathResult
+		select {
+		case result = <-results:
+		case <-runCtx.Done():
+			// Production stopped before every run completed (client
+			// disconnect or an earlier error return): drain without waiting.
+			break consumer
+		}
 		if result.err != nil {
-			if errors.Is(result.err, ErrTooManyPaths) {
-				return nil, result.err
-			}
 			return nil, fmt.Errorf("stochastic run %d: %w", result.index, result.err)
 		}
-		pending[result.index] = result.path
+		pending[result.index] = pendingRun{path: result.path, sample: result.sample}
 		for {
-			path, ok := pending[nextIndex]
+			run, ok := pending[nextIndex]
 			if !ok {
 				break
 			}
 			delete(pending, nextIndex)
 			// Accumulation happens in submission order for exact parity with
 			// the sequential TS implementation (sorted merges + counters).
-			if err := consumeOrdered(session, path); err != nil {
+			if err := consumeOrdered(session, run.path, run.sample); err != nil {
 				return nil, err
 			}
 			nextIndex++
 		}
 	}
+	if nextIndex < session.config.RunCount {
+		return nil, ctx.Err()
+	}
 	return session.result()
 }
 
-func consumeOrdered(session *stochasticSession, path *types.ProjectionPath) error {
+func consumeOrdered(
+	session *stochasticSession,
+	path *types.ProjectionPath,
+	sample *types.MonteCarloSample,
+) error {
 	session.valuesMutex.Lock()
-	defer session.valuesMutex.Unlock()
 	session.runtimes.Consume(&EvaluationContext{
-		Path:        path,
-		Document:    &path.EffectiveDocument,
-		DetailLevel: "summary",
+		Path:             path,
+		Document:         &path.EffectiveDocument,
+		MonteCarloSample: sample,
+		DetailLevel:      "summary",
 	})
 	for _, row := range path.Rows {
 		session.pendingValuesByDate[row.Date] = append(session.pendingValuesByDate[row.Date], mathRound(row.NetWorth))
@@ -117,26 +146,29 @@ func consumeOrdered(session *stochasticSession, path *types.ProjectionPath) erro
 	}
 	session.completedRuns++
 	batchComplete := session.completedRuns%stochasticProgressBatch == 0 || session.completedRuns == session.config.RunCount
+	progressSnapshot := session.progress(types.PhaseStochasticRuns)
+	var partialResult *types.StochasticProjectionResult
 	if batchComplete {
-		session.flushBatchLocked()
+		partialResult = session.flushBatchLocked()
+	}
+	session.valuesMutex.Unlock()
+
+	// Progress callbacks write to the HTTP response; they must never run
+	// while valuesMutex is held or a stalled client stalls accumulation.
+	if batchComplete {
+		if session.onProgress != nil {
+			session.onProgress(progressSnapshot, partialResult)
+		}
 		return nil
 	}
 	if session.completedRuns == 1 || session.completedRuns%session.progressUpdateRuns == 0 {
 		if session.onProgress != nil {
-			session.onProgress(session.progress(types.PhaseStochasticRuns), nil)
+			session.onProgress(progressSnapshot, nil)
 		}
 	}
 	return nil
 }
 
-func mathRound(value float64) float64 { return float64(int64(value + copysignOne(value))) }
-
-func copysignOne(value float64) float64 {
-	if value < 0 {
-		return -0.5
-	}
-	return 0.5
-}
-
-// ErrTooManyPaths mirrors the TS over-consumption guard.
-var ErrTooManyPaths = errors.New("Stochastic projection received too many paths.")
+// mathRound matches JavaScript Math.round: half rounds toward +Infinity
+// (Math.round(-2.5) === -2), unlike truncation on v±0.5.
+func mathRound(value float64) float64 { return math.Floor(value + 0.5) }

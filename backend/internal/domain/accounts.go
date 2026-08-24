@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -71,5 +70,3 @@ func GetTotalDestinationHeadroom(balances map[string]float64, accountByID map[st
 	}
 	return total
 }
-
-var _ = fmt.Sprintf // keep fmt import for future diagnostics

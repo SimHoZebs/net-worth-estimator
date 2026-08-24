@@ -80,6 +80,11 @@ func ValidateFinancialModel(document *types.FinancialModelDocument, incomeData *
 				fmt.Sprintf("Checkpoint account '%s' does not exist.", checkpoint.AccountID),
 				pathWithField([]any{"checkpoints", index}, "AccountId")...)
 		}
+		if !IsValidIsoDate(checkpoint.Date) {
+			addIssue(&issues, types.SeverityError, "checkpoint.date.format",
+				fmt.Sprintf("Checkpoint date '%s' must be a YYYY-MM-DD calendar date.", checkpoint.Date),
+				pathWithField([]any{"checkpoints", index}, "date")...)
+		}
 		key := checkpoint.AccountID + "\x00" + checkpoint.Date
 		if checkpointKeys[key] {
 			addIssue(&issues, types.SeverityError, "checkpoint.account-date.duplicate",
@@ -316,7 +321,20 @@ func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []type
 				"Posting sourceAccountId must not appear in destinations.",
 				[]any{"postings", index}...)
 		}
-		if posting.EndDate != nil && CompareIsoDates(*posting.EndDate, posting.StartDate) < 0 {
+		if !IsValidIsoDate(posting.StartDate) {
+			addIssue(issues, types.SeverityError, "posting.start-date.format",
+				fmt.Sprintf("Posting '%s' startDate must be a YYYY-MM-DD calendar date.", posting.ID),
+				pathWithField([]any{"postings", index}, "startDate")...)
+		}
+		if posting.EndDate != nil && !IsValidIsoDate(*posting.EndDate) {
+			addIssue(issues, types.SeverityError, "posting.end-date.format",
+				fmt.Sprintf("Posting '%s' endDate must be a YYYY-MM-DD calendar date.", posting.ID),
+				pathWithField([]any{"postings", index}, "endDate")...)
+		}
+		if posting.EndDate != nil &&
+			IsValidIsoDate(posting.StartDate) &&
+			IsValidIsoDate(*posting.EndDate) &&
+			CompareIsoDates(*posting.EndDate, posting.StartDate) < 0 {
 			addIssue(issues, types.SeverityError, "posting.schedule.invalid",
 				"Posting endDate must be the same as or later than startDate.",
 				pathWithField([]any{"postings", index}, "endDate")...)
