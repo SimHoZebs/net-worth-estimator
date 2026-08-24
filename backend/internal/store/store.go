@@ -108,7 +108,9 @@ func (s *Store) migrate() error {
 	var version int64
 	row := s.db.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_version`)
 	if err := row.Scan(&version); err == nil && version < 1 {
-		_, _ = s.db.Exec(`INSERT INTO schema_version (version) VALUES (1)`)
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version) VALUES (1)`); err != nil {
+			return fmt.Errorf("record schema version: %w", err)
+		}
 	}
 	return nil
 }

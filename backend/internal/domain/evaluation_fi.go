@@ -12,11 +12,6 @@ import (
 
 const fiEpsilon = FIShortfallTolerance
 
-// FIAnalysis mirrors types.FinancialIndependenceAnalysis with JSON tags.
-type FIAnalysis struct {
-	Rows []types.ProjectionRow `json:"-"`
-}
-
 // FIRow is one candidate-date analysis row.
 type FIRow struct {
 	Date                     IsoDate               `json:"date"`
@@ -454,6 +449,26 @@ func selectedAssetRates(plan *types.FIPlan) map[string]float64 {
 	return rates
 }
 
+// selectedAssetRateOrder lists selected asset IDs in first-seen plan-source
+// order, matching TS Map insertion semantics. FI withdrawal allocation and
+// trajectory payloads iterate in this order; the remainder is absorbed by the
+// last account, so ordering changes allocation pennies.
+func selectedAssetRateOrder(plan *types.FIPlan, rates map[string]float64) []string {
+	order := make([]string, 0, len(rates))
+	seen := map[string]bool{}
+	for _, source := range plan.Sources {
+		if seen[source.AccountID] {
+			continue
+		}
+		if _, ok := rates[source.AccountID]; !ok {
+			continue
+		}
+		seen[source.AccountID] = true
+		order = append(order, source.AccountID)
+	}
+	return order
+}
+
 func selectedCashflowIDs(plan *types.FIPlan) map[string]bool {
 	ids := map[string]bool{}
 	for _, source := range plan.Sources {
@@ -462,15 +477,6 @@ func selectedCashflowIDs(plan *types.FIPlan) map[string]bool {
 		}
 	}
 	return ids
-}
-
-func sortedMapKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 func latestRowAtOrBefore(rows []types.ProjectionRow, date IsoDate) *types.ProjectionRow {
@@ -570,9 +576,9 @@ func realizedCashflowByMonth(events []types.MovementEvent, cashflowIDs map[strin
 	return amounts
 }
 
-func optimisticLaterYearWithdrawalCapacity(balances map[string]float64, assetRates map[string]float64, accountsByID map[string]types.Account) float64 {
+func optimisticLaterYearWithdrawalCapacity(balances map[string]float64, assetRateOrder []string, assetRates map[string]float64, accountsByID map[string]types.Account) float64 {
 	capacity := 0.0
-	for _, accountID := range sortedMapKeys(assetRates) {
+	for _, accountID := range assetRateOrder {
 		rate := assetRates[accountID]
 		if rate == 0 {
 			continue
@@ -652,7 +658,7 @@ type branchEventGroup struct {
 	occurrences []DatedPostingOccurrence
 }
 
-func applyBranchPostingEvents(events []branchEventGroup, baseRealizedByDateAndPosting map[string]float64, baseEventsByDateAndPosting map[string]*types.MovementEvent, dispositions map[string]postingDisposition, transitions *TransitionRuntime) float64 {
+func applyBranchPostingEvents(events []branchEventGroup, baseRealizedByDateAndPosting map[string]float64, baseEventsByDateAndPosting map[string]*types.MovementEvent, dispositions map[string]postingDisposition, transitions *TransitionRuntime) (float64, error) {
 	observedDirectIncome := 0.0
 	for _, group := range events {
 		sorted := make([]DatedPostingOccurrence, len(group.occurrences))
@@ -679,17 +685,21 @@ func applyBranchPostingEvents(events []branchEventGroup, baseRealizedByDateAndPo
 							continue
 						}
 						destinations := []string{*resolver.DestinationAccountID}
-						_, _ = transitions.ExecuteGeneratedMovement(AccountMovementAction{
+						if _, err := transitions.ExecuteGeneratedMovement(AccountMovementAction{
 							SourceAccountID: nil,
 							Destinations:    destinations,
 							RequestedAmount: resolver.RealizedAmount,
-						})
+						}); err != nil {
+							return 0, fmt.Errorf("replay posting %q on %s: %w", posting.ID, group.date, err)
+						}
 						if resolver.EmployerMatchRealizedAmount > 0 {
-							_, _ = transitions.ExecuteGeneratedMovement(AccountMovementAction{
+							if _, err := transitions.ExecuteGeneratedMovement(AccountMovementAction{
 								SourceAccountID: nil,
 								Destinations:    destinations,
 								RequestedAmount: resolver.EmployerMatchRealizedAmount,
-							})
+							}); err != nil {
+								return 0, fmt.Errorf("replay posting %q on %s: %w", posting.ID, group.date, err)
+							}
 						}
 					}
 				}
@@ -697,10 +707,12 @@ func applyBranchPostingEvents(events []branchEventGroup, baseRealizedByDateAndPo
 				observedDirectIncome += realizedAmount
 				continue
 			}
-			_, _ = transitions.ExecutePosting(occurrence, group.date)
+			if _, err := transitions.ExecutePosting(occurrence, group.date); err != nil {
+				return 0, fmt.Errorf("replay posting %q on %s: %w", posting.ID, group.date, err)
+			}
 		}
 	}
-	return observedDirectIncome
+	return observedDirectIncome, nil
 }
 
 type cycleOutcome struct {
@@ -728,6 +740,7 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 	}
 	candidateRow := latestRowAtOrBefore(path.Rows, candidate.Date)
 	assetRates := selectedAssetRates(plan)
+	assetRateOrder := selectedAssetRateOrder(plan, assetRates)
 	expenseBaseline := expenseBaselineDate(plan, path.ProjectionStartDate, candidate.Date)
 	cashflowIDs := selectedCashflowIDs(plan)
 	accountsByID := map[string]types.Account{}
@@ -744,7 +757,7 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 			func(date IsoDate) float64 { return expenseAt(plan, expenseBaseline, date) },
 			realizedCashflowByMonth(path.MovementEvents, cashflowIDs, candidate.Date, monthCount),
 		)
-		if HasInsufficientOptimisticWithdrawalCapacity(minimumWithdrawals, candidate.AnnualWithdrawalCapacity, optimisticLaterYearWithdrawalCapacity(candidateBalances, assetRates, accountsByID)) {
+		if HasInsufficientOptimisticWithdrawalCapacity(minimumWithdrawals, candidate.AnnualWithdrawalCapacity, optimisticLaterYearWithdrawalCapacity(candidateBalances, assetRateOrder, assetRates, accountsByID)) {
 			return &FIRunOutcome{
 				CandidateDate:       candidate.Date,
 				Status:              "summary",
@@ -758,7 +771,7 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 	}
 
 	startingSelectedAssetBalance := 0.0
-	for _, accountID := range sortedMapKeys(assetRates) {
+	for _, accountID := range assetRateOrder {
 		startingSelectedAssetBalance += math.Max(0, candidateBalances[accountID])
 	}
 	continuingIDs := map[string]bool{}
@@ -791,7 +804,7 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 		return nil, err
 	}
 	balances := transitions.State.Balances
-	selectedAccountIDs := sortedMapKeys(assetRates)
+	selectedAccountIDs := assetRateOrder
 	balanceTrajectoryRow := func(date IsoDate) map[string]any {
 		accountsPayload := make([]types.JsonValue, 0, len(selectedAccountIDs))
 		for _, accountID := range selectedAccountIDs {
@@ -838,6 +851,10 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 		balanceTrajectory            []map[string]any
 	}
 
+	// First replay/transition error; surfaced after the behavior loop so a
+	// failing posting becomes an evaluation diagnostic like in TypeScript.
+	var branchErr error
+
 	behavior := ReactiveBehavior[branchState, *FIRunOutcome]{
 		Initialize: func() branchState {
 			state := branchState{
@@ -852,12 +869,19 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 		React: func(state *branchState, period BehaviorPeriod) {
 			if period.Index%12 == 0 {
 				state.remainingWithdrawalByAccount = map[string]float64{}
-				for _, accountID := range sortedMapKeys(assetRates) {
+				for _, accountID := range assetRateOrder {
 					rate := assetRates[accountID]
 					state.remainingWithdrawalByAccount[accountID] = math.Max(0, balances[accountID]) * rate
 				}
 			}
-			directIncome := applyBranchPostingEvents(eventsByPeriod[period.Index], baseRealizedByDateAndPosting, baseEventsByDateAndPosting, dispositions, transitions)
+			directIncome, err := applyBranchPostingEvents(eventsByPeriod[period.Index], baseRealizedByDateAndPosting, baseEventsByDateAndPosting, dispositions, transitions)
+			if err != nil && branchErr == nil {
+				branchErr = err
+				return
+			}
+			if branchErr != nil {
+				return
+			}
 			remainingExpense := maxFloat(0, expenseAt(plan, expenseBaseline, period.StartDate)/12-directIncome)
 			type capacityEntry struct {
 				accountID   string
@@ -865,7 +889,7 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 				capacity    float64
 			}
 			capacities := make([]capacityEntry, 0, len(assetRates))
-			for _, accountID := range sortedMapKeys(assetRates) {
+			for _, accountID := range assetRateOrder {
 				accountLimit := GetWithdrawableAmount(balances, accountsByID, accountID)
 				actionLimit := math.Min(math.Max(0, balances[accountID]), state.remainingWithdrawalByAccount[accountID])
 				capacities = append(capacities, capacityEntry{accountID: accountID, actionLimit: actionLimit, capacity: math.Min(accountLimit, actionLimit)})
@@ -963,7 +987,7 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 			}
 		},
 		ShouldStop: func(state *branchState, period BehaviorPeriod) bool {
-			return summaryOnly && state.hadWithdrawalShortfall
+			return branchErr != nil || (summaryOnly && state.hadWithdrawalShortfall)
 		},
 		Finish: func(state *branchState) *FIRunOutcome {
 			if summaryOnly && state.hadWithdrawalShortfall {
@@ -1027,6 +1051,9 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 		},
 	}
 	outcome := RunReactiveBehavior(periods, behavior)
+	if branchErr != nil {
+		return nil, branchErr
+	}
 	outcome.isEligible = candidate.IsEligible
 	return outcome, nil
 }
@@ -1054,6 +1081,7 @@ func SelectFIOutcomeIndex(outcomes []*FIRunOutcome) int {
 // EvaluateFinancialIndependence runs the deterministic FI analysis.
 func EvaluateFinancialIndependence(path *types.ProjectionPath, plan *types.FIPlan, monteCarloSample *types.MonteCarloSample, candidateDates []IsoDate, detailLevel string) (*FIAnalysisResult, error) {
 	assetRates := selectedAssetRates(plan)
+	assetRateOrder := selectedAssetRateOrder(plan, assetRates)
 	cashflowIDs := selectedCashflowIDs(plan)
 	requestedDates := candidateDates
 	if requestedDates == nil {
@@ -1078,7 +1106,7 @@ func EvaluateFinancialIndependence(path *types.ProjectionPath, plan *types.FIPla
 		annualDirectIncome := realizedCashflowBetween(path.MovementEvents, cashflowIDs, date, AddYearsClamped(date, 1))
 		analysisRow := FIRow{Date: date}
 		analysisRow.MinimumNetWorth = plan.MinimumNetWorth
-		for _, accountID := range sortedMapKeys(assetRates) {
+		for _, accountID := range assetRateOrder {
 			rate := assetRates[accountID]
 			balance := math.Max(0, balanceAt(row, accountID))
 			analysisRow.AssetContributions = append(analysisRow.AssetContributions, FIAssetContribution{
@@ -1381,7 +1409,9 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 	Status: func(deterministic PathResult, probabilistic types.JsonValue) types.EvaluationResultStatus {
 		if probabilistic != nil {
 			payload := probabilistic.(map[string]any)
-			if payload["selfSustainingDate"] != nil {
+			// The payload stores *IsoDate values; a nil pointer boxed in the
+			// interface is not nil itself, so assert the concrete type.
+			if date, ok := payload["selfSustainingDate"].(*IsoDate); ok && date != nil {
 				return types.StatusSatisfied
 			}
 			return types.StatusNotSatisfied

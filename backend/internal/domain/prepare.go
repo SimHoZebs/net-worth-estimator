@@ -214,6 +214,14 @@ func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *
 	}
 
 	startDate := settings.FallbackProjectionStartDate
+	if !IsValidIsoDate(startDate) {
+		return nil, &SimulationPreparationError{Issues: []types.ModelValidationIssue{{
+			Severity: types.SeverityError,
+			Code:     "settings.projection-start.format",
+			Message:  fmt.Sprintf("fallbackProjectionStartDate must be a YYYY-MM-DD calendar date (got %q).", startDate),
+			Path:     []any{"fallbackProjectionStartDate"},
+		}}}
+	}
 	state, historicalSnapshots, includeStartDateEvents, err := replayHistoricalState(&effectiveDocument, startDate, incomeData)
 	if err != nil {
 		return nil, err

@@ -4,7 +4,6 @@ import (
 	"math"
 	"math/rand"
 	"sort"
-	"sync"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -24,11 +23,31 @@ type lcg struct {
 }
 
 func newLCG(seed int64) *lcg {
-	return &lcg{state: seed & lcgMask}
+	return &lcg{state: seed}
+}
+
+// jsStateAdvance reproduces JavaScript number semantics for
+// `(state * 1664525 + 1013904223) & 0x7fffffff`: the multiply and add happen
+// in float64 (losing low bits once products exceed 2^53), then the bitwise
+// AND converts through ToUint32. Exact int64 math diverges from V8 for large
+// seeds, so the float64 steps are emulated explicitly.
+func jsStateAdvance(state int64) int64 {
+	product := float64(state) * 1664525
+	sum := product + 1013904223
+	if math.IsNaN(sum) || math.IsInf(sum, 0) {
+		return 0
+	}
+	truncated := math.Trunc(sum)
+	// ToUint32: reduce modulo 2^32 without converting an out-of-range float.
+	mod := math.Mod(truncated, 4294967296)
+	if mod < 0 {
+		mod += 4294967296
+	}
+	return int64(mod) & 0x7fffffff
 }
 
 func (l *lcg) next() float64 {
-	l.state = (l.state*1664525 + 1013904223) & lcgMask
+	l.state = jsStateAdvance(l.state)
 	return float64(l.state) / float64(lcgMask)
 }
 
@@ -63,11 +82,14 @@ func NewStochasticSampler(seed *int64) StochasticSampler {
 	}
 }
 
-// NormalizeStochasticConfig clamps run counts to [1, 10000].
+// NormalizeStochasticConfig clamps run counts into [1, 10000], matching TS
+// normalizeStochasticConfig for every decodable (integer) input.
 func NormalizeStochasticConfig(config types.StochasticConfig) types.StochasticConfig {
 	runCount := config.RunCount
-	if runCount < 1 || runCount > 10_000 {
+	if runCount < 1 {
 		runCount = 1
+	} else if runCount > 10_000 {
+		runCount = 10_000
 	}
 	return types.StochasticConfig{RunCount: runCount, Seed: config.Seed}
 }
@@ -134,13 +156,4 @@ func percentilesToJSON(bands types.PercentileBands) map[string]any {
 		"p75": bands.P75,
 		"p90": bands.P90,
 	}
-}
-
-var samplerMutex sync.Mutex
-
-// SampleLogNormal draws using a mutex-guarded shared sampler.
-func SampleLogNormal(sampler StochasticSampler, expectedReturn, volatility float64) float64 {
-	samplerMutex.Lock()
-	defer samplerMutex.Unlock()
-	return sampler(expectedReturn, volatility)
 }

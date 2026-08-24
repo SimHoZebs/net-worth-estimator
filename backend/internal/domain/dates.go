@@ -20,6 +20,13 @@ func ParseIsoDate(value string) (time.Time, error) {
 	return t, nil
 }
 
+// IsValidIsoDate reports whether value is a well-formed YYYY-MM-DD calendar
+// string. User-supplied dates must pass this before any CompareIsoDates call.
+func IsValidIsoDate(value string) bool {
+	_, err := ParseIsoDate(value)
+	return err == nil
+}
+
 func MustParseIsoDate(value string) time.Time {
 	t, err := ParseIsoDate(value)
 	if err != nil {

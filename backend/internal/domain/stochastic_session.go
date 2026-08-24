@@ -2,7 +2,6 @@ package domain
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"sync"
 
@@ -187,42 +186,11 @@ func (s *stochasticSession) projectSample(sample *types.MonteCarloSample) (*type
 	return BuildProjectionPath(s.prepared, &run), nil
 }
 
-func (s *stochasticSession) consumeSample(path *types.ProjectionPath) error {
-	s.valuesMutex.Lock()
-	defer s.valuesMutex.Unlock()
-	if s.completedRuns >= s.config.RunCount {
-		return ErrTooManyPaths
-	}
-	s.runtimes.Consume(&EvaluationContext{
-		Path:             path,
-		Document:         &path.EffectiveDocument,
-		MonteCarloSample: pathSampleOf(path),
-		DetailLevel:      "summary",
-	})
-	for _, row := range path.Rows {
-		s.pendingValuesByDate[row.Date] = append(s.pendingValuesByDate[row.Date], math.Round(row.NetWorth))
-		if _, ok := s.isHistoricalByDate[row.Date]; !ok {
-			s.isHistoricalByDate[row.Date] = row.IsHistorical
-		}
-	}
-	s.completedRuns++
-	batchComplete := s.completedRuns%stochasticProgressBatch == 0 || s.completedRuns == s.config.RunCount
-	if batchComplete {
-		s.flushBatchLocked()
-		return nil
-	}
-	if s.completedRuns == 1 || s.completedRuns%s.progressUpdateRuns == 0 {
-		if s.onProgress != nil {
-			s.onProgress(s.progress(types.PhaseStochasticRuns), nil)
-		}
-	}
-	return nil
-}
-
-// pathSampleOf recovers nothing; the coordinator passes the sample explicitly.
-func pathSampleOf(*types.ProjectionPath) *types.MonteCarloSample { return nil }
-
-func (s *stochasticSession) flushBatchLocked() {
+// flushBatchLocked folds this batch's per-run values into the sorted
+// percentile buffers, closes evaluation accumulators for the completed runs,
+// and snapshots the partial result. Callers must hold valuesMutex; the
+// progress write itself happens outside the lock in the coordinator.
+func (s *stochasticSession) flushBatchLocked() *types.StochasticProjectionResult {
 	for date, values := range s.pendingValuesByDate {
 		sort.Float64s(values)
 		existing, ok := s.sortedValuesByDate[date]
@@ -238,9 +206,7 @@ func (s *stochasticSession) flushBatchLocked() {
 		DeterministicPath: s.deterministicPath,
 		RunCount:          s.completedRuns,
 	})
-	if s.onProgress != nil {
-		s.onProgress(s.progress(types.PhaseStochasticRuns), s.buildResult())
-	}
+	return s.buildResult()
 }
 
 func (s *stochasticSession) buildResult() *types.StochasticProjectionResult {

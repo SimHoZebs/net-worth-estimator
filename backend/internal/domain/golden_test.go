@@ -262,4 +262,5 @@ func TestGoldenStochasticSeeded(t *testing.T) {
 	}
 	compareValues(t, "result.bands", payload["result"].(map[string]any)["bands"], toAny(t, result.Bands))
 	compareValues(t, "result.milestones", payload["result"].(map[string]any)["milestones"], toAny(t, result.Milestones))
+	compareValues(t, "result.evaluations", payload["result"].(map[string]any)["evaluations"], toAny(t, result.Evaluations))
 }
