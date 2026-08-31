@@ -1,6 +1,9 @@
 import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { buildAccountDiagnosticChartData } from "@/chart/chartData";
+import {
+	buildAccountDiagnosticChartData,
+	buildStochasticChartData,
+} from "@/chart/chartData";
 import { EvaluationResults } from "@/components/evaluations/EvaluationResults";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { LazySection } from "@/components/ui/lazy-section";
@@ -89,8 +92,15 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 	const hasStochasticData =
 		stochasticResult !== undefined && stochasticResult !== null;
 	const accountDiagnosticChartData = useMemo(
-		() => buildAccountDiagnosticChartData(document, result, stochasticResult),
-		[document, result, stochasticResult],
+		() => buildAccountDiagnosticChartData(document, result),
+		[document, result],
+	);
+	const stochasticChartData = useMemo(
+		() =>
+			stochasticResult
+				? buildStochasticChartData(result, stochasticResult)
+				: null,
+		[result, stochasticResult],
 	);
 	const currentChangeCount = useStore(selectCurrentChangeCount);
 	const fulfillment =
@@ -111,6 +121,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 					hasStochasticData={hasStochasticData}
 					stochasticIsProvisional={stochasticIsProvisional}
 					chartData={accountDiagnosticChartData}
+					stochasticChartData={stochasticChartData}
 					milestoneDates={milestoneDates}
 				/>
 			</section>

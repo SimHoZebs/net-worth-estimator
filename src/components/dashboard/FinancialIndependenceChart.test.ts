@@ -7,6 +7,7 @@ import type { FinancialIndependenceDetailedRunOutcome } from "@/lib/projection";
 import { createBaseDocument } from "@/lib/projection/__fixtures__";
 import {
 	buildFinancialIndependenceBalanceData,
+	buildFinancialIndependenceBalanceIndex,
 	buildFinancialIndependenceBalanceTooltip,
 	buildFinancialIndependenceChartOptions,
 	FinancialIndependenceChart,
@@ -49,10 +50,12 @@ describe("FinancialIndependenceChart", () => {
 
 	it("aligns monthly balances in selected source order", () => {
 		const outcome = makeOutcome();
-		const data = buildFinancialIndependenceBalanceData(outcome, [
-			"brokerage",
-			"roth",
-		]);
+		const balanceIndex = buildFinancialIndependenceBalanceIndex(outcome);
+		const data = buildFinancialIndependenceBalanceData(
+			outcome,
+			["brokerage", "roth"],
+			balanceIndex,
+		);
 
 		expect(data[0]).toEqual([
 			new Date(2026, 0, 1).getTime(),
@@ -75,9 +78,11 @@ describe("FinancialIndependenceChart", () => {
 			]);
 		}
 
+		const outcome = makeOutcome();
 		const tooltip = buildFinancialIndependenceBalanceTooltip(
-			makeOutcome(),
+			outcome,
 			accounts,
+			buildFinancialIndependenceBalanceIndex(outcome),
 			1,
 		);
 		expect(tooltip).toContain("Feb 1, 2026");
@@ -86,6 +91,24 @@ describe("FinancialIndependenceChart", () => {
 		expect(tooltip).toContain("$51,000");
 		expect(tooltip).toContain("$149,000");
 		expect(tooltip).not.toContain("Brokerage <main>");
+	});
+
+	it("preserves first-match balances when a trajectory row is ambiguous", () => {
+		const outcome = makeOutcome();
+		outcome.balanceTrajectory[0]?.accounts.push({
+			accountId: "brokerage",
+			balance: 999_999,
+		});
+		const balanceIndex = buildFinancialIndependenceBalanceIndex(outcome);
+
+		expect(balanceIndex[0]?.get("brokerage")).toBe(100_000);
+		expect(
+			buildFinancialIndependenceBalanceData(
+				outcome,
+				["brokerage"],
+				balanceIndex,
+			)[1],
+		).toEqual([100_000, 98_000]);
 	});
 });
 

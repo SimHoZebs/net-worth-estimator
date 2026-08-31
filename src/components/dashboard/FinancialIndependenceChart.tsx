@@ -49,9 +49,18 @@ export const FinancialIndependenceChart = memo(
 				})),
 			[accountIds, accountsById],
 		);
+		const balanceIndex = useMemo(
+			() => buildFinancialIndependenceBalanceIndex(outcome),
+			[outcome],
+		);
 		const data = useMemo(
-			() => buildFinancialIndependenceBalanceData(outcome, accountIds),
-			[outcome, accountIds],
+			() =>
+				buildFinancialIndependenceBalanceData(
+					outcome,
+					accountIds,
+					balanceIndex,
+				),
+			[outcome, accountIds, balanceIndex],
 		);
 		const options = useMemo(
 			() => buildFinancialIndependenceChartOptions(accounts),
@@ -59,8 +68,13 @@ export const FinancialIndependenceChart = memo(
 		);
 		const tooltipContent = useCallback(
 			(_chart: uPlot, index: number) =>
-				buildFinancialIndependenceBalanceTooltip(outcome, accounts, index),
-			[outcome, accounts],
+				buildFinancialIndependenceBalanceTooltip(
+					outcome,
+					accounts,
+					balanceIndex,
+					index,
+				),
+			[outcome, accounts, balanceIndex],
 		);
 
 		return (
@@ -109,9 +123,28 @@ export const FinancialIndependenceChart = memo(
 	},
 );
 
+export type FinancialIndependenceBalanceIndex = ReadonlyArray<
+	ReadonlyMap<string, number>
+>;
+
+export function buildFinancialIndependenceBalanceIndex(
+	outcome: FinancialIndependenceDetailedRunOutcome,
+): FinancialIndependenceBalanceIndex {
+	return outcome.balanceTrajectory.map((row) => {
+		const balanceByAccountId = new Map<string, number>();
+		for (const account of row.accounts) {
+			if (!balanceByAccountId.has(account.accountId)) {
+				balanceByAccountId.set(account.accountId, account.balance);
+			}
+		}
+		return balanceByAccountId;
+	});
+}
+
 export function buildFinancialIndependenceBalanceData(
 	outcome: FinancialIndependenceDetailedRunOutcome,
 	accountIds: readonly string[],
+	balanceIndex: FinancialIndependenceBalanceIndex,
 ): uPlot.AlignedData {
 	if (outcome.balanceTrajectory.length === 0) {
 		return Array.from({ length: accountIds.length + 1 }, () => [
@@ -121,10 +154,8 @@ export function buildFinancialIndependenceBalanceData(
 	return [
 		outcome.balanceTrajectory.map((row) => parseChartDate(row.date)),
 		...accountIds.map((accountId) =>
-			outcome.balanceTrajectory.map(
-				(row) =>
-					row.accounts.find((account) => account.accountId === accountId)
-						?.balance ?? 0,
+			balanceIndex.map(
+				(balanceByAccountId) => balanceByAccountId.get(accountId) ?? 0,
 			),
 		),
 	];
@@ -175,15 +206,15 @@ export function buildFinancialIndependenceChartOptions(
 export function buildFinancialIndependenceBalanceTooltip(
 	outcome: FinancialIndependenceDetailedRunOutcome,
 	accounts: readonly FinancialIndependenceChartAccount[],
+	balanceIndex: FinancialIndependenceBalanceIndex,
 	index: number,
 ) {
 	const row = outcome.balanceTrajectory[index];
 	if (!row) return "";
+	const balanceByAccountId = balanceIndex[index];
 	const balances = accounts.map((account) => ({
 		...account,
-		balance:
-			row.accounts.find((entry) => entry.accountId === account.id)?.balance ??
-			0,
+		balance: balanceByAccountId?.get(account.id) ?? 0,
 	}));
 	const total = balances.reduce((sum, account) => sum + account.balance, 0);
 	let html =

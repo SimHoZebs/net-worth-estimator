@@ -9,7 +9,10 @@ import {
 	stochasticProject,
 } from "@/lib/projection";
 import { makeSettings, validCsvFiles } from "@/lib/projection/__fixtures__";
-import { buildAccountDiagnosticChartData } from "../chartData";
+import {
+	buildAccountDiagnosticChartData,
+	buildStochasticChartData,
+} from "../chartData";
 
 const PROJECTION_SETTINGS = makeSettings({
 	fallbackProjectionStartDate: "2026-04-01",
@@ -24,7 +27,7 @@ const EMPTY_MODEL_OVERRIDES: ModelOverrides = {
 };
 
 describe("buildAccountDiagnosticChartData", () => {
-	it("returns per-account balances and deterministic net worth when no stochastic data is provided", () => {
+	it("returns per-account balances and deterministic net worth", () => {
 		const { data: document } = parseCsvFinancialModel(validCsvFiles);
 		expect(document).not.toBeNull();
 
@@ -42,12 +45,6 @@ describe("buildAccountDiagnosticChartData", () => {
 
 		for (const row of data) {
 			expect(typeof row.netWorth).toBe("number");
-			expect(row._hasStochastic).toBe(0);
-			expect(row.outerThickness).toBe(0);
-			expect(row.innerThickness).toBe(0);
-			expect(row.p10_base).toBe(row.netWorth);
-			expect(row.p25_base).toBe(row.netWorth);
-			expect(row.p50).toBe(row.netWorth);
 		}
 
 		for (const account of document.accounts.filter((a) => a.enabled)) {
@@ -70,16 +67,12 @@ describe("buildAccountDiagnosticChartData", () => {
 			},
 		);
 
-		const data = buildAccountDiagnosticChartData(
-			document,
+		const data = buildStochasticChartData(
 			stochasticResult.deterministic,
 			stochasticResult,
 		);
 
 		expect(data.length).toBeGreaterThan(0);
-
-		const hasBands = data.some((row) => row._hasStochastic === 1);
-		expect(hasBands).toBe(true);
 
 		const bandByDate = new Map(stochasticResult.bands.map((b) => [b.date, b]));
 
@@ -93,7 +86,6 @@ describe("buildAccountDiagnosticChartData", () => {
 
 			const band = bandByDate.get(row.date as string);
 			if (band) {
-				expect(row._hasStochastic).toBe(1);
 				expect(row.p10_base).toBe(band.netWorth.p10);
 				expect(row.outerThickness).toBe(band.netWorth.p90 - band.netWorth.p10);
 				expect(row.p25_base).toBe(band.netWorth.p25);
@@ -104,7 +96,6 @@ describe("buildAccountDiagnosticChartData", () => {
 				expect(row._p25).toBe(band.netWorth.p25);
 				expect(row._p75).toBe(band.netWorth.p75);
 			} else {
-				expect(row._hasStochastic).toBe(0);
 				expect(row.outerThickness).toBe(0);
 				expect(row.p10_base).toBe(row.netWorth);
 				expect(row.p50).toBe(row.netWorth);
@@ -155,27 +146,39 @@ describe("buildAccountDiagnosticChartData", () => {
 			},
 		};
 
-		const data = buildAccountDiagnosticChartData(
-			document,
-			result,
-			fakeStochastic,
-		);
+		const data = buildStochasticChartData(result, fakeStochastic);
 
 		expect(data.length).toBeGreaterThan(0);
 
 		for (const row of data) {
 			if (row.date === "9999-01-01") {
-				expect(row._hasStochastic).toBe(1);
 				expect(row.p10_base).toBe(400_000);
 				expect(row.p50).toBe(500_000);
 				expect(row.outerThickness).toBe(200_000);
 			} else {
-				expect(row._hasStochastic).toBe(0);
 				expect(row.outerThickness).toBe(0);
 				expect(row.p10_base).toBe(row.netWorth);
 				expect(row.p25_base).toBe(row.netWorth);
 				expect(row.p50).toBe(row.netWorth);
 			}
 		}
+	});
+
+	it("preserves first-match account lookup behavior", () => {
+		const { data: document } = parseCsvFinancialModel(validCsvFiles);
+		if (!document) throw new Error("Financial model failed to load");
+		const result = projectFinancialModelDocument(
+			document,
+			PROJECTION_SETTINGS,
+			EMPTY_MODEL_OVERRIDES,
+		);
+		const firstRow = result.timeline.sampledRows[0];
+		const firstSnapshot = firstRow?.accountSnapshots[0];
+		if (!firstRow || !firstSnapshot) throw new Error("Projection row is empty");
+		firstRow.accountSnapshots.push({ ...firstSnapshot, balance: 999_999 });
+
+		const data = buildAccountDiagnosticChartData(document, result);
+
+		expect(data[0]?.[firstSnapshot.accountId]).toBe(firstSnapshot.balance);
 	});
 });

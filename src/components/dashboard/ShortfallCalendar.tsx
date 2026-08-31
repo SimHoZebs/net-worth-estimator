@@ -54,6 +54,12 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 
 	const shortfallDays = useMemo(() => {
 		if (!fulfillment) return [];
+		const netWorthByDate = new Map<string, number>();
+		for (const row of rows) {
+			if (!netWorthByDate.has(row.date)) {
+				netWorthByDate.set(row.date, row.netWorth);
+			}
+		}
 		return fulfillment.dates
 			.filter((day) => day.unfulfilledAmount > 0)
 			.map(
@@ -63,7 +69,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 					requestedPostingAmount: day.requestedAmount,
 					realizedPostingAmount: day.realizedAmount,
 					unfulfilledAmount: day.unfulfilledAmount,
-					netWorth: rows.find((row) => row.date === day.date)?.netWorth ?? 0,
+					netWorth: netWorthByDate.get(day.date) ?? 0,
 				}),
 			);
 	}, [fulfillment, rows]);
