@@ -17,13 +17,12 @@ type getModelOutput struct {
 }
 
 func (s *Server) loadStoredDocument() (*types.FinancialModelDocument, []types.ModelValidationIssue, error) {
-	document, err := s.store.LoadDocument()
+	document, incomeData, err := s.store.LoadDocumentAndIncomeData()
 	if err != nil {
 		return nil, nil, err
 	}
-	incomeData, err := s.store.LoadIncomeData()
-	if err != nil {
-		return nil, nil, err
+	if document == nil {
+		return nil, []types.ModelValidationIssue{}, nil
 	}
 	issues := domainValidate(document, incomeData)
 	return document, issues, nil
@@ -69,16 +68,9 @@ type resetOutput struct {
 }
 
 func (s *Server) resetModel(_ context.Context, _ *struct{}) (*resetOutput, error) {
-	if err := s.store.ImportCSV(s.SeedModelPath, s.SeedIncomePath); err != nil {
+	document, incomeData, err := s.store.ImportCSV(s.SeedModelPath, s.SeedIncomePath)
+	if err != nil {
 		return nil, huma.Error500InternalServerError("reset failed: " + err.Error())
-	}
-	document, err := s.store.LoadDocument()
-	if err != nil {
-		return nil, huma.Error500InternalServerError(err.Error())
-	}
-	incomeData, err := s.store.LoadIncomeData()
-	if err != nil {
-		return nil, huma.Error500InternalServerError(err.Error())
 	}
 	output := &resetOutput{}
 	output.Body.Reset = true

@@ -20,7 +20,7 @@ func main() {
 		log.Fatalf("open store: %v", err)
 	}
 	defer database.Close()
-	if err := database.ImportCSV(*modelPath, *incomePath); err != nil {
+	if _, _, err := database.ImportCSV(*modelPath, *incomePath); err != nil {
 		log.Fatalf("import: %v", err)
 	}
 	fmt.Printf("imported %s and %s into %s\n", *modelPath, *incomePath, *dbPath)

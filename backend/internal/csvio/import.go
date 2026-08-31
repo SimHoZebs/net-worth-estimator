@@ -120,6 +120,7 @@ func ParseNumberValue(value any) float64 {
 // ImportModel reads the model CSV tables from a directory into a document.
 func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 	document := &types.FinancialModelDocument{
+		SourcePath:  filepath.ToSlash(filepath.Base(filepath.Clean(csvPath))),
 		Evaluations: types.EmptyEvaluationTables(),
 	}
 

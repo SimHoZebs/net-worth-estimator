@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,11 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
+type queryer interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+}
+
 // SaveDocument atomically replaces the canonical model document.
 func (s *Store) SaveDocument(document *types.FinancialModelDocument) error {
 	tx, err := s.db.Begin()
@@ -16,6 +22,16 @@ func (s *Store) SaveDocument(document *types.FinancialModelDocument) error {
 		return fmt.Errorf("save begin: %w", err)
 	}
 	defer tx.Rollback()
+	if err := replaceDocument(tx, document); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("save commit: %w", err)
+	}
+	return nil
+}
+
+func deleteDocumentRows(tx *sql.Tx) error {
 	if _, err := tx.Exec(`DELETE FROM accounts`); err != nil {
 		return err
 	}
@@ -26,6 +42,23 @@ func (s *Store) SaveDocument(document *types.FinancialModelDocument) error {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM evaluations`); err != nil {
+		return err
+	}
+	return nil
+}
+
+func clearDocument(tx *sql.Tx) error {
+	if err := deleteDocumentRows(tx); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE model_metadata SET source_path = '', document_present = 0 WHERE id = 1`); err != nil {
+		return fmt.Errorf("clear model metadata: %w", err)
+	}
+	return nil
+}
+
+func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
+	if err := deleteDocumentRows(tx); err != nil {
 		return err
 	}
 
@@ -48,10 +81,10 @@ func (s *Store) SaveDocument(document *types.FinancialModelDocument) error {
 			return fmt.Errorf("insert account %s: %w", account.ID, err)
 		}
 	}
-	for _, checkpoint := range document.Checkpoints {
+	for position, checkpoint := range document.Checkpoints {
 		if _, err := tx.Exec(
-			`INSERT INTO checkpoints (date, account_id, balance) VALUES (?,?,?)`,
-			checkpoint.Date, checkpoint.AccountID, checkpoint.Balance,
+			`INSERT INTO checkpoints (position, date, account_id, balance) VALUES (?,?,?,?)`,
+			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance,
 		); err != nil {
 			return fmt.Errorf("insert checkpoint: %w", err)
 		}
@@ -94,7 +127,13 @@ func (s *Store) SaveDocument(document *types.FinancialModelDocument) error {
 	if err := saveEvaluationTable(tx, string(types.EvaluationTypePostingFulfillment), fulfillmentEvaluationRows(document)); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if _, err := tx.Exec(
+		`UPDATE model_metadata SET source_path = ?, document_present = 1 WHERE id = 1`,
+		document.SourcePath,
+	); err != nil {
+		return fmt.Errorf("save model metadata: %w", err)
+	}
+	return nil
 }
 
 func fiEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
@@ -147,10 +186,38 @@ func saveEvaluationTable(tx *sql.Tx, evaluationType string, rows []evaluationRow
 
 // LoadDocument reads the canonical document; returns nil if absent.
 func (s *Store) LoadDocument() (*types.FinancialModelDocument, error) {
+	tx, err := s.db.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, fmt.Errorf("load document begin: %w", err)
+	}
+	defer tx.Rollback()
+	document, err := loadDocument(tx)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("load document commit: %w", err)
+	}
+	return document, nil
+}
+
+func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
+	var sourcePath string
+	var documentPresent int
+	if err := q.QueryRow(`SELECT source_path, document_present FROM model_metadata WHERE id = 1`).Scan(&sourcePath, &documentPresent); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("load model metadata: %w", err)
+	}
+	if documentPresent == 0 {
+		return nil, nil
+	}
 	document := &types.FinancialModelDocument{
+		SourcePath:  sourcePath,
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	accountRows, err := s.db.Query(`SELECT id, label, min_balance, max_balance, color, enabled FROM accounts ORDER BY position`)
+	accountRows, err := q.Query(`SELECT id, label, min_balance, max_balance, color, enabled FROM accounts ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -184,8 +251,15 @@ func (s *Store) LoadDocument() (*types.FinancialModelDocument, error) {
 		account.Enabled = enabled != 0
 		document.Accounts = append(document.Accounts, account)
 	}
+	if err := accountRows.Err(); err != nil {
+		accountRows.Close()
+		return nil, fmt.Errorf("iterate accounts: %w", err)
+	}
+	if err := accountRows.Close(); err != nil {
+		return nil, fmt.Errorf("close accounts: %w", err)
+	}
 
-	checkpointRows, err := s.db.Query(`SELECT date, account_id, balance FROM checkpoints ORDER BY date, rowid`)
+	checkpointRows, err := q.Query(`SELECT date, account_id, balance FROM checkpoints ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -197,15 +271,22 @@ func (s *Store) LoadDocument() (*types.FinancialModelDocument, error) {
 		}
 		document.Checkpoints = append(document.Checkpoints, checkpoint)
 	}
+	if err := checkpointRows.Err(); err != nil {
+		checkpointRows.Close()
+		return nil, fmt.Errorf("iterate checkpoints: %w", err)
+	}
+	if err := checkpointRows.Close(); err != nil {
+		return nil, fmt.Errorf("close checkpoints: %w", err)
+	}
 
-	postingRows, err := s.db.Query(`SELECT id, label, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled FROM postings ORDER BY position`)
+	postingRows, err := q.Query(`SELECT id, label, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled FROM postings ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
 	defer postingRows.Close()
 	for postingRows.Next() {
 		var posting types.Posting
-		var sourceAccountID, endDate, annualCap sql.NullString
+		var sourceAccountID, endDate sql.NullString
 		var destinationsJSON, amountJSON string
 		var frequency string
 		var enabled int64
@@ -213,7 +294,6 @@ func (s *Store) LoadDocument() (*types.FinancialModelDocument, error) {
 		if err := postingRows.Scan(&posting.ID, &posting.Label, &sourceAccountID, &destinationsJSON, &amountJSON, &frequency, &posting.AnnualRate, &posting.AnnualGrowthRate, &posting.Volatility, &posting.StartDate, &endDate, &capNull, &posting.Priority, &enabled); err != nil {
 			return nil, err
 		}
-		_ = annualCap
 		if sourceAccountID.Valid {
 			value := sourceAccountID.String
 			posting.SourceAccountID = &value
@@ -240,8 +320,15 @@ func (s *Store) LoadDocument() (*types.FinancialModelDocument, error) {
 		posting.Enabled = enabled != 0
 		document.Postings = append(document.Postings, posting)
 	}
+	if err := postingRows.Err(); err != nil {
+		postingRows.Close()
+		return nil, fmt.Errorf("iterate postings: %w", err)
+	}
+	if err := postingRows.Close(); err != nil {
+		return nil, fmt.Errorf("close postings: %w", err)
+	}
 
-	evaluationRows, err := s.db.Query(`SELECT type, instance_id, label, enabled, config_json FROM evaluations ORDER BY type, position`)
+	evaluationRows, err := q.Query(`SELECT type, instance_id, label, enabled, config_json FROM evaluations ORDER BY type, position`)
 	if err != nil {
 		return nil, err
 	}
@@ -279,6 +366,13 @@ func (s *Store) LoadDocument() (*types.FinancialModelDocument, error) {
 			})
 		}
 	}
+	if err := evaluationRows.Err(); err != nil {
+		evaluationRows.Close()
+		return nil, fmt.Errorf("iterate evaluations: %w", err)
+	}
+	if err := evaluationRows.Close(); err != nil {
+		return nil, fmt.Errorf("close evaluations: %w", err)
+	}
 
 	if document.Accounts == nil {
 		document.Accounts = []types.Account{}
@@ -294,12 +388,15 @@ func (s *Store) LoadDocument() (*types.FinancialModelDocument, error) {
 
 // DocumentExists reports whether any canonical rows are present.
 func (s *Store) DocumentExists() (bool, error) {
-	var count int64
-	row := s.db.QueryRow(`SELECT COUNT(*) FROM accounts`)
-	if err := row.Scan(&count); err != nil {
+	var present int
+	row := s.db.QueryRow(`SELECT document_present FROM model_metadata WHERE id = 1`)
+	if err := row.Scan(&present); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
 		return false, err
 	}
-	return count > 0, nil
+	return present != 0, nil
 }
 
 // SaveIncomeData replaces income source/tax profile tables.
@@ -309,6 +406,16 @@ func (s *Store) SaveIncomeData(snapshot *types.IncomeDataSnapshot) error {
 		return err
 	}
 	defer tx.Rollback()
+	if err := replaceIncomeData(tx, snapshot); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("save income commit: %w", err)
+	}
+	return nil
+}
+
+func replaceIncomeData(tx *sql.Tx, snapshot *types.IncomeDataSnapshot) error {
 	if _, err := tx.Exec(`DELETE FROM income_sources`); err != nil {
 		return err
 	}
@@ -343,16 +450,32 @@ func (s *Store) SaveIncomeData(snapshot *types.IncomeDataSnapshot) error {
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 // LoadIncomeData reads the income snapshot.
 func (s *Store) LoadIncomeData() (*types.IncomeDataSnapshot, error) {
+	tx, err := s.db.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, fmt.Errorf("load income begin: %w", err)
+	}
+	defer tx.Rollback()
+	snapshot, err := loadIncomeData(tx)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("load income commit: %w", err)
+	}
+	return snapshot, nil
+}
+
+func loadIncomeData(q queryer) (*types.IncomeDataSnapshot, error) {
 	snapshot := &types.IncomeDataSnapshot{
 		IncomeSources: []types.IncomeSourceDefinition{},
 		TaxProfiles:   []types.IncomeTaxProfile{},
 	}
-	rows, err := s.db.Query(`SELECT id, label, effective_from, effective_to, annual_gross_income FROM income_sources ORDER BY position`)
+	rows, err := q.Query(`SELECT id, label, effective_from, effective_to, annual_gross_income FROM income_sources ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +492,14 @@ func (s *Store) LoadIncomeData() (*types.IncomeDataSnapshot, error) {
 		}
 		snapshot.IncomeSources = append(snapshot.IncomeSources, source)
 	}
-	profileRows, err := s.db.Query(`SELECT id, label, deduction, brackets_json, source_url FROM tax_profiles ORDER BY position`)
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, fmt.Errorf("iterate income sources: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close income sources: %w", err)
+	}
+	profileRows, err := q.Query(`SELECT id, label, deduction, brackets_json, source_url FROM tax_profiles ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +520,35 @@ func (s *Store) LoadIncomeData() (*types.IncomeDataSnapshot, error) {
 		}
 		snapshot.TaxProfiles = append(snapshot.TaxProfiles, profile)
 	}
+	if err := profileRows.Err(); err != nil {
+		profileRows.Close()
+		return nil, fmt.Errorf("iterate tax profiles: %w", err)
+	}
+	if err := profileRows.Close(); err != nil {
+		return nil, fmt.Errorf("close tax profiles: %w", err)
+	}
 	return snapshot, nil
+}
+
+// LoadDocumentAndIncomeData reads one consistent model and income snapshot.
+func (s *Store) LoadDocumentAndIncomeData() (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error) {
+	tx, err := s.db.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, nil, fmt.Errorf("load aggregate begin: %w", err)
+	}
+	defer tx.Rollback()
+	document, err := loadDocument(tx)
+	if err != nil {
+		return nil, nil, err
+	}
+	incomeData, err := loadIncomeData(tx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, nil, fmt.Errorf("load aggregate commit: %w", err)
+	}
+	return document, incomeData, nil
 }
 
 // GetArtifact / PutArtifact implement the bounded artifact cache.

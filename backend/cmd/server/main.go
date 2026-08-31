@@ -64,7 +64,7 @@ func main() {
 		log.Fatalf("check store: %v", err)
 	}
 	if !exists {
-		if err := database.ImportCSV(modelPath, incomePath); err != nil {
+		if _, _, err := database.ImportCSV(modelPath, incomePath); err != nil {
 			log.Fatalf("seed from CSV: %v", err)
 		}
 		fmt.Printf("seeded database from %s and %s\n", modelPath, incomePath)
