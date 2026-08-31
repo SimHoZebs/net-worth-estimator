@@ -19,6 +19,16 @@ func domainValidate(document *types.FinancialModelDocument, incomeData *types.In
 
 // resolveDocument returns the request document/income data or stored ones.
 func (s *Server) resolveDocument(requested *types.FinancialModelDocument, requestedIncome *types.IncomeDataSnapshot) (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error) {
+	if requested == nil && requestedIncome == nil {
+		document, incomeData, err := s.store.LoadDocumentAndIncomeData()
+		if err != nil {
+			return nil, nil, err
+		}
+		if document == nil {
+			return nil, nil, fmt.Errorf("financial model is not initialized")
+		}
+		return document, incomeData, nil
+	}
 	var document *types.FinancialModelDocument
 	if requested != nil {
 		document = requested
@@ -28,6 +38,9 @@ func (s *Server) resolveDocument(requested *types.FinancialModelDocument, reques
 			return nil, nil, err
 		}
 		document = stored
+	}
+	if document == nil {
+		return nil, nil, fmt.Errorf("financial model is not initialized")
 	}
 	if requestedIncome != nil {
 		return document, requestedIncome, nil
