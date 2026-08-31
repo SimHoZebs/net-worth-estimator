@@ -5,6 +5,7 @@ import type {
 	FinancialModelRepository,
 } from "@/lib/projection";
 import { FinancialModelValidationError } from "@/lib/projection";
+import { INCOME_DATA_QUERY_KEY } from "./useIncomeData";
 
 export const FINANCIAL_MODEL_QUERY_KEY = ["financial-model"] as const;
 
@@ -66,6 +67,7 @@ export function useFinancialModelResetMutation(
 		},
 		onSuccess: (result) => {
 			queryClient.setQueryData(FINANCIAL_MODEL_QUERY_KEY, result);
+			queryClient.invalidateQueries({ queryKey: INCOME_DATA_QUERY_KEY });
 		},
 	});
 }

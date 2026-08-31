@@ -4,17 +4,25 @@ import {
 	type Posting,
 } from "@/lib/projection";
 
-export function findPaymentPosting(
+export function indexPaymentPostingsByAccountId(
 	document: FinancialModelDocument,
-	accountId: string,
-): Posting | undefined {
-	return document.postings.find(
-		(p) =>
-			p.enabled &&
-			p.destinations?.includes(accountId) &&
-			(p.label.toLowerCase().includes("payment") ||
-				p.label.toLowerCase().includes("pay")),
-	);
+): ReadonlyMap<string, Posting> {
+	const paymentByAccountId = new Map<string, Posting>();
+	for (const posting of document.postings) {
+		const label = posting.label.toLowerCase();
+		if (
+			!posting.enabled ||
+			(!label.includes("payment") && !label.includes("pay"))
+		) {
+			continue;
+		}
+		for (const accountId of posting.destinations ?? []) {
+			if (!paymentByAccountId.has(accountId)) {
+				paymentByAccountId.set(accountId, posting);
+			}
+		}
+	}
+	return paymentByAccountId;
 }
 
 export function isDebtAccount(label: string): boolean {

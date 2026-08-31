@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import {
 	estimateMonthlyPayment,
-	findPaymentPosting,
+	indexPaymentPostingsByAccountId,
 	isDebtAccount,
 } from "@/lib/debt-utils";
 import { currency, formatDate } from "@/lib/format";
@@ -39,13 +39,14 @@ export const DebtSummary = memo(function DebtSummary({
 	for (const summary of result.accountSummaries) {
 		openingBalanceByAccount.set(summary.accountId, summary.startingBalance);
 	}
+	const paymentPostingByAccountId = indexPaymentPostingsByAccountId(document);
 
 	const debtAccounts = document.accounts
 		.filter((a) => a.enabled && (openingBalanceByAccount.get(a.id) ?? 0) < 0)
 		.map((a) => ({
 			account: a,
 			balance: openingBalanceByAccount.get(a.id) ?? 0,
-			paymentPosting: findPaymentPosting(document, a.id),
+			paymentPosting: paymentPostingByAccountId.get(a.id),
 		}));
 
 	// Also include accounts whose label suggests debt even if balance is 0
@@ -57,7 +58,7 @@ export const DebtSummary = memo(function DebtSummary({
 		.map((a) => ({
 			account: a,
 			balance: openingBalanceByAccount.get(a.id) ?? 0,
-			paymentPosting: findPaymentPosting(document, a.id),
+			paymentPosting: paymentPostingByAccountId.get(a.id),
 		}));
 
 	const allDebts = [...debtAccounts, ...debtByLabel];

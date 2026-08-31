@@ -54,23 +54,20 @@ export function ReadOnlyAccountsTable({
 	const summariesById = new Map(
 		(accountSummaries ?? []).map((summary) => [summary.accountId, summary]),
 	);
-	const rulesByAccount = useMemo(() => {
+	const { rulesByAccount, unassignedRules } = useMemo(() => {
 		const grouped = new Map<string, Posting[]>();
+		const unassigned: Posting[] = [];
+		const accountIds = new Set(accounts.map((account) => account.id));
 		for (const account of accounts) grouped.set(account.id, []);
 		for (const rule of accountRules) {
-			for (const accountId of associatedAccountIds(rule, accounts)) {
+			const associations = associatedAccountIds(rule, accountIds);
+			if (associations.length === 0) unassigned.push(rule);
+			for (const accountId of associations) {
 				grouped.get(accountId)?.push(rule);
 			}
 		}
-		return grouped;
+		return { rulesByAccount: grouped, unassignedRules: unassigned };
 	}, [accountRules, accounts]);
-	const unassignedRules = useMemo(
-		() =>
-			accountRules.filter(
-				(rule) => associatedAccountIds(rule, accounts).length === 0,
-			),
-		[accountRules, accounts],
-	);
 	const rows: AccountPositionRow[] = accounts.map((account) => {
 		const summary = summariesById.get(account.id);
 		return {

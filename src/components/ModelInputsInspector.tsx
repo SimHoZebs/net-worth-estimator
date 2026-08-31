@@ -84,35 +84,32 @@ export function ModelInputsInspector() {
 	const [readTab, setReadTab] = useState<ReadInputTab>("accounts");
 	const [editTab, setEditTab] = useState<EditInputTab>("postings");
 
-	const readDocument = useMemo(
-		() =>
-			document
-				? {
-						...document,
-						accounts: [
-							...document.accounts.filter(
-								(account) =>
-									account.enabled && !disabledAccountIds.includes(account.id),
-							),
-							...addedAccounts.filter((account) => account.enabled),
-						],
-						postings: [
-							...document.postings.filter(
-								(posting) =>
-									posting.enabled && !disabledPostingIds.includes(posting.id),
-							),
-							...addedPostings.filter((posting) => posting.enabled),
-						],
-					}
-				: null,
-		[
-			document,
-			addedAccounts,
-			addedPostings,
-			disabledAccountIds,
-			disabledPostingIds,
-		],
-	);
+	const readDocument = useMemo(() => {
+		if (!document) return null;
+		const disabledAccounts = new Set(disabledAccountIds);
+		const disabledPostings = new Set(disabledPostingIds);
+		return {
+			...document,
+			accounts: [
+				...document.accounts.filter(
+					(account) => account.enabled && !disabledAccounts.has(account.id),
+				),
+				...addedAccounts.filter((account) => account.enabled),
+			],
+			postings: [
+				...document.postings.filter(
+					(posting) => posting.enabled && !disabledPostings.has(posting.id),
+				),
+				...addedPostings.filter((posting) => posting.enabled),
+			],
+		};
+	}, [
+		document,
+		addedAccounts,
+		addedPostings,
+		disabledAccountIds,
+		disabledPostingIds,
+	]);
 	const displayDocument =
 		isEditing && workingDocument ? workingDocument : readDocument;
 	const postingGroups = useMemo(
