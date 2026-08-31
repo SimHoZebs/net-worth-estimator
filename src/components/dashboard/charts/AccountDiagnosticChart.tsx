@@ -1,4 +1,5 @@
 import { memo, useState } from "react";
+import type { StochasticChartRow } from "@/chart/chartData";
 import {
 	Card,
 	CardContent,
@@ -15,6 +16,7 @@ interface AccountDiagnosticChartProps {
 	hasStochasticData: boolean;
 	stochasticIsProvisional?: boolean;
 	chartData: Record<string, string | number>[];
+	stochasticChartData: StochasticChartRow[] | null;
 	milestoneDates?: { hitTarget?: string; firstShortfall?: string };
 }
 
@@ -23,6 +25,7 @@ export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
 	hasStochasticData,
 	stochasticIsProvisional = false,
 	chartData,
+	stochasticChartData,
 	milestoneDates,
 }: AccountDiagnosticChartProps) {
 	const [viewMode, setViewMode] = useState<"stacked" | "accounts">("stacked");
@@ -60,6 +63,7 @@ export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
 							hasStochasticData={hasStochasticData}
 							stochasticIsProvisional={stochasticIsProvisional}
 							chartData={chartData}
+							stochasticChartData={stochasticChartData}
 							milestoneDates={milestoneDates}
 						/>
 					) : (

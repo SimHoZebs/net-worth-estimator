@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, useRef, useState } from "react";
 import type uPlot from "uplot";
-import { parseChartDate } from "@/chart/chartData";
+import { parseChartDate, type StochasticChartRow } from "@/chart/chartData";
 import {
 	buildPointDetails,
 	formatPointDetailsSummary,
@@ -35,6 +35,7 @@ interface StackedContributionChartProps {
 	hasStochasticData: boolean;
 	stochasticIsProvisional?: boolean;
 	chartData: Record<string, string | number>[];
+	stochasticChartData: StochasticChartRow[] | null;
 	milestoneDates?: { hitTarget?: string; firstShortfall?: string };
 }
 
@@ -43,6 +44,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 	hasStochasticData,
 	stochasticIsProvisional = false,
 	chartData,
+	stochasticChartData,
 	milestoneDates,
 }: StackedContributionChartProps) {
 	const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -87,27 +89,22 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 		};
 	}, [accountCount]);
 
-	const data = useMemo((): uPlot.AlignedData => {
-		const columnCount = 1 + accountCount + 2 + 4;
+	const deterministicData = useMemo(() => {
 		if (chartData.length === 0) {
-			return Array.from({ length: columnCount }, () => [
-				0,
-			]) as uPlot.AlignedData;
+			return {
+				timestamps: [0],
+				accountSeries: Array.from({ length: accountCount }, () => [0]),
+				netWorth: [0],
+			};
 		}
 		const timestamps: number[] = [];
 		const assetCumulative: number[][] = assets.map(() => []);
 		const liabilityCumulative: number[][] = liabilities.map(() => []);
-		const p50: number[] = [];
 		const netWorth: number[] = [];
-		const p10: number[] = [];
-		const p90: number[] = [];
-		const p25: number[] = [];
-		const p75: number[] = [];
 
 		for (const row of chartData) {
 			timestamps.push(parseChartDate(String(row.date)));
 			const rowNetWorth = Number(row.netWorth);
-			p50.push(Number(row.p50 ?? rowNetWorth));
 			netWorth.push(rowNetWorth);
 			let assetTotal = 0;
 			for (let index = 0; index < assets.length; index++) {
@@ -119,23 +116,56 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 				liabilityTotal += Number(row[liabilities[index].id] ?? 0);
 				liabilityCumulative[index].push(liabilityTotal);
 			}
-			p10.push(Number(row._p10 ?? rowNetWorth));
-			p90.push(Number(row._p90 ?? rowNetWorth));
-			p25.push(Number(row._p25 ?? rowNetWorth));
-			p75.push(Number(row._p75 ?? rowNetWorth));
 		}
-		return [
+		return {
 			timestamps,
-			...assetCumulative.slice().reverse(),
-			...liabilityCumulative,
-			p50,
+			accountSeries: [
+				...assetCumulative.slice().reverse(),
+				...liabilityCumulative,
+			],
 			netWorth,
-			p10,
-			p90,
-			p25,
-			p75,
-		];
+		};
 	}, [accountCount, assets, chartData, liabilities]);
+	const stochasticByDate = useMemo(() => {
+		const index = new Map<string, StochasticChartRow>();
+		for (const row of stochasticChartData ?? []) {
+			if (!index.has(row.date)) index.set(row.date, row);
+		}
+		return index;
+	}, [stochasticChartData]);
+	const stochasticSeries = useMemo(() => {
+		if (chartData.length === 0) {
+			return { p50: [0], p10: [0], p90: [0], p25: [0], p75: [0] };
+		}
+		const p50: number[] = [];
+		const p10: number[] = [];
+		const p90: number[] = [];
+		const p25: number[] = [];
+		const p75: number[] = [];
+		for (const row of chartData) {
+			const rowNetWorth = Number(row.netWorth);
+			const stochastic = stochasticByDate.get(String(row.date));
+			p50.push(stochastic?.p50 ?? rowNetWorth);
+			p10.push(stochastic?._p10 ?? rowNetWorth);
+			p90.push(stochastic?._p90 ?? rowNetWorth);
+			p25.push(stochastic?._p25 ?? rowNetWorth);
+			p75.push(stochastic?._p75 ?? rowNetWorth);
+		}
+		return { p50, p10, p90, p25, p75 };
+	}, [chartData, stochasticByDate]);
+	const data = useMemo(
+		(): uPlot.AlignedData => [
+			deterministicData.timestamps,
+			...deterministicData.accountSeries,
+			stochasticSeries.p50,
+			deterministicData.netWorth,
+			stochasticSeries.p10,
+			stochasticSeries.p90,
+			stochasticSeries.p25,
+			stochasticSeries.p75,
+		],
+		[deterministicData, stochasticSeries],
+	);
 
 	const options = useMemo((): uPlot.Options => {
 		const base = createBaseOptions();
@@ -216,10 +246,21 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 
 	const selectedDetails = useMemo(() => {
 		const row = selectedIndex == null ? undefined : chartData[selectedIndex];
+		const stochastic = row ? stochasticByDate.get(String(row.date)) : undefined;
 		return row
-			? buildPointDetails({ row, accounts: enabledAccounts, hasStochasticData })
+			? buildPointDetails({
+					row: stochastic ? { ...row, ...stochastic } : row,
+					accounts: enabledAccounts,
+					hasStochasticData,
+				})
 			: null;
-	}, [chartData, enabledAccounts, hasStochasticData, selectedIndex]);
+	}, [
+		chartData,
+		enabledAccounts,
+		hasStochasticData,
+		selectedIndex,
+		stochasticByDate,
+	]);
 	const handleCursorChange = useCallback((index: number | null) => {
 		setSelectedIndex(index);
 	}, []);
