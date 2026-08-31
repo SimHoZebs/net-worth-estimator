@@ -32,17 +32,14 @@ interface StochasticState
 
 function publicState(
 	state: StochasticState,
-	evaluations: ProjectionRuntimeSettings["evaluations"],
+	result: StochasticProjectionResult | null,
+	progress: StochasticProgress | null,
 ): ProjectionHookState<StochasticProjectionResult, StochasticProgress> {
 	return {
-		result: state.result
-			? labelStochasticResult(state.result, evaluations)
-			: null,
+		result,
 		runtimeError: state.runtimeError,
 		isRunning: state.isRunning,
-		progress: state.progress
-			? labelStochasticProgress(state.progress, evaluations)
-			: null,
+		progress,
 		resultIsStale: state.resultIsStale,
 	};
 }
@@ -220,19 +217,34 @@ export function useStochastic(
 
 		return () => controller.abort();
 	}, [baseKey, computationSettings, engine, requestKey]);
+	const labeledResult = useMemo(
+		() =>
+			state.result
+				? labelStochasticResult(state.result, projectionSettings.evaluations)
+				: null,
+		[state.result, projectionSettings.evaluations],
+	);
+	const labeledProgress = useMemo(
+		() =>
+			state.progress
+				? labelStochasticProgress(
+						state.progress,
+						projectionSettings.evaluations,
+					)
+				: null,
+		[state.progress, projectionSettings.evaluations],
+	);
 
 	if (state.requestKey !== requestKey) {
 		const retainBaseResult =
 			enabled && state.result !== null && state.resultBaseKey === baseKey;
 		return {
-			result: retainBaseResult
-				? labelStochasticResult(state.result!, projectionSettings.evaluations)
-				: null,
+			result: retainBaseResult ? labeledResult : null,
 			runtimeError: null,
 			isRunning: enabled && document !== null && config !== null,
 			progress: null,
 			resultIsStale: retainBaseResult,
 		};
 	}
-	return publicState(state, projectionSettings.evaluations);
+	return publicState(state, labeledResult, labeledProgress);
 }

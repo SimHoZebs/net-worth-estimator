@@ -186,6 +186,79 @@ describe("projection hook request provenance", () => {
 		);
 	});
 
+	it("keeps labeled results stable across unrelated stochastic progress", async () => {
+		const document = createBaseDocument();
+		const settings = makeSettings();
+		const deterministic = projectFinancialModelDocument(
+			document,
+			settings,
+			overrides,
+		);
+		const partialResult = stochasticProject(document, settings, overrides, {
+			runCount: 1,
+			seed: 1,
+		});
+		const completion = deferred<typeof partialResult>();
+		let onProgress:
+			| ((progress: StochasticProgress, partial?: typeof partialResult) => void)
+			| undefined;
+		const engine: ProjectionEngine = {
+			project: vi.fn().mockResolvedValue(deterministic),
+			projectStochastic: vi.fn().mockImplementation((_request, callback) => {
+				onProgress = callback;
+				return completion.promise;
+			}),
+		};
+		const hook = renderHook(
+			() => ({
+				deterministic: useProjection(document, settings, overrides, true),
+				stochastic: useStochastic(
+					document,
+					settings,
+					overrides,
+					{ runCount: 1, seed: 1 },
+					true,
+				),
+			}),
+			{ wrapper: wrapperWithEngine(engine) },
+		);
+
+		await waitFor(() => {
+			expect(hook.result.current.deterministic.result).not.toBeNull();
+			expect(onProgress).toBeDefined();
+		});
+		const deterministicResult = hook.result.current.deterministic.result;
+		act(() =>
+			onProgress?.(
+				{
+					phase: "stochastic-runs",
+					completedRuns: 1,
+					totalRuns: 1,
+					fraction: 1,
+					evaluationWorkloads: [],
+				},
+				partialResult,
+			),
+		);
+		const stochasticResult = hook.result.current.stochastic.result;
+
+		expect(hook.result.current.deterministic.result).toBe(deterministicResult);
+		expect(stochasticResult).not.toBeNull();
+
+		act(() =>
+			onProgress?.({
+				phase: "deterministic-evaluations",
+				completedRuns: 1,
+				totalRuns: 1,
+				fraction: 1,
+				evaluationWorkloads: [],
+			}),
+		);
+
+		expect(hook.result.current.deterministic.result).toBe(deterministicResult);
+		expect(hook.result.current.stochastic.result).toBe(stochasticResult);
+	});
+
 	it("retains base results but marks evaluation-only replacements stale", async () => {
 		const document = createBaseDocument();
 		const firstSettings = makeSettings();
