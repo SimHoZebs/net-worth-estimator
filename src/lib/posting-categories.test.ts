@@ -48,11 +48,9 @@ describe("posting presentation categories", () => {
 			arithmetic: "abs(reference) * rate",
 		});
 
-		expect(associatedAccountIds(posting, accounts)).toEqual([
-			"source",
-			"destination",
-			"reference",
-		]);
+		expect(
+			associatedAccountIds(posting, new Set(accounts.map(({ id }) => id))),
+		).toEqual(["source", "destination", "reference"]);
 	});
 
 	it("does not treat reserved arithmetic tokens as account references", () => {
@@ -63,7 +61,9 @@ describe("posting presentation categories", () => {
 			id: "growth",
 			arithmetic: "abs(brokerage) * rate",
 		});
-		expect(associatedAccountIds(posting, accounts)).toEqual(["brokerage"]);
+		expect(
+			associatedAccountIds(posting, new Set(accounts.map(({ id }) => id))),
+		).toEqual(["brokerage"]);
 	});
 
 	it("treats only postings ending before the projection as past", () => {

@@ -1,4 +1,4 @@
-import { type Account, getExpression, type Posting } from "@/lib/projection";
+import { getExpression, type Posting } from "@/lib/projection";
 
 const SALARY_POSTING_ID = "salary";
 const CHECKING_ACCOUNT_ID = "checking";
@@ -25,9 +25,8 @@ export function arithmeticIdentifiers(arithmetic: string): string[] {
 
 export function associatedAccountIds(
 	posting: Posting,
-	accounts: readonly Account[],
+	accountIds: ReadonlySet<string>,
 ): string[] {
-	const accountIds = new Set(accounts.map((account) => account.id));
 	const associated = new Set<string>();
 	if (posting.sourceAccountId && accountIds.has(posting.sourceAccountId)) {
 		associated.add(posting.sourceAccountId);

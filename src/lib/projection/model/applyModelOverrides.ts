@@ -17,11 +17,12 @@ export function applyModelOverrides(
 	const accounts = document.accounts
 		.filter((account) => !disabledAccountIds.has(account.id))
 		.concat(overrides.addedAccounts);
+	const activeAccountIds = new Set(accounts.map((account) => account.id));
 	return {
 		...document,
 		accounts,
 		checkpoints: document.checkpoints.filter((checkpoint) =>
-			accounts.some((account) => account.id === checkpoint.AccountId),
+			activeAccountIds.has(checkpoint.AccountId),
 		),
 		postings: document.postings
 			.filter((posting) => !disabledPostingIds.has(posting.id))
