@@ -61,14 +61,14 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 	}
 	if earliestCheckpointDate != "" {
 		recurringPostings := []types.Posting{}
-		recurringIndexes := map[*types.Posting]int{}
+		recurringOriginalIndexes := []int{}
 		for index := range document.Postings {
 			posting := &document.Postings[index]
 			if posting.Frequency != types.FrequencyOnce {
 				recurringPostings = append(recurringPostings, *posting)
+				recurringOriginalIndexes = append(recurringOriginalIndexes, index)
 			}
 		}
-		// Map back from copies to original indexes for stable ordering.
 		recurringOccurrencesByDate := map[string][]DatedPostingOccurrence{}
 		AddOccurrences(recurringPostings, recurringOccurrencesByDate, earliestCheckpointDate, projectionStartDate, true)
 		for date, occurrences := range recurringOccurrencesByDate {
@@ -76,30 +76,13 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 				continue
 			}
 			for _, occurrence := range occurrences {
-				originalIndex := -1
-				for index := range document.Postings {
-					if &document.Postings[index] == occurrence.Posting {
-						originalIndex = index
-						break
-					}
-				}
-				if originalIndex < 0 {
-					for index := range document.Postings {
-						if document.Postings[index].ID == occurrence.Posting.ID {
-							originalIndex = index
-							break
-						}
-					}
-				}
-				if originalIndex >= 0 {
-					occurrencesByDate[date] = append(occurrencesByDate[date], DatedPostingOccurrence{
-						Posting: &document.Postings[originalIndex],
-						Index:   originalIndex,
-					})
-				}
+				originalIndex := recurringOriginalIndexes[occurrence.Index]
+				occurrencesByDate[date] = append(occurrencesByDate[date], DatedPostingOccurrence{
+					Posting: &document.Postings[originalIndex],
+					Index:   originalIndex,
+				})
 			}
 		}
-		_ = recurringIndexes
 	}
 
 	transitions, err := CreateTransitionRuntime(types.FinancialModel{

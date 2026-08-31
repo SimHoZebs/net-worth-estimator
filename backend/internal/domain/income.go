@@ -175,13 +175,43 @@ func ProgressiveIncomeLiability(taxableAmount float64, profile *types.IncomeTaxP
 	return liability
 }
 
-func findIncomeSource(data *types.IncomeDataSnapshot, id, date string) (*types.IncomeSourceDefinition, error) {
-	var matches []*types.IncomeSourceDefinition
-	for i := range data.IncomeSources {
-		source := &data.IncomeSources[i]
-		if source.ID != id {
-			continue
+type incomeRuntimeIndex struct {
+	sourcesByID     map[string][]*types.IncomeSourceDefinition
+	taxProfileByID  map[string]*types.IncomeTaxProfile
+	incomeSourceIDs map[string]bool
+	taxProfileIDs   map[string]bool
+	accountIDs      map[string]bool
+}
+
+func newIncomeRuntimeIndex(data *types.IncomeDataSnapshot, accountByID map[string]types.Account) *incomeRuntimeIndex {
+	index := &incomeRuntimeIndex{
+		sourcesByID:     make(map[string][]*types.IncomeSourceDefinition),
+		taxProfileByID:  make(map[string]*types.IncomeTaxProfile),
+		incomeSourceIDs: make(map[string]bool, len(data.IncomeSources)),
+		taxProfileIDs:   make(map[string]bool, len(data.TaxProfiles)),
+		accountIDs:      make(map[string]bool, len(accountByID)),
+	}
+	for sourceIndex := range data.IncomeSources {
+		source := &data.IncomeSources[sourceIndex]
+		index.sourcesByID[source.ID] = append(index.sourcesByID[source.ID], source)
+		index.incomeSourceIDs[source.ID] = true
+	}
+	for profileIndex := range data.TaxProfiles {
+		profile := &data.TaxProfiles[profileIndex]
+		if _, exists := index.taxProfileByID[profile.ID]; !exists {
+			index.taxProfileByID[profile.ID] = profile
 		}
+		index.taxProfileIDs[profile.ID] = true
+	}
+	for id := range accountByID {
+		index.accountIDs[id] = true
+	}
+	return index
+}
+
+func findIncomeSource(index *incomeRuntimeIndex, id, date string) (*types.IncomeSourceDefinition, error) {
+	var matches []*types.IncomeSourceDefinition
+	for _, source := range index.sourcesByID[id] {
 		if source.EffectiveFrom <= date && (source.EffectiveTo == nil || date <= *source.EffectiveTo) {
 			matches = append(matches, source)
 		}
@@ -195,11 +225,9 @@ func findIncomeSource(data *types.IncomeDataSnapshot, id, date string) (*types.I
 	return matches[0], nil
 }
 
-func findTaxProfile(data *types.IncomeDataSnapshot, id string) (*types.IncomeTaxProfile, error) {
-	for i := range data.TaxProfiles {
-		if data.TaxProfiles[i].ID == id {
-			return &data.TaxProfiles[i], nil
-		}
+func findTaxProfile(index *incomeRuntimeIndex, id string) (*types.IncomeTaxProfile, error) {
+	if profile, exists := index.taxProfileByID[id]; exists {
+		return profile, nil
 	}
 	return nil, incomeErrf("Tax profile '%s' does not exist.", id)
 }
@@ -275,33 +303,21 @@ type IncomeExecutionResult struct {
 	Income          types.IncomeEvent
 }
 
-// ExecuteIncomePosting runs the ordered payroll pipeline for one occurrence.
-func ExecuteIncomePosting(posting *types.Posting, date string, data *types.IncomeDataSnapshot, balances map[string]float64, accountByID map[string]types.Account, order []string) (IncomeExecutionResult, error) {
+// executeIncomePosting runs the ordered payroll pipeline for one occurrence.
+func executeIncomePosting(posting *types.Posting, date string, incomeIndex *incomeRuntimeIndex, balances map[string]float64, accountByID map[string]types.Account, order []string) (IncomeExecutionResult, error) {
 	result := IncomeExecutionResult{}
 	config, err := ParseIncomeAmountConfig(posting.Amount.Config)
 	if err != nil {
 		return result, err
 	}
-	incomeSourceIDs := make(map[string]bool, len(data.IncomeSources))
-	for _, source := range data.IncomeSources {
-		incomeSourceIDs[source.ID] = true
-	}
-	taxProfileIDs := make(map[string]bool, len(data.TaxProfiles))
-	for _, profile := range data.TaxProfiles {
-		taxProfileIDs[profile.ID] = true
-	}
-	accountIDs := make(map[string]bool, len(accountByID))
-	for id := range accountByID {
-		accountIDs[id] = true
-	}
 	if err := ValidateIncomeAmountConfig(posting.Amount.Config, &AmountReferenceContext{
-		AccountIDs:      accountIDs,
-		IncomeSourceIDs: incomeSourceIDs,
-		TaxProfileIDs:   taxProfileIDs,
+		AccountIDs:      incomeIndex.accountIDs,
+		IncomeSourceIDs: incomeIndex.incomeSourceIDs,
+		TaxProfileIDs:   incomeIndex.taxProfileIDs,
 	}); err != nil {
 		return result, err
 	}
-	source, err := findIncomeSource(data, config.IncomeSourceID, date)
+	source, err := findIncomeSource(incomeIndex, config.IncomeSourceID, date)
 	if err != nil {
 		return result, err
 	}
@@ -325,7 +341,7 @@ func ExecuteIncomePosting(posting *types.Posting, date string, data *types.Incom
 			}
 		} else {
 			profileID, _ := step.Config["profileId"].(string)
-			profile, err := findTaxProfile(data, profileID)
+			profile, err := findTaxProfile(incomeIndex, profileID)
 			if err != nil {
 				return result, err
 			}
