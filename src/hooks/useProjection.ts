@@ -29,12 +29,10 @@ interface ProjectionState extends ProjectionHookState<ProjectionResult> {
 
 function publicState(
 	state: ProjectionState,
-	evaluations: ProjectionRuntimeSettings["evaluations"],
+	result: ProjectionResult | null,
 ): ProjectionHookState<ProjectionResult> {
 	return {
-		result: state.result
-			? labelProjectionResult(state.result, evaluations)
-			: null,
+		result,
 		runtimeError: state.runtimeError,
 		isRunning: state.isRunning,
 		progress: state.progress,
@@ -177,19 +175,24 @@ export function useProjection(
 
 		return () => controller.abort();
 	}, [baseKey, computationSettings, engine, requestKey]);
+	const labeledResult = useMemo(
+		() =>
+			state.result
+				? labelProjectionResult(state.result, projectionSettings.evaluations)
+				: null,
+		[state.result, projectionSettings.evaluations],
+	);
 
 	if (state.requestKey !== requestKey) {
 		const retainBaseResult =
 			enabled && state.result !== null && state.resultBaseKey === baseKey;
 		return {
-			result: retainBaseResult
-				? labelProjectionResult(state.result!, projectionSettings.evaluations)
-				: null,
+			result: retainBaseResult ? labeledResult : null,
 			runtimeError: null,
 			isRunning: enabled && document !== null,
 			progress: null,
 			resultIsStale: retainBaseResult,
 		};
 	}
-	return publicState(state, projectionSettings.evaluations);
+	return publicState(state, labeledResult);
 }
