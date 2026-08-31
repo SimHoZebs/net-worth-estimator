@@ -15,6 +15,7 @@ interface DialogProps {
 	ariaDescribedby?: string;
 	role?: "dialog" | "alertdialog";
 	className?: string;
+	overlayClassName?: string;
 }
 
 function focusableElements(dialog: HTMLElement): HTMLElement[] {
@@ -33,6 +34,7 @@ export function Dialog({
 	ariaDescribedby,
 	role = "dialog",
 	className,
+	overlayClassName,
 }: DialogProps) {
 	const dialogRef = useRef<HTMLDivElement>(null);
 	const previousFocusRef = useRef<HTMLElement | null>(null);
@@ -75,7 +77,10 @@ export function Dialog({
 
 	return (
 		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4 backdrop-blur-sm"
+			className={cn(
+				"fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4 backdrop-blur-sm",
+				overlayClassName,
+			)}
 			role="presentation"
 			onMouseDown={(event) => {
 				if (event.target === event.currentTarget) onClose();

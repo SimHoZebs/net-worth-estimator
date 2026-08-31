@@ -182,6 +182,25 @@ body {
 		linear-gradient(180deg, color-mix(in oklab, var(--surface) 84%, transparent), var(--background) 20rem);
 }
 
+.drawer-panel {
+	animation: drawer-slide-in 0.2s ease-out;
+}
+
+@keyframes drawer-slide-in {
+	from {
+		transform: translateX(-100%);
+	}
+	to {
+		transform: translateX(0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.drawer-panel {
+		animation: none;
+	}
+}
+
 .uplot,
 .uplot canvas {
 	background: transparent;
