@@ -54,7 +54,7 @@ type TransitionRuntime struct {
 	accountOrder     []string
 	projectionStart  string
 	monteCarloSample *types.MonteCarloSample
-	incomeData       *types.IncomeDataSnapshot
+	incomeIndex      *incomeRuntimeIndex
 }
 
 // CreateTransitionRuntime clones initialState and binds model context.
@@ -79,7 +79,7 @@ func CreateTransitionRuntime(model types.FinancialModel, initialState Simulation
 		accountOrder:     accountOrder,
 		projectionStart:  projectionStartDate,
 		monteCarloSample: monteCarloSample,
-		incomeData:       incomeData,
+		incomeIndex:      newIncomeRuntimeIndex(incomeData, accountByID),
 	}, nil
 }
 
@@ -107,7 +107,7 @@ func (t *TransitionRuntime) applyAndCollectDeltas(result AccountMovementResult, 
 func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, date string) (PostingExecutionTransition, error) {
 	posting := occurrence.Posting
 	if posting.Amount.Resolver == "income" {
-		execution, err := ExecuteIncomePosting(posting, date, t.incomeData, t.State.Balances, t.accountByID, t.accountOrder)
+		execution, err := executeIncomePosting(posting, date, t.incomeIndex, t.State.Balances, t.accountByID, t.accountOrder)
 		if err != nil {
 			return PostingExecutionTransition{}, err
 		}
