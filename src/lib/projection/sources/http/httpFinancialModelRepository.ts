@@ -1,3 +1,4 @@
+import { buildApiUrl } from "@/lib/api-url";
 import {
 	type FinancialModelParseResult,
 	type FinancialModelRepository,
@@ -10,7 +11,7 @@ import { parseFinancialModelDocument } from "../csv/csvDataSource";
 // HTTP repository backed by the Go backend (chi + huma + SQLite). The backend
 // is the canonical persistence; see docs/backend-migration/ASSUMPTIONS.md A1.
 
-export const FINANCIAL_MODEL_HTTP_API_PATH = "/v1/financial-model";
+export const FINANCIAL_MODEL_HTTP_API_PATH = buildApiUrl("/v1/financial-model");
 
 export interface HttpFinancialModelRepositoryOptions {
 	basePath?: string;
@@ -38,10 +39,7 @@ async function requestModel(
 	basePath: string,
 	init?: RequestInit,
 ): Promise<FinancialModelParseResult> {
-	const response = await fetchImpl(basePath, {
-		headers: { "Content-Type": "application/json" },
-		...init,
-	});
+	const response = await fetchImpl(basePath, init);
 	if (!response.ok) {
 		throw new Error(`Financial model request failed (${response.status}).`);
 	}
@@ -69,6 +67,7 @@ export function createHttpFinancialModelRepository(
 				try {
 					return await requestModel(fetchImpl, basePath, {
 						method: "PUT",
+						headers: { "Content-Type": "application/json" },
 						body: JSON.stringify(document),
 					});
 				} catch (error) {

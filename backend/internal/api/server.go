@@ -20,11 +20,23 @@ type Server struct {
 	SeedIncomePath string
 }
 
+// Config controls HTTP integration behavior and bundled reset sources.
+type Config struct {
+	SeedModelPath  string
+	SeedIncomePath string
+	AllowedOrigins []string
+}
+
 // New builds the chi router with all routes.
-func New(store *store.Store, seedModelPath, seedIncomePath string) http.Handler {
-	server := &Server{store: store, SeedModelPath: seedModelPath, SeedIncomePath: seedIncomePath}
+func New(store *store.Store, serverConfig Config) http.Handler {
+	server := &Server{
+		store:          store,
+		SeedModelPath:  serverConfig.SeedModelPath,
+		SeedIncomePath: serverConfig.SeedIncomePath,
+	}
 	router := chi.NewRouter()
 	router.Use(middleware.Recoverer)
+	router.Use(corsMiddleware(serverConfig.AllowedOrigins))
 
 	config := huma.DefaultConfig("Net Worth Estimator API", "1.0.0")
 	api := humachi.New(router, config)

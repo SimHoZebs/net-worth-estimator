@@ -13,7 +13,7 @@ The Net Worth Estimator is a React application that loads a `FinancialModelDocum
 
 ## 2. Data Flow
 
-1. `App.tsx` creates `createHttpFinancialModelRepository()` and `createHttpIncomeDataSource()`. The Vite dev server proxies `/v1` to the Go backend (`NET_WORTH_ESTIMATOR_BACKEND`, default `http://localhost:8787`).
+1. `App.tsx` creates `createHttpFinancialModelRepository()` and `createHttpIncomeDataSource()`. The browser uses same-origin `/v1` routes unless the Vite build sets `VITE_API_BASE_URL`; the development server proxies `/v1` to `NET_WORTH_ESTIMATOR_BACKEND` (default `http://localhost:8787`).
 2. Model Inputs and query hooks depend only on `FinancialModelRepository`. Browser CSV ingestion and browser storage remain implemented behind that boundary but are not wired by default.
 3. Parsing and cross-reference validation produce a validated `FinancialModelDocument` plus diagnostics. Invalid or malformed data surfaces diagnostics instead of being silently discarded.
 4. Zustand stores session-only `ModelOverrides`, displayed as current changes. `applyModelOverrides` creates the effective document without mutating canonical data.
@@ -35,10 +35,11 @@ The persistence boundary is the validated `FinancialModelDocument` aggregate. CS
 - The Go server (`backend/cmd/server`) imports canonical CSV data (`NET_WORTH_ESTIMATOR_MODEL_PATH`, default `public/configs`) and income data (`NET_WORTH_ESTIMATOR_INCOME_PATH`, default `public/data/income`) into `NET_WORTH_ESTIMATOR_DB` (SQLite).
 - Income definitions are served through `/v1/income-data`. Posting analyses are also exposed at `/v1/analyses/postings`; the client currently derives analyses locally.
 - Projection endpoints: `POST /v1/projections/deterministic` (JSON) and `POST /v1/projections/stochastic` (SSE stream).
+- `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` accepts a comma-separated runtime allowlist of exact HTTP/S browser origins. Requests carrying any other `Origin` are rejected; requests without `Origin` remain available to health checks, trusted proxies, and non-browser clients.
 
 ### Browser
 
-Browser CSV ingestion and browser storage (`net-worth-estimator:financial-model` via `localStorageFinancialModelDao`) remain implemented behind the repository boundary but are not wired by default. Malformed canonical persisted data returns parse/validation diagnostics instead of falling back to bundled data.
+Browser CSV ingestion and browser storage (`net-worth-estimator:financial-model` via `localStorageFinancialModelDao`) remain implemented behind the repository boundary but are not wired by default. Malformed canonical persisted data returns parse/validation diagnostics instead of falling back to bundled data. `VITE_API_BASE_URL` is normalized once and prefixes every HTTP and SSE backend route in separate-origin deployments.
 
 ### Projection Artifacts
 

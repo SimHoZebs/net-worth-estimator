@@ -1,9 +1,10 @@
+import { buildApiUrl } from "@/lib/api-url";
 import type { IncomeDataLoadResult, IncomeDataSource } from "../../incomeData";
 import { parseIncomeDataFiles } from "../../sources/csv/incomeDataSource";
 
 // HTTP income data source backed by the Go backend snapshot endpoint.
 
-export const INCOME_DATA_HTTP_API_PATH = "/v1/income-data";
+export const INCOME_DATA_HTTP_API_PATH = buildApiUrl("/v1/income-data");
 
 export interface HttpIncomeDataSourceOptions {
 	basePath?: string;

@@ -14,7 +14,7 @@ import (
 
 func TestGetModelReturnsNullWhenStoreIsUninitialized(t *testing.T) {
 	database := openAPIStore(t)
-	handler := New(database, "unused", "unused")
+	handler := New(database, Config{SeedModelPath: "unused", SeedIncomePath: "unused"})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
 
@@ -38,8 +38,10 @@ func TestResetReturnsTheAtomicallyImportedAggregate(t *testing.T) {
 	root := apiProjectRoot(t)
 	handler := New(
 		database,
-		filepath.Join(root, "public", "configs"),
-		filepath.Join(root, "public", "data", "income"),
+		Config{
+			SeedModelPath:  filepath.Join(root, "public", "configs"),
+			SeedIncomePath: filepath.Join(root, "public", "data", "income"),
+		},
 	)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/financial-model/reset", nil))
