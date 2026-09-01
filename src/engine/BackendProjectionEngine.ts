@@ -1,3 +1,4 @@
+import { buildApiUrl } from "@/lib/api-url";
 import type {
 	EvaluationResultCollection,
 	ProjectionResult,
@@ -16,7 +17,7 @@ import type {
 // backend (chi + huma) over HTTP/SSE. Computation no longer runs in browser
 // workers; see docs/backend-migration/ASSUMPTIONS.md A2/A4.
 
-const API_BASE = "/v1";
+const API_BASE = buildApiUrl("/v1");
 
 type StochasticStreamEvent = {
 	progress?: unknown;

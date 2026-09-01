@@ -1,0 +1,11 @@
+.git
+.gitignore
+node_modules
+dist
+private-data
+uploads
+backend/testdata
+coverage
+**/*.db
+**/*.db-shm
+**/*.db-wal

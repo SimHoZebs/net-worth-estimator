@@ -12,7 +12,17 @@ export default defineConfig(({ mode }) => {
 		plugins: [react(), tailwindcss()],
 		server: {
 			proxy: {
-				"/v1": { target: backendOrigin, changeOrigin: true },
+				"/v1": {
+					target: backendOrigin,
+					changeOrigin: true,
+					configure(proxy) {
+						proxy.on("proxyReq", (proxyRequest) => {
+							// The browser request is same-origin with Vite; do not make the
+							// backend interpret the development proxy hop as cross-origin.
+							proxyRequest.removeHeader("origin");
+						});
+					},
+				},
 			},
 		},
 		resolve: {

@@ -6,11 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -38,6 +41,60 @@ func defaultDBPath() string {
 	return filepath.Join(home, ".local", "share", "net-worth-estimator", "net-worth-estimator.db")
 }
 
+func parseAllowedOrigins(value string) ([]string, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, nil
+	}
+
+	origins := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, candidate := range strings.Split(value, ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			return nil, errors.New("origin entries cannot be empty")
+		}
+		parsed, err := url.Parse(candidate)
+		if err != nil {
+			return nil, fmt.Errorf("parse origin %q: %w", candidate, err)
+		}
+		scheme := strings.ToLower(parsed.Scheme)
+		if (scheme != "http" && scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Opaque != "" {
+			return nil, fmt.Errorf("origin %q must contain only an HTTP/S scheme and host", candidate)
+		}
+		if (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+			return nil, fmt.Errorf("origin %q cannot contain a path, query, or fragment", candidate)
+		}
+
+		host := strings.ToLower(parsed.Hostname())
+		if host == "" {
+			return nil, fmt.Errorf("origin %q must contain a host", candidate)
+		}
+		port := parsed.Port()
+		if port != "" {
+			parsedPort, err := strconv.Atoi(port)
+			if err != nil || parsedPort < 1 || parsedPort > 65535 {
+				return nil, fmt.Errorf("origin %q contains an invalid port", candidate)
+			}
+			port = strconv.Itoa(parsedPort)
+		}
+		if (scheme == "http" && port == "80") || (scheme == "https" && port == "443") {
+			port = ""
+		}
+		if port != "" {
+			host = net.JoinHostPort(host, port)
+		} else if strings.Contains(host, ":") {
+			host = "[" + host + "]"
+		}
+		origin := scheme + "://" + host
+		if _, exists := seen[origin]; exists {
+			continue
+		}
+		seen[origin] = struct{}{}
+		origins = append(origins, origin)
+	}
+	return origins, nil
+}
+
 func main() {
 	port := 8787
 	if parsed, err := strconv.Atoi(envOr("PORT", "8787")); err == nil && parsed > 0 {
@@ -52,6 +109,10 @@ func main() {
 	}
 	modelPath := envOr("NET_WORTH_ESTIMATOR_MODEL_PATH", "public/configs")
 	incomePath := envOr("NET_WORTH_ESTIMATOR_INCOME_PATH", "public/data/income")
+	allowedOrigins, err := parseAllowedOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
+	if err != nil {
+		log.Fatalf("configure allowed origins: %v", err)
+	}
 
 	database, err := store.Open(dbPath)
 	if err != nil {
@@ -70,7 +131,11 @@ func main() {
 		fmt.Printf("seeded database from %s and %s\n", modelPath, incomePath)
 	}
 
-	handler := api.New(database, modelPath, incomePath)
+	handler := api.New(database, api.Config{
+		SeedModelPath:  modelPath,
+		SeedIncomePath: incomePath,
+		AllowedOrigins: allowedOrigins,
+	})
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),
 		Handler:           handler,
