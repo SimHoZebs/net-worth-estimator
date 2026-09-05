@@ -39,6 +39,9 @@ func (s *Server) getModel(_ context.Context, _ *struct{}) (*getModelOutput, erro
 func (s *Server) putModel(_ context.Context, input *struct {
 	Body types.FinancialModelDocument `json:"body"`
 }) (*getModelOutput, error) {
+	if s.ReadOnly {
+		return nil, huma.Error403Forbidden("server is read-only")
+	}
 	document := &input.Body
 	effectiveIncome, err := s.store.LoadIncomeData()
 	if err != nil {
@@ -60,24 +63,17 @@ func (s *Server) putModel(_ context.Context, input *struct {
 	return &getModelOutput{Body: parseResultBody{Document: document, Issues: issues}}, nil
 }
 
-type resetOutput struct {
+type statusOutput struct {
 	Body struct {
-		Reset  bool             `json:"reset"`
-		Result *parseResultBody `json:"result,omitempty"`
+		ReadOnly    bool `json:"readOnly"`
+		AuthEnabled bool `json:"authEnabled"`
 	}
 }
 
-func (s *Server) resetModel(_ context.Context, _ *struct{}) (*resetOutput, error) {
-	document, incomeData, err := s.store.ImportCSV(s.SeedModelPath, s.SeedIncomePath)
-	if err != nil {
-		return nil, huma.Error500InternalServerError("reset failed: " + err.Error())
-	}
-	output := &resetOutput{}
-	output.Body.Reset = true
-	output.Body.Result = &parseResultBody{
-		Document: document,
-		Issues:   domainValidate(document, incomeData),
-	}
+func (s *Server) getStatus(_ context.Context, _ *struct{}) (*statusOutput, error) {
+	output := &statusOutput{}
+	output.Body.ReadOnly = s.ReadOnly
+	output.Body.AuthEnabled = s.AuthEnabled
 	return output, nil
 }
 

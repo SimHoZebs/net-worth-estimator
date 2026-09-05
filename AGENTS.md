@@ -38,7 +38,6 @@ App (src/App.tsx)
 | --- | --- | --- |
 | `useFinancialModelQuery` | `hooks/useFinancialModel.ts` | loads `{ document, issues }` from `FinancialModelRepository.loadDocument`; `staleTime: Infinity` |
 | `useFinancialModelMutation` | `hooks/useFinancialModel.ts` | saves a `FinancialModelDocument` and invalidates the model query |
-| `useFinancialModelResetMutation` | `hooks/useFinancialModel.ts` | resets the source and replaces query data |
 | `usePostingAnalyses` | `hooks/usePostingAnalyses.ts` | derives observations from model postings and composes classification, payroll detection, and salary estimation analyses |
 | `useProjection` | `hooks/useProjection.ts` | `(document, settings, overrides, enabled) -> ProjectionHookState<ProjectionResult>` |
 | `useStochastic` | `hooks/useStochastic.ts` | `(document, settings, overrides, config, enabled) -> ProjectionHookState<StochasticProjectionResult>` |
@@ -68,11 +67,11 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 
 1. **Model source**: Go backend serves `GET/PUT /v1/financial-model` from imported canonical CSV data. The Vite dev server proxies `/v1` to `NET_WORTH_ESTIMATOR_BACKEND` (default `http://localhost:8787`).
 2. **Persistence DI**: `App.tsx` creates `createHttpFinancialModelRepository()` and `createHttpIncomeDataSource()`. Browser CSV ingestion and browser storage remain available behind the repository abstraction but are not wired.
-3. **Query layer**: `useFinancialModelQuery`, `useFinancialModelMutation`, and `useFinancialModelResetMutation` connect the source to TanStack Query.
+3. **Query layer**: `useFinancialModelQuery` and `useFinancialModelMutation` connect the source to TanStack Query.
 4. **Current changes**: `ModelOverrides` remain in Zustand and are applied with `applyModelOverrides`; canonical data is not mutated.
 5. **Projection**: `useProjection`/`useStochastic` -> `CachedProjectionEngine` over `BackendProjectionEngine` (`src/engine/`). Deterministic runs POST `/v1/projections/deterministic`; the Go backend computes and returns results.
 6. **Monte Carlo**: `POST /v1/projections/stochastic` streams SSE `progress`/`partial`/`result` events; exact percentiles are aggregated server-side.
-7. **Reset/save**: go through the HTTP repository (`/v1/financial-model`, `/v1/financial-model/reset`); malformed data surfaces diagnostics. Analyses use the canonical model postings.
+7. **Save**: goes through the HTTP repository (`PUT /v1/financial-model`, bearer token when auth is configured, rejected when the server is read-only); malformed data surfaces diagnostics. Analyses use the canonical model postings. There is no reset route; CSV files are seed-only.
 8. **Derived artifacts**: the client keeps an in-memory content-addressed artifact store; durable artifact storage lives in the backend. `IndexedDbProjectionArtifactStore` exists but is not wired by default.
 9. **Independent analyses**: `AnalysisDefinition` computations run as explicit pipelines over posting-derived observations. Active analyses contribute classifier requirements to one shared posting-classification plan before payroll detection and salary estimation; the pipeline does not participate in projection or mutate the financial model.
 
@@ -90,7 +89,7 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 | `ComparisonSnapshot` | read-only captured metrics for UI comparison |
 | `ProjectionResult` | deterministic public result and evaluation result tables |
 | `StochasticProjectionResult` | deterministic result, exact percentile bands, and stochastic evaluation aggregation |
-| `FinancialModelRepository` | application-facing model reads plus optional labeled save and reset capabilities |
+| `FinancialModelRepository` | application-facing model reads plus optional labeled save capability |
 | `FinancialModelIngestionSource` | read-only external snapshot and semantic revision used by ingestion |
 | `FinancialModelDao` | implementation-neutral persisted-record reads and conditional replacement; no lifecycle methods |
 | `FinancialModelParseResult` | `{ document, issues }` |

@@ -11,7 +11,6 @@ export interface ModelSourceInfo {
 	description: string;
 	repositoryType: string;
 	saveLabel: string | null;
-	resetLabel: string | null;
 }
 
 export interface ModelRuntime {
@@ -28,10 +27,8 @@ export interface ModelRuntime {
 	dataUpdatedAt: number;
 	projectionStartDate: string;
 	isSaving: boolean;
-	isResetting: boolean;
 	reload: () => void;
 	save: () => void;
-	reset?: () => void;
 	applyTemplate: (output: TemplateOutput) => void;
 }
 
