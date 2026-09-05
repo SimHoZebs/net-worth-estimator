@@ -25,8 +25,6 @@ export function SourceStatusCard() {
 		issues,
 		sourceActionError,
 		reload,
-		reset,
-		isResetting,
 	} = useModelRuntime();
 	const hasValidationErrors = issues.some(
 		(issue) => issue.severity === "error",
@@ -84,17 +82,6 @@ export function SourceStatusCard() {
 				<p className="type-caption">{source.description}</p>
 
 				<div className="flex flex-wrap justify-end gap-2">
-					{source.resetLabel && reset ? (
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							onClick={reset}
-							disabled={isLoading || isResetting}
-						>
-							{isResetting ? "Resetting..." : source.resetLabel}
-						</Button>
-					) : null}
 					<Button
 						type="button"
 						variant="secondary"

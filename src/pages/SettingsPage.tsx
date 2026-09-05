@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBeforeUnload, useBlocker } from "react-router-dom";
+import { BackendAccessCard } from "@/components/BackendAccessCard";
 import { EvaluationSettings } from "@/components/evaluations/EvaluationSettings";
 import { StochasticControls } from "@/components/StochasticControls";
 import { ModelAssumptionsCard } from "@/components/sidebar/ModelAssumptionsCard";
@@ -93,6 +94,7 @@ export function SettingsPage() {
 							<SimulationSettingsCard />
 							<div className="space-y-6">
 								<StochasticControls />
+								<BackendAccessCard />
 								<AppearanceSettings />
 							</div>
 						</div>

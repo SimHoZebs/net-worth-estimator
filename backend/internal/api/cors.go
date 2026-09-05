@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	corsAllowedHeaders = "Content-Type"
+	corsAllowedHeaders = "Content-Type, Authorization"
 	corsAllowedMethods = "GET, POST, PUT, OPTIONS"
 )
 
@@ -65,9 +65,14 @@ func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 
 func corsHeadersAllowed(value string) bool {
 	for header := range strings.SplitSeq(value, ",") {
-		if trimmed := strings.TrimSpace(header); trimmed != "" && !strings.EqualFold(trimmed, "Content-Type") {
-			return false
+		trimmed := strings.TrimSpace(header)
+		if trimmed == "" {
+			continue
 		}
+		if strings.EqualFold(trimmed, "Content-Type") || strings.EqualFold(trimmed, "Authorization") {
+			continue
+		}
+		return false
 	}
 	return true
 }

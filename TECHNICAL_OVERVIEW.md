@@ -31,7 +31,7 @@ The persistence boundary is the validated `FinancialModelDocument` aggregate. CS
 
 ### Backend
 
-- Canonical routes: `GET/PUT /v1/financial-model`, `POST /v1/financial-model/reset`
+- Canonical routes: `GET/PUT /v1/financial-model`, `GET /v1/status`. There is no reset route; CSV files are seed-only. `PUT` is rejected with 403 when `NET_WORTH_ESTIMATOR_READ_ONLY=1` and requires a bearer token (`NET_WORTH_ESTIMATOR_AUTH_TOKEN`) when auth is configured.
 - The Go server (`backend/cmd/server`) imports canonical CSV data (`NET_WORTH_ESTIMATOR_MODEL_PATH`, default `public/configs`) and income data (`NET_WORTH_ESTIMATOR_INCOME_PATH`, default `public/data/income`) into `NET_WORTH_ESTIMATOR_DB` (SQLite).
 - Income definitions are served through `/v1/income-data`. Posting analyses are also exposed at `/v1/analyses/postings`; the client currently derives analyses locally.
 - Projection endpoints: `POST /v1/projections/deterministic` (JSON) and `POST /v1/projections/stochastic` (SSE stream).
@@ -180,7 +180,7 @@ React Router uses browser paths. Production hosting must serve `index.html` for 
 | `src/engine/BackendProjectionEngine.ts` | HTTP/SSE client for backend deterministic and stochastic projection |
 | `src/engine/CachedProjectionEngine.ts` | content-addressed cache over the computation engine |
 | `src/engine/applicationProjectionEngine.ts` | application wiring: cached backend engine plus in-memory artifacts |
-| `src/hooks/useFinancialModel.ts` | document query, save, and reset hooks |
+| `src/hooks/useFinancialModel.ts` | document query and save hooks |
 | `src/hooks/useProjection.ts` | deterministic projection hook |
 | `src/hooks/useStochastic.ts` | stochastic projection hook |
 | `src/lib/analysis/postingObservations.ts` | derives analysis observations from one-time external-inflow postings |

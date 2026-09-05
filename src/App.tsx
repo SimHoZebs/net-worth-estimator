@@ -1,18 +1,22 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import {
 	useFinancialModelMutation,
 	useFinancialModelQuery,
-	useFinancialModelResetMutation,
 } from "@/hooks/useFinancialModel";
 import { useIncomeDataQuery } from "@/hooks/useIncomeData";
+import { getAuthToken } from "@/lib/auth-token";
 import type { TemplateOutput } from "@/lib/patterns";
 import {
 	summarizeValidationIssues,
 	validateCsvFinancialModel,
 } from "@/lib/projection";
-import { createHttpFinancialModelRepository } from "@/lib/projection/sources/http/httpFinancialModelRepository";
+import {
+	createHttpFinancialModelRepository,
+	fetchServerStatus,
+	withoutWriteCapabilities,
+} from "@/lib/projection/sources/http/httpFinancialModelRepository";
 import { createHttpIncomeDataSource } from "@/lib/projection/sources/http/httpIncomeDataSource";
 import {
 	ModelRuntimeProvider,
@@ -23,7 +27,7 @@ import { useProjectionOrchestration } from "@/runtime/useProjectionOrchestration
 import { useStore } from "@/store";
 
 function createModelRepository() {
-	return createHttpFinancialModelRepository();
+	return createHttpFinancialModelRepository({ getAuthToken });
 }
 
 function createIncomeDataSource() {
@@ -31,7 +35,28 @@ function createIncomeDataSource() {
 }
 
 export default function App() {
-	const modelRepository = useMemo(() => createModelRepository(), []);
+	const baseRepository = useMemo(() => createModelRepository(), []);
+	const [serverReadOnly, setServerReadOnly] = useState(false);
+	useEffect(() => {
+		let cancelled = false;
+		fetchServerStatus()
+			.then((status) => {
+				if (!cancelled) setServerReadOnly(status.readOnly);
+			})
+			.catch(() => {
+				// Leave write UI visible; the server enforces read-only itself.
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+	const modelRepository = useMemo(
+		() =>
+			serverReadOnly
+				? withoutWriteCapabilities(baseRepository)
+				: baseRepository,
+		[baseRepository, serverReadOnly],
+	);
 	const incomeDataSource = useMemo(() => createIncomeDataSource(), []);
 	const {
 		data: modelData,
@@ -49,11 +74,8 @@ export default function App() {
 		refetch: refetchIncomeData,
 	} = useIncomeDataQuery(incomeDataSource);
 	const modelMutation = useFinancialModelMutation(modelRepository);
-	const modelResetMutation = useFinancialModelResetMutation(modelRepository);
 	const saveModel = modelMutation.mutate;
-	const resetModel = modelResetMutation.mutate;
 	const isSaving = modelMutation.isPending;
-	const isResetting = modelResetMutation.isPending;
 	const document = modelData?.document ?? null;
 	const issues = useMemo(() => {
 		const modelIssues = modelData?.issues ?? [];
@@ -73,10 +95,8 @@ export default function App() {
 		});
 	}, [incomeDataResult, modelData]);
 	const loadError = modelError?.message ?? incomeDataError?.message ?? null;
-	const sourceActionError =
-		modelMutation.error?.message ?? modelResetMutation.error?.message ?? null;
-	const isSourceUpdating =
-		isModelFetching || isIncomeDataFetching || modelResetMutation.isPending;
+	const sourceActionError = modelMutation.error?.message ?? null;
+	const isSourceUpdating = isModelFetching || isIncomeDataFetching;
 	const isLoading = isModelLoading || isIncomeDataLoading || isSourceUpdating;
 	const replaceEvaluations = useStore((state) => state.replaceEvaluations);
 	const finishEditing = useStore((state) => state.finishEditing);
@@ -137,19 +157,6 @@ export default function App() {
 			onSuccess: finishEditing,
 		});
 	}, [finishEditing, isSaving, modelRepository.save, saveModel]);
-	const handleResetSource = useCallback(() => {
-		if (!modelRepository.reset || isResetting) return;
-		requestEvaluationReload();
-		resetModel(undefined, {
-			onSuccess: finishEditing,
-		});
-	}, [
-		modelRepository.reset,
-		finishEditing,
-		isResetting,
-		requestEvaluationReload,
-		resetModel,
-	]);
 	const handleApplyTemplate = useCallback(
 		(output: TemplateOutput) => {
 			const store = useStore.getState();
@@ -173,7 +180,6 @@ export default function App() {
 			description: modelRepository.description,
 			repositoryType: modelRepository.repositoryType,
 			saveLabel: modelRepository.save?.label ?? null,
-			resetLabel: modelRepository.reset?.label ?? null,
 		}),
 		[modelRepository],
 	);
@@ -192,10 +198,8 @@ export default function App() {
 			dataUpdatedAt,
 			projectionStartDate,
 			isSaving,
-			isResetting,
 			reload: handleReload,
 			save: handleSave,
-			reset: modelRepository.reset ? handleResetSource : undefined,
 			applyTemplate: handleApplyTemplate,
 		}),
 		[
@@ -211,11 +215,8 @@ export default function App() {
 			dataUpdatedAt,
 			projectionStartDate,
 			isSaving,
-			isResetting,
 			handleReload,
 			handleSave,
-			modelRepository.reset,
-			handleResetSource,
 			handleApplyTemplate,
 			incomeDataResult?.data,
 		],

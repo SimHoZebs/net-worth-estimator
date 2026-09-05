@@ -5,7 +5,6 @@ import type {
 	FinancialModelRepository,
 } from "@/lib/projection";
 import { FinancialModelValidationError } from "@/lib/projection";
-import { INCOME_DATA_QUERY_KEY } from "./useIncomeData";
 
 export const FINANCIAL_MODEL_QUERY_KEY = ["financial-model"] as const;
 
@@ -46,28 +45,6 @@ export function useFinancialModelMutation(
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: FINANCIAL_MODEL_QUERY_KEY });
-		},
-	});
-}
-
-export function useFinancialModelResetMutation(
-	repository: FinancialModelRepository,
-) {
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationFn: () => {
-			if (!repository.reset) {
-				throw new Error(
-					"This data source does not support resetting model edits.",
-				);
-			}
-
-			return repository.reset.run().then(requireSuccessfulMutation);
-		},
-		onSuccess: (result) => {
-			queryClient.setQueryData(FINANCIAL_MODEL_QUERY_KEY, result);
-			queryClient.invalidateQueries({ queryKey: INCOME_DATA_QUERY_KEY });
 		},
 	});
 }

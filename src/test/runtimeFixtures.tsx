@@ -20,7 +20,6 @@ export function createModelRuntimeFixture(
 			description: "Test financial model",
 			repositoryType: "test",
 			saveLabel: "Save",
-			resetLabel: "Reset",
 		},
 		document: null,
 		incomeData: null,
@@ -34,10 +33,8 @@ export function createModelRuntimeFixture(
 		dataUpdatedAt: 0,
 		projectionStartDate: "2026-01-31",
 		isSaving: false,
-		isResetting: false,
 		reload: () => {},
 		save: () => {},
-		reset: () => {},
 		applyTemplate: () => {},
 		...overrides,
 	};

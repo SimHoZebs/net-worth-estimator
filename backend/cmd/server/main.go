@@ -95,6 +95,17 @@ func parseAllowedOrigins(value string) ([]string, error) {
 	return origins, nil
 }
 
+// parseReadOnly reports whether the server must reject canonical model
+// writes. Unset or unrecognized values mean writable (dev default).
+func parseReadOnly(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes":
+		return true
+	default:
+		return false
+	}
+}
+
 func main() {
 	port := 8787
 	if parsed, err := strconv.Atoi(envOr("PORT", "8787")); err == nil && parsed > 0 {
@@ -113,6 +124,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure allowed origins: %v", err)
 	}
+	readOnly := parseReadOnly(os.Getenv("NET_WORTH_ESTIMATOR_READ_ONLY"))
+	// Never logged: bearer token guarding canonical model writes. Empty
+	// means auth disabled (dev default).
+	authToken := os.Getenv("NET_WORTH_ESTIMATOR_AUTH_TOKEN")
 
 	database, err := store.Open(dbPath)
 	if err != nil {
@@ -132,9 +147,9 @@ func main() {
 	}
 
 	handler := api.New(database, api.Config{
-		SeedModelPath:  modelPath,
-		SeedIncomePath: incomePath,
 		AllowedOrigins: allowedOrigins,
+		ReadOnly:       readOnly,
+		AuthToken:      authToken,
 	})
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),

@@ -37,7 +37,9 @@ Income source definitions and tax profiles are loaded from `public/data/income/`
 ## Persistence
 
 - The Go backend persists the canonical model and income data in SQLite. Set `NET_WORTH_ESTIMATOR_DB` to choose the database file.
-- An empty database is seeded from `public/configs/` and `public/data/income/`. Later bundled CSV changes do not replace persisted data; `POST /v1/financial-model/reset` explicitly reloads the seed files.
+- An empty database is seeded from `public/configs/` and `public/data/income/`. Later bundled CSV changes do not replace persisted data. There is no reset endpoint; CSV files are seed-only (first boot plus the offline `cmd/importcsv` operator tool).
+- `NET_WORTH_ESTIMATOR_READ_ONLY=1` rejects canonical model writes with 403 while keeping reads and projections public.
+- Write access is guarded by a single bearer token (`NET_WORTH_ESTIMATOR_AUTH_TOKEN`), sent from Settings as an `Authorization` header on save only. Serve exclusively behind HTTPS; a token captured over plain HTTP permits world-write replay.
 - Malformed persisted data is not silently replaced; parsing and validation diagnostics are returned to the UI.
 - `ModelOverrides` remain session-only and never mutate the canonical data.
 - Production deployments must place the SQLite database on durable storage.
@@ -83,7 +85,7 @@ The image supplies container defaults for `HOST`, `PORT`, the database path, and
 
 The browser uses same-origin `/v1` routes by default. For a separately deployed frontend, set `VITE_API_BASE_URL=https://<backend-host>` in the frontend build environment. The value may contain a path prefix but must not include `/v1`; it applies to model persistence, income data, deterministic projections, and stochastic SSE streams. Add the frontend's exact origin, without a path, to the backend's `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` runtime variable.
 
-The API currently has no authentication. Public exposure permits anyone with the URL to read, replace, reset, or run projections against the financial model. CORS restricts browser origins only; it does not protect the API from non-browser clients. Keep the service private or place an authentication and trusted-access layer in front of it before public use.
+Reads, deterministic/stochastic projections, and posting analyses are public by design. Canonical model writes require the bearer token above (or are rejected entirely when read-only mode is on). CORS restricts browser origins only; it does not protect the API from non-browser clients, which is why writes are token-guarded server-side.
 
 ## Scripts
 
@@ -100,7 +102,7 @@ npm run build
 - `src/pages/ResultsPage.tsx`: read-only projection and evaluation outputs
 - `src/pages/SettingsPage.tsx`: session-only projection and evaluation configuration
 - `src/pages/ModelInputsPage.tsx`: canonical model inputs, temporary changes, templates, and source actions
-- `src/hooks/useFinancialModel.ts`: TanStack Query wrappers for load, save, and reset
+- `src/hooks/useFinancialModel.ts`: TanStack Query wrappers for load and save
 - `src/store.ts`: `ModelOverrides`, document editor, runtime settings, read-only comparison metrics, and theme state
 - `src/engine/WorkerProjectionEngine.ts`: deterministic and stochastic Web Worker facade
 - `src/components/ProjectionDashboard.tsx`: projection dashboard

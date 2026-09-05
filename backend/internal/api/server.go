@@ -15,28 +15,32 @@ import (
 // Server carries runtime dependencies.
 type Server struct {
 	store *store.Store
-	// Seed paths used by reset; CSV files remain the bundled source snapshot.
-	SeedModelPath  string
-	SeedIncomePath string
+	// ReadOnly rejects canonical model writes with 403. Reads and compute
+	// endpoints are unaffected.
+	ReadOnly bool
+	// AuthEnabled reports whether a bearer token guards writes.
+	AuthEnabled bool
 }
 
-// Config controls HTTP integration behavior and bundled reset sources.
+// Config controls HTTP integration behavior.
 type Config struct {
-	SeedModelPath  string
-	SeedIncomePath string
 	AllowedOrigins []string
+	ReadOnly       bool
+	// AuthToken guards PUT /v1/financial-model. Empty means auth disabled.
+	AuthToken string
 }
 
 // New builds the chi router with all routes.
 func New(store *store.Store, serverConfig Config) http.Handler {
 	server := &Server{
-		store:          store,
-		SeedModelPath:  serverConfig.SeedModelPath,
-		SeedIncomePath: serverConfig.SeedIncomePath,
+		store:       store,
+		ReadOnly:    serverConfig.ReadOnly,
+		AuthEnabled: serverConfig.AuthToken != "",
 	}
 	router := chi.NewRouter()
 	router.Use(middleware.Recoverer)
 	router.Use(corsMiddleware(serverConfig.AllowedOrigins))
+	router.Use(writeAuthMiddleware(serverConfig.ReadOnly, serverConfig.AuthToken))
 
 	config := huma.DefaultConfig("Net Worth Estimator API", "1.0.0")
 	api := humachi.New(router, config)
@@ -56,11 +60,11 @@ func New(store *store.Store, serverConfig Config) http.Handler {
 	}, server.putModel)
 
 	huma.Register(api, huma.Operation{
-		OperationID: "reset-financial-model",
-		Method:      "POST",
-		Path:        "/v1/financial-model/reset",
-		Summary:     "Reset the canonical model to the bundled CSV source",
-	}, server.resetModel)
+		OperationID: "get-server-status",
+		Method:      "GET",
+		Path:        "/v1/status",
+		Summary:     "Report server write availability and auth state",
+	}, server.getStatus)
 
 	huma.Register(api, huma.Operation{
 		OperationID: "get-income-data",

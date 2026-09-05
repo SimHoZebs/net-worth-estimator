@@ -16,6 +16,22 @@ func TestParseAllowedOriginsNormalizesAndDeduplicates(t *testing.T) {
 	}
 }
 
+func TestParseReadOnlyAcceptsTruthyValues(t *testing.T) {
+	for _, value := range []string{"1", "true", "TRUE", " yes "} {
+		if !parseReadOnly(value) {
+			t.Fatalf("parseReadOnly(%q) = false, want true", value)
+		}
+	}
+}
+
+func TestParseReadOnlyDefaultsToWritable(t *testing.T) {
+	for _, value := range []string{"", "0", "false", "no", "banana"} {
+		if parseReadOnly(value) {
+			t.Fatalf("parseReadOnly(%q) = true, want false", value)
+		}
+	}
+}
+
 func TestParseAllowedOriginsRejectsInvalidValues(t *testing.T) {
 	for _, value := range []string{
 		"*",
