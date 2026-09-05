@@ -29,6 +29,7 @@ import { CashFlowWaterfall } from "./dashboard/CashFlowWaterfall";
 import { AccountDiagnosticChart } from "./dashboard/charts/AccountDiagnosticChart";
 import { DebtSummary } from "./dashboard/DebtSummary";
 import { DriverCard } from "./dashboard/DriverCard";
+import { HouseholdCycleCard } from "./dashboard/HouseholdCycleCard";
 import { NetWorthReconciliation } from "./dashboard/NetWorthReconciliation";
 import { ShortfallCalendar } from "./dashboard/ShortfallCalendar";
 import { SimulationOverview } from "./dashboard/SimulationOverview";
@@ -132,6 +133,10 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 					stochasticResult={stochasticResult}
 					stochasticIsProvisional={stochasticIsProvisional}
 				/>
+			</section>
+
+			<section id="household-cycle">
+				<HouseholdCycleCard document={document} />
 			</section>
 
 			<section className="flex flex-wrap items-center gap-2">
