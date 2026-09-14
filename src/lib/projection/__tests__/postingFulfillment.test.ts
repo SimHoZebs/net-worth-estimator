@@ -10,12 +10,12 @@ import {
 	makePosting,
 	makeSettings,
 } from "../__fixtures__";
+import { validatePostingFulfillmentConfig } from "../evaluation/postingFulfillment";
 import {
 	evaluatePostingFulfillment,
 	postingFulfillmentEvaluation,
-	validatePostingFulfillmentConfig,
-} from "../evaluation/postingFulfillment";
-import { projectRawFinancialModelDocument } from "../simulation/projectPath";
+} from "../reference/evaluation/postingFulfillment";
+import { projectRawFinancialModelDocument } from "../reference/simulation/projectPath";
 
 function historicalBalance(accountId: string, balance: number, priority = 1) {
 	return makePosting({

@@ -15,7 +15,7 @@ import { makePosting, makeSettings, validCsvFiles } from "../__fixtures__";
 import {
 	buildSampleCountsByPostingId,
 	getStochasticProgressUpdateRunInterval,
-} from "../analysis/projectStochastic";
+} from "../reference/analysis/projectStochastic";
 import { createExpressionAmount } from "../simulation/amountResolution";
 import type {
 	FinancialIndependencePlan,

@@ -3,7 +3,7 @@ import { makeAccount, makePosting } from "../__fixtures__";
 import {
 	cloneSimulationState,
 	createTransitionRuntime,
-} from "../simulation/transitions";
+} from "../reference/simulation/transitions";
 import type { SimulationState } from "../types/simulation";
 
 function state(overrides: Partial<SimulationState> = {}): SimulationState {

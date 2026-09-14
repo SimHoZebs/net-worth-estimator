@@ -4,7 +4,7 @@ import {
 	addOccurrences,
 	frequencyDivisor,
 	resolveAccountMovement,
-} from "../simulation/postings";
+} from "../reference/simulation/postings";
 
 describe("posting recurrence", () => {
 	function occurrenceDates(

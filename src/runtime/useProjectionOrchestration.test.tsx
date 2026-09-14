@@ -9,7 +9,7 @@ import {
 	makePosting,
 	makeSettings,
 } from "@/lib/projection/__fixtures__";
-import { projectFinancialModelDocument } from "@/lib/projection/analysis/projectFinancialModel";
+import { projectFinancialModelDocument } from "@/lib/projection/reference/analysis/projectFinancialModel";
 import { useStore } from "@/store";
 import { useProjectionOrchestration } from "./useProjectionOrchestration";
 

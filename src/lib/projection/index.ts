@@ -1,9 +1,4 @@
 export {
-	evaluateProjectionPath,
-	projectFinancialModelDocument,
-} from "./analysis/projectFinancialModel";
-export { stochasticProject } from "./analysis/projectStochastic";
-export {
 	getConfiguredEvaluation,
 	getFinancialIndependenceConfig,
 	getFinancialIndependenceResult,
@@ -13,12 +8,11 @@ export {
 	getPostingFulfillmentResult,
 	type ValidatedConfiguredEvaluation,
 } from "./evaluation/accessors";
+export { evaluationConfigValidators } from "./evaluation/configValidation";
 export {
-	evaluateFinancialIndependence,
 	FINANCIAL_INDEPENDENCE_DEFINITION_ID,
 	type FinancialIndependenceProbabilisticResult,
 	normalizeFinancialIndependencePlan,
-	selectFinancialIndependenceOutcomeIndex,
 	validateFinancialIndependencePlan,
 } from "./evaluation/financialIndependence";
 export { isJsonValue } from "./evaluation/json";
@@ -30,23 +24,14 @@ export {
 } from "./evaluation/netWorthThreshold";
 export {
 	DEFAULT_POSTING_FULFILLMENT_INSTANCE_ID,
-	evaluatePostingFulfillment,
 	POSTING_FULFILLMENT_DEFINITION_ID,
 	type PostingFulfillmentDateSummary,
 	type PostingFulfillmentEvent,
 	type PostingFulfillmentPathResult,
 	type PostingFulfillmentPostingSummary,
 	type PostingFulfillmentProbabilisticResult,
-	postingFulfillmentEvaluation,
 	validatePostingFulfillmentConfig,
 } from "./evaluation/postingFulfillment";
-export {
-	type EvaluationContext,
-	type EvaluationDefinition,
-	type EvaluationFinalizeContext,
-	EvaluationRegistry,
-	EvaluationRuntimeSet,
-} from "./evaluation/runtime";
 export type {
 	IncomeDataLoadResult,
 	IncomeDataSource,
@@ -69,6 +54,48 @@ export type {
 } from "./modelRepository";
 export { FinancialModelValidationError } from "./modelRepository";
 export {
+	evaluateProjectionPath,
+	projectFinancialModelDocument,
+} from "./reference/analysis/projectFinancialModel";
+export { stochasticProject } from "./reference/analysis/projectStochastic";
+export {
+	evaluateFinancialIndependence,
+	financialIndependenceEvaluation,
+	selectFinancialIndependenceOutcomeIndex,
+} from "./reference/evaluation/financialIndependence";
+export {
+	evaluateNetWorthThreshold,
+	netWorthThresholdEvaluation,
+} from "./reference/evaluation/netWorthThreshold";
+export {
+	evaluatePostingFulfillment,
+	postingFulfillmentEvaluation,
+} from "./reference/evaluation/postingFulfillment";
+export {
+	type EvaluationContext,
+	type EvaluationDefinition,
+	type EvaluationFinalizeContext,
+	EvaluationRegistry,
+	EvaluationRuntimeSet,
+} from "./reference/evaluation/runtime";
+export {
+	executeIncomePosting,
+	type IncomeExecutionResult,
+	progressiveIncomeLiability,
+} from "./reference/simulation/incomeResolution";
+export {
+	type AccountMovementAction,
+	type AccountMovementResult,
+	resolveAccountMovement,
+	resolveAccountMovementAmount,
+} from "./reference/simulation/postings";
+export {
+	prepareSimulationRequest,
+	SimulationPreparationError,
+} from "./reference/simulation/prepareSimulation";
+export { projectRawFinancialModelDocument } from "./reference/simulation/projectPath";
+export { simulate } from "./reference/simulation/simulate";
+export {
 	amountProviders,
 	amountResolvers,
 	createExpressionAmount,
@@ -76,26 +103,8 @@ export {
 	updateExpressionAmount,
 	validateAmountDescriptor,
 } from "./simulation/amountResolution";
-export {
-	executeIncomePosting,
-	type IncomeExecutionResult,
-	progressiveIncomeLiability,
-	validateIncomeAmountConfig,
-} from "./simulation/incomeResolution";
-export {
-	type AccountMovementAction,
-	type AccountMovementResult,
-	resolveAccountMovement,
-	resolveAccountMovementAmount,
-} from "./simulation/postings";
-export {
-	prepareSimulationRequest,
-	SimulationPreparationError,
-} from "./simulation/prepareSimulation";
-export { projectRawFinancialModelDocument } from "./simulation/projectPath";
-export { simulate } from "./simulation/simulate";
+export { validateIncomeAmountConfig } from "./simulation/incomeConfig";
 export { parseFinancialModelDocument } from "./sources/csv/csvDataSource";
-
 export type {
 	CsvFinancialModelOptions,
 	CsvFinancialModelParseResult,

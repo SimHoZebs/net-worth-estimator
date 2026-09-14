@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { projectRawFinancialModelDocument } from "../simulation/projectPath";
+import { projectRawFinancialModelDocument } from "../reference/simulation/projectPath";
 import { parseCsvFinancialModel } from "../sources/csv/csvLoader";
 import { validateCsvFinancialModel } from "../sources/csv/csvValidation";
 import { parseIncomeDataFiles } from "../sources/csv/incomeDataSource";

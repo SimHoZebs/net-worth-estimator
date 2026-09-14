@@ -1,3 +1,4 @@
+import { evaluationConfigValidators } from "../evaluation/configValidation";
 import { isJsonValue } from "../evaluation/json";
 import {
 	EVALUATION_TYPE_ORDER,
@@ -28,36 +29,24 @@ export function validateFinancialModel(
 	validateUniqueIds(issues, document.accounts, "account.id", paths.account);
 	validateUniqueIds(issues, document.postings, "posting.id", paths.posting);
 	validateEvaluationInstanceIds(issues, document, paths);
-	if (options.evaluationRegistry) {
-		for (const type of EVALUATION_TYPE_ORDER) {
-			const definition = options.evaluationRegistry.get(type);
-			for (const [index, evaluation] of document.evaluations[type].entries()) {
-				if (!definition) {
-					addEvaluationIssue(
-						issues,
-						paths,
-						type,
-						index,
-						"No evaluator is registered for this evaluation type.",
-					);
-					continue;
+	for (const type of EVALUATION_TYPE_ORDER) {
+		const validateConfig = evaluationConfigValidators[type];
+		for (const [index, evaluation] of document.evaluations[type].entries()) {
+			try {
+				const normalized = validateConfig(evaluation.config);
+				if (!isJsonValue(normalized)) {
+					throw new Error("Evaluation config must be JSON-serializable.");
 				}
-				try {
-					const normalized = definition.validateConfig(evaluation.config);
-					if (!isJsonValue(normalized)) {
-						throw new Error("Evaluation config must be JSON-serializable.");
-					}
-				} catch (error) {
-					addEvaluationIssue(
-						issues,
-						paths,
-						type,
-						index,
-						error instanceof Error
-							? error.message
-							: "Evaluation config is invalid.",
-					);
-				}
+			} catch (error) {
+				addEvaluationIssue(
+					issues,
+					paths,
+					type,
+					index,
+					error instanceof Error
+						? error.message
+						: "Evaluation config is invalid.",
+				);
 			}
 		}
 	}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makePosting } from "../__fixtures__/postings";
+import { simulate } from "../reference/simulation/simulate";
 import {
 	AmountResolutionError,
 	createExpressionAmount,
@@ -7,7 +8,6 @@ import {
 	updateExpressionAmount,
 	validateAmountDescriptor,
 } from "../simulation/amountResolution";
-import { simulate } from "../simulation/simulate";
 import { validateCsvFinancialModel } from "../sources/csv/csvValidation";
 import type {
 	FinancialModelDocument,

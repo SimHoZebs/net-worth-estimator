@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runReactiveBehavior } from "../behavior/runtime";
+import { runReactiveBehavior } from "../reference/behavior/runtime";
 
 describe("runReactiveBehavior", () => {
 	it("stops after the period that satisfies shouldStop", () => {

@@ -1,17 +1,20 @@
+import { resolvePostingAmountDescriptor } from "../../simulation/amountResolution";
 import type {
 	Account,
 	IsoDate,
 	Posting,
 	PostingFrequency,
-} from "../types/model";
-
-import { addMonthsClamped, compareIsoDates, daysBetween } from "../utils/date";
+} from "../../types/model";
+import {
+	addMonthsClamped,
+	compareIsoDates,
+	daysBetween,
+} from "../../utils/date";
 import {
 	getHeadroom,
 	getTotalDestinationHeadroom,
 	getWithdrawableAmount,
 } from "./accounts";
-import { resolvePostingAmountDescriptor } from "./amountResolution";
 
 export interface DatedPostingOccurrence {
 	posting: Posting;

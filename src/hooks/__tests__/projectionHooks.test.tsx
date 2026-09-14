@@ -7,8 +7,8 @@ import {
 	createBaseDocument,
 	makeSettings,
 } from "@/lib/projection/__fixtures__";
-import { projectFinancialModelDocument } from "@/lib/projection/analysis/projectFinancialModel";
-import { stochasticProject } from "@/lib/projection/analysis/projectStochastic";
+import { projectFinancialModelDocument } from "@/lib/projection/reference/analysis/projectFinancialModel";
+import { stochasticProject } from "@/lib/projection/reference/analysis/projectStochastic";
 import type { ProjectionEngine } from "@/lib/projection/runtime/ProjectionEngine";
 import { deferred } from "@/test/deferred";
 import { wrapperWithEngine } from "@/test/projectionEngineWrapper";

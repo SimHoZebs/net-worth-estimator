@@ -1,5 +1,3 @@
-import type { IncomeDataSnapshot, IncomeTaxProfile } from "../types/income";
-import type { Account, IncomeEvent, Posting } from "../types/model";
 import {
 	IncomeResolutionError,
 	parseIncomeAmountConfig,
@@ -7,7 +5,9 @@ import {
 	percentageStepSchema,
 	taxStepSchema,
 	validateIncomeAmountConfig,
-} from "./incomeConfig";
+} from "../../simulation/incomeConfig";
+import type { IncomeDataSnapshot, IncomeTaxProfile } from "../../types/income";
+import type { Account, IncomeEvent, Posting } from "../../types/model";
 import {
 	type AccountMovementResult,
 	applyAccountMovement,
@@ -227,5 +227,3 @@ export function executeIncomePosting({
 		},
 	};
 }
-
-export { validateIncomeAmountConfig } from "./incomeConfig";
