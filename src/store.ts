@@ -56,7 +56,7 @@ const createComparisonSlice: StateCreator<AppStore, [], [], ComparisonSlice> = (
 			comparisonSnapshots: [
 				...state.comparisonSnapshots,
 				{
-					id: `comparison-${timestamp}`,
+					id: `comparison-${crypto.randomUUID()}`,
 					label,
 					timestamp,
 					metrics: structuredClone(metrics),
