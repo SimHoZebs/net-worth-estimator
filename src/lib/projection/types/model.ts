@@ -202,6 +202,8 @@ export interface Checkpoint {
 	Date: IsoDate;
 	AccountId: string;
 	Balance: number;
+	/** Row owner: "model" (owner/seed) or "simplefin". Read-only from GET. */
+	source?: string | null;
 }
 
 export interface CheckpointCorrection {
@@ -234,6 +236,8 @@ export interface Posting {
 	annualCap: number | null;
 	priority: number;
 	enabled: boolean;
+	/** Row owner: "model" (owner/seed) or "simplefin". Read-only from GET. */
+	source?: string | null;
 }
 
 export interface FinancialModelDocument {
