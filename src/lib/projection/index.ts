@@ -53,48 +53,26 @@ export type {
 	RepositoryAction,
 } from "./modelRepository";
 export { FinancialModelValidationError } from "./modelRepository";
-export {
-	evaluateProjectionPath,
-	projectFinancialModelDocument,
-} from "./reference/analysis/projectFinancialModel";
-export { stochasticProject } from "./reference/analysis/projectStochastic";
-export {
-	evaluateFinancialIndependence,
-	financialIndependenceEvaluation,
-	selectFinancialIndependenceOutcomeIndex,
-} from "./reference/evaluation/financialIndependence";
-export {
-	evaluateNetWorthThreshold,
-	netWorthThresholdEvaluation,
-} from "./reference/evaluation/netWorthThreshold";
-export {
-	evaluatePostingFulfillment,
-	postingFulfillmentEvaluation,
-} from "./reference/evaluation/postingFulfillment";
-export {
-	type EvaluationContext,
-	type EvaluationDefinition,
-	type EvaluationFinalizeContext,
-	EvaluationRegistry,
-	EvaluationRuntimeSet,
-} from "./reference/evaluation/runtime";
-export {
-	executeIncomePosting,
-	type IncomeExecutionResult,
-	progressiveIncomeLiability,
-} from "./reference/simulation/incomeResolution";
-export {
-	type AccountMovementAction,
-	type AccountMovementResult,
-	resolveAccountMovement,
-	resolveAccountMovementAmount,
-} from "./reference/simulation/postings";
-export {
-	prepareSimulationRequest,
-	SimulationPreparationError,
-} from "./reference/simulation/prepareSimulation";
-export { projectRawFinancialModelDocument } from "./reference/simulation/projectPath";
-export { simulate } from "./reference/simulation/simulate";
+
+import type { FinancialIndependenceRunOutcome } from "./types/model";
+
+/**
+ * View selector over backend-computed FI outcomes: first cycle-established
+ * outcome, else the last eligible one, else the last outcome. Pure UI helper;
+ * it does not run the projection kernel.
+ */
+export function selectFinancialIndependenceOutcomeIndex(
+	outcomes: readonly FinancialIndependenceRunOutcome[],
+) {
+	const successfulIndex = outcomes.findIndex(
+		(outcome) => outcome.cycleEstablished,
+	);
+	if (successfulIndex >= 0) return successfulIndex;
+	for (let index = outcomes.length - 1; index >= 0; index--) {
+		if (outcomes[index]?.status !== "ineligible") return index;
+	}
+	return outcomes.length - 1;
+}
 export {
 	amountProviders,
 	amountResolvers,
