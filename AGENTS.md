@@ -51,7 +51,7 @@ Route pages should compose feature components rather than forward shared-state p
 
 ## Store
 
-`src/store.ts` composes five Zustand slices:
+`src/store.ts` composes four Zustand slices; theme lives in a separate `src/themeStore.ts` store because it is orthogonal to domain state:
 
 | Slice | Purpose |
 | --- | --- |
@@ -59,20 +59,19 @@ Route pages should compose feature components rather than forward shared-state p
 | `Editor` | CRUD on a working `FinancialModelDocument` and edit/dirty state |
 | `Settings` | typed evaluation tables, horizon, stochastic preference, and stochastic config |
 | `Comparison` | read-only `ComparisonSnapshot` metrics; snapshots cannot restore model state |
-| `Theme` | light/dark/system theme and DOM application |
 
 Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selectEditorState`, and `selectEditorActions`.
 
 ## Data Flow
 
 1. **Model source**: Go backend serves `GET/PUT /v1/financial-model` from imported canonical CSV data. The Vite dev server proxies `/v1` to `NET_WORTH_ESTIMATOR_BACKEND` (default `http://localhost:8787`).
-2. **Persistence DI**: `App.tsx` creates `createHttpFinancialModelRepository()` and `createHttpIncomeDataSource()`. Browser CSV ingestion and browser storage remain available behind the repository abstraction but are not wired.
+2. **Persistence DI**: `App.tsx` creates `createHttpFinancialModelRepository()` and `createHttpIncomeDataSource()`. The HTTP backend is the only persistence; there is no browser storage or CSV ingestion path.
 3. **Query layer**: `useFinancialModelQuery` and `useFinancialModelMutation` connect the source to TanStack Query.
 4. **Current changes**: `ModelOverrides` remain in Zustand and are applied with `applyModelOverrides`; canonical data is not mutated.
-5. **Projection**: `useProjection`/`useStochastic` -> `CachedProjectionEngine` over `BackendProjectionEngine` (`src/engine/`). Deterministic runs POST `/v1/projections/deterministic`; the Go backend computes and returns results.
+5. **Projection**: `useProjection`/`useStochastic` share one `useEngineRequest` state machine over `BackendProjectionEngine` (`src/engine/`). Deterministic runs POST `/v1/projections/deterministic`; the Go backend computes and returns results. Server cache plus TanStack Query cover repeats; there is no client projection cache.
 6. **Monte Carlo**: `POST /v1/projections/stochastic` streams SSE `progress`/`partial`/`result` events; exact percentiles are aggregated server-side.
 7. **Save**: goes through the HTTP repository (`PUT /v1/financial-model`, bearer token when auth is configured, rejected when the server is read-only); malformed data surfaces diagnostics. Analyses use the canonical model postings. There is no reset route; CSV files are seed-only.
-8. **Derived artifacts**: the client keeps an in-memory content-addressed artifact store; durable artifact storage lives in the backend. `IndexedDbProjectionArtifactStore` exists but is not wired by default.
+8. **Derived artifacts**: durable artifact storage lives in the backend (`projection_artifacts`). The client keeps no projection cache.
 9. **Independent analyses**: `AnalysisDefinition` computations run as explicit pipelines over posting-derived observations. Active analyses contribute classifier requirements to one shared posting-classification plan before payroll detection and salary estimation; the pipeline does not participate in projection or mutate the financial model.
 
 ## Key Types
@@ -100,7 +99,7 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 
 - Simulation logic must never branch on specific account IDs, posting IDs, labels, or categories.
 - `projectFinancialModelDocument`, `projectRawFinancialModelDocument`, `applyModelOverrides`, and `prepareSimulationRequest` are the canonical core APIs.
-- Shared state transitions belong in `lib/projection/simulation/transitions.ts`; deterministic, branch, and Monte Carlo execution must not duplicate transition semantics.
+- Shared state transitions belong in `lib/projection/reference/simulation/transitions.ts`; deterministic, branch, and Monte Carlo execution must not duplicate transition semantics.
 - FI logic is a derived evaluation and must not add semantic branches to generic simulation.
 - Reactive behaviors emit generic account movements through shared account constraints instead of mutating balances directly.
 - FI continuing postings are explicitly selected; never infer them from IDs, labels, categories, or non-zero rates.
