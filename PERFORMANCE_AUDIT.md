@@ -20,7 +20,7 @@ Record initial JavaScript transfer, chart update duration, worker time, and main
 
 ## Known Boundaries
 
-- Projection and stochastic computation run in Web Workers.
+- Projection and stochastic computation run in the Go backend and stream to the browser (JSON/SSE).
 - uPlot owns canvas rendering and is destroyed on unmount or option changes.
 - Projection progress is exposed separately from result artifacts to limit unrelated rerenders.
 - Lazy sections defer expensive dashboard rendering, while route imports defer page downloads.
