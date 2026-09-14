@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalSerialize } from "../canonical";
+import { canonicalSerialize } from "./canonical";
 
 describe("canonicalSerialize", () => {
 	it("sorts plain-object keys recursively while preserving array order", () => {

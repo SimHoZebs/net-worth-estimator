@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useProjectionEngine } from "@/engine/ProjectionEngineContext";
+import { useMemo } from "react";
 import type {
 	FinancialModelDocument,
 	ModelOverrides,
@@ -8,41 +7,14 @@ import type {
 	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
-import { applyModelOverrides } from "@/lib/projection";
-import { canonicalSerialize } from "@/lib/projection/artifacts";
-import {
-	evaluationComputationDescriptor,
-	projectionComputationSettings,
-	simulationDocument,
-} from "@/lib/projection/runtime/computationIdentity";
-import type { IncomeDataSnapshot } from "@/lib/projection/types/income";
-import { normalizeStochasticConfig } from "@/lib/projection/utils/stochastic";
 import {
 	labelStochasticProgress,
 	labelStochasticResult,
-	projectionComputationSettingsKey,
-} from "./projectionComputationSettings";
+} from "@/lib/projection/runtime/resultLabels";
+import type { IncomeDataSnapshot } from "@/lib/projection/types/income";
+import { normalizeStochasticConfig } from "@/lib/projection/utils/stochastic";
 import type { ProjectionHookState } from "./types";
-
-interface StochasticState
-	extends ProjectionHookState<StochasticProjectionResult, StochasticProgress> {
-	requestKey: string | null;
-	resultBaseKey: string | null;
-}
-
-function publicState(
-	state: StochasticState,
-	result: StochasticProjectionResult | null,
-	progress: StochasticProgress | null,
-): ProjectionHookState<StochasticProjectionResult, StochasticProgress> {
-	return {
-		result,
-		runtimeError: state.runtimeError,
-		isRunning: state.isRunning,
-		progress,
-		resultIsStale: state.resultIsStale,
-	};
-}
+import { useEngineRequest } from "./useEngineRequest";
 
 export function useStochastic(
 	document: FinancialModelDocument | null,
@@ -52,20 +24,6 @@ export function useStochastic(
 	enabled: boolean,
 	incomeData?: IncomeDataSnapshot,
 ): ProjectionHookState<StochasticProjectionResult, StochasticProgress> {
-	const engine = useProjectionEngine();
-	const computationSettingsKey =
-		projectionComputationSettingsKey(projectionSettings);
-	const computationSettingsRef = useRef<{
-		key: string;
-		value: ProjectionRuntimeSettings;
-	} | null>(null);
-	if (computationSettingsRef.current?.key !== computationSettingsKey) {
-		computationSettingsRef.current = {
-			key: computationSettingsKey,
-			value: projectionComputationSettings(projectionSettings),
-		};
-	}
-	const computationSettings = computationSettingsRef.current.value;
 	const runCount = config?.runCount ?? null;
 	const seed = config?.seed ?? null;
 	const stableConfig = useMemo(
@@ -73,178 +31,23 @@ export function useStochastic(
 			runCount === null ? null : normalizeStochasticConfig({ runCount, seed }),
 		[runCount, seed],
 	);
-	const baseKey = useMemo(
-		() =>
-			canonicalSerialize({
-				document: document
-					? simulationDocument(applyModelOverrides(document, overrides))
-					: null,
-				fallbackProjectionStartDate:
-					computationSettings.fallbackProjectionStartDate,
-				horizonYears: computationSettings.horizonYears,
-				config: stableConfig,
-				enabled,
-				incomeData: incomeData ?? null,
-			}),
-		[
-			document,
-			computationSettings.fallbackProjectionStartDate,
-			computationSettings.horizonYears,
-			overrides,
-			stableConfig,
-			enabled,
-			incomeData,
-		],
-	);
-	const requestKey = useMemo(
-		() =>
-			canonicalSerialize({
-				baseKey,
-				evaluations: evaluationComputationDescriptor(
-					computationSettings.evaluations,
-				),
-			}),
-		[baseKey, computationSettings.evaluations],
-	);
-	const inputRef = useRef({
+	return useEngineRequest<StochasticProjectionResult, StochasticProgress>({
 		document,
+		projectionSettings,
 		overrides,
-		enabled,
-		stableConfig,
+		active: enabled && stableConfig !== null,
+		extraKey: stableConfig,
 		incomeData,
+		execute: (engine, input, onProgress) => {
+			if (stableConfig === null)
+				throw new DOMException("Aborted", "AbortError");
+			return engine.projectStochastic(
+				{ ...input, config: stableConfig },
+				onProgress,
+			);
+		},
+		labelResult: labelStochasticResult,
+		labelProgress: labelStochasticProgress,
+		failureMessage: "Stochastic simulation failed.",
 	});
-	inputRef.current = { document, overrides, enabled, stableConfig, incomeData };
-	const [state, setState] = useState<StochasticState>({
-		result: null,
-		runtimeError: null,
-		isRunning: false,
-		progress: null,
-		resultIsStale: false,
-		requestKey: null,
-		resultBaseKey: null,
-	});
-
-	useEffect(() => {
-		const input = inputRef.current;
-		if (
-			!input.enabled ||
-			input.document === null ||
-			input.stableConfig === null
-		) {
-			setState({
-				result: null,
-				runtimeError: null,
-				isRunning: false,
-				progress: null,
-				resultIsStale: false,
-				requestKey,
-				resultBaseKey: null,
-			});
-			return;
-		}
-
-		const controller = new AbortController();
-		setState((current) => {
-			const retainBaseResult =
-				current.result !== null && current.resultBaseKey === baseKey;
-			return {
-				result: retainBaseResult ? current.result : null,
-				runtimeError: null,
-				isRunning: true,
-				progress: null,
-				resultIsStale: retainBaseResult,
-				requestKey,
-				resultBaseKey: retainBaseResult ? baseKey : null,
-			};
-		});
-
-		engine
-			.projectStochastic(
-				{
-					document: input.document,
-					projectionSettings: computationSettings,
-					overrides: input.overrides,
-					config: input.stableConfig,
-					incomeData: input.incomeData,
-					signal: controller.signal,
-				},
-				(progress, partial) => {
-					setState((current) =>
-						current.requestKey === requestKey
-							? {
-									...current,
-									progress,
-									result: partial ?? current.result,
-									resultBaseKey: partial ? baseKey : current.resultBaseKey,
-									resultIsStale: partial ? false : current.resultIsStale,
-								}
-							: current,
-					);
-				},
-			)
-			.then((result) => {
-				setState((current) =>
-					current.requestKey === requestKey
-						? {
-								result,
-								runtimeError: null,
-								isRunning: false,
-								progress: null,
-								resultIsStale: false,
-								requestKey,
-								resultBaseKey: baseKey,
-							}
-						: current,
-				);
-			})
-			.catch((err: unknown) => {
-				if (err instanceof DOMException && err.name === "AbortError") return;
-				setState((current) =>
-					current.requestKey === requestKey
-						? {
-								...current,
-								runtimeError:
-									err instanceof Error
-										? err.message
-										: "Stochastic simulation failed.",
-								isRunning: false,
-								progress: null,
-								resultIsStale: current.result !== null,
-							}
-						: current,
-				);
-			});
-
-		return () => controller.abort();
-	}, [baseKey, computationSettings, engine, requestKey]);
-	const labeledResult = useMemo(
-		() =>
-			state.result
-				? labelStochasticResult(state.result, projectionSettings.evaluations)
-				: null,
-		[state.result, projectionSettings.evaluations],
-	);
-	const labeledProgress = useMemo(
-		() =>
-			state.progress
-				? labelStochasticProgress(
-						state.progress,
-						projectionSettings.evaluations,
-					)
-				: null,
-		[state.progress, projectionSettings.evaluations],
-	);
-
-	if (state.requestKey !== requestKey) {
-		const retainBaseResult =
-			enabled && state.result !== null && state.resultBaseKey === baseKey;
-		return {
-			result: retainBaseResult ? labeledResult : null,
-			runtimeError: null,
-			isRunning: enabled && document !== null && config !== null,
-			progress: null,
-			resultIsStale: retainBaseResult,
-		};
-	}
-	return publicState(state, labeledResult, labeledProgress);
 }

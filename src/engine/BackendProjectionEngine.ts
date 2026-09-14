@@ -1,14 +1,11 @@
 import { buildApiUrl } from "@/lib/api-url";
 import type {
-	EvaluationResultCollection,
 	ProjectionResult,
-	RawProjectionOutput,
 	StochasticProjectionResult,
 } from "@/lib/projection";
 import type {
 	ProgressCallback,
-	ProjectionComputationEngine,
-	ProjectionEvaluationRequest,
+	ProjectionEngine,
 	ProjectionRequest,
 	StochasticRequest,
 } from "@/lib/projection/runtime/ProjectionEngine";
@@ -48,7 +45,7 @@ async function postJson<TResponse>(
 	return payload;
 }
 
-export class BackendProjectionEngine implements ProjectionComputationEngine {
+export class BackendProjectionEngine implements ProjectionEngine {
 	async project(request: ProjectionRequest): Promise<ProjectionResult> {
 		const payload = await postJson<{
 			result?: ProjectionResult;
@@ -69,20 +66,6 @@ export class BackendProjectionEngine implements ProjectionComputationEngine {
 			throw new Error("Backend returned no projection result.");
 		}
 		return payload.result;
-	}
-
-	async projectBase(_request: ProjectionRequest): Promise<RawProjectionOutput> {
-		throw new Error(
-			"Base-only projections are not exposed by the backend engine.",
-		);
-	}
-
-	async evaluateProjection(
-		_request: ProjectionEvaluationRequest,
-	): Promise<EvaluationResultCollection> {
-		throw new Error(
-			"Evaluation-only requests are not exposed by the backend engine.",
-		);
 	}
 
 	async projectStochastic(

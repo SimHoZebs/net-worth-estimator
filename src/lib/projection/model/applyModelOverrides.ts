@@ -29,10 +29,3 @@ export function applyModelOverrides(
 			.concat(overrides.addedPostings),
 	};
 }
-
-export function prepareFinancialModelDocument(
-	document: FinancialModelDocument,
-	overrides: ModelOverrides = EMPTY_MODEL_OVERRIDES,
-): FinancialModelDocument {
-	return applyModelOverrides(document, overrides);
-}

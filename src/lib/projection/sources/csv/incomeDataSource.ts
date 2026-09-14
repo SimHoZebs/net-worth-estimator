@@ -1,9 +1,8 @@
 import Papa from "papaparse";
 import { z } from "zod";
-import type { IncomeDataLoadResult, IncomeDataSource } from "../../incomeData";
+import type { IncomeDataLoadResult } from "../../incomeData";
 import {
 	INCOME_DATA_FILE_NAMES,
-	INCOME_DATA_PUBLIC_PATH,
 	type IncomeDataSnapshot,
 	type IncomeSourceDefinition,
 	type IncomeTaxProfile,
@@ -254,58 +253,4 @@ export function parseIncomeDataFiles(files: {
 		issues,
 	);
 	return { data, issues };
-}
-
-export interface CsvIncomeDataSourceOptions {
-	basePath?: string;
-	fetchImpl?: typeof fetch;
-}
-
-export function createCsvIncomeDataSource(
-	options: CsvIncomeDataSourceOptions = {},
-): IncomeDataSource {
-	const basePath = (options.basePath ?? INCOME_DATA_PUBLIC_PATH).replace(
-		/\/$/u,
-		"",
-	);
-	const fetchImpl = options.fetchImpl ?? fetch;
-	const loadFile = async (fileName: string) => {
-		const response = await fetchImpl(`${basePath}/${fileName}`);
-		if (!response.ok) {
-			throw new Error(
-				`Could not load ${fileName} from ${basePath} (${response.status} ${response.statusText}).`,
-			);
-		}
-		return response.text();
-	};
-	return {
-		sourceType: "csv-income-data",
-		label: "Income data",
-		description:
-			"Loads income definitions and tax profiles from CSV data files.",
-		load: async () => {
-			try {
-				const [incomeSources, taxProfiles] = await Promise.all([
-					loadFile(INCOME_DATA_FILE_NAMES.incomeSources),
-					loadFile(INCOME_DATA_FILE_NAMES.taxProfiles),
-				]);
-				return parseIncomeDataFiles({ incomeSources, taxProfiles });
-			} catch (error) {
-				return {
-					data: null,
-					issues: [
-						{
-							severity: "error",
-							code: "income-data.load.failed",
-							message:
-								error instanceof Error
-									? error.message
-									: "Could not load income data.",
-							path: [],
-						},
-					],
-				};
-			}
-		},
-	};
 }

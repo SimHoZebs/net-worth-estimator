@@ -93,7 +93,7 @@ export function useProjectionOrchestration({
 		effectiveDocument?.postings.some(
 			(posting) => posting.volatility > 0 && posting.enabled,
 		) ?? false;
-	const stochasticWorkerEnabled =
+	const stochasticEnabled =
 		stochasticPreference !== "disabled" &&
 		hasStochasticAccounts &&
 		validationIsValid &&
@@ -111,7 +111,7 @@ export function useProjectionOrchestration({
 		projectionSettings,
 		modelOverrides,
 		stochasticConfig,
-		stochasticWorkerEnabled,
+		stochasticEnabled,
 		incomeData,
 	);
 	const stochasticIsProvisional =

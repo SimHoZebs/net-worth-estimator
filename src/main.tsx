@@ -11,7 +11,7 @@ import {
 	RouteErrorFallback,
 	RouteLoadingFallback,
 } from "./components/RouteErrorFallback";
-import { createApplicationProjectionEngine } from "./engine/applicationProjectionEngine";
+import { BackendProjectionEngine } from "./engine/BackendProjectionEngine";
 import { ProjectionEngineProvider } from "./engine/ProjectionEngineContext";
 import "./styles.css";
 
@@ -49,7 +49,7 @@ const queryClient = new QueryClient({
 	},
 });
 
-const engine = createApplicationProjectionEngine();
+const engine = new BackendProjectionEngine();
 
 const router = createBrowserRouter([
 	{
