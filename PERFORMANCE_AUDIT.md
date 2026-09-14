@@ -2,7 +2,7 @@
 
 ## Current Shape
 
-The dashboard uses uPlot with direct data updates, explicit chart cleanup, and worker-backed deterministic and Monte Carlo computation. Progressive stochastic results intentionally update the dashboard so users can see convergence.
+The dashboard uses uPlot with direct data updates, explicit chart cleanup, and Go-backend deterministic and Monte Carlo computation over JSON/SSE. Progressive stochastic results intentionally update the dashboard so users can see convergence.
 
 The main production bundle should remain monitored because route pages and heavy dashboard components can otherwise be pulled into the initial chunk. Route-level lazy loading is enabled in `src/main.tsx`; build output should be inspected for regressions rather than relying on raw source size.
 
@@ -16,7 +16,7 @@ Profile representative models with:
 - Progress streaming enabled
 - Both reduced-motion and normal-motion preferences
 
-Record initial JavaScript transfer, chart update duration, worker time, and main-thread blocking. Optimize only after identifying a measured bottleneck.
+Record initial JavaScript transfer, chart update duration, backend compute time, and main-thread blocking. Optimize only after identifying a measured bottleneck.
 
 ## Known Boundaries
 
