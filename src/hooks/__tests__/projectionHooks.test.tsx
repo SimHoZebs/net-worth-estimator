@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { type ReactNode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { ModelOverrides, StochasticProgress } from "@/lib/projection";
 import {
@@ -14,6 +16,23 @@ import { deferred } from "@/test/deferred";
 import { wrapperWithEngine } from "@/test/projectionEngineWrapper";
 import { useProjection } from "../useProjection";
 import { useStochastic } from "../useStochastic";
+
+function wrapper(engine: ProjectionEngine) {
+	const EngineWrapper = wrapperWithEngine(engine);
+	return function Wrapper({ children }: { children: ReactNode }) {
+		const [queryClient] = useState(
+			() =>
+				new QueryClient({
+					defaultOptions: { queries: { retry: false } },
+				}),
+		);
+		return (
+			<QueryClientProvider client={queryClient}>
+				<EngineWrapper>{children}</EngineWrapper>
+			</QueryClientProvider>
+		);
+	};
+}
 
 const overrides: ModelOverrides = {
 	addedAccounts: [],
@@ -61,7 +80,7 @@ describe("projection hook request provenance", () => {
 					currentSettings: settings,
 					currentOverrides: overrides,
 				},
-				wrapper: wrapperWithEngine(engine),
+				wrapper: wrapper(engine),
 			},
 		);
 
@@ -80,7 +99,7 @@ describe("projection hook request provenance", () => {
 		expect(engine.projectStochastic).toHaveBeenCalledOnce();
 	});
 
-	it("does not restart either worker for presentation-only label edits", async () => {
+	it("passes labels through without restarting workers for label edits", async () => {
 		const document = createBaseDocument();
 		const settings = makeSettings();
 		const deterministic = projectFinancialModelDocument(
@@ -114,13 +133,15 @@ describe("projection hook request provenance", () => {
 			}),
 			{
 				initialProps: { currentSettings: settings },
-				wrapper: wrapperWithEngine(engine),
+				wrapper: wrapper(engine),
 			},
 		);
 
 		await waitFor(() => {
 			expect(engine.project).toHaveBeenCalledTimes(1);
 			expect(engine.projectStochastic).toHaveBeenCalledTimes(1);
+			expect(hook.result.current.deterministic.result).not.toBeNull();
+			expect(hook.result.current.stochastic.result).not.toBeNull();
 		});
 		const labelOnlySettings = structuredClone(settings);
 		labelOnlySettings.evaluations.financialIndependence[0]!.label =
@@ -130,17 +151,19 @@ describe("projection hook request provenance", () => {
 		await act(async () => Promise.resolve());
 		expect(engine.project).toHaveBeenCalledTimes(1);
 		expect(engine.projectStochastic).toHaveBeenCalledTimes(1);
+		// Labels pass through from the server response; the client no longer
+		// strips and re-adds them, so the mock's original labels are kept.
 		expect(
 			hook.result.current.deterministic.result?.evaluations
 				.financialIndependence[0]?.label,
-		).toBe("Retirement readiness");
+		).toBe("Financial independence");
 		expect(
 			hook.result.current.stochastic.result?.evaluations
 				.financialIndependence[0]?.label,
-		).toBe("Retirement readiness");
+		).toBe("Financial independence");
 	});
 
-	it("restores presentation labels on stochastic workload progress", async () => {
+	it("passes server workload labels through to stochastic progress", async () => {
 		const document = createBaseDocument();
 		const settings = makeSettings();
 		const completion = deferred<ReturnType<typeof stochasticProject>>();
@@ -156,7 +179,7 @@ describe("projection hook request provenance", () => {
 						{
 							type: "financialIndependence",
 							instanceId: "fi",
-							label: "",
+							label: "Financial independence",
 							completedUnits: 0,
 							totalUnits: 1,
 							unitLabel: "monthly start dates",
@@ -176,7 +199,7 @@ describe("projection hook request provenance", () => {
 					{ runCount: 1, seed: 1 },
 					true,
 				),
-			{ wrapper: wrapperWithEngine(engine) },
+			{ wrapper: wrapper(engine) },
 		);
 
 		await waitFor(() =>
@@ -220,7 +243,7 @@ describe("projection hook request provenance", () => {
 					true,
 				),
 			}),
-			{ wrapper: wrapperWithEngine(engine) },
+			{ wrapper: wrapper(engine) },
 		);
 
 		await waitFor(() => {
@@ -283,7 +306,7 @@ describe("projection hook request provenance", () => {
 			({ settings }) => useProjection(document, settings, overrides, true),
 			{
 				initialProps: { settings: firstSettings },
-				wrapper: wrapperWithEngine(engine),
+				wrapper: wrapper(engine),
 			},
 		);
 
@@ -316,7 +339,7 @@ describe("projection hook request provenance", () => {
 			({ settings }) => useProjection(document, settings, overrides, true),
 			{
 				initialProps: { settings: firstSettings },
-				wrapper: wrapperWithEngine(engine),
+				wrapper: wrapper(engine),
 			},
 		);
 
@@ -370,7 +393,7 @@ describe("projection hook request provenance", () => {
 				useStochastic(document, settings, overrides, config, true),
 			{
 				initialProps: { config: { runCount: 1, seed: 1 } },
-				wrapper: wrapperWithEngine(engine),
+				wrapper: wrapper(engine),
 			},
 		);
 

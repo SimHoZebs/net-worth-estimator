@@ -18,6 +18,7 @@ import {
 	withoutWriteCapabilities,
 } from "@/lib/projection/sources/http/httpFinancialModelRepository";
 import { createHttpIncomeDataSource } from "@/lib/projection/sources/http/httpIncomeDataSource";
+import { canonicalSerialize } from "@/lib/projection/utils/canonical";
 import {
 	ModelRuntimeProvider,
 	type ModelSourceInfo,
@@ -104,7 +105,7 @@ export default function App() {
 	const syncSystemTheme = useThemeStore((state) => state.syncSystemTheme);
 
 	const sourceEvaluationsFingerprint = document
-		? JSON.stringify(document.evaluations)
+		? canonicalSerialize(document.evaluations)
 		: null;
 	const loadedEvaluationsFingerprint = useRef<string | null>(null);
 	useEffect(() => {
@@ -120,10 +121,8 @@ export default function App() {
 		document === null ||
 		loadedEvaluationsFingerprint.current === sourceEvaluationsFingerprint;
 	const requestEvaluationReload = useCallback(() => {
-		if (!document) return;
-		replaceEvaluations(document.evaluations);
-		loadedEvaluationsFingerprint.current = sourceEvaluationsFingerprint;
-	}, [document, replaceEvaluations, sourceEvaluationsFingerprint]);
+		if (document) replaceEvaluations(document.evaluations);
+	}, [document, replaceEvaluations]);
 
 	useEffect(() => {
 		const media = window.matchMedia("(prefers-color-scheme: dark)");
