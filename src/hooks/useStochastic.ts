@@ -1,4 +1,6 @@
-import { useMemo } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useMemo, useRef, useState } from "react";
+import { useProjectionEngine } from "@/engine/ProjectionEngineContext";
 import type {
 	FinancialModelDocument,
 	ModelOverrides,
@@ -7,14 +9,10 @@ import type {
 	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
-import {
-	labelStochasticProgress,
-	labelStochasticResult,
-} from "@/lib/projection/runtime/resultLabels";
+import { projectionRequestIdentity } from "@/lib/projection/runtime/computationIdentity";
 import type { IncomeDataSnapshot } from "@/lib/projection/types/income";
 import { normalizeStochasticConfig } from "@/lib/projection/utils/stochastic";
 import type { ProjectionHookState } from "./types";
-import { useEngineRequest } from "./useEngineRequest";
 
 export function useStochastic(
 	document: FinancialModelDocument | null,
@@ -24,6 +22,7 @@ export function useStochastic(
 	enabled: boolean,
 	incomeData?: IncomeDataSnapshot,
 ): ProjectionHookState<StochasticProjectionResult, StochasticProgress> {
+	const engine = useProjectionEngine();
 	const runCount = config?.runCount ?? null;
 	const seed = config?.seed ?? null;
 	const stableConfig = useMemo(
@@ -31,23 +30,85 @@ export function useStochastic(
 			runCount === null ? null : normalizeStochasticConfig({ runCount, seed }),
 		[runCount, seed],
 	);
-	return useEngineRequest<StochasticProjectionResult, StochasticProgress>({
+	const active = enabled && stableConfig !== null && document !== null;
+	const requestIdentity = projectionRequestIdentity({
 		document,
-		projectionSettings,
 		overrides,
-		active: enabled && stableConfig !== null,
-		extraKey: stableConfig,
+		settings: projectionSettings,
 		incomeData,
-		execute: (engine, input, onProgress) => {
-			if (stableConfig === null)
-				throw new DOMException("Aborted", "AbortError");
+		extra: stableConfig,
+	});
+	const [progressState, setProgressState] = useState<{
+		key: string;
+		progress: StochasticProgress;
+		partial: StochasticProjectionResult | null;
+	} | null>(null);
+	const identityRef = useRef(requestIdentity);
+	identityRef.current = requestIdentity;
+	const query = useQuery({
+		queryKey: ["projection", "stochastic", requestIdentity],
+		queryFn: ({ signal }) => {
+			if (document === null || stableConfig === null) {
+				throw new Error(
+					"Stochastic projection requires a document and config.",
+				);
+			}
+			const fetchIdentity = requestIdentity;
 			return engine.projectStochastic(
-				{ ...input, config: stableConfig },
-				onProgress,
+				{
+					document,
+					projectionSettings,
+					overrides,
+					incomeData,
+					config: stableConfig,
+					signal,
+				},
+				(progress, partial) => {
+					if (identityRef.current !== fetchIdentity) return;
+					setProgressState((current) => ({
+						key: fetchIdentity,
+						progress,
+						partial:
+							partial ??
+							(current?.key === fetchIdentity ? current.partial : null),
+					}));
+				},
 			);
 		},
-		labelResult: labelStochasticResult,
-		labelProgress: labelStochasticProgress,
-		failureMessage: "Stochastic simulation failed.",
+		enabled: active,
+		placeholderData: keepPreviousData,
+		staleTime: Infinity,
+		retry: false,
 	});
+	if (!active) {
+		return {
+			result: null,
+			runtimeError: null,
+			isRunning: false,
+			progress: null,
+			resultIsStale: false,
+		};
+	}
+	const settledResult =
+		!query.isFetching && !query.isPlaceholderData ? (query.data ?? null) : null;
+	const livePartial =
+		progressState?.key === requestIdentity ? progressState.partial : null;
+	const liveProgress =
+		progressState?.key === requestIdentity && settledResult === null
+			? progressState.progress
+			: null;
+	const result =
+		settledResult ??
+		livePartial ??
+		(query.data !== undefined ? query.data : null);
+	return {
+		result,
+		runtimeError: query.error ? query.error.message : null,
+		isRunning: query.isFetching,
+		progress: liveProgress,
+		resultIsStale:
+			result !== null &&
+			livePartial === null &&
+			(query.isPlaceholderData || query.isError),
+	};
 }
