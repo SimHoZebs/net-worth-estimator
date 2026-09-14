@@ -2,7 +2,6 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useProjectionEngine } from "@/engine/ProjectionEngineContext";
 import type {
 	FinancialModelDocument,
-	ModelOverrides,
 	ProjectionResult,
 	ProjectionRuntimeSettings,
 } from "@/lib/projection";
@@ -15,7 +14,6 @@ export type { ProjectionHookState };
 export function useProjection(
 	document: FinancialModelDocument | null,
 	projectionSettings: ProjectionRuntimeSettings,
-	overrides: ModelOverrides,
 	enabled: boolean,
 	incomeData?: IncomeDataSnapshot,
 ): ProjectionHookState<ProjectionResult> {
@@ -23,7 +21,6 @@ export function useProjection(
 	const active = enabled && document !== null;
 	const requestIdentity = projectionRequestIdentity({
 		document,
-		overrides,
 		settings: projectionSettings,
 		incomeData,
 	});
@@ -36,7 +33,6 @@ export function useProjection(
 			return engine.project({
 				document,
 				projectionSettings,
-				overrides,
 				incomeData,
 				signal,
 			});

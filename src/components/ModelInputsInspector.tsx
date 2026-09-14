@@ -50,19 +50,6 @@ export function ModelInputsInspector() {
 		save,
 	} = useModelRuntime();
 	const { result, projectionResultIsStale } = useProjectionArtifacts();
-	const {
-		disabledAccountIds,
-		disabledPostingIds,
-		addedAccounts,
-		addedPostings,
-	} = useStore(
-		useShallow((s) => ({
-			disabledAccountIds: s.disabledAccountIds,
-			disabledPostingIds: s.disabledPostingIds,
-			addedAccounts: s.addedAccounts,
-			addedPostings: s.addedPostings,
-		})),
-	);
 	const { isEditing, isDirty, workingDocument } = useStore(
 		useShallow(selectEditorState),
 	);
@@ -86,30 +73,12 @@ export function ModelInputsInspector() {
 
 	const readDocument = useMemo(() => {
 		if (!document) return null;
-		const disabledAccounts = new Set(disabledAccountIds);
-		const disabledPostings = new Set(disabledPostingIds);
 		return {
 			...document,
-			accounts: [
-				...document.accounts.filter(
-					(account) => account.enabled && !disabledAccounts.has(account.id),
-				),
-				...addedAccounts.filter((account) => account.enabled),
-			],
-			postings: [
-				...document.postings.filter(
-					(posting) => posting.enabled && !disabledPostings.has(posting.id),
-				),
-				...addedPostings.filter((posting) => posting.enabled),
-			],
+			accounts: document.accounts.filter((account) => account.enabled),
+			postings: document.postings.filter((posting) => posting.enabled),
 		};
-	}, [
-		document,
-		addedAccounts,
-		addedPostings,
-		disabledAccountIds,
-		disabledPostingIds,
-	]);
+	}, [document]);
 	const displayDocument =
 		isEditing && workingDocument ? workingDocument : readDocument;
 	const postingGroups = useMemo(

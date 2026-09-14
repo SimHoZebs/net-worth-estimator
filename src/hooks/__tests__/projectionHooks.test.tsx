@@ -5,7 +5,6 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { type ReactNode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type {
-	ModelOverrides,
 	ProjectionResult,
 	StochasticProgress,
 	StochasticProjectionResult,
@@ -36,13 +35,6 @@ function wrapper(engine: ProjectionEngine) {
 		);
 	};
 }
-
-const overrides: ModelOverrides = {
-	addedAccounts: [],
-	addedPostings: [],
-	disabledAccountIds: [],
-	disabledPostingIds: [],
-};
 
 function timelineRow(date: string, netWorth: number) {
 	return {
@@ -143,17 +135,11 @@ describe("projection hook request provenance", () => {
 			projectStochastic: vi.fn().mockResolvedValue(staticStochastic()),
 		};
 		const hook = renderHook(
-			({ currentDocument, currentSettings, currentOverrides }) => ({
-				deterministic: useProjection(
-					currentDocument,
-					currentSettings,
-					currentOverrides,
-					true,
-				),
+			({ currentDocument, currentSettings }) => ({
+				deterministic: useProjection(currentDocument, currentSettings, true),
 				stochastic: useStochastic(
 					currentDocument,
 					currentSettings,
-					currentOverrides,
 					{ runCount: 1, seed: 1 },
 					true,
 				),
@@ -162,7 +148,6 @@ describe("projection hook request provenance", () => {
 				initialProps: {
 					currentDocument: document,
 					currentSettings: settings,
-					currentOverrides: overrides,
 				},
 				wrapper: wrapper(engine),
 			},
@@ -175,7 +160,6 @@ describe("projection hook request provenance", () => {
 		hook.rerender({
 			currentDocument: structuredClone(document),
 			currentSettings: structuredClone(settings),
-			currentOverrides: structuredClone(overrides),
 		});
 		await act(async () => Promise.resolve());
 
@@ -194,16 +178,10 @@ describe("projection hook request provenance", () => {
 		};
 		const hook = renderHook(
 			({ currentSettings }) => ({
-				deterministic: useProjection(
-					document,
-					currentSettings,
-					overrides,
-					true,
-				),
+				deterministic: useProjection(document, currentSettings, true),
 				stochastic: useStochastic(
 					document,
 					currentSettings,
-					overrides,
 					{ runCount: 1, seed: 1 },
 					true,
 				),
@@ -268,14 +246,7 @@ describe("projection hook request provenance", () => {
 			}),
 		};
 		const hook = renderHook(
-			() =>
-				useStochastic(
-					document,
-					settings,
-					overrides,
-					{ runCount: 1, seed: 1 },
-					true,
-				),
+			() => useStochastic(document, settings, { runCount: 1, seed: 1 }, true),
 			{ wrapper: wrapper(engine) },
 		);
 
@@ -304,11 +275,10 @@ describe("projection hook request provenance", () => {
 		};
 		const hook = renderHook(
 			() => ({
-				deterministic: useProjection(document, settings, overrides, true),
+				deterministic: useProjection(document, settings, true),
 				stochastic: useStochastic(
 					document,
 					settings,
-					overrides,
 					{ runCount: 1, seed: 1 },
 					true,
 				),
@@ -368,7 +338,7 @@ describe("projection hook request provenance", () => {
 			projectStochastic: vi.fn(),
 		};
 		const hook = renderHook(
-			({ settings }) => useProjection(document, settings, overrides, true),
+			({ settings }) => useProjection(document, settings, true),
 			{
 				initialProps: { settings: firstSettings },
 				wrapper: wrapper(engine),
@@ -401,7 +371,7 @@ describe("projection hook request provenance", () => {
 			projectStochastic: vi.fn(),
 		};
 		const hook = renderHook(
-			({ settings }) => useProjection(document, settings, overrides, true),
+			({ settings }) => useProjection(document, settings, true),
 			{
 				initialProps: { settings: firstSettings },
 				wrapper: wrapper(engine),
@@ -446,8 +416,7 @@ describe("projection hook request provenance", () => {
 				}),
 		};
 		const hook = renderHook(
-			({ config }) =>
-				useStochastic(document, settings, overrides, config, true),
+			({ config }) => useStochastic(document, settings, config, true),
 			{
 				initialProps: { config: { runCount: 1, seed: 1 } },
 				wrapper: wrapper(engine),

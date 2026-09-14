@@ -59,8 +59,8 @@ describe("useProjectionOrchestration", () => {
 			}),
 		);
 
-		expect(vi.mocked(useProjection).mock.calls[0]?.[3]).toBe(false);
-		expect(vi.mocked(useStochastic).mock.calls[0]?.[4]).toBe(false);
+		expect(vi.mocked(useProjection).mock.calls[0]?.[2]).toBe(false);
+		expect(vi.mocked(useStochastic).mock.calls[0]?.[3]).toBe(false);
 		expect(result.current.effectiveDocument).toEqual(document);
 		expect(result.current.capabilities).toEqual({
 			hasStochasticAccounts: true,
@@ -90,7 +90,8 @@ describe("useProjectionOrchestration", () => {
 				postingFulfillment: [],
 			},
 		};
-		useStore.setState({ disabledPostingIds: ["salary"] });
+		useStore.getState().startEditing(document);
+		useStore.getState().updatePosting("salary", { enabled: false });
 		vi.mocked(useProjection).mockReturnValue({
 			result: projectionResult,
 			runtimeError: "projection warning",

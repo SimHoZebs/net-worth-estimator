@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { makeAccount, makePosting } from "@/lib/projection/__fixtures__";
 import {
+	countDocumentDiff,
 	DEFAULT_EVALUATIONS,
 	selectCurrentChangeCount,
-	selectModelOverrides,
 	useStore,
 } from "@/store";
 
@@ -26,98 +26,70 @@ function makeFinancialModelDocument(): FinancialModelDocument {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Model overrides slice tests                                        */
+/*  Unsaved-diff count tests                                           */
 /* ------------------------------------------------------------------ */
 
-describe("Model overrides slice", () => {
+describe("selectCurrentChangeCount", () => {
 	beforeEach(() => {
-		useStore.getState().resetCurrentChanges();
+		useStore.getState().cancelEditing();
 	});
 
-	it("adds a temporary account", () => {
-		const before = useStore.getState().addedAccounts;
-		useStore.getState().addTemporaryAccount(makeAccount({ id: "a1" }));
-		expect(useStore.getState().addedAccounts).toHaveLength(1);
-		expect(useStore.getState().addedAccounts).not.toBe(before);
+	it("is zero when not editing", () => {
+		expect(selectCurrentChangeCount(useStore.getState())).toBe(0);
 	});
 
-	it("removes a temporary account by id", () => {
-		useStore.getState().addTemporaryAccount(makeAccount({ id: "a1" }));
-		useStore.getState().addTemporaryAccount(makeAccount({ id: "a2" }));
-		useStore.getState().removeTemporaryAccount("a1");
-		expect(useStore.getState().addedAccounts).toHaveLength(1);
-		expect(useStore.getState().addedAccounts[0].id).toBe("a2");
+	it("is zero for a fresh draft", () => {
+		useStore.getState().startEditing(makeFinancialModelDocument());
+		expect(selectCurrentChangeCount(useStore.getState())).toBe(0);
 	});
 
-	it("adds a temporary posting", () => {
-		useStore.getState().addTemporaryPosting(makePosting({ id: "p1" }));
-		expect(useStore.getState().addedPostings).toHaveLength(1);
+	it("counts added, removed, and modified rows", () => {
+		const document = makeFinancialModelDocument();
+		useStore.getState().startEditing(document);
+		useStore
+			.getState()
+			.addAccount(makeAccount({ id: "a2", label: "Checking" }));
+		useStore.getState().updatePosting("p1", { label: "Salary (new)" });
+		useStore.getState().deleteAccount("a1");
+		expect(selectCurrentChangeCount(useStore.getState())).toBe(3);
 	});
 
-	it("removes a temporary posting by id", () => {
-		useStore.getState().addTemporaryPosting(makePosting({ id: "p1" }));
-		useStore.getState().addTemporaryPosting(makePosting({ id: "p2" }));
-		useStore.getState().removeTemporaryPosting("p1");
-		expect(useStore.getState().addedPostings).toHaveLength(1);
-		expect(useStore.getState().addedPostings[0].id).toBe("p2");
+	it("counts a disabled draft row as one change", () => {
+		useStore.getState().startEditing(makeFinancialModelDocument());
+		useStore.getState().updatePosting("p1", { enabled: false });
+		expect(selectCurrentChangeCount(useStore.getState())).toBe(1);
+		useStore.getState().updatePosting("p1", { enabled: true });
+		expect(selectCurrentChangeCount(useStore.getState())).toBe(0);
 	});
 
-	it("toggles account disabled state on and off", () => {
-		useStore.getState().toggleAccountDisabled("a1");
-		expect(useStore.getState().disabledAccountIds).toEqual(["a1"]);
-		useStore.getState().toggleAccountDisabled("a1");
-		expect(useStore.getState().disabledAccountIds).toEqual([]);
+	it("counts checkpoint additions and removals", () => {
+		useStore.getState().startEditing(makeFinancialModelDocument());
+		useStore.getState().addCheckpoint({
+			Date: "2026-01-01",
+			AccountId: "a1",
+			Balance: 100,
+		});
+		expect(selectCurrentChangeCount(useStore.getState())).toBe(1);
+		useStore.getState().deleteCheckpoint(0);
+		expect(selectCurrentChangeCount(useStore.getState())).toBe(0);
 	});
 
-	it("toggles posting disabled state on and off", () => {
-		useStore.getState().togglePostingDisabled("p1");
-		expect(useStore.getState().disabledPostingIds).toEqual(["p1"]);
-		useStore.getState().togglePostingDisabled("p1");
-		expect(useStore.getState().disabledPostingIds).toEqual([]);
-	});
-
-	it("supports multiple disabled accounts", () => {
-		useStore.getState().toggleAccountDisabled("a1");
-		useStore.getState().toggleAccountDisabled("a2");
-		expect(useStore.getState().disabledAccountIds).toEqual(["a1", "a2"]);
-	});
-
-	it("resets all overrides to initial state", () => {
-		useStore.getState().addTemporaryAccount(makeAccount({ id: "a1" }));
-		useStore.getState().addTemporaryPosting(makePosting({ id: "p1" }));
-		useStore.getState().toggleAccountDisabled("a1");
-		useStore.getState().togglePostingDisabled("p1");
-		useStore.getState().resetCurrentChanges();
-		expect(useStore.getState().addedAccounts).toEqual([]);
-		expect(useStore.getState().addedPostings).toEqual([]);
-		expect(useStore.getState().disabledAccountIds).toEqual([]);
-		expect(useStore.getState().disabledPostingIds).toEqual([]);
+	it("resets to zero after cancel or finish editing", () => {
+		useStore.getState().startEditing(makeFinancialModelDocument());
+		useStore.getState().addPosting(makePosting({ id: "p2", label: "Bonus" }));
+		expect(selectCurrentChangeCount(useStore.getState())).toBe(1);
+		useStore.getState().cancelEditing();
+		expect(selectCurrentChangeCount(useStore.getState())).toBe(0);
+		useStore.getState().startEditing(makeFinancialModelDocument());
+		useStore.getState().finishEditing();
+		expect(selectCurrentChangeCount(useStore.getState())).toBe(0);
 	});
 });
 
-/* ------------------------------------------------------------------ */
-/*  Selector tests                                                     */
-/* ------------------------------------------------------------------ */
-
-describe("Selectors", () => {
-	it("selectCurrentChangeCount returns correct count", () => {
-		useStore.getState().resetCurrentChanges();
-		useStore.getState().addTemporaryAccount(makeAccount({ id: "a1" }));
-		useStore
-			.getState()
-			.addTemporaryAccount(makeAccount({ id: "a2", label: "Checking" }));
-		useStore.getState().addTemporaryPosting(makePosting({ id: "p1" }));
-		useStore.getState().toggleAccountDisabled("a1");
-		expect(selectCurrentChangeCount(useStore.getState())).toBe(4);
-	});
-
-	it("selectModelOverrides returns the current overrides", () => {
-		useStore.getState().resetCurrentChanges();
-		useStore.getState().addTemporaryAccount(makeAccount({ id: "a1" }));
-		useStore.getState().togglePostingDisabled("p1");
-		const modelOverrides = selectModelOverrides(useStore.getState());
-		expect(modelOverrides.addedAccounts).toHaveLength(1);
-		expect(modelOverrides.disabledPostingIds).toEqual(["p1"]);
+describe("countDocumentDiff", () => {
+	it("returns zero for identical documents", () => {
+		const document = makeFinancialModelDocument();
+		expect(countDocumentDiff(document, structuredClone(document))).toBe(0);
 	});
 });
 
@@ -128,16 +100,17 @@ describe("Selectors", () => {
 describe("Comparison slice", () => {
 	beforeEach(() => {
 		useStore.getState().clearComparisons();
-		useStore.getState().resetCurrentChanges();
+		useStore.getState().cancelEditing();
 	});
 
 	it("captures derived metrics without creating a restorable model", () => {
-		useStore.getState().addTemporaryAccount(makeAccount({ id: "a1" }));
+		useStore.getState().startEditing(makeFinancialModelDocument());
+		useStore.getState().addPosting(makePosting({ id: "p2", label: "Bonus" }));
 		useStore.getState().captureCurrentComparison("Trial", {
 			currentNetWorth: 100,
 			finalNetWorth: 200,
 			evaluationOutcomes: [],
-			currentChangeCount: 1,
+			currentChangeCount: selectCurrentChangeCount(useStore.getState()),
 		});
 
 		const snapshot = useStore.getState().comparisonSnapshots[0];
@@ -158,7 +131,6 @@ describe("Comparison slice", () => {
 
 describe("Editor slice", () => {
 	beforeEach(() => {
-		useStore.getState().resetCurrentChanges();
 		useStore.getState().cancelEditing();
 	});
 
@@ -190,11 +162,21 @@ describe("Editor slice", () => {
 			expect(useStore.getState().workingDocument).not.toBe(document);
 		});
 
+		it("startEditing captures a baseline for the unsaved-diff count", () => {
+			useStore.getState().startEditing(document);
+			expect(useStore.getState().editingBaseline).toEqual(document);
+			expect(useStore.getState().editingBaseline).not.toBe(document);
+			expect(useStore.getState().editingBaseline).not.toBe(
+				useStore.getState().workingDocument,
+			);
+		});
+
 		it("cancelEditing resets state", () => {
 			useStore.getState().startEditing(document);
 			useStore.getState().cancelEditing();
 			expect(useStore.getState().isEditing).toBe(false);
 			expect(useStore.getState().workingDocument).toBeNull();
+			expect(useStore.getState().editingBaseline).toBeNull();
 		});
 
 		it("updateAccount modifies workingDocument and sets isDirty", () => {

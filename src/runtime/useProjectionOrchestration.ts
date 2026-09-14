@@ -4,7 +4,6 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useProjection } from "@/hooks/useProjection";
 import { useStochastic } from "@/hooks/useStochastic";
 import {
-	applyModelOverrides,
 	EVALUATION_TYPE_ORDER,
 	type FinancialModelDocument,
 } from "@/lib/projection";
@@ -14,11 +13,7 @@ import type {
 	ProjectionCapabilities,
 	ProjectionExecution,
 } from "@/runtime/projectionRuntime";
-import {
-	selectCurrentChangeCount,
-	selectModelOverrides,
-	useStore,
-} from "@/store";
+import { selectCurrentChangeCount, useStore } from "@/store";
 
 function formatTodayIsoDate() {
 	return new Date().toISOString().slice(0, 10);
@@ -41,13 +36,13 @@ export function useProjectionOrchestration({
 	incomeData?: IncomeDataSnapshot;
 	incomeDataReady?: boolean;
 }) {
-	const modelOverrides = useStore(useShallow(selectModelOverrides));
 	const {
 		currentChangeCount,
 		evaluations,
 		horizonYears,
 		stochasticPreference,
 		stochasticConfig,
+		workingDocument,
 	} = useStore(
 		useShallow((state) => ({
 			currentChangeCount: selectCurrentChangeCount(state),
@@ -55,6 +50,7 @@ export function useProjectionOrchestration({
 			horizonYears: state.horizonYears,
 			stochasticPreference: state.stochasticPreference,
 			stochasticConfig: state.stochasticConfig,
+			workingDocument: state.workingDocument,
 		})),
 	);
 	const projectionStartDate = useMemo(() => formatTodayIsoDate(), []);
@@ -71,8 +67,8 @@ export function useProjectionOrchestration({
 		[projectionStartDate, settledHorizonYears, evaluations],
 	);
 	const effectiveDocument = useMemo(
-		() => (document ? applyModelOverrides(document, modelOverrides) : null),
-		[document, modelOverrides],
+		() => workingDocument ?? document,
+		[document, workingDocument],
 	);
 	const {
 		result,
@@ -80,9 +76,8 @@ export function useProjectionOrchestration({
 		isRunning: isProjecting,
 		resultIsStale: projectionResultIsStale,
 	} = useProjection(
-		document,
+		effectiveDocument,
 		projectionSettings,
-		modelOverrides,
 		validationIsValid &&
 			evaluationsAreHydrated &&
 			incomeDataReady &&
@@ -107,9 +102,8 @@ export function useProjectionOrchestration({
 		progress: stochasticProgress,
 		resultIsStale: stochasticResultIsStale,
 	} = useStochastic(
-		document,
+		effectiveDocument,
 		projectionSettings,
-		modelOverrides,
 		stochasticConfig,
 		stochasticEnabled,
 		incomeData,

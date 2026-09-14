@@ -3,7 +3,6 @@ import { useMemo, useRef, useState } from "react";
 import { useProjectionEngine } from "@/engine/ProjectionEngineContext";
 import type {
 	FinancialModelDocument,
-	ModelOverrides,
 	ProjectionRuntimeSettings,
 	StochasticConfig,
 	StochasticProgress,
@@ -17,7 +16,6 @@ import type { ProjectionHookState } from "./types";
 export function useStochastic(
 	document: FinancialModelDocument | null,
 	projectionSettings: ProjectionRuntimeSettings,
-	overrides: ModelOverrides,
 	config: StochasticConfig | null,
 	enabled: boolean,
 	incomeData?: IncomeDataSnapshot,
@@ -33,7 +31,6 @@ export function useStochastic(
 	const active = enabled && stableConfig !== null && document !== null;
 	const requestIdentity = projectionRequestIdentity({
 		document,
-		overrides,
 		settings: projectionSettings,
 		incomeData,
 		extra: stableConfig,
@@ -58,7 +55,6 @@ export function useStochastic(
 				{
 					document,
 					projectionSettings,
-					overrides,
 					incomeData,
 					config: stableConfig,
 					signal,

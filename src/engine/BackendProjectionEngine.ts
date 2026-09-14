@@ -57,7 +57,6 @@ export class BackendProjectionEngine implements ProjectionEngine {
 				document: request.document,
 				incomeData: request.incomeData,
 				settings: request.projectionSettings,
-				overrides: request.overrides,
 			},
 			request.signal,
 		);
@@ -87,7 +86,6 @@ export class BackendProjectionEngine implements ProjectionEngine {
 					document: request.document,
 					incomeData: request.incomeData,
 					settings: request.projectionSettings,
-					overrides: request.overrides,
 					config: request.config,
 				}),
 				signal: controller.signal,

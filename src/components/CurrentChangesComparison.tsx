@@ -55,7 +55,7 @@ export const CurrentChangesComparison = memo(
 								type="text"
 								value={labelInput}
 								onChange={(e) => setLabelInput(e.target.value)}
-								placeholder="Baseline (no temporary changes)"
+								placeholder="Baseline (no unsaved changes)"
 								className="w-full rounded-lg border border-border/80 bg-card/85 px-3 py-1.5 type-body shadow-sm outline-none placeholder:text-muted-foreground focus:border-ring dark:border-white/10 sm:max-w-xs"
 							/>
 							<Button
@@ -90,7 +90,7 @@ export const CurrentChangesComparison = memo(
 											<th className="px-4 py-3">Current NW</th>
 											<th className="px-4 py-3">Final NW</th>
 											<th className="px-4 py-3">Evaluation outcomes</th>
-											<th className="px-4 py-3">Temporary changes</th>
+											<th className="px-4 py-3">Unsaved changes</th>
 											<th className="px-4 py-3" />
 										</tr>
 									</thead>

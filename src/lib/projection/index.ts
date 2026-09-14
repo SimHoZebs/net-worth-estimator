@@ -43,10 +43,6 @@ export {
 	getAmountPresentation,
 	getExpression,
 } from "./model/amountPresentation";
-export {
-	applyModelOverrides,
-	EMPTY_MODEL_OVERRIDES,
-} from "./model/applyModelOverrides";
 export type {
 	FinancialModelParseResult,
 	FinancialModelRepository,

@@ -1,11 +1,22 @@
+import { useMemo } from "react";
 import { useShallow } from "zustand/shallow";
 import { TemporaryAccountForm } from "@/components/dashboard/current-changes/TemporaryAccountForm";
 import { TemporaryPostingForm } from "@/components/dashboard/current-changes/TemporaryPostingForm";
 import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { StatusPill } from "@/components/ui/status-pill";
-import type { FinancialModelDocument } from "@/lib/projection";
-import { selectCurrentChangeCount, useStore } from "@/store";
+import type {
+	Account,
+	FinancialModelDocument,
+	Posting,
+} from "@/lib/projection";
+import { useModelRuntime } from "@/runtime/modelRuntime";
+import {
+	selectCurrentChangeCount,
+	selectEditorActions,
+	selectEditorState,
+	useStore,
+} from "@/store";
 
 interface CurrentChangesControlsProps {
 	document: FinancialModelDocument;
@@ -14,43 +25,102 @@ interface CurrentChangesControlsProps {
 export function CurrentChangesControls({
 	document,
 }: CurrentChangesControlsProps) {
-	const currentChanges = useStore(
-		useShallow((s) => ({
-			addedAccounts: s.addedAccounts,
-			addedPostings: s.addedPostings,
-			disabledAccountIds: s.disabledAccountIds,
-			disabledPostingIds: s.disabledPostingIds,
-		})),
+	const { isEditing, isDirty, workingDocument, editingBaseline } = useStore(
+		useShallow(selectEditorState),
 	);
+	const {
+		startEditing,
+		cancelEditing,
+		addAccount,
+		deleteAccount,
+		updateAccount,
+		addPosting,
+		deletePosting,
+		updatePosting,
+	} = useStore(useShallow(selectEditorActions));
+	const { save, isSaving, source } = useModelRuntime();
 	const currentChangeCount = useStore(selectCurrentChangeCount);
-	const resetCurrentChanges = useStore((s) => s.resetCurrentChanges);
-	const addTemporaryAccount = useStore((s) => s.addTemporaryAccount);
-	const removeTemporaryAccount = useStore((s) => s.removeTemporaryAccount);
-	const addTemporaryPosting = useStore((s) => s.addTemporaryPosting);
-	const removeTemporaryPosting = useStore((s) => s.removeTemporaryPosting);
-	const toggleAccountDisabled = useStore((s) => s.toggleAccountDisabled);
-	const togglePostingDisabled = useStore((s) => s.togglePostingDisabled);
-	const accountById = new Map(
-		document.accounts.map((account) => [account.id, account]),
+
+	const baseline = editingBaseline ?? document;
+	const draft = workingDocument;
+	const baselineAccountIds = useMemo(
+		() => new Set(baseline.accounts.map((account) => account.id)),
+		[baseline],
 	);
-	const postingById = new Map(
-		document.postings.map((posting) => [posting.id, posting]),
+	const baselinePostingIds = useMemo(
+		() => new Set(baseline.postings.map((posting) => posting.id)),
+		[baseline],
 	);
+	const draftAccounts = draft?.accounts ?? [];
+	const draftPostings = draft?.postings ?? [];
+	const addedAccounts = useMemo(
+		() =>
+			draft
+				? draftAccounts.filter((account) => !baselineAccountIds.has(account.id))
+				: [],
+		[draft, draftAccounts, baselineAccountIds],
+	);
+	const addedPostings = useMemo(
+		() =>
+			draft
+				? draftPostings.filter((posting) => !baselinePostingIds.has(posting.id))
+				: [],
+		[draft, draftPostings, baselinePostingIds],
+	);
+	const disabledAccounts = useMemo(
+		() => (draft ? draftAccounts.filter((account) => !account.enabled) : []),
+		[draft, draftAccounts],
+	);
+	const disabledPostings = useMemo(
+		() => (draft ? draftPostings.filter((posting) => !posting.enabled) : []),
+		[draft, draftPostings],
+	);
+	// Rows available for quick-exclude: enabled rows in the draft when editing,
+	// otherwise enabled baseline rows (excluding starts an edit session).
+	const excludableAccounts = (draft ?? baseline).accounts.filter(
+		(account) => account.enabled,
+	);
+	const excludablePostings = (draft ?? baseline).postings.filter(
+		(posting) => posting.enabled,
+	);
+	const routeDocument = draft ?? document;
+
+	const ensureEditing = () => {
+		if (!isEditing) {
+			startEditing(document);
+		}
+	};
+	const handleAddAccount = (account: Account) => {
+		ensureEditing();
+		addAccount(account);
+	};
+	const handleAddPosting = (posting: Posting) => {
+		ensureEditing();
+		addPosting(posting);
+	};
+	const handleExcludeAccount = (id: string) => {
+		ensureEditing();
+		updateAccount(id, { enabled: false });
+	};
+	const handleExcludePosting = (id: string) => {
+		ensureEditing();
+		updatePosting(id, { enabled: false });
+	};
 
 	return (
 		<Collapsible autoOpenWhen={currentChangeCount > 0}>
 			<Collapsible.Trigger>
 				<Collapsible.Header
-					title="Current changes"
+					title="Draft changes"
 					description={
 						currentChangeCount > 0
-							? `${currentChangeCount} temporary change${currentChangeCount === 1 ? "" : "s"} active.`
-							: "Temporarily add trial accounts and scheduled transactions."
+							? `${currentChangeCount} unsaved change${currentChangeCount === 1 ? "" : "s"} in the draft.`
+							: "Stage trial accounts and scheduled transactions in the draft."
 					}
 					trailing={
 						<div className="flex items-center gap-2">
 							{currentChangeCount > 0 ? (
-								<StatusPill>{currentChangeCount} active</StatusPill>
+								<StatusPill>{currentChangeCount} unsaved</StatusPill>
 							) : null}
 							<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
 								Show details
@@ -61,38 +131,47 @@ export function CurrentChangesControls({
 			</Collapsible.Trigger>
 			<Collapsible.Content>
 				<div className="space-y-6">
-					<div className="flex justify-end">
+					<div className="flex justify-end gap-2">
 						<Button
 							type="button"
 							variant="secondary"
 							size="sm"
-							onClick={resetCurrentChanges}
-							disabled={currentChangeCount === 0}
+							onClick={cancelEditing}
+							disabled={!isEditing}
 						>
-							Reset current changes
+							Discard draft
+						</Button>
+						<Button
+							type="button"
+							size="sm"
+							onClick={save}
+							disabled={!isEditing || !isDirty || !source.saveLabel || isSaving}
+						>
+							{isSaving
+								? "Saving..."
+								: (source.saveLabel ?? "Save unavailable")}
 						</Button>
 					</div>
 
-					{currentChanges.disabledAccountIds.length > 0 ||
-					currentChanges.disabledPostingIds.length > 0 ? (
+					{disabledAccounts.length > 0 || disabledPostings.length > 0 ? (
 						<div className="space-y-3">
 							<h3 className="type-body type-value font-semibold/80">
 								Excluded from this scenario
 							</h3>
-							{currentChanges.disabledAccountIds.map((id) => (
+							{disabledAccounts.map((account) => (
 								<ExcludedItem
-									key={`excluded-account-${id}`}
-									label={accountById.get(id)?.label ?? id}
+									key={`excluded-account-${account.id}`}
+									label={account.label}
 									type="Account"
-									onRestore={() => toggleAccountDisabled(id)}
+									onRestore={() => updateAccount(account.id, { enabled: true })}
 								/>
 							))}
-							{currentChanges.disabledPostingIds.map((id) => (
+							{disabledPostings.map((posting) => (
 								<ExcludedItem
-									key={`excluded-posting-${id}`}
-									label={postingById.get(id)?.label ?? id}
+									key={`excluded-posting-${posting.id}`}
+									label={posting.label}
 									type="Transaction"
-									onRestore={() => togglePostingDisabled(id)}
+									onRestore={() => updatePosting(posting.id, { enabled: true })}
 								/>
 							))}
 						</div>
@@ -100,29 +179,62 @@ export function CurrentChangesControls({
 
 					<div className="space-y-3">
 						<h3 className="type-body type-value font-semibold/80">
-							Temporary additions
+							Quick-exclude baseline rows
+						</h3>
+						<p className="type-caption text-muted-foreground">
+							Excluding a row sets enabled=false on the draft row
+							{isEditing
+								? "."
+								: " and starts a draft edit session when needed."}
+						</p>
+						{excludableAccounts.map((account) => (
+							<ExcludableItem
+								key={`excludable-account-${account.id}`}
+								label={account.label}
+								type="Account"
+								onExclude={() => handleExcludeAccount(account.id)}
+							/>
+						))}
+						{excludablePostings.map((posting) => (
+							<ExcludableItem
+								key={`excludable-posting-${posting.id}`}
+								label={posting.label}
+								type="Transaction"
+								onExclude={() => handleExcludePosting(posting.id)}
+							/>
+						))}
+						{excludableAccounts.length === 0 &&
+						excludablePostings.length === 0 ? (
+							<p className="type-caption text-muted-foreground">
+								Every row is already excluded or removed.
+							</p>
+						) : null}
+					</div>
+
+					<div className="space-y-3">
+						<h3 className="type-body type-value font-semibold/80">
+							Draft additions
 						</h3>
 
 						<TemporaryAccountForm
-							accounts={currentChanges.addedAccounts}
+							accounts={addedAccounts}
 							reservedIds={[
-								...document.accounts.map((account) => account.id),
-								...document.postings.map((posting) => posting.id),
-								...currentChanges.addedPostings.map((posting) => posting.id),
+								...routeDocument.accounts.map((account) => account.id),
+								...routeDocument.postings.map((posting) => posting.id),
 							]}
-							onAdd={addTemporaryAccount}
-							onRemove={removeTemporaryAccount}
+							onAdd={handleAddAccount}
+							onRemove={deleteAccount}
 						/>
 
 						<TemporaryPostingForm
-							postings={currentChanges.addedPostings}
-							document={document}
+							postings={addedPostings}
+							document={routeDocument}
 							reservedIds={[
-								...document.accounts.map((account) => account.id),
-								...currentChanges.addedAccounts.map((account) => account.id),
+								...routeDocument.accounts.map((account) => account.id),
+								...routeDocument.postings.map((posting) => posting.id),
 							]}
-							onAdd={addTemporaryPosting}
-							onRemove={removeTemporaryPosting}
+							onAdd={handleAddPosting}
+							onRemove={deletePosting}
 						/>
 					</div>
 				</div>
@@ -148,6 +260,28 @@ function ExcludedItem({
 			</div>
 			<Button type="button" variant="ghost" size="sm" onClick={onRestore}>
 				Restore
+			</Button>
+		</div>
+	);
+}
+
+function ExcludableItem({
+	label,
+	type,
+	onExclude,
+}: {
+	label: string;
+	type: string;
+	onExclude: () => void;
+}) {
+	return (
+		<div className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-surface/60 px-4 py-2">
+			<div>
+				<div className="type-label">{label}</div>
+				<div className="type-caption">{type}</div>
+			</div>
+			<Button type="button" variant="ghost" size="sm" onClick={onExclude}>
+				Exclude
 			</Button>
 		</div>
 	);
