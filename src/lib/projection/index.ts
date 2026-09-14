@@ -61,7 +61,6 @@ export {
 export {
 	applyModelOverrides,
 	EMPTY_MODEL_OVERRIDES,
-	prepareFinancialModelDocument,
 } from "./model/applyModelOverrides";
 export type {
 	FinancialModelParseResult,
@@ -69,22 +68,6 @@ export type {
 	RepositoryAction,
 } from "./modelRepository";
 export { FinancialModelValidationError } from "./modelRepository";
-export type {
-	FinancialModelDao,
-	FinancialModelDaoRead,
-	FinancialModelIngestionSource,
-	FinancialModelRecord,
-	FinancialModelSourceSnapshot,
-	FinancialModelStorageLifecycle,
-	IngestionSynchronizationResult,
-	SourceProvenance,
-	UserProvenance,
-} from "./persistence/financialModelPersistence";
-export {
-	createFinancialModelRecord,
-	FinancialModelIngestionCoordinator,
-	financialModelSourceRevision,
-} from "./persistence/financialModelPersistence";
 export {
 	amountProviders,
 	amountResolvers,
@@ -111,16 +94,8 @@ export {
 } from "./simulation/prepareSimulation";
 export { projectRawFinancialModelDocument } from "./simulation/projectPath";
 export { simulate } from "./simulation/simulate";
-export {
-	createBrowserFinancialModelRepository,
-	FINANCIAL_MODEL_STORAGE_KEY,
-} from "./sources/csv/browserFinancialModelRepository";
-export { createBundledCsvFinancialModelSource } from "./sources/csv/bundledCsvFinancialModelSource";
-export {
-	createCsvApiFinancialModelRepository,
-	FinancialModelApiError,
-	parseFinancialModelDocument,
-} from "./sources/csv/csvDataSource";
+export { parseFinancialModelDocument } from "./sources/csv/csvDataSource";
+
 export type {
 	CsvFinancialModelOptions,
 	CsvFinancialModelParseResult,
@@ -150,10 +125,7 @@ export {
 	summarizeValidationIssues,
 	validateCsvFinancialModel,
 } from "./sources/csv/csvValidation";
-export {
-	createCsvIncomeDataSource,
-	parseIncomeDataFiles,
-} from "./sources/csv/incomeDataSource";
+export { parseIncomeDataFiles } from "./sources/csv/incomeDataSource";
 export type {
 	IncomeDataSnapshot,
 	IncomeSourceDefinition,

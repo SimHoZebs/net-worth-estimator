@@ -1,15 +1,10 @@
 import { z } from "zod";
 import type {
-	FinancialModelParseResult,
-	FinancialModelRepository,
-} from "../../modelRepository";
-import type {
 	Checkpoint,
 	FinancialIndependenceSource,
 	FinancialModelDocument,
 	Posting,
 } from "../../types/model";
-import type { ModelValidationIssue } from "../../types/validation";
 import { csvDateSchema } from "./csvSchema";
 
 const finiteNumber = z.number().finite();
@@ -18,6 +13,7 @@ const checkpointSchema = z
 		Date: csvDateSchema,
 		AccountId: z.string().trim().min(1),
 		Balance: finiteNumber,
+		source: z.string().trim().min(1).nullish(),
 	})
 	.strict() satisfies z.ZodType<Checkpoint>;
 const amountBindingSchema = z.discriminatedUnion("source", [
@@ -60,6 +56,7 @@ const postingSchema = z
 		annualCap: finiteNumber.nullable(),
 		priority: finiteNumber.int().min(1),
 		enabled: z.boolean(),
+		source: z.string().trim().min(1).nullish(),
 	})
 	.strict() satisfies z.ZodType<Posting>;
 const evaluationFields = {
@@ -161,120 +158,4 @@ export function parseFinancialModelDocument(
 ): FinancialModelDocument | null {
 	const result = financialModelDocumentSchema.safeParse(value);
 	return result.success ? result.data : null;
-}
-const modelValidationIssueSchema = z.object({
-	code: z.string(),
-	message: z.string(),
-	path: z.array(z.union([z.string(), z.number()])),
-	severity: z.enum(["error", "warning"]),
-}) satisfies z.ZodType<ModelValidationIssue>;
-const financialModelParseResultSchema = z.object({
-	document: financialModelDocumentSchema.nullable(),
-	issues: z.array(modelValidationIssueSchema),
-}) satisfies z.ZodType<FinancialModelParseResult>;
-
-async function parseApiResponse(
-	response: Response,
-): Promise<FinancialModelParseResult> {
-	let payload: unknown;
-
-	try {
-		payload = await response.json();
-	} catch {
-		throw new Error(
-			"Invalid financial model API response: expected a valid FinancialModelParseResult payload.",
-		);
-	}
-
-	const parsed = financialModelParseResultSchema.safeParse(payload);
-	if (!parsed.success) {
-		throw new Error(
-			"Invalid financial model API response: expected a valid FinancialModelParseResult payload.",
-		);
-	}
-
-	return parsed.data;
-}
-
-export class FinancialModelApiError extends Error {
-	readonly status: number;
-	readonly result: FinancialModelParseResult | null;
-
-	constructor(
-		status: number,
-		message: string,
-		result: FinancialModelParseResult | null,
-	) {
-		super(message);
-		this.name = "FinancialModelApiError";
-		this.status = status;
-		this.result = result;
-	}
-}
-
-async function requestFinancialModel(
-	fetchImpl: typeof fetch,
-	apiPath: string,
-	init?: RequestInit,
-): Promise<FinancialModelParseResult> {
-	const response = init
-		? await fetchImpl(apiPath, init)
-		: await fetchImpl(apiPath);
-	let result: FinancialModelParseResult | null = null;
-	try {
-		result = await parseApiResponse(response);
-	} catch (error) {
-		if (!response.ok) {
-			throw new FinancialModelApiError(
-				response.status,
-				`Failed to access financial model (${response.status} ${response.statusText}).`,
-				null,
-			);
-		}
-		throw error;
-	}
-	if (!response.ok) {
-		const message =
-			result.issues.find((issue) => issue.severity === "error")?.message ??
-			`Financial model request failed (${response.status} ${response.statusText}).`;
-		throw new FinancialModelApiError(response.status, message, result);
-	}
-	return result;
-}
-
-export interface CsvApiFinancialModelRepositoryOptions {
-	apiPath?: string;
-	fetchImpl?: typeof fetch;
-}
-
-export function createCsvApiFinancialModelRepository(
-	options?: CsvApiFinancialModelRepositoryOptions,
-): FinancialModelRepository {
-	const apiPath = options?.apiPath ?? "/api/financial-model";
-	const fetchImpl = options?.fetchImpl ?? fetch;
-	const loadDocument = async (): Promise<FinancialModelParseResult> => {
-		return requestFinancialModel(fetchImpl, apiPath);
-	};
-
-	return {
-		repositoryType: "csv-api",
-		label: "Development model repository",
-		description:
-			"Uses the Vite development API, whose server-side adapter ingests and exports the checkout's model CSV files.",
-		loadDocument,
-		save: {
-			label: "Save to CSV files",
-			description:
-				"Writes the edited model to public/configs/ through the local Vite dev server.",
-			run: async (
-				document: FinancialModelDocument,
-			): Promise<FinancialModelParseResult> => {
-				return requestFinancialModel(fetchImpl, apiPath, {
-					method: "PUT",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(document),
-				});
-			},
-		},
-	};
 }

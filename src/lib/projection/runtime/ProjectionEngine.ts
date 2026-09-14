@@ -1,12 +1,8 @@
 import type {
-	EvaluationResultCollection,
-	EvaluationTables,
 	FinancialModelDocument,
 	ModelOverrides,
-	ProjectionPath,
 	ProjectionResult,
 	ProjectionRuntimeSettings,
-	RawProjectionOutput,
 	StochasticConfig,
 	StochasticProgress,
 	StochasticProjectionResult,
@@ -25,12 +21,6 @@ export interface StochasticRequest extends ProjectionRequest {
 	config: StochasticConfig;
 }
 
-export interface ProjectionEvaluationRequest {
-	path: ProjectionPath;
-	evaluations: EvaluationTables;
-	signal?: AbortSignal;
-}
-
 export type ProgressCallback = (
 	progress: StochasticProgress,
 	partial?: StochasticProjectionResult,
@@ -42,12 +32,4 @@ export interface ProjectionEngine {
 		request: StochasticRequest,
 		onProgress?: ProgressCallback,
 	): Promise<StochasticProjectionResult>;
-}
-
-/** Internal staged worker capability used by the artifact cache. */
-export interface ProjectionComputationEngine extends ProjectionEngine {
-	projectBase(request: ProjectionRequest): Promise<RawProjectionOutput>;
-	evaluateProjection(
-		request: ProjectionEvaluationRequest,
-	): Promise<EvaluationResultCollection>;
 }
