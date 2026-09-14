@@ -1,45 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { runAnalysis } from "./runtime";
-import type { AnalysisDefinition } from "./types";
+import { throwIfAborted, toAnalysisResult } from "./runtime";
 
 describe("analysis runtime", () => {
-	it("preserves definition warnings as a successful value", async () => {
-		const definition: AnalysisDefinition<number, number> = {
-			id: "double",
-			label: "Double",
-			run: ({ input }) => ({
-				value: input * 2,
+	it("reports a ready result without diagnostics", () => {
+		expect(toAnalysisResult({ value: 8, diagnostics: [] })).toMatchObject({
+			state: "ready",
+			value: 8,
+		});
+	});
+
+	it("preserves warnings as a successful value", () => {
+		expect(
+			toAnalysisResult({
+				value: 8,
 				diagnostics: [
 					{ code: "approximate", severity: "warning", message: "Approximate" },
 				],
 			}),
-		};
-		await expect(runAnalysis(definition, 4)).resolves.toMatchObject({
+		).toMatchObject({
 			state: "warning",
 			value: 8,
 		});
 	});
 
-	it("isolates unexpected definition failures", async () => {
-		const definition: AnalysisDefinition<void, never> = {
-			id: "broken",
-			label: "Broken",
-			run: () => {
-				throw new Error("analysis exploded");
-			},
-		};
-		await expect(runAnalysis(definition, undefined)).resolves.toMatchObject({
-			state: "error",
-			value: null,
-			diagnostics: [{ message: "analysis exploded" }],
-		});
-	});
-
-	it("treats definition error diagnostics as an error result", async () => {
-		const definition: AnalysisDefinition<void, number> = {
-			id: "invalid",
-			label: "Invalid",
-			run: () => ({
+	it("treats error diagnostics as an error result", () => {
+		expect(
+			toAnalysisResult({
 				value: 1,
 				diagnostics: [
 					{
@@ -49,38 +35,26 @@ describe("analysis runtime", () => {
 					},
 				],
 			}),
-		};
-		await expect(runAnalysis(definition, undefined)).resolves.toMatchObject({
+		).toMatchObject({
 			state: "error",
 			value: null,
 		});
 	});
 
-	it("rethrows cancellation instead of reporting an analysis error", async () => {
+	it("throws when the signal was aborted", () => {
 		const controller = new AbortController();
 		controller.abort();
-		const definition: AnalysisDefinition<void, null> = {
-			id: "cancelled",
-			label: "Cancelled",
-			run: () => ({ value: null, diagnostics: [] }),
-		};
-		await expect(
-			runAnalysis(definition, undefined, controller.signal),
-		).rejects.toMatchObject({ name: "AbortError" });
+		try {
+			throwIfAborted(controller.signal);
+			expect.unreachable();
+		} catch (error) {
+			expect(error).toMatchObject({ name: "AbortError" });
+		}
 	});
 
-	it("rethrows a later failure when the signal was aborted", async () => {
+	it("does nothing when the signal is live", () => {
 		const controller = new AbortController();
-		const definition: AnalysisDefinition<void, null> = {
-			id: "late-cancelled",
-			label: "Late cancelled",
-			run: async () => {
-				controller.abort();
-				throw new Error("late failure");
-			},
-		};
-		await expect(
-			runAnalysis(definition, undefined, controller.signal),
-		).rejects.toMatchObject({ name: "AbortError" });
+		expect(() => throwIfAborted(controller.signal)).not.toThrow();
+		expect(() => throwIfAborted()).not.toThrow();
 	});
 });

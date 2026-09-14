@@ -1,17 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import { classifyPosting, classifyPostings } from "./classification";
 import {
-	createPostingClassificationAnalysis,
-	createPostingClassificationPlan,
-	runAnalysis,
-} from "@/lib/analysis";
-import type {
-	PostingClassificationValue,
-	PostingClassifier,
-} from "./classification";
-import {
-	payerClassifier,
-	paymentRailClassifier,
-	payrollClassifier,
+	classifyPayer,
+	classifyPaymentRail,
+	classifyPayrollLanguage,
+	detectPaymentRail,
 } from "./postingClassifiers";
 import type { PostingObservation } from "./postingObservations";
 
@@ -32,135 +25,81 @@ function posting(
 	};
 }
 
-const payrollPlan = createPostingClassificationPlan([
-	payerClassifier,
-	payrollClassifier,
-	paymentRailClassifier,
-]);
-const classificationAnalysis = createPostingClassificationAnalysis(payrollPlan);
-
 describe("posting classification", () => {
-	it("runs only selected classifier definitions", async () => {
-		const selected = classifier("selected");
-		const omitted = classifier("omitted");
-		const result = await classificationAnalysisFor([selected]).run({
-			input: { postings: [posting("one"), posting("two")] },
-		});
-
-		expect(selected.classify).toHaveBeenCalledTimes(2);
-		expect(omitted.classify).not.toHaveBeenCalled();
-		expect(result.value.postings[0]?.classifications.get(selected)?.value).toBe(
-			true,
-		);
-	});
-
-	it("combines requirement sets and evaluates shared definitions once", () => {
-		const shared = classifier("shared");
-		const sibling = classifier("sibling");
-		const analysis = createPostingClassificationAnalysis(
-			createPostingClassificationPlan([shared], [shared, sibling]),
-		);
-
-		analysis.run({ input: { postings: [posting("one")] } });
-
-		expect(shared.classify).toHaveBeenCalledTimes(1);
-		expect(sibling.classify).toHaveBeenCalledTimes(1);
-	});
-
-	it("rejects different definitions with the same id", () => {
-		expect(() =>
-			createPostingClassificationPlan(
-				[classifier("duplicate")],
-				[classifier("duplicate")],
-			),
-		).toThrow(
-			'Conflicting posting classifier definitions share the id "duplicate".',
-		);
-	});
-
-	it("classifies payroll evidence and exposes typed payer and rail values", async () => {
-		const result = await classificationAnalysis.run({
-			input: {
-				postings: [
-					posting("amazon", {
-						description: "AMAZON DEVELOPME PAYROLL PPD ID: 9111111103",
-						counterpartyName: "ACH credit",
-					}),
-				],
-			},
-		});
-		const classifications = result.value.postings[0]!.classifications;
-
-		expect(classifications.get(payerClassifier)?.value).toEqual({
+	it("extracts a normalized payer identity", () => {
+		expect(
+			classifyPayer(
+				posting("amazon", {
+					description: "AMAZON DEVELOPME PAYROLL PPD ID: 9111111103",
+					counterpartyName: "ACH credit",
+				}),
+			).value,
+		).toEqual({
 			identity: "amazon developme",
 			label: "amazon developme",
 		});
-		expect(classifications.get(payrollClassifier)?.value).toBe(true);
-		expect(classifications.get(paymentRailClassifier)?.value).toBe("ach");
-		expect(
-			classifications
-				.evidenceFor([
-					payerClassifier,
-					payrollClassifier,
-					paymentRailClassifier,
-				])
-				.map(({ code }) => code),
-		).toEqual(["payer.identity", "payroll.language", "payment-rail.ach"]);
 	});
 
-	it("does not infer payroll from debit, unresolved, or uninformative postings", async () => {
-		const result = await classificationAnalysis.run({
-			input: {
-				postings: [
-					posting("debit", { amount: -2000 }),
-					posting("unresolved", { amount: null }),
-					posting("unknown", {
-						description: "CARD CREDIT",
-						counterpartyName: "---",
-					}),
-				],
-			},
-		});
-
+	it("detects payroll language only on positive informative inflows", () => {
+		expect(classifyPayrollLanguage(posting("pay"))).toHaveLength(1);
 		expect(
-			result.value.postings.map(({ classifications }) =>
-				classifications.get(payrollClassifier),
+			classifyPayrollLanguage(posting("debit", { amount: -2000 })),
+		).toEqual([]);
+		expect(
+			classifyPayrollLanguage(posting("unresolved", { amount: null })),
+		).toEqual([]);
+		expect(
+			classifyPayrollLanguage(
+				posting("unknown", {
+					description: "CARD CREDIT",
+					counterpartyName: "---",
+				}),
 			),
-		).toEqual([null, null, null]);
+		).toEqual([]);
 	});
 
-	it("keeps classifier failures inside the analysis runtime", async () => {
-		const broken: PostingClassifier<"broken", true> = {
-			id: "broken",
-			classify() {
-				throw new Error("classification exploded");
-			},
-		};
-		const result = await runAnalysis(classificationAnalysisFor([broken]), {
-			postings: [posting("one")],
+	it("detects the payment rail", () => {
+		expect(detectPaymentRail("ACH credit DIRECT DEPOSIT")).toBe("ach");
+		expect(detectPaymentRail("CARD CREDIT")).toBe("card");
+		expect(detectPaymentRail("pleasant transfer")).toBe("unknown");
+		expect(
+			classifyPaymentRail(
+				posting("rail", {
+					description: "AMAZON DEVELOPME PAYROLL PPD ID: 9111111103",
+					counterpartyName: "ACH credit",
+				}),
+			).value,
+		).toBe("ach");
+	});
+
+	it("combines payer, payroll-language, and rail evidence in order", () => {
+		const classified = classifyPosting(
+			posting("amazon", {
+				description: "AMAZON DEVELOPME PAYROLL PPD ID: 9111111103",
+				counterpartyName: "ACH credit",
+			}),
+		);
+
+		expect(classified.payer).toEqual({
+			identity: "amazon developme",
+			label: "amazon developme",
+		});
+		expect(classified.hasPayrollLanguage).toBe(true);
+		expect(classified.paymentRail).toBe("ach");
+		expect(classified.evidence.map(({ code }) => code)).toEqual([
+			"payer.identity",
+			"payroll.language",
+			"payment-rail.ach",
+		]);
+	});
+
+	it("classifies every observation in a dataset", () => {
+		const dataset = classifyPostings({
+			postings: [posting("one"), posting("two", { amount: -5 })],
 		});
 
-		expect(result).toMatchObject({
-			state: "error",
-			value: null,
-			diagnostics: [{ message: "classification exploded" }],
-		});
+		expect(dataset.postings).toHaveLength(2);
+		expect(dataset.postings[0]?.hasPayrollLanguage).toBe(true);
+		expect(dataset.postings[1]?.hasPayrollLanguage).toBe(false);
 	});
 });
-
-function classifier<TId extends string>(id: TId) {
-	return {
-		id,
-		classify: vi.fn<
-			(posting: PostingObservation) => PostingClassificationValue<true>
-		>(() => ({ value: true, evidence: [] })),
-	} satisfies PostingClassifier<TId, true>;
-}
-
-function classificationAnalysisFor(
-	classifiers: readonly PostingClassifier<string, unknown>[],
-) {
-	return createPostingClassificationAnalysis(
-		createPostingClassificationPlan(classifiers),
-	);
-}

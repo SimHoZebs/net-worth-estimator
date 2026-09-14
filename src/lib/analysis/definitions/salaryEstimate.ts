@@ -1,6 +1,6 @@
 import type {
-	AnalysisDefinition,
 	AnalysisDiagnostic,
+	AnalysisValue,
 	EvidenceItem,
 	EvidenceSummary,
 } from "@/lib/analysis";
@@ -251,159 +251,154 @@ function unavailable(diagnostics: AnalysisDiagnostic[]) {
 	};
 }
 
-export const salaryEstimateAnalysis: AnalysisDefinition<
-	PayrollDetectionResult,
-	SalaryEstimateResult
-> = {
-	id: "salary-estimate",
-	label: "Annualized observed net pay",
-	run({ input }) {
-		const diagnostics: AnalysisDiagnostic[] = [];
-		const selected = [...input.candidates]
-			.filter((candidate) => candidate.transactions.length >= 2)
-			.sort(
-				(left, right) =>
-					candidateScore(right) - candidateScore(left) ||
-					left.key.localeCompare(right.key),
-			)[0];
-		if (!selected) {
-			return unavailable([
-				{
-					code:
-						input.candidates.length > 0
-							? "salary.insufficient-history"
-							: "salary.no-recurring-payroll",
-					severity: "warning",
-					message:
-						input.candidates.length > 0
-							? "At least two comparable payroll deposits are required to show a provisional estimate."
-							: "A net-pay estimate needs a recurring payroll deposit series.",
-				},
-			]);
-		}
-		const rawTwiceMonthlyPattern = twiceMonthlyCalendarPattern(
-			selected.transactions,
+export function estimateSalary(
+	input: PayrollDetectionResult,
+): AnalysisValue<SalaryEstimateResult> {
+	const diagnostics: AnalysisDiagnostic[] = [];
+	const selected = [...input.candidates]
+		.filter((candidate) => candidate.transactions.length >= 2)
+		.sort(
+			(left, right) =>
+				candidateScore(right) - candidateScore(left) ||
+				left.key.localeCompare(right.key),
+		)[0];
+	if (!selected) {
+		return unavailable([
+			{
+				code:
+					input.candidates.length > 0
+						? "salary.insufficient-history"
+						: "salary.no-recurring-payroll",
+				severity: "warning",
+				message:
+					input.candidates.length > 0
+						? "At least two comparable payroll deposits are required to show a provisional estimate."
+						: "A net-pay estimate needs a recurring payroll deposit series.",
+			},
+		]);
+	}
+	const rawTwiceMonthlyPattern = twiceMonthlyCalendarPattern(
+		selected.transactions,
+	);
+	const cluster = recurringAmountCluster(selected.transactions);
+	if (cluster.ambiguous) {
+		return unavailable([
+			{
+				code: "salary.multimodal-deposits",
+				severity: "warning",
+				message:
+					"Payroll deposits have multiple materially different recurring amounts, so observed net pay is ambiguous.",
+			},
+		]);
+	}
+	if (cluster.included.length < 2) {
+		return unavailable([
+			{
+				code: "salary.insufficient-history",
+				severity: "warning",
+				message:
+					"At least two comparable payroll deposits are required to show a provisional estimate.",
+			},
+		]);
+	}
+	const cadence = classifyCadence(cluster.included);
+	if (!cadence) {
+		return unavailable([
+			{
+				code: "salary.ambiguous-cadence",
+				severity: "warning",
+				message:
+					"Payroll deposits were found, but their cadence is too irregular or ambiguous to estimate safely.",
+			},
+		]);
+	}
+	if (cadence.cadence === "twice-monthly" && !rawTwiceMonthlyPattern) {
+		return unavailable([
+			{
+				code: "salary.ambiguous-cadence",
+				severity: "warning",
+				message:
+					"An additional observed deposit makes the twice-monthly cadence ambiguous.",
+			},
+		]);
+	}
+	const amounts = cluster.included.map(({ amount }) => amount);
+	if (cluster.excluded.length > 0) {
+		diagnostics.push({
+			code: "salary.off-cycle-payments-excluded",
+			severity: "info",
+			message: `${cluster.excluded.length} amount outlier${cluster.excluded.length === 1 ? " was" : "s were"} excluded from the recurring-pay estimate.`,
+		});
+	}
+	const typicalNetDeposit = median(amounts);
+	const status: SalaryEstimateStatus =
+		cluster.included.length >= 3 ? "confirmed" : "provisional";
+	const regularPayEvidenceItems: EvidenceItem[] = [
+		{
+			code: "regular-pay.comparable-count",
+			source: "behavioral",
+			strength: status === "confirmed" ? "moderate" : "weak",
+			message: `${cluster.included.length} comparable deposit${cluster.included.length === 1 ? "" : "s"} support the regular-pay estimate.`,
+			transactionIds: cluster.included.map(({ id }) => id),
+		},
+		{
+			code: `regular-pay.cadence.${cadence.cadence}`,
+			source: "behavioral",
+			strength: status === "confirmed" ? "moderate" : "weak",
+			message:
+				status === "confirmed"
+					? `${cluster.included.length - 1} observed intervals support a ${cadence.cadence} cadence.`
+					: "Only one observed interval supports this cadence; more history is needed.",
+		},
+	];
+	const limitations: string[] = [];
+	if (status === "provisional") {
+		limitations.push(
+			"This is a per-deposit estimate only; annualization is withheld until more comparable history is available.",
 		);
-		const cluster = recurringAmountCluster(selected.transactions);
-		if (cluster.ambiguous) {
-			return unavailable([
-				{
-					code: "salary.multimodal-deposits",
-					severity: "warning",
-					message:
-						"Payroll deposits have multiple materially different recurring amounts, so observed net pay is ambiguous.",
-				},
-			]);
-		}
-		if (cluster.included.length < 2) {
-			return unavailable([
-				{
-					code: "salary.insufficient-history",
-					severity: "warning",
-					message:
-						"At least two comparable payroll deposits are required to show a provisional estimate.",
-				},
-			]);
-		}
-		const cadence = classifyCadence(cluster.included);
-		if (!cadence) {
-			return unavailable([
-				{
-					code: "salary.ambiguous-cadence",
-					severity: "warning",
-					message:
-						"Payroll deposits were found, but their cadence is too irregular or ambiguous to estimate safely.",
-				},
-			]);
-		}
-		if (cadence.cadence === "twice-monthly" && !rawTwiceMonthlyPattern) {
-			return unavailable([
-				{
-					code: "salary.ambiguous-cadence",
-					severity: "warning",
-					message:
-						"An additional observed deposit makes the twice-monthly cadence ambiguous.",
-				},
-			]);
-		}
-		const amounts = cluster.included.map(({ amount }) => amount);
-		if (cluster.excluded.length > 0) {
-			diagnostics.push({
-				code: "salary.off-cycle-payments-excluded",
-				severity: "info",
-				message: `${cluster.excluded.length} amount outlier${cluster.excluded.length === 1 ? " was" : "s were"} excluded from the recurring-pay estimate.`,
-			});
-		}
-		const typicalNetDeposit = median(amounts);
-		const status: SalaryEstimateStatus =
-			cluster.included.length >= 3 ? "confirmed" : "provisional";
-		const regularPayEvidenceItems: EvidenceItem[] = [
-			{
-				code: "regular-pay.comparable-count",
-				source: "behavioral",
-				strength: status === "confirmed" ? "moderate" : "weak",
-				message: `${cluster.included.length} comparable deposit${cluster.included.length === 1 ? "" : "s"} support the regular-pay estimate.`,
-				transactionIds: cluster.included.map(({ id }) => id),
-			},
-			{
-				code: `regular-pay.cadence.${cadence.cadence}`,
-				source: "behavioral",
-				strength: status === "confirmed" ? "moderate" : "weak",
-				message:
+	}
+	if (cluster.excluded.length > 0) {
+		regularPayEvidenceItems.push({
+			code: "regular-pay.variable-amount-candidate",
+			source: "behavioral",
+			strength: "weak",
+			message:
+				"An amount outlier was excluded from the regular-pay estimate; it is not classified as a bonus.",
+			transactionIds: cluster.excluded.map(({ id }) => id),
+		});
+		limitations.push(
+			"Excluded amount candidates may be bonuses, raises, corrections, or other variable compensation.",
+		);
+	}
+	return {
+		value: {
+			status,
+			estimate: {
+				payerLabel: selected.payerLabel,
+				accountId: selected.accountId,
+				currency: "USD",
+				cadence: cadence.cadence,
+				typicalNetDeposit,
+				annualizedObservedNetPay:
 					status === "confirmed"
-						? `${cluster.included.length - 1} observed intervals support a ${cadence.cadence} cadence.`
-						: "Only one observed interval supports this cadence; more history is needed.",
-			},
-		];
-		const limitations: string[] = [];
-		if (status === "provisional") {
-			limitations.push(
-				"This is a per-deposit estimate only; annualization is withheld until more comparable history is available.",
-			);
-		}
-		if (cluster.excluded.length > 0) {
-			regularPayEvidenceItems.push({
-				code: "regular-pay.variable-amount-candidate",
-				source: "behavioral",
-				strength: "weak",
-				message:
-					"An amount outlier was excluded from the regular-pay estimate; it is not classified as a bonus.",
-				transactionIds: cluster.excluded.map(({ id }) => id),
-			});
-			limitations.push(
-				"Excluded amount candidates may be bonuses, raises, corrections, or other variable compensation.",
-			);
-		}
-		return {
-			value: {
-				status,
-				estimate: {
-					payerLabel: selected.payerLabel,
-					accountId: selected.accountId,
-					currency: "USD",
-					cadence: cadence.cadence,
-					typicalNetDeposit,
-					annualizedObservedNetPay:
-						status === "confirmed"
-							? {
-									low: quantile(amounts, 0.25) * cadence.annualPeriods,
-									midpoint: typicalNetDeposit * cadence.annualPeriods,
-									high: quantile(amounts, 0.75) * cadence.annualPeriods,
-								}
-							: null,
-					identityEvidence: selected.identityEvidence,
-					regularPayEvidence: {
-						strength: status === "confirmed" ? "moderate" : "weak",
-						items: regularPayEvidenceItems,
-					},
-					observationCount: selected.transactions.length,
-					comparableObservationCount: cluster.included.length,
-					supportingTransactionIds: cluster.included.map(({ id }) => id),
-					excludedTransactionIds: cluster.excluded.map(({ id }) => id),
-					limitations,
+						? {
+								low: quantile(amounts, 0.25) * cadence.annualPeriods,
+								midpoint: typicalNetDeposit * cadence.annualPeriods,
+								high: quantile(amounts, 0.75) * cadence.annualPeriods,
+							}
+						: null,
+				identityEvidence: selected.identityEvidence,
+				regularPayEvidence: {
+					strength: status === "confirmed" ? "moderate" : "weak",
+					items: regularPayEvidenceItems,
 				},
+				observationCount: selected.transactions.length,
+				comparableObservationCount: cluster.included.length,
+				supportingTransactionIds: cluster.included.map(({ id }) => id),
+				excludedTransactionIds: cluster.excluded.map(({ id }) => id),
+				limitations,
 			},
-			diagnostics,
-		};
-	},
-};
+		},
+		diagnostics,
+	};
+}

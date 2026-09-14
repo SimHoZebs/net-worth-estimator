@@ -1,18 +1,9 @@
 import { describe, expect, it } from "vitest";
-import {
-	createPostingClassificationAnalysis,
-	createPostingClassificationPlan,
-} from "@/lib/analysis";
+import { classifyPostings } from "@/lib/analysis";
 import type { PostingObservationDataset } from "../postingObservations";
 import type { PayrollCandidate } from "./payrollDetection";
-import { payrollDetectionAnalysis } from "./payrollDetection";
-import { salaryEstimateAnalysis } from "./salaryEstimate";
-
-const classificationAnalysis = createPostingClassificationAnalysis(
-	createPostingClassificationPlan(
-		payrollDetectionAnalysis.classificationRequirements,
-	),
-);
+import { detectPayroll } from "./payrollDetection";
+import { estimateSalary } from "./salaryEstimate";
 
 function candidate(
 	dates: string[],
@@ -34,19 +25,16 @@ function candidate(
 	};
 }
 
-async function detectPayroll(input: PostingObservationDataset) {
-	const classified = await classificationAnalysis.run({ input });
-	return payrollDetectionAnalysis.run({ input: classified.value });
+function detectPayrollFromDataset(input: PostingObservationDataset) {
+	return detectPayroll(classifyPostings(input));
 }
 
 describe("salary estimate analysis", () => {
-	it("annualizes a biweekly recurring net-pay stream", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate(["2026-01-02", "2026-01-16", "2026-01-30", "2026-02-13"]),
-				],
-			},
+	it("annualizes a biweekly recurring net-pay stream", () => {
+		const result = estimateSalary({
+			candidates: [
+				candidate(["2026-01-02", "2026-01-16", "2026-01-30", "2026-02-13"]),
+			],
 		});
 		expect(result.value.estimate).toMatchObject({
 			cadence: "biweekly",
@@ -59,13 +47,11 @@ describe("salary estimate analysis", () => {
 		});
 	});
 
-	it("prefers a validated twice-monthly calendar pattern", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate(["2026-02-01", "2026-02-28", "2026-03-01", "2026-03-31"]),
-				],
-			},
+	it("prefers a validated twice-monthly calendar pattern", () => {
+		const result = estimateSalary({
+			candidates: [
+				candidate(["2026-02-01", "2026-02-28", "2026-03-01", "2026-03-31"]),
+			],
 		});
 		expect(result.value.estimate).toMatchObject({
 			cadence: "twice-monthly",
@@ -75,123 +61,107 @@ describe("salary estimate analysis", () => {
 		});
 	});
 
-	it("does not choose biweekly over indistinguishable twice-monthly timing", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate(["2026-02-01", "2026-02-15", "2026-03-01", "2026-03-15"]),
-				],
-			},
+	it("does not choose biweekly over indistinguishable twice-monthly timing", () => {
+		const result = estimateSalary({
+			candidates: [
+				candidate(["2026-02-01", "2026-02-15", "2026-03-01", "2026-03-15"]),
+			],
 		});
 		expect(result.value.estimate).toBeNull();
 		expect(result.diagnostics[0]?.code).toBe("salary.ambiguous-cadence");
 	});
 
-	it("rejects calendar schedules with an extra observed deposit", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate([
+	it("rejects calendar schedules with an extra observed deposit", () => {
+		const result = estimateSalary({
+			candidates: [
+				candidate([
+					"2026-01-01",
+					"2026-01-15",
+					"2026-02-01",
+					"2026-02-15",
+					"2026-03-01",
+					"2026-03-15",
+					"2026-04-01",
+					"2026-04-15",
+					"2026-04-25",
+				]),
+			],
+		});
+		expect(result.value.estimate).toBeNull();
+		expect(result.diagnostics[0]?.code).toBe("salary.ambiguous-cadence");
+	});
+
+	it("rejects calendar schedules with skipped months", () => {
+		const result = estimateSalary({
+			candidates: [
+				candidate(["2026-01-01", "2026-01-15", "2026-03-01", "2026-03-15"]),
+			],
+		});
+		expect(result.value.estimate).toBeNull();
+		expect(result.diagnostics[0]?.code).toBe("salary.ambiguous-cadence");
+	});
+
+	it("rejects two clustered deposits per month as twice-monthly pay", () => {
+		const result = estimateSalary({
+			candidates: [
+				candidate(["2026-01-01", "2026-01-02", "2026-02-01", "2026-02-02"]),
+			],
+		});
+		expect(result.value.estimate).toBeNull();
+		expect(result.diagnostics[0]?.code).toBe("salary.ambiguous-cadence");
+	});
+
+	it("does not hide an extra high-value deposit before calendar validation", () => {
+		const result = estimateSalary({
+			candidates: [
+				candidate(
+					[
 						"2026-01-01",
 						"2026-01-15",
+						"2026-01-25",
 						"2026-02-01",
 						"2026-02-15",
 						"2026-03-01",
 						"2026-03-15",
-						"2026-04-01",
-						"2026-04-15",
-						"2026-04-25",
-					]),
-				],
-			},
+					],
+					[2000, 2000, 10_000, 2000, 2000, 2000, 2000],
+				),
+			],
 		});
 		expect(result.value.estimate).toBeNull();
 		expect(result.diagnostics[0]?.code).toBe("salary.ambiguous-cadence");
 	});
 
-	it("rejects calendar schedules with skipped months", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate(["2026-01-01", "2026-01-15", "2026-03-01", "2026-03-15"]),
-				],
-			},
+	it("rejects weak twice-monthly evidence without a calendar pattern", () => {
+		const result = estimateSalary({
+			candidates: [
+				candidate([
+					"2026-01-02",
+					"2026-01-16",
+					"2026-01-30",
+					"2026-02-13",
+					"2026-02-26",
+					"2026-03-12",
+				]),
+			],
 		});
 		expect(result.value.estimate).toBeNull();
 		expect(result.diagnostics[0]?.code).toBe("salary.ambiguous-cadence");
 	});
 
-	it("rejects two clustered deposits per month as twice-monthly pay", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate(["2026-01-01", "2026-01-02", "2026-02-01", "2026-02-02"]),
-				],
-			},
-		});
-		expect(result.value.estimate).toBeNull();
-		expect(result.diagnostics[0]?.code).toBe("salary.ambiguous-cadence");
-	});
-
-	it("does not hide an extra high-value deposit before calendar validation", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate(
-						[
-							"2026-01-01",
-							"2026-01-15",
-							"2026-01-25",
-							"2026-02-01",
-							"2026-02-15",
-							"2026-03-01",
-							"2026-03-15",
-						],
-						[2000, 2000, 10_000, 2000, 2000, 2000, 2000],
-					),
-				],
-			},
-		});
-		expect(result.value.estimate).toBeNull();
-		expect(result.diagnostics[0]?.code).toBe("salary.ambiguous-cadence");
-	});
-
-	it("rejects weak twice-monthly evidence without a calendar pattern", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate([
-						"2026-01-02",
-						"2026-01-16",
-						"2026-01-30",
-						"2026-02-13",
-						"2026-02-26",
-						"2026-03-12",
-					]),
-				],
-			},
-		});
-		expect(result.value.estimate).toBeNull();
-		expect(result.diagnostics[0]?.code).toBe("salary.ambiguous-cadence");
-	});
-
-	it("rejects unsupported fixed intervals that resemble weekly or monthly pay", async () => {
-		const everyFiveDays = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate(["2026-01-01", "2026-01-06", "2026-01-11", "2026-01-16"]),
-				],
-			},
+	it("rejects unsupported fixed intervals that resemble weekly or monthly pay", () => {
+		const everyFiveDays = estimateSalary({
+			candidates: [
+				candidate(["2026-01-01", "2026-01-06", "2026-01-11", "2026-01-16"]),
+			],
 		});
 		expect(everyFiveDays.value.estimate).toBeNull();
 		expect(everyFiveDays.diagnostics[0]?.code).toBe("salary.ambiguous-cadence");
 
-		const everyTwentyFiveDays = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate(["2026-01-01", "2026-01-26", "2026-02-20", "2026-03-17"]),
-				],
-			},
+		const everyTwentyFiveDays = estimateSalary({
+			candidates: [
+				candidate(["2026-01-01", "2026-01-26", "2026-02-20", "2026-03-17"]),
+			],
 		});
 		expect(everyTwentyFiveDays.value.estimate).toBeNull();
 		expect(everyTwentyFiveDays.diagnostics[0]?.code).toBe(
@@ -199,22 +169,20 @@ describe("salary estimate analysis", () => {
 		);
 	});
 
-	it("excludes an off-cycle amount outlier from a monthly estimate", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate(
-						[
-							"2026-01-31",
-							"2026-02-15",
-							"2026-02-28",
-							"2026-03-31",
-							"2026-04-30",
-						],
-						[3000, 9000, 3000, 3000, 3000],
-					),
-				],
-			},
+	it("excludes an off-cycle amount outlier from a monthly estimate", () => {
+		const result = estimateSalary({
+			candidates: [
+				candidate(
+					[
+						"2026-01-31",
+						"2026-02-15",
+						"2026-02-28",
+						"2026-03-31",
+						"2026-04-30",
+					],
+					[3000, 9000, 3000, 3000, 3000],
+				),
+			],
 		});
 		expect(result.value.estimate).toMatchObject({
 			cadence: "monthly",
@@ -226,31 +194,27 @@ describe("salary estimate analysis", () => {
 		);
 	});
 
-	it("does not combine two recurring amount modes", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate(
-						["2026-01-02", "2026-01-16", "2026-01-30", "2026-02-13"],
-						[2000, 2000, 4000, 4000],
-					),
-				],
-			},
+	it("does not combine two recurring amount modes", () => {
+		const result = estimateSalary({
+			candidates: [
+				candidate(
+					["2026-01-02", "2026-01-16", "2026-01-30", "2026-02-13"],
+					[2000, 2000, 4000, 4000],
+				),
+			],
 		});
 		expect(result.value.estimate).toBeNull();
 		expect(result.diagnostics[0]?.code).toBe("salary.multimodal-deposits");
 	});
 
-	it("excludes a singleton high-side amount outlier", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate(
-						["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"],
-						[2000, 2000, 2000, 3000],
-					),
-				],
-			},
+	it("excludes a singleton high-side amount outlier", () => {
+		const result = estimateSalary({
+			candidates: [
+				candidate(
+					["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"],
+					[2000, 2000, 2000, 3000],
+				),
+			],
 		});
 		expect(result.value.estimate).toMatchObject({
 			annualizedObservedNetPay: { midpoint: 24_000 },
@@ -258,7 +222,7 @@ describe("salary estimate analysis", () => {
 		});
 	});
 
-	it("keeps the robust outlier path available after payroll detection", async () => {
+	it("keeps the robust outlier path available after payroll detection", () => {
 		const dates = [
 			"2026-01-31",
 			"2026-02-15",
@@ -266,7 +230,7 @@ describe("salary estimate analysis", () => {
 			"2026-03-31",
 			"2026-04-30",
 		];
-		const detected = await detectPayroll({
+		const detected = detectPayrollFromDataset({
 			postings: dates.map((bookedDate, index) => ({
 				id: `observed-${index}`,
 				postingId: `observed-${index}`,
@@ -278,14 +242,14 @@ describe("salary estimate analysis", () => {
 				counterpartyName: "Acme Inc",
 			})),
 		});
-		const result = await salaryEstimateAnalysis.run({ input: detected.value });
+		const result = estimateSalary(detected.value);
 		expect(result.value.estimate?.annualizedObservedNetPay?.midpoint).toBe(
 			36_000,
 		);
 	});
 
-	it("keeps a strong payroll identity provisional with only two regular deposits", async () => {
-		const detected = await detectPayroll({
+	it("keeps a strong payroll identity provisional with only two regular deposits", () => {
+		const detected = detectPayrollFromDataset({
 			postings: [
 				{
 					id: "amazon-april",
@@ -319,7 +283,7 @@ describe("salary estimate analysis", () => {
 				},
 			],
 		});
-		const result = await salaryEstimateAnalysis.run({ input: detected.value });
+		const result = estimateSalary(detected.value);
 		expect(result.value).toMatchObject({
 			status: "provisional",
 			estimate: {
@@ -332,31 +296,27 @@ describe("salary estimate analysis", () => {
 		});
 	});
 
-	it("returns no estimate for insufficient or ambiguous history", async () => {
-		const insufficient = await salaryEstimateAnalysis.run({
-			input: { candidates: [candidate(["2026-01-01"])] },
+	it("returns no estimate for insufficient or ambiguous history", () => {
+		const insufficient = estimateSalary({
+			candidates: [candidate(["2026-01-01"])],
 		});
 		expect(insufficient.value.estimate).toBeNull();
 		expect(insufficient.diagnostics[0]?.code).toBe(
 			"salary.insufficient-history",
 		);
 
-		const irregular = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate(["2026-01-01", "2026-01-11", "2026-02-08", "2026-03-25"]),
-				],
-			},
+		const irregular = estimateSalary({
+			candidates: [
+				candidate(["2026-01-01", "2026-01-11", "2026-02-08", "2026-03-25"]),
+			],
 		});
 		expect(irregular.value.estimate).toBeNull();
 		expect(irregular.diagnostics[0]?.code).toBe("salary.ambiguous-cadence");
 	});
 
-	it("returns a provisional per-deposit result with two comparable deposits", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [candidate(["2026-06-30", "2026-07-31"])],
-			},
+	it("returns a provisional per-deposit result with two comparable deposits", () => {
+		const result = estimateSalary({
+			candidates: [candidate(["2026-06-30", "2026-07-31"])],
 		});
 		expect(result.value).toMatchObject({
 			status: "provisional",
@@ -371,19 +331,17 @@ describe("salary estimate analysis", () => {
 		);
 	});
 
-	it("rejects a cadence-breaking gap hidden by a median", async () => {
-		const result = await salaryEstimateAnalysis.run({
-			input: {
-				candidates: [
-					candidate([
-						"2026-01-02",
-						"2026-01-16",
-						"2026-01-30",
-						"2026-02-13",
-						"2026-03-13",
-					]),
-				],
-			},
+	it("rejects a cadence-breaking gap hidden by a median", () => {
+		const result = estimateSalary({
+			candidates: [
+				candidate([
+					"2026-01-02",
+					"2026-01-16",
+					"2026-01-30",
+					"2026-02-13",
+					"2026-03-13",
+				]),
+			],
 		});
 		expect(result.value.estimate).toBeNull();
 		expect(result.diagnostics[0]?.code).toBe("salary.ambiguous-cadence");

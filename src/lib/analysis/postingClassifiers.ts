@@ -1,7 +1,3 @@
-import type {
-	PostingClassificationValue,
-	PostingClassifier,
-} from "./classification";
 import type { EvidenceItem } from "./evidence";
 import type { PostingObservation } from "./postingObservations";
 
@@ -66,7 +62,7 @@ function payerDetails(transaction: PostingObservation): PayerClassification {
 	};
 }
 
-function detectPaymentRail(text: string): PaymentRail {
+export function detectPaymentRail(text: string): PaymentRail {
 	if (/\b(ach|ppd|ccd|direct\s+dep(?:osit)?s?)\b/iu.test(text)) return "ach";
 	if (/\b(card|visa|mastercard|debit)\b/iu.test(text)) return "card";
 	if (/\b(check|cheque)\b/iu.test(text)) return "check";
@@ -74,75 +70,66 @@ function detectPaymentRail(text: string): PaymentRail {
 	return "unknown";
 }
 
-function evidence(
-	code: string,
-	message: string,
-): PostingClassificationValue<true> {
+export function classifyPayer(posting: PostingObservation): {
+	value: PayerClassification;
+	evidence: EvidenceItem[];
+} {
+	const value = payerDetails(posting);
 	return {
-		value: true,
-		evidence: [{ code, source: "lexical", strength: "moderate", message }],
+		value,
+		evidence: value.identity
+			? [
+					{
+						code: "payer.identity",
+						source: "lexical",
+						strength: "moderate",
+						message: `Normalized payer identity: ${value.identity}.`,
+					},
+				]
+			: [],
 	};
 }
 
-export const payerClassifier: PostingClassifier<"payer", PayerClassification> =
-	{
-		id: "payer",
-		classify(posting) {
-			const value = payerDetails(posting);
-			const items: EvidenceItem[] = value.identity
-				? [
-						{
-							code: "payer.identity",
-							source: "lexical",
-							strength: "moderate",
-							message: `Normalized payer identity: ${value.identity}.`,
-						},
-					]
-				: [];
-			return { value, evidence: items };
-		},
-	};
-
-export const payrollClassifier: PostingClassifier<"payroll", true> = {
-	id: "payroll",
-	classify(posting) {
-		if (
-			posting.amount === null ||
-			posting.amount <= 0 ||
-			!PAYROLL_LANGUAGE.test(
-				`${posting.description} ${posting.counterpartyName ?? ""}`,
-			)
-		)
-			return null;
-		return evidence(
-			"payroll.language",
-			"Payroll language was found in the transaction text.",
-		);
-	},
-};
-
-export const paymentRailClassifier: PostingClassifier<
-	"payment-rail",
-	PaymentRail
-> = {
-	id: "payment-rail",
-	classify(posting) {
-		const value = detectPaymentRail(
+export function classifyPayrollLanguage(
+	posting: PostingObservation,
+): EvidenceItem[] {
+	if (
+		posting.amount === null ||
+		posting.amount <= 0 ||
+		!PAYROLL_LANGUAGE.test(
 			`${posting.description} ${posting.counterpartyName ?? ""}`,
-		);
-		return {
-			value,
-			evidence:
-				value === "unknown"
-					? []
-					: [
-							{
-								code: `payment-rail.${value}`,
-								source: "rail",
-								strength: "weak",
-								message: `Payment rail appears to be ${value.toUpperCase()}.`,
-							},
-						],
-		};
-	},
-};
+		)
+	)
+		return [];
+	return [
+		{
+			code: "payroll.language",
+			source: "lexical",
+			strength: "moderate",
+			message: "Payroll language was found in the transaction text.",
+		},
+	];
+}
+
+export function classifyPaymentRail(posting: PostingObservation): {
+	value: PaymentRail;
+	evidence: EvidenceItem[];
+} {
+	const value = detectPaymentRail(
+		`${posting.description} ${posting.counterpartyName ?? ""}`,
+	);
+	return {
+		value,
+		evidence:
+			value === "unknown"
+				? []
+				: [
+						{
+							code: `payment-rail.${value}`,
+							source: "rail",
+							strength: "weak",
+							message: `Payment rail appears to be ${value.toUpperCase()}.`,
+						},
+					],
+	};
+}
