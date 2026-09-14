@@ -134,7 +134,10 @@ export {
 	summarizeValidationIssues,
 	validateCsvFinancialModel,
 } from "./sources/csv/csvValidation";
-export { parseIncomeDataFiles } from "./sources/csv/incomeDataSource";
+export {
+	parseIncomeDataFiles,
+	parseIncomeDataSnapshot,
+} from "./sources/csv/incomeDataSource";
 export type {
 	IncomeDataSnapshot,
 	IncomeSourceDefinition,

@@ -254,3 +254,72 @@ export function parseIncomeDataFiles(files: {
 	);
 	return { data, issues };
 }
+
+const incomeDataSnapshotSchema = z.object({
+	incomeSources: z.array(z.unknown()),
+	taxProfiles: z.array(z.unknown()),
+});
+
+function parseSnapshotRows<T>(
+	fileName: string,
+	rows: unknown[],
+	schema: z.ZodType<T>,
+): { rows: T[]; issues: ModelValidationIssue[] } {
+	const issues: ModelValidationIssue[] = [];
+	const parsed: T[] = [];
+	rows.forEach((row, index) => {
+		const result = schema.safeParse(row);
+		if (!result.success) {
+			for (const issue of result.error.issues) {
+				issues.push({
+					severity: "error",
+					code: "income-data.row.invalid",
+					message: issue.message,
+					path: [fileName, index, ...issue.path.map(String)],
+				});
+			}
+			return;
+		}
+		parsed.push(result.data);
+	});
+	return { rows: parsed, issues };
+}
+
+/**
+ * Validates a backend JSON snapshot directly. Replaces the old
+ * serialize-to-CSV-and-reparse roundtrip: the wire shape already matches the
+ * row schemas, so only row validation and snapshot checks run.
+ */
+export function parseIncomeDataSnapshot(value: unknown): IncomeDataLoadResult {
+	const parsed = incomeDataSnapshotSchema.safeParse(value);
+	if (!parsed.success) {
+		return {
+			data: null,
+			issues: [
+				{
+					severity: "error",
+					code: "income-data.snapshot.invalid",
+					message: "Income data snapshot is invalid.",
+					path: [],
+				},
+			],
+		};
+	}
+	const incomeResult = parseSnapshotRows(
+		INCOME_DATA_FILE_NAMES.incomeSources,
+		parsed.data.incomeSources,
+		incomeSourceSchema,
+	);
+	const taxResult = parseSnapshotRows(
+		INCOME_DATA_FILE_NAMES.taxProfiles,
+		parsed.data.taxProfiles,
+		taxProfileSchema,
+	);
+	const issues = [...incomeResult.issues, ...taxResult.issues];
+	const data = validateSnapshot(
+		incomeResult.rows,
+		taxResult.rows as IncomeTaxProfile[],
+		issues,
+	);
+	return { data, issues };
+}
