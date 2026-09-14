@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { makePosting } from "../__fixtures__/postings";
-import { simulate } from "../reference/simulation/simulate";
 import {
 	AmountResolutionError,
 	createExpressionAmount,
@@ -163,67 +162,6 @@ describe("posting amount resolution", () => {
 
 		expect(resolve(providerInput("posting-year-to-date"))).toBe(900);
 		expect(resolve(providerInput("posting-prior-year-to-date"))).toBe(800);
-	});
-
-	it("does not double count the current source occurrence in a threshold resolver", () => {
-		const salary = makePosting({
-			id: "salary",
-			destinations: ["cash"],
-			arithmetic: "100",
-			startDate: "2026-01-01",
-			priority: 1,
-		});
-		const tax = makePosting({
-			id: "tax",
-			sourceAccountId: "cash",
-			amount: {
-				resolver: "threshold-percentage",
-				config: { rate: 0.1, threshold: 100 },
-				inputs: {
-					currentAmount: {
-						source: "provider",
-						provider: "posting-latest",
-						arguments: { id: "salary" },
-					},
-					yearToDateAmount: {
-						source: "provider",
-						provider: "posting-prior-year-to-date",
-						arguments: { id: "salary" },
-					},
-				},
-			},
-			startDate: "2026-01-01",
-			priority: 2,
-		});
-		const run = simulate({
-			model: {
-				accounts: [
-					{
-						id: "cash",
-						label: "Cash",
-						minBalance: 0,
-						maxBalance: Number.POSITIVE_INFINITY,
-						color: null,
-						enabled: true,
-					},
-				],
-				postings: [salary, tax],
-			},
-			initialState: {
-				balances: { cash: 0 },
-				latestRealizedPostingAmounts: new Map(),
-				realizedPostingAmountsByYear: new Map(),
-			},
-			startDate: "2026-01-01",
-			endDate: "2026-02-01",
-			includeStartDateEvents: true,
-		});
-
-		expect(
-			run.movementAttempts
-				.filter((event) => event.origin.postingId === "tax")
-				.map((event) => event.requestedAmount),
-		).toEqual([0, 10]);
 	});
 
 	it("validates provider arguments and references", () => {

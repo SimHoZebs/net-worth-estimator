@@ -1,30 +1,103 @@
 import { describe, expect, it } from "vitest";
 import type {
-	ModelOverrides,
+	ProjectionResult,
 	StochasticProjectionResult,
 } from "@/lib/projection";
-import {
-	parseCsvFinancialModel,
-	projectFinancialModelDocument,
-	stochasticProject,
-} from "@/lib/projection";
-import { makeSettings, validCsvFiles } from "@/lib/projection/__fixtures__";
+import { parseCsvFinancialModel } from "@/lib/projection";
+import { validCsvFiles } from "@/lib/projection/__fixtures__";
 import {
 	buildAccountDiagnosticChartData,
 	buildStochasticChartData,
 } from "../chartData";
 
-const PROJECTION_SETTINGS = makeSettings({
-	fallbackProjectionStartDate: "2026-04-01",
-	horizonYears: 5,
-});
+function sampledRow(
+	date: string,
+	netWorth: number,
+	balances: Record<string, number>,
+) {
+	return {
+		date,
+		isHistorical: false,
+		netWorth,
+		accountSnapshots: Object.entries(balances).map(([accountId, balance]) => ({
+			accountId,
+			date,
+			balance,
+			impacts: [],
+		})),
+		externalInflowAmount: 0,
+		externalOutflowAmount: 0,
+		internalTransferAmount: 0,
+	};
+}
 
-const EMPTY_MODEL_OVERRIDES: ModelOverrides = {
-	addedAccounts: [],
-	addedPostings: [],
-	disabledAccountIds: [],
-	disabledPostingIds: [],
-};
+function staticResult(balancesByDate: Array<Record<string, number>>) {
+	const dates = ["2026-04-01", "2026-05-01", "2026-06-01"];
+	const sampledRows = dates.map((date, index) => {
+		const balances = balancesByDate[index] ?? {};
+		const netWorth = Object.values(balances).reduce(
+			(sum, value) => sum + value,
+			0,
+		);
+		return sampledRow(date, netWorth, balances);
+	});
+	return {
+		timeline: { rows: sampledRows, sampledRows },
+		accountSummaries: [],
+		totals: {
+			externalInflowAmount: 0,
+			externalOutflowAmount: 0,
+			internalTransferAmount: 0,
+		},
+		milestones: {
+			latestHistoricalDate: null,
+			projectionStartDate: "2026-04-01",
+		},
+		summary: {
+			currentNetWorth: sampledRows[0]?.netWorth ?? 0,
+			finalNetWorth: sampledRows[sampledRows.length - 1]?.netWorth ?? 0,
+		},
+		evaluations: {
+			financialIndependence: [],
+			netWorthThreshold: [],
+			postingFulfillment: [],
+		},
+	} satisfies ProjectionResult;
+}
+
+function staticStochastic(
+	deterministic: ProjectionResult,
+): StochasticProjectionResult {
+	return {
+		config: { runCount: 50, seed: 42 },
+		deterministic,
+		bands: deterministic.timeline.sampledRows.map((row) => ({
+			date: row.date,
+			isHistorical: false,
+			netWorth: {
+				p10: row.netWorth - 200,
+				p25: row.netWorth - 100,
+				p50: row.netWorth,
+				p75: row.netWorth + 100,
+				p90: row.netWorth + 200,
+			},
+		})),
+		milestones: {
+			finalNetWorthPercentiles: {
+				p10: 300_000,
+				p25: 400_000,
+				p50: 500_000,
+				p75: 600_000,
+				p90: 700_000,
+			},
+		},
+		evaluations: {
+			financialIndependence: [],
+			netWorthThreshold: [],
+			postingFulfillment: [],
+		},
+	};
+}
 
 describe("buildAccountDiagnosticChartData", () => {
 	it("returns per-account balances and deterministic net worth", () => {
@@ -32,11 +105,11 @@ describe("buildAccountDiagnosticChartData", () => {
 		expect(document).not.toBeNull();
 
 		if (!document) throw new Error("Financial model failed to load");
-		const result = projectFinancialModelDocument(
-			document,
-			PROJECTION_SETTINGS,
-			EMPTY_MODEL_OVERRIDES,
+		const enabled = document.accounts.filter((a) => a.enabled);
+		const balances = Object.fromEntries(
+			enabled.map((account, index) => [account.id, (index + 1) * 1000]),
 		);
+		const result = staticResult([balances, balances, balances]);
 		const data = buildAccountDiagnosticChartData(document, result);
 
 		expect(data.length).toBeGreaterThan(0);
@@ -47,25 +120,18 @@ describe("buildAccountDiagnosticChartData", () => {
 			expect(typeof row.netWorth).toBe("number");
 		}
 
-		for (const account of document.accounts.filter((a) => a.enabled)) {
+		for (const account of enabled) {
 			expect(typeof data[0][account.id]).toBe("number");
 		}
 	});
 
 	it("merges stochastic band data into rows when stochastic result is provided", () => {
-		const { data: document } = parseCsvFinancialModel(validCsvFiles);
-		expect(document).not.toBeNull();
-
-		if (!document) throw new Error("Financial model failed to load");
-		const stochasticResult = stochasticProject(
-			document,
-			PROJECTION_SETTINGS,
-			EMPTY_MODEL_OVERRIDES,
-			{
-				runCount: 50,
-				seed: 42,
-			},
-		);
+		const result = staticResult([
+			{ checking: 1000 },
+			{ checking: 1100 },
+			{ checking: 1200 },
+		]);
+		const stochasticResult = staticStochastic(result);
 
 		const data = buildStochasticChartData(
 			stochasticResult.deterministic,
@@ -104,15 +170,11 @@ describe("buildAccountDiagnosticChartData", () => {
 	});
 
 	it("falls back to deterministic net worth for sampled row dates missing from band map", () => {
-		const { data: document } = parseCsvFinancialModel(validCsvFiles);
-		expect(document).not.toBeNull();
-
-		if (!document) throw new Error("Financial model failed to load");
-		const result = projectFinancialModelDocument(
-			document,
-			PROJECTION_SETTINGS,
-			EMPTY_MODEL_OVERRIDES,
-		);
+		const result = staticResult([
+			{ checking: 1000 },
+			{ checking: 1100 },
+			{ checking: 1200 },
+		]);
 
 		const fakeStochastic: StochasticProjectionResult = {
 			config: { runCount: 10, seed: null },
@@ -167,11 +229,11 @@ describe("buildAccountDiagnosticChartData", () => {
 	it("preserves first-match account lookup behavior", () => {
 		const { data: document } = parseCsvFinancialModel(validCsvFiles);
 		if (!document) throw new Error("Financial model failed to load");
-		const result = projectFinancialModelDocument(
-			document,
-			PROJECTION_SETTINGS,
-			EMPTY_MODEL_OVERRIDES,
-		);
+		const result = staticResult([
+			{ checking: 1000 },
+			{ checking: 1100 },
+			{ checking: 1200 },
+		]);
 		const firstRow = result.timeline.sampledRows[0];
 		const firstSnapshot = firstRow?.accountSnapshots[0];
 		if (!firstRow || !firstSnapshot) throw new Error("Projection row is empty");

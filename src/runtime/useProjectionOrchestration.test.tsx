@@ -4,12 +4,8 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useProjection } from "@/hooks/useProjection";
 import { useStochastic } from "@/hooks/useStochastic";
-import {
-	createBaseDocument,
-	makePosting,
-	makeSettings,
-} from "@/lib/projection/__fixtures__";
-import { projectFinancialModelDocument } from "@/lib/projection/reference/analysis/projectFinancialModel";
+import type { ProjectionResult } from "@/lib/projection";
+import { createBaseDocument, makePosting } from "@/lib/projection/__fixtures__";
 import { useStore } from "@/store";
 import { useProjectionOrchestration } from "./useProjectionOrchestration";
 
@@ -17,13 +13,6 @@ vi.mock("@/hooks/useProjection", () => ({ useProjection: vi.fn() }));
 vi.mock("@/hooks/useStochastic", () => ({ useStochastic: vi.fn() }));
 
 const initialStoreState = useStore.getInitialState();
-const emptyOverrides = {
-	addedAccounts: [],
-	addedPostings: [],
-	disabledAccountIds: [],
-	disabledPostingIds: [],
-};
-
 describe("useProjectionOrchestration", () => {
 	beforeEach(() => {
 		useStore.setState(initialStoreState, true);
@@ -82,11 +71,25 @@ describe("useProjectionOrchestration", () => {
 
 	it("constructs execution and stale-safe comparison values", () => {
 		const document = createBaseDocument();
-		const projectionResult = projectFinancialModelDocument(
-			document,
-			makeSettings(),
-			emptyOverrides,
-		);
+		const projectionResult: ProjectionResult = {
+			timeline: { rows: [], sampledRows: [] },
+			accountSummaries: [],
+			totals: {
+				externalInflowAmount: 0,
+				externalOutflowAmount: 0,
+				internalTransferAmount: 0,
+			},
+			milestones: {
+				latestHistoricalDate: null,
+				projectionStartDate: "2026-02-01",
+			},
+			summary: { currentNetWorth: 1600, finalNetWorth: 2400 },
+			evaluations: {
+				financialIndependence: [],
+				netWorthThreshold: [],
+				postingFulfillment: [],
+			},
+		};
 		useStore.setState({ disabledPostingIds: ["salary"] });
 		vi.mocked(useProjection).mockReturnValue({
 			result: projectionResult,
