@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { projectRawFinancialModelDocument } from "../reference/simulation/projectPath";
 import { parseCsvFinancialModel } from "../sources/csv/csvLoader";
 import { validateCsvFinancialModel } from "../sources/csv/csvValidation";
-import { parseIncomeDataFiles } from "../sources/csv/incomeDataSource";
+import {
+	parseIncomeDataFiles,
+	parseIncomeDataSnapshot,
+} from "../sources/csv/incomeDataSource";
 import type { IncomeDataSnapshot } from "../types/income";
 import type { FinancialModelDocument, ModelFileContents } from "../types/model";
 
@@ -110,6 +113,46 @@ describe("income data source and income posting", () => {
 			result.issues.some(
 				(issue) => issue.code === "income-data.tax-profile.brackets",
 			),
+		).toBe(true);
+	});
+
+	it("parses a backend JSON snapshot identically to the CSV files", () => {
+		const fromCsv = parseIncomeDataFiles({ incomeSources, taxProfiles });
+		expect(fromCsv.issues).toEqual([]);
+		if (!fromCsv.data) throw new Error("Expected valid income data.");
+		const fromSnapshot = parseIncomeDataSnapshot(
+			JSON.parse(JSON.stringify(fromCsv.data)),
+		);
+		expect(fromSnapshot.issues).toEqual([]);
+		expect(fromSnapshot.data).toEqual(fromCsv.data);
+	});
+
+	it("rejects a malformed snapshot shape", () => {
+		const result = parseIncomeDataSnapshot({ incomeSources: null });
+		expect(result.data).toBeNull();
+		expect(
+			result.issues.some(
+				(issue) => issue.code === "income-data.snapshot.invalid",
+			),
+		).toBe(true);
+	});
+
+	it("reports invalid snapshot rows without a CSV roundtrip", () => {
+		const result = parseIncomeDataSnapshot({
+			incomeSources: [
+				{
+					id: "salary",
+					label: "Salary",
+					effectiveFrom: "2026-02-31",
+					effectiveTo: null,
+					annualGrossIncome: 120000,
+				},
+			],
+			taxProfiles: [],
+		});
+		expect(result.data).toBeNull();
+		expect(
+			result.issues.some((issue) => issue.code === "income-data.row.invalid"),
 		).toBe(true);
 	});
 
