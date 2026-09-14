@@ -2,15 +2,16 @@
 
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import type {
+	FinancialIndependenceDetailedRunOutcome,
+	FinancialIndependencePlan,
+	FinancialIndependenceRow,
+} from "@/lib/projection";
 import {
 	createBaseDocument,
 	makeAccount,
 	makePosting,
-	makeSettings,
 } from "@/lib/projection/__fixtures__";
-import { getFinancialIndependenceResult } from "@/lib/projection/evaluation/accessors";
-import { projectFinancialModelDocument } from "@/lib/projection/reference/analysis/projectFinancialModel";
-import { selectFinancialIndependenceOutcomeIndex } from "@/lib/projection/reference/evaluation/financialIndependence";
 import { OverviewCard } from "./OverviewCard";
 
 afterEach(cleanup);
@@ -199,80 +200,82 @@ function buildSuccessfulResult() {
 			makeAccount({ id: "brokerage", label: "Brokerage" }),
 			makeAccount({ id: "roth", label: "Roth IRA" }),
 		],
-		postings: [
-			makePosting({
-				id: "opening-brokerage",
-				destinations: ["brokerage"],
-				arithmetic: "1000",
-				frequency: "once",
-				startDate: "2026-01-31",
-			}),
-			makePosting({
-				id: "opening-roth",
-				destinations: ["roth"],
-				arithmetic: "2000",
-				frequency: "once",
-				startDate: "2026-01-31",
-			}),
-			makePosting({
-				id: "future-brokerage",
-				destinations: ["brokerage"],
-				arithmetic: "9000",
-				frequency: "once",
-				startDate: "2027-01-01",
-			}),
+		postings: [],
+	});
+	const plan: FinancialIndependencePlan = {
+		minimumNetWorth: 0,
+		annualExpenseTarget: 300,
+		annualExpenseTargetBasis: "fi-date-dollars",
+		annualExpenseGrowthRate: 0,
+		withdrawalRate: 0.04,
+		evaluationYears: 1,
+		requiredConfidence: 0.9,
+		sources: [
+			{ type: "asset", accountId: "brokerage", included: true },
+			{
+				type: "asset",
+				accountId: "roth",
+				included: true,
+				withdrawalRateOverride: 0.05,
+			},
 		],
-	});
-	const defaults = makeSettings();
-	const settings = makeSettings({
-		horizonYears: 2,
-		evaluations: {
-			...defaults.evaluations,
-			financialIndependence: [
-				{
-					instanceId: "fi",
-					label: "Financial independence",
-					enabled: true,
-					config: {
-						minimumNetWorth: 0,
-						annualExpenseTarget: 300,
-						annualExpenseTargetBasis: "fi-date-dollars",
-						annualExpenseGrowthRate: 0,
-						withdrawalRate: 0.04,
-						evaluationYears: 1,
-						requiredConfidence: 0.9,
-						sources: [
-							{ type: "asset", accountId: "brokerage", included: true },
-							{
-								type: "asset",
-								accountId: "roth",
-								included: true,
-								withdrawalRateOverride: 0.05,
-							},
-						],
-						continuingPostingIds: [],
-						principalPolicy: "allow-drawdown",
-					},
-				},
-			],
+		continuingPostingIds: [],
+		principalPolicy: "allow-drawdown",
+	};
+	const row: FinancialIndependenceRow = {
+		date: "2027-01-01",
+		netWorth: 12_000,
+		minimumNetWorth: 0,
+		minimumNetWorthMet: true,
+		annualDirectIncome: 0,
+		assetContributions: [
+			{
+				accountId: "brokerage",
+				balance: 10_000,
+				withdrawalRate: 0.04,
+				annualWithdrawalCapacity: 400,
+			},
+			{
+				accountId: "roth",
+				balance: 2_000,
+				withdrawalRate: 0.05,
+				annualWithdrawalCapacity: 100,
+			},
+		],
+		selectedAssetBalance: 12_000,
+		annualWithdrawalCapacity: 500,
+		totalAnnualCapacity: 500,
+		annualExpenseTarget: 300,
+		coverageRatio: 500 / 300,
+		isCovered: true,
+		isEligible: true,
+	};
+	const outcome: FinancialIndependenceDetailedRunOutcome = {
+		candidateDate: "2027-01-01",
+		status: "evaluated",
+		minimumNetWorthMet: true,
+		initialCoverageMet: true,
+		expensesFullyCovered: true,
+		hadWithdrawalShortfall: false,
+		startingSelectedAssetBalance: 12_000,
+		endingSelectedAssetBalance: 12_000,
+		startingRealSelectedAssetBalance: 12_000,
+		endingRealSelectedAssetBalance: 12_000,
+		principalReplenished: true,
+		cycleEstablished: true,
+		withdrawals: {
+			requestedAmount: 300,
+			realizedAmount: 300,
+			shortfallAmount: 0,
+			firstShortfallDate: null,
+			lastShortfallDate: null,
+			shortfallOccurrenceCount: 0,
+			constraints: [],
+			relatedAccountIds: [],
+			accounts: [],
+			firstShortfall: null,
 		},
-	});
-	const plan = settings.evaluations.financialIndependence[0]!.config;
-	const result = projectFinancialModelDocument(document, settings, {
-		addedAccounts: [],
-		addedPostings: [],
-		disabledAccountIds: [],
-		disabledPostingIds: [],
-	});
-	const analysis = getFinancialIndependenceResult(result, "fi")?.deterministic;
-	if (!analysis) throw new Error("Missing FI analysis.");
-	const selectedIndex = selectFinancialIndependenceOutcomeIndex(
-		analysis.runOutcomes,
-	);
-	const row = analysis.rows[selectedIndex];
-	const outcome = analysis.runOutcomes[selectedIndex];
-	if (!row || !outcome || outcome.status === "summary") {
-		throw new Error("Missing detailed FI candidate details.");
-	}
+		balanceTrajectory: [],
+	};
 	return { document, plan, row, outcome };
 }

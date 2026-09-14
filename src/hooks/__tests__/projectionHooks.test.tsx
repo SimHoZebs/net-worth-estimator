@@ -4,13 +4,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { type ReactNode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import type { ModelOverrides, StochasticProgress } from "@/lib/projection";
+import type {
+	ModelOverrides,
+	ProjectionResult,
+	StochasticProgress,
+	StochasticProjectionResult,
+} from "@/lib/projection";
 import {
 	createBaseDocument,
 	makeSettings,
 } from "@/lib/projection/__fixtures__";
-import { projectFinancialModelDocument } from "@/lib/projection/reference/analysis/projectFinancialModel";
-import { stochasticProject } from "@/lib/projection/reference/analysis/projectStochastic";
 import type { ProjectionEngine } from "@/lib/projection/runtime/ProjectionEngine";
 import { deferred } from "@/test/deferred";
 import { wrapperWithEngine } from "@/test/projectionEngineWrapper";
@@ -41,22 +44,103 @@ const overrides: ModelOverrides = {
 	disabledPostingIds: [],
 };
 
+function timelineRow(date: string, netWorth: number) {
+	return {
+		date,
+		isHistorical: false,
+		netWorth,
+		accountSnapshots: [],
+		externalInflowAmount: 0,
+		externalOutflowAmount: 0,
+		internalTransferAmount: 0,
+	};
+}
+
+function staticDeterministic(): ProjectionResult {
+	const rows = [
+		timelineRow("2026-02-01", 1600),
+		timelineRow("2026-03-01", 1700),
+	];
+	return {
+		timeline: { rows, sampledRows: rows },
+		accountSummaries: [],
+		totals: {
+			externalInflowAmount: 0,
+			externalOutflowAmount: 0,
+			internalTransferAmount: 0,
+		},
+		milestones: {
+			latestHistoricalDate: null,
+			projectionStartDate: "2026-02-01",
+		},
+		summary: { currentNetWorth: 1600, finalNetWorth: 1700 },
+		evaluations: {
+			financialIndependence: [
+				{
+					instanceId: "fi",
+					label: "Financial independence",
+					status: "satisfied",
+					deterministic: null,
+					probabilistic: null,
+					diagnostics: [],
+				},
+			],
+			netWorthThreshold: [],
+			postingFulfillment: [],
+		},
+	};
+}
+
+function staticStochastic(
+	deterministic: ProjectionResult = staticDeterministic(),
+): StochasticProjectionResult {
+	return {
+		config: { runCount: 1, seed: 1 },
+		deterministic,
+		bands: deterministic.timeline.sampledRows.map((row) => ({
+			date: row.date,
+			isHistorical: false,
+			netWorth: {
+				p10: row.netWorth - 100,
+				p25: row.netWorth - 50,
+				p50: row.netWorth,
+				p75: row.netWorth + 50,
+				p90: row.netWorth + 100,
+			},
+		})),
+		milestones: {
+			finalNetWorthPercentiles: {
+				p10: 1500,
+				p25: 1600,
+				p50: 1700,
+				p75: 1800,
+				p90: 1900,
+			},
+		},
+		evaluations: {
+			financialIndependence: [
+				{
+					instanceId: "fi",
+					label: "Financial independence",
+					status: "satisfied",
+					deterministic: null,
+					probabilistic: null,
+					diagnostics: [],
+				},
+			],
+			netWorthThreshold: [],
+			postingFulfillment: [],
+		},
+	};
+}
+
 describe("projection hook request provenance", () => {
 	it("does not restart workers for structurally equal cloned inputs", async () => {
 		const document = createBaseDocument();
 		const settings = makeSettings();
 		const engine: ProjectionEngine = {
-			project: vi
-				.fn()
-				.mockResolvedValue(
-					projectFinancialModelDocument(document, settings, overrides),
-				),
-			projectStochastic: vi.fn().mockResolvedValue(
-				stochasticProject(document, settings, overrides, {
-					runCount: 1,
-					seed: 1,
-				}),
-			),
+			project: vi.fn().mockResolvedValue(staticDeterministic()),
+			projectStochastic: vi.fn().mockResolvedValue(staticStochastic()),
 		};
 		const hook = renderHook(
 			({ currentDocument, currentSettings, currentOverrides }) => ({
@@ -102,15 +186,8 @@ describe("projection hook request provenance", () => {
 	it("passes labels through without restarting workers for label edits", async () => {
 		const document = createBaseDocument();
 		const settings = makeSettings();
-		const deterministic = projectFinancialModelDocument(
-			document,
-			settings,
-			overrides,
-		);
-		const stochastic = stochasticProject(document, settings, overrides, {
-			runCount: 1,
-			seed: 1,
-		});
+		const deterministic = staticDeterministic();
+		const stochastic = staticStochastic();
 		const engine: ProjectionEngine = {
 			project: vi.fn().mockResolvedValue(deterministic),
 			projectStochastic: vi.fn().mockResolvedValue(stochastic),
@@ -166,7 +243,7 @@ describe("projection hook request provenance", () => {
 	it("passes server workload labels through to stochastic progress", async () => {
 		const document = createBaseDocument();
 		const settings = makeSettings();
-		const completion = deferred<ReturnType<typeof stochasticProject>>();
+		const completion = deferred<StochasticProjectionResult>();
 		const engine: ProjectionEngine = {
 			project: vi.fn(),
 			projectStochastic: vi.fn().mockImplementation((_request, onProgress) => {
@@ -212,15 +289,8 @@ describe("projection hook request provenance", () => {
 	it("keeps labeled results stable across unrelated stochastic progress", async () => {
 		const document = createBaseDocument();
 		const settings = makeSettings();
-		const deterministic = projectFinancialModelDocument(
-			document,
-			settings,
-			overrides,
-		);
-		const partialResult = stochasticProject(document, settings, overrides, {
-			runCount: 1,
-			seed: 1,
-		});
+		const deterministic = staticDeterministic();
+		const partialResult = staticStochastic();
 		const completion = deferred<typeof partialResult>();
 		let onProgress:
 			| ((progress: StochasticProgress, partial?: typeof partialResult) => void)
@@ -288,13 +358,8 @@ describe("projection hook request provenance", () => {
 		const secondSettings = structuredClone(firstSettings);
 		secondSettings.evaluations
 			.financialIndependence[0]!.config.annualExpenseTarget = 50_000;
-		const firstResult = projectFinancialModelDocument(
-			document,
-			firstSettings,
-			overrides,
-		);
-		const replacement =
-			deferred<ReturnType<typeof projectFinancialModelDocument>>();
+		const firstResult = staticDeterministic();
+		const replacement = deferred<ProjectionResult>();
 		const engine: ProjectionEngine = {
 			project: vi
 				.fn()
@@ -326,8 +391,8 @@ describe("projection hook request provenance", () => {
 		const document = createBaseDocument();
 		const firstSettings = makeSettings({ horizonYears: 1 });
 		const secondSettings = makeSettings({ horizonYears: 2 });
-		const first = deferred<ReturnType<typeof projectFinancialModelDocument>>();
-		const second = deferred<ReturnType<typeof projectFinancialModelDocument>>();
+		const first = deferred<ProjectionResult>();
+		const second = deferred<ProjectionResult>();
 		const engine: ProjectionEngine = {
 			project: vi
 				.fn()
@@ -346,17 +411,9 @@ describe("projection hook request provenance", () => {
 		await waitFor(() => expect(engine.project).toHaveBeenCalledTimes(1));
 		hook.rerender({ settings: secondSettings });
 		await waitFor(() => expect(engine.project).toHaveBeenCalledTimes(2));
-		act(() =>
-			first.resolve(
-				projectFinancialModelDocument(document, firstSettings, overrides),
-			),
-		);
+		act(() => first.resolve(staticDeterministic()));
 		expect(hook.result.current.result).toBeNull();
-		act(() =>
-			second.resolve(
-				projectFinancialModelDocument(document, secondSettings, overrides),
-			),
-		);
+		act(() => second.resolve(staticDeterministic()));
 		await waitFor(() =>
 			expect(hook.result.current.result?.timeline.rows.length).toBeGreaterThan(
 				0,
@@ -367,12 +424,12 @@ describe("projection hook request provenance", () => {
 	it("ignores obsolete stochastic partial callbacks", async () => {
 		const document = createBaseDocument();
 		const settings = makeSettings({ horizonYears: 2 });
-		const first = deferred<ReturnType<typeof stochasticProject>>();
-		const second = deferred<ReturnType<typeof stochasticProject>>();
+		const first = deferred<StochasticProjectionResult>();
+		const second = deferred<StochasticProjectionResult>();
 		const callbacks: Array<
 			(
 				progress: StochasticProgress,
-				partial?: ReturnType<typeof stochasticProject>,
+				partial?: StochasticProjectionResult,
 			) => void
 		> = [];
 		const engine: ProjectionEngine = {
@@ -400,10 +457,7 @@ describe("projection hook request provenance", () => {
 		await waitFor(() => expect(callbacks).toHaveLength(1));
 		hook.rerender({ config: { runCount: 2, seed: 1 } });
 		await waitFor(() => expect(callbacks).toHaveLength(2));
-		const obsolete = stochasticProject(document, settings, overrides, {
-			runCount: 1,
-			seed: 1,
-		});
+		const obsolete = staticStochastic();
 		act(() =>
 			callbacks[0](
 				{
@@ -417,10 +471,7 @@ describe("projection hook request provenance", () => {
 			),
 		);
 		expect(hook.result.current.result).toBeNull();
-		const current = stochasticProject(document, settings, overrides, {
-			runCount: 2,
-			seed: 1,
-		});
+		const current = staticStochastic();
 		act(() =>
 			callbacks[1](
 				{

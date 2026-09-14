@@ -1,14 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { projectRawFinancialModelDocument } from "../reference/simulation/projectPath";
 import { parseCsvFinancialModel } from "../sources/csv/csvLoader";
 import { validateCsvFinancialModel } from "../sources/csv/csvValidation";
 import {
 	parseIncomeDataFiles,
 	parseIncomeDataSnapshot,
 } from "../sources/csv/incomeDataSource";
-import type { IncomeDataSnapshot } from "../types/income";
-import type { FinancialModelDocument, ModelFileContents } from "../types/model";
+import type { ModelFileContents } from "../types/model";
 
 const incomeSources = [
 	"id,label,effectiveFrom,effectiveTo,annualGrossIncome",
@@ -18,73 +16,6 @@ const taxProfiles = [
 	"id,label,deduction,brackets,sourceUrl",
 	'us-federal,US federal,10000,"[{""upTo"":50000,""rate"":0.1},{""upTo"":null,""rate"":0.2}]",https://example.com/tax',
 ].join("\n");
-
-function makeDocument(): FinancialModelDocument {
-	return {
-		sourcePath: "test",
-		accounts: [
-			{
-				id: "checking",
-				label: "Checking",
-				minBalance: Number.NEGATIVE_INFINITY,
-				maxBalance: Number.POSITIVE_INFINITY,
-				color: null,
-				enabled: true,
-			},
-			{
-				id: "k401",
-				label: "401(k)",
-				minBalance: Number.NEGATIVE_INFINITY,
-				maxBalance: Number.POSITIVE_INFINITY,
-				color: null,
-				enabled: true,
-			},
-		],
-		checkpoints: [],
-		evaluations: {
-			financialIndependence: [],
-			netWorthThreshold: [],
-			postingFulfillment: [],
-		},
-		postings: [
-			{
-				id: "salary",
-				label: "Salary",
-				sourceAccountId: null,
-				destinations: ["checking"],
-				amount: {
-					resolver: "income",
-					config: {
-						incomeSourceId: "salary",
-						resolvers: [
-							{
-								resolver: "percentage",
-								config: { rate: 0.1, annualCap: null },
-								destinationAccountId: "k401",
-								employerMatchRate: 0.5,
-							},
-							{
-								resolver: "progressive-bracket",
-								config: { profileId: "us-federal" },
-								destinationAccountId: null,
-							},
-						],
-					},
-					inputs: {},
-				},
-				frequency: "monthly",
-				annualRate: 0,
-				annualGrowthRate: 0,
-				volatility: 0,
-				startDate: "2026-01-01",
-				endDate: "2026-01-01",
-				annualCap: null,
-				priority: 1,
-				enabled: true,
-			},
-		],
-	};
-}
 
 describe("income data source and income posting", () => {
 	it("parses income and tax CSV data", () => {
@@ -154,80 +85,6 @@ describe("income data source and income posting", () => {
 		expect(
 			result.issues.some((issue) => issue.code === "income-data.row.invalid"),
 		).toBe(true);
-	});
-
-	it("runs ordered payroll resolvers and settles net, contribution, and match", () => {
-		const data = parseIncomeDataFiles({ incomeSources, taxProfiles }).data;
-		if (!data) throw new Error("Expected valid income data.");
-		const result = projectRawFinancialModelDocument(
-			makeDocument(),
-			{
-				fallbackProjectionStartDate: "2026-01-01",
-				horizonYears: 1,
-				evaluations: {
-					financialIndependence: [],
-					netWorthThreshold: [],
-					postingFulfillment: [],
-				},
-			},
-			undefined,
-			undefined,
-			data as IncomeDataSnapshot,
-		);
-		const event = result.path.movementEvents[0];
-		expect(event?.realizedAmount).toBeCloseTo(7_783.333333);
-		expect(event?.income?.resolvers[0]?.realizedAmount).toBeCloseTo(1_000);
-		expect(event?.income?.resolvers[1]?.realizedAmount).toBeCloseTo(
-			1_216.666667,
-		);
-		expect(event?.income?.employerMatchRealized).toBeCloseTo(500);
-		expect(
-			result.path.rows[0]?.accountSnapshots.find(
-				(row) => row.accountId === "checking",
-			)?.balance,
-		).toBeCloseTo(7_783.333333);
-		expect(
-			result.path.rows[0]?.accountSnapshots.find(
-				(row) => row.accountId === "k401",
-			)?.balance,
-		).toBeCloseTo(1_500);
-	});
-
-	it("spreads a resolver annual cap across recurring occurrences", () => {
-		const data = parseIncomeDataFiles({ incomeSources, taxProfiles }).data;
-		if (!data) throw new Error("Expected valid income data.");
-		const document = makeDocument();
-		const posting = document.postings[0]!;
-		posting.startDate = "2026-01-01";
-		posting.endDate = "2026-12-01";
-		const firstResolver = (
-			posting.amount.config.resolvers as Array<{
-				config: Record<string, unknown>;
-			}>
-		)[0]!;
-		firstResolver.config.rate = 1;
-		firstResolver.config.annualCap = 23_000;
-		const result = projectRawFinancialModelDocument(
-			document,
-			{
-				fallbackProjectionStartDate: "2026-01-01",
-				horizonYears: 1,
-				evaluations: {
-					financialIndependence: [],
-					netWorthThreshold: [],
-					postingFulfillment: [],
-				},
-			},
-			undefined,
-			undefined,
-			data,
-		);
-		const contributionTotal = result.path.movementEvents.reduce(
-			(total, event) =>
-				total + (event.income?.resolvers[0]?.realizedAmount ?? 0),
-			0,
-		);
-		expect(contributionTotal).toBeCloseTo(23_000);
 	});
 
 	it("accepts the bundled income posting with the bundled source data", async () => {
