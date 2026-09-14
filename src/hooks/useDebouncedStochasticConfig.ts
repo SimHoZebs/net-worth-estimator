@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { StochasticConfig } from "@/lib/projection";
+import { useDebouncedValue } from "./useDebouncedValue";
 
 const DEBOUNCE_MS = 2000;
 
@@ -45,7 +46,7 @@ export function useDebouncedStochasticConfig(
 		config.seed !== null ? String(config.seed) : "",
 	);
 	const [pendingDraft, setPendingDraft] = useState<PendingDraft | null>(null);
-	const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const settledDraft = useDebouncedValue(pendingDraft, DEBOUNCE_MS);
 	const pendingDraftRef = useRef<PendingDraft | null>(null);
 	const configRef = useRef(config);
 	configRef.current = config;
@@ -69,62 +70,21 @@ export function useDebouncedStochasticConfig(
 				? String(config.seed)
 				: "";
 
-	function scheduleConfigChange(draft: PendingDraft) {
-		const nextDraft = { ...pendingDraftRef.current, ...draft };
-		setPendingDraft(nextDraft);
-		pendingDraftRef.current = nextDraft;
-
-		if (debounceRef.current !== null) {
-			clearTimeout(debounceRef.current);
+	useEffect(() => {
+		if (settledDraft === null || pendingDraftRef.current !== settledDraft) {
+			return;
 		}
-
-		debounceRef.current = setTimeout(() => {
-			const pending = pendingDraftRef.current;
-			if (pending !== null) {
-				const { nextConfig, hasValidField } = applyPendingDraft(
-					configRef.current,
-					pending,
-				);
-				if (hasValidField) onConfigChangeRef.current(nextConfig);
-			}
-			setPendingDraft(null);
-			pendingDraftRef.current = null;
-			debounceRef.current = null;
-		}, DEBOUNCE_MS);
-	}
-
-	function applyImmediately() {
-		if (debounceRef.current !== null) {
-			clearTimeout(debounceRef.current);
-			debounceRef.current = null;
-		}
-
-		if (pendingDraftRef.current !== null) {
-			const { nextConfig, hasValidField } = applyPendingDraft(
-				configRef.current,
-				pendingDraftRef.current,
-			);
-			if (hasValidField) onConfigChangeRef.current(nextConfig);
-		}
-		setPendingDraft(null);
+		const { nextConfig, hasValidField } = applyPendingDraft(
+			configRef.current,
+			settledDraft,
+		);
 		pendingDraftRef.current = null;
-	}
-
-	function updateRunCountInput(value: string) {
-		setDraftRunCount(value);
-		scheduleConfigChange({ runCount: value });
-	}
-
-	function updateSeedInput(value: string) {
-		setDraftSeed(value);
-		scheduleConfigChange({ seed: value });
-	}
+		setPendingDraft(null);
+		if (hasValidField) onConfigChangeRef.current(nextConfig);
+	}, [settledDraft]);
 
 	useEffect(() => {
 		return () => {
-			if (debounceRef.current !== null) {
-				clearTimeout(debounceRef.current);
-			}
 			if (pendingDraftRef.current !== null) {
 				const { nextConfig, hasValidField } = applyPendingDraft(
 					configRef.current,
@@ -134,6 +94,34 @@ export function useDebouncedStochasticConfig(
 			}
 		};
 	}, []);
+
+	function updateDraft(draft: PendingDraft) {
+		const nextDraft = { ...pendingDraftRef.current, ...draft };
+		pendingDraftRef.current = nextDraft;
+		setPendingDraft(nextDraft);
+	}
+
+	function updateRunCountInput(value: string) {
+		setDraftRunCount(value);
+		updateDraft({ runCount: value });
+	}
+
+	function updateSeedInput(value: string) {
+		setDraftSeed(value);
+		updateDraft({ seed: value });
+	}
+
+	function applyImmediately() {
+		if (pendingDraftRef.current !== null) {
+			const { nextConfig, hasValidField } = applyPendingDraft(
+				configRef.current,
+				pendingDraftRef.current,
+			);
+			pendingDraftRef.current = null;
+			setPendingDraft(null);
+			if (hasValidField) onConfigChangeRef.current(nextConfig);
+		}
+	}
 
 	return {
 		runCountInput,
