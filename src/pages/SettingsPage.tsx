@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { useModelRuntime } from "@/runtime/modelRuntime";
-import { useStore } from "@/store";
+import { useThemeStore } from "@/themeStore";
 
 export function SettingsPage() {
 	const model = useModelRuntime();
@@ -141,8 +141,8 @@ export function SettingsPage() {
 }
 
 function AppearanceSettings() {
-	const theme = useStore((state) => state.theme);
-	const setTheme = useStore((state) => state.setTheme);
+	const theme = useThemeStore((state) => state.theme);
+	const setTheme = useThemeStore((state) => state.setTheme);
 	return (
 		<Card className="rounded-[1.4rem] border-border/80">
 			<CardHeader>

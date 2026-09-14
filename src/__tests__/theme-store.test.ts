@@ -24,7 +24,7 @@ function createStorage(value: string | null) {
 
 async function loadStore() {
 	vi.resetModules();
-	return (await import("@/store")).useStore;
+	return (await import("@/themeStore")).useThemeStore;
 }
 
 afterEach(() => {

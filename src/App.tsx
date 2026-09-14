@@ -25,6 +25,7 @@ import {
 import { ProjectionRuntimeProvider } from "@/runtime/projectionRuntime";
 import { useProjectionOrchestration } from "@/runtime/useProjectionOrchestration";
 import { useStore } from "@/store";
+import { useThemeStore } from "@/themeStore";
 
 function createModelRepository() {
 	return createHttpFinancialModelRepository({ getAuthToken });
@@ -100,7 +101,7 @@ export default function App() {
 	const isLoading = isModelLoading || isIncomeDataLoading || isSourceUpdating;
 	const replaceEvaluations = useStore((state) => state.replaceEvaluations);
 	const finishEditing = useStore((state) => state.finishEditing);
-	const syncSystemTheme = useStore((state) => state.syncSystemTheme);
+	const syncSystemTheme = useThemeStore((state) => state.syncSystemTheme);
 
 	const sourceEvaluationsFingerprint = document
 		? JSON.stringify(document.evaluations)
