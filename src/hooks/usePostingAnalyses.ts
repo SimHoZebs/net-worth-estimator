@@ -3,25 +3,20 @@ import {
 	type AnalysisResult,
 	buildPostingObservationDataset,
 	type ClassifiedPostingDataset,
-	createPostingClassificationAnalysis,
-	createPostingClassificationPlan,
+	classifyPostings,
 	type PostingObservationDataset,
-	runAnalysis,
+	throwIfAborted,
+	toAnalysisResult,
 } from "@/lib/analysis";
 import {
+	detectPayroll,
+	estimateSalary,
 	type PayrollDetectionResult,
-	payrollDetectionAnalysis,
 	type SalaryEstimateResult,
-	salaryEstimateAnalysis,
 } from "@/lib/analysis/definitions";
 import type { FinancialModelDocument } from "@/lib/projection";
 
 const ANALYSIS_CACHE_TIME_MS = 5 * 60 * 1000;
-const postingClassificationAnalysis = createPostingClassificationAnalysis(
-	createPostingClassificationPlan(
-		payrollDetectionAnalysis.classificationRequirements,
-	),
-);
 
 export interface PostingAnalysisResults {
 	classification: AnalysisResult<ClassifiedPostingDataset>;
@@ -36,26 +31,21 @@ export function usePostingAnalyses(document: FinancialModelDocument | null) {
 	return useQuery({
 		queryKey: ["posting-analyses", observationDataset],
 		queryFn: async ({ signal }): Promise<PostingAnalysisResults> => {
-			const classification = await runAnalysis(
-				postingClassificationAnalysis,
-				observationDataset!,
-				signal,
-			);
+			throwIfAborted(signal);
+			const classification = toAnalysisResult({
+				value: classifyPostings(observationDataset!),
+				diagnostics: [],
+			});
+			throwIfAborted(signal);
 			if (classification.value === null) {
 				return { classification, payroll: null, salary: null };
 			}
-			const payroll = await runAnalysis(
-				payrollDetectionAnalysis,
-				classification.value,
-				signal,
-			);
+			const payroll = toAnalysisResult(detectPayroll(classification.value));
+			throwIfAborted(signal);
 			if (payroll.value === null)
 				return { classification, payroll, salary: null };
-			const salary = await runAnalysis(
-				salaryEstimateAnalysis,
-				payroll.value,
-				signal,
-			);
+			const salary = toAnalysisResult(estimateSalary(payroll.value));
+			throwIfAborted(signal);
 			return { classification, payroll, salary };
 		},
 		enabled: observationDataset !== null,

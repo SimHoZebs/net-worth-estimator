@@ -9,15 +9,6 @@ export interface AnalysisValue<TOutput> {
 	diagnostics: AnalysisDiagnostic[];
 }
 
-export interface AnalysisDefinition<TInput, TOutput> {
-	id: string;
-	label: string;
-	run(args: {
-		input: TInput;
-		signal?: AbortSignal;
-	}): Promise<AnalysisValue<TOutput>> | AnalysisValue<TOutput>;
-}
-
 export type AnalysisResult<TOutput> =
 	| {
 			state: "ready" | "warning";
