@@ -180,7 +180,9 @@ describe("golden dump", () => {
 			},
 		};
 		const config: StochasticConfig = { runCount: 20, seed: 42 };
-		const { stochasticProject } = await import("../analysis/projectStochastic");
+		const { stochasticProject } = await import(
+			"../reference/analysis/projectStochastic"
+		);
 		const result = stochasticProject(
 			document,
 			settings,

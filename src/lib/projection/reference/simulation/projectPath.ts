@@ -1,4 +1,4 @@
-import type { IncomeDataSnapshot } from "../types/income";
+import type { IncomeDataSnapshot } from "../../types/income";
 import type {
 	Account,
 	AccountDelta,
@@ -11,12 +11,12 @@ import type {
 	ProjectionRow,
 	ProjectionRuntimeSettings,
 	RawProjectionOutput,
-} from "../types/model";
+} from "../../types/model";
 import type {
 	MonteCarloSample,
 	PreparedProjection,
 	SimulationRun,
-} from "../types/simulation";
+} from "../../types/simulation";
 import { computeNetWorth } from "./accounts";
 import { prepareSimulationRequest } from "./prepareSimulation";
 import { simulate } from "./simulate";

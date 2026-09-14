@@ -8,7 +8,7 @@ import {
 	makePosting,
 	makeSettings,
 } from "@/lib/projection/__fixtures__";
-import { projectFinancialModelDocument } from "@/lib/projection/analysis/projectFinancialModel";
+import { projectFinancialModelDocument } from "@/lib/projection/reference/analysis/projectFinancialModel";
 import { FinancialIndependenceEvaluation } from "./FinancialIndependenceEvaluation";
 
 vi.mock("@/components/dashboard/FinancialIndependenceChart", () => ({

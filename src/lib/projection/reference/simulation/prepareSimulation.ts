@@ -1,18 +1,21 @@
 import {
 	applyModelOverrides,
 	EMPTY_MODEL_OVERRIDES,
-} from "../model/applyModelOverrides";
-import type { IncomeDataSnapshot } from "../types/income";
+} from "../../model/applyModelOverrides";
+import type { IncomeDataSnapshot } from "../../types/income";
 import type {
 	FinancialModelDocument,
 	IsoDate,
 	ModelOverrides,
 	ProjectionRuntimeSettings,
-} from "../types/model";
-import type { MonteCarloSample, PreparedProjection } from "../types/simulation";
-import type { ModelValidationIssue } from "../types/validation";
-import { addYearsClamped, compareIsoDates } from "../utils/date";
-import { validateFinancialModel } from "../validation/validateFinancialModel";
+} from "../../types/model";
+import type {
+	MonteCarloSample,
+	PreparedProjection,
+} from "../../types/simulation";
+import type { ModelValidationIssue } from "../../types/validation";
+import { addYearsClamped, compareIsoDates } from "../../utils/date";
+import { validateFinancialModel } from "../../validation/validateFinancialModel";
 import { initAccountBalances, snapshotBalances } from "./accounts";
 import { addOccurrences, type DatedPostingOccurrence } from "./postings";
 import { createTransitionRuntime } from "./transitions";

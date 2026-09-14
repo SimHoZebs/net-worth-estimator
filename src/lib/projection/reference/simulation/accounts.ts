@@ -1,4 +1,4 @@
-import type { Account } from "../types/model";
+import type { Account } from "../../types/model";
 
 export function initAccountBalances(
 	accounts: Account[],

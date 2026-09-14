@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildFinancialIndependenceCandidateDates,
+	validateFinancialIndependencePlan,
+} from "../evaluation/financialIndependence";
+import {
 	evaluateFinancialIndependence,
 	financialIndependenceEvaluation,
 	selectFinancialIndependenceOutcomeIndex,
-	validateFinancialIndependencePlan,
-} from "../evaluation/financialIndependence";
+} from "../reference/evaluation/financialIndependence";
 import { createExpressionAmount } from "../simulation/amountResolution";
 import type {
 	Account,

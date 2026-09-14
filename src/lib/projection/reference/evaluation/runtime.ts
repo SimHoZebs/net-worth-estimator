@@ -1,3 +1,4 @@
+import { isJsonValue } from "../../evaluation/json";
 import type {
 	EvaluationDiagnostic,
 	EvaluationInstance,
@@ -9,11 +10,10 @@ import type {
 	FinancialModelDocument,
 	JsonValue,
 	ProjectionPath,
-} from "../types/model";
-import { EVALUATION_TYPE_ORDER } from "../types/model";
-import type { MonteCarloSample } from "../types/simulation";
-import type { StochasticEvaluationWorkload } from "../types/stochastic";
-import { isJsonValue } from "./json";
+} from "../../types/model";
+import { EVALUATION_TYPE_ORDER } from "../../types/model";
+import type { MonteCarloSample } from "../../types/simulation";
+import type { StochasticEvaluationWorkload } from "../../types/stochastic";
 
 export interface EvaluationContext {
 	path: ProjectionPath;

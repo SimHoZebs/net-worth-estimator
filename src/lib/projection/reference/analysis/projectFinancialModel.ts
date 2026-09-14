@@ -1,7 +1,4 @@
-import { evaluationRegistry } from "../evaluation/registry";
-import { EvaluationRuntimeSet } from "../evaluation/runtime";
-import { projectRawFinancialModelDocument } from "../simulation/projectPath";
-import type { IncomeDataSnapshot } from "../types/income";
+import type { IncomeDataSnapshot } from "../../types/income";
 import type {
 	EvaluationResultCollection,
 	EvaluationTables,
@@ -10,8 +7,11 @@ import type {
 	ProjectionPath,
 	ProjectionResult,
 	ProjectionRuntimeSettings,
-} from "../types/model";
-import type { MonteCarloSample } from "../types/simulation";
+} from "../../types/model";
+import type { MonteCarloSample } from "../../types/simulation";
+import { evaluationRegistry } from "../evaluation/registry";
+import { EvaluationRuntimeSet } from "../evaluation/runtime";
+import { projectRawFinancialModelDocument } from "../simulation/projectPath";
 
 export function evaluateProjectionPath(
 	path: ProjectionPath,

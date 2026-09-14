@@ -1,5 +1,5 @@
-import type { IsoDate } from "../types/model";
-import { addMonthsClamped } from "../utils/date";
+import type { IsoDate } from "../../types/model";
+import { addMonthsClamped } from "../../utils/date";
 
 export const FI_SHORTFALL_TOLERANCE = 0.01;
 

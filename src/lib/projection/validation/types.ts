@@ -1,4 +1,3 @@
-import type { EvaluationRegistry } from "../evaluation/runtime";
 import type { IncomeDataSnapshot } from "../types/income";
 import type { EvaluationType } from "../types/model";
 import type { ModelPath } from "../types/validation";
@@ -14,5 +13,4 @@ export interface ValidationPaths {
 export interface FinancialModelValidationOptions {
 	incomeData?: IncomeDataSnapshot;
 	paths?: ValidationPaths;
-	evaluationRegistry?: EvaluationRegistry;
 }

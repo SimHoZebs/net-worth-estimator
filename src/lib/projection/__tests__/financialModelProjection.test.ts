@@ -12,7 +12,7 @@ import {
 	makeSettings,
 } from "../__fixtures__";
 import { NO_CEILING, NO_FLOOR } from "../constants";
-import { projectRawFinancialModelDocument } from "../simulation/projectPath";
+import { projectRawFinancialModelDocument } from "../reference/simulation/projectPath";
 
 function getBalance(
 	row:

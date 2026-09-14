@@ -1,11 +1,11 @@
-import { EMPTY_INCOME_DATA, type IncomeDataSnapshot } from "../types/income";
-import type { IsoDate, MovementEvent } from "../types/model";
+import { EMPTY_INCOME_DATA, type IncomeDataSnapshot } from "../../types/income";
+import type { IsoDate, MovementEvent } from "../../types/model";
 import type {
 	FinancialModel,
 	MonteCarloSample,
 	SimulationState,
-} from "../types/simulation";
-import { projectionYearIndex } from "../utils/date";
+} from "../../types/simulation";
+import { projectionYearIndex } from "../../utils/date";
 import { snapshotBalances } from "./accounts";
 import { executeIncomePosting } from "./incomeResolution";
 import type {

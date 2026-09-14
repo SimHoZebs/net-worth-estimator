@@ -5,8 +5,8 @@ import {
 	makePosting,
 	makeSettings,
 } from "../__fixtures__";
-import { prepareSimulationRequest } from "../simulation/prepareSimulation";
-import { simulate } from "../simulation/simulate";
+import { prepareSimulationRequest } from "../reference/simulation/prepareSimulation";
+import { simulate } from "../reference/simulation/simulate";
 import type { SimulationRequest } from "../types/simulation";
 
 describe("simulation request preparation", () => {

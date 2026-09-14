@@ -8,9 +8,9 @@ import {
 	makePosting,
 	makeSettings,
 } from "@/lib/projection/__fixtures__";
-import { projectFinancialModelDocument } from "@/lib/projection/analysis/projectFinancialModel";
 import { getFinancialIndependenceResult } from "@/lib/projection/evaluation/accessors";
-import { selectFinancialIndependenceOutcomeIndex } from "@/lib/projection/evaluation/financialIndependence";
+import { projectFinancialModelDocument } from "@/lib/projection/reference/analysis/projectFinancialModel";
+import { selectFinancialIndependenceOutcomeIndex } from "@/lib/projection/reference/evaluation/financialIndependence";
 import { OverviewCard } from "./OverviewCard";
 
 afterEach(cleanup);

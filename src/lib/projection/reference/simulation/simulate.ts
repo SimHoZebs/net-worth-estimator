@@ -1,6 +1,6 @@
-import type { MovementEvent } from "../types/model";
-import type { SimulationRequest, SimulationRun } from "../types/simulation";
-import { compareIsoDates } from "../utils/date";
+import type { MovementEvent } from "../../types/model";
+import type { SimulationRequest, SimulationRun } from "../../types/simulation";
+import { compareIsoDates } from "../../utils/date";
 import { snapshotBalances } from "./accounts";
 import type { DatedPostingOccurrence } from "./postings";
 import { addOccurrences } from "./postings";

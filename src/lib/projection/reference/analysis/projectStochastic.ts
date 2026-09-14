@@ -1,3 +1,30 @@
+import type { IncomeDataSnapshot } from "../../types/income";
+import type {
+	FinancialModelDocument,
+	ModelOverrides,
+	ProjectionPath,
+	ProjectionResult,
+	ProjectionRuntimeSettings,
+} from "../../types/model";
+import type {
+	MonteCarloSample,
+	PreparedProjection,
+} from "../../types/simulation";
+import type {
+	StochasticBandRow,
+	StochasticConfig,
+	StochasticProgress,
+	StochasticProgressPhase,
+	StochasticProjectionResult,
+} from "../../types/stochastic";
+import { projectionYearIndex } from "../../utils/date";
+import {
+	computePercentilesFromSorted,
+	createStochasticSampler,
+	mergeSorted,
+	normalizeStochasticConfig,
+	type StochasticSampler,
+} from "../../utils/stochastic";
 import { evaluationRegistry } from "../evaluation/registry";
 import { EvaluationRuntimeSet } from "../evaluation/runtime";
 import { addOccurrences } from "../simulation/postings";
@@ -7,30 +34,6 @@ import {
 	buildProjectionPath,
 } from "../simulation/projectPath";
 import { simulate } from "../simulation/simulate";
-import type { IncomeDataSnapshot } from "../types/income";
-import type {
-	FinancialModelDocument,
-	ModelOverrides,
-	ProjectionPath,
-	ProjectionResult,
-	ProjectionRuntimeSettings,
-} from "../types/model";
-import type { MonteCarloSample, PreparedProjection } from "../types/simulation";
-import type {
-	StochasticBandRow,
-	StochasticConfig,
-	StochasticProgress,
-	StochasticProgressPhase,
-	StochasticProjectionResult,
-} from "../types/stochastic";
-import { projectionYearIndex } from "../utils/date";
-import {
-	computePercentilesFromSorted,
-	createStochasticSampler,
-	mergeSorted,
-	normalizeStochasticConfig,
-	type StochasticSampler,
-} from "../utils/stochastic";
 
 function buildStochasticRates(
 	postings: FinancialModelDocument["postings"],

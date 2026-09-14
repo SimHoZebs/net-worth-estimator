@@ -1,13 +1,13 @@
-import {
-	getTotalDestinationHeadroom,
-	getWithdrawableAmount,
-} from "../simulation/accounts";
 import type {
 	Account,
 	AccountMovementConstraint,
 	MovementEvent,
 	ProjectionPath,
-} from "../types/model";
+} from "../../types/model";
+import {
+	getTotalDestinationHeadroom,
+	getWithdrawableAmount,
+} from "../simulation/accounts";
 
 const EPSILON = 1e-9;
 
