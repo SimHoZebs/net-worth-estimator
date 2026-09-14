@@ -9,7 +9,6 @@ import {
 	type FinancialIndependenceProbabilisticResult,
 	validateFinancialIndependencePlan,
 } from "./financialIndependence";
-import { isJsonValue } from "./json";
 import {
 	type NetWorthThresholdPathResult,
 	type NetWorthThresholdProbabilisticResult,
@@ -90,7 +89,7 @@ export function getPostingFulfillmentResult(
 	>(collection?.evaluations.postingFulfillment, instanceId);
 }
 
-export function getConfiguredEvaluation<TConfig>(
+function findConfiguredEvaluation<TConfig>(
 	evaluations: readonly EvaluationInstance<TConfig>[],
 	validate: (config: unknown) => TConfig,
 	results?: readonly EvaluationResultEnvelope[] | null,
@@ -111,15 +110,27 @@ export function getConfiguredEvaluation<TConfig>(
 			continue;
 		}
 		try {
-			const config = validate(evaluation.config);
-			if (!isJsonValue(config)) continue;
-			return { ...evaluation, config };
+			return { ...evaluation, config: validate(evaluation.config) };
 		} catch {
 			// Intentional probe: an invalid candidate config falls through to the
-			// next result collection instead of failing the whole lookup.
+			// next candidate instead of failing the whole lookup.
 		}
 	}
 	return null;
+}
+
+/**
+ * Backwards-compatible alias for the shared config probe. Prefer the direct
+ * per-type getters below; this export remains because the projection barrel
+ * re-exports it.
+ */
+export function getConfiguredEvaluation<TConfig>(
+	evaluations: readonly EvaluationInstance<TConfig>[],
+	validate: (config: unknown) => TConfig,
+	results?: readonly EvaluationResultEnvelope[] | null,
+	instanceId?: string,
+): ValidatedConfiguredEvaluation<TConfig> | null {
+	return findConfiguredEvaluation(evaluations, validate, results, instanceId);
 }
 
 export function getFinancialIndependenceConfig(
@@ -127,7 +138,7 @@ export function getFinancialIndependenceConfig(
 	collection?: EvaluationResultCollection | null,
 	instanceId?: string,
 ) {
-	return getConfiguredEvaluation(
+	return findConfiguredEvaluation(
 		evaluations.financialIndependence,
 		validateFinancialIndependencePlan,
 		collection?.evaluations.financialIndependence,
@@ -140,7 +151,7 @@ export function getNetWorthThresholdConfig(
 	collection?: EvaluationResultCollection | null,
 	instanceId?: string,
 ) {
-	return getConfiguredEvaluation(
+	return findConfiguredEvaluation(
 		evaluations.netWorthThreshold,
 		validateNetWorthThresholdConfig,
 		collection?.evaluations.netWorthThreshold,
@@ -153,7 +164,7 @@ export function getPostingFulfillmentConfig(
 	collection?: EvaluationResultCollection | null,
 	instanceId?: string,
 ) {
-	return getConfiguredEvaluation(
+	return findConfiguredEvaluation(
 		evaluations.postingFulfillment,
 		validatePostingFulfillmentConfig,
 		collection?.evaluations.postingFulfillment,
