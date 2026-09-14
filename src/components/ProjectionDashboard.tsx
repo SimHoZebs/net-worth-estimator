@@ -145,7 +145,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 				</div>
 				{currentChangeCount > 0 ? (
 					<div className="rounded-full border border-tertiary-border bg-tertiary-subtle px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
-						{currentChangeCount} temporary change
+						{currentChangeCount} unsaved change
 						{currentChangeCount === 1 ? "" : "s"}
 					</div>
 				) : null}

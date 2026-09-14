@@ -1,6 +1,5 @@
 import type {
 	FinancialModelDocument,
-	ModelOverrides,
 	ProjectionResult,
 	ProjectionRuntimeSettings,
 	StochasticConfig,
@@ -13,7 +12,6 @@ export interface ProjectionRequest {
 	document: FinancialModelDocument;
 	incomeData?: IncomeDataSnapshot;
 	projectionSettings: ProjectionRuntimeSettings;
-	overrides: ModelOverrides;
 	signal?: AbortSignal;
 }
 

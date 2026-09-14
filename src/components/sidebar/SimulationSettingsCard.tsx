@@ -40,7 +40,7 @@ export function SimulationSettingsCard() {
 					/>
 					<div className="mt-1 type-caption text-muted-foreground/70">
 						From {formatDate(projectionStartDate)} · {currentChangeCount}{" "}
-						temporary change{currentChangeCount === 1 ? "" : "s"}
+						unsaved change{currentChangeCount === 1 ? "" : "s"}
 					</div>
 				</div>
 			</CardContent>

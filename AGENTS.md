@@ -39,8 +39,8 @@ App (src/App.tsx)
 | `useFinancialModelQuery` | `hooks/useFinancialModel.ts` | loads `{ document, issues }` from `FinancialModelRepository.loadDocument`; `staleTime: Infinity` |
 | `useFinancialModelMutation` | `hooks/useFinancialModel.ts` | saves a `FinancialModelDocument` and invalidates the model query |
 | `usePostingAnalyses` | `hooks/usePostingAnalyses.ts` | derives observations from model postings and composes classification, payroll detection, and salary estimation analyses |
-| `useProjection` | `hooks/useProjection.ts` | `(document, settings, overrides, enabled) -> ProjectionHookState<ProjectionResult>` |
-| `useStochastic` | `hooks/useStochastic.ts` | `(document, settings, overrides, config, enabled) -> ProjectionHookState<StochasticProjectionResult>` |
+| `useProjection` | `hooks/useProjection.ts` | `(document, settings, enabled) -> ProjectionHookState<ProjectionResult>` |
+| `useStochastic` | `hooks/useStochastic.ts` | `(document, settings, config, enabled) -> ProjectionHookState<StochasticProjectionResult>` |
 | `useDebouncedStochasticConfig` | `hooks/useDebouncedStochasticConfig.ts` | debounces Monte Carlo configuration |
 
 `ProjectionHookState<T>` is `{ result, runtimeError, isRunning, progress }`.
@@ -51,23 +51,22 @@ Route pages should compose feature components rather than forward shared-state p
 
 ## Store
 
-`src/store.ts` composes four Zustand slices; theme lives in a separate `src/themeStore.ts` store because it is orthogonal to domain state:
+`src/store.ts` composes three Zustand slices; theme lives in a separate `src/themeStore.ts` store because it is orthogonal to domain state:
 
 | Slice | Purpose |
 | --- | --- |
-| `ModelOverrides` | session-only current changes: added rows, disabled IDs, and reset |
-| `Editor` | CRUD on a working `FinancialModelDocument` and edit/dirty state |
+| `Editor` | single staged draft: `workingDocument` plus the `editingBaseline` snapshot, edit/dirty state, and CRUD on the draft |
 | `Settings` | typed evaluation tables, horizon, stochastic preference, and stochastic config |
 | `Comparison` | read-only `ComparisonSnapshot` metrics; snapshots cannot restore model state |
 
-Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selectEditorState`, and `selectEditorActions`.
+`selectCurrentChangeCount` derives the unsaved-diff count (added + removed + modified rows across accounts, postings, and checkpoints) from `editingBaseline` vs `workingDocument`. Primary selectors are `selectCurrentChangeCount`, `selectEditorState`, and `selectEditorActions`.
 
 ## Data Flow
 
 1. **Model source**: Go backend serves `GET/PUT /v1/financial-model` from imported canonical CSV data. The Vite dev server proxies `/v1` to `NET_WORTH_ESTIMATOR_BACKEND` (default `http://localhost:8787`).
 2. **Persistence DI**: `App.tsx` creates `createHttpFinancialModelRepository()` and `createHttpIncomeDataSource()`. The HTTP backend is the only persistence; there is no browser storage or CSV ingestion path.
 3. **Query layer**: `useFinancialModelQuery` and `useFinancialModelMutation` connect the source to TanStack Query.
-4. **Current changes**: `ModelOverrides` remain in Zustand and are applied with `applyModelOverrides`; canonical data is not mutated.
+4. **Current changes**: the `Editor` draft is the only staging area. Trial additions, enabled=false toggles, and removals all edit `workingDocument` directly (starting an edit session from canonical when needed); canonical data is untouched until save.
 5. **Projection**: `useProjection`/`useStochastic` share one `useEngineRequest` state machine over `BackendProjectionEngine` (`src/engine/`). Deterministic runs POST `/v1/projections/deterministic`; the Go backend computes and returns results. Server cache plus TanStack Query cover repeats; there is no client projection cache.
 6. **Monte Carlo**: `POST /v1/projections/stochastic` streams SSE `progress`/`partial`/`result` events; exact percentiles are aggregated server-side.
 7. **Save**: goes through the HTTP repository (`PUT /v1/financial-model`, bearer token when auth is configured, rejected when the server is read-only); malformed data surfaces diagnostics. Analyses use the canonical model postings. There is no reset route; CSV files are seed-only.
@@ -80,7 +79,6 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 | --- | --- |
 | `FinancialModelDocument` | canonical persisted accounts, checkpoints, postings, evaluations, and source metadata |
 | `Checkpoint` | absolute end-of-day observed balance that corrects historical modeled account state |
-| `ModelOverrides` | session-only additions and disabled account/posting IDs |
 | `SimulationRequest` | fully prepared model, runtime state, date range, event policy, and optional sample |
 | `SimulationRun` | exact states, dated balance snapshots, and ordered movement attempts |
 | `ProjectionPath` | immutable evaluator-facing time series and movement events |
@@ -98,14 +96,14 @@ Primary selectors are `selectCurrentChangeCount`, `selectModelOverrides`, `selec
 ## Rules
 
 - Simulation logic must never branch on specific account IDs, posting IDs, labels, or categories.
-- `projectFinancialModelDocument`, `projectRawFinancialModelDocument`, `applyModelOverrides`, and `prepareSimulationRequest` are the canonical core APIs.
+- `projectFinancialModelDocument`, `projectRawFinancialModelDocument`, and `prepareSimulationRequest` are the canonical core APIs.
 - Shared state transitions belong in `lib/projection/reference/simulation/transitions.ts`; deterministic, branch, and Monte Carlo execution must not duplicate transition semantics.
 - FI logic is a derived evaluation and must not add semantic branches to generic simulation.
 - Reactive behaviors emit generic account movements through shared account constraints instead of mutating balances directly.
 - FI continuing postings are explicitly selected; never infer them from IDs, labels, categories, or non-zero rates.
 - Evaluation definitions register in `evaluation/registry.ts`; central coordinators must not import evaluator-specific logic.
 - Evaluation configuration and results remain grouped by type. `EVALUATION_TYPE_ORDER` controls type order, table arrays preserve ingestion order, and instances retain stable globally unique IDs. Configs and public bodies must remain JSON-serializable.
-- `ModelOverrides` are session-only and never mutate canonical data.
+- Draft rows are session-only and never mutate canonical data until save.
 - Comparison snapshots contain metrics only; do not add restoration or alternative-model semantics.
 - Keep the domain canonical-only: no named alternative models, compatibility APIs, alternate readers, or additional persistence routes.
 - Use the `@/lib/projection` barrel for projection types and utilities.

@@ -1,9 +1,7 @@
-import { applyModelOverrides } from "../model/applyModelOverrides";
 import type { IncomeDataSnapshot } from "../types/income";
 import type {
 	EvaluationTables,
 	FinancialModelDocument,
-	ModelOverrides,
 	ProjectionRuntimeSettings,
 } from "../types/model";
 import { canonicalSerialize } from "../utils/canonical";
@@ -31,17 +29,12 @@ export function evaluationComputationDescriptor(evaluations: EvaluationTables) {
 // through for labeled result envelopes.
 export function projectionRequestIdentity(options: {
 	document: FinancialModelDocument | null;
-	overrides: ModelOverrides;
 	settings: ProjectionRuntimeSettings;
 	incomeData?: IncomeDataSnapshot;
 	extra?: unknown;
 }): string {
 	return canonicalSerialize({
-		document: options.document
-			? simulationDocument(
-					applyModelOverrides(options.document, options.overrides),
-				)
-			: null,
+		document: options.document ? simulationDocument(options.document) : null,
 		settings: {
 			fallbackProjectionStartDate: options.settings.fallbackProjectionStartDate,
 			horizonYears: options.settings.horizonYears,

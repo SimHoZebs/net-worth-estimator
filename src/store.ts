@@ -9,7 +9,6 @@ import type {
 	EvaluationType,
 	FinancialIndependencePlan,
 	FinancialModelDocument,
-	ModelOverrides,
 	Posting,
 	StochasticConfig,
 } from "@/lib/projection";
@@ -74,69 +73,12 @@ const createComparisonSlice: StateCreator<AppStore, [], [], ComparisonSlice> = (
 });
 
 /* ------------------------------------------------------------------ */
-/*  Model overrides slice                                              */
-/* ------------------------------------------------------------------ */
-
-const initialModelOverrides: ModelOverrides = {
-	addedAccounts: [],
-	addedPostings: [],
-	disabledAccountIds: [],
-	disabledPostingIds: [],
-};
-
-export interface ModelOverridesSlice extends ModelOverrides {
-	addTemporaryAccount: (account: Account) => void;
-	removeTemporaryAccount: (id: string) => void;
-	addTemporaryPosting: (posting: Posting) => void;
-	removeTemporaryPosting: (id: string) => void;
-	toggleAccountDisabled: (id: string) => void;
-	togglePostingDisabled: (id: string) => void;
-	resetCurrentChanges: () => void;
-}
-
-const createModelOverridesSlice: StateCreator<
-	AppStore,
-	[],
-	[],
-	ModelOverridesSlice
-> = (set) => ({
-	...initialModelOverrides,
-
-	addTemporaryAccount: (account) =>
-		set((s) => ({ addedAccounts: [...s.addedAccounts, account] })),
-
-	removeTemporaryAccount: (id) =>
-		set((s) => ({ addedAccounts: s.addedAccounts.filter((a) => a.id !== id) })),
-
-	addTemporaryPosting: (posting) =>
-		set((s) => ({ addedPostings: [...s.addedPostings, posting] })),
-
-	removeTemporaryPosting: (id) =>
-		set((s) => ({ addedPostings: s.addedPostings.filter((p) => p.id !== id) })),
-
-	toggleAccountDisabled: (id) =>
-		set((s) => ({
-			disabledAccountIds: s.disabledAccountIds.includes(id)
-				? s.disabledAccountIds.filter((did) => did !== id)
-				: [...s.disabledAccountIds, id],
-		})),
-
-	togglePostingDisabled: (id) =>
-		set((s) => ({
-			disabledPostingIds: s.disabledPostingIds.includes(id)
-				? s.disabledPostingIds.filter((did) => did !== id)
-				: [...s.disabledPostingIds, id],
-		})),
-
-	resetCurrentChanges: () => set(initialModelOverrides),
-});
-
-/* ------------------------------------------------------------------ */
 /*  Editor slice                                                       */
 /* ------------------------------------------------------------------ */
 
 interface EditorSlice {
 	workingDocument: FinancialModelDocument | null;
+	editingBaseline: FinancialModelDocument | null;
 	isDirty: boolean;
 	isEditing: boolean;
 	startEditing: (document: FinancialModelDocument) => void;
@@ -158,22 +100,34 @@ const createEditorSlice: StateCreator<AppStore, [], [], EditorSlice> = (
 	_get,
 ) => ({
 	workingDocument: null,
+	editingBaseline: null,
 	isDirty: false,
 	isEditing: false,
 
 	startEditing: (document: FinancialModelDocument) => {
 		set({
 			workingDocument: cloneDocument(document),
+			editingBaseline: cloneDocument(document),
 			isDirty: false,
 			isEditing: true,
 		});
 	},
 
 	cancelEditing: () =>
-		set({ workingDocument: null, isDirty: false, isEditing: false }),
+		set({
+			workingDocument: null,
+			editingBaseline: null,
+			isDirty: false,
+			isEditing: false,
+		}),
 
 	finishEditing: () =>
-		set({ workingDocument: null, isDirty: false, isEditing: false }),
+		set({
+			workingDocument: null,
+			editingBaseline: null,
+			isDirty: false,
+			isEditing: false,
+		}),
 
 	updateAccount: (id, changes) =>
 		set((s) => {
@@ -529,13 +483,9 @@ const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (
 /*  Composed store                                                     */
 /* ------------------------------------------------------------------ */
 
-export type AppStore = ModelOverridesSlice &
-	EditorSlice &
-	SettingsSlice &
-	ComparisonSlice;
+export type AppStore = EditorSlice & SettingsSlice & ComparisonSlice;
 
 export const useStore = create<AppStore>()((...args) => ({
-	...createModelOverridesSlice(...args),
 	...createEditorSlice(...args),
 	...createSettingsSlice(...args),
 	...createComparisonSlice(...args),
@@ -546,22 +496,15 @@ export const useStore = create<AppStore>()((...args) => ({
 /* ------------------------------------------------------------------ */
 
 export const selectCurrentChangeCount = (s: AppStore) =>
-	s.addedAccounts.length +
-	s.addedPostings.length +
-	s.disabledAccountIds.length +
-	s.disabledPostingIds.length;
-
-export const selectModelOverrides = (s: AppStore): ModelOverrides => ({
-	addedAccounts: s.addedAccounts,
-	addedPostings: s.addedPostings,
-	disabledAccountIds: s.disabledAccountIds,
-	disabledPostingIds: s.disabledPostingIds,
-});
+	s.workingDocument && s.editingBaseline
+		? countDocumentDiff(s.editingBaseline, s.workingDocument)
+		: 0;
 
 export const selectEditorState = (s: AppStore) => ({
 	isEditing: s.isEditing,
 	isDirty: s.isDirty,
 	workingDocument: s.workingDocument,
+	editingBaseline: s.editingBaseline,
 });
 
 export const selectEditorActions = (s: AppStore) => ({
@@ -582,6 +525,67 @@ export const selectEditorActions = (s: AppStore) => ({
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Unsaved-diff count between the canonical baseline captured at
+ * `startEditing` and the live draft: added + removed + modified rows
+ * across accounts, postings, and checkpoints. Checkpoints carry no stable
+ * ID, so they compare positionally.
+ */
+export function countDocumentDiff(
+	baseline: FinancialModelDocument,
+	draft: FinancialModelDocument,
+): number {
+	let count = 0;
+	const baselineAccounts = new Map(
+		baseline.accounts.map((account) => [account.id, account]),
+	);
+	const draftAccountIds = new Set(draft.accounts.map((account) => account.id));
+	for (const account of draft.accounts) {
+		const original = baselineAccounts.get(account.id);
+		if (
+			original === undefined ||
+			JSON.stringify(account) !== JSON.stringify(original)
+		) {
+			count += 1;
+		}
+	}
+	for (const account of baseline.accounts) {
+		if (!draftAccountIds.has(account.id)) count += 1;
+	}
+	const baselinePostings = new Map(
+		baseline.postings.map((posting) => [posting.id, posting]),
+	);
+	const draftPostingIds = new Set(draft.postings.map((posting) => posting.id));
+	for (const posting of draft.postings) {
+		const original = baselinePostings.get(posting.id);
+		if (
+			original === undefined ||
+			JSON.stringify(posting) !== JSON.stringify(original)
+		) {
+			count += 1;
+		}
+	}
+	for (const posting of baseline.postings) {
+		if (!draftPostingIds.has(posting.id)) count += 1;
+	}
+	const checkpointCount = Math.max(
+		baseline.checkpoints.length,
+		draft.checkpoints.length,
+	);
+	for (let index = 0; index < checkpointCount; index++) {
+		const original = baseline.checkpoints[index];
+		const current = draft.checkpoints[index];
+		if (
+			original === undefined ||
+			current === undefined ||
+			JSON.stringify(current) !== JSON.stringify(original)
+		) {
+			count += 1;
+		}
+	}
+	return count;
+}
 
 export function cloneDocument(
 	document: FinancialModelDocument,

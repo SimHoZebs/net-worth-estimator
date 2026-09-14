@@ -81,7 +81,7 @@ export function AppShell({ children }: AppShellProps) {
 							{source.label}
 						</span>
 						{currentChangeCount > 0
-							? ` · ${currentChangeCount} temporary change${currentChangeCount === 1 ? "" : "s"}`
+							? ` · ${currentChangeCount} unsaved change${currentChangeCount === 1 ? "" : "s"}`
 							: ""}
 						{isEditing && isDirty ? " · Unsaved baseline edits" : ""}
 						{isEditing && !isDirty ? " · Editing baseline" : ""}
