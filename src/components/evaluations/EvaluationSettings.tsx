@@ -179,13 +179,14 @@ export function EvaluationSettings({
 														...evaluation,
 														config: config.normalized,
 													}}
-													onChange={(changes) =>
+													onChange={(changes) => {
 														updateEvaluationConfig(
 															type,
 															evaluation.instanceId,
 															changes,
-														)
-													}
+														);
+														onDraftDirtyChange(dirtyKey, false);
+													}}
 													onDirtyChange={(dirty) =>
 														onDraftDirtyChange(dirtyKey, dirty)
 													}
@@ -200,13 +201,14 @@ export function EvaluationSettings({
 													config.normalized as unknown as FinancialIndependencePlan
 												}
 												sourceRevision={dataUpdatedAt}
-												onApply={(changes) =>
+												onApply={(changes) => {
 													updateEvaluationConfig(
 														type,
 														evaluation.instanceId,
 														changes,
-													)
-												}
+													);
+													onDraftDirtyChange(dirtyKey, false);
+												}}
 												onDirtyChange={(dirty) =>
 													onDraftDirtyChange(dirtyKey, dirty)
 												}

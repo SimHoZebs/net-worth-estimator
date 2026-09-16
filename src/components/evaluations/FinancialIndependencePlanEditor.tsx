@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -226,15 +226,39 @@ export const FinancialIndependencePlanEditor = memo(
 		const dirty =
 			planFingerprint(draft) !== committedFingerprint ||
 			JSON.stringify(numericDrafts) !== committedNumericFingerprint;
-		const onDirtyChangeRef = useRef(onDirtyChange);
-		onDirtyChangeRef.current = onDirtyChange;
-		useEffect(() => {
-			onDirtyChangeRef.current?.(dirty);
-			return () => onDirtyChangeRef.current?.(false);
-		}, [dirty]);
+
+		function notifyDirty(
+			nextDraft: FinancialIndependencePlan,
+			nextNumericDrafts: FinancialIndependenceNumericDrafts,
+		) {
+			onDirtyChange?.(
+				planFingerprint(nextDraft) !== committedFingerprint ||
+					JSON.stringify(nextNumericDrafts) !== committedNumericFingerprint,
+			);
+		}
+
+		function updateDraft(
+			updater: (
+				current: FinancialIndependencePlan,
+			) => FinancialIndependencePlan,
+		) {
+			const next = updater(draft);
+			setDraft(next);
+			notifyDirty(next, numericDrafts);
+		}
+
+		function updateNumericDrafts(
+			updater: (
+				current: FinancialIndependenceNumericDrafts,
+			) => FinancialIndependenceNumericDrafts,
+		) {
+			const next = updater(numericDrafts);
+			setNumericDrafts(next);
+			notifyDirty(draft, next);
+		}
 
 		const toggleCashflow = (postingId: string) => {
-			setDraft((current) => {
+			updateDraft((current) => {
 				const selected = current.sources.some(
 					(source) =>
 						source.type === "cashflow" &&
@@ -266,58 +290,55 @@ export const FinancialIndependencePlanEditor = memo(
 
 		const toggleAsset = (accountId: string) => {
 			const wasSelected = selectedAssets.has(accountId);
-			setNumericDrafts((current) => {
-				const assetWithdrawalRates = { ...current.assetWithdrawalRates };
-				if (wasSelected) delete assetWithdrawalRates[accountId];
-				return { ...current, assetWithdrawalRates };
-			});
-			setDraft((current) => {
-				const existing = current.sources.find(
-					(source) => source.type === "asset" && source.accountId === accountId,
-				);
-				const sources = current.sources.filter(
-					(source) =>
-						!(source.type === "asset" && source.accountId === accountId),
-				);
-				if (existing?.included !== true) {
-					sources.push({
-						type: "asset",
-						accountId,
-						included: true,
-						...(existing?.type === "asset" &&
-						existing.withdrawalRateOverride !== undefined
-							? { withdrawalRateOverride: existing.withdrawalRateOverride }
-							: {}),
-					});
-				}
-				const nextSelectedAssets = new Set(
-					sources.flatMap((source) =>
-						source.type === "asset" && source.included
-							? [source.accountId]
-							: [],
-					),
-				);
-				const postingById = new Map(
-					document.postings.map((posting) => [posting.id, posting]),
-				);
-				return {
-					...current,
-					sources,
-					continuingPostingIds: current.continuingPostingIds.filter(
-						(postingId) => {
-							const posting = postingById.get(postingId);
-							return (
-								posting !== undefined &&
-								postingLinksToAssets(posting, nextSelectedAssets)
-							);
-						},
-					),
-				};
-			});
+			const nextNumericDrafts: FinancialIndependenceNumericDrafts = {
+				...numericDrafts,
+				assetWithdrawalRates: { ...numericDrafts.assetWithdrawalRates },
+			};
+			if (wasSelected) delete nextNumericDrafts.assetWithdrawalRates[accountId];
+			const existing = draft.sources.find(
+				(source) => source.type === "asset" && source.accountId === accountId,
+			);
+			const sources = draft.sources.filter(
+				(source) =>
+					!(source.type === "asset" && source.accountId === accountId),
+			);
+			if (existing?.included !== true) {
+				sources.push({
+					type: "asset",
+					accountId,
+					included: true,
+					...(existing?.type === "asset" &&
+					existing.withdrawalRateOverride !== undefined
+						? { withdrawalRateOverride: existing.withdrawalRateOverride }
+						: {}),
+				});
+			}
+			const nextSelectedAssets = new Set(
+				sources.flatMap((source) =>
+					source.type === "asset" && source.included ? [source.accountId] : [],
+				),
+			);
+			const postingById = new Map(
+				document.postings.map((posting) => [posting.id, posting]),
+			);
+			const nextDraft = {
+				...draft,
+				sources,
+				continuingPostingIds: draft.continuingPostingIds.filter((postingId) => {
+					const posting = postingById.get(postingId);
+					return (
+						posting !== undefined &&
+						postingLinksToAssets(posting, nextSelectedAssets)
+					);
+				}),
+			};
+			setNumericDrafts(nextNumericDrafts);
+			setDraft(nextDraft);
+			notifyDirty(nextDraft, nextNumericDrafts);
 		};
 
 		const toggleContinuingPosting = (postingId: string) => {
-			setDraft((current) => {
+			updateDraft((current) => {
 				const selected = current.continuingPostingIds.includes(postingId);
 				return cleanPlan({
 					...current,
@@ -360,7 +381,7 @@ export const FinancialIndependencePlanEditor = memo(
 								min={0}
 								step={1000}
 								onChange={(annualExpenseTarget) =>
-									setNumericDrafts((current) => ({
+									updateNumericDrafts((current) => ({
 										...current,
 										annualExpenseTarget,
 									}))
@@ -373,7 +394,7 @@ export const FinancialIndependencePlanEditor = memo(
 								min={0}
 								step={0.1}
 								onChange={(annualExpenseGrowthRate) =>
-									setNumericDrafts((current) => ({
+									updateNumericDrafts((current) => ({
 										...current,
 										annualExpenseGrowthRate,
 									}))
@@ -383,7 +404,7 @@ export const FinancialIndependencePlanEditor = memo(
 						<SpendingValueBasis
 							value={draft.annualExpenseTargetBasis}
 							onChange={(annualExpenseTargetBasis) =>
-								setDraft((current) => ({
+								updateDraft((current) => ({
 									...current,
 									annualExpenseTargetBasis,
 								}))
@@ -404,7 +425,7 @@ export const FinancialIndependencePlanEditor = memo(
 							max={100}
 							step={0.1}
 							onChange={(withdrawalRate) =>
-								setNumericDrafts((current) => ({
+								updateNumericDrafts((current) => ({
 									...current,
 									withdrawalRate,
 								}))
@@ -455,7 +476,7 @@ export const FinancialIndependencePlanEditor = memo(
 								min={1}
 								max={50}
 								onChange={(evaluationYears) =>
-									setNumericDrafts((current) => ({
+									updateNumericDrafts((current) => ({
 										...current,
 										evaluationYears,
 									}))
@@ -468,7 +489,7 @@ export const FinancialIndependencePlanEditor = memo(
 								min={1}
 								max={100}
 								onChange={(requiredConfidence) =>
-									setNumericDrafts((current) => ({
+									updateNumericDrafts((current) => ({
 										...current,
 										requiredConfidence,
 									}))
@@ -478,7 +499,7 @@ export const FinancialIndependencePlanEditor = memo(
 						<EndingPortfolioPolicy
 							plan={draft}
 							onChange={(principalPolicy) =>
-								setDraft((current) => ({ ...current, principalPolicy }))
+								updateDraft((current) => ({ ...current, principalPolicy }))
 							}
 						/>
 					</FinancialIndependenceEditorSection>
@@ -507,7 +528,7 @@ export const FinancialIndependencePlanEditor = memo(
 								min={0}
 								step={50_000}
 								onChange={(minimumNetWorth) =>
-									setNumericDrafts((current) => ({
+									updateNumericDrafts((current) => ({
 										...current,
 										minimumNetWorth,
 									}))
@@ -542,7 +563,7 @@ export const FinancialIndependencePlanEditor = memo(
 																] ?? ""
 															}
 															onChange={(event) =>
-																setNumericDrafts((current) => ({
+																updateNumericDrafts((current) => ({
 																	...current,
 																	assetWithdrawalRates: {
 																		...current.assetWithdrawalRates,
@@ -612,6 +633,7 @@ export const FinancialIndependencePlanEditor = memo(
 								onClick={() => {
 									setDraft(committedPlan);
 									setNumericDrafts(committedNumericDrafts);
+									onDirtyChange?.(false);
 								}}
 							>
 								Discard changes
@@ -626,6 +648,8 @@ export const FinancialIndependencePlanEditor = memo(
 									onApply(appliedPlan);
 									setDraft(appliedPlan);
 									setNumericDrafts(numericDraftsForPlan(appliedPlan));
+									// No onDirtyChange here: the parent clears its
+									// dirty flag in its onApply wrapper.
 								}}
 							>
 								Update analysis

@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { Outlet } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import {
@@ -6,6 +6,7 @@ import {
 	useFinancialModelQuery,
 } from "@/hooks/useFinancialModel";
 import { useIncomeDataQuery } from "@/hooks/useIncomeData";
+import { useServerStatusQuery } from "@/hooks/useServerStatus";
 import { getAuthToken } from "@/lib/auth-token";
 import type { TemplateOutput } from "@/lib/patterns";
 import {
@@ -14,7 +15,6 @@ import {
 } from "@/lib/projection";
 import {
 	createHttpFinancialModelRepository,
-	fetchServerStatus,
 	withoutWriteCapabilities,
 } from "@/lib/projection/sources/http/httpFinancialModelRepository";
 import { createHttpIncomeDataSource } from "@/lib/projection/sources/http/httpIncomeDataSource";
@@ -38,20 +38,10 @@ function createIncomeDataSource() {
 
 export default function App() {
 	const baseRepository = useMemo(() => createModelRepository(), []);
-	const [serverReadOnly, setServerReadOnly] = useState(false);
-	useEffect(() => {
-		let cancelled = false;
-		fetchServerStatus()
-			.then((status) => {
-				if (!cancelled) setServerReadOnly(status.readOnly);
-			})
-			.catch(() => {
-				// Leave write UI visible; the server enforces read-only itself.
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, []);
+	const { data: serverStatus } = useServerStatusQuery();
+	// On fetch failure data stays undefined and write UI stays visible;
+	// the server enforces read-only itself.
+	const serverReadOnly = serverStatus?.readOnly ?? false;
 	const modelRepository = useMemo(
 		() =>
 			serverReadOnly
