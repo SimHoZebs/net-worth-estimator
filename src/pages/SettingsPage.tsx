@@ -22,6 +22,22 @@ export function SettingsPage() {
 	const [dirtyDrafts, setDirtyDrafts] = useState<ReadonlySet<string>>(
 		new Set(),
 	);
+	// FI editors reset their drafts whenever the model reloads (their
+	// revision includes dataUpdatedAt), so their dirty flags must reset too.
+	// Threshold editors only reset when their own committed value changes,
+	// which is already notified explicitly, so their flags are preserved.
+	const [syncedDataUpdatedAt, setSyncedDataUpdatedAt] = useState(
+		model.dataUpdatedAt,
+	);
+	if (syncedDataUpdatedAt !== model.dataUpdatedAt) {
+		setSyncedDataUpdatedAt(model.dataUpdatedAt);
+		setDirtyDrafts((current) => {
+			const next = new Set(
+				[...current].filter((key) => !key.startsWith("financialIndependence:")),
+			);
+			return next.size === current.size ? current : next;
+		});
+	}
 	const hasDirtyDrafts = dirtyDrafts.size > 0;
 	const blocker = useBlocker(hasDirtyDrafts);
 	const handleDraftDirtyChange = useCallback((key: string, dirty: boolean) => {

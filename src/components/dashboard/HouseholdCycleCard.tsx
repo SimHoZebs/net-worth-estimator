@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
-import { currency } from "@/lib/format";
+import { currency, formatDate } from "@/lib/format";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { DriverCard } from "./DriverCard";
 import {
@@ -17,6 +17,8 @@ import {
 	HOUSEHOLD_CYCLE_CUTOFF_DAY,
 	type HouseholdCycleInputs,
 	latestCheckingBalance,
+	latestSyncBalance,
+	seedExposureFromSync,
 } from "./householdCycle";
 
 interface HouseholdCycleCardProps {
@@ -41,10 +43,36 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 		...DEFAULT_HOUSEHOLD_CYCLE_INPUTS,
 		checkingBalance: seededChecking,
 	}));
+	const [touched, setTouched] = useState<
+		ReadonlySet<keyof HouseholdCycleInputs>
+	>(new Set());
+	const syncSeed = useMemo(() => seedExposureFromSync(document), [document]);
+	const syncBalance = useMemo(() => latestSyncBalance(document), [document]);
+	// Adjust untouched inputs while rendering so children never see a stale
+	// seed value. React discards this pass and re-renders immediately.
+	const checkingSeed = latestCheckingBalance(document);
+	const seedCandidates = {
+		checkingBalance: checkingSeed,
+		primeExposure: syncSeed.prime,
+		ultimateExposure: syncSeed.ultimate,
+		wifeCurrentCycle: syncSeed.wife,
+	} as const;
+	let syncedInputs: HouseholdCycleInputs | null = null;
+	for (const [key, value] of Object.entries(seedCandidates)) {
+		const field = key as keyof typeof seedCandidates;
+		if (value === null || touched.has(field)) continue;
+		const current = inputs[field];
+		if (current !== value) {
+			syncedInputs = { ...(syncedInputs ?? inputs), [field]: value };
+		}
+	}
+	if (syncedInputs !== null) setInputs(syncedInputs);
 	const result = useMemo(() => computeHouseholdCycle(inputs), [inputs]);
 
-	const set = (key: keyof HouseholdCycleInputs) => (raw: string) =>
+	const set = (key: keyof HouseholdCycleInputs) => (raw: string) => {
+		setTouched((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
 		setInputs((prev) => ({ ...prev, [key]: parseAmount(raw) }));
+	};
 
 	const cashDenominator = Math.max(
 		Math.abs(inputs.checkingBalance),
@@ -68,6 +96,34 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 				</div>
 			</CardHeader>
 			<CardContent>
+				<div className="mb-4 type-caption" aria-live="polite">
+					{syncBalance ? (
+						<>
+							Synced balances as of {formatDate(syncBalance.date)} (
+							{syncBalance.ageDays === 0
+								? "today"
+								: `${syncBalance.ageDays}d old`}
+							) across {syncBalance.syncedAccounts}{" "}
+							{syncBalance.syncedAccounts === 1 ? "account" : "accounts"}. Card
+							inputs below were seeded from pending sync rows and stay editable.
+						</>
+					) : (
+						<>
+							No synced balances yet — all inputs are manual. Configure the
+							SimpleFIN sync to seed balances and pending card charges.
+						</>
+					)}
+					{syncSeed.unclassified.length > 0 ? (
+						<>
+							{" "}
+							{currency.format(
+								syncSeed.unclassified.reduce((sum, row) => sum + row.amount, 0),
+							)}{" "}
+							in pending rows did not match a card slot (
+							{syncSeed.unclassified.map((row) => row.label).join(", ")}).
+						</>
+					) : null}
+				</div>
 				<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 					<DriverCard
 						label="Cash cushion"

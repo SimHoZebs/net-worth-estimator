@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TableSearch } from "@/components/ui/table-search";
 import { formatDate } from "@/lib/format";
@@ -45,9 +45,7 @@ export function TransactionHistoryTable({
 		1,
 		Math.ceil(groups.length / DATE_GROUPS_PER_PAGE),
 	);
-	useEffect(() => {
-		setPage((current) => Math.min(current, pageCount - 1));
-	}, [pageCount]);
+	if (page > pageCount - 1) setPage(pageCount - 1);
 	const currentPage = Math.min(page, pageCount - 1);
 	const visibleGroups = groups.slice(
 		currentPage * DATE_GROUPS_PER_PAGE,

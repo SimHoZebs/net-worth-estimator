@@ -1,11 +1,4 @@
-import {
-	createContext,
-	type ReactNode,
-	useContext,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { createContext, type ReactNode, useContext, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const ROOT_BASE_CLASS =
@@ -51,14 +44,14 @@ function CollapsibleRoot({
 }: CollapsibleRootProps) {
 	const isControlled = controlledOpen !== undefined;
 	const [internalOpen, setInternalOpen] = useState(defaultOpen || autoOpenWhen);
-	const prevAutoOpenWhenRef = useRef(autoOpenWhen);
+	const [prevAutoOpenWhen, setPrevAutoOpenWhen] = useState(autoOpenWhen);
 
-	useEffect(() => {
-		if (!isControlled && autoOpenWhen && !prevAutoOpenWhenRef.current) {
+	if (prevAutoOpenWhen !== autoOpenWhen) {
+		setPrevAutoOpenWhen(autoOpenWhen);
+		if (!isControlled && autoOpenWhen) {
 			setInternalOpen(true);
 		}
-		prevAutoOpenWhenRef.current = autoOpenWhen;
-	}, [autoOpenWhen, isControlled]);
+	}
 
 	const isOpen = isControlled ? controlledOpen : internalOpen;
 

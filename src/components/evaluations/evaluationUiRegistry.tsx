@@ -1,4 +1,4 @@
-import { type ComponentType, useEffect, useRef, useState } from "react";
+import { type ComponentType, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { parseDecimalDraft } from "@/lib/number-draft";
 import type {
@@ -63,12 +63,11 @@ function ThresholdConfigEditor({
 	}
 	const parsedTarget = parseDecimalDraft(draftTarget);
 	const dirty = draftTarget !== committedDraft;
-	const onDirtyChangeRef = useRef(onDirtyChange);
-	onDirtyChangeRef.current = onDirtyChange;
-	useEffect(() => {
-		onDirtyChangeRef.current?.(dirty);
-		return () => onDirtyChangeRef.current?.(false);
-	}, [dirty]);
+
+	function handleDraftChange(value: string) {
+		setDraftTarget(value);
+		onDirtyChange?.(value !== committedDraft);
+	}
 
 	return (
 		<div className="space-y-2">
@@ -83,7 +82,7 @@ function ThresholdConfigEditor({
 					inputMode="decimal"
 					step={50_000}
 					value={draftTarget}
-					onChange={(event) => setDraftTarget(event.target.value)}
+					onChange={(event) => handleDraftChange(event.target.value)}
 					className="mt-1 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 text-sm shadow-sm outline-none focus:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 dark:border-white/10"
 				/>
 			</label>
@@ -93,7 +92,7 @@ function ThresholdConfigEditor({
 					variant="ghost"
 					size="sm"
 					disabled={!dirty}
-					onClick={() => setDraftTarget(committedDraft)}
+					onClick={() => handleDraftChange(committedDraft)}
 				>
 					Discard
 				</Button>
