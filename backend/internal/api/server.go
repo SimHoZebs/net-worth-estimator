@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
@@ -20,6 +21,8 @@ type Server struct {
 	ReadOnly bool
 	// AuthEnabled reports whether a bearer token guards writes.
 	AuthEnabled bool
+	// SyncRunner runs the SimpleFIN sync on trigger. Nil when unconfigured.
+	SyncRunner *simplefin.Runner
 }
 
 // Config controls HTTP integration behavior.
@@ -28,6 +31,8 @@ type Config struct {
 	ReadOnly       bool
 	// AuthToken guards PUT /v1/financial-model. Empty means auth disabled.
 	AuthToken string
+	// SyncRunner runs the SimpleFIN sync on trigger. Nil when unconfigured.
+	SyncRunner *simplefin.Runner
 }
 
 // New builds the chi router with all routes.
@@ -36,6 +41,7 @@ func New(store *store.Store, serverConfig Config) http.Handler {
 		store:       store,
 		ReadOnly:    serverConfig.ReadOnly,
 		AuthEnabled: serverConfig.AuthToken != "",
+		SyncRunner:  serverConfig.SyncRunner,
 	}
 	router := chi.NewRouter()
 	router.Use(middleware.Recoverer)
@@ -65,6 +71,13 @@ func New(store *store.Store, serverConfig Config) http.Handler {
 		Path:        "/v1/status",
 		Summary:     "Report server write availability and auth state",
 	}, server.getStatus)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "trigger-simplefin-sync",
+		Method:      "POST",
+		Path:        "/v1/sync/simplefin",
+		Summary:     "Run the SimpleFIN sync (balances and pending seed)",
+	}, server.triggerSync)
 
 	huma.Register(api, huma.Operation{
 		OperationID: "get-income-data",

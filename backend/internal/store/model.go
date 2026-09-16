@@ -58,11 +58,33 @@ func clearDocument(tx *sql.Tx) error {
 }
 
 func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
+	// Sync-owned rows are managed by the SimpleFIN sync, never by model
+	// PUT/seed payloads: snapshot them, drop forged sfin- rows from the
+	// incoming document, then re-merge. Incoming owner checkpoints win key
+	// collisions, so owners always keep an override path.
+	syncedCheckpoints, err := loadSyncedCheckpoints(tx)
+	if err != nil {
+		return err
+	}
+	syncedPostings, err := loadSyncedPostings(tx)
+	if err != nil {
+		return err
+	}
 	if err := deleteDocumentRows(tx); err != nil {
 		return err
 	}
 
-	for position, account := range document.Accounts {
+	incomingCheckpointKeys := make(map[string]struct{}, len(document.Checkpoints))
+	for _, checkpoint := range document.Checkpoints {
+		incomingCheckpointKeys[checkpoint.AccountID+"\x00"+checkpoint.Date] = struct{}{}
+	}
+	syncedCheckpointsByKey := make(map[string]types.Checkpoint, len(syncedCheckpoints))
+	for _, checkpoint := range syncedCheckpoints {
+		syncedCheckpointsByKey[checkpoint.AccountID+"\x00"+checkpoint.Date] = checkpoint
+	}
+
+	position := 0
+	for _, account := range document.Accounts {
 		var minBalance, maxBalance any = types.NoFloor, types.NoCeiling
 		if account.MinBalance != nil {
 			minBalance = *account.MinBalance
@@ -80,43 +102,55 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 		); err != nil {
 			return fmt.Errorf("insert account %s: %w", account.ID, err)
 		}
+		position++
 	}
-	for position, checkpoint := range document.Checkpoints {
+	checkpointPosition := 0
+	untouchedSyncKeys := make(map[string]struct{})
+	for _, checkpoint := range document.Checkpoints {
+		key := checkpoint.AccountID + "\x00" + checkpoint.Date
+		if synced, ok := syncedCheckpointsByKey[key]; ok && synced.Balance == checkpoint.Balance {
+			// Byte-identical round-trip of a sync row: leave it sync-owned.
+			untouchedSyncKeys[key] = struct{}{}
+			continue
+		}
 		if _, err := tx.Exec(
-			`INSERT INTO checkpoints (position, date, account_id, balance) VALUES (?,?,?,?)`,
-			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance,
+			`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (?,?,?,?,?)`,
+			checkpointPosition, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceModel,
 		); err != nil {
 			return fmt.Errorf("insert checkpoint: %w", err)
 		}
+		checkpointPosition++
 	}
-	for position, posting := range document.Postings {
-		destinationsJSON := []byte("null")
-		if posting.Destinations != nil {
-			destinationsJSON, _ = json.Marshal(posting.Destinations)
-		}
-		amountJSON, err := json.Marshal(posting.Amount)
-		if err != nil {
-			return fmt.Errorf("marshal amount %s: %w", posting.ID, err)
-		}
-		var sourceAccountID, endDate, annualCap any
-		if posting.SourceAccountID != nil {
-			sourceAccountID = *posting.SourceAccountID
-		}
-		if posting.EndDate != nil {
-			endDate = *posting.EndDate
-		}
-		if posting.AnnualCap != nil {
-			annualCap = *posting.AnnualCap
+	for _, checkpoint := range syncedCheckpoints {
+		key := checkpoint.AccountID + "\x00" + checkpoint.Date
+		if _, present := incomingCheckpointKeys[key]; present {
+			if _, untouched := untouchedSyncKeys[key]; !untouched {
+				continue
+			}
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO postings (id, position, label, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled)
-			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-			posting.ID, position, posting.Label, sourceAccountID, string(destinationsJSON), string(amountJSON),
-			string(posting.Frequency), posting.AnnualRate, posting.AnnualGrowthRate, posting.Volatility,
-			posting.StartDate, endDate, annualCap, posting.Priority, boolToInt(posting.Enabled),
+			`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (?,?,?,?,?)`,
+			checkpointPosition, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceSimpleFIN,
 		); err != nil {
-			return fmt.Errorf("insert posting %s: %w", posting.ID, err)
+			return fmt.Errorf("re-merge synced checkpoint: %w", err)
 		}
+		checkpointPosition++
+	}
+	postingPosition := 0
+	for _, posting := range document.Postings {
+		if IsSyncPostingID(posting.ID) {
+			continue
+		}
+		if err := insertPosting(tx, postingPosition, &posting, SourceModel); err != nil {
+			return err
+		}
+		postingPosition++
+	}
+	for _, posting := range syncedPostings {
+		if err := insertPosting(tx, postingPosition, &posting, SourceSimpleFIN); err != nil {
+			return fmt.Errorf("re-merge synced posting: %w", err)
+		}
+		postingPosition++
 	}
 	if err := saveEvaluationTable(tx, string(types.EvaluationTypeFinancialIndependence), fiEvaluationRows(document)); err != nil {
 		return err
@@ -134,6 +168,90 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 		return fmt.Errorf("save model metadata: %w", err)
 	}
 	return nil
+}
+
+func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source string) error {
+	destinationsJSON := []byte("null")
+	if posting.Destinations != nil {
+		var err error
+		destinationsJSON, err = json.Marshal(posting.Destinations)
+		if err != nil {
+			return fmt.Errorf("marshal destinations %s: %w", posting.ID, err)
+		}
+	}
+	amountJSON, err := json.Marshal(posting.Amount)
+	if err != nil {
+		return fmt.Errorf("marshal amount %s: %w", posting.ID, err)
+	}
+	var sourceAccountID, endDate, annualCap any
+	if posting.SourceAccountID != nil {
+		sourceAccountID = *posting.SourceAccountID
+	}
+	if posting.EndDate != nil {
+		endDate = *posting.EndDate
+	}
+	if posting.AnnualCap != nil {
+		annualCap = *posting.AnnualCap
+	}
+	if _, err := tx.Exec(
+		`INSERT INTO postings (id, position, label, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled, source)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		posting.ID, position, posting.Label, sourceAccountID, string(destinationsJSON), string(amountJSON),
+		string(posting.Frequency), posting.AnnualRate, posting.AnnualGrowthRate, posting.Volatility,
+		posting.StartDate, endDate, annualCap, posting.Priority, boolToInt(posting.Enabled), source,
+	); err != nil {
+		return fmt.Errorf("insert posting %s: %w", posting.ID, err)
+	}
+	return nil
+}
+
+func scanCheckpointRow(rows *sql.Rows) (types.Checkpoint, error) {
+	var checkpoint types.Checkpoint
+	if err := rows.Scan(&checkpoint.Date, &checkpoint.AccountID, &checkpoint.Balance, &checkpoint.Source); err != nil {
+		return types.Checkpoint{}, err
+	}
+	return checkpoint, nil
+}
+
+func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
+	var posting types.Posting
+	var sourceAccountID, endDate sql.NullString
+	var destinationsJSON, amountJSON string
+	var frequency string
+	var enabled int64
+	var capNull sql.NullFloat64
+	var source sql.NullString
+	if err := rows.Scan(&posting.ID, &posting.Label, &sourceAccountID, &destinationsJSON, &amountJSON, &frequency, &posting.AnnualRate, &posting.AnnualGrowthRate, &posting.Volatility, &posting.StartDate, &endDate, &capNull, &posting.Priority, &enabled, &source); err != nil {
+		return types.Posting{}, err
+	}
+	if sourceAccountID.Valid {
+		value := sourceAccountID.String
+		posting.SourceAccountID = &value
+	}
+	if destinationsJSON != "null" {
+		if err := json.Unmarshal([]byte(destinationsJSON), &posting.Destinations); err != nil {
+			return types.Posting{}, fmt.Errorf("parse destinations %s: %w", posting.ID, err)
+		}
+	} else {
+		posting.Destinations = nil
+	}
+	if err := json.Unmarshal([]byte(amountJSON), &posting.Amount); err != nil {
+		return types.Posting{}, fmt.Errorf("parse amount %s: %w", posting.ID, err)
+	}
+	posting.Frequency = types.PostingFrequency(frequency)
+	if endDate.Valid {
+		value := endDate.String
+		posting.EndDate = &value
+	}
+	if capNull.Valid {
+		value := capNull.Float64
+		posting.AnnualCap = &value
+	}
+	posting.Enabled = enabled != 0
+	if source.Valid {
+		posting.Source = source.String
+	}
+	return posting, nil
 }
 
 func fiEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
@@ -259,14 +377,14 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close accounts: %w", err)
 	}
 
-	checkpointRows, err := q.Query(`SELECT date, account_id, balance FROM checkpoints ORDER BY position`)
+	checkpointRows, err := q.Query(`SELECT date, account_id, balance, source FROM checkpoints ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
 	defer checkpointRows.Close()
 	for checkpointRows.Next() {
-		var checkpoint types.Checkpoint
-		if err := checkpointRows.Scan(&checkpoint.Date, &checkpoint.AccountID, &checkpoint.Balance); err != nil {
+		checkpoint, err := scanCheckpointRow(checkpointRows)
+		if err != nil {
 			return nil, err
 		}
 		document.Checkpoints = append(document.Checkpoints, checkpoint)
@@ -279,45 +397,16 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close checkpoints: %w", err)
 	}
 
-	postingRows, err := q.Query(`SELECT id, label, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled FROM postings ORDER BY position`)
+	postingRows, err := q.Query(`SELECT id, label, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled, source FROM postings ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
 	defer postingRows.Close()
 	for postingRows.Next() {
-		var posting types.Posting
-		var sourceAccountID, endDate sql.NullString
-		var destinationsJSON, amountJSON string
-		var frequency string
-		var enabled int64
-		var capNull sql.NullFloat64
-		if err := postingRows.Scan(&posting.ID, &posting.Label, &sourceAccountID, &destinationsJSON, &amountJSON, &frequency, &posting.AnnualRate, &posting.AnnualGrowthRate, &posting.Volatility, &posting.StartDate, &endDate, &capNull, &posting.Priority, &enabled); err != nil {
+		posting, err := scanPostingRow(postingRows)
+		if err != nil {
 			return nil, err
 		}
-		if sourceAccountID.Valid {
-			value := sourceAccountID.String
-			posting.SourceAccountID = &value
-		}
-		if destinationsJSON != "null" {
-			if err := json.Unmarshal([]byte(destinationsJSON), &posting.Destinations); err != nil {
-				return nil, fmt.Errorf("parse destinations %s: %w", posting.ID, err)
-			}
-		} else {
-			posting.Destinations = nil
-		}
-		if err := json.Unmarshal([]byte(amountJSON), &posting.Amount); err != nil {
-			return nil, fmt.Errorf("parse amount %s: %w", posting.ID, err)
-		}
-		posting.Frequency = types.PostingFrequency(frequency)
-		if endDate.Valid {
-			value := endDate.String
-			posting.EndDate = &value
-		}
-		if capNull.Valid {
-			value := capNull.Float64
-			posting.AnnualCap = &value
-		}
-		posting.Enabled = enabled != 0
 		document.Postings = append(document.Postings, posting)
 	}
 	if err := postingRows.Err(); err != nil {

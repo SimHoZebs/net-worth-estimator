@@ -146,10 +146,14 @@ func main() {
 		fmt.Printf("seeded database from %s and %s\n", modelPath, incomePath)
 	}
 
+	syncRunner, syncStop := configureSync(database)
+	defer syncStop()
+
 	handler := api.New(database, api.Config{
 		AllowedOrigins: allowedOrigins,
 		ReadOnly:       readOnly,
 		AuthToken:      authToken,
+		SyncRunner:     syncRunner,
 	})
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),
