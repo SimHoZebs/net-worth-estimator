@@ -6,14 +6,19 @@ import (
 	"net/http"
 )
 
-// writeAuthMiddleware guards canonical model writes. Precedence: read-only
-// rejects everything with 403 first; otherwise a missing or wrong bearer
-// token is 401. When no token is configured (dev default) writes stay open.
-// Reads and compute endpoints always pass through.
+// writeAuthMiddleware guards canonical model writes and the SimpleFIN sync
+// trigger. Precedence: read-only rejects everything with 403 first;
+// otherwise a missing or wrong bearer token is 401. When no token is
+// configured (dev default) guarded routes stay open. Reads and compute
+// endpoints always pass through.
 func writeAuthMiddleware(readOnly bool, token string) func(http.Handler) http.Handler {
+	guarded := map[string]struct{}{
+		http.MethodPut + " /v1/financial-model": {},
+		http.MethodPost + " /v1/sync/simplefin": {},
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPut || r.URL.Path != "/v1/financial-model" {
+			if _, ok := guarded[r.Method+" "+r.URL.Path]; !ok {
 				next.ServeHTTP(w, r)
 				return
 			}

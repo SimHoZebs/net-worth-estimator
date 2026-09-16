@@ -188,3 +188,4 @@ React Router uses browser paths. Production hosting must serve `index.html` for 
 | `src/lib/analysis/postingClassifiers.ts` | reusable payer, payroll-language, and payment-rail classifiers |
 | `src/lib/analysis/` | independent analysis contract, runtime, and definitions |
 | `src/hooks/usePostingAnalyses.ts` | typed posting-classification-to-payroll-to-salary analysis composition |
+- The SimpleFIN sync (`POST /v1/sync/simplefin`, same auth rules as `PUT`) writes only balance checkpoints and projection-disabled pending seed postings. Rows carry a `source` flag (`model` vs `simplefin`, V3 schema) exposed read-only on `GET`; saves strip forged sync rows and re-merge stored ones, with owner checkpoints winning key collisions. Projection/analysis POSTs additionally write best-effort cache rows to `projection_artifacts`; "owner-only writes" covers canonical model rows.

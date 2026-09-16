@@ -3,6 +3,7 @@ package main
 import (
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestParseAllowedOriginsNormalizesAndDeduplicates(t *testing.T) {
@@ -29,6 +30,19 @@ func TestParseReadOnlyDefaultsToWritable(t *testing.T) {
 		if parseReadOnly(value) {
 			t.Fatalf("parseReadOnly(%q) = true, want false", value)
 		}
+	}
+}
+
+func TestNextSyncDelayTargetsMorning(t *testing.T) {
+	morning := time.Date(2026, 8, 5, 1, 0, 0, 0, time.UTC)
+	delay := nextSyncDelay(morning, 15)
+	if delay != 2*time.Hour+15*time.Minute {
+		t.Fatalf("delay = %v, want 2h15m", delay)
+	}
+	afternoon := time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC)
+	overnight := nextSyncDelay(afternoon, 0)
+	if overnight != 15*time.Hour {
+		t.Fatalf("delay = %v, want 15h", overnight)
 	}
 }
 

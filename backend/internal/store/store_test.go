@@ -42,7 +42,7 @@ func TestStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T) {
 	if loaded.SourcePath != document.SourcePath {
 		t.Fatalf("source path = %q, want %q", loaded.SourcePath, document.SourcePath)
 	}
-	if !reflect.DeepEqual(loaded.Checkpoints, document.Checkpoints) {
+	if !reflect.DeepEqual(loaded.Checkpoints, withSourceModel(document.Checkpoints)) {
 		t.Fatalf("checkpoint order changed: got %+v, want %+v", loaded.Checkpoints, document.Checkpoints)
 	}
 	if loaded.Accounts[0].MinBalance == nil || *loaded.Accounts[0].MinBalance != types.NoFloor {

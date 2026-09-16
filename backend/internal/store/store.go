@@ -12,7 +12,7 @@ type Store struct {
 	db *sql.DB
 }
 
-const latestSchemaVersion = 2
+const latestSchemaVersion = 3
 
 // Open opens (creating if needed) the database and applies migrations.
 func Open(path string) (*Store, error) {
@@ -63,6 +63,15 @@ func (s *Store) migrate() error {
 		}
 		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (2)`); err != nil {
 			return fmt.Errorf("record schema version 2: %w", err)
+		}
+		version = 2
+	}
+	if version < 3 {
+		if err := migrateV3(tx); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (3)`); err != nil {
+			return fmt.Errorf("record schema version 3: %w", err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -195,7 +204,20 @@ func migrateV2(tx *sql.Tx) error {
 	return nil
 }
 
-// Clear removes all canonical model rows (used by reset/import).
+func migrateV3(tx *sql.Tx) error {
+	statements := []string{
+		`ALTER TABLE checkpoints ADD COLUMN source TEXT NOT NULL DEFAULT 'model'`,
+		`ALTER TABLE postings ADD COLUMN source TEXT NOT NULL DEFAULT 'model'`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("migrate schema version 3: %w", err)
+		}
+	}
+	return nil
+}
+
+// Clear removes all canonical model rows (used by tests/import).
 func (s *Store) Clear() error {
 	tx, err := s.db.Begin()
 	if err != nil {

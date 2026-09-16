@@ -61,6 +61,9 @@ type Checkpoint struct {
 	Date      IsoDate `json:"Date"`
 	AccountID string  `json:"AccountId"`
 	Balance   float64 `json:"Balance"`
+	// Source names the row owner: "model" (owner/seed) or "simplefin".
+	// Read-only on GET; PUT ignores it (server recomputes ownership).
+	Source string `json:"source,omitempty"`
 }
 
 type CheckpointCorrection struct {
@@ -164,6 +167,9 @@ type Posting struct {
 	AnnualCap        *float64                `json:"annualCap"`
 	Priority         int                     `json:"priority"`
 	Enabled          bool                    `json:"enabled"`
+	// Source names the row owner: "model" (owner/seed) or "simplefin".
+	// Read-only on GET; PUT ignores it (server recomputes ownership).
+	Source string `json:"source,omitempty"`
 }
 
 type FinancialModelDocument struct {

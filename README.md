@@ -116,3 +116,4 @@ npm run build
 - `src/lib/projection/analysis/`: deterministic and stochastic orchestration
 
 See `TECHNICAL_OVERVIEW.md` for the detailed data flow and engine contracts.
+- The optional SimpleFIN sync (daily scheduler plus bearer-guarded `POST /v1/sync/simplefin`) writes only balance checkpoints and projection-disabled pending card-charge seeds, all marked `source: "simplefin"`. It never materializes checking flows or posted history. Sync-owned rows cannot be edited through model saves; add your own checkpoint to override a synced balance. Removing a mapped account does not garbage-collect its sync rows — remap or delete them directly. Start with `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1`.
