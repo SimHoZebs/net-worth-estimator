@@ -12,7 +12,10 @@ import type {
 import { projectionRequestIdentity } from "@/lib/projection/runtime/computationIdentity";
 import type { ProjectionEngine } from "@/lib/projection/runtime/ProjectionEngine";
 import type { IncomeDataSnapshot } from "@/lib/projection/types/income";
-import { normalizeStochasticConfig } from "@/lib/projection/utils/stochastic";
+import {
+	deriveStochasticSeed,
+	normalizeStochasticConfig,
+} from "@/lib/projection/utils/stochastic";
 import type { ProjectionHookState } from "./types";
 
 export type { ProjectionHookState };
@@ -106,10 +109,27 @@ export function useStochastic(
 ): ProjectionHookState<StochasticProjectionResult, StochasticProgress> {
 	const runCount = config?.runCount ?? null;
 	const seed = config?.seed ?? null;
+	// A blank seed means "derive from the inputs": identical models share
+	// identical draws, so results are cacheable, attachable, and stable
+	// across refreshes. An explicit seed always wins.
+	const derivedSeed = useMemo(
+		() =>
+			runCount === null || seed !== null || document === null
+				? null
+				: deriveStochasticSeed({
+						document,
+						settings: projectionSettings,
+						incomeData,
+						runCount,
+					}),
+		[document, projectionSettings, incomeData, runCount, seed],
+	);
 	const stableConfig = useMemo(
 		() =>
-			runCount === null ? null : normalizeStochasticConfig({ runCount, seed }),
-		[runCount, seed],
+			runCount === null
+				? null
+				: normalizeStochasticConfig({ runCount, seed: seed ?? derivedSeed }),
+		[runCount, seed, derivedSeed],
 	);
 	const active = enabled && stableConfig !== null && document !== null;
 	const requestIdentity = projectionRequestIdentity({

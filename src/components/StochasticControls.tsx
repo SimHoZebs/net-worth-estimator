@@ -37,7 +37,7 @@ export function StochasticControls() {
 			? `Computing ${config.runCount} projections - ${progressPct}%`
 			: `Computing ${config.runCount} projections…`
 		: hasStochasticResult
-			? `Ready — ${config.runCount} run${config.runCount === 1 ? "" : "s"}${config.seed !== null ? ` (seed ${config.seed})` : ""}`
+			? `Ready — ${config.runCount} run${config.runCount === 1 ? "" : "s"}${config.seed !== null ? ` (seed ${config.seed})` : " (auto seed)"}`
 			: simulationActive
 				? "Waiting to start…"
 				: "Disabled";
@@ -115,7 +115,7 @@ export function StochasticControls() {
 								</div>
 								<div className="space-y-1">
 									<label htmlFor="stochastic-seed" className="type-eyebrow">
-										Seed (optional)
+										Seed (auto when blank)
 									</label>
 									<input
 										id="stochastic-seed"
@@ -123,7 +123,7 @@ export function StochasticControls() {
 										inputMode="numeric"
 										value={seedInput}
 										onChange={(e) => updateSeedInput(e.currentTarget.value)}
-										placeholder="Random"
+										placeholder="Auto"
 										className="w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 type-body shadow-sm outline-none placeholder:text-muted-foreground focus:border-ring dark:border-white/10"
 									/>
 								</div>
@@ -164,6 +164,11 @@ export function StochasticControls() {
 							<div className="rounded-xl border border-border/70 bg-surface/70 px-4 py-3 dark:border-white/10 dark:bg-surface/50">
 								<div className="type-eyebrow">How the simulation works</div>
 								<ul className="mt-1.5 space-y-1 type-caption">
+									<li>
+										With a blank seed, the seed is derived from the model
+										inputs, so identical models produce identical bands and
+										share cached results. Enter a seed to override it.
+									</li>
 									<li>
 										Each independent Monte Carlo sample draws a sequence of
 										yearly investment returns for every volatile posting using a

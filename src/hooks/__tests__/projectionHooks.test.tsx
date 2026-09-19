@@ -6,6 +6,7 @@ import { type ReactNode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type {
 	ProjectionResult,
+	StochasticConfig,
 	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
@@ -454,5 +455,50 @@ describe("projection hook request provenance", () => {
 			),
 		);
 		expect(hook.result.current.result?.bands).toEqual(current.bands);
+	});
+
+	it("derives a deterministic seed when the config seed is blank", async () => {
+		const document = createBaseDocument();
+		const settings = makeSettings();
+		const seen: StochasticConfig[] = [];
+		const engine: ProjectionEngine = {
+			project: vi.fn(),
+			projectStochastic: vi.fn().mockImplementation((request) => {
+				seen.push(request.config);
+				return Promise.resolve(staticStochastic());
+			}),
+		};
+		const hook = renderHook(
+			() =>
+				useStochastic(document, settings, { runCount: 100, seed: null }, true),
+			{ wrapper: wrapper(engine) },
+		);
+
+		await waitFor(() => expect(hook.result.current.result).not.toBeNull());
+		const first = seen[0];
+		if (!first) throw new Error("Expected the engine to be called.");
+		expect(first.runCount).toBe(100);
+		expect(first.seed).not.toBeNull();
+		expect(seen.every((config) => config.seed === first.seed)).toBe(true);
+	});
+
+	it("passes an explicit seed through untouched", async () => {
+		const document = createBaseDocument();
+		const settings = makeSettings();
+		let sent: StochasticConfig | undefined;
+		const engine: ProjectionEngine = {
+			project: vi.fn(),
+			projectStochastic: vi.fn().mockImplementation((request) => {
+				sent = request.config;
+				return Promise.resolve(staticStochastic());
+			}),
+		};
+		const hook = renderHook(
+			() => useStochastic(document, settings, { runCount: 100, seed: 7 }, true),
+			{ wrapper: wrapper(engine) },
+		);
+
+		await waitFor(() => expect(hook.result.current.result).not.toBeNull());
+		expect(sent).toEqual({ runCount: 100, seed: 7 });
 	});
 });

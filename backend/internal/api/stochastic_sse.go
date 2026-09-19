@@ -255,9 +255,10 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Unseeded runs are never cached or shared: a nil seed means "fresh
-	// random draw", matching TS semantics. The shipped frontend always
-	// materializes a concrete seed before sending, so app traffic is
-	// registry-eligible.
+	// random draw", matching TS semantics. The shipped frontend derives a
+	// deterministic seed from the request content when the seed box is
+	// blank, so app traffic is registry-eligible; explicit null (raw API
+	// use) keeps fresh-draw semantics.
 	cacheEligible := body.Config.Seed != nil
 	var cacheKey string
 	if cacheEligible {
