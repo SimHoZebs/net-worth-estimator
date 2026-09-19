@@ -343,6 +343,24 @@ interface SettingsSlice {
 	setStochasticPreference: (preference: StochasticPreference) => void;
 	stochasticConfig: StochasticConfig;
 	setStochasticConfig: (config: StochasticConfig) => void;
+	householdCycleOverrides: Partial<
+		Record<
+			| "checkingBalance"
+			| "unpaidCashObligations"
+			| "primeExposure"
+			| "ultimateExposure"
+			| "wifeCurrentCycle"
+			| "expectedPaycheck"
+			| "nextMonthFixedObligations"
+			| "protectedReserve",
+			number
+		>
+	>;
+	setHouseholdCycleInput: (
+		key: keyof SettingsSlice["householdCycleOverrides"],
+		value: number,
+	) => void;
+	resetHouseholdCycleInputs: () => void;
 }
 
 const DEFAULT_HORIZON_YEARS = 15;
@@ -480,6 +498,16 @@ const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (
 
 	stochasticConfig: { runCount: DEFAULT_STOCHASTIC_RUN_COUNT, seed: null },
 	setStochasticConfig: (config) => set({ stochasticConfig: config }),
+
+	householdCycleOverrides: {},
+	setHouseholdCycleInput: (key, value) =>
+		set((state) => ({
+			householdCycleOverrides: {
+				...state.householdCycleOverrides,
+				[key]: value,
+			},
+		})),
+	resetHouseholdCycleInputs: () => set({ householdCycleOverrides: {} }),
 });
 
 /* ------------------------------------------------------------------ */
