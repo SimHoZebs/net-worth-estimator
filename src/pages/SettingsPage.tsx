@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBeforeUnload, useBlocker } from "react-router-dom";
 import { BackendAccessCard } from "@/components/BackendAccessCard";
+import { HouseholdCycleSettingsCard } from "@/components/dashboard/HouseholdCycleSettingsCard";
 import { EvaluationSettings } from "@/components/evaluations/EvaluationSettings";
 import { StochasticControls } from "@/components/StochasticControls";
 import { ModelAssumptionsCard } from "@/components/sidebar/ModelAssumptionsCard";
@@ -115,6 +116,9 @@ export function SettingsPage() {
 							</div>
 						</div>
 						<EvaluationSettings onDraftDirtyChange={handleDraftDirtyChange} />
+						<HouseholdCycleSettingsCard
+							document={model.effectiveDocument ?? model.document}
+						/>
 						<div className="max-w-2xl">
 							<ModelAssumptionsCard />
 						</div>

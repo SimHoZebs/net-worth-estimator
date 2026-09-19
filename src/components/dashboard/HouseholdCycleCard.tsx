@@ -1,4 +1,5 @@
-import { memo, useMemo, useState } from "react";
+import { memo } from "react";
+import { Link } from "react-router-dom";
 import {
 	Card,
 	CardContent,
@@ -6,73 +7,24 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { currency, formatDate } from "@/lib/format";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { DriverCard } from "./DriverCard";
-import {
-	computeHouseholdCycle,
-	DEFAULT_HOUSEHOLD_CYCLE_INPUTS,
-	HOUSEHOLD_CYCLE_CUTOFF_DAY,
-	type HouseholdCycleInputs,
-	latestCheckingBalance,
-	latestSyncBalance,
-	seedExposureFromSync,
-} from "./householdCycle";
+import { HOUSEHOLD_CYCLE_CUTOFF_DAY } from "./householdCycle";
+import { useHouseholdCycle } from "./useHouseholdCycle";
 
 interface HouseholdCycleCardProps {
 	document: FinancialModelDocument;
 }
 
-function parseAmount(raw: string): number {
-	const value = Number(raw);
-	return Number.isFinite(value) ? value : 0;
-}
-
+/** Results-only household status. Inputs live in Settings. */
 export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 	document,
 }: HouseholdCycleCardProps) {
-	const seededChecking = useMemo(
-		() =>
-			latestCheckingBalance(document) ??
-			DEFAULT_HOUSEHOLD_CYCLE_INPUTS.checkingBalance,
-		[document],
-	);
-	const [inputs, setInputs] = useState<HouseholdCycleInputs>(() => ({
-		...DEFAULT_HOUSEHOLD_CYCLE_INPUTS,
-		checkingBalance: seededChecking,
-	}));
-	const [touched, setTouched] = useState<
-		ReadonlySet<keyof HouseholdCycleInputs>
-	>(new Set());
-	const syncSeed = useMemo(() => seedExposureFromSync(document), [document]);
-	const syncBalance = useMemo(() => latestSyncBalance(document), [document]);
-	// Adjust untouched inputs while rendering so children never see a stale
-	// seed value. React discards this pass and re-renders immediately.
-	const checkingSeed = latestCheckingBalance(document);
-	const seedCandidates = {
-		checkingBalance: checkingSeed,
-		primeExposure: syncSeed.prime,
-		ultimateExposure: syncSeed.ultimate,
-		wifeCurrentCycle: syncSeed.wife,
-	} as const;
-	let syncedInputs: HouseholdCycleInputs | null = null;
-	for (const [key, value] of Object.entries(seedCandidates)) {
-		const field = key as keyof typeof seedCandidates;
-		if (value === null || touched.has(field)) continue;
-		const current = inputs[field];
-		if (current !== value) {
-			syncedInputs = { ...(syncedInputs ?? inputs), [field]: value };
-		}
-	}
-	if (syncedInputs !== null) setInputs(syncedInputs);
-	const result = useMemo(() => computeHouseholdCycle(inputs), [inputs]);
-
-	const set = (key: keyof HouseholdCycleInputs) => (raw: string) => {
-		setTouched((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
-		setInputs((prev) => ({ ...prev, [key]: parseAmount(raw) }));
-	};
+	const state = useHouseholdCycle(document);
+	if (!state) return null;
+	const { inputs, result, syncBalance, unclassified } = state;
 
 	const cashDenominator = Math.max(
 		Math.abs(inputs.checkingBalance),
@@ -85,14 +37,22 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 	return (
 		<Card className="rounded-[1.6rem] border-border shadow-sm">
 			<CardHeader>
-				<div>
-					<CardTitle>Household cycle</CardTitle>
-					<CardDescription>
-						Paycheck-cycle status through the {HOUSEHOLD_CYCLE_CUTOFF_DAY}th.
-						Cash cushion and card-cycle capacity stay completely separate:
-						current-cycle card charges are paid from the next paycheck, not
-						current checking.
-					</CardDescription>
+				<div className="flex flex-wrap items-start justify-between gap-3">
+					<div>
+						<CardTitle>Household cycle</CardTitle>
+						<CardDescription>
+							Paycheck-cycle status through the {HOUSEHOLD_CYCLE_CUTOFF_DAY}th.
+							Cash cushion and card-cycle capacity stay completely separate:
+							current-cycle card charges are paid from the next paycheck, not
+							current checking.
+						</CardDescription>
+					</div>
+					<Link
+						to="/settings"
+						className="shrink-0 rounded-full border border-border/80 px-3 py-1 type-label uppercase tracking-[0.12em] text-muted-foreground transition hover:border-ring/70 hover:text-foreground"
+					>
+						Edit inputs
+					</Link>
 				</div>
 			</CardHeader>
 			<CardContent>
@@ -105,22 +65,23 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 								: `${syncBalance.ageDays}d old`}
 							) across {syncBalance.syncedAccounts}{" "}
 							{syncBalance.syncedAccounts === 1 ? "account" : "accounts"}. Card
-							inputs below were seeded from pending sync rows and stay editable.
+							inputs are seeded from pending sync rows; adjust them in Settings.
 						</>
 					) : (
 						<>
-							No synced balances yet — all inputs are manual. Configure the
-							SimpleFIN sync to seed balances and pending card charges.
+							No synced balances yet — inputs are manual. Configure the
+							SimpleFIN sync to seed balances and pending card charges, then
+							adjust them in Settings.
 						</>
 					)}
-					{syncSeed.unclassified.length > 0 ? (
+					{unclassified.length > 0 ? (
 						<>
 							{" "}
 							{currency.format(
-								syncSeed.unclassified.reduce((sum, row) => sum + row.amount, 0),
+								unclassified.reduce((sum, row) => sum + row.amount, 0),
 							)}{" "}
 							in pending rows did not match a card slot (
-							{syncSeed.unclassified.map((row) => row.label).join(", ")}).
+							{unclassified.map((row) => row.label).join(", ")}).
 						</>
 					) : null}
 				</div>
@@ -213,49 +174,6 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 					</div>
 				</div>
 
-				<div className="mt-5 grid gap-3 md:grid-cols-2">
-					<AmountField
-						label="Checking balance"
-						value={inputs.checkingBalance}
-						onChange={set("checkingBalance")}
-					/>
-					<AmountField
-						label="Unpaid cash obligations before next paycheck"
-						value={inputs.unpaidCashObligations}
-						onChange={set("unpaidCashObligations")}
-					/>
-					<AmountField
-						label="Prime current-cycle exposure (incl. pending)"
-						value={inputs.primeExposure}
-						onChange={set("primeExposure")}
-					/>
-					<AmountField
-						label="Ultimate current-cycle exposure (incl. pending)"
-						value={inputs.ultimateExposure}
-						onChange={set("ultimateExposure")}
-					/>
-					<AmountField
-						label="Wife's current-cycle amount"
-						value={inputs.wifeCurrentCycle}
-						onChange={set("wifeCurrentCycle")}
-					/>
-					<AmountField
-						label="Expected next paycheck"
-						value={inputs.expectedPaycheck}
-						onChange={set("expectedPaycheck")}
-					/>
-					<AmountField
-						label="Next month's fixed obligations"
-						value={inputs.nextMonthFixedObligations}
-						onChange={set("nextMonthFixedObligations")}
-					/>
-					<AmountField
-						label="Protected reserve"
-						value={inputs.protectedReserve}
-						onChange={set("protectedReserve")}
-					/>
-				</div>
-
 				<div className="mt-5 overflow-x-auto">
 					<Table>
 						<TableBody>
@@ -307,26 +225,3 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 		</Card>
 	);
 });
-
-function AmountField({
-	label,
-	value,
-	onChange,
-}: {
-	label: string;
-	value: number;
-	onChange: (raw: string) => void;
-}) {
-	return (
-		<label className="block rounded-2xl border border-border/70 bg-card/80 px-3 py-2">
-			<span className="type-label">{label}</span>
-			<Input
-				type="number"
-				aria-label={label}
-				className="mt-1 tabular-nums"
-				value={String(value)}
-				onChange={(event) => onChange(event.target.value)}
-			/>
-		</label>
-	);
-}
