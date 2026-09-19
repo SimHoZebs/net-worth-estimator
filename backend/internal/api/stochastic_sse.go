@@ -239,7 +239,7 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 
 	var body struct {
 		Document   *types.FinancialModelDocument   `json:"document,omitempty"`
-		Overrides  types.ModelOverrides            `json:"overrides"`
+		Overrides  types.ModelOverrides            `json:"overrides,omitempty"`
 		Settings   types.ProjectionRuntimeSettings `json:"settings"`
 		Config     types.StochasticConfig          `json:"config"`
 		IncomeData *types.IncomeDataSnapshot       `json:"incomeData,omitempty"`

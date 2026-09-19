@@ -54,7 +54,7 @@ func (s *Server) resolveDocument(requested *types.FinancialModelDocument, reques
 
 type projectionRequestBody struct {
 	Document   *types.FinancialModelDocument   `json:"document,omitempty"`
-	Overrides  types.ModelOverrides            `json:"overrides"`
+	Overrides  types.ModelOverrides            `json:"overrides,omitempty"`
 	Settings   types.ProjectionRuntimeSettings `json:"settings"`
 	IncomeData *types.IncomeDataSnapshot       `json:"incomeData,omitempty"`
 }
