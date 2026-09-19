@@ -22,8 +22,7 @@ import {
 import { parseDecimalDraft } from "@/lib/number-draft";
 import type { Account, FinancialModelDocument } from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
-
-const NO_CHANGED_IDS = new Set<string>();
+import { findChangedIds, NO_CHANGED_IDS } from "./_shared";
 
 function inputStyle(isDirty: boolean) {
 	return editableTableCellInputStyle(isDirty);
@@ -102,17 +101,11 @@ export function EditableAccountsTable({
 	);
 	const changedAccountIds = useMemo(() => {
 		if (!isDirty || workingDocument === null) return NO_CHANGED_IDS;
-		const changed = new Set<string>();
-		for (const account of workingDocument.accounts) {
-			const original = documentAccountsById.get(account.id);
-			if (
-				original === undefined ||
-				JSON.stringify(account) !== JSON.stringify(original)
-			) {
-				changed.add(account.id);
-			}
-		}
-		return changed;
+		return findChangedIds(
+			documentAccountsById,
+			workingDocument.accounts,
+			isDirty,
+		);
 	}, [isDirty, workingDocument, documentAccountsById]);
 
 	return (

@@ -6,7 +6,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Path adaptation ported from simulation/projectPath.ts.
+// Path adaptation. Go is the owner.
 
 func roundCurrency(value float64) float64 { return math.Round(value) }
 

@@ -1,11 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import {
 	type AnalysisResult,
 	buildPostingObservationDataset,
 	type ClassifiedPostingDataset,
 	classifyPostings,
-	type PostingObservationDataset,
-	throwIfAborted,
+	type PostingObservation,
 	toAnalysisResult,
 } from "@/lib/analysis";
 import {
@@ -16,40 +15,58 @@ import {
 } from "@/lib/analysis/definitions";
 import type { FinancialModelDocument } from "@/lib/projection";
 
-const ANALYSIS_CACHE_TIME_MS = 5 * 60 * 1000;
-
 export interface PostingAnalysisResults {
 	classification: AnalysisResult<ClassifiedPostingDataset>;
 	payroll: AnalysisResult<PayrollDetectionResult> | null;
 	salary: AnalysisResult<SalaryEstimateResult> | null;
 }
 
-export function usePostingAnalyses(document: FinancialModelDocument | null) {
-	const observationDataset: PostingObservationDataset | null = document
-		? buildPostingObservationDataset(document)
-		: null;
-	return useQuery({
-		queryKey: ["posting-analyses", observationDataset],
-		queryFn: async ({ signal }): Promise<PostingAnalysisResults> => {
-			throwIfAborted(signal);
-			const classification = toAnalysisResult({
-				value: classifyPostings(observationDataset!),
-				diagnostics: [],
-			});
-			throwIfAborted(signal);
-			if (classification.value === null) {
-				return { classification, payroll: null, salary: null };
-			}
-			const payroll = toAnalysisResult(detectPayroll(classification.value));
-			throwIfAborted(signal);
-			if (payroll.value === null)
-				return { classification, payroll, salary: null };
-			const salary = toAnalysisResult(estimateSalary(payroll.value));
-			throwIfAborted(signal);
-			return { classification, payroll, salary };
-		},
-		enabled: observationDataset !== null,
-		staleTime: Infinity,
-		gcTime: ANALYSIS_CACHE_TIME_MS,
-	});
+export interface PostingAnalyses {
+	data: PostingAnalysisResults | null;
+	observations: PostingObservation[];
+	isLoading: false;
+	isError: false;
+}
+
+// Pure synchronous pipeline over posting-derived observations: no query
+// shell needed. Observations are exposed alongside the results so pages do
+// not rebuild the dataset a second time.
+export function usePostingAnalyses(
+	document: FinancialModelDocument | null,
+): PostingAnalyses {
+	return useMemo<PostingAnalyses>(() => {
+		if (!document) {
+			return { data: null, observations: [], isLoading: false, isError: false };
+		}
+		const observationDataset = buildPostingObservationDataset(document);
+		const observations = observationDataset.postings;
+		const classification = toAnalysisResult({
+			value: classifyPostings(observationDataset),
+			diagnostics: [],
+		});
+		if (classification.value === null) {
+			return {
+				data: { classification, payroll: null, salary: null },
+				observations,
+				isLoading: false,
+				isError: false,
+			};
+		}
+		const payroll = toAnalysisResult(detectPayroll(classification.value));
+		if (payroll.value === null) {
+			return {
+				data: { classification, payroll, salary: null },
+				observations,
+				isLoading: false,
+				isError: false,
+			};
+		}
+		const salary = toAnalysisResult(estimateSalary(payroll.value));
+		return {
+			data: { classification, payroll, salary },
+			observations,
+			isLoading: false,
+			isError: false,
+		};
+	}, [document]);
 }

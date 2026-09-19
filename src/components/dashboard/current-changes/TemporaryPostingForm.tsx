@@ -1,8 +1,11 @@
 import { useState } from "react";
+import {
+	describePostingRoute,
+	duplicateIdError,
+	parseDecimalField,
+} from "@/components/_draftHelpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatRoute } from "@/lib/format";
-import { parseDecimalDraft } from "@/lib/number-draft";
 import {
 	createExpressionAmount,
 	type FinancialModelDocument,
@@ -47,17 +50,7 @@ function emptyPosting(): TemporaryPostingDraft {
 }
 
 function describeRoute(posting: Posting, document: FinancialModelDocument) {
-	const accountById = new Map(document.accounts.map((a) => [a.id, a]));
-	const sourceLabel = posting.sourceAccountId
-		? (accountById.get(posting.sourceAccountId)?.label ??
-			posting.sourceAccountId)
-		: null;
-	const destinations = posting.destinations
-		? posting.destinations.map((destId) => ({
-				label: accountById.get(destId)?.label ?? destId,
-			}))
-		: null;
-	return formatRoute(sourceLabel, destinations);
+	return describePostingRoute(posting, document.accounts, " -> ");
 }
 
 interface TemporaryPostingFormProps {
@@ -86,21 +79,15 @@ export function TemporaryPostingForm({
 
 		const errors: string[] = [];
 		const id = adding.id.trim();
-		if (
-			reservedIds.includes(id) ||
-			document.postings.some((posting) => posting.id === id) ||
-			postings.some((posting) => posting.id === id)
-		) {
-			errors.push(`Posting ID "${id}" is already in use.`);
+		const duplicateError = duplicateIdError(id, "Posting", reservedIds, [
+			...document.postings.map((posting) => posting.id),
+			...postings.map((posting) => posting.id),
+		]);
+		if (duplicateError) {
+			errors.push(duplicateError);
 		}
-		const parseNumber = (raw: string, label: string) => {
-			const parsed = parseDecimalDraft(raw);
-			if (parsed === null) {
-				errors.push(`${label} must be a valid number.`);
-				return 0;
-			}
-			return parsed;
-		};
+		const parseNumber = (raw: string, label: string) =>
+			parseDecimalField(raw, label, errors);
 		const annualRate = parseNumber(adding.annualRate, "Annual rate");
 		const annualGrowthRate = parseNumber(
 			adding.annualGrowthRate,

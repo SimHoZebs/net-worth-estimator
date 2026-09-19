@@ -159,19 +159,21 @@ export function CurrentChangesControls({
 								Excluded from this scenario
 							</h3>
 							{disabledAccounts.map((account) => (
-								<ExcludedItem
+								<DraftRowItem
 									key={`excluded-account-${account.id}`}
 									label={account.label}
 									type="Account"
-									onRestore={() => updateAccount(account.id, { enabled: true })}
+									actionLabel="Restore"
+									onAction={() => updateAccount(account.id, { enabled: true })}
 								/>
 							))}
 							{disabledPostings.map((posting) => (
-								<ExcludedItem
+								<DraftRowItem
 									key={`excluded-posting-${posting.id}`}
 									label={posting.label}
 									type="Transaction"
-									onRestore={() => updatePosting(posting.id, { enabled: true })}
+									actionLabel="Restore"
+									onAction={() => updatePosting(posting.id, { enabled: true })}
 								/>
 							))}
 						</div>
@@ -188,19 +190,21 @@ export function CurrentChangesControls({
 								: " and starts a draft edit session when needed."}
 						</p>
 						{excludableAccounts.map((account) => (
-							<ExcludableItem
+							<DraftRowItem
 								key={`excludable-account-${account.id}`}
 								label={account.label}
 								type="Account"
-								onExclude={() => handleExcludeAccount(account.id)}
+								actionLabel="Exclude"
+								onAction={() => handleExcludeAccount(account.id)}
 							/>
 						))}
 						{excludablePostings.map((posting) => (
-							<ExcludableItem
+							<DraftRowItem
 								key={`excludable-posting-${posting.id}`}
 								label={posting.label}
 								type="Transaction"
-								onExclude={() => handleExcludePosting(posting.id)}
+								actionLabel="Exclude"
+								onAction={() => handleExcludePosting(posting.id)}
 							/>
 						))}
 						{excludableAccounts.length === 0 &&
@@ -243,14 +247,16 @@ export function CurrentChangesControls({
 	);
 }
 
-function ExcludedItem({
+function DraftRowItem({
 	label,
 	type,
-	onRestore,
+	actionLabel,
+	onAction,
 }: {
 	label: string;
 	type: string;
-	onRestore: () => void;
+	actionLabel: "Restore" | "Exclude";
+	onAction: () => void;
 }) {
 	return (
 		<div className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-surface/60 px-4 py-2">
@@ -258,30 +264,8 @@ function ExcludedItem({
 				<div className="type-label">{label}</div>
 				<div className="type-caption">{type}</div>
 			</div>
-			<Button type="button" variant="ghost" size="sm" onClick={onRestore}>
-				Restore
-			</Button>
-		</div>
-	);
-}
-
-function ExcludableItem({
-	label,
-	type,
-	onExclude,
-}: {
-	label: string;
-	type: string;
-	onExclude: () => void;
-}) {
-	return (
-		<div className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-surface/60 px-4 py-2">
-			<div>
-				<div className="type-label">{label}</div>
-				<div className="type-caption">{type}</div>
-			</div>
-			<Button type="button" variant="ghost" size="sm" onClick={onExclude}>
-				Exclude
+			<Button type="button" variant="ghost" size="sm" onClick={onAction}>
+				{actionLabel}
 			</Button>
 		</div>
 	);

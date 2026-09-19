@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { TableSearch } from "@/components/ui/table-search";
 import { formatDate } from "@/lib/format";
 import type { Account, Posting } from "@/lib/projection";
+import { useTableSearch } from "./_shared";
 import {
 	TransactionListRow,
 	transactionMatchesSearch,
@@ -19,14 +20,13 @@ export function TransactionHistoryTable({
 	postings,
 	accounts,
 }: TransactionHistoryTableProps) {
-	const [search, setSearch] = useState("");
+	const { search, setSearch, query } = useTableSearch();
 	const [page, setPage] = useState(0);
 	const accountById = useMemo(
 		() => new Map(accounts.map((account) => [account.id, account])),
 		[accounts],
 	);
 	const groups = useMemo(() => {
-		const query = search.trim().toLowerCase();
 		const byDate = new Map<string, Posting[]>();
 		for (const posting of postings) {
 			if (!transactionMatchesSearch(posting, accountById, query)) {
@@ -40,7 +40,7 @@ export function TransactionHistoryTable({
 			date,
 			transactions,
 		})).sort((left, right) => right.date.localeCompare(left.date));
-	}, [postings, search, accountById]);
+	}, [postings, query, accountById]);
 	const pageCount = Math.max(
 		1,
 		Math.ceil(groups.length / DATE_GROUPS_PER_PAGE),

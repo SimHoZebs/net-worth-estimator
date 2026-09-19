@@ -39,9 +39,6 @@ func (s *Server) getModel(_ context.Context, _ *struct{}) (*getModelOutput, erro
 func (s *Server) putModel(_ context.Context, input *struct {
 	Body types.FinancialModelDocument `json:"body"`
 }) (*getModelOutput, error) {
-	if s.ReadOnly {
-		return nil, huma.Error403Forbidden("server is read-only")
-	}
 	document := &input.Body
 	effectiveIncome, err := s.store.LoadIncomeData()
 	if err != nil {

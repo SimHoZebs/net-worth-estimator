@@ -11,8 +11,6 @@ import {
 	RouteErrorFallback,
 	RouteLoadingFallback,
 } from "./components/RouteErrorFallback";
-import { BackendProjectionEngine } from "./engine/BackendProjectionEngine";
-import { ProjectionEngineProvider } from "./engine/ProjectionEngineContext";
 import "./styles.css";
 
 const AnalysisPage = lazy(() =>
@@ -49,8 +47,6 @@ const queryClient = new QueryClient({
 	},
 });
 
-const engine = new BackendProjectionEngine();
-
 const router = createBrowserRouter([
 	{
 		path: "/",
@@ -68,10 +64,8 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
 	<StrictMode>
-		<ProjectionEngineProvider engine={engine}>
-			<QueryClientProvider client={queryClient}>
-				<RouterProvider router={router} />
-			</QueryClientProvider>
-		</ProjectionEngineProvider>
+		<QueryClientProvider client={queryClient}>
+			<RouterProvider router={router} />
+		</QueryClientProvider>
 	</StrictMode>,
 );

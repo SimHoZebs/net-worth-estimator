@@ -7,7 +7,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Pure deterministic kernel ported from simulation/simulate.ts.
+// Pure deterministic kernel. Go is the owner.
 
 func maxFloat(a, b float64) float64 {
 	if a > b || math.IsNaN(b) {

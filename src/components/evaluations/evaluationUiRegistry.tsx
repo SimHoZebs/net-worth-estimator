@@ -1,5 +1,4 @@
 import { type ComponentType, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { parseDecimalDraft } from "@/lib/number-draft";
 import type {
 	EvaluationInstance,
@@ -16,7 +15,9 @@ import {
 	validatePostingFulfillmentConfig,
 } from "@/lib/projection";
 import { DEFAULT_FINANCIAL_INDEPENDENCE_PLAN } from "@/store";
+import { EvaluationEditorFooter } from "./_Metric";
 import { FinancialIndependenceEvaluation } from "./FinancialIndependenceEvaluation";
+import { FiNumberField } from "./FinancialIndependencePlanFields";
 import { NetWorthThresholdEvaluation } from "./NetWorthThresholdEvaluation";
 import { PostingFulfillmentEvaluation } from "./PostingFulfillmentEvaluation";
 
@@ -71,44 +72,25 @@ function ThresholdConfigEditor({
 
 	return (
 		<div className="space-y-2">
-			<label
-				className="block type-caption"
-				htmlFor={`threshold-${evaluation.instanceId}`}
-			>
-				Target net worth
-				<input
-					id={`threshold-${evaluation.instanceId}`}
-					type="text"
-					inputMode="decimal"
-					step={50_000}
-					value={draftTarget}
-					onChange={(event) => handleDraftChange(event.target.value)}
-					className="mt-1 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 text-sm shadow-sm outline-none focus:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 dark:border-white/10"
-				/>
-			</label>
-			<div className="flex justify-end gap-2">
-				<Button
-					type="button"
-					variant="ghost"
-					size="sm"
-					disabled={!dirty}
-					onClick={() => handleDraftChange(committedDraft)}
-				>
-					Discard
-				</Button>
-				<Button
-					type="button"
-					size="sm"
-					disabled={!dirty || parsedTarget === null}
-					onClick={() => {
-						if (parsedTarget === null) return;
-						onChange({ target: parsedTarget });
-						setDraftTarget(String(parsedTarget));
-					}}
-				>
-					Update analysis
-				</Button>
-			</div>
+			<FiNumberField
+				label="Target net worth"
+				id={`threshold-${evaluation.instanceId}`}
+				value={draftTarget}
+				step={50_000}
+				onChange={handleDraftChange}
+			/>
+			<EvaluationEditorFooter
+				dirty={dirty}
+				canSubmit={parsedTarget !== null}
+				discardLabel="Discard"
+				submitLabel="Update analysis"
+				onDiscard={() => handleDraftChange(committedDraft)}
+				onSubmit={() => {
+					if (parsedTarget === null) return;
+					onChange({ target: parsedTarget });
+					setDraftTarget(String(parsedTarget));
+				}}
+			/>
 		</div>
 	);
 }

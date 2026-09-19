@@ -4,8 +4,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Deterministic orchestration ported from analysis/projectFinancialModel.ts
-// plus the evaluator registry from evaluation/registry.ts.
+// Deterministic orchestration and evaluator registry. Go is the owner.
 
 // EvaluationRegistry is the process-wide definition registry.
 var evaluationRegistryInstance = NewEvaluationRegistry()

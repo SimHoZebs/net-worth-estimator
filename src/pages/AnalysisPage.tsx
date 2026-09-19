@@ -7,7 +7,6 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { usePostingAnalyses } from "@/hooks/usePostingAnalyses";
-import { buildPostingObservationDataset } from "@/lib/analysis";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 
 const usd = new Intl.NumberFormat("en-US", {
@@ -20,9 +19,7 @@ export function AnalysisPage() {
 	const model = useModelRuntime();
 	const document = model.effectiveDocument ?? model.document;
 	const analyses = usePostingAnalyses(document);
-	const observationRows = document
-		? buildPostingObservationDataset(document).postings
-		: [];
+	const observationRows = analyses.observations;
 	const firstDate = observationRows[0]?.bookedDate ?? null;
 	const lastDate =
 		observationRows[observationRows.length - 1]?.bookedDate ?? null;

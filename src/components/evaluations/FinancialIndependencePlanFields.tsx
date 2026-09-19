@@ -47,6 +47,7 @@ export function FiNumberField({
 	min,
 	max,
 	step,
+	id,
 	onChange,
 }: {
 	label: string;
@@ -55,6 +56,7 @@ export function FiNumberField({
 	min?: number;
 	max?: number;
 	step?: number;
+	id?: string;
 	onChange: (value: string) => void;
 }) {
 	return (
@@ -69,6 +71,7 @@ export function FiNumberField({
 				type="text"
 				inputMode="decimal"
 				aria-label={label}
+				id={id}
 				min={min}
 				max={max}
 				step={step}

@@ -1,7 +1,6 @@
 import { memo, useCallback, useMemo } from "react";
 import type uPlot from "uplot";
 import { parseChartDate } from "@/chart/chartData";
-import { createBaseOptions } from "@/chart/uplotBase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import { currency, formatDate } from "@/lib/format";
@@ -10,8 +9,12 @@ import type {
 	FinancialModelDocument,
 } from "@/lib/projection";
 import { escapeHtml } from "@/lib/utils";
-
-const FALLBACK_ACCOUNT_COLOR = "GrayText";
+import {
+	baseChartOptions,
+	closeChartTooltip,
+	openChartTooltip,
+	resolveAccountColor,
+} from "./charts/_chartShared";
 
 interface FinancialIndependenceChartProps {
 	document: FinancialModelDocument;
@@ -45,7 +48,7 @@ export const FinancialIndependenceChart = memo(
 				accountIds.map((accountId) => ({
 					id: accountId,
 					label: accountsById.get(accountId)?.label ?? accountId,
-					color: accountsById.get(accountId)?.color ?? FALLBACK_ACCOUNT_COLOR,
+					color: resolveAccountColor(accountsById.get(accountId)?.color),
 				})),
 			[accountIds, accountsById],
 		);
@@ -164,12 +167,9 @@ export function buildFinancialIndependenceBalanceData(
 export function buildFinancialIndependenceChartOptions(
 	accounts: readonly FinancialIndependenceChartAccount[],
 ): uPlot.Options {
-	const base = createBaseOptions();
+	const base = baseChartOptions();
 	return {
 		...base,
-		width: 0,
-		height: 0,
-		legend: { show: false },
 		series: [
 			{},
 			...accounts.map((account) => ({
@@ -217,10 +217,10 @@ export function buildFinancialIndependenceBalanceTooltip(
 		balance: balanceByAccountId?.get(account.id) ?? 0,
 	}));
 	const total = balances.reduce((sum, account) => sum + account.balance, 0);
-	let html =
-		'<div class="min-w-56 rounded-lg border border-border/80 bg-card/95 px-3 py-2 shadow-xl backdrop-blur dark:border-white/10">';
-	html += `<div class="type-label">${escapeHtml(formatDate(row.date))}</div>`;
-	html += '<div class="mt-1 space-y-1">';
+	let html = openChartTooltip(escapeHtml(formatDate(row.date)), {
+		widthClass: "min-w-56",
+		listClass: "mt-1 space-y-1",
+	});
 	for (const account of balances) {
 		html += '<div class="flex justify-between gap-4 type-caption">';
 		html +=
@@ -235,6 +235,7 @@ export function buildFinancialIndependenceBalanceTooltip(
 		'<div class="mt-1 flex justify-between gap-4 border-t border-border/70 pt-1 type-caption type-value">';
 	html += "<span>Selected assets</span>";
 	html += `<span class="tabular-nums">${escapeHtml(currency.format(total))}</span>`;
-	html += "</div></div></div>";
+	html += "</div>";
+	html += closeChartTooltip();
 	return html;
 }

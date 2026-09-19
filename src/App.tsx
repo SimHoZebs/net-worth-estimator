@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import {
@@ -18,7 +18,6 @@ import {
 	withoutWriteCapabilities,
 } from "@/lib/projection/sources/http/httpFinancialModelRepository";
 import { createHttpIncomeDataSource } from "@/lib/projection/sources/http/httpIncomeDataSource";
-import { canonicalSerialize } from "@/lib/projection/utils/canonical";
 import {
 	ModelRuntimeProvider,
 	type ModelSourceInfo,
@@ -94,22 +93,19 @@ export default function App() {
 	const finishEditing = useStore((state) => state.finishEditing);
 	const syncSystemTheme = useThemeStore((state) => state.syncSystemTheme);
 
-	const sourceEvaluationsFingerprint = document
-		? canonicalSerialize(document.evaluations)
-		: null;
-	const loadedEvaluationsFingerprint = useRef<string | null>(null);
+	// Seed session evaluations from the loaded document, keyed by the query's
+	// data timestamp so reloads re-seed while session edits stay untouched.
+	const [syncedEvaluationsAt, setSyncedEvaluationsAt] = useState<number | null>(
+		null,
+	);
 	useEffect(() => {
-		if (
-			document &&
-			sourceEvaluationsFingerprint !== loadedEvaluationsFingerprint.current
-		) {
+		if (document && syncedEvaluationsAt !== dataUpdatedAt) {
 			replaceEvaluations(document.evaluations);
-			loadedEvaluationsFingerprint.current = sourceEvaluationsFingerprint;
+			setSyncedEvaluationsAt(dataUpdatedAt);
 		}
-	}, [document, replaceEvaluations, sourceEvaluationsFingerprint]);
+	}, [document, dataUpdatedAt, syncedEvaluationsAt, replaceEvaluations]);
 	const evaluationsAreHydrated =
-		document === null ||
-		loadedEvaluationsFingerprint.current === sourceEvaluationsFingerprint;
+		document === null || syncedEvaluationsAt === dataUpdatedAt;
 	const requestEvaluationReload = useCallback(() => {
 		if (document) replaceEvaluations(document.evaluations);
 	}, [document, replaceEvaluations]);

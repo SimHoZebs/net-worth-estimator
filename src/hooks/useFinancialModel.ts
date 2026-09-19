@@ -1,10 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
 	FinancialModelDocument,
 	FinancialModelParseResult,
 	FinancialModelRepository,
 } from "@/lib/projection";
 import { FinancialModelValidationError } from "@/lib/projection";
+import { useImmutableQuery } from "./types";
 
 export const FINANCIAL_MODEL_QUERY_KEY = ["financial-model"] as const;
 
@@ -21,11 +22,9 @@ function requireSuccessfulMutation(
 }
 
 export function useFinancialModelQuery(repository: FinancialModelRepository) {
-	return useQuery({
-		queryKey: FINANCIAL_MODEL_QUERY_KEY,
-		queryFn: () => repository.loadDocument(),
-		staleTime: Infinity,
-	});
+	return useImmutableQuery(FINANCIAL_MODEL_QUERY_KEY, () =>
+		repository.loadDocument(),
+	);
 }
 
 export function useFinancialModelMutation(

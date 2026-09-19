@@ -27,9 +27,8 @@ import {
 	type Posting,
 	updateExpressionAmount,
 } from "@/lib/projection";
+import { findChangedIds, NO_CHANGED_IDS } from "./_shared";
 import { PostingAmount } from "./PostingAmount";
-
-const NO_CHANGED_IDS = new Set<string>();
 
 function inputStyle(isDirty: boolean) {
 	return editableTableCellInputStyle(isDirty);
@@ -133,17 +132,11 @@ export function EditablePostingsTable({
 	);
 	const changedPostingIds = useMemo(() => {
 		if (!isDirty || workingDocument === null) return NO_CHANGED_IDS;
-		const changed = new Set<string>();
-		for (const posting of workingDocument.postings) {
-			const original = originalPostingById.get(posting.id);
-			if (
-				original === undefined ||
-				JSON.stringify(posting) !== JSON.stringify(original)
-			) {
-				changed.add(posting.id);
-			}
-		}
-		return changed;
+		return findChangedIds(
+			originalPostingById,
+			workingDocument.postings,
+			isDirty,
+		);
 	}, [isDirty, workingDocument, originalPostingById]);
 
 	return (

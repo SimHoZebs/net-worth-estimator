@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
+import { parseDecimalField } from "@/components/_draftHelpers";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { parseDecimalDraft } from "@/lib/number-draft";
 import type {
 	IncomeTemplateInput,
 	TemplateGenerationResult,
@@ -45,14 +45,8 @@ function parseIncomeInput(
 	input: IncomeFormValue,
 ): { ok: true; input: IncomeTemplateInput } | { ok: false; error: string } {
 	const errors: string[] = [];
-	const parseNumber = (raw: string, label: string) => {
-		const parsed = parseDecimalDraft(raw);
-		if (parsed === null) {
-			errors.push(`${label} must be a valid number.`);
-			return 0;
-		}
-		return parsed;
-	};
+	const parseNumber = (raw: string, label: string) =>
+		parseDecimalField(raw, label, errors);
 
 	if (!input.incomeSourceId) errors.push("Income source is required.");
 	if (!input.taxProfileId) errors.push("Tax profile is required.");
