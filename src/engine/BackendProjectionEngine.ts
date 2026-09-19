@@ -13,8 +13,22 @@ import type {
 // BackendProjectionEngine routes all projection computation to the Go
 // backend (chi + huma) over HTTP/SSE. Computation no longer runs in browser
 // workers; see docs/backend-migration/ASSUMPTIONS.md A2/A4.
+//
+// Recovery contract (browser backgrounding): reconnects are full restarts —
+// the client re-POSTs the same body, preserving the last progress/partial
+// across attempts so the UI never flashes to empty. The server sends a
+// `retry` hint plus `: heartbeat` comments; heartbeats keep idle proxies/NAT
+// from killing long batches, and a per-attempt stall timer converts a frozen
+// tab (no bytes for STALL_TIMEOUT_MS) into a bounded reconnect instead of a
+// hung spinner. Server `error` events and HTTP 4xx are terminal and never
+// retried; only network failures, HTTP 5xx, stalls, and truncated streams
+// (closed without a result) reconnect.
 
 const API_BASE = buildApiUrl("/v1");
+
+const MAX_ATTEMPTS = 3;
+const STALL_TIMEOUT_MS = 30_000;
+const RECONNECT_BASE_DELAY_MS = 1_000;
 
 type StochasticStreamEvent = {
 	progress?: unknown;
@@ -22,6 +36,47 @@ type StochasticStreamEvent = {
 	result?: unknown;
 	error?: string;
 };
+
+class StallError extends Error {
+	constructor() {
+		super("Stochastic stream stalled.");
+		this.name = "StallError";
+	}
+}
+
+// TerminalError marks failures that must never reconnect: server `error`
+// events (deterministic computation failures) and HTTP 4xx (bad request).
+class TerminalError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "TerminalError";
+	}
+}
+
+function isAbortError(error: unknown): boolean {
+	return (
+		error instanceof DOMException ||
+		(error instanceof Error && error.name === "AbortError")
+	);
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+	return new Promise((resolve, reject) => {
+		if (signal?.aborted) {
+			reject(new DOMException("Aborted", "AbortError"));
+			return;
+		}
+		const timer = setTimeout(() => {
+			signal?.removeEventListener("abort", onAbort);
+			resolve();
+		}, ms);
+		const onAbort = () => {
+			clearTimeout(timer);
+			reject(new DOMException("Aborted", "AbortError"));
+		};
+		signal?.addEventListener("abort", onAbort, { once: true });
+	});
+}
 
 async function postJson<TResponse>(
 	path: string,
@@ -71,30 +126,84 @@ export class BackendProjectionEngine implements ProjectionEngine {
 		request: StochasticRequest,
 		onProgress?: ProgressCallback,
 	): Promise<StochasticProjectionResult> {
-		const controller = new AbortController();
-		const abortHandler = () => controller.abort();
 		if (request.signal?.aborted) {
 			throw new DOMException("Aborted", "AbortError");
 		}
-		request.signal?.addEventListener("abort", abortHandler, { once: true });
+		const body = JSON.stringify({
+			document: request.document,
+			incomeData: request.incomeData,
+			settings: request.projectionSettings,
+			config: request.config,
+		});
+		let serverRetryMs = RECONNECT_BASE_DELAY_MS;
+		let lastError: unknown = null;
+
+		for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+			if (request.signal?.aborted) {
+				throw new DOMException("Aborted", "AbortError");
+			}
+			if (attempt > 0) {
+				await sleep(serverRetryMs * 2 ** (attempt - 1), request.signal);
+			}
+			try {
+				return await this.readStreamAttempt(
+					body,
+					request.signal,
+					(retryMs) => {
+						if (retryMs !== null) serverRetryMs = retryMs;
+					},
+					onProgress,
+				);
+			} catch (error) {
+				if (isAbortError(error) && request.signal?.aborted) throw error;
+				if (error instanceof TerminalError) throw error;
+				lastError = error;
+			}
+		}
+		throw lastError instanceof Error
+			? lastError
+			: new Error("Stochastic projection failed.");
+	}
+
+	private async readStreamAttempt(
+		body: string,
+		outerSignal: AbortSignal | undefined,
+		onRetryHint: (retryMs: number | null) => void,
+		onProgress?: ProgressCallback,
+	): Promise<StochasticProjectionResult> {
+		const controller = new AbortController();
+		const abortHandler = () => controller.abort();
+		let stalled = false;
+		if (outerSignal?.aborted) {
+			throw new DOMException("Aborted", "AbortError");
+		}
+		outerSignal?.addEventListener("abort", abortHandler, { once: true });
+
+		let stallTimer: ReturnType<typeof setTimeout> | undefined;
+		const armStallTimer = () => {
+			clearTimeout(stallTimer);
+			stallTimer = setTimeout(() => {
+				stalled = true;
+				controller.abort();
+			}, STALL_TIMEOUT_MS);
+		};
 
 		try {
 			const response = await fetch(`${API_BASE}/projections/stochastic`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					document: request.document,
-					incomeData: request.incomeData,
-					settings: request.projectionSettings,
-					config: request.config,
-				}),
+				body,
 				signal: controller.signal,
 			});
 			if (!response.ok || !response.body) {
 				const detail = await response.text().catch(() => "");
-				throw new Error(
-					detail || `Stochastic stream failed (${response.status}).`,
-				);
+				const status = response.status;
+				if (status >= 400 && status < 500) {
+					throw new TerminalError(
+						detail || `Stochastic projection failed (${status}).`,
+					);
+				}
+				throw new Error(detail || `Stochastic stream failed (${status}).`);
 			}
 
 			const reader = response.body.getReader();
@@ -103,10 +212,18 @@ export class BackendProjectionEngine implements ProjectionEngine {
 			let finalResult: StochasticProjectionResult | null = null;
 			let streamError: string | null = null;
 
+			armStallTimer();
 			for (;;) {
-				const { done, value } = await reader.read();
-				if (done) break;
-				buffer += decoder.decode(value, { stream: true });
+				let read: ReadableStreamReadResult<Uint8Array>;
+				try {
+					read = await reader.read();
+				} catch (error) {
+					if (stalled) throw new StallError();
+					throw error;
+				}
+				if (read.done) break;
+				armStallTimer();
+				buffer += decoder.decode(read.value, { stream: true });
 				let separatorIndex = buffer.indexOf("\n\n");
 				while (separatorIndex >= 0) {
 					const rawEvent = buffer.slice(0, separatorIndex);
@@ -114,6 +231,8 @@ export class BackendProjectionEngine implements ProjectionEngine {
 					separatorIndex = buffer.indexOf("\n\n");
 					const event = parseSseEvent(rawEvent);
 					if (!event) continue;
+					if (event.retryMs !== null) onRetryHint(event.retryMs);
+					if (event.name === null) continue;
 					let parsed: StochasticStreamEvent;
 					try {
 						parsed = JSON.parse(event.data) as StochasticStreamEvent;
@@ -139,12 +258,13 @@ export class BackendProjectionEngine implements ProjectionEngine {
 				}
 			}
 
-			if (streamError) throw new Error(streamError);
+			if (streamError) throw new TerminalError(streamError);
 			if (!finalResult) {
 				throw new Error("Stochastic stream ended without a result.");
 			}
 			return finalResult;
 		} catch (error) {
+			if (stalled) throw new StallError();
 			if (
 				error instanceof DOMException ||
 				(error instanceof Error && error.name === "AbortError")
@@ -155,23 +275,33 @@ export class BackendProjectionEngine implements ProjectionEngine {
 				? error
 				: new Error("Stochastic projection failed.");
 		} finally {
-			request.signal?.removeEventListener("abort", abortHandler);
+			clearTimeout(stallTimer);
+			outerSignal?.removeEventListener("abort", abortHandler);
 		}
 	}
 }
 
-function parseSseEvent(
-	rawEvent: string,
-): { name: string; data: string } | null {
-	let name = "message";
+function parseSseEvent(rawEvent: string): {
+	name: string | null;
+	data: string;
+	retryMs: number | null;
+} | null {
+	let name: string | null = "message";
+	let retryMs: number | null = null;
 	const dataLines: string[] = [];
 	for (const line of rawEvent.split("\n")) {
 		if (line.startsWith("event:")) {
 			name = line.slice(6).trim();
 		} else if (line.startsWith("data:")) {
 			dataLines.push(line.slice(5).trimStart());
+		} else if (line.startsWith("retry:")) {
+			const parsed = Number.parseInt(line.slice(6).trim(), 10);
+			if (Number.isFinite(parsed) && parsed >= 0) retryMs = parsed;
 		}
 	}
+	if (retryMs !== null && dataLines.length === 0) {
+		return { name: null, data: "", retryMs };
+	}
 	if (dataLines.length === 0) return null;
-	return { name, data: dataLines.join("\n") };
+	return { name, data: dataLines.join("\n"), retryMs };
 }

@@ -177,17 +177,77 @@ describe("projectStochastic", () => {
 		expect(seen).toEqual([{ completedRuns: 1 }]);
 	});
 
-	it("throws the stream error message", async () => {
+	it("ignores heartbeats, retry hints, and event IDs", async () => {
+		const final = { marker: "final" };
+		const seen: unknown[] = [];
 		stubFetch(async () =>
+			sseResponse([
+				`retry: 3000\n\n: heartbeat\n\n${progressEvent({ completedRuns: 1 })}`,
+				`id: 1\n${resultEvent(final)}`,
+			]),
+		);
+
+		await expect(
+			new BackendProjectionEngine().projectStochastic(
+				stochasticRequest,
+				(progress) => {
+					seen.push(progress);
+				},
+			),
+		).resolves.toEqual(final);
+		expect(seen).toEqual([{ completedRuns: 1 }]);
+	});
+
+	it("reconnects a truncated stream and preserves earlier progress", async () => {
+		const progress = { completedRuns: 25, totalRuns: 50 };
+		const final = { marker: "final" };
+		const seen: Array<{ progress: unknown; partial?: unknown }> = [];
+		const fetchMock = vi.fn(async () => sseResponse([progressEvent(progress)]));
+		fetchMock.mockImplementationOnce(async () =>
+			sseResponse([progressEvent(progress)]),
+		);
+		fetchMock.mockImplementationOnce(async () =>
+			sseResponse([resultEvent(final)]),
+		);
+		stubFetch(fetchMock);
+
+		await expect(
+			new BackendProjectionEngine().projectStochastic(
+				stochasticRequest,
+				(progressUpdate, partialUpdate) => {
+					seen.push({ progress: progressUpdate, partial: partialUpdate });
+				},
+			),
+		).resolves.toEqual(final);
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+		expect(seen).toEqual([{ progress, partial: undefined }]);
+	});
+
+	it("does not reconnect terminal stream errors", async () => {
+		const fetchMock = vi.fn(async () =>
 			sseResponse([
 				`event: error\ndata: ${JSON.stringify({ error: "sampling failed" })}\n\n`,
 			]),
 		);
+		stubFetch(fetchMock);
+
 		await expect(
 			new BackendProjectionEngine().projectStochastic(stochasticRequest),
 		).rejects.toThrow("sampling failed");
+		expect(fetchMock).toHaveBeenCalledOnce();
 	});
 
+	it("does not reconnect HTTP 4xx failures", async () => {
+		const fetchMock = vi.fn(
+			async () => new Response("bad request", { status: 400 }),
+		);
+		stubFetch(fetchMock);
+
+		await expect(
+			new BackendProjectionEngine().projectStochastic(stochasticRequest),
+		).rejects.toThrow("bad request");
+		expect(fetchMock).toHaveBeenCalledOnce();
+	});
 	it("throws when the stream ends without a result", async () => {
 		stubFetch(async () => sseResponse([progressEvent({})]));
 		await expect(

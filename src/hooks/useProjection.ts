@@ -40,7 +40,9 @@ export function useProjection(
 		enabled: active,
 		placeholderData: keepPreviousData,
 		staleTime: Infinity,
-		retry: false,
+		// Deterministic runs are cheap and server-cacheable: retry transient
+		// backgrounding blips automatically instead of sticking an error.
+		retry: 2,
 	});
 	if (!active) {
 		return {
