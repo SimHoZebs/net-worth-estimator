@@ -74,6 +74,9 @@ export function useStochastic(
 		enabled: active,
 		placeholderData: keepPreviousData,
 		staleTime: Infinity,
+		// No TanStack retry here: BackendProjectionEngine already runs a
+		// bounded SSE reconnect loop (full restart, partials preserved), and
+		// a query-level retry would multiply attempts.
 		retry: false,
 	});
 	if (!active) {
