@@ -1,4 +1,4 @@
-import { createExpressionAmount } from "../simulation/amountResolution";
+import { createExpressionAmount } from "../model/expressionAmount";
 import type { Posting } from "../types/model";
 
 type PostingOverrides = Partial<Posting> & {

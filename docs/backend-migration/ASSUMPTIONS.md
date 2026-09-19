@@ -43,7 +43,7 @@ Living document. Every non-obvious decision made while porting the TypeScript do
 - D2. The Vite plugin (`plugins/csvFilePlugin.ts`) is retired rather than proxied; the Go server serves `/api/*` in dev via vite proxy during migration.
 - D3. Browser persistence paths (localStorage DAO, Web Locks, IndexedDB artifacts) are deleted at cutover; artifact identity hashing is recomputed in Go, so previously cached browser artifacts are abandoned (they were disposable by design).
 - D4. `accessors.ts` helpers are UI-selection utilities and are not ported; the API returns full result collections.
-- D5. Analyses pipeline ports observation derivation, shared classification plan, payroll detection, and salary estimation faithfully; classifier wording/labels are preserved.
+- D5. Posting analyses (observation derivation, shared classification plan, payroll detection, salary estimation) are client-owned under `src/lib/analysis/`; the former server-side port and `POST /v1/analyses/postings` were removed.
 
 ## Implementation notes (recorded during the build)
 

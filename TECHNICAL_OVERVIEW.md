@@ -5,7 +5,7 @@ The Net Worth Estimator is a React application that loads a `FinancialModelDocum
 ## 1. Tech Stack
 
 - React 19, Vite, and TypeScript
-- Go backend (chi + huma) for model persistence, projections, and analyses
+- Go backend (chi + huma) for model persistence and projections
 - Tailwind CSS v4 and uPlot
 - Zustand and TanStack Query
 - Papa Parse and Zod
@@ -14,10 +14,10 @@ The Net Worth Estimator is a React application that loads a `FinancialModelDocum
 ## 2. Data Flow
 
 1. `App.tsx` creates `createHttpFinancialModelRepository()` and `createHttpIncomeDataSource()`. The browser uses same-origin `/v1` routes unless the Vite build sets `VITE_API_BASE_URL`; the development server proxies `/v1` to `NET_WORTH_ESTIMATOR_BACKEND` (default `http://localhost:8787`).
-2. Model Inputs and query hooks depend only on `FinancialModelRepository`, implemented by `createHttpFinancialModelRepository` against the Go backend. Raw CSV parsing (`sources/csv/csvLoader`) remains only as test support; the browser never loads model CSVs directly.
-3. Parsing and cross-reference validation produce a validated `FinancialModelDocument` plus diagnostics. Invalid or malformed data surfaces diagnostics instead of being silently discarded.
+2. Model Inputs and query hooks depend only on `FinancialModelRepository`, implemented by `createHttpFinancialModelRepository` against the Go backend. There is no client CSV parsing; the HTTP layer keeps thin wire-shape parsers (`sources/http/documentParser`, `sources/http/incomeSnapshotParser`) and the browser never loads model CSVs directly.
+3. The backend validates the `FinancialModelDocument` and returns diagnostics with the payload. The client renders those server-provided diagnostics; it performs no business-rule validation of its own. Invalid or malformed data surfaces diagnostics instead of being silently discarded.
 4. The Zustand Editor slice stages a session-only draft (`workingDocument` plus the `editingBaseline` snapshot in `src/store.ts`), displayed as current changes. The effective document is `workingDocument ?? canonical document` (`src/runtime/useProjectionOrchestration.ts`); canonical data is untouched until save.
-5. `useProjection` and `useStochastic` share one `useEngineRequest` state machine over `BackendProjectionEngine`, which POSTs to `/v1/projections/deterministic` or streams `/v1/projections/stochastic` over SSE. The server cache plus TanStack Query cover repeat requests; there is no client-side projection cache.
+5. `useProjection` and `useStochastic` share one query-state core in `src/hooks/useProjections.ts` over `BackendProjectionEngine`, which POSTs to `/v1/projections/deterministic` or streams `/v1/projections/stochastic` over SSE. The server cache plus TanStack Query cover repeat requests; there is no client-side projection cache.
 6. `prepareSimulationRequest` resolves overrides, opening balances, dates, event policy, and optional `MonteCarloSample` into a prepared projection containing a `SimulationRequest`.
 7. The pure `simulate` kernel returns an exact `SimulationRun`. `projectRawFinancialModelDocument` adapts it into a `ProjectionPath` and public result; `projectFinancialModelDocument` adds configured evaluations. The backend implements this pipeline; the TypeScript kernel remains the parity reference.
 8. The persistent routed workspace exposes the loaded document and projection state to separate Results, Settings, and Model Inputs pages without restarting projection hooks during navigation.
@@ -34,7 +34,7 @@ The HTTP repository is the only model persistence. There is no DAO, ingestion co
 - Canonical routes: `GET/PUT /v1/financial-model`, `GET /v1/status`. There is no reset route; CSV files are seed-only. `PUT` is rejected with 403 when `NET_WORTH_ESTIMATOR_READ_ONLY=1` and requires a bearer token (`NET_WORTH_ESTIMATOR_AUTH_TOKEN`) when auth is configured.
 - The SimpleFIN sync (`POST /v1/sync/simplefin`, same auth rules as `PUT`) writes only balance checkpoints and projection-disabled pending seed postings. Rows carry a `source` flag (`model` vs `simplefin`, V3 schema) exposed read-only on `GET`; saves strip forged sync rows and re-merge stored ones, with owner checkpoints winning key collisions. Projection/analysis POSTs additionally write best-effort cache rows to `projection_artifacts`; "owner-only writes" covers canonical model rows.
 - The Go server (`backend/cmd/server`) imports canonical CSV data (`NET_WORTH_ESTIMATOR_MODEL_PATH`, default `public/configs`) and income data (`NET_WORTH_ESTIMATOR_INCOME_PATH`, default `public/data/income`) into `NET_WORTH_ESTIMATOR_DB` (SQLite).
-- Income definitions are served through `/v1/income-data`. Posting analyses are also exposed at `/v1/analyses/postings`; the client currently derives analyses locally.
+- Income definitions are served through `/v1/income-data`. Posting analyses run client-side (`src/hooks/usePostingAnalyses.ts` over `src/lib/analysis/`); there is no server analyses endpoint.
 - Projection endpoints: `POST /v1/projections/deterministic` (JSON) and `POST /v1/projections/stochastic` (SSE stream).
 - `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` accepts a comma-separated runtime allowlist of exact HTTP/S browser origins. Requests carrying any other `Origin` are rejected; requests without `Origin` remain available to health checks, trusted proxies, and non-browser clients.
 
@@ -46,7 +46,7 @@ The browser holds no model storage. Malformed canonical persisted data returns p
 
 - Derived projection artifacts are separate from the canonical `FinancialModelRepository` and live in the backend (`projection_artifacts` table, best-effort).
 - The client keeps no projection cache: the server cache plus TanStack Query (`staleTime: Infinity`) cover repeat requests.
-- Request identity for React state uses `canonicalSerialize` (sorted object keys, order-preserving arrays) in `useEngineRequest`; it is not a cache key.
+- Request identity is the `canonicalSerialize` string (sorted object keys, order-preserving arrays) from `projectionRequestIdentity`, used directly as the TanStack query key; it is not the server artifact cache key.
 - Completed stochastic results are cached server-side by effective simulation inputs, normalized run count, seed intent, and evaluation configuration. A first unseeded cache miss materializes a concrete seed; later identical requests reuse that outcome.
 - Progressive stochastic results are never persisted. A stochastic evaluation cache miss replays samples because individual sample paths are intentionally not retained.
 - Hashing, validation, and artifact-store failures fail open: the backend still computes the requested projection.
@@ -54,7 +54,7 @@ The browser holds no model storage. Malformed canonical persisted data returns p
 ### Simulation Kernel (Go Backend)
 
 - The browser never simulates. All simulation lives in the Go backend (`backend/internal/domain/`: `prepare.go`, `transitions.go`, `simulate.go`, `path.go`, `project.go`, `stochastic.go`). There is no TypeScript simulation kernel; the former `lib/projection/reference/` parity reference has been deleted.
-- Evaluation config and validation (`src/lib/projection/evaluation/*`: config validators, result accessors) stay client-side because editors, validation, and result components import them. Execution (kernel, branch simulation, evaluation runtime, stochastic orchestration) runs in the backend.
+- Evaluation config validators (`src/lib/projection/evaluation/*`) stay client-side only where editors need instant field-level feedback (evaluation editors and result guards); they mirror backend rules and never gate persistence or projection. Result accessors are pure view selectors over backend-computed outcomes. Execution (kernel, branch simulation, evaluation runtime, stochastic orchestration) and authoritative validation run in the backend.
 
 ## 4. Core Types
 
@@ -184,10 +184,10 @@ React Router uses browser paths. Production hosting must serve `index.html` for 
 | `backend/internal/domain/behavior.go` | generic reactive-behavior period loop |
 | `src/lib/projection/evaluation/configValidation.ts` | single validation entry for evaluation configs |
 | `src/engine/BackendProjectionEngine.ts` | HTTP/SSE client for backend deterministic and stochastic projection |
-| `src/hooks/useEngineRequest.ts` | shared backend-request state machine for both projection hooks |
+| `src/hooks/useProjections.ts` | deterministic + stochastic hooks over a shared query-state core |
+| `src/hooks/useProjection.ts` | re-export of the deterministic hook (historical path kept for mocks) |
+| `src/hooks/useStochastic.ts` | re-export of the stochastic hook (historical path kept for mocks) |
 | `src/hooks/useFinancialModel.ts` | document query and save hooks |
-| `src/hooks/useProjection.ts` | deterministic projection hook (thin wrapper) |
-| `src/hooks/useStochastic.ts` | stochastic projection hook (thin wrapper) |
 | `src/lib/analysis/postingObservations.ts` | derives analysis observations from one-time external-inflow postings |
 | `src/lib/analysis/classification.ts` | typed classifier definitions, requirement-plan composition, and shared classification pass |
 | `src/lib/analysis/postingClassifiers.ts` | reusable payer, payroll-language, and payment-rail classifiers |

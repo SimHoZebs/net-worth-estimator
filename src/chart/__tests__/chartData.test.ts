@@ -3,8 +3,7 @@ import type {
 	ProjectionResult,
 	StochasticProjectionResult,
 } from "@/lib/projection";
-import { parseCsvFinancialModel } from "@/lib/projection";
-import { validCsvFiles } from "@/lib/projection/__fixtures__";
+import { createBaseDocument } from "@/lib/projection/__fixtures__";
 import {
 	buildAccountDiagnosticChartData,
 	buildStochasticChartData,
@@ -101,10 +100,7 @@ function staticStochastic(
 
 describe("buildAccountDiagnosticChartData", () => {
 	it("returns per-account balances and deterministic net worth", () => {
-		const { data: document } = parseCsvFinancialModel(validCsvFiles);
-		expect(document).not.toBeNull();
-
-		if (!document) throw new Error("Financial model failed to load");
+		const document = createBaseDocument();
 		const enabled = document.accounts.filter((a) => a.enabled);
 		const balances = Object.fromEntries(
 			enabled.map((account, index) => [account.id, (index + 1) * 1000]),
@@ -227,8 +223,7 @@ describe("buildAccountDiagnosticChartData", () => {
 	});
 
 	it("preserves first-match account lookup behavior", () => {
-		const { data: document } = parseCsvFinancialModel(validCsvFiles);
-		if (!document) throw new Error("Financial model failed to load");
+		const document = createBaseDocument();
 		const result = staticResult([
 			{ checking: 1000 },
 			{ checking: 1100 },

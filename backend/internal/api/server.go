@@ -93,13 +93,6 @@ func New(store *store.Store, serverConfig Config) http.Handler {
 		Summary:     "Run a deterministic projection",
 	}, server.projectDeterministic)
 
-	huma.Register(api, huma.Operation{
-		OperationID: "analyze-postings",
-		Method:      "POST",
-		Path:        "/v1/analyses/postings",
-		Summary:     "Run posting-derived analyses (payroll evidence)",
-	}, server.analyzePostings)
-
 	// Raw SSE endpoint for stochastic progress streaming.
 	router.Post("/v1/projections/stochastic", server.stochasticSSE)
 

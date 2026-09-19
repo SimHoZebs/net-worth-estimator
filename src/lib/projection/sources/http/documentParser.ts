@@ -5,12 +5,25 @@ import type {
 	FinancialModelDocument,
 	Posting,
 } from "../../types/model";
-import { csvDateSchema } from "./csvSchema";
+
+const isoDateSchema = z
+	.string()
+	.trim()
+	.regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/u)
+	.refine((value) => {
+		const [year, month, day] = value.split("-").map(Number);
+		const date = new Date(Date.UTC(year!, month! - 1, day!));
+		return (
+			date.getUTCFullYear() === year &&
+			date.getUTCMonth() === month! - 1 &&
+			date.getUTCDate() === day
+		);
+	}, "Expected a valid date.");
 
 const finiteNumber = z.number().finite();
 const checkpointSchema = z
 	.object({
-		Date: csvDateSchema,
+		Date: isoDateSchema,
 		AccountId: z.string().trim().min(1),
 		Balance: finiteNumber,
 		source: z.string().trim().min(1).nullish(),
@@ -51,8 +64,8 @@ const postingSchema = z
 		annualRate: finiteNumber,
 		annualGrowthRate: finiteNumber,
 		volatility: finiteNumber,
-		startDate: csvDateSchema,
-		endDate: csvDateSchema.nullable(),
+		startDate: isoDateSchema,
+		endDate: isoDateSchema.nullable(),
 		annualCap: finiteNumber.nullable(),
 		priority: finiteNumber.int().min(1),
 		enabled: z.boolean(),
@@ -81,6 +94,11 @@ const financialIndependenceSourceSchema = z.discriminatedUnion("type", [
 		})
 		.strict(),
 ]) satisfies z.ZodType<FinancialIndependenceSource>;
+
+/**
+ * Thin wire-shape parser for the backend document payload. Structural shape
+ * only; all business-rule validation runs server-side in Go.
+ */
 export const financialModelDocumentSchema = z
 	.object({
 		sourcePath: z.string(),

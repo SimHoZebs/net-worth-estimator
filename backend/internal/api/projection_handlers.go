@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -110,52 +109,5 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 	}
 	putArtifact(s.store, cacheKey, "deterministic", result)
 	output.Body.Result = result
-	return output, nil
-}
-
-// ---- Analyses (posting-derived payroll evidence) ----
-
-type analysesOutput struct {
-	Status int `json:"-"`
-	Body   struct {
-		Error   string                       `json:"error,omitempty"`
-		Issues  []types.ModelValidationIssue `json:"issues,omitempty"`
-		Results map[string]any               `json:"results,omitempty"`
-	}
-}
-
-func (s *Server) analyzePostings(_ context.Context, input *struct {
-	Body projectionRequestBody
-}) (*analysesOutput, error) {
-	document, incomeData, err := s.resolveDocument(input.Body.Document, input.Body.IncomeData)
-	if err != nil {
-		return nil, huma.Error500InternalServerError(err.Error())
-	}
-	// Posting analyses parse posting dates directly; reject malformed
-	// documents with structured issues instead of panicking into a 500.
-	output := &analysesOutput{Status: http.StatusOK}
-	issues := domainValidate(document, incomeData)
-	for _, issue := range issues {
-		if issue.Severity == types.SeverityError {
-			output.Body.Issues = append(output.Body.Issues, issue)
-		}
-	}
-	if len(output.Body.Issues) > 0 {
-		return output, nil
-	}
-	results, err := domain.RunPostingAnalyses(document)
-	if err != nil {
-		output.Body.Error = err.Error()
-		return output, nil
-	}
-	payload, err := json.Marshal(results)
-	if err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("encode analysis results: %v", err))
-	}
-	decoded := map[string]any{}
-	if err := json.Unmarshal(payload, &decoded); err != nil {
-		return nil, huma.Error500InternalServerError(fmt.Sprintf("decode analysis results: %v", err))
-	}
-	output.Body.Results = decoded
 	return output, nil
 }

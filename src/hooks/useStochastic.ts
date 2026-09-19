@@ -1,5 +1,10 @@
-// Thin re-export so the historical "@/hooks/useStochastic" module path (and
-// its test mocks) keeps working. The implementation lives alongside
-// useProjection in useProjection.ts, sharing one engine singleton, request
-// identity, and stale mapping.
-export { setProjectionEngine, useStochastic } from "./useProjection";
+// Historical module path (and its test mocks) keeps working. The
+// implementation lives alongside useProjection in "./useProjections",
+// sharing one engine singleton, request identity, and query-state core.
+
+export type { ProjectionHookState } from "./types";
+export {
+	setProjectionEngine,
+	useProjection,
+	useStochastic,
+} from "./useProjections";

@@ -1,6 +1,6 @@
 import { buildApiUrl } from "@/lib/api-url";
 import type { IncomeDataLoadResult, IncomeDataSource } from "../../incomeData";
-import { parseIncomeDataSnapshot } from "../../sources/csv/incomeDataSource";
+import { parseIncomeDataSnapshot } from "./incomeSnapshotParser";
 
 // HTTP income data source backed by the Go backend snapshot endpoint.
 

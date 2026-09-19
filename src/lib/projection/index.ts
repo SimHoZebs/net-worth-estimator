@@ -8,7 +8,6 @@ export {
 	getPostingFulfillmentResult,
 	type ValidatedConfiguredEvaluation,
 } from "./evaluation/accessors";
-export { evaluationConfigValidators } from "./evaluation/configValidation";
 export {
 	FINANCIAL_INDEPENDENCE_DEFINITION_ID,
 	type FinancialIndependenceProbabilisticResult,
@@ -43,6 +42,11 @@ export {
 	getAmountPresentation,
 	getExpression,
 } from "./model/amountPresentation";
+export {
+	createExpressionAmount,
+	updateExpressionAmount,
+} from "./model/expressionAmount";
+export { summarizeValidationIssues } from "./model/validationSummary";
 export type {
 	FinancialModelParseResult,
 	FinancialModelRepository,
@@ -70,43 +74,10 @@ export function selectFinancialIndependenceOutcomeIndex(
 	return outcomes.length - 1;
 }
 export {
-	amountProviders,
-	amountResolvers,
-	createExpressionAmount,
-	resolvePostingAmountDescriptor,
-	updateExpressionAmount,
-	validateAmountDescriptor,
-} from "./simulation/amountResolution";
-export { validateIncomeAmountConfig } from "./simulation/incomeConfig";
-export { parseFinancialModelDocument } from "./sources/csv/csvDataSource";
-export type {
-	CsvFinancialModelOptions,
-	CsvFinancialModelParseResult,
-} from "./sources/csv/csvLoader";
-export { parseCsvFinancialModel } from "./sources/csv/csvLoader";
-export {
-	csvAccountSchema,
-	csvAccountsHeaders,
-	csvCheckpointSchema,
-	csvCheckpointsHeaders,
-	csvDateSchema,
-	csvFinancialIndependenceHeaders,
-	csvFinancialIndependenceSchema,
-	csvNetWorthThresholdHeaders,
-	csvNetWorthThresholdSchema,
-	csvPostingFulfillmentHeaders,
-	csvPostingFulfillmentSchema,
-	csvPostingSchema,
-	csvPostingsHeaders,
-} from "./sources/csv/csvSchema";
-export {
-	summarizeValidationIssues,
-	validateCsvFinancialModel,
-} from "./sources/csv/csvValidation";
-export {
-	parseIncomeDataFiles,
-	parseIncomeDataSnapshot,
-} from "./sources/csv/incomeDataSource";
+	financialModelDocumentSchema,
+	parseFinancialModelDocument,
+} from "./sources/http/documentParser";
+export { parseIncomeDataSnapshot } from "./sources/http/incomeSnapshotParser";
 export type {
 	IncomeDataSnapshot,
 	IncomeSourceDefinition,
@@ -211,11 +182,3 @@ export type {
 	ModelValidationSeverity,
 } from "./types/validation";
 export { normalizeStochasticConfig } from "./utils/stochastic";
-export type {
-	FinancialModelValidationOptions,
-	ValidationPaths,
-} from "./validation/types";
-export {
-	summarizeValidationIssues as summarizeModelValidationIssues,
-	validateFinancialModel,
-} from "./validation/validateFinancialModel";

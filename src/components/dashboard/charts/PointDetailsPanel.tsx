@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { AccountColorDot } from "@/chart/chartView";
 import { groupPointAccounts, type PointDetails } from "@/chart/pointDetails";
 import { currency } from "@/lib/format";
-import { AccountColorDot } from "./_chartShared";
 
 interface PointDetailsPanelProps {
 	details: PointDetails;

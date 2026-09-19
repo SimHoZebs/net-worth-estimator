@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo } from "react";
 import { Outlet } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import {
@@ -9,10 +9,7 @@ import { useIncomeDataQuery } from "@/hooks/useIncomeData";
 import { useServerStatusQuery } from "@/hooks/useServerStatus";
 import { getAuthToken } from "@/lib/auth-token";
 import type { TemplateOutput } from "@/lib/patterns";
-import {
-	summarizeValidationIssues,
-	validateCsvFinancialModel,
-} from "@/lib/projection";
+import { summarizeValidationIssues } from "@/lib/projection";
 import {
 	createHttpFinancialModelRepository,
 	withoutWriteCapabilities,
@@ -69,13 +66,11 @@ export default function App() {
 	const isSaving = modelMutation.isPending;
 	const document = modelData?.document ?? null;
 	const issues = useMemo(() => {
-		const modelIssues = modelData?.issues ?? [];
+		// Diagnostics come from the Go backend (model + income endpoints);
+		// the client performs no business-rule validation of its own.
 		const candidates = [
-			...modelIssues,
+			...(modelData?.issues ?? []),
 			...(incomeDataResult?.issues ?? []),
-			...(modelData?.document && incomeDataResult?.data
-				? validateCsvFinancialModel(modelData.document, incomeDataResult.data)
-				: []),
 		];
 		const seen = new Set<string>();
 		return candidates.filter((issue) => {
@@ -89,26 +84,29 @@ export default function App() {
 	const sourceActionError = modelMutation.error?.message ?? null;
 	const isSourceUpdating = isModelFetching || isIncomeDataFetching;
 	const isLoading = isModelLoading || isIncomeDataLoading || isSourceUpdating;
-	const replaceEvaluations = useStore((state) => state.replaceEvaluations);
+	const syncEvaluationsFromDocument = useStore(
+		(state) => state.syncEvaluationsFromDocument,
+	);
+	const lastEvaluationSyncAt = useStore((state) => state.lastEvaluationSyncAt);
 	const finishEditing = useStore((state) => state.finishEditing);
 	const syncSystemTheme = useThemeStore((state) => state.syncSystemTheme);
 
-	// Seed session evaluations from the loaded document, keyed by the query's
-	// data timestamp so reloads re-seed while session edits stay untouched.
-	const [syncedEvaluationsAt, setSyncedEvaluationsAt] = useState<number | null>(
-		null,
-	);
+	// Session evaluations are the single truth for projection and UI (see
+	// store.ts). Sync them from the loaded document; the store guard makes
+	// repeat calls with the same timestamp no-ops, so session edits survive
+	// re-renders while reloads re-seed.
 	useEffect(() => {
-		if (document && syncedEvaluationsAt !== dataUpdatedAt) {
-			replaceEvaluations(document.evaluations);
-			setSyncedEvaluationsAt(dataUpdatedAt);
-		}
-	}, [document, dataUpdatedAt, syncedEvaluationsAt, replaceEvaluations]);
+		if (document)
+			syncEvaluationsFromDocument(document.evaluations, dataUpdatedAt);
+	}, [document, dataUpdatedAt, syncEvaluationsFromDocument]);
 	const evaluationsAreHydrated =
-		document === null || syncedEvaluationsAt === dataUpdatedAt;
+		document === null || lastEvaluationSyncAt === dataUpdatedAt;
 	const requestEvaluationReload = useCallback(() => {
-		if (document) replaceEvaluations(document.evaluations);
-	}, [document, replaceEvaluations]);
+		if (document)
+			syncEvaluationsFromDocument(document.evaluations, dataUpdatedAt, {
+				force: true,
+			});
+	}, [document, dataUpdatedAt, syncEvaluationsFromDocument]);
 
 	useEffect(() => {
 		const media = window.matchMedia("(prefers-color-scheme: dark)");

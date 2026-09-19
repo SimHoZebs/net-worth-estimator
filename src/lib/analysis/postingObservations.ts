@@ -1,8 +1,5 @@
 import type { FinancialModelDocument } from "@/lib/projection";
-import {
-	getExpression,
-	resolvePostingAmountDescriptor,
-} from "@/lib/projection";
+import { getExpression } from "@/lib/projection";
 
 export interface PostingObservation {
 	id: string;
@@ -19,6 +16,26 @@ export interface PostingObservationDataset {
 	postings: PostingObservation[];
 }
 
+/**
+ * Best-effort constant evaluator for observation display amounts. Handles
+ * numeric literals and constant arithmetic (+ - * / parentheses) only.
+ * Anything referencing postings, accounts, or rates stays null; the Go
+ * backend remains the single source of truth for computed amounts.
+ */
+function evaluateConstantExpression(expression: string): number | null {
+	const trimmed = expression.trim();
+	if (trimmed === "") return null;
+	if (!/^[0-9\s+\-*/().]+$/.test(trimmed)) return null;
+	try {
+		const value = new Function(
+			`"use strict"; return (${trimmed});`,
+		)() as unknown;
+		return typeof value === "number" && Number.isFinite(value) ? value : null;
+	} catch {
+		return null;
+	}
+}
+
 export function buildPostingObservationDataset(
 	document: FinancialModelDocument,
 ): PostingObservationDataset {
@@ -33,22 +50,12 @@ export function buildPostingObservationDataset(
 		)
 			continue;
 		let amount: number | null = null;
+		const expression = getExpression(posting);
 		if (
-			getExpression(posting) !== null &&
+			expression !== null &&
 			Object.keys(posting.amount.inputs).length === 0
 		) {
-			try {
-				const resolvedAmount = resolvePostingAmountDescriptor(posting.amount, {
-					balances: {},
-					latestRealizedPostingAmounts: new Map(),
-					realizedPostingAmountsByYear: new Map(),
-					date: posting.startDate,
-					occurrenceRate: 0,
-				});
-				amount = Number.isFinite(resolvedAmount) ? resolvedAmount : null;
-			} catch {
-				amount = null;
-			}
+			amount = evaluateConstantExpression(expression);
 		}
 		postings.push({
 			id: posting.id,

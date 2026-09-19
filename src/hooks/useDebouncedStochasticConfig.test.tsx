@@ -82,7 +82,7 @@ describe("useDebouncedStochasticConfig", () => {
 		expect(onChange).toHaveBeenCalledOnce();
 	});
 
-	it("flushes rebased pending intent when its page unmounts", () => {
+	it("discards pending intent when its page unmounts", () => {
 		vi.useFakeTimers();
 		const onChange = vi.fn();
 		const { result, rerender, unmount } = renderHook(
@@ -100,8 +100,7 @@ describe("useDebouncedStochasticConfig", () => {
 
 		unmount();
 
-		expect(onChange).toHaveBeenCalledOnce();
-		expect(onChange).toHaveBeenCalledWith({ runCount: 2500, seed: 42 });
+		expect(onChange).not.toHaveBeenCalled();
 	});
 
 	it("does not overwrite a newer run count with an invalid draft", () => {
