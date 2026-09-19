@@ -1,6 +1,7 @@
 import { memo, useCallback, useMemo, useRef, useState } from "react";
 import type uPlot from "uplot";
 import { parseChartDate, type StochasticChartRow } from "@/chart/chartData";
+import { baseChartOptions, resolveAccountColor } from "@/chart/chartView";
 import {
 	buildPointDetails,
 	formatPointDetailsSummary,
@@ -8,7 +9,6 @@ import {
 import { createReferenceLinesHooks } from "@/chart/uplotBase";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import type { FinancialModelDocument } from "@/lib/projection";
-import { baseChartOptions, resolveAccountColor } from "./_chartShared";
 import { PointDetailsPanel } from "./PointDetailsPanel";
 
 interface AccountMeta {

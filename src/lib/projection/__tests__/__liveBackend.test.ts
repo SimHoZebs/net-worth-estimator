@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFinancialModelDocument } from "@/lib/projection/sources/csv/csvDataSource";
+import { parseFinancialModelDocument } from "@/lib/projection/sources/http/documentParser";
 
 // Live end-to-end check: fetch the canonical document from the Go backend and
 // drive it through the backend projection endpoints used by the app.

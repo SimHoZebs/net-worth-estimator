@@ -247,7 +247,10 @@ describe("Editor slice", () => {
 
 describe("Settings slice", () => {
 	beforeEach(() => {
-		useStore.setState({ evaluations: structuredClone(DEFAULT_EVALUATIONS) });
+		useStore.setState({
+			evaluations: structuredClone(DEFAULT_EVALUATIONS),
+			lastEvaluationSyncAt: null,
+		});
 	});
 
 	it("updates an evaluation config without changing its stable ID", () => {
@@ -265,10 +268,58 @@ describe("Settings slice", () => {
 
 	it("replaces evaluation settings from a document without retaining references", () => {
 		const evaluations = structuredClone(DEFAULT_EVALUATIONS);
-		useStore.getState().replaceEvaluations(evaluations);
+		useStore.getState().syncEvaluationsFromDocument(evaluations, 1);
 
 		evaluations.financialIndependence[0]!.label = "Changed outside the store";
 		expect(useStore.getState().evaluations).toEqual(DEFAULT_EVALUATIONS);
+	});
+
+	it("ignores repeat syncs for the same timestamp so session edits survive", () => {
+		useStore
+			.getState()
+			.syncEvaluationsFromDocument(structuredClone(DEFAULT_EVALUATIONS), 1);
+		useStore
+			.getState()
+			.updateEvaluation("financialIndependence", "financial-independence", {
+				label: "Session edit",
+			});
+		useStore
+			.getState()
+			.syncEvaluationsFromDocument(structuredClone(DEFAULT_EVALUATIONS), 1);
+		expect(
+			useStore.getState().evaluations.financialIndependence[0]!.label,
+		).toBe("Session edit");
+	});
+
+	it("re-seeds on a new timestamp or a forced reload", () => {
+		useStore
+			.getState()
+			.syncEvaluationsFromDocument(structuredClone(DEFAULT_EVALUATIONS), 1);
+		useStore
+			.getState()
+			.updateEvaluation("financialIndependence", "financial-independence", {
+				label: "Session edit",
+			});
+		useStore
+			.getState()
+			.syncEvaluationsFromDocument(structuredClone(DEFAULT_EVALUATIONS), 2);
+		expect(
+			useStore.getState().evaluations.financialIndependence[0]!.label,
+		).toBe("Financial independence");
+
+		useStore
+			.getState()
+			.updateEvaluation("financialIndependence", "financial-independence", {
+				label: "Session edit",
+			});
+		useStore
+			.getState()
+			.syncEvaluationsFromDocument(structuredClone(DEFAULT_EVALUATIONS), 2, {
+				force: true,
+			});
+		expect(
+			useStore.getState().evaluations.financialIndependence[0]!.label,
+		).toBe("Financial independence");
 	});
 
 	it("duplicates and reorders evaluation instances with unique stable IDs", () => {

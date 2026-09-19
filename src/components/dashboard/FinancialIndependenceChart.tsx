@@ -1,6 +1,12 @@
 import { memo, useCallback, useMemo } from "react";
 import type uPlot from "uplot";
 import { parseChartDate } from "@/chart/chartData";
+import {
+	baseChartOptions,
+	closeChartTooltip,
+	openChartTooltip,
+	resolveAccountColor,
+} from "@/chart/chartView";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import { currency, formatDate } from "@/lib/format";
@@ -9,12 +15,6 @@ import type {
 	FinancialModelDocument,
 } from "@/lib/projection";
 import { escapeHtml } from "@/lib/utils";
-import {
-	baseChartOptions,
-	closeChartTooltip,
-	openChartTooltip,
-	resolveAccountColor,
-} from "./charts/_chartShared";
 
 interface FinancialIndependenceChartProps {
 	document: FinancialModelDocument;

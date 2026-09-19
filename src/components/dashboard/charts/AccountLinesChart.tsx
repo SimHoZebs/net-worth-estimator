@@ -1,17 +1,17 @@
 import { memo, useCallback, useMemo } from "react";
 import type uPlot from "uplot";
 import { parseChartDate } from "@/chart/chartData";
-import { UPlotChart } from "@/components/ui/UPlotChart";
-import { currency, formatDate, formatIsoDateLocal } from "@/lib/format";
-import type { FinancialModelDocument } from "@/lib/projection";
-import { escapeHtml } from "@/lib/utils";
 import {
 	AccountColorDot,
 	baseChartOptions,
 	closeChartTooltip,
 	openChartTooltip,
 	resolveAccountColor,
-} from "./_chartShared";
+} from "@/chart/chartView";
+import { UPlotChart } from "@/components/ui/UPlotChart";
+import { currency, formatDate, formatIsoDateLocal } from "@/lib/format";
+import type { FinancialModelDocument } from "@/lib/projection";
+import { escapeHtml } from "@/lib/utils";
 
 interface AccountLinesChartProps {
 	document: FinancialModelDocument;

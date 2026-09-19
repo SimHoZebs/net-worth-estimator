@@ -1,5 +1,5 @@
 import type uPlot from "uplot";
-import { createBaseOptions } from "@/chart/uplotBase";
+import { createBaseOptions } from "./uplotBase";
 
 export const FALLBACK_ACCOUNT_COLOR = "GrayText";
 

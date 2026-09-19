@@ -7,11 +7,12 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Account, ProjectionAccountSummary } from "@/lib/projection";
-import { makeAccount } from "@/lib/projection/__fixtures__/accounts";
+import { createBaseDocument, makeAccount } from "@/lib/projection/__fixtures__";
 import { makePosting } from "@/lib/projection/__fixtures__/postings";
-import { ReadOnlyAccountsTable } from "./ReadOnlyAccountsTable";
+import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
+import { AccountsTable } from "./AccountsTable";
 
 afterEach(cleanup);
 
@@ -26,7 +27,112 @@ function summaries(accounts: Account[]): ProjectionAccountSummary[] {
 	}));
 }
 
-describe("ReadOnlyAccountsTable", () => {
+function renderEditableTable() {
+	const account = makeAccount({
+		id: "checking",
+		minBalance: 100,
+		maxBalance: 1_000,
+	});
+	const document = createBaseDocument({ accounts: [account] });
+	const updateAccount = vi.fn();
+	render(
+		<AccountsTable
+			editable
+			displayDocument={document}
+			document={document}
+			isDirty={false}
+			workingDocument={null}
+			updateAccount={updateAccount}
+			deleteAccount={vi.fn()}
+			addAccount={vi.fn()}
+		/>,
+	);
+	return updateAccount;
+}
+
+describe("AccountsTable", () => {
+	it("keeps partial limits local and restores them with Escape", () => {
+		const updateAccount = renderEditableTable();
+		const minimum = screen.getByLabelText(
+			"Minimum balance for checking",
+		) as HTMLInputElement;
+
+		fireEvent.change(minimum, { target: { value: "-" } });
+		expect(minimum.value).toBe("-");
+		expect(updateAccount).not.toHaveBeenCalled();
+
+		fireEvent.keyDown(minimum, { key: "Escape" });
+		expect(minimum.value).toBe("100");
+		expect(updateAccount).not.toHaveBeenCalled();
+	});
+
+	it("commits finite limits on Enter and sentinel blanks on blur", () => {
+		const updateAccount = renderEditableTable();
+		const minimum = screen.getByLabelText("Minimum balance for checking");
+		const maximum = screen.getByLabelText("Maximum balance for checking");
+
+		fireEvent.change(minimum, { target: { value: "125.5" } });
+		fireEvent.keyDown(minimum, { key: "Enter" });
+		expect(updateAccount).toHaveBeenCalledWith("checking", {
+			minBalance: 125.5,
+		});
+
+		fireEvent.change(maximum, { target: { value: "" } });
+		fireEvent.blur(maximum);
+		expect(updateAccount).toHaveBeenCalledWith("checking", {
+			maxBalance: NO_CEILING,
+		});
+	});
+
+	it("renders unbounded limits as blanks", () => {
+		const account = makeAccount({
+			id: "checking",
+			minBalance: NO_FLOOR,
+			maxBalance: NO_CEILING,
+		});
+		const document = createBaseDocument({ accounts: [account] });
+		render(
+			<AccountsTable
+				editable
+				displayDocument={document}
+				document={document}
+				isDirty={false}
+				workingDocument={null}
+				updateAccount={vi.fn()}
+				deleteAccount={vi.fn()}
+				addAccount={vi.fn()}
+			/>,
+		);
+
+		expect(
+			(
+				screen.getByLabelText(
+					"Minimum balance for checking",
+				) as HTMLInputElement
+			).value,
+		).toBe("");
+		expect(
+			(
+				screen.getByLabelText(
+					"Maximum balance for checking",
+				) as HTMLInputElement
+			).value,
+		).toBe("");
+	});
+
+	it("rejects JavaScript non-decimal numeric syntax", () => {
+		const updateAccount = renderEditableTable();
+		const minimum = screen.getByLabelText(
+			"Minimum balance for checking",
+		) as HTMLInputElement;
+
+		fireEvent.change(minimum, { target: { value: "0x10" } });
+		fireEvent.blur(minimum);
+
+		expect(minimum.value).toBe("100");
+		expect(updateAccount).not.toHaveBeenCalled();
+	});
+
 	it("shows an account rule under every associated account", () => {
 		const accounts = [
 			makeAccount({ id: "source", label: "Source account" }),
@@ -40,7 +146,7 @@ describe("ReadOnlyAccountsTable", () => {
 			arithmetic: "100",
 		});
 		render(
-			<ReadOnlyAccountsTable
+			<AccountsTable
 				accounts={accounts}
 				accountRules={[rule]}
 				accountSummaries={summaries(accounts)}
@@ -70,7 +176,7 @@ describe("ReadOnlyAccountsTable", () => {
 	it("keeps rules without an associated account visible", () => {
 		const account = makeAccount({ id: "cash" });
 		render(
-			<ReadOnlyAccountsTable
+			<AccountsTable
 				accounts={[account]}
 				accountRules={[
 					makePosting({ id: "unassigned", label: "Unassigned rule" }),
@@ -92,7 +198,7 @@ describe("ReadOnlyAccountsTable", () => {
 			makeAccount({ id: "loan", label: "Loan" }),
 		];
 		render(
-			<ReadOnlyAccountsTable
+			<AccountsTable
 				accounts={accounts}
 				accountRules={[]}
 				accountSummaries={[
@@ -137,7 +243,7 @@ describe("ReadOnlyAccountsTable", () => {
 			color: "#ff0000",
 		});
 		render(
-			<ReadOnlyAccountsTable
+			<AccountsTable
 				accounts={[account]}
 				accountRules={[]}
 				accountSummaries={summaries([account])}
@@ -161,7 +267,7 @@ describe("ReadOnlyAccountsTable", () => {
 	it("does not present stale balances", () => {
 		const account = makeAccount({ id: "cash", label: "Cash" });
 		render(
-			<ReadOnlyAccountsTable
+			<AccountsTable
 				accounts={[account]}
 				accountRules={[]}
 				accountSummaries={[

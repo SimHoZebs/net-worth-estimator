@@ -314,8 +314,18 @@ function hasEvaluationInstanceId(
 }
 
 interface SettingsSlice {
+	// Single evaluation truth for projection and UI. The session overlay in
+	// `evaluations` feeds useProjectionOrchestration and the evaluation
+	// editors; `workingDocument.evaluations` is inert carry-through (cloned
+	// for the persisted shape, never read for computation, never diffed, and
+	// never mutated by Editor mutators).
 	evaluations: EvaluationTables;
-	replaceEvaluations: (evaluations: EvaluationTables) => void;
+	lastEvaluationSyncAt: number | null;
+	syncEvaluationsFromDocument: (
+		evaluations: EvaluationTables,
+		dataUpdatedAt: number,
+		options?: { force?: boolean },
+	) => void;
 	addEvaluation: (
 		type: EvaluationType,
 		evaluation: EvaluationInstance<unknown>,
@@ -369,11 +379,20 @@ const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (
 	set,
 ) => ({
 	// Seeded defaults: component tests and pre-load renders expect usable
-	// evaluation tables. App replaces these from the loaded document keyed
-	// by data timestamp (see App.tsx), so session edits survive re-renders.
+	// evaluation tables. The store owns seeding from the loaded document via
+	// syncEvaluationsFromDocument (guarded by data timestamp), so session
+	// edits survive re-renders and reloads re-seed.
 	evaluations: structuredClone(DEFAULT_EVALUATIONS),
-	replaceEvaluations: (evaluations) =>
-		set({ evaluations: structuredClone(evaluations) }),
+	lastEvaluationSyncAt: null,
+	syncEvaluationsFromDocument: (evaluations, dataUpdatedAt, options) =>
+		set((state) =>
+			!options?.force && state.lastEvaluationSyncAt === dataUpdatedAt
+				? state
+				: {
+						evaluations: structuredClone(evaluations),
+						lastEvaluationSyncAt: dataUpdatedAt,
+					},
+		),
 	addEvaluation: (type, evaluation) =>
 		set((state) =>
 			!evaluation.instanceId.trim() ||
@@ -526,10 +545,32 @@ export const useStore = create<AppStore>()((...args) => ({
 /*  Selectors                                                          */
 /* ------------------------------------------------------------------ */
 
-export const selectCurrentChangeCount = (s: AppStore) =>
-	s.workingDocument && s.editingBaseline
-		? countDocumentDiff(s.editingBaseline, s.workingDocument)
-		: 0;
+// Memoized diff: every Editor mutator replaces the workingDocument
+// reference, so identity comparison skips the row-by-row JSON equality pass
+// on unrelated store updates (stochastic keystrokes, horizon slider, theme).
+// Recomputation happens only when the baseline or draft reference changes.
+let diffMemo: {
+	baseline: FinancialModelDocument | null;
+	draft: FinancialModelDocument | null;
+	count: number;
+} = { baseline: null, draft: null, count: 0 };
+
+export const selectCurrentChangeCount = (s: AppStore) => {
+	if (!s.workingDocument || !s.editingBaseline) return 0;
+	if (
+		diffMemo.baseline === s.editingBaseline &&
+		diffMemo.draft === s.workingDocument
+	) {
+		return diffMemo.count;
+	}
+	const count = countDocumentDiff(s.editingBaseline, s.workingDocument);
+	diffMemo = {
+		baseline: s.editingBaseline,
+		draft: s.workingDocument,
+		count,
+	};
+	return count;
+};
 
 // Stable atomic selectors. Prefer these (or wrap the composites below in
 // useShallow): each returns a stable reference instead of a fresh object.
@@ -571,7 +612,9 @@ export const selectEditorActions = (s: AppStore) => ({
  * Unsaved-diff count between the canonical baseline captured at
  * `startEditing` and the live draft: added + removed + modified rows
  * across accounts, postings, and checkpoints. Checkpoints carry no stable
- * ID, so they compare positionally.
+ * ID, so they compare positionally. Evaluations are intentionally excluded:
+ * the session overlay in `evaluations` is the single truth and the draft
+ * copy is inert carry-through.
  */
 export function countDocumentDiff(
 	baseline: FinancialModelDocument,

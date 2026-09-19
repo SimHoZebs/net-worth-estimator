@@ -1,4 +1,3 @@
-import Papa from "papaparse";
 import { z } from "zod";
 import type { IncomeDataLoadResult } from "../../incomeData";
 import {
@@ -8,21 +7,6 @@ import {
 	type IncomeTaxProfile,
 } from "../../types/income";
 import type { ModelValidationIssue } from "../../types/validation";
-
-const incomeSourceHeaders = [
-	"id",
-	"label",
-	"effectiveFrom",
-	"effectiveTo",
-	"annualGrossIncome",
-] as const;
-const taxProfileHeaders = [
-	"id",
-	"label",
-	"deduction",
-	"brackets",
-	"sourceUrl",
-] as const;
 
 const dateSchema = z
 	.string()
@@ -52,14 +36,11 @@ const taxProfileSchema = z.object({
 	id: z.string().trim().min(1),
 	label: z.string().trim().min(1),
 	deduction: z.coerce.number().finite().min(0),
-	brackets: z.preprocess(
-		parseJson,
-		z.array(
-			z.object({
-				upTo: z.number().finite().nullable(),
-				rate: z.number().finite().min(0).max(1),
-			}),
-		),
+	brackets: z.array(
+		z.object({
+			upTo: z.number().finite().nullable(),
+			rate: z.number().finite().min(0).max(1),
+		}),
 	),
 	sourceUrl: z.preprocess(
 		(value) =>
@@ -67,66 +48,6 @@ const taxProfileSchema = z.object({
 		z.string().url().nullable(),
 	),
 });
-
-function parseJson(value: unknown): unknown {
-	if (typeof value !== "string") return value;
-	try {
-		return JSON.parse(value) as unknown;
-	} catch {
-		return undefined;
-	}
-}
-
-function parseRows<T>(
-	fileName: string,
-	text: string,
-	headers: readonly string[],
-	schema: z.ZodType<T>,
-): { rows: T[]; issues: ModelValidationIssue[] } {
-	const issues: ModelValidationIssue[] = [];
-	const parsed = Papa.parse<Record<string, unknown>>(text, {
-		header: true,
-		skipEmptyLines: "greedy",
-		transformHeader: (header) => header.trim(),
-		transform: (value) => (typeof value === "string" ? value.trim() : value),
-	});
-	const fields = parsed.meta.fields ?? [];
-	for (const header of headers) {
-		if (!fields.includes(header)) {
-			issues.push({
-				severity: "error",
-				code: "income-data.header.missing",
-				message: `Missing required header '${header}'.`,
-				path: [fileName],
-			});
-		}
-	}
-	for (const error of parsed.errors) {
-		issues.push({
-			severity: "error",
-			code: "income-data.csv.invalid",
-			message: error.message,
-			path: [fileName, (error.row ?? 0) + 2],
-		});
-	}
-	const rows: T[] = [];
-	parsed.data.forEach((row, index) => {
-		const result = schema.safeParse(row);
-		if (!result.success) {
-			for (const issue of result.error.issues) {
-				issues.push({
-					severity: "error",
-					code: "income-data.row.invalid",
-					message: issue.message,
-					path: [fileName, index + 2, ...issue.path.map(String)],
-				});
-			}
-			return;
-		}
-		rows.push(result.data);
-	});
-	return { rows, issues };
-}
 
 function validateSnapshot(
 	incomeSources: IncomeSourceDefinition[],
@@ -230,31 +151,6 @@ function validateSnapshot(
 			};
 }
 
-export function parseIncomeDataFiles(files: {
-	incomeSources: string;
-	taxProfiles: string;
-}): IncomeDataLoadResult {
-	const incomeResult = parseRows(
-		INCOME_DATA_FILE_NAMES.incomeSources,
-		files.incomeSources,
-		incomeSourceHeaders,
-		incomeSourceSchema,
-	);
-	const taxResult = parseRows(
-		INCOME_DATA_FILE_NAMES.taxProfiles,
-		files.taxProfiles,
-		taxProfileHeaders,
-		taxProfileSchema,
-	);
-	const issues = [...incomeResult.issues, ...taxResult.issues];
-	const data = validateSnapshot(
-		incomeResult.rows,
-		taxResult.rows as IncomeTaxProfile[],
-		issues,
-	);
-	return { data, issues };
-}
-
 const incomeDataSnapshotSchema = z.object({
 	incomeSources: z.array(z.unknown()),
 	taxProfiles: z.array(z.unknown()),
@@ -286,9 +182,8 @@ function parseSnapshotRows<T>(
 }
 
 /**
- * Validates a backend JSON snapshot directly. Replaces the old
- * serialize-to-CSV-and-reparse roundtrip: the wire shape already matches the
- * row schemas, so only row validation and snapshot checks run.
+ * Thin wire-shape parser for the backend income-data snapshot. Row shape and
+ * snapshot consistency only; simulation semantics run server-side in Go.
  */
 export function parseIncomeDataSnapshot(value: unknown): IncomeDataLoadResult {
 	const parsed = incomeDataSnapshotSchema.safeParse(value);

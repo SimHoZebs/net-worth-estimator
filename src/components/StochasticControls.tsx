@@ -110,6 +110,7 @@ export function StochasticControls() {
 										max={10000}
 										value={runCountInput}
 										onChange={(e) => updateRunCountInput(e.currentTarget.value)}
+										onBlur={applyImmediately}
 										className="w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 type-body shadow-sm outline-none focus:border-ring dark:border-white/10"
 									/>
 								</div>
@@ -123,6 +124,7 @@ export function StochasticControls() {
 										inputMode="numeric"
 										value={seedInput}
 										onChange={(e) => updateSeedInput(e.currentTarget.value)}
+										onBlur={applyImmediately}
 										placeholder="Auto"
 										className="w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 type-body shadow-sm outline-none placeholder:text-muted-foreground focus:border-ring dark:border-white/10"
 									/>

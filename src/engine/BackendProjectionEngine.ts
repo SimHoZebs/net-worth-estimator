@@ -20,15 +20,17 @@ import type {
 // `retry` hint plus `: heartbeat` comments; heartbeats keep idle proxies/NAT
 // from killing long batches, and a per-attempt stall timer converts a frozen
 // tab (no bytes for STALL_TIMEOUT_MS) into a bounded reconnect instead of a
-// hung spinner. Server `error` events and HTTP 4xx are terminal and never
-// retried; only network failures, HTTP 5xx, stalls, and truncated streams
-// (closed without a result) reconnect.
+// hung spinner. Server `error` events and HTTP 4xx are terminal (marked with
+// TERMINAL_ERROR_CODE) and never retried; only network failures, HTTP 5xx,
+// stalls, and truncated streams (closed without a result) reconnect.
 
 const API_BASE = buildApiUrl("/v1");
 
 const MAX_ATTEMPTS = 3;
 const STALL_TIMEOUT_MS = 30_000;
 const RECONNECT_BASE_DELAY_MS = 1_000;
+
+const TERMINAL_ERROR_CODE = "projection-terminal";
 
 type StochasticStreamEvent = {
 	progress?: unknown;
@@ -37,20 +39,19 @@ type StochasticStreamEvent = {
 	error?: string;
 };
 
-class StallError extends Error {
-	constructor() {
-		super("Stochastic stream stalled.");
-		this.name = "StallError";
-	}
+// Terminal failures (server `error` events, HTTP 4xx) must never reconnect.
+// They are plain Errors tagged with a code instead of a dedicated subclass.
+function terminalError(message: string): Error {
+	const error = new Error(message);
+	(error as Error & { code?: string }).code = TERMINAL_ERROR_CODE;
+	return error;
 }
 
-// TerminalError marks failures that must never reconnect: server `error`
-// events (deterministic computation failures) and HTTP 4xx (bad request).
-class TerminalError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = "TerminalError";
-	}
+function isTerminalError(error: unknown): boolean {
+	return (
+		error instanceof Error &&
+		(error as Error & { code?: string }).code === TERMINAL_ERROR_CODE
+	);
 }
 
 function isAbortError(error: unknown): boolean {
@@ -156,7 +157,7 @@ export class BackendProjectionEngine implements ProjectionEngine {
 				);
 			} catch (error) {
 				if (isAbortError(error) && request.signal?.aborted) throw error;
-				if (error instanceof TerminalError) throw error;
+				if (isTerminalError(error)) throw error;
 				lastError = error;
 			}
 		}
@@ -199,7 +200,7 @@ export class BackendProjectionEngine implements ProjectionEngine {
 				const detail = await response.text().catch(() => "");
 				const status = response.status;
 				if (status >= 400 && status < 500) {
-					throw new TerminalError(
+					throw terminalError(
 						detail || `Stochastic projection failed (${status}).`,
 					);
 				}
@@ -218,7 +219,7 @@ export class BackendProjectionEngine implements ProjectionEngine {
 				try {
 					read = await reader.read();
 				} catch (error) {
-					if (stalled) throw new StallError();
+					if (stalled) throw new Error("Stochastic stream stalled.");
 					throw error;
 				}
 				if (read.done) break;
@@ -258,17 +259,14 @@ export class BackendProjectionEngine implements ProjectionEngine {
 				}
 			}
 
-			if (streamError) throw new TerminalError(streamError);
+			if (streamError) throw terminalError(streamError);
 			if (!finalResult) {
 				throw new Error("Stochastic stream ended without a result.");
 			}
 			return finalResult;
 		} catch (error) {
-			if (stalled) throw new StallError();
-			if (
-				error instanceof DOMException ||
-				(error instanceof Error && error.name === "AbortError")
-			) {
+			if (stalled) throw new Error("Stochastic stream stalled.");
+			if (isAbortError(error)) {
 				throw new DOMException("Aborted", "AbortError");
 			}
 			throw error instanceof Error
@@ -286,22 +284,30 @@ function parseSseEvent(rawEvent: string): {
 	data: string;
 	retryMs: number | null;
 } | null {
-	let name: string | null = "message";
+	let name = "message";
 	let retryMs: number | null = null;
 	const dataLines: string[] = [];
 	for (const line of rawEvent.split("\n")) {
-		if (line.startsWith("event:")) {
-			name = line.slice(6).trim();
-		} else if (line.startsWith("data:")) {
-			dataLines.push(line.slice(5).trimStart());
-		} else if (line.startsWith("retry:")) {
-			const parsed = Number.parseInt(line.slice(6).trim(), 10);
-			if (Number.isFinite(parsed) && parsed >= 0) retryMs = parsed;
+		if (line.startsWith(":")) continue;
+		const colon = line.indexOf(":");
+		if (colon < 0) continue;
+		const value = line.slice(colon + 1).trim();
+		switch (line.slice(0, colon)) {
+			case "event":
+				name = value;
+				break;
+			case "data":
+				dataLines.push(value);
+				break;
+			case "retry": {
+				const parsed = Number.parseInt(value, 10);
+				if (Number.isFinite(parsed) && parsed >= 0) retryMs = parsed;
+				break;
+			}
 		}
 	}
-	if (retryMs !== null && dataLines.length === 0) {
-		return { name: null, data: "", retryMs };
+	if (dataLines.length === 0) {
+		return retryMs !== null ? { name: null, data: "", retryMs } : null;
 	}
-	if (dataLines.length === 0) return null;
 	return { name, data: dataLines.join("\n"), retryMs };
 }

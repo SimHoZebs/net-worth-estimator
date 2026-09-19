@@ -6,7 +6,7 @@ import {
 } from "../../modelRepository";
 import type { FinancialModelDocument } from "../../types/model";
 import type { ModelValidationIssue } from "../../types/validation";
-import { parseFinancialModelDocument } from "../csv/csvDataSource";
+import { parseFinancialModelDocument } from "./documentParser";
 
 // HTTP repository backed by the Go backend (chi + huma + SQLite). The backend
 // is the canonical persistence; see docs/backend-migration/ASSUMPTIONS.md A1.

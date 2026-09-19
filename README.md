@@ -17,7 +17,7 @@ The product model is intentionally generic:
 
 ## CSV Files
 
-The app reads these CSV files under `public/configs/`:
+The Go backend seeds its SQLite database from these CSV files under `public/configs/`; the browser never reads CSV directly:
 
 - `accounts.csv`
 - `checkpoints.csv`
@@ -86,7 +86,7 @@ The image supplies container defaults for `HOST`, `PORT`, the database path, and
 
 The browser uses same-origin `/v1` routes by default. For a separately deployed frontend, set `VITE_API_BASE_URL=https://<backend-host>` in the frontend build environment. The value may contain a path prefix but must not include `/v1`; it applies to model persistence, income data, deterministic projections, and stochastic SSE streams. Add the frontend's exact origin, without a path, to the backend's `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` runtime variable.
 
-Reads, deterministic/stochastic projections, and posting analyses are public by design. Canonical model writes require the bearer token above (or are rejected entirely when read-only mode is on). CORS restricts browser origins only; it does not protect the API from non-browser clients, which is why writes are token-guarded server-side.
+Reads and deterministic/stochastic projections are public by design. Canonical model writes require the bearer token above (or are rejected entirely when read-only mode is on). CORS restricts browser origins only; it does not protect the API from non-browser clients, which is why writes are token-guarded server-side.
 
 ## Scripts
 

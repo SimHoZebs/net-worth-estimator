@@ -1,12 +1,9 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import { CurrentChangesControls } from "@/components/CurrentChangesControls";
-import { EditableAccountsTable } from "@/components/dashboard/tables/EditableAccountsTable";
-import { EditableCheckpointsTable } from "@/components/dashboard/tables/EditableCheckpointsTable";
-import { EditablePostingsTable } from "@/components/dashboard/tables/EditablePostingsTable";
-import { ReadOnlyAccountsTable } from "@/components/dashboard/tables/ReadOnlyAccountsTable";
-import { ReadOnlyCheckpointsTable } from "@/components/dashboard/tables/ReadOnlyCheckpointsTable";
-import { ReadOnlyPostingsTable } from "@/components/dashboard/tables/ReadOnlyPostingsTable";
+import { AccountsTable } from "@/components/dashboard/tables/AccountsTable";
+import { CheckpointsTable } from "@/components/dashboard/tables/CheckpointsTable";
+import { PostingsTable } from "@/components/dashboard/tables/PostingsTable";
 import { TransactionHistoryTable } from "@/components/dashboard/tables/TransactionHistoryTable";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -262,7 +259,8 @@ export function ModelInputsInspector() {
 
 						<div className="space-y-4">
 							{isEditing && activeTab === "postings" ? (
-								<EditablePostingsTable
+								<PostingsTable
+									editable
 									displayDocument={displayDocument}
 									document={document}
 									isDirty={isDirty}
@@ -275,7 +273,7 @@ export function ModelInputsInspector() {
 							) : null}
 
 							{!isEditing && activeTab === "scheduled" ? (
-								<ReadOnlyPostingsTable
+								<PostingsTable
 									postings={postingGroups.scheduledTransactions}
 									accounts={displayDocument.accounts}
 									projectionStartDate={projectionStartDate}
@@ -285,7 +283,8 @@ export function ModelInputsInspector() {
 
 							{activeTab === "accounts" ? (
 								isEditing ? (
-									<EditableAccountsTable
+									<AccountsTable
+										editable
 										displayDocument={displayDocument}
 										document={document}
 										isDirty={isDirty}
@@ -295,7 +294,7 @@ export function ModelInputsInspector() {
 										addAccount={addAccount}
 									/>
 								) : (
-									<ReadOnlyAccountsTable
+									<AccountsTable
 										accounts={displayDocument.accounts}
 										accountRules={postingGroups.accountRules}
 										accountSummaries={result?.accountSummaries ?? null}
@@ -319,7 +318,8 @@ export function ModelInputsInspector() {
 
 							{activeTab === "checkpoints" ? (
 								isEditing ? (
-									<EditableCheckpointsTable
+									<CheckpointsTable
+										editable
 										displayDocument={displayDocument}
 										projectionStartDate={projectionStartDate}
 										updateCheckpoint={updateCheckpoint}
@@ -327,7 +327,7 @@ export function ModelInputsInspector() {
 										addCheckpoint={addCheckpoint}
 									/>
 								) : (
-									<ReadOnlyCheckpointsTable
+									<CheckpointsTable
 										checkpoints={displayDocument.checkpoints}
 										showAdvanced={showAdvanced}
 										accountLabelById={accountLabelById}

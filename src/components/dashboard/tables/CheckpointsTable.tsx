@@ -7,6 +7,12 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import {
+	createTableColumn,
+	DataTable,
+	formatCurrency,
+	type TableColumn,
+} from "@/components/ui/data-table";
+import {
 	Table,
 	TableBody,
 	TableCell,
@@ -14,12 +20,12 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { TableSearch } from "@/components/ui/table-search";
+import { formatDate } from "@/lib/format";
 import type { Checkpoint, FinancialModelDocument } from "@/lib/projection";
+import { useTableSearch } from "./_shared";
 
-const inputClassName =
-	"w-full rounded-lg border border-input bg-card px-2 py-1 type-body outline-none type-code focus:border-ring";
-
-interface EditableCheckpointsTableProps {
+export interface CheckpointsTableEditProps {
 	displayDocument: FinancialModelDocument;
 	projectionStartDate: string;
 	updateCheckpoint: (index: number, changes: Partial<Checkpoint>) => void;
@@ -27,13 +33,59 @@ interface EditableCheckpointsTableProps {
 	addCheckpoint: (checkpoint: Checkpoint) => void;
 }
 
-export function EditableCheckpointsTable({
+export interface CheckpointsTableViewProps {
+	checkpoints: Checkpoint[];
+	showAdvanced: boolean;
+	accountLabelById: Map<string, string>;
+}
+
+export type CheckpointsTableProps =
+	| ({ editable: true } & CheckpointsTableEditProps)
+	| ({ editable?: false } & CheckpointsTableViewProps);
+
+export function CheckpointsTable(props: CheckpointsTableProps) {
+	if (props.editable === true) {
+		const { editable, ...editProps } = props;
+		return <EditableCheckpointsGrid {...editProps} />;
+	}
+	const { editable, ...viewProps } = props;
+	return <ReadOnlyCheckpointsView {...viewProps} />;
+}
+
+const inputClassName =
+	"w-full rounded-lg border border-input bg-card px-2 py-1 type-body outline-none type-code focus:border-ring";
+
+const checkpointColumn = createTableColumn<Checkpoint>();
+
+export function checkpointColumns(
+	showAdvanced: boolean,
+	accountLabelById: ReadonlyMap<string, string>,
+): TableColumn<Checkpoint>[] {
+	return [
+		checkpointColumn({ key: "Date", label: "As of", format: formatDate }),
+		checkpointColumn({
+			key: "AccountId",
+			label: showAdvanced ? "Account ID" : "Account",
+			format: (accountId) =>
+				showAdvanced
+					? accountId
+					: (accountLabelById.get(accountId) ?? accountId),
+		}),
+		checkpointColumn({
+			key: "Balance",
+			label: "Observed balance",
+			format: formatCurrency,
+		}),
+	];
+}
+
+function EditableCheckpointsGrid({
 	displayDocument,
 	projectionStartDate,
 	updateCheckpoint,
 	deleteCheckpoint,
 	addCheckpoint,
-}: EditableCheckpointsTableProps) {
+}: CheckpointsTableEditProps) {
 	return (
 		<Card className="rounded-[1.8rem] border-border shadow-sm">
 			<CardHeader>
@@ -131,5 +183,42 @@ export function EditableCheckpointsTable({
 				</div>
 			</CardContent>
 		</Card>
+	);
+}
+
+function ReadOnlyCheckpointsView({
+	checkpoints,
+	showAdvanced,
+	accountLabelById,
+}: CheckpointsTableViewProps) {
+	const { search, setSearch, query: normalizedSearch } = useTableSearch();
+	const rows = checkpoints.filter((checkpoint) => {
+		const accountLabel =
+			accountLabelById.get(checkpoint.AccountId) ?? checkpoint.AccountId;
+		return (
+			!normalizedSearch ||
+			checkpoint.Date.includes(normalizedSearch) ||
+			checkpoint.AccountId.toLowerCase().includes(normalizedSearch) ||
+			accountLabel.toLowerCase().includes(normalizedSearch)
+		);
+	});
+
+	return (
+		<div>
+			<TableSearch
+				value={search}
+				onChange={setSearch}
+				placeholder="Search balance checkpoints..."
+			/>
+			<DataTable
+				title="Balance checkpoints"
+				description="Absolute end-of-day balances that correct modeled history before later postings continue."
+				rows={rows}
+				rowKey={(checkpoint) => `${checkpoint.AccountId}:${checkpoint.Date}`}
+				emptyText="No balance checkpoints."
+				variant="flat"
+				columns={checkpointColumns(showAdvanced, accountLabelById)}
+			/>
+		</div>
 	);
 }
