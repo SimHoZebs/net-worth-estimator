@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { duplicateIdError } from "@/components/_draftHelpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Account } from "@/lib/projection";
@@ -34,11 +35,14 @@ export function TemporaryAccountForm({
 	const commit = () => {
 		if (!adding?.id.trim() || !adding.label.trim()) return;
 		const id = adding.id.trim();
-		if (
-			reservedIds.includes(id) ||
-			accounts.some((account) => account.id === id)
-		) {
-			setError(`Account ID "${id}" is already in use.`);
+		const duplicateError = duplicateIdError(
+			id,
+			"Account",
+			reservedIds,
+			accounts.map((account) => account.id),
+		);
+		if (duplicateError) {
+			setError(duplicateError);
 			return;
 		}
 		onAdd({ ...adding, id, label: adding.label.trim() });

@@ -4,7 +4,6 @@ import {
 	createExpressionAmount,
 	getExpression,
 	parseCsvFinancialModel,
-	serializeCsvFinancialModel,
 } from "../";
 import {
 	nullMinMaxCsvFiles,
@@ -142,22 +141,6 @@ describe("CSV financial model", () => {
 		).toEqual(["second", "first"]);
 	});
 
-	it("round-trips evaluation configuration through CSV", () => {
-		const parsed = parseCsvFinancialModel(validCsvFiles);
-		expect(parsed.data).not.toBeNull();
-
-		const serialized = serializeCsvFinancialModel(parsed.data!);
-		const reparsed = parseCsvFinancialModel(serialized);
-
-		expect(serialized.postings.split("\n")[0]).toBe(
-			"id,label,sourceAccountId,destinations,amount,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled",
-		);
-		expect(serialized.postings).not.toContain("arithmetic");
-		expect(reparsed.issues).toEqual([]);
-		expect(reparsed.data?.evaluations).toEqual(parsed.data?.evaluations);
-		expect(reparsed.data?.checkpoints).toEqual(parsed.data?.checkpoints);
-	});
-
 	it("validates checkpoint account references and account-date uniqueness", () => {
 		const result = parseCsvFinancialModel({
 			...validCsvFiles,
@@ -229,138 +212,6 @@ describe("CSV financial model", () => {
 		expect(result.issues).toContainEqual(
 			expect.objectContaining({ code: "csv.row.invalid" }),
 		);
-	});
-
-	it("round-trips canonical non-expression amount descriptors", () => {
-		const parsed = parseCsvFinancialModel(validCsvFiles);
-		if (!parsed.data) throw new Error("Document is null");
-		parsed.data.postings[0]!.amount = {
-			resolver: "percentage",
-			config: { rate: 0.125 },
-			inputs: { amount: { source: "literal", value: 80 } },
-		};
-		const serialized = serializeCsvFinancialModel(parsed.data);
-		const reparsed = parseCsvFinancialModel(serialized);
-		expect(reparsed.data?.postings[0]?.amount).toEqual(
-			parsed.data.postings[0]?.amount,
-		);
-	});
-
-	it("defaults legacy FI CSVs and serializes an explicit expense basis", () => {
-		const legacy = parseCsvFinancialModel({
-			...validCsvFiles,
-			behaviors: {
-				...validCsvFiles.behaviors,
-				financialIndependence: [
-					"instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy",
-					'fi,FI,true,0,70000,0.025,0.04,10,0.9,"[]","[]",preserve-real-principal',
-				].join("\n"),
-			},
-		});
-		if (!legacy.data) throw new Error("Legacy FI CSV did not parse.");
-		expect(
-			legacy.data.evaluations.financialIndependence[0]?.config
-				.annualExpenseTargetBasis,
-		).toBe("projection-start-purchasing-power");
-		legacy.data.evaluations
-			.financialIndependence[0]!.config.annualExpenseTargetBasis =
-			"projection-start-purchasing-power";
-
-		const serialized = serializeCsvFinancialModel(legacy.data);
-		const reparsed = parseCsvFinancialModel(serialized);
-
-		expect(serialized.behaviors.financialIndependence).toContain(
-			"annualExpenseTargetBasis",
-		);
-		expect(
-			reparsed.data?.evaluations.financialIndependence[0]?.config
-				.annualExpenseTargetBasis,
-		).toBe("projection-start-purchasing-power");
-	});
-
-	it("round-trips local table order without a global row order", () => {
-		const parsed = parseCsvFinancialModel(validCsvFiles);
-		expect(parsed.data).not.toBeNull();
-		const document = {
-			...parsed.data!,
-			evaluations: {
-				...parsed.data!.evaluations,
-				netWorthThreshold: [
-					{
-						instanceId: "second",
-						label: "Second",
-						enabled: true,
-						config: { target: 2 },
-					},
-					{
-						instanceId: "first",
-						label: "First",
-						enabled: true,
-						config: { target: 1 },
-					},
-				],
-			},
-		};
-
-		const reparsed = parseCsvFinancialModel(
-			serializeCsvFinancialModel(document),
-		);
-
-		expect(
-			reparsed.data?.evaluations.netWorthThreshold.map(
-				({ instanceId }) => instanceId,
-			),
-		).toEqual(["second", "first"]);
-	});
-
-	it("serializes an empty evaluation collection as a valid header-only file", () => {
-		const parsed = parseCsvFinancialModel(validCsvFiles);
-		expect(parsed.data).not.toBeNull();
-
-		const serialized = serializeCsvFinancialModel({
-			...parsed.data!,
-			evaluations: {
-				financialIndependence: [],
-				netWorthThreshold: [],
-				postingFulfillment: [],
-			},
-		});
-		const reparsed = parseCsvFinancialModel(serialized);
-
-		expect(serialized.behaviors.financialIndependence).toBe(
-			"instanceId,label,enabled,minimumNetWorth,annualExpenseTarget,annualExpenseGrowthRate,withdrawalRate,evaluationYears,requiredConfidence,sources,continuingPostingIds,principalPolicy,annualExpenseTargetBasis",
-		);
-		expect(serialized.behaviors.netWorthThreshold).toBe(
-			"instanceId,label,enabled,target",
-		);
-		expect(reparsed.data?.evaluations).toEqual({
-			financialIndependence: [],
-			netWorthThreshold: [],
-			postingFulfillment: [],
-		});
-		expect(reparsed.issues).toEqual([]);
-	});
-
-	it("escapes account and posting text when serializing", () => {
-		const parsed = parseCsvFinancialModel(validCsvFiles);
-		expect(parsed.data).not.toBeNull();
-		const document = {
-			...parsed.data!,
-			accounts: parsed.data!.accounts.map((account, index) =>
-				index === 0 ? { ...account, label: 'Checking, "Primary"' } : account,
-			),
-			postings: parsed.data!.postings.map((posting, index) =>
-				index === 0 ? { ...posting, label: 'Salary, "Gross"' } : posting,
-			),
-		};
-
-		const reparsed = parseCsvFinancialModel(
-			serializeCsvFinancialModel(document),
-		);
-
-		expect(reparsed.data?.accounts[0]?.label).toBe('Checking, "Primary"');
-		expect(reparsed.data?.postings[0]?.label).toBe('Salary, "Gross"');
-		expect(reparsed.issues).toEqual([]);
 	});
 
 	it("reports circular posting dependency chains", () => {

@@ -97,7 +97,7 @@ Route pages should compose feature components rather than forward shared-state p
 
 - Simulation logic must never branch on specific account IDs, posting IDs, labels, or categories.
 - `projectFinancialModelDocument`, `projectRawFinancialModelDocument`, and `prepareSimulationRequest` are the canonical core APIs.
-- Shared state transitions belong in `lib/projection/reference/simulation/transitions.ts`; deterministic, branch, and Monte Carlo execution must not duplicate transition semantics.
+- Shared state transitions belong in `backend/internal/domain/transitions.go`; deterministic, branch, and Monte Carlo execution must not duplicate transition semantics.
 - FI logic is a derived evaluation and must not add semantic branches to generic simulation.
 - Reactive behaviors emit generic account movements through shared account constraints instead of mutating balances directly.
 - FI continuing postings are explicitly selected; never infer them from IDs, labels, categories, or non-zero rates.

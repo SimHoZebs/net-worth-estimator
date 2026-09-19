@@ -1,18 +1,22 @@
 import { memo, useCallback, useMemo } from "react";
 import type uPlot from "uplot";
 import { parseChartDate } from "@/chart/chartData";
-import { createBaseOptions } from "@/chart/uplotBase";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import { currency, formatDate, formatIsoDateLocal } from "@/lib/format";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { escapeHtml } from "@/lib/utils";
+import {
+	AccountColorDot,
+	baseChartOptions,
+	closeChartTooltip,
+	openChartTooltip,
+	resolveAccountColor,
+} from "./_chartShared";
 
 interface AccountLinesChartProps {
 	document: FinancialModelDocument;
 	chartData: Record<string, string | number>[];
 }
-
-const FALLBACK_ACCOUNT_COLOR = "GrayText";
 
 export const AccountLinesChart = memo(function AccountLinesChart({
 	document,
@@ -45,9 +49,7 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 			const iso = formatIsoDateLocal(new Date(ts));
 			const dateStr = formatDate(iso);
 
-			let html = `<div class="max-w-xs rounded-lg border border-border/80 bg-card/95 px-3 py-2 shadow-xl backdrop-blur dark:border-white/10">`;
-			html += `<div class="type-label">${dateStr}</div>`;
-			html += `<div class="mt-1 space-y-0.5">`;
+			let html = openChartTooltip(dateStr);
 
 			const rawRow = cd[idx] as Record<string, number> | undefined;
 			const nonZero: {
@@ -85,21 +87,21 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 				html += `</div>`;
 			}
 
-			html += `</div></div>`;
+			html += closeChartTooltip();
 			return html;
 		},
 		[enabledAccounts, chartData],
 	);
 
 	const options = useMemo((): uPlot.Options => {
-		const base = createBaseOptions();
+		const base = baseChartOptions();
 
 		const series: uPlot.Series[] = [
 			{},
 			...enabledAccounts.map((a) => ({
 				label: a.label,
 				show: true,
-				stroke: a.color ?? FALLBACK_ACCOUNT_COLOR,
+				stroke: resolveAccountColor(a.color),
 				width: 2,
 				points: { show: false },
 			})),
@@ -107,11 +109,7 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 
 		return {
 			...base,
-			width: 0,
-			height: 0,
-			legend: { show: false },
 			series,
-			bands: [],
 			scales: {
 				...base.scales,
 				y: {
@@ -137,12 +135,7 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 			<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 type-caption">
 				{enabledAccounts.map((a) => (
 					<span key={a.id} className="inline-flex items-center gap-1.5">
-						<span
-							className="inline-block h-2.5 w-2.5 rounded-sm"
-							style={{
-								backgroundColor: a.color ?? FALLBACK_ACCOUNT_COLOR,
-							}}
-						/>
+						<AccountColorDot color={a.color} />
 						{a.label}
 					</span>
 				))}

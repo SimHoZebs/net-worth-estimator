@@ -7,7 +7,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Request preparation ported from simulation/prepareSimulation.ts.
+// Request preparation for simulation. Go is the owner.
 
 // SimulationPreparationError carries validation issues blocking simulation.
 type SimulationPreparationError struct {

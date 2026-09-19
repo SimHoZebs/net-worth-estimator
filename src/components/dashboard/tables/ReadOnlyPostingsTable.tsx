@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { TableSearch } from "@/components/ui/table-search";
 import { currency, formatDate, formatFrequency, pct } from "@/lib/format";
 import { isPastScheduledPosting } from "@/lib/posting-categories";
 import type { Account, Posting } from "@/lib/projection";
+import { SearchFooter, useTableSearch } from "./_shared";
 import {
 	TransactionListRow,
 	transactionMatchesSearch,
@@ -22,17 +23,16 @@ export function ReadOnlyPostingsTable({
 	projectionStartDate,
 	showAdvanced,
 }: ReadOnlyPostingsTableProps) {
-	const [search, setSearch] = useState("");
+	const { search, setSearch, query } = useTableSearch();
 	const accountById = useMemo(
 		() => new Map(accounts.map((account) => [account.id, account])),
 		[accounts],
 	);
 	const visiblePostings = useMemo(() => {
-		const query = search.trim().toLowerCase();
 		return postings.filter((posting) =>
 			transactionMatchesSearch(posting, accountById, query),
 		);
-	}, [postings, search, accountById]);
+	}, [postings, query, accountById]);
 	const currentPostings = visiblePostings.filter(
 		(posting) => !isPastScheduledPosting(posting, projectionStartDate),
 	);
@@ -83,10 +83,11 @@ export function ReadOnlyPostingsTable({
 					</Collapsible.Content>
 				</Collapsible>
 			) : null}
-			<div className="type-caption">
-				{currentPostings.length} current transaction
-				{currentPostings.length === 1 ? "" : "s"}
-			</div>
+			<SearchFooter
+				count={currentPostings.length}
+				singular="current transaction"
+				plural="current transactions"
+			/>
 		</div>
 	);
 }

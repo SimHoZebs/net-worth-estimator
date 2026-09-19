@@ -350,6 +350,9 @@ const DEFAULT_HORIZON_YEARS = 15;
 const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> = (
 	set,
 ) => ({
+	// Seeded defaults: component tests and pre-load renders expect usable
+	// evaluation tables. App replaces these from the loaded document keyed
+	// by data timestamp (see App.tsx), so session edits survive re-renders.
 	evaluations: structuredClone(DEFAULT_EVALUATIONS),
 	replaceEvaluations: (evaluations) =>
 		set({ evaluations: structuredClone(evaluations) }),
@@ -500,11 +503,21 @@ export const selectCurrentChangeCount = (s: AppStore) =>
 		? countDocumentDiff(s.editingBaseline, s.workingDocument)
 		: 0;
 
+// Stable atomic selectors. Prefer these (or wrap the composites below in
+// useShallow): each returns a stable reference instead of a fresh object.
+export const selectIsEditing = (s: AppStore) => s.isEditing;
+export const selectIsDirty = (s: AppStore) => s.isDirty;
+export const selectWorkingDocument = (s: AppStore) => s.workingDocument;
+export const selectEditingBaseline = (s: AppStore) => s.editingBaseline;
+export const selectStartEditing = (s: AppStore) => s.startEditing;
+export const selectCancelEditing = (s: AppStore) => s.cancelEditing;
+export const selectFinishEditing = (s: AppStore) => s.finishEditing;
+
 export const selectEditorState = (s: AppStore) => ({
-	isEditing: s.isEditing,
-	isDirty: s.isDirty,
-	workingDocument: s.workingDocument,
-	editingBaseline: s.editingBaseline,
+	isEditing: selectIsEditing(s),
+	isDirty: selectIsDirty(s),
+	workingDocument: selectWorkingDocument(s),
+	editingBaseline: selectEditingBaseline(s),
 });
 
 export const selectEditorActions = (s: AppStore) => ({
@@ -536,50 +549,53 @@ export function countDocumentDiff(
 	baseline: FinancialModelDocument,
 	draft: FinancialModelDocument,
 ): number {
+	return (
+		countKeyedRowDiff(
+			baseline.accounts,
+			draft.accounts,
+			(account) => account.id,
+		) +
+		countKeyedRowDiff(
+			baseline.postings,
+			draft.postings,
+			(posting) => posting.id,
+		) +
+		countPositionalRowDiff(baseline.checkpoints, draft.checkpoints)
+	);
+}
+
+function isJsonEqual(current: unknown, original: unknown): boolean {
+	return JSON.stringify(current) === JSON.stringify(original);
+}
+
+function countKeyedRowDiff<T>(
+	baseline: T[],
+	draft: T[],
+	getId: (row: T) => string,
+): number {
+	const originals = new Map(baseline.map((row) => [getId(row), row]));
+	const draftIds = new Set(draft.map((row) => getId(row)));
 	let count = 0;
-	const baselineAccounts = new Map(
-		baseline.accounts.map((account) => [account.id, account]),
-	);
-	const draftAccountIds = new Set(draft.accounts.map((account) => account.id));
-	for (const account of draft.accounts) {
-		const original = baselineAccounts.get(account.id);
-		if (
-			original === undefined ||
-			JSON.stringify(account) !== JSON.stringify(original)
-		) {
-			count += 1;
-		}
+	for (const row of draft) {
+		const original = originals.get(getId(row));
+		if (original === undefined || !isJsonEqual(row, original)) count += 1;
 	}
-	for (const account of baseline.accounts) {
-		if (!draftAccountIds.has(account.id)) count += 1;
+	for (const row of baseline) {
+		if (!draftIds.has(getId(row))) count += 1;
 	}
-	const baselinePostings = new Map(
-		baseline.postings.map((posting) => [posting.id, posting]),
-	);
-	const draftPostingIds = new Set(draft.postings.map((posting) => posting.id));
-	for (const posting of draft.postings) {
-		const original = baselinePostings.get(posting.id);
-		if (
-			original === undefined ||
-			JSON.stringify(posting) !== JSON.stringify(original)
-		) {
-			count += 1;
-		}
-	}
-	for (const posting of baseline.postings) {
-		if (!draftPostingIds.has(posting.id)) count += 1;
-	}
-	const checkpointCount = Math.max(
-		baseline.checkpoints.length,
-		draft.checkpoints.length,
-	);
-	for (let index = 0; index < checkpointCount; index++) {
-		const original = baseline.checkpoints[index];
-		const current = draft.checkpoints[index];
+	return count;
+}
+
+function countPositionalRowDiff<T>(baseline: T[], draft: T[]): number {
+	let count = 0;
+	const rowCount = Math.max(baseline.length, draft.length);
+	for (let index = 0; index < rowCount; index++) {
+		const original = baseline[index];
+		const current = draft[index];
 		if (
 			original === undefined ||
 			current === undefined ||
-			JSON.stringify(current) !== JSON.stringify(original)
+			!isJsonEqual(current, original)
 		) {
 			count += 1;
 		}

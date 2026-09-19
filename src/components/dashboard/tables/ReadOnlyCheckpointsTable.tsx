@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
 	createTableColumn,
 	DataTable,
@@ -7,6 +6,7 @@ import {
 import { TableSearch } from "@/components/ui/table-search";
 import { formatDate } from "@/lib/format";
 import type { Checkpoint } from "@/lib/projection";
+import { useTableSearch } from "./_shared";
 
 interface ReadOnlyCheckpointsTableProps {
 	checkpoints: Checkpoint[];
@@ -21,8 +21,7 @@ export function ReadOnlyCheckpointsTable({
 	showAdvanced,
 	accountLabelById,
 }: ReadOnlyCheckpointsTableProps) {
-	const [search, setSearch] = useState("");
-	const normalizedSearch = search.trim().toLowerCase();
+	const { search, setSearch, query: normalizedSearch } = useTableSearch();
 	const rows = checkpoints.filter((checkpoint) => {
 		const accountLabel =
 			accountLabelById.get(checkpoint.AccountId) ?? checkpoint.AccountId;

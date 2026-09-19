@@ -12,7 +12,7 @@ The product model is intentionally generic:
 - Annual caps are generic, and source-funded rows clamp to the source account's available positive balance.
 - Financial independence is derived from annual expense coverage and a full principal-preservation cycle. Explicit continuing postings and shared account constraints drive reactive withdrawals.
 - Monte Carlo confidence is aggregated from complete run outcomes, never inferred from percentile-band slope.
-- Baseline edits are persisted by the active `FinancialModelRepository`. `ModelOverrides`, shown as current changes, are session-only and never mutate the canonical document.
+- Baseline edits are persisted by the active `FinancialModelRepository`. The Editor draft (`workingDocument` plus the `editingBaseline` snapshot in `src/store.ts`), shown as current changes, is session-only and never mutates the canonical document.
 - `ComparisonSnapshot` records read-only metrics for comparison. It does not store or restore an alternative model.
 
 ## CSV Files
@@ -40,8 +40,9 @@ Income source definitions and tax profiles are loaded from `public/data/income/`
 - An empty database is seeded from `public/configs/` and `public/data/income/`. Later bundled CSV changes do not replace persisted data. There is no reset endpoint; CSV files are seed-only (first boot plus the offline `cmd/importcsv` operator tool).
 - `NET_WORTH_ESTIMATOR_READ_ONLY=1` rejects canonical model writes with 403 while keeping reads and projections public.
 - Write access is guarded by a single bearer token (`NET_WORTH_ESTIMATOR_AUTH_TOKEN`), sent from Settings as an `Authorization` header on save only. Serve exclusively behind HTTPS; a token captured over plain HTTP permits world-write replay.
+- The optional SimpleFIN sync (daily scheduler plus bearer-guarded `POST /v1/sync/simplefin`) writes only balance checkpoints and projection-disabled pending card-charge seeds, all marked `source: "simplefin"`. It never materializes checking flows or posted history. Sync-owned rows cannot be edited through model saves; add your own checkpoint to override a synced balance. Removing a mapped account does not garbage-collect its sync rows — remap or delete them directly. Start with `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1`.
 - Malformed persisted data is not silently replaced; parsing and validation diagnostics are returned to the UI.
-- `ModelOverrides` remain session-only and never mutate the canonical data.
+- Editor draft changes remain session-only and never mutate the canonical data.
 - Production deployments must place the SQLite database on durable storage.
 
 ## Run
@@ -103,17 +104,16 @@ npm run build
 - `src/pages/SettingsPage.tsx`: session-only projection and evaluation configuration
 - `src/pages/ModelInputsPage.tsx`: canonical model inputs, temporary changes, templates, and source actions
 - `src/hooks/useFinancialModel.ts`: TanStack Query wrappers for load and save
-- `src/store.ts`: `ModelOverrides`, document editor, runtime settings, read-only comparison metrics, and theme state
-- `src/engine/WorkerProjectionEngine.ts`: deterministic and stochastic Web Worker facade
+- `src/store.ts`: Editor draft (`workingDocument` + `editingBaseline`), runtime settings, and read-only comparison metrics; theme lives in the separate `src/themeStore.ts` store
+- `src/engine/BackendProjectionEngine.ts`: HTTP/SSE client for backend deterministic and stochastic projection
 - `src/components/ProjectionDashboard.tsx`: projection dashboard
 - `src/components/ModelInputsInspector.tsx`: scheduled transactions, paginated one-time history, account rules, and canonical editing UI
 - `src/components/ModelValidationPanel.tsx`: parsing and validation diagnostics
 - `src/components/CurrentChangesControls.tsx`: session-only override controls
 - `src/components/CurrentChangesComparison.tsx`: read-only metric snapshots
-- `src/lib/projection/model/`: canonical document override handling
-- `src/lib/projection/simulation/`: request preparation, shared transitions, deterministic kernel, and path adaptation
-- `src/lib/projection/evaluation/`: path and branch evaluations
-- `src/lib/projection/analysis/`: deterministic and stochastic orchestration
+- `src/lib/projection/model/`: amount presentation and checkpoint-surrogate helpers
+- `backend/internal/domain/`: Go simulation kernel (request preparation, shared transitions, deterministic simulation, path adaptation)
+- `src/lib/projection/evaluation/`: evaluation config validation, result accessors, and evaluator definitions
+- `src/lib/analysis/`: posting-derived independent analyses (classification, payroll detection, salary estimation)
 
 See `TECHNICAL_OVERVIEW.md` for the detailed data flow and engine contracts.
-- The optional SimpleFIN sync (daily scheduler plus bearer-guarded `POST /v1/sync/simplefin`) writes only balance checkpoints and projection-disabled pending card-charge seeds, all marked `source: "simplefin"`. It never materializes checking flows or posted history. Sync-owned rows cannot be edited through model saves; add your own checkpoint to override a synced balance. Removing a mapped account does not garbage-collect its sync rows — remap or delete them directly. Start with `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1`.

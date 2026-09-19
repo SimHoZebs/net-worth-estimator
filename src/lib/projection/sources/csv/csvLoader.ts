@@ -1,14 +1,11 @@
 import Papa from "papaparse";
 import type { ZodType } from "zod";
-import { NO_CEILING, NO_FLOOR } from "../../constants";
 import { isGeneratedCheckpointSurrogate } from "../../model/checkpointSurrogates";
 import {
-	type BehaviorCollectionKey,
 	CSV_BEHAVIOR_FILE_NAMES,
 	CSV_MODEL_FILE_NAMES,
 	CSV_MODEL_PUBLIC_PATH,
 	type FinancialModelDocument,
-	type ModelCollectionKey,
 	type ModelFileContents,
 } from "../../types/model";
 import type { ModelValidationIssue } from "../../types/validation";
@@ -18,7 +15,6 @@ import {
 	csvAccountsHeaders,
 	csvCheckpointSchema,
 	csvCheckpointsHeaders,
-	csvFinancialIndependenceHeaders,
 	csvFinancialIndependenceRequiredHeaders,
 	csvFinancialIndependenceSchema,
 	csvNetWorthThresholdHeaders,
@@ -37,17 +33,12 @@ export interface CsvFinancialModelParseResult {
 
 export interface CsvFinancialModelOptions {
 	basePath?: string;
-	fetchImpl?: typeof fetch;
 }
 
 interface ParsedRowsResult<TRow> {
 	rows: TRow[];
 	issues: ModelValidationIssue[];
 	hasFatalIssue: boolean;
-}
-
-function normalizeBasePath(basePath: string): string {
-	return basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
 }
 
 function parseRows<TRow>(
@@ -246,144 +237,5 @@ export function parseCsvFinancialModel(
 	return {
 		data: document,
 		issues: [...issues, ...validateCsvFinancialModel(document)],
-	};
-}
-
-export async function fetchCsvFinancialModelFiles(
-	options: CsvFinancialModelOptions = {},
-): Promise<ModelFileContents> {
-	const fetchImpl = options.fetchImpl ?? fetch;
-	const basePath = normalizeBasePath(options.basePath ?? CSV_MODEL_PUBLIC_PATH);
-
-	const modelEntries = await Promise.all(
-		(
-			Object.entries(CSV_MODEL_FILE_NAMES) as Array<
-				[ModelCollectionKey, string]
-			>
-		).map(async ([key, fileName]) => {
-			const response = await fetchImpl(`${basePath}/${fileName}`);
-
-			if (!response.ok) {
-				throw new Error(
-					`Could not load ${fileName} from ${basePath} (${response.status} ${response.statusText}).`,
-				);
-			}
-
-			return [key, await response.text()] as const;
-		}),
-	);
-	const behaviorEntries = await Promise.all(
-		(
-			Object.entries(CSV_BEHAVIOR_FILE_NAMES) as Array<
-				[BehaviorCollectionKey, string]
-			>
-		).map(async ([key, fileName]) => {
-			const response = await fetchImpl(`${basePath}/${fileName}`);
-
-			if (!response.ok) {
-				throw new Error(
-					`Could not load ${fileName} from ${basePath} (${response.status} ${response.statusText}).`,
-				);
-			}
-
-			return [key, await response.text()] as const;
-		}),
-	);
-
-	const fileMap = Object.fromEntries(modelEntries) as Record<
-		ModelCollectionKey,
-		string
-	>;
-	const behaviorFileMap = Object.fromEntries(behaviorEntries) as Record<
-		BehaviorCollectionKey,
-		string
-	>;
-
-	return {
-		accounts: fileMap.accounts,
-		checkpoints: fileMap.checkpoints,
-		behaviors: behaviorFileMap,
-		postings: fileMap.postings,
-	};
-}
-
-export async function loadCsvFinancialModel(
-	options: CsvFinancialModelOptions = {},
-): Promise<CsvFinancialModelParseResult> {
-	const csvFiles = await fetchCsvFinancialModelFiles(options);
-	return parseCsvFinancialModel(csvFiles, {
-		basePath: options.basePath ?? CSV_MODEL_PUBLIC_PATH,
-	});
-}
-
-export function serializeCsvFinancialModel(
-	document: FinancialModelDocument,
-): ModelFileContents {
-	const serializeRows = (rows: object[], headers: readonly string[]) =>
-		rows.length === 0
-			? headers.join(",")
-			: Papa.unparse(rows, { columns: [...headers], newline: "\n" });
-
-	return {
-		accounts: serializeRows(
-			document.accounts.map((account) => ({
-				...account,
-				minBalance:
-					account.minBalance === NO_FLOOR ? "-Infinity" : account.minBalance,
-				maxBalance:
-					account.maxBalance === NO_CEILING ? "Infinity" : account.maxBalance,
-				color: account.color ?? "",
-			})),
-			csvAccountsHeaders,
-		),
-		checkpoints: serializeRows(document.checkpoints, csvCheckpointsHeaders),
-		postings: serializeRows(
-			document.postings.map((posting) => ({
-				...posting,
-				amount: JSON.stringify(posting.amount),
-				sourceAccountId: posting.sourceAccountId ?? "",
-				destinations: posting.destinations?.join(";") ?? "",
-				endDate: posting.endDate ?? "",
-				annualCap: posting.annualCap ?? "",
-			})),
-			csvPostingsHeaders,
-		),
-		behaviors: {
-			financialIndependence: serializeRows(
-				document.evaluations.financialIndependence.map(
-					({ instanceId, label, enabled, config }) => ({
-						instanceId,
-						label,
-						enabled,
-						...config,
-						sources: JSON.stringify(config.sources),
-						continuingPostingIds: JSON.stringify(config.continuingPostingIds),
-					}),
-				),
-				csvFinancialIndependenceHeaders,
-			),
-			netWorthThreshold: serializeRows(
-				document.evaluations.netWorthThreshold.map(
-					({ instanceId, label, enabled, config }) => ({
-						instanceId,
-						label,
-						enabled,
-						target: config.target,
-					}),
-				),
-				csvNetWorthThresholdHeaders,
-			),
-			postingFulfillment: serializeRows(
-				document.evaluations.postingFulfillment.map(
-					({ instanceId, label, enabled, config }) => ({
-						instanceId,
-						label,
-						enabled,
-						postingIds: JSON.stringify(config.postingIds),
-					}),
-				),
-				csvPostingFulfillmentHeaders,
-			),
-		},
 	};
 }

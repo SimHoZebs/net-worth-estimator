@@ -6,9 +6,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Shared state transitions ported from simulation/transitions.ts. This file is
-// the single semantic source for posting execution across deterministic,
-// branch (FI), and Monte Carlo runs.
+// Shared state transitions; Go is the owner and single semantic source for
+// posting execution across deterministic, branch (FI), and Monte Carlo runs.
 
 // AppliedMovementTransition carries a movement result plus per-account deltas.
 type AppliedMovementTransition struct {

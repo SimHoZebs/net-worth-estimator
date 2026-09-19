@@ -5,12 +5,10 @@ import {
 	buildPointDetails,
 	formatPointDetailsSummary,
 } from "@/chart/pointDetails";
-import {
-	createBaseOptions,
-	createReferenceLinesHooks,
-} from "@/chart/uplotBase";
+import { createReferenceLinesHooks } from "@/chart/uplotBase";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import type { FinancialModelDocument } from "@/lib/projection";
+import { baseChartOptions, resolveAccountColor } from "./_chartShared";
 import { PointDetailsPanel } from "./PointDetailsPanel";
 
 interface AccountMeta {
@@ -25,7 +23,6 @@ interface AccountGroups {
 }
 
 const NET_WORTH_CHART_MAX_Y = 2_000_000;
-const FALLBACK_ACCOUNT_COLOR = "GrayText";
 const NET_WORTH_SERIES_COLOR = "CanvasText";
 const BAND_SOFT_COLOR = "color-mix(in oklab, CanvasText 15%, transparent)";
 const BAND_COLOR = "color-mix(in oklab, CanvasText 25%, transparent)";
@@ -168,24 +165,21 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 	);
 
 	const options = useMemo((): uPlot.Options => {
-		const base = createBaseOptions();
+		const base = baseChartOptions();
 		const fillSeries: uPlot.Series[] = [
 			...assets.slice().reverse(),
 			...liabilities,
 		].map((account) => ({
 			label: account.label,
 			show: true,
-			stroke: account.color ?? FALLBACK_ACCOUNT_COLOR,
+			stroke: resolveAccountColor(account.color),
 			width: 1.5,
-			fill: account.color ?? FALLBACK_ACCOUNT_COLOR,
+			fill: resolveAccountColor(account.color),
 			points: { show: false },
 		}));
 		const bandIndex = 1 + accountCount + 2;
 		return {
 			...base,
-			width: 0,
-			height: 0,
-			legend: { show: false },
 			series: [
 				{},
 				...fillSeries,

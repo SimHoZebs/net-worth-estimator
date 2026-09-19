@@ -8,6 +8,7 @@ import type {
 	Posting,
 	ProjectionAccountSummary,
 } from "@/lib/projection";
+import { duplicateIds, useTableSearch } from "./_shared";
 import {
 	AccountPositionGroup,
 	type AccountPositionRow,
@@ -33,7 +34,7 @@ export function ReadOnlyAccountsTable({
 	balancesAreStale,
 	showAdvanced,
 }: ReadOnlyAccountsTableProps) {
-	const [search, setSearch] = useState("");
+	const { search, setSearch, query } = useTableSearch();
 	const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(
 		new Set(),
 	);
@@ -94,7 +95,6 @@ export function ReadOnlyAccountsTable({
 		(sum, row) => sum + (row.balance ?? 0),
 		0,
 	);
-	const query = search.trim().toLowerCase();
 	const matchesSearch = (row: AccountPositionRow) =>
 		!query ||
 		row.account.label.toLowerCase().includes(query) ||
@@ -239,14 +239,4 @@ function PositionMetric({
 			</div>
 		</div>
 	);
-}
-
-function duplicateIds(ids: string[]) {
-	const seen = new Set<string>();
-	const duplicates = new Set<string>();
-	for (const id of ids) {
-		if (seen.has(id)) duplicates.add(id);
-		seen.add(id);
-	}
-	return duplicates;
 }

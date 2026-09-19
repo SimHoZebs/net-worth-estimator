@@ -8,11 +8,6 @@ import {
 	type FinancialModelDocument,
 } from "@/lib/projection";
 import type { IncomeDataSnapshot } from "@/lib/projection/types/income";
-import type {
-	ProjectionArtifacts,
-	ProjectionCapabilities,
-	ProjectionExecution,
-} from "@/runtime/projectionRuntime";
 import { selectCurrentChangeCount, useStore } from "@/store";
 
 function formatTodayIsoDate() {
@@ -148,55 +143,30 @@ export function useProjectionOrchestration({
 		stochasticResult,
 		stochasticResultIsStale,
 	]);
-	const artifacts = useMemo<ProjectionArtifacts>(
-		() => ({
-			result,
-			projectionResultIsStale,
-			stochasticResult,
-			stochasticResultIsStale,
-			stochasticIsProvisional,
-			currentMetrics,
-		}),
-		[
-			result,
-			projectionResultIsStale,
-			stochasticResult,
-			stochasticResultIsStale,
-			stochasticIsProvisional,
-			currentMetrics,
-		],
-	);
-	const execution = useMemo<ProjectionExecution>(
-		() => ({
-			runtimeError,
-			isProjecting,
-			stochasticError,
-			isStochasticRunning,
-		}),
-		[runtimeError, isProjecting, stochasticError, isStochasticRunning],
-	);
-	const capabilities = useMemo<ProjectionCapabilities>(
-		() => ({
-			hasStochasticAccounts,
-			hasStochasticResult,
-			canCaptureComparison:
-				!isProjecting && !isStochasticRunning && !isSourceUpdating,
-		}),
-		[
-			hasStochasticAccounts,
-			hasStochasticResult,
-			isProjecting,
-			isStochasticRunning,
-			isSourceUpdating,
-		],
-	);
 
 	return {
 		effectiveDocument,
 		projectionStartDate,
-		artifacts,
-		execution,
-		capabilities,
+		artifacts: {
+			result,
+			projectionResultIsStale,
+			stochasticResult,
+			stochasticResultIsStale,
+			stochasticIsProvisional,
+			currentMetrics,
+		},
+		execution: {
+			runtimeError,
+			isProjecting,
+			stochasticError,
+			isStochasticRunning,
+		},
+		capabilities: {
+			hasStochasticAccounts,
+			hasStochasticResult,
+			canCaptureComparison:
+				!isProjecting && !isStochasticRunning && !isSourceUpdating,
+		},
 		stochasticProgress,
 	};
 }

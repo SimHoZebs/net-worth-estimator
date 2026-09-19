@@ -74,15 +74,6 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 		return err
 	}
 
-	incomingCheckpointKeys := make(map[string]struct{}, len(document.Checkpoints))
-	for _, checkpoint := range document.Checkpoints {
-		incomingCheckpointKeys[checkpoint.AccountID+"\x00"+checkpoint.Date] = struct{}{}
-	}
-	syncedCheckpointsByKey := make(map[string]types.Checkpoint, len(syncedCheckpoints))
-	for _, checkpoint := range syncedCheckpoints {
-		syncedCheckpointsByKey[checkpoint.AccountID+"\x00"+checkpoint.Date] = checkpoint
-	}
-
 	position := 0
 	for _, account := range document.Accounts {
 		var minBalance, maxBalance any = types.NoFloor, types.NoCeiling
@@ -104,53 +95,11 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 		}
 		position++
 	}
-	checkpointPosition := 0
-	untouchedSyncKeys := make(map[string]struct{})
-	for _, checkpoint := range document.Checkpoints {
-		key := checkpoint.AccountID + "\x00" + checkpoint.Date
-		if synced, ok := syncedCheckpointsByKey[key]; ok && synced.Balance == checkpoint.Balance {
-			// Byte-identical round-trip of a sync row: leave it sync-owned.
-			untouchedSyncKeys[key] = struct{}{}
-			continue
-		}
-		if _, err := tx.Exec(
-			`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (?,?,?,?,?)`,
-			checkpointPosition, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceModel,
-		); err != nil {
-			return fmt.Errorf("insert checkpoint: %w", err)
-		}
-		checkpointPosition++
+	if _, err := remergeCheckpoints(tx, document.Checkpoints, syncedCheckpoints, 0); err != nil {
+		return err
 	}
-	for _, checkpoint := range syncedCheckpoints {
-		key := checkpoint.AccountID + "\x00" + checkpoint.Date
-		if _, present := incomingCheckpointKeys[key]; present {
-			if _, untouched := untouchedSyncKeys[key]; !untouched {
-				continue
-			}
-		}
-		if _, err := tx.Exec(
-			`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (?,?,?,?,?)`,
-			checkpointPosition, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceSimpleFIN,
-		); err != nil {
-			return fmt.Errorf("re-merge synced checkpoint: %w", err)
-		}
-		checkpointPosition++
-	}
-	postingPosition := 0
-	for _, posting := range document.Postings {
-		if IsSyncPostingID(posting.ID) {
-			continue
-		}
-		if err := insertPosting(tx, postingPosition, &posting, SourceModel); err != nil {
-			return err
-		}
-		postingPosition++
-	}
-	for _, posting := range syncedPostings {
-		if err := insertPosting(tx, postingPosition, &posting, SourceSimpleFIN); err != nil {
-			return fmt.Errorf("re-merge synced posting: %w", err)
-		}
-		postingPosition++
+	if _, err := remergePostings(tx, document.Postings, syncedPostings, 0); err != nil {
+		return err
 	}
 	if err := saveEvaluationTable(tx, string(types.EvaluationTypeFinancialIndependence), fiEvaluationRows(document)); err != nil {
 		return err
@@ -638,39 +587,6 @@ func (s *Store) LoadDocumentAndIncomeData() (*types.FinancialModelDocument, *typ
 		return nil, nil, fmt.Errorf("load aggregate commit: %w", err)
 	}
 	return document, incomeData, nil
-}
-
-// GetArtifact / PutArtifact implement the bounded artifact cache.
-func (s *Store) GetArtifact(identity string) (string, bool, error) {
-	row := s.db.QueryRow(`SELECT payload FROM projection_artifacts WHERE identity = ?`, identity)
-	var payload string
-	if err := row.Scan(&payload); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", false, nil
-		}
-		return "", false, err
-	}
-	return payload, true, nil
-}
-
-func (s *Store) PutArtifact(identity, kind, payload string) error {
-	const maxArtifacts = 256
-	_, err := s.db.Exec(
-		`INSERT INTO projection_artifacts (identity, kind, payload) VALUES (?,?,?)
-		 ON CONFLICT(identity) DO NOTHING`,
-		identity, kind, payload,
-	)
-	if err != nil {
-		return err
-	}
-	// Evict oldest rows regardless of kind so stochastic entries cannot grow
-	// without bound.
-	_, err = s.db.Exec(`
-		DELETE FROM projection_artifacts WHERE identity IN (
-			SELECT identity FROM projection_artifacts
-			ORDER BY created_at LIMIT MAX(0, (SELECT COUNT(*) FROM projection_artifacts) - ?)
-		)`, maxArtifacts)
-	return err
 }
 
 func boolToInt(value bool) int {

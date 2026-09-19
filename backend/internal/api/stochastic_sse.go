@@ -160,6 +160,76 @@ func (run *sharedStochasticRun) outcome() (*types.StochasticProjectionResult, er
 	return run.result, run.runErr
 }
 
+// ---- Shared SSE stream helpers ----
+
+// sseEventWriter serializes SSE event writes for one stream.
+type sseEventWriter func(id, name string, payload any) error
+
+// newSSEEventWriter builds the single mutex-guarded event writer for a
+// stream. The heartbeat goroutine and the event loop run on different
+// goroutines and their bytes must never interleave mid-event.
+func newSSEEventWriter(w http.ResponseWriter, flusher http.Flusher, writeMu *sync.Mutex) sseEventWriter {
+	return func(id, name string, payload any) error {
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		if _, err := fmt.Fprintf(w, "id: %s\nevent: %s\ndata: %s\n\n", id, name, encoded); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+}
+
+// startSSEHeartbeat keeps idle proxies/NAT from killing long batches between
+// progress flushes. It stops when done closes or a write fails.
+func startSSEHeartbeat(w http.ResponseWriter, flusher http.Flusher, writeMu *sync.Mutex, done chan struct{}) {
+	go func() {
+		ticker := time.NewTicker(sseHeartbeatInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				writeMu.Lock()
+				_, err := fmt.Fprintf(w, ": heartbeat\n\n")
+				if err == nil {
+					flusher.Flush()
+				}
+				writeMu.Unlock()
+				if err != nil {
+					return
+				}
+			}
+		}
+	}()
+}
+
+// stochasticProgressPayload builds the cumulative progress/partial payload:
+// every partial is a cumulative snapshot, so it supersedes the previous one.
+func stochasticProgressPayload(progress types.StochasticProgress, partial *types.StochasticProjectionResult) (string, map[string]any) {
+	payload := map[string]any{"progress": progress}
+	eventName := "progress"
+	if partial != nil {
+		eventName = "partial"
+		payload["partial"] = partial
+	}
+	return eventName, payload
+}
+
+// writeStochasticProgress streams one progress/partial event. A broken
+// stream only detaches its client; the shared run continues for the rest.
+func writeStochasticProgress(writeEvent sseEventWriter, progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
+	eventName, payload := stochasticProgressPayload(progress, partial)
+	if err := writeEvent(strconv.Itoa(progress.CompletedRuns), eventName, payload); err != nil {
+		log.Printf("stochastic sse: %s write failed: %v", eventName, err)
+	}
+}
+
 func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -246,52 +316,11 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 	var writeMu sync.Mutex
 	heartbeatDone := make(chan struct{})
 	defer close(heartbeatDone)
-	go func() {
-		ticker := time.NewTicker(sseHeartbeatInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-heartbeatDone:
-				return
-			case <-ticker.C:
-				writeMu.Lock()
-				_, err := fmt.Fprintf(w, ": heartbeat\n\n")
-				if err == nil {
-					flusher.Flush()
-				}
-				writeMu.Unlock()
-				if err != nil {
-					return
-				}
-			}
-		}
-	}()
+	startSSEHeartbeat(w, flusher, &writeMu, heartbeatDone)
 
-	writeEvent := func(id, name string, payload any) error {
-		encoded, err := json.Marshal(payload)
-		if err != nil {
-			return err
-		}
-		writeMu.Lock()
-		defer writeMu.Unlock()
-		if _, err := fmt.Fprintf(w, "id: %s\nevent: %s\ndata: %s\n\n", id, name, encoded); err != nil {
-			return err
-		}
-		flusher.Flush()
-		return nil
-	}
-	writeProgress := func(completedRuns int, progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
-		payload := map[string]any{"progress": progress}
-		eventName := "progress"
-		if partial != nil {
-			eventName = "partial"
-			payload["partial"] = partial
-		}
-		if err := writeEvent(strconv.Itoa(completedRuns), eventName, payload); err != nil {
-			// A broken stream only detaches this client; the shared run
-			// continues for attached and reconnecting clients.
-			log.Printf("stochastic sse: %s write failed: %v", eventName, err)
-		}
+	writeEvent := newSSEEventWriter(w, flusher, &writeMu)
+	writeProgress := func(_ int, progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
+		writeStochasticProgress(writeEvent, progress, partial)
 	}
 
 	if owner {
@@ -383,53 +412,12 @@ func (s *Server) serveStochasticInline(
 	var writeMu sync.Mutex
 	heartbeatDone := make(chan struct{})
 	defer close(heartbeatDone)
-	go func() {
-		ticker := time.NewTicker(sseHeartbeatInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-heartbeatDone:
-				return
-			case <-ticker.C:
-				writeMu.Lock()
-				_, err := fmt.Fprintf(w, ": heartbeat\n\n")
-				if err == nil {
-					flusher.Flush()
-				}
-				writeMu.Unlock()
-				if err != nil {
-					return
-				}
-			}
-		}
-	}()
+	startSSEHeartbeat(w, flusher, &writeMu, heartbeatDone)
 
-	writeEvent := func(id, name string, payload any) error {
-		encoded, err := json.Marshal(payload)
-		if err != nil {
-			return err
-		}
-		writeMu.Lock()
-		defer writeMu.Unlock()
-		if _, err := fmt.Fprintf(w, "id: %s\nevent: %s\ndata: %s\n\n", id, name, encoded); err != nil {
-			return err
-		}
-		flusher.Flush()
-		return nil
-	}
+	writeEvent := newSSEEventWriter(w, flusher, &writeMu)
 
 	progressCallback := func(progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
-		payload := map[string]any{"progress": progress}
-		eventName := "progress"
-		if partial != nil {
-			eventName = "partial"
-			payload["partial"] = partial
-		}
-		if err := writeEvent(strconv.Itoa(progress.CompletedRuns), eventName, payload); err != nil {
-			// The request context cancels the projection on client
-			// disconnect; log so stream breakage is never silent.
-			log.Printf("stochastic sse: %s write failed: %v", eventName, err)
-		}
+		writeStochasticProgress(writeEvent, progress, partial)
 	}
 
 	ctx := r.Context()

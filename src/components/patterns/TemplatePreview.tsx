@@ -1,3 +1,4 @@
+import { describePostingRoute as describeSharedPostingRoute } from "@/components/_draftHelpers";
 import { currency } from "@/lib/format";
 import type { Account, Posting } from "@/lib/projection";
 import { PostingAmount } from "../dashboard/tables/PostingAmount";
@@ -85,15 +86,7 @@ export function describePostingRoute(
 	posting: Posting,
 	accounts: Account[],
 ): string {
-	const byId = new Map(accounts.map((a) => [a.id, a]));
-	const src = posting.sourceAccountId
-		? (byId.get(posting.sourceAccountId)?.label ?? posting.sourceAccountId)
-		: "External";
-	const dst =
-		posting.destinations === null
-			? "External"
-			: posting.destinations.map((d) => byId.get(d)?.label ?? d).join(" ; ");
-	return `${src} \u2192 ${dst}`;
+	return describeSharedPostingRoute(posting, accounts);
 }
 
 export function describePostingCap(posting: Posting): string {

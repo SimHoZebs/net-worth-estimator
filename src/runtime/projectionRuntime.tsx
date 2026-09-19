@@ -28,17 +28,19 @@ export interface ProjectionCapabilities {
 	canCaptureComparison: boolean;
 }
 
-const ProjectionArtifactsContext = createContext<ProjectionArtifacts | null>(
+interface ProjectionRuntimeValue {
+	artifacts: ProjectionArtifacts;
+	execution: ProjectionExecution;
+	capabilities: ProjectionCapabilities;
+	stochasticProgress: StochasticProgress | null;
+}
+
+// One narrow context for the whole projection runtime. The four consumer
+// hooks below are selectors over it, so components keep their imports while
+// the provider tree stays flat.
+const ProjectionRuntimeContext = createContext<ProjectionRuntimeValue | null>(
 	null,
 );
-const ProjectionExecutionContext = createContext<ProjectionExecution | null>(
-	null,
-);
-const ProjectionCapabilitiesContext =
-	createContext<ProjectionCapabilities | null>(null);
-const StochasticProgressContext = createContext<
-	StochasticProgress | null | undefined
->(undefined);
 
 export function ProjectionRuntimeProvider({
 	artifacts,
@@ -46,62 +48,38 @@ export function ProjectionRuntimeProvider({
 	capabilities,
 	stochasticProgress,
 	children,
-}: {
-	artifacts: ProjectionArtifacts;
-	execution: ProjectionExecution;
-	capabilities: ProjectionCapabilities;
-	stochasticProgress: StochasticProgress | null;
+}: ProjectionRuntimeValue & {
 	children: ReactNode;
 }) {
 	return (
-		<ProjectionArtifactsContext.Provider value={artifacts}>
-			<ProjectionCapabilitiesContext.Provider value={capabilities}>
-				<StochasticProgressContext.Provider value={stochasticProgress}>
-					<ProjectionExecutionContext.Provider value={execution}>
-						{children}
-					</ProjectionExecutionContext.Provider>
-				</StochasticProgressContext.Provider>
-			</ProjectionCapabilitiesContext.Provider>
-		</ProjectionArtifactsContext.Provider>
+		<ProjectionRuntimeContext.Provider
+			value={{ artifacts, execution, capabilities, stochasticProgress }}
+		>
+			{children}
+		</ProjectionRuntimeContext.Provider>
 	);
 }
 
-export function useProjectionArtifacts() {
-	const runtime = useContext(ProjectionArtifactsContext);
+function useProjectionRuntime() {
+	const runtime = useContext(ProjectionRuntimeContext);
 	if (!runtime) {
-		throw new Error(
-			"useProjectionArtifacts requires ProjectionRuntimeProvider.",
-		);
+		throw new Error("useProjectionRuntime requires ProjectionRuntimeProvider.");
 	}
 	return runtime;
+}
+
+export function useProjectionArtifacts() {
+	return useProjectionRuntime().artifacts;
 }
 
 export function useProjectionExecution() {
-	const runtime = useContext(ProjectionExecutionContext);
-	if (!runtime) {
-		throw new Error(
-			"useProjectionExecution requires ProjectionRuntimeProvider.",
-		);
-	}
-	return runtime;
+	return useProjectionRuntime().execution;
 }
 
 export function useProjectionCapabilities() {
-	const runtime = useContext(ProjectionCapabilitiesContext);
-	if (!runtime) {
-		throw new Error(
-			"useProjectionCapabilities requires ProjectionRuntimeProvider.",
-		);
-	}
-	return runtime;
+	return useProjectionRuntime().capabilities;
 }
 
 export function useStochasticProgress() {
-	const progress = useContext(StochasticProgressContext);
-	if (progress === undefined) {
-		throw new Error(
-			"useStochasticProgress requires ProjectionRuntimeProvider.",
-		);
-	}
-	return progress;
+	return useProjectionRuntime().stochasticProgress;
 }

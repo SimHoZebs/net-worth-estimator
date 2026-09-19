@@ -25,6 +25,94 @@ func IsSyncPostingID(id string) bool {
 	return strings.HasPrefix(id, SyncPostingPrefix)
 }
 
+// syncCheckpointKey identifies an owner/sync checkpoint row for re-merge.
+func syncCheckpointKey(accountID, date string) string {
+	return accountID + "\x00" + date
+}
+
+// nextTablePosition returns MAX(position)+1 for a position-ordered table, or
+// 0 when empty. One position-management helper shared by the sync apply and
+// document re-merge paths.
+func nextTablePosition(tx *sql.Tx, table string) (int, error) {
+	var maxPosition sql.NullInt64
+	if err := tx.QueryRow(`SELECT MAX(position) FROM ` + table).Scan(&maxPosition); err != nil {
+		return 0, fmt.Errorf("next %s position: %w", table, err)
+	}
+	if maxPosition.Valid {
+		return int(maxPosition.Int64) + 1, nil
+	}
+	return 0, nil
+}
+
+// remergeCheckpoints writes owner checkpoints then re-merges sync-owned rows.
+// Incoming owner checkpoints win key collisions, so owners always keep an
+// override path. Returns the next free position.
+func remergeCheckpoints(tx *sql.Tx, incoming []types.Checkpoint, synced []types.Checkpoint, startPosition int) (int, error) {
+	incomingKeys := make(map[string]struct{}, len(incoming))
+	for _, checkpoint := range incoming {
+		incomingKeys[syncCheckpointKey(checkpoint.AccountID, checkpoint.Date)] = struct{}{}
+	}
+	syncedByKey := make(map[string]types.Checkpoint, len(synced))
+	for _, checkpoint := range synced {
+		syncedByKey[syncCheckpointKey(checkpoint.AccountID, checkpoint.Date)] = checkpoint
+	}
+	position := startPosition
+	untouchedSyncKeys := make(map[string]struct{})
+	for _, checkpoint := range incoming {
+		key := syncCheckpointKey(checkpoint.AccountID, checkpoint.Date)
+		if synced, ok := syncedByKey[key]; ok && synced.Balance == checkpoint.Balance {
+			// Byte-identical round-trip of a sync row: leave it sync-owned.
+			untouchedSyncKeys[key] = struct{}{}
+			continue
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (?,?,?,?,?)`,
+			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceModel,
+		); err != nil {
+			return 0, fmt.Errorf("insert checkpoint: %w", err)
+		}
+		position++
+	}
+	for _, checkpoint := range synced {
+		key := syncCheckpointKey(checkpoint.AccountID, checkpoint.Date)
+		if _, present := incomingKeys[key]; present {
+			if _, untouched := untouchedSyncKeys[key]; !untouched {
+				continue
+			}
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (?,?,?,?,?)`,
+			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceSimpleFIN,
+		); err != nil {
+			return 0, fmt.Errorf("re-merge synced checkpoint: %w", err)
+		}
+		position++
+	}
+	return position, nil
+}
+
+// remergePostings writes owner postings (dropping forged sync-namespace IDs)
+// then re-merges sync-owned rows. Returns the next free position.
+func remergePostings(tx *sql.Tx, incoming []types.Posting, synced []types.Posting, startPosition int) (int, error) {
+	position := startPosition
+	for i := range incoming {
+		if IsSyncPostingID(incoming[i].ID) {
+			continue
+		}
+		if err := insertPosting(tx, position, &incoming[i], SourceModel); err != nil {
+			return 0, err
+		}
+		position++
+	}
+	for i := range synced {
+		if err := insertPosting(tx, position, &synced[i], SourceSimpleFIN); err != nil {
+			return 0, fmt.Errorf("re-merge synced posting: %w", err)
+		}
+		position++
+	}
+	return position, nil
+}
+
 func loadSyncedCheckpoints(tx *sql.Tx) ([]types.Checkpoint, error) {
 	rows, err := tx.Query(`SELECT date, account_id, balance, source FROM checkpoints WHERE source = ? ORDER BY position`, SourceSimpleFIN)
 	if err != nil {
@@ -104,13 +192,9 @@ func (s *Store) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []types.Post
 	}
 	defer tx.Rollback()
 
-	var maxPosition sql.NullInt64
-	if err := tx.QueryRow(`SELECT MAX(position) FROM checkpoints`).Scan(&maxPosition); err != nil {
-		return summary, fmt.Errorf("sync checkpoint position: %w", err)
-	}
-	nextPosition := 0
-	if maxPosition.Valid {
-		nextPosition = int(maxPosition.Int64) + 1
+	nextPosition, err := nextTablePosition(tx, "checkpoints")
+	if err != nil {
+		return summary, err
 	}
 	for _, checkpoint := range checkpoints {
 		result, err := tx.Exec(
@@ -166,13 +250,9 @@ func (s *Store) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []types.Post
 		}
 		summary.PendingDeleted += int(deleted)
 	}
-	var maxPostingPosition sql.NullInt64
-	if err := tx.QueryRow(`SELECT MAX(position) FROM postings`).Scan(&maxPostingPosition); err != nil {
-		return summary, fmt.Errorf("sync posting position: %w", err)
-	}
-	nextPostingPosition := 0
-	if maxPostingPosition.Valid {
-		nextPostingPosition = int(maxPostingPosition.Int64) + 1
+	nextPostingPosition, err := nextTablePosition(tx, "postings")
+	if err != nil {
+		return summary, err
 	}
 	for i := range pending {
 		if err := insertPosting(tx, nextPostingPosition, &pending[i], SourceSimpleFIN); err != nil {

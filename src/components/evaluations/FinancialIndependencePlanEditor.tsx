@@ -1,5 +1,4 @@
 import { memo, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -14,6 +13,7 @@ import type {
 	FinancialModelDocument,
 } from "@/lib/projection";
 import { normalizeFinancialIndependencePlan } from "@/lib/projection";
+import { EvaluationEditorFooter } from "./_Metric";
 import {
 	EndingPortfolioPolicy,
 	FI_INPUT_CLASS,
@@ -624,37 +624,28 @@ export const FinancialIndependencePlanEditor = memo(
 								Updating runs the deterministic and Monte Carlo analysis once.
 							</p>
 						</div>
-						<div className="flex flex-col gap-2 no-print sm:flex-row">
-							<Button
-								type="button"
-								variant="ghost"
-								className="w-full sm:w-auto"
-								disabled={!dirty}
-								onClick={() => {
-									setDraft(committedPlan);
-									setNumericDrafts(committedNumericDrafts);
-									onDirtyChange?.(false);
-								}}
-							>
-								Discard changes
-							</Button>
-							<Button
-								type="button"
-								className="w-full sm:w-auto"
-								disabled={!dirty || parsedDraft === null}
-								onClick={() => {
-									if (!parsedDraft) return;
-									const appliedPlan = cleanPlan(parsedDraft);
-									onApply(appliedPlan);
-									setDraft(appliedPlan);
-									setNumericDrafts(numericDraftsForPlan(appliedPlan));
-									// No onDirtyChange here: the parent clears its
-									// dirty flag in its onApply wrapper.
-								}}
-							>
-								Update analysis
-							</Button>
-						</div>
+						<EvaluationEditorFooter
+							dirty={dirty}
+							canSubmit={parsedDraft !== null}
+							discardLabel="Discard changes"
+							submitLabel="Update analysis"
+							className="flex flex-col gap-2 no-print sm:flex-row"
+							buttonClassName="w-full sm:w-auto"
+							onDiscard={() => {
+								setDraft(committedPlan);
+								setNumericDrafts(committedNumericDrafts);
+								onDirtyChange?.(false);
+							}}
+							onSubmit={() => {
+								if (!parsedDraft) return;
+								const appliedPlan = cleanPlan(parsedDraft);
+								onApply(appliedPlan);
+								setDraft(appliedPlan);
+								setNumericDrafts(numericDraftsForPlan(appliedPlan));
+								// No onDirtyChange here: the parent clears its
+								// dirty flag in its onApply wrapper.
+							}}
+						/>
 					</div>
 				</CardContent>
 			</Card>

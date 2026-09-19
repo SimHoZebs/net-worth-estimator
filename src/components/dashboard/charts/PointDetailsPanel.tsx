@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { groupPointAccounts, type PointDetails } from "@/chart/pointDetails";
 import { currency } from "@/lib/format";
-
-const FALLBACK_ACCOUNT_COLOR = "GrayText";
+import { AccountColorDot } from "./_chartShared";
 
 interface PointDetailsPanelProps {
 	details: PointDetails;
@@ -79,11 +78,9 @@ export function PointDetailsPanel({
 							className="flex items-center justify-between gap-3 type-caption"
 						>
 							<span className="inline-flex min-w-0 items-center gap-2 text-foreground/80">
-								<span
+								<AccountColorDot
+									color={account.color}
 									className="h-2 w-2 shrink-0 rounded-full"
-									style={{
-										backgroundColor: account.color ?? FALLBACK_ACCOUNT_COLOR,
-									}}
 								/>
 								<span className="truncate">{account.label}</span>
 							</span>

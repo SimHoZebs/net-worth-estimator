@@ -106,42 +106,27 @@ func projectionSettingsDescriptor(settings types.ProjectionRuntimeSettings) map[
 	}
 }
 
-type evaluationConfigEntry struct {
-	instanceID string
-	label      string
-	enabled    bool
-	config     types.JsonValue
+func evaluationDescriptor(tables *types.EvaluationTables) map[string]any {
+	return map[string]any{
+		"financialIndependence": enabledEvaluationConfigs(tables.FinancialIndependence),
+		"netWorthThreshold":     enabledEvaluationConfigs(tables.NetWorthThreshold),
+		"postingFulfillment":    enabledEvaluationConfigs(tables.PostingFulfillment),
+	}
 }
 
-func evaluationDescriptor(tables *types.EvaluationTables) map[string]any {
-	collect := func(entries []evaluationConfigEntry) []map[string]any {
-		out := make([]map[string]any, 0, len(entries))
-		for _, entry := range entries {
-			if !entry.enabled {
-				continue // disabled configs never affect computation
-			}
-			out = append(out, map[string]any{
-				"instanceId": entry.instanceID,
-				"config":     entry.config,
-			})
+// enabledEvaluationConfigs strips label-only fields from evaluation tables
+// so renaming an instance does not invalidate cached computation. Disabled
+// configs never affect computation.
+func enabledEvaluationConfigs(items []types.EvaluationInstance[types.JsonValue]) []map[string]any {
+	out := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		if !item.Enabled {
+			continue
 		}
-		return out
+		out = append(out, map[string]any{
+			"instanceId": item.InstanceID,
+			"config":     item.Config,
+		})
 	}
-	fi := make([]evaluationConfigEntry, 0, len(tables.FinancialIndependence))
-	for _, item := range tables.FinancialIndependence {
-		fi = append(fi, evaluationConfigEntry{item.InstanceID, item.Label, item.Enabled, item.Config})
-	}
-	nw := make([]evaluationConfigEntry, 0, len(tables.NetWorthThreshold))
-	for _, item := range tables.NetWorthThreshold {
-		nw = append(nw, evaluationConfigEntry{item.InstanceID, item.Label, item.Enabled, item.Config})
-	}
-	pf := make([]evaluationConfigEntry, 0, len(tables.PostingFulfillment))
-	for _, item := range tables.PostingFulfillment {
-		pf = append(pf, evaluationConfigEntry{item.InstanceID, item.Label, item.Enabled, item.Config})
-	}
-	return map[string]any{
-		"financialIndependence": collect(fi),
-		"netWorthThreshold":     collect(nw),
-		"postingFulfillment":    collect(pf),
-	}
+	return out
 }
