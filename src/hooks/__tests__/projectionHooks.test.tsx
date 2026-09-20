@@ -501,4 +501,45 @@ describe("projection hook request provenance", () => {
 		await waitFor(() => expect(hook.result.current.result).not.toBeNull());
 		expect(sent).toEqual({ runCount: 100, seed: 7 });
 	});
+
+	it("logs recalculation triggers with the facets that moved", async () => {
+		const debug = vi.fn();
+		vi.stubGlobal("console", { ...console, debug });
+		try {
+			const document = createBaseDocument();
+			const settings = makeSettings();
+			const engine: ProjectionEngine = {
+				project: vi.fn(),
+				projectStochastic: vi.fn().mockResolvedValue(staticStochastic()),
+			};
+			const hook = renderHook(
+				({ config }) => useStochastic(document, settings, config, true),
+				{
+					initialProps: { config: { runCount: 1, seed: 1 } },
+					wrapper: wrapper(engine),
+				},
+			);
+
+			await waitFor(() =>
+				expect(engine.projectStochastic).toHaveBeenCalledTimes(1),
+			);
+			hook.rerender({ config: { runCount: 2, seed: 1 } });
+			await waitFor(() =>
+				expect(engine.projectStochastic).toHaveBeenCalledTimes(2),
+			);
+
+			const lines = debug.mock.calls.map((call) => String(call[0]));
+			expect(lines.some((line) => line.includes("stochastic start"))).toBe(
+				true,
+			);
+			expect(
+				lines.some(
+					(line) =>
+						line.includes("stochastic recalculation") && line.includes("extra"),
+				),
+			).toBe(true);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
 });

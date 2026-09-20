@@ -18,8 +18,14 @@ export function ResultsPage() {
 	const { document, issues, validationIsValid, isLoading, loadError, reload } =
 		useModelRuntime();
 	const { result } = useProjectionArtifacts();
-	const { runtimeError, isProjecting, stochasticError, isStochasticRunning } =
-		useProjectionExecution();
+	const {
+		runtimeError,
+		isProjecting,
+		stochasticError,
+		isStochasticRunning,
+		retryProjection,
+		retryStochastic,
+	} = useProjectionExecution();
 	const stochasticProgress = useStochasticProgress();
 
 	return (
@@ -93,10 +99,17 @@ export function ResultsPage() {
 				<ErrorAlert
 					title="Stochastic simulation failed"
 					message={stochasticError}
+					actionLabel="Retry simulation"
+					onAction={retryStochastic}
 				/>
 			) : null}
 			{runtimeError ? (
-				<ErrorAlert title="Projection failed" message={runtimeError} />
+				<ErrorAlert
+					title="Projection failed"
+					message={runtimeError}
+					actionLabel="Retry projection"
+					onAction={retryProjection}
+				/>
 			) : null}
 			{document &&
 			validationIsValid &&
@@ -163,11 +176,28 @@ function ProjectionActivity({
 	);
 }
 
-function ErrorAlert({ title, message }: { title: string; message: string }) {
+function ErrorAlert({
+	title,
+	message,
+	actionLabel,
+	onAction,
+}: {
+	title: string;
+	message: string;
+	actionLabel: string;
+	onAction: () => void;
+}) {
 	return (
 		<Alert variant="destructive" className="rounded-[1.6rem]">
 			<AlertTitle>{title}</AlertTitle>
-			<AlertDescription>{message}</AlertDescription>
+			<AlertDescription>
+				<p>{message}</p>
+				<div className="mt-3 flex flex-wrap gap-2 no-print">
+					<Button type="button" size="sm" onClick={onAction}>
+						{actionLabel}
+					</Button>
+				</div>
+			</AlertDescription>
 		</Alert>
 	);
 }

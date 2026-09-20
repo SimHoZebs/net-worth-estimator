@@ -292,6 +292,12 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("X-Cache", "miss")
+	_, prefix := parseArtifactKeyMeta(cacheKey)
+	// Miss line with the input summary: identical summaries on later misses
+	// mean the same data recomputed (registry lost or backend restarted).
+	log.Printf("stochastic recalc key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d runs=%d",
+		prefix, len(document.Accounts), len(document.Postings), len(document.Checkpoints),
+		body.Settings.HorizonYears, body.Config.RunCount)
 	run, owner := getOrStartSharedRun(cacheKey)
 	if !owner {
 		w.Header().Set("X-Cache", "attach")
@@ -325,6 +331,7 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if owner {
+		log.Printf("stochastic run start key_prefix=%s runs=%d", prefix, body.Config.RunCount)
 		// The computation is detached from the request context: this
 		// stream dropping must never cancel the shared run. The work is
 		// bounded (runCount) and always lands in the artifact cache, so an
@@ -339,30 +346,41 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 				putArtifact(s.store, cacheKey, "stochastic", result)
 			}, result, runErr)
 			if runErr != nil {
-				log.Printf("stochastic shared run: %v", runErr)
+				log.Printf("stochastic finish key_prefix=%s status=error error=%v", prefix, runErr)
+			} else {
+				log.Printf("stochastic finish key_prefix=%s status=ok runs=%d", prefix, body.Config.RunCount)
 			}
 		}()
 	}
 
 	ch, snapshot, hasSnapshot, finished := run.subscribe()
 	if finished {
+		log.Printf("stochastic attach key_prefix=%s outcome=finished", prefix)
 		s.writeSharedRunOutcome(writeEvent, run)
 		return
 	}
 	defer run.unsubscribe(ch)
+	completedRuns := 0
 	if hasSnapshot {
+		completedRuns = snapshot.progress.CompletedRuns
+		log.Printf("stochastic attach key_prefix=%s outcome=resume completedRuns=%d", prefix, completedRuns)
 		writeProgress(snapshot.progress.CompletedRuns, snapshot.progress, snapshot.partial)
+	} else {
+		log.Printf("stochastic attach key_prefix=%s outcome=resume completedRuns=0", prefix)
 	}
 	ctx := r.Context()
 	for {
 		select {
 		case event := <-ch:
+			completedRuns = event.progress.CompletedRuns
 			writeProgress(event.progress.CompletedRuns, event.progress, event.partial)
 		case <-run.done:
 			s.writeSharedRunOutcome(writeEvent, run)
 			return
 		case <-ctx.Done():
-			// Detach only; the shared run continues for others.
+			// Detach only; the shared run continues for others. The
+			// completedRuns count shows how far this stream got.
+			log.Printf("stochastic detach key_prefix=%s completedRuns=%d", prefix, completedRuns)
 			return
 		}
 	}

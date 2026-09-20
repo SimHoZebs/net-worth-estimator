@@ -114,3 +114,16 @@ function serializeValue(value: unknown, ancestors: WeakSet<object>): string {
 export function canonicalSerialize(value: unknown): string {
 	return serializeValue(value, new WeakSet<object>());
 }
+
+/**
+ * FNV-1a 32-bit hash rendered as 8 lowercase hex chars. Used for short
+ * identity prefixes in logs and (masked to 31 bits) deterministic seeds.
+ */
+export function fnv1aHex(input: string): string {
+	let hash = 0x811c9dc5;
+	for (let index = 0; index < input.length; index++) {
+		hash ^= input.charCodeAt(index);
+		hash = Math.imul(hash, 0x01000193);
+	}
+	return (hash >>> 0).toString(16).padStart(8, "0");
+}

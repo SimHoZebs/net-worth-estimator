@@ -8,7 +8,7 @@ import type {
 	ProjectionRuntimeSettings,
 } from "../types/model";
 import type { StochasticConfig } from "../types/stochastic";
-import { canonicalSerialize } from "./canonical";
+import { canonicalSerialize, fnv1aHex } from "./canonical";
 
 export function normalizeStochasticConfig(
 	config: StochasticConfig,
@@ -46,14 +46,5 @@ export function deriveStochasticSeed(options: {
 		incomeData: options.incomeData ?? null,
 		runCount: options.runCount,
 	});
-	return fnv1a31(fingerprint);
-}
-
-function fnv1a31(input: string): number {
-	let hash = 0x811c9dc5;
-	for (let index = 0; index < input.length; index++) {
-		hash ^= input.charCodeAt(index);
-		hash = Math.imul(hash, 0x01000193);
-	}
-	return hash & 0x7fffffff;
+	return Number.parseInt(fnv1aHex(fingerprint), 16) & 0x7fffffff;
 }

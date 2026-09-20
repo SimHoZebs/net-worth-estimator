@@ -70,6 +70,7 @@ export function useProjectionOrchestration({
 		runtimeError,
 		isRunning: isProjecting,
 		resultIsStale: projectionResultIsStale,
+		refetch: refetchProjection,
 	} = useProjection(
 		effectiveDocument,
 		projectionSettings,
@@ -94,6 +95,7 @@ export function useProjectionOrchestration({
 		result: stochasticResult,
 		runtimeError: stochasticError,
 		isRunning: isStochasticRunning,
+		refetch: refetchStochastic,
 		progress: stochasticProgress,
 		resultIsStale: stochasticResultIsStale,
 	} = useStochastic(
@@ -160,6 +162,8 @@ export function useProjectionOrchestration({
 			isProjecting,
 			stochasticError,
 			isStochasticRunning,
+			retryProjection: refetchProjection,
+			retryStochastic: refetchStochastic,
 		},
 		capabilities: {
 			hasStochasticAccounts,
