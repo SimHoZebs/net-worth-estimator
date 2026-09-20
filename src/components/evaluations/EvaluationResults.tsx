@@ -50,6 +50,7 @@ export function EvaluationResults({
 				level="h2"
 				eyebrow="Ordered questions"
 				title="Evaluations"
+				titleClassName="sr-only"
 				description="Outcomes, behavior evidence, diagnostics, and probabilistic analysis for each configured evaluation."
 			/>
 

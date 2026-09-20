@@ -43,7 +43,7 @@ export function EvaluationSettings({
 			<PageHeader
 				level="h2"
 				title="Evaluations"
-				titleClassName="type-title text-2xl"
+				titleClassName="sr-only"
 				description="Choose the questions the projection should answer and configure their assumptions."
 				descriptionClassName="mt-1 type-muted"
 				actions={

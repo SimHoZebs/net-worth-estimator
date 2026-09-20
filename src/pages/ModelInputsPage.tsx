@@ -17,9 +17,8 @@ export function ModelInputsPage() {
 		<main className="space-y-6">
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 				<div>
-					<div className="type-eyebrow text-primary">Source model</div>
-					<h1 className="mt-1 type-title text-3xl">Model inputs</h1>
-					<p className="mt-1 max-w-2xl type-muted">
+					<h1 className="sr-only">Model inputs</h1>
+					<p className="max-w-2xl type-muted">
 						Maintain baseline accounts, scheduled transactions, balance history,
 						and temporary changes.
 					</p>

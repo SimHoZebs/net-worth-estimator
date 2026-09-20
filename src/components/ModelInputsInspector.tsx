@@ -13,7 +13,6 @@ import {
 	CardContent,
 	CardDescription,
 	CardHeader,
-	CardTitle,
 } from "@/components/ui/card";
 import { pluralize } from "@/lib/format";
 import { partitionPostings } from "@/lib/posting-categories";
@@ -152,7 +151,6 @@ export function ModelInputsInspector() {
 	return (
 		<Card className="rounded-[1.8rem] border-border/80">
 			<CardHeader>
-				<CardTitle>Model inputs</CardTitle>
 				<CardDescription>
 					Posting-derived projection inputs and observed account balances.
 					Validation: {validationSummary}.
