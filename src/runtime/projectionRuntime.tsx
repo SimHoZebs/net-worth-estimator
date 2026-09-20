@@ -20,6 +20,8 @@ export interface ProjectionExecution {
 	isProjecting: boolean;
 	stochasticError: string | null;
 	isStochasticRunning: boolean;
+	retryProjection: () => void;
+	retryStochastic: () => void;
 }
 
 export interface ProjectionCapabilities {

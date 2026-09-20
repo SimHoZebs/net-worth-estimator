@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BackendProjectionEngine } from "@/engine/BackendProjectionEngine";
 import type {
 	FinancialModelDocument,
@@ -9,7 +9,15 @@ import type {
 	StochasticProgress,
 	StochasticProjectionResult,
 } from "@/lib/projection";
-import { projectionRequestIdentity } from "@/lib/projection/runtime/computationIdentity";
+import {
+	type ComputationSummary,
+	diffComputationSummaries,
+	formatComputationSummary,
+	identityPrefix,
+	logRecalculation,
+	projectionRequestIdentity,
+	summarizeComputation,
+} from "@/lib/projection/runtime/computationIdentity";
 import type { ProjectionEngine } from "@/lib/projection/runtime/ProjectionEngine";
 import type { IncomeDataSnapshot } from "@/lib/projection/types/income";
 import {
@@ -56,6 +64,7 @@ function inactiveState<TResult, TProgress>(): ProjectionHookState<
 		isRunning: false,
 		progress: null,
 		resultIsStale: false,
+		refetch: () => {},
 	};
 }
 
@@ -79,7 +88,42 @@ function toHookState<TResult, TProgress>(
 		resultIsStale:
 			overrides?.resultIsStale ??
 			(result !== null && (query.isPlaceholderData || query.isError)),
+		// Noop default; both hooks override with their query's refetch.
+		refetch: () => {},
 	};
+}
+
+// Logs why a (re)calculation starts: the first line names the trigger, and
+// identity changes name the facets that moved. `changed=none-same-data`
+// means the recompute was redundant — the cache or an attach should have
+// served it, so treat that line as a bug report.
+function useLogRecalculationTrigger(
+	kind: "deterministic" | "stochastic",
+	active: boolean,
+	requestIdentity: string,
+	summary: ComputationSummary,
+) {
+	const previous = useRef<{
+		identity: string;
+		summary: ComputationSummary;
+	} | null>(null);
+	useEffect(() => {
+		if (!active) return;
+		const prefix = identityPrefix(requestIdentity);
+		const detail = formatComputationSummary(summary);
+		const prev = previous.current;
+		previous.current = { identity: requestIdentity, summary };
+		if (!prev) {
+			logRecalculation(`${kind} start`, { identity: prefix, summary: detail });
+		} else if (prev.identity !== requestIdentity) {
+			const changed = diffComputationSummaries(prev.summary, summary);
+			logRecalculation(`${kind} recalculation`, {
+				identity: prefix,
+				changed: changed.join(",") || "none-same-data",
+				summary: detail,
+			});
+		}
+	}, [active, kind, requestIdentity, summary]);
 }
 
 export function useProjection(
@@ -94,12 +138,25 @@ export function useProjection(
 		settings: projectionSettings,
 		incomeData,
 	});
+	const summary = useMemo(
+		() =>
+			summarizeComputation({
+				document,
+				settings: projectionSettings,
+				incomeData,
+			}),
+		[document, projectionSettings, incomeData],
+	);
+	useLogRecalculationTrigger("deterministic", active, requestIdentity, summary);
 	const query = useQuery({
 		queryKey: ["projection", "deterministic", requestIdentity],
 		queryFn: ({ signal }) => {
 			if (document === null) {
 				throw new Error("Projection requires a document.");
 			}
+			logRecalculation("deterministic fetch", {
+				identity: identityPrefix(requestIdentity),
+			});
 			return activeEngine.project({
 				document,
 				projectionSettings,
@@ -116,7 +173,7 @@ export function useProjection(
 	if (!active) {
 		return inactiveState();
 	}
-	return toHookState(query);
+	return { ...toHookState(query), refetch: () => void query.refetch() };
 }
 
 export function useStochastic(
@@ -157,6 +214,17 @@ export function useStochastic(
 		incomeData,
 		extra: stableConfig,
 	});
+	const summary = useMemo(
+		() =>
+			summarizeComputation({
+				document,
+				settings: projectionSettings,
+				incomeData,
+				extra: stableConfig,
+			}),
+		[document, projectionSettings, incomeData, stableConfig],
+	);
+	useLogRecalculationTrigger("stochastic", active, requestIdentity, summary);
 	const [progressState, setProgressState] = useState<{
 		key: string;
 		progress: StochasticProgress;
@@ -173,6 +241,9 @@ export function useStochastic(
 				);
 			}
 			const fetchIdentity = requestIdentity;
+			logRecalculation("stochastic fetch", {
+				identity: identityPrefix(requestIdentity),
+			});
 			return activeEngine.projectStochastic(
 				{
 					document,
@@ -215,12 +286,15 @@ export function useStochastic(
 		settledResult ??
 		livePartial ??
 		(query.data !== undefined ? query.data : null);
-	return toHookState(query, {
-		result,
-		progress: liveProgress,
-		resultIsStale:
-			result !== null &&
-			livePartial === null &&
-			(query.isPlaceholderData || query.isError),
-	});
+	return {
+		...toHookState(query, {
+			result,
+			progress: liveProgress,
+			resultIsStale:
+				result !== null &&
+				livePartial === null &&
+				(query.isPlaceholderData || query.isError),
+		}),
+		refetch: () => void query.refetch(),
+	};
 }

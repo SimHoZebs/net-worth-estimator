@@ -223,6 +223,38 @@ describe("projectStochastic", () => {
 		expect(seen).toEqual([{ progress, partial: undefined }]);
 	});
 
+	it("logs reconnect attempts with the failure reason", async () => {
+		const debug = vi.fn();
+		vi.stubGlobal("console", { ...console, debug });
+		try {
+			const final = { marker: "final" };
+			const fetchMock = vi.fn(async () => sseResponse([]));
+			fetchMock.mockImplementationOnce(async () => sseResponse([]));
+			fetchMock.mockImplementationOnce(async () =>
+				sseResponse([resultEvent(final)]),
+			);
+			stubFetch(fetchMock);
+
+			await expect(
+				new BackendProjectionEngine().projectStochastic(stochasticRequest),
+			).resolves.toEqual(final);
+
+			const lines = debug.mock.calls.map((call) => String(call[0]));
+			expect(
+				lines.some(
+					(line) =>
+						line.includes("stochastic attempt failed") &&
+						line.includes("reason=truncated"),
+				),
+			).toBe(true);
+			expect(lines.some((line) => line.includes("stochastic recovered"))).toBe(
+				true,
+			);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it("does not reconnect terminal stream errors", async () => {
 		const fetchMock = vi.fn(async () =>
 			sseResponse([

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalSerialize } from "./canonical";
+import { canonicalSerialize, fnv1aHex } from "./canonical";
 
 describe("canonicalSerialize", () => {
 	it("sorts plain-object keys recursively while preserving array order", () => {
@@ -32,5 +32,12 @@ describe("canonicalSerialize", () => {
 
 		expect(() => canonicalSerialize(new Date())).toThrow("plain objects");
 		expect(() => canonicalSerialize(cyclic)).toThrow("cycles");
+	});
+});
+
+describe("fnv1aHex", () => {
+	it("matches the FNV-1a 32-bit test vectors", () => {
+		expect(fnv1aHex("")).toBe("811c9dc5");
+		expect(fnv1aHex("a")).toBe("e40c292c");
 	});
 });

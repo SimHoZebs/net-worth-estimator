@@ -6,6 +6,10 @@ export interface ProjectionHookState<TResult, TProgress = number> {
 	isRunning: boolean;
 	progress: TProgress | null;
 	resultIsStale: boolean;
+	// Manual recovery for terminal errors (e.g. a backgrounded stream that
+	// exhausted reconnects). Same identity, so a still-running server
+	// computation attaches instead of restarting.
+	refetch: () => void;
 }
 
 /**

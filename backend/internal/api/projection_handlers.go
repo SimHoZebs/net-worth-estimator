@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -91,6 +92,10 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 		output.Body.Result = &cachedCopy
 		return output, nil
 	}
+	_, prefix := parseArtifactKeyMeta(cacheKey)
+	log.Printf("deterministic recalc key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d",
+		prefix, len(document.Accounts), len(document.Postings), len(document.Checkpoints),
+		input.Body.Settings.HorizonYears)
 
 	result, err := domain.ProjectFinancialModelDocument(document, &input.Body.Settings, input.Body.Overrides, nil, incomeData)
 	// huma writes this status verbatim; default to 200 and only raise it for

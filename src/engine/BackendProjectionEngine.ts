@@ -3,6 +3,11 @@ import type {
 	ProjectionResult,
 	StochasticProjectionResult,
 } from "@/lib/projection";
+import {
+	identityPrefix,
+	logRecalculation,
+	projectionRequestIdentity,
+} from "@/lib/projection/runtime/computationIdentity";
 import type {
 	ProgressCallback,
 	ProjectionEngine,
@@ -14,13 +19,14 @@ import type {
 // backend (chi + huma) over HTTP/SSE. Computation no longer runs in browser
 // workers; see docs/backend-migration/ASSUMPTIONS.md A2/A4.
 //
-// Recovery contract (browser backgrounding): reconnects are full restarts —
-// the client re-POSTs the same body, preserving the last progress/partial
-// across attempts so the UI never flashes to empty. The server sends a
-// `retry` hint plus `: heartbeat` comments; heartbeats keep idle proxies/NAT
-// from killing long batches, and a per-attempt stall timer converts a frozen
-// tab (no bytes for STALL_TIMEOUT_MS) into a bounded reconnect instead of a
-// hung spinner. Server `error` events and HTTP 4xx are terminal (marked with
+// Recovery contract (browser backgrounding): the client re-POSTs the same
+// body, preserving the last progress/partial across attempts so the UI never
+// flashes to empty. The server attaches the reconnect to the still-running
+// computation (or its cached result). The server sends a `retry` hint plus
+// `: heartbeat` comments; heartbeats keep idle proxies/NAT from killing long
+// batches, and a per-attempt stall timer converts a frozen tab (no bytes for
+// STALL_TIMEOUT_MS) into a bounded reconnect instead of a hung spinner.
+// Server `error` events and HTTP 4xx are terminal (marked with
 // TERMINAL_ERROR_CODE) and never retried; only network failures, HTTP 5xx,
 // stalls, and truncated streams (closed without a result) reconnect.
 
@@ -59,6 +65,21 @@ function isAbortError(error: unknown): boolean {
 		error instanceof DOMException ||
 		(error instanceof Error && error.name === "AbortError")
 	);
+}
+
+// classifyStreamFailure names why a reconnectable attempt failed, so the
+// attempt-failed log line explains whether the server, the proxy, or the
+// browser's background throttling broke the stream.
+function classifyStreamFailure(error: unknown): string {
+	if (!(error instanceof Error)) return "unknown";
+	if (error instanceof TypeError) return "network";
+	const message = error.message;
+	if (message === "Stochastic stream stalled.") return "stalled";
+	if (message === "Stochastic stream ended without a result.") {
+		return "truncated";
+	}
+	if (/^Stochastic stream failed \(5/.test(message)) return "http-5xx";
+	return "unknown";
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -138,6 +159,14 @@ export class BackendProjectionEngine implements ProjectionEngine {
 		});
 		let serverRetryMs = RECONNECT_BASE_DELAY_MS;
 		let lastError: unknown = null;
+		const identity = identityPrefix(
+			projectionRequestIdentity({
+				document: request.document,
+				settings: request.projectionSettings,
+				incomeData: request.incomeData,
+				extra: request.config,
+			}),
+		);
 
 		for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
 			if (request.signal?.aborted) {
@@ -147,7 +176,7 @@ export class BackendProjectionEngine implements ProjectionEngine {
 				await sleep(serverRetryMs * 2 ** (attempt - 1), request.signal);
 			}
 			try {
-				return await this.readStreamAttempt(
+				const result = await this.readStreamAttempt(
 					body,
 					request.signal,
 					(retryMs) => {
@@ -155,12 +184,34 @@ export class BackendProjectionEngine implements ProjectionEngine {
 					},
 					onProgress,
 				);
+				if (attempt > 0) {
+					logRecalculation("stochastic recovered", {
+						identity,
+						attempts: attempt + 1,
+					});
+				}
+				return result;
 			} catch (error) {
 				if (isAbortError(error) && request.signal?.aborted) throw error;
-				if (isTerminalError(error)) throw error;
+				if (isTerminalError(error)) {
+					logRecalculation("stochastic terminal", {
+						identity,
+						reason: error instanceof Error ? error.message : "unknown",
+					});
+					throw error;
+				}
 				lastError = error;
+				logRecalculation("stochastic attempt failed", {
+					identity,
+					attempt: attempt + 1,
+					reason: classifyStreamFailure(error),
+				});
 			}
 		}
+		logRecalculation("stochastic gave up", {
+			identity,
+			attempts: MAX_ATTEMPTS,
+		});
 		throw lastError instanceof Error
 			? lastError
 			: new Error("Stochastic projection failed.");

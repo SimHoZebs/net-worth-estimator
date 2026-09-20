@@ -67,6 +67,8 @@ export function createProjectionExecutionFixture(
 		isProjecting: false,
 		stochasticError: null,
 		isStochasticRunning: false,
+		retryProjection: () => {},
+		retryStochastic: () => {},
 		...overrides,
 	};
 }

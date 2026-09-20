@@ -24,6 +24,7 @@ describe("useProjectionOrchestration", () => {
 			isRunning: false,
 			progress: null,
 			resultIsStale: false,
+			refetch: () => {},
 		});
 		vi.mocked(useStochastic).mockReturnValue({
 			result: null,
@@ -31,6 +32,7 @@ describe("useProjectionOrchestration", () => {
 			isRunning: false,
 			progress: null,
 			resultIsStale: false,
+			refetch: () => {},
 		});
 	});
 
@@ -98,6 +100,7 @@ describe("useProjectionOrchestration", () => {
 			isRunning: true,
 			progress: null,
 			resultIsStale: true,
+			refetch: () => {},
 		});
 
 		const { result } = renderHook(() =>
@@ -114,6 +117,8 @@ describe("useProjectionOrchestration", () => {
 			isProjecting: true,
 			stochasticError: null,
 			isStochasticRunning: false,
+			retryProjection: expect.any(Function),
+			retryStochastic: expect.any(Function),
 		});
 		expect(result.current.artifacts.currentMetrics).toEqual({
 			currentNetWorth: projectionResult.summary.currentNetWorth,
