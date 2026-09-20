@@ -91,3 +91,25 @@ as synced; checking seed from checkpoints already exists, plus a balance-age
 - Client: auto-seed + override + badge tests; `test:run`, `typecheck`.
 - Live: dry-run, inspect counts, enable. Operator provides Access URL +
   account map via env; wife's card stays manual.
+
+## Mock interlude + cutover (temporary)
+
+Until the Bridge is wired up, `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK=1`
+fabricates bridge-shaped responses (`mock-checking`, `mock-prime`) through
+the unchanged Map/ApplySyncPlan path. Mock rows are intentionally identical
+to real sync rows (`source='simplefin'`, `sfin-pending-*`); no code
+distinguishes mock from real, so there is no mock-specific logic to rot.
+Optional `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE` serves a custom
+GET-/accounts-shaped JSON file, reloaded per fetch. Mock and the real
+Access URL are mutually exclusive (fatal at startup).
+
+Cutover procedure: back up the DB, stop the server, preview with the
+commented SELECTs in `backend/scripts/purge-simplefin-sync.sql`, run the two
+DELETEs (all `source='simplefin'` rows, mock and real alike), unset MOCK,
+set the real URL + map, restart, then trigger with dry-run first. The first
+real sync re-inserts fresh checkpoints and the pending snapshot.
+
+Removal checklist: delete `backend/internal/simplefin/mock*.go`, drop the
+MOCK wiring in `backend/cmd/server/sync.go`, remove the mock docs from
+`.env.example`/`README.md`/this plan. `grep -r MockRunner backend` must
+return nothing.
