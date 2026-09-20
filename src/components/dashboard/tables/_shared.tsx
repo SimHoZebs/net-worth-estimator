@@ -42,6 +42,15 @@ export function useChangedIds<T extends { id: string }>(
 	);
 }
 
+export function useRowById<T extends { id: string }>(
+	rows: readonly T[] | null | undefined,
+): ReadonlyMap<string, T> {
+	return useMemo(
+		() => new Map((rows ?? []).map((row) => [row.id, row] as const)),
+		[rows],
+	);
+}
+
 export function useTableSearch(initial = "") {
 	const [search, setSearch] = useState(initial);
 	const query = useMemo(() => search.trim().toLowerCase(), [search]);

@@ -3,17 +3,11 @@ import { useBeforeUnload, useBlocker } from "react-router-dom";
 import { BackendAccessCard } from "@/components/BackendAccessCard";
 import { HouseholdCycleSettingsCard } from "@/components/dashboard/HouseholdCycleSettingsCard";
 import { EvaluationSettings } from "@/components/evaluations/EvaluationSettings";
+import { PageHeader, SectionCard } from "@/components/present/present";
 import { StochasticControls } from "@/components/StochasticControls";
 import { ModelAssumptionsCard } from "@/components/sidebar/ModelAssumptionsCard";
 import { SimulationSettingsCard } from "@/components/sidebar/SimulationSettingsCard";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import { useThemeStore } from "@/themeStore";
@@ -82,29 +76,23 @@ export function SettingsPage() {
 				className="space-y-8"
 				inert={blocker.state === "blocked" ? true : undefined}
 			>
-				<div>
-					<div className="type-eyebrow text-primary">
-						Projection configuration
-					</div>
-					<h1 className="mt-1 type-title text-3xl">Settings</h1>
-					<p className="mt-1 max-w-2xl type-muted">
-						Configure the simulation, evaluations, uncertainty analysis, and
-						appearance. Projection settings remain session-only.
-					</p>
-				</div>
+				<PageHeader
+					eyebrow="Projection configuration"
+					title="Settings"
+					description="Configure the simulation, evaluations, uncertainty analysis, and appearance. Projection settings remain session-only."
+					stacked
+				/>
 
 				{model.loadError && !model.document ? (
-					<Card className="border-destructive/30">
-						<CardHeader>
-							<CardTitle>Financial model could not be loaded</CardTitle>
-							<CardDescription>{model.loadError}</CardDescription>
-						</CardHeader>
-						<CardContent>
-							<Button type="button" size="sm" onClick={model.reload}>
-								Retry loading
-							</Button>
-						</CardContent>
-					</Card>
+					<SectionCard
+						title="Financial model could not be loaded"
+						description={model.loadError}
+						className="border-destructive/30"
+					>
+						<Button type="button" size="sm" onClick={model.reload}>
+							Retry loading
+						</Button>
+					</SectionCard>
 				) : model.document ? (
 					<>
 						<div className="grid items-start gap-6 lg:grid-cols-2">
@@ -124,11 +112,9 @@ export function SettingsPage() {
 						</div>
 					</>
 				) : (
-					<Card>
-						<CardContent className="p-6 type-muted">
-							Settings will be available after the financial model loads.
-						</CardContent>
-					</Card>
+					<SectionCard contentClassName="p-6 type-muted">
+						Settings will be available after the financial model loads.
+					</SectionCard>
 				)}
 			</main>
 			{blocker.state === "blocked" ? (
@@ -164,29 +150,25 @@ function AppearanceSettings() {
 	const theme = useThemeStore((state) => state.theme);
 	const setTheme = useThemeStore((state) => state.setTheme);
 	return (
-		<Card className="rounded-[1.4rem] border-border/80">
-			<CardHeader>
-				<CardTitle>Appearance</CardTitle>
-				<CardDescription>
-					Choose how the workspace follows your display.
-				</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<fieldset className="grid grid-cols-3 gap-2">
-					<legend className="sr-only">Color theme</legend>
-					{(["light", "dark", "system"] as const).map((option) => (
-						<button
-							key={option}
-							type="button"
-							aria-pressed={theme === option}
-							onClick={() => setTheme(option)}
-							className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${theme === option ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface text-muted-foreground hover:border-ring hover:text-foreground"}`}
-						>
-							{option}
-						</button>
-					))}
-				</fieldset>
-			</CardContent>
-		</Card>
+		<SectionCard
+			title="Appearance"
+			description="Choose how the workspace follows your display."
+			className="rounded-[1.4rem] border-border/80"
+		>
+			<fieldset className="grid grid-cols-3 gap-2">
+				<legend className="sr-only">Color theme</legend>
+				{(["light", "dark", "system"] as const).map((option) => (
+					<button
+						key={option}
+						type="button"
+						aria-pressed={theme === option}
+						onClick={() => setTheme(option)}
+						className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${theme === option ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface text-muted-foreground hover:border-ring hover:text-foreground"}`}
+					>
+						{option}
+					</button>
+				))}
+			</fieldset>
+		</SectionCard>
 	);
 }

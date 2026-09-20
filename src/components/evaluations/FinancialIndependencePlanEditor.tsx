@@ -1,4 +1,6 @@
 import { memo, useMemo, useState } from "react";
+import { FinancialIndependenceEditorSection } from "@/components/fields/editor-section";
+import { LabeledField } from "@/components/fields/field-kit";
 import {
 	Card,
 	CardContent,
@@ -16,9 +18,7 @@ import { normalizeFinancialIndependencePlan } from "@/lib/projection";
 import { EvaluationEditorFooter } from "./_Metric";
 import {
 	EndingPortfolioPolicy,
-	FI_INPUT_CLASS,
 	FiNumberField,
-	FinancialIndependenceEditorSection,
 	RetirementIncomeField,
 	SpendingValueBasis,
 } from "./FinancialIndependencePlanFields";
@@ -548,32 +548,29 @@ export const FinancialIndependencePlanEditor = memo(
 											.filter((account) => selectedAssets.has(account.id))
 											.map((account) => {
 												return (
-													<label key={account.id} className="type-caption">
-														{account.label} (%)
-														<input
-															type="text"
-															inputMode="decimal"
-															min={0}
-															max={100}
-															step={0.1}
-															placeholder={numericDrafts.withdrawalRate}
-															value={
-																numericDrafts.assetWithdrawalRates[
-																	account.id
-																] ?? ""
-															}
-															onChange={(event) =>
-																updateNumericDrafts((current) => ({
-																	...current,
-																	assetWithdrawalRates: {
-																		...current.assetWithdrawalRates,
-																		[account.id]: event.target.value,
-																	},
-																}))
-															}
-															className={FI_INPUT_CLASS}
-														/>
-													</label>
+													<LabeledField
+														key={account.id}
+														label={`${account.label} (%)`}
+														type="text"
+														inputMode="decimal"
+														min={0}
+														max={100}
+														step={0.1}
+														placeholder={numericDrafts.withdrawalRate}
+														value={
+															numericDrafts.assetWithdrawalRates[account.id] ??
+															""
+														}
+														onChange={(next) =>
+															updateNumericDrafts((current) => ({
+																...current,
+																assetWithdrawalRates: {
+																	...current.assetWithdrawalRates,
+																	[account.id]: next,
+																},
+															}))
+														}
+													/>
 												);
 											})}
 									</div>

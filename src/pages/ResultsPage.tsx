@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { CurrentChangesComparison } from "@/components/CurrentChangesComparison";
 import { ProjectionDashboard } from "@/components/ProjectionDashboard";
+import { PageHeader } from "@/components/present/present";
 import { SimulationProgressPanel } from "@/components/SimulationProgressPanel";
 import { StochasticProgressDetails } from "@/components/StochasticProgressDetails";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -23,26 +24,23 @@ export function ResultsPage() {
 
 	return (
 		<main className="space-y-6">
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-				<div>
-					<div className="type-eyebrow text-primary">Projection workspace</div>
-					<h1 className="mt-1 type-title text-3xl">Results</h1>
-					<p className="mt-1 max-w-2xl type-muted">
-						Projected balances, evaluation outcomes, and the evidence behind
-						them.
-					</p>
-				</div>
-				<Button
-					type="button"
-					variant="ghost"
-					size="sm"
-					onClick={() => window.print()}
-					disabled={!document}
-					className="no-print"
-				>
-					Print results
-				</Button>
-			</div>
+			<PageHeader
+				eyebrow="Projection workspace"
+				title="Results"
+				description="Projected balances, evaluation outcomes, and the evidence behind them."
+				actions={
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onClick={() => window.print()}
+						disabled={!document}
+						className="no-print"
+					>
+						Print results
+					</Button>
+				}
+			/>
 
 			{isLoading && !document ? <ResultsSkeleton /> : null}
 			{loadError && !document ? (

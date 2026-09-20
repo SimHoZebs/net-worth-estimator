@@ -1,4 +1,9 @@
-import { type ReactNode, useId, useState } from "react";
+import { useState } from "react";
+import {
+	type ChoiceCardOption,
+	ChoiceCards,
+} from "@/components/fields/editor-section";
+import { LabeledField } from "@/components/fields/field-kit";
 import { Button } from "@/components/ui/button";
 import { formatPercentRate } from "@/lib/format";
 import type {
@@ -8,38 +13,8 @@ import type {
 	Posting,
 } from "@/lib/projection";
 
-export const FI_INPUT_CLASS =
-	"mt-1 min-w-0 w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 text-sm shadow-sm outline-none transition focus:border-ring dark:border-white/10";
-
-export function FinancialIndependenceEditorSection({
-	number,
-	title,
-	description,
-	children,
-}: {
-	number: string;
-	title: string;
-	description: string;
-	children: ReactNode;
-}) {
-	return (
-		<section className="overflow-hidden rounded-[1.35rem] border border-border/80 bg-surface/60 dark:border-white/10 dark:bg-surface/45">
-			<header className="flex gap-3 border-b border-border/70 px-4 py-4 dark:border-white/10">
-				<span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary-border bg-primary-subtle type-label text-primary">
-					{number}
-				</span>
-				<div>
-					<h3 className="type-title text-base">{title}</h3>
-					<p className="mt-0.5 max-w-3xl type-caption text-muted-foreground">
-						{description}
-					</p>
-				</div>
-			</header>
-			<div className="space-y-4 p-4">{children}</div>
-		</section>
-	);
-}
-
+// Thin kit-backed number field. Raw draft text stays in the parent until
+// submit, so intermediate states ("", "-", "0x10") are preserved.
 export function FiNumberField({
 	label,
 	description,
@@ -60,97 +35,18 @@ export function FiNumberField({
 	onChange: (value: string) => void;
 }) {
 	return (
-		<label className="min-w-0 type-caption">
-			<span className="type-label text-foreground">{label}</span>
-			{description ? (
-				<span className="mt-0.5 block text-muted-foreground">
-					{description}
-				</span>
-			) : null}
-			<input
-				type="text"
-				inputMode="decimal"
-				aria-label={label}
-				id={id}
-				min={min}
-				max={max}
-				step={step}
-				value={value}
-				onChange={(event) => onChange(event.target.value)}
-				className={FI_INPUT_CLASS}
-			/>
-		</label>
-	);
-}
-
-interface ChoiceCardOption<TValue extends string> {
-	value: TValue;
-	label: string;
-	badge?: string;
-	description: ReactNode;
-}
-
-function FiChoiceCards<TValue extends string>({
-	legend,
-	description,
-	value,
-	options,
-	onChange,
-	columns,
-}: {
-	legend: string;
-	description: string;
-	value: TValue;
-	options: Array<ChoiceCardOption<TValue>>;
-	onChange: (value: TValue) => void;
-	columns: string;
-}) {
-	const groupName = useId();
-	return (
-		<fieldset>
-			<legend className="type-label text-foreground">{legend}</legend>
-			<p className="mt-0.5 type-caption text-muted-foreground">{description}</p>
-			<div className={`mt-3 grid gap-2 ${columns}`}>
-				{options.map((option) => {
-					const selected = value === option.value;
-					return (
-						<label
-							key={option.value}
-							className={`cursor-pointer rounded-2xl border p-4 transition ${
-								selected
-									? "border-primary-border bg-primary-subtle/55 shadow-sm"
-									: "border-border/70 bg-card/55 hover:border-ring/60"
-							}`}
-						>
-							<span className="flex items-start gap-2">
-								<input
-									type="radio"
-									aria-label={option.label}
-									name={groupName}
-									value={option.value}
-									checked={selected}
-									onChange={() => onChange(option.value)}
-									className="mt-1 accent-primary"
-								/>
-								<span>
-									<span className="block type-label text-foreground">
-										{option.label}
-									</span>
-									{option.badge ? (
-										<span className="mt-1 inline-block rounded-full border border-border/70 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-											{option.badge}
-										</span>
-									) : null}
-								</span>
-							</span>
-							<span className="mt-3 block type-caption leading-relaxed text-muted-foreground">
-								{option.description}
-							</span>
-						</label>
-					);
-				})}
-			</div>
-		</fieldset>
+		<LabeledField
+			label={label}
+			description={description}
+			id={id}
+			type="text"
+			inputMode="decimal"
+			min={min}
+			max={max}
+			step={step}
+			value={value}
+			onChange={onChange}
+		/>
 	);
 }
 
@@ -181,7 +77,7 @@ export function SpendingValueBasis({
 	onChange: (basis: FinancialIndependenceExpenseBasis) => void;
 }) {
 	return (
-		<FiChoiceCards
+		<ChoiceCards
 			legend="Spending value"
 			description="Choose when the entered annual spending amount is valued."
 			value={value}
@@ -225,7 +121,7 @@ export function EndingPortfolioPolicy({
 	onChange: (policy: FinancialIndependencePrincipalPolicy) => void;
 }) {
 	return (
-		<FiChoiceCards
+		<ChoiceCards
 			legend="Ending portfolio requirement"
 			description="This rule is checked after every expense in the FI test period has been funded."
 			value={plan.principalPolicy}

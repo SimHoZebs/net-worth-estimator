@@ -1,3 +1,4 @@
+import { LabeledField } from "@/components/fields/field-kit";
 import { StochasticProgressDetails } from "@/components/StochasticProgressDetails";
 import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
@@ -95,40 +96,27 @@ export function StochasticControls() {
 					{simulationActive ? (
 						<>
 							<div className={"grid gap-3"}>
-								<div className="space-y-1">
-									<label
-										htmlFor="stochastic-run-count"
-										className="type-eyebrow"
-									>
-										Independent sample count
-									</label>
-									<input
-										id="stochastic-run-count"
-										type="number"
-										inputMode="numeric"
-										min={1}
-										max={10000}
-										value={runCountInput}
-										onChange={(e) => updateRunCountInput(e.currentTarget.value)}
-										onBlur={applyImmediately}
-										className="w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 type-body shadow-sm outline-none focus:border-ring dark:border-white/10"
-									/>
-								</div>
-								<div className="space-y-1">
-									<label htmlFor="stochastic-seed" className="type-eyebrow">
-										Seed (auto when blank)
-									</label>
-									<input
-										id="stochastic-seed"
-										type="number"
-										inputMode="numeric"
-										value={seedInput}
-										onChange={(e) => updateSeedInput(e.currentTarget.value)}
-										onBlur={applyImmediately}
-										placeholder="Auto"
-										className="w-full rounded-xl border border-border/80 bg-card/85 px-3 py-2 type-body shadow-sm outline-none placeholder:text-muted-foreground focus:border-ring dark:border-white/10"
-									/>
-								</div>
+								<LabeledField
+									label="Independent sample count"
+									id="stochastic-run-count"
+									type="number"
+									inputMode="numeric"
+									min={1}
+									max={10000}
+									value={runCountInput}
+									onChange={updateRunCountInput}
+									onBlur={applyImmediately}
+								/>
+								<LabeledField
+									label="Seed (auto when blank)"
+									id="stochastic-seed"
+									type="number"
+									inputMode="numeric"
+									value={seedInput}
+									onChange={updateSeedInput}
+									onBlur={applyImmediately}
+									placeholder="Auto"
+								/>
 								<div className="flex items-end">
 									<Button
 										type="button"

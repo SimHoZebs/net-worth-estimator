@@ -1,5 +1,5 @@
+import { PageHeader, SectionCard } from "@/components/present/present";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type {
 	EvaluationInstance,
 	FinancialIndependencePlan,
@@ -40,35 +40,35 @@ export function EvaluationSettings({
 
 	return (
 		<section className="space-y-4">
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-				<div>
-					<h2 className="type-title text-2xl">Evaluations</h2>
-					<p className="mt-1 type-muted">
-						Choose the questions the projection should answer and configure
-						their assumptions.
-					</p>
-				</div>
-				<div className="flex flex-wrap gap-2">
-					{EVALUATION_TYPE_ORDER.map((type) => (
-						<Button
-							key={type}
-							type="button"
-							size="sm"
-							variant="secondary"
-							onClick={() =>
-								addEvaluation(type, {
-									instanceId: nextInstanceId(type, evaluations),
-									label: evaluationUiRegistry[type].defaultLabel,
-									enabled: true,
-									config: evaluationUiRegistry[type].createConfig(),
-								})
-							}
-						>
-							Add {evaluationUiRegistry[type].label}
-						</Button>
-					))}
-				</div>
-			</div>
+			<PageHeader
+				level="h2"
+				title="Evaluations"
+				titleClassName="type-title text-2xl"
+				description="Choose the questions the projection should answer and configure their assumptions."
+				descriptionClassName="mt-1 type-muted"
+				actions={
+					<div className="flex flex-wrap gap-2">
+						{EVALUATION_TYPE_ORDER.map((type) => (
+							<Button
+								key={type}
+								type="button"
+								size="sm"
+								variant="secondary"
+								onClick={() =>
+									addEvaluation(type, {
+										instanceId: nextInstanceId(type, evaluations),
+										label: evaluationUiRegistry[type].defaultLabel,
+										enabled: true,
+										config: evaluationUiRegistry[type].createConfig(),
+									})
+								}
+							>
+								Add {evaluationUiRegistry[type].label}
+							</Button>
+						))}
+					</div>
+				}
+			/>
 
 			{EVALUATION_TYPE_ORDER.map((type) => {
 				const definition = evaluationUiRegistry[type];
@@ -81,11 +81,11 @@ export function EvaluationSettings({
 							const config = validatedConfig(type, evaluation.config);
 							const dirtyKey = `${type}:${evaluation.instanceId}`;
 							return (
-								<Card
+								<SectionCard
 									key={evaluation.instanceId}
 									className="rounded-[1.8rem] border-border/80"
-								>
-									<CardHeader className="border-b border-border/70">
+									headerClassName="border-b border-border/70"
+									header={
 										<div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
 											<div className="flex min-w-0 items-start gap-3">
 												<input
@@ -162,46 +162,25 @@ export function EvaluationSettings({
 												</Button>
 											</div>
 										</div>
-									</CardHeader>
-									<CardContent className="space-y-4 p-4 md:p-6">
-										{config.error ? (
-											<p
-												role="alert"
-												className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 type-caption text-destructive"
-											>
-												{config.error}
-											</p>
-										) : null}
-										{ConfigEditor && config.normalized !== null ? (
-											<div className="max-w-sm">
-												<ConfigEditor
-													evaluation={{
-														...evaluation,
-														config: config.normalized,
-													}}
-													onChange={(changes) => {
-														updateEvaluationConfig(
-															type,
-															evaluation.instanceId,
-															changes,
-														);
-														onDraftDirtyChange(dirtyKey, false);
-													}}
-													onDirtyChange={(dirty) =>
-														onDraftDirtyChange(dirtyKey, dirty)
-													}
-												/>
-											</div>
-										) : null}
-										{type === "financialIndependence" &&
-										config.normalized !== null ? (
-											<FinancialIndependencePlanEditor
-												document={document}
-												plan={
-													config.normalized as unknown as FinancialIndependencePlan
-												}
-												sourceRevision={dataUpdatedAt}
-												onApply={(changes) => {
+									}
+									contentClassName="space-y-4 p-4 md:p-6"
+								>
+									{config.error ? (
+										<p
+											role="alert"
+											className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 type-caption text-destructive"
+										>
+											{config.error}
+										</p>
+									) : null}
+									{ConfigEditor && config.normalized !== null ? (
+										<div className="max-w-sm">
+											<ConfigEditor
+												evaluation={{
+													...evaluation,
+													config: config.normalized,
+												}}
+												onChange={(changes) => {
 													updateEvaluationConfig(
 														type,
 														evaluation.instanceId,
@@ -213,9 +192,30 @@ export function EvaluationSettings({
 													onDraftDirtyChange(dirtyKey, dirty)
 												}
 											/>
-										) : null}
-									</CardContent>
-								</Card>
+										</div>
+									) : null}
+									{type === "financialIndependence" &&
+									config.normalized !== null ? (
+										<FinancialIndependencePlanEditor
+											document={document}
+											plan={
+												config.normalized as unknown as FinancialIndependencePlan
+											}
+											sourceRevision={dataUpdatedAt}
+											onApply={(changes) => {
+												updateEvaluationConfig(
+													type,
+													evaluation.instanceId,
+													changes,
+												);
+												onDraftDirtyChange(dirtyKey, false);
+											}}
+											onDirtyChange={(dirty) =>
+												onDraftDirtyChange(dirtyKey, dirty)
+											}
+										/>
+									) : null}
+								</SectionCard>
 							);
 						})}
 					</div>

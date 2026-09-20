@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { duplicateIdError } from "@/components/_draftHelpers";
+import { FIELD_ERROR_CLASS, LabeledField } from "@/components/fields/field-kit";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import type { Account } from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
 
@@ -73,44 +73,22 @@ export function TemporaryAccountForm({
 			{adding ? (
 				<div className="space-y-2 rounded-2xl border border-border p-3">
 					<div className="grid gap-2 sm:grid-cols-2">
-						<div>
-							<label
-								htmlFor="temporary-account-id"
-								className="block type-caption"
-							>
-								ID
-							</label>
-							<Input
-								id="temporary-account-id"
-								className="w-full rounded-lg "
-								value={adding.id}
-								onChange={(e) => setAdding({ ...adding, id: e.target.value })}
-								placeholder="e.g. savings"
-							/>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-account-label"
-								className="block type-caption"
-							>
-								Label
-							</label>
-							<Input
-								id="temporary-account-label"
-								className="w-full rounded-lg "
-								value={adding.label}
-								onChange={(e) =>
-									setAdding({ ...adding, label: e.target.value })
-								}
-								placeholder="Savings"
-							/>
-						</div>
+						<LabeledField
+							label="ID"
+							id="temporary-account-id"
+							value={adding.id}
+							onChange={(id) => setAdding({ ...adding, id })}
+							placeholder="e.g. savings"
+						/>
+						<LabeledField
+							label="Label"
+							id="temporary-account-label"
+							value={adding.label}
+							onChange={(label) => setAdding({ ...adding, label })}
+							placeholder="Savings"
+						/>
 					</div>
-					{error ? (
-						<div className="rounded-xl border border-destructive/25 bg-destructive-subtle p-3 type-body text-destructive-foreground">
-							{error}
-						</div>
-					) : null}
+					{error ? <div className={FIELD_ERROR_CLASS}>{error}</div> : null}
 					<div className="flex gap-2">
 						<Button type="button" size="sm" onClick={commit}>
 							Add account

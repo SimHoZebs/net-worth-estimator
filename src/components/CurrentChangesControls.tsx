@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/shallow";
 import { TemporaryAccountForm } from "@/components/dashboard/current-changes/TemporaryAccountForm";
 import { TemporaryPostingForm } from "@/components/dashboard/current-changes/TemporaryPostingForm";
+import { Metric } from "@/components/present/present";
 import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -259,14 +260,18 @@ function DraftRowItem({
 	onAction: () => void;
 }) {
 	return (
-		<div className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-surface/60 px-4 py-2">
-			<div>
-				<div className="type-label">{label}</div>
-				<div className="type-caption">{type}</div>
-			</div>
-			<Button type="button" variant="ghost" size="sm" onClick={onAction}>
-				{actionLabel}
-			</Button>
-		</div>
+		<Metric
+			size="sm"
+			label={label}
+			value={type}
+			labelClassName="type-label"
+			valueClassName="type-caption"
+			className="border-border/80 px-4 py-2"
+			trailing={
+				<Button type="button" variant="ghost" size="sm" onClick={onAction}>
+					{actionLabel}
+				</Button>
+			}
+		/>
 	);
 }
