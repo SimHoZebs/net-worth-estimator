@@ -79,6 +79,7 @@ export function SettingsPage() {
 				<PageHeader
 					eyebrow="Projection configuration"
 					title="Settings"
+					titleClassName="sr-only"
 					description="Configure the simulation, evaluations, uncertainty analysis, and appearance. Projection settings remain session-only."
 					stacked
 				/>

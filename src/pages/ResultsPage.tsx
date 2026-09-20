@@ -33,6 +33,7 @@ export function ResultsPage() {
 			<PageHeader
 				eyebrow="Projection workspace"
 				title="Results"
+				titleClassName="sr-only"
 				description="Projected balances, evaluation outcomes, and the evidence behind them."
 				actions={
 					<Button

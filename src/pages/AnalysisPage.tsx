@@ -35,6 +35,7 @@ export function AnalysisPage() {
 			<PageHeader
 				eyebrow="Posting analysis"
 				title="Analysis"
+				titleClassName="sr-only"
 				description="Analyze enabled one-time external inflows already present in the financial model. No separate transaction dataset is used."
 				splitAt="lg"
 				actions={
