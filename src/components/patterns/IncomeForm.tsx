@@ -1,4 +1,8 @@
-import { Input } from "@/components/ui/input";
+import {
+	Field,
+	FieldSelect,
+	LabeledField,
+} from "@/components/fields/field-kit";
 import type {
 	IncomeSourceDefinition,
 	IncomeTaxProfile,
@@ -21,8 +25,6 @@ interface IncomeFormProps {
 	incomeSources: IncomeSourceDefinition[];
 	taxProfiles: IncomeTaxProfile[];
 }
-
-const LABEL_CLASS = "block type-label mb-1";
 
 const presets = [
 	{
@@ -91,36 +93,25 @@ export function IncomeForm({
 			</div>
 
 			<div className="grid grid-cols-2 gap-3">
-				<div>
-					<label htmlFor="income-template-label" className={LABEL_CLASS}>
-						Label
-					</label>
-					<Input
-						id="income-template-label"
-						value={value.label}
-						onChange={(e) => update({ label: e.target.value })}
-						placeholder="e.g. Acme Salary"
-					/>
-				</div>
-				<div>
-					<label htmlFor="income-template-start-date" className={LABEL_CLASS}>
-						Start Date
-					</label>
-					<Input
-						id="income-template-start-date"
-						value={value.startDate}
-						onChange={(e) => update({ startDate: e.target.value })}
-						placeholder="YYYY-MM-DD"
-					/>
-				</div>
+				<LabeledField
+					label="Label"
+					id="income-template-label"
+					value={value.label}
+					onChange={(label) => update({ label })}
+					placeholder="e.g. Acme Salary"
+				/>
+				<LabeledField
+					label="Start Date"
+					id="income-template-start-date"
+					value={value.startDate}
+					onChange={(startDate) => update({ startDate })}
+					placeholder="YYYY-MM-DD"
+				/>
 
-				<div>
-					<label htmlFor="income-template-source" className={LABEL_CLASS}>
-						Income source
-					</label>
-					<select
+				<Field label="Income source" id="income-template-source">
+					<FieldSelect
 						id="income-template-source"
-						className="h-9 w-full rounded-md border border-input bg-background px-3 type-body"
+						aria-label="Income source"
 						value={value.incomeSourceId}
 						onChange={(e) => update({ incomeSourceId: e.target.value })}
 					>
@@ -130,15 +121,12 @@ export function IncomeForm({
 								{source.label}
 							</option>
 						))}
-					</select>
-				</div>
-				<div>
-					<label htmlFor="income-template-tax" className={LABEL_CLASS}>
-						Tax profile
-					</label>
-					<select
+					</FieldSelect>
+				</Field>
+				<Field label="Tax profile" id="income-template-tax">
+					<FieldSelect
 						id="income-template-tax"
-						className="h-9 w-full rounded-md border border-input bg-background px-3 type-body"
+						aria-label="Tax profile"
 						value={value.taxProfileId}
 						onChange={(e) => update({ taxProfileId: e.target.value })}
 					>
@@ -148,69 +136,55 @@ export function IncomeForm({
 								{profile.label}
 							</option>
 						))}
-					</select>
-				</div>
+					</FieldSelect>
+				</Field>
 
-				<div>
-					<label htmlFor="income-template-contribution" className={LABEL_CLASS}>
-						401(k) Contribution (%)
-					</label>
-					<Input
-						id="income-template-contribution"
-						type="number"
-						min={0}
-						max={100}
-						step={0.1}
-						value={value.k401ContributionRate}
-						onChange={(e) => update({ k401ContributionRate: e.target.value })}
-						placeholder="4"
-					/>
-				</div>
-				<div>
-					<label htmlFor="income-template-match" className={LABEL_CLASS}>
-						Employer Match (%)
-					</label>
-					<Input
-						id="income-template-match"
-						type="number"
-						min={0}
-						max={100}
-						step={0.1}
-						value={value.k401EmployerMatchRate}
-						onChange={(e) => update({ k401EmployerMatchRate: e.target.value })}
-						placeholder="50"
-					/>
-				</div>
+				<LabeledField
+					label="401(k) Contribution (%)"
+					id="income-template-contribution"
+					type="number"
+					min={0}
+					max={100}
+					step={0.1}
+					value={value.k401ContributionRate}
+					onChange={(k401ContributionRate) => update({ k401ContributionRate })}
+					placeholder="4"
+				/>
+				<LabeledField
+					label="Employer Match (%)"
+					id="income-template-match"
+					type="number"
+					min={0}
+					max={100}
+					step={0.1}
+					value={value.k401EmployerMatchRate}
+					onChange={(k401EmployerMatchRate) =>
+						update({ k401EmployerMatchRate })
+					}
+					placeholder="50"
+				/>
 
-				<div>
-					<label htmlFor="income-template-cap" className={LABEL_CLASS}>
-						401(k) Annual Cap ($)
-					</label>
-					<Input
-						id="income-template-cap"
-						type="number"
-						min={0}
-						step={500}
-						value={value.k401AnnualCap}
-						onChange={(e) => update({ k401AnnualCap: e.target.value })}
-						placeholder="23000"
-					/>
-				</div>
-				<div>
-					<label htmlFor="income-template-auto-invest" className={LABEL_CLASS}>
-						Auto-invest After Tax (%)
-					</label>
-					<Input
-						id="income-template-auto-invest"
-						type="number"
-						min={0}
-						max={100}
-						step={0.1}
-						value={value.autoInvestRate}
-						onChange={(e) => update({ autoInvestRate: e.target.value })}
-						placeholder="10"
-					/>
-				</div>
+				<LabeledField
+					label="401(k) Annual Cap ($)"
+					id="income-template-cap"
+					type="number"
+					min={0}
+					step={500}
+					value={value.k401AnnualCap}
+					onChange={(k401AnnualCap) => update({ k401AnnualCap })}
+					placeholder="23000"
+				/>
+				<LabeledField
+					label="Auto-invest After Tax (%)"
+					id="income-template-auto-invest"
+					type="number"
+					min={0}
+					max={100}
+					step={0.1}
+					value={value.autoInvestRate}
+					onChange={(autoInvestRate) => update({ autoInvestRate })}
+					placeholder="10"
+				/>
 			</div>
 		</div>
 	);

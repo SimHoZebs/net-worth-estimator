@@ -1,4 +1,5 @@
 import { memo, useState } from "react";
+import { Pill } from "@/components/present/present";
 import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { currency } from "@/lib/format";
@@ -183,9 +184,7 @@ function EvaluationOutcomes({
 					className="flex items-center justify-between gap-3 type-caption"
 				>
 					<span className="truncate">{outcome.label}</span>
-					<span className="shrink-0 rounded-full border border-border/70 px-2 py-0.5 uppercase tracking-[0.1em]">
-						{outcome.status}
-					</span>
+					<Pill size="xs">{outcome.status}</Pill>
 				</div>
 			))}
 		</div>

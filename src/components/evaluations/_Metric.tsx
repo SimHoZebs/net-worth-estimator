@@ -1,22 +1,6 @@
 import { Button } from "@/components/ui/button";
 
-export function Metric({
-	label,
-	value,
-	detail,
-}: {
-	label: string;
-	value: string;
-	detail: string;
-}) {
-	return (
-		<div className="rounded-2xl border border-border/70 bg-surface/70 p-4 dark:border-white/10 dark:bg-surface/55">
-			<div className="type-label">{label}</div>
-			<div className="mt-1 type-metric text-foreground">{value}</div>
-			<div className="type-muted">{detail}</div>
-		</div>
-	);
-}
+export { Metric } from "@/components/present/present";
 
 export function EvaluationEditorFooter({
 	dirty,

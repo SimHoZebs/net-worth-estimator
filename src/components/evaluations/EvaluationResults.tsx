@@ -1,6 +1,6 @@
+import { PageHeader, Pill, SectionCard } from "@/components/present/present";
 import { SimulationProgressPanel } from "@/components/SimulationProgressPanel";
 import { StochasticProgressDetails } from "@/components/StochasticProgressDetails";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import type {
 	EvaluationInstance,
 	EvaluationResultCollection,
@@ -46,14 +46,12 @@ export function EvaluationResults({
 
 	return (
 		<section id="evaluations" className="space-y-4">
-			<div>
-				<div className="type-eyebrow text-primary">Ordered questions</div>
-				<h2 className="mt-1 type-title text-2xl">Evaluations</h2>
-				<p className="mt-1 max-w-2xl type-muted">
-					Outcomes, behavior evidence, diagnostics, and probabilistic analysis
-					for each configured evaluation.
-				</p>
-			</div>
+			<PageHeader
+				level="h2"
+				eyebrow="Ordered questions"
+				title="Evaluations"
+				description="Outcomes, behavior evidence, diagnostics, and probabilistic analysis for each configured evaluation."
+			/>
 
 			{EVALUATION_TYPE_ORDER.map((type) => (
 				<EvaluationTypeSection
@@ -142,11 +140,11 @@ function EvaluationTypeSection({
 					? Math.round(stochasticProgress.fraction * 100)
 					: null;
 				return (
-					<Card
+					<SectionCard
 						key={evaluation.instanceId}
 						className="overflow-hidden rounded-[1.8rem] border-border/80 bg-card/92"
-					>
-						<CardHeader className="border-b border-border/70 bg-surface/45 dark:border-white/10">
+						headerClassName="border-b border-border/70 bg-surface/45 dark:border-white/10"
+						header={
 							<div className="flex items-start justify-between gap-4">
 								<div>
 									<div className="type-title text-xl">{evaluation.label}</div>
@@ -154,75 +152,69 @@ function EvaluationTypeSection({
 										{evaluation.instanceId}
 									</div>
 								</div>
-								{hasLocalProgress ? null : (
-									<span className="rounded-full border border-border/70 px-3 py-1 type-label uppercase tracking-[0.12em]">
-										{status}
-									</span>
-								)}
+								{hasLocalProgress ? null : <Pill>{status}</Pill>}
 							</div>
-						</CardHeader>
-						<CardContent className="space-y-4 p-4 md:p-6">
-							{hasLocalProgress && stochasticProgress && stochasticWorkload ? (
-								<SimulationProgressPanel
-									title={
-										type === "financialIndependence"
-											? "Running FI Monte Carlo"
-											: `Updating ${evaluation.label}`
-									}
-									description={
-										type === "financialIndependence"
-											? resultsAreStale
-												? "Previous FI results are hidden until recalculation completes."
-												: "The deterministic FI result below is current. Monte Carlo confidence is still being calculated."
-											: "Monte Carlo analysis is recomputing this evaluation's outcome."
-									}
-									progressPct={workloadProgressPct}
-									progressLabel={`${evaluation.label} Monte Carlo progress`}
-								>
-									<StochasticProgressDetails
-										progress={stochasticProgress}
-										showPhase={false}
-										showWorkloadLabels={false}
-										showWorkloadTotals={false}
-										showDescriptions={false}
-										workloads={[stochasticWorkload]}
-									/>
-								</SimulationProgressPanel>
-							) : null}
-							{config.error ? (
-								<Diagnostic message={config.error} error />
-							) : null}
-							{envelope?.diagnostics.map((diagnostic) => (
-								<Diagnostic
-									key={`${diagnostic.code}-${diagnostic.message}`}
-									message={diagnostic.message}
-									error={diagnostic.severity === "error"}
+						}
+						contentClassName="space-y-4 p-4 md:p-6"
+					>
+						{hasLocalProgress && stochasticProgress && stochasticWorkload ? (
+							<SimulationProgressPanel
+								title={
+									type === "financialIndependence"
+										? "Running FI Monte Carlo"
+										: `Updating ${evaluation.label}`
+								}
+								description={
+									type === "financialIndependence"
+										? resultsAreStale
+											? "Previous FI results are hidden until recalculation completes."
+											: "The deterministic FI result below is current. Monte Carlo confidence is still being calculated."
+										: "Monte Carlo analysis is recomputing this evaluation's outcome."
+								}
+								progressPct={workloadProgressPct}
+								progressLabel={`${evaluation.label} Monte Carlo progress`}
+							>
+								<StochasticProgressDetails
+									progress={stochasticProgress}
+									showPhase={false}
+									showWorkloadLabels={false}
+									showWorkloadTotals={false}
+									showDescriptions={false}
+									workloads={[stochasticWorkload]}
 								/>
-							))}
-							{evaluation.enabled &&
-							config.normalized !== null &&
-							!resultsAreStale ? (
-								<ResultRenderer
-									evaluation={{
-										...evaluation,
-										config: config.normalized,
-									}}
-									document={document}
-									result={result}
-									stochasticResult={stochasticResult}
-									stochasticIsProvisional={stochasticIsProvisional}
-									sourceRevision={sourceRevision}
-									resultsAreStale={resultsAreStale}
-									blockerValue={blockerValue}
-									blockerDetail={blockerDetail}
-								/>
-							) : resultsAreStale && evaluation.enabled && !hasLocalProgress ? (
-								<p className="rounded-2xl border border-dashed border-border/80 p-5 type-muted">
-									Updating this evaluation with the current settings.
-								</p>
-							) : null}
-						</CardContent>
-					</Card>
+							</SimulationProgressPanel>
+						) : null}
+						{config.error ? <Diagnostic message={config.error} error /> : null}
+						{envelope?.diagnostics.map((diagnostic) => (
+							<Diagnostic
+								key={`${diagnostic.code}-${diagnostic.message}`}
+								message={diagnostic.message}
+								error={diagnostic.severity === "error"}
+							/>
+						))}
+						{evaluation.enabled &&
+						config.normalized !== null &&
+						!resultsAreStale ? (
+							<ResultRenderer
+								evaluation={{
+									...evaluation,
+									config: config.normalized,
+								}}
+								document={document}
+								result={result}
+								stochasticResult={stochasticResult}
+								stochasticIsProvisional={stochasticIsProvisional}
+								sourceRevision={sourceRevision}
+								resultsAreStale={resultsAreStale}
+								blockerValue={blockerValue}
+								blockerDetail={blockerDetail}
+							/>
+						) : resultsAreStale && evaluation.enabled && !hasLocalProgress ? (
+							<p className="rounded-2xl border border-dashed border-border/80 p-5 type-muted">
+								Updating this evaluation with the current settings.
+							</p>
+						) : null}
+					</SectionCard>
 				);
 			})}
 		</div>

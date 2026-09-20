@@ -1,11 +1,3 @@
-import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 import {
 	createTableColumn,
 	DataTable,
@@ -20,10 +12,15 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { TableSearch } from "@/components/ui/table-search";
 import { formatDate } from "@/lib/format";
 import type { Checkpoint, FinancialModelDocument } from "@/lib/projection";
-import { useTableSearch } from "./_shared";
+import { plainCellClass } from "./primitives/cells";
+import { SearchField, useSearchFilter } from "./primitives/search";
+import {
+	AddRowButton,
+	EditableTableCard,
+	RowDeleteButton,
+} from "./primitives/shells";
 
 export interface CheckpointsTableEditProps {
 	displayDocument: FinancialModelDocument;
@@ -51,9 +48,6 @@ export function CheckpointsTable(props: CheckpointsTableProps) {
 	const { editable, ...viewProps } = props;
 	return <ReadOnlyCheckpointsView {...viewProps} />;
 }
-
-const inputClassName =
-	"w-full rounded-lg border border-input bg-card px-2 py-1 type-body outline-none type-code focus:border-ring";
 
 const checkpointColumn = createTableColumn<Checkpoint>();
 
@@ -87,102 +81,88 @@ function EditableCheckpointsGrid({
 	addCheckpoint,
 }: CheckpointsTableEditProps) {
 	return (
-		<Card className="rounded-[1.8rem] border-border shadow-sm">
-			<CardHeader>
-				<CardTitle>Balance checkpoints</CardTitle>
-				<CardDescription>
-					Record absolute end-of-day balances. Later modeled postings continue
-					from these observed values.
-				</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<Table>
-					<TableHeader>
-						<TableRow>
-							<TableHead>Date</TableHead>
-							<TableHead>Account</TableHead>
-							<TableHead>Balance</TableHead>
-							<TableHead />
+		<EditableTableCard
+			title="Balance checkpoints"
+			description="Record absolute end-of-day balances. Later modeled postings continue from these observed values."
+			footer={
+				<AddRowButton
+					onClick={() =>
+						addCheckpoint({
+							Date: projectionStartDate,
+							AccountId: displayDocument.accounts[0]?.id ?? "",
+							Balance: 0,
+						})
+					}
+				>
+					Add checkpoint
+				</AddRowButton>
+			}
+		>
+			<Table>
+				<TableHeader>
+					<TableRow>
+						<TableHead>Date</TableHead>
+						<TableHead>Account</TableHead>
+						<TableHead>Balance</TableHead>
+						<TableHead />
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{displayDocument.checkpoints.map((checkpoint, index) => (
+						<TableRow
+							key={`${checkpoint.AccountId}:${checkpoint.Date}:${index}`}
+						>
+							<TableCell>
+								<input
+									className={plainCellClass}
+									type="date"
+									value={checkpoint.Date}
+									onChange={(event) =>
+										updateCheckpoint(index, { Date: event.target.value })
+									}
+								/>
+							</TableCell>
+							<TableCell>
+								<select
+									className={plainCellClass}
+									value={checkpoint.AccountId}
+									onChange={(event) =>
+										updateCheckpoint(index, {
+											AccountId: event.target.value,
+										})
+									}
+								>
+									<option value="">Select account</option>
+									{displayDocument.accounts.map((account) => (
+										<option key={account.id} value={account.id}>
+											{account.label}
+										</option>
+									))}
+								</select>
+							</TableCell>
+							<TableCell>
+								<input
+									className={plainCellClass}
+									type="number"
+									step="any"
+									value={checkpoint.Balance}
+									onChange={(event) =>
+										updateCheckpoint(index, {
+											Balance: Number(event.target.value),
+										})
+									}
+								/>
+							</TableCell>
+							<TableCell>
+								<RowDeleteButton onClick={() => deleteCheckpoint(index)}>
+									Remove
+								</RowDeleteButton>
+							</TableCell>
 						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{displayDocument.checkpoints.map((checkpoint, index) => (
-							<TableRow
-								key={`${checkpoint.AccountId}:${checkpoint.Date}:${index}`}
-							>
-								<TableCell>
-									<input
-										className={inputClassName}
-										type="date"
-										value={checkpoint.Date}
-										onChange={(event) =>
-											updateCheckpoint(index, { Date: event.target.value })
-										}
-									/>
-								</TableCell>
-								<TableCell>
-									<select
-										className={inputClassName}
-										value={checkpoint.AccountId}
-										onChange={(event) =>
-											updateCheckpoint(index, {
-												AccountId: event.target.value,
-											})
-										}
-									>
-										<option value="">Select account</option>
-										{displayDocument.accounts.map((account) => (
-											<option key={account.id} value={account.id}>
-												{account.label}
-											</option>
-										))}
-									</select>
-								</TableCell>
-								<TableCell>
-									<input
-										className={inputClassName}
-										type="number"
-										step="any"
-										value={checkpoint.Balance}
-										onChange={(event) =>
-											updateCheckpoint(index, {
-												Balance: Number(event.target.value),
-											})
-										}
-									/>
-								</TableCell>
-								<TableCell>
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										onClick={() => deleteCheckpoint(index)}
-									>
-										Remove
-									</Button>
-								</TableCell>
-							</TableRow>
-						))}
-					</TableBody>
-				</Table>
-				<div className="mt-3">
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						onClick={() =>
-							addCheckpoint({
-								Date: projectionStartDate,
-								AccountId: displayDocument.accounts[0]?.id ?? "",
-								Balance: 0,
-							})
-						}
-					>
-						Add checkpoint
-					</Button>
-				</div>
-			</CardContent>
-		</Card>
+					))}
+				</TableBody>
+			</Table>
+		</EditableTableCard>
 	);
 }
 
@@ -191,8 +171,11 @@ function ReadOnlyCheckpointsView({
 	showAdvanced,
 	accountLabelById,
 }: CheckpointsTableViewProps) {
-	const { search, setSearch, query: normalizedSearch } = useTableSearch();
-	const rows = checkpoints.filter((checkpoint) => {
+	const {
+		search,
+		setSearch,
+		visible: rows,
+	} = useSearchFilter(checkpoints, (checkpoint, normalizedSearch) => {
 		const accountLabel =
 			accountLabelById.get(checkpoint.AccountId) ?? checkpoint.AccountId;
 		return (
@@ -205,7 +188,7 @@ function ReadOnlyCheckpointsView({
 
 	return (
 		<div>
-			<TableSearch
+			<SearchField
 				value={search}
 				onChange={setSearch}
 				placeholder="Search balance checkpoints..."

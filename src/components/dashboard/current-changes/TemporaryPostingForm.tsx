@@ -4,8 +4,13 @@ import {
 	duplicateIdError,
 	parseDecimalField,
 } from "@/components/_draftHelpers";
+import {
+	FIELD_ERROR_CLASS,
+	Field,
+	FieldSelect,
+	LabeledField,
+} from "@/components/fields/field-kit";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
 	createExpressionAmount,
 	type FinancialModelDocument,
@@ -158,108 +163,57 @@ export function TemporaryPostingForm({
 			{adding ? (
 				<div className="space-y-2 rounded-2xl border border-border p-3">
 					<div className="grid gap-2 sm:grid-cols-2">
-						<div>
-							<label
-								htmlFor="temporary-posting-id"
-								className="block type-caption"
-							>
-								ID
-							</label>
-							<Input
-								id="temporary-posting-id"
-								className="w-full rounded-lg "
-								value={adding.id}
-								onChange={(e) => setAdding({ ...adding, id: e.target.value })}
-								placeholder="e.g. bonus"
-							/>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-posting-label"
-								className="block type-caption"
-							>
-								Label
-							</label>
-							<Input
-								id="temporary-posting-label"
-								className="w-full rounded-lg "
-								value={adding.label}
-								onChange={(e) =>
-									setAdding({ ...adding, label: e.target.value })
-								}
-								placeholder="Bonus"
-							/>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-posting-source"
-								className="block type-caption"
-							>
-								Source Account
-							</label>
-							<Input
-								id="temporary-posting-source"
-								className="w-full rounded-lg "
-								value={adding.sourceAccountId ?? ""}
-								onChange={(e) =>
-									setAdding({
-										...adding,
-										sourceAccountId: e.target.value || null,
-									})
-								}
-								placeholder="Leave blank for external"
-							/>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-posting-destinations"
-								className="block type-caption"
-							>
-								Destinations (; separated)
-							</label>
-							<Input
-								id="temporary-posting-destinations"
-								className="w-full rounded-lg "
-								value={adding.destinations?.join(";") ?? ""}
-								onChange={(e) => {
-									const raw = e.target.value;
-									setAdding({
-										...adding,
-										destinations: raw.trim()
-											? raw.split(";").map((s) => s.trim())
-											: null,
-									});
-								}}
-								placeholder="Leave blank for external"
-							/>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-posting-amount"
-								className="block type-caption"
-							>
-								Amount calculation
-							</label>
-							<Input
-								id="temporary-posting-amount"
-								className="w-full rounded-lg "
-								value={adding.arithmetic}
-								onChange={(e) =>
-									setAdding({ ...adding, arithmetic: e.target.value })
-								}
-								placeholder="e.g. 15000"
-							/>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-posting-frequency"
-								className="block type-caption"
-							>
-								Frequency
-							</label>
-							<select
+						<LabeledField
+							label="ID"
+							id="temporary-posting-id"
+							value={adding.id}
+							onChange={(id) => setAdding({ ...adding, id })}
+							placeholder="e.g. bonus"
+						/>
+						<LabeledField
+							label="Label"
+							id="temporary-posting-label"
+							value={adding.label}
+							onChange={(label) => setAdding({ ...adding, label })}
+							placeholder="Bonus"
+						/>
+						<LabeledField
+							label="Source Account"
+							id="temporary-posting-source"
+							value={adding.sourceAccountId ?? ""}
+							onChange={(value) =>
+								setAdding({
+									...adding,
+									sourceAccountId: value || null,
+								})
+							}
+							placeholder="Leave blank for external"
+						/>
+						<LabeledField
+							label="Destinations (; separated)"
+							id="temporary-posting-destinations"
+							value={adding.destinations?.join(";") ?? ""}
+							onChange={(value) => {
+								setAdding({
+									...adding,
+									destinations: value.trim()
+										? value.split(";").map((s) => s.trim())
+										: null,
+								});
+							}}
+							placeholder="Leave blank for external"
+						/>
+						<LabeledField
+							label="Amount calculation"
+							id="temporary-posting-amount"
+							value={adding.arithmetic}
+							onChange={(arithmetic) => setAdding({ ...adding, arithmetic })}
+							placeholder="e.g. 15000"
+						/>
+						<Field label="Frequency" id="temporary-posting-frequency">
+							<FieldSelect
 								id="temporary-posting-frequency"
-								className="w-full rounded-lg "
+								aria-label="Frequency"
 								value={adding.frequency}
 								onChange={(e) => {
 									const frequency = e.target.value as Posting["frequency"];
@@ -272,153 +226,71 @@ export function TemporaryPostingForm({
 								<option value="monthly">monthly</option>
 								<option value="quarterly">quarterly</option>
 								<option value="annual">annual</option>
-							</select>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-posting-rate"
-								className="block type-caption"
-							>
-								Annual Rate
-							</label>
-							<Input
-								id="temporary-posting-rate"
-								type="number"
-								step={0.01}
-								className="w-full rounded-lg "
-								value={adding.annualRate}
-								onChange={(e) =>
-									setAdding({ ...adding, annualRate: e.target.value })
-								}
-							/>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-posting-growth"
-								className="block type-caption"
-							>
-								Annual Growth Rate
-							</label>
-							<Input
-								id="temporary-posting-growth"
-								type="number"
-								step={0.01}
-								className="w-full rounded-lg "
-								value={adding.annualGrowthRate}
-								onChange={(e) =>
-									setAdding({
-										...adding,
-										annualGrowthRate: e.target.value,
-									})
-								}
-							/>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-posting-volatility"
-								className="block type-caption"
-							>
-								Volatility
-							</label>
-							<Input
-								id="temporary-posting-volatility"
-								type="number"
-								min={0}
-								step={0.01}
-								className="w-full rounded-lg "
-								value={adding.volatility}
-								onChange={(e) =>
-									setAdding({ ...adding, volatility: e.target.value })
-								}
-							/>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-posting-start"
-								className="block type-caption"
-							>
-								Start Date
-							</label>
-							<Input
-								id="temporary-posting-start"
-								className="w-full rounded-lg "
-								value={adding.startDate}
-								onChange={(e) =>
-									setAdding({
-										...adding,
-										startDate: e.target.value,
-									})
-								}
-								placeholder="YYYY-MM-DD"
-							/>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-posting-end"
-								className="block type-caption"
-							>
-								End Date
-							</label>
-							<Input
-								id="temporary-posting-end"
-								className="w-full rounded-lg "
-								value={adding.endDate ?? ""}
-								disabled={adding.frequency === "once"}
-								onChange={(e) =>
-									setAdding({ ...adding, endDate: e.target.value || null })
-								}
-								placeholder="YYYY-MM-DD or blank"
-							/>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-posting-cap"
-								className="block type-caption"
-							>
-								Annual Cap
-							</label>
-							<Input
-								id="temporary-posting-cap"
-								type="number"
-								min={0}
-								className="w-full rounded-lg "
-								value={adding.annualCap}
-								onChange={(e) =>
-									setAdding({
-										...adding,
-										annualCap: e.target.value,
-									})
-								}
-								placeholder="Blank for none"
-							/>
-						</div>
-						<div>
-							<label
-								htmlFor="temporary-posting-priority"
-								className="block type-caption"
-							>
-								Priority
-							</label>
-							<Input
-								id="temporary-posting-priority"
-								type="number"
-								min={1}
-								className="w-full rounded-lg "
-								value={adding.priority}
-								onChange={(e) =>
-									setAdding({
-										...adding,
-										priority: e.target.value,
-									})
-								}
-							/>
-						</div>
+							</FieldSelect>
+						</Field>
+						<LabeledField
+							label="Annual Rate"
+							id="temporary-posting-rate"
+							type="number"
+							step={0.01}
+							value={adding.annualRate}
+							onChange={(annualRate) => setAdding({ ...adding, annualRate })}
+						/>
+						<LabeledField
+							label="Annual Growth Rate"
+							id="temporary-posting-growth"
+							type="number"
+							step={0.01}
+							value={adding.annualGrowthRate}
+							onChange={(annualGrowthRate) =>
+								setAdding({ ...adding, annualGrowthRate })
+							}
+						/>
+						<LabeledField
+							label="Volatility"
+							id="temporary-posting-volatility"
+							type="number"
+							min={0}
+							step={0.01}
+							value={adding.volatility}
+							onChange={(volatility) => setAdding({ ...adding, volatility })}
+						/>
+						<LabeledField
+							label="Start Date"
+							id="temporary-posting-start"
+							value={adding.startDate}
+							onChange={(startDate) => setAdding({ ...adding, startDate })}
+							placeholder="YYYY-MM-DD"
+						/>
+						<LabeledField
+							label="End Date"
+							id="temporary-posting-end"
+							value={adding.endDate ?? ""}
+							disabled={adding.frequency === "once"}
+							onChange={(value) =>
+								setAdding({ ...adding, endDate: value || null })
+							}
+							placeholder="YYYY-MM-DD or blank"
+						/>
+						<LabeledField
+							label="Annual Cap"
+							id="temporary-posting-cap"
+							type="number"
+							min={0}
+							value={adding.annualCap}
+							onChange={(annualCap) => setAdding({ ...adding, annualCap })}
+							placeholder="Blank for none"
+						/>
+						<LabeledField
+							label="Priority"
+							id="temporary-posting-priority"
+							type="number"
+							min={1}
+							value={adding.priority}
+							onChange={(priority) => setAdding({ ...adding, priority })}
+						/>
 					</div>
-					{error ? (
-						<div className="rounded-xl border border-destructive/25 bg-destructive-subtle p-3 type-body text-destructive-foreground">
-							{error}
-						</div>
-					) : null}
+					{error ? <div className={FIELD_ERROR_CLASS}>{error}</div> : null}
 					<div className="flex gap-2">
 						<Button type="button" size="sm" onClick={commit}>
 							Add posting

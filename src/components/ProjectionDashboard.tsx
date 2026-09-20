@@ -5,6 +5,7 @@ import {
 	buildStochasticChartData,
 } from "@/chart/chartData";
 import { EvaluationResults } from "@/components/evaluations/EvaluationResults";
+import { Pill } from "@/components/present/present";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { LazySection } from "@/components/ui/lazy-section";
 import { currency, formatDate, pct } from "@/lib/format";
@@ -140,19 +141,28 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 			</section>
 
 			<section className="flex flex-wrap items-center gap-2">
-				<div className="rounded-full border border-primary-border bg-primary-subtle px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-primary">
+				<Pill
+					tone="primary"
+					textClassName="text-xs font-medium tracking-[0.16em]"
+				>
 					Base simulation ready
-				</div>
+				</Pill>
 				{currentChangeCount > 0 ? (
-					<div className="rounded-full border border-tertiary-border bg-tertiary-subtle px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
+					<Pill
+						tone="tertiary"
+						textClassName="text-xs font-medium tracking-[0.16em]"
+					>
 						{currentChangeCount} unsaved change
 						{currentChangeCount === 1 ? "" : "s"}
-					</div>
+					</Pill>
 				) : null}
 				{stochasticIsProvisional ? (
-					<div className="rounded-full border border-primary-border bg-primary-subtle px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-primary">
+					<Pill
+						tone="primary"
+						textClassName="text-xs font-medium tracking-[0.16em]"
+					>
 						Provisional Monte Carlo
-					</div>
+					</Pill>
 				) : null}
 			</section>
 
