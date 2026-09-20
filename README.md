@@ -86,17 +86,11 @@ The image supplies container defaults for `HOST`, `PORT`, the database path, and
 
 The browser uses same-origin `/v1` routes by default. For a separately deployed frontend, set `VITE_API_BASE_URL=https://<backend-host>` in the frontend build environment. The value may contain a path prefix but must not include `/v1`; it applies to model persistence, income data, deterministic projections, and stochastic SSE streams. Add the frontend's exact origin, without a path, to the backend's `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` runtime variable.
 
-### Automatic deploys from CI
+### Automatic deploys
 
-`.github/workflows/deploy-backend.yml` ships every green `main` build to Northflank: after the `CI` workflow succeeds, it builds the backend image, pushes `ghcr.io/<owner>/net-worth-estimator-server:<sha>` (plus `latest`), and rolls the Northflank service to the new image. Pushes that touch no backend inputs (`backend/`, the seed dirs, `Dockerfile`, or the workflow itself) skip the deploy so the pod is never recycled pointlessly.
+Pushes to `main` build and deploy automatically through the service's own Northflank CI — no GitHub-side deploy workflow needed. (A GHCR + `deploy-to-northflank` workflow was tried and removed: it targets deployment-type services and would fight the combined service's built-in CI.)
 
-One-time setup:
-
-1. **Northflank**: save your GHCR credentials as registry credentials and note the credentials ID. Create the backend as a **deployment** service (source: Northflank image, not a Dockerfile build) with the same shape as above — port `8787`, `GET /healthz` check, persistent volume on `/data`, **1 instance** (SQLite), and the same runtime variables. Note the project ID and service ID.
-2. **Northflank**: create an API token with the **Update Deployment** permission.
-3. **GitHub** (repo Settings → Secrets and variables → Actions): add secret `NORTHFLANK_API_KEY`, and variables `NORTHFLANK_PROJECT_ID`, `NORTHFLANK_SERVICE_ID`, `NORTHFLANK_CREDENTIALS_ID`.
-
-The next qualifying `main` push deploys itself. Keep the Dockerfile-build combined service **or** the CI-driven deployment service, not both writing to the same `/data` volume.
+> **Durability gap (open):** the Northflank service currently has no persistent volume on `/data`, so the SQLite database (canonical model edits and the projection artifact cache) is ephemeral and reseeds from CSVs on every redeploy. Mount a persistent volume at `/data` (keeping 1 instance) to close it.
 
 Reads and deterministic/stochastic projections are public by design. Canonical model writes require the bearer token above (or are rejected entirely when read-only mode is on). CORS restricts browser origins only; it does not protect the API from non-browser clients, which is why writes are token-guarded server-side.
 
