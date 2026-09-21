@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { EmptyState } from "@/components/present/present";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { currency, formatFrequency, pct } from "@/lib/format";
 import { isPastScheduledPosting } from "@/lib/posting-categories";
@@ -56,9 +57,9 @@ export function ReadOnlyPostingsView({
 					showAdvanced={showAdvanced}
 				/>
 			) : (
-				<div className="rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center type-muted">
+				<EmptyState className="px-4 py-8 text-center">
 					No current scheduled transactions match this search.
-				</div>
+				</EmptyState>
 			)}
 			{pastPostings.length > 0 ? (
 				<Collapsible className="!rounded-2xl !border-border/70 !bg-surface/55 !p-0 !shadow-none !backdrop-blur-none">

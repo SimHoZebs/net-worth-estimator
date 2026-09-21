@@ -7,7 +7,7 @@ import {
 	openChartTooltip,
 	resolveAccountColor,
 } from "@/chart/chartView";
-import { SectionCard } from "@/components/present/present";
+import { Pill, SectionCard } from "@/components/present/present";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import { currency, formatDate } from "@/lib/format";
 import type {
@@ -85,9 +85,7 @@ export const FinancialIndependenceChart = memo(
 				title="Opening and month-end balances"
 				action={
 					outcome.status === "ineligible" ? (
-						<span className="rounded-full border border-tertiary-border bg-tertiary-subtle px-3 py-1 type-label uppercase tracking-[0.12em] text-tertiary-foreground">
-							Counterfactual preview
-						</span>
+						<Pill tone="tertiary">Counterfactual preview</Pill>
 					) : undefined
 				}
 				className="overflow-hidden rounded-[1.8rem] border-border/80"

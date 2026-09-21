@@ -1,5 +1,6 @@
 import { FinancialIndependenceChart } from "@/components/dashboard/FinancialIndependenceChart";
 import { OverviewCard } from "@/components/dashboard/OverviewCard";
+import { EmptyState } from "@/components/present/present";
 import type {
 	EvaluationInstance,
 	FinancialIndependenceAnalysis,
@@ -65,9 +66,9 @@ export function FinancialIndependenceEvaluation({
 					) : null}
 				</>
 			) : (
-				<p className="rounded-2xl border border-dashed border-border/80 p-5 type-muted">
+				<EmptyState>
 					No healthy deterministic outcome is available for this evaluation.
-				</p>
+				</EmptyState>
 			)}
 		</div>
 	);

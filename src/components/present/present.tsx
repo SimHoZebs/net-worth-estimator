@@ -92,8 +92,28 @@ export function Metric({
 	);
 }
 
-export type PillTone = "neutral" | "primary" | "tertiary";
+export type PillTone = "neutral" | "primary" | "tertiary" | "destructive";
 export type PillSize = "md" | "xs";
+
+/** Dashed-border placeholder for empty content. */
+export function EmptyState({
+	children,
+	className,
+}: {
+	children: ReactNode;
+	className?: string;
+}) {
+	return (
+		<div
+			className={cn(
+				"rounded-2xl border border-dashed border-border/80 p-5 type-muted",
+				className,
+			)}
+		>
+			{children}
+		</div>
+	);
+}
 
 export function Pill({
 	tone = "neutral",
@@ -119,7 +139,9 @@ export function Pill({
 					? "border-primary-border bg-primary-subtle text-primary"
 					: tone === "tertiary"
 						? "border-tertiary-border bg-tertiary-subtle text-tertiary-foreground"
-						: "border-border/70",
+						: tone === "destructive"
+							? "border-destructive/25 bg-destructive-subtle text-destructive-foreground"
+							: "border-border/70",
 				className,
 			)}
 		>
