@@ -116,7 +116,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 		[derived.firstUnderfulfilledDate],
 	);
 	return (
-		<div className="space-y-6">
+		<div className="space-y-4">
 			<section id="projection-chart">
 				<AccountDiagnosticChart
 					document={document}
@@ -192,7 +192,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 				</LazySection>
 			</section>
 
-			<section className="grid gap-4 md:grid-cols-3">
+			<section className="grid gap-3 md:grid-cols-3">
 				<div className="flex flex-col gap-3">
 					<DriverCard
 						label="Main constraint"

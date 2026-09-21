@@ -29,7 +29,7 @@ export function ResultsPage() {
 	const stochasticProgress = useStochasticProgress();
 
 	return (
-		<main className="space-y-6">
+		<main className="space-y-4">
 			<PageHeader
 				title="Results"
 				titleClassName="sr-only"

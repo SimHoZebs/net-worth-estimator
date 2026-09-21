@@ -21,7 +21,7 @@ export const DriverCard = memo(function DriverCard({
 
 	return (
 		<Card className={`rounded-[1.6rem] ${toneClassName}`}>
-			<CardContent className="space-y-2 p-5">
+			<CardContent className="space-y-1 p-4">
 				<div className="type-label">{label}</div>
 				<div className="type-title text-foreground">{value}</div>
 				{detail ? (

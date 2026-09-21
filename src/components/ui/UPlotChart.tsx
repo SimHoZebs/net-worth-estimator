@@ -91,7 +91,7 @@ export function UPlotChart({
 
 		const rect = target.getBoundingClientRect();
 		const width = rect.width || 600;
-		const height = rect.height || 420;
+		const height = rect.height || 300;
 
 		const opts: uPlot.Options = {
 			...options,
@@ -209,7 +209,7 @@ export function UPlotChart({
 		<div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
 			<div
 				ref={targetRef}
-				className="relative min-h-[420px] w-full min-w-[700px] overflow-hidden md:min-w-0"
+				className="relative min-h-[300px] w-full min-w-[700px] overflow-hidden md:min-w-0"
 			>
 				<div
 					ref={tooltipRef}
