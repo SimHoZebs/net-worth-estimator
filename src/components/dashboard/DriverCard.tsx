@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { Metric } from "@/components/present/present";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const DriverCard = memo(function DriverCard({
@@ -21,12 +22,15 @@ export const DriverCard = memo(function DriverCard({
 
 	return (
 		<Card className={`rounded-[1.6rem] ${toneClassName}`}>
-			<CardContent className="space-y-1 p-4">
-				<div className="type-label">{label}</div>
-				<div className="type-title text-foreground">{value}</div>
-				{detail ? (
-					<div className="type-muted text-current/75">{detail}</div>
-				) : null}
+			<CardContent className="p-4">
+				<Metric
+					label={label}
+					value={value}
+					detail={detail}
+					className="border-0 bg-transparent p-0 dark:bg-transparent"
+					valueClassName="mt-1 type-metric text-foreground"
+					detailClassName="type-muted text-current/75"
+				/>
 			</CardContent>
 		</Card>
 	);

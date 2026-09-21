@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SectionCard } from "@/components/present/present";
 import {
 	Table,
 	TableBody,
@@ -59,13 +59,14 @@ export const DebtSummary = memo(function DebtSummary({
 
 	if (allDebts.length === 0) {
 		return (
-			<Card className="rounded-[1.6rem] border-border shadow-sm ">
-				<CardContent className="p-5">
-					<div className="type-muted">
-						No debt accounts are currently tracked.
-					</div>
-				</CardContent>
-			</Card>
+			<SectionCard
+				title="Debt summary"
+				className="rounded-[1.6rem] border-border shadow-sm"
+			>
+				<div className="type-muted">
+					No debt accounts are currently tracked.
+				</div>
+			</SectionCard>
 		);
 	}
 
@@ -83,83 +84,81 @@ export const DebtSummary = memo(function DebtSummary({
 	}, 0);
 
 	return (
-		<Card className="rounded-[1.6rem] border-border shadow-sm ">
-			<CardHeader>
-				<CardTitle>Debt summary</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<Table>
-					<TableHeader>
-						<TableRow>
-							<TableHead>Debt</TableHead>
-							<TableHead className="text-right">Balance</TableHead>
-							<TableHead className="text-right">Payment</TableHead>
-							<TableHead>Frequency</TableHead>
-							<TableHead>Est. payoff</TableHead>
-							<TableHead className="text-right">Priority</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{allDebts.map((d) => {
-							const monthlyPmt = estimateMonthlyPayment(
-								d.paymentPosting ?? undefined,
-							);
-							const principal = Math.abs(d.balance);
-							const monthsToPayoff =
-								monthlyPmt > 0 ? Math.ceil(principal / monthlyPmt) : Infinity;
-							const payoffDate =
-								monthsToPayoff < 1200
-									? new Date(
-											Date.now() + monthsToPayoff * 30 * 24 * 60 * 60 * 1000,
-										)
-											.toISOString()
-											.slice(0, 10)
-									: null;
-							return (
-								<TableRow key={d.account.id}>
-									<TableCell className="type-body text-foreground/80">
-										{d.account.label}
-									</TableCell>
-									<TableCell className="text-right type-value text-sm">
-										{currency.format(d.balance)}
-									</TableCell>
-									<TableCell className="text-right type-body text-foreground/80">
-										{d.paymentPosting
-											? describePostingAmount(d.paymentPosting)
-											: "—"}
-									</TableCell>
-									<TableCell className="type-muted">
-										{d.paymentPosting ? d.paymentPosting.frequency : "—"}
-									</TableCell>
-									<TableCell className="type-muted">
-										{payoffDate ? formatDate(payoffDate) : "Beyond 100 yr"}
-									</TableCell>
-									<TableCell className="text-right type-body tabular-nums text-muted-foreground">
-										{d.paymentPosting?.priority ?? "—"}
-									</TableCell>
-								</TableRow>
-							);
-						})}
-						<TableRow className="border-t-2 border-border">
-							<TableCell className="type-title">Total debt</TableCell>
-							<TableCell className="text-right type-title">
-								{currency.format(-totalDebt)}
-							</TableCell>
-							<TableCell colSpan={4} />
-						</TableRow>
-					</TableBody>
-				</Table>
-				{estimatedTotalInterest > 0 ? (
-					<div className="mt-3 rounded-xl border border-tertiary-border bg-tertiary-subtle px-4 py-3">
-						<div className="type-caption type-value text-tertiary-foreground">
-							Estimated interest over loan life
-						</div>
-						<div className="mt-0.5 type-title text-lg text-tertiary-foreground">
-							{currency.format(estimatedTotalInterest)}
-						</div>
+		<SectionCard
+			title="Debt summary"
+			className="rounded-[1.6rem] border-border shadow-sm"
+		>
+			<Table>
+				<TableHeader>
+					<TableRow>
+						<TableHead>Debt</TableHead>
+						<TableHead className="text-right">Balance</TableHead>
+						<TableHead className="text-right">Payment</TableHead>
+						<TableHead>Frequency</TableHead>
+						<TableHead>Est. payoff</TableHead>
+						<TableHead className="text-right">Priority</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{allDebts.map((d) => {
+						const monthlyPmt = estimateMonthlyPayment(
+							d.paymentPosting ?? undefined,
+						);
+						const principal = Math.abs(d.balance);
+						const monthsToPayoff =
+							monthlyPmt > 0 ? Math.ceil(principal / monthlyPmt) : Infinity;
+						const payoffDate =
+							monthsToPayoff < 1200
+								? new Date(
+										Date.now() + monthsToPayoff * 30 * 24 * 60 * 60 * 1000,
+									)
+										.toISOString()
+										.slice(0, 10)
+								: null;
+						return (
+							<TableRow key={d.account.id}>
+								<TableCell className="type-body text-foreground/80">
+									{d.account.label}
+								</TableCell>
+								<TableCell className="text-right type-value text-sm">
+									{currency.format(d.balance)}
+								</TableCell>
+								<TableCell className="text-right type-body text-foreground/80">
+									{d.paymentPosting
+										? describePostingAmount(d.paymentPosting)
+										: "—"}
+								</TableCell>
+								<TableCell className="type-muted">
+									{d.paymentPosting ? d.paymentPosting.frequency : "—"}
+								</TableCell>
+								<TableCell className="type-muted">
+									{payoffDate ? formatDate(payoffDate) : "Beyond 100 yr"}
+								</TableCell>
+								<TableCell className="text-right type-body tabular-nums text-muted-foreground">
+									{d.paymentPosting?.priority ?? "—"}
+								</TableCell>
+							</TableRow>
+						);
+					})}
+					<TableRow className="border-t-2 border-border">
+						<TableCell className="type-title">Total debt</TableCell>
+						<TableCell className="text-right type-title">
+							{currency.format(-totalDebt)}
+						</TableCell>
+						<TableCell colSpan={4} />
+					</TableRow>
+				</TableBody>
+			</Table>
+			{estimatedTotalInterest > 0 ? (
+				<div className="mt-3 rounded-xl border border-tertiary-border bg-tertiary-subtle px-4 py-3">
+					<div className="type-caption type-value text-tertiary-foreground">
+						Estimated interest over loan life
 					</div>
-				) : null}
-			</CardContent>
-		</Card>
+					<div className="mt-0.5 type-title text-lg text-tertiary-foreground">
+						{currency.format(estimatedTotalInterest)}
+					</div>
+				</div>
+			) : null}
+		</SectionCard>
 	);
 });

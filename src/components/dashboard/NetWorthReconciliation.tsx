@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SectionCard } from "@/components/present/present";
 import {
 	Table,
 	TableBody,
@@ -144,35 +144,33 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 	);
 
 	return (
-		<Card className="rounded-[1.6rem] border-border shadow-sm">
-			<CardHeader>
-				<CardTitle>Actual and modeled account state</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<div className="space-y-6">
-					{renderTable("Assets", assets)}
-					{renderTable("Liabilities", liabilities)}
-				</div>
+		<SectionCard
+			title="Actual and modeled account state"
+			className="rounded-[1.6rem] border-border shadow-sm"
+		>
+			<div className="space-y-6">
+				{renderTable("Assets", assets)}
+				{renderTable("Liabilities", liabilities)}
+			</div>
 
-				<div className="mt-4 grid gap-3 border-t border-border/70 pt-4 sm:grid-cols-2">
-					<div>
-						<div className="type-caption text-muted-foreground/70">
-							Checkpoint coverage
-						</div>
-						<div className="type-value font-semibold">
-							{observedRows.length} of {rows.length} active accounts
-						</div>
+			<div className="mt-4 grid gap-3 border-t border-border/70 pt-4 sm:grid-cols-2">
+				<div>
+					<div className="type-caption text-muted-foreground/70">
+						Checkpoint coverage
 					</div>
-					<div className="sm:text-right">
-						<div className="type-caption text-muted-foreground/70">
-							Posting-derived current net worth
-						</div>
-						<div className="type-value font-semibold">
-							{currency.format(result.summary.currentNetWorth)}
-						</div>
+					<div className="type-value font-semibold">
+						{observedRows.length} of {rows.length} active accounts
 					</div>
 				</div>
-			</CardContent>
-		</Card>
+				<div className="sm:text-right">
+					<div className="type-caption text-muted-foreground/70">
+						Posting-derived current net worth
+					</div>
+					<div className="type-value font-semibold">
+						{currency.format(result.summary.currentNetWorth)}
+					</div>
+				</div>
+			</div>
+		</SectionCard>
 	);
 });

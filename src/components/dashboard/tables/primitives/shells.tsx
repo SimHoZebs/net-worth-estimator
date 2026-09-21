@@ -1,12 +1,6 @@
 import type { ReactNode } from "react";
+import { SectionCard } from "@/components/present/present";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 
 interface EditableTableCardProps {
 	title: string;
@@ -23,16 +17,14 @@ export function EditableTableCard({
 	footer,
 }: EditableTableCardProps) {
 	return (
-		<Card className="rounded-[1.8rem] border-border shadow-sm">
-			<CardHeader>
-				<CardTitle>{title}</CardTitle>
-				<CardDescription>{description}</CardDescription>
-			</CardHeader>
-			<CardContent>
-				{children}
-				{footer ? <div className="mt-3">{footer}</div> : null}
-			</CardContent>
-		</Card>
+		<SectionCard
+			title={title}
+			description={description}
+			className="rounded-[1.8rem] border-border shadow-sm"
+		>
+			{children}
+			{footer ? <div className="mt-3">{footer}</div> : null}
+		</SectionCard>
 	);
 }
 

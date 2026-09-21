@@ -23,6 +23,7 @@ interface MetricProps {
 	capitalize?: boolean;
 	size?: MetricSize;
 	trailing?: ReactNode;
+	ariaLabel?: string;
 	className?: string;
 	labelClassName?: string;
 	valueClassName?: string;
@@ -36,6 +37,7 @@ export function Metric({
 	capitalize = false,
 	size = "md",
 	trailing,
+	ariaLabel,
 	className,
 	labelClassName,
 	valueClassName,
@@ -70,6 +72,7 @@ export function Metric({
 	);
 	return (
 		<div
+			{...(ariaLabel ? { role: "region", "aria-label": ariaLabel } : {})}
 			className={cn(
 				size === "sm"
 					? "rounded-xl border border-border/70 bg-surface/60 p-3"

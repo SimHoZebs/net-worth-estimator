@@ -7,7 +7,7 @@ import {
 	openChartTooltip,
 	resolveAccountColor,
 } from "@/chart/chartView";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SectionCard } from "@/components/present/present";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import { currency, formatDate } from "@/lib/format";
 import type {
@@ -81,47 +81,45 @@ export const FinancialIndependenceChart = memo(
 		);
 
 		return (
-			<Card className="overflow-hidden rounded-[1.8rem] border-border/80">
-				<CardHeader>
-					<div className="flex flex-wrap items-center justify-between gap-2">
-						<CardTitle>Opening and month-end balances</CardTitle>
-						{outcome.status === "ineligible" ? (
-							<span className="rounded-full border border-tertiary-border bg-tertiary-subtle px-3 py-1 type-label uppercase tracking-[0.12em] text-tertiary-foreground">
-								Counterfactual preview
-							</span>
-						) : null}
-					</div>
-				</CardHeader>
-				<CardContent>
-					{outcome.balanceTrajectory.length > 0 && accounts.length > 0 ? (
-						<>
-							<UPlotChart
-								options={options}
-								data={data}
-								tooltipContent={tooltipContent}
-							/>
-							<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 type-caption">
-								{accounts.map((account) => (
+			<SectionCard
+				title="Opening and month-end balances"
+				action={
+					outcome.status === "ineligible" ? (
+						<span className="rounded-full border border-tertiary-border bg-tertiary-subtle px-3 py-1 type-label uppercase tracking-[0.12em] text-tertiary-foreground">
+							Counterfactual preview
+						</span>
+					) : undefined
+				}
+				className="overflow-hidden rounded-[1.8rem] border-border/80"
+			>
+				{outcome.balanceTrajectory.length > 0 && accounts.length > 0 ? (
+					<>
+						<UPlotChart
+							options={options}
+							data={data}
+							tooltipContent={tooltipContent}
+						/>
+						<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 type-caption">
+							{accounts.map((account) => (
+								<span
+									key={account.id}
+									className="inline-flex items-center gap-1.5"
+								>
 									<span
-										key={account.id}
-										className="inline-flex items-center gap-1.5"
-									>
-										<span
-											className="inline-block h-2.5 w-2.5 rounded-full"
-											style={{ backgroundColor: account.color }}
-										/>
-										{account.label}
-									</span>
-								))}
-							</div>
-						</>
-					) : (
-						<p className="type-muted">
-							No selected accounts are included in this FI plan.
-						</p>
-					)}
-				</CardContent>
-			</Card>
+										className="inline-block h-2.5 w-2.5 rounded-full"
+										style={{ backgroundColor: account.color }}
+									/>
+									{account.label}
+								</span>
+							))}
+						</div>
+					</>
+				) : (
+					<p className="type-muted">
+						No selected accounts are included in this FI plan.
+					</p>
+				)}
+			</SectionCard>
 		);
 	},
 );

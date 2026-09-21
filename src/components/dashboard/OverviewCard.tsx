@@ -1,5 +1,10 @@
 import { memo } from "react";
-import { PageHeader, Pill, SectionCard } from "@/components/present/present";
+import {
+	Metric,
+	PageHeader,
+	Pill,
+	SectionCard,
+} from "@/components/present/present";
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	FinancialIndependenceDetailedRunOutcome,
@@ -169,17 +174,47 @@ function TestSummary({
 				</Pill>
 			</div>
 			<div className="grid gap-2 pt-3 sm:grid-cols-2">
-				<SummaryCheck
+				<Metric
+					size="sm"
 					label="Net worth"
+					ariaLabel="Net worth"
 					value={`${currency.format(row.netWorth)} / ${currency.format(row.minimumNetWorth)}`}
-					basis="current / minimum"
-					met={outcome.minimumNetWorthMet}
+					detail="current / minimum"
+					trailing={
+						<Pill
+							size="xs"
+							tone={outcome.minimumNetWorthMet ? "primary" : "tertiary"}
+							textClassName="type-label tracking-[0.1em]"
+							className="border-0"
+						>
+							{outcome.minimumNetWorthMet ? "Met" : "Below"}
+						</Pill>
+					}
+					className="border-border/60 bg-card/55 px-3 py-2"
+					labelClassName="type-label text-foreground/75"
+					valueClassName="mt-1 type-value tabular-nums"
+					detailClassName="mt-0.5 type-caption"
 				/>
-				<SummaryCheck
+				<Metric
+					size="sm"
 					label="FI-date annual capacity"
+					ariaLabel="FI-date annual capacity"
 					value={`${currency.format(row.totalAnnualCapacity)} / ${currency.format(row.annualExpenseTarget)}`}
-					basis="capacity / target"
-					met={outcome.initialCoverageMet}
+					detail="capacity / target"
+					trailing={
+						<Pill
+							size="xs"
+							tone={outcome.initialCoverageMet ? "primary" : "tertiary"}
+							textClassName="type-label tracking-[0.1em]"
+							className="border-0"
+						>
+							{outcome.initialCoverageMet ? "Met" : "Below"}
+						</Pill>
+					}
+					className="border-border/60 bg-card/55 px-3 py-2"
+					labelClassName="type-label text-foreground/75"
+					valueClassName="mt-1 type-value tabular-nums"
+					detailClassName="mt-0.5 type-caption"
 				/>
 			</div>
 			<div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-current/15 pt-3 type-caption">
@@ -189,39 +224,6 @@ function TestSummary({
 				<span>Principal target: {principalTargetLabel(plan)}</span>
 			</div>
 		</div>
-	);
-}
-
-function SummaryCheck({
-	label,
-	value,
-	basis,
-	met,
-}: {
-	label: string;
-	value: string;
-	basis: string;
-	met: boolean;
-}) {
-	return (
-		<section
-			aria-label={label}
-			className="rounded-xl border border-border/60 bg-card/55 px-3 py-2"
-		>
-			<div className="flex items-center justify-between gap-3">
-				<div className="type-label text-foreground/75">{label}</div>
-				<Pill
-					size="xs"
-					tone={met ? "primary" : "tertiary"}
-					textClassName="type-label tracking-[0.1em]"
-					className="border-0"
-				>
-					{met ? "Met" : "Below"}
-				</Pill>
-			</div>
-			<div className="mt-2 type-value tabular-nums">{value}</div>
-			<div className="mt-0.5 type-caption">{basis}</div>
-		</section>
 	);
 }
 

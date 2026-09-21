@@ -2,10 +2,9 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/shallow";
 import { TemporaryAccountForm } from "@/components/dashboard/current-changes/TemporaryAccountForm";
 import { TemporaryPostingForm } from "@/components/dashboard/current-changes/TemporaryPostingForm";
-import { Metric } from "@/components/present/present";
+import { Metric, Pill } from "@/components/present/present";
 import { Button } from "@/components/ui/button";
 import { Collapsible } from "@/components/ui/collapsible-section";
-import { StatusPill } from "@/components/ui/status-pill";
 import type {
 	Account,
 	FinancialModelDocument,
@@ -121,7 +120,7 @@ export function CurrentChangesControls({
 					trailing={
 						<div className="flex items-center gap-2">
 							{currentChangeCount > 0 ? (
-								<StatusPill>{currentChangeCount} unsaved</StatusPill>
+								<Pill>{currentChangeCount} unsaved</Pill>
 							) : null}
 							<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
 								Show details
