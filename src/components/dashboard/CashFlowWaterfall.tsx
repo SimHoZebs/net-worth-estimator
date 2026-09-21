@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SectionCard } from "@/components/present/present";
 import {
 	Table,
 	TableBody,
@@ -60,70 +60,68 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({
 	const remaining = totalInflow - totalOutflow;
 
 	return (
-		<Card className="rounded-[1.6rem] border-border shadow-sm ">
-			<CardHeader>
-				<CardTitle>Monthly cash flow</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<Table>
-					<TableHeader>
-						<TableRow>
-							<TableHead>Category</TableHead>
-							<TableHead>Transaction</TableHead>
-							<TableHead>Amount</TableHead>
-							<TableHead>Frequency</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{items.length > 0 ? (
-							<>
-								{items.map((item, i) => (
-									<TableRow key={i}>
-										<TableCell className="type-label tracking-wide">
-											{item.category}
-										</TableCell>
-										<TableCell className="type-body text-foreground/80">
-											{item.label}
-										</TableCell>
-										<TableCell className="type-value text-sm">
-											{item.isNumeric
-												? currency.format(item.amount ?? 0)
-												: item.arithmetic}
-										</TableCell>
-										<TableCell className="type-muted">
-											{formatFrequency(item.frequency)}
-										</TableCell>
-									</TableRow>
-								))}
-								<TableRow className="border-t-2 border-border">
-									<TableCell colSpan={2} className="type-title">
-										Remaining cash / investment capacity
+		<SectionCard
+			title="Monthly cash flow"
+			className="rounded-[1.6rem] border-border shadow-sm"
+		>
+			<Table>
+				<TableHeader>
+					<TableRow>
+						<TableHead>Category</TableHead>
+						<TableHead>Transaction</TableHead>
+						<TableHead>Amount</TableHead>
+						<TableHead>Frequency</TableHead>
+					</TableRow>
+				</TableHeader>
+				<TableBody>
+					{items.length > 0 ? (
+						<>
+							{items.map((item, i) => (
+								<TableRow key={i}>
+									<TableCell className="type-label tracking-wide">
+										{item.category}
 									</TableCell>
-									<TableCell className="type-title">
-										{currency.format(remaining)}
+									<TableCell className="type-body text-foreground/80">
+										{item.label}
 									</TableCell>
-									<TableCell />
+									<TableCell className="type-value text-sm">
+										{item.isNumeric
+											? currency.format(item.amount ?? 0)
+											: item.arithmetic}
+									</TableCell>
+									<TableCell className="type-muted">
+										{formatFrequency(item.frequency)}
+									</TableCell>
 								</TableRow>
-							</>
-						) : (
-							<TableRow>
-								<TableCell
-									colSpan={4}
-									className="py-6 text-center text-muted-foreground"
-								>
-									No scheduled transactions are enabled.
+							))}
+							<TableRow className="border-t-2 border-border">
+								<TableCell colSpan={2} className="type-title">
+									Remaining cash / investment capacity
 								</TableCell>
+								<TableCell className="type-title">
+									{currency.format(remaining)}
+								</TableCell>
+								<TableCell />
 							</TableRow>
-						)}
-					</TableBody>
-				</Table>
-				{numericItems.length < items.length ? (
-					<div className="mt-3 type-caption text-muted-foreground/70">
-						Some transactions use formulas rather than fixed amounts. Exact
-						monthly totals depend on account balances and other dynamic values.
-					</div>
-				) : null}
-			</CardContent>
-		</Card>
+						</>
+					) : (
+						<TableRow>
+							<TableCell
+								colSpan={4}
+								className="py-6 text-center text-muted-foreground"
+							>
+								No scheduled transactions are enabled.
+							</TableCell>
+						</TableRow>
+					)}
+				</TableBody>
+			</Table>
+			{numericItems.length < items.length ? (
+				<div className="mt-3 type-caption text-muted-foreground/70">
+					Some transactions use formulas rather than fixed amounts. Exact
+					monthly totals depend on account balances and other dynamic values.
+				</div>
+			) : null}
+		</SectionCard>
 	);
 });
