@@ -131,7 +131,7 @@ function buildIneligibleProjection(): {
 		milestones: { firstCoverageDate: null, firstSelfSustainingDate: null },
 	};
 	const result: ProjectionResult = {
-		timeline: { rows: [], sampledRows: [] },
+		timeline: { rows: [] },
 		accountSummaries: [],
 		totals: {
 			externalInflowAmount: 0,

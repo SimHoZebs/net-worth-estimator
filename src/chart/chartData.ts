@@ -21,7 +21,7 @@ export function buildBalanceChartData(
 		(account) => account.enabled,
 	);
 
-	return result.timeline.sampledRows.map((row) => {
+	return result.timeline.rows.map((row) => {
 		const balanceByAccountId = new Map<string, number>();
 		for (const snapshot of row.accountSnapshots) {
 			if (!balanceByAccountId.has(snapshot.accountId)) {
@@ -48,7 +48,7 @@ export function buildAccountDiagnosticChartData(
 		(account) => account.enabled,
 	);
 
-	return result.timeline.sampledRows.map((row) => {
+	return result.timeline.rows.map((row) => {
 		const entry: Record<string, string | number> = {
 			date: row.date,
 			netWorth: row.netWorth,
@@ -88,7 +88,7 @@ export function buildStochasticChartData(
 	const bandDateIndex = new Map(
 		stochasticResult.bands.map((band) => [band.date, band]),
 	);
-	return result.timeline.sampledRows.map((row) => {
+	return result.timeline.rows.map((row) => {
 		const band = bandDateIndex.get(row.date);
 		const p10 = band?.netWorth.p10 ?? row.netWorth;
 		const p25 = band?.netWorth.p25 ?? row.netWorth;

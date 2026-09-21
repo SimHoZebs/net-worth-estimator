@@ -223,10 +223,9 @@ func (s *stochasticSession) buildResult() *types.StochasticProjectionResult {
 		finalBands = bands[len(bands)-1].NetWorth
 	}
 	result := &types.StochasticProjectionResult{
-		Config:        s.config,
-		Deterministic: *s.deterministic,
-		Bands:         bands,
-		Evaluations:   s.runtimes.Result().Evaluations,
+		Config:      s.config,
+		Bands:       bands,
+		Evaluations: s.runtimes.Result().Evaluations,
 	}
 	result.Milestones.FinalNetWorthPercentiles = finalBands
 	return result

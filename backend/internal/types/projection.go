@@ -75,8 +75,7 @@ type ProjectionAccountSummary struct {
 
 type ProjectionCoreResult struct {
 	Timeline struct {
-		Rows        []ProjectionRow `json:"rows"`
-		SampledRows []ProjectionRow `json:"sampledRows"`
+		Rows []ProjectionRow `json:"rows"`
 	} `json:"timeline"`
 	AccountSummaries []ProjectionAccountSummary `json:"accountSummaries"`
 	Totals           struct {
@@ -96,8 +95,7 @@ type ProjectionCoreResult struct {
 
 type ProjectionResult struct {
 	Timeline struct {
-		Rows        []ProjectionRow `json:"rows"`
-		SampledRows []ProjectionRow `json:"sampledRows"`
+		Rows []ProjectionRow `json:"rows"`
 	} `json:"timeline"`
 	AccountSummaries []ProjectionAccountSummary `json:"accountSummaries"`
 	Totals           struct {
@@ -131,10 +129,9 @@ type ProjectionPath struct {
 }
 
 type StochasticProjectionResult struct {
-	Config        StochasticConfig    `json:"config"`
-	Deterministic ProjectionResult    `json:"deterministic"`
-	Bands         []StochasticBandRow `json:"bands"`
-	Milestones    struct {
+	Config     StochasticConfig    `json:"config"`
+	Bands      []StochasticBandRow `json:"bands"`
+	Milestones struct {
 		FinalNetWorthPercentiles PercentileBands `json:"finalNetWorthPercentiles"`
 	} `json:"milestones"`
 	Evaluations EvaluationResultTables `json:"evaluations"`

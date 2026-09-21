@@ -202,10 +202,8 @@ func AdaptSimulationRun(prepared *types.PreparedProjection, run *types.Simulatio
 
 	result := &types.ProjectionResult{}
 	result.Timeline.Rows = make([]types.ProjectionRow, len(path.Rows))
-	result.Timeline.SampledRows = make([]types.ProjectionRow, len(path.Rows))
 	for index, row := range path.Rows {
 		result.Timeline.Rows[index] = roundRow(row)
-		result.Timeline.SampledRows[index] = roundRow(row)
 	}
 	result.AccountSummaries = accountSummaries
 	result.Totals.ExternalInflowAmount = roundCurrency(totals.inflow)

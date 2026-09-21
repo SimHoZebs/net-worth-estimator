@@ -443,7 +443,6 @@ export interface FinancialIndependenceAnalysis {
 export interface ProjectionCoreResult {
 	timeline: {
 		rows: ProjectionRow[];
-		sampledRows: ProjectionRow[];
 	};
 	accountSummaries: ProjectionAccountSummary[];
 	totals: {

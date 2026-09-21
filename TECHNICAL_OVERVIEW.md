@@ -145,6 +145,8 @@ The stochastic coordinator:
 6. Processes runs in server-side batches and streams SSE `progress`/`partial` events; the client renders progressive `StochasticProjectionResult` updates.
 7. Discards each sample path after the distribution and enabled evaluation trackers consume it.
 
+8. Partial and final payloads carry percentile bands, milestones, and stochastic evaluations without re-embedding the deterministic timeline; the client reads deterministic state from its own query.
+
 Percentile-band slope is never interpreted as a run outcome. FI confidence dates come from the cumulative distribution of each run's first successful candidate.
 
 ## 8. UI and State

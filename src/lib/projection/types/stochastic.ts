@@ -2,7 +2,6 @@ import type {
 	EvaluationResultCollection,
 	EvaluationType,
 	IsoDate,
-	ProjectionResult,
 } from "./model";
 
 export interface StochasticConfig {
@@ -53,7 +52,6 @@ export interface StochasticBandRow {
 
 export interface StochasticProjectionResult extends EvaluationResultCollection {
 	config: StochasticConfig;
-	deterministic: ProjectionResult;
 	bands: StochasticBandRow[];
 	milestones: {
 		finalNetWorthPercentiles: PercentileBands;
