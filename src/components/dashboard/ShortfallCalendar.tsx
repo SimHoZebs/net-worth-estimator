@@ -135,7 +135,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 							/>
 						</div>
 
-						<div className="space-y-3 rounded-2xl border border-tertiary-border/80 bg-tertiary-subtle/80 p-4 shadow-inner shadow-white/20 dark:shadow-black/20">
+						<div className="space-y-2 rounded-2xl border border-tertiary-border/80 bg-tertiary-subtle/80 p-3 shadow-inner shadow-white/20 dark:shadow-black/20">
 							<div>
 								<div className="text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
 									Underfulfilled dates
@@ -150,12 +150,12 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 							</div>
 
 							<div className="space-y-2">
-								{shortfallDays.slice(0, 8).map((day) => (
+								{shortfallDays.slice(0, 6).map((day) => (
 									<button
 										key={day.date}
 										type="button"
 										onClick={() => setSelectedDateIso(day.date)}
-										className="w-full rounded-xl border border-border/80 bg-card/82 px-3 py-2 text-left shadow-sm transition hover:border-tertiary-border hover:bg-tertiary-subtle dark:border-white/10"
+										className="w-full rounded-xl border border-border/80 bg-card/82 px-3 py-1.5 text-left shadow-sm transition hover:border-tertiary-border hover:bg-tertiary-subtle dark:border-white/10"
 									>
 										<div className="flex items-center justify-between gap-2">
 											<span className="type-label text-tertiary-foreground">
@@ -173,9 +173,9 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 								))}
 							</div>
 
-							{shortfallDays.length > 8 ? (
+							{shortfallDays.length > 6 ? (
 								<div className="type-caption text-tertiary-foreground/70">
-									Showing the first 8 of {shortfallDays.length}.
+									Showing the first 6 of {shortfallDays.length}.
 								</div>
 							) : null}
 						</div>

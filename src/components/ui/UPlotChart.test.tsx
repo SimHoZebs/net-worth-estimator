@@ -250,7 +250,7 @@ describe("UPlotChart data transitions", () => {
 		expect(chart.setSize).not.toHaveBeenCalled();
 
 		act(() => notifyResize(700, 500));
-		expect(chart.setSize).toHaveBeenLastCalledWith({ width: 700, height: 420 });
+		expect(chart.setSize).toHaveBeenLastCalledWith({ width: 700, height: 300 });
 
 		chart.height = 360;
 		act(() => notifyResize(800, 900));

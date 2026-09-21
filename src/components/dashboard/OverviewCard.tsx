@@ -40,7 +40,7 @@ export const OverviewCard = memo(function OverviewCard({
 	return (
 		<SectionCard
 			className="rounded-[1.8rem] border-primary-border/55 bg-gradient-to-br from-card/96 via-card/92 to-primary-subtle/30"
-			contentClassName="p-5 md:p-6"
+			contentClassName="p-4"
 		>
 			{row && outcome ? (
 				<>
@@ -50,16 +50,16 @@ export const OverviewCard = memo(function OverviewCard({
 						eyebrow="FI date"
 						eyebrowClassName="type-eyebrow"
 						title={formatDate(row.date)}
-						titleClassName="mt-2 text-balance text-xl font-semibold tracking-tight text-foreground md:text-2xl"
+						titleClassName="mt-2 text-balance text-xl font-semibold tracking-tight text-foreground"
 						description={`Spending target in ${expenseBasisLabel(plan)}`}
 						descriptionClassName="mt-1 type-caption"
-						className="border-b border-border/70 pb-5"
+						className="border-b border-border/70 pb-4"
 					/>
 
 					<TestSummary plan={plan} row={row} outcome={outcome} />
 
 					{directIncomeLabels.length > 0 || row.annualDirectIncome > 0 ? (
-						<div className="border-b border-border/70 py-4">
+						<div className="border-b border-border/70 py-3">
 							<div className="type-label">Annual direct income</div>
 							<div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
 								<span className="text-foreground/85">
@@ -75,8 +75,8 @@ export const OverviewCard = memo(function OverviewCard({
 					) : null}
 
 					{row.assetContributions.length > 0 ? (
-						<div className="py-4">
-							<div className="mb-3 type-label">Selected accounts</div>
+						<div className="py-3">
+							<div className="mb-2 type-label">Selected accounts</div>
 							<div className="overflow-x-auto">
 								<div className="min-w-[34rem]">
 									<div className="grid grid-cols-[minmax(10rem,1fr)_8rem_7rem_9rem] gap-3 border-b border-border/70 pb-2 type-label">
@@ -90,7 +90,7 @@ export const OverviewCard = memo(function OverviewCard({
 										return (
 											<div
 												key={contribution.accountId}
-												className="grid grid-cols-[minmax(10rem,1fr)_8rem_7rem_9rem] gap-3 border-b border-border/45 py-3 text-sm last:border-0"
+												className="grid grid-cols-[minmax(10rem,1fr)_8rem_7rem_9rem] gap-3 border-b border-border/45 py-2 text-sm last:border-0"
 											>
 												<span className="flex min-w-0 items-center gap-2 text-foreground/85">
 													<span
@@ -156,7 +156,7 @@ function TestSummary({
 	const passed = status === "Passed";
 	return (
 		<div
-			className={`my-4 rounded-2xl border px-4 py-4 md:px-5 ${passed ? "border-primary-border/60 bg-primary-subtle/40" : "border-tertiary-border/70 bg-tertiary-subtle/45"}`}
+			className={`my-3 rounded-2xl border px-4 py-3 ${passed ? "border-primary-border/60 bg-primary-subtle/40" : "border-tertiary-border/70 bg-tertiary-subtle/45"}`}
 		>
 			<div className="flex flex-wrap items-center justify-between gap-2 border-b border-current/15 pb-3">
 				<div className="type-label">{yearTestLabel(plan.evaluationYears)}</div>
@@ -168,7 +168,7 @@ function TestSummary({
 					{status}
 				</Pill>
 			</div>
-			<div className="grid gap-3 pt-3 sm:grid-cols-2">
+			<div className="grid gap-2 pt-3 sm:grid-cols-2">
 				<SummaryCheck
 					label="Net worth"
 					value={`${currency.format(row.netWorth)} / ${currency.format(row.minimumNetWorth)}`}
@@ -206,7 +206,7 @@ function SummaryCheck({
 	return (
 		<section
 			aria-label={label}
-			className="rounded-xl border border-border/60 bg-card/55 px-3 py-3"
+			className="rounded-xl border border-border/60 bg-card/55 px-3 py-2"
 		>
 			<div className="flex items-center justify-between gap-3">
 				<div className="type-label text-foreground/75">{label}</div>

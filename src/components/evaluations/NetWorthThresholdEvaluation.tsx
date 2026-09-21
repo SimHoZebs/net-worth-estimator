@@ -39,9 +39,14 @@ export function NetWorthThresholdEvaluation({
 
 	return (
 		<div>
-			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-				<Metric label="Target" value={currency.format(config.target)} />
+			<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
 				<Metric
+					size="sm"
+					label="Target"
+					value={currency.format(config.target)}
+				/>
+				<Metric
+					size="sm"
 					label="Deterministic outcome"
 					value={
 						deterministic?.firstReachedDate
@@ -50,6 +55,7 @@ export function NetWorthThresholdEvaluation({
 					}
 				/>
 				<Metric
+					size="sm"
 					label={`${stochasticIsProvisional ? "Provisional " : ""}probability`}
 					value={
 						probabilistic
@@ -58,6 +64,7 @@ export function NetWorthThresholdEvaluation({
 					}
 				/>
 				<Metric
+					size="sm"
 					label={`${stochasticIsProvisional ? "Provisional " : ""}median date`}
 					value={
 						probabilistic?.medianReachedDate

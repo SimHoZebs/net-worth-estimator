@@ -59,7 +59,7 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 					<>Manual inputs — no synced balances yet.</>
 				)}
 			</div>
-			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+			<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
 				<DriverCard
 					label="Cash cushion"
 					value={currency.format(result.cashCushion)}
@@ -82,8 +82,8 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 				/>
 			</div>
 
-			<div className="mt-5 grid gap-3 lg:grid-cols-2">
-				<div className="rounded-2xl border border-border/70 bg-surface/70 p-4">
+			<div className="mt-4 grid gap-2 lg:grid-cols-2">
+				<div className="rounded-2xl border border-border/70 bg-surface/70 p-3">
 					<div className="type-label">Cash · checking</div>
 					<div
 						className="mt-2 flex h-3 overflow-hidden rounded-full bg-muted"
@@ -107,7 +107,7 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 						{currency.format(inputs.unpaidCashObligations)} unpaid
 					</div>
 				</div>
-				<div className="rounded-2xl border border-border/70 bg-surface/70 p-4">
+				<div className="rounded-2xl border border-border/70 bg-surface/70 p-3">
 					<div className="type-label">Cards · next paycheck</div>
 					<div
 						className="mt-2 flex h-3 overflow-hidden rounded-full bg-muted"

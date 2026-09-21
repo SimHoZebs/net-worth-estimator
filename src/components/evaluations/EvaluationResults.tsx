@@ -45,7 +45,7 @@ export function EvaluationResults({
 		: (stochasticResult ?? results ?? result);
 
 	return (
-		<section id="evaluations" className="space-y-4">
+		<section id="evaluations" className="space-y-3">
 			<PageHeader level="h2" title="Evaluations" titleClassName="sr-only" />
 
 			{EVALUATION_TYPE_ORDER.map((type) => (
@@ -108,7 +108,7 @@ function EvaluationTypeSection({
 	if (table.length === 0) return null;
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-2">
 			<h3 className="type-eyebrow text-muted-foreground">{definition.label}</h3>
 			{table.map((evaluation) => {
 				const config = validatedConfig(type, evaluation.config);
@@ -141,11 +141,11 @@ function EvaluationTypeSection({
 						headerClassName="border-b border-border/70 bg-surface/45 dark:border-white/10"
 						header={
 							<div className="flex items-start justify-between gap-4">
-								<div className="type-title text-xl">{evaluation.label}</div>
+								<div className="type-title text-lg">{evaluation.label}</div>
 								{hasLocalProgress ? null : <Pill>{status}</Pill>}
 							</div>
 						}
-						contentClassName="space-y-4 p-4 md:p-6"
+						contentClassName="space-y-4 p-4"
 					>
 						{hasLocalProgress && stochasticProgress && stochasticWorkload ? (
 							<SimulationProgressPanel
