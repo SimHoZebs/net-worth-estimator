@@ -1,11 +1,5 @@
 import type { Key, ReactNode } from "react";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { SectionCard } from "@/components/present/present";
 import {
 	Table,
 	TableBody,
@@ -126,12 +120,12 @@ export function DataTable<TRow extends object>({
 	}
 
 	return (
-		<Card className="rounded-[1.8rem] border-border shadow-sm ">
-			<CardHeader>
-				<CardTitle>{title}</CardTitle>
-				<CardDescription>{description}</CardDescription>
-			</CardHeader>
-			<CardContent>{table}</CardContent>
-		</Card>
+		<SectionCard
+			title={title}
+			description={description}
+			className="rounded-[1.8rem] border-border shadow-sm"
+		>
+			{table}
+		</SectionCard>
 	);
 }

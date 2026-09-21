@@ -5,15 +5,9 @@ import { AccountsTable } from "@/components/dashboard/tables/AccountsTable";
 import { CheckpointsTable } from "@/components/dashboard/tables/CheckpointsTable";
 import { PostingsTable } from "@/components/dashboard/tables/PostingsTable";
 import { TransactionHistoryTable } from "@/components/dashboard/tables/TransactionHistoryTable";
+import { EmptyState, SectionCard } from "@/components/present/present";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardAction,
-	CardContent,
-	CardDescription,
-	CardHeader,
-} from "@/components/ui/card";
 import { pluralize } from "@/lib/format";
 import { partitionPostings } from "@/lib/posting-categories";
 import { useModelRuntime } from "@/runtime/modelRuntime";
@@ -149,13 +143,15 @@ export function ModelInputsInspector() {
 	const activeTab = isEditing ? editTab : readTab;
 
 	return (
-		<Card className="rounded-[1.8rem] border-border/80">
-			<CardHeader>
-				<CardDescription>
+		<SectionCard
+			description={
+				<>
 					Posting-derived projection inputs and observed account balances.
 					Validation: {validationSummary}.
-				</CardDescription>
-				<CardAction className="flex flex-wrap justify-end gap-2">
+				</>
+			}
+			action={
+				<div className="flex flex-wrap justify-end gap-2">
 					{isEditing ? (
 						<>
 							<Button
@@ -200,152 +196,152 @@ export function ModelInputsInspector() {
 							) : null}
 						</>
 					)}
-				</CardAction>
-			</CardHeader>
+				</div>
+			}
+			className="rounded-[1.8rem] border-border/80"
+			contentClassName="space-y-5"
+		>
+			{loadError ? (
+				<Alert variant="destructive" className="rounded-[1.6rem]">
+					<AlertTitle>Financial model could not be loaded</AlertTitle>
+					<AlertDescription>{loadError}</AlertDescription>
+				</Alert>
+			) : null}
 
-			<CardContent className="space-y-5">
-				{loadError ? (
-					<Alert variant="destructive" className="rounded-[1.6rem]">
-						<AlertTitle>Financial model could not be loaded</AlertTitle>
-						<AlertDescription>{loadError}</AlertDescription>
-					</Alert>
-				) : null}
+			{sourceActionError ? (
+				<Alert variant="destructive" className="rounded-[1.6rem]">
+					<AlertTitle>Source action failed</AlertTitle>
+					<AlertDescription>{sourceActionError}</AlertDescription>
+				</Alert>
+			) : null}
 
-				{sourceActionError ? (
-					<Alert variant="destructive" className="rounded-[1.6rem]">
-						<AlertTitle>Source action failed</AlertTitle>
-						<AlertDescription>{sourceActionError}</AlertDescription>
-					</Alert>
-				) : null}
+			{issues.length > 0 ? <ModelValidationPanel issues={issues} /> : null}
 
-				{issues.length > 0 ? <ModelValidationPanel issues={issues} /> : null}
-
-				{document && displayDocument ? (
-					<>
-						<div className="flex flex-wrap items-center justify-between gap-3">
-							<fieldset className="flex flex-wrap gap-2">
-								<legend className="sr-only">Model input sections</legend>
-								{tabs.map((tab) => (
-									<button
-										key={tab.id}
-										type="button"
-										aria-pressed={activeTab === tab.id}
-										onClick={() =>
-											isEditing
-												? setEditTab(tab.id as EditInputTab)
-												: setReadTab(tab.id as ReadInputTab)
-										}
-										className={tabClassName(activeTab === tab.id)}
-									>
-										{tab.label} <span className="opacity-70">{tab.count}</span>
-									</button>
-								))}
-							</fieldset>
-
-							{!isEditing ? (
+			{document && displayDocument ? (
+				<>
+					<div className="flex flex-wrap items-center justify-between gap-3">
+						<fieldset className="flex flex-wrap gap-2">
+							<legend className="sr-only">Model input sections</legend>
+							{tabs.map((tab) => (
 								<button
+									key={tab.id}
 									type="button"
-									onClick={() => setShowAdvanced(!showAdvanced)}
-									className="rounded-lg border border-border px-3 py-1.5 type-label transition hover:border-ring hover:text-foreground"
+									aria-pressed={activeTab === tab.id}
+									onClick={() =>
+										isEditing
+											? setEditTab(tab.id as EditInputTab)
+											: setReadTab(tab.id as ReadInputTab)
+									}
+									className={tabClassName(activeTab === tab.id)}
 								>
-									{showAdvanced
-										? "Hide technical fields"
-										: "Show technical fields"}
+									{tab.label} <span className="opacity-70">{tab.count}</span>
 								</button>
-							) : null}
-						</div>
+							))}
+						</fieldset>
 
-						<div className="space-y-4">
-							{isEditing && activeTab === "postings" ? (
-								<PostingsTable
+						{!isEditing ? (
+							<button
+								type="button"
+								onClick={() => setShowAdvanced(!showAdvanced)}
+								className="rounded-lg border border-border px-3 py-1.5 type-label transition hover:border-ring hover:text-foreground"
+							>
+								{showAdvanced
+									? "Hide technical fields"
+									: "Show technical fields"}
+							</button>
+						) : null}
+					</div>
+
+					<div className="space-y-4">
+						{isEditing && activeTab === "postings" ? (
+							<PostingsTable
+								editable
+								displayDocument={displayDocument}
+								document={document}
+								isDirty={isDirty}
+								workingDocument={workingDocument}
+								projectionStartDate={projectionStartDate}
+								updatePosting={updatePosting}
+								deletePosting={deletePosting}
+								addPosting={addPosting}
+							/>
+						) : null}
+
+						{!isEditing && activeTab === "scheduled" ? (
+							<PostingsTable
+								postings={postingGroups.scheduledTransactions}
+								accounts={displayDocument.accounts}
+								projectionStartDate={projectionStartDate}
+								showAdvanced={showAdvanced}
+							/>
+						) : null}
+
+						{activeTab === "accounts" ? (
+							isEditing ? (
+								<AccountsTable
 									editable
 									displayDocument={displayDocument}
 									document={document}
 									isDirty={isDirty}
 									workingDocument={workingDocument}
-									projectionStartDate={projectionStartDate}
-									updatePosting={updatePosting}
-									deletePosting={deletePosting}
-									addPosting={addPosting}
+									updateAccount={updateAccount}
+									deleteAccount={deleteAccount}
+									addAccount={addAccount}
 								/>
-							) : null}
-
-							{!isEditing && activeTab === "scheduled" ? (
-								<PostingsTable
-									postings={postingGroups.scheduledTransactions}
+							) : (
+								<AccountsTable
 									accounts={displayDocument.accounts}
-									projectionStartDate={projectionStartDate}
+									accountRules={postingGroups.accountRules}
+									accountSummaries={result?.accountSummaries ?? null}
+									currentNetWorth={result?.summary.currentNetWorth ?? null}
+									projectionStartDate={
+										result?.milestones.projectionStartDate ??
+										projectionStartDate
+									}
+									balancesAreStale={projectionResultIsStale}
 									showAdvanced={showAdvanced}
 								/>
-							) : null}
+							)
+						) : null}
 
-							{activeTab === "accounts" ? (
-								isEditing ? (
-									<AccountsTable
-										editable
-										displayDocument={displayDocument}
-										document={document}
-										isDirty={isDirty}
-										workingDocument={workingDocument}
-										updateAccount={updateAccount}
-										deleteAccount={deleteAccount}
-										addAccount={addAccount}
-									/>
-								) : (
-									<AccountsTable
-										accounts={displayDocument.accounts}
-										accountRules={postingGroups.accountRules}
-										accountSummaries={result?.accountSummaries ?? null}
-										currentNetWorth={result?.summary.currentNetWorth ?? null}
-										projectionStartDate={
-											result?.milestones.projectionStartDate ??
-											projectionStartDate
-										}
-										balancesAreStale={projectionResultIsStale}
-										showAdvanced={showAdvanced}
-									/>
-								)
-							) : null}
+						{!isEditing && activeTab === "history" ? (
+							<TransactionHistoryTable
+								postings={postingGroups.transactionHistory}
+								accounts={displayDocument.accounts}
+							/>
+						) : null}
 
-							{!isEditing && activeTab === "history" ? (
-								<TransactionHistoryTable
-									postings={postingGroups.transactionHistory}
-									accounts={displayDocument.accounts}
+						{activeTab === "checkpoints" ? (
+							isEditing ? (
+								<CheckpointsTable
+									editable
+									displayDocument={displayDocument}
+									projectionStartDate={projectionStartDate}
+									updateCheckpoint={updateCheckpoint}
+									deleteCheckpoint={deleteCheckpoint}
+									addCheckpoint={addCheckpoint}
 								/>
-							) : null}
-
-							{activeTab === "checkpoints" ? (
-								isEditing ? (
-									<CheckpointsTable
-										editable
-										displayDocument={displayDocument}
-										projectionStartDate={projectionStartDate}
-										updateCheckpoint={updateCheckpoint}
-										deleteCheckpoint={deleteCheckpoint}
-										addCheckpoint={addCheckpoint}
-									/>
-								) : (
-									<CheckpointsTable
-										checkpoints={displayDocument.checkpoints}
-										showAdvanced={showAdvanced}
-										accountLabelById={accountLabelById}
-									/>
-								)
-							) : null}
-						</div>
-					</>
-				) : (
-					<div className="rounded-2xl border border-dashed border-border/80 bg-surface/70 px-4 py-8 text-center type-muted dark:border-white/10 dark:bg-surface/50">
-						No financial model loaded yet.
+							) : (
+								<CheckpointsTable
+									checkpoints={displayDocument.checkpoints}
+									showAdvanced={showAdvanced}
+									accountLabelById={accountLabelById}
+								/>
+							)
+						) : null}
 					</div>
-				)}
+				</>
+			) : (
+				<EmptyState className="bg-surface/70 px-4 py-8 text-center dark:border-white/10 dark:bg-surface/50">
+					No financial model loaded yet.
+				</EmptyState>
+			)}
 
-				{document ? (
-					<div className="border-t border-border/70 pt-5">
-						<CurrentChangesControls document={document} />
-					</div>
-				) : null}
-			</CardContent>
-		</Card>
+			{document ? (
+				<div className="border-t border-border/70 pt-5">
+					<CurrentChangesControls document={document} />
+				</div>
+			) : null}
+		</SectionCard>
 	);
 }

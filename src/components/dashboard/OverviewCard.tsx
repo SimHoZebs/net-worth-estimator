@@ -1,5 +1,6 @@
 import { memo } from "react";
 import {
+	EmptyState,
 	Metric,
 	PageHeader,
 	Pill,
@@ -130,12 +131,12 @@ export const OverviewCard = memo(function OverviewCard({
 					) : null}
 				</>
 			) : (
-				<div className="rounded-2xl border border-dashed border-border/80 p-5">
+				<EmptyState>
 					<p className="text-pretty text-foreground">
 						No complete {yearTestLabel(plan.evaluationYears)} fits in the
 						projection horizon.
 					</p>
-				</div>
+				</EmptyState>
 			)}
 		</SectionCard>
 	);

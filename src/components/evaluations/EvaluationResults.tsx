@@ -1,4 +1,9 @@
-import { PageHeader, Pill, SectionCard } from "@/components/present/present";
+import {
+	EmptyState,
+	PageHeader,
+	Pill,
+	SectionCard,
+} from "@/components/present/present";
 import { SimulationProgressPanel } from "@/components/SimulationProgressPanel";
 import { StochasticProgressDetails } from "@/components/StochasticProgressDetails";
 import type {
@@ -200,9 +205,9 @@ function EvaluationTypeSection({
 								blockerDetail={blockerDetail}
 							/>
 						) : resultsAreStale && evaluation.enabled && !hasLocalProgress ? (
-							<p className="rounded-2xl border border-dashed border-border/80 p-5 type-muted">
+							<EmptyState>
 								Updating this evaluation with the current settings.
-							</p>
+							</EmptyState>
 						) : null}
 					</SectionCard>
 				);

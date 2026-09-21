@@ -1,4 +1,5 @@
 import { type ReactNode, useId } from "react";
+import { Pill } from "@/components/present/present";
 
 // Editor-specific layout for the financial independence plan editor. Kept
 // separate from the generic kit in field-kit.tsx so each file stays focused.
@@ -86,9 +87,13 @@ export function ChoiceCards<TValue extends string>({
 										{option.label}
 									</span>
 									{option.badge ? (
-										<span className="mt-1 inline-block rounded-full border border-border/70 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+										<Pill
+											size="xs"
+											textClassName="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+											className="mt-1 inline-block"
+										>
 											{option.badge}
-										</span>
+										</Pill>
 									) : null}
 								</span>
 							</span>

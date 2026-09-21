@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { EmptyState } from "@/components/present/present";
 import { Button } from "@/components/ui/button";
 import { TableSearch } from "@/components/ui/table-search";
 import { formatDate } from "@/lib/format";
@@ -97,9 +98,9 @@ export function TransactionHistoryTable({
 						</section>
 					))
 				) : (
-					<div className="rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center type-muted">
+					<EmptyState className="px-4 py-8 text-center">
 						No transactions match this search.
-					</div>
+					</EmptyState>
 				)}
 			</div>
 			<div className="flex flex-wrap items-center justify-between gap-3 type-caption">

@@ -1,4 +1,9 @@
-import { Metric, PageHeader, SectionCard } from "@/components/present/present";
+import {
+	EmptyState,
+	Metric,
+	PageHeader,
+	SectionCard,
+} from "@/components/present/present";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePostingAnalyses } from "@/hooks/usePostingAnalyses";
 import { useModelRuntime } from "@/runtime/modelRuntime";
@@ -80,14 +85,14 @@ export function AnalysisPage() {
 								}
 							/>
 						</div>
-						<div className="rounded-2xl border border-dashed border-border/80 bg-muted/30 p-4">
+						<EmptyState className="bg-muted/30 p-4">
 							<div className="type-title text-base">What is included</div>
 							<p className="mt-1 type-muted">
 								The analysis reads one-time postings with no source account and
 								at least one destination. Recurring model rules are not treated
 								as observed pay.
 							</p>
-						</div>
+						</EmptyState>
 					</SectionCard>
 
 					<SectionCard
@@ -219,14 +224,14 @@ export function AnalysisPage() {
 								</div>
 							</>
 						) : (
-							<div className="rounded-2xl border border-dashed border-border/80 bg-muted/25 p-6">
+							<EmptyState className="bg-muted/25 p-6">
 								<div className="type-title">No defensible estimate yet</div>
 								<p className="mt-2 type-muted">
 									Add at least two comparable one-time external inflow postings.
 									A confirmed annualized result needs three or more comparable
 									postings.
 								</p>
-							</div>
+							</EmptyState>
 						)}
 
 						{analysisDiagnostics.length > 0 ? (

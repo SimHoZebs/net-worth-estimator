@@ -1,11 +1,5 @@
+import { Pill, SectionCard } from "@/components/present/present";
 import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 import { formatDate } from "@/lib/format";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 
@@ -36,63 +30,65 @@ export function SourceStatusCard() {
 			: sourceActionError
 				? "Action failed"
 				: "Loaded";
-	const statusClassName =
+	const statusTone =
 		loadError || sourceActionError
-			? "border-destructive/25 bg-destructive-subtle text-destructive-foreground"
+			? "destructive"
 			: isLoading
-				? "border-tertiary-border bg-tertiary-subtle text-tertiary-foreground"
-				: "border-primary-border bg-primary-subtle text-primary";
+				? "tertiary"
+				: "primary";
 
 	return (
-		<Card className="rounded-[1.4rem] shadow-sm ">
-			<CardHeader>
-				<CardTitle>Source</CardTitle>
-				<CardDescription>Load state and low-priority metadata.</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-4">
-				<div className="flex items-center justify-between gap-3">
-					<div>
-						<div className="type-value text-sm">{source.label}</div>
-						<div className="type-caption">
-							Projection starts {formatDate(projectionStartDate)}
-						</div>
+		<SectionCard
+			title="Source"
+			description="Load state and low-priority metadata."
+			className="rounded-[1.4rem] shadow-sm"
+			contentClassName="space-y-4"
+		>
+			<div className="flex items-center justify-between gap-3">
+				<div>
+					<div className="type-value text-sm">{source.label}</div>
+					<div className="type-caption">
+						Projection starts {formatDate(projectionStartDate)}
 					</div>
-					<span
-						className={`rounded-full border px-2.5 py-0.5 type-caption font-medium ${statusClassName}`}
-					>
-						{status}
-					</span>
 				</div>
+				<Pill
+					size="xs"
+					tone={statusTone}
+					textClassName="type-caption font-medium"
+					className="normal-case px-2.5"
+				>
+					{status}
+				</Pill>
+			</div>
 
-				<dl className="space-y-2 type-caption">
-					<div className="flex justify-between gap-3">
-						<dt>Last loaded</dt>
-						<dd className="text-right text-foreground/80">
-							{formatLoadedAt(dataUpdatedAt)}
-						</dd>
-					</div>
-					<div className="flex justify-between gap-3">
-						<dt>Source type</dt>
-						<dd className="text-right text-foreground/80">
-							{source.repositoryType}
-						</dd>
-					</div>
-				</dl>
-
-				<p className="type-caption">{source.description}</p>
-
-				<div className="flex flex-wrap justify-end gap-2">
-					<Button
-						type="button"
-						variant="secondary"
-						size="sm"
-						onClick={reload}
-						disabled={isLoading}
-					>
-						{isLoading ? "Loading..." : "Reload"}
-					</Button>
+			<dl className="space-y-2 type-caption">
+				<div className="flex justify-between gap-3">
+					<dt>Last loaded</dt>
+					<dd className="text-right text-foreground/80">
+						{formatLoadedAt(dataUpdatedAt)}
+					</dd>
 				</div>
-			</CardContent>
-		</Card>
+				<div className="flex justify-between gap-3">
+					<dt>Source type</dt>
+					<dd className="text-right text-foreground/80">
+						{source.repositoryType}
+					</dd>
+				</div>
+			</dl>
+
+			<p className="type-caption">{source.description}</p>
+
+			<div className="flex flex-wrap justify-end gap-2">
+				<Button
+					type="button"
+					variant="secondary"
+					size="sm"
+					onClick={reload}
+					disabled={isLoading}
+				>
+					{isLoading ? "Loading..." : "Reload"}
+				</Button>
+			</div>
+		</SectionCard>
 	);
 }

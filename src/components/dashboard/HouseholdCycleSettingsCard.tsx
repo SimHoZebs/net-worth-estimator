@@ -1,7 +1,7 @@
 import { memo } from "react";
+import { LabeledField } from "@/components/fields/field-kit";
 import { SectionCard } from "@/components/present/present";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { useHouseholdCycle } from "./useHouseholdCycle";
 
@@ -106,15 +106,13 @@ function AmountField({
 	onChange: (raw: string) => void;
 }) {
 	return (
-		<label className="block rounded-2xl border border-border/70 bg-card/80 px-3 py-2">
-			<span className="type-label">{label}</span>
-			<Input
-				type="number"
-				aria-label={label}
-				className="mt-1 tabular-nums"
-				value={String(value)}
-				onChange={(event) => onChange(event.target.value)}
-			/>
-		</label>
+		<LabeledField
+			label={label}
+			type="number"
+			inputMode="decimal"
+			value={String(value)}
+			onChange={onChange}
+			className="tabular-nums"
+		/>
 	);
 }

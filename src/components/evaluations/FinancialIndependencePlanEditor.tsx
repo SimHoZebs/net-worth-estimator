@@ -1,13 +1,7 @@
 import { memo, useMemo, useState } from "react";
 import { FinancialIndependenceEditorSection } from "@/components/fields/editor-section";
 import { LabeledField } from "@/components/fields/field-kit";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { SectionCard } from "@/components/present/present";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { parseDecimalDraft } from "@/lib/number-draft";
 import type {
@@ -358,294 +352,288 @@ export const FinancialIndependencePlanEditor = memo(
 		};
 
 		return (
-			<Card className="rounded-[1.4rem] border-border/80">
-				<CardHeader>
-					<CardTitle>Financial independence assumptions</CardTitle>
-					<CardDescription>
-						Define the spending goal, how it is funded, and what must be true
-						for the plan to count as successful. Changes stay here until you
-						update the analysis.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="space-y-5">
-					<FinancialIndependenceEditorSection
-						number="1"
-						title="Goal"
-						description="Set the lifestyle this plan must support after work."
-					>
-						<div className="grid gap-3 sm:grid-cols-2">
-							<FiNumberField
-								label="Annual spending"
-								description="Annualized spending interpreted using the selected value basis."
-								value={numericDrafts.annualExpenseTarget}
-								min={0}
-								step={1000}
-								onChange={(annualExpenseTarget) =>
-									updateNumericDrafts((current) => ({
-										...current,
-										annualExpenseTarget,
-									}))
-								}
-							/>
-							<FiNumberField
-								label="Spending inflation (%)"
-								description="Grows annual spending and adjusts the purchasing-power rule."
-								value={numericDrafts.annualExpenseGrowthRate}
-								min={0}
-								step={0.1}
-								onChange={(annualExpenseGrowthRate) =>
-									updateNumericDrafts((current) => ({
-										...current,
-										annualExpenseGrowthRate,
-									}))
-								}
-							/>
-						</div>
-						<SpendingValueBasis
-							value={draft.annualExpenseTargetBasis}
-							onChange={(annualExpenseTargetBasis) =>
-								updateDraft((current) => ({
-									...current,
-									annualExpenseTargetBasis,
-								}))
-							}
-						/>
-					</FinancialIndependenceEditorSection>
-
-					<FinancialIndependenceEditorSection
-						number="2"
-						title="Funding"
-						description="Choose the portfolio and income available to pay for the goal."
-					>
+			<SectionCard
+				title="Financial independence assumptions"
+				description="Define the spending goal, how it is funded, and what must be true for the plan to count as successful. Changes stay here until you update the analysis."
+				className="rounded-[1.4rem] border-border/80"
+				contentClassName="space-y-5"
+			>
+				<FinancialIndependenceEditorSection
+					number="1"
+					title="Goal"
+					description="Set the lifestyle this plan must support after work."
+				>
+					<div className="grid gap-3 sm:grid-cols-2">
 						<FiNumberField
-							label="Portfolio withdrawal rate (%)"
-							description="Maximum annual withdrawal from each selected asset, recalculated from its balance at the start of each test year."
-							value={numericDrafts.withdrawalRate}
+							label="Annual spending"
+							description="Annualized spending interpreted using the selected value basis."
+							value={numericDrafts.annualExpenseTarget}
 							min={0}
-							max={100}
-							step={0.1}
-							onChange={(withdrawalRate) =>
+							step={1000}
+							onChange={(annualExpenseTarget) =>
 								updateNumericDrafts((current) => ({
 									...current,
-									withdrawalRate,
+									annualExpenseTarget,
 								}))
 							}
 						/>
-						<div>
-							<div className="type-label text-foreground">
-								Withdrawable assets
-							</div>
-							<p className="mt-0.5 type-caption text-muted-foreground">
-								Accounts you are willing to draw from to fund spending.
-							</p>
-							<div className="mt-3 grid gap-2 sm:grid-cols-2">
-								{assetAccounts.map((account) => (
-									<label
-										key={account.id}
-										className="flex items-start gap-2 rounded-xl border border-border/60 bg-card/60 p-3 type-caption"
-									>
-										<input
-											type="checkbox"
-											checked={selectedAssets.has(account.id)}
-											onChange={() => toggleAsset(account.id)}
-											className="mt-0.5 accent-primary"
-										/>
-										<span>{account.label}</span>
-									</label>
-								))}
-							</div>
-						</div>
-						<RetirementIncomeField
-							postings={retirementIncomePostings}
-							selectedIds={selectedCashflows}
-							continuingIds={continuingIds}
-							onToggle={toggleCashflow}
-						/>
-					</FinancialIndependenceEditorSection>
-
-					<FinancialIndependenceEditorSection
-						number="3"
-						title="Success"
-						description="Define how long the plan must work and how much certainty and portfolio value must remain."
-					>
-						<div className="grid gap-3 sm:grid-cols-2">
-							<FiNumberField
-								label="Test period (years)"
-								description="Every month of spending must be funded for this full period."
-								value={numericDrafts.evaluationYears}
-								min={1}
-								max={50}
-								onChange={(evaluationYears) =>
-									updateNumericDrafts((current) => ({
-										...current,
-										evaluationYears,
-									}))
-								}
-							/>
-							<FiNumberField
-								label="Required Monte Carlo confidence (%)"
-								description="Controls the reported confidence-qualified FI date; it does not change individual simulation paths."
-								value={numericDrafts.requiredConfidence}
-								min={1}
-								max={100}
-								onChange={(requiredConfidence) =>
-									updateNumericDrafts((current) => ({
-										...current,
-										requiredConfidence,
-									}))
-								}
-							/>
-						</div>
-						<EndingPortfolioPolicy
-							plan={draft}
-							onChange={(principalPolicy) =>
-								updateDraft((current) => ({ ...current, principalPolicy }))
+						<FiNumberField
+							label="Spending inflation (%)"
+							description="Grows annual spending and adjusts the purchasing-power rule."
+							value={numericDrafts.annualExpenseGrowthRate}
+							min={0}
+							step={0.1}
+							onChange={(annualExpenseGrowthRate) =>
+								updateNumericDrafts((current) => ({
+									...current,
+									annualExpenseGrowthRate,
+								}))
 							}
 						/>
-					</FinancialIndependenceEditorSection>
+					</div>
+					<SpendingValueBasis
+						value={draft.annualExpenseTargetBasis}
+						onChange={(annualExpenseTargetBasis) =>
+							updateDraft((current) => ({
+								...current,
+								annualExpenseTargetBasis,
+							}))
+						}
+					/>
+				</FinancialIndependenceEditorSection>
 
-					<Collapsible
-						unstyled
-						className="rounded-2xl border border-border/80 bg-surface/55 p-4 dark:border-white/10"
-					>
-						<Collapsible.Trigger className="type-label text-foreground">
-							<span className="flex items-center justify-between gap-3">
-								<span className="inline-flex items-center gap-2">
-									<Collapsible.Chevron />
-									Model details
-								</span>
-								<span className="type-caption font-normal text-muted-foreground">
-									{draft.continuingPostingIds.length} portfolio activity rule
-									{draft.continuingPostingIds.length === 1 ? "" : "s"} continue
-								</span>
-							</span>
-						</Collapsible.Trigger>
-						<Collapsible.Content className="mt-4 space-y-5 border-t border-border/70 pt-4">
-							<FiNumberField
-								label="Minimum total net worth"
-								description="Candidate dates are ignored until whole-model net worth reaches this gate, before selected funding coverage is tested."
-								value={numericDrafts.minimumNetWorth}
-								min={0}
-								step={50_000}
-								onChange={(minimumNetWorth) =>
-									updateNumericDrafts((current) => ({
-										...current,
-										minimumNetWorth,
-									}))
-								}
-							/>
-
-							{selectedAssets.size > 0 ? (
-								<div>
-									<div className="type-label text-foreground">
-										Per-account withdrawal rates
-									</div>
-									<p className="mt-0.5 type-caption text-muted-foreground">
-										Leave blank to use the portfolio withdrawal rate.
-									</p>
-									<div className="mt-3 grid gap-2 sm:grid-cols-2">
-										{assetAccounts
-											.filter((account) => selectedAssets.has(account.id))
-											.map((account) => {
-												return (
-													<LabeledField
-														key={account.id}
-														label={`${account.label} (%)`}
-														type="text"
-														inputMode="decimal"
-														min={0}
-														max={100}
-														step={0.1}
-														placeholder={numericDrafts.withdrawalRate}
-														value={
-															numericDrafts.assetWithdrawalRates[account.id] ??
-															""
-														}
-														onChange={(next) =>
-															updateNumericDrafts((current) => ({
-																...current,
-																assetWithdrawalRates: {
-																	...current.assetWithdrawalRates,
-																	[account.id]: next,
-																},
-															}))
-														}
-													/>
-												);
-											})}
-									</div>
-								</div>
-							) : null}
-
-							<div>
-								<div className="type-label text-foreground">
-									Continuing portfolio activity
-								</div>
-								<p className="mt-0.5 type-caption text-muted-foreground">
-									Explicit model postings replayed during the FI test, such as
-									investment growth. A posting cannot also count as spendable
-									retirement income.
-								</p>
-								{continuingPostings.length === 0 ? (
-									<p className="mt-3 type-caption text-muted-foreground">
-										Select an asset to see its related postings.
-									</p>
-								) : (
-									<div className="mt-3 grid gap-2 sm:grid-cols-2">
-										{continuingPostings.map((posting) => (
-											<label
-												key={posting.id}
-												className="flex items-start gap-2 rounded-xl border border-border/60 bg-card/60 p-3 type-caption"
-											>
-												<input
-													type="checkbox"
-													checked={continuingIds.has(posting.id)}
-													onChange={() => toggleContinuingPosting(posting.id)}
-													className="mt-0.5 accent-primary"
-												/>
-												<span>{posting.label}</span>
-											</label>
-										))}
-									</div>
-								)}
-							</div>
-						</Collapsible.Content>
-					</Collapsible>
-
-					<div className="flex flex-col gap-3 rounded-2xl border border-primary-border/50 bg-primary-subtle/35 p-4 sm:flex-row sm:items-center sm:justify-between">
-						<div>
-							<div className="type-label text-foreground">
-								{dirty ? "Draft changes ready" : "Analysis is up to date"}
-							</div>
-							<p className="type-caption text-muted-foreground">
-								Updating runs the deterministic and Monte Carlo analysis once.
-							</p>
+				<FinancialIndependenceEditorSection
+					number="2"
+					title="Funding"
+					description="Choose the portfolio and income available to pay for the goal."
+				>
+					<FiNumberField
+						label="Portfolio withdrawal rate (%)"
+						description="Maximum annual withdrawal from each selected asset, recalculated from its balance at the start of each test year."
+						value={numericDrafts.withdrawalRate}
+						min={0}
+						max={100}
+						step={0.1}
+						onChange={(withdrawalRate) =>
+							updateNumericDrafts((current) => ({
+								...current,
+								withdrawalRate,
+							}))
+						}
+					/>
+					<div>
+						<div className="type-label text-foreground">
+							Withdrawable assets
 						</div>
-						<EvaluationEditorFooter
-							dirty={dirty}
-							canSubmit={parsedDraft !== null}
-							discardLabel="Discard changes"
-							submitLabel="Update analysis"
-							className="flex flex-col gap-2 no-print sm:flex-row"
-							buttonClassName="w-full sm:w-auto"
-							onDiscard={() => {
-								setDraft(committedPlan);
-								setNumericDrafts(committedNumericDrafts);
-								onDirtyChange?.(false);
-							}}
-							onSubmit={() => {
-								if (!parsedDraft) return;
-								const appliedPlan = cleanPlan(parsedDraft);
-								onApply(appliedPlan);
-								setDraft(appliedPlan);
-								setNumericDrafts(numericDraftsForPlan(appliedPlan));
-								// No onDirtyChange here: the parent clears its
-								// dirty flag in its onApply wrapper.
-							}}
+						<p className="mt-0.5 type-caption text-muted-foreground">
+							Accounts you are willing to draw from to fund spending.
+						</p>
+						<div className="mt-3 grid gap-2 sm:grid-cols-2">
+							{assetAccounts.map((account) => (
+								<label
+									key={account.id}
+									className="flex items-start gap-2 rounded-xl border border-border/60 bg-card/60 p-3 type-caption"
+								>
+									<input
+										type="checkbox"
+										checked={selectedAssets.has(account.id)}
+										onChange={() => toggleAsset(account.id)}
+										className="mt-0.5 accent-primary"
+									/>
+									<span>{account.label}</span>
+								</label>
+							))}
+						</div>
+					</div>
+					<RetirementIncomeField
+						postings={retirementIncomePostings}
+						selectedIds={selectedCashflows}
+						continuingIds={continuingIds}
+						onToggle={toggleCashflow}
+					/>
+				</FinancialIndependenceEditorSection>
+
+				<FinancialIndependenceEditorSection
+					number="3"
+					title="Success"
+					description="Define how long the plan must work and how much certainty and portfolio value must remain."
+				>
+					<div className="grid gap-3 sm:grid-cols-2">
+						<FiNumberField
+							label="Test period (years)"
+							description="Every month of spending must be funded for this full period."
+							value={numericDrafts.evaluationYears}
+							min={1}
+							max={50}
+							onChange={(evaluationYears) =>
+								updateNumericDrafts((current) => ({
+									...current,
+									evaluationYears,
+								}))
+							}
+						/>
+						<FiNumberField
+							label="Required Monte Carlo confidence (%)"
+							description="Controls the reported confidence-qualified FI date; it does not change individual simulation paths."
+							value={numericDrafts.requiredConfidence}
+							min={1}
+							max={100}
+							onChange={(requiredConfidence) =>
+								updateNumericDrafts((current) => ({
+									...current,
+									requiredConfidence,
+								}))
+							}
 						/>
 					</div>
-				</CardContent>
-			</Card>
+					<EndingPortfolioPolicy
+						plan={draft}
+						onChange={(principalPolicy) =>
+							updateDraft((current) => ({ ...current, principalPolicy }))
+						}
+					/>
+				</FinancialIndependenceEditorSection>
+
+				<Collapsible
+					unstyled
+					className="rounded-2xl border border-border/80 bg-surface/55 p-4 dark:border-white/10"
+				>
+					<Collapsible.Trigger className="type-label text-foreground">
+						<span className="flex items-center justify-between gap-3">
+							<span className="inline-flex items-center gap-2">
+								<Collapsible.Chevron />
+								Model details
+							</span>
+							<span className="type-caption font-normal text-muted-foreground">
+								{draft.continuingPostingIds.length} portfolio activity rule
+								{draft.continuingPostingIds.length === 1 ? "" : "s"} continue
+							</span>
+						</span>
+					</Collapsible.Trigger>
+					<Collapsible.Content className="mt-4 space-y-5 border-t border-border/70 pt-4">
+						<FiNumberField
+							label="Minimum total net worth"
+							description="Candidate dates are ignored until whole-model net worth reaches this gate, before selected funding coverage is tested."
+							value={numericDrafts.minimumNetWorth}
+							min={0}
+							step={50_000}
+							onChange={(minimumNetWorth) =>
+								updateNumericDrafts((current) => ({
+									...current,
+									minimumNetWorth,
+								}))
+							}
+						/>
+
+						{selectedAssets.size > 0 ? (
+							<div>
+								<div className="type-label text-foreground">
+									Per-account withdrawal rates
+								</div>
+								<p className="mt-0.5 type-caption text-muted-foreground">
+									Leave blank to use the portfolio withdrawal rate.
+								</p>
+								<div className="mt-3 grid gap-2 sm:grid-cols-2">
+									{assetAccounts
+										.filter((account) => selectedAssets.has(account.id))
+										.map((account) => {
+											return (
+												<LabeledField
+													key={account.id}
+													label={`${account.label} (%)`}
+													type="text"
+													inputMode="decimal"
+													min={0}
+													max={100}
+													step={0.1}
+													placeholder={numericDrafts.withdrawalRate}
+													value={
+														numericDrafts.assetWithdrawalRates[account.id] ?? ""
+													}
+													onChange={(next) =>
+														updateNumericDrafts((current) => ({
+															...current,
+															assetWithdrawalRates: {
+																...current.assetWithdrawalRates,
+																[account.id]: next,
+															},
+														}))
+													}
+												/>
+											);
+										})}
+								</div>
+							</div>
+						) : null}
+
+						<div>
+							<div className="type-label text-foreground">
+								Continuing portfolio activity
+							</div>
+							<p className="mt-0.5 type-caption text-muted-foreground">
+								Explicit model postings replayed during the FI test, such as
+								investment growth. A posting cannot also count as spendable
+								retirement income.
+							</p>
+							{continuingPostings.length === 0 ? (
+								<p className="mt-3 type-caption text-muted-foreground">
+									Select an asset to see its related postings.
+								</p>
+							) : (
+								<div className="mt-3 grid gap-2 sm:grid-cols-2">
+									{continuingPostings.map((posting) => (
+										<label
+											key={posting.id}
+											className="flex items-start gap-2 rounded-xl border border-border/60 bg-card/60 p-3 type-caption"
+										>
+											<input
+												type="checkbox"
+												checked={continuingIds.has(posting.id)}
+												onChange={() => toggleContinuingPosting(posting.id)}
+												className="mt-0.5 accent-primary"
+											/>
+											<span>{posting.label}</span>
+										</label>
+									))}
+								</div>
+							)}
+						</div>
+					</Collapsible.Content>
+				</Collapsible>
+
+				<div className="flex flex-col gap-3 rounded-2xl border border-primary-border/50 bg-primary-subtle/35 p-4 sm:flex-row sm:items-center sm:justify-between">
+					<div>
+						<div className="type-label text-foreground">
+							{dirty ? "Draft changes ready" : "Analysis is up to date"}
+						</div>
+						<p className="type-caption text-muted-foreground">
+							Updating runs the deterministic and Monte Carlo analysis once.
+						</p>
+					</div>
+					<EvaluationEditorFooter
+						dirty={dirty}
+						canSubmit={parsedDraft !== null}
+						discardLabel="Discard changes"
+						submitLabel="Update analysis"
+						className="flex flex-col gap-2 no-print sm:flex-row"
+						buttonClassName="w-full sm:w-auto"
+						onDiscard={() => {
+							setDraft(committedPlan);
+							setNumericDrafts(committedNumericDrafts);
+							onDirtyChange?.(false);
+						}}
+						onSubmit={() => {
+							if (!parsedDraft) return;
+							const appliedPlan = cleanPlan(parsedDraft);
+							onApply(appliedPlan);
+							setDraft(appliedPlan);
+							setNumericDrafts(numericDraftsForPlan(appliedPlan));
+							// No onDirtyChange here: the parent clears its
+							// dirty flag in its onApply wrapper.
+						}}
+					/>
+				</div>
+			</SectionCard>
 		);
 	},
 );
