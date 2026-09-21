@@ -31,7 +31,6 @@ const result: ProjectionResult = {
 				],
 			},
 		],
-		sampledRows: [],
 	},
 	accountSummaries: [
 		{

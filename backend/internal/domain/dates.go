@@ -2,12 +2,19 @@ package domain
 
 import (
 	"fmt"
-	"math"
 	"time"
 )
 
 // Date helpers ported from utils/date.ts. All dates are UTC calendar dates
 // formatted "YYYY-MM-DD".
+//
+// Hot-path note: simulation calls CompareIsoDates, DaysBetween,
+// ProjectionYearIndex, and AddMonthsClamped millions of times per stochastic
+// run. Those use integer math on the validated YYYY-MM-DD shape instead of
+// time.Parse/time.Format: the format is fixed-width and zero-padded, so
+// lexicographic order is chronological order. time.Parse stays behind
+// ParseIsoDate/IsValidIsoDate (input validation) and the daily/weekly
+// advanceDate path, which is rare in practice.
 
 const msPerDay = 24 * 60 * 60 * 1000
 
@@ -44,22 +51,43 @@ func daysInMonth(year int, month time.Month) int {
 	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 
-func CompareIsoDates(left, right string) int {
-	l := MustParseIsoDate(left)
-	r := MustParseIsoDate(right)
-	switch {
-	case l.Before(r):
-		return -1
-	case l.After(r):
-		return 1
-	default:
-		return 0
+// splitIsoDate extracts year/month/day numbers from a validated YYYY-MM-DD
+// string. Callers must validate with IsValidIsoDate first.
+func splitIsoDate(value string) (year, month, day int) {
+	year = int(value[0]-'0')*1000 + int(value[1]-'0')*100 + int(value[2]-'0')*10 + int(value[3]-'0')
+	month = int(value[5]-'0')*10 + int(value[6]-'0')
+	day = int(value[8]-'0')*10 + int(value[9]-'0')
+	return year, month, day
+}
+
+// daysFromCivil counts days since 1970-01-01 (Howard Hinnant's algorithm).
+// Inverting it is unnecessary: only differences are used.
+func daysFromCivil(year, month, day int) int {
+	if month <= 2 {
+		year--
+		month += 12
 	}
+	era := year / 400
+	yoe := year - era*400
+	doy := (153*(month-3)+2)/5 + day - 1
+	doe := yoe*365 + yoe/4 - yoe/100 + doy
+	return era*146097 + doe - 719468
+}
+
+func CompareIsoDates(left, right string) int {
+	if left < right {
+		return -1
+	}
+	if left > right {
+		return 1
+	}
+	return 0
 }
 
 func DaysBetween(left, right string) int {
-	diff := MustParseIsoDate(right).Sub(MustParseIsoDate(left))
-	return int(math.Round(diff.Hours() / 24))
+	leftYear, leftMonth, leftDay := splitIsoDate(left)
+	rightYear, rightMonth, rightDay := splitIsoDate(right)
+	return daysFromCivil(rightYear, rightMonth, rightDay) - daysFromCivil(leftYear, leftMonth, leftDay)
 }
 
 // ProjectionYearIndex returns floor(daysBetween(start,date)/365).
@@ -70,11 +98,8 @@ func ProjectionYearIndex(projectionStartDate, date string) int {
 // AddMonthsClamped adds months keeping day-of-month clamped to the target
 // month length (Jan-31 + 1mo -> Feb-28). Ported from addMonthsClamped.
 func AddMonthsClamped(date string, monthsToAdd int) string {
-	source := MustParseIsoDate(date)
-	year := source.Year()
-	month := int(source.Month()) - 1
-	day := source.Day()
-	nextMonthIndex := month + monthsToAdd
+	year, month, day := splitIsoDate(date)
+	nextMonthIndex := (month - 1) + monthsToAdd
 	targetYear := year + floorDiv(nextMonthIndex, 12)
 	targetMonth := ((nextMonthIndex % 12) + 12) % 12
 	lastDay := daysInMonth(targetYear, time.Month(targetMonth+1))
@@ -82,7 +107,7 @@ func AddMonthsClamped(date string, monthsToAdd int) string {
 	if day > lastDay {
 		targetDay = lastDay
 	}
-	return FormatIsoDate(time.Date(targetYear, time.Month(targetMonth+1), targetDay, 0, 0, 0, 0, time.UTC))
+	return fmt.Sprintf("%04d-%02d-%02d", targetYear, targetMonth+1, targetDay)
 }
 
 // AddYearsClamped adds years through clamped month addition.

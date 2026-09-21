@@ -85,7 +85,7 @@ Route pages should compose feature components rather than forward shared-state p
 | `MonteCarloSample` | sampled annual posting rates for one run |
 | `ComparisonSnapshot` | read-only captured metrics for UI comparison |
 | `ProjectionResult` | deterministic public result and evaluation result tables |
-| `StochasticProjectionResult` | deterministic result, exact percentile bands, and stochastic evaluation aggregation |
+| `StochasticProjectionResult` | exact percentile bands and stochastic evaluation aggregation |
 | `FinancialModelRepository` | application-facing model reads plus optional labeled save capability |
 | `FinancialModelIngestionSource` | read-only external snapshot and semantic revision used by ingestion |
 | `FinancialModelDao` | implementation-neutral persisted-record reads and conditional replacement; no lifecycle methods |

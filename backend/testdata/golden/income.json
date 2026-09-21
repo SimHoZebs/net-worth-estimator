@@ -153,8 +153,7 @@
 	},
 	"result": {
 		"timeline": {
-			"rows": [],
-			"sampledRows": []
+			"rows": []
 		},
 		"accountSummaries": [
 			{

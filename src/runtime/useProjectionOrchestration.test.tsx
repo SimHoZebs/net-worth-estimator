@@ -74,7 +74,7 @@ describe("useProjectionOrchestration", () => {
 	it("constructs execution and stale-safe comparison values", () => {
 		const document = createBaseDocument();
 		const projectionResult: ProjectionResult = {
-			timeline: { rows: [], sampledRows: [] },
+			timeline: { rows: [] },
 			accountSummaries: [],
 			totals: {
 				externalInflowAmount: 0,

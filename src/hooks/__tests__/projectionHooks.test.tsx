@@ -55,7 +55,7 @@ function staticDeterministic(): ProjectionResult {
 		timelineRow("2026-03-01", 1700),
 	];
 	return {
-		timeline: { rows, sampledRows: rows },
+		timeline: { rows },
 		accountSummaries: [],
 		totals: {
 			externalInflowAmount: 0,
@@ -84,13 +84,11 @@ function staticDeterministic(): ProjectionResult {
 	};
 }
 
-function staticStochastic(
-	deterministic: ProjectionResult = staticDeterministic(),
-): StochasticProjectionResult {
+function staticStochastic(): StochasticProjectionResult {
+	const deterministic = staticDeterministic();
 	return {
 		config: { runCount: 1, seed: 1 },
-		deterministic,
-		bands: deterministic.timeline.sampledRows.map((row) => ({
+		bands: deterministic.timeline.rows.map((row) => ({
 			date: row.date,
 			isHistorical: false,
 			netWorth: {

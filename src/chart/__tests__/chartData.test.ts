@@ -41,7 +41,7 @@ function staticResult(balancesByDate: Array<Record<string, number>>) {
 		return sampledRow(date, netWorth, balances);
 	});
 	return {
-		timeline: { rows: sampledRows, sampledRows },
+		timeline: { rows: sampledRows },
 		accountSummaries: [],
 		totals: {
 			externalInflowAmount: 0,
@@ -69,8 +69,8 @@ function staticStochastic(
 ): StochasticProjectionResult {
 	return {
 		config: { runCount: 50, seed: 42 },
-		deterministic,
-		bands: deterministic.timeline.sampledRows.map((row) => ({
+
+		bands: deterministic.timeline.rows.map((row) => ({
 			date: row.date,
 			isHistorical: false,
 			netWorth: {
@@ -129,10 +129,7 @@ describe("buildAccountDiagnosticChartData", () => {
 		]);
 		const stochasticResult = staticStochastic(result);
 
-		const data = buildStochasticChartData(
-			stochasticResult.deterministic,
-			stochasticResult,
-		);
+		const data = buildStochasticChartData(result, stochasticResult);
 
 		expect(data.length).toBeGreaterThan(0);
 
@@ -174,7 +171,6 @@ describe("buildAccountDiagnosticChartData", () => {
 
 		const fakeStochastic: StochasticProjectionResult = {
 			config: { runCount: 10, seed: null },
-			deterministic: result,
 			bands: [
 				{
 					date: "9999-01-01",
@@ -229,7 +225,7 @@ describe("buildAccountDiagnosticChartData", () => {
 			{ checking: 1100 },
 			{ checking: 1200 },
 		]);
-		const firstRow = result.timeline.sampledRows[0];
+		const firstRow = result.timeline.rows[0];
 		const firstSnapshot = firstRow?.accountSnapshots[0];
 		if (!firstRow || !firstSnapshot) throw new Error("Projection row is empty");
 		firstRow.accountSnapshots.push({ ...firstSnapshot, balance: 999_999 });
