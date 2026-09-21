@@ -1,12 +1,6 @@
 import { memo, useMemo, useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import {
 	currency,
@@ -105,13 +99,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 	return (
 		<Card className="rounded-[1.6rem] border-border/80">
 			<CardHeader>
-				<div>
-					<CardTitle>Underfulfillment calendar</CardTitle>
-					<CardDescription>
-						Dates where account constraints limit scheduled transactions. Select
-						a highlighted day for movement detail.
-					</CardDescription>
-				</div>
+				<CardTitle>Underfulfillment calendar</CardTitle>
 			</CardHeader>
 			<CardContent>
 				{!fulfillment ? (
@@ -187,8 +175,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 
 							{shortfallDays.length > 8 ? (
 								<div className="type-caption text-tertiary-foreground/70">
-									Showing the first 8 shortfall dates. Use the calendar for
-									later dates.
+									Showing the first 8 of {shortfallDays.length}.
 								</div>
 							) : null}
 						</div>
@@ -212,10 +199,6 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 								Projected underfulfillment
 							</div>
 							<h3 className="mt-1 type-title">{selectedDay.label}</h3>
-							<p className="mt-1 type-muted">
-								{currency.format(selectedDay.unfulfilledAmount)} constrained on
-								this date.
-							</p>
 						</div>
 						<button
 							type="button"

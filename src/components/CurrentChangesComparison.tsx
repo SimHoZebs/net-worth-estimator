@@ -31,19 +31,7 @@ export const CurrentChangesComparison = memo(
 		return (
 			<Collapsible defaultOpen={false}>
 				<Collapsible.Trigger>
-					<Collapsible.Header
-						title="Saved comparisons"
-						description={
-							hasComparisons
-								? `${comparisonSnapshots.length} comparison snapshot${comparisonSnapshots.length === 1 ? "" : "s"} saved. Capture the current projection to compare with future changes.`
-								: "Capture the current projection to compare with future changes."
-						}
-						trailing={
-							<span className="hidden type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70 sm:inline">
-								Show details
-							</span>
-						}
-					/>
+					<Collapsible.Header title="Saved comparisons" />
 				</Collapsible.Trigger>
 				<Collapsible.Content>
 					<div className="space-y-4">
@@ -158,10 +146,6 @@ export const CurrentChangesComparison = memo(
 										</tr>
 									</tbody>
 								</table>
-								<div className="border-t border-border/70 bg-muted/70 px-4 py-2 type-caption text-muted-foreground/70">
-									Comparison snapshots are read-only captures of projection
-									outcomes. They do not save or restore alternative models.
-								</div>
 							</div>
 						) : null}
 					</div>

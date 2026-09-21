@@ -1,11 +1,5 @@
 import { memo } from "react";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Table,
 	TableBody,
@@ -68,12 +62,7 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({
 	return (
 		<Card className="rounded-[1.6rem] border-border shadow-sm ">
 			<CardHeader>
-				<div>
-					<CardTitle>Monthly cash flow</CardTitle>
-					<CardDescription>
-						How money moves through the model each month.
-					</CardDescription>
-				</div>
+				<CardTitle>Monthly cash flow</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<Table>

@@ -1,12 +1,6 @@
 import { memo, useState } from "react";
 import type { StochasticChartRow } from "@/chart/chartData";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { AccountLinesChart } from "./AccountLinesChart";
 import { StackedContributionChart } from "./StackedContributionChart";
@@ -35,14 +29,7 @@ export const AccountDiagnosticChart = memo(function AccountDiagnosticChart({
 			<Card className="min-w-0 rounded-[1.8rem] border-border/80 bg-card/92">
 				<CardHeader>
 					<div className="flex items-start justify-between gap-4">
-						<div>
-							<CardTitle>Net worth projection</CardTitle>
-							<CardDescription>
-								{viewMode === "stacked"
-									? "Net worth over time with account contributions."
-									: "Individual account balances over time."}
-							</CardDescription>
-						</div>
+						<CardTitle>Net worth projection</CardTitle>
 						<button
 							type="button"
 							onClick={() =>

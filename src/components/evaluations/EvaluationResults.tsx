@@ -46,13 +46,7 @@ export function EvaluationResults({
 
 	return (
 		<section id="evaluations" className="space-y-4">
-			<PageHeader
-				level="h2"
-				eyebrow="Ordered questions"
-				title="Evaluations"
-				titleClassName="sr-only"
-				description="Outcomes, behavior evidence, diagnostics, and probabilistic analysis for each configured evaluation."
-			/>
+			<PageHeader level="h2" title="Evaluations" titleClassName="sr-only" />
 
 			{EVALUATION_TYPE_ORDER.map((type) => (
 				<EvaluationTypeSection
@@ -147,12 +141,7 @@ function EvaluationTypeSection({
 						headerClassName="border-b border-border/70 bg-surface/45 dark:border-white/10"
 						header={
 							<div className="flex items-start justify-between gap-4">
-								<div>
-									<div className="type-title text-xl">{evaluation.label}</div>
-									<div className="mt-1 type-caption">
-										{evaluation.instanceId}
-									</div>
-								</div>
+								<div className="type-title text-xl">{evaluation.label}</div>
 								{hasLocalProgress ? null : <Pill>{status}</Pill>}
 							</div>
 						}
@@ -170,7 +159,7 @@ function EvaluationTypeSection({
 										? resultsAreStale
 											? "Previous FI results are hidden until recalculation completes."
 											: "The deterministic FI result below is current. Monte Carlo confidence is still being calculated."
-										: "Monte Carlo analysis is recomputing this evaluation's outcome."
+										: undefined
 								}
 								progressPct={workloadProgressPct}
 								progressLabel={`${evaluation.label} Monte Carlo progress`}
