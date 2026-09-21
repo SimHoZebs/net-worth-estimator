@@ -9,7 +9,7 @@ export const DriverCard = memo(function DriverCard({
 }: {
 	label: string;
 	value: string;
-	detail: string;
+	detail?: string;
 	tone?: "default" | "tertiary" | "primary";
 }) {
 	const toneClassName =
@@ -24,7 +24,9 @@ export const DriverCard = memo(function DriverCard({
 			<CardContent className="space-y-2 p-5">
 				<div className="type-label">{label}</div>
 				<div className="type-title text-foreground">{value}</div>
-				<div className="type-muted text-current/75">{detail}</div>
+				{detail ? (
+					<div className="type-muted text-current/75">{detail}</div>
+				) : null}
 			</CardContent>
 		</Card>
 	);

@@ -1,7 +1,6 @@
 import { memo } from "react";
 import { Link } from "react-router-dom";
 import { SectionCard } from "@/components/present/present";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { currency, formatDate } from "@/lib/format";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { DriverCard } from "./DriverCard";
@@ -30,8 +29,7 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 
 	return (
 		<SectionCard
-			title="Household cycle"
-			description={`Paycheck-cycle status through the ${HOUSEHOLD_CYCLE_CUTOFF_DAY}th. Cash cushion and card-cycle capacity stay completely separate: current-cycle card charges are paid from the next paycheck, not current checking.`}
+			title={`Household cycle · through the ${HOUSEHOLD_CYCLE_CUTOFF_DAY}th`}
 			action={
 				<Link
 					to="/settings"
@@ -45,62 +43,48 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 			<div className="mb-4 type-caption" aria-live="polite">
 				{syncBalance ? (
 					<>
-						Synced balances as of {formatDate(syncBalance.date)} (
-						{syncBalance.ageDays === 0
-							? "today"
-							: `${syncBalance.ageDays}d old`}
-						) across {syncBalance.syncedAccounts}{" "}
-						{syncBalance.syncedAccounts === 1 ? "account" : "accounts"}. Card
-						inputs are seeded from pending sync rows; adjust them in Settings.
+						Synced {formatDate(syncBalance.date)}
+						{syncBalance.ageDays > 0 ? ` (${syncBalance.ageDays}d old)` : ""}
+						{unclassified.length > 0 ? (
+							<>
+								{" · "}
+								{currency.format(
+									unclassified.reduce((sum, row) => sum + row.amount, 0),
+								)}{" "}
+								unclassified ({unclassified.map((row) => row.label).join(", ")})
+							</>
+						) : null}
 					</>
 				) : (
-					<>
-						No synced balances yet — inputs are manual. Configure the SimpleFIN
-						sync to seed balances and pending card charges, then adjust them in
-						Settings.
-					</>
+					<>Manual inputs — no synced balances yet.</>
 				)}
-				{unclassified.length > 0 ? (
-					<>
-						{" "}
-						{currency.format(
-							unclassified.reduce((sum, row) => sum + row.amount, 0),
-						)}{" "}
-						in pending rows did not match a card slot (
-						{unclassified.map((row) => row.label).join(", ")}).
-					</>
-				) : null}
 			</div>
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 				<DriverCard
 					label="Cash cushion"
 					value={currency.format(result.cashCushion)}
-					detail="Checking − unpaid cash obligations before next paycheck"
 					tone={result.cashCushion < 0 ? "tertiary" : "primary"}
 				/>
 				<DriverCard
-					label={`Current cycle committed through the ${HOUSEHOLD_CYCLE_CUTOFF_DAY}th`}
+					label="Committed this cycle"
 					value={currency.format(result.currentCycleCommitted)}
-					detail="Prime + Ultimate exposure including pending + wife's current-cycle amount"
 					tone="default"
 				/>
 				<DriverCard
-					label="Theoretical room left"
+					label="Room left"
 					value={currency.format(result.theoreticalRoom)}
-					detail="Paycheck − next month's fixed obligations − committed"
 					tone={result.theoreticalRoom < 0 ? "tertiary" : "primary"}
 				/>
 				<DriverCard
-					label="Conservative room left"
+					label="Safe to spend"
 					value={currency.format(result.conservativeRoom)}
-					detail="Theoretical room − protected reserve"
 					tone={result.conservativeRoom < 0 ? "tertiary" : "primary"}
 				/>
 			</div>
 
 			<div className="mt-5 grid gap-3 lg:grid-cols-2">
 				<div className="rounded-2xl border border-border/70 bg-surface/70 p-4">
-					<div className="type-label">Cash lane · current checking</div>
+					<div className="type-label">Cash · checking</div>
 					<div
 						className="mt-2 flex h-3 overflow-hidden rounded-full bg-muted"
 						aria-hidden
@@ -120,12 +104,11 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 					</div>
 					<div className="mt-2 type-caption">
 						{currency.format(inputs.checkingBalance)} checking −{" "}
-						{currency.format(inputs.unpaidCashObligations)} unpaid ={" "}
-						{currency.format(result.cashCushion)} cushion
+						{currency.format(inputs.unpaidCashObligations)} unpaid
 					</div>
 				</div>
 				<div className="rounded-2xl border border-border/70 bg-surface/70 p-4">
-					<div className="type-label">Card lane · paid from next paycheck</div>
+					<div className="type-label">Cards · next paycheck</div>
 					<div
 						className="mt-2 flex h-3 overflow-hidden rounded-full bg-muted"
 						aria-hidden
@@ -152,59 +135,10 @@ export const HouseholdCycleCard = memo(function HouseholdCycleCard({
 					<div className="mt-2 type-caption">
 						{currency.format(inputs.primeExposure)} Prime +{" "}
 						{currency.format(inputs.ultimateExposure)} Ultimate +{" "}
-						{currency.format(inputs.wifeCurrentCycle)} wife ={" "}
-						{currency.format(result.currentCycleCommitted)} committed
+						{currency.format(inputs.wifeCurrentCycle)} wife
 					</div>
 				</div>
 			</div>
-
-			<div className="mt-5 overflow-x-auto">
-				<Table>
-					<TableBody>
-						<TableRow>
-							<TableCell className="type-body text-foreground/80">
-								Cash cushion
-							</TableCell>
-							<TableCell className="text-right type-value text-sm">
-								{currency.format(result.cashCushion)}
-							</TableCell>
-						</TableRow>
-						<TableRow>
-							<TableCell className="type-body text-foreground/80">
-								Current cycle committed through the {HOUSEHOLD_CYCLE_CUTOFF_DAY}
-								th
-							</TableCell>
-							<TableCell className="text-right type-value text-sm">
-								{currency.format(result.currentCycleCommitted)}
-							</TableCell>
-						</TableRow>
-						<TableRow>
-							<TableCell className="type-body text-foreground/80">
-								Theoretical room left
-							</TableCell>
-							<TableCell className="text-right type-value text-sm">
-								{currency.format(result.theoreticalRoom)}
-							</TableCell>
-						</TableRow>
-						<TableRow>
-							<TableCell className="type-body text-foreground/80">
-								Conservative room left
-							</TableCell>
-							<TableCell className="text-right type-value text-sm">
-								{currency.format(result.conservativeRoom)}
-							</TableCell>
-						</TableRow>
-					</TableBody>
-				</Table>
-			</div>
-
-			<p className="mt-4 type-body text-foreground/85">
-				So the clean numbers are: {currency.format(result.cashCushion)} cash
-				cushion now, {currency.format(result.currentCycleCommitted)} committed
-				to the current cycle, {currency.format(result.conservativeRoom)} safe
-				room / {currency.format(result.theoreticalRoom)} absolute theoretical
-				room until the {HOUSEHOLD_CYCLE_CUTOFF_DAY}th.
-			</p>
 		</SectionCard>
 	);
 });

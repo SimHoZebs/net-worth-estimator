@@ -58,16 +58,11 @@ describe("HouseholdCycleCard", () => {
 		renderResults(createBaseDocument());
 
 		expect(screen.getAllByText("Cash cushion").length).toBeGreaterThan(0);
-		expect(
-			screen.getAllByText("Current cycle committed through the 19th").length,
-		).toBeGreaterThan(0);
-		expect(screen.getAllByText("Theoretical room left").length).toBeGreaterThan(
+		expect(screen.getAllByText("Committed this cycle").length).toBeGreaterThan(
 			0,
 		);
-		expect(
-			screen.getAllByText("Conservative room left").length,
-		).toBeGreaterThan(0);
-		expect(screen.getByText(/So the clean numbers are:/)).not.toBeNull();
+		expect(screen.getAllByText("Room left").length).toBeGreaterThan(0);
+		expect(screen.getAllByText("Safe to spend").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Checking balance")).toBeNull();
 		expect(screen.getByRole("link", { name: "Edit inputs" })).toHaveProperty(
 			"tagName",
@@ -106,7 +101,7 @@ describe("HouseholdCycleCard", () => {
 
 		// 2000 − 500 = 1500 cushion; 400 + 0 + 0 = 400 committed;
 		// 5000 − 2500 − 400 = 2100 theoretical; 2100 − 725 = 1375 conservative.
-		expect(screen.getByText(/\$1,500 cash cushion now,/)).not.toBeNull();
+		expect(screen.getByText("$1,500")).not.toBeNull();
 	});
 
 	it("seeds card exposure and staleness from sync rows", () => {
@@ -117,7 +112,7 @@ describe("HouseholdCycleCard", () => {
 				(_, element) => element?.textContent?.includes("$42") ?? false,
 			).length,
 		).toBeGreaterThan(0);
-		expect(screen.getByText(/Synced balances as of/)).not.toBeNull();
+		expect(screen.getByText(/Synced /)).not.toBeNull();
 	});
 });
 
