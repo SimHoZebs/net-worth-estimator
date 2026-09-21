@@ -10,7 +10,7 @@ export function SimulationProgressPanel({
 	children,
 }: {
 	title: string;
-	description: string;
+	description?: string;
 	progressPct: number | null;
 	progressLabel: string;
 	live?: boolean;
@@ -35,7 +35,9 @@ export function SimulationProgressPanel({
 							<span className="type-label tabular-nums">{progressPct}%</span>
 						) : null}
 					</div>
-					<AlertDescription>{description}</AlertDescription>
+					{description ? (
+						<AlertDescription>{description}</AlertDescription>
+					) : null}
 					{children}
 					<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-current/10">
 						<div

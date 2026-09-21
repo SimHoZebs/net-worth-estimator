@@ -8,7 +8,7 @@ import { EvaluationResults } from "@/components/evaluations/EvaluationResults";
 import { Pill } from "@/components/present/present";
 import { Collapsible } from "@/components/ui/collapsible-section";
 import { LazySection } from "@/components/ui/lazy-section";
-import { currency, formatDate, pct } from "@/lib/format";
+import { formatDate, pct } from "@/lib/format";
 import type {
 	FinancialModelDocument,
 	ProjectionResult,
@@ -141,12 +141,6 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 			</section>
 
 			<section className="flex flex-wrap items-center gap-2">
-				<Pill
-					tone="primary"
-					textClassName="text-xs font-medium tracking-[0.16em]"
-				>
-					Base simulation ready
-				</Pill>
 				{currentChangeCount > 0 ? (
 					<Pill
 						tone="tertiary"
@@ -185,15 +179,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 				<LazySection>
 					<Collapsible defaultOpen={false}>
 						<Collapsible.Trigger>
-							<Collapsible.Header
-								title="Cash flow, debt, and reconciliation"
-								description="Monthly cash-flow map, debt summary, and current balance reconciliation."
-								trailing={
-									<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">
-										Show details
-									</span>
-								}
-							/>
+							<Collapsible.Header title="Cash flow, debt, and reconciliation" />
 						</Collapsible.Trigger>
 						<Collapsible.Content>
 							<div className="space-y-5">
@@ -211,7 +197,6 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 					<DriverCard
 						label="Main constraint"
 						value={derived.blockerValue}
-						detail={derived.blockerDetail}
 						tone={derived.biggestShortfallPosting ? "tertiary" : "primary"}
 					/>
 					<Link
@@ -230,7 +215,6 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 								? formatDate(derived.firstProjectedEvent.date)
 								: "No future transactions"
 					}
-					detail={derived.nextEventDetail}
 				/>
 				<DriverCard
 					label="Planned transaction completion"
@@ -238,13 +222,6 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 						derived.fulfillmentAvailable
 							? pct.format(derived.postingUtilizationRate)
 							: "Unavailable"
-					}
-					detail={
-						!derived.fulfillmentAvailable
-							? "Enable a healthy posting-fulfillment evaluation to inspect completion."
-							: derived.requestedPostingAmount === 0
-								? `No scheduled transactions are requesting future activity across ${derived.enabledPostingCount} transaction${derived.enabledPostingCount === 1 ? "" : "s"}.`
-								: `The model applied ${currency.format(derived.realizedPostingAmount)} of ${currency.format(derived.requestedPostingAmount)} in planned transactions${derived.destinationLimitedPostingAmount > 0 ? `; ${currency.format(derived.destinationLimitedPostingAmount)} was no longer applicable after destinations reached their limits.` : "."}`
 					}
 					tone={
 						derived.fulfillmentAvailable && derived.postingUtilizationRate < 1

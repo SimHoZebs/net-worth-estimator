@@ -126,8 +126,7 @@ export const OverviewCard = memo(function OverviewCard({
 				</>
 			) : (
 				<div className="rounded-2xl border border-dashed border-border/80 p-5">
-					<div className="type-eyebrow">Financial independence result</div>
-					<p className="mt-2 text-pretty text-foreground">
+					<p className="text-pretty text-foreground">
 						No complete {yearTestLabel(plan.evaluationYears)} fits in the
 						projection horizon.
 					</p>

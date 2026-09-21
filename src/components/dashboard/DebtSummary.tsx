@@ -1,11 +1,5 @@
 import { memo } from "react";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Table,
 	TableBody,
@@ -91,12 +85,7 @@ export const DebtSummary = memo(function DebtSummary({
 	return (
 		<Card className="rounded-[1.6rem] border-border shadow-sm ">
 			<CardHeader>
-				<div>
-					<CardTitle>Debt summary</CardTitle>
-					<CardDescription>
-						Current debt balances, scheduled payments, and estimated interest.
-					</CardDescription>
-				</div>
+				<CardTitle>Debt summary</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<Table>
@@ -167,9 +156,6 @@ export const DebtSummary = memo(function DebtSummary({
 						</div>
 						<div className="mt-0.5 type-title text-lg text-tertiary-foreground">
 							{currency.format(estimatedTotalInterest)}
-						</div>
-						<div className="type-caption text-tertiary-foreground/80">
-							Rough estimate based on current balance and payment schedule.
 						</div>
 					</div>
 				) : null}

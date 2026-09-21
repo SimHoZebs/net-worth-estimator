@@ -1,11 +1,5 @@
 import { memo } from "react";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Table,
 	TableBody,
@@ -152,13 +146,7 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 	return (
 		<Card className="rounded-[1.6rem] border-border shadow-sm">
 			<CardHeader>
-				<div>
-					<CardTitle>Actual and modeled account state</CardTitle>
-					<CardDescription>
-						Each checkpoint corrects its account after same-date postings. The
-						difference shows the modeled balance immediately before correction.
-					</CardDescription>
-				</div>
+				<CardTitle>Actual and modeled account state</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<div className="space-y-6">
@@ -173,9 +161,6 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 						</div>
 						<div className="type-value font-semibold">
 							{observedRows.length} of {rows.length} active accounts
-						</div>
-						<div className="type-caption text-muted-foreground/70">
-							Independently dated observations are not summed.
 						</div>
 					</div>
 					<div className="sm:text-right">

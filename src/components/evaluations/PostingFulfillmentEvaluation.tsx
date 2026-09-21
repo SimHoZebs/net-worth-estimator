@@ -33,12 +33,10 @@ export function PostingFulfillmentEvaluation({
 			<Metric
 				label="Requested"
 				value={currency.format(deterministic.requestedAmount)}
-				detail="Scheduled posting requests"
 			/>
 			<Metric
 				label="Applied"
 				value={currency.format(deterministic.realizedAmount)}
-				detail="Transferred by the model"
 			/>
 			<Metric
 				label="Destination-limited"
@@ -64,7 +62,7 @@ export function PostingFulfillmentEvaluation({
 				detail={
 					probabilistic
 						? `${probabilistic.fulfilledRunCount} of ${probabilistic.runCount} independent Monte Carlo samples`
-						: "Across stochastic projection paths"
+						: undefined
 				}
 			/>
 		</div>

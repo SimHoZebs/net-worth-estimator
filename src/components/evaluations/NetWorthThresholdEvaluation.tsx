@@ -39,13 +39,8 @@ export function NetWorthThresholdEvaluation({
 
 	return (
 		<div>
-			<div className="mb-2 type-eyebrow">Outcome and analysis</div>
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-				<Metric
-					label="Target"
-					value={currency.format(config.target)}
-					detail="Configured evaluation threshold"
-				/>
+				<Metric label="Target" value={currency.format(config.target)} />
 				<Metric
 					label="Deterministic outcome"
 					value={
@@ -53,7 +48,6 @@ export function NetWorthThresholdEvaluation({
 							? formatDate(deterministic.firstReachedDate)
 							: "Not reached"
 					}
-					detail="First base-path date at or above the target"
 				/>
 				<Metric
 					label={`${stochasticIsProvisional ? "Provisional " : ""}probability`}
@@ -62,7 +56,6 @@ export function NetWorthThresholdEvaluation({
 							? pct.format(probabilistic.probability)
 							: "Run Monte Carlo"
 					}
-					detail="Share of independent Monte Carlo samples that reached the target"
 				/>
 				<Metric
 					label={`${stochasticIsProvisional ? "Provisional " : ""}median date`}
@@ -76,7 +69,7 @@ export function NetWorthThresholdEvaluation({
 					detail={
 						probabilistic
 							? `P10 ${probabilistic.p10ReachedDate ? formatDate(probabilistic.p10ReachedDate) : "never"} · P90 ${probabilistic.p90ReachedDate ? formatDate(probabilistic.p90ReachedDate) : "never"}`
-							: "Reached-date distribution across successful independent Monte Carlo samples"
+							: undefined
 					}
 				/>
 			</div>

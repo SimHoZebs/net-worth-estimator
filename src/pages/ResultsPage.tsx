@@ -31,10 +31,8 @@ export function ResultsPage() {
 	return (
 		<main className="space-y-6">
 			<PageHeader
-				eyebrow="Projection workspace"
 				title="Results"
 				titleClassName="sr-only"
-				description="Projected balances, evaluation outcomes, and the evidence behind them."
 				actions={
 					<Button
 						type="button"
@@ -151,7 +149,6 @@ function ProjectionActivity({
 			{isProjecting ? (
 				<SimulationProgressPanel
 					title="Updating base projection"
-					description="Recomputing projected balances and deterministic evaluation outcomes."
 					progressPct={null}
 					progressLabel="Base projection progress"
 					live={!isStochasticRunning}
@@ -160,7 +157,6 @@ function ProjectionActivity({
 			{isStochasticRunning ? (
 				<SimulationProgressPanel
 					title="Updating Monte Carlo projection ranges"
-					description="Recomputing the probabilistic ranges shown with the base projection. Evaluation-specific work appears with each evaluation below."
 					progressPct={stochasticProgressPct}
 					progressLabel="Monte Carlo projection progress"
 					live

@@ -21,23 +21,18 @@ export function SimulationOverview({
 				<PageHeader
 					stacked
 					level="h2"
-					eyebrow="Base simulation"
 					title="Projection path"
 					titleClassName="mt-1 type-title text-xl"
-					description="Account state and transaction execution before evaluation-specific questions are applied."
-					descriptionClassName="mt-1 type-muted"
 					className="mb-4"
 				/>
 				<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 					<Metric
 						label="Current net worth"
 						value={currency.format(result.summary.currentNetWorth)}
-						detail="At the projection boundary"
 					/>
 					<Metric
 						label="Deterministic final"
 						value={currency.format(result.summary.finalNetWorth)}
-						detail="Base-path ending net worth"
 					/>
 					<Metric
 						label={`${stochasticIsProvisional ? "Provisional " : ""}median final`}
@@ -51,7 +46,7 @@ export function SimulationOverview({
 						detail={
 							stochasticResult
 								? `P10 ${currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p10)} · P90 ${currency.format(stochasticResult.milestones.finalNetWorthPercentiles.p90)}`
-								: "Distribution across independent Monte Carlo samples"
+								: undefined
 						}
 					/>
 					<Metric
@@ -59,7 +54,6 @@ export function SimulationOverview({
 						value={String(
 							result.timeline.rows.filter((row) => !row.isHistorical).length,
 						)}
-						detail="Dated state transitions in the base path"
 					/>
 				</div>
 			</CardContent>
