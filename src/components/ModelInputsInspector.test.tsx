@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 describe("ModelInputsInspector", () => {
-	it("opens on the current position", () => {
+	it("opens on accounts", () => {
 		const document = createBaseDocument();
 		render(
 			<RuntimeFixtureProviders
@@ -30,13 +30,13 @@ describe("ModelInputsInspector", () => {
 
 		expect(
 			screen
-				.getByRole("button", { name: /Current position/ })
+				.getByRole("button", { name: /Accounts/ })
 				.getAttribute("aria-pressed"),
 		).toBe("true");
 		expect(screen.getByText("Your accounts")).not.toBeNull();
 	});
 
-	it("keeps separate read and edit tab selections", () => {
+	it("keeps a single section selection across manage mode", () => {
 		const document = createBaseDocument({
 			postings: [
 				makePosting({
@@ -54,18 +54,16 @@ describe("ModelInputsInspector", () => {
 			</RuntimeFixtureProviders>,
 		);
 
-		fireEvent.click(
-			screen.getByRole("button", { name: /Transaction history/ }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: /Activity/ }));
 		expect(
 			screen
-				.getByRole("button", { name: /Transaction history/ })
+				.getByRole("button", { name: /Activity/ })
 				.getAttribute("aria-pressed"),
 		).toBe("true");
-		fireEvent.click(screen.getByRole("button", { name: "Edit baseline" }));
+		fireEvent.click(screen.getByRole("button", { name: "Manage" }));
 		expect(
 			screen
-				.getByRole("button", { name: /Posting definitions/ })
+				.getByRole("button", { name: /Activity/ })
 				.getAttribute("aria-pressed"),
 		).toBe("true");
 		expect(
@@ -74,7 +72,7 @@ describe("ModelInputsInspector", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 		expect(
 			screen
-				.getByRole("button", { name: /Transaction history/ })
+				.getByRole("button", { name: /Activity/ })
 				.getAttribute("aria-pressed"),
 		).toBe("true");
 	});

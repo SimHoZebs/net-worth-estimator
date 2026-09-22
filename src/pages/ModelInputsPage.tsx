@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import { ModelInputsInspector } from "@/components/ModelInputsInspector";
 import { TemplateWizard } from "@/components/patterns/TemplateWizard";
-import { SourceStatusCard } from "@/components/sidebar/SourceStatusCard";
 import { Button } from "@/components/ui/button";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import { useStore } from "@/store";
@@ -34,9 +33,8 @@ export function ModelInputsPage() {
 				</Button>
 			</div>
 
-			<div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+			<div className="mx-auto w-full max-w-5xl">
 				<ModelInputsInspector />
-				<SourceStatusCard />
 			</div>
 
 			{showWizard && wizardDocument ? (
