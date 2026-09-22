@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 describe("ModelInputsInspector", () => {
-	it("opens on accounts", () => {
+	it("opens on accounts with quick actions", () => {
 		const document = createBaseDocument();
 		render(
 			<RuntimeFixtureProviders
@@ -33,10 +33,38 @@ describe("ModelInputsInspector", () => {
 				.getByRole("button", { name: /Accounts/ })
 				.getAttribute("aria-pressed"),
 		).toBe("true");
-		expect(screen.getByText("Your accounts")).not.toBeNull();
+		expect(screen.getByText("Total balance")).not.toBeNull();
+		expect(screen.getByRole("button", { name: /Pay/ })).not.toBeNull();
 	});
 
-	it("keeps a single section selection across manage mode", () => {
+	it("opens a money movement detail from the scheduled feed", () => {
+		const document = createBaseDocument({
+			postings: [
+				makePosting({
+					id: "salary",
+					label: "Salary",
+					sourceAccountId: null,
+					destinations: ["checking"],
+					frequency: "monthly",
+					startDate: "2026-02-01",
+				}),
+			],
+		});
+		render(
+			<RuntimeFixtureProviders
+				model={{ document, effectiveDocument: document }}
+			>
+				<ModelInputsInspector />
+			</RuntimeFixtureProviders>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: /Scheduled/ }));
+		fireEvent.click(screen.getByRole("button", { name: /Salary/ }));
+		expect(screen.getByRole("heading", { name: "Salary" })).not.toBeNull();
+		expect(screen.getByRole("button", { name: "Exclude" })).not.toBeNull();
+	});
+
+	it("keeps the selected section when opening activity", () => {
 		const document = createBaseDocument({
 			postings: [
 				makePosting({
@@ -55,21 +83,6 @@ describe("ModelInputsInspector", () => {
 		);
 
 		fireEvent.click(screen.getByRole("button", { name: /Activity/ }));
-		expect(
-			screen
-				.getByRole("button", { name: /Activity/ })
-				.getAttribute("aria-pressed"),
-		).toBe("true");
-		fireEvent.click(screen.getByRole("button", { name: "Manage" }));
-		expect(
-			screen
-				.getByRole("button", { name: /Activity/ })
-				.getAttribute("aria-pressed"),
-		).toBe("true");
-		expect(
-			screen.getByRole("columnheader", { name: "Amount calculation" }),
-		).not.toBeNull();
-		fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 		expect(
 			screen
 				.getByRole("button", { name: /Activity/ })
