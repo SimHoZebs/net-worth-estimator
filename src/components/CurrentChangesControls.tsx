@@ -75,14 +75,6 @@ export function CurrentChangesControls({
 		() => (draft ? draftPostings.filter((posting) => !posting.enabled) : []),
 		[draft, draftPostings],
 	);
-	// Rows available for quick-exclude: enabled rows in the draft when editing,
-	// otherwise enabled baseline rows (excluding starts an edit session).
-	const excludableAccounts = (draft ?? baseline).accounts.filter(
-		(account) => account.enabled,
-	);
-	const excludablePostings = (draft ?? baseline).postings.filter(
-		(posting) => posting.enabled,
-	);
 	const routeDocument = draft ?? document;
 
 	const ensureEditing = () => {
@@ -97,14 +89,6 @@ export function CurrentChangesControls({
 	const handleAddPosting = (posting: Posting) => {
 		ensureEditing();
 		addPosting(posting);
-	};
-	const handleExcludeAccount = (id: string) => {
-		ensureEditing();
-		updateAccount(id, { enabled: false });
-	};
-	const handleExcludePosting = (id: string) => {
-		ensureEditing();
-		updatePosting(id, { enabled: false });
 	};
 
 	return (
@@ -181,38 +165,12 @@ export function CurrentChangesControls({
 
 					<div className="space-y-3">
 						<h3 className="type-body type-value font-semibold/80">
-							Quick-exclude baseline rows
+							Exclude from lists
 						</h3>
 						<p className="type-caption text-muted-foreground">
-							Excluding a row sets enabled=false on the draft row
-							{isEditing
-								? "."
-								: " and starts a draft edit session when needed."}
+							Use Exclude on an account, scheduled transaction, or activity row.
+							Excluded rows return here with a Restore action.
 						</p>
-						{excludableAccounts.map((account) => (
-							<DraftRowItem
-								key={`excludable-account-${account.id}`}
-								label={account.label}
-								type="Account"
-								actionLabel="Exclude"
-								onAction={() => handleExcludeAccount(account.id)}
-							/>
-						))}
-						{excludablePostings.map((posting) => (
-							<DraftRowItem
-								key={`excludable-posting-${posting.id}`}
-								label={posting.label}
-								type="Transaction"
-								actionLabel="Exclude"
-								onAction={() => handleExcludePosting(posting.id)}
-							/>
-						))}
-						{excludableAccounts.length === 0 &&
-						excludablePostings.length === 0 ? (
-							<p className="type-caption text-muted-foreground">
-								Every row is already excluded or removed.
-							</p>
-						) : null}
 					</div>
 
 					<div className="space-y-3">
