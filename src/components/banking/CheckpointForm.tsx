@@ -59,10 +59,6 @@ export function CheckpointForm({
 					<h2 id="checkpoint-form-title" className="type-title text-lg">
 						Verify balance
 					</h2>
-					<p className="type-caption">
-						Record what the balance really is. Later activity continues from
-						here.
-					</p>
 				</div>
 				<div>
 					<label className={labelClass} htmlFor="checkpoint-form-account">

@@ -14,14 +14,8 @@ export function ModelInputsPage() {
 
 	return (
 		<main className="space-y-6">
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-				<div>
-					<h1 className="sr-only">Model inputs</h1>
-					<p className="max-w-2xl type-muted">
-						Maintain baseline accounts, scheduled transactions, balance history,
-						and temporary changes.
-					</p>
-				</div>
+			<div className="flex justify-end">
+				<h1 className="sr-only">Model inputs</h1>
 				<Button
 					type="button"
 					variant="secondary"
@@ -29,7 +23,7 @@ export function ModelInputsPage() {
 					onClick={() => setShowWizard(true)}
 					disabled={!wizardDocument}
 				>
-					Add from template
+					Templates
 				</Button>
 			</div>
 
