@@ -97,9 +97,24 @@ Reads and deterministic/stochastic projections are public by design. Canonical m
 ## Scripts
 
 ```bash
-npm run typecheck
-npm run test:run
-npm run build
+npm run verify          # biome check + vitest run + typecheck
+npx vitest run <file>   # single-file frontend test
+npm run build           # also runs on pre-push
+```
+
+Backend (`backend/`, `CGO_ENABLED=0` baked in):
+
+```bash
+backend/scripts/verify.sh [--help] [package]                   # gofmt -> go vet -> go test (default ./...)
+backend/scripts/bench-sim.sh [--help] [scenario] [-- flags...] # bench one projection/iter (default scenario: deterministic)
+```
+
+Ops (`scripts/`):
+
+```bash
+scripts/nf-status.sh [--service ID] [--project ID]                                                  # Northflank service health + latest build (secrets redacted)
+node scripts/shots.mjs <url> [--out f.png] [--width N] [--height N] [--full-page] [--wait ms]       # screenshot via playwright-core (opt-in: npm i -D playwright-core)
+BASE_URL=http://localhost:8787 scripts/smoke-backend.sh [--help]                                     # canned healthz -> model -> sync smoke
 ```
 
 ## Architecture
