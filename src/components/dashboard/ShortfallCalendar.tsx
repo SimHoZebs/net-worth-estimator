@@ -125,10 +125,10 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 					<p>Posting-fulfillment evaluation is unavailable.</p>
 					<p className="mt-2">
 						<Link
-							to="/model-inputs"
+							to="/accounts"
 							className="font-semibold underline underline-offset-2"
 						>
-							Review model inputs
+							Review accounts
 						</Link>{" "}
 						to enable a healthy posting-fulfillment evaluation.
 					</p>
@@ -219,7 +219,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 					<p>No posting requests are underfulfilled within the horizon.</p>
 					<p className="mt-2">
 						<Link
-							to="/model-inputs"
+							to="/accounts"
 							className="font-semibold underline underline-offset-2"
 						>
 							Review scheduled transactions

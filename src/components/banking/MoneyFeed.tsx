@@ -15,6 +15,7 @@ export function MoneyFeed({
 	onOpen,
 	groupByDate = false,
 	dateDescending = true,
+	showDate = false,
 }: {
 	postings: Posting[];
 	accounts: Account[];
@@ -25,6 +26,7 @@ export function MoneyFeed({
 	onOpen: (posting: Posting) => void;
 	groupByDate?: boolean;
 	dateDescending?: boolean;
+	showDate?: boolean;
 }) {
 	const accountById = useMemo(
 		() => new Map(accounts.map((account) => [account.id, account])),
@@ -91,9 +93,9 @@ export function MoneyFeed({
 					}}
 					placeholder="Search"
 					aria-label={searchLabel}
-					className="min-h-11 min-w-0 flex-1 rounded-full border border-border bg-card px-4 py-2.5 type-body placeholder:text-muted-foreground sm:max-w-xs"
+					className="min-h-11 min-w-0 flex-1 basis-full rounded-full border border-border bg-card px-4 py-2.5 type-body placeholder:text-muted-foreground sm:basis-auto sm:max-w-xs"
 				/>
-				<span aria-live="polite" className="type-caption">
+				<span aria-live="polite" className="sr-only">
 					{sorted.length} {sorted.length === 1 ? "match" : "matches"}
 				</span>
 				<fieldset className="flex flex-wrap gap-1.5">
@@ -131,7 +133,7 @@ export function MoneyFeed({
 							<div className="mb-1.5 px-1 type-label text-muted-foreground">
 								{formatDate(group.date)}
 							</div>
-							<div className="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/80 bg-card/70">
+							<div className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-card/70">
 								{group.rows.map((posting) => (
 									<MoneyRow
 										key={posting.id}
@@ -145,13 +147,14 @@ export function MoneyFeed({
 					))}
 				</div>
 			) : (
-				<div className="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/80 bg-card/70">
+				<div className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-card/70">
 					{visible.map((posting) => (
 						<MoneyRow
 							key={posting.id}
 							posting={posting}
 							accountById={accountById}
 							onOpen={onOpen}
+							showDate={showDate}
 						/>
 					))}
 				</div>

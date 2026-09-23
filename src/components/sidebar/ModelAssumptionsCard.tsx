@@ -27,7 +27,7 @@ export function ModelAssumptionsCard() {
 					size="sm"
 					label="Accounts"
 					value={enabledAccounts}
-					className="px-2 py-3 dark:border-white/10 dark:bg-surface/50"
+					className="border-0 px-2 py-3 dark:bg-surface/50"
 					labelClassName="text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground/70"
 					valueClassName="mt-1 type-title"
 				/>
@@ -35,7 +35,7 @@ export function ModelAssumptionsCard() {
 					size="sm"
 					label="Flows"
 					value={enabledPostings}
-					className="px-2 py-3 dark:border-white/10 dark:bg-surface/50"
+					className="border-0 px-2 py-3 dark:bg-surface/50"
 					labelClassName="text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground/70"
 					valueClassName="mt-1 type-title"
 				/>

@@ -31,7 +31,7 @@ describe("ResultsPage", () => {
 				),
 				children: [
 					{ index: true, element: <ResultsPage /> },
-					{ path: "model-inputs", element: <div>Inputs</div> },
+					{ path: "accounts", element: <div>Inputs</div> },
 				],
 			},
 		]);
@@ -43,9 +43,7 @@ describe("ResultsPage", () => {
 		);
 		fireEvent.click(screen.getByRole("button", { name: "Retry loading" }));
 		expect(onReload).toHaveBeenCalledOnce();
-		expect(
-			screen.getByRole("link", { name: "Open model inputs" }),
-		).not.toBeNull();
+		expect(screen.getByRole("link", { name: "Open accounts" })).not.toBeNull();
 	});
 
 	it("shows deterministic and stochastic worker activity with progress", () => {

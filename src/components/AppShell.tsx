@@ -1,8 +1,7 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
 import { Button } from "@/components/ui/button";
-import { Dialog } from "@/components/ui/dialog";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import { selectCurrentChangeCount, useStore } from "@/store";
 import { useThemeStore } from "@/themeStore";
@@ -11,13 +10,13 @@ interface AppShellProps {
 	children: ReactNode;
 }
 
-// Order matches the primary task flow: review results, edit model inputs,
-// tune settings, then dig into posting analysis.
+// Order matches the primary task flow: review results, edit accounts,
+// analyze, configure.
 const routes = [
 	{ to: "/", label: "Results", end: true },
-	{ to: "/model-inputs", label: "Model inputs", end: false },
-	{ to: "/settings", label: "Settings", end: false },
 	{ to: "/analysis", label: "Analysis", end: false },
+	{ to: "/settings", label: "Settings", end: false },
+	{ to: "/accounts", label: "Accounts", end: false },
 ];
 
 const MAIN_CONTENT_ID = "main-content";
@@ -44,38 +43,6 @@ function useRouteFocusReset(targetId: string) {
 		}
 		document.getElementById(targetId)?.focus({ preventScroll: true });
 	}, [pathname, targetId]);
-}
-
-function MenuIcon() {
-	return (
-		<svg
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="2"
-			strokeLinecap="round"
-			className="size-4"
-			aria-hidden="true"
-		>
-			<path d="M4 6h16M4 12h16M4 18h16" />
-		</svg>
-	);
-}
-
-function CloseIcon() {
-	return (
-		<svg
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="2"
-			strokeLinecap="round"
-			className="size-4"
-			aria-hidden="true"
-		>
-			<path d="M6 6l12 12M18 6L6 18" />
-		</svg>
-	);
 }
 
 function SunIcon() {
@@ -138,19 +105,7 @@ export function AppShell({ children }: AppShellProps) {
 			isDirty: state.isDirty,
 		})),
 	);
-	const [isNavOpen, setIsNavOpen] = useState(false);
-
 	useRouteFocusReset(MAIN_CONTENT_ID);
-
-	useEffect(() => {
-		if (!isNavOpen) return;
-		const desktop = window.matchMedia("(min-width: 64rem)");
-		const handleChange = () => {
-			if (desktop.matches) setIsNavOpen(false);
-		};
-		desktop.addEventListener("change", handleChange);
-		return () => desktop.removeEventListener("change", handleChange);
-	}, [isNavOpen]);
 
 	const statusBlock = (
 		<div className="min-w-0">
@@ -188,14 +143,13 @@ export function AppShell({ children }: AppShellProps) {
 	// screens, sidebar list on desktop. One link set keeps DOM order, tab
 	// order, and screen-reader output identical everywhere. React Router's
 	// NavLink reports aria-current="page" for the active route.
-	const navLinks = (onNavigate?: () => void) => (
+	const navLinks = (
 		<ul className="flex items-stretch gap-1 lg:flex-col">
 			{routes.map((route) => (
 				<li key={route.to} className="min-w-0 flex-1 lg:flex-none">
 					<NavLink
 						to={route.to}
 						end={route.end}
-						onClick={onNavigate}
 						className={({ isActive }) =>
 							`flex min-h-[44px] flex-1 items-center justify-center rounded-xl px-2 py-2 text-center text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:w-full lg:justify-start lg:px-4 ${
 								isActive
@@ -221,18 +175,6 @@ export function AppShell({ children }: AppShellProps) {
 					<div className="min-w-0 flex-1">{statusBlock}</div>
 					<div className="flex shrink-0 items-center gap-2">
 						<ThemeToggle />
-						<Button
-							variant="outline"
-							size="icon"
-							type="button"
-							aria-label="Open navigation menu"
-							aria-haspopup="dialog"
-							aria-expanded={isNavOpen}
-							onClick={() => setIsNavOpen(true)}
-							className="min-h-11 min-w-11"
-						>
-							<MenuIcon />
-						</Button>
 					</div>
 				</div>
 			</header>
@@ -245,7 +187,7 @@ export function AppShell({ children }: AppShellProps) {
 							aria-label="Primary navigation"
 							className="min-w-0 flex-1 lg:flex-none"
 						>
-							{navLinks()}
+							{navLinks}
 						</nav>
 						<div className="hidden shrink-0 lg:mt-auto lg:block">
 							<ThemeToggle />
@@ -256,43 +198,11 @@ export function AppShell({ children }: AppShellProps) {
 				<div
 					id={MAIN_CONTENT_ID}
 					tabIndex={-1}
-					className="min-w-0 flex-1 px-4 pt-6 pb-28 md:px-8 lg:pb-12"
+					className="min-w-0 flex-1 px-4 pt-6 pb-28 outline-none md:px-8 lg:pb-12"
 				>
 					{children}
 				</div>
 			</div>
-
-			{isNavOpen ? (
-				<Dialog
-					ariaLabel="Navigation menu"
-					onClose={() => setIsNavOpen(false)}
-					sheetOnMobile={false}
-					overlayClassName="no-print items-stretch justify-start p-0 lg:hidden"
-					className="drawer-panel h-full max-h-full w-72 max-w-[85vw] rounded-none border-y-0 border-l-0 bg-card/95 shadow-2xl backdrop-blur-xl"
-				>
-					<div className="flex h-full flex-col gap-5 p-5">
-						<div className="flex items-start justify-between gap-4">
-							<div className="min-w-0 flex-1">{statusBlock}</div>
-							<Button
-								variant="ghost"
-								size="icon"
-								type="button"
-								aria-label="Close navigation menu"
-								onClick={() => setIsNavOpen(false)}
-								className="min-h-11 min-w-11"
-							>
-								<CloseIcon />
-							</Button>
-						</div>
-						<nav
-							aria-label="Secondary navigation"
-							className="rounded-2xl border border-border/70 bg-surface/70 p-1 shadow-sm dark:border-white/10"
-						>
-							{navLinks(() => setIsNavOpen(false))}
-						</nav>
-					</div>
-				</Dialog>
-			) : null}
 		</div>
 	);
 }

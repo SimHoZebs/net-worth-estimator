@@ -35,7 +35,7 @@ export function SimulationSettingsCard() {
 
 	return (
 		<SectionCard title="Plan" className="rounded-[1.4rem] border-border/80">
-			<div className="rounded-2xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
+			<div className="rounded-2xl bg-surface/75 p-4 dark:bg-surface/55">
 				<div className="flex items-center justify-between gap-3">
 					<label htmlFor="horizon-years" className="type-eyebrow">
 						Horizon

@@ -85,7 +85,7 @@ export function StochasticControls() {
 			{!hasStochasticAccounts ? (
 				<p className="type-caption text-muted-foreground">
 					<Link
-						to="/model-inputs"
+						to="/accounts"
 						className="font-medium text-primary underline-offset-4 hover:underline"
 					>
 						Add volatility →
