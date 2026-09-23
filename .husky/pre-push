@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+set -e
+start=$(date +%s)
+
+npm run build
+
+end=$(date +%s)
+echo "pre-push: done in $((end - start))s"
