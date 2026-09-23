@@ -124,13 +124,9 @@ describe("HouseholdCycleSettingsCard", () => {
 			</MemoryRouter>,
 		);
 
-		expect(screen.getByText("Cash lane · current checking")).not.toBeNull();
-		expect(
-			screen.getByText("Card lane · paid from next paycheck"),
-		).not.toBeNull();
-		expect(
-			screen.getByText("Paycheck lane · next cycle capacity"),
-		).not.toBeNull();
+		expect(screen.getByText("Cash")).not.toBeNull();
+		expect(screen.getByText("Cards")).not.toBeNull();
+		expect(screen.getByText("Paycheck")).not.toBeNull();
 
 		const prime = screen.getByLabelText(
 			"Prime current-cycle exposure (incl. pending)",

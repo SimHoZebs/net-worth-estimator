@@ -3,7 +3,7 @@ import { useBeforeUnload, useBlocker } from "react-router-dom";
 import { BackendAccessCard } from "@/components/BackendAccessCard";
 import { HouseholdCycleSettingsCard } from "@/components/dashboard/HouseholdCycleSettingsCard";
 import { EvaluationSettings } from "@/components/evaluations/EvaluationSettings";
-import { PageHeader, SectionCard } from "@/components/present/present";
+import { SectionCard } from "@/components/present/present";
 import { StochasticControls } from "@/components/StochasticControls";
 import { ModelAssumptionsCard } from "@/components/sidebar/ModelAssumptionsCard";
 import { SimulationSettingsCard } from "@/components/sidebar/SimulationSettingsCard";
@@ -73,14 +73,10 @@ export function SettingsPage() {
 	return (
 		<>
 			<main
-				className="space-y-6"
+				className="mx-auto w-full max-w-2xl space-y-6"
 				inert={blocker.state === "blocked" ? true : undefined}
 			>
-				<PageHeader
-					eyebrow="Projection configuration"
-					title="Settings"
-					description="Session-only settings. Configure the simulation plan, uncertainty, goals, and appearance — changes apply instantly and are never written to the canonical model."
-				/>
+				<h1 className="type-title text-2xl">Settings</h1>
 
 				{model.loadError && !model.document ? (
 					<SectionCard
@@ -89,7 +85,7 @@ export function SettingsPage() {
 						className="border-destructive/30"
 					>
 						<Button type="button" size="sm" onClick={model.reload}>
-							Retry loading
+							Retry
 						</Button>
 					</SectionCard>
 				) : model.document ? (
@@ -100,15 +96,11 @@ export function SettingsPage() {
 						<HouseholdCycleSettingsCard
 							document={model.effectiveDocument ?? model.document}
 						/>
-						<div className="max-w-2xl">
-							<ModelAssumptionsCard />
-						</div>
+						<ModelAssumptionsCard />
 						<BackendAccessCard />
 					</div>
 				) : (
-					<SectionCard contentClassName="p-6 type-muted">
-						Settings will be available after the financial model loads.
-					</SectionCard>
+					<SectionCard contentClassName="p-6 type-muted">Loading…</SectionCard>
 				)}
 				<AppearanceSettings />
 			</main>
@@ -116,23 +108,18 @@ export function SettingsPage() {
 				<Dialog
 					role="alertdialog"
 					ariaLabelledby="discard-settings-title"
-					ariaDescribedby="discard-settings-description"
 					onClose={stayOnSettings}
 					className="max-w-md rounded-[1.8rem] border border-border bg-card p-6 shadow-2xl"
 				>
 					<h2 id="discard-settings-title" className="type-title text-xl">
 						Discard unapplied changes?
 					</h2>
-					<p id="discard-settings-description" className="mt-2 type-muted">
-						One or more evaluation editors contain changes that have not been
-						applied to the projection.
-					</p>
 					<div className="mt-6 flex justify-end gap-2">
 						<Button type="button" variant="secondary" onClick={stayOnSettings}>
-							Stay on Settings
+							Stay
 						</Button>
 						<Button type="button" onClick={() => blocker.proceed()}>
-							Discard and leave
+							Discard
 						</Button>
 					</div>
 				</Dialog>
@@ -147,7 +134,6 @@ function AppearanceSettings() {
 	return (
 		<SectionCard
 			title="Appearance"
-			description="Choose how the workspace follows your display."
 			className="rounded-[1.4rem] border-border/80"
 		>
 			<fieldset className="grid grid-cols-3 gap-2">

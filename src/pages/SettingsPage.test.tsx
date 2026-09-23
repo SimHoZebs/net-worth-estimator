@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	within,
+} from "@testing-library/react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/AppShell";
@@ -60,14 +66,15 @@ describe("SettingsPage", () => {
 		fireEvent.click(screen.getByRole("link", { name: "Results" }));
 
 		const dialog = await screen.findByRole("alertdialog");
-		const stayButton = screen.getByRole("button", { name: "Stay on Settings" });
+		const stayButton = screen.getByRole("button", { name: "Stay" });
 		expect(document.activeElement).toBe(stayButton);
 		fireEvent.keyDown(dialog, { key: "Escape" });
 		expect(screen.getByRole("heading", { name: "Settings" })).not.toBeNull();
 
 		fireEvent.click(screen.getByRole("link", { name: "Results" }));
+		const retryDialog = await screen.findByRole("alertdialog");
 		fireEvent.click(
-			await screen.findByRole("button", { name: "Discard and leave" }),
+			within(retryDialog).getByRole("button", { name: "Discard" }),
 		);
 		expect(
 			await screen.findByRole("heading", { name: "Results fixture" }),
