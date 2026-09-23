@@ -1,12 +1,9 @@
 import { Metric, SectionCard } from "@/components/present/present";
 import { formatPercentRate } from "@/lib/format";
 import { useModelRuntime } from "@/runtime/modelRuntime";
-import { useProjectionCapabilities } from "@/runtime/projectionRuntime";
 
 export function ModelAssumptionsCard() {
 	const { document: canonicalDocument, effectiveDocument } = useModelRuntime();
-	const { hasStochasticResult: hasStochasticData } =
-		useProjectionCapabilities();
 	const document = effectiveDocument ?? canonicalDocument;
 	if (!document) return null;
 	const enabledAccounts = document.accounts.filter(
@@ -21,8 +18,7 @@ export function ModelAssumptionsCard() {
 
 	return (
 		<SectionCard
-			title="Model assumptions"
-			description="Compact notes about rates and simplifications."
+			title="Assumptions"
 			className="rounded-[1.4rem] border-border/80"
 			contentClassName="space-y-4"
 		>
@@ -47,7 +43,7 @@ export function ModelAssumptionsCard() {
 
 			<details className="rounded-xl border border-border/70 bg-surface/70 px-4 py-3 dark:border-white/10 dark:bg-surface/50">
 				<summary className="cursor-pointer select-none type-eyebrow">
-					Annual rates
+					Rates
 				</summary>
 				{annualRatePostings.length > 0 ? (
 					<div className="mt-3 space-y-2 type-body">
@@ -67,41 +63,9 @@ export function ModelAssumptionsCard() {
 						))}
 					</div>
 				) : (
-					<div className="mt-2 type-muted text-muted-foreground/70">
-						No annual rates configured on enabled transactions.
-					</div>
+					<div className="mt-2 type-muted text-muted-foreground/70">None.</div>
 				)}
 			</details>
-
-			<details className="rounded-xl border border-border/70 bg-surface/70 px-4 py-3 dark:border-white/10 dark:bg-surface/50">
-				<summary className="cursor-pointer select-none type-eyebrow">
-					Model boundaries
-				</summary>
-				<ul className="mt-3 space-y-1 type-caption">
-					<li>
-						Income uses the configured tax profile and ordered payroll
-						resolvers; the checking deposit is post-tax.
-					</li>
-					<li>
-						Investment returns, loan rates, and expense growth are annual rates
-						converted to monthly.
-					</li>
-					<li>
-						Inflation is not explicitly modeled; values are nominal dollars.
-					</li>
-					<li>
-						Salary growth, expense growth, and loan rates stay fixed unless
-						edited in the model inputs.
-					</li>
-				</ul>
-			</details>
-
-			{hasStochasticData ? (
-				<div className="type-caption text-muted-foreground/70">
-					Monte Carlo bands are based on the volatile transactions configured in
-					the input data.
-				</div>
-			) : null}
 		</SectionCard>
 	);
 }

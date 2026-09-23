@@ -34,15 +34,11 @@ export function SimulationSettingsCard() {
 	};
 
 	return (
-		<SectionCard
-			title="Simulation plan"
-			description="Simulation settings shared by the base path and every evaluation."
-			className="rounded-[1.4rem] border-border/80"
-		>
+		<SectionCard title="Plan" className="rounded-[1.4rem] border-border/80">
 			<div className="rounded-2xl border border-border/80 bg-surface/75 p-4 dark:border-white/10 dark:bg-surface/55">
 				<div className="flex items-center justify-between gap-3">
 					<label htmlFor="horizon-years" className="type-eyebrow">
-						Projection horizon
+						Horizon
 					</label>
 					<span className="type-title" aria-live="polite">
 						{horizonYears} yr
@@ -84,7 +80,7 @@ export function SimulationSettingsCard() {
 				</div>
 				<div className="mt-3 max-w-44">
 					<LabeledField
-						label={`Exact years (${MIN_HORIZON_YEARS}–${MAX_HORIZON_YEARS})`}
+						label="Years"
 						id="horizon-years-exact"
 						type="text"
 						inputMode="numeric"
@@ -108,8 +104,7 @@ export function SimulationSettingsCard() {
 					/>
 				</div>
 				<div className="mt-1 type-caption text-muted-foreground/70">
-					From {formatDate(projectionStartDate)} · applies instantly to the base
-					path and every evaluation.
+					From {formatDate(projectionStartDate)}
 				</div>
 			</div>
 		</SectionCard>

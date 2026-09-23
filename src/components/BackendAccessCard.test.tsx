@@ -14,10 +14,10 @@ describe("BackendAccessCard", () => {
 	it("stores the token without displaying it", () => {
 		render(<BackendAccessCard />);
 
-		fireEvent.change(screen.getByLabelText("Access token"), {
+		fireEvent.change(screen.getByLabelText("Token"), {
 			target: { value: "secret-token" },
 		});
-		fireEvent.click(screen.getByRole("button", { name: "Set token" }));
+		fireEvent.click(screen.getByRole("button", { name: "Set" }));
 
 		expect(getAuthToken()).toBe("secret-token");
 		expect(screen.queryByText("secret-token")).toBeNull();
@@ -27,13 +27,13 @@ describe("BackendAccessCard", () => {
 	it("clears the token", () => {
 		render(<BackendAccessCard />);
 
-		fireEvent.change(screen.getByLabelText("Access token"), {
+		fireEvent.change(screen.getByLabelText("Token"), {
 			target: { value: "secret-token" },
 		});
-		fireEvent.click(screen.getByRole("button", { name: "Set token" }));
-		fireEvent.click(screen.getByRole("button", { name: "Clear token" }));
+		fireEvent.click(screen.getByRole("button", { name: "Set" }));
+		fireEvent.click(screen.getByRole("button", { name: "Clear" }));
 
 		expect(getAuthToken()).toBeNull();
-		expect(screen.getByText("No token (read-only)")).not.toBeNull();
+		expect(screen.getByText("No token")).not.toBeNull();
 	});
 });

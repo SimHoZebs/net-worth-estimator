@@ -111,16 +111,15 @@ describe("EvaluationSettings", () => {
 
 		renderSettings();
 
-		const labels = [
-			screen.getByLabelText("Label for First target"),
-			screen.getByLabelText("Label for Second target"),
-		].map((input) => (input as HTMLInputElement).value);
-		expect(labels).toEqual(["First target", "Second target"]);
+		const names = screen
+			.getAllByLabelText("Goal name")
+			.map((input) => (input as HTMLInputElement).value);
+		expect(names).toEqual(["First target", "Second target"]);
 		expect(
-			screen.getByLabelText("Label for First target").getAttribute("title"),
+			screen.getAllByLabelText("Goal name")[0]?.getAttribute("title"),
 		).toBe("first-target");
 		expect(
-			screen.getByLabelText("Label for Second target").getAttribute("title"),
+			screen.getAllByLabelText("Goal name")[1]?.getAttribute("title"),
 		).toBe("second-target");
 		expect(screen.queryByText("first-target", { exact: false })).toBeNull();
 		expect(screen.queryByText("second-target", { exact: false })).toBeNull();
@@ -144,7 +143,7 @@ describe("EvaluationSettings", () => {
 		renderSettings();
 
 		expect(screen.getByLabelText("Enable Broken target")).not.toBeNull();
-		expect(screen.getByLabelText("Label for Broken target")).not.toBeNull();
+		expect(screen.getByLabelText("Goal name")).not.toBeNull();
 		expect(screen.queryByLabelText("Target net worth")).toBeNull();
 		expect(screen.getAllByRole("alert")).toHaveLength(1);
 	});
