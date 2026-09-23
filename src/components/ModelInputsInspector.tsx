@@ -253,27 +253,11 @@ export function ModelInputsInspector() {
 		return changes;
 	}, [baseline?.checkpoints, draft?.checkpoints]);
 
-	const tabs: { id: InputSection; label: string; count: number }[] = [
-		{
-			id: "accounts",
-			label: "Accounts",
-			count: displayDocument?.accounts.length ?? 0,
-		},
-		{
-			id: "scheduled",
-			label: "Scheduled",
-			count: postingGroups.scheduledTransactions.length,
-		},
-		{
-			id: "activity",
-			label: "Activity",
-			count: postingGroups.transactionHistory.length,
-		},
-		{
-			id: "reconcile",
-			label: "Reconcile",
-			count: displayDocument?.checkpoints.length ?? 0,
-		},
+	const tabs: { id: InputSection; label: string }[] = [
+		{ id: "accounts", label: "Accounts" },
+		{ id: "scheduled", label: "Scheduled" },
+		{ id: "activity", label: "Activity" },
+		{ id: "reconcile", label: "Reconcile" },
 	];
 	const issueCounts = useMemo(
 		() => countIssuesByTab(issues, document?.postings),
@@ -283,7 +267,7 @@ export function ModelInputsInspector() {
 	const lastLoaded =
 		dataUpdatedAt === 0
 			? "Not loaded"
-			: new Date(dataUpdatedAt).toLocaleString();
+			: new Date(dataUpdatedAt).toLocaleDateString();
 
 	const openCreate = (direction: MoneyDirection, fromAccountId?: string) => {
 		if (!displayDocument) return;
@@ -369,19 +353,8 @@ export function ModelInputsInspector() {
 				</Alert>
 			) : null}
 
-			<p className="type-caption text-muted-foreground">
-				{source.label} · {lastLoaded} ·{" "}
-				{source.saveLabel ? (
-					<span className="text-[color:var(--chart-success)]">
-						Saving enabled
-					</span>
-				) : (
-					<span>Read-only — saving unavailable</span>
-				)}{" "}
-				·{" "}
-				<a href="/settings" className="underline underline-offset-2">
-					Settings
-				</a>
+			<p className="truncate type-caption text-muted-foreground">
+				{source.label} · {lastLoaded}
 			</p>
 
 			{document && displayDocument ? (
@@ -406,7 +379,7 @@ export function ModelInputsInspector() {
 										key={tab.id}
 										type="button"
 										aria-pressed={isActive}
-										aria-label={`${tab.label}, ${tab.count} items${tabIssues > 0 ? `, ${tabIssues} validation ${tabIssues === 1 ? "issue" : "issues"}` : ""}`}
+										aria-label={`${tab.label}${tabIssues > 0 ? `, ${tabIssues} validation ${tabIssues === 1 ? "issue" : "issues"}` : ""}`}
 										title={
 											tabIssues > 0
 												? `${tabIssues} validation ${tabIssues === 1 ? "issue" : "issues"} — see Reconcile`
@@ -419,7 +392,7 @@ export function ModelInputsInspector() {
 										}}
 										className={`${tabClassName(isActive)} relative min-h-11`}
 									>
-										{tab.label} <span className="opacity-70">{tab.count}</span>
+										{tab.label}
 										{tab.id === "reconcile" && tabIssues > 0 ? (
 											<span
 												aria-hidden="true"
@@ -454,7 +427,6 @@ export function ModelInputsInspector() {
 								projectionStartDate={
 									result?.milestones.projectionStartDate ?? projectionStartDate
 								}
-								onAddAccount={() => setAccountForm({ mode: "create" })}
 								rulesFor={(accountId) =>
 									displayDocument.postings.filter((posting) =>
 										associatedAccountIds(posting, accountIds).includes(
@@ -781,7 +753,6 @@ function AccountsView({
 	balancesAvailable,
 	currentNetWorth,
 	projectionStartDate,
-	onAddAccount,
 	rulesFor,
 	activityFor,
 	accountById,
@@ -802,7 +773,6 @@ function AccountsView({
 	balancesAvailable: boolean;
 	currentNetWorth: number | null;
 	projectionStartDate: string;
-	onAddAccount: () => void;
 	rulesFor: (accountId: string) => Posting[];
 	activityFor: (accountId: string) => Posting[];
 	accountById: ReadonlyMap<string, Account>;
@@ -899,34 +869,18 @@ function AccountsView({
 					type="search"
 					value={accountQuery}
 					onChange={(event) => onQuery(event.target.value)}
-					placeholder="Search accounts"
+					placeholder="Search"
 					aria-label="Search accounts"
 					className="min-h-11 w-full rounded-full border border-border bg-card px-4 py-2.5 type-body placeholder:text-muted-foreground sm:max-w-xs"
 				/>
-				<span aria-live="polite" className="type-caption">
+				<span aria-live="polite" className="sr-only">
 					{ordered.length} {ordered.length === 1 ? "account" : "accounts"}
 				</span>
 			</div>
-
 			{ordered.length === 0 ? (
-				<div className="space-y-3 rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center">
-					<p className="type-muted">
-						{normalized
-							? "No accounts match this search."
-							: "No accounts yet. Add one to start modeling."}
-					</p>
-					{normalized ? null : (
-						<Button
-							type="button"
-							variant="secondary"
-							size="sm"
-							className="min-h-11"
-							onClick={onAddAccount}
-						>
-							+ Account
-						</Button>
-					)}
-				</div>
+				<p role="status" className="type-muted">
+					None.
+				</p>
 			) : (
 				<div className="grid gap-2 sm:grid-cols-2">
 					{ordered.map(({ account, balance }) => (
@@ -1080,7 +1034,7 @@ function AccountDetail({
 					<h4 className="mb-1.5 px-1 type-label text-muted-foreground">
 						Scheduled
 					</h4>
-					<div className="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/70">
+					<div className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-card/70">
 						{rules.map((posting) => (
 							<MoneyRowInline
 								key={posting.id}
@@ -1098,7 +1052,7 @@ function AccountDetail({
 					<h4 className="mb-1.5 px-1 type-label text-muted-foreground">
 						Recent
 					</h4>
-					<div className="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/70">
+					<div className="divide-y divide-border/60 overflow-hidden rounded-2xl bg-card/70">
 						{activity.map((posting) => (
 							<MoneyRowInline
 								key={posting.id}
@@ -1176,8 +1130,8 @@ function ScheduledView({
 			<MoneyFeed
 				postings={current}
 				accounts={accounts}
-				emptyText="No scheduled movements yet. Add a repeating paycheck, bill, or transfer."
-				searchLabel="Search scheduled movements"
+				emptyText="None."
+				searchLabel="Search scheduled"
 				emptyAction={
 					<Button
 						type="button"
@@ -1186,19 +1140,17 @@ function ScheduledView({
 						className="min-h-11"
 						onClick={onAdd}
 					>
-						New scheduled movement
+						New
 					</Button>
 				}
 				onOpen={onOpen}
 				dateDescending={false}
+				showDate
 			/>
 			{past.length > 0 ? (
 				<details className="rounded-2xl border border-border/70">
 					<summary className="cursor-pointer min-h-11 content-center px-4 py-3 type-body font-medium text-muted-foreground">
 						Ended · {past.length}
-						<span className="block type-caption font-normal">
-							Scheduled movements whose end date has passed.
-						</span>
 					</summary>
 					<div className="border-t border-border/70 p-3">
 						<MoneyFeed
@@ -1207,6 +1159,7 @@ function ScheduledView({
 							emptyText="None."
 							onOpen={onOpen}
 							dateDescending={false}
+							showDate
 						/>
 					</div>
 				</details>
@@ -1298,18 +1251,14 @@ function StatementsView({
 								{modeled !== null ? ` · Model ${currency.format(modeled)}` : ""}
 							</p>
 							{rows.length > 0 ? (
-								<ul className="mt-3 divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70">
+								<ul className="mt-3 divide-y divide-border/60 overflow-hidden rounded-xl bg-surface/55">
 									{rows.map((row) => (
 										<li
 											key={`${row.AccountId}:${row.Date}`}
 											className="flex items-center justify-between gap-3 px-3 py-2"
 										>
-											<span className="type-body text-sm">
+											<span className="type-body text-sm tabular-nums">
 												{formatDate(row.Date)} · {currency.format(row.Balance)}
-												<span className="type-caption">
-													{" "}
-													· {labelById.get(row.AccountId) ?? row.AccountId}
-												</span>
 											</span>
 											<ConfirmButton
 												label={`Remove checkpoint for ${labelById.get(row.AccountId) ?? row.AccountId} on ${row.Date}`}
@@ -1417,7 +1366,7 @@ function PendingDock({
 				</p>
 			) : null}
 			{open ? (
-				<div className="space-y-4 rounded-2xl border border-border/70 p-4">
+				<div className="space-y-4 rounded-2xl bg-surface/55 p-4">
 					<div className="flex justify-end">
 						<Button
 							type="button"

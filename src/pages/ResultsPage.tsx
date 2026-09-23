@@ -58,10 +58,10 @@ export function ResultsPage() {
 								Retry loading
 							</Button>
 							<Link
-								to="/model-inputs"
+								to="/accounts"
 								className={buttonVariants({ variant: "secondary", size: "sm" })}
 							>
-								Open model inputs
+								Open accounts
 							</Link>
 						</div>
 					</AlertDescription>
@@ -85,10 +85,10 @@ export function ResultsPage() {
 					<AlertDescription>
 						Review and correct the diagnostics on the{" "}
 						<Link
-							to="/model-inputs"
+							to="/accounts"
 							className="font-semibold underline underline-offset-2"
 						>
-							Model inputs page
+							Accounts
 						</Link>
 						.
 					</AlertDescription>
@@ -215,10 +215,10 @@ function ErrorAlert({
 						{actionLabel}
 					</Button>
 					<Link
-						to="/model-inputs"
+						to="/accounts"
 						className={buttonVariants({ variant: "secondary", size: "sm" })}
 					>
-						Open model inputs
+						Open accounts
 					</Link>
 					<Link
 						to="/settings"

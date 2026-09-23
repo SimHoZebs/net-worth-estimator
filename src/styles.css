@@ -83,37 +83,37 @@
 
 .dark {
 	color-scheme: dark;
-	--background: oklch(0.145 0.026 255);
+	--background: oklch(0.115 0.022 252);
 	--foreground: oklch(0.93 0.018 248);
-	--card: oklch(0.205 0.03 255);
+	--card: oklch(0.205 0.03 256);
 	--card-foreground: var(--foreground);
-	--surface: oklch(0.175 0.03 255);
-	--surface-elevated: oklch(0.245 0.033 255);
+	--surface: oklch(0.165 0.026 254);
+	--surface-elevated: oklch(0.25 0.033 256);
 
-	--primary: oklch(0.73 0.135 166);
-	--primary-subtle: oklch(0.28 0.058 169);
-	--primary-border: oklch(0.47 0.095 169);
-	--primary-foreground: oklch(0.12 0.025 170);
-	--secondary: oklch(0.285 0.033 255);
+	--primary: oklch(0.62 0.12 166);
+	--primary-subtle: oklch(0.22 0.05 169);
+	--primary-border: oklch(0.4 0.085 169);
+	--primary-foreground: oklch(0.13 0.025 170);
+	--secondary: oklch(0.27 0.033 255);
 	--secondary-foreground: oklch(0.9 0.021 248);
 	--tertiary: oklch(0.79 0.14 75);
-	--tertiary-subtle: oklch(0.27 0.057 61);
-	--tertiary-border: oklch(0.48 0.1 63);
-	--tertiary-foreground: oklch(0.91 0.084 82);
-	--muted: oklch(0.255 0.027 255);
-	--muted-foreground: oklch(0.68 0.032 248);
-	--accent: oklch(0.315 0.043 213);
+	--tertiary-subtle: oklch(0.29 0.06 64);
+	--tertiary-border: oklch(0.53 0.105 66);
+	--tertiary-foreground: oklch(0.92 0.08 82);
+	--muted: oklch(0.245 0.027 255);
+	--muted-foreground: oklch(0.72 0.03 248);
+	--accent: oklch(0.30 0.043 213);
 	--accent-foreground: oklch(0.93 0.018 248);
 	--destructive: oklch(0.72 0.18 25);
 	--destructive-subtle: oklch(0.25 0.064 22);
 	--destructive-foreground: oklch(0.88 0.075 24);
-	--border: oklch(0.335 0.034 255);
-	--input: oklch(0.39 0.037 255);
-	--ring: oklch(0.71 0.125 166);
+	--border: oklch(0.32 0.033 255);
+	--input: oklch(0.38 0.037 255);
+	--ring: oklch(0.66 0.115 166);
 	--chart-axis: oklch(0.77 0.026 248);
-	--chart-grid: oklch(0.32 0.033 255);
+	--chart-grid: oklch(0.30 0.032 255);
 	--chart-target: oklch(0.83 0.025 248);
-	--chart-success: oklch(0.73 0.135 166);
+	--chart-success: oklch(0.68 0.125 166);
 	--chart-warning: oklch(0.8 0.145 75);
 }
 

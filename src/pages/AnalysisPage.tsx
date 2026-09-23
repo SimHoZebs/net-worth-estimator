@@ -1,10 +1,7 @@
 import { useMemo } from "react";
 import {
-	DeferredSection,
 	DiagnosticsList,
 	EvidenceItemList,
-	OutlierList,
-	PostingEvidenceList,
 } from "@/components/analysis/EvidenceList";
 import {
 	EmptyState,
@@ -34,11 +31,6 @@ export function AnalysisPage() {
 		model.effectiveDocument !== canonicalDocument;
 
 	const observationRows = analyses.observations;
-	const classificationValue =
-		analyses.data?.classification.state === "ready" ||
-		analyses.data?.classification.state === "warning"
-			? analyses.data.classification.value
-			: null;
 	const payrollResult = analyses.data?.payroll ?? null;
 	const payrollValue =
 		payrollResult && payrollResult.state !== "error"
@@ -50,23 +42,6 @@ export function AnalysisPage() {
 	const salaryStatus = salaryValue?.status ?? "unavailable";
 	const estimate = salaryValue?.estimate ?? null;
 	const statusCopy = salaryStatusCopy(salaryStatus);
-
-	const classifiedById = useMemo(() => {
-		const map = new Map<
-			string,
-			NonNullable<typeof classificationValue>["postings"][number]
-		>();
-		for (const item of classificationValue?.postings ?? []) {
-			map.set(item.posting.id, item);
-		}
-		return map;
-	}, [classificationValue]);
-
-	const observationById = useMemo(() => {
-		const map = new Map<string, (typeof observationRows)[number]>();
-		for (const posting of observationRows) map.set(posting.id, posting);
-		return map;
-	}, [observationRows]);
 
 	const firstDate = observationRows[0]?.bookedDate ?? null;
 	const lastDate =
@@ -88,40 +63,6 @@ export function AnalysisPage() {
 		);
 		return bySupport ?? payrollValue.candidates[0] ?? null;
 	}, [estimate, payrollValue]);
-
-	const supportingRows = useMemo(() => {
-		if (!estimate) return [];
-		return estimate.supportingTransactionIds
-			.map((id) => observationById.get(id))
-			.filter((posting) => posting !== undefined)
-			.map((observation) => ({
-				observation,
-				classified: classifiedById.get(observation.id),
-			}));
-	}, [estimate, observationById, classifiedById]);
-
-	const allPostingRows = useMemo(
-		() =>
-			observationRows.map((observation) => ({
-				observation,
-				classified: classifiedById.get(observation.id),
-			})),
-		[observationRows, classifiedById],
-	);
-
-	const outlierLookup = useMemo(() => {
-		const map = new Map<
-			string,
-			(typeof observationRows)[number] | { bookedDate: string; amount: number }
-		>();
-		for (const posting of observationRows) map.set(posting.id, posting);
-		for (const candidate of payrollValue?.candidates ?? []) {
-			for (const transaction of candidate.transactions) {
-				if (!map.has(transaction.id)) map.set(transaction.id, transaction);
-			}
-		}
-		return map;
-	}, [observationRows, payrollValue]);
 
 	const payrollNoneDetected =
 		payrollResult?.diagnostics.some(
@@ -169,58 +110,33 @@ export function AnalysisPage() {
 			) : null}
 
 			{document ? (
-				<div className="grid items-start gap-6 xl:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.2fr)]">
-					<SectionCard
-						title="Postings"
-						className="rounded-[1.8rem]"
-						headerClassName="border-b border-border/70 bg-surface/45"
-						contentClassName="space-y-5"
-					>
-						<div className="grid grid-cols-2 gap-3">
-							<Metric
-								size="sm"
-								capitalize
-								label="Count"
-								value={String(observationRows.length)}
-							/>
-							<div className="rounded-xl border border-border/70 bg-surface/60 p-3">
-								<div className="type-caption">Range</div>
-								<div className="mt-1 break-words type-value">
-									{firstDate && lastDate ? (
-										<>
-											<time dateTime={firstDate}>
-												{formatPostingDate(firstDate)}
-											</time>{" "}
-											<span aria-hidden="true">-</span>{" "}
-											<time dateTime={lastDate}>
-												{formatPostingDate(lastDate)}
-											</time>
-										</>
-									) : (
-										"None"
-									)}
-								</div>
-							</div>
-						</div>
-
-						<DeferredSection>
-							<div className="space-y-3">
-								<h2 className="type-title text-base">
-									All ({observationRows.length})
-								</h2>
-								{observationRows.length > 0 ? (
-									<PostingEvidenceList postings={allPostingRows} />
-								) : (
-									<p role="status" className="type-muted">
-										None.
-									</p>
-								)}
-							</div>
-						</DeferredSection>
-					</SectionCard>
+				<div className="space-y-6">
+					<p className="type-caption text-muted-foreground">
+						{observationRows.length} postings
+						{firstDate && lastDate ? (
+							<>
+								{" · "}
+								<time dateTime={firstDate}>{formatPostingDate(firstDate)}</time>{" "}
+								<span aria-hidden="true">–</span>{" "}
+								<time dateTime={lastDate}>{formatPostingDate(lastDate)}</time>
+							</>
+						) : null}{" "}
+						·{" "}
+						<a
+							href="/accounts"
+							className="font-semibold underline underline-offset-2"
+						>
+							View postings
+						</a>
+					</p>
 
 					<SectionCard
-						title="Net pay"
+						title={
+							<span className="flex items-center gap-2">
+								<StatusGlyph status={salaryStatus} />
+								Net pay
+							</span>
+						}
 						className="rounded-[2rem] border-primary-border/80 bg-card/95"
 						headerClassName="border-b border-primary-border/60 bg-primary-subtle/60"
 						contentClassName="space-y-5 p-5 md:p-6"
@@ -264,7 +180,7 @@ export function AnalysisPage() {
 												: "annualization withheld"}
 										</div>
 									</div>
-									<div className="rounded-2xl border border-border/70 bg-surface/70 p-4">
+									<div className="rounded-2xl bg-surface/70 p-4">
 										<div className="type-caption">
 											{estimate.annualizedObservedNetPay ? "Range" : "Status"}
 										</div>
@@ -293,7 +209,7 @@ export function AnalysisPage() {
 									</div>
 								</div>
 
-								<div className="rounded-2xl border border-border/70 bg-surface/50 p-4">
+								<div className="rounded-2xl bg-surface/50 p-4">
 									<h2 className="type-title text-base">{statusCopy.heading}</h2>
 								</div>
 
@@ -303,12 +219,14 @@ export function AnalysisPage() {
 										capitalize
 										label="Payer"
 										value={estimate.payerLabel}
+										className="border-0"
 									/>
 									<Metric
 										size="sm"
 										capitalize
 										label="Cadence"
 										value={estimate.cadence.replace("-", " ")}
+										className="border-0"
 									/>
 									<Metric
 										size="sm"
@@ -319,6 +237,7 @@ export function AnalysisPage() {
 												{formatRoundedUsd(estimate.typicalNetDeposit)}
 											</span>
 										}
+										className="border-0"
 									/>
 								</div>
 								<div className="grid gap-3 sm:grid-cols-2">
@@ -327,12 +246,14 @@ export function AnalysisPage() {
 										capitalize
 										label="Identity"
 										value={estimate.identityEvidence.strength}
+										className="border-0"
 									/>
 									<Metric
 										size="sm"
 										capitalize
 										label="Regularity"
 										value={estimate.regularPayEvidence.strength}
+										className="border-0"
 									/>
 								</div>
 
@@ -365,26 +286,33 @@ export function AnalysisPage() {
 
 								<div className="space-y-3">
 									<h2 className="type-title text-base">
-										Supporting ({supportingRows.length})
+										Supporting · {estimate.comparableObservationCount} of{" "}
+										{estimate.observationCount}
 									</h2>
-									<PostingEvidenceList
-										postings={supportingRows}
-										emptyMessage="None."
-										searchLabel="Filter supporting postings"
-									/>
+									<p className="type-caption">
+										<a
+											href="/accounts"
+											className="font-semibold underline underline-offset-2"
+										>
+											View postings
+										</a>
+									</p>
 								</div>
 
-								<OutlierList
-									excludedIds={estimate.excludedTransactionIds}
-									lookup={outlierLookup}
-								/>
+								{estimate.excludedTransactionIds.length > 0 ? (
+									<p className="type-caption text-muted-foreground">
+										{estimate.excludedTransactionIds.length} outlier
+										{estimate.excludedTransactionIds.length === 1 ? "" : "s"}{" "}
+										excluded
+									</p>
+								) : null}
 
 								<p className="type-caption">
 									<a
-										href="/model-inputs"
+										href="/accounts"
 										className="font-semibold underline underline-offset-2"
 									>
-										Edit in Model inputs
+										Edit in Accounts
 									</a>
 								</p>
 							</>
@@ -393,10 +321,10 @@ export function AnalysisPage() {
 								<div className="type-title">{statusCopy.heading}</div>
 								<p className="mt-3 type-caption">
 									<a
-										href="/model-inputs"
+										href="/accounts"
 										className="font-semibold underline underline-offset-2"
 									>
-										Edit in Model inputs
+										Edit in Accounts
 									</a>
 								</p>
 							</EmptyState>
@@ -410,10 +338,10 @@ export function AnalysisPage() {
 								<h2 className="type-title text-base">No payroll detected</h2>
 								<p className="type-caption">
 									<a
-										href="/model-inputs"
+										href="/accounts"
 										className="font-semibold underline underline-offset-2"
 									>
-										Edit in Model inputs
+										Edit in Accounts
 									</a>
 								</p>
 							</div>
@@ -429,6 +357,25 @@ export function AnalysisPage() {
 				</div>
 			) : null}
 		</main>
+	);
+}
+
+function StatusGlyph({ status }: { status: string }) {
+	const glyph =
+		status === "confirmed" ? "✓" : status === "provisional" ? "~" : "–";
+	const tone =
+		status === "confirmed"
+			? "border-[color:var(--chart-success)] text-[color:var(--chart-success)]"
+			: status === "provisional"
+				? "border-tertiary-border text-tertiary-foreground"
+				: "border-border text-muted-foreground";
+	return (
+		<span
+			aria-hidden="true"
+			className={`flex size-6 items-center justify-center rounded-full border text-sm font-bold ${tone}`}
+		>
+			{glyph}
+		</span>
 	);
 }
 

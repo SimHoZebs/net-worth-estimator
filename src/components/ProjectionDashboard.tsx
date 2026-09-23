@@ -217,10 +217,10 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 						tone={derived.biggestShortfallPosting ? "tertiary" : "primary"}
 					/>
 					<Link
-						to="/model-inputs"
+						to="/accounts"
 						className="no-print w-full rounded-2xl border border-border/80 bg-card/85 px-4 py-3 text-sm font-semibold text-muted-foreground shadow-sm transition hover:border-ring/70 hover:bg-accent hover:text-accent-foreground dark:border-white/10"
 					>
-						Explore model inputs
+						Explore accounts
 					</Link>
 				</div>
 				<DriverCard

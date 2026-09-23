@@ -240,7 +240,7 @@ function GoalCard({
 							}}
 							className="mt-2 accent-primary"
 						/>
-						<div className="min-w-0">
+						<div className="min-w-0 flex-1">
 							<input
 								type="text"
 								value={evaluation.label}
@@ -252,7 +252,7 @@ function GoalCard({
 									});
 									flashRecalculating(dirtyKey);
 								}}
-								className="max-w-full bg-transparent type-title text-xl outline-none focus:text-primary focus-visible:ring-2 focus-visible:ring-ring/40"
+								className="w-full bg-transparent type-title text-xl outline-none focus:text-primary focus-visible:ring-2 focus-visible:ring-ring/40"
 							/>
 							<div className="mt-1 flex flex-wrap items-center gap-2">
 								{isRecalculating ? (

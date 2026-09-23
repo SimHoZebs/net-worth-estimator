@@ -48,7 +48,7 @@ function renderSettingsRoute() {
 				children: [
 					{ index: true, element: <h1>Results fixture</h1> },
 					{ path: "settings", element: <SettingsPage /> },
-					{ path: "model-inputs", element: <h1>Inputs fixture</h1> },
+					{ path: "accounts", element: <h1>Inputs fixture</h1> },
 				],
 			},
 		],

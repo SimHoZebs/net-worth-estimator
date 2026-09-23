@@ -6,7 +6,7 @@ import {
 } from "@/lib/posting-categories";
 import type { Account, Posting } from "@/lib/projection";
 import { describePostingAmount, getExpression } from "@/lib/projection";
-import { directionLabel, moneyDirection } from "./money";
+import { moneyDirection } from "./money";
 
 function initials(label: string): string {
 	const words = label.trim().split(/\s+/).filter(Boolean);
@@ -70,10 +70,12 @@ export function MoneyRow({
 	posting,
 	accountById,
 	onOpen,
+	showDate = false,
 }: {
 	posting: Posting;
 	accountById: ReadonlyMap<string, Account>;
 	onOpen: (posting: Posting) => void;
+	showDate?: boolean;
 }) {
 	const direction = moneyDirection(posting);
 	const source = posting.sourceAccountId
@@ -106,9 +108,19 @@ export function MoneyRow({
 			<span className="min-w-0 flex-1">
 				<span className="block truncate type-value">{posting.label}</span>
 				<span className="block truncate type-caption">
-					{directionLabel(direction)} · {counterparty} ·{" "}
-					{formatFrequency(posting.frequency)} ·{" "}
-					<DateText value={posting.startDate} />
+					{counterparty}
+					{posting.frequency !== "once" ? (
+						<>
+							{" · "}
+							{formatFrequency(posting.frequency)}
+						</>
+					) : null}
+					{showDate ? (
+						<>
+							{" · "}
+							<DateText value={posting.startDate} />
+						</>
+					) : null}
 				</span>
 			</span>
 			<span className="shrink-0 type-value">

@@ -56,7 +56,11 @@ const router = createBrowserRouter([
 			{ index: true, element: lazyElement(<ResultsPage />) },
 			{ path: "analysis", element: lazyElement(<AnalysisPage />) },
 			{ path: "settings", element: lazyElement(<SettingsPage />) },
-			{ path: "model-inputs", element: lazyElement(<ModelInputsPage />) },
+			{ path: "accounts", element: lazyElement(<ModelInputsPage />) },
+			{
+				path: "model-inputs",
+				element: <Navigate to="/accounts" replace />,
+			},
 			{ path: "*", element: <Navigate to="/" replace /> },
 		],
 	},
