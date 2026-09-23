@@ -87,7 +87,7 @@ describe("AnalysisPage", () => {
 	it("analyzes one-time external inflow postings without an import control", async () => {
 		renderPage();
 		expect(screen.queryByLabelText("Import transaction CSV")).toBeNull();
-		expect(await screen.findByText("Observed net pay")).not.toBeNull();
+		expect(await screen.findByText("Net pay")).not.toBeNull();
 		expect((await screen.findAllByText("$7,518")).length).toBeGreaterThan(0);
 		expect(screen.getByText("provisional")).not.toBeNull();
 		expect(screen.getByText("3")).not.toBeNull();
@@ -95,7 +95,7 @@ describe("AnalysisPage", () => {
 
 	it("does not treat recurring model rules as observed postings", async () => {
 		renderPage();
-		expect(await screen.findByText("Observed postings")).not.toBeNull();
+		expect(await screen.findByText("Postings")).not.toBeNull();
 		expect(screen.getByText("3")).not.toBeNull();
 	});
 });
