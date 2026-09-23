@@ -1,21 +1,50 @@
-import { type ReactNode, useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import { selectCurrentChangeCount, useStore } from "@/store";
+import { useThemeStore } from "@/themeStore";
 
 interface AppShellProps {
 	children: ReactNode;
 }
 
+// Order matches the primary task flow: review results, edit model inputs,
+// tune settings, then dig into posting analysis.
 const routes = [
 	{ to: "/", label: "Results", end: true },
-	{ to: "/analysis", label: "Analysis", end: false },
-	{ to: "/settings", label: "Settings", end: false },
 	{ to: "/model-inputs", label: "Model inputs", end: false },
+	{ to: "/settings", label: "Settings", end: false },
+	{ to: "/analysis", label: "Analysis", end: false },
 ];
+
+const MAIN_CONTENT_ID = "main-content";
+
+/**
+ * Reset scroll and move programmatic focus to the content wrapper on route
+ * change so keyboard and screen-reader users land at the start of the new
+ * page. Pages own their own <main> landmark, so the shell exposes a
+ * focusable wrapper carrying the skip-link target id instead.
+ */
+function useRouteFocusReset(targetId: string) {
+	const { pathname } = useLocation();
+	const isFirstRender = useRef(true);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: pathname intentionally re-runs the reset on route change without being read.
+	useEffect(() => {
+		if (isFirstRender.current) {
+			isFirstRender.current = false;
+			return;
+		}
+		try {
+			window.scrollTo({ top: 0, behavior: "auto" });
+		} catch {
+			// Scroll options are unavailable in some test environments.
+		}
+		document.getElementById(targetId)?.focus({ preventScroll: true });
+	}, [pathname, targetId]);
+}
 
 function MenuIcon() {
 	return (
@@ -49,6 +78,57 @@ function CloseIcon() {
 	);
 }
 
+function SunIcon() {
+	return (
+		<svg
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			className="size-4"
+			aria-hidden="true"
+		>
+			<circle cx="12" cy="12" r="4" />
+			<path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+		</svg>
+	);
+}
+
+function MoonIcon() {
+	return (
+		<svg
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			className="size-4"
+			aria-hidden="true"
+		>
+			<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+		</svg>
+	);
+}
+
+function ThemeToggle() {
+	const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
+	const setTheme = useThemeStore((state) => state.setTheme);
+	const isDark = resolvedTheme === "dark";
+	return (
+		<Button
+			variant="outline"
+			size="icon"
+			type="button"
+			aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+			aria-pressed={isDark}
+			onClick={() => setTheme(isDark ? "light" : "dark")}
+		>
+			{isDark ? <SunIcon /> : <MoonIcon />}
+		</Button>
+	);
+}
+
 export function AppShell({ children }: AppShellProps) {
 	const { source, document, isLoading, loadError } = useModelRuntime();
 	const { currentChangeCount, isEditing, isDirty } = useStore(
@@ -59,6 +139,8 @@ export function AppShell({ children }: AppShellProps) {
 		})),
 	);
 	const [isNavOpen, setIsNavOpen] = useState(false);
+
+	useRouteFocusReset(MAIN_CONTENT_ID);
 
 	useEffect(() => {
 		if (!isNavOpen) return;
@@ -71,9 +153,9 @@ export function AppShell({ children }: AppShellProps) {
 	}, [isNavOpen]);
 
 	const statusBlock = (
-		<div>
+		<div className="min-w-0">
 			<div className="type-eyebrow text-primary">Net worth estimator</div>
-			<div className="mt-1 type-caption">
+			<div className="mt-1 truncate type-caption">
 				{document ? (
 					<span>
 						Baseline loaded from{" "}
@@ -102,81 +184,109 @@ export function AppShell({ children }: AppShellProps) {
 		</div>
 	);
 
-	const navLinks = (onNavigate?: () => void) =>
-		routes.map((route) => (
-			<NavLink
-				key={route.to}
-				to={route.to}
-				end={route.end}
-				onClick={onNavigate}
-				className={({ isActive }) =>
-					`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:w-full ${
-						isActive
-							? "bg-primary text-primary-foreground shadow-sm"
-							: "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-					}`
-				}
-			>
-				{route.label}
-			</NavLink>
-		));
+	// A single nav landmark restyled per breakpoint: bottom tab bar on small
+	// screens, sidebar list on desktop. One link set keeps DOM order, tab
+	// order, and screen-reader output identical everywhere. React Router's
+	// NavLink reports aria-current="page" for the active route.
+	const navLinks = (onNavigate?: () => void) => (
+		<ul className="flex items-stretch gap-1 lg:flex-col">
+			{routes.map((route) => (
+				<li key={route.to} className="min-w-0 flex-1 lg:flex-none">
+					<NavLink
+						to={route.to}
+						end={route.end}
+						onClick={onNavigate}
+						className={({ isActive }) =>
+							`flex min-h-[44px] flex-1 items-center justify-center rounded-xl px-2 py-2 text-center text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:w-full lg:justify-start lg:px-4 ${
+								isActive
+									? "bg-primary text-primary-foreground shadow-sm"
+									: "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+							}`
+						}
+					>
+						{route.label}
+					</NavLink>
+				</li>
+			))}
+		</ul>
+	);
 
 	return (
 		<div className="app-shell min-h-screen bg-background text-foreground">
-			<header className="no-print border-b border-border/70 bg-card/72 backdrop-blur-xl dark:border-white/10 lg:hidden">
-				<div className="flex items-start justify-between gap-4 px-4 py-4 md:px-8">
-					{statusBlock}
-					<Button
-						variant="outline"
-						size="icon"
-						aria-label="Open navigation menu"
-						aria-haspopup="dialog"
-						aria-expanded={isNavOpen}
-						onClick={() => setIsNavOpen(true)}
-					>
-						<MenuIcon />
-					</Button>
+			<a href={`#${MAIN_CONTENT_ID}`} className="skip-link">
+				Skip to main content
+			</a>
+			<header className="no-print sticky top-0 z-40 border-b border-border/70 bg-card/72 backdrop-blur-xl lg:hidden dark:border-white/10">
+				<div className="flex items-center justify-between gap-3 px-4 py-3 md:px-8">
+					<div className="min-w-0 flex-1">{statusBlock}</div>
+					<div className="flex shrink-0 items-center gap-2">
+						<ThemeToggle />
+						<Button
+							variant="outline"
+							size="icon"
+							type="button"
+							aria-label="Open navigation menu"
+							aria-haspopup="dialog"
+							aria-expanded={isNavOpen}
+							onClick={() => setIsNavOpen(true)}
+							className="min-h-11 min-w-11"
+						>
+							<MenuIcon />
+						</Button>
+					</div>
 				</div>
 			</header>
 
-			<div className="mx-auto flex max-w-[106rem] flex-col lg:flex-row">
-				<aside className="no-print hidden shrink-0 border-border/70 bg-card/72 backdrop-blur-xl dark:border-white/10 lg:sticky lg:top-0 lg:block lg:h-screen lg:w-64 lg:border-r">
-					<div className="flex h-full flex-col gap-5 px-5 py-8">
-						{statusBlock}
+			<div className="mx-auto flex max-w-[var(--content-max-width)] flex-col lg:flex-row">
+				<div className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-card/90 backdrop-blur-xl lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:w-64 lg:shrink-0 lg:border-t-0 lg:border-r lg:bg-card/72 dark:border-white/10">
+					<div className="flex items-center gap-2 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] lg:h-full lg:flex-col lg:items-stretch lg:gap-5 lg:px-5 lg:py-8">
+						<div className="hidden min-w-0 lg:block">{statusBlock}</div>
 						<nav
 							aria-label="Primary navigation"
-							className="flex flex-col gap-1 rounded-2xl border border-border/70 bg-surface/70 p-1 shadow-sm dark:border-white/10"
+							className="min-w-0 flex-1 lg:flex-none"
 						>
 							{navLinks()}
 						</nav>
+						<div className="hidden shrink-0 lg:mt-auto lg:block">
+							<ThemeToggle />
+						</div>
 					</div>
-				</aside>
+				</div>
 
-				<div className="min-w-0 flex-1 px-4 py-6 md:px-8">{children}</div>
+				<div
+					id={MAIN_CONTENT_ID}
+					tabIndex={-1}
+					className="min-w-0 flex-1 px-4 pt-6 pb-28 md:px-8 lg:pb-12"
+				>
+					{children}
+				</div>
 			</div>
 
 			{isNavOpen ? (
 				<Dialog
 					ariaLabel="Navigation menu"
 					onClose={() => setIsNavOpen(false)}
+					sheetOnMobile={false}
 					overlayClassName="no-print items-stretch justify-start p-0 lg:hidden"
-					className="drawer-panel h-full max-h-full w-72 max-w-[85vw] rounded-none border-l-0 border-y-0 bg-card/95 shadow-2xl backdrop-blur-xl"
+					className="drawer-panel h-full max-h-full w-72 max-w-[85vw] rounded-none border-y-0 border-l-0 bg-card/95 shadow-2xl backdrop-blur-xl"
 				>
 					<div className="flex h-full flex-col gap-5 p-5">
 						<div className="flex items-start justify-between gap-4">
-							{statusBlock}
+							<div className="min-w-0 flex-1">{statusBlock}</div>
 							<Button
 								variant="ghost"
 								size="icon"
+								type="button"
 								aria-label="Close navigation menu"
 								onClick={() => setIsNavOpen(false)}
+								className="min-h-11 min-w-11"
 							>
 								<CloseIcon />
 							</Button>
 						</div>
 						<nav
-							aria-label="Primary navigation"
-							className="flex flex-col gap-1 rounded-2xl border border-border/70 bg-surface/70 p-1 shadow-sm dark:border-white/10"
+							aria-label="Secondary navigation"
+							className="rounded-2xl border border-border/70 bg-surface/70 p-1 shadow-sm dark:border-white/10"
 						>
 							{navLinks(() => setIsNavOpen(false))}
 						</nav>

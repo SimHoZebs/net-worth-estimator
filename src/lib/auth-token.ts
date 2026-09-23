@@ -4,16 +4,23 @@ const STORAGE_KEY = "net-worth-estimator:auth-token";
 
 const listeners = new Set<() => void>();
 
+let memoryToken: string | null = null;
+
 function notify() {
 	for (const listener of listeners) listener();
 }
 
 function readStoredToken(): string | null {
 	try {
-		return window.localStorage?.getItem(STORAGE_KEY) ?? null;
+		const stored = window.localStorage?.getItem(STORAGE_KEY);
+		if (stored !== undefined && stored !== null) {
+			memoryToken = stored;
+			return stored;
+		}
 	} catch {
-		return null;
+		// Storage unavailable (private mode, SSR, jsdom without URL).
 	}
+	return memoryToken;
 }
 
 /**
@@ -27,9 +34,11 @@ export function getAuthToken(): string | null {
 }
 
 export function setAuthToken(token: string): void {
+	const trimmed = token.trim();
+	memoryToken = trimmed === "" ? null : trimmed;
 	try {
-		if (token.trim() === "") window.localStorage?.removeItem(STORAGE_KEY);
-		else window.localStorage?.setItem(STORAGE_KEY, token.trim());
+		if (trimmed === "") window.localStorage?.removeItem(STORAGE_KEY);
+		else window.localStorage?.setItem(STORAGE_KEY, trimmed);
 	} catch {
 		// Storage can be unavailable even when window exists.
 	}

@@ -73,15 +73,13 @@ export function SettingsPage() {
 	return (
 		<>
 			<main
-				className="space-y-8"
+				className="space-y-6"
 				inert={blocker.state === "blocked" ? true : undefined}
 			>
 				<PageHeader
 					eyebrow="Projection configuration"
 					title="Settings"
-					titleClassName="sr-only"
-					description="Configure the simulation, evaluations, uncertainty analysis, and appearance. Projection settings remain session-only."
-					stacked
+					description="Session-only settings. Configure the simulation plan, uncertainty, goals, and appearance — changes apply instantly and are never written to the canonical model."
 				/>
 
 				{model.loadError && !model.document ? (
@@ -95,15 +93,9 @@ export function SettingsPage() {
 						</Button>
 					</SectionCard>
 				) : model.document ? (
-					<>
-						<div className="grid items-start gap-6 lg:grid-cols-2">
-							<SimulationSettingsCard />
-							<div className="space-y-6">
-								<StochasticControls />
-								<BackendAccessCard />
-								<AppearanceSettings />
-							</div>
-						</div>
+					<div className="space-y-6">
+						<SimulationSettingsCard />
+						<StochasticControls />
 						<EvaluationSettings onDraftDirtyChange={handleDraftDirtyChange} />
 						<HouseholdCycleSettingsCard
 							document={model.effectiveDocument ?? model.document}
@@ -111,12 +103,14 @@ export function SettingsPage() {
 						<div className="max-w-2xl">
 							<ModelAssumptionsCard />
 						</div>
-					</>
+						<BackendAccessCard />
+					</div>
 				) : (
 					<SectionCard contentClassName="p-6 type-muted">
 						Settings will be available after the financial model loads.
 					</SectionCard>
 				)}
+				<AppearanceSettings />
 			</main>
 			{blocker.state === "blocked" ? (
 				<Dialog
@@ -164,7 +158,7 @@ function AppearanceSettings() {
 						type="button"
 						aria-pressed={theme === option}
 						onClick={() => setTheme(option)}
-						className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${theme === option ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface text-muted-foreground hover:border-ring hover:text-foreground"}`}
+						className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${theme === option ? "border-primary bg-primary text-primary-foreground" : "border-border bg-surface text-muted-foreground hover:border-ring hover:text-foreground"}`}
 					>
 						{option}
 					</button>

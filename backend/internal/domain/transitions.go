@@ -54,6 +54,16 @@ type TransitionRuntime struct {
 	projectionStart  string
 	monteCarloSample *types.MonteCarloSample
 	incomeIndex      *incomeRuntimeIndex
+	// incomeConfigs caches the parsed+validated income config per posting
+	// ID. Income postings execute on every occurrence date, but their
+	// config never changes within a run; parsing once preserves exact
+	// error behavior (the first execution still surfaces the error).
+	incomeConfigs map[string]*cachedIncomeConfig
+}
+
+type cachedIncomeConfig struct {
+	config types.IncomeAmountConfig
+	err    error
 }
 
 // CreateTransitionRuntime clones initialState and binds model context.
@@ -79,7 +89,26 @@ func CreateTransitionRuntime(model types.FinancialModel, initialState Simulation
 		projectionStart:  projectionStartDate,
 		monteCarloSample: monteCarloSample,
 		incomeIndex:      newIncomeRuntimeIndex(incomeData, accountByID),
+		incomeConfigs:    map[string]*cachedIncomeConfig{},
 	}, nil
+}
+
+// incomeConfig parses and validates an income posting's amount config once
+// per runtime; later occurrences reuse the cached outcome.
+func (t *TransitionRuntime) incomeConfig(posting *types.Posting) (types.IncomeAmountConfig, error) {
+	if cached, ok := t.incomeConfigs[posting.ID]; ok {
+		return cached.config, cached.err
+	}
+	config, err := ParseIncomeAmountConfig(posting.Amount.Config)
+	if err == nil {
+		err = validateParsedIncomeAmountConfig(config, &AmountReferenceContext{
+			AccountIDs:      t.incomeIndex.accountIDs,
+			IncomeSourceIDs: t.incomeIndex.incomeSourceIDs,
+			TaxProfileIDs:   t.incomeIndex.taxProfileIDs,
+		})
+	}
+	t.incomeConfigs[posting.ID] = &cachedIncomeConfig{config: config, err: err}
+	return config, err
 }
 
 func (t *TransitionRuntime) observePosting(postingID string, realizedAmount float64, date string) {
@@ -106,7 +135,11 @@ func (t *TransitionRuntime) applyAndCollectDeltas(result AccountMovementResult, 
 func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, date string) (PostingExecutionTransition, error) {
 	posting := occurrence.Posting
 	if posting.Amount.Resolver == "income" {
-		execution, err := executeIncomePosting(posting, date, t.incomeIndex, t.State.Balances, t.accountByID, t.accountOrder)
+		config, err := t.incomeConfig(posting)
+		if err != nil {
+			return PostingExecutionTransition{}, err
+		}
+		execution, err := executeIncomePosting(posting, config, date, t.incomeIndex, t.State.Balances, t.accountByID, t.accountOrder)
 		if err != nil {
 			return PostingExecutionTransition{}, err
 		}

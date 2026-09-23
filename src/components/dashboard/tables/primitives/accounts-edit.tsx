@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/table";
 import type { Account } from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
-import { useChangedIds, useRowById } from "../_shared";
+import { nextReadableId, useChangedIds, useRowById } from "../_shared";
 import type { AccountsTableEditProps } from "../AccountsTable";
 import {
 	CheckboxCell,
@@ -120,12 +120,15 @@ export function EditableAccountsGrid({
 	return (
 		<EditableTableCard
 			title="Accounts"
-			description="Edit, add, or remove account rows."
+			description="Edit, add, or remove account rows. New rows get a readable ID (new-account, new-account-2, …) — rename it in the ID cell."
 			footer={
 				<AddRowButton
 					onClick={() =>
 						addAccount({
-							id: `new-account-${Date.now()}`,
+							id: nextReadableId(
+								"new-account",
+								displayDocument.accounts.map((a) => a.id),
+							),
 							label: "New account",
 							minBalance: NO_FLOOR,
 							maxBalance: NO_CEILING,

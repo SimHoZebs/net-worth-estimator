@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { Link } from "react-router-dom";
 import { LabeledField } from "@/components/fields/field-kit";
 import { SectionCard } from "@/components/present/present";
 import { Button } from "@/components/ui/button";
@@ -23,9 +24,17 @@ export const HouseholdCycleSettingsCard = memo(
 				title="Household cycle"
 				description="Paycheck-cycle inputs. Results render on the Results page."
 				action={
-					<Button type="button" size="sm" variant="ghost" onClick={reset}>
-						Reset to seeds
-					</Button>
+					<div className="flex flex-wrap items-center gap-2">
+						<Link
+							to="/"
+							className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
+						>
+							View results on Results →
+						</Link>
+						<Button type="button" size="sm" variant="ghost" onClick={reset}>
+							Reset to seeds
+						</Button>
+					</div>
 				}
 				className="rounded-[1.4rem] border-border/80"
 				contentClassName="space-y-5"
@@ -112,7 +121,7 @@ function AmountField({
 			inputMode="decimal"
 			value={String(value)}
 			onChange={onChange}
-			className="tabular-nums"
+			className="min-h-11 tabular-nums"
 		/>
 	);
 }

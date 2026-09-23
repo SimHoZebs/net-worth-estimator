@@ -3,7 +3,11 @@ import type { StochasticConfig } from "@/lib/projection";
 import { normalizeStochasticConfig } from "@/lib/projection/utils/stochastic";
 import { useDebouncedValue } from "./useDebouncedValue";
 
-const DEBOUNCE_MS = 2000;
+export const STOCHASTIC_DEBOUNCE_MS = 2000;
+const DEBOUNCE_MS = STOCHASTIC_DEBOUNCE_MS;
+const MAX_RUN_COUNT = 10_000;
+
+const countFormatter = new Intl.NumberFormat();
 
 function parseRunCount(value: string): number | null {
 	if (value.trim() === "") return null;
@@ -21,6 +25,45 @@ function displaySeed(seed: number | null): string {
 	return seed !== null ? String(seed) : "";
 }
 
+/**
+ * Inline warning for the sample-count draft. Reports clamping (e.g.
+ * 20000 → 10,000) and invalid text; null when the draft applies cleanly.
+ */
+export function runCountDraftNotice(value: string): string | null {
+	const trimmed = value.trim();
+	if (trimmed === "") {
+		return `Enter a whole number from 1 to ${countFormatter.format(MAX_RUN_COUNT)}.`;
+	}
+	if (!/^[+-]?(\d+(\.\d+)?|\.\d+)$/.test(trimmed)) {
+		return `“${trimmed}” isn't a number — keeping the current sample count.`;
+	}
+	const parsed = Number(trimmed);
+	if (!Number.isFinite(parsed)) {
+		return `“${trimmed}” isn't a number — keeping the current sample count.`;
+	}
+	const normalized = normalizeStochasticConfig({
+		runCount: parsed,
+		seed: null,
+	}).runCount;
+	if (normalized !== parsed) {
+		return `Will clamp ${countFormatter.format(parsed)} → ${countFormatter.format(normalized)}.`;
+	}
+	return null;
+}
+
+/**
+ * Inline warning for the seed draft. Blank means auto (no warning);
+ * non-numeric text keeps the current seed.
+ */
+export function seedDraftNotice(value: string): string | null {
+	const trimmed = value.trim();
+	if (trimmed === "") return null;
+	if (!/^[+-]?\d+$/.test(trimmed)) {
+		return `“${trimmed}” isn't a whole number — keeping the current seed.`;
+	}
+	return null;
+}
+
 export function useDebouncedStochasticConfig(
 	config: StochasticConfig,
 	onConfigChange: (config: StochasticConfig) => void,
@@ -31,6 +74,8 @@ export function useDebouncedStochasticConfig(
 		runCount: false,
 		seed: false,
 	});
+	const [lastApplied, setLastApplied] = useState<StochasticConfig | null>(null);
+	const [pendingMs, setPendingMs] = useState<number | null>(null);
 
 	const configRef = useRef(config);
 	configRef.current = config;
@@ -94,7 +139,11 @@ export function useDebouncedStochasticConfig(
 		// debounce settles after an explicit apply, the diff guard below
 		// skips the duplicate commit.
 		setDirtyFields({ runCount: false, seed: false });
-		if (changed) onConfigChangeRef.current(next);
+		setPendingMs(null);
+		if (changed) {
+			setLastApplied(next);
+			onConfigChangeRef.current(next);
+		}
 	}, []);
 
 	// Stable identity so the generic debounce only restarts on user edits,
@@ -110,6 +159,29 @@ export function useDebouncedStochasticConfig(
 		commitTexts(settledDraft.runCount, settledDraft.seed);
 	}, [settledDraft, commitTexts]);
 
+	const hasPendingChanges =
+		runCountText !== String(config.runCount) ||
+		seedText !== displaySeed(config.seed);
+
+	// Countdown until the debounce settles. Drives the "Will resample in Ns"
+	// hint; cleared on commit or when the draft matches the applied config.
+	// Draft and config intentionally restart the countdown on every keystroke;
+	// hasPendingChanges alone would not restart the timer while it stays true.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: restart on keystroke
+	useEffect(() => {
+		if (!hasPendingChanges) {
+			setPendingMs((current) => (current === null ? current : null));
+			return;
+		}
+		setPendingMs(DEBOUNCE_MS);
+		const startedAt = Date.now();
+		const interval = setInterval(() => {
+			const remaining = DEBOUNCE_MS - (Date.now() - startedAt);
+			setPendingMs(remaining > 0 ? remaining : 0);
+		}, 250);
+		return () => clearInterval(interval);
+	}, [draft, hasPendingChanges, config]);
+
 	function updateRunCountInput(value: string) {
 		setRunCountText(value);
 		setDirtyFields((dirty) =>
@@ -122,20 +194,34 @@ export function useDebouncedStochasticConfig(
 		setDirtyFields((dirty) => (dirty.seed ? dirty : { ...dirty, seed: true }));
 	}
 
-	// Commit-on-blur/Apply entry point. Unmounting with a pending draft
-	// intentionally discards it instead of flushing.
+	// Commit-on-blur/Apply entry point. Also flushed on unmount (see below)
+	// so navigating away mid-debounce never loses the draft.
 	function applyImmediately() {
 		commitTexts(runCountText, seedText);
 	}
 
-	const hasPendingChanges =
-		runCountText !== String(config.runCount) ||
-		seedText !== displaySeed(config.seed);
+	// Flush a pending draft on unmount: navigating away with <2s left still
+	// applies the edit to the store instead of discarding it. Invalid drafts
+	// revert without touching the store (commitTexts guards on no-change).
+	const latestTextsRef = useRef(draft);
+	latestTextsRef.current = draft;
+	const commitTextsRef = useRef(commitTexts);
+	commitTextsRef.current = commitTexts;
+	useEffect(() => {
+		return () => {
+			const latest = latestTextsRef.current;
+			commitTextsRef.current(latest.runCount, latest.seed);
+		};
+	}, []);
 
 	return {
 		runCountInput: runCountText,
 		seedInput: seedText,
 		hasPendingChanges,
+		pendingMs,
+		lastApplied,
+		runCountNotice: runCountDraftNotice(runCountText),
+		seedNotice: seedDraftNotice(seedText),
 		updateRunCountInput,
 		updateSeedInput,
 		applyImmediately,

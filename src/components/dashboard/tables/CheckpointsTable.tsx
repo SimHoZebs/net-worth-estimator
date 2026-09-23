@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
 import type { Checkpoint, FinancialModelDocument } from "@/lib/projection";
-import { plainCellClass } from "./primitives/cells";
+import { DecimalCell, plainCellClass } from "./primitives/cells";
 import { SearchField, useSearchFilter } from "./primitives/search";
 import {
 	AddRowButton,
@@ -108,6 +108,16 @@ function EditableCheckpointsGrid({
 					</TableRow>
 				</TableHeader>
 				<TableBody>
+					{displayDocument.checkpoints.length === 0 ? (
+						<TableRow>
+							<TableCell
+								colSpan={4}
+								className="py-6 text-center text-muted-foreground"
+							>
+								No checkpoints yet. Add one below to record an observed balance.
+							</TableCell>
+						</TableRow>
+					) : null}
 					{displayDocument.checkpoints.map((checkpoint, index) => (
 						<TableRow
 							key={`${checkpoint.AccountId}:${checkpoint.Date}:${index}`}
@@ -116,6 +126,7 @@ function EditableCheckpointsGrid({
 								<input
 									className={plainCellClass}
 									type="date"
+									aria-label={`Checkpoint date for row ${index + 1}`}
 									value={checkpoint.Date}
 									onChange={(event) =>
 										updateCheckpoint(index, { Date: event.target.value })
@@ -125,6 +136,7 @@ function EditableCheckpointsGrid({
 							<TableCell>
 								<select
 									className={plainCellClass}
+									aria-label={`Checkpoint account for row ${index + 1}`}
 									value={checkpoint.AccountId}
 									onChange={(event) =>
 										updateCheckpoint(index, {
@@ -141,16 +153,16 @@ function EditableCheckpointsGrid({
 								</select>
 							</TableCell>
 							<TableCell>
-								<input
-									className={plainCellClass}
-									type="number"
-									step="any"
+								<DecimalCell
+									label={`Checkpoint balance for row ${index + 1}`}
 									value={checkpoint.Balance}
-									onChange={(event) =>
-										updateCheckpoint(index, {
-											Balance: Number(event.target.value),
-										})
-									}
+									isDirty={false}
+									onCommit={(balance) => {
+										// Blank drafts are rejected (kept + announced), never
+										// committed as Number("") === 0.
+										if (balance !== null)
+											updateCheckpoint(index, { Balance: balance });
+									}}
 								/>
 							</TableCell>
 							<TableCell>
@@ -192,6 +204,9 @@ function ReadOnlyCheckpointsView({
 				value={search}
 				onChange={setSearch}
 				placeholder="Search balance checkpoints..."
+				ariaLabel="Search balance checkpoints"
+				resultCount={rows.length}
+				resultLabel={rows.length === 1 ? "checkpoint" : "checkpoints"}
 			/>
 			<DataTable
 				title="Balance checkpoints"

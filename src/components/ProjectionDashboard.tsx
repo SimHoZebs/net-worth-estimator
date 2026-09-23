@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { type CSSProperties, memo, type ReactNode, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
 	buildAccountDiagnosticChartData,
@@ -115,49 +115,78 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 		}),
 		[derived.firstUnderfulfilledDate],
 	);
+	const hasShortfall = derived.biggestShortfallPosting !== null;
+	const hasDebt = useMemo(
+		() =>
+			result.accountSummaries.some(
+				(summary) => summary.enabled && summary.startingBalance < 0,
+			),
+		[result.accountSummaries],
+	);
+	const isStale =
+		evaluationResultsAreStale || stochasticEvaluationResultsAreStale;
+	const hasAnomaly = hasShortfall || hasDebt || isStale;
 	return (
 		<div className="space-y-4">
-			<section id="projection-chart">
-				<AccountDiagnosticChart
-					document={document}
-					hasStochasticData={hasStochasticData}
-					stochasticIsProvisional={stochasticIsProvisional}
-					chartData={accountDiagnosticChartData}
-					stochasticChartData={stochasticChartData}
-					milestoneDates={milestoneDates}
-				/>
-			</section>
+			<section id="verdict" aria-label="Verdict summary" className="space-y-3">
+				<nav
+					aria-label="Results sections"
+					className="no-print flex flex-wrap items-center gap-2"
+				>
+					<VerdictLink href="#evaluations">Evaluations</VerdictLink>
+					<VerdictLink href="#projected-shortfalls">
+						{hasShortfall
+							? `Shortfall ${formatDate(derived.firstUnderfulfilledDate ?? "")}`
+							: "Shortfalls"}
+					</VerdictLink>
+					<VerdictLink href="#overview">Path</VerdictLink>
+					<VerdictLink href="#projection-chart">Chart</VerdictLink>
+					<VerdictLink href="#household-cycle">Household</VerdictLink>
+					<VerdictLink href="#cash-flow-debt">Cash flow</VerdictLink>
+				</nav>
 
-			<section id="overview">
-				<SimulationOverview
-					result={result}
-					stochasticResult={stochasticResult}
-					stochasticIsProvisional={stochasticIsProvisional}
-				/>
-			</section>
-
-			<section id="household-cycle">
-				<HouseholdCycleCard document={document} />
-			</section>
-
-			<section className="flex flex-wrap items-center gap-2">
-				{currentChangeCount > 0 ? (
-					<Pill
-						tone="tertiary"
-						textClassName="text-xs font-medium tracking-[0.16em]"
-					>
-						{currentChangeCount} unsaved change
-						{currentChangeCount === 1 ? "" : "s"}
-					</Pill>
-				) : null}
-				{stochasticIsProvisional ? (
-					<Pill
-						tone="primary"
-						textClassName="text-xs font-medium tracking-[0.16em]"
-					>
-						Provisional Monte Carlo
-					</Pill>
-				) : null}
+				<div className="flex flex-wrap items-center gap-2">
+					{currentChangeCount > 0 ? (
+						<Pill
+							tone="tertiary"
+							textClassName="text-xs font-medium tracking-[0.16em]"
+						>
+							{currentChangeCount} unsaved change
+							{currentChangeCount === 1 ? "" : "s"}
+						</Pill>
+					) : null}
+					{stochasticIsProvisional ? (
+						<Pill
+							tone="primary"
+							textClassName="text-xs font-medium tracking-[0.16em]"
+						>
+							Provisional Monte Carlo
+						</Pill>
+					) : null}
+					{isStale ? (
+						<Pill
+							tone="tertiary"
+							textClassName="text-xs font-medium tracking-[0.16em]"
+						>
+							Showing previous results · updating
+						</Pill>
+					) : null}
+					{hasShortfall && derived.firstUnderfulfilledDate ? (
+						<a
+							href="#projected-shortfalls"
+							className="shrink-0 rounded-full border border-tertiary-border bg-tertiary-subtle px-3 py-1 text-xs font-medium tracking-[0.12em] text-tertiary-foreground uppercase"
+						>
+							First shortfall {formatDate(derived.firstUnderfulfilledDate)}
+						</a>
+					) : (
+						<a
+							href="#projected-shortfalls"
+							className="shrink-0 rounded-full border border-border/70 px-3 py-1 text-xs font-medium tracking-[0.12em] uppercase"
+						>
+							No shortfalls
+						</a>
+					)}
+				</div>
 			</section>
 
 			<EvaluationResults
@@ -175,28 +204,16 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 				blockerDetail={derived.blockerDetail}
 			/>
 
-			<section id="cash-flow-debt">
-				<LazySection>
-					<Collapsible defaultOpen={false}>
-						<Collapsible.Trigger>
-							<Collapsible.Header title="Cash flow, debt, and reconciliation" />
-						</Collapsible.Trigger>
-						<Collapsible.Content>
-							<div className="space-y-5">
-								<CashFlowWaterfall document={document} />
-								<DebtSummary document={document} result={result} />
-								<NetWorthReconciliation document={document} result={result} />
-							</div>
-						</Collapsible.Content>
-					</Collapsible>
-				</LazySection>
-			</section>
-
-			<section className="grid gap-3 md:grid-cols-3">
+			<section
+				id="verdict-constraint"
+				aria-label="Key drivers"
+				className="grid gap-3 md:grid-cols-3"
+			>
 				<div className="flex flex-col gap-3">
 					<DriverCard
 						label="Main constraint"
 						value={derived.blockerValue}
+						detail={derived.blockerDetail}
 						tone={derived.biggestShortfallPosting ? "tertiary" : "primary"}
 					/>
 					<Link
@@ -215,6 +232,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 								? formatDate(derived.firstProjectedEvent.date)
 								: "No future transactions"
 					}
+					detail={derived.nextEventDetail}
 				/>
 				<DriverCard
 					label="Planned transaction completion"
@@ -231,7 +249,11 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 				/>
 			</section>
 
-			<section id="projected-shortfalls">
+			<section
+				id="projected-shortfalls"
+				style={belowFoldStyle}
+				className="scroll-mt-4"
+			>
 				<ShortfallCalendar
 					fulfillment={fulfillment}
 					rows={result.timeline.rows}
@@ -239,6 +261,85 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 					accounts={document.accounts}
 				/>
 			</section>
+
+			<section id="overview" className="scroll-mt-4">
+				<SimulationOverview
+					result={result}
+					stochasticResult={stochasticResult}
+					stochasticIsProvisional={stochasticIsProvisional}
+				/>
+			</section>
+
+			<section id="projection-chart" className="scroll-mt-4">
+				<AccountDiagnosticChart
+					document={document}
+					hasStochasticData={hasStochasticData}
+					stochasticIsProvisional={stochasticIsProvisional}
+					chartData={accountDiagnosticChartData}
+					stochasticChartData={stochasticChartData}
+					milestoneDates={milestoneDates}
+				/>
+			</section>
+
+			<section
+				id="household-cycle"
+				style={belowFoldStyle}
+				className="scroll-mt-4"
+			>
+				<HouseholdCycleCard document={document} />
+			</section>
+
+			<section
+				id="cash-flow-debt"
+				style={belowFoldStyle}
+				className="scroll-mt-4"
+			>
+				<LazySection>
+					<Collapsible defaultOpen={hasAnomaly} autoOpenWhen={hasAnomaly}>
+						<Collapsible.Trigger>
+							<Collapsible.Header
+								title="Cash flow, debt, and reconciliation"
+								trailing={
+									hasAnomaly ? (
+										<Pill tone="tertiary" size="xs">
+											Needs review
+										</Pill>
+									) : undefined
+								}
+							/>
+						</Collapsible.Trigger>
+						<Collapsible.Content>
+							<div className="space-y-5">
+								<CashFlowWaterfall document={document} />
+								<DebtSummary document={document} result={result} />
+								<NetWorthReconciliation document={document} result={result} />
+							</div>
+						</Collapsible.Content>
+					</Collapsible>
+				</LazySection>
+			</section>
 		</div>
 	);
 });
+
+const belowFoldStyle: CSSProperties = {
+	contentVisibility: "auto",
+	containIntrinsicSize: "auto none auto 600px",
+};
+
+function VerdictLink({
+	href,
+	children,
+}: {
+	href: string;
+	children: ReactNode;
+}) {
+	return (
+		<a
+			href={href}
+			className="shrink-0 rounded-full border border-border/70 bg-card/85 px-3 py-1 text-xs font-medium tracking-[0.12em] uppercase transition hover:border-ring/70 hover:bg-accent hover:text-accent-foreground"
+		>
+			{children}
+		</a>
+	);
+}

@@ -15,7 +15,7 @@ import (
 
 // Server carries runtime dependencies.
 type Server struct {
-	store *store.Store
+	store store.Store
 	// ReadOnly rejects canonical model writes with 403. Reads and compute
 	// endpoints are unaffected.
 	ReadOnly bool
@@ -36,7 +36,7 @@ type Config struct {
 }
 
 // New builds the chi router with all routes.
-func New(store *store.Store, serverConfig Config) http.Handler {
+func New(store store.Store, serverConfig Config) http.Handler {
 	server := &Server{
 		store:       store,
 		ReadOnly:    serverConfig.ReadOnly,

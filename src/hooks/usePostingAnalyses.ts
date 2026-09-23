@@ -24,13 +24,15 @@ export interface PostingAnalysisResults {
 export interface PostingAnalyses {
 	data: PostingAnalysisResults | null;
 	observations: PostingObservation[];
-	isLoading: false;
-	isError: false;
+	isLoading: boolean;
+	isError: boolean;
 }
 
 // Pure synchronous pipeline over posting-derived observations: no query
 // shell needed. Observations are exposed alongside the results so pages do
-// not rebuild the dataset a second time.
+// not rebuild the dataset a second time. isLoading stays false because the
+// pipeline is synchronous; isError reflects error-severity diagnostics.
+// Pages add live regions for loading and errors.
 export function usePostingAnalyses(
 	document: FinancialModelDocument | null,
 ): PostingAnalyses {
@@ -44,21 +46,21 @@ export function usePostingAnalyses(
 			value: classifyPostings(observationDataset),
 			diagnostics: [],
 		});
-		if (classification.value === null) {
+		if (classification.state === "error") {
 			return {
 				data: { classification, payroll: null, salary: null },
 				observations,
 				isLoading: false,
-				isError: false,
+				isError: true,
 			};
 		}
 		const payroll = toAnalysisResult(detectPayroll(classification.value));
-		if (payroll.value === null) {
+		if (payroll.state === "error") {
 			return {
 				data: { classification, payroll, salary: null },
 				observations,
 				isLoading: false,
-				isError: false,
+				isError: true,
 			};
 		}
 		const salary = toAnalysisResult(estimateSalary(payroll.value));
@@ -66,7 +68,7 @@ export function usePostingAnalyses(
 			data: { classification, payroll, salary },
 			observations,
 			isLoading: false,
-			isError: false,
+			isError: salary.state === "error",
 		};
 	}, [document]);
 }

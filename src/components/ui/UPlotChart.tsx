@@ -3,7 +3,9 @@ import {
 	useCallback,
 	useEffect,
 	useLayoutEffect,
+	useMemo,
 	useRef,
+	useState,
 } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
@@ -51,6 +53,7 @@ export function UPlotChart({
 	const dataTransitionRef = useRef(dataTransition);
 	const animationFrameRef = useRef<number | null>(null);
 	const prefersReducedMotion = usePrefersReducedMotion();
+	const [isCompactViewport, setIsCompactViewport] = useState(false);
 	dataRef.current = data;
 	dataTransitionRef.current = dataTransition;
 	tooltipContentRef.current = tooltipContent;
@@ -59,6 +62,45 @@ export function UPlotChart({
 	const transitionKey = dataTransition
 		? `${dataTransition.durationMs ?? 200}:${dataTransition.seriesIndexes.join(",")}`
 		: "";
+
+	// Track compact viewport (<640px) so the y-axis shrinks and x ticks condense.
+	// Uses innerWidth + resize (not matchMedia) to avoid colliding with the
+	// prefers-reduced-motion media listener in tests and production.
+	useEffect(() => {
+		const update = () =>
+			setIsCompactViewport(
+				typeof window !== "undefined" && window.innerWidth < 640,
+			);
+		update();
+		window.addEventListener("resize", update);
+		return () => window.removeEventListener("resize", update);
+	}, []);
+
+	const responsiveOptions = useMemo((): uPlot.Options => {
+		if (!isCompactViewport) return options;
+		const axes = (options.axes ?? []).map((axis, index) => {
+			if (index === 0) {
+				return {
+					...axis,
+					space: 70,
+					gap: 6,
+					font: "11px system-ui, sans-serif",
+					values: "{MMM}",
+				};
+			}
+			if (index === 1) {
+				return {
+					...axis,
+					size: 48,
+					space: 44,
+					gap: 4,
+					font: "11px system-ui, sans-serif",
+				};
+			}
+			return axis;
+		});
+		return { ...options, axes };
+	}, [options, isCompactViewport]);
 
 	const cancelTransition = useCallback(() => {
 		if (animationFrameRef.current == null) return;
@@ -94,17 +136,19 @@ export function UPlotChart({
 		const height = rect.height || 300;
 
 		const opts: uPlot.Options = {
-			...options,
+			...responsiveOptions,
 			width,
 			height,
 			hooks: {
-				...options.hooks,
+				...responsiveOptions.hooks,
 				setCursor: [
-					...(options.hooks?.setCursor ?? []),
+					...(responsiveOptions.hooks?.setCursor ?? []),
 					(self: uPlot) => {
 						const tooltip = tooltipRef.current;
 						if (!tooltip) return;
 						const idx = self.cursor.idx;
+						// Always propagate cursor changes so touch taps update
+						// the PointDetailsPanel even when the hover tooltip is hidden.
 						onCursorChangeRef.current?.(idx ?? null);
 						if (idx == null) {
 							tooltip.style.display = "none";
@@ -153,7 +197,12 @@ export function UPlotChart({
 			chartRef.current?.destroy();
 			chartRef.current = null;
 		};
-	}, [options, desktopTooltipOnly, positionTooltip, cancelTransition]);
+	}, [
+		responsiveOptions,
+		desktopTooltipOnly,
+		positionTooltip,
+		cancelTransition,
+	]);
 
 	useLayoutEffect(() => {
 		const chart = chartRef.current;
@@ -206,10 +255,18 @@ export function UPlotChart({
 	}, [data, transitionKey, prefersReducedMotion, cancelTransition]);
 
 	return (
-		<div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
+		<div className="w-full min-w-0">
 			<div
 				ref={targetRef}
-				className="relative min-h-[300px] w-full min-w-[700px] overflow-hidden md:min-w-0"
+				className="relative min-h-[260px] w-full min-w-0 touch-manipulation overflow-hidden sm:min-h-[300px]"
+				onClick={() => {
+					// Ensure touch taps select the nearest point even when the
+					// cursor hover path does not fire on some mobile browsers.
+					const chart = chartRef.current;
+					if (!chart || chart.cursor.idx != null) return;
+					const len = chart.data[0]?.length ?? 0;
+					if (len > 0) onCursorChangeRef.current?.(len - 1);
+				}}
 			>
 				<div
 					ref={tooltipRef}

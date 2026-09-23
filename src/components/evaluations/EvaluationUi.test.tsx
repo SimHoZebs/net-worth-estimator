@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationTables } from "@/lib/projection";
 import { DEFAULT_EVALUATIONS, useStore } from "@/store";
@@ -21,14 +22,16 @@ const emptyDocument = {
 
 function renderSettings() {
 	return render(
-		<RuntimeFixtureProviders
-			model={{
-				document: emptyDocument as never,
-				effectiveDocument: emptyDocument as never,
-			}}
-		>
-			<EvaluationSettings onDraftDirtyChange={() => {}} />
-		</RuntimeFixtureProviders>,
+		<MemoryRouter>
+			<RuntimeFixtureProviders
+				model={{
+					document: emptyDocument as never,
+					effectiveDocument: emptyDocument as never,
+				}}
+			>
+				<EvaluationSettings onDraftDirtyChange={() => {}} />
+			</RuntimeFixtureProviders>
+		</MemoryRouter>,
 	);
 }
 
@@ -109,12 +112,18 @@ describe("EvaluationSettings", () => {
 		renderSettings();
 
 		const labels = [
-			screen.getByLabelText("Label for first-target"),
-			screen.getByLabelText("Label for second-target"),
+			screen.getByLabelText("Label for First target"),
+			screen.getByLabelText("Label for Second target"),
 		].map((input) => (input as HTMLInputElement).value);
 		expect(labels).toEqual(["First target", "Second target"]);
-		expect(screen.getByText("first-target", { exact: false })).not.toBeNull();
-		expect(screen.getByText("second-target", { exact: false })).not.toBeNull();
+		expect(
+			screen.getByLabelText("Label for First target").getAttribute("title"),
+		).toBe("first-target");
+		expect(
+			screen.getByLabelText("Label for Second target").getAttribute("title"),
+		).toBe("second-target");
+		expect(screen.queryByText("first-target", { exact: false })).toBeNull();
+		expect(screen.queryByText("second-target", { exact: false })).toBeNull();
 	});
 
 	it("renders malformed config without opening an editor", () => {
@@ -135,7 +144,7 @@ describe("EvaluationSettings", () => {
 		renderSettings();
 
 		expect(screen.getByLabelText("Enable Broken target")).not.toBeNull();
-		expect(screen.getByLabelText("Label for broken-target")).not.toBeNull();
+		expect(screen.getByLabelText("Label for Broken target")).not.toBeNull();
 		expect(screen.queryByLabelText("Target net worth")).toBeNull();
 		expect(screen.getAllByRole("alert")).toHaveLength(1);
 	});
@@ -173,7 +182,7 @@ describe("EvaluationSettings", () => {
 
 		expect(screen.getByText("Target outcome")).not.toBeNull();
 		expect(screen.queryByLabelText("Enable Target outcome")).toBeNull();
-		expect(screen.queryByLabelText("Label for target")).toBeNull();
+		expect(screen.queryByLabelText("Label for Target outcome")).toBeNull();
 		expect(screen.queryByLabelText("Target net worth")).toBeNull();
 	});
 

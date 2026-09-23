@@ -16,7 +16,7 @@ type queryer interface {
 }
 
 // SaveDocument atomically replaces the canonical model document.
-func (s *Store) SaveDocument(document *types.FinancialModelDocument) error {
+func (s *sqliteStore) SaveDocument(document *types.FinancialModelDocument) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("save begin: %w", err)
@@ -252,7 +252,7 @@ func saveEvaluationTable(tx *sql.Tx, evaluationType string, rows []evaluationRow
 }
 
 // LoadDocument reads the canonical document; returns nil if absent.
-func (s *Store) LoadDocument() (*types.FinancialModelDocument, error) {
+func (s *sqliteStore) LoadDocument() (*types.FinancialModelDocument, error) {
 	tx, err := s.db.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return nil, fmt.Errorf("load document begin: %w", err)
@@ -425,7 +425,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 }
 
 // DocumentExists reports whether any canonical rows are present.
-func (s *Store) DocumentExists() (bool, error) {
+func (s *sqliteStore) DocumentExists() (bool, error) {
 	var present int
 	row := s.db.QueryRow(`SELECT document_present FROM model_metadata WHERE id = 1`)
 	if err := row.Scan(&present); err != nil {
@@ -438,7 +438,7 @@ func (s *Store) DocumentExists() (bool, error) {
 }
 
 // SaveIncomeData replaces income source/tax profile tables.
-func (s *Store) SaveIncomeData(snapshot *types.IncomeDataSnapshot) error {
+func (s *sqliteStore) SaveIncomeData(snapshot *types.IncomeDataSnapshot) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -492,7 +492,7 @@ func replaceIncomeData(tx *sql.Tx, snapshot *types.IncomeDataSnapshot) error {
 }
 
 // LoadIncomeData reads the income snapshot.
-func (s *Store) LoadIncomeData() (*types.IncomeDataSnapshot, error) {
+func (s *sqliteStore) LoadIncomeData() (*types.IncomeDataSnapshot, error) {
 	tx, err := s.db.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return nil, fmt.Errorf("load income begin: %w", err)
@@ -569,7 +569,7 @@ func loadIncomeData(q queryer) (*types.IncomeDataSnapshot, error) {
 }
 
 // LoadDocumentAndIncomeData reads one consistent model and income snapshot.
-func (s *Store) LoadDocumentAndIncomeData() (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error) {
+func (s *sqliteStore) LoadDocumentAndIncomeData() (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error) {
 	tx, err := s.db.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return nil, nil, fmt.Errorf("load aggregate begin: %w", err)

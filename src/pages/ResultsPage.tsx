@@ -123,7 +123,14 @@ export function ResultsPage() {
 			{document && validationIsValid && result ? (
 				<>
 					<ProjectionDashboard />
-					<CurrentChangesComparison />
+					<section
+						style={{
+							contentVisibility: "auto",
+							containIntrinsicSize: "auto none auto 400px",
+						}}
+					>
+						<CurrentChangesComparison />
+					</section>
 				</>
 			) : null}
 		</main>
@@ -143,15 +150,28 @@ function ProjectionActivity({
 		isStochasticRunning && stochasticProgress !== null
 			? Math.round(stochasticProgress.fraction * 100)
 			: null;
+	const summary =
+		isProjecting && isStochasticRunning
+			? "Updating base projection and Monte Carlo ranges."
+			: isProjecting
+				? "Updating base projection."
+				: "Updating Monte Carlo projection ranges.";
 
 	return (
-		<section className="space-y-3" aria-label="Projection activity">
+		<section
+			aria-label="Projection activity"
+			role="status"
+			aria-live="polite"
+			aria-atomic="true"
+			className="space-y-3"
+		>
+			<p className="sr-only">{summary}</p>
 			{isProjecting ? (
 				<SimulationProgressPanel
 					title="Updating base projection"
 					progressPct={null}
 					progressLabel="Base projection progress"
-					live={!isStochasticRunning}
+					live={false}
 				/>
 			) : null}
 			{isStochasticRunning ? (
@@ -159,12 +179,13 @@ function ProjectionActivity({
 					title="Updating Monte Carlo projection ranges"
 					progressPct={stochasticProgressPct}
 					progressLabel="Monte Carlo projection progress"
-					live
+					live={false}
 				>
 					{stochasticProgress ? (
 						<StochasticProgressDetails
 							progress={stochasticProgress}
 							workloads={[]}
+							compact
 						/>
 					) : null}
 				</SimulationProgressPanel>
@@ -193,6 +214,18 @@ function ErrorAlert({
 					<Button type="button" size="sm" onClick={onAction}>
 						{actionLabel}
 					</Button>
+					<Link
+						to="/model-inputs"
+						className={buttonVariants({ variant: "secondary", size: "sm" })}
+					>
+						Open model inputs
+					</Link>
+					<Link
+						to="/settings"
+						className={buttonVariants({ variant: "ghost", size: "sm" })}
+					>
+						Open settings
+					</Link>
 				</div>
 			</AlertDescription>
 		</Alert>

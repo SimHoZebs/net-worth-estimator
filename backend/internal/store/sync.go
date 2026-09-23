@@ -183,7 +183,7 @@ func escapeLike(value string) string {
 // snapshot-scoped per card account: existing sync pending rows for the given
 // accounts are deleted before the fresh set is inserted. With dryRun the
 // transaction rolls back and only counts are returned.
-func (s *Store) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []types.Posting, cardAccounts []string, dryRun bool) (SyncApplySummary, error) {
+func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []types.Posting, cardAccounts []string, dryRun bool) (SyncApplySummary, error) {
 	var summary SyncApplySummary
 	summary.DryRun = dryRun
 	tx, err := s.db.Begin()

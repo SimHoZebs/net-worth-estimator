@@ -71,11 +71,11 @@ export const CurrentChangesComparison = memo(
 						</div>
 
 						{hasComparisons ? (
-							<div className="overflow-x-auto rounded-xl border border-border/80 dark:border-white/10">
-								<table className="w-full min-w-[42rem] type-body">
+							<div className="relative overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 dark:border-white/10">
+								<table className="w-full type-body">
 									<thead>
 										<tr className="border-b border-border/80 bg-muted/70 text-left type-label tracking-wide">
-											<th className="px-4 py-3">Name</th>
+											<th className="sticky left-0 bg-muted px-4 py-3">Name</th>
 											<th className="px-4 py-3">Current NW</th>
 											<th className="px-4 py-3">Final NW</th>
 											<th className="px-4 py-3">Evaluation outcomes</th>
@@ -93,16 +93,18 @@ export const CurrentChangesComparison = memo(
 													key={sn.id}
 													className="border-b border-border/70 last:border-b-0"
 												>
-													<td className="px-4 py-3 type-value">{sn.label}</td>
-													<td className="px-4 py-3 tabular-nums text-foreground">
+													<td className="sticky left-0 bg-card px-4 py-3 type-value whitespace-normal break-words">
+														{sn.label}
+													</td>
+													<td className="px-4 py-3 tabular-nums whitespace-normal text-foreground">
 														{currency.format(sn.metrics.currentNetWorth)}
 													</td>
 													<td
-														className={`px-4 py-3 tabular-nums ${sameFinal ? "text-muted-foreground/70" : "text-foreground"}`}
+														className={`px-4 py-3 tabular-nums whitespace-normal ${sameFinal ? "text-muted-foreground/70" : "text-foreground"}`}
 													>
 														{currency.format(sn.metrics.finalNetWorth)}
 													</td>
-													<td className="px-4 py-3 text-foreground">
+													<td className="px-4 py-3 whitespace-normal text-foreground">
 														<EvaluationOutcomes
 															outcomes={sn.metrics.evaluationOutcomes}
 														/>
@@ -125,16 +127,16 @@ export const CurrentChangesComparison = memo(
 											);
 										})}
 										<tr className="border-t-2 border-border bg-muted/70">
-											<td className="px-4 py-3 type-value font-semibold">
+											<td className="sticky left-0 bg-muted px-4 py-3 type-value font-semibold whitespace-normal break-words">
 												Current
 											</td>
-											<td className="px-4 py-3 tabular-nums type-value font-semibold">
+											<td className="px-4 py-3 tabular-nums type-value font-semibold whitespace-normal">
 												{currency.format(currentMetrics.currentNetWorth)}
 											</td>
-											<td className="px-4 py-3 tabular-nums type-value font-semibold">
+											<td className="px-4 py-3 tabular-nums type-value font-semibold whitespace-normal">
 												{currency.format(currentMetrics.finalNetWorth)}
 											</td>
-											<td className="px-4 py-3 type-value font-semibold">
+											<td className="px-4 py-3 type-value font-semibold whitespace-normal">
 												<EvaluationOutcomes
 													outcomes={currentMetrics.evaluationOutcomes}
 												/>
@@ -146,6 +148,10 @@ export const CurrentChangesComparison = memo(
 										</tr>
 									</tbody>
 								</table>
+								<div
+									aria-hidden
+									className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
+								/>
 							</div>
 						) : null}
 					</div>
@@ -161,13 +167,13 @@ function EvaluationOutcomes({
 	outcomes: ComparisonMetrics["evaluationOutcomes"];
 }) {
 	return outcomes.length > 0 ? (
-		<div className="flex min-w-48 flex-col gap-1.5">
+		<div className="flex min-w-0 flex-col gap-1.5">
 			{outcomes.map((outcome) => (
 				<div
 					key={outcome.instanceId}
-					className="flex items-center justify-between gap-3 type-caption"
+					className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 type-caption"
 				>
-					<span className="truncate">{outcome.label}</span>
+					<span className="min-w-0 break-words">{outcome.label}</span>
 					<Pill size="xs">{outcome.status}</Pill>
 				</div>
 			))}

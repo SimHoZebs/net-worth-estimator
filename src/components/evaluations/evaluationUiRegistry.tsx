@@ -84,6 +84,8 @@ function ThresholdConfigEditor({
 				canSubmit={parsedTarget !== null}
 				discardLabel="Discard"
 				submitLabel="Update analysis"
+				className="flex flex-col gap-2 sm:flex-row sm:justify-end"
+				buttonClassName="w-full sm:w-auto min-h-11"
 				onDiscard={() => handleDraftChange(committedDraft)}
 				onSubmit={() => {
 					if (parsedTarget === null) return;

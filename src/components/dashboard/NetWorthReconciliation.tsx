@@ -88,7 +88,7 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 				const modeledBalance = row.modeledBalanceAtCheckpoint;
 				return (
 					<TableRow key={row.accountId}>
-						<TableCell className="type-body text-foreground/80">
+						<TableCell className="sticky left-0 bg-card/95 type-body whitespace-normal break-words text-foreground/80 backdrop-blur">
 							{row.label}
 						</TableCell>
 						<TableCell className="text-right type-value text-sm">
@@ -116,7 +116,7 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 			<TableRow>
 				<TableCell
 					colSpan={5}
-					className="py-4 text-center type-muted text-muted-foreground/70"
+					className="py-4 text-center type-muted whitespace-normal text-muted-foreground/70"
 				>
 					{emptyMessage}
 				</TableCell>
@@ -124,12 +124,14 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 		);
 
 	const renderTable = (title: string, balances: ReconciliationRow[]) => (
-		<div className="overflow-x-auto">
+		<div className="relative overflow-x-auto overscroll-x-contain">
 			<h4 className="mb-2 type-eyebrow">{title}</h4>
 			<Table>
 				<TableHeader>
 					<TableRow>
-						<TableHead>Account</TableHead>
+						<TableHead className="sticky left-0 bg-muted/95 backdrop-blur">
+							Account
+						</TableHead>
 						<TableHead className="text-right">Observed</TableHead>
 						<TableHead>As of</TableHead>
 						<TableHead className="text-right">Modeled same date</TableHead>
@@ -140,6 +142,10 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 					{renderRows(balances, `No ${title.toLowerCase()} accounts.`)}
 				</TableBody>
 			</Table>
+			<div
+				aria-hidden
+				className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
+			/>
 		</div>
 	);
 

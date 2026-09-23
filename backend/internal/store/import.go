@@ -8,7 +8,7 @@ import (
 )
 
 // ImportCSV seeds the database from CSV directories, replacing content.
-func (s *Store) ImportCSV(modelPath, incomePath string) (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error) {
+func (s *sqliteStore) ImportCSV(modelPath, incomePath string) (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error) {
 	document, err := csvio.ImportModel(modelPath)
 	if err != nil {
 		return nil, nil, err

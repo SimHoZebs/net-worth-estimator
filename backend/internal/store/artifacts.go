@@ -8,7 +8,7 @@ import (
 const maxArtifacts = 256
 
 // GetArtifact / PutArtifact implement the bounded artifact cache.
-func (s *Store) GetArtifact(identity string) (string, bool, error) {
+func (s *sqliteStore) GetArtifact(identity string) (string, bool, error) {
 	row := s.db.QueryRow(`SELECT payload FROM projection_artifacts WHERE identity = ?`, identity)
 	var payload string
 	if err := row.Scan(&payload); err != nil {
@@ -20,7 +20,7 @@ func (s *Store) GetArtifact(identity string) (string, bool, error) {
 	return payload, true, nil
 }
 
-func (s *Store) PutArtifact(identity, kind, payload string) error {
+func (s *sqliteStore) PutArtifact(identity, kind, payload string) error {
 	_, err := s.db.Exec(
 		`INSERT INTO projection_artifacts (identity, kind, payload) VALUES (?,?,?)
 		 ON CONFLICT(identity) DO NOTHING`,

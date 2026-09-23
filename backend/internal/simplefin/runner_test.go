@@ -12,7 +12,7 @@ import (
 
 var errBridgeDown = errors.New("bridge down")
 
-func openRunnerStore(t *testing.T) *store.Store {
+func openRunnerStore(t *testing.T) store.Store {
 	t.Helper()
 	database, err := store.Open(filepath.Join(t.TempDir(), "runner.db"))
 	if err != nil {

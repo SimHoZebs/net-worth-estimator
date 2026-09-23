@@ -113,7 +113,12 @@ export function MoneyDetail({
 				) : null}
 
 				<details className="rounded-2xl border border-border/70 px-4 py-3">
-					<summary className="cursor-pointer type-caption">Details</summary>
+					<summary className="cursor-pointer min-h-11 type-body font-medium content-center">
+						Details
+						<span className="block type-caption font-normal text-muted-foreground">
+							Internal identifiers — safe to ignore.
+						</span>
+					</summary>
 					<p className="mt-2 break-all type-code">
 						{posting.id} · priority {posting.priority}
 					</p>
@@ -125,16 +130,29 @@ export function MoneyDetail({
 							type="button"
 							variant="secondary"
 							size="sm"
+							className="min-h-11"
 							onClick={onRestore}
 						>
 							Restore
 						</Button>
 					) : (
-						<Button type="button" variant="ghost" size="sm" onClick={onExclude}>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							className="min-h-11"
+							onClick={onExclude}
+						>
 							Exclude
 						</Button>
 					)}
-					<Button type="button" variant="secondary" size="sm" onClick={onEdit}>
+					<Button
+						type="button"
+						variant="secondary"
+						size="sm"
+						className="min-h-11"
+						onClick={onEdit}
+					>
 						Edit
 					</Button>
 					{confirmingDelete ? (
@@ -142,6 +160,7 @@ export function MoneyDetail({
 							type="button"
 							variant="destructive"
 							size="sm"
+							className="min-h-11"
 							onClick={onDelete}
 						>
 							Confirm delete
@@ -151,6 +170,7 @@ export function MoneyDetail({
 							type="button"
 							variant="ghost"
 							size="sm"
+							className="min-h-11"
 							onClick={() => setConfirmingDelete(true)}
 						>
 							Delete

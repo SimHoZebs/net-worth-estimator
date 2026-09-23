@@ -88,7 +88,7 @@ Route pages should compose feature components rather than forward shared-state p
 | `StochasticProjectionResult` | exact percentile bands and stochastic evaluation aggregation |
 | `FinancialModelRepository` | application-facing model reads plus optional labeled save capability |
 | `FinancialModelIngestionSource` | read-only external snapshot and semantic revision used by ingestion |
-| `FinancialModelDao` | implementation-neutral persisted-record reads and conditional replacement; no lifecycle methods |
+| `FinancialModelDao` | `store.Store` interface: canonical model, income, artifacts, sync state; SQLite file backend; `RunConformance` proves replacements |
 | `FinancialModelParseResult` | `{ document, issues }` |
 | `PostingObservationDataset` | observations derived from enabled one-time external-inflow postings |
 | `AnalysisDefinition` | typed independent computation from an input value to a diagnosed output |

@@ -44,6 +44,8 @@
 
 :root {
 	--radius: 0.7rem;
+	--content-max-width: 80rem;
+	--bottom-nav-safe-area: env(safe-area-inset-bottom, 0px);
 	/* Semantic aliases. App code should use these roles instead of raw palettes. */
 	--background: oklch(0.965 0.019 88);
 	--foreground: oklch(0.18 0.031 252);
@@ -235,5 +237,98 @@ body {
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
 		scroll-behavior: auto !important;
+	}
+}
+
+/* Mobile-first shell + global a11y (Track A). */
+
+/* Skip link: visually hidden until focused, then pinned top-left so the
+   page does not shift. Target is #main-content (see AppShell). */
+.skip-link {
+	position: fixed;
+	top: 0.75rem;
+	left: 0.75rem;
+	z-index: 100;
+	border-radius: var(--radius-lg);
+	background: var(--primary);
+	color: var(--primary-foreground);
+	padding: 0.75rem 1rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+	box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
+	transform: translateY(-300%);
+	transition: transform 0.15s ease-out;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+	transform: none;
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+}
+
+/* Visible keyboard focus for elements without component-level rings.
+   Buttons are excluded: buttonVariants already renders a ring. */
+:where(
+	a:not([data-slot="button"]),
+	input,
+	select,
+	textarea,
+	[tabindex]:not([tabindex="-1"])
+):focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+}
+
+/* Defer rendering of heavy below-the-fold sections. */
+.defer-heavy {
+	content-visibility: auto;
+	contain-intrinsic-size: auto 600px;
+}
+
+/* Horizontal scroll-shadow hint for overflow tables and carousels. */
+.scroll-hint-x {
+	overflow-x: auto;
+	background-image:
+		linear-gradient(to right, var(--card) 35%, transparent),
+		linear-gradient(to left, var(--card) 35%, transparent),
+		linear-gradient(to right, rgb(0 0 0 / 0.14), transparent),
+		linear-gradient(to left, rgb(0 0 0 / 0.14), transparent);
+	background-position:
+		left center,
+		right center,
+		left center,
+		right center;
+	background-size:
+		2.5rem 100%,
+		2.5rem 100%,
+		1rem 100%,
+		1rem 100%;
+	background-attachment: local, local, scroll, scroll;
+	background-repeat: no-repeat;
+}
+
+/* Bottom-sheet entrance for mobile dialogs (see dialog.tsx). */
+.sheet-panel {
+	animation: sheet-slide-up 0.24s ease-out;
+}
+
+@keyframes sheet-slide-up {
+	from {
+		transform: translateY(2rem);
+		opacity: 0.6;
+	}
+	to {
+		transform: translateY(0);
+		opacity: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.sheet-panel {
+		animation: none;
+	}
+	.skip-link {
+		transition: none;
 	}
 }

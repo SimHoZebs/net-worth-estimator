@@ -40,7 +40,7 @@ type cachedPayload[T any] struct {
 	hit   bool
 }
 
-func lookupArtifact[T any](st *store.Store, key string) (cachedPayload[T], error) {
+func lookupArtifact[T any](st store.Store, key string) (cachedPayload[T], error) {
 	payload, ok, err := st.GetArtifact(key)
 	if err != nil || !ok {
 		logArtifactLookup(key, false)
@@ -88,7 +88,7 @@ func parseArtifactKeyMeta(key string) (string, string) {
 	return kind, digest
 }
 
-func putArtifact[T any](st *store.Store, key, kind string, value T) {
+func putArtifact[T any](st store.Store, key, kind string, value T) {
 	payload, err := json.Marshal(value)
 	if err != nil {
 		return // best-effort cache write

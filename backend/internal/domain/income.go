@@ -121,6 +121,12 @@ func ValidateIncomeAmountConfig(value map[string]types.JsonValue, references *Am
 	if err != nil {
 		return err
 	}
+	return validateParsedIncomeAmountConfig(config, references)
+}
+
+// validateParsedIncomeAmountConfig cross-validates an already-parsed config
+// against account, income-source, and tax-profile references.
+func validateParsedIncomeAmountConfig(config types.IncomeAmountConfig, references *AmountReferenceContext) error {
 	if references != nil && references.IncomeSourceIDs != nil &&
 		!references.IncomeSourceIDs[config.IncomeSourceID] {
 		return incomeErrf("Income source '%s' does not exist.", config.IncomeSourceID)
@@ -304,19 +310,10 @@ type IncomeExecutionResult struct {
 }
 
 // executeIncomePosting runs the ordered payroll pipeline for one occurrence.
-func executeIncomePosting(posting *types.Posting, date string, incomeIndex *incomeRuntimeIndex, balances map[string]float64, accountByID map[string]types.Account, order []string) (IncomeExecutionResult, error) {
+// The amount config is parsed and validated once per TransitionRuntime (see
+// TransitionRuntime.incomeConfig) and passed in pre-parsed.
+func executeIncomePosting(posting *types.Posting, config types.IncomeAmountConfig, date string, incomeIndex *incomeRuntimeIndex, balances map[string]float64, accountByID map[string]types.Account, order []string) (IncomeExecutionResult, error) {
 	result := IncomeExecutionResult{}
-	config, err := ParseIncomeAmountConfig(posting.Amount.Config)
-	if err != nil {
-		return result, err
-	}
-	if err := ValidateIncomeAmountConfig(posting.Amount.Config, &AmountReferenceContext{
-		AccountIDs:      incomeIndex.accountIDs,
-		IncomeSourceIDs: incomeIndex.incomeSourceIDs,
-		TaxProfileIDs:   incomeIndex.taxProfileIDs,
-	}); err != nil {
-		return result, err
-	}
 	source, err := findIncomeSource(incomeIndex, config.IncomeSourceID, date)
 	if err != nil {
 		return result, err

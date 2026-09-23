@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { EmptyState } from "@/components/present/present";
 import { Button } from "@/components/ui/button";
-import { TableSearch } from "@/components/ui/table-search";
 import { formatDate } from "@/lib/format";
 import type { Account, Posting } from "@/lib/projection";
 import { useTableSearch } from "./_shared";
+import { SearchField } from "./primitives/search";
 import {
 	TransactionListRow,
 	transactionMatchesSearch,
@@ -65,13 +65,16 @@ export function TransactionHistoryTable({
 					Recorded one-time activity, newest first.
 				</p>
 			</div>
-			<TableSearch
+			<SearchField
 				value={search}
 				onChange={(value) => {
 					setSearch(value);
 					setPage(0);
 				}}
 				placeholder="Search transaction history..."
+				ariaLabel="Search transaction history"
+				resultCount={transactionCount}
+				resultLabel={transactionCount === 1 ? "transaction" : "transactions"}
 			/>
 			<div className="space-y-6">
 				{visibleGroups.length > 0 ? (

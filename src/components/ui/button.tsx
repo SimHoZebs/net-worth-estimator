@@ -21,14 +21,18 @@ const buttonVariants = cva(
 				link: "border-none px-0 text-foreground underline-offset-4 hover:underline",
 			},
 			size: {
-				default: "h-9 px-4 py-2",
+				// Default, large, and icon sizes meet the 44px minimum touch
+				// target. xs/sm (and icon-xs/icon-sm) stay small as a dense
+				// opt-in for data-dense surfaces only, never for primary
+				// actions.
+				default: "h-11 min-h-11 px-4 py-2",
 				xs: "h-7 rounded-md px-2 type-caption [&_svg:not([class*='size-'])]:size-3",
 				sm: "h-8 rounded-md px-3 type-body [&_svg:not([class*='size-'])]:size-3.5",
-				lg: "h-10 px-5 type-body",
-				icon: "size-8",
+				lg: "h-12 min-h-12 px-5 type-body",
+				icon: "size-11",
 				"icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
 				"icon-sm": "size-7 rounded-md",
-				"icon-lg": "size-9",
+				"icon-lg": "size-12",
 			},
 		},
 		defaultVariants: {

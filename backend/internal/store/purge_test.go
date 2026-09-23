@@ -13,7 +13,7 @@ import (
 // are identical by design, so cutover purges both and the first real sync
 // re-inserts fresh state.
 func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
-	store := openTestStore(t)
+	store := openSQLiteStore(t)
 	if err := store.SaveDocument(ownerDocument()); err != nil {
 		t.Fatalf("save owner document: %v", err)
 	}

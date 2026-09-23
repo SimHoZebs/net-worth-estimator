@@ -183,7 +183,7 @@ func (s *stochasticSession) projectSample(sample *types.MonteCarloSample) (*type
 	if err != nil {
 		return nil, err
 	}
-	return BuildProjectionPath(s.prepared, &run), nil
+	return BuildStochasticSamplePath(s.prepared, &run), nil
 }
 
 // flushBatchLocked folds this batch's per-run values into the sorted

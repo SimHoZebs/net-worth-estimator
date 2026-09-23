@@ -20,6 +20,7 @@ export function ModelInputsPage() {
 					type="button"
 					variant="secondary"
 					size="sm"
+					className="min-h-11"
 					onClick={() => setShowWizard(true)}
 					disabled={!wizardDocument}
 				>

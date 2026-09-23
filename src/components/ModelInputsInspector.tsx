@@ -37,7 +37,8 @@ import {
 import { MoneyAmountText, MoneyAvatar } from "./banking/MoneyRow";
 import { type MoneyDirection, moneyDirection, slugId } from "./banking/money";
 import { DateText } from "./dashboard/tables/primitives/formatting";
-import { ModelValidationPanel } from "./ModelValidationPanel";
+import { ConfirmButton } from "./dashboard/tables/primitives/shells";
+import { countIssuesByTab, ModelValidationPanel } from "./ModelValidationPanel";
 
 type InputSection = "accounts" | "scheduled" | "activity" | "reconcile";
 
@@ -168,6 +169,89 @@ export function ModelInputsInspector() {
 		draft?.postings.filter((p) => !baselinePostingIds.has(p.id)) ?? [];
 	const excludedAccounts = draft?.accounts.filter((a) => !a.enabled) ?? [];
 	const excludedPostings = draft?.postings.filter((p) => !p.enabled) ?? [];
+	const baselineAccountById = useMemo(
+		() => new Map(baseline?.accounts.map((a) => [a.id, a]) ?? []),
+		[baseline],
+	);
+	const baselinePostingById = useMemo(
+		() => new Map(baseline?.postings.map((p) => [p.id, p]) ?? []),
+		[baseline],
+	);
+	const draftAccountIds = useMemo(
+		() => new Set(draft?.accounts.map((a) => a.id) ?? []),
+		[draft],
+	);
+	const draftPostingIds = useMemo(
+		() => new Set(draft?.postings.map((p) => p.id) ?? []),
+		[draft],
+	);
+	// Modified-but-enabled rows. Disabled rows render under Excluded instead
+	// so nothing is listed twice; added rows render under New.
+	const modifiedAccounts = useMemo(
+		() =>
+			draft?.accounts.filter((a) => {
+				if (!a.enabled || !baselineAccountIds.has(a.id)) return false;
+				const original = baselineAccountById.get(a.id);
+				return (
+					original !== undefined &&
+					JSON.stringify(a) !== JSON.stringify(original)
+				);
+			}) ?? [],
+		[draft?.accounts, baselineAccountIds, baselineAccountById],
+	);
+	const modifiedPostings = useMemo(
+		() =>
+			draft?.postings.filter((p) => {
+				if (!p.enabled || !baselinePostingIds.has(p.id)) return false;
+				const original = baselinePostingById.get(p.id);
+				return (
+					original !== undefined &&
+					JSON.stringify(p) !== JSON.stringify(original)
+				);
+			}) ?? [],
+		[draft?.postings, baselinePostingIds, baselinePostingById],
+	);
+	const removedAccounts = useMemo(
+		() => baseline?.accounts.filter((a) => !draftAccountIds.has(a.id)) ?? [],
+		[baseline?.accounts, draftAccountIds],
+	);
+	const removedPostings = useMemo(
+		() => baseline?.postings.filter((p) => !draftPostingIds.has(p.id)) ?? [],
+		[baseline?.postings, draftPostingIds],
+	);
+	// Checkpoints carry no stable ID, so diffs compare positionally (same as
+	// countDocumentDiff) and describe each changed slot.
+	const checkpointChanges = useMemo(() => {
+		const before = baseline?.checkpoints ?? [];
+		const after = draft?.checkpoints ?? [];
+		const changes: { key: string; text: string }[] = [];
+		const rowCount = Math.max(before.length, after.length);
+		for (let index = 0; index < rowCount; index++) {
+			const original = before[index];
+			const current = after[index];
+			if (original === undefined && current !== undefined) {
+				changes.push({
+					key: `checkpoint-added-${index}`,
+					text: `Added checkpoint: ${currency.format(current.Balance)} on ${formatDate(current.Date)}`,
+				});
+			} else if (original !== undefined && current === undefined) {
+				changes.push({
+					key: `checkpoint-removed-${index}`,
+					text: `Removed checkpoint: ${currency.format(original.Balance)} on ${formatDate(original.Date)}`,
+				});
+			} else if (
+				original !== undefined &&
+				current !== undefined &&
+				JSON.stringify(current) !== JSON.stringify(original)
+			) {
+				changes.push({
+					key: `checkpoint-modified-${index}`,
+					text: `Changed checkpoint: ${currency.format(original.Balance)} on ${formatDate(original.Date)} → ${currency.format(current.Balance)} on ${formatDate(current.Date)}`,
+				});
+			}
+		}
+		return changes;
+	}, [baseline?.checkpoints, draft?.checkpoints]);
 
 	const tabs: { id: InputSection; label: string; count: number }[] = [
 		{
@@ -191,6 +275,10 @@ export function ModelInputsInspector() {
 			count: displayDocument?.checkpoints.length ?? 0,
 		},
 	];
+	const issueCounts = useMemo(
+		() => countIssuesByTab(issues, document?.postings),
+		[issues, document?.postings],
+	);
 
 	const lastLoaded =
 		dataUpdatedAt === 0
@@ -246,6 +334,7 @@ export function ModelInputsInspector() {
 						type="button"
 						variant="ghost"
 						size="sm"
+						className="min-h-11"
 						onClick={reload}
 						disabled={isLoading}
 					>
@@ -256,6 +345,7 @@ export function ModelInputsInspector() {
 							type="button"
 							variant="secondary"
 							size="sm"
+							className="min-h-11"
 							onClick={() => setAccountForm({ mode: "create" })}
 						>
 							+ Account
@@ -280,7 +370,18 @@ export function ModelInputsInspector() {
 			) : null}
 
 			<p className="type-caption text-muted-foreground">
-				{source.label} · {lastLoaded}
+				{source.label} · {lastLoaded} ·{" "}
+				{source.saveLabel ? (
+					<span className="text-[color:var(--chart-success)]">
+						Saving enabled
+					</span>
+				) : (
+					<span>Read-only — saving unavailable</span>
+				)}{" "}
+				·{" "}
+				<a href="/settings" className="underline underline-offset-2">
+					Settings
+				</a>
 			</p>
 
 			{document && displayDocument ? (
@@ -294,25 +395,48 @@ export function ModelInputsInspector() {
 							setCheckpointOpen(true);
 						}}
 					/>
-
 					<div className="flex flex-wrap items-center gap-3">
 						<fieldset className="flex flex-wrap gap-2">
 							<legend className="sr-only">Sections</legend>
-							{tabs.map((tab) => (
-								<button
-									key={tab.id}
-									type="button"
-									aria-pressed={activeSection === tab.id}
-									onClick={() => {
-										setActiveSection(tab.id);
-										setDetailPostingId(null);
-										setMoneyForm(null);
-									}}
-									className={tabClassName(activeSection === tab.id)}
-								>
-									{tab.label} <span className="opacity-70">{tab.count}</span>
-								</button>
-							))}
+							{tabs.map((tab) => {
+								const tabIssues = issueCounts[tab.id] ?? 0;
+								const isActive = activeSection === tab.id;
+								return (
+									<button
+										key={tab.id}
+										type="button"
+										aria-pressed={isActive}
+										aria-label={`${tab.label}, ${tab.count} items${tabIssues > 0 ? `, ${tabIssues} validation ${tabIssues === 1 ? "issue" : "issues"}` : ""}`}
+										title={
+											tabIssues > 0
+												? `${tabIssues} validation ${tabIssues === 1 ? "issue" : "issues"} — see Reconcile`
+												: undefined
+										}
+										onClick={() => {
+											setActiveSection(tab.id);
+											setDetailPostingId(null);
+											setMoneyForm(null);
+										}}
+										className={`${tabClassName(isActive)} relative min-h-11`}
+									>
+										{tab.label} <span className="opacity-70">{tab.count}</span>
+										{tab.id === "reconcile" && tabIssues > 0 ? (
+											<span
+												aria-hidden="true"
+												className="ml-1 rounded-full bg-destructive px-1.5 py-0.5 text-[11px] font-semibold text-white"
+											>
+												{tabIssues}
+											</span>
+										) : null}
+										{tab.id !== "reconcile" && tabIssues > 0 ? (
+											<span
+												aria-hidden="true"
+												className="absolute top-1 right-1 size-2 rounded-full bg-destructive"
+											/>
+										) : null}
+									</button>
+								);
+							})}
 						</fieldset>
 					</div>
 
@@ -330,6 +454,7 @@ export function ModelInputsInspector() {
 								projectionStartDate={
 									result?.milestones.projectionStartDate ?? projectionStartDate
 								}
+								onAddAccount={() => setAccountForm({ mode: "create" })}
 								rulesFor={(accountId) =>
 									displayDocument.postings.filter((posting) =>
 										associatedAccountIds(posting, accountIds).includes(
@@ -384,6 +509,7 @@ export function ModelInputsInspector() {
 								accounts={displayDocument.accounts}
 								projectionStartDate={projectionStartDate}
 								onOpen={(posting) => setDetailPostingId(posting.id)}
+								onAdd={() => openCreate("transfer")}
 							/>
 						) : null}
 
@@ -391,7 +517,19 @@ export function ModelInputsInspector() {
 							<MoneyFeed
 								postings={historyPostings}
 								accounts={displayDocument.accounts}
-								emptyText="No activity."
+								emptyText="No activity yet. Record a one-time movement to start the history."
+								searchLabel="Search activity"
+								emptyAction={
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										className="min-h-11"
+										onClick={() => openCreate("out")}
+									>
+										New movement
+									</Button>
+								}
 								onOpen={(posting) => setDetailPostingId(posting.id)}
 								groupByDate
 								dateDescending
@@ -426,7 +564,19 @@ export function ModelInputsInspector() {
 				</>
 			) : (
 				<EmptyState className="bg-surface/70 px-4 py-8 text-center dark:border-white/10 dark:bg-surface/50">
-					No financial model loaded yet.
+					<div className="space-y-3">
+						<p>No financial model loaded yet.</p>
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							className="min-h-11"
+							onClick={reload}
+							disabled={isLoading}
+						>
+							{isLoading ? "Loading..." : "Reload"}
+						</Button>
+					</div>
 				</EmptyState>
 			)}
 
@@ -439,9 +589,22 @@ export function ModelInputsInspector() {
 					open={showPending || currentChangeCount > 0}
 					onToggle={() => setShowPending(!showPending)}
 					onSave={save}
-					onDiscard={cancelEditing}
+					onDiscard={() => {
+						if (
+							window.confirm(
+								"Discard all unsaved changes? This cannot be undone.",
+							)
+						) {
+							cancelEditing();
+						}
+					}}
 					addedAccounts={addedAccounts}
 					addedPostings={addedPostings}
+					modifiedAccounts={modifiedAccounts}
+					modifiedPostings={modifiedPostings}
+					removedAccounts={removedAccounts}
+					removedPostings={removedPostings}
+					checkpointChanges={checkpointChanges}
 					excludedAccounts={excludedAccounts}
 					excludedPostings={excludedPostings}
 					onRestoreAccount={(id) => updateAccount(id, { enabled: true })}
@@ -599,7 +762,7 @@ function QuickActions({
 					key={action.label}
 					type="button"
 					onClick={action.onClick}
-					className="rounded-2xl border border-border/80 bg-card/85 px-2 py-3 type-value text-sm transition hover:border-ring hover:shadow-sm"
+					className="min-h-11 rounded-2xl border border-border/80 bg-card/85 px-2 py-3 type-value text-sm transition hover:border-ring hover:shadow-sm"
 				>
 					{action.label}
 				</button>
@@ -618,6 +781,7 @@ function AccountsView({
 	balancesAvailable,
 	currentNetWorth,
 	projectionStartDate,
+	onAddAccount,
 	rulesFor,
 	activityFor,
 	accountById,
@@ -638,6 +802,7 @@ function AccountsView({
 	balancesAvailable: boolean;
 	currentNetWorth: number | null;
 	projectionStartDate: string;
+	onAddAccount: () => void;
 	rulesFor: (accountId: string) => Posting[];
 	activityFor: (accountId: string) => Posting[];
 	accountById: ReadonlyMap<string, Account>;
@@ -729,19 +894,39 @@ function AccountsView({
 				</div>
 			</section>
 
-			<input
-				type="search"
-				value={accountQuery}
-				onChange={(event) => onQuery(event.target.value)}
-				placeholder="Search"
-				aria-label="Search accounts"
-				className="w-full rounded-full border border-border bg-card px-4 py-2 type-body placeholder:text-muted-foreground sm:max-w-xs"
-			/>
+			<div className="flex flex-wrap items-center gap-2">
+				<input
+					type="search"
+					value={accountQuery}
+					onChange={(event) => onQuery(event.target.value)}
+					placeholder="Search accounts"
+					aria-label="Search accounts"
+					className="min-h-11 w-full rounded-full border border-border bg-card px-4 py-2.5 type-body placeholder:text-muted-foreground sm:max-w-xs"
+				/>
+				<span aria-live="polite" className="type-caption">
+					{ordered.length} {ordered.length === 1 ? "account" : "accounts"}
+				</span>
+			</div>
 
 			{ordered.length === 0 ? (
-				<p className="rounded-2xl border border-dashed border-border/80 px-4 py-6 text-center type-muted">
-					None.
-				</p>
+				<div className="space-y-3 rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center">
+					<p className="type-muted">
+						{normalized
+							? "No accounts match this search."
+							: "No accounts yet. Add one to start modeling."}
+					</p>
+					{normalized ? null : (
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							className="min-h-11"
+							onClick={onAddAccount}
+						>
+							+ Account
+						</Button>
+					)}
+				</div>
 			) : (
 				<div className="grid gap-2 sm:grid-cols-2">
 					{ordered.map(({ account, balance }) => (
@@ -841,7 +1026,7 @@ function AccountDetail({
 						key={label}
 						type="button"
 						onClick={onClick}
-						className="rounded-2xl border border-border/80 bg-card/85 px-2 py-2.5 type-value text-sm transition hover:border-ring"
+						className="min-h-11 rounded-2xl border border-border/80 bg-card/85 px-2 py-2.5 type-value text-sm transition hover:border-ring"
 					>
 						{label}
 					</button>
@@ -849,10 +1034,22 @@ function AccountDetail({
 			</div>
 
 			<div className="flex flex-wrap gap-2">
-				<Button type="button" variant="ghost" size="sm" onClick={onEdit}>
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					className="min-h-11"
+					onClick={onEdit}
+				>
 					Edit
 				</Button>
-				<Button type="button" variant="ghost" size="sm" onClick={onExclude}>
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					className="min-h-11"
+					onClick={onExclude}
+				>
 					Exclude
 				</Button>
 				{confirmingDelete ? (
@@ -860,6 +1057,7 @@ function AccountDetail({
 						type="button"
 						variant="destructive"
 						size="sm"
+						className="min-h-11"
 						onClick={onDelete}
 					>
 						Confirm delete
@@ -869,6 +1067,7 @@ function AccountDetail({
 						type="button"
 						variant="ghost"
 						size="sm"
+						className="min-h-11"
 						onClick={() => setConfirmingDelete(true)}
 					>
 						Delete
@@ -958,11 +1157,13 @@ function ScheduledView({
 	accounts,
 	projectionStartDate,
 	onOpen,
+	onAdd,
 }: {
 	postings: Posting[];
 	accounts: Account[];
 	projectionStartDate: string;
 	onOpen: (posting: Posting) => void;
+	onAdd: () => void;
 }) {
 	const current = postings.filter(
 		(p) => !isPastScheduledPosting(p, projectionStartDate),
@@ -975,14 +1176,29 @@ function ScheduledView({
 			<MoneyFeed
 				postings={current}
 				accounts={accounts}
-				emptyText="None."
+				emptyText="No scheduled movements yet. Add a repeating paycheck, bill, or transfer."
+				searchLabel="Search scheduled movements"
+				emptyAction={
+					<Button
+						type="button"
+						variant="secondary"
+						size="sm"
+						className="min-h-11"
+						onClick={onAdd}
+					>
+						New scheduled movement
+					</Button>
+				}
 				onOpen={onOpen}
 				dateDescending={false}
 			/>
 			{past.length > 0 ? (
 				<details className="rounded-2xl border border-border/70">
-					<summary className="cursor-pointer px-4 py-3 type-label text-muted-foreground">
+					<summary className="cursor-pointer min-h-11 content-center px-4 py-3 type-body font-medium text-muted-foreground">
 						Ended · {past.length}
+						<span className="block type-caption font-normal">
+							Scheduled movements whose end date has passed.
+						</span>
 					</summary>
 					<div className="border-t border-border/70 p-3">
 						<MoneyFeed
@@ -1029,9 +1245,20 @@ function StatementsView({
 	return (
 		<div className="space-y-3">
 			{ordered.length === 0 ? (
-				<p className="rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center type-muted">
-					None.
-				</p>
+				<div className="space-y-3 rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center">
+					<p className="type-muted">
+						No accounts yet. Add one to start verifying balances.
+					</p>
+					<Button
+						type="button"
+						variant="secondary"
+						size="sm"
+						className="min-h-11"
+						onClick={() => onVerify(null)}
+					>
+						Verify a balance
+					</Button>
+				</div>
 			) : (
 				ordered.map((account) => {
 					const rows = (byAccount.get(account.id) ?? [])
@@ -1058,6 +1285,7 @@ function StatementsView({
 									type="button"
 									variant="ghost"
 									size="sm"
+									className="min-h-11"
 									onClick={() => onVerify(account.id)}
 								>
 									Verify
@@ -1083,14 +1311,13 @@ function StatementsView({
 													· {labelById.get(row.AccountId) ?? row.AccountId}
 												</span>
 											</span>
-											<Button
-												type="button"
+											<ConfirmButton
+												label={`Remove checkpoint for ${labelById.get(row.AccountId) ?? row.AccountId} on ${row.Date}`}
+												onConfirm={() => onDelete(row.AccountId, row.Date)}
+												idleLabel="Remove"
+												confirmLabel="Confirm remove"
 												variant="ghost"
-												size="sm"
-												onClick={() => onDelete(row.AccountId, row.Date)}
-											>
-												Remove
-											</Button>
+											/>
 										</li>
 									))}
 								</ul>
@@ -1114,6 +1341,11 @@ function PendingDock({
 	onDiscard,
 	addedAccounts,
 	addedPostings,
+	modifiedAccounts,
+	modifiedPostings,
+	removedAccounts,
+	removedPostings,
+	checkpointChanges,
 	excludedAccounts,
 	excludedPostings,
 	onRestoreAccount,
@@ -1131,6 +1363,11 @@ function PendingDock({
 	onDiscard: () => void;
 	addedAccounts: Account[];
 	addedPostings: Posting[];
+	modifiedAccounts: Account[];
+	modifiedPostings: Posting[];
+	removedAccounts: Account[];
+	removedPostings: Posting[];
+	checkpointChanges: { key: string; text: string }[];
 	excludedAccounts: Account[];
 	excludedPostings: Posting[];
 	onRestoreAccount: (id: string) => void;
@@ -1139,17 +1376,25 @@ function PendingDock({
 	onRemovePosting: (id: string) => void;
 }) {
 	if (count === 0 && !isDirty) return null;
+	const saveReason = isSaving
+		? "Saving…"
+		: !isDirty
+			? "No unsaved changes."
+			: !saveLabel
+				? "Saving unavailable — read-only server or sign-in required. See Settings."
+				: null;
 	return (
 		<div className="space-y-3">
-			<div className="sticky bottom-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-card/95 px-4 py-3 shadow-lg backdrop-blur">
+			<div className="sticky bottom-[max(0.75rem,env(safe-area-inset-bottom))] flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-card/95 px-4 py-3 shadow-lg backdrop-blur">
 				<span className="type-caption">
 					{count > 0 ? `${count} unsaved` : "Unsaved changes"}
 				</span>
-				<div className="flex gap-2">
+				<div className="flex flex-wrap items-center gap-2">
 					<Button
 						type="button"
 						variant="secondary"
 						size="sm"
+						className="min-h-11"
 						onClick={onToggle}
 					>
 						{open ? "Hide" : "Review"}
@@ -1157,13 +1402,20 @@ function PendingDock({
 					<Button
 						type="button"
 						size="sm"
+						className="min-h-11"
 						onClick={onSave}
 						disabled={!isDirty || !saveLabel || isSaving}
+						title={saveReason ?? saveLabel ?? undefined}
 					>
 						{isSaving ? "Saving..." : (saveLabel ?? "Save unavailable")}
 					</Button>
 				</div>
 			</div>
+			{saveReason ? (
+				<p aria-live="polite" className="type-caption">
+					{saveReason}
+				</p>
+			) : null}
 			{open ? (
 				<div className="space-y-4 rounded-2xl border border-border/70 p-4">
 					<div className="flex justify-end">
@@ -1171,8 +1423,10 @@ function PendingDock({
 							type="button"
 							variant="ghost"
 							size="sm"
+							className="min-h-11"
 							onClick={onDiscard}
 							disabled={!isDirty}
+							title="Discarding asks for confirmation first."
 						>
 							Discard
 						</Button>
@@ -1223,6 +1477,60 @@ function PendingDock({
 							))}
 						</div>
 					) : null}
+					{modifiedAccounts.length + modifiedPostings.length > 0 ? (
+						<div className="space-y-2">
+							<h3 className="type-value text-sm">Modified</h3>
+							{modifiedAccounts.map((account) => (
+								<PendingRow
+									key={`modified-account-${account.id}`}
+									label={account.label}
+									kind="Account"
+									actionLabel="Remove"
+									onAction={() => onRemoveAccount(account.id)}
+								/>
+							))}
+							{modifiedPostings.map((posting) => (
+								<PendingRow
+									key={`modified-posting-${posting.id}`}
+									label={posting.label}
+									kind="Movement"
+									actionLabel="Remove"
+									onAction={() => onRemovePosting(posting.id)}
+								/>
+							))}
+						</div>
+					) : null}
+					{removedAccounts.length + removedPostings.length > 0 ? (
+						<div className="space-y-2">
+							<h3 className="type-value text-sm">Removed</h3>
+							{removedAccounts.map((account) => (
+								<PendingRow
+									key={`removed-account-${account.id}`}
+									label={account.label}
+									kind="Account"
+								/>
+							))}
+							{removedPostings.map((posting) => (
+								<PendingRow
+									key={`removed-posting-${posting.id}`}
+									label={posting.label}
+									kind="Movement"
+								/>
+							))}
+						</div>
+					) : null}
+					{checkpointChanges.length > 0 ? (
+						<div className="space-y-2">
+							<h3 className="type-value text-sm">Checkpoints</h3>
+							{checkpointChanges.map((change) => (
+								<PendingRow
+									key={change.key}
+									label={change.text}
+									kind="Checkpoint"
+								/>
+							))}
+						</div>
+					) : null}
 				</div>
 			) : null}
 		</div>
@@ -1237,8 +1545,8 @@ function PendingRow({
 }: {
 	label: string;
 	kind: string;
-	actionLabel: string;
-	onAction: () => void;
+	actionLabel?: string;
+	onAction?: () => void;
 }) {
 	return (
 		<div className="flex items-center justify-between gap-3 rounded-xl border border-border/80 px-4 py-2">
@@ -1246,9 +1554,17 @@ function PendingRow({
 				<span className="block truncate type-label">{label}</span>
 				<span className="block type-caption">{kind}</span>
 			</span>
-			<Button type="button" variant="ghost" size="sm" onClick={onAction}>
-				{actionLabel}
-			</Button>
+			{actionLabel && onAction ? (
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					className="min-h-11 shrink-0"
+					onClick={onAction}
+				>
+					{actionLabel}
+				</Button>
+			) : null}
 		</div>
 	);
 }

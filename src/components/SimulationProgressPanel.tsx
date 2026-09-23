@@ -21,6 +21,7 @@ export function SimulationProgressPanel({
 			variant="tertiary"
 			role={live ? "status" : "group"}
 			aria-live={live ? "polite" : undefined}
+			aria-atomic={live ? "true" : undefined}
 			className="rounded-[1.6rem] px-4 py-3"
 		>
 			<div className="flex items-start gap-3">

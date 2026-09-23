@@ -42,7 +42,7 @@ func (e *InProgressError) Error() string {
 // Runner orchestrates fetch, map, and apply. The zero value is unusable;
 // construct with NewRunner.
 type Runner struct {
-	store  *store.Store
+	store  store.Store
 	config Config
 	fetch  func(ctx context.Context, start, end time.Time) (*AccountSet, error)
 	now    func() time.Time
@@ -53,7 +53,7 @@ type Runner struct {
 }
 
 // NewRunner builds a runner. client may be nil only when Fetch is stubbed.
-func NewRunner(database *store.Store, config Config, client *Client) *Runner {
+func NewRunner(database store.Store, config Config, client *Client) *Runner {
 	fetch := func(ctx context.Context, start, end time.Time) (*AccountSet, error) {
 		return client.Fetch(ctx, start, end)
 	}

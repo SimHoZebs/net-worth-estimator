@@ -107,16 +107,34 @@ func classifyAttempts(attempts []*types.MovementEvent, postingsByID map[string]*
 
 // BuildProjectionPath adapts a run into the evaluator-facing path.
 func BuildProjectionPath(prepared *types.PreparedProjection, run *types.SimulationRun) *types.ProjectionPath {
+	return buildProjectionPath(prepared, run, true)
+}
+
+// BuildStochasticSamplePath adapts one Monte Carlo sample run. Sample
+// consumers (percentile bands plus the threshold, fulfillment, and FI
+// accumulators) read row dates, net worth, per-account balances, movement
+// events, and posting state — never per-account impacts or classified
+// cashflow totals — so impact classification is skipped. Every retained
+// field is bit-identical to BuildProjectionPath.
+func BuildStochasticSamplePath(prepared *types.PreparedProjection, run *types.SimulationRun) *types.ProjectionPath {
+	return buildProjectionPath(prepared, run, false)
+}
+
+func buildProjectionPath(prepared *types.PreparedProjection, run *types.SimulationRun, detailed bool) *types.ProjectionPath {
 	effectiveDocument := prepared.EffectiveDocument
-	postingsByID := map[string]*types.Posting{}
-	for index := range effectiveDocument.Postings {
-		posting := &effectiveDocument.Postings[index]
-		postingsByID[posting.ID] = posting
-	}
-	attemptsByDate := map[string][]*types.MovementEvent{}
-	for index := range run.MovementAttempts {
-		attempt := &run.MovementAttempts[index]
-		attemptsByDate[attempt.Date] = append(attemptsByDate[attempt.Date], attempt)
+	var postingsByID map[string]*types.Posting
+	var attemptsByDate map[string][]*types.MovementEvent
+	if detailed {
+		postingsByID = map[string]*types.Posting{}
+		for index := range effectiveDocument.Postings {
+			posting := &effectiveDocument.Postings[index]
+			postingsByID[posting.ID] = posting
+		}
+		attemptsByDate = map[string][]*types.MovementEvent{}
+		for index := range run.MovementAttempts {
+			attempt := &run.MovementAttempts[index]
+			attemptsByDate[attempt.Date] = append(attemptsByDate[attempt.Date], attempt)
+		}
 	}
 
 	historicalRows := make([]types.ProjectionRow, 0, len(prepared.HistoricalSnapshots))
@@ -128,8 +146,10 @@ func BuildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 	}
 	projectedRows := make([]types.ProjectionRow, 0, len(run.Snapshots))
 	for _, snapshot := range run.Snapshots {
-		attempts := attemptsByDate[snapshot.Date]
-		classified := classifyAttempts(attempts, postingsByID)
+		classified := classifiedAttempts{}
+		if detailed {
+			classified = classifyAttempts(attemptsByDate[snapshot.Date], postingsByID)
+		}
 		projectedRows = append(projectedRows, createRow(
 			snapshot.Date, false, snapshot.Balances, effectiveDocument.Accounts,
 			classified.accountImpacts, classified.externalInflowAmount,
