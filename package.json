@@ -17,6 +17,7 @@
 		"lint:fix": "biome check --write src vite.config.ts",
 		"test": "VITE_CONFIG_NATIVE_IGNORE_WARNING=true vitest",
 		"test:run": "VITE_CONFIG_NATIVE_IGNORE_WARNING=true vitest run",
+		"verify": "biome check src vite.config.ts && npm run test:run && npm run typecheck",
 		"prepare": "husky"
 	},
 	"dependencies": {

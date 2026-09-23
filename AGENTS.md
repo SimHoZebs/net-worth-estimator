@@ -111,3 +111,9 @@ Route pages should compose feature components rather than forward shared-state p
 - Historical preparation merges postings and checkpoints chronologically. Same-date postings execute first, checkpoints then overwrite observed accounts, and later postings continue from that corrected state. Checkpoints emit no movement or cash-flow events.
 - Enabled `once` postings before the projection start establish historical balances through shared transitions. Start-date rows remain projected events; historical replay carries dependency/cap state but emits no projected movements or evaluation events.
 - Run `npm run test:run` and `npm run typecheck` after code changes.
+
+## Verification
+
+- Run `npm run verify` before finishing any code task.
+- When touching `backend/`, also run `backend/scripts/verify.sh` (scoped, e.g. `backend/scripts/verify.sh ./internal/domain/...`).
+- `npm run verify` is red until `biome check --write src` lands (pre-existing `src/` drift).
