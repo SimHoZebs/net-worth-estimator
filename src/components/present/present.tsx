@@ -160,6 +160,8 @@ interface PageHeaderProps {
 	actions?: ReactNode;
 	splitAt?: "sm" | "lg";
 	stacked?: boolean;
+	/** Opt into screen-reader-only title text. Titles are visible by default. */
+	visuallyHiddenTitle?: boolean;
 	className?: string;
 	eyebrowClassName?: string;
 	titleClassName?: string;
@@ -174,31 +176,30 @@ export function PageHeader({
 	actions,
 	splitAt = "sm",
 	stacked = false,
+	visuallyHiddenTitle = false,
 	className,
 	eyebrowClassName,
 	titleClassName,
 	descriptionClassName,
 }: PageHeaderProps) {
 	const Title = level;
+	const resolvedTitleClassName =
+		titleClassName ??
+		(visuallyHiddenTitle
+			? "sr-only"
+			: level === "h1"
+				? "mt-1 type-title text-3xl"
+				: level === "h2"
+					? "mt-1 type-title text-2xl"
+					: "mt-1 type-title text-xl");
 	const text = (
-		<div>
+		<div className="min-w-0">
 			{eyebrow ? (
 				<div className={eyebrowClassName ?? "type-eyebrow text-primary"}>
 					{eyebrow}
 				</div>
 			) : null}
-			<Title
-				className={
-					titleClassName ??
-					(level === "h1"
-						? "mt-1 type-title text-3xl"
-						: level === "h2"
-							? "mt-1 type-title text-2xl"
-							: "mt-1 type-title text-xl")
-				}
-			>
-				{title}
-			</Title>
+			<Title className={resolvedTitleClassName}>{title}</Title>
 			{description ? (
 				<p className={descriptionClassName ?? "mt-1 max-w-2xl type-muted"}>
 					{description}
@@ -210,6 +211,7 @@ export function PageHeader({
 	return (
 		<div
 			className={cn(
+				"min-w-0",
 				actions &&
 					!stacked &&
 					(splitAt === "lg"
@@ -219,7 +221,11 @@ export function PageHeader({
 			)}
 		>
 			{text}
-			{actions}
+			{actions ? (
+				<div className="flex shrink-0 flex-wrap items-center gap-2">
+					{actions}
+				</div>
+			) : null}
 		</div>
 	);
 }

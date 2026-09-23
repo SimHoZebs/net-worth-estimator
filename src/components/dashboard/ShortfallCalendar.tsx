@@ -1,4 +1,5 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { SectionCard } from "@/components/present/present";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog } from "@/components/ui/dialog";
@@ -32,6 +33,19 @@ interface ShortfallDay {
 	netWorth: number;
 }
 
+function useLargeCalendarBreakpoint() {
+	const [isLarge, setIsLarge] = useState(
+		() => typeof window !== "undefined" && window.innerWidth >= 1024,
+	);
+	useEffect(() => {
+		const update = () => setIsLarge(window.innerWidth >= 1024);
+		update();
+		window.addEventListener("resize", update);
+		return () => window.removeEventListener("resize", update);
+	}, []);
+	return isLarge;
+}
+
 export const ShortfallCalendar = memo(function ShortfallCalendar({
 	fulfillment,
 	rows,
@@ -39,6 +53,8 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 	accounts,
 }: ShortfallCalendarProps) {
 	const [selectedDateIso, setSelectedDateIso] = useState<string | null>(null);
+	const [showAllShortfalls, setShowAllShortfalls] = useState(false);
+	const isLargeViewport = useLargeCalendarBreakpoint();
 
 	const postingById = useMemo(() => {
 		const map: Record<string, Posting> = {};
@@ -95,6 +111,9 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 	const lastShortfallDate = shortfallDays[shortfallDays.length - 1]?.date
 		? parseIsoDateLocal(shortfallDays[shortfallDays.length - 1].date)
 		: undefined;
+	const visibleShortfallDays = showAllShortfalls
+		? shortfallDays
+		: shortfallDays.slice(0, 6);
 
 	return (
 		<SectionCard
@@ -103,11 +122,20 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 		>
 			{!fulfillment ? (
 				<div className="rounded-2xl border border-border/80 bg-muted/40 px-4 py-6 type-body text-muted-foreground">
-					Posting-fulfillment evaluation is unavailable.
+					<p>Posting-fulfillment evaluation is unavailable.</p>
+					<p className="mt-2">
+						<Link
+							to="/model-inputs"
+							className="font-semibold underline underline-offset-2"
+						>
+							Review model inputs
+						</Link>{" "}
+						to enable a healthy posting-fulfillment evaluation.
+					</p>
 				</div>
 			) : shortfallDays.length > 0 ? (
 				<div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
-					<div className="rounded-2xl border border-border/80 bg-surface/75 p-3 dark:border-white/10 dark:bg-surface/55">
+					<div className="min-w-0 rounded-2xl border border-border/80 bg-surface/75 p-3 dark:border-white/10 dark:bg-surface/55">
 						<Calendar
 							mode="single"
 							selected={
@@ -116,7 +144,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 							defaultMonth={firstShortfallDate}
 							startMonth={firstShortfallDate}
 							endMonth={lastShortfallDate}
-							numberOfMonths={2}
+							numberOfMonths={isLargeViewport ? 2 : 1}
 							disabled={(date) =>
 								!shortfallDayByDate.has(formatIsoDateLocal(date))
 							}
@@ -149,7 +177,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 						</div>
 
 						<div className="space-y-2">
-							{shortfallDays.slice(0, 6).map((day) => (
+							{visibleShortfallDays.map((day) => (
 								<button
 									key={day.date}
 									type="button"
@@ -173,15 +201,38 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 						</div>
 
 						{shortfallDays.length > 6 ? (
-							<div className="type-caption text-tertiary-foreground/70">
-								Showing the first 6 of {shortfallDays.length}.
-							</div>
+							<button
+								type="button"
+								onClick={() => setShowAllShortfalls((v) => !v)}
+								aria-expanded={showAllShortfalls}
+								className="type-caption font-semibold text-tertiary-foreground underline underline-offset-4"
+							>
+								{showAllShortfalls
+									? "Show fewer dates"
+									: `View all ${shortfallDays.length} dates`}
+							</button>
 						) : null}
 					</div>
 				</div>
 			) : (
 				<div className="rounded-2xl border border-primary-border/80 bg-primary-subtle/80 px-4 py-6 type-body text-primary">
-					No posting requests are underfulfilled within the horizon.
+					<p>No posting requests are underfulfilled within the horizon.</p>
+					<p className="mt-2">
+						<Link
+							to="/model-inputs"
+							className="font-semibold underline underline-offset-2"
+						>
+							Review scheduled transactions
+						</Link>{" "}
+						or{" "}
+						<Link
+							to="/settings"
+							className="font-semibold underline underline-offset-2"
+						>
+							adjust the horizon
+						</Link>{" "}
+						to explore more of the projection.
+					</p>
 				</div>
 			)}
 
@@ -189,7 +240,7 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 				<Dialog
 					ariaLabel={`Shortfall detail for ${selectedDay.label}`}
 					onClose={() => setSelectedDateIso(null)}
-					className="max-w-4xl rounded-[1.6rem] border border-border/80 bg-card p-5 shadow-2xl dark:border-white/10"
+					className="max-w-4xl rounded-[1.6rem] border border-border/80 bg-card p-4 shadow-2xl sm:p-5 dark:border-white/10"
 				>
 					<div className="mb-4 flex items-start justify-between gap-4">
 						<div>
@@ -207,14 +258,16 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 						</button>
 					</div>
 
-					<ShortfallDetailPanel
-						periodStartDate={selectedDay.date}
-						periodLabel={selectedDay.label}
-						events={selectedEvents}
-						rows={rows}
-						postingById={postingById}
-						accounts={accounts}
-					/>
+					<div className="max-w-full overflow-x-auto overscroll-x-contain">
+						<ShortfallDetailPanel
+							periodStartDate={selectedDay.date}
+							periodLabel={selectedDay.label}
+							events={selectedEvents}
+							rows={rows}
+							postingById={postingById}
+							accounts={accounts}
+						/>
+					</div>
 				</Dialog>
 			) : null}
 		</SectionCard>

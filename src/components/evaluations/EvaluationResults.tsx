@@ -168,9 +168,11 @@ function EvaluationTypeSection({
 								}
 								progressPct={workloadProgressPct}
 								progressLabel={`${evaluation.label} Monte Carlo progress`}
+								live={false}
 							>
 								<StochasticProgressDetails
 									progress={stochasticProgress}
+									compact
 									showPhase={false}
 									showWorkloadLabels={false}
 									showWorkloadTotals={false}

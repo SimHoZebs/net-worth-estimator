@@ -82,7 +82,7 @@ describe("useDebouncedStochasticConfig", () => {
 		expect(onChange).toHaveBeenCalledOnce();
 	});
 
-	it("discards pending intent when its page unmounts", () => {
+	it("flushes pending intent when its page unmounts", () => {
 		vi.useFakeTimers();
 		const onChange = vi.fn();
 		const { result, rerender, unmount } = renderHook(
@@ -100,7 +100,62 @@ describe("useDebouncedStochasticConfig", () => {
 
 		unmount();
 
-		expect(onChange).not.toHaveBeenCalled();
+		expect(onChange).toHaveBeenCalledOnce();
+		expect(onChange).toHaveBeenCalledWith({ runCount: 2500, seed: 42 });
+	});
+
+	it("counts down the pending resample window and records the last apply", () => {
+		vi.useFakeTimers();
+		const onChange = vi.fn();
+		const { result } = renderHook(
+			({ config }) => useDebouncedStochasticConfig(config, onChange),
+			{
+				initialProps: {
+					config: { runCount: 1000, seed: null } as StochasticConfig,
+				},
+			},
+		);
+
+		expect(result.current.hasPendingChanges).toBe(false);
+		expect(result.current.pendingMs).toBeNull();
+		expect(result.current.lastApplied).toBeNull();
+
+		act(() => result.current.updateRunCountInput("2500"));
+		expect(result.current.hasPendingChanges).toBe(true);
+		expect(result.current.pendingMs).toBe(2000);
+
+		act(() => vi.advanceTimersByTime(2000));
+		expect(onChange).toHaveBeenCalledOnce();
+		expect(result.current.lastApplied).toEqual({
+			runCount: 2500,
+			seed: null,
+		});
+		expect(result.current.pendingMs).toBeNull();
+	});
+
+	it("warns about clamped and invalid drafts", () => {
+		vi.useFakeTimers();
+		const onChange = vi.fn();
+		const { result } = renderHook(
+			({ config }) => useDebouncedStochasticConfig(config, onChange),
+			{
+				initialProps: {
+					config: { runCount: 1000, seed: null } as StochasticConfig,
+				},
+			},
+		);
+
+		act(() => result.current.updateRunCountInput("20000"));
+		expect(result.current.runCountNotice).toContain("10,000");
+
+		act(() => result.current.updateRunCountInput("abc"));
+		expect(result.current.runCountNotice).toContain("isn't a number");
+
+		act(() => result.current.updateSeedInput("1.5"));
+		expect(result.current.seedNotice).toContain("whole number");
+
+		act(() => result.current.updateSeedInput(""));
+		expect(result.current.seedNotice).toBeNull();
 	});
 
 	it("does not overwrite a newer run count with an invalid draft", () => {

@@ -13,6 +13,10 @@ function cssColor(variableName: string, fallback: string): string {
 export function createBaseOptions(): Partial<uPlot.Options> {
 	const axisColor = cssColor("--chart-axis", "#334155");
 	const gridColor = cssColor("--chart-grid", "#e2e8f0");
+	const isCompact =
+		typeof window !== "undefined" &&
+		typeof window.innerWidth === "number" &&
+		window.innerWidth < 640;
 
 	return {
 		ms: 1,
@@ -25,18 +29,24 @@ export function createBaseOptions(): Partial<uPlot.Options> {
 				scale: "x",
 				side: 2,
 				stroke: axisColor,
-				font: "12px system-ui, sans-serif",
+				font: isCompact
+					? "11px system-ui, sans-serif"
+					: "12px system-ui, sans-serif",
 				grid: { stroke: gridColor, width: 1 },
 				ticks: { stroke: gridColor, width: 1, size: 6 },
-				gap: 4,
-				values: "{MMM} '{YY}",
+				gap: isCompact ? 6 : 4,
+				space: isCompact ? 70 : 50,
+				values: isCompact ? "{MMM}" : "{MMM} '{YY}",
 			},
 			{
 				scale: "y",
 				side: 3,
 				stroke: axisColor,
-				font: "12px system-ui, sans-serif",
-				size: 72,
+				font: isCompact
+					? "11px system-ui, sans-serif"
+					: "12px system-ui, sans-serif",
+				size: isCompact ? 48 : 72,
+				space: isCompact ? 44 : 50,
 				grid: { stroke: gridColor, width: 1 },
 				ticks: { stroke: gridColor, width: 1, size: 6 },
 				gap: 4,

@@ -26,7 +26,7 @@ export function PointDetailsPanel({
 			className={
 				compact
 					? "max-w-xs rounded-xl border border-border/80 bg-card/95 px-3 py-2 shadow-xl backdrop-blur dark:border-white/10"
-					: "mt-3 rounded-2xl border border-border/80 bg-surface/60 p-4 md:hidden"
+					: "mt-3 rounded-2xl border border-border/80 bg-surface/60 p-4"
 			}
 			aria-label={`Projection details for ${details.date}`}
 		>

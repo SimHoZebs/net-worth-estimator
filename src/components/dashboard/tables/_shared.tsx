@@ -67,8 +67,24 @@ export function SearchFooter({
 	plural: string;
 }) {
 	return (
-		<div className="type-caption">
+		<div className="type-caption" aria-live="polite">
 			{count} {count === 1 ? singular : plural}
 		</div>
 	);
+}
+
+/**
+ * Readable auto-ID for newly added rows ("new-account", "new-account-2", …)
+ * instead of cryptic timestamp IDs. Suffixes only when the base is taken.
+ */
+export function nextReadableId(
+	prefix: string,
+	existingIds: ReadonlySet<string> | readonly string[],
+): string {
+	const existing =
+		existingIds instanceof Set ? existingIds : new Set(existingIds);
+	if (!existing.has(prefix)) return prefix;
+	let counter = 2;
+	while (existing.has(`${prefix}-${counter}`)) counter += 1;
+	return `${prefix}-${counter}`;
 }

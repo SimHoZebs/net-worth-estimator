@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -20,7 +21,7 @@ func withSourceModel(checkpoints []types.Checkpoint) []types.Checkpoint {
 	return out
 }
 
-func execSyncSetup(t *testing.T, store *Store, statements []string) {
+func execSyncSetup(t *testing.T, store *sqliteStore, statements []string) {
 	t.Helper()
 	tx, err := store.db.Begin()
 	if err != nil {
@@ -37,7 +38,7 @@ func execSyncSetup(t *testing.T, store *Store, statements []string) {
 	}
 }
 
-func seedSyncRows(t *testing.T, store *Store) {
+func seedSyncRows(t *testing.T, store *sqliteStore) {
 	t.Helper()
 	execSyncSetup(t, store, []string{
 		`INSERT INTO accounts (id, position, label, enabled) VALUES ('prime_card', 1, 'Prime', 1)`,
@@ -66,14 +67,40 @@ func ownerDocument() *types.FinancialModelDocument {
 	}
 }
 
-func loadPostingIDs(t *testing.T, store *Store) (ids []string, sources map[string]string) {
+// seedSyncState creates one synced checkpoint plus one synced pending
+// posting through the public API, so conformance tests never depend on SQL.
+func seedSyncState(t *testing.T, store Store) {
+	t.Helper()
+	document := ownerDocument()
+	document.Accounts = append(document.Accounts, types.Account{ID: "prime_card", Label: "Prime", Enabled: true})
+	if err := store.SaveDocument(document); err != nil {
+		t.Fatalf("save owner document with card account: %v", err)
+	}
+	summary, err := store.ApplySyncPlan(
+		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-01", Balance: 111}},
+		[]types.Posting{syncPendingPosting("sfin-pending-prime_card-tx1", "prime_card", "2026-08-02")},
+		[]string{"prime_card"}, false,
+	)
+	if err != nil || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
+		t.Fatalf("seed sync state = %+v, err %v", summary, err)
+	}
+}
+
+func loadPostingIDs(t *testing.T, store Store) (ids []string, sources map[string]string) {
 	t.Helper()
 	loaded, err := store.LoadDocument()
 	if err != nil {
 		t.Fatalf("load document: %v", err)
 	}
+	return postingIDsFromDocument(loaded)
+}
+
+func postingIDsFromDocument(document *types.FinancialModelDocument) (ids []string, sources map[string]string) {
 	sources = map[string]string{}
-	for _, posting := range loaded.Postings {
+	if document == nil {
+		return ids, sources
+	}
+	for _, posting := range document.Postings {
 		ids = append(ids, posting.ID)
 		sources[posting.ID] = posting.Source
 	}
@@ -81,11 +108,16 @@ func loadPostingIDs(t *testing.T, store *Store) (ids []string, sources map[strin
 }
 
 func TestSaveDropsForgedSyncRowsAndMergesStored(t *testing.T) {
-	store := openTestStore(t)
+	testSaveDropsForgedSyncRowsAndMergesStored(t, openTestStore)
+}
+
+func testSaveDropsForgedSyncRowsAndMergesStored(t *testing.T, newStore func(*testing.T) Store) {
+	t.Helper()
+	store := newStore(t)
 	if err := store.SaveDocument(ownerDocument()); err != nil {
 		t.Fatalf("save owner document: %v", err)
 	}
-	seedSyncRows(t, store)
+	seedSyncState(t, store)
 
 	forged := ownerDocument()
 	forged.Checkpoints[0].Source = SourceSimpleFIN
@@ -129,11 +161,16 @@ func TestSaveDropsForgedSyncRowsAndMergesStored(t *testing.T) {
 }
 
 func TestOwnerCheckpointWinsKeyCollision(t *testing.T) {
-	store := openTestStore(t)
+	testOwnerCheckpointWinsKeyCollision(t, openTestStore)
+}
+
+func testOwnerCheckpointWinsKeyCollision(t *testing.T, newStore func(*testing.T) Store) {
+	t.Helper()
+	store := newStore(t)
 	if err := store.SaveDocument(ownerDocument()); err != nil {
 		t.Fatalf("save owner document: %v", err)
 	}
-	seedSyncRows(t, store)
+	seedSyncState(t, store)
 
 	correction := ownerDocument()
 	correction.Checkpoints = append(correction.Checkpoints, types.Checkpoint{
@@ -162,11 +199,16 @@ func TestOwnerCheckpointWinsKeyCollision(t *testing.T) {
 }
 
 func TestRoundTripPreservesSyncRows(t *testing.T) {
-	store := openTestStore(t)
+	testRoundTripPreservesSyncRows(t, openTestStore)
+}
+
+func testRoundTripPreservesSyncRows(t *testing.T, newStore func(*testing.T) Store) {
+	t.Helper()
+	store := newStore(t)
 	if err := store.SaveDocument(ownerDocument()); err != nil {
 		t.Fatalf("save owner document: %v", err)
 	}
-	seedSyncRows(t, store)
+	seedSyncState(t, store)
 
 	loaded, err := store.LoadDocument()
 	if err != nil {
@@ -228,10 +270,7 @@ func TestOpenMigratesVersionTwoSourceColumns(t *testing.T) {
 		t.Fatalf("close version two database: %v", err)
 	}
 
-	store, err := Open(path)
-	if err != nil {
-		t.Fatalf("open migrated store: %v", err)
-	}
+	store := openSQLiteStoreAt(t, path)
 	t.Cleanup(func() { _ = store.Close() })
 	document, err := store.LoadDocument()
 	if err != nil {
@@ -262,7 +301,7 @@ func syncPendingPosting(id, accountID, day string) types.Posting {
 	}
 }
 
-func countRows(t *testing.T, store *Store, table, where string) int {
+func countRows(t *testing.T, store *sqliteStore, table, where string) int {
 	t.Helper()
 	var count int
 	query := `SELECT COUNT(*) FROM ` + table
@@ -275,8 +314,61 @@ func countRows(t *testing.T, store *Store, table, where string) int {
 	return count
 }
 
+// findCheckpoint locates one checkpoint in a loaded document for
+// interface-level assertions (replacing raw SQL row checks).
+func findCheckpoint(document *types.FinancialModelDocument, accountID string, date types.IsoDate) (types.Checkpoint, bool) {
+	if document == nil {
+		return types.Checkpoint{}, false
+	}
+	for _, checkpoint := range document.Checkpoints {
+		if checkpoint.AccountID == accountID && checkpoint.Date == date {
+			return checkpoint, true
+		}
+	}
+	return types.Checkpoint{}, false
+}
+
+// syncedPendingIDs lists sync-namespace pending posting IDs in a loaded
+// document, replacing raw COUNT queries over the postings table.
+func syncedPendingIDs(document *types.FinancialModelDocument) []string {
+	var ids []string
+	if document == nil {
+		return ids
+	}
+	for _, posting := range document.Postings {
+		if strings.HasPrefix(posting.ID, SyncPostingPrefix+"pending-") {
+			ids = append(ids, posting.ID)
+		}
+	}
+	return ids
+}
+
+// hasSimpleFINRows reports whether a loaded document carries any sync-owned
+// rows (used to prove dry runs write nothing).
+func hasSimpleFINRows(document *types.FinancialModelDocument) bool {
+	if document == nil {
+		return false
+	}
+	for _, checkpoint := range document.Checkpoints {
+		if checkpoint.Source == SourceSimpleFIN {
+			return true
+		}
+	}
+	return len(syncedPendingIDs(document)) > 0
+}
+
 func TestApplySyncPlanCheckpointLifecycle(t *testing.T) {
-	store := openTestStore(t)
+	testApplySyncPlanCheckpointLifecycle(t, openTestStore)
+}
+
+func testApplySyncPlanCheckpointLifecycle(t *testing.T, newStore func(*testing.T) Store) {
+	t.Helper()
+	store := newStore(t)
+	// An owner document first, mirroring production (seeded DB): sync rows
+	// merge into the visible document instead of an empty store.
+	if err := store.SaveDocument(ownerDocument()); err != nil {
+		t.Fatalf("save owner document: %v", err)
+	}
 	cards := []string{"prime_card"}
 
 	summary, err := store.ApplySyncPlan(
@@ -307,21 +399,26 @@ func TestApplySyncPlanCheckpointLifecycle(t *testing.T) {
 		t.Fatalf("load: %v", err)
 	}
 	_ = loaded
-	var balance float64
-	var source string
-	if err := store.db.QueryRow(
-		`SELECT balance, source FROM checkpoints WHERE account_id = 'checking' AND date = '2026-08-05'`,
-	).Scan(&balance, &source); err != nil || balance != 150 || source != SourceSimpleFIN {
-		t.Fatalf("checkpoint = %v %q, err %v", balance, source, err)
+	checkpoint, ok := findCheckpoint(loaded, "checking", "2026-08-05")
+	if !ok || checkpoint.Balance != 150 || checkpoint.Source != SourceSimpleFIN {
+		t.Fatalf("checkpoint = %+v, want balance 150 source simplefin", checkpoint)
 	}
 }
 
 func TestApplySyncPlanSkipsUserCheckpoint(t *testing.T) {
-	store := openTestStore(t)
-	execSyncSetup(t, store, []string{
-		`INSERT INTO accounts (id, position, label, enabled) VALUES ('checking', 0, 'Checking', 1)`,
-		`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (0, '2026-08-05', 'checking', 999, 'model')`,
+	testApplySyncPlanSkipsUserCheckpoint(t, openTestStore)
+}
+
+func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T) Store) {
+	t.Helper()
+	store := newStore(t)
+	document := ownerDocument()
+	document.Checkpoints = append(document.Checkpoints, types.Checkpoint{
+		Date: "2026-08-05", AccountID: "checking", Balance: 999,
 	})
+	if err := store.SaveDocument(document); err != nil {
+		t.Fatalf("save user checkpoint: %v", err)
+	}
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
 		nil, []string{"checking"}, false,
@@ -329,16 +426,26 @@ func TestApplySyncPlanSkipsUserCheckpoint(t *testing.T) {
 	if err != nil || summary.CheckpointsSkipped != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
-	var balance float64
-	if err := store.db.QueryRow(
-		`SELECT balance FROM checkpoints WHERE account_id = 'checking' AND date = '2026-08-05'`,
-	).Scan(&balance); err != nil || balance != 999 {
-		t.Fatalf("user checkpoint overwritten: %v, err %v", balance, err)
+	loaded, err := store.LoadDocument()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	checkpoint, ok := findCheckpoint(loaded, "checking", "2026-08-05")
+	if !ok || checkpoint.Balance != 999 {
+		t.Fatalf("user checkpoint overwritten: %+v", checkpoint)
 	}
 }
 
 func TestApplySyncPlanRefreshesPendingSnapshot(t *testing.T) {
-	store := openTestStore(t)
+	testApplySyncPlanRefreshesPendingSnapshot(t, openTestStore)
+}
+
+func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*testing.T) Store) {
+	t.Helper()
+	store := newStore(t)
+	if err := store.SaveDocument(ownerDocument()); err != nil {
+		t.Fatalf("save owner document: %v", err)
+	}
 	cards := []string{"prime_card"}
 
 	first, err := store.ApplySyncPlan(nil, []types.Posting{
@@ -356,16 +463,26 @@ func TestApplySyncPlanRefreshesPendingSnapshot(t *testing.T) {
 	if err != nil || second.PendingDeleted != 2 || second.PendingInserted != 2 {
 		t.Fatalf("second apply = %+v, err %v", second, err)
 	}
-	if got := countRows(t, store, "postings", "id LIKE 'sfin-pending-%'"); got != 2 {
-		t.Fatalf("pending rows = %d, want 2", got)
+	loaded, err := store.LoadDocument()
+	if err != nil {
+		t.Fatalf("load: %v", err)
 	}
-	if got := countRows(t, store, "postings", "id = 'sfin-pending-prime_card-a'"); got != 0 {
-		t.Fatal("stale pending row survived refresh")
+	got := syncedPendingIDs(loaded)
+	if len(got) != 2 {
+		t.Fatalf("pending rows = %v, want 2", got)
+	}
+	for _, id := range got {
+		if id == "sfin-pending-prime_card-a" {
+			t.Fatalf("stale pending row survived refresh: %v", got)
+		}
 	}
 }
 
 func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
-	store := openTestStore(t)
+	// SQLite-only: a model-source row with a colliding sync-prefix ID can
+	// only exist as legacy data (SaveDocument drops such rows by design),
+	// so only raw SQL can set up this coexistence case.
+	store := openSQLiteStore(t)
 	execSyncSetup(t, store, []string{
 		`INSERT INTO postings (id, position, label, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, priority, enabled, source)
 		 VALUES ('sfin-pending-prime_card-manual', 0, 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', 'once', 0, 0, 0, '2026-08-02', 6, 1, 'model')`,
@@ -382,7 +499,15 @@ func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
 }
 
 func TestApplySyncPlanDryRunWritesNothing(t *testing.T) {
-	store := openTestStore(t)
+	testApplySyncPlanDryRunWritesNothing(t, openTestStore)
+}
+
+func testApplySyncPlanDryRunWritesNothing(t *testing.T, newStore func(*testing.T) Store) {
+	t.Helper()
+	store := newStore(t)
+	if err := store.SaveDocument(ownerDocument()); err != nil {
+		t.Fatalf("save owner document: %v", err)
+	}
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
 		[]types.Posting{syncPendingPosting("sfin-pending-prime_card-a", "prime_card", "2026-08-02")},
@@ -391,10 +516,11 @@ func TestApplySyncPlanDryRunWritesNothing(t *testing.T) {
 	if err != nil || !summary.DryRun || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
 		t.Fatalf("dry run = %+v, err %v", summary, err)
 	}
-	if got := countRows(t, store, "checkpoints", ""); got != 0 {
-		t.Fatalf("dry run wrote %d checkpoints", got)
+	loaded, err := store.LoadDocument()
+	if err != nil {
+		t.Fatalf("load: %v", err)
 	}
-	if got := countRows(t, store, "postings", ""); got != 0 {
-		t.Fatalf("dry run wrote %d postings", got)
+	if hasSimpleFINRows(loaded) {
+		t.Fatalf("dry run wrote sync rows: %+v", loaded)
 	}
 }

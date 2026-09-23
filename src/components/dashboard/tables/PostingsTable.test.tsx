@@ -99,7 +99,13 @@ describe("PostingsTable", () => {
 		fireEvent.change(rate, { target: { value: "" } });
 		expect(updatePosting).not.toHaveBeenCalled();
 		fireEvent.blur(rate);
-		expect(rate.value).toBe("0");
+		// Required blanks stay visible with an announced error instead of
+		// silently reverting to the committed value.
+		expect(rate.value).toBe("");
+		expect(rate.getAttribute("aria-invalid")).toBe("true");
+		expect(
+			screen.getByText(/Salary annual rate: enter a number/),
+		).not.toBeNull();
 		expect(updatePosting).not.toHaveBeenCalled();
 
 		fireEvent.change(rate, { target: { value: "0.25" } });

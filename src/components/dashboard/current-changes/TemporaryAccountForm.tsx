@@ -1,9 +1,14 @@
 import { useState } from "react";
 import { duplicateIdError } from "@/components/_draftHelpers";
-import { FIELD_ERROR_CLASS, LabeledField } from "@/components/fields/field-kit";
+import {
+	FieldError,
+	LabeledField,
+	useSubmitError,
+} from "@/components/fields/field-kit";
 import { Button } from "@/components/ui/button";
 import type { Account } from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
+import { ConfirmButton } from "../tables/primitives/shells";
 
 function emptyAccount(): Account {
 	return {
@@ -30,11 +35,29 @@ export function TemporaryAccountForm({
 	onRemove,
 }: TemporaryAccountFormProps) {
 	const [adding, setAdding] = useState<Account | null>(null);
-	const [error, setError] = useState<string | null>(null);
+	const { error, errorId, formRef, fail, clear, propsFor } = useSubmitError();
+
+	const updateAdding = (patch: Partial<Account>) => {
+		if (error) clear();
+		setAdding((current) => (current ? { ...current, ...patch } : current));
+	};
+
+	const suggestId = (label: string) =>
+		label
+			.trim()
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "")
+			.slice(0, 40) || "account";
 
 	const commit = () => {
-		if (!adding?.id.trim() || !adding.label.trim()) return;
-		const id = adding.id.trim();
+		if (!adding) return;
+		const id = adding.id.trim() || suggestId(adding.label);
+		const label = adding.label.trim();
+		if (!label) {
+			fail("Give the account a name.", "temporary-account-label");
+			return;
+		}
 		const duplicateError = duplicateIdError(
 			id,
 			"Account",
@@ -42,12 +65,12 @@ export function TemporaryAccountForm({
 			accounts.map((account) => account.id),
 		);
 		if (duplicateError) {
-			setError(duplicateError);
+			fail(duplicateError, "temporary-account-id");
 			return;
 		}
-		onAdd({ ...adding, id, label: adding.label.trim() });
+		onAdd({ ...adding, id, label });
 		setAdding(null);
-		setError(null);
+		clear();
 	};
 
 	return (
@@ -61,9 +84,10 @@ export function TemporaryAccountForm({
 						type="button"
 						variant="ghost"
 						size="sm"
+						className="min-h-11"
 						onClick={() => {
 							setAdding(emptyAccount());
-							setError(null);
+							clear();
 						}}
 					>
 						+ Add
@@ -71,35 +95,54 @@ export function TemporaryAccountForm({
 				) : null}
 			</div>
 			{adding ? (
-				<div className="space-y-2 rounded-2xl border border-border p-3">
+				<div
+					ref={formRef}
+					className="space-y-2 rounded-2xl border border-border p-3"
+				>
 					<div className="grid gap-2 sm:grid-cols-2">
 						<LabeledField
 							label="ID"
+							description="Unique ID — auto-filled from the name when left blank."
 							id="temporary-account-id"
+							labelClassName="type-body font-medium text-foreground"
 							value={adding.id}
-							onChange={(id) => setAdding({ ...adding, id })}
+							onChange={(id) => updateAdding({ id })}
 							placeholder="e.g. savings"
+							{...propsFor("temporary-account-id")}
 						/>
 						<LabeledField
 							label="Label"
 							id="temporary-account-label"
+							labelClassName="type-body font-medium text-foreground"
 							value={adding.label}
-							onChange={(label) => setAdding({ ...adding, label })}
+							onChange={(label) =>
+								updateAdding({
+									label,
+									...(adding.id.trim() ? null : { id: suggestId(label) }),
+								})
+							}
 							placeholder="Savings"
+							{...propsFor("temporary-account-label")}
 						/>
 					</div>
-					{error ? <div className={FIELD_ERROR_CLASS}>{error}</div> : null}
-					<div className="flex gap-2">
-						<Button type="button" size="sm" onClick={commit}>
+					{error ? <FieldError id={errorId}>{error}</FieldError> : null}
+					<div className="sticky bottom-0 -mx-3 -mb-3 flex gap-2 border-t border-border/70 bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+						<Button
+							type="button"
+							size="sm"
+							className="min-h-11"
+							onClick={commit}
+						>
 							Add account
 						</Button>
 						<Button
 							type="button"
 							variant="ghost"
 							size="sm"
+							className="min-h-11"
 							onClick={() => {
 								setAdding(null);
-								setError(null);
+								clear();
 							}}
 						>
 							Cancel
@@ -124,14 +167,13 @@ export function TemporaryAccountForm({
 							{account.id}
 						</span>
 					</div>
-					<Button
-						type="button"
+					<ConfirmButton
+						label={`Remove temporary account ${account.label}`}
+						onConfirm={() => onRemove(account.id)}
+						idleLabel="Remove"
+						confirmLabel="Confirm remove"
 						variant="ghost"
-						size="sm"
-						onClick={() => onRemove(account.id)}
-					>
-						Remove
-					</Button>
+					/>
 				</div>
 			))}
 		</div>

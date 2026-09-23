@@ -4,24 +4,60 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
+
 	_ "modernc.org/sqlite"
 )
 
-// Store wraps the SQLite database implementing the canonical persistence.
-type Store struct {
+// Store is the persistence seam behind the canonical model, income data,
+// projection artifacts, and SimpleFIN sync state. The server, API handlers,
+// and sync runner depend only on this interface; the SQLite file backend
+// below is one implementation. A replacement backend (Turso, Postgres, …)
+// implements these twelve methods plus a constructor, then runs the
+// conformance suite (RunConformance) to prove it.
+//
+// Contract notes for implementers:
+//   - Writes are single-threaded by the caller discipline (one server, one
+//     instance); the backend must still serialize concurrent writes safely.
+//   - Readers always see the latest committed state (no stale replicas).
+//   - SQL must stay portable: plain DDL/DML plus ON CONFLICT only. No
+//     SQLite pragmas, extensions, or file assumptions outside Open.
+//   - An empty backend reports DocumentExists() == false so the server
+//     seeds from CSVs on first boot; Open applies migrations itself.
+//   - Clear resets all persisted state; the conformance suite relies on it.
+type Store interface {
+	LoadDocument() (*types.FinancialModelDocument, error)
+	SaveDocument(document *types.FinancialModelDocument) error
+	DocumentExists() (bool, error)
+	LoadIncomeData() (*types.IncomeDataSnapshot, error)
+	SaveIncomeData(snapshot *types.IncomeDataSnapshot) error
+	LoadDocumentAndIncomeData() (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error)
+	ImportCSV(modelPath, incomePath string) (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error)
+	GetArtifact(identity string) (string, bool, error)
+	PutArtifact(identity, kind, payload string) error
+	ApplySyncPlan(checkpoints []SyncCheckpoint, pending []types.Posting, cardAccounts []string, dryRun bool) (SyncApplySummary, error)
+	Clear() error
+	Close() error
+}
+
+// sqliteStore is the embedded-SQLite Store implementation. Pure-Go driver
+// (modernc), single file, WAL mode, one open connection.
+type sqliteStore struct {
 	db *sql.DB
 }
 
 const latestSchemaVersion = 3
 
-// Open opens (creating if needed) the database and applies migrations.
-func Open(path string) (*Store, error) {
+// Open opens (creating if needed) the SQLite database and applies
+// migrations. It returns the Store interface so callers never name the
+// implementation.
+func Open(path string) (Store, error) {
 	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
 	db.SetMaxOpenConns(1) // single-writer discipline; reads are cheap at this scale
-	store := &Store{db: db}
+	store := &sqliteStore{db: db}
 	if err := store.migrate(); err != nil {
 		db.Close()
 		return nil, err
@@ -30,9 +66,9 @@ func Open(path string) (*Store, error) {
 }
 
 // Close closes the database.
-func (s *Store) Close() error { return s.db.Close() }
+func (s *sqliteStore) Close() error { return s.db.Close() }
 
-func (s *Store) migrate() error {
+func (s *sqliteStore) migrate() error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin migration: %w", err)
@@ -218,7 +254,7 @@ func migrateV3(tx *sql.Tx) error {
 }
 
 // Clear removes all canonical model rows (used by tests/import).
-func (s *Store) Clear() error {
+func (s *sqliteStore) Clear() error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("clear begin: %w", err)

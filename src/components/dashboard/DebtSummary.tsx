@@ -88,67 +88,77 @@ export const DebtSummary = memo(function DebtSummary({
 			title="Debt summary"
 			className="rounded-[1.6rem] border-border shadow-sm"
 		>
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead>Debt</TableHead>
-						<TableHead className="text-right">Balance</TableHead>
-						<TableHead className="text-right">Payment</TableHead>
-						<TableHead>Frequency</TableHead>
-						<TableHead>Est. payoff</TableHead>
-						<TableHead className="text-right">Priority</TableHead>
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{allDebts.map((d) => {
-						const monthlyPmt = estimateMonthlyPayment(
-							d.paymentPosting ?? undefined,
-						);
-						const principal = Math.abs(d.balance);
-						const monthsToPayoff =
-							monthlyPmt > 0 ? Math.ceil(principal / monthlyPmt) : Infinity;
-						const payoffDate =
-							monthsToPayoff < 1200
-								? new Date(
-										Date.now() + monthsToPayoff * 30 * 24 * 60 * 60 * 1000,
-									)
-										.toISOString()
-										.slice(0, 10)
-								: null;
-						return (
-							<TableRow key={d.account.id}>
-								<TableCell className="type-body text-foreground/80">
-									{d.account.label}
-								</TableCell>
-								<TableCell className="text-right type-value text-sm">
-									{currency.format(d.balance)}
-								</TableCell>
-								<TableCell className="text-right type-body text-foreground/80">
-									{d.paymentPosting
-										? describePostingAmount(d.paymentPosting)
-										: "—"}
-								</TableCell>
-								<TableCell className="type-muted">
-									{d.paymentPosting ? d.paymentPosting.frequency : "—"}
-								</TableCell>
-								<TableCell className="type-muted">
-									{payoffDate ? formatDate(payoffDate) : "Beyond 100 yr"}
-								</TableCell>
-								<TableCell className="text-right type-body tabular-nums text-muted-foreground">
-									{d.paymentPosting?.priority ?? "—"}
-								</TableCell>
-							</TableRow>
-						);
-					})}
-					<TableRow className="border-t-2 border-border">
-						<TableCell className="type-title">Total debt</TableCell>
-						<TableCell className="text-right type-title">
-							{currency.format(-totalDebt)}
-						</TableCell>
-						<TableCell colSpan={4} />
-					</TableRow>
-				</TableBody>
-			</Table>
+			<div className="relative">
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead className="sticky left-0 bg-muted/95 backdrop-blur">
+								Debt
+							</TableHead>
+							<TableHead className="text-right">Balance</TableHead>
+							<TableHead className="text-right">Payment</TableHead>
+							<TableHead>Frequency</TableHead>
+							<TableHead>Est. payoff</TableHead>
+							<TableHead className="text-right">Priority</TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{allDebts.map((d) => {
+							const monthlyPmt = estimateMonthlyPayment(
+								d.paymentPosting ?? undefined,
+							);
+							const principal = Math.abs(d.balance);
+							const monthsToPayoff =
+								monthlyPmt > 0 ? Math.ceil(principal / monthlyPmt) : Infinity;
+							const payoffDate =
+								monthsToPayoff < 1200
+									? new Date(
+											Date.now() + monthsToPayoff * 30 * 24 * 60 * 60 * 1000,
+										)
+											.toISOString()
+											.slice(0, 10)
+									: null;
+							return (
+								<TableRow key={d.account.id}>
+									<TableCell className="sticky left-0 bg-card/95 type-body whitespace-normal break-words text-foreground/80 backdrop-blur">
+										{d.account.label}
+									</TableCell>
+									<TableCell className="text-right type-value text-sm">
+										{currency.format(d.balance)}
+									</TableCell>
+									<TableCell className="text-right type-body whitespace-normal break-words text-foreground/80">
+										{d.paymentPosting
+											? describePostingAmount(d.paymentPosting)
+											: "—"}
+									</TableCell>
+									<TableCell className="type-muted">
+										{d.paymentPosting ? d.paymentPosting.frequency : "—"}
+									</TableCell>
+									<TableCell className="type-muted">
+										{payoffDate ? formatDate(payoffDate) : "Beyond 100 yr"}
+									</TableCell>
+									<TableCell className="text-right type-body tabular-nums text-muted-foreground">
+										{d.paymentPosting?.priority ?? "—"}
+									</TableCell>
+								</TableRow>
+							);
+						})}
+						<TableRow className="border-t-2 border-border">
+							<TableCell className="sticky left-0 bg-card/95 type-title backdrop-blur">
+								Total debt
+							</TableCell>
+							<TableCell className="text-right type-title">
+								{currency.format(-totalDebt)}
+							</TableCell>
+							<TableCell colSpan={4} />
+						</TableRow>
+					</TableBody>
+				</Table>
+				<div
+					aria-hidden
+					className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
+				/>
+			</div>
 			{estimatedTotalInterest > 0 ? (
 				<div className="mt-3 rounded-xl border border-tertiary-border bg-tertiary-subtle px-4 py-3">
 					<div className="type-caption type-value text-tertiary-foreground">

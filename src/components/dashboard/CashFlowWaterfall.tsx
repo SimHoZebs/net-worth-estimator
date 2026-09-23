@@ -64,58 +64,69 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({
 			title="Monthly cash flow"
 			className="rounded-[1.6rem] border-border shadow-sm"
 		>
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead>Category</TableHead>
-						<TableHead>Transaction</TableHead>
-						<TableHead>Amount</TableHead>
-						<TableHead>Frequency</TableHead>
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{items.length > 0 ? (
-						<>
-							{items.map((item, i) => (
-								<TableRow key={i}>
-									<TableCell className="type-label tracking-wide">
-										{item.category}
-									</TableCell>
-									<TableCell className="type-body text-foreground/80">
-										{item.label}
-									</TableCell>
-									<TableCell className="type-value text-sm">
-										{item.isNumeric
-											? currency.format(item.amount ?? 0)
-											: item.arithmetic}
-									</TableCell>
-									<TableCell className="type-muted">
-										{formatFrequency(item.frequency)}
-									</TableCell>
-								</TableRow>
-							))}
-							<TableRow className="border-t-2 border-border">
-								<TableCell colSpan={2} className="type-title">
-									Remaining cash / investment capacity
-								</TableCell>
-								<TableCell className="type-title">
-									{currency.format(remaining)}
-								</TableCell>
-								<TableCell />
-							</TableRow>
-						</>
-					) : (
+			<div className="relative">
+				<Table>
+					<TableHeader>
 						<TableRow>
-							<TableCell
-								colSpan={4}
-								className="py-6 text-center text-muted-foreground"
-							>
-								No scheduled transactions are enabled.
-							</TableCell>
+							<TableHead className="sticky left-0 bg-muted/95 backdrop-blur">
+								Category
+							</TableHead>
+							<TableHead>Transaction</TableHead>
+							<TableHead>Amount</TableHead>
+							<TableHead>Frequency</TableHead>
 						</TableRow>
-					)}
-				</TableBody>
-			</Table>
+					</TableHeader>
+					<TableBody>
+						{items.length > 0 ? (
+							<>
+								{items.map((item, i) => (
+									<TableRow key={i}>
+										<TableCell className="sticky left-0 bg-card/95 type-label tracking-wide backdrop-blur">
+											{item.category}
+										</TableCell>
+										<TableCell className="type-body whitespace-normal break-words text-foreground/80">
+											{item.label}
+										</TableCell>
+										<TableCell className="type-value text-sm">
+											{item.isNumeric
+												? currency.format(item.amount ?? 0)
+												: item.arithmetic}
+										</TableCell>
+										<TableCell className="type-muted">
+											{formatFrequency(item.frequency)}
+										</TableCell>
+									</TableRow>
+								))}
+								<TableRow className="border-t-2 border-border">
+									<TableCell
+										colSpan={2}
+										className="type-title whitespace-normal break-words"
+									>
+										Remaining cash / investment capacity
+									</TableCell>
+									<TableCell className="type-title">
+										{currency.format(remaining)}
+									</TableCell>
+									<TableCell />
+								</TableRow>
+							</>
+						) : (
+							<TableRow>
+								<TableCell
+									colSpan={4}
+									className="py-6 text-center whitespace-normal text-muted-foreground"
+								>
+									No scheduled transactions are enabled.
+								</TableCell>
+							</TableRow>
+						)}
+					</TableBody>
+				</Table>
+				<div
+					aria-hidden
+					className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
+				/>
+			</div>
 			{numericItems.length < items.length ? (
 				<div className="mt-3 type-caption text-muted-foreground/70">
 					Some transactions use formulas rather than fixed amounts. Exact

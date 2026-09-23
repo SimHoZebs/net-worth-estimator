@@ -20,7 +20,7 @@ import (
 // Mock and real sources are mutually exclusive: mock rows are intentionally
 // identical to real sync rows, so cutover is a documented DB purge
 // (backend/scripts/purge-simplefin-sync.sql), never a code branch.
-func configureSync(database *store.Store) (*simplefin.Runner, func()) {
+func configureSync(database store.Store) (*simplefin.Runner, func()) {
 	mockMode := simplefin.ParseMockMode(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK"))
 	mockFile := strings.TrimSpace(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE"))
 	accessURL := os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL")

@@ -83,9 +83,9 @@ export const OverviewCard = memo(function OverviewCard({
 					{row.assetContributions.length > 0 ? (
 						<div className="py-3">
 							<div className="mb-2 type-label">Selected accounts</div>
-							<div className="overflow-x-auto">
-								<div className="min-w-[34rem]">
-									<div className="grid grid-cols-[minmax(10rem,1fr)_8rem_7rem_9rem] gap-3 border-b border-border/70 pb-2 type-label">
+							<div className="relative overflow-x-auto overscroll-x-contain">
+								<div className="min-w-0">
+									<div className="hidden grid-cols-[minmax(10rem,1fr)_8rem_7rem_9rem] gap-3 border-b border-border/70 pb-2 type-label sm:grid">
 										<span>Account</span>
 										<span className="text-right">FI-date balance</span>
 										<span className="text-right">Withdrawal rate</span>
@@ -96,9 +96,9 @@ export const OverviewCard = memo(function OverviewCard({
 										return (
 											<div
 												key={contribution.accountId}
-												className="grid grid-cols-[minmax(10rem,1fr)_8rem_7rem_9rem] gap-3 border-b border-border/45 py-2 text-sm last:border-0"
+												className="grid grid-cols-2 gap-x-3 gap-y-1 border-b border-border/45 py-2 text-sm last:border-0 sm:grid-cols-[minmax(10rem,1fr)_8rem_7rem_9rem]"
 											>
-												<span className="flex min-w-0 items-center gap-2 text-foreground/85">
+												<span className="col-span-2 flex min-w-0 items-center gap-2 text-foreground/85 sm:col-span-1">
 													<span
 														className="h-2.5 w-2.5 shrink-0 rounded-full bg-muted-foreground"
 														style={
@@ -111,13 +111,23 @@ export const OverviewCard = memo(function OverviewCard({
 														{account?.label ?? contribution.accountId}
 													</span>
 												</span>
-												<span className="text-right tabular-nums">
+												<span className="text-left tabular-nums sm:text-right">
+													<span className="type-caption sm:hidden">
+														Balance{" "}
+													</span>
 													{currency.format(contribution.balance)}
 												</span>
-												<span className="text-right tabular-nums">
+												<span className="text-left tabular-nums sm:text-right">
+													<span className="type-caption sm:hidden">Rate </span>
 													{pct.format(contribution.withdrawalRate)}
 												</span>
-												<strong className="text-right type-value tabular-nums">
+												<strong className="col-span-2 text-left type-value tabular-nums sm:col-span-1 sm:text-right">
+													<span
+														aria-hidden
+														className="type-caption font-normal sm:hidden"
+													>
+														Capacity{" "}
+													</span>
 													{currency.format(
 														contribution.annualWithdrawalCapacity,
 													)}
@@ -126,6 +136,10 @@ export const OverviewCard = memo(function OverviewCard({
 										);
 									})}
 								</div>
+								<div
+									aria-hidden
+									className="pointer-events-none absolute inset-y-0 right-0 hidden w-6 bg-gradient-to-l from-background to-transparent sm:block"
+								/>
 							</div>
 						</div>
 					) : null}

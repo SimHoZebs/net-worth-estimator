@@ -136,7 +136,7 @@ func TestReadOnlyRejectsPutWithSeededDocument(t *testing.T) {
 	}
 }
 
-func openAPIStore(t *testing.T) *store.Store {
+func openAPIStore(t *testing.T) store.Store {
 	t.Helper()
 	database, err := store.Open(filepath.Join(t.TempDir(), "api.db"))
 	if err != nil {

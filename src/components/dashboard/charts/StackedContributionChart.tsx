@@ -1,13 +1,18 @@
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useId, useMemo, useRef, useState } from "react";
 import type uPlot from "uplot";
 import { parseChartDate, type StochasticChartRow } from "@/chart/chartData";
-import { baseChartOptions, resolveAccountColor } from "@/chart/chartView";
+import {
+	AccountColorDot,
+	baseChartOptions,
+	resolveAccountColor,
+} from "@/chart/chartView";
 import {
 	buildPointDetails,
 	formatPointDetailsSummary,
 } from "@/chart/pointDetails";
 import { createReferenceLinesHooks } from "@/chart/uplotBase";
 import { UPlotChart } from "@/components/ui/UPlotChart";
+import { currency, formatDate } from "@/lib/format";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { PointDetailsPanel } from "./PointDetailsPanel";
 
@@ -258,26 +263,149 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 	const handleCursorChange = useCallback((index: number | null) => {
 		setSelectedIndex(index);
 	}, []);
+	const [showDataTable, setShowDataTable] = useState(false);
+	const descriptionId = useId();
+	const figcaptionId = useId();
+
+	const maxPlottedValue = useMemo(() => {
+		let max = Number.NEGATIVE_INFINITY;
+		for (const row of chartData) {
+			max = Math.max(max, Number(row.netWorth ?? 0));
+		}
+		for (const row of stochasticChartData ?? []) {
+			max = Math.max(max, row._p90, row._p75, row.p50);
+		}
+		return max;
+	}, [chartData, stochasticChartData]);
+	const isClipped = maxPlottedValue > NET_WORTH_CHART_MAX_Y;
+
+	const sampledRows = useMemo(() => {
+		if (chartData.length <= 12) return chartData;
+		const step = Math.ceil(chartData.length / 12);
+		return chartData.filter((_, i) => i % step === 0);
+	}, [chartData]);
 
 	return (
-		<div className="min-w-0">
-			<UPlotChart
-				options={options}
-				data={data}
-				dataTransition={hasStochasticData ? dataTransition : undefined}
-				tooltip={
-					selectedDetails ? (
-						<PointDetailsPanel details={selectedDetails} compact />
-					) : null
-				}
-				onCursorChange={handleCursorChange}
-				desktopTooltipOnly
-			/>
+		<figure className="min-w-0" aria-describedby={descriptionId}>
+			<figcaption id={figcaptionId} className="sr-only">
+				Stacked account contributions with net worth and Monte Carlo bands. An
+				equivalent data table is available behind the “Show data table” toggle.
+			</figcaption>
+			<p id={descriptionId} className="type-caption">
+				Stacked areas show account contributions; the line shows{" "}
+				{hasStochasticData ? "median " : ""}net worth.{" "}
+				<span className="md:hidden">Tap chart for values.</span>
+				<span className="hidden md:inline">
+					Hover for values; select a point to pin details.
+				</span>
+			</p>
+			{isClipped ? (
+				<p
+					role="note"
+					className="mt-2 rounded-xl border border-tertiary-border/70 bg-tertiary-subtle/50 px-3 py-2 type-caption text-tertiary-foreground"
+				>
+					Values above {currency.format(NET_WORTH_CHART_MAX_Y)} are clipped to
+					keep smaller balances readable. See the data table for exact amounts.
+				</p>
+			) : null}
+			<div className="mt-2 min-w-0">
+				<UPlotChart
+					options={options}
+					data={data}
+					dataTransition={hasStochasticData ? dataTransition : undefined}
+					tooltip={
+						selectedDetails ? (
+							<PointDetailsPanel details={selectedDetails} compact />
+						) : null
+					}
+					onCursorChange={handleCursorChange}
+					desktopTooltipOnly
+				/>
+			</div>
 			<ChartEncodingLegend
+				accounts={[...assets, ...liabilities]}
 				hasStochasticData={hasStochasticData}
 				stochasticIsProvisional={stochasticIsProvisional}
 			/>
-			{selectedDetails && (
+			<div className="no-print mt-2">
+				<button
+					type="button"
+					onClick={() => setShowDataTable((v) => !v)}
+					aria-expanded={showDataTable}
+					className="rounded-lg border border-border/80 px-2.5 py-1 type-label transition hover:bg-accent"
+				>
+					{showDataTable ? "Hide data table" : "Show data table"}
+				</button>
+			</div>
+			{showDataTable ? (
+				<div className="relative mt-2 overflow-x-auto overscroll-x-contain rounded-xl border border-border/70">
+					<table className="w-full type-caption">
+						<caption className="sr-only">
+							Sampled net worth by date with Monte Carlo medians
+						</caption>
+						<thead>
+							<tr className="border-b border-border/70 bg-muted/55 text-left">
+								<th scope="col" className="sticky left-0 bg-muted px-2 py-1.5">
+									Date
+								</th>
+								<th scope="col" className="px-2 py-1.5 text-right">
+									Net worth
+								</th>
+								{hasStochasticData ? (
+									<>
+										<th scope="col" className="px-2 py-1.5 text-right">
+											P50
+										</th>
+										<th scope="col" className="px-2 py-1.5 text-right">
+											P10–P90
+										</th>
+									</>
+								) : null}
+							</tr>
+						</thead>
+						<tbody>
+							{sampledRows.map((row) => {
+								const band = stochasticByDate.get(String(row.date));
+								return (
+									<tr
+										key={String(row.date)}
+										className="border-b border-border/60 last:border-0"
+									>
+										<th
+											scope="row"
+											className="sticky left-0 bg-card px-2 py-1.5 text-left font-medium"
+										>
+											{formatDate(String(row.date))}
+										</th>
+										<td className="px-2 py-1.5 text-right tabular-nums">
+											{currency.format(Number(row.netWorth ?? 0))}
+										</td>
+										{hasStochasticData ? (
+											<>
+												<td className="px-2 py-1.5 text-right tabular-nums">
+													{band
+														? currency.format(band.p50)
+														: currency.format(Number(row.netWorth ?? 0))}
+												</td>
+												<td className="px-2 py-1.5 text-right tabular-nums">
+													{band
+														? `${currency.format(band._p10)} – ${currency.format(band._p90)}`
+														: "—"}
+												</td>
+											</>
+										) : null}
+									</tr>
+								);
+							})}
+						</tbody>
+					</table>
+					<div
+						aria-hidden
+						className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
+					/>
+				</div>
+			) : null}
+			{selectedDetails ? (
 				<>
 					<PointDetailsPanel
 						key={selectedIndex}
@@ -288,8 +416,12 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 						{formatPointDetailsSummary(selectedDetails)}
 					</span>
 				</>
+			) : (
+				<p className="mt-2 type-caption md:hidden">
+					Tip: tap the chart to see values for that date.
+				</p>
 			)}
-		</div>
+		</figure>
 	);
 });
 
@@ -327,12 +459,16 @@ function accountListsMatch(
 }
 
 function ChartEncodingLegend({
+	accounts,
 	hasStochasticData,
 	stochasticIsProvisional,
 }: {
+	accounts: AccountMeta[];
 	hasStochasticData: boolean;
 	stochasticIsProvisional: boolean;
 }) {
+	const visible = accounts.slice(0, 8);
+	const hidden = accounts.slice(8);
 	return (
 		<div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-2 type-caption text-muted-foreground">
 			<span className="inline-flex items-center gap-1.5">
@@ -341,14 +477,30 @@ function ChartEncodingLegend({
 					? `${stochasticIsProvisional ? "Provisional " : ""}median net worth`
 					: "Net worth"}
 			</span>
-			<span className="inline-flex items-center gap-1.5">
-				<span className="flex h-2.5 w-4 overflow-hidden rounded-sm">
-					<span className="w-1/3 bg-sky-500" />
-					<span className="w-1/3 bg-emerald-500" />
-					<span className="w-1/3 bg-amber-500" />
+			{visible.map((account) => (
+				<span key={account.id} className="inline-flex items-center gap-1.5">
+					<AccountColorDot color={resolveAccountColor(account.color)} />
+					{account.label}
 				</span>
-				Accounts
-			</span>
+			))}
+			{hidden.length > 0 ? (
+				<details className="inline-flex">
+					<summary className="cursor-pointer underline decoration-border underline-offset-4">
+						Show all {accounts.length} accounts
+					</summary>
+					<span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+						{hidden.map((account) => (
+							<span
+								key={account.id}
+								className="inline-flex items-center gap-1.5"
+							>
+								<AccountColorDot color={resolveAccountColor(account.color)} />
+								{account.label}
+							</span>
+						))}
+					</span>
+				</details>
+			) : null}
 			{hasStochasticData && (
 				<>
 					<span className="inline-flex items-center gap-1.5">

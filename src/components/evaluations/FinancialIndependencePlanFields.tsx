@@ -46,6 +46,7 @@ export function FiNumberField({
 			step={step}
 			value={value}
 			onChange={onChange}
+			className="min-h-11 tabular-nums"
 		/>
 	);
 }

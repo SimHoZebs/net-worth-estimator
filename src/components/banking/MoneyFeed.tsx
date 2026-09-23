@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { formatDate } from "@/lib/format";
 import type { Account, Posting } from "@/lib/projection";
 import { MoneyRow } from "./MoneyRow";
@@ -10,6 +10,8 @@ export function MoneyFeed({
 	postings,
 	accounts,
 	emptyText,
+	emptyAction,
+	searchLabel = "Search money movements",
 	onOpen,
 	groupByDate = false,
 	dateDescending = true,
@@ -17,6 +19,9 @@ export function MoneyFeed({
 	postings: Posting[];
 	accounts: Account[];
 	emptyText: string;
+	/** CTA rendered inside the empty state (e.g. a "New movement" button). */
+	emptyAction?: ReactNode;
+	searchLabel?: string;
 	onOpen: (posting: Posting) => void;
 	groupByDate?: boolean;
 	dateDescending?: boolean;
@@ -76,7 +81,7 @@ export function MoneyFeed({
 
 	return (
 		<div className="space-y-3">
-			<div className="flex flex-wrap gap-2">
+			<div className="flex flex-wrap items-center gap-2">
 				<input
 					type="search"
 					value={query}
@@ -85,9 +90,12 @@ export function MoneyFeed({
 						setVisibleCount(PAGE_SIZE);
 					}}
 					placeholder="Search"
-					aria-label="Search"
-					className="min-w-0 flex-1 rounded-full border border-border bg-card px-4 py-2 type-body placeholder:text-muted-foreground sm:max-w-xs"
+					aria-label={searchLabel}
+					className="min-h-11 min-w-0 flex-1 rounded-full border border-border bg-card px-4 py-2.5 type-body placeholder:text-muted-foreground sm:max-w-xs"
 				/>
+				<span aria-live="polite" className="type-caption">
+					{sorted.length} {sorted.length === 1 ? "match" : "matches"}
+				</span>
 				<fieldset className="flex flex-wrap gap-1.5">
 					<legend className="sr-only">Filter by direction</legend>
 					{chips.map((chip) => (
@@ -99,7 +107,7 @@ export function MoneyFeed({
 								setFilter(chip.id);
 								setVisibleCount(PAGE_SIZE);
 							}}
-							className={`rounded-full px-3 py-1.5 type-caption font-medium transition ${
+							className={`min-h-11 rounded-full px-4 py-2.5 type-caption font-medium transition ${
 								filter === chip.id
 									? "bg-primary text-primary-foreground shadow-sm"
 									: "border border-border/80 text-muted-foreground hover:text-foreground"
@@ -112,9 +120,10 @@ export function MoneyFeed({
 			</div>
 
 			{visible.length === 0 ? (
-				<p className="rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center type-muted">
-					{emptyText}
-				</p>
+				<div className="space-y-3 rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center">
+					<p className="type-muted">{emptyText}</p>
+					{emptyAction}
+				</div>
 			) : groups ? (
 				<div className="space-y-5">
 					{groups.map((group) => (
@@ -153,7 +162,7 @@ export function MoneyFeed({
 					<button
 						type="button"
 						onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
-						className="rounded-full border border-border px-4 py-2 type-caption font-medium hover:border-ring"
+						className="min-h-11 rounded-full border border-border px-4 py-2.5 type-caption font-medium hover:border-ring"
 					>
 						Show more ({sorted.length - visible.length})
 					</button>

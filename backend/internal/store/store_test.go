@@ -11,11 +11,20 @@ import (
 )
 
 func TestStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T) {
-	store := openTestStore(t)
+	testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t, openTestStore)
+}
+
+func TestOpenCreatesCurrentSchemaVersion(t *testing.T) {
+	store := openSQLiteStore(t)
 	var version int
 	if err := store.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != latestSchemaVersion {
 		t.Fatalf("fresh schema version = %d, err %v", version, err)
 	}
+}
+
+func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore func(*testing.T) Store) {
+	t.Helper()
+	store := newStore(t)
 	document := &types.FinancialModelDocument{
 		SourcePath: "test-source",
 		Accounts: []types.Account{{
@@ -88,7 +97,12 @@ func TestStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T) {
 }
 
 func TestStorePersistsEffectiveDatedIncomeRowsWithSharedID(t *testing.T) {
-	store := openTestStore(t)
+	testStorePersistsEffectiveDatedIncomeRowsWithSharedID(t, openTestStore)
+}
+
+func testStorePersistsEffectiveDatedIncomeRowsWithSharedID(t *testing.T, newStore func(*testing.T) Store) {
+	t.Helper()
+	store := newStore(t)
 	juneEnd := types.IsoDate("2026-06-30")
 	snapshot := &types.IncomeDataSnapshot{
 		IncomeSources: []types.IncomeSourceDefinition{
@@ -148,7 +162,12 @@ func TestOpenMigratesVersionOneData(t *testing.T) {
 }
 
 func TestImportCSVRollsBackModelWhenIncomeReplacementFails(t *testing.T) {
-	store := openTestStore(t)
+	testImportCSVRollsBackModelWhenIncomeReplacementFails(t, openTestStore)
+}
+
+func testImportCSVRollsBackModelWhenIncomeReplacementFails(t *testing.T, newStore func(*testing.T) Store) {
+	t.Helper()
+	store := newStore(t)
 	root := projectRoot(t)
 	modelPath := filepath.Join(root, "public", "configs")
 	incomePath := filepath.Join(root, "public", "data", "income")
@@ -208,14 +227,31 @@ func TestOpenRejectsFutureSchemaVersion(t *testing.T) {
 	}
 }
 
-func openTestStore(t *testing.T) *Store {
+func openTestStore(t *testing.T) Store {
 	t.Helper()
-	store, err := Open(filepath.Join(t.TempDir(), "store.db"))
+	return openSQLiteStore(t)
+}
+
+// openSQLiteStore opens the embedded-SQLite backend directly. Tests that
+// assert on SQL-level details (schema versions, raw scripts) use this;
+// behavioral tests go through RunConformance with the interface instead.
+func openSQLiteStore(t *testing.T) *sqliteStore {
+	t.Helper()
+	return openSQLiteStoreAt(t, filepath.Join(t.TempDir(), "store.db"))
+}
+
+func openSQLiteStoreAt(t *testing.T, path string) *sqliteStore {
+	t.Helper()
+	store, err := Open(path)
 	if err != nil {
 		t.Fatalf("open test store: %v", err)
 	}
+	implementation, ok := store.(*sqliteStore)
+	if !ok {
+		t.Fatalf("Open returned %T, want *sqliteStore", store)
+	}
 	t.Cleanup(func() { _ = store.Close() })
-	return store
+	return implementation
 }
 
 func createVersionOneDatabase(t *testing.T, path string) {

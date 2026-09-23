@@ -120,7 +120,7 @@ describe("AccountsTable", () => {
 		).toBe("");
 	});
 
-	it("rejects JavaScript non-decimal numeric syntax", () => {
+	it("keeps invalid numeric drafts visible with an announced error", () => {
 		const updateAccount = renderEditableTable();
 		const minimum = screen.getByLabelText(
 			"Minimum balance for checking",
@@ -129,7 +129,13 @@ describe("AccountsTable", () => {
 		fireEvent.change(minimum, { target: { value: "0x10" } });
 		fireEvent.blur(minimum);
 
-		expect(minimum.value).toBe("100");
+		// Invalid drafts stay visible (never silently reverted) with
+		// aria-invalid + an announced error until corrected.
+		expect(minimum.value).toBe("0x10");
+		expect(minimum.getAttribute("aria-invalid")).toBe("true");
+		expect(
+			screen.getByText(/Minimum balance for checking.*not a number/),
+		).not.toBeNull();
 		expect(updateAccount).not.toHaveBeenCalled();
 	});
 

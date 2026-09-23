@@ -30,8 +30,9 @@ export function BackendAccessCard() {
 				Status:{" "}
 				<strong>{activeToken ? "Token set" : "No token (read-only)"}</strong>
 			</div>
-			<Field label="Access token">
+			<Field label="Access token" id="backend-access-token">
 				<FieldInput
+					id="backend-access-token"
 					type="password"
 					autoComplete="off"
 					placeholder={activeToken ? "••••••••" : "Paste token"}
@@ -40,6 +41,7 @@ export function BackendAccessCard() {
 					onKeyDown={(event) => {
 						if (event.key === "Enter") saveToken();
 					}}
+					className="min-h-11"
 				/>
 			</Field>
 			<div className="flex flex-wrap gap-2">

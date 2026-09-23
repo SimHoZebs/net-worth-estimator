@@ -616,7 +616,7 @@ export const FinancialIndependencePlanEditor = memo(
 						discardLabel="Discard changes"
 						submitLabel="Update analysis"
 						className="flex flex-col gap-2 no-print sm:flex-row"
-						buttonClassName="w-full sm:w-auto"
+						buttonClassName="w-full sm:w-auto min-h-11"
 						onDiscard={() => {
 							setDraft(committedPlan);
 							setNumericDrafts(committedNumericDrafts);

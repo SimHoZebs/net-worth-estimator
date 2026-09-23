@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { SectionCard } from "@/components/present/present";
 import { Button } from "@/components/ui/button";
 
@@ -55,14 +55,66 @@ export function RowDeleteButton({
 	children = "✕",
 }: RowDeleteButtonProps) {
 	return (
+		<ConfirmButton
+			label={label}
+			onConfirm={onClick}
+			idleLabel={children}
+			confirmLabel="Confirm?"
+			variant="ghost"
+		/>
+	);
+}
+
+/**
+ * Two-step destructive button: the first tap arms ("Confirm?"), the second
+ * confirms. Disarms after 5s. Keeps row deletion undo-safe on touch screens
+ * where a single ✕ is too easy to hit.
+ */
+export function ConfirmButton({
+	label,
+	onConfirm,
+	idleLabel,
+	confirmLabel = "Confirm delete",
+	variant = "destructive",
+	className,
+}: {
+	label?: string;
+	onConfirm: () => void;
+	idleLabel: ReactNode;
+	confirmLabel?: ReactNode;
+	variant?: "ghost" | "destructive";
+	className?: string;
+}) {
+	const [armed, setArmed] = useState(false);
+	const timer = useRef<number | null>(null);
+	useEffect(
+		() => () => {
+			if (timer.current !== null) window.clearTimeout(timer.current);
+		},
+		[],
+	);
+	return (
 		<Button
 			type="button"
-			variant="ghost"
+			variant={variant}
 			size="sm"
-			onClick={onClick}
+			className={className}
 			aria-label={label}
+			aria-pressed={armed}
+			onClick={() => {
+				if (!armed) {
+					setArmed(true);
+					if (timer.current !== null) window.clearTimeout(timer.current);
+					timer.current = window.setTimeout(() => setArmed(false), 5000);
+					return;
+				}
+				if (timer.current !== null) window.clearTimeout(timer.current);
+				setArmed(false);
+				onConfirm();
+			}}
+			onBlur={() => setArmed(false)}
 		>
-			{children}
+			{armed ? confirmLabel : idleLabel}
 		</Button>
 	);
 }

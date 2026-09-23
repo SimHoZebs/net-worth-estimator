@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FIELD_ERROR_CLASS } from "@/components/fields/field-kit";
+import { FieldError, useSubmitError } from "@/components/fields/field-kit";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import {
@@ -76,7 +76,7 @@ export function moneyFormFromPosting(posting: Posting): MoneyFormValue {
 }
 
 export function buildPosting(
-	editing: Posting | null,
+	_editing: Posting | null,
 	value: MoneyFormValue,
 ): { posting: Omit<Posting, "id" | "enabled">; error?: string } {
 	const label = value.label.trim();
@@ -153,8 +153,8 @@ const DIRECTIONS: { id: MoneyDirection; label: string }[] = [
 ];
 
 const inputClass =
-	"w-full rounded-xl border border-border bg-card px-3 py-2 type-body";
-const labelClass = "mb-1 block type-caption font-medium";
+	"w-full rounded-xl border border-border bg-card px-3 py-2.5 min-h-11 type-body user-invalid:border-destructive";
+const labelClass = "mb-1 block type-body font-medium";
 
 export function MoneyForm({
 	title,
@@ -171,15 +171,18 @@ export function MoneyForm({
 	submitLabel: string;
 	/** When set, the amount field is read-only and the original amount object is preserved on save. */
 	amountLockedExplanation?: string | null;
-	onSubmit: (value: MoneyFormValue) => string | void;
+	onSubmit: (value: MoneyFormValue) => string | undefined;
 	onClose: () => void;
 }) {
 	const [value, setValue] = useState<MoneyFormValue>(initial);
-	const [error, setError] = useState<string | null>(null);
+	const { error, errorId, formRef, fail, clear, propsFor } = useSubmitError();
 	const set = <K extends keyof MoneyFormValue>(
 		key: K,
 		next: MoneyFormValue[K],
-	) => setValue((current) => ({ ...current, [key]: next }));
+	) => {
+		if (error) clear();
+		setValue((current) => ({ ...current, [key]: next }));
+	};
 
 	const toggleDestination = (id: string) => {
 		if (id === "external") {
@@ -198,7 +201,17 @@ export function MoneyForm({
 
 	const handleSubmit = () => {
 		const result = onSubmit(value);
-		if (typeof result === "string" && result) setError(result);
+		if (typeof result === "string" && result) {
+			if (result.includes("name")) fail(result, "money-form-label");
+			else if (result.includes("Amount")) fail(result, "money-form-amount");
+			else if (result.includes("where the money goes"))
+				fail(result, "money-form-to-group");
+			else if (result.includes("which account"))
+				fail(result, "money-form-from");
+			else if (result.includes("start date")) fail(result, "money-form-start");
+			else if (result.includes("cap")) fail(result, "money-form-annualCap");
+			else fail(result);
+		}
 	};
 
 	return (
@@ -207,7 +220,7 @@ export function MoneyForm({
 			onClose={onClose}
 			className="max-w-lg rounded-[1.8rem] border border-border/80 bg-card shadow-xl"
 		>
-			<div className="space-y-4 px-6 py-6">
+			<div ref={formRef} className="space-y-4 px-6 py-6">
 				<div>
 					<h2 id="money-form-title" className="type-title text-lg">
 						{title}
@@ -269,7 +282,7 @@ export function MoneyForm({
 										};
 									});
 								}}
-								className={`rounded-full px-3 py-2 type-caption font-semibold transition ${
+								className={`min-h-11 rounded-full px-3 py-2 type-caption font-semibold transition ${
 									value.direction === option.id
 										? "bg-card text-foreground shadow-sm"
 										: "text-muted-foreground"
@@ -291,6 +304,7 @@ export function MoneyForm({
 						value={value.label}
 						onChange={(event) => set("label", event.target.value)}
 						placeholder="e.g. Rent, Paycheck, Savings hop"
+						{...propsFor("money-form-label")}
 					/>
 				</div>
 
@@ -305,6 +319,7 @@ export function MoneyForm({
 								className={inputClass}
 								value={value.fromAccountId}
 								onChange={(event) => set("fromAccountId", event.target.value)}
+								{...propsFor("money-form-from")}
 							>
 								{accounts.map((account) => (
 									<option key={account.id} value={account.id}>
@@ -315,32 +330,39 @@ export function MoneyForm({
 						</div>
 					) : null}
 					<div>
-						<span className={labelClass}>
-							{value.direction === "out" ? "To" : "To (tick accounts)"}
-						</span>
 						{value.direction === "out" ? (
-							<div className={inputClass}>External</div>
+							<>
+								<span className={labelClass}>To</span>
+								<div className={inputClass}>External</div>
+							</>
 						) : (
-							<div className="flex flex-wrap gap-1.5">
-								{accounts.map((account) => {
-									const active = value.toAccountIds.includes(account.id);
-									return (
-										<button
-											key={account.id}
-											type="button"
-											aria-pressed={active}
-											onClick={() => toggleDestination(account.id)}
-											className={`rounded-full px-3 py-1.5 type-caption font-medium transition ${
-												active
-													? "bg-primary text-primary-foreground"
-													: "border border-border/80 text-muted-foreground"
-											}`}
-										>
-											{account.label}
-										</button>
-									);
-								})}
-							</div>
+							<fieldset className="min-w-0">
+								<legend className={labelClass}>To (tick accounts)</legend>
+								<div
+									id="money-form-to-group"
+									tabIndex={-1}
+									className="flex flex-wrap gap-1.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+								>
+									{accounts.map((account) => {
+										const active = value.toAccountIds.includes(account.id);
+										return (
+											<button
+												key={account.id}
+												type="button"
+												aria-pressed={active}
+												onClick={() => toggleDestination(account.id)}
+												className={`min-h-11 min-w-11 rounded-full px-4 py-2.5 type-caption font-medium transition ${
+													active
+														? "bg-primary text-primary-foreground"
+														: "border border-border/80 text-muted-foreground"
+												}`}
+											>
+												{account.label}
+											</button>
+										);
+									})}
+								</div>
+							</fieldset>
 						)}
 					</div>
 				</div>
@@ -358,6 +380,7 @@ export function MoneyForm({
 							placeholder="e.g. 1200"
 							inputMode="decimal"
 							disabled={!!amountLockedExplanation}
+							{...propsFor("money-form-amount")}
 						/>
 						{amountLockedExplanation ? (
 							<p className="mt-1 type-caption text-muted-foreground">
@@ -395,6 +418,7 @@ export function MoneyForm({
 							className={inputClass}
 							value={value.startDate}
 							onChange={(event) => set("startDate", event.target.value)}
+							{...propsFor("money-form-start")}
 						/>
 					</div>
 					{value.frequency !== "once" ? (
@@ -414,8 +438,11 @@ export function MoneyForm({
 				</div>
 
 				<details className="rounded-2xl border border-border/70 px-4 py-3">
-					<summary className="cursor-pointer type-caption">
+					<summary className="cursor-pointer min-h-11 type-body font-medium content-center">
 						Assumptions (rates, cap, priority)
+						<span className="block type-caption font-normal text-muted-foreground">
+							Optional tuning — defaults model a plain movement.
+						</span>
 					</summary>
 					<div className="mt-3 grid gap-3 sm:grid-cols-2">
 						{(
@@ -437,19 +464,31 @@ export function MoneyForm({
 									value={value[key]}
 									onChange={(event) => set(key, event.target.value)}
 									inputMode="decimal"
+									{...propsFor(`money-form-${key}`)}
 								/>
 							</div>
 						))}
 					</div>
 				</details>
 
-				{error ? <p className={FIELD_ERROR_CLASS}>{error}</p> : null}
+				{error ? <FieldError id={errorId}>{error}</FieldError> : null}
 
-				<div className="flex justify-end gap-2">
-					<Button type="button" variant="ghost" size="sm" onClick={onClose}>
+				<div className="sticky bottom-0 -mx-6 -mb-6 flex justify-end gap-2 border-t border-border/70 bg-card px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						className="min-h-11"
+						onClick={onClose}
+					>
 						Cancel
 					</Button>
-					<Button type="button" size="sm" onClick={handleSubmit}>
+					<Button
+						type="button"
+						size="sm"
+						className="min-h-11"
+						onClick={handleSubmit}
+					>
 						{submitLabel}
 					</Button>
 				</div>

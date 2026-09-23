@@ -89,7 +89,7 @@ func LoadMockAccountSet(path string) (*AccountSet, error) {
 // NewMockRunner builds a runner whose fetch returns MockAccountSet instead
 // of hitting the Bridge. Mapping, apply, guards, and scheduler behavior are
 // unchanged.
-func NewMockRunner(database *store.Store, config Config) *Runner {
+func NewMockRunner(database store.Store, config Config) *Runner {
 	runner := NewRunner(database, config, nil)
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return MockAccountSet(runner.now()), nil
@@ -99,7 +99,7 @@ func NewMockRunner(database *store.Store, config Config) *Runner {
 
 // NewMockRunnerFromFile builds a mock runner that reloads the AccountSet
 // from path on every fetch, so file edits apply without a restart.
-func NewMockRunnerFromFile(database *store.Store, config Config, path string) *Runner {
+func NewMockRunnerFromFile(database store.Store, config Config, path string) *Runner {
 	runner := NewRunner(database, config, nil)
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return LoadMockAccountSet(path)

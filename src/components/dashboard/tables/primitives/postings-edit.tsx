@@ -6,7 +6,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { createExpressionAmount } from "@/lib/projection";
-import { useChangedIds, useRowById } from "../_shared";
+import { nextReadableId, useChangedIds, useRowById } from "../_shared";
 import type { PostingsTableEditProps } from "../PostingsTable";
 import { PostingEditRow } from "./postings-edit-row";
 import { AddRowButton, EditableTableCard } from "./shells";
@@ -31,12 +31,15 @@ export function EditablePostingsGrid({
 	return (
 		<EditableTableCard
 			title="Posting definitions"
-			description="Edit the canonical amount calculations and scheduling fields."
+			description="Edit the canonical amount calculations and scheduling fields. New rows get a readable ID (new-posting, new-posting-2, …) — rename it in the ID cell."
 			footer={
 				<AddRowButton
 					onClick={() =>
 						addPosting({
-							id: `new-posting-${Date.now()}`,
+							id: nextReadableId(
+								"new-posting",
+								displayDocument.postings.map((p) => p.id),
+							),
 							label: "New posting",
 							sourceAccountId: null,
 							destinations: null,

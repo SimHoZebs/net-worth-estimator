@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"runtime"
 	"sync"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -29,7 +30,13 @@ func StochasticProjection(
 		return nil, err
 	}
 
-	const workerCount = 4
+	// Scale the pool with available CPUs: accumulation stays ordered in
+	// submission order, so extra workers only add throughput, never
+	// result churn.
+	workerCount := runtime.NumCPU()
+	if workerCount < 1 {
+		workerCount = 1
+	}
 	type sampleJob struct {
 		sample *types.MonteCarloSample
 		index  int

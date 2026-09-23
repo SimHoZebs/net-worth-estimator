@@ -152,7 +152,7 @@ export function ShortfallDetailPanel({
 		});
 
 	return (
-		<div className="space-y-3">
+		<div className="max-w-full min-w-0 space-y-3">
 			<div className="type-body type-value font-semibold/80">
 				Cash flow for {periodLabel}
 			</div>
@@ -222,91 +222,107 @@ export function ShortfallDetailPanel({
 							</span>
 						</summary>
 						{accountsWithSteps ? (
-							<div className="border-t border-border/70 px-3 pb-2 pt-1">
-								<Table>
-									<TableHeader>
-										<TableRow className="border-b border-border/70 hover:bg-transparent">
-											<TableHead className="w-4 type-caption text-muted-foreground/70"></TableHead>
-											<TableHead className="type-caption">Flow</TableHead>
-											<TableHead className="text-right type-caption">
-												Requested
-											</TableHead>
-											<TableHead className="text-right type-caption">
-												Applied
-											</TableHead>
-											<TableHead className="text-right type-caption">
-												Impact
-											</TableHead>
-											<TableHead className="text-right type-caption">
-												Running balance
-											</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										<TableRow className="border-b-0">
-											<TableCell className="w-4 type-caption text-muted-foreground/70"></TableCell>
-											<TableCell className="type-label">Start</TableCell>
-											<TableCell className="type-caption text-right text-muted-foreground/70"></TableCell>
-											<TableCell className="type-caption text-right text-muted-foreground/70"></TableCell>
-											<TableCell className="type-caption text-right text-muted-foreground/70"></TableCell>
-											<TableCell className="type-caption text-right type-value/80">
-												{currency.format(startBalance)}
-											</TableCell>
-										</TableRow>
-										{steps.map((step, index) => {
-											const signColor =
-												step.delta > 0
-													? "text-primary"
-													: step.delta < 0
-														? "text-destructive"
-														: "text-muted-foreground";
-											return (
-												<TableRow
-													key={`${step.postingId}-${index}`}
-													className="border-b-0"
-												>
-													<TableCell
-														className={`w-4 type-caption ${signColor}`}
+							<div className="relative border-t border-border/70 px-3 pb-2 pt-1">
+								<div className="relative">
+									<Table>
+										<TableHeader>
+											<TableRow className="border-b border-border/70 hover:bg-transparent">
+												<TableHead className="w-4 type-caption text-muted-foreground/70" />
+												<TableHead className="sticky left-0 bg-card type-caption">
+													Flow
+												</TableHead>
+												<TableHead className="text-right type-caption">
+													Requested
+												</TableHead>
+												<TableHead className="text-right type-caption">
+													Applied
+												</TableHead>
+												<TableHead className="text-right type-caption">
+													Impact
+												</TableHead>
+												<TableHead className="text-right type-caption">
+													Running balance
+												</TableHead>
+											</TableRow>
+										</TableHeader>
+										<TableBody>
+											<TableRow className="border-b-0">
+												<TableCell className="w-4 type-caption text-muted-foreground/70" />
+												<TableCell className="sticky left-0 bg-card type-label whitespace-normal break-words">
+													Start
+												</TableCell>
+												<TableCell className="type-caption text-right text-muted-foreground/70" />
+												<TableCell className="type-caption text-right text-muted-foreground/70" />
+												<TableCell className="type-caption text-right text-muted-foreground/70" />
+												<TableCell className="type-caption text-right type-value/80">
+													{currency.format(startBalance)}
+												</TableCell>
+											</TableRow>
+											{steps.map((step, index) => {
+												const signColor =
+													step.delta > 0
+														? "text-primary"
+														: step.delta < 0
+															? "text-destructive"
+															: "text-muted-foreground";
+												return (
+													<TableRow
+														key={`${step.postingId}-${index}`}
+														className="border-b-0"
 													>
-														{step.delta > 0 ? "+" : step.delta < 0 ? "-" : "·"}
-													</TableCell>
-													<TableCell className={`type-caption ${signColor}`}>
-														{step.label}
-														{step.isShortfall ? (
-															<span className="ml-2 inline-flex items-center gap-1 type-value text-tertiary-foreground">
-																Shortfall{" "}
-																{currency.format(step.shortfallAmount)}
-																{step.constraints.length > 0
-																	? ` · ${step.constraints.join(", ")}`
-																	: ""}
-															</span>
-														) : null}
-													</TableCell>
-													<TableCell
-														className={`type-caption text-right ${signColor}`}
-													>
-														{currency.format(step.requested)}
-													</TableCell>
-													<TableCell
-														className={`type-caption text-right ${signColor}`}
-													>
-														{currency.format(step.realized)}
-													</TableCell>
-													<TableCell
-														className={`type-caption font-medium text-right ${signColor}`}
-													>
-														{currency.format(Math.abs(step.delta))}
-													</TableCell>
-													<TableCell
-														className={`type-caption font-medium text-right ${signColor}`}
-													>
-														{currency.format(step.runningBalance)}
-													</TableCell>
-												</TableRow>
-											);
-										})}
-									</TableBody>
-								</Table>
+														<TableCell
+															className={`w-4 type-caption ${signColor}`}
+														>
+															{step.delta > 0
+																? "+"
+																: step.delta < 0
+																	? "-"
+																	: "·"}
+														</TableCell>
+														<TableCell
+															className={`sticky left-0 bg-card type-caption whitespace-normal break-words ${signColor}`}
+														>
+															{step.label}
+															{step.isShortfall ? (
+																<span className="ml-2 inline-flex flex-wrap items-center gap-1 type-value text-tertiary-foreground">
+																	Shortfall{" "}
+																	{currency.format(step.shortfallAmount)}
+																	{step.constraints.length > 0
+																		? ` · ${step.constraints.join(", ")}`
+																		: ""}
+																</span>
+															) : null}
+														</TableCell>
+														<TableCell
+															className={`type-caption text-right ${signColor}`}
+														>
+															{currency.format(step.requested)}
+														</TableCell>
+														<TableCell
+															className={`type-caption text-right ${signColor}`}
+														>
+															{currency.format(step.realized)}
+														</TableCell>
+														<TableCell
+															className={`type-caption font-medium text-right ${signColor}`}
+														>
+															{currency.format(Math.abs(step.delta))}
+														</TableCell>
+														<TableCell
+															className={`type-caption font-medium text-right ${signColor}`}
+														>
+															{currency.format(step.runningBalance)}
+														</TableCell>
+													</TableRow>
+												);
+											})}
+										</TableBody>
+									</Table>
+									<div
+										aria-hidden
+										className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
+									/>
+								</div>
 							</div>
 						) : null}
 					</details>

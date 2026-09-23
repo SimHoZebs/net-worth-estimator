@@ -1,6 +1,50 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { pluralize } from "@/lib/format";
-import type { ModelValidationIssue } from "@/lib/projection";
+import type { ModelPath, ModelValidationIssue } from "@/lib/projection";
+
+export type ModelInputTab = "accounts" | "scheduled" | "activity" | "reconcile";
+
+/**
+ * Maps a validation issue to the model-inputs tab that owns it, using the
+ * first path segment from the backend diagnostics. Posting issues resolve to
+ * scheduled/activity by frequency when the posting list is provided.
+ */
+export function validationIssueTab(
+	issue: ModelValidationIssue,
+	postings?: readonly { id: string; frequency: string }[],
+): ModelInputTab {
+	const head = issue.path[0];
+	if (head === "accounts") return "accounts";
+	if (head === "checkpoints") return "reconcile";
+	if (head === "postings") {
+		const index = issue.path[1];
+		const posting = typeof index === "number" ? postings?.[index] : undefined;
+		if (posting?.frequency === "once") return "activity";
+		return "scheduled";
+	}
+	return "reconcile";
+}
+
+/** Counts issues per model-inputs tab. */
+export function countIssuesByTab(
+	issues: ModelValidationIssue[],
+	postings?: readonly { id: string; frequency: string }[],
+): Record<ModelInputTab, number> {
+	const counts: Record<ModelInputTab, number> = {
+		accounts: 0,
+		scheduled: 0,
+		activity: 0,
+		reconcile: 0,
+	};
+	for (const issue of issues) {
+		counts[validationIssueTab(issue, postings)] += 1;
+	}
+	return counts;
+}
+
+export function pathLabel(path: ModelPath): string {
+	return path.map(String).join(".") || "root";
+}
 
 export function ModelValidationPanel({
 	issues,
