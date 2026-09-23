@@ -113,9 +113,7 @@ export function MoneyDetail({
 				) : null}
 
 				<details className="rounded-2xl border border-border/70 px-4 py-3">
-					<summary className="cursor-pointer type-caption">
-						Technical details
-					</summary>
+					<summary className="cursor-pointer type-caption">Details</summary>
 					<p className="mt-2 break-all type-code">
 						{posting.id} · priority {posting.priority}
 					</p>

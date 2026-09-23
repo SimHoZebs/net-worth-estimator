@@ -3,7 +3,7 @@ import { useShallow } from "zustand/shallow";
 import { EmptyState, SectionCard } from "@/components/present/present";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { currency, formatDate, pluralize } from "@/lib/format";
+import { currency, formatDate } from "@/lib/format";
 import {
 	associatedAccountIds,
 	isPastScheduledPosting,
@@ -35,12 +35,7 @@ import {
 	moneyFormFromPosting,
 } from "./banking/MoneyForm";
 import { MoneyAmountText, MoneyAvatar } from "./banking/MoneyRow";
-import {
-	type MoneyDirection,
-	moneyDirection,
-	slugId,
-	touchesAccount,
-} from "./banking/money";
+import { type MoneyDirection, moneyDirection, slugId } from "./banking/money";
 import { DateText } from "./dashboard/tables/primitives/formatting";
 import { ModelValidationPanel } from "./ModelValidationPanel";
 
@@ -146,41 +141,9 @@ export function ModelInputsInspector() {
 		return summary?.enabled ? summary.startingBalance : null;
 	};
 
-	const filterByAccount = (postings: Posting[]) =>
-		selectedAccountId
-			? postings.filter((posting) =>
-					touchesAccount(posting, selectedAccountId, accountIds),
-				)
-			: postings;
-
-	const scheduledPostings = filterByAccount(
-		postingGroups.scheduledTransactions,
-	);
-	const historyPostings = filterByAccount(postingGroups.transactionHistory);
-	const rulesPostings = filterByAccount(postingGroups.accountRules);
-	const visibleCheckpoints = selectedAccountId
-		? (displayDocument?.checkpoints.filter(
-				(checkpoint) => checkpoint.AccountId === selectedAccountId,
-			) ?? [])
-		: (displayDocument?.checkpoints ?? []);
-	const visibleIssues = selectedAccountId
-		? issues.filter((issue) => issue.path.includes(selectedAccountId))
-		: issues;
-
-	const errorCount = issues.filter(
-		(issue) => issue.severity === "error",
-	).length;
-	const warningCount = issues.filter(
-		(issue) => issue.severity === "warning",
-	).length;
-	const validationSummary =
-		errorCount > 0
-			? pluralize(errorCount, "error")
-			: warningCount > 0
-				? pluralize(warningCount, "warning")
-				: document
-					? "Clean"
-					: "Pending";
+	const scheduledPostings = postingGroups.scheduledTransactions;
+	const historyPostings = postingGroups.transactionHistory;
+	const visibleCheckpoints = displayDocument?.checkpoints ?? [];
 
 	const ensureEditing = () => {
 		if (!workingDocument && document) startEditing(document);
@@ -275,18 +238,8 @@ export function ModelInputsInspector() {
 			setDetailPostingId(null);
 		};
 
-	const selectedAccount = selectedAccountId
-		? accountById.get(selectedAccountId)
-		: null;
-
 	return (
 		<SectionCard
-			description={
-				<>
-					What the model thinks you have, and whether it is right. Validation:{" "}
-					{validationSummary}.
-				</>
-			}
 			action={
 				<div className="flex flex-wrap justify-end gap-2">
 					<Button
@@ -305,7 +258,7 @@ export function ModelInputsInspector() {
 							size="sm"
 							onClick={() => setAccountForm({ mode: "create" })}
 						>
-							Add account
+							+ Account
 						</Button>
 					) : null}
 				</div>
@@ -327,7 +280,7 @@ export function ModelInputsInspector() {
 			) : null}
 
 			<p className="type-caption text-muted-foreground">
-				{source.label} · Last loaded {lastLoaded}
+				{source.label} · {lastLoaded}
 			</p>
 
 			{document && displayDocument ? (
@@ -344,7 +297,7 @@ export function ModelInputsInspector() {
 
 					<div className="flex flex-wrap items-center gap-3">
 						<fieldset className="flex flex-wrap gap-2">
-							<legend className="sr-only">Model input sections</legend>
+							<legend className="sr-only">Sections</legend>
 							{tabs.map((tab) => (
 								<button
 									key={tab.id}
@@ -362,12 +315,6 @@ export function ModelInputsInspector() {
 							))}
 						</fieldset>
 					</div>
-
-					<AccountPicker
-						accounts={displayDocument.accounts}
-						selectedAccountId={selectedAccountId}
-						onSelect={setSelectedAccountId}
-					/>
 
 					<div className="space-y-4">
 						{activeSection === "accounts" ? (
@@ -390,6 +337,16 @@ export function ModelInputsInspector() {
 										),
 									)
 								}
+								activityFor={(accountId) =>
+									postingGroups.transactionHistory
+										.filter((posting) =>
+											associatedAccountIds(posting, accountIds).includes(
+												accountId,
+											),
+										)
+										.sort((a, b) => b.startDate.localeCompare(a.startDate))
+										.slice(0, 10)
+								}
 								accountById={accountById}
 								latestCheckpointFor={(accountId) =>
 									displayDocument.checkpoints
@@ -397,6 +354,9 @@ export function ModelInputsInspector() {
 										.sort((a, b) => b.Date.localeCompare(a.Date))[0] ?? null
 								}
 								onOpenPosting={(posting) => setDetailPostingId(posting.id)}
+								onNewMoney={(direction, accountId) =>
+									openCreate(direction, accountId)
+								}
 								onEditAccount={(account) =>
 									setAccountForm({ mode: "edit", account })
 								}
@@ -413,68 +373,39 @@ export function ModelInputsInspector() {
 								onExcludeAccount={(id) => {
 									ensureEditing();
 									updateAccount(id, { enabled: false });
+									setSelectedAccountId(null);
 								}}
-								onAddAccount={() => setAccountForm({ mode: "create" })}
 							/>
 						) : null}
 
 						{activeSection === "scheduled" ? (
 							<ScheduledView
 								postings={scheduledPostings}
-								total={postingGroups.scheduledTransactions.length}
 								accounts={displayDocument.accounts}
 								projectionStartDate={projectionStartDate}
-								selectedLabel={
-									selectedAccountId
-										? (accountById.get(selectedAccountId)?.label ??
-											selectedAccountId)
-										: null
-								}
-								onClearFilter={() => setSelectedAccountId(null)}
 								onOpen={(posting) => setDetailPostingId(posting.id)}
-								onAdd={() => openCreate("transfer")}
 							/>
 						) : null}
 
 						{activeSection === "activity" ? (
-							<div className="space-y-3">
-								{selectedAccountId ? (
-									<FilterNotice
-										text={`Filtered by ${accountById.get(selectedAccountId)?.label ?? selectedAccountId} · ${historyPostings.length} of ${postingGroups.transactionHistory.length}`}
-										onClear={() => setSelectedAccountId(null)}
-									/>
-								) : null}
-								<MoneyFeed
-									postings={historyPostings}
-									accounts={displayDocument.accounts}
-									emptyText="No past activity."
-									onOpen={(posting) => setDetailPostingId(posting.id)}
-									groupByDate
-									dateDescending
-								/>
-							</div>
+							<MoneyFeed
+								postings={historyPostings}
+								accounts={displayDocument.accounts}
+								emptyText="No activity."
+								onOpen={(posting) => setDetailPostingId(posting.id)}
+								groupByDate
+								dateDescending
+							/>
 						) : null}
 
 						{activeSection === "reconcile" ? (
 							<div className="space-y-4">
-								{selectedAccountId ? (
-									<FilterNotice
-										text={`Reconcile filtered by ${accountById.get(selectedAccountId)?.label ?? selectedAccountId} · ${visibleCheckpoints.length} of ${displayDocument.checkpoints.length} statements, ${visibleIssues.length} of ${issues.length} diagnostics`}
-										onClear={() => setSelectedAccountId(null)}
-									/>
-								) : null}
-								{visibleIssues.length > 0 ? (
-									<ModelValidationPanel issues={visibleIssues} />
-								) : selectedAccountId ? (
-									<p className="type-caption text-muted-foreground">
-										No diagnostics mention this account. Overall validation:{" "}
-										{validationSummary}.
-									</p>
+								{issues.length > 0 ? (
+									<ModelValidationPanel issues={issues} />
 								) : null}
 								<StatementsView
 									accounts={displayDocument.accounts}
 									checkpoints={visibleCheckpoints}
-									filtered={selectedAccountId !== null}
 									balanceOf={balanceOf}
 									onVerify={(accountId) => {
 										ensureEditing();
@@ -656,10 +587,10 @@ function QuickActions({
 	onVerify: () => void;
 }) {
 	const actions = [
-		{ label: "Pay", hint: "money out", onClick: onPay },
-		{ label: "Transfer", hint: "move it", onClick: onTransfer },
-		{ label: "Receive", hint: "money in", onClick: onReceive },
-		{ label: "Verify", hint: "check balance", onClick: onVerify },
+		{ label: "Pay", onClick: onPay },
+		{ label: "Transfer", onClick: onTransfer },
+		{ label: "Receive", onClick: onReceive },
+		{ label: "Verify", onClick: onVerify },
 	];
 	return (
 		<div className="grid grid-cols-4 gap-2">
@@ -668,53 +599,11 @@ function QuickActions({
 					key={action.label}
 					type="button"
 					onClick={action.onClick}
-					className="rounded-2xl border border-border/80 bg-card/85 px-2 py-3 text-center transition hover:border-ring hover:shadow-sm"
+					className="rounded-2xl border border-border/80 bg-card/85 px-2 py-3 type-value text-sm transition hover:border-ring hover:shadow-sm"
 				>
-					<span className="block type-value text-sm">{action.label}</span>
-					<span className="block type-caption">{action.hint}</span>
+					{action.label}
 				</button>
 			))}
-		</div>
-	);
-}
-
-function AccountPicker({
-	accounts,
-	selectedAccountId,
-	onSelect,
-}: {
-	accounts: Account[];
-	selectedAccountId: string | null;
-	onSelect: (id: string | null) => void;
-}) {
-	return (
-		<div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/70 bg-surface/55 px-3 py-2">
-			<label className="type-caption" htmlFor="account-context">
-				Viewing
-			</label>
-			<select
-				id="account-context"
-				className="min-w-0 flex-1 rounded-lg border border-border bg-card px-2 py-1.5 type-caption sm:max-w-xs"
-				value={selectedAccountId ?? ""}
-				onChange={(event) => onSelect(event.target.value || null)}
-			>
-				<option value="">Everything</option>
-				{accounts.map((account) => (
-					<option key={account.id} value={account.id}>
-						{account.label}
-					</option>
-				))}
-			</select>
-			{selectedAccountId ? (
-				<Button
-					type="button"
-					variant="ghost"
-					size="sm"
-					onClick={() => onSelect(null)}
-				>
-					Clear
-				</Button>
-			) : null}
 		</div>
 	);
 }
@@ -730,14 +619,15 @@ function AccountsView({
 	currentNetWorth,
 	projectionStartDate,
 	rulesFor,
+	activityFor,
 	accountById,
 	latestCheckpointFor,
 	onOpenPosting,
+	onNewMoney,
 	onEditAccount,
 	onDeleteAccount,
 	onVerify,
 	onExcludeAccount,
-	onAddAccount,
 }: {
 	accounts: Account[];
 	accountQuery: string;
@@ -749,16 +639,17 @@ function AccountsView({
 	currentNetWorth: number | null;
 	projectionStartDate: string;
 	rulesFor: (accountId: string) => Posting[];
+	activityFor: (accountId: string) => Posting[];
 	accountById: ReadonlyMap<string, Account>;
 	latestCheckpointFor: (
 		accountId: string,
 	) => { Date: string; Balance: number } | null;
 	onOpenPosting: (posting: Posting) => void;
+	onNewMoney: (direction: MoneyDirection, accountId: string) => void;
 	onEditAccount: (account: Account) => void;
 	onDeleteAccount: (account: Account) => void;
 	onVerify: (accountId: string) => void;
 	onExcludeAccount: (id: string) => void;
-	onAddAccount: () => void;
 }) {
 	const normalized = accountQuery.trim().toLowerCase();
 	const matching = accounts.filter(
@@ -767,41 +658,64 @@ function AccountsView({
 			account.label.toLowerCase().includes(normalized) ||
 			account.id.toLowerCase().includes(normalized),
 	);
-	const balanceRows = matching.map((account) => ({
-		account,
-		balance: balanceOf(account.id),
-	}));
-	const assets = balanceRows.filter(
-		(row) => row.balance !== null && row.balance >= 0,
-	);
-	const debts = balanceRows.filter(
-		(row) => row.balance !== null && row.balance < 0,
-	);
-	const unknown = balanceRows.filter((row) => row.balance === null);
-	const assetsTotal = assets.reduce((sum, row) => sum + (row.balance ?? 0), 0);
-	const debtsTotal = debts.reduce((sum, row) => sum + (row.balance ?? 0), 0);
 	const selected = selectedAccountId
 		? accountById.get(selectedAccountId)
 		: null;
+
+	if (selected) {
+		return (
+			<AccountDetail
+				account={selected}
+				balance={balanceOf(selected.id)}
+				rules={rulesFor(selected.id)}
+				activity={activityFor(selected.id)}
+				accountById={accountById}
+				latestCheckpoint={latestCheckpointFor(selected.id)}
+				onBack={() => onSelect(null)}
+				onOpenPosting={onOpenPosting}
+				onNewMoney={(direction) => onNewMoney(direction, selected.id)}
+				onEdit={() => onEditAccount(selected)}
+				onDelete={() => onDeleteAccount(selected)}
+				onVerify={() => onVerify(selected.id)}
+				onExclude={() => onExcludeAccount(selected.id)}
+			/>
+		);
+	}
+
+	const rows = matching.map((account) => ({
+		account,
+		balance: balanceOf(account.id),
+	}));
+	const ordered = [...rows].sort(
+		(a, b) => (b.balance ?? -Infinity) - (a.balance ?? -Infinity),
+	);
+	const assetsTotal = rows.reduce(
+		(sum, row) =>
+			sum + (row.balance !== null && row.balance >= 0 ? row.balance : 0),
+		0,
+	);
+	const debtsTotal = rows.reduce(
+		(sum, row) =>
+			sum + (row.balance !== null && row.balance < 0 ? row.balance : 0),
+		0,
+	);
 
 	return (
 		<div className="space-y-4">
 			<section className="overflow-hidden rounded-[1.6rem] border border-border/80 bg-gradient-to-br from-card via-card to-surface/70">
 				<div className="border-b border-border/70 p-5">
-					<div className="type-eyebrow text-primary">Total balance</div>
 					<div className="mt-1 type-metric text-foreground">
 						{balancesAvailable && currentNetWorth !== null
 							? currency.format(currentNetWorth)
 							: "—"}
 					</div>
-					<p className="mt-1 type-muted">
-						After recorded activity through{" "}
-						<DateText value={projectionStartDate} />.
+					<p className="mt-1 type-caption text-muted-foreground">
+						As of <DateText value={projectionStartDate} />
 					</p>
 				</div>
 				<div className="grid grid-cols-2 divide-x divide-border/70">
 					<div className="px-5 py-4">
-						<div className="type-label">Cash & assets</div>
+						<div className="type-label">In</div>
 						<div className="mt-1 type-value text-[color:var(--chart-success)]">
 							{balancesAvailable ? currency.format(assetsTotal) : "—"}
 						</div>
@@ -819,91 +733,39 @@ function AccountsView({
 				type="search"
 				value={accountQuery}
 				onChange={(event) => onQuery(event.target.value)}
-				placeholder="Search accounts…"
+				placeholder="Search"
 				aria-label="Search accounts"
 				className="w-full rounded-full border border-border bg-card px-4 py-2 type-body placeholder:text-muted-foreground sm:max-w-xs"
 			/>
 
-			{[
-				{ title: "Cash & assets", rows: assets },
-				{ title: "Owed", rows: debts },
-				...(unknown.length > 0
-					? [{ title: "Waiting on balances", rows: unknown }]
-					: []),
-			].map((group) => (
-				<section key={group.title} aria-label={group.title}>
-					<h3 className="mb-2 px-1 type-label text-muted-foreground">
-						{group.title}
-					</h3>
-					{group.rows.length === 0 ? (
-						<p className="rounded-2xl border border-dashed border-border/80 px-4 py-6 text-center type-muted">
-							Nothing here.
-						</p>
-					) : (
-						<div className="grid gap-2 sm:grid-cols-2">
-							{group.rows.map(({ account, balance }) => {
-								const rules = rulesFor(account.id);
-								const isSelected = selectedAccountId === account.id;
-								return (
-									<button
-										key={account.id}
-										type="button"
-										aria-pressed={isSelected}
-										onClick={() => onSelect(isSelected ? null : account.id)}
-										className={`rounded-2xl border p-4 text-left transition ${
-											isSelected
-												? "border-primary bg-primary-subtle shadow-sm"
-												: "border-border/80 bg-card/70 hover:border-ring"
-										}`}
-									>
-										<span className="flex items-center gap-2">
-											<span
-												aria-hidden="true"
-												className="size-3 rounded-full"
-												style={{ backgroundColor: account.color ?? "#64748b" }}
-											/>
-											<span className="min-w-0 flex-1 truncate type-value">
-												{account.label}
-											</span>
-										</span>
-										<span className="mt-2 block type-metric text-xl">
-											{balance === null ? "—" : currency.format(balance)}
-										</span>
-										<span className="mt-1 block type-caption">
-											{rules.length} rule{rules.length === 1 ? "" : "s"}
-										</span>
-									</button>
-								);
-							})}
-						</div>
-					)}
-				</section>
-			))}
-
-			{selected ? (
-				<AccountDetail
-					account={selected}
-					balance={balanceOf(selected.id)}
-					rules={rulesFor(selected.id)}
-					accountById={accountById}
-					latestCheckpoint={latestCheckpointFor(selected.id)}
-					onOpenPosting={onOpenPosting}
-					onEdit={() => onEditAccount(selected)}
-					onDelete={() => onDeleteAccount(selected)}
-					onVerify={() => onVerify(selected.id)}
-					onExclude={() => onExcludeAccount(selected.id)}
-					onClose={() => onSelect(null)}
-				/>
+			{ordered.length === 0 ? (
+				<p className="rounded-2xl border border-dashed border-border/80 px-4 py-6 text-center type-muted">
+					None.
+				</p>
 			) : (
-				<div className="flex justify-center">
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						onClick={onAddAccount}
-					>
-						Add an account
-					</Button>
+				<div className="grid gap-2 sm:grid-cols-2">
+					{ordered.map(({ account, balance }) => (
+						<button
+							key={account.id}
+							type="button"
+							onClick={() => onSelect(account.id)}
+							className="rounded-2xl border border-border/80 bg-card/70 p-4 text-left transition hover:border-ring"
+						>
+							<span className="flex items-center gap-2">
+								<span
+									aria-hidden="true"
+									className="size-3 rounded-full"
+									style={{ backgroundColor: account.color ?? "#64748b" }}
+								/>
+								<span className="min-w-0 flex-1 truncate type-value">
+									{account.label}
+								</span>
+							</span>
+							<span className="mt-2 block type-metric text-xl">
+								{balance === null ? "—" : currency.format(balance)}
+							</span>
+						</button>
+					))}
 				</div>
 			)}
 		</div>
@@ -914,33 +776,41 @@ function AccountDetail({
 	account,
 	balance,
 	rules,
+	activity,
 	accountById,
 	latestCheckpoint,
+	onBack,
 	onOpenPosting,
+	onNewMoney,
 	onEdit,
 	onDelete,
 	onVerify,
 	onExclude,
-	onClose,
 }: {
 	account: Account;
 	balance: number | null;
 	rules: Posting[];
+	activity: Posting[];
 	accountById: ReadonlyMap<string, Account>;
 	latestCheckpoint: { Date: string; Balance: number } | null;
+	onBack: () => void;
 	onOpenPosting: (posting: Posting) => void;
+	onNewMoney: (direction: MoneyDirection) => void;
 	onEdit: () => void;
 	onDelete: () => void;
 	onVerify: () => void;
 	onExclude: () => void;
-	onClose: () => void;
 }) {
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
 	return (
-		<section
-			aria-label={`${account.label} details`}
-			className="space-y-3 rounded-[1.6rem] border border-border/80 bg-card/70 p-5"
-		>
+		<div className="space-y-4">
+			<button
+				type="button"
+				onClick={onBack}
+				className="type-label text-muted-foreground hover:text-foreground"
+			>
+				‹ Accounts
+			</button>
 			<div className="flex items-center gap-3">
 				<MoneyAvatar
 					label={account.label}
@@ -950,23 +820,37 @@ function AccountDetail({
 				<div className="min-w-0 flex-1">
 					<h3 className="truncate type-title text-lg">{account.label}</h3>
 					<p className="type-caption">
-						{balance === null ? "Balance pending" : currency.format(balance)}
+						{balance === null ? "—" : currency.format(balance)}
 						{latestCheckpoint
-							? ` · Verified ${formatDate(latestCheckpoint.Date)} at ${currency.format(latestCheckpoint.Balance)}`
-							: " · Never verified"}
+							? ` · ${formatDate(latestCheckpoint.Date)} · ${currency.format(latestCheckpoint.Balance)}`
+							: " · Unverified"}
 					</p>
 				</div>
-				<Button type="button" variant="ghost" size="sm" onClick={onClose}>
-					Close
-				</Button>
+			</div>
+
+			<div className="grid grid-cols-4 gap-2">
+				{(
+					[
+						["Pay", () => onNewMoney("out")],
+						["Transfer", () => onNewMoney("transfer")],
+						["Receive", () => onNewMoney("in")],
+						["Verify", onVerify],
+					] as const
+				).map(([label, onClick]) => (
+					<button
+						key={label}
+						type="button"
+						onClick={onClick}
+						className="rounded-2xl border border-border/80 bg-card/85 px-2 py-2.5 type-value text-sm transition hover:border-ring"
+					>
+						{label}
+					</button>
+				))}
 			</div>
 
 			<div className="flex flex-wrap gap-2">
-				<Button type="button" variant="secondary" size="sm" onClick={onEdit}>
-					Edit account
-				</Button>
-				<Button type="button" variant="secondary" size="sm" onClick={onVerify}>
-					Verify balance
+				<Button type="button" variant="ghost" size="sm" onClick={onEdit}>
+					Edit
 				</Button>
 				<Button type="button" variant="ghost" size="sm" onClick={onExclude}>
 					Exclude
@@ -992,31 +876,42 @@ function AccountDetail({
 				)}
 			</div>
 
-			<div>
-				<h4 className="mb-1.5 px-1 type-label text-muted-foreground">
-					Rules touching this account
-				</h4>
-				{rules.length === 0 ? (
-					<p className="rounded-2xl border border-dashed border-border/80 px-4 py-6 text-center type-muted">
-						No rules touch this account yet.
-					</p>
-				) : (
+			{rules.length > 0 ? (
+				<div>
+					<h4 className="mb-1.5 px-1 type-label text-muted-foreground">
+						Scheduled
+					</h4>
 					<div className="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/70">
 						{rules.map((posting) => (
-							<div key={posting.id} className="flex items-center gap-2 pr-2">
-								<div className="min-w-0 flex-1">
-									<MoneyRowInline
-										posting={posting}
-										accountById={accountById}
-										onOpen={onOpenPosting}
-									/>
-								</div>
-							</div>
+							<MoneyRowInline
+								key={posting.id}
+								posting={posting}
+								accountById={accountById}
+								onOpen={onOpenPosting}
+							/>
 						))}
 					</div>
-				)}
-			</div>
-		</section>
+				</div>
+			) : null}
+
+			{activity.length > 0 ? (
+				<div>
+					<h4 className="mb-1.5 px-1 type-label text-muted-foreground">
+						Recent
+					</h4>
+					<div className="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/70">
+						{activity.map((posting) => (
+							<MoneyRowInline
+								key={posting.id}
+								posting={posting}
+								accountById={accountById}
+								onOpen={onOpenPosting}
+							/>
+						))}
+					</div>
+				</div>
+			) : null}
+		</div>
 	);
 }
 
@@ -1060,22 +955,14 @@ function MoneyRowInline({
 
 function ScheduledView({
 	postings,
-	total,
 	accounts,
 	projectionStartDate,
-	selectedLabel,
-	onClearFilter,
 	onOpen,
-	onAdd,
 }: {
 	postings: Posting[];
-	total: number;
 	accounts: Account[];
 	projectionStartDate: string;
-	selectedLabel: string | null;
-	onClearFilter: () => void;
 	onOpen: (posting: Posting) => void;
-	onAdd: () => void;
 }) {
 	const current = postings.filter(
 		(p) => !isPastScheduledPosting(p, projectionStartDate),
@@ -1085,29 +972,13 @@ function ScheduledView({
 	);
 	return (
 		<div className="space-y-4">
-			{selectedLabel ? (
-				<FilterNotice
-					text={`Filtered by ${selectedLabel} · ${postings.length} of ${total}`}
-					onClear={onClearFilter}
-				/>
-			) : null}
-			<div className="flex justify-end">
-				<Button type="button" variant="secondary" size="sm" onClick={onAdd}>
-					New scheduled payment
-				</Button>
-			</div>
-			<div>
-				<h3 className="mb-1.5 px-1 type-label text-muted-foreground">
-					Upcoming
-				</h3>
-				<MoneyFeed
-					postings={current}
-					accounts={accounts}
-					emptyText="Nothing scheduled."
-					onOpen={onOpen}
-					dateDescending={false}
-				/>
-			</div>
+			<MoneyFeed
+				postings={current}
+				accounts={accounts}
+				emptyText="None."
+				onOpen={onOpen}
+				dateDescending={false}
+			/>
 			{past.length > 0 ? (
 				<details className="rounded-2xl border border-border/70">
 					<summary className="cursor-pointer px-4 py-3 type-label text-muted-foreground">
@@ -1117,7 +988,7 @@ function ScheduledView({
 						<MoneyFeed
 							postings={past}
 							accounts={accounts}
-							emptyText="No ended schedules."
+							emptyText="None."
 							onOpen={onOpen}
 							dateDescending={false}
 						/>
@@ -1131,14 +1002,12 @@ function ScheduledView({
 function StatementsView({
 	accounts,
 	checkpoints,
-	filtered,
 	balanceOf,
 	onVerify,
 	onDelete,
 }: {
 	accounts: Account[];
 	checkpoints: { Date: string; AccountId: string; Balance: number }[];
-	filtered: boolean;
 	balanceOf: (accountId: string) => number | null;
 	onVerify: (accountId: string | null) => void;
 	onDelete: (accountId: string, date: string) => void;
@@ -1154,24 +1023,14 @@ function StatementsView({
 		byAccount.set(checkpoint.AccountId, group);
 	}
 	const ordered = accounts
-		.filter((account) => !filtered || byAccount.has(account.id))
+		.slice()
 		.sort((a, b) => a.label.localeCompare(b.label));
 
 	return (
 		<div className="space-y-3">
-			<div className="flex justify-end">
-				<Button
-					type="button"
-					variant="secondary"
-					size="sm"
-					onClick={() => onVerify(null)}
-				>
-					Verify a balance
-				</Button>
-			</div>
 			{ordered.length === 0 ? (
 				<p className="rounded-2xl border border-dashed border-border/80 px-4 py-8 text-center type-muted">
-					No statements for this filter.
+					None.
 				</p>
 			) : (
 				ordered.map((account) => {
@@ -1206,11 +1065,9 @@ function StatementsView({
 							</div>
 							<p className="mt-1 type-caption">
 								{latest
-									? `Verified ${formatDate(latest.Date)} at ${currency.format(latest.Balance)}`
-									: "Never verified"}
-								{modeled !== null
-									? ` · Model says ${currency.format(modeled)}`
-									: ""}
+									? `${formatDate(latest.Date)} · ${currency.format(latest.Balance)}`
+									: "Unverified"}
+								{modeled !== null ? ` · Model ${currency.format(modeled)}` : ""}
 							</p>
 							{rows.length > 0 ? (
 								<ul className="mt-3 divide-y divide-border/60 overflow-hidden rounded-xl border border-border/70">
@@ -1286,9 +1143,7 @@ function PendingDock({
 		<div className="space-y-3">
 			<div className="sticky bottom-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-card/95 px-4 py-3 shadow-lg backdrop-blur">
 				<span className="type-caption">
-					{count > 0
-						? `${count} unsaved change${count === 1 ? "" : "s"} waiting.`
-						: "Editing. Changes stage here until saved."}
+					{count > 0 ? `${count} unsaved` : "Unsaved changes"}
 				</span>
 				<div className="flex gap-2">
 					<Button
@@ -1297,7 +1152,7 @@ function PendingDock({
 						size="sm"
 						onClick={onToggle}
 					>
-						{open ? "Hide review" : "Review"}
+						{open ? "Hide" : "Review"}
 					</Button>
 					<Button
 						type="button"
@@ -1319,7 +1174,7 @@ function PendingDock({
 							onClick={onDiscard}
 							disabled={!isDirty}
 						>
-							Discard draft
+							Discard
 						</Button>
 					</div>
 					{excludedAccounts.length + excludedPostings.length > 0 ? (
@@ -1347,7 +1202,7 @@ function PendingDock({
 					) : null}
 					{addedAccounts.length + addedPostings.length > 0 ? (
 						<div className="space-y-2">
-							<h3 className="type-value text-sm">New in this draft</h3>
+							<h3 className="type-value text-sm">New</h3>
 							{addedAccounts.map((account) => (
 								<PendingRow
 									key={`added-account-${account.id}`}
@@ -1367,12 +1222,7 @@ function PendingDock({
 								/>
 							))}
 						</div>
-					) : (
-						<p className="type-caption text-muted-foreground">
-							Edits to existing rows count here too — open the row to change it
-							back, or discard the whole draft.
-						</p>
-					)}
+					) : null}
 				</div>
 			) : null}
 		</div>
@@ -1398,23 +1248,6 @@ function PendingRow({
 			</span>
 			<Button type="button" variant="ghost" size="sm" onClick={onAction}>
 				{actionLabel}
-			</Button>
-		</div>
-	);
-}
-
-export function FilterNotice({
-	text,
-	onClear,
-}: {
-	text: string;
-	onClear: () => void;
-}) {
-	return (
-		<div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/70 bg-surface/55 px-3 py-2 type-caption text-muted-foreground">
-			<span>{text}</span>
-			<Button type="button" variant="ghost" size="sm" onClick={onClear}>
-				Clear filter
 			</Button>
 		</div>
 	);

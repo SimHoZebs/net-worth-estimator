@@ -69,8 +69,8 @@ export function MoneyFeed({
 
 	const chips: { id: MoneyDirection | "all"; label: string }[] = [
 		{ id: "all", label: "All" },
-		{ id: "in", label: "Money in" },
-		{ id: "out", label: "Money out" },
+		{ id: "in", label: "In" },
+		{ id: "out", label: "Out" },
 		{ id: "transfer", label: "Transfers" },
 	];
 
@@ -84,8 +84,8 @@ export function MoneyFeed({
 						setQuery(event.target.value);
 						setVisibleCount(PAGE_SIZE);
 					}}
-					placeholder="Search money movement…"
-					aria-label="Search money movement"
+					placeholder="Search"
+					aria-label="Search"
 					className="min-w-0 flex-1 rounded-full border border-border bg-card px-4 py-2 type-body placeholder:text-muted-foreground sm:max-w-xs"
 				/>
 				<fieldset className="flex flex-wrap gap-1.5">
@@ -155,7 +155,7 @@ export function MoneyFeed({
 						onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
 						className="rounded-full border border-border px-4 py-2 type-caption font-medium hover:border-ring"
 					>
-						Show more ({sorted.length - visible.length} remaining)
+						Show more ({sorted.length - visible.length})
 					</button>
 				</div>
 			) : null}

@@ -33,8 +33,10 @@ describe("ModelInputsInspector", () => {
 				.getByRole("button", { name: /Accounts/ })
 				.getAttribute("aria-pressed"),
 		).toBe("true");
-		expect(screen.getByText("Total balance")).not.toBeNull();
-		expect(screen.getByRole("button", { name: /Pay/ })).not.toBeNull();
+		expect(
+			screen.getByRole("searchbox", { name: "Search accounts" }),
+		).not.toBeNull();
+		expect(screen.getByRole("button", { name: "Pay" })).not.toBeNull();
 	});
 
 	it("opens a money movement detail from the scheduled feed", () => {
