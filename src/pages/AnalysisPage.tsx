@@ -257,16 +257,22 @@ export function AnalysisPage() {
 									/>
 								</div>
 
-								<div className="space-y-3">
-									<h2 className="type-title text-base">Why these</h2>
-									<EvidenceItemList items={estimate.identityEvidence.items} />
-									<EvidenceItemList items={estimate.regularPayEvidence.items} />
-									{selectedCandidate ? (
+								<details className="rounded-2xl bg-surface/50 px-4 py-3">
+									<summary className="cursor-pointer type-title text-base">
+										Why these
+									</summary>
+									<div className="mt-3 space-y-3">
+										<EvidenceItemList items={estimate.identityEvidence.items} />
 										<EvidenceItemList
-											items={selectedCandidate.regularityEvidence.items}
+											items={estimate.regularPayEvidence.items}
 										/>
-									) : null}
-								</div>
+										{selectedCandidate ? (
+											<EvidenceItemList
+												items={selectedCandidate.regularityEvidence.items}
+											/>
+										) : null}
+									</div>
+								</details>
 
 								{estimate.limitations.length > 0 ? (
 									<div className="space-y-2">
