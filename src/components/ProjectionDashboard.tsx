@@ -26,7 +26,6 @@ import {
 	useStochasticProgress,
 } from "@/runtime/projectionRuntime";
 import { selectCurrentChangeCount, useStore } from "@/store";
-import { CashFlowWaterfall } from "./dashboard/CashFlowWaterfall";
 import { AccountDiagnosticChart } from "./dashboard/charts/AccountDiagnosticChart";
 import { DebtSummary } from "./dashboard/DebtSummary";
 import { DriverCard } from "./dashboard/DriverCard";
@@ -142,7 +141,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 					<VerdictLink href="#overview">Path</VerdictLink>
 					<VerdictLink href="#projection-chart">Chart</VerdictLink>
 					<VerdictLink href="#household-cycle">Household</VerdictLink>
-					<VerdictLink href="#cash-flow-debt">Cash flow</VerdictLink>
+					<VerdictLink href="#debt-reconciliation">Debt</VerdictLink>
 				</nav>
 
 				<div className="flex flex-wrap items-center gap-2">
@@ -294,7 +293,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 			</section>
 
 			<section
-				id="cash-flow-debt"
+				id="debt-reconciliation"
 				style={belowFoldStyle}
 				className="scroll-mt-4"
 			>
@@ -302,7 +301,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 					<Collapsible defaultOpen={hasAnomaly} autoOpenWhen={hasAnomaly}>
 						<Collapsible.Trigger>
 							<Collapsible.Header
-								title="Cash flow, debt, and reconciliation"
+								title="Debt and reconciliation"
 								trailing={
 									hasAnomaly ? (
 										<Pill tone="tertiary" size="xs">
@@ -314,7 +313,6 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 						</Collapsible.Trigger>
 						<Collapsible.Content>
 							<div className="space-y-5">
-								<CashFlowWaterfall document={document} />
 								<DebtSummary document={document} result={result} />
 								<NetWorthReconciliation document={document} result={result} />
 							</div>
