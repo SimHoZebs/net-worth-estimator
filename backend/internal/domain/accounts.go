@@ -6,7 +6,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Account constraint helpers ported from simulation/accounts.ts.
+// Account constraint helpers.
 
 func InitAccountBalances(accounts []types.Account) map[string]float64 {
 	balances := make(map[string]float64, len(accounts))

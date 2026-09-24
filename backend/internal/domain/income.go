@@ -7,10 +7,9 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Income amount config parsing/validation ported from incomeConfig.ts and the
-// payroll pipeline from incomeResolution.ts.
+// Income amount config parsing, validation, and payroll execution.
 
-// IncomeResolutionError mirrors IncomeResolutionError.
+// IncomeResolutionError reports income-resolution failures.
 type IncomeResolutionError struct{ Message string }
 
 func (e *IncomeResolutionError) Error() string { return e.Message }
@@ -267,8 +266,8 @@ func collectDeltas(before, after map[string]float64) []AccountDeltaEntry {
 	return collectDeltasInOrder(before, after, nil)
 }
 
-// collectDeltasInOrder emits changed accounts in model declaration order
-// (matching TS object insertion order), with any extras appended sorted.
+// collectDeltasInOrder emits changed accounts in model declaration order,
+// with any extras appended sorted.
 func collectDeltasInOrder(before, after map[string]float64, order []string) []AccountDeltaEntry {
 	seen := map[string]bool{}
 	deltas := []AccountDeltaEntry{}

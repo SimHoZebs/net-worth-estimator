@@ -6,9 +6,9 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// TestMathRoundMatchesJavaScript pins the JS Math.round parity contract:
-// halves round toward +Infinity (Math.round(-2.5) === -2).
-func TestMathRoundMatchesJavaScript(t *testing.T) {
+// TestMathRoundRoundingContract pins the rounding contract: halves round toward
+// +Infinity.
+func TestMathRoundRoundingContract(t *testing.T) {
 	cases := []struct {
 		input    float64
 		expected float64
@@ -28,9 +28,9 @@ func TestMathRoundMatchesJavaScript(t *testing.T) {
 	}
 }
 
-// TestLCGMatchesJavaScript replays the TS LCG sequence bit-for-bit,
-// including a seed large enough to exceed exact-double products.
-func TestLCGMatchesJavaScript(t *testing.T) {
+// TestLCGDeterministicSequence replays the fixed LCG sequence, including a
+// seed large enough to exceed exact-double products.
+func TestLCGDeterministicSequence(t *testing.T) {
 	lcg := newLCG(42)
 	expected := []float64{
 		0.5046903498026963,
@@ -49,8 +49,8 @@ func TestLCGMatchesJavaScript(t *testing.T) {
 	}
 }
 
-// TestNormalizeStochasticConfigClamps matches TS normalizeStochasticConfig:
-// finite run counts truncate and clamp into [1, 10000].
+// TestNormalizeStochasticConfigClamps verifies that finite run counts clamp
+// into [1, 10000].
 func TestNormalizeStochasticConfigClamps(t *testing.T) {
 	cases := []struct {
 		input    int

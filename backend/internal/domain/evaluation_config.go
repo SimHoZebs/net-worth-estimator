@@ -7,9 +7,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Evaluation configuration validation/normalization ported from the three
-// evaluator modules. Kept beside validation so document cross-validation and
-// evaluation runtimes share one source of truth.
+// Evaluation configuration validation and normalization. Kept beside validation
+// so document cross-validation and evaluation runtimes share one source of truth.
 
 func finiteNonNegative(value, fallback float64) float64 {
 	if math.IsNaN(value) || math.IsInf(value, 0) {
@@ -18,7 +17,8 @@ func finiteNonNegative(value, fallback float64) float64 {
 	return math.Max(0, value)
 }
 
-// NormalizeFIPlan mirrors normalizeFinancialIndependencePlan.
+// NormalizeFIPlan normalizes source selection, rates, confidence, and evaluation
+// years for financial-independence evaluation.
 func NormalizeFIPlan(plan types.FIPlan) types.FIPlan {
 	sources := make([]types.FISource, len(plan.Sources))
 	for i, source := range plan.Sources {
@@ -115,7 +115,7 @@ func stringArrayField(obj map[string]any, key string) ([]string, bool) {
 }
 
 // ValidateFIPlanConfig validates raw FI config JSON and returns the normalized
-// plan. Port of validateFinancialIndependencePlan.
+// plan.
 func ValidateFIPlanConfig(config any) error {
 	obj, ok := asObject(config)
 	if !ok {

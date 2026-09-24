@@ -1,4 +1,4 @@
-// Package csvio imports/exports canonical CSV files for seeding and parity.
+// Package csvio reads canonical CSV files for seeding.
 package csvio
 
 import (
@@ -14,7 +14,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// FileNames mirror types/model.ts and types/income.ts.
+// Canonical CSV file names.
 const (
 	AccountsFile      = "accounts.csv"
 	CheckpointsFile   = "checkpoints.csv"
@@ -61,9 +61,9 @@ func parseBool(value string) bool {
 }
 
 func parseBound(value string) (*float64, error) {
-	// CSV sentinels map to the canonical finite sentinel constants
-	// (constants.ts NO_FLOOR / NO_CEILING). Any other non-finite spelling
-	// ("inf", "NaN", ...) is rejected: the canonical representation is finite.
+	// CSV sentinels map to the canonical finite sentinel constants. Any other
+	// non-finite spelling ("inf", "NaN", ...) is rejected: the canonical
+	// representation is finite.
 	switch value {
 	case "-Infinity":
 		v := types.NoFloor
@@ -324,8 +324,8 @@ func parseDestinations(raw string) []string {
 	if err := strictUnmarshal([]byte(raw), &destinations); err == nil {
 		return destinations
 	}
-	// Fallback: semicolon- or comma-separated plain list (TS CSV writer emits
-	// semicolon-separated destination IDs for multi-destination rows).
+	// Fallback: semicolon- or comma-separated plain list; JSON arrays are
+	// accepted by the strict parser.
 	separator := ";"
 	if !strings.Contains(raw, ";") {
 		separator = ","

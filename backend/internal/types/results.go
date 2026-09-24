@@ -39,7 +39,7 @@ type EvaluationResultCollection struct {
 	Evaluations EvaluationResultTables `json:"evaluations"`
 }
 
-// Model validation diagnostics (types/validation.ts).
+// Model validation diagnostics.
 
 type ValidationSeverity string
 

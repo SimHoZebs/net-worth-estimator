@@ -7,7 +7,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Financial-model cross-validation ported from validation/*.ts.
+// Financial-model cross-validation.
 
 func addIssue(issues *[]types.ModelValidationIssue, severity types.ValidationSeverity, code, message string, path ...any) {
 	*issues = append(*issues, types.ModelValidationIssue{
@@ -31,7 +31,7 @@ func validateUniqueIDs(issues *[]types.ModelValidationIssue, ids []string, codeP
 }
 
 // ValidateFinancialModel runs all cross-field checks and returns issues in
-// TS-equivalent order.
+// stable validation order.
 func ValidateFinancialModel(document *types.FinancialModelDocument, incomeData *types.IncomeDataSnapshot) []types.ModelValidationIssue {
 	issues := []types.ModelValidationIssue{}
 	accountIDs := make(map[string]bool, len(document.Accounts))
@@ -371,7 +371,7 @@ func formatBound(value float64) string {
 	return fmt.Sprintf("%v", value)
 }
 
-// SummarizeValidationIssues mirrors summarizeValidationIssues.
+// SummarizeValidationIssues separates errors and warnings and reports validity.
 func SummarizeValidationIssues(issues []types.ModelValidationIssue) (errors, warnings []types.ModelValidationIssue, isValid bool) {
 	errors = []types.ModelValidationIssue{}
 	warnings = []types.ModelValidationIssue{}

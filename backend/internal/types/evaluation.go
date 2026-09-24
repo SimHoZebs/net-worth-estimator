@@ -52,7 +52,7 @@ type EvaluationInstance[T any] struct {
 	Config     T      `json:"config"`
 }
 
-// Evaluation tables carry raw JSON configs (matching TS), validated lazily by
+// Evaluation tables carry raw JSON configs, validated lazily by
 // the evaluation runtime / document validators.
 type (
 	FIEvaluation          = EvaluationInstance[JsonValue]

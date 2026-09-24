@@ -7,8 +7,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Evaluation runtime ported from evaluation/runtime.ts. Definitions register
-// by type; central coordinators never import evaluator-specific logic.
+// Evaluation runtime. Definitions register by type; central coordinators
+// never import evaluator-specific logic.
 
 // EvaluationContext is passed to every evaluation hook.
 type EvaluationContext struct {
@@ -25,7 +25,7 @@ type EvaluationFinalizeContext struct {
 	RunCount          int
 }
 
-// EvaluationWorkloadPlan describes stochastic work units for progress UI.
+// EvaluationWorkloadPlan describes stochastic work units for progress reporting.
 type EvaluationWorkloadPlan struct {
 	UnitsPerRun         int
 	UnitLabel           string
@@ -305,7 +305,7 @@ func rawInstances(tables *types.EvaluationTables) []rawInstance {
 	return instances
 }
 
-// NewEvaluationRuntimeSet mirrors the constructor logic of EvaluationRuntimeSet.
+// NewEvaluationRuntimeSet creates a runtime set from evaluation tables.
 func NewEvaluationRuntimeSet(tables *types.EvaluationTables, registry *EvaluationRegistry) *EvaluationRuntimeSet {
 	idCounts := map[string]int{}
 	for _, instance := range rawInstances(tables) {

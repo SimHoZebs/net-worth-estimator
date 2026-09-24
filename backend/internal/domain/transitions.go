@@ -22,7 +22,7 @@ type PostingExecutionTransition struct {
 	Income    *types.IncomeEvent
 }
 
-// SimulationState mirrors types.SimulationState with owned maps.
+// SimulationState is the backend state type with owned maps.
 type SimulationState = types.SimulationState
 
 // CloneSimulationState deep-copies balances and realized amount maps.

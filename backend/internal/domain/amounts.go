@@ -8,10 +8,9 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Amount resolution ported from simulation/amountResolution.ts and
-// simulation/incomeConfig.ts.
+// Amount resolution for posting and income configurations.
 
-// AmountResolutionError mirrors AmountResolutionError / IncomeResolutionError.
+// AmountResolutionError reports amount-resolution failures.
 type AmountResolutionError struct{ Message string }
 
 func (e *AmountResolutionError) Error() string { return e.Message }
@@ -421,7 +420,7 @@ func joinStrings(items []string, sep string) string {
 }
 
 // ValidateAmountDescriptor validates an amount descriptor and returns posting
-// dependencies for cycle detection. Port of validateAmountDescriptor.
+// dependencies for cycle detection.
 func ValidateAmountDescriptor(amount types.PostingAmountResolution, references *AmountReferenceContext) ([]string, error) {
 	if amount.Resolver == "income" {
 		if len(amount.Inputs) > 0 {

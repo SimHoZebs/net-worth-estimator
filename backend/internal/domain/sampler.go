@@ -8,13 +8,11 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Stochastic sampling utilities ported from utils/stochastic.ts.
+// Stochastic sampling utilities.
 //
-// Parity notes (docs/backend-migration/ASSUMPTIONS.md A11/A12):
-//   - The LCG is reproduced bit-for-bit: intermediate products stay below 2^53
-//     so JS double arithmetic is exact; Go int64 math matches it exactly.
-//   - Box-Muller uses math.Log/Sqrt/Cos which may differ from V8 by ULPs;
-//     golden comparisons over sampled paths allow 1e-12 relative tolerance.
+// The seeded LCG uses a fixed recurrence and deterministic sample order.
+// Box-Muller uses Go's math.Log, math.Sqrt, and math.Cos; golden comparisons
+// use a tight relative tolerance for values affected by transcendental arithmetic.
 
 const lcgMask = int64(0x7fffffff)
 
@@ -26,19 +24,17 @@ func newLCG(seed int64) *lcg {
 	return &lcg{state: seed}
 }
 
-// jsStateAdvance reproduces JavaScript number semantics for
-// `(state * 1664525 + 1013904223) & 0x7fffffff`: the multiply and add happen
-// in float64 (losing low bits once products exceed 2^53), then the bitwise
-// AND converts through ToUint32. Exact int64 math diverges from V8 for large
-// seeds, so the float64 steps are emulated explicitly.
-func jsStateAdvance(state int64) int64 {
+// lcgStateAdvance applies the LCG recurrence with float64 intermediate
+// arithmetic before masking with 0x7fffffff. The explicit float64 steps
+// preserve deterministic state transitions for large seeds.
+func lcgStateAdvance(state int64) int64 {
 	product := float64(state) * 1664525
 	sum := product + 1013904223
 	if math.IsNaN(sum) || math.IsInf(sum, 0) {
 		return 0
 	}
 	truncated := math.Trunc(sum)
-	// ToUint32: reduce modulo 2^32 without converting an out-of-range float.
+	// Reduce modulo 2^32 without converting an out-of-range float.
 	mod := math.Mod(truncated, 4294967296)
 	if mod < 0 {
 		mod += 4294967296
@@ -47,7 +43,7 @@ func jsStateAdvance(state int64) int64 {
 }
 
 func (l *lcg) next() float64 {
-	l.state = jsStateAdvance(l.state)
+	l.state = lcgStateAdvance(l.state)
 	return float64(l.state) / float64(lcgMask)
 }
 
@@ -82,8 +78,8 @@ func NewStochasticSampler(seed *int64) StochasticSampler {
 	}
 }
 
-// NormalizeStochasticConfig clamps run counts into [1, 10000], matching TS
-// normalizeStochasticConfig for every decodable (integer) input.
+// NormalizeStochasticConfig clamps run counts into [1, 10000] for every
+// decodable integer input.
 func NormalizeStochasticConfig(config types.StochasticConfig) types.StochasticConfig {
 	runCount := config.RunCount
 	if runCount < 1 {

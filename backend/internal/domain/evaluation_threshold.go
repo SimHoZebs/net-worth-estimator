@@ -7,7 +7,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Net worth threshold evaluation ported from evaluation/netWorthThreshold.ts.
+// Net worth threshold evaluation.
 
 // NetWorthThresholdPathResult is the deterministic result shape.
 type NetWorthThresholdPathResult struct {

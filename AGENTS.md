@@ -1,120 +1,112 @@
-# AGENTS.md - Net Worth Estimator
+# AGENTS.md - Net Worth Estimator Backend
 
-## Quick Start
+## Start
 
-- `npm run dev` - start the Vite dev server (proxies `/v1` to the backend)
-- `cd backend && go run ./cmd/server` - start the Go backend on `:8787`
-- `npm run test:run` - run Vitest once
-- `npm run typecheck` - run TypeScript checks
+From the repository root:
 
-Read `TECHNICAL_OVERVIEW.md` for system-level details.
-
-## Component Map
-
-```text
-main.tsx -> providers -> <RouterProvider> -> <App>
-
-App (src/App.tsx)
-`-- runtime providers -> <AppShell> -> <Outlet>
-    |-- / -> <ResultsPage> -> dashboard, evaluation results, comparisons
-    |-- /analysis -> posting-derived evidence and analyses
-    |-- /settings -> simulation, Monte Carlo, evaluation, and theme settings
-    `-- /model-inputs -> inspector, current changes, templates, and source status
+```bash
+NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
+NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs" \
+NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income" \
+CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-### Dashboard Sub-components
+The server listens on `127.0.0.1:8787` by default. Seed paths are resolved from the process working directory, so use absolute paths when starting through `go -C`.
 
-| Directory | Contents |
+## Backend Map
+
+| Path | Responsibility |
 | --- | --- |
-| `src/components/dashboard/` | overview cards, metrics, reconciliation, cash flow, debt, shortfall, FI, account, contribution, and stochastic views |
-| `src/components/dashboard/tables/` | scheduled transactions, transaction history, account rules, and canonical editors |
-| `src/components/dashboard/current-changes/` | temporary account and posting forms |
-| `src/components/dashboard/charts/` | diagnostic, account, contribution, and point-detail chart components |
-| `src/components/ui/` | presentational primitives |
+| `backend/cmd/server/` | configuration, startup, graceful shutdown, SimpleFIN scheduler |
+| `backend/cmd/importcsv/` | offline CSV replacement into an existing SQLite database |
+| `backend/internal/api/` | HTTP routes, CORS, bearer guard, deterministic API, stochastic SSE, artifact identity |
+| `backend/internal/types/` | persisted model, income, request, result, evaluation, and validation types |
+| `backend/internal/store/` | `Store`, SQLite migrations, model/income persistence, sync ownership, bounded artifacts |
+| `backend/internal/domain/` | validation, request preparation, shared transitions, simulation, evaluations, stochastic kernels |
+| `backend/internal/csvio/` | canonical model and income CSV import |
+| `backend/internal/simplefin/` | Bridge client, mapping, scheduler-safe runner, dry-run, mock fixture mode |
+| `backend/scripts/` | verification and benchmark entry points |
+| `scripts/` | backend smoke and Northflank operator inspection |
 
-## Hook Layer
+## Runtime Configuration
 
-| Hook | File | Contract |
+| Variable | Default | Effect |
 | --- | --- | --- |
-| `useFinancialModelQuery` | `hooks/useFinancialModel.ts` | loads `{ document, issues }` from `FinancialModelRepository.loadDocument`; `staleTime: Infinity` |
-| `useFinancialModelMutation` | `hooks/useFinancialModel.ts` | saves a `FinancialModelDocument` and invalidates the model query |
-| `usePostingAnalyses` | `hooks/usePostingAnalyses.ts` | derives observations from model postings and composes classification, payroll detection, and salary estimation analyses |
-| `useProjection` | `hooks/useProjection.ts` | `(document, settings, enabled) -> ProjectionHookState<ProjectionResult>` |
-| `useStochastic` | `hooks/useStochastic.ts` | `(document, settings, config, enabled) -> ProjectionHookState<StochasticProjectionResult>` |
-| `useDebouncedStochasticConfig` | `hooks/useDebouncedStochasticConfig.ts` | debounces Monte Carlo configuration |
+| `HOST` | `127.0.0.1`; container `0.0.0.0` | listen address |
+| `PORT` | `8787` | listen port |
+| `NET_WORTH_ESTIMATOR_DB` | per-user SQLite path; container `/data/net-worth-estimator.db` | canonical data and artifacts |
+| `NET_WORTH_ESTIMATOR_MODEL_PATH` | `public/configs` | first-boot model seed directory |
+| `NET_WORTH_ESTIMATOR_INCOME_PATH` | `public/data/income` | first-boot income seed directory |
+| `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` | empty | comma-separated exact HTTP/S origins |
+| `NET_WORTH_ESTIMATOR_READ_ONLY` | writable | `1`, `true`, or `yes` rejects guarded writes with 403 |
+| `NET_WORTH_ESTIMATOR_AUTH_TOKEN` | empty | bearer token for guarded writes |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` | empty | Bridge Access URL secret; enables real sync |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS` | empty | `bridge-id=model-account-id,...` mapping |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` | empty | model account IDs eligible for pending-charge seeds |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN` | empty | exact value `1` plans counts without committing writes |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK` | empty | exact value `1` enables fixture mode |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE` | empty | optional fixture file, valid only with mock mode |
 
-`ProjectionHookState<T>` is `{ result, runtimeError, isRunning, progress }`.
+## API and Persistence Flow
 
-`App.tsx` owns projection hooks above the route outlet. Do not move them into individual pages; route navigation must not abort or restart unchanged computations.
+- `api.New(store.Store, api.Config)` builds the router. `GET /healthz`, `GET/PUT /v1/financial-model`, `GET /v1/status`, `GET /v1/income-data`, `POST /v1/projections/deterministic`, `POST /v1/projections/stochastic`, and `POST /v1/sync/simplefin` are the current routes.
+- `PUT /v1/financial-model` validates against the stored income snapshot. Error diagnostics return the document and issues without persisting it; warning-only documents are persisted.
+- The read-only guard runs before bearer validation on model saves and sync triggers. A missing or wrong bearer returns 401 when a token is configured. Reads and projection computation remain unguarded.
+- `store.Open` applies schema migrations and enables SQLite WAL, foreign keys, a 5-second busy timeout, and one connection. An empty database is seeded once from CSV by `cmd/server`; later CSV edits do not replace stored data.
+- `store.Store` is the persistence boundary. `SaveDocument` atomically replaces owner rows while preserving sync-owned rows. Checkpoints and postings carry `source: "model" | "simplefin"`; sync-owned checkpoint collisions yield to owner rows.
+- Completed deterministic and seeded stochastic results are best-effort cached in `projection_artifacts`. The cache is bounded to 256 rows across both kinds. Partial results are not persisted. Unseeded stochastic runs are neither shared nor cached.
+- The root `Dockerfile` runs as UID/GID `10001`, listens on `0.0.0.0:8787`, and stores SQLite at `/data/net-worth-estimator.db`. Production durability requires `/data` on persistent storage and one service instance.
 
-Route pages should compose feature components rather than forward shared-state prop bundles. Feature components select user-owned state directly from Zustand and consume hook-owned model/projection state from `src/runtime/`. Keep explicit props for presentational component boundaries.
+## Simulation Rules
 
-## Store
+- `types.ApplyModelOverrides` creates the effective request document without mutating canonical state. `ModelOverrides` is request-scoped and is never stored.
+- `domain.ValidateFinancialModel` is the authoritative cross-field validator. IDs, references, dates, amount descriptors, dependencies, account bounds, and evaluation configs are validated before simulation.
+- `PrepareSimulationRequest` applies overrides, replays history, resolves the projection dates, and creates one `SimulationRequest`.
+- Historical preparation merges enabled one-time postings and recurring occurrences needed for checkpoint replay with checkpoints. Same-date postings execute first by ascending priority and declaration order; checkpoints then overwrite observed account balances. A checkpoint on the projection start suppresses start-date events.
+- Historical execution carries balances, latest realized posting amounts, and annual-cap state. It does not emit projected movement or evaluation events.
+- `Simulate` accepts only a prepared request. Posting structure, not IDs, labels, or account categories, selects external inflow, external outflow, or transfer behavior.
+- All deterministic, financial-independence branch, and stochastic execution uses `TransitionRuntime` in `domain/transitions.go`. Behavior-generated withdrawals emit `AccountMovementAction`; they do not mutate balances directly.
+- Source-funded movements clamp to positive withdrawable balance, destinations clamp to ceiling headroom, and annual caps apply per posting and calendar year. Movement records retain requested and realized amounts plus ordered account deltas.
+- `AdaptSimulationRun` separates historical rows from projected rows and rounds public projection values. `ProjectFinancialModelDocument` adds configured evaluation results.
+- `EvaluationRegistry` owns the three definitions: financial independence, net-worth threshold, and posting fulfillment. Evaluation instance IDs are globally unique; `types.EvaluationTypeOrder` fixes type order while each table preserves stored row order.
+- Financial independence uses explicit selected sources and continuing posting IDs. It never infers continuation from a posting's identity, label, category, or rate.
+- `StochasticProjection` reuses one prepared baseline request, samples annual rates up front, simulates on a worker pool, and accumulates results in submission order. Percentiles come from complete sorted run distributions.
 
-`src/store.ts` composes three Zustand slices; theme lives in a separate `src/themeStore.ts` store because it is orthogonal to domain state:
+## Stochastic SSE
 
-| Slice | Purpose |
+- A seeded request is content-addressed. A cache hit emits one `result` event; a miss owns an in-process shared run; an attached stream receives the latest cumulative `partial` snapshot and then remaining events.
+- Event names are `progress`, `partial`, `result`, and `error`. Data shapes are `{progress}`, `{progress, partial}`, `{result}`, and `{error}` respectively.
+- The stream sends `retry: 3000` and heartbeat comments every 15 seconds. `X-Cache` is `hit`, `miss`, or `attach`.
+- An unseeded `seed: null` run stays attached to that request, is canceled on disconnect, and is never persisted.
+
+## Core Go APIs
+
+| Symbol | Contract |
 | --- | --- |
-| `Editor` | single staged draft: `workingDocument` plus the `editingBaseline` snapshot, edit/dirty state, and CRUD on the draft |
-| `Settings` | typed evaluation tables, horizon, stochastic preference, and stochastic config |
-| `Comparison` | read-only `ComparisonSnapshot` metrics; snapshots cannot restore model state |
-
-`selectCurrentChangeCount` derives the unsaved-diff count (added + removed + modified rows across accounts, postings, and checkpoints) from `editingBaseline` vs `workingDocument`. Primary selectors are `selectCurrentChangeCount`, `selectEditorState`, and `selectEditorActions`.
-
-## Data Flow
-
-1. **Model source**: Go backend serves `GET/PUT /v1/financial-model` from imported canonical CSV data. The Vite dev server proxies `/v1` to `NET_WORTH_ESTIMATOR_BACKEND` (default `http://localhost:8787`).
-2. **Persistence DI**: `App.tsx` creates `createHttpFinancialModelRepository()` and `createHttpIncomeDataSource()`. The HTTP backend is the only persistence; there is no browser storage or CSV ingestion path.
-3. **Query layer**: `useFinancialModelQuery` and `useFinancialModelMutation` connect the source to TanStack Query.
-4. **Current changes**: the `Editor` draft is the only staging area. Trial additions, enabled=false toggles, and removals all edit `workingDocument` directly (starting an edit session from canonical when needed); canonical data is untouched until save.
-5. **Projection**: `useProjection`/`useStochastic` share one query-state core in `src/hooks/useProjections.ts` over `BackendProjectionEngine` (`src/engine/`). Deterministic runs POST `/v1/projections/deterministic`; the Go backend computes and returns results. Server cache plus TanStack Query cover repeats; there is no client projection cache.
-6. **Monte Carlo**: `POST /v1/projections/stochastic` streams SSE `progress`/`partial`/`result` events; exact percentiles are aggregated server-side.
-7. **Save**: goes through the HTTP repository (`PUT /v1/financial-model`, bearer token when auth is configured, rejected when the server is read-only); malformed data surfaces diagnostics. Analyses use the canonical model postings. There is no reset route; CSV files are seed-only.
-8. **Derived artifacts**: durable artifact storage lives in the backend (`projection_artifacts`). The client keeps no projection cache.
-9. **Independent analyses**: `AnalysisDefinition` computations run as explicit pipelines over posting-derived observations. Active analyses contribute classifier requirements to one shared posting-classification plan before payroll detection and salary estimation; the pipeline does not participate in projection or mutate the financial model.
-
-## Key Types
-
-| Type | Purpose |
-| --- | --- |
-| `FinancialModelDocument` | canonical persisted accounts, checkpoints, postings, evaluations, and source metadata |
-| `Checkpoint` | absolute end-of-day observed balance that corrects historical modeled account state |
-| `SimulationRequest` | fully prepared model, runtime state, date range, event policy, and optional sample |
-| `SimulationRun` | exact states, dated balance snapshots, and ordered movement attempts |
-| `ProjectionPath` | immutable evaluator-facing time series and movement events |
-| `MonteCarloSample` | sampled annual posting rates for one run |
-| `ComparisonSnapshot` | read-only captured metrics for UI comparison |
-| `ProjectionResult` | deterministic public result and evaluation result tables |
-| `StochasticProjectionResult` | exact percentile bands and stochastic evaluation aggregation |
-| `FinancialModelRepository` | application-facing model reads plus optional labeled save capability |
-| `FinancialModelIngestionSource` | read-only external snapshot and semantic revision used by ingestion |
-| `FinancialModelDao` | `store.Store` interface: canonical model, income, artifacts, sync state; SQLite file backend; `RunConformance` proves replacements |
-| `FinancialModelParseResult` | `{ document, issues }` |
-| `PostingObservationDataset` | observations derived from enabled one-time external-inflow postings |
-| `AnalysisDefinition` | typed independent computation from an input value to a diagnosed output |
-
-## Rules
-
-- Simulation logic must never branch on specific account IDs, posting IDs, labels, or categories.
-- `projectFinancialModelDocument`, `projectRawFinancialModelDocument`, and `prepareSimulationRequest` are the canonical core APIs.
-- Shared state transitions belong in `backend/internal/domain/transitions.go`; deterministic, branch, and Monte Carlo execution must not duplicate transition semantics.
-- FI logic is a derived evaluation and must not add semantic branches to generic simulation.
-- Reactive behaviors emit generic account movements through shared account constraints instead of mutating balances directly.
-- FI continuing postings are explicitly selected; never infer them from IDs, labels, categories, or non-zero rates.
-- Evaluation definitions register in `evaluation/registry.ts`; central coordinators must not import evaluator-specific logic.
-- Evaluation configuration and results remain grouped by type. `EVALUATION_TYPE_ORDER` controls type order, table arrays preserve ingestion order, and instances retain stable globally unique IDs. Configs and public bodies must remain JSON-serializable.
-- Draft rows are session-only and never mutate canonical data until save.
-- Comparison snapshots contain metrics only; do not add restoration or alternative-model semantics.
-- Keep the domain canonical-only: no named alternative models, compatibility APIs, alternate readers, or additional persistence routes.
-- Use the `@/lib/projection` barrel for projection types and utilities.
-- Deterministic and stochastic computation runs in the Go backend, never in browser JS.
-- Historical preparation merges postings and checkpoints chronologically. Same-date postings execute first, checkpoints then overwrite observed accounts, and later postings continue from that corrected state. Checkpoints emit no movement or cash-flow events.
-- Enabled `once` postings before the projection start establish historical balances through shared transitions. Start-date rows remain projected events; historical replay carries dependency/cap state but emits no projected movements or evaluation events.
-- Run `npm run test:run` and `npm run typecheck` after code changes.
+| `store.Open`, `store.Store` | migrated persistence and synchronization boundary |
+| `api.New`, `api.Server`, `api.Config` | HTTP wiring and access policy |
+| `domain.ValidateFinancialModel` | model and income cross-validation |
+| `domain.PrepareSimulationRequest` | overrides, history, dates, state, and request preparation |
+| `domain.Simulate` | deterministic movement kernel |
+| `domain.AdaptSimulationRun`, `domain.ProjectRawFinancialModelDocument` | path and public-result adaptation |
+| `domain.ProjectFinancialModelDocument` | deterministic projection plus evaluations |
+| `domain.EvaluateProjectionPath` | configured evaluation execution |
+| `domain.StochasticProjection` | sampled projection, evaluation accumulation, percentiles, progress |
+| `simplefin.Runner.Sync`, `simplefin.Runner.Trigger` | scheduled/direct and guarded manual synchronization |
 
 ## Verification
 
-- Run `npm run verify` before finishing any code task.
-- When touching `backend/`, also run `backend/scripts/verify.sh` (scoped, e.g. `backend/scripts/verify.sh ./internal/domain/...`).
-- `npm run verify` is red until `biome check --write src` lands (pre-existing `src/` drift).
-- See `TESTING.md` for real-data testing and UI end-state verification.
+Run the narrowest relevant package first, then the production-package gate:
+
+```bash
+backend/scripts/verify.sh ./internal/domain/...
+backend/scripts/verify.sh ./internal/api
+backend/scripts/verify.sh ./internal/store
+backend/scripts/verify.sh ./internal/simplefin
+backend/scripts/verify.sh ./internal/...
+backend/scripts/verify.sh ./cmd/...
+```
+
+The script runs `gofmt` checks, `go vet`, and `go test` with `CGO_ENABLED=0`. CI additionally runs `go mod tidy` checking, production-package `go build`, and `go test -race`. The no-argument script also discovers the copy-only benchmark template under `backend/scripts/`; that template currently prevents a repository-wide gate and is excluded from CI and hooks.
+
+See `README.md`, `TECHNICAL_OVERVIEW.md`, and `TESTING.md` for runtime and verification detail. `PRODUCT_INTENT.md` defines product intent independently of this implementation.

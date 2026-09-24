@@ -2,7 +2,7 @@ package domain
 
 import ()
 
-// FI shortfall bounds ported from evaluation/financialIndependenceBounds.ts.
+// FI shortfall bounds.
 
 const FIShortfallTolerance = 0.01
 

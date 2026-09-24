@@ -13,8 +13,8 @@ import (
 )
 
 // Server-side artifact cache: content-addressed reuse of completed
-// projections across requests and reloads (ASSUMPTIONS A2/N-followup).
-// Identity is Go-owned; no cross-implementation hash compatibility is kept.
+// projections across requests and reloads. artifactKey defines the identity;
+// identity is Go-owned, so hashes are not cross-implementation compatible.
 
 const artifactCacheVersion = 1
 

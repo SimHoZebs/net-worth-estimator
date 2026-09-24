@@ -7,7 +7,7 @@ type AccountDelta struct {
 	Delta     float64 `json:"delta"`
 }
 
-// MovementOrigin mirrors {"type":"posting","postingId":"..."}.
+// MovementOrigin has the posting movement-origin JSON shape.
 type MovementOrigin struct {
 	Type      string `json:"type"` // always "posting"
 	PostingID string `json:"postingId"`
