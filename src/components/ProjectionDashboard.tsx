@@ -134,11 +134,11 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 					className="no-print flex flex-wrap items-center gap-2"
 				>
 					<VerdictLink href="#evaluations">Evaluations</VerdictLink>
-					<VerdictLink href="#projected-shortfalls">
-						{hasShortfall
-							? `Shortfall ${formatDate(derived.firstUnderfulfilledDate ?? "")}`
-							: "Shortfalls"}
-					</VerdictLink>
+					{hasShortfall ? (
+						<VerdictLink href="#projected-shortfalls">
+							Shortfall {formatDate(derived.firstUnderfulfilledDate ?? "")}
+						</VerdictLink>
+					) : null}
 					<VerdictLink href="#overview">Path</VerdictLink>
 					<VerdictLink href="#projection-chart">Chart</VerdictLink>
 					<VerdictLink href="#household-cycle">Household</VerdictLink>
@@ -178,14 +178,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 						>
 							First shortfall {formatDate(derived.firstUnderfulfilledDate)}
 						</a>
-					) : (
-						<a
-							href="#projected-shortfalls"
-							className="shrink-0 rounded-full border border-border/70 px-3 py-1 text-xs font-medium tracking-[0.12em] uppercase"
-						>
-							No shortfalls
-						</a>
-					)}
+					) : null}
 				</div>
 			</section>
 
@@ -210,12 +203,14 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 				className="grid gap-3 md:grid-cols-3"
 			>
 				<div className="flex flex-col gap-3">
-					<DriverCard
-						label="Main constraint"
-						value={derived.blockerValue}
-						detail={derived.blockerDetail}
-						tone={derived.biggestShortfallPosting ? "tertiary" : "primary"}
-					/>
+					{derived.biggestShortfallPosting ? (
+						<DriverCard
+							label="Main constraint"
+							value={derived.blockerValue}
+							detail={derived.blockerDetail}
+							tone="tertiary"
+						/>
+					) : null}
 					<Link
 						to="/accounts"
 						className="no-print w-full rounded-2xl border border-border/80 bg-card/85 px-4 py-3 text-sm font-semibold text-muted-foreground shadow-sm transition hover:border-ring/70 hover:bg-accent hover:text-accent-foreground dark:border-white/10"
@@ -223,44 +218,53 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 						Explore accounts
 					</Link>
 				</div>
-				<DriverCard
-					label="Next projected transaction"
-					value={
-						!derived.fulfillmentAvailable
-							? "Unavailable"
-							: derived.firstProjectedEvent
-								? formatDate(derived.firstProjectedEvent.date)
-								: "No future transactions"
-					}
-					detail={derived.nextEventDetail}
-				/>
-				<DriverCard
-					label="Planned transaction completion"
-					value={
-						derived.fulfillmentAvailable
-							? pct.format(derived.postingUtilizationRate)
-							: "Unavailable"
-					}
-					tone={
-						derived.fulfillmentAvailable && derived.postingUtilizationRate < 1
-							? "tertiary"
-							: "primary"
-					}
-				/>
+				{!derived.fulfillmentAvailable ||
+				!derived.firstProjectedEvent ||
+				derived.firstProjectedEvent.unfulfilledAmount > 0 ||
+				(derived.firstProjectedEvent.destinationLimitedAmount ?? 0) > 0 ? (
+					<DriverCard
+						label="Next projected transaction"
+						value={
+							!derived.fulfillmentAvailable
+								? "Unavailable"
+								: derived.firstProjectedEvent
+									? formatDate(derived.firstProjectedEvent.date)
+									: "No future transactions"
+						}
+						detail={derived.nextEventDetail}
+					/>
+				) : null}
+				{!derived.fulfillmentAvailable || derived.postingUtilizationRate < 1 ? (
+					<DriverCard
+						label="Planned transaction completion"
+						value={
+							derived.fulfillmentAvailable
+								? pct.format(derived.postingUtilizationRate)
+								: "Unavailable"
+						}
+						tone={
+							derived.fulfillmentAvailable && derived.postingUtilizationRate < 1
+								? "tertiary"
+								: "primary"
+						}
+					/>
+				) : null}
 			</section>
 
-			<section
-				id="projected-shortfalls"
-				style={belowFoldStyle}
-				className="scroll-mt-4"
-			>
-				<ShortfallCalendar
-					fulfillment={fulfillment}
-					rows={result.timeline.rows}
-					postings={document.postings}
-					accounts={document.accounts}
-				/>
-			</section>
+			{fulfillment && hasShortfall ? (
+				<section
+					id="projected-shortfalls"
+					style={belowFoldStyle}
+					className="scroll-mt-4"
+				>
+					<ShortfallCalendar
+						fulfillment={fulfillment}
+						rows={result.timeline.rows}
+						postings={document.postings}
+						accounts={document.accounts}
+					/>
+				</section>
+			) : null}
 
 			<section id="overview" className="scroll-mt-4">
 				<SimulationOverview

@@ -57,18 +57,7 @@ export const DebtSummary = memo(function DebtSummary({
 
 	const allDebts = [...debtAccounts, ...debtByLabel];
 
-	if (allDebts.length === 0) {
-		return (
-			<SectionCard
-				title="Debt summary"
-				className="rounded-[1.6rem] border-border shadow-sm"
-			>
-				<div className="type-muted">
-					No debt accounts are currently tracked.
-				</div>
-			</SectionCard>
-		);
-	}
+	if (allDebts.length === 0) return null;
 
 	const totalDebt = allDebts.reduce((sum, d) => sum + Math.abs(d.balance), 0);
 

@@ -81,73 +81,63 @@ export const NetWorthReconciliation = memo(function NetWorthReconciliation({
 	);
 	const observedRows = rows.filter((row) => row.checkpoint !== null);
 
-	const renderRows = (balances: ReconciliationRow[], emptyMessage: string) =>
-		balances.length > 0 ? (
-			balances.map((row) => {
-				const observedBalance = row.checkpoint?.Balance;
-				const modeledBalance = row.modeledBalanceAtCheckpoint;
-				return (
-					<TableRow key={row.accountId}>
-						<TableCell className="sticky left-0 bg-card/95 type-body whitespace-normal break-words text-foreground/80 backdrop-blur">
-							{row.label}
-						</TableCell>
-						<TableCell className="text-right type-value text-sm">
-							{observedBalance === undefined
-								? "Not observed"
-								: currency.format(observedBalance)}
-						</TableCell>
-						<TableCell className="type-muted">
-							{row.checkpoint ? formatDate(row.checkpoint.Date) : "-"}
-						</TableCell>
-						<TableCell className="text-right type-value text-sm">
-							{modeledBalance === null
-								? "No same-date snapshot"
-								: currency.format(modeledBalance)}
-						</TableCell>
-						<TableCell className="text-right type-value text-sm">
-							{observedBalance === undefined || modeledBalance === null
-								? "-"
-								: currency.format(observedBalance - modeledBalance)}
-						</TableCell>
-					</TableRow>
-				);
-			})
-		) : (
-			<TableRow>
-				<TableCell
-					colSpan={5}
-					className="py-4 text-center type-muted whitespace-normal text-muted-foreground/70"
-				>
-					{emptyMessage}
-				</TableCell>
-			</TableRow>
+	const renderRows = (balances: ReconciliationRow[]) =>
+		balances.map((row) => {
+			const observedBalance = row.checkpoint?.Balance;
+			const modeledBalance = row.modeledBalanceAtCheckpoint;
+			return (
+				<TableRow key={row.accountId}>
+					<TableCell className="sticky left-0 bg-card/95 type-body whitespace-normal break-words text-foreground/80 backdrop-blur">
+						{row.label}
+					</TableCell>
+					<TableCell className="text-right type-value text-sm">
+						{observedBalance === undefined
+							? "Not observed"
+							: currency.format(observedBalance)}
+					</TableCell>
+					<TableCell className="type-muted">
+						{row.checkpoint ? formatDate(row.checkpoint.Date) : "-"}
+					</TableCell>
+					<TableCell className="text-right type-value text-sm">
+						{modeledBalance === null
+							? "No same-date snapshot"
+							: currency.format(modeledBalance)}
+					</TableCell>
+					<TableCell className="text-right type-value text-sm">
+						{observedBalance === undefined || modeledBalance === null
+							? "-"
+							: currency.format(observedBalance - modeledBalance)}
+					</TableCell>
+				</TableRow>
+			);
+		});
+
+	const renderTable = (title: string, balances: ReconciliationRow[]) =>
+		balances.length === 0 ? null : (
+			<div className="relative overflow-x-auto overscroll-x-contain">
+				<h4 className="mb-2 type-eyebrow">{title}</h4>
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead className="sticky left-0 bg-muted/95 backdrop-blur">
+								Account
+							</TableHead>
+							<TableHead className="text-right">Observed</TableHead>
+							<TableHead>As of</TableHead>
+							<TableHead className="text-right">Modeled same date</TableHead>
+							<TableHead className="text-right">Difference</TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableBody>{renderRows(balances)}</TableBody>
+				</Table>
+				<div
+					aria-hidden
+					className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
+				/>
+			</div>
 		);
 
-	const renderTable = (title: string, balances: ReconciliationRow[]) => (
-		<div className="relative overflow-x-auto overscroll-x-contain">
-			<h4 className="mb-2 type-eyebrow">{title}</h4>
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead className="sticky left-0 bg-muted/95 backdrop-blur">
-							Account
-						</TableHead>
-						<TableHead className="text-right">Observed</TableHead>
-						<TableHead>As of</TableHead>
-						<TableHead className="text-right">Modeled same date</TableHead>
-						<TableHead className="text-right">Difference</TableHead>
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{renderRows(balances, `No ${title.toLowerCase()} accounts.`)}
-				</TableBody>
-			</Table>
-			<div
-				aria-hidden
-				className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"
-			/>
-		</div>
-	);
+	if (rows.length === 0) return null;
 
 	return (
 		<SectionCard
