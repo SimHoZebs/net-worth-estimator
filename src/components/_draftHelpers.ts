@@ -1,4 +1,4 @@
-import { parseDecimalDraft } from "@/lib/number-draft";
+import { parseDecimalDraft } from "@/lib/numberDraft";
 
 export function parseDecimalField(
 	raw: string,

@@ -1,7 +1,6 @@
-import { currency, formatDate, pct } from "@/lib/format";
+import { formatDate, pct } from "@/lib/format";
 import type {
 	EvaluationInstance,
-	NetWorthThresholdConfig,
 	ProjectionResult,
 	StochasticProjectionResult,
 } from "@/lib/projection";
@@ -22,9 +21,8 @@ export function NetWorthThresholdEvaluation({
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
 }) {
-	let config: NetWorthThresholdConfig;
 	try {
-		config = validateNetWorthThresholdConfig(evaluation.config);
+		validateNetWorthThresholdConfig(evaluation.config);
 	} catch {
 		return null;
 	}
@@ -39,15 +37,10 @@ export function NetWorthThresholdEvaluation({
 
 	return (
 		<div>
-			<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+			<div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
 				<Metric
 					size="sm"
-					label="Target"
-					value={currency.format(config.target)}
-				/>
-				<Metric
-					size="sm"
-					label="Deterministic outcome"
+					label="First reached"
 					value={
 						deterministic?.firstReachedDate
 							? formatDate(deterministic.firstReachedDate)

@@ -4,11 +4,11 @@ import {
 	FieldError,
 	LabeledField,
 	useSubmitError,
-} from "@/components/fields/field-kit";
-import { Button } from "@/components/ui/button";
+} from "@/components/fields/FieldKit";
+import { Button } from "@/components/ui/Button";
 import type { Account } from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
-import { ConfirmButton } from "../tables/primitives/shells";
+import { ConfirmButton } from "../tables/primitives/Shells";
 
 function emptyAccount(): Account {
 	return {

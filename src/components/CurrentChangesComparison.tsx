@@ -1,7 +1,7 @@
 import { memo, useState } from "react";
-import { Pill } from "@/components/present/present";
-import { Button } from "@/components/ui/button";
-import { Collapsible } from "@/components/ui/collapsible-section";
+import { Pill } from "@/components/present/Present";
+import { Button } from "@/components/ui/Button";
+import { Collapsible } from "@/components/ui/CollapsibleSection";
 import { currency } from "@/lib/format";
 import {
 	useProjectionArtifacts,

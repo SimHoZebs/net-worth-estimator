@@ -3,8 +3,8 @@ import type {
 	FinancialModelDocument,
 	Posting,
 } from "@/lib/projection";
-import { EditablePostingsGrid } from "./primitives/postings-edit";
-import { ReadOnlyPostingsView } from "./primitives/postings-view";
+import { EditablePostingsGrid } from "./primitives/PostingsEdit";
+import { ReadOnlyPostingsView } from "./primitives/PostingsView";
 
 export interface PostingsTableEditProps {
 	displayDocument: FinancialModelDocument;

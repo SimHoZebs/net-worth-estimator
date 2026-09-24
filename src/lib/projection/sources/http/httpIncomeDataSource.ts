@@ -1,4 +1,4 @@
-import { buildApiUrl } from "@/lib/api-url";
+import { buildApiUrl } from "@/lib/apiUrl";
 import type { IncomeDataLoadResult, IncomeDataSource } from "../../incomeData";
 import { parseIncomeDataSnapshot } from "./incomeSnapshotParser";
 

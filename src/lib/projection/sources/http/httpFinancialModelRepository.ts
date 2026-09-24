@@ -1,4 +1,4 @@
-import { buildApiUrl } from "@/lib/api-url";
+import { buildApiUrl } from "@/lib/apiUrl";
 import {
 	type FinancialModelParseResult,
 	type FinancialModelRepository,

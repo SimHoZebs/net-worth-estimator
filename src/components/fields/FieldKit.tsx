@@ -5,7 +5,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 
 // Single styling source for form fields. All form inputs and selects across

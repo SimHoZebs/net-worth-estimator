@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { PostingCalculationDetails } from "@/components/dashboard/tables/PostingAmount";
-import { DateText } from "@/components/dashboard/tables/primitives/formatting";
+import { DateText } from "@/components/dashboard/tables/primitives/Formatting";
 import { TransactionRoute } from "@/components/dashboard/tables/TransactionPresentation";
-import { Button } from "@/components/ui/button";
-import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { currency, formatFrequency, pct } from "@/lib/format";
 import type { Account, Posting } from "@/lib/projection";
 import { describePostingAmount, getExpression } from "@/lib/projection";

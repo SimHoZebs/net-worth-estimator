@@ -1,6 +1,6 @@
 import { isRouteErrorResponse, useRouteError } from "react-router-dom";
-import { SectionCard } from "@/components/present/present";
-import { Button } from "@/components/ui/button";
+import { SectionCard } from "@/components/present/Present";
+import { Button } from "@/components/ui/Button";
 
 export function RouteErrorFallback() {
 	const error = useRouteError();

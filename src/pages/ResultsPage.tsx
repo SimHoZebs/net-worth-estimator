@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 import { CurrentChangesComparison } from "@/components/CurrentChangesComparison";
 import { ProjectionDashboard } from "@/components/ProjectionDashboard";
-import { PageHeader } from "@/components/present/present";
+import { PageHeader } from "@/components/present/Present";
 import { SimulationProgressPanel } from "@/components/SimulationProgressPanel";
 import { StochasticProgressDetails } from "@/components/StochasticProgressDetails";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/Alert";
+import { Button, buttonVariants } from "@/components/ui/Button";
 import type { StochasticProgress } from "@/lib/projection";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import {

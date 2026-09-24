@@ -1,8 +1,4 @@
-import {
-	Field,
-	FieldSelect,
-	LabeledField,
-} from "@/components/fields/field-kit";
+import { Field, FieldSelect, LabeledField } from "@/components/fields/FieldKit";
 import type {
 	IncomeSourceDefinition,
 	IncomeTaxProfile,

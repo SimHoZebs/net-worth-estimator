@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useTableSearch } from "../_shared";
+import { useTableSearch } from "../_Shared";
 
 /**
  * Table search wiring shared by every read-only view: search state plus a

@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Field, FieldInput } from "@/components/fields/field-kit";
-import { SectionCard } from "@/components/present/present";
-import { Button } from "@/components/ui/button";
-import { clearAuthToken, setAuthToken, useAuthToken } from "@/lib/auth-token";
+import { Field, FieldInput } from "@/components/fields/FieldKit";
+import { SectionCard } from "@/components/present/Present";
+import { Button } from "@/components/ui/Button";
+import { clearAuthToken, setAuthToken, useAuthToken } from "@/lib/authToken";
 
 export function BackendAccessCard() {
 	const activeToken = useAuthToken();

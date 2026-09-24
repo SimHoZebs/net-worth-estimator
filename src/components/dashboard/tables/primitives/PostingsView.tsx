@@ -1,17 +1,17 @@
 import { useMemo } from "react";
-import { EmptyState } from "@/components/present/present";
-import { Collapsible } from "@/components/ui/collapsible-section";
+import { EmptyState } from "@/components/present/Present";
+import { Collapsible } from "@/components/ui/CollapsibleSection";
 import { currency, formatFrequency, pct } from "@/lib/format";
-import { isPastScheduledPosting } from "@/lib/posting-categories";
+import { isPastScheduledPosting } from "@/lib/postingCategories";
 import type { Account, Posting } from "@/lib/projection";
-import { SearchFooter } from "../_shared";
+import { SearchFooter } from "../_Shared";
 import type { PostingsTableViewProps } from "../PostingsTable";
 import {
 	TransactionListRow,
 	transactionMatchesSearch,
 } from "../TransactionPresentation";
-import { DateText } from "./formatting";
-import { SearchField, useSearchFilter } from "./search";
+import { DateText } from "./Formatting";
+import { SearchField, useSearchFilter } from "./Search";
 
 export function ReadOnlyPostingsView({
 	postings,

@@ -1,7 +1,7 @@
 import { memo } from "react";
-import { LabeledField } from "@/components/fields/field-kit";
-import { SectionCard } from "@/components/present/present";
-import { Button } from "@/components/ui/button";
+import { LabeledField } from "@/components/fields/FieldKit";
+import { SectionCard } from "@/components/present/Present";
+import { Button } from "@/components/ui/Button";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { useHouseholdCycle } from "./useHouseholdCycle";
 

@@ -3,12 +3,12 @@ import { useBeforeUnload, useBlocker } from "react-router-dom";
 import { BackendAccessCard } from "@/components/BackendAccessCard";
 import { HouseholdCycleSettingsCard } from "@/components/dashboard/HouseholdCycleSettingsCard";
 import { EvaluationSettings } from "@/components/evaluations/EvaluationSettings";
-import { SectionCard } from "@/components/present/present";
+import { SectionCard } from "@/components/present/Present";
 import { StochasticControls } from "@/components/StochasticControls";
 import { ModelAssumptionsCard } from "@/components/sidebar/ModelAssumptionsCard";
 import { SimulationSettingsCard } from "@/components/sidebar/SimulationSettingsCard";
-import { Button } from "@/components/ui/button";
-import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import { useThemeStore } from "@/themeStore";
 

@@ -1,4 +1,4 @@
-import { Metric, SectionCard } from "@/components/present/present";
+import { Metric, SectionCard } from "@/components/present/Present";
 import { formatPercentRate } from "@/lib/format";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 

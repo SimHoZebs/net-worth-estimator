@@ -1,6 +1,6 @@
 import { type ComponentType, useEffect, useRef, useState } from "react";
-import { EmptyState, Pill, SectionCard } from "@/components/present/present";
-import { Button } from "@/components/ui/button";
+import { EmptyState, Pill, SectionCard } from "@/components/present/Present";
+import { Button } from "@/components/ui/Button";
 import type {
 	EvaluationInstance,
 	EvaluationType,
@@ -15,7 +15,7 @@ import {
 	evaluationUiRegistry,
 	nextInstanceId,
 	validatedConfig,
-} from "./evaluationUiRegistry";
+} from "./EvaluationUiRegistry";
 import { FinancialIndependencePlanEditor } from "./FinancialIndependencePlanEditor";
 
 export interface EvaluationSettingsProps {

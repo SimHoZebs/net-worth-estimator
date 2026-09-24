@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { SectionCard } from "@/components/present/present";
-import { Button } from "@/components/ui/button";
+import { SectionCard } from "@/components/present/Present";
+import { Button } from "@/components/ui/Button";
 
 interface EditableTableCardProps {
 	title: string;

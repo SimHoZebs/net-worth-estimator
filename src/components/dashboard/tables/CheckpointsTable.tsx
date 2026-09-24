@@ -3,7 +3,7 @@ import {
 	DataTable,
 	formatCurrency,
 	type TableColumn,
-} from "@/components/ui/data-table";
+} from "@/components/ui/DataTable";
 import {
 	Table,
 	TableBody,
@@ -11,16 +11,16 @@ import {
 	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/Table";
 import { formatDate } from "@/lib/format";
 import type { Checkpoint, FinancialModelDocument } from "@/lib/projection";
-import { DecimalCell, plainCellClass } from "./primitives/cells";
-import { SearchField, useSearchFilter } from "./primitives/search";
+import { DecimalCell, plainCellClass } from "./primitives/Cells";
+import { SearchField, useSearchFilter } from "./primitives/Search";
 import {
 	AddRowButton,
 	EditableTableCard,
 	RowDeleteButton,
-} from "./primitives/shells";
+} from "./primitives/Shells";
 
 export interface CheckpointsTableEditProps {
 	displayDocument: FinancialModelDocument;

@@ -2,7 +2,7 @@ import {
 	DraftCommitInput as KitDraftCommitInput,
 	type DraftCommitInputProps as KitDraftCommitInputProps,
 	editableTableCellInputStyle as kitEditableTableCellInputStyle,
-} from "@/components/fields/field-kit";
+} from "@/components/fields/FieldKit";
 
 // Backward-compatible re-export: tables import from here. The canonical
 // implementation lives in the field kit.

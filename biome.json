@@ -27,7 +27,15 @@
 				"noStaticElementInteractions": "off"
 			},
 			"style": {
-				"noNonNullAssertion": "off"
+				"noNonNullAssertion": "off",
+				"useFilenamingConvention": {
+					"level": "error",
+					"options": {
+						"strictCase": false,
+						"requireAscii": true,
+						"filenameCases": ["camelCase", "PascalCase", "export"]
+					}
+				}
 			},
 			"correctness": {
 				"noUnsafeOptionalChaining": "warn"
@@ -43,5 +51,34 @@
 			"**/*.json",
 			"**/*.md"
 		]
-	}
+	},
+	"overrides": [
+		{
+			"includes": ["src/components/**/*.tsx", "src/pages/**/*.tsx"],
+			"linter": {
+				"rules": {
+					"style": {
+						"useFilenamingConvention": {
+							"level": "error",
+							"options": {
+								"strictCase": false,
+								"requireAscii": true,
+								"filenameCases": ["PascalCase"]
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/vite-env.d.ts"],
+			"linter": {
+				"rules": {
+					"style": {
+						"useFilenamingConvention": "off"
+					}
+				}
+			}
+		}
+	]
 }

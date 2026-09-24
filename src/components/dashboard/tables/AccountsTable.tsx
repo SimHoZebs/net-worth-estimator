@@ -4,8 +4,8 @@ import type {
 	Posting,
 	ProjectionAccountSummary,
 } from "@/lib/projection";
-import { EditableAccountsGrid } from "./primitives/accounts-edit";
-import { ReadOnlyAccountsView } from "./primitives/accounts-view";
+import { EditableAccountsGrid } from "./primitives/AccountsEdit";
+import { ReadOnlyAccountsView } from "./primitives/AccountsView";
 
 export interface AccountsTableEditProps {
 	displayDocument: FinancialModelDocument;

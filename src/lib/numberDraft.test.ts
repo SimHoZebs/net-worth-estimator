@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDecimalDraft } from "./number-draft";
+import { parseDecimalDraft } from "./numberDraft";
 
 describe("parseDecimalDraft", () => {
 	it.each([

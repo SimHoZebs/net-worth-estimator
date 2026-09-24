@@ -1,7 +1,7 @@
 import {
 	isNumericArithmetic,
 	parseNumericArithmetic,
-} from "@/lib/posting-categories";
+} from "@/lib/postingCategories";
 import { type FinancialModelDocument, getExpression } from "@/lib/projection";
 
 /** Paycheck-cycle inputs. Pure UI-side derivation; never touches simulation. */

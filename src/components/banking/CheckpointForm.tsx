@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { FieldError, useSubmitError } from "@/components/fields/field-kit";
-import { Button } from "@/components/ui/button";
-import { Dialog } from "@/components/ui/dialog";
+import { FieldError, useSubmitError } from "@/components/fields/FieldKit";
+import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import type { Account } from "@/lib/projection";
 
 const inputClass =

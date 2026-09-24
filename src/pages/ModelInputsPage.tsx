@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { ModelInputsInspector } from "@/components/ModelInputsInspector";
 import { TemplateWizard } from "@/components/patterns/TemplateWizard";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import { useStore } from "@/store";
 

@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { EmptyState } from "@/components/present/present";
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/present/Present";
+import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/format";
 import type { Account, Posting } from "@/lib/projection";
-import { useTableSearch } from "./_shared";
-import { SearchField } from "./primitives/search";
+import { useTableSearch } from "./_Shared";
+import { SearchField } from "./primitives/Search";
 import {
 	TransactionListRow,
 	transactionMatchesSearch,

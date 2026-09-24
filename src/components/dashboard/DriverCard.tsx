@@ -1,6 +1,6 @@
 import { memo } from "react";
-import { Metric } from "@/components/present/present";
-import { Card, CardContent } from "@/components/ui/card";
+import { Metric } from "@/components/present/Present";
+import { Card, CardContent } from "@/components/ui/Card";
 
 export const DriverCard = memo(function DriverCard({
 	label,

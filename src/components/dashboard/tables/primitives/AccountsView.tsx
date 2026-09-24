@@ -1,16 +1,16 @@
 import { useMemo, useState } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { associatedAccountIds } from "@/lib/posting-categories";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/Alert";
+import { associatedAccountIds } from "@/lib/postingCategories";
 import type { Posting } from "@/lib/projection";
-import { duplicateIds } from "../_shared";
+import { duplicateIds } from "../_Shared";
 import {
 	AccountPositionGroup,
 	type AccountPositionRow,
 } from "../AccountPositionGroup";
 import { AccountRules } from "../AccountRules";
 import type { AccountsTableViewProps } from "../AccountsTable";
-import { CurrencyText, DateText } from "./formatting";
-import { SearchField, useSearchFilter } from "./search";
+import { CurrencyText, DateText } from "./Formatting";
+import { SearchField, useSearchFilter } from "./Search";
 
 function matchesAccountRow(row: AccountPositionRow, query: string): boolean {
 	return (

@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { SectionCard } from "@/components/present/present";
+import { SectionCard } from "@/components/present/Present";
 import {
 	Table,
 	TableBody,
@@ -7,12 +7,12 @@ import {
 	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/Table";
 import {
 	estimateMonthlyPayment,
 	indexPaymentPostingsByAccountId,
 	isDebtAccount,
-} from "@/lib/debt-utils";
+} from "@/lib/debtUtils";
 import { currency, formatDate } from "@/lib/format";
 import {
 	describePostingAmount,

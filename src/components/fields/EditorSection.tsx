@@ -1,5 +1,5 @@
 import { type ReactNode, useId } from "react";
-import { Pill } from "@/components/present/present";
+import { Pill } from "@/components/present/Present";
 
 // Editor-specific layout for the financial independence plan editor. Kept
 // separate from the generic kit in field-kit.tsx so each file stays focused.
