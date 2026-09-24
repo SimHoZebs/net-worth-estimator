@@ -32,12 +32,9 @@ export function StochasticControls() {
 
 	const {
 		runCountInput,
-		seedInput,
 		hasPendingChanges,
 		runCountNotice,
-		seedNotice,
 		updateRunCountInput,
-		updateSeedInput,
 		applyImmediately,
 	} = useDebouncedStochasticConfig(config, onConfigChange);
 
@@ -56,7 +53,7 @@ export function StochasticControls() {
 		: stochasticError
 			? "Failed."
 			: hasStochasticResult
-				? `${config.runCount}${config.seed !== null ? ` · ${config.seed}` : ""}`
+				? `${config.runCount}`
 				: simulationActive
 					? "…"
 					: "Off";
@@ -64,11 +61,11 @@ export function StochasticControls() {
 	const body = (
 		<div className="space-y-4">
 			<div className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-surface/75 px-4 py-3 dark:border-white/10 dark:bg-surface/55">
-				<div className="type-value text-sm">Monte Carlo</div>
+				<div className="type-value text-sm">Ranges</div>
 				<label className="relative inline-flex cursor-pointer items-center">
 					<input
 						type="checkbox"
-						aria-label="Monte Carlo"
+						aria-label="Ranges"
 						className="peer sr-only"
 						checked={simulationActive}
 						onChange={(e) =>
@@ -116,7 +113,7 @@ export function StochasticControls() {
 					<div className="grid gap-3">
 						<div>
 							<LabeledField
-								label="Samples"
+								label="Scenarios"
 								id="stochastic-run-count"
 								type="text"
 								inputMode="numeric"
@@ -131,24 +128,6 @@ export function StochasticControls() {
 								</p>
 							) : null}
 						</div>
-						<div>
-							<LabeledField
-								label="Seed"
-								id="stochastic-seed"
-								type="text"
-								inputMode="numeric"
-								value={seedInput}
-								onChange={updateSeedInput}
-								onBlur={applyImmediately}
-								placeholder="Auto"
-								className="min-h-11 tabular-nums"
-							/>
-							{seedNotice ? (
-								<p role="status" className="mt-1 type-caption">
-									{seedNotice}
-								</p>
-							) : null}
-						</div>
 						<div className="flex items-center gap-3">
 							<Button
 								type="button"
@@ -160,7 +139,7 @@ export function StochasticControls() {
 								}
 								className="min-h-11"
 							>
-								{isRunning ? "Running…" : "Resample"}
+								{isRunning ? "Running…" : "Update"}
 							</Button>
 							{hasPendingChanges && !isRunning ? (
 								<p
@@ -180,7 +159,7 @@ export function StochasticControls() {
 						<div className="space-y-1">
 							<StochasticProgressBar
 								fraction={runFraction}
-								label="Monte Carlo progress"
+								label="Range progress"
 							/>
 							<StochasticProgressDetails progress={progress} compact />
 						</div>
@@ -194,7 +173,7 @@ export function StochasticControls() {
 		<Collapsible defaultOpen={!hasStochasticResult || stochasticError !== null}>
 			<Collapsible.Trigger>
 				<Collapsible.Header
-					title="Monte Carlo"
+					title="Ranges"
 					description={statusLabel}
 					trailing={
 						<span className="type-label uppercase tracking-[0.16em] transition-colors group-hover:text-foreground/70">

@@ -185,7 +185,7 @@ describe("EvaluationSettings", () => {
 		expect(screen.queryByLabelText("Target net worth")).toBeNull();
 	});
 
-	it("shows Monte Carlo workload progress inside its evaluation card", () => {
+	it("shows range workload progress inside its evaluation card", () => {
 		render(
 			<EvaluationResults
 				document={emptyDocument as never}
@@ -226,11 +226,11 @@ describe("EvaluationSettings", () => {
 		);
 
 		const progress = screen.getByRole("progressbar", {
-			name: "Financial independence Monte Carlo progress",
+			name: "Financial independence range progress",
 		});
 		expect(progress.getAttribute("aria-valuenow")).toBe("37");
 		const card = screen
-			.getByText("Running FI Monte Carlo")
+			.getByText("Calculating ranges")
 			.closest("[data-slot='card']");
 		expect(card?.textContent).toContain(
 			"Previous FI results are hidden until recalculation completes.",
@@ -240,7 +240,7 @@ describe("EvaluationSettings", () => {
 		expect(card?.textContent).toContain(
 			"1,246 candidate sustainability cycles attempted",
 		);
-		expect(card?.textContent).not.toContain("370 / 1,000 Monte Carlo paths");
+		expect(card?.textContent).not.toContain("370 / 1,000 scenarios");
 		expect(card?.textContent).not.toContain("Updating FI outcomes");
 		expect(card?.textContent).not.toContain("Failed cycles stop");
 		expect(
@@ -249,7 +249,7 @@ describe("EvaluationSettings", () => {
 		expect(screen.queryByRole("status")).toBeNull();
 	});
 
-	it("identifies the deterministic FI result as current during Monte Carlo", () => {
+	it("identifies the deterministic FI result as current while ranges calculate", () => {
 		render(
 			<EvaluationResults
 				document={emptyDocument as never}
@@ -285,9 +285,9 @@ describe("EvaluationSettings", () => {
 
 		expect(
 			screen.getByText(
-				"The deterministic FI result below is current. Monte Carlo confidence is still being calculated.",
+				"The deterministic FI result below is current. Range confidence is still being calculated.",
 			),
 		).not.toBeNull();
-		expect(screen.getByText("Running FI Monte Carlo")).not.toBeNull();
+		expect(screen.getByText("Calculating ranges")).not.toBeNull();
 	});
 });

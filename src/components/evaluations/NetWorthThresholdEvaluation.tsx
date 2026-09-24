@@ -50,11 +50,7 @@ export function NetWorthThresholdEvaluation({
 				<Metric
 					size="sm"
 					label={`${stochasticIsProvisional ? "Provisional " : ""}probability`}
-					value={
-						probabilistic
-							? pct.format(probabilistic.probability)
-							: "Run Monte Carlo"
-					}
+					value={probabilistic ? pct.format(probabilistic.probability) : "—"}
 				/>
 				<Metric
 					size="sm"
@@ -64,7 +60,7 @@ export function NetWorthThresholdEvaluation({
 							? formatDate(probabilistic.medianReachedDate)
 							: probabilistic
 								? "Not reached"
-								: "Run Monte Carlo"
+								: "—"
 					}
 					detail={
 						probabilistic

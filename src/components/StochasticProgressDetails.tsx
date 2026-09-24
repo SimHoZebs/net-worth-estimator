@@ -8,15 +8,15 @@ const obsoleteFiDescription =
 	"Failed cycles stop at the first shortfall; date checks stop after the first successful";
 
 /**
- * Single phase-label source for Monte Carlo progress. The top-level
+ * Single phase-label source for range progress. The top-level
  * controls and the per-evaluation cards both render through this (via
  * StochasticProgressDetails compact mode), so the strings never diverge.
  */
 export function stochasticPhaseLabel(progress: StochasticProgress): string {
-	if (progress.phase === "preparing") return "Preparing simulation inputs";
+	if (progress.phase === "preparing") return "Preparing";
 	if (progress.phase === "deterministic-evaluations")
-		return "Evaluating deterministic baselines";
-	return `${countFormatter.format(progress.completedRuns)} / ${countFormatter.format(progress.totalRuns)} Monte Carlo paths`;
+		return "Evaluating baselines";
+	return `${countFormatter.format(progress.completedRuns)} / ${countFormatter.format(progress.totalRuns)} scenarios`;
 }
 
 /**

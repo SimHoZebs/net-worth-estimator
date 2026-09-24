@@ -96,9 +96,9 @@ export function ResultsPage() {
 			) : null}
 			{stochasticError ? (
 				<ErrorAlert
-					title="Stochastic simulation failed"
+					title="Ranges failed"
 					message={stochasticError}
-					actionLabel="Retry simulation"
+					actionLabel="Retry"
 					onAction={retryStochastic}
 				/>
 			) : null}
@@ -152,10 +152,10 @@ function ProjectionActivity({
 			: null;
 	const summary =
 		isProjecting && isStochasticRunning
-			? "Updating base projection and Monte Carlo ranges."
+			? "Updating base projection and ranges."
 			: isProjecting
 				? "Updating base projection."
-				: "Updating Monte Carlo projection ranges.";
+				: "Updating ranges.";
 
 	return (
 		<section
@@ -176,9 +176,9 @@ function ProjectionActivity({
 			) : null}
 			{isStochasticRunning ? (
 				<SimulationProgressPanel
-					title="Updating Monte Carlo projection ranges"
+					title="Updating ranges"
 					progressPct={stochasticProgressPct}
-					progressLabel="Monte Carlo projection progress"
+					progressLabel="Range progress"
 					live={false}
 				>
 					{stochasticProgress ? (
