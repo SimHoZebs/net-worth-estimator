@@ -23,9 +23,7 @@ describe("FinancialIndependencePlanEditor", () => {
 		expect(screen.getByRole("heading", { name: "Funding" })).not.toBeNull();
 		expect(screen.getByRole("heading", { name: "Success" })).not.toBeNull();
 		expect(
-			screen.getByText(
-				"None configured. This plan currently relies on portfolio withdrawals.",
-			),
+			screen.getByRole("button", { name: "Add retirement income" }),
 		).not.toBeNull();
 		expect(screen.queryByLabelText("salary")).toBeNull();
 		expect(screen.getByText("Model details", { exact: true })).not.toBeNull();

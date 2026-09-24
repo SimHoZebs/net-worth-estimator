@@ -71,7 +71,7 @@ export const OverviewCard = memo(function OverviewCard({
 								<span className="text-foreground/85">
 									{directIncomeLabels.length > 0
 										? formatList(directIncomeLabels)
-										: "Selected cash flow"}
+										: "Cash flow"}
 								</span>
 								<strong className="type-value tabular-nums">
 									{currency.format(row.annualDirectIncome)}
@@ -82,7 +82,6 @@ export const OverviewCard = memo(function OverviewCard({
 
 					{row.assetContributions.length > 0 ? (
 						<div className="py-3">
-							<div className="mb-2 type-label">Selected accounts</div>
 							<div className="relative overflow-x-auto overscroll-x-contain">
 								<div className="min-w-0">
 									<div className="hidden grid-cols-[minmax(10rem,1fr)_8rem_7rem_9rem] gap-3 border-b border-border/70 pb-2 type-label sm:grid">

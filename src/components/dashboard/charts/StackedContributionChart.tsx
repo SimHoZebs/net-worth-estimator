@@ -264,7 +264,6 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 		setSelectedIndex(index);
 	}, []);
 	const [showDataTable, setShowDataTable] = useState(false);
-	const descriptionId = useId();
 	const figcaptionId = useId();
 
 	const maxPlottedValue = useMemo(() => {
@@ -286,19 +285,11 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 	}, [chartData]);
 
 	return (
-		<figure className="min-w-0" aria-describedby={descriptionId}>
+		<figure className="min-w-0" aria-describedby={figcaptionId}>
 			<figcaption id={figcaptionId} className="sr-only">
 				Stacked account contributions with net worth and Monte Carlo bands. An
 				equivalent data table is available behind the “Show data table” toggle.
 			</figcaption>
-			<p id={descriptionId} className="type-caption">
-				Stacked areas show account contributions; the line shows{" "}
-				{hasStochasticData ? "median " : ""}net worth.{" "}
-				<span className="md:hidden">Tap chart for values.</span>
-				<span className="hidden md:inline">
-					Hover for values; select a point to pin details.
-				</span>
-			</p>
 			{isClipped ? (
 				<p
 					role="note"
@@ -416,11 +407,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 						{formatPointDetailsSummary(selectedDetails)}
 					</span>
 				</>
-			) : (
-				<p className="mt-2 type-caption md:hidden">
-					Tip: tap the chart to see values for that date.
-				</p>
-			)}
+			) : null}
 		</figure>
 	);
 });
@@ -486,7 +473,7 @@ function ChartEncodingLegend({
 			{hidden.length > 0 ? (
 				<details className="inline-flex">
 					<summary className="cursor-pointer underline decoration-border underline-offset-4">
-						Show all {accounts.length} accounts
+						Show all accounts
 					</summary>
 					<span className="flex flex-wrap items-center gap-x-4 gap-y-1">
 						{hidden.map((account) => (
