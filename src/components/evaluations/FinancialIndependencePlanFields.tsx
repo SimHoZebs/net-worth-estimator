@@ -80,7 +80,6 @@ export function SpendingValueBasis({
 	return (
 		<ChoiceCards
 			legend="Spending value"
-			description="Choose when the entered annual spending amount is valued."
 			value={value}
 			options={spendingBasisOptions}
 			onChange={onChange}
@@ -156,17 +155,12 @@ export function RetirementIncomeField({
 					<div className="type-label text-foreground">
 						Other retirement income
 					</div>
-					{selected.length === 0 ? (
-						<p className="mt-1 type-caption text-muted-foreground">
-							None configured. This plan currently relies on portfolio
-							withdrawals.
-						</p>
-					) : (
+					{selected.length > 0 ? (
 						<p className="mt-1 type-caption text-muted-foreground">
 							{selected.map((posting) => posting.label).join(", ")} will be
 							counted as spendable income during FI.
 						</p>
-					)}
+					) : null}
 				</div>
 				<Button
 					type="button"
@@ -180,15 +174,8 @@ export function RetirementIncomeField({
 			</div>
 			{open ? (
 				<div className="mt-4 border-t border-border/70 pt-4">
-					<p className="mb-3 type-caption text-muted-foreground">
-						Choose only income that remains available without continued
-						employment. Selected income is treated as spendable and is not
-						replayed into its destination account.
-					</p>
 					{candidates.length === 0 ? (
-						<p className="type-caption text-muted-foreground">
-							No unassigned income postings are available.
-						</p>
+						<p className="type-caption text-muted-foreground">None.</p>
 					) : (
 						<div className="grid gap-2 sm:grid-cols-2">
 							{candidates.map((posting) => (

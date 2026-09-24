@@ -80,6 +80,9 @@ export const FinancialIndependenceChart = memo(
 			[outcome, accounts, balanceIndex],
 		);
 
+		if (outcome.balanceTrajectory.length === 0 || accounts.length === 0)
+			return null;
+
 		return (
 			<SectionCard
 				title="Opening and month-end balances"
@@ -90,33 +93,22 @@ export const FinancialIndependenceChart = memo(
 				}
 				className="overflow-hidden rounded-[1.8rem] border-border/80"
 			>
-				{outcome.balanceTrajectory.length > 0 && accounts.length > 0 ? (
-					<>
-						<UPlotChart
-							options={options}
-							data={data}
-							tooltipContent={tooltipContent}
-						/>
-						<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 type-caption">
-							{accounts.map((account) => (
-								<span
-									key={account.id}
-									className="inline-flex items-center gap-1.5"
-								>
-									<span
-										className="inline-block h-2.5 w-2.5 rounded-full"
-										style={{ backgroundColor: account.color }}
-									/>
-									{account.label}
-								</span>
-							))}
-						</div>
-					</>
-				) : (
-					<p className="type-muted">
-						No selected accounts are included in this FI plan.
-					</p>
-				)}
+				<UPlotChart
+					options={options}
+					data={data}
+					tooltipContent={tooltipContent}
+				/>
+				<div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 type-caption">
+					{accounts.map((account) => (
+						<span key={account.id} className="inline-flex items-center gap-1.5">
+							<span
+								className="inline-block h-2.5 w-2.5 rounded-full"
+								style={{ backgroundColor: account.color }}
+							/>
+							{account.label}
+						</span>
+					))}
+				</div>
 			</SectionCard>
 		);
 	},

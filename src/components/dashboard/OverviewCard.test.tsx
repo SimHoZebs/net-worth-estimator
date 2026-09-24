@@ -40,9 +40,9 @@ describe("OverviewCard", () => {
 		expect(
 			screen.getByText("Principal target: Drawdown allowed"),
 		).not.toBeNull();
-		expect(screen.getByText("Selected accounts")).not.toBeNull();
 		expect(screen.getByText("Withdrawal rate")).not.toBeNull();
 		expect(screen.getByText("Annual capacity")).not.toBeNull();
+		expect(screen.queryByText("Selected accounts")).toBeNull();
 		expect(screen.getByText("Brokerage")).not.toBeNull();
 		expect(screen.getByText("Roth IRA")).not.toBeNull();
 		expect(screen.getByText("4%")).not.toBeNull();

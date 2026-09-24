@@ -354,19 +354,13 @@ export const FinancialIndependencePlanEditor = memo(
 		return (
 			<SectionCard
 				title="Financial independence assumptions"
-				description="Define the spending goal, how it is funded, and what must be true for the plan to count as successful. Changes stay here until you update the analysis."
 				className="rounded-[1.4rem] border-border/80"
 				contentClassName="space-y-5"
 			>
-				<FinancialIndependenceEditorSection
-					number="1"
-					title="Goal"
-					description="Set the lifestyle this plan must support after work."
-				>
+				<FinancialIndependenceEditorSection number="1" title="Goal">
 					<div className="grid gap-3 sm:grid-cols-2">
 						<FiNumberField
 							label="Annual spending"
-							description="Annualized spending interpreted using the selected value basis."
 							value={numericDrafts.annualExpenseTarget}
 							min={0}
 							step={1000}
@@ -379,7 +373,6 @@ export const FinancialIndependencePlanEditor = memo(
 						/>
 						<FiNumberField
 							label="Spending inflation (%)"
-							description="Grows annual spending and adjusts the purchasing-power rule."
 							value={numericDrafts.annualExpenseGrowthRate}
 							min={0}
 							step={0.1}
@@ -402,11 +395,7 @@ export const FinancialIndependencePlanEditor = memo(
 					/>
 				</FinancialIndependenceEditorSection>
 
-				<FinancialIndependenceEditorSection
-					number="2"
-					title="Funding"
-					description="Choose the portfolio and income available to pay for the goal."
-				>
+				<FinancialIndependenceEditorSection number="2" title="Funding">
 					<FiNumberField
 						label="Portfolio withdrawal rate (%)"
 						description="Maximum annual withdrawal from each selected asset, recalculated from its balance at the start of each test year."
@@ -425,9 +414,6 @@ export const FinancialIndependencePlanEditor = memo(
 						<div className="type-label text-foreground">
 							Withdrawable assets
 						</div>
-						<p className="mt-0.5 type-caption text-muted-foreground">
-							Accounts you are willing to draw from to fund spending.
-						</p>
 						<div className="mt-3 grid gap-2 sm:grid-cols-2">
 							{assetAccounts.map((account) => (
 								<label
@@ -453,15 +439,10 @@ export const FinancialIndependencePlanEditor = memo(
 					/>
 				</FinancialIndependenceEditorSection>
 
-				<FinancialIndependenceEditorSection
-					number="3"
-					title="Success"
-					description="Define how long the plan must work and how much certainty and portfolio value must remain."
-				>
+				<FinancialIndependenceEditorSection number="3" title="Success">
 					<div className="grid gap-3 sm:grid-cols-2">
 						<FiNumberField
 							label="Test period (years)"
-							description="Every month of spending must be funded for this full period."
 							value={numericDrafts.evaluationYears}
 							min={1}
 							max={50}
@@ -566,20 +547,11 @@ export const FinancialIndependencePlanEditor = memo(
 							</div>
 						) : null}
 
-						<div>
-							<div className="type-label text-foreground">
-								Continuing portfolio activity
-							</div>
-							<p className="mt-0.5 type-caption text-muted-foreground">
-								Explicit model postings replayed during the FI test, such as
-								investment growth. A posting cannot also count as spendable
-								retirement income.
-							</p>
-							{continuingPostings.length === 0 ? (
-								<p className="mt-3 type-caption text-muted-foreground">
-									Select an asset to see its related postings.
-								</p>
-							) : (
+						{continuingPostings.length === 0 ? null : (
+							<div>
+								<div className="type-label text-foreground">
+									Continuing portfolio activity
+								</div>
 								<div className="mt-3 grid gap-2 sm:grid-cols-2">
 									{continuingPostings.map((posting) => (
 										<label
@@ -596,19 +568,14 @@ export const FinancialIndependencePlanEditor = memo(
 										</label>
 									))}
 								</div>
-							)}
-						</div>
+							</div>
+						)}
 					</Collapsible.Content>
 				</Collapsible>
 
 				<div className="flex flex-col gap-3 rounded-2xl border border-primary-border/50 bg-primary-subtle/35 p-4 sm:flex-row sm:items-center sm:justify-between">
-					<div>
-						<div className="type-label text-foreground">
-							{dirty ? "Draft changes ready" : "Analysis is up to date"}
-						</div>
-						<p className="type-caption text-muted-foreground">
-							Updating runs the deterministic and Monte Carlo analysis once.
-						</p>
+					<div className="type-label text-foreground">
+						{dirty ? "Draft changes ready" : "Analysis is up to date"}
 					</div>
 					<EvaluationEditorFooter
 						dirty={dirty}

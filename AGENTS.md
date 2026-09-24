@@ -117,3 +117,4 @@ Route pages should compose feature components rather than forward shared-state p
 - Run `npm run verify` before finishing any code task.
 - When touching `backend/`, also run `backend/scripts/verify.sh` (scoped, e.g. `backend/scripts/verify.sh ./internal/domain/...`).
 - `npm run verify` is red until `biome check --write src` lands (pre-existing `src/` drift).
+- See `TESTING.md` for real-data testing and UI end-state verification.

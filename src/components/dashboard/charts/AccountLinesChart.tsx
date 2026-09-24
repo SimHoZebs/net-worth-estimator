@@ -25,7 +25,6 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 	chartData,
 }: AccountLinesChartProps) {
 	const [showDataTable, setShowDataTable] = useState(false);
-	const descriptionId = useId();
 	const figcaptionId = useId();
 	const enabledAccounts = useMemo(
 		() => document.accounts.filter((a) => a.enabled),
@@ -139,18 +138,11 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 	}, [chartData]);
 
 	return (
-		<figure className="min-w-0" aria-describedby={descriptionId}>
+		<figure className="min-w-0" aria-describedby={figcaptionId}>
 			<figcaption id={figcaptionId} className="sr-only">
 				Account balance lines over the projection horizon. An equivalent data
 				table is available behind the “Show data table” toggle.
 			</figcaption>
-			<p id={descriptionId} className="type-caption">
-				Lines show each enabled account balance.{" "}
-				<span className="md:hidden">Tap chart for values.</span>
-				<span className="hidden md:inline">
-					Hover for values; select a point to pin details.
-				</span>
-			</p>
 			<div className="mt-2 min-w-0">
 				<UPlotChart
 					options={options}
@@ -168,7 +160,7 @@ export const AccountLinesChart = memo(function AccountLinesChart({
 				{hiddenLegend.length > 0 ? (
 					<details className="inline-flex">
 						<summary className="cursor-pointer underline decoration-border underline-offset-4">
-							Show all {enabledAccounts.length} accounts
+							Show all accounts
 						</summary>
 						<span className="flex flex-wrap items-center gap-x-4 gap-y-1">
 							{hiddenLegend.map((a) => (

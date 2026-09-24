@@ -12,7 +12,7 @@ export function FinancialIndependenceEditorSection({
 }: {
 	number: string;
 	title: string;
-	description: string;
+	description?: string;
 	children: ReactNode;
 }) {
 	return (
@@ -23,9 +23,11 @@ export function FinancialIndependenceEditorSection({
 				</span>
 				<div>
 					<h3 className="type-title text-base">{title}</h3>
-					<p className="mt-0.5 max-w-3xl type-caption text-muted-foreground">
-						{description}
-					</p>
+					{description ? (
+						<p className="mt-0.5 max-w-3xl type-caption text-muted-foreground">
+							{description}
+						</p>
+					) : null}
 				</div>
 			</header>
 			<div className="space-y-4 p-4">{children}</div>
@@ -49,7 +51,7 @@ export function ChoiceCards<TValue extends string>({
 	columns,
 }: {
 	legend: string;
-	description: string;
+	description?: string;
 	value: TValue;
 	options: Array<ChoiceCardOption<TValue>>;
 	onChange: (value: TValue) => void;
@@ -59,7 +61,11 @@ export function ChoiceCards<TValue extends string>({
 	return (
 		<fieldset>
 			<legend className="type-label text-foreground">{legend}</legend>
-			<p className="mt-0.5 type-caption text-muted-foreground">{description}</p>
+			{description ? (
+				<p className="mt-0.5 type-caption text-muted-foreground">
+					{description}
+				</p>
+			) : null}
 			<div className={`mt-3 grid gap-2 ${columns}`}>
 				{options.map((option) => {
 					const selected = value === option.value;

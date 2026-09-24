@@ -6,8 +6,6 @@ import {
 } from "@/chart/chartData";
 import { EvaluationResults } from "@/components/evaluations/EvaluationResults";
 import { Pill } from "@/components/present/Present";
-import { Collapsible } from "@/components/ui/CollapsibleSection";
-import { LazySection } from "@/components/ui/LazySection";
 import { formatDate, pct } from "@/lib/format";
 import type {
 	FinancialModelDocument,
@@ -27,10 +25,8 @@ import {
 } from "@/runtime/projectionRuntime";
 import { selectCurrentChangeCount, useStore } from "@/store";
 import { AccountDiagnosticChart } from "./dashboard/charts/AccountDiagnosticChart";
-import { DebtSummary } from "./dashboard/DebtSummary";
 import { DriverCard } from "./dashboard/DriverCard";
 import { HouseholdCycleCard } from "./dashboard/HouseholdCycleCard";
-import { NetWorthReconciliation } from "./dashboard/NetWorthReconciliation";
 import { ShortfallCalendar } from "./dashboard/ShortfallCalendar";
 import { SimulationOverview } from "./dashboard/SimulationOverview";
 import { useDashboardDerivedValues } from "./dashboard/useDashboardDerivedValues";
@@ -115,16 +111,8 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 		[derived.firstUnderfulfilledDate],
 	);
 	const hasShortfall = derived.biggestShortfallPosting !== null;
-	const hasDebt = useMemo(
-		() =>
-			result.accountSummaries.some(
-				(summary) => summary.enabled && summary.startingBalance < 0,
-			),
-		[result.accountSummaries],
-	);
 	const isStale =
 		evaluationResultsAreStale || stochasticEvaluationResultsAreStale;
-	const hasAnomaly = hasShortfall || hasDebt || isStale;
 	return (
 		<div className="space-y-4">
 			<section id="verdict" aria-label="Verdict summary" className="space-y-3">
@@ -141,7 +129,6 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 					<VerdictLink href="#overview">Path</VerdictLink>
 					<VerdictLink href="#projection-chart">Chart</VerdictLink>
 					<VerdictLink href="#household-cycle">Household</VerdictLink>
-					<VerdictLink href="#debt-reconciliation">Debt</VerdictLink>
 				</nav>
 
 				<div className="flex flex-wrap items-center gap-2">
@@ -290,35 +277,6 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 				className="scroll-mt-4"
 			>
 				<HouseholdCycleCard document={document} />
-			</section>
-
-			<section
-				id="debt-reconciliation"
-				style={belowFoldStyle}
-				className="scroll-mt-4"
-			>
-				<LazySection>
-					<Collapsible defaultOpen={hasAnomaly} autoOpenWhen={hasAnomaly}>
-						<Collapsible.Trigger>
-							<Collapsible.Header
-								title="Debt and reconciliation"
-								trailing={
-									hasAnomaly ? (
-										<Pill tone="tertiary" size="xs">
-											Needs review
-										</Pill>
-									) : undefined
-								}
-							/>
-						</Collapsible.Trigger>
-						<Collapsible.Content>
-							<div className="space-y-5">
-								<DebtSummary document={document} result={result} />
-								<NetWorthReconciliation document={document} result={result} />
-							</div>
-						</Collapsible.Content>
-					</Collapsible>
-				</LazySection>
 			</section>
 		</div>
 	);
