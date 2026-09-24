@@ -5,9 +5,9 @@ import {
 	buildStochasticChartData,
 } from "@/chart/chartData";
 import { EvaluationResults } from "@/components/evaluations/EvaluationResults";
-import { Pill } from "@/components/present/present";
-import { Collapsible } from "@/components/ui/collapsible-section";
-import { LazySection } from "@/components/ui/lazy-section";
+import { Pill } from "@/components/present/Present";
+import { Collapsible } from "@/components/ui/CollapsibleSection";
+import { LazySection } from "@/components/ui/LazySection";
 import { formatDate, pct } from "@/lib/format";
 import type {
 	FinancialModelDocument,

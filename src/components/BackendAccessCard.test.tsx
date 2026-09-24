@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { clearAuthToken, getAuthToken } from "@/lib/auth-token";
+import { clearAuthToken, getAuthToken } from "@/lib/authToken";
 import { BackendAccessCard } from "./BackendAccessCard";
 
 afterEach(() => {

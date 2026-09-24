@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildApiUrl } from "./api-url";
+import { buildApiUrl } from "./apiUrl";
 
 describe("buildApiUrl", () => {
 	it("preserves same-origin paths when no base URL is configured", () => {

@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 
-export { Metric } from "@/components/present/present";
+export { Metric } from "@/components/present/Present";
 
 export function EvaluationEditorFooter({
 	dirty,

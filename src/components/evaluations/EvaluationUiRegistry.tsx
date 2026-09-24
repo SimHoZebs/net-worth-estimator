@@ -1,5 +1,5 @@
 import { type ComponentType, useState } from "react";
-import { parseDecimalDraft } from "@/lib/number-draft";
+import { parseDecimalDraft } from "@/lib/numberDraft";
 import type {
 	EvaluationInstance,
 	EvaluationTables,

@@ -1,9 +1,9 @@
 import { memo, useMemo, useState } from "react";
-import { FinancialIndependenceEditorSection } from "@/components/fields/editor-section";
-import { LabeledField } from "@/components/fields/field-kit";
-import { SectionCard } from "@/components/present/present";
-import { Collapsible } from "@/components/ui/collapsible-section";
-import { parseDecimalDraft } from "@/lib/number-draft";
+import { FinancialIndependenceEditorSection } from "@/components/fields/EditorSection";
+import { LabeledField } from "@/components/fields/FieldKit";
+import { SectionCard } from "@/components/present/Present";
+import { Collapsible } from "@/components/ui/CollapsibleSection";
+import { parseDecimalDraft } from "@/lib/numberDraft";
 import type {
 	FinancialIndependencePlan,
 	FinancialModelDocument,

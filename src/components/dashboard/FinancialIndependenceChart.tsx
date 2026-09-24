@@ -7,7 +7,7 @@ import {
 	openChartTooltip,
 	resolveAccountColor,
 } from "@/chart/chartView";
-import { Pill, SectionCard } from "@/components/present/present";
+import { Pill, SectionCard } from "@/components/present/Present";
 import { UPlotChart } from "@/components/ui/UPlotChart";
 import { currency, formatDate } from "@/lib/format";
 import type {

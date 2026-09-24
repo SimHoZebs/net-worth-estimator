@@ -3,7 +3,7 @@ import {
 	PageHeader,
 	Pill,
 	SectionCard,
-} from "@/components/present/present";
+} from "@/components/present/Present";
 import { SimulationProgressPanel } from "@/components/SimulationProgressPanel";
 import { StochasticProgressDetails } from "@/components/StochasticProgressDetails";
 import type {
@@ -16,7 +16,7 @@ import type {
 } from "@/lib/projection";
 import { EVALUATION_TYPE_ORDER, type EvaluationType } from "@/lib/projection";
 import { useStore } from "@/store";
-import { evaluationUiRegistry, validatedConfig } from "./evaluationUiRegistry";
+import { evaluationUiRegistry, validatedConfig } from "./EvaluationUiRegistry";
 
 interface EvaluationResultsProps {
 	results?: EvaluationResultCollection | null;
@@ -135,6 +135,27 @@ function EvaluationTypeSection({
 						? "updating"
 						: `${stochasticIsProvisional && stochasticResult ? "provisional " : ""}${envelope?.status ?? "pending"}`
 					: "disabled";
+				const quiet =
+					!hasLocalProgress &&
+					(status === "satisfied" || status === "disabled");
+				if (quiet) {
+					return (
+						<div
+							key={evaluation.instanceId}
+							className="flex items-center justify-between gap-3 px-1 py-1"
+						>
+							<span className="min-w-0 truncate type-value text-sm">
+								{evaluation.label}
+							</span>
+							<Pill
+								size="xs"
+								tone={status === "satisfied" ? "primary" : "neutral"}
+							>
+								{status}
+							</Pill>
+						</div>
+					);
+				}
 				const ResultRenderer = definition.ResultRenderer;
 				const workloadProgressPct = stochasticProgress
 					? Math.round(stochasticProgress.fraction * 100)

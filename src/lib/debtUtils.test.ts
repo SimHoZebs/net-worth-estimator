@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createBaseDocument, makePosting } from "@/lib/projection/__fixtures__";
-import { indexPaymentPostingsByAccountId } from "./debt-utils";
+import { indexPaymentPostingsByAccountId } from "./debtUtils";
 
 describe("indexPaymentPostingsByAccountId", () => {
 	it("indexes the first enabled payment posting for each destination", () => {

@@ -1,4 +1,4 @@
-import { TableCell, TableRow } from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/Table";
 import {
 	getExpression,
 	type Posting,
@@ -10,8 +10,8 @@ import {
 	CommitCell,
 	DecimalCell,
 	editableCellClass,
-} from "./cells";
-import { RowDeleteButton } from "./shells";
+} from "./Cells";
+import { RowDeleteButton } from "./Shells";
 
 function ExpressionField({
 	posting,

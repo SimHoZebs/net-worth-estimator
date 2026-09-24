@@ -1,5 +1,5 @@
-import { Metric, PageHeader } from "@/components/present/present";
-import { Card, CardContent } from "@/components/ui/card";
+import { Metric, PageHeader } from "@/components/present/Present";
+import { Card, CardContent } from "@/components/ui/Card";
 import { currency, formatDate } from "@/lib/format";
 import type {
 	ProjectionResult,

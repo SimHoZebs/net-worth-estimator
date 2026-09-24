@@ -2,9 +2,9 @@ import { useState } from "react";
 import {
 	type ChoiceCardOption,
 	ChoiceCards,
-} from "@/components/fields/editor-section";
-import { LabeledField } from "@/components/fields/field-kit";
-import { Button } from "@/components/ui/button";
+} from "@/components/fields/EditorSection";
+import { LabeledField } from "@/components/fields/FieldKit";
+import { Button } from "@/components/ui/Button";
 import { formatPercentRate } from "@/lib/format";
 import type {
 	FinancialIndependenceExpenseBasis,

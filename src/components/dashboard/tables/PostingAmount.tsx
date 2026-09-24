@@ -1,8 +1,8 @@
-import { formatCurrency } from "@/components/ui/data-table";
+import { formatCurrency } from "@/components/ui/DataTable";
 import {
 	isNumericArithmetic,
 	parseNumericArithmetic,
-} from "@/lib/posting-categories";
+} from "@/lib/postingCategories";
 import {
 	describePostingAmount,
 	getAmountPresentation,

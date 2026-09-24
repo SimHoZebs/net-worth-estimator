@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useShallow } from "zustand/shallow";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import { selectCurrentChangeCount, useStore } from "@/store";
 import { useThemeStore } from "@/themeStore";

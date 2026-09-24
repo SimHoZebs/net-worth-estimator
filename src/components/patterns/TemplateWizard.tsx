@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { parseDecimalField } from "@/components/_draftHelpers";
-import { Button } from "@/components/ui/button";
-import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import type {
 	IncomeTemplateInput,
 	TemplateGenerationResult,

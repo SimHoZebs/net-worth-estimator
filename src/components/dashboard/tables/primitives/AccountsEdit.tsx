@@ -5,18 +5,18 @@ import {
 	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/Table";
 import type { Account } from "@/lib/projection";
 import { NO_CEILING, NO_FLOOR } from "@/lib/projection/constants";
-import { nextReadableId, useChangedIds, useRowById } from "../_shared";
+import { nextReadableId, useChangedIds, useRowById } from "../_Shared";
 import type { AccountsTableEditProps } from "../AccountsTable";
 import {
 	CheckboxCell,
 	CommitCell,
 	DecimalCell,
 	editableCellClass,
-} from "./cells";
-import { AddRowButton, EditableTableCard, RowDeleteButton } from "./shells";
+} from "./Cells";
+import { AddRowButton, EditableTableCard, RowDeleteButton } from "./Shells";
 
 interface AccountEditRowProps {
 	account: Account;

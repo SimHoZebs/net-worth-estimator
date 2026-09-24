@@ -2,7 +2,7 @@ import {
 	associatedAccountIds,
 	isNumericArithmetic,
 	parseNumericArithmetic,
-} from "@/lib/posting-categories";
+} from "@/lib/postingCategories";
 import { getExpression, type Posting } from "@/lib/projection";
 
 export type MoneyDirection = "in" | "out" | "transfer";

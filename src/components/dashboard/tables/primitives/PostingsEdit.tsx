@@ -4,12 +4,12 @@ import {
 	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/Table";
 import { createExpressionAmount } from "@/lib/projection";
-import { nextReadableId, useChangedIds, useRowById } from "../_shared";
+import { nextReadableId, useChangedIds, useRowById } from "../_Shared";
 import type { PostingsTableEditProps } from "../PostingsTable";
-import { PostingEditRow } from "./postings-edit-row";
-import { AddRowButton, EditableTableCard } from "./shells";
+import { PostingEditRow } from "./PostingsEditRow";
+import { AddRowButton, EditableTableCard } from "./Shells";
 
 export function EditablePostingsGrid({
 	displayDocument,

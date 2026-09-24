@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Link } from "react-router-dom";
-import { SectionCard } from "@/components/present/present";
+import { SectionCard } from "@/components/present/Present";
 import { currency, formatDate } from "@/lib/format";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { DriverCard } from "./DriverCard";

@@ -5,7 +5,7 @@ import {
 	PageHeader,
 	Pill,
 	SectionCard,
-} from "@/components/present/present";
+} from "@/components/present/Present";
 import { currency, formatDate, pct } from "@/lib/format";
 import type {
 	FinancialIndependenceDetailedRunOutcome,

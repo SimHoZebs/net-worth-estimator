@@ -8,8 +8,8 @@ import {
 	Metric,
 	Pill,
 	SectionCard,
-} from "@/components/present/present";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+} from "@/components/present/Present";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/Alert";
 import { usePostingAnalyses } from "@/hooks/usePostingAnalyses";
 import {
 	formatExactUsd,

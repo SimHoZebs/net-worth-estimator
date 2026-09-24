@@ -1,6 +1,6 @@
 import { FinancialIndependenceChart } from "@/components/dashboard/FinancialIndependenceChart";
 import { OverviewCard } from "@/components/dashboard/OverviewCard";
-import { EmptyState } from "@/components/present/present";
+import { EmptyState } from "@/components/present/Present";
 import type {
 	EvaluationInstance,
 	FinancialIndependenceAnalysis,

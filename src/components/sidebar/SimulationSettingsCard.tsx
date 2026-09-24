@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { LabeledField } from "@/components/fields/field-kit";
-import { SectionCard } from "@/components/present/present";
+import { LabeledField } from "@/components/fields/FieldKit";
+import { SectionCard } from "@/components/present/Present";
 import { formatDate } from "@/lib/format";
 import { useModelRuntime } from "@/runtime/modelRuntime";
 import { useStore } from "@/store";

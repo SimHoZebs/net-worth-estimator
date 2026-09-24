@@ -3,7 +3,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { createTableColumn, DataTable } from "./data-table";
+import { createTableColumn, DataTable } from "./DataTable";
 
 interface TestRow {
 	id: string;

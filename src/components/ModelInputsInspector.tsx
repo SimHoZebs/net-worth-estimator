@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/shallow";
-import { EmptyState, SectionCard } from "@/components/present/present";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { EmptyState, SectionCard } from "@/components/present/Present";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
 import { currency, formatDate } from "@/lib/format";
 import {
 	associatedAccountIds,
 	isPastScheduledPosting,
 	partitionPostings,
-} from "@/lib/posting-categories";
+} from "@/lib/postingCategories";
 import type {
 	Account,
 	FinancialModelDocument,
@@ -36,8 +36,8 @@ import {
 } from "./banking/MoneyForm";
 import { MoneyAmountText, MoneyAvatar } from "./banking/MoneyRow";
 import { type MoneyDirection, moneyDirection, slugId } from "./banking/money";
-import { DateText } from "./dashboard/tables/primitives/formatting";
-import { ConfirmButton } from "./dashboard/tables/primitives/shells";
+import { DateText } from "./dashboard/tables/primitives/Formatting";
+import { ConfirmButton } from "./dashboard/tables/primitives/Shells";
 import { countIssuesByTab, ModelValidationPanel } from "./ModelValidationPanel";
 
 type InputSection = "accounts" | "scheduled" | "activity" | "reconcile";

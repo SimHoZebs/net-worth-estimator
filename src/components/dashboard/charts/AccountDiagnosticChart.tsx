@@ -1,6 +1,6 @@
 import { memo, useState } from "react";
 import type { StochasticChartRow } from "@/chart/chartData";
-import { SectionCard } from "@/components/present/present";
+import { SectionCard } from "@/components/present/Present";
 import type { FinancialModelDocument } from "@/lib/projection";
 import { AccountLinesChart } from "./AccountLinesChart";
 import { StackedContributionChart } from "./StackedContributionChart";

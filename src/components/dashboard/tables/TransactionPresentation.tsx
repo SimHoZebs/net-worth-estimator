@@ -2,7 +2,7 @@ import { currency } from "@/lib/format";
 import {
 	isNumericArithmetic,
 	parseNumericArithmetic,
-} from "@/lib/posting-categories";
+} from "@/lib/postingCategories";
 import {
 	type Account,
 	describePostingAmount,

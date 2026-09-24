@@ -5,7 +5,7 @@ import {
 	associatedAccountIds,
 	isPastScheduledPosting,
 	partitionPostings,
-} from "./posting-categories";
+} from "./postingCategories";
 
 describe("posting presentation categories", () => {
 	it("separates history, direct cash-flow transactions, and account rules", () => {

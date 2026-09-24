@@ -1,4 +1,4 @@
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/Alert";
 import { pluralize } from "@/lib/format";
 import type { ModelPath, ModelValidationIssue } from "@/lib/projection";
 

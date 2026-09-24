@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
-import { LabeledField } from "@/components/fields/field-kit";
+import { LabeledField } from "@/components/fields/FieldKit";
 import {
 	StochasticProgressBar,
 	StochasticProgressDetails,
 } from "@/components/StochasticProgressDetails";
-import { Button } from "@/components/ui/button";
-import { Collapsible } from "@/components/ui/collapsible-section";
+import { Button } from "@/components/ui/Button";
+import { Collapsible } from "@/components/ui/CollapsibleSection";
 import { useDebouncedStochasticConfig } from "@/hooks/useDebouncedStochasticConfig";
 import {
 	useProjectionCapabilities,

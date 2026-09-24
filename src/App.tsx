@@ -7,7 +7,7 @@ import {
 } from "@/hooks/useFinancialModel";
 import { useIncomeDataQuery } from "@/hooks/useIncomeData";
 import { useServerStatusQuery } from "@/hooks/useServerStatus";
-import { getAuthToken } from "@/lib/auth-token";
+import { getAuthToken } from "@/lib/authToken";
 import type { TemplateOutput } from "@/lib/patterns";
 import { summarizeValidationIssues } from "@/lib/projection";
 import {

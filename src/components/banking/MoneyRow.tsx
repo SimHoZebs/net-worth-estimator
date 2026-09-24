@@ -1,9 +1,9 @@
-import { DateText } from "@/components/dashboard/tables/primitives/formatting";
+import { DateText } from "@/components/dashboard/tables/primitives/Formatting";
 import { currency, formatFrequency } from "@/lib/format";
 import {
 	isNumericArithmetic,
 	parseNumericArithmetic,
-} from "@/lib/posting-categories";
+} from "@/lib/postingCategories";
 import type { Account, Posting } from "@/lib/projection";
 import { describePostingAmount, getExpression } from "@/lib/projection";
 import { moneyDirection } from "./money";

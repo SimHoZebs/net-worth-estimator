@@ -1,5 +1,5 @@
 import type { Key, ReactNode } from "react";
-import { SectionCard } from "@/components/present/present";
+import { SectionCard } from "@/components/present/Present";
 import {
 	Table,
 	TableBody,
@@ -7,7 +7,7 @@ import {
 	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/Table";
 import { currency, decimal, integer } from "@/lib/format";
 
 interface TableColumnDefinition<TRow, TKey extends keyof TRow> {

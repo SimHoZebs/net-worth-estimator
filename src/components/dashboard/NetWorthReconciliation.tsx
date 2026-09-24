@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { SectionCard } from "@/components/present/present";
+import { SectionCard } from "@/components/present/Present";
 import {
 	Table,
 	TableBody,
@@ -7,7 +7,7 @@ import {
 	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/Table";
 import { currency, formatDate } from "@/lib/format";
 import type {
 	Checkpoint,

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/Alert";
 
 export function SimulationProgressPanel({
 	title,

@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
-import { SectionCard } from "@/components/present/present";
-import { Calendar } from "@/components/ui/calendar";
-import { Dialog } from "@/components/ui/dialog";
+import { SectionCard } from "@/components/present/Present";
+import { Calendar } from "@/components/ui/Calendar";
+import { Dialog } from "@/components/ui/Dialog";
 import {
 	currency,
 	formatDate,

@@ -10,15 +10,15 @@ import {
 	FieldSelect,
 	LabeledField,
 	useSubmitError,
-} from "@/components/fields/field-kit";
-import { Button } from "@/components/ui/button";
+} from "@/components/fields/FieldKit";
+import { Button } from "@/components/ui/Button";
 import {
 	createExpressionAmount,
 	type FinancialModelDocument,
 	type Posting,
 } from "@/lib/projection";
 import { PostingAmount } from "../tables/PostingAmount";
-import { ConfirmButton } from "../tables/primitives/shells";
+import { ConfirmButton } from "../tables/primitives/Shells";
 
 type TemporaryPostingDraft = Omit<
 	Posting,

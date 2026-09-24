@@ -3,8 +3,8 @@ import {
 	DraftCommitInput,
 	editableTableCellInputStyle,
 	FieldError,
-} from "@/components/fields/field-kit";
-import { parseDecimalDraft } from "@/lib/number-draft";
+} from "@/components/fields/FieldKit";
+import { parseDecimalDraft } from "@/lib/numberDraft";
 
 /** Dirty-aware styling for editable table cells (44px touch target). */
 export function editableCellClass(isDirty: boolean): string {
