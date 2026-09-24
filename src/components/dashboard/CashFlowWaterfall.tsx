@@ -59,6 +59,8 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({
 		.reduce((sum, i) => sum + Math.abs(i.amount ?? 0), 0);
 	const remaining = totalInflow - totalOutflow;
 
+	if (items.length === 0) return null;
+
 	return (
 		<SectionCard
 			title="Monthly cash flow"
@@ -77,49 +79,36 @@ export const CashFlowWaterfall = memo(function CashFlowWaterfall({
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{items.length > 0 ? (
-							<>
-								{items.map((item, i) => (
-									<TableRow key={i}>
-										<TableCell className="sticky left-0 bg-card/95 type-label tracking-wide backdrop-blur">
-											{item.category}
-										</TableCell>
-										<TableCell className="type-body whitespace-normal break-words text-foreground/80">
-											{item.label}
-										</TableCell>
-										<TableCell className="type-value text-sm">
-											{item.isNumeric
-												? currency.format(item.amount ?? 0)
-												: item.arithmetic}
-										</TableCell>
-										<TableCell className="type-muted">
-											{formatFrequency(item.frequency)}
-										</TableCell>
-									</TableRow>
-								))}
-								<TableRow className="border-t-2 border-border">
-									<TableCell
-										colSpan={2}
-										className="type-title whitespace-normal break-words"
-									>
-										Remaining cash / investment capacity
-									</TableCell>
-									<TableCell className="type-title">
-										{currency.format(remaining)}
-									</TableCell>
-									<TableCell />
-								</TableRow>
-							</>
-						) : (
-							<TableRow>
-								<TableCell
-									colSpan={4}
-									className="py-6 text-center whitespace-normal text-muted-foreground"
-								>
-									No scheduled transactions are enabled.
+						{items.map((item, i) => (
+							<TableRow key={i}>
+								<TableCell className="sticky left-0 bg-card/95 type-label tracking-wide backdrop-blur">
+									{item.category}
+								</TableCell>
+								<TableCell className="type-body whitespace-normal break-words text-foreground/80">
+									{item.label}
+								</TableCell>
+								<TableCell className="type-value text-sm">
+									{item.isNumeric
+										? currency.format(item.amount ?? 0)
+										: item.arithmetic}
+								</TableCell>
+								<TableCell className="type-muted">
+									{formatFrequency(item.frequency)}
 								</TableCell>
 							</TableRow>
-						)}
+						))}
+						<TableRow className="border-t-2 border-border">
+							<TableCell
+								colSpan={2}
+								className="type-title whitespace-normal break-words"
+							>
+								Remaining cash / investment capacity
+							</TableCell>
+							<TableCell className="type-title">
+								{currency.format(remaining)}
+							</TableCell>
+							<TableCell />
+						</TableRow>
 					</TableBody>
 				</Table>
 				<div

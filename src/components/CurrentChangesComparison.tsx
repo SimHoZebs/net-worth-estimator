@@ -178,7 +178,5 @@ function EvaluationOutcomes({
 				</div>
 			))}
 		</div>
-	) : (
-		<span className="type-caption text-muted-foreground">No evaluations</span>
-	);
+	) : null;
 }

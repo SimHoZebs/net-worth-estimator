@@ -1,5 +1,4 @@
 import { memo, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { SectionCard } from "@/components/present/present";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog } from "@/components/ui/dialog";
@@ -18,7 +17,7 @@ import type {
 import { ShortfallDetailPanel } from "./ShortfallDetailPanel";
 
 interface ShortfallCalendarProps {
-	fulfillment: PostingFulfillmentPathResult | null;
+	fulfillment: PostingFulfillmentPathResult;
 	rows: ProjectionRow[];
 	postings: Posting[];
 	accounts: Account[];
@@ -63,7 +62,6 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 	}, [postings]);
 
 	const shortfallDays = useMemo(() => {
-		if (!fulfillment) return [];
 		const netWorthByDate = new Map<string, number>();
 		for (const row of rows) {
 			if (!netWorthByDate.has(row.date)) {
@@ -120,121 +118,85 @@ export const ShortfallCalendar = memo(function ShortfallCalendar({
 			title="Underfulfillment calendar"
 			className="rounded-[1.6rem] border-border/80"
 		>
-			{!fulfillment ? (
-				<div className="rounded-2xl border border-border/80 bg-muted/40 px-4 py-6 type-body text-muted-foreground">
-					<p>Posting-fulfillment evaluation is unavailable.</p>
-					<p className="mt-2">
-						<Link
-							to="/accounts"
-							className="font-semibold underline underline-offset-2"
-						>
-							Review accounts
-						</Link>{" "}
-						to enable a healthy posting-fulfillment evaluation.
-					</p>
+			<div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
+				<div className="min-w-0 rounded-2xl border border-border/80 bg-surface/75 p-3 dark:border-white/10 dark:bg-surface/55">
+					<Calendar
+						mode="single"
+						selected={
+							selectedDay ? parseIsoDateLocal(selectedDay.date) : undefined
+						}
+						defaultMonth={firstShortfallDate}
+						startMonth={firstShortfallDate}
+						endMonth={lastShortfallDate}
+						numberOfMonths={isLargeViewport ? 2 : 1}
+						disabled={(date) =>
+							!shortfallDayByDate.has(formatIsoDateLocal(date))
+						}
+						modifiers={{ shortfall: shortfallDates }}
+						modifiersClassNames={{
+							shortfall:
+								"[&_button]:border [&_button]:border-tertiary-border [&_button]:bg-tertiary-subtle [&_button]:font-semibold [&_button]:text-tertiary-foreground [&_button]:hover:bg-tertiary/15",
+						}}
+						onDayClick={(date, modifiers) => {
+							if (modifiers.disabled) return;
+							const isoDate = formatIsoDateLocal(date);
+							if (shortfallDayByDate.has(isoDate)) setSelectedDateIso(isoDate);
+						}}
+					/>
 				</div>
-			) : shortfallDays.length > 0 ? (
-				<div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_16rem]">
-					<div className="min-w-0 rounded-2xl border border-border/80 bg-surface/75 p-3 dark:border-white/10 dark:bg-surface/55">
-						<Calendar
-							mode="single"
-							selected={
-								selectedDay ? parseIsoDateLocal(selectedDay.date) : undefined
-							}
-							defaultMonth={firstShortfallDate}
-							startMonth={firstShortfallDate}
-							endMonth={lastShortfallDate}
-							numberOfMonths={isLargeViewport ? 2 : 1}
-							disabled={(date) =>
-								!shortfallDayByDate.has(formatIsoDateLocal(date))
-							}
-							modifiers={{ shortfall: shortfallDates }}
-							modifiersClassNames={{
-								shortfall:
-									"[&_button]:border [&_button]:border-tertiary-border [&_button]:bg-tertiary-subtle [&_button]:font-semibold [&_button]:text-tertiary-foreground [&_button]:hover:bg-tertiary/15",
-							}}
-							onDayClick={(date, modifiers) => {
-								if (modifiers.disabled) return;
-								const isoDate = formatIsoDateLocal(date);
-								if (shortfallDayByDate.has(isoDate))
-									setSelectedDateIso(isoDate);
-							}}
-						/>
+
+				<div className="space-y-2 rounded-2xl border border-tertiary-border/80 bg-tertiary-subtle/80 p-3 shadow-inner shadow-white/20 dark:shadow-black/20">
+					<div>
+						<div className="text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
+							Underfulfilled dates
+						</div>
+						<div className="mt-1 type-metric text-tertiary-foreground">
+							{currency.format(totalShortfall)}
+						</div>
+						<div className="type-caption text-tertiary-foreground/80">
+							Total unfunded across {shortfallDays.length} date
+							{shortfallDays.length === 1 ? "" : "s"}
+						</div>
 					</div>
 
-					<div className="space-y-2 rounded-2xl border border-tertiary-border/80 bg-tertiary-subtle/80 p-3 shadow-inner shadow-white/20 dark:shadow-black/20">
-						<div>
-							<div className="text-xs font-medium uppercase tracking-[0.16em] text-tertiary-foreground">
-								Underfulfilled dates
-							</div>
-							<div className="mt-1 type-metric text-tertiary-foreground">
-								{currency.format(totalShortfall)}
-							</div>
-							<div className="type-caption text-tertiary-foreground/80">
-								Total unfunded across {shortfallDays.length} date
-								{shortfallDays.length === 1 ? "" : "s"}
-							</div>
-						</div>
-
-						<div className="space-y-2">
-							{visibleShortfallDays.map((day) => (
-								<button
-									key={day.date}
-									type="button"
-									onClick={() => setSelectedDateIso(day.date)}
-									className="w-full rounded-xl border border-border/80 bg-card/82 px-3 py-1.5 text-left shadow-sm transition hover:border-tertiary-border hover:bg-tertiary-subtle dark:border-white/10"
-								>
-									<div className="flex items-center justify-between gap-2">
-										<span className="type-label text-tertiary-foreground">
-											{day.label}
-										</span>
-										<span className="type-caption type-value font-semibold text-tertiary-foreground">
-											{currency.format(day.unfulfilledAmount)}
-										</span>
-									</div>
-									<div className="mt-1 type-caption text-tertiary-foreground/70">
-										Requested {currency.format(day.requestedPostingAmount)}
-										applied {currency.format(day.realizedPostingAmount)}
-									</div>
-								</button>
-							))}
-						</div>
-
-						{shortfallDays.length > 6 ? (
+					<div className="space-y-2">
+						{visibleShortfallDays.map((day) => (
 							<button
+								key={day.date}
 								type="button"
-								onClick={() => setShowAllShortfalls((v) => !v)}
-								aria-expanded={showAllShortfalls}
-								className="type-caption font-semibold text-tertiary-foreground underline underline-offset-4"
+								onClick={() => setSelectedDateIso(day.date)}
+								className="w-full rounded-xl border border-border/80 bg-card/82 px-3 py-1.5 text-left shadow-sm transition hover:border-tertiary-border hover:bg-tertiary-subtle dark:border-white/10"
 							>
-								{showAllShortfalls
-									? "Show fewer dates"
-									: `View all ${shortfallDays.length} dates`}
+								<div className="flex items-center justify-between gap-2">
+									<span className="type-label text-tertiary-foreground">
+										{day.label}
+									</span>
+									<span className="type-caption type-value font-semibold text-tertiary-foreground">
+										{currency.format(day.unfulfilledAmount)}
+									</span>
+								</div>
+								<div className="mt-1 type-caption text-tertiary-foreground/70">
+									Requested {currency.format(day.requestedPostingAmount)}
+									applied {currency.format(day.realizedPostingAmount)}
+								</div>
 							</button>
-						) : null}
+						))}
 					</div>
-				</div>
-			) : (
-				<div className="rounded-2xl border border-primary-border/80 bg-primary-subtle/80 px-4 py-6 type-body text-primary">
-					<p>No posting requests are underfulfilled within the horizon.</p>
-					<p className="mt-2">
-						<Link
-							to="/accounts"
-							className="font-semibold underline underline-offset-2"
+
+					{shortfallDays.length > 6 ? (
+						<button
+							type="button"
+							onClick={() => setShowAllShortfalls((v) => !v)}
+							aria-expanded={showAllShortfalls}
+							className="type-caption font-semibold text-tertiary-foreground underline underline-offset-4"
 						>
-							Review scheduled transactions
-						</Link>{" "}
-						or{" "}
-						<Link
-							to="/settings"
-							className="font-semibold underline underline-offset-2"
-						>
-							adjust the horizon
-						</Link>{" "}
-						to explore more of the projection.
-					</p>
+							{showAllShortfalls
+								? "Show fewer dates"
+								: `View all ${shortfallDays.length} dates`}
+						</button>
+					) : null}
 				</div>
-			)}
+			</div>
 
 			{selectedDay ? (
 				<Dialog
