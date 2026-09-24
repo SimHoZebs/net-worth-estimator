@@ -287,7 +287,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 	return (
 		<figure className="min-w-0" aria-describedby={figcaptionId}>
 			<figcaption id={figcaptionId} className="sr-only">
-				Stacked account contributions with net worth and Monte Carlo bands. An
+				Stacked account contributions with net worth and range bands. An
 				equivalent data table is available behind the “Show data table” toggle.
 			</figcaption>
 			{isClipped ? (
@@ -332,7 +332,7 @@ export const StackedContributionChart = memo(function StackedContributionChart({
 				<div className="relative mt-2 overflow-x-auto overscroll-x-contain rounded-xl border border-border/70">
 					<table className="w-full type-caption">
 						<caption className="sr-only">
-							Sampled net worth by date with Monte Carlo medians
+							Sampled net worth by date with range medians
 						</caption>
 						<thead>
 							<tr className="border-b border-border/70 bg-muted/55 text-left">

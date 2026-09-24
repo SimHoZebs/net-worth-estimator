@@ -29,6 +29,16 @@ vi.mock("@/components/dashboard/charts/AccountLinesChart", () => ({
  */
 const BANNED: RegExp[] = [
 	/Model inputs/,
+	/Monte Carlo/,
+	/Resample/,
+	/\bSeed\b/,
+	/sample count/,
+	/Simulation failed/,
+	/Retry simulation/,
+	/simulation inputs/,
+	/Monte Carlo paths/,
+	/independent .* samples/,
+	/Model inputs/,
 	/What is included/,
 	/Show details/,
 	/No shortfalls/,

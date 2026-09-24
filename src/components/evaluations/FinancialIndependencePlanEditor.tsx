@@ -454,8 +454,8 @@ export const FinancialIndependencePlanEditor = memo(
 							}
 						/>
 						<FiNumberField
-							label="Required Monte Carlo confidence (%)"
-							description="Controls the reported confidence-qualified FI date; it does not change individual simulation paths."
+							label="Required confidence (%)"
+							description="Share of scenarios that must succeed for an FI date to qualify."
 							value={numericDrafts.requiredConfidence}
 							min={1}
 							max={100}

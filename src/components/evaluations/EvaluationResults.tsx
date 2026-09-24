@@ -111,10 +111,19 @@ function EvaluationTypeSection({
 	const definition = evaluationUiRegistry[type];
 
 	if (table.length === 0) return null;
+	const redundantEyebrow =
+		table.length === 1 &&
+		table[0] !== undefined &&
+		table[0].label.trim().toLowerCase() ===
+			definition.label.trim().toLowerCase();
 
 	return (
 		<div className="space-y-2">
-			<h3 className="type-eyebrow text-muted-foreground">{definition.label}</h3>
+			{redundantEyebrow ? null : (
+				<h3 className="type-eyebrow text-muted-foreground">
+					{definition.label}
+				</h3>
+			)}
 			{table.map((evaluation) => {
 				const config = validatedConfig(type, evaluation.config);
 				const envelope = resultCollection?.evaluations[type].find(
@@ -177,18 +186,18 @@ function EvaluationTypeSection({
 							<SimulationProgressPanel
 								title={
 									type === "financialIndependence"
-										? "Running FI Monte Carlo"
+										? "Calculating ranges"
 										: `Updating ${evaluation.label}`
 								}
 								description={
 									type === "financialIndependence"
 										? resultsAreStale
 											? "Previous FI results are hidden until recalculation completes."
-											: "The deterministic FI result below is current. Monte Carlo confidence is still being calculated."
+											: "The deterministic FI result below is current. Range confidence is still being calculated."
 										: undefined
 								}
 								progressPct={workloadProgressPct}
-								progressLabel={`${evaluation.label} Monte Carlo progress`}
+								progressLabel={`${evaluation.label} range progress`}
 								live={false}
 							>
 								<StochasticProgressDetails

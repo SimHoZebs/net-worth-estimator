@@ -10,10 +10,12 @@ export function SimulationOverview({
 	result,
 	stochasticResult,
 	stochasticIsProvisional = false,
+	debtPayoffDate = null,
 }: {
 	result: ProjectionResult;
 	stochasticResult?: StochasticProjectionResult | null;
 	stochasticIsProvisional?: boolean;
+	debtPayoffDate?: string | null;
 }) {
 	const projectedRows = result.timeline.rows.filter((row) => !row.isHistorical);
 	const firstProjected = projectedRows[0]?.date;
@@ -43,13 +45,11 @@ export function SimulationOverview({
 					<Metric
 						size="sm"
 						label={`${stochasticIsProvisional ? "Provisional " : ""}Median final (P50)`}
-						value={
-							percentiles ? currency.format(percentiles.p50) : "Run Monte Carlo"
-						}
+						value={percentiles ? currency.format(percentiles.p50) : "—"}
 						detail={
 							percentiles
-								? "50th percentile across Monte Carlo paths"
-								: "Enable Monte Carlo in Settings"
+								? "50th percentile across scenarios"
+								: "Turn on Ranges in Settings"
 						}
 					/>
 					<Metric
@@ -58,14 +58,17 @@ export function SimulationOverview({
 						value={
 							percentiles
 								? `${currency.format(percentiles.p10)} – ${currency.format(percentiles.p90)}`
-								: "Run Monte Carlo"
+								: "—"
 						}
 						detail={
 							percentiles
-								? "80% of Monte Carlo paths land in this band"
+								? "80% of scenarios land in this band"
 								: "P10 lower bound · P90 upper bound"
 						}
 					/>
+					{debtPayoffDate ? (
+						<Metric size="sm" label="Debt payoff" value={debtPayoffDate} />
+					) : null}
 				</div>
 				<p className="mt-3 type-caption">
 					{projectedRows.length} projected{" "}

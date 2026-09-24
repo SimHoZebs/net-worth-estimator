@@ -62,11 +62,11 @@ export function PostingFulfillmentEvaluation({
 				value={
 					probabilistic
 						? pct.format(probabilistic.fullFulfillmentProbability)
-						: "Run Monte Carlo"
+						: "—"
 				}
 				detail={
 					probabilistic
-						? `${probabilistic.fulfilledRunCount} of ${probabilistic.runCount} independent Monte Carlo samples`
+						? `${probabilistic.fulfilledRunCount} of ${probabilistic.runCount} scenarios`
 						: undefined
 				}
 			/>

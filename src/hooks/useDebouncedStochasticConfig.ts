@@ -35,11 +35,11 @@ export function runCountDraftNotice(value: string): string | null {
 		return `Enter a whole number from 1 to ${countFormatter.format(MAX_RUN_COUNT)}.`;
 	}
 	if (!/^[+-]?(\d+(\.\d+)?|\.\d+)$/.test(trimmed)) {
-		return `“${trimmed}” isn't a number — keeping the current sample count.`;
+		return `“${trimmed}” isn't a number — keeping the current scenario count.`;
 	}
 	const parsed = Number(trimmed);
 	if (!Number.isFinite(parsed)) {
-		return `“${trimmed}” isn't a number — keeping the current sample count.`;
+		return `“${trimmed}” isn't a number — keeping the current scenario count.`;
 	}
 	const normalized = normalizeStochasticConfig({
 		runCount: parsed,

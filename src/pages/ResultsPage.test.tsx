@@ -86,11 +86,9 @@ describe("ResultsPage", () => {
 
 		const activity = screen.getByLabelText("Projection activity");
 		expect(activity.textContent).toContain("Updating base projection");
-		expect(activity.textContent).toContain(
-			"Updating Monte Carlo projection ranges",
-		);
+		expect(activity.textContent).toContain("Updating ranges");
 		expect(activity.textContent).toContain("37%");
-		expect(activity.textContent).toContain("370 / 1,000 Monte Carlo paths");
+		expect(activity.textContent).toContain("370 / 1,000 scenarios");
 		expect(activity.textContent).not.toContain("monthly start dates checked");
 		expect(screen.getAllByRole("status")).toHaveLength(1);
 	});
@@ -117,13 +115,11 @@ describe("ResultsPage", () => {
 		render(<RouterProvider router={router} />);
 
 		const activity = screen.getByRole("status");
-		expect(activity.textContent).toContain(
-			"Updating Monte Carlo projection ranges",
-		);
+		expect(activity.textContent).toContain("Updating ranges");
 		expect(activity.textContent).toContain("64%");
 	});
 
-	it("shows deterministic activity without Monte Carlo", () => {
+	it("shows deterministic activity without ranges", () => {
 		const router = createMemoryRouter([
 			{
 				path: "/",

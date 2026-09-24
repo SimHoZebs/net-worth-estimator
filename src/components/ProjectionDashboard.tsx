@@ -1,11 +1,14 @@
 import { type CSSProperties, memo, type ReactNode, useMemo } from "react";
-import { Link } from "react-router-dom";
 import {
 	buildAccountDiagnosticChartData,
 	buildStochasticChartData,
 } from "@/chart/chartData";
 import { EvaluationResults } from "@/components/evaluations/EvaluationResults";
 import { Pill } from "@/components/present/Present";
+import {
+	estimateMonthlyPayment,
+	indexPaymentPostingsByAccountId,
+} from "@/lib/debtUtils";
 import { formatDate, pct } from "@/lib/format";
 import type {
 	FinancialModelDocument,
@@ -111,6 +114,33 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 		[derived.firstUnderfulfilledDate],
 	);
 	const hasShortfall = derived.biggestShortfallPosting !== null;
+	const debtPayoff = useMemo(() => {
+		const startingBalanceById = new Map(
+			result.accountSummaries.map((summary) => [
+				summary.accountId,
+				summary.startingBalance,
+			]),
+		);
+		const debts = document.accounts.filter(
+			(account) =>
+				account.enabled && (startingBalanceById.get(account.id) ?? 0) < 0,
+		);
+		if (debts.length === 0) return null;
+		const payments = indexPaymentPostingsByAccountId(document);
+		let latestMonths = 0;
+		for (const debt of debts) {
+			const principal = Math.abs(startingBalanceById.get(debt.id) ?? 0);
+			const monthly = estimateMonthlyPayment(payments.get(debt.id));
+			if (monthly <= 0) return null;
+			latestMonths = Math.max(latestMonths, Math.ceil(principal / monthly));
+		}
+		const debtFreeDate = new Date(
+			Date.now() + latestMonths * 30 * 24 * 60 * 60 * 1000,
+		)
+			.toISOString()
+			.slice(0, 10);
+		return { date: formatDate(debtFreeDate) };
+	}, [document, result]);
 	const isStale =
 		evaluationResultsAreStale || stochasticEvaluationResultsAreStale;
 	return (
@@ -146,7 +176,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 							tone="primary"
 							textClassName="text-xs font-medium tracking-[0.16em]"
 						>
-							Provisional Monte Carlo
+							Provisional
 						</Pill>
 					) : null}
 					{isStale ? (
@@ -188,22 +218,14 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 				aria-label="Key drivers"
 				className="grid gap-3 md:grid-cols-3"
 			>
-				<div className="flex flex-col gap-3">
-					{derived.biggestShortfallPosting ? (
-						<DriverCard
-							label="Main constraint"
-							value={derived.blockerValue}
-							detail={derived.blockerDetail}
-							tone="tertiary"
-						/>
-					) : null}
-					<Link
-						to="/accounts"
-						className="no-print w-full rounded-2xl border border-border/80 bg-card/85 px-4 py-3 text-sm font-semibold text-muted-foreground shadow-sm transition hover:border-ring/70 hover:bg-accent hover:text-accent-foreground dark:border-white/10"
-					>
-						Explore accounts
-					</Link>
-				</div>
+				{derived.biggestShortfallPosting ? (
+					<DriverCard
+						label="Main constraint"
+						value={derived.blockerValue}
+						detail={derived.blockerDetail}
+						tone="tertiary"
+					/>
+				) : null}
 				{!derived.fulfillmentAvailable ||
 				!derived.firstProjectedEvent ||
 				derived.firstProjectedEvent.unfulfilledAmount > 0 ||
@@ -236,7 +258,6 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 					/>
 				) : null}
 			</section>
-
 			{fulfillment && hasShortfall ? (
 				<section
 					id="projected-shortfalls"
@@ -257,6 +278,7 @@ const ProjectionDashboardContent = memo(function ProjectionDashboardContent({
 					result={result}
 					stochasticResult={stochasticResult}
 					stochasticIsProvisional={stochasticIsProvisional}
+					debtPayoffDate={debtPayoff?.date ?? null}
 				/>
 			</section>
 

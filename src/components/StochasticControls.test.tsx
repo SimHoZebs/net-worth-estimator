@@ -56,7 +56,7 @@ describe("StochasticControls", () => {
 			</RuntimeFixtureProviders>,
 		);
 
-		expect(screen.getByText("125 / 1,000 Monte Carlo paths")).not.toBeNull();
+		expect(screen.getByText("125 / 1,000 scenarios")).not.toBeNull();
 		expect(
 			screen.getByText("7,625 / 61,000 monthly start dates checked"),
 		).not.toBeNull();
