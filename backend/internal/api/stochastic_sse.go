@@ -15,16 +15,15 @@ import (
 )
 
 // stochasticSSE streams StochasticProgress events plus optional partial
-// results, mirroring the TS worker postMessage protocol over SSE.
+// results over SSE.
 //
 // Recovery contract: seeded computations run once per content key in the
-// shared-run registry below. A client that drops its stream (backgrounded
-// browser, dead TCP) re-POSTs the same body and attaches to the still-running
-// computation: it immediately receives the latest partial, then the remaining
-// stream. Post-completion reconnects are served from the DB artifact cache.
-// Unseeded runs bypass the registry (fresh random draws cannot be shared).
-// A `retry` hint plus `: heartbeat` comments keep backgrounded/proxied
-// streams alive.
+// shared-run registry below. A caller that drops its stream re-POSTs the same
+// body and attaches to the still-running computation: it immediately receives
+// the latest partial, then the remaining stream. Post-completion reconnects
+// are served from the DB artifact cache. Unseeded runs bypass the registry
+// because fresh random draws cannot be shared. A `retry` hint plus `: heartbeat`
+// comments keep proxied streams alive.
 const (
 	sseRetryMs           = 3000
 	sseHeartbeatInterval = 15 * time.Second
@@ -45,8 +44,8 @@ type stochasticStreamEvent struct {
 }
 
 // sharedStochasticRun is one seeded computation feeding many attached SSE
-// streams. The computation runs on a detached context: client disconnects
-// only detach streams, never cancel the run.
+// streams. The computation runs on a detached context: a disconnected caller
+// only detaches its stream, never cancels the run.
 type sharedStochasticRun struct {
 	mu          sync.Mutex
 	subscribers map[chan stochasticStreamEvent]struct{}
@@ -221,8 +220,8 @@ func stochasticProgressPayload(progress types.StochasticProgress, partial *types
 	return eventName, payload
 }
 
-// writeStochasticProgress streams one progress/partial event. A broken
-// stream only detaches its client; the shared run continues for the rest.
+// writeStochasticProgress streams one progress/partial event. A broken stream
+// only detaches that stream; the shared run continues for the rest.
 func writeStochasticProgress(writeEvent sseEventWriter, progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
 	eventName, payload := stochasticProgressPayload(progress, partial)
 	if err := writeEvent(strconv.Itoa(progress.CompletedRuns), eventName, payload); err != nil {
@@ -255,10 +254,8 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Unseeded runs are never cached or shared: a nil seed means "fresh
-	// random draw", matching TS semantics. The shipped frontend derives a
-	// deterministic seed from the request content when the seed box is
-	// blank, so app traffic is registry-eligible; explicit null (raw API
-	// use) keeps fresh-draw semantics.
+	// random draw". Seeded requests are eligible for the shared registry and
+	// artifact cache; an explicit null keeps fresh-draw semantics.
 	cacheEligible := body.Config.Seed != nil
 	var cacheKey string
 	if cacheEligible {
@@ -309,10 +306,10 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	// Reconnect hint: a backgrounded browser that drops the stream waits
-	// this long before the client re-issues the POST (which attaches to the
-	// still-running computation). Heartbeats below keep idle proxies/NAT
-	// from killing long batches between progress flushes.
+	// Reconnect hint: a caller that drops the stream waits this long before
+	// re-issuing the POST, which attaches to the still-running computation.
+	// Heartbeats below keep idle proxies/NAT from killing long batches between
+	// progress flushes.
 	if _, err := fmt.Fprintf(w, "retry: %d\n\n", sseRetryMs); err == nil {
 		flusher.Flush()
 	}

@@ -2,7 +2,7 @@ package domain
 
 import ()
 
-// Behavior runtime ported from behavior/runtime.ts: a generic period loop.
+// Behavior runtime provides a generic period loop.
 
 // BehaviorPeriod is one monthly evaluation window.
 type BehaviorPeriod struct {
@@ -14,7 +14,7 @@ type BehaviorPeriod struct {
 // ReactiveBehavior drives per-period state transitions to a final result.
 type ReactiveBehavior[TState any, TResult any] struct {
 	Initialize func() TState
-	React      func(state *TState, period BehaviorPeriod)
+	Advance    func(state *TState, period BehaviorPeriod)
 	ShouldStop func(state *TState, period BehaviorPeriod) bool
 	Finish     func(state *TState) TResult
 }
@@ -23,7 +23,7 @@ type ReactiveBehavior[TState any, TResult any] struct {
 func RunReactiveBehavior[TState any, TResult any](periods []BehaviorPeriod, behavior ReactiveBehavior[TState, TResult]) TResult {
 	state := behavior.Initialize()
 	for _, period := range periods {
-		behavior.React(&state, period)
+		behavior.Advance(&state, period)
 		if behavior.ShouldStop != nil && behavior.ShouldStop(&state, period) {
 			break
 		}

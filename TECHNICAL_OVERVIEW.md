@@ -1,197 +1,511 @@
-# Technical Overview: Net Worth Estimator
+# Technical Overview: Net Worth Estimator Backend
 
-The Net Worth Estimator is a React application that loads a `FinancialModelDocument` from a Go backend, validates it, and projects net worth and financial-independence outcomes. Deterministic and Monte Carlo computation runs in the Go backend; the browser never simulates.
+The backend is the authoritative implementation for model validation, persistence, deterministic simulation, stochastic simulation, and configured evaluations. It exposes one HTTP/SSE contract and stores canonical data, income data, sync-owned rows, and completed projection artifacts in SQLite.
 
-## 1. Tech Stack
+`PRODUCT_INTENT.md` defines the product experience. This document defines only the current Go contracts and domain behavior.
 
-- React 19, Vite, and TypeScript
-- Go backend (chi + huma) for model persistence and projections
-- Tailwind CSS v4 and uPlot
-- Zustand and TanStack Query
-- Papa Parse and Zod
-- Vitest
+## 1. System Boundary
 
-## 2. Data Flow
+The runtime has four primary layers:
 
-1. `App.tsx` creates `createHttpFinancialModelRepository()` and `createHttpIncomeDataSource()`. The browser uses same-origin `/v1` routes unless the Vite build sets `VITE_API_BASE_URL`; the development server proxies `/v1` to `NET_WORTH_ESTIMATOR_BACKEND` (default `http://localhost:8787`).
-2. Model Inputs and query hooks depend only on `FinancialModelRepository`, implemented by `createHttpFinancialModelRepository` against the Go backend. There is no client CSV parsing; the HTTP layer keeps thin wire-shape parsers (`sources/http/documentParser`, `sources/http/incomeSnapshotParser`) and the browser never loads model CSVs directly.
-3. The backend validates the `FinancialModelDocument` and returns diagnostics with the payload. The client renders those server-provided diagnostics; it performs no business-rule validation of its own. Invalid or malformed data surfaces diagnostics instead of being silently discarded.
-4. The Zustand Editor slice stages a session-only draft (`workingDocument` plus the `editingBaseline` snapshot in `src/store.ts`), displayed as current changes. The effective document is `workingDocument ?? canonical document` (`src/runtime/useProjectionOrchestration.ts`); canonical data is untouched until save.
-5. `useProjection` and `useStochastic` share one query-state core in `src/hooks/useProjections.ts` over `BackendProjectionEngine`, which POSTs to `/v1/projections/deterministic` or streams `/v1/projections/stochastic` over SSE. The server cache plus TanStack Query cover repeat requests; there is no client-side projection cache.
-6. `prepareSimulationRequest` resolves overrides, opening balances, dates, event policy, and optional `MonteCarloSample` into a prepared projection containing a `SimulationRequest`.
-7. The pure `simulate` kernel returns an exact `SimulationRun`. `projectRawFinancialModelDocument` adapts it into a `ProjectionPath` and public result; `projectFinancialModelDocument` adds configured evaluations. The backend implements this pipeline; the TypeScript kernel remains the parity reference.
-8. The persistent routed workspace exposes the loaded document and projection state to separate Results, Settings, and Model Inputs pages without restarting projection hooks during navigation.
-9. The Analysis page derives observations from enabled one-time external-inflow postings and composes independent analyses without changing the financial model or projection lifecycle.
+```text
+HTTP/SSE handlers
+      ↓
+validation and projection orchestration
+      ↓
+shared domain transitions and evaluation runtime
+      ↓
+Store interface backed by SQLite
+```
+
+- `internal/api` parses HTTP configuration, resolves stored or request-scoped inputs, applies access policy, and serializes results.
+- `internal/domain` validates the model, prepares history, executes posting transitions, and runs evaluations.
+- `internal/store` owns transactions, ordering, schema migration, row ownership, and artifact eviction.
+- `internal/types` defines the JSON and domain values shared across those layers.
+
+The model aggregate is `types.FinancialModelDocument`. Income is stored separately as `types.IncomeDataSnapshot` and is passed into validation and income resolution at request time.
+
+## 2. HTTP Contracts
+
+`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, bearer token, and optional `simplefin.Runner`.
+
+### Canonical model
+
+`GET /v1/financial-model` returns:
+
+```json
+{
+  "document": "FinancialModelDocument or null",
+  "issues": []
+}
+```
+
+Each issue contains `severity`, `code`, `message`, and `path`. Stored model and income rows are loaded in one read transaction. The response always includes a non-null issue array; `document` is null when the store has no canonical model.
+
+`PUT /v1/financial-model` accepts one `FinancialModelDocument`. It validates the incoming document against the stored income snapshot and returns the same `{document, issues}` shape.
+
+- Any error-severity issue prevents persistence.
+- Warning-only documents are persisted.
+- A rejected request does not replace stored state.
+- The `source` field on checkpoint and posting inputs is not trusted. The store recomputes ownership.
+
+### Status and income
+
+`GET /v1/status` returns:
+
+```json
+{
+  "readOnly": false,
+  "authEnabled": true
+}
+```
+
+`GET /v1/income-data` returns `types.IncomeDataSnapshot`, containing effective-dated `incomeSources` and ordered `taxProfiles`.
+
+### Deterministic projection
+
+`POST /v1/projections/deterministic` accepts:
+
+```json
+{
+  "document": "optional FinancialModelDocument",
+  "overrides": {
+    "addedAccounts": [],
+    "addedPostings": [],
+    "disabledAccountIds": [],
+    "disabledPostingIds": []
+  },
+  "settings": {
+    "fallbackProjectionStartDate": "YYYY-MM-DD",
+    "horizonYears": 1,
+    "evaluations": {}
+  },
+  "incomeData": "optional IncomeDataSnapshot"
+}
+```
+
+Resolution rules:
+
+- If both `document` and `incomeData` are omitted, one stored snapshot supplies both.
+- If only one is supplied, the other comes from storage.
+- A supplied document or income snapshot affects only that request.
+- `overrides` are applied by `types.ApplyModelOverrides` to a new document value; stored state is unchanged.
+
+A successful response has `result` and `X-Cache: hit|miss`.
+
+A `domain.SimulationPreparationError`, including model validation failure, returns HTTP 200 with `issues`. An unexpected execution error returns HTTP 500 with `error`. Cache read and write failures do not prevent computation.
+
+### Stochastic projection and SSE
+
+`POST /v1/projections/stochastic` accepts the deterministic inputs plus:
+
+```json
+{
+  "config": {
+    "runCount": 100,
+    "seed": 42
+  }
+}
+```
+
+`runCount` is normalized to `[1, 10000]`. A null seed requests fresh unseeded draws.
+
+The response is `text/event-stream` with `Cache-Control: no-store`. It writes `retry: 3000` and heartbeat comments every 15 seconds.
+
+| Event | Data |
+| --- | --- |
+| `progress` | `{ "progress": StochasticProgress }` |
+| `partial` | `{ "progress": StochasticProgress, "partial": StochasticProjectionResult }` |
+| `result` | `{ "result": StochasticProjectionResult }` |
+| `error` | `{ "error": string }` |
+
+A `partial` result is a cumulative snapshot. A slow attached stream may skip intermediate snapshots because the next one supersedes them.
+
+`X-Cache` semantics:
+
+| Value | Meaning |
+| --- | --- |
+| `hit` | completed seeded result loaded from SQLite; stream contains one `result` event |
+| `miss` | this request owns a new seeded run, or an unseeded request-bound run |
+| `attach` | this request attached to an identical seeded run already in progress |
+
+An attached seeded request receives the latest cumulative snapshot, if one exists, and then remaining events. A stream disconnect detaches only that stream. The shared seeded computation continues. Completed seeded runs remain in the in-process registry for 60 seconds and in SQLite afterward.
+
+An unseeded run does not use the shared registry or artifact cache. Its context follows the request, so disconnect cancels computation and no result is persisted.
+
+### SimpleFIN trigger
+
+`POST /v1/sync/simplefin` calls `simplefin.Runner.Trigger` and returns `simplefin.Summary` counts.
+
+| Condition | Status |
+| --- | --- |
+| read-only mode | 403, before bearer validation |
+| token configured and missing/wrong | 401 |
+| sync unconfigured | 503 |
+| another run is active | 409 |
+| successful manual run was less than 20 hours ago | 429 |
+| success | 200 |
+
+### Origin and write policy
+
+`ParseAllowedOrigins` accepts comma-separated exact HTTP/S origins. It rejects non-root paths, queries, fragments, credentials, invalid ports, empty entries, and wildcard values. CORS permits only `GET`, `POST`, `PUT`, and `OPTIONS`, and only `Content-Type` and `Authorization` request headers.
+
+A request without an `Origin` header passes. Origin filtering does not grant write access.
+
+`writeAuthMiddleware` guards exactly:
+
+- `PUT /v1/financial-model`;
+- `POST /v1/sync/simplefin`.
+
+Read-only mode rejects those routes first with 403. Otherwise, a configured token requires the exact `Bearer <token>` value and is compared in constant time. Reads and projection computation remain unguarded.
 
 ## 3. Persistence
 
-The persistence boundary is the validated `FinancialModelDocument` aggregate. CSV represents an external snapshot of that aggregate through `accounts.csv`, `checkpoints.csv`, `postings.csv`, and one typed table per evaluation type under `configs/behavior/`. Checkpoints are absolute end-of-day observed account balances used to correct historical modeled state and reconcile it with posting-derived balances. Income definitions and tax profiles are separate source data and are never part of the persisted model document.
+### Store contract
 
-The HTTP repository is the only model persistence. There is no DAO, ingestion coordinator, or browser storage: `PUT /v1/financial-model` validates and stores the canonical document server-side.
+`store.Store` is the persistence boundary. Its methods cover:
 
-### Backend
+- canonical document load/save;
+- income snapshot load/save;
+- one consistent document-and-income load;
+- CSV replacement import;
+- artifact get/put;
+- transactional SimpleFIN application;
+- test/import clear and close.
 
-- Canonical routes: `GET/PUT /v1/financial-model`, `GET /v1/status`. There is no reset route; CSV files are seed-only. `PUT` is rejected with 403 when `NET_WORTH_ESTIMATOR_READ_ONLY=1` and requires a bearer token (`NET_WORTH_ESTIMATOR_AUTH_TOKEN`) when auth is configured.
-- The SimpleFIN sync (`POST /v1/sync/simplefin`, same auth rules as `PUT`) writes only balance checkpoints and projection-disabled pending seed postings. Rows carry a `source` flag (`model` vs `simplefin`, V3 schema) exposed read-only on `GET`; saves strip forged sync rows and re-merge stored ones, with owner checkpoints winning key collisions. Projection/analysis POSTs additionally write best-effort cache rows to `projection_artifacts`; "owner-only writes" covers canonical model rows.
-- The Go server (`backend/cmd/server`) imports canonical CSV data (`NET_WORTH_ESTIMATOR_MODEL_PATH`, default `public/configs`) and income data (`NET_WORTH_ESTIMATOR_INCOME_PATH`, default `public/data/income`) into `NET_WORTH_ESTIMATOR_DB` (SQLite).
-- Income definitions are served through `/v1/income-data`. Posting analyses run client-side (`src/hooks/usePostingAnalyses.ts` over `src/lib/analysis/`); there is no server analyses endpoint.
-- Projection endpoints: `POST /v1/projections/deterministic` (JSON) and `POST /v1/projections/stochastic` (SSE stream).
-- `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` accepts a comma-separated runtime allowlist of exact HTTP/S browser origins. Requests carrying any other `Origin` are rejected; requests without `Origin` remain available to health checks, trusted proxies, and non-browser clients.
+`store.Open` returns the interface, not the SQLite implementation. `RunConformance` exercises that interface for canonical round trips, income effective dating, import rollback, row ownership, sync behavior, dry-run rollback, and artifact first-write behavior.
 
-### Browser
+### SQLite setup
 
-The browser holds no model storage. Malformed canonical persisted data returns parse/validation diagnostics instead of falling back to bundled data. `VITE_API_BASE_URL` is normalized once and prefixes every HTTP and SSE backend route in separate-origin deployments.
+`store.Open(path)` opens the pure-Go SQLite driver and sets:
 
-### Projection Artifacts
+- WAL journal mode;
+- foreign keys;
+- a 5-second busy timeout;
+- one open connection.
 
-- Derived projection artifacts are separate from the canonical `FinancialModelRepository` and live in the backend (`projection_artifacts` table, best-effort).
-- The client keeps no projection cache: the server cache plus TanStack Query (`staleTime: Infinity`) cover repeat requests.
-- Request identity is the `canonicalSerialize` string (sorted object keys, order-preserving arrays) from `projectionRequestIdentity`, used directly as the TanStack query key; it is not the server artifact cache key.
-- Completed stochastic results are cached server-side by effective simulation inputs, normalized run count, seed intent, and evaluation configuration. A first unseeded cache miss materializes a concrete seed; later identical requests reuse that outcome.
-- Progressive stochastic results are never persisted. A stochastic evaluation cache miss replays samples because individual sample paths are intentionally not retained.
-- Hashing, validation, and artifact-store failures fail open: the backend still computes the requested projection.
+Migrations are transactional and forward-only. A database newer than the supported schema is rejected.
 
-### Simulation Kernel (Go Backend)
+The current schema stores:
 
-- The browser never simulates. All simulation lives in the Go backend (`backend/internal/domain/`: `prepare.go`, `transitions.go`, `simulate.go`, `path.go`, `project.go`, `stochastic.go`). There is no TypeScript simulation kernel; the former `lib/projection/reference/` parity reference has been deleted.
-- Evaluation config validators (`src/lib/projection/evaluation/*`) stay client-side only where editors need instant field-level feedback (evaluation editors and result guards); they mirror backend rules and never gate persistence or projection. Result accessors are pure view selectors over backend-computed outcomes. Execution (kernel, branch simulation, evaluation runtime, stochastic orchestration) and authoritative validation run in the backend.
+| Table | Purpose |
+| --- | --- |
+| `schema_version` | applied migration versions |
+| `model_metadata` | source path and document-present flag |
+| `accounts` | ordered account definitions |
+| `checkpoints` | ordered balance observations, unique by account/date, with owner |
+| `postings` | ordered posting definitions with owner |
+| `evaluations` | type, globally keyed instance ID, order, label, enablement, and JSON config |
+| `income_sources` | effective-dated income rows sharing an ID |
+| `tax_profiles` | ordered deductions, brackets, and source URL |
+| `projection_artifacts` | versioned content identity, kind, creation time, and JSON payload |
 
-## 4. Core Types
+### First boot and import
 
-- `FinancialModelDocument`: canonical persisted accounts, balance checkpoints, postings, typed evaluation tables, and source metadata.
-- Editor draft (`workingDocument` + `editingBaseline` in `src/store.ts`): the session-only staged document. The effective projection input is `workingDocument ?? canonical document`; the frontend sends no `overrides` payload.
-- `SimulationRequest`: resolved model, initial state, date range, start-date event policy, and optional `MonteCarloSample`.
-- `SimulationRun`: exact initial/final states, dated balance snapshots, and ordered movement attempts from one kernel execution.
-- `ProjectionPath`: immutable evaluator-facing timeline, effective document, and raw movement records containing requested amounts, realized amounts, and account deltas.
-- `MonteCarloSample`: sampled annual rates by posting ID for one stochastic run.
-- `ComparisonSnapshot`: read-only current/final net-worth and evaluation metrics captured by the UI. It contains no model document or overrides and cannot restore state.
-- `EvaluationTables`: typed tables keyed by evaluation type. `EVALUATION_TYPE_ORDER` controls type order, and each table's array order preserves ingestion order.
-- `EvaluationResultCollection`: locally ordered result tables keyed by evaluation type.
+`cmd/server` calls `DocumentExists`. When false, `ImportCSV(modelPath, incomePath)` parses both seed directories and replaces model and income state in one transaction. Later server starts read the database and do not rescan seed directories.
 
-There is no named alternative-model domain or persistence API. Comparisons are metric snapshots only.
+`cmd/importcsv` deliberately invokes the same import path for operator-controlled replacement of an existing database.
 
-### Independent Transaction Evidence
+### Canonical replacement and ownership
 
-- Posting observations are derived from enabled `once` postings with no source account and at least one destination. Recurring model rules are not treated as observed pay.
-- Posting observations use the posting label/date/account and resolve numeric expressions when available; unresolved amounts remain source observations but cannot contribute to salary amounts.
-- `AnalysisDefinition<TInput, TOutput>` is the common contract for independent enrichment, inference, map-data, and comparison computations. It is intentionally separate from projection `EvaluationDefinition`.
-- Posting classification is an independent shared pass. Each analysis declares the classifier definitions it requires; orchestration combines those requirements into one plan, rejects conflicting definitions, and evaluates each selected classifier once per posting.
-- The first composed pipeline consumes shared payer, payroll-language, and payment-rail classifications, detects recurring payroll evidence, and estimates observed net pay. Confirmed results can annualize; provisional results expose only per-deposit values when cadence history is weak. It does not read or mutate the modeled salary.
+`SaveDocument` runs one transaction:
+
+1. Snapshot stored sync-owned checkpoints and postings.
+2. Delete current canonical model rows.
+3. Insert incoming owner rows.
+4. Re-merge stored sync-owned rows.
+5. Persist source metadata.
+
+Incoming `source` values are ignored. Incoming posting IDs in the reserved `sfin-` namespace are dropped. Stored sync rows therefore cannot be forged, edited, or deleted through a model save.
+
+Checkpoint collision rules are explicit:
+
+- an incoming owner checkpoint with the same key and balance preserves the stored sync row;
+- an incoming owner checkpoint with the same key and a different balance wins;
+- a sync checkpoint with the same key is omitted after an owner override;
+- a later synchronization skips the owner-owned key until owner data is removed.
+
+### Artifact durability
+
+Completed deterministic results and completed seeded stochastic results are stored in `projection_artifacts`. The table is bounded to 256 rows across both kinds; the oldest rows are evicted after insertion.
+
+Artifact writes are best-effort. A malformed stored payload is treated as a miss. A store failure fails open and the requested projection is still computed.
+
+The cache is durable only when the SQLite file is durable. A container or service without persistent storage for its database loses canonical edits and artifacts on replacement.
+
+## 4. Artifact Identity
+
+`api.artifactKey` hashes a versioned descriptor with SHA-256. The identity prefix is `<kind>:1:<digest>`.
+
+Deterministic identity includes:
+
+- the resolved model document;
+- request overrides;
+- fallback projection start date and horizon;
+- every enabled evaluation instance ID and config, excluding evaluation labels;
+- the resolved income snapshot.
+
+Seeded stochastic identity adds the requested run count and the exact seed.
+
+Consequences:
+
+- omitting model and income bodies still tracks saved model and income changes because the handler hashes the resolved stored snapshot;
+- disabled evaluation configs do not affect computation identity;
+- evaluation label-only changes do not invalidate a result;
+- a seed is part of stochastic identity;
+- unseeded stochastic runs are not content-addressed;
+- identities are backend-owned and contain no cross-runtime cache compatibility requirement.
 
 ## 5. Model Semantics
 
-### Accounts and Postings
+### Accounts
 
-- Accounts hold signed balances with generic minimum and maximum constraints.
-- Postings select an exact amount resolver and bind its required inputs to literals or registered providers.
-- Resolvers receive only validated config and concrete numeric inputs. Providers may read narrowly supplied balances, latest/YTD posting observations, the occurrence date, and the effective occurrence rate.
-- The `income` resolver is an ordered payroll pipeline. It reads effective-dated annual gross income from the separate income data source, runs its `resolvers` array from left to right, and deposits the remaining post-tax amount into the posting destinations. Resolver steps may settle pre-tax contributions and employer match into their own destination accounts.
-- Income definitions and tax profiles are source data, served by the backend from CSV under `public/data/income/`; they are not application configuration or part of the persisted financial-model document. Their normalized snapshot is passed through projection requests and cache identity.
-- Posting frequency may be recurring or explicitly `once`; one-time rows execute exactly on their start date regardless of whether the end date is blank or equal to it.
-- Blank `sourceAccountId` plus destinations is an external inflow.
-- A source plus no destinations is an external outflow.
-- A source plus destinations is an account-to-account transfer.
-- Expression amounts preserve the arithmetic language and may apply annual growth and stochastic occurrence rates. Numeric resolvers reject those posting-level rate fields.
-- Percentage, progressive-bracket, capped-percentage, and threshold-percentage are unrounded composable numeric primitives; the income pipeline composes percentage and progressive-bracket steps against the remaining annual amount.
-- Source-funded rows clamp to available positive balance; `annualCap` is enforced per calendar year.
-- Same-date rows execute by ascending priority, then file order.
-- Historical postings and checkpoints are merged chronologically during request preparation. Same-date postings execute first, then checkpoints overwrite only their observed accounts as end-of-day truth. These corrections emit no cash-flow movements, but later postings and projection continue from the corrected state.
-- During request preparation, enabled `once` postings dated strictly before the projection start are replayed through shared transitions in date, priority, then file order. Their balance snapshots form historical rows, while their dependency and annual-cap state carries into projection execution.
-- A `once` posting on the projection start remains a normal projected event. Historical replay does not emit projected movement, cash-flow, or fulfillment events, and Monte Carlo samples do not resample already-realized history.
+Accounts are ordered rows with a unique ID, label, bounds, optional color, and enabled flag. Net worth sums only enabled accounts.
 
-## 6. Engine Design
+- `NoFloor` is `-1e13`.
+- `NoCeiling` is `+1e13`.
+- A source can withdraw only `max(0, balance - minBalance)`.
+- A destination can receive only `max(0, maxBalance - balance)`.
+- Bounds are structural constraints, not labels or categories.
 
-The deterministic kernel in `backend/internal/domain/simulate.go` receives only a prepared `SimulationRequest`. It does not receive overrides, evaluation configuration, or horizon settings. All simulation runs in the Go backend; there is no TypeScript simulation kernel.
+### Posting structure
 
-- No name-based branching: IDs, labels, and categories do not select behavior.
-- Classification is structural: source and destination presence determines inflow, outflow, or transfer behavior.
-- `enabled` gates participation; `priority` only controls order.
-- Account category is a UI concern.
-- Shared transition functions apply growth, movement constraints, and posting execution consistently across deterministic, branch, and Monte Carlo runs.
-- The kernel is pure and deterministic for the same request.
+Posting behavior is selected only by source and destination presence:
 
-Canonical core APIs (Go backend, `backend/internal/domain/`) are:
+| Source | Destinations | Behavior |
+| --- | --- | --- |
+| absent | present | external inflow |
+| present | absent | external outflow |
+| present | present | account-to-account transfer |
 
-| API | Role |
+`enabled` controls participation. `priority` controls same-date order. A declaration index breaks priority ties.
+
+`once` executes exactly on `startDate`, whether or not `endDate` is nil or equal to that date. Recurring schedules use 365-day years, 52-week years, and clamped calendar-month/year addition.
+
+### Amount resolution
+
+`PostingAmountResolution` contains a resolver name, resolver config, and exact required inputs. Each input is either a finite literal or a named provider binding.
+
+Current providers:
+
+- `model-value`;
+- `posting-latest`;
+- `posting-year-to-date`;
+- `posting-prior-year-to-date`;
+- `account-balance`;
+- `occurrence-rate`.
+
+Current general resolvers:
+
+- `expression`;
+- `percentage`;
+- `progressive-bracket`;
+- `capped-percentage`;
+- `threshold-percentage`.
+
+`expression` can use posting annual rate, annual growth, and sampled annual volatility. Other resolvers require those posting-level rate fields to be zero.
+
+The `income` resolver is a separate ordered pipeline. It reads the effective income source for the occurrence date, executes configured resolver steps, routes configured outputs, and deposits the remaining net cash into posting destinations. Income posting validation permits at most one enabled income posting, requires destinations, forbids a source account, and forbids a posting annual cap.
+
+### Constraints and movement records
+
+`ResolveAccountMovement` clamps a nonnegative requested amount by:
+
+1. an optional action limit, such as remaining annual cap;
+2. positive source withdrawable balance;
+3. total destination headroom.
+
+`TransitionRuntime` applies the realized amount and records ordered account deltas. Every movement exposes requested and realized amounts, which is the causal evidence used by fulfillment and financial-independence diagnostics.
+
+Annual-cap usage is observed from realized amounts by posting and calendar year.
+
+## 6. Validation and Preparation
+
+`domain.ValidateFinancialModel` is the authoritative validator. It checks:
+
+- duplicate account, posting, and cross-type evaluation IDs;
+- account/posting ID collisions;
+- checkpoint account, date, and duplicate key validity;
+- amount resolver config, exact required inputs, provider references, and posting dependency cycles;
+- posting source/destination references, duplicate destinations, same-account routing, and schedules;
+- account bounds;
+- evaluation instance IDs and config;
+- income references when income data is supplied.
+
+Warnings and errors share the ordered `ModelValidationIssue` shape. `SeverityError` blocks persistence and simulation. `SeverityWarning` does not.
+
+`PrepareSimulationRequest`:
+
+1. applies request overrides without mutating the input document;
+2. requires income data when an enabled income posting exists;
+3. validates the effective model;
+4. validates `fallbackProjectionStartDate`;
+5. replays historical state;
+6. computes the clamped projection end date;
+7. creates one `types.SimulationRequest`.
+
+## 7. Historical Replay and Checkpoints
+
+Historical preparation uses the same `TransitionRuntime` as projection execution.
+
+- Checkpoints after the projection start are invalid.
+- Enabled `once` postings before the projection start are replayed.
+- A `once` posting on the projection start joins history only when a checkpoint exists that day.
+- When the earliest checkpoint exists, recurring occurrences needed between that date and the projection start are replayed.
+- Without a start-date checkpoint, projection includes start-date occurrences.
+- With a start-date checkpoint, projection excludes start-date occurrences.
+- Historical dates execute in ascending calendar order.
+- Same-date postings execute by ascending priority, then declaration index.
+- Checkpoints execute after same-date postings and overwrite only their account balance.
+
+Each historical correction records observed balance, modeled balance, and adjustment. Historical rows carry no projected movement totals. Replay still updates balances, latest realized posting amounts, and annual-cap state for later projection and amount providers.
+
+`BuildProjectionPath` prefixes these historical observations with projected snapshots. `ProjectionRow.isHistorical` marks the boundary.
+
+## 8. Deterministic Kernel
+
+`Simulate` accepts only a prepared `types.SimulationRequest`. It does not resolve overrides, dates, evaluations, or persistence state.
+
+The kernel:
+
+1. creates a `TransitionRuntime` from the prepared model, state, date, income snapshot, and optional sampled rates;
+2. expands enabled occurrences through the projection window;
+3. sorts dates and same-date occurrences;
+4. executes each occurrence through the shared transition path;
+5. records every requested/realized movement and ordered account deltas;
+6. snapshots balances after each event date;
+7. returns exact initial state, final state, snapshots, movements, and sample metadata.
+
+`BuildProjectionPath` adapts exact results for evaluators. `AdaptSimulationRun` then creates the public `ProjectionResult` by:
+
+- separating historical and projected rows;
+- classifying each projected movement structurally;
+- computing current and final net worth;
+- accumulating external inflow, external outflow, and internal transfer totals;
+- rounding public monetary values with `roundCurrency`.
+
+`ProjectFinancialModelDocument` adds the configured evaluation tables.
+
+## 9. Evaluation Runtime
+
+`EvaluationRegistry` contains three process-wide definitions:
+
+| Go definition | Type |
 | --- | --- |
-| `PrepareSimulationRequest` (`prepare.go`) | resolves the effective document, opening balances, dates, event policy, and optional `MonteCarloSample` into one prepared request |
-| `ProjectRawFinancialModelDocument` (`path.go`) | runs the kernel and returns the evaluator-facing path plus public projection data |
-| `ProjectFinancialModelDocument` (`project.go`) | adds deterministic configured evaluations |
+| `financialIndependenceDefinition` | `financialIndependence` |
+| `netWorthThresholdDefinition` | `netWorthThreshold` |
+| `postingFulfillmentDefinition` | `postingFulfillment` |
 
-On the client, the effective document is `workingDocument ?? canonical document` (`src/runtime/useProjectionOrchestration.ts`); there is no `applyModelOverrides` in the frontend.
+`types.EvaluationTypeOrder` fixes table order. Each table preserves stored order. Instance IDs are globally unique across all three tables.
 
-### Behavior and Evaluation
+`EvaluationRuntimeSet`:
 
-- Read-only evaluations inspect an immutable `ProjectionPath`.
-- Behaviors observe branch state and emit generic actions through the shared movement resolver.
-- FI coverage uses canonical monthly candidate dates. Failed summary cycles stop at the first spending shortfall, and candidate scanning stops at the first successful cycle. Only the selected deterministic candidate is rerun with complete diagnostics and balance history.
-- Branches replay only explicitly selected continuing postings. They never infer continuation from IDs, labels, categories, or rates.
-- Candidate state includes all base-path events on the candidate date; branch processing starts strictly afterward.
-- Branch state inherits latest realized posting amounts, current-year cap usage, and the run's sampled rates.
-- Movement attempts record requested and realized amounts plus account deltas. Evaluations that need constraint diagnostics derive and own them from those generic facts and the effective model.
-- Evaluator failures remain isolated in per-instance diagnostics.
+- parses and validates each enabled definition;
+- preserves per-instance diagnostics;
+- runs deterministic path evaluation;
+- prepares stochastic workload reporting;
+- creates one accumulator per enabled evaluation;
+- consumes one sampled path per run in submission order;
+- finalizes probabilistic envelopes;
+- returns typed result tables.
 
-## 7. Monte Carlo
+An evaluator failure is isolated to that instance as an error diagnostic. Other configured instances continue.
 
-Postings with `volatility > 0` enable Monte Carlo projection. A seedable linear congruential generator and log-normal sampling produce each `MonteCarloSample`.
+### Financial independence
 
-The stochastic coordinator:
+`EvaluateFinancialIndependence` builds canonical monthly candidate dates. For each candidate it measures net worth, selected annual direct income, selected asset balances, withdrawal capacity, annual expense target, and coverage.
 
-1. Calls `prepareSimulationRequest` once and reuses that prepared model, state, dates, and event structure for the deterministic baseline and every sampled run.
-2. Executes path-only samples: each sample produces the `ProjectionPath` required by distribution and evaluation accumulators without building a redundant complete public result.
-3. Uses the deterministic path's monthly FI candidate schedule for every run.
-4. Records each run's first successful FI candidate and aggregates the cumulative probability that FI has been achieved by each candidate date.
-5. Maintains exact sorted value distributions and computes P10/P25/P50/P75/P90 with exact percentile aggregation.
-6. Processes runs in server-side batches and streams SSE `progress`/`partial` events; the client renders progressive `StochasticProjectionResult` updates.
-7. Discards each sample path after the distribution and enabled evaluation trackers consume it.
+The full principal-preservation cycle uses the generic monthly behavior loop and `TransitionRuntime`:
 
-8. Partial and final payloads carry percentile bands, milestones, and stochastic evaluations without re-embedding the deterministic timeline; the client reads deterministic state from its own query.
+- selected cashflow sources are observed from the base path;
+- only explicitly selected continuing postings execute in the branch;
+- monthly expenses are covered by reactive withdrawals;
+- withdrawals obey account floors, nonnegative balance, and annual withdrawal limits;
+- a cycle fails at the first unresolved expense shortfall;
+- principal policy is `allow-drawdown`, `preserve-nominal-principal`, or `preserve-real-principal`;
+- summary scans stop at the first successful candidate;
+- detailed deterministic output reruns the selected candidate with full withdrawal and balance evidence;
+- stochastic output aggregates first-success dates and coverage distributions against required confidence.
 
-Percentile-band slope is never interpreted as a run outcome. FI confidence dates come from the cumulative distribution of each run's first successful candidate.
+Continuing postings are never inferred from IDs, labels, categories, or nonzero rates.
 
-## 8. UI and State
+### Net-worth threshold
 
-- `/`: read-only current/projected metrics, charts, reconciliation, cash flow, debt, shortfalls, evaluation outcomes, and saved comparisons.
-- `/settings`: session-only horizon, Monte Carlo, evaluation, and appearance configuration. Unapplied evaluation drafts block navigation; pending debounced Monte Carlo values flush when the page unmounts.
-- `/model-inputs`: scheduled salary/checking transactions, paginated one-time transaction history, account-associated future rules, canonical editing, validation, temporary changes, templates, and source actions.
-- `/analysis`: posting-derived payroll evidence and annualized observed net-pay inference.
-- `App`: persistent data, mutation, deterministic projection, and stochastic projection controller shared by every route.
-- `runtime/modelRuntime`: read-only model/repository state and wrapped actions; executable repository operations remain private to `App`.
-- `runtime/projectionRuntime`: separate projection-artifact and execution-status providers so Monte Carlo progress does not rerender unrelated model consumers.
-- `ProjectionDashboard`: current/projected metrics, account and contribution charts, reconciliation, cash flow, debt, shortfalls, and read-only evaluation outcomes.
-- `EvaluationSettings`: evaluation collection management and type-specific configuration.
-- `ModelInputsInspector`: presentation-grouped read views plus canonical account and posting editors. Posting grouping is UI-only and does not change model semantics.
-- `ModelValidationPanel`: parsing and cross-reference diagnostics.
-- `CurrentChangesControls`: session-only temporary additions and disable toggles.
-- `CurrentChangesComparison`: captures and compares read-only `ComparisonSnapshot` metrics.
-- `TemplateWizard`: generates common accounts and postings into the document editor.
+`EvaluateNetWorthThreshold` scans projected rows only and returns the first date at which net worth reaches the configured target. Stochastic aggregation reports success probability and P10, median, and P90 reached dates across successful sampled outcomes.
 
-`src/store.ts` composes `Editor`, `Settings`, and `Comparison` slices; theme lives in a separate `src/themeStore.ts` store. Current changes and projection settings are session-only. Baseline document edits persist only through the active `FinancialModelRepository`.
+### Posting fulfillment
 
-Route pages compose feature components. Feature components read user-owned state through Zustand selectors and hook-owned runtime state through the narrow runtime providers; presentational tables and charts continue to receive explicit props.
+`EvaluatePostingFulfillment` selects all postings when `postingIds` is null, or the configured subset otherwise. It reconstructs pre-event balances, classifies binding constraints, and reports requested, realized, destination-limited, and unfulfilled amounts.
 
-React Router uses browser paths. Production hosting must serve `index.html` for direct requests to application routes.
+A residual below 0.5 is not reportable. Deterministic output includes first underfulfilled date plus event, date, and posting summaries. Stochastic output reports full-fulfillment probability and unfulfilled-amount percentiles.
 
-## 9. Key Files
+## 10. Stochastic Kernel
 
-| File | Role |
+`StochasticProjection` creates one `stochasticSession` and one prepared baseline request. The session then:
+
+1. prepares and runs the deterministic baseline;
+2. evaluates deterministic baseline evaluations in summary mode;
+3. counts required annual rates per posting from enabled occurrences and horizon;
+4. creates annual-rate samples for each run;
+5. simulates sample paths on a worker pool sized to available CPUs;
+6. consumes completed paths in submission order;
+7. appends rounded net worth values per date;
+8. flushes cumulative partial results every 50 completed runs and at completion;
+9. feeds each sample path to evaluation accumulators;
+10. merges sorted value slices and computes P10/P25/P50/P75/P90.
+
+Samples are created sequentially from one sampler. Worker completion order does not change accumulation order. Percentiles require all configured runs; an interrupted run is not a successful partial result.
+
+The seed controls the state sequence. Run-count normalization and seed-null behavior are part of the artifact and sharing contract.
+
+## 11. SimpleFIN Flow
+
+`internal/simplefin` is configured once in `cmd/server`:
+
+- `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` enables a real Bridge runner.
+- `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS` maps Bridge IDs to model account IDs.
+- `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` selects model accounts eligible for pending-charge seeds.
+- `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1` plans without committing.
+- `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK=1` enables fixture mode; an optional fixture file is reloaded for each fetch.
+- Fixture mode and a real Access URL are mutually exclusive.
+- An invalid account map is fatal at startup.
+
+`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. `Map` emits one balance checkpoint per mapped account/date and only pending negative card charges as disabled `once` postings. Posted, positive, non-USD, invalid-amount, and unmapped rows are counted by reason without logging descriptions or amounts.
+
+`Store.ApplySyncPlan` applies checkpoints and the pending snapshot in one transaction. Owner checkpoints win key collisions. Pending deletion is constrained by owner, account, and the escaped reserved prefix. Dry-run returns before commit, so the transaction rolls back.
+
+The scheduler calls `Runner.Sync` daily at a random minute from 03:00 through 03:59 local time. Manual triggers use `Runner.Trigger`, which rejects concurrent and too-recent successful runs.
+
+## 12. Backend Key Files
+
+| File | Responsibility |
 | --- | --- |
-| `backend/internal/domain/prepare.go` | initial state and request preparation |
-| `backend/internal/domain/transitions.go` | shared state transitions |
-| `backend/internal/domain/simulate.go` | pure deterministic kernel |
-| `backend/internal/domain/path.go` | run-to-path and public-result adaptation |
-| `backend/internal/domain/project.go` | deterministic orchestration |
-| `backend/internal/domain/stochastic.go` (+ `stochastic_session.go`) | prepared-request reuse, sample execution, exact percentiles, and progress batches |
-| `backend/internal/domain/evaluation_runtime.go` | evaluation definition registration, configured evaluation lifecycle, and stochastic trackers |
-| `backend/internal/domain/behavior.go` | generic reactive-behavior period loop |
-| `src/lib/projection/evaluation/configValidation.ts` | single validation entry for evaluation configs |
-| `src/engine/BackendProjectionEngine.ts` | HTTP/SSE client for backend deterministic and stochastic projection |
-| `src/hooks/useProjections.ts` | deterministic + stochastic hooks over a shared query-state core |
-| `src/hooks/useProjection.ts` | re-export of the deterministic hook (historical path kept for mocks) |
-| `src/hooks/useStochastic.ts` | re-export of the stochastic hook (historical path kept for mocks) |
-| `src/hooks/useFinancialModel.ts` | document query and save hooks |
-| `src/lib/analysis/postingObservations.ts` | derives analysis observations from one-time external-inflow postings |
-| `src/lib/analysis/classification.ts` | typed classifier definitions, requirement-plan composition, and shared classification pass |
-| `src/lib/analysis/postingClassifiers.ts` | reusable payer, payroll-language, and payment-rail classifiers |
-| `src/lib/analysis/` | independent analysis contract, runtime, and definitions |
-| `src/hooks/usePostingAnalyses.ts` | typed posting-classification-to-payroll-to-salary analysis composition |
+| `backend/cmd/server/main.go` | environment, first-boot seed, HTTP lifecycle |
+| `backend/cmd/server/sync.go` | SimpleFIN configuration and daily scheduler |
+| `backend/cmd/importcsv/main.go` | offline seed replacement |
+| `backend/internal/api/server.go` | router and operation registration |
+| `backend/internal/api/auth.go` | read-only and bearer policy |
+| `backend/internal/api/cors.go` | origin parsing and preflight enforcement |
+| `backend/internal/api/model_handlers.go` | model, status, and income handlers |
+| `backend/internal/api/projection_handlers.go` | deterministic resolution, execution, and cache |
+| `backend/internal/api/stochastic_sse.go` | shared seeded runs and event serialization |
+| `backend/internal/api/artifacts.go` | content identity and cache helpers |
+| `backend/internal/store/store.go` | `Store`, `store.Open`, migrations |
+| `backend/internal/store/model.go` | canonical transaction and ordered reload |
+| `backend/internal/store/sync.go` | ownership merge and sync application |
+| `backend/internal/store/artifacts.go` | bounded artifact storage |
+| `backend/internal/csvio/import.go` | model and income CSV parsing |
+| `backend/internal/domain/validation.go` | authoritative model validation |
+| `backend/internal/domain/prepare.go` | overrides, history, dates, initial state |
+| `backend/internal/domain/transitions.go` | shared movement and income execution |
+| `backend/internal/domain/simulate.go` | deterministic kernel |
+| `backend/internal/domain/path.go` | path and public-result adaptation |
+| `backend/internal/domain/evaluation_runtime.go` | registry and evaluator lifecycle |
+| `backend/internal/domain/evaluation_fi.go` | financial-independence branch evaluation |
+| `backend/internal/domain/evaluation_threshold.go` | net-worth threshold evaluation |
+| `backend/internal/domain/evaluation_fulfillment.go` | posting fulfillment evaluation |
+| `backend/internal/domain/stochastic.go` | worker execution and progress |
+| `backend/internal/domain/stochastic_session.go` | baseline, samples, percentiles, accumulators |
+| `backend/internal/domain/sampler.go` | seeded sampling and percentile helpers |
+| `backend/internal/simplefin/runner.go` | fetch/map/apply orchestration and trigger guards |
+| `backend/internal/simplefin/map.go` | checkpoint and pending-charge mapping |

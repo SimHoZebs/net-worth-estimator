@@ -104,8 +104,8 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 	if err != nil {
 		output.Body.Error = err.Error()
 		if preparationError, ok := err.(*domain.SimulationPreparationError); ok {
-			// Validation failures stay HTTP 200: the client reads the issue
-			// list from the body and surfaces it as model diagnostics.
+			// Validation failures stay HTTP 200: callers read the issue list from the
+			// body and surface it as model diagnostics.
 			output.Body.Issues = preparationError.Issues
 			return output, nil
 		}

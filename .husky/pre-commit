@@ -2,9 +2,6 @@
 set -e
 start=$(date +%s)
 
-npx lint-staged
-npm run verify
-
 staged_go=$(git diff --cached --name-only --diff-filter=ACM | grep '^backend/.*\.go$' || true)
 if [ -z "$staged_go" ]; then
   echo "pre-commit: no staged backend Go files, skipping backend verify."

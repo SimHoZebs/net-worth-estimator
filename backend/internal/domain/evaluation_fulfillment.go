@@ -7,7 +7,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Posting fulfillment evaluation ported from evaluation/postingFulfillment.ts.
+// Posting fulfillment evaluation.
 
 const minReportableUnfulfilledAmount = 0.5
 

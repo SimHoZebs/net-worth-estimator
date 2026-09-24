@@ -1,7 +1,6 @@
 package types
 
-// Simulation-layer types (types/simulation.ts) and stochastic types
-// (types/stochastic.ts).
+// Simulation and stochastic wire types.
 
 type FinancialModel struct {
 	Accounts []Account `json:"accounts"`
@@ -64,7 +63,7 @@ type PreparedProjection struct {
 
 type StochasticConfig struct {
 	RunCount int    `json:"runCount"`
-	Seed     *int64 `json:"seed"` // nil = unseeded (Math.random equivalent)
+	Seed     *int64 `json:"seed"` // nil = unseeded (fresh random draw)
 }
 
 type StochasticProgressPhase string

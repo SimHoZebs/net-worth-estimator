@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-// Arithmetic expression language ported from simulation/arithmetic.ts.
+// Arithmetic expression language.
 // Grammar: expr := term (('+'|'-') term)* ; term := unary (('*'|'/') unary)* ;
 // unary := '-' unary | call ; call := 'abs' '(' expr ')' | primary ;
 // primary := number | 'rate' | identifier | '(' expr ')'.
@@ -297,7 +297,7 @@ func (p *parser) primary() (func(map[string]float64) float64, error) {
 		return func(ctx map[string]float64) float64 {
 			v, ok := ctx[name]
 			if !ok {
-				return math.NaN() // matches TS undefined propagation
+				return math.NaN() // missing identifiers propagate as NaN
 			}
 			return v
 		}, nil
@@ -361,7 +361,7 @@ func ArithmeticRequirements(input string) ([]string, error) {
 }
 
 // EvaluateArithmetic evaluates input against a concrete numeric context,
-// defaulting missing requirement identifiers to 0 (legacy TS behavior).
+// defaulting missing requirement identifiers to 0.
 func EvaluateArithmetic(input string, ctx map[string]float64) (float64, error) {
 	parsed, err := ParseArithmetic(input)
 	if err != nil {

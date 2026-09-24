@@ -12,10 +12,10 @@ import (
 
 // StochasticProjection runs the full Monte Carlo projection with progress.
 //
-// The coordinator goroutine builds samples sequentially (LCG order parity),
-// simulates paths on a bounded worker pool, and consumes results in
+// The coordinator goroutine builds samples sequentially (preserving LCG
+// order), simulates paths on a bounded goroutine pool, and consumes results in
 // submission order. Evaluation accumulators and percentile buffers are only
-// touched by the coordinator, matching TS single-threaded accumulation.
+// touched by the coordinator, preserving deterministic accumulation.
 func StochasticProjection(
 	ctx context.Context,
 	document *types.FinancialModelDocument,
@@ -105,8 +105,8 @@ consumer:
 		select {
 		case result = <-results:
 		case <-runCtx.Done():
-			// Production stopped before every run completed (client
-			// disconnect or an earlier error return): drain without waiting.
+			// Production stopped before every run completed (request
+			// cancellation or an earlier error return): drain without waiting.
 			break consumer
 		}
 		if result.err != nil {
@@ -119,8 +119,8 @@ consumer:
 				break
 			}
 			delete(pending, nextIndex)
-			// Accumulation happens in submission order for exact parity with
-			// the sequential TS implementation (sorted merges + counters).
+			// Accumulation happens in submission order to preserve exact ordered
+			// semantics for sorted merges and counters.
 			if err := consumeOrdered(session, run.path, run.sample); err != nil {
 				return nil, err
 			}
@@ -161,7 +161,7 @@ func consumeOrdered(
 	session.valuesMutex.Unlock()
 
 	// Progress callbacks write to the HTTP response; they must never run
-	// while valuesMutex is held or a stalled client stalls accumulation.
+	// while valuesMutex is held or a stalled subscriber stalls accumulation.
 	if batchComplete {
 		if session.onProgress != nil {
 			session.onProgress(progressSnapshot, partialResult)
@@ -176,6 +176,5 @@ func consumeOrdered(
 	return nil
 }
 
-// mathRound matches JavaScript Math.round: half rounds toward +Infinity
-// (Math.round(-2.5) === -2), unlike truncation on v±0.5.
+// mathRound rounds halves toward +Infinity, unlike truncation on v±0.5.
 func mathRound(value float64) float64 { return math.Floor(value + 0.5) }

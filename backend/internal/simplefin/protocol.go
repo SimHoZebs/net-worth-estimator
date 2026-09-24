@@ -75,8 +75,9 @@ func (t Transaction) ParseAmount() (float64, error) {
 	return amount, nil
 }
 
-// Client fetches SimpleFIN account sets. The access URL is a secret and must
-// never be logged; errors carry only the URL host.
+// Client fetches SimpleFIN account sets. The access URL is a secret. Protocol
+// errors carry only the host, but transport errors can wrap the request URL;
+// callers must redact those errors before external logging or API responses.
 type Client struct {
 	AccessURL  string
 	HTTPClient *http.Client

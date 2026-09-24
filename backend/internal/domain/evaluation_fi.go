@@ -8,7 +8,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Financial independence evaluation ported from evaluation/financialIndependence.ts.
+// Financial independence evaluation.
 
 const fiEpsilon = FIShortfallTolerance
 
@@ -45,7 +45,7 @@ type withdrawalAttempt struct {
 	bindingConstraints []accountMovementConstraint
 }
 
-// FIWithdrawalSummary mirrors the TS shape.
+// FIWithdrawalSummary is the wire shape for withdrawal results.
 type FIWithdrawalSummary struct {
 	RequestedAmount          float64           `json:"requestedAmount"`
 	RealizedAmount           float64           `json:"realizedAmount"`
@@ -130,9 +130,9 @@ func selectedAssetRates(plan *types.FIPlan) map[string]float64 {
 }
 
 // selectedAssetRateOrder lists selected asset IDs in first-seen plan-source
-// order, matching TS Map insertion semantics. FI withdrawal allocation and
-// trajectory payloads iterate in this order; the remainder is absorbed by the
-// last account, so ordering changes allocation pennies.
+// order. FI withdrawal allocation and trajectory payloads iterate in this order;
+// the remainder is absorbed by the last account, so ordering changes allocation
+// pennies.
 func selectedAssetRateOrder(plan *types.FIPlan, rates map[string]float64) []string {
 	order := make([]string, 0, len(rates))
 	seen := map[string]bool{}
@@ -531,8 +531,8 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 		balanceTrajectory            []map[string]any
 	}
 
-	// First replay/transition error; surfaced after the behavior loop so a
-	// failing posting becomes an evaluation diagnostic like in TypeScript.
+	// First replay/transition error is surfaced after the behavior loop as an
+	// evaluation diagnostic.
 	var branchErr error
 
 	behavior := ReactiveBehavior[branchState, *FIRunOutcome]{
@@ -546,7 +546,7 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 			}
 			return state
 		},
-		React: func(state *branchState, period BehaviorPeriod) {
+		Advance: func(state *branchState, period BehaviorPeriod) {
 			if period.Index%12 == 0 {
 				state.remainingWithdrawalByAccount = map[string]float64{}
 				for _, accountID := range assetRateOrder {
@@ -883,7 +883,7 @@ type fiAccumulator struct {
 	runCount              int
 }
 
-// FIProbabilisticResult mirrors the stochastic finalize output.
+// FIProbabilisticResult is the stochastic finalize output shape.
 type FIProbabilisticResult struct {
 	FiCycleSuccessProbability float64  `json:"fiCycleSuccessProbability"`
 	MedianCoverageDate        *IsoDate `json:"medianCoverageDate"`
