@@ -27,7 +27,7 @@ The model aggregate is `types.FinancialModelDocument`. Income is stored separate
 
 ## 2. HTTP Contracts
 
-`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, bearer token, and optional `simplefin.Runner`.
+`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, bearer token, optional `simplefin.Runner`, and optional static frontend directory. When `FrontendDir` is set, the router serves built assets and falls back to `index.html` for non-asset GET paths while keeping API, health, docs, and OpenAPI routes reserved.
 
 ### Canonical model
 
@@ -36,13 +36,14 @@ The model aggregate is `types.FinancialModelDocument`. Income is stored separate
 ```json
 {
   "document": "FinancialModelDocument or null",
-  "issues": []
+  "issues": [],
+  "revision": "\"sha256-...\""
 }
 ```
 
-Each issue contains `severity`, `code`, `message`, and `path`. Stored model and income rows are loaded in one read transaction. The response always includes a non-null issue array; `document` is null when the store has no canonical model.
+Each issue contains `severity`, `code`, `message`, and `path`. Stored model and income rows are loaded in one read transaction. The response always includes a non-null issue array; `document` is null when the store has no canonical model. `revision` and the `ETag` response header identify the canonical content used by conditional writes.
 
-`PUT /v1/financial-model` accepts one `FinancialModelDocument`. It validates the incoming document against the stored income snapshot and returns the same `{document, issues}` shape.
+`PUT /v1/financial-model` accepts one `FinancialModelDocument` and requires an `If-Match` header containing the revision returned by the preceding read. It validates the incoming document against the stored income snapshot and returns the same `{document, issues, revision}` shape. A missing `If-Match` value returns 428; a stale value returns 412 without changing stored state.
 
 - Any error-severity issue prevents persistence.
 - Warning-only documents are persisted.
@@ -148,7 +149,7 @@ An unseeded run does not use the shared registry or artifact cache. Its context 
 
 ### Origin and write policy
 
-`ParseAllowedOrigins` accepts comma-separated exact HTTP/S origins. It rejects non-root paths, queries, fragments, credentials, invalid ports, empty entries, and wildcard values. CORS permits only `GET`, `POST`, `PUT`, and `OPTIONS`, and only `Content-Type` and `Authorization` request headers.
+`ParseAllowedOrigins` accepts comma-separated exact HTTP/S origins. It rejects non-root paths, queries, fragments, credentials, invalid ports, empty entries, and wildcard values. CORS permits only `GET`, `POST`, `PUT`, and `OPTIONS`, and only `Content-Type`, `Authorization`, and `If-Match` request headers. Same-origin requests are accepted automatically; configured origins are checked exactly. A TLS-terminating proxy must forward exactly one valid `X-Forwarded-Proto` and `X-Forwarded-Host` value, or have its public HTTPS origin listed in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`.
 
 A request without an `Origin` header passes. Origin filtering does not grant write access.
 
@@ -165,7 +166,7 @@ Read-only mode rejects those routes first with 403. Otherwise, a configured toke
 
 `store.Store` is the persistence boundary. Its methods cover:
 
-- canonical document load/save;
+- canonical document load/save, including conditional save by content identity;
 - income snapshot load/save;
 - one consistent document-and-income load;
 - CSV replacement import;
@@ -208,7 +209,7 @@ The current schema stores:
 
 ### Canonical replacement and ownership
 
-`SaveDocument` runs one transaction:
+`SaveDocument` runs one transaction. `SaveDocumentIfUnchanged` first reads the current canonical content identity inside that transaction and rejects a mismatched ETag before replacing rows.
 
 1. Snapshot stored sync-owned checkpoints and postings.
 2. Delete current canonical model rows.

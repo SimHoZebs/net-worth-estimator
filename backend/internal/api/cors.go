@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	corsAllowedHeaders = "Content-Type, Authorization"
+	corsAllowedHeaders = "Content-Type, Authorization, If-Match"
 	corsAllowedMethods = "GET, POST, PUT, OPTIONS"
+	corsExposedHeaders = "ETag, X-Cache, Link"
 )
 
 var allowedCORSMethods = map[string]struct{}{
@@ -37,11 +38,14 @@ func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 				return
 			}
 
-			if _, allowed := origins[origin]; !allowed {
+			_, configured := origins[origin]
+			requestHost, validRequestHost := corsRequestHost(r)
+			if !configured && (!validRequestHost || !sameCORSOrigin(origin, requestHost, corsRequestScheme(r))) {
 				http.Error(w, "origin is not allowed", http.StatusForbidden)
 				return
 			}
 			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Expose-Headers", corsExposedHeaders)
 
 			requestedMethod := r.Header.Get("Access-Control-Request-Method")
 			if r.Method != http.MethodOptions || requestedMethod == "" {
@@ -68,13 +72,158 @@ func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 	}
 }
 
+func corsRequestHost(r *http.Request) (string, bool) {
+	if r == nil {
+		return "", false
+	}
+	if r.Header != nil {
+		forwardedHosts := r.Header.Values("X-Forwarded-Host")
+		if len(forwardedHosts) > 0 {
+			if len(forwardedHosts) != 1 {
+				return "", false
+			}
+			forwardedHost := strings.TrimSpace(forwardedHosts[0])
+			if strings.Contains(forwardedHost, ",") {
+				return "", false
+			}
+			if _, _, ok := corsRequestHostParts(forwardedHost); !ok {
+				return "", false
+			}
+			return forwardedHost, true
+		}
+	}
+	return r.Host, r.Host != ""
+}
+
+func sameCORSOrigin(origin, requestHost, requestScheme string) bool {
+	originHost, originPort, originScheme, ok := corsOriginParts(origin)
+	if !ok {
+		return false
+	}
+	requestHostName, requestPort, ok := corsRequestHostParts(requestHost)
+	if !ok || !strings.EqualFold(originHost, requestHostName) || !strings.EqualFold(originScheme, requestScheme) {
+		return false
+	}
+	if requestPort == "" {
+		requestPort = defaultCORSOriginPort(requestScheme)
+	}
+	return originPort == requestPort
+}
+
+func corsRequestScheme(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	if r.URL != nil {
+		if scheme := normalizeCORSOriginScheme(r.URL.Scheme); scheme != "" {
+			return scheme
+		}
+	}
+	if r.TLS != nil {
+		return "https"
+	}
+	if r.Header != nil {
+		forwardedProtocols := r.Header.Values("X-Forwarded-Proto")
+		if len(forwardedProtocols) == 1 {
+			if scheme := normalizeCORSOriginScheme(forwardedProtocols[0]); scheme != "" {
+				return scheme
+			}
+		}
+	}
+	return "http"
+}
+
+func normalizeCORSOriginScheme(value string) string {
+	scheme := strings.ToLower(strings.TrimSpace(value))
+	if scheme == "http" || scheme == "https" {
+		return scheme
+	}
+	return ""
+}
+
+func defaultCORSOriginPort(scheme string) string {
+	if strings.EqualFold(scheme, "https") {
+		return "443"
+	}
+	return "80"
+}
+
+func corsOriginParts(value string) (string, string, string, bool) {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Opaque != "" {
+		return "", "", "", false
+	}
+	scheme := normalizeCORSOriginScheme(parsed.Scheme)
+	if scheme == "" {
+		return "", "", "", false
+	}
+	if (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+		return "", "", "", false
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host == "" {
+		return "", "", "", false
+	}
+	port := parsed.Port()
+	if port == "" {
+		if strings.HasSuffix(parsed.Host, ":") {
+			return "", "", "", false
+		}
+		port = defaultCORSOriginPort(scheme)
+	} else {
+		normalizedPort, ok := normalizeCORSOriginPort(port)
+		if !ok {
+			return "", "", "", false
+		}
+		port = normalizedPort
+	}
+	return host, port, scheme, true
+}
+
+func corsRequestHostParts(value string) (string, string, bool) {
+	if value == "" || strings.TrimSpace(value) != value {
+		return "", "", false
+	}
+	parsed, err := url.Parse("//" + value)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Opaque != "" {
+		return "", "", false
+	}
+	if parsed.Path != "" || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+		return "", "", false
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host == "" {
+		return "", "", false
+	}
+	port := parsed.Port()
+	if port == "" {
+		if strings.HasSuffix(parsed.Host, ":") {
+			return "", "", false
+		}
+		return host, "", true
+	}
+	port, ok := normalizeCORSOriginPort(port)
+	if !ok {
+		return "", "", false
+	}
+	return host, port, true
+}
+
+func normalizeCORSOriginPort(value string) (string, bool) {
+	port, err := strconv.Atoi(value)
+	if err != nil || port < 1 || port > 65535 {
+		return "", false
+	}
+	return strconv.Itoa(port), true
+}
+
 func corsHeadersAllowed(value string) bool {
 	for header := range strings.SplitSeq(value, ",") {
 		trimmed := strings.TrimSpace(header)
 		if trimmed == "" {
 			continue
 		}
-		if strings.EqualFold(trimmed, "Content-Type") || strings.EqualFold(trimmed, "Authorization") {
+		if strings.EqualFold(trimmed, "Content-Type") || strings.EqualFold(trimmed, "Authorization") || strings.EqualFold(trimmed, "If-Match") {
 			continue
 		}
 		return false

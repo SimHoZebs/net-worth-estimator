@@ -32,8 +32,8 @@ The server listens on `127.0.0.1:8787` by default.
 | Method and path | Contract |
 | --- | --- |
 | `GET /healthz` | returns `ok` |
-| `GET /v1/financial-model` | returns `{ "document": FinancialModelDocument | null, "issues": [] }` |
-| `PUT /v1/financial-model` | validates a `FinancialModelDocument`; returns the document and issues; persists only when no error-severity issue exists |
+| `GET /v1/financial-model` | returns `{ "document": FinancialModelDocument | null, "issues": [], "revision": "sha256..." }` and an `ETag` header |
+| `PUT /v1/financial-model` | validates a `FinancialModelDocument`; requires an `If-Match` revision; returns the document, issues, and revision; persists only when no error-severity issue exists and the revision still matches |
 | `GET /v1/status` | returns `{ "readOnly": bool, "authEnabled": bool }` |
 | `GET /v1/income-data` | returns the effective `IncomeDataSnapshot` |
 | `POST /v1/projections/deterministic` | accepts optional `document`, `overrides`, and `incomeData` plus `settings`; returns `{ "result": ProjectionResult }`, validation issues, or an error; `X-Cache` is `hit` or `miss` |
@@ -85,10 +85,10 @@ go run ./cmd/importcsv \
 
 - `store.Open` uses the pure-Go SQLite driver, WAL mode, foreign keys, a 5-second busy timeout, one connection, and forward schema migrations.
 - The SQLite file is authoritative for the canonical model, income snapshot, sync state, and completed projection artifacts.
-- `SaveDocument` atomically replaces owner rows. Rows use `source: "model" | "simplefin"`. Stored sync-owned rows survive model saves, and owner checkpoints win key collisions.
+- `SaveDocument` atomically replaces owner rows. `SaveDocumentIfUnchanged` performs the same replacement only when the caller's ETag still matches the stored content. Rows use `source: "model" | "simplefin"`. Stored sync-owned rows survive model saves, and owner checkpoints win key collisions.
 - `NET_WORTH_ESTIMATOR_READ_ONLY=1`, `true`, or `yes` rejects `PUT /v1/financial-model` and `POST /v1/sync/simplefin` with 403 before bearer validation.
 - When `NET_WORTH_ESTIMATOR_AUTH_TOKEN` is non-empty, guarded routes require `Authorization: Bearer <token>`. Missing or incorrect values return 401. Reads and projection computation remain available.
-- `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` accepts comma-separated exact HTTP/S origins. A request carrying any other origin is rejected; a request without an origin passes. Origin filtering is not authorization for direct API callers.
+- `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` accepts comma-separated exact HTTP/S origins. Same-origin requests are allowed automatically; configured origins are also allowed. A request carrying any other origin is rejected, while a request without an origin passes. Behind a TLS-terminating proxy, forward exactly one valid `X-Forwarded-Proto` and `X-Forwarded-Host` value, or configure the public HTTPS origin explicitly. Origin filtering is not authorization for direct API callers.
 - There is no HTTP reset route. Use a database backup and the offline import tool for operator-controlled replacement.
 - Completed projection artifacts are best-effort cached. The cache is bounded to 256 deterministic and stochastic rows combined. Cache failures fail open; requested projection computation still runs.
 - Canonical edits and cached artifacts survive redeployment only when the SQLite file is on durable storage.
@@ -107,7 +107,7 @@ SimpleFIN is optional and narrow:
 - the guarded trigger endpoint permits one in-flight run and spaces successful manual runs by 20 hours;
 - fixture mode is for local verification only and follows the same mapping, ownership, and persistence path as a real run.
 
-A removed model account does not garbage-collect sync rows. Operators must keep mappings valid or purge the affected source rows deliberately.
+A model save that removes an account referenced by sync-owned rows preserves that account so observations and postings cannot become orphaned. Sync rows are not garbage-collected; operators must keep mappings valid or purge affected source rows deliberately.
 
 ## Run from Source
 
@@ -117,14 +117,15 @@ From the repository root:
 NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
 NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs" \
 NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income" \
+NET_WORTH_ESTIMATOR_FRONTEND_PATH="$PWD/waypoint-frontend/dist" \
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-The `go -C` command changes the process working directory to `backend`, which is why the seed paths above are absolute. The default local database path is under the operating system's per-user configuration directory; `/tmp` keeps test runs isolated.
+The `go -C` command changes the process working directory to `backend`, which is why the seed paths above are absolute. Build the frontend first, or omit `NET_WORTH_ESTIMATOR_FRONTEND_PATH` for an API-only process. The default local database path is under the operating system's per-user configuration directory; `/tmp` keeps test runs isolated.
 
 ## Container and Northflank Contract
 
-The root `Dockerfile` builds a Go 1.27 server, runs it as UID/GID `10001`, listens on `0.0.0.0:8787`, and defaults SQLite to `/data/net-worth-estimator.db`.
+The root `Dockerfile` builds the Go server and Waypoint frontend, runs the server as UID/GID `10001`, listens on `0.0.0.0:8787`, serves the frontend at `/`, and defaults SQLite to `/data/net-worth-estimator.db`.
 
 Local durable-container run:
 

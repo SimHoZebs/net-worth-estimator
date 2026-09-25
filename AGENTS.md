@@ -8,10 +8,11 @@ From the repository root:
 NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
 NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs" \
 NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income" \
+NET_WORTH_ESTIMATOR_FRONTEND_PATH="$PWD/waypoint-frontend/dist" \
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-The server listens on `127.0.0.1:8787` by default. Seed paths are resolved from the process working directory, so use absolute paths when starting through `go -C`.
+The server listens on `127.0.0.1:8787` by default. Seed paths are resolved from the process working directory, so use absolute paths when starting through `go -C`. The optional `NET_WORTH_ESTIMATOR_FRONTEND_PATH` enables built frontend assets and SPA fallback.
 
 ## Backend Map
 
@@ -37,7 +38,8 @@ The server listens on `127.0.0.1:8787` by default. Seed paths are resolved from 
 | `NET_WORTH_ESTIMATOR_DB` | per-user SQLite path; container `/data/net-worth-estimator.db` | canonical data and artifacts |
 | `NET_WORTH_ESTIMATOR_MODEL_PATH` | `public/configs` | first-boot model seed directory |
 | `NET_WORTH_ESTIMATOR_INCOME_PATH` | `public/data/income` | first-boot income seed directory |
-| `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` | empty | comma-separated exact HTTP/S origins |
+| `NET_WORTH_ESTIMATOR_FRONTEND_PATH` | empty | built frontend directory for same-origin static serving and SPA fallback |
+| `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` | empty | comma-separated exact HTTP/S origins; same-origin requests are allowed automatically |
 | `NET_WORTH_ESTIMATOR_READ_ONLY` | writable | `1`, `true`, or `yes` rejects guarded writes with 403 |
 | `NET_WORTH_ESTIMATOR_AUTH_TOKEN` | empty | bearer token for guarded writes |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` | empty | Bridge Access URL secret; enables real sync |
@@ -50,10 +52,12 @@ The server listens on `127.0.0.1:8787` by default. Seed paths are resolved from 
 ## API and Persistence Flow
 
 - `api.New(store.Store, api.Config)` builds the router. `GET /healthz`, `GET/PUT /v1/financial-model`, `GET /v1/status`, `GET /v1/income-data`, `POST /v1/projections/deterministic`, `POST /v1/projections/stochastic`, and `POST /v1/sync/simplefin` are the current routes.
+- `GET /v1/financial-model` returns an `ETag` and revision; `PUT /v1/financial-model` requires `If-Match`, returns 428 when it is missing, and returns 412 for a stale content identity.
 - `PUT /v1/financial-model` validates against the stored income snapshot. Error diagnostics return the document and issues without persisting it; warning-only documents are persisted.
+- `api.Config.FrontendDir` optionally serves the built Waypoint frontend with same-origin static assets and SPA fallback.
 - The read-only guard runs before bearer validation on model saves and sync triggers. A missing or wrong bearer returns 401 when a token is configured. Reads and projection computation remain unguarded.
 - `store.Open` applies schema migrations and enables SQLite WAL, foreign keys, a 5-second busy timeout, and one connection. An empty database is seeded once from CSV by `cmd/server`; later CSV edits do not replace stored data.
-- `store.Store` is the persistence boundary. `SaveDocument` atomically replaces owner rows while preserving sync-owned rows. Checkpoints and postings carry `source: "model" | "simplefin"`; sync-owned checkpoint collisions yield to owner rows.
+- `store.Store` is the persistence boundary. `SaveDocument` atomically replaces owner rows while preserving sync-owned rows; `SaveDocumentIfUnchanged` rejects stale content identities. Checkpoints and postings carry `source: "model" | "simplefin"`; sync-owned checkpoint collisions yield to owner rows.
 - Completed deterministic and seeded stochastic results are best-effort cached in `projection_artifacts`. The cache is bounded to 256 rows across both kinds. Partial results are not persisted. Unseeded stochastic runs are neither shared nor cached.
 - The root `Dockerfile` runs as UID/GID `10001`, listens on `0.0.0.0:8787`, and stores SQLite at `/data/net-worth-estimator.db`. Production durability requires `/data` on persistent storage and one service instance.
 

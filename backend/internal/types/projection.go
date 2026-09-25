@@ -43,7 +43,9 @@ type MovementEvent struct {
 		AccountID string  `json:"accountId"`
 		Delta     float64 `json:"delta"`
 	} `json:"accountDeltas"`
-	Income *IncomeEvent `json:"income,omitempty"`
+	BindingConstraints []JsonValue  `json:"bindingConstraints,omitempty"`
+	AvailableAmount    *float64     `json:"availableAmount,omitempty"`
+	Income             *IncomeEvent `json:"income,omitempty"`
 }
 
 type AccountSnapshot struct {
@@ -111,7 +113,8 @@ type ProjectionResult struct {
 		CurrentNetWorth float64 `json:"currentNetWorth"`
 		FinalNetWorth   float64 `json:"finalNetWorth"`
 	} `json:"summary"`
-	Evaluations EvaluationResultTables `json:"evaluations"`
+	Evaluations    EvaluationResultTables `json:"evaluations"`
+	MovementEvents []MovementEvent        `json:"movementEvents,omitempty"`
 }
 
 // ProjectionPath is the evaluator-facing immutable timeline.

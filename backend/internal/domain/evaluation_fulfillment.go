@@ -91,6 +91,11 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 		postingsByID[posting.ID] = posting
 	}
 	realizedByPostingAndYear := map[string]float64{}
+	for postingID, byYear := range path.ProjectionStartPostingState.RealizedPostingAmountsByYear {
+		for year, amount := range byYear {
+			realizedByPostingAndYear[postingID+":"+year] = amount
+		}
+	}
 
 	sorted := make([]*types.MovementEvent, len(path.MovementEvents))
 	for index := range path.MovementEvents {
