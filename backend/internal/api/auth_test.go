@@ -9,9 +9,12 @@ import (
 	"testing"
 )
 
-func putDocument(handler http.Handler, document json.RawMessage, authorization string) *httptest.ResponseRecorder {
+func putDocument(handler http.Handler, document json.RawMessage, authorization, ifMatch string) *httptest.ResponseRecorder {
 	request := httptest.NewRequest(http.MethodPut, "/v1/financial-model", bytes.NewReader(document))
 	request.Header.Set("Content-Type", "application/json")
+	if ifMatch != "" {
+		request.Header.Set("If-Match", ifMatch)
+	}
 	if authorization != "" {
 		request.Header.Set("Authorization", authorization)
 	}
@@ -51,12 +54,13 @@ func TestPutAuthMatrix(t *testing.T) {
 			handler.ServeHTTP(before, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
 			var beforePayload struct {
 				Document json.RawMessage `json:"document"`
+				Revision string          `json:"revision"`
 			}
 			if err := json.Unmarshal(before.Body.Bytes(), &beforePayload); err != nil {
 				t.Fatalf("decode GET response: %v", err)
 			}
 
-			response := putDocument(handler, beforePayload.Document, test.authHeader)
+			response := putDocument(handler, beforePayload.Document, test.authHeader, beforePayload.Revision)
 			if response.Code != test.want {
 				t.Fatalf("PUT status = %d, want %d, body %s", response.Code, test.want, response.Body.String())
 			}

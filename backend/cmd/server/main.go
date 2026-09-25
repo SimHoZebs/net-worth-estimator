@@ -70,6 +70,7 @@ func main() {
 	}
 	modelPath := envOr("NET_WORTH_ESTIMATOR_MODEL_PATH", "public/configs")
 	incomePath := envOr("NET_WORTH_ESTIMATOR_INCOME_PATH", "public/data/income")
+	frontendPath := envOr("NET_WORTH_ESTIMATOR_FRONTEND_PATH", "")
 	allowedOrigins, err := parseAllowedOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
 	if err != nil {
 		log.Fatalf("configure allowed origins: %v", err)
@@ -104,6 +105,7 @@ func main() {
 		ReadOnly:       readOnly,
 		AuthToken:      authToken,
 		SyncRunner:     syncRunner,
+		FrontendDir:    frontendPath,
 	})
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),

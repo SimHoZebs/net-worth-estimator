@@ -4,15 +4,18 @@ import (
 	"context"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 type parseResultBody struct {
 	Document *types.FinancialModelDocument `json:"document"`
 	Issues   []types.ModelValidationIssue  `json:"issues"`
+	Revision string                        `json:"revision,omitempty"`
 }
 
 type getModelOutput struct {
+	ETag string `header:"ETag"`
 	Body parseResultBody
 }
 
@@ -33,13 +36,28 @@ func (s *Server) getModel(_ context.Context, _ *struct{}) (*getModelOutput, erro
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	return &getModelOutput{Body: parseResultBody{Document: document, Issues: issues}}, nil
+	revision, err := store.DocumentETag(document)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	return &getModelOutput{ETag: revision, Body: parseResultBody{Document: document, Issues: issues, Revision: revision}}, nil
 }
 
 func (s *Server) putModel(_ context.Context, input *struct {
-	Body types.FinancialModelDocument `json:"body"`
+	IfMatch string                       `header:"If-Match"`
+	Body    types.FinancialModelDocument `json:"body"`
 }) (*getModelOutput, error) {
 	document := &input.Body
+	if input.IfMatch == "" {
+		return nil, huma.Error428PreconditionRequired("If-Match is required for financial model writes. Reload the model before saving.")
+	}
+	matches, err := s.store.DocumentMatchesETag(input.IfMatch)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	if !matches {
+		return nil, huma.Error412PreconditionFailed("The server model changed after it was loaded. Reload it before saving.")
+	}
 	effectiveIncome, err := s.store.LoadIncomeData()
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
@@ -53,11 +71,32 @@ func (s *Server) putModel(_ context.Context, input *struct {
 		}
 	}
 	if !hasErrors {
-		if err := s.store.SaveDocument(document); err != nil {
+		saved, err := s.store.SaveDocumentIfUnchanged(document, input.IfMatch)
+		if err != nil {
 			return nil, huma.Error500InternalServerError(err.Error())
 		}
+		if !saved {
+			return nil, huma.Error412PreconditionFailed("The server model changed after it was loaded. Reload it before saving.")
+		}
+		canonical, err := s.store.LoadDocument()
+		if err != nil {
+			return nil, huma.Error500InternalServerError(err.Error())
+		}
+		document = canonical
 	}
-	return &getModelOutput{Body: parseResultBody{Document: document, Issues: issues}}, nil
+	var revisionDocument *types.FinancialModelDocument = document
+	if hasErrors {
+		var loadErr error
+		revisionDocument, loadErr = s.store.LoadDocument()
+		if loadErr != nil {
+			return nil, huma.Error500InternalServerError(loadErr.Error())
+		}
+	}
+	revision, err := store.DocumentETag(revisionDocument)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	return &getModelOutput{ETag: revision, Body: parseResultBody{Document: document, Issues: issues, Revision: revision}}, nil
 }
 
 type statusOutput struct {

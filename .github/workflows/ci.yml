@@ -23,3 +23,21 @@ jobs:
       - run: go vet ./internal/... ./cmd/...
       - run: go build ./internal/... ./cmd/...
       - run: go test -race ./internal/... ./cmd/...
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: waypoint-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: waypoint-frontend/package-lock.json
+      - run: npm ci --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

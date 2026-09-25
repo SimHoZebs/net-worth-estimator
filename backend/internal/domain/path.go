@@ -2,6 +2,7 @@ package domain
 
 import (
 	"math"
+	"sort"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -61,6 +62,137 @@ func roundRow(row types.ProjectionRow) types.ProjectionRow {
 		}
 	}
 	return row
+}
+
+type movementAccountDelta = struct {
+	AccountID string  `json:"accountId"`
+	Delta     float64 `json:"delta"`
+}
+
+func cloneIncomeEvent(income *types.IncomeEvent) *types.IncomeEvent {
+	if income == nil {
+		return nil
+	}
+	cloned := *income
+	cloned.AnnualGrossIncome = roundCurrency(income.AnnualGrossIncome)
+	cloned.GrossAmount = roundCurrency(income.GrossAmount)
+	cloned.NetCashRequested = roundCurrency(income.NetCashRequested)
+	cloned.NetCashRealized = roundCurrency(income.NetCashRealized)
+	cloned.EmployerMatchRequested = roundCurrency(income.EmployerMatchRequested)
+	cloned.EmployerMatchRealized = roundCurrency(income.EmployerMatchRealized)
+	if income.Resolvers != nil {
+		cloned.Resolvers = make([]types.IncomeResolverEvent, len(income.Resolvers))
+		for index, resolver := range income.Resolvers {
+			resolver.RequestedAmount = roundCurrency(resolver.RequestedAmount)
+			resolver.RealizedAmount = roundCurrency(resolver.RealizedAmount)
+			resolver.TaxableAmountAfter = roundCurrency(resolver.TaxableAmountAfter)
+			resolver.EmployerMatchAmount = roundCurrency(resolver.EmployerMatchAmount)
+			resolver.EmployerMatchRealizedAmount = roundCurrency(resolver.EmployerMatchRealizedAmount)
+			if resolver.DestinationAccountID != nil {
+				destinationID := *resolver.DestinationAccountID
+				resolver.DestinationAccountID = &destinationID
+			}
+			cloned.Resolvers[index] = resolver
+		}
+	}
+	return &cloned
+}
+
+func cloneMovementEvent(event types.MovementEvent) types.MovementEvent {
+	cloned := event
+	cloned.RequestedAmount = roundCurrency(event.RequestedAmount)
+	cloned.RealizedAmount = roundCurrency(event.RealizedAmount)
+	if event.AccountDeltas != nil {
+		cloned.AccountDeltas = make([]movementAccountDelta, len(event.AccountDeltas))
+		for index, delta := range event.AccountDeltas {
+			cloned.AccountDeltas[index] = delta
+			cloned.AccountDeltas[index].Delta = roundCurrency(delta.Delta)
+		}
+	}
+	if event.BindingConstraints != nil {
+		cloned.BindingConstraints = make([]types.JsonValue, len(event.BindingConstraints))
+		copy(cloned.BindingConstraints, event.BindingConstraints)
+	}
+	if event.AvailableAmount != nil {
+		available := roundCurrency(*event.AvailableAmount)
+		cloned.AvailableAmount = &available
+	}
+	cloned.Income = cloneIncomeEvent(event.Income)
+	return cloned
+}
+
+func publicMovementEvents(path *types.ProjectionPath) []types.MovementEvent {
+	if path.MovementEvents == nil {
+		return nil
+	}
+	evaluatedBySequence := make(map[int][]accountMovementConstraint)
+	for _, evaluated := range evaluateMovementEvents(path) {
+		evaluatedBySequence[evaluated.event.Sequence] = evaluated.bindingConstraints
+	}
+	balancesBeforeBySequence := ReconstructBalancesBeforeEvents(path)
+	accountsByID := make(map[string]types.Account, len(path.EffectiveDocument.Accounts))
+	for _, account := range path.EffectiveDocument.Accounts {
+		accountsByID[account.ID] = account
+	}
+	postingsByID := make(map[string]*types.Posting, len(path.EffectiveDocument.Postings))
+	for index := range path.EffectiveDocument.Postings {
+		posting := &path.EffectiveDocument.Postings[index]
+		postingsByID[posting.ID] = posting
+	}
+	capRemainingBySequence := map[int]float64{}
+	realizedByPostingAndYear := map[string]float64{}
+	for postingID, byYear := range path.ProjectionStartPostingState.RealizedPostingAmountsByYear {
+		for year, amount := range byYear {
+			realizedByPostingAndYear[postingID+":"+year] = amount
+		}
+	}
+	orderedEvents := make([]*types.MovementEvent, len(path.MovementEvents))
+	for index := range path.MovementEvents {
+		orderedEvents[index] = &path.MovementEvents[index]
+	}
+	sort.SliceStable(orderedEvents, func(i, j int) bool {
+		if orderedEvents[i].Date != orderedEvents[j].Date {
+			return orderedEvents[i].Date < orderedEvents[j].Date
+		}
+		return orderedEvents[i].Sequence < orderedEvents[j].Sequence
+	})
+	for _, event := range orderedEvents {
+		posting := postingsByID[event.Origin.PostingID]
+		if posting == nil || posting.AnnualCap == nil {
+			continue
+		}
+		key := event.Origin.PostingID + ":" + event.Date[:4]
+		remaining := math.Max(0, *posting.AnnualCap-realizedByPostingAndYear[key])
+		capRemainingBySequence[event.Sequence] = remaining
+		realizedByPostingAndYear[key] += event.RealizedAmount
+	}
+	events := make([]types.MovementEvent, len(path.MovementEvents))
+	for index, source := range path.MovementEvents {
+		event := cloneMovementEvent(source)
+		event.BindingConstraints = nil
+		event.AvailableAmount = nil
+		constraints := evaluatedBySequence[source.Sequence]
+		if len(constraints) > 0 {
+			event.BindingConstraints = make([]types.JsonValue, len(constraints))
+			for constraintIndex, constraint := range constraints {
+				event.BindingConstraints[constraintIndex] = constraint.toTypes()
+			}
+			if posting := postingsByID[source.Origin.PostingID]; posting != nil && posting.SourceAccountID != nil {
+				if _, exists := accountsByID[*posting.SourceAccountID]; exists {
+					if balancesBefore, ok := balancesBeforeBySequence[source.Sequence]; ok {
+						available := GetWithdrawableAmount(balancesBefore, accountsByID, *posting.SourceAccountID)
+						if remaining, capped := capRemainingBySequence[source.Sequence]; capped && remaining < available {
+							available = remaining
+						}
+						available = roundCurrency(available)
+						event.AvailableAmount = &available
+					}
+				}
+			}
+		}
+		events[index] = event
+	}
+	return events
 }
 
 type classifiedAttempts struct {
@@ -240,6 +372,7 @@ func AdaptSimulationRun(prepared *types.PreparedProjection, run *types.Simulatio
 		finalNetWorth = latestRow.NetWorth
 	}
 	result.Summary.FinalNetWorth = roundCurrency(finalNetWorth)
+	result.MovementEvents = publicMovementEvents(path)
 
 	copyResultTables := func(dst *types.EvaluationResultTables) {}
 	_ = copyResultTables
