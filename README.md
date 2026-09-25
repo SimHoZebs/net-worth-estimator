@@ -117,7 +117,7 @@ From the repository root:
 NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
 NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs" \
 NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income" \
-NET_WORTH_ESTIMATOR_FRONTEND_PATH="$PWD/waypoint-frontend/dist" \
+NET_WORTH_ESTIMATOR_FRONTEND_PATH="$PWD/frontend/dist" \
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
