@@ -16,10 +16,10 @@ FROM node:24-alpine AS frontend-build
 
 WORKDIR /build/frontend
 
-COPY waypoint-frontend/package.json waypoint-frontend/package-lock.json ./
+COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-COPY waypoint-frontend/ ./
+COPY frontend/ ./
 RUN npm run build
 
 FROM alpine:3.22

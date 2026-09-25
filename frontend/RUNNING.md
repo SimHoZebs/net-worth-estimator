@@ -7,19 +7,19 @@ A household financial planning frontend with a local fixture mode and a same-ori
 Use Node.js 24 or newer. The default build uses server mode and expects the Go API on `127.0.0.1:8787`. From the repository root, start the backend with the frontend bundle available:
 
 ```sh
-npm --prefix waypoint-frontend ci
-npm --prefix waypoint-frontend run build
+npm --prefix frontend ci
+npm --prefix frontend run build
 NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
 NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs" \
 NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income" \
-NET_WORTH_ESTIMATOR_FRONTEND_PATH="$PWD/waypoint-frontend/dist" \
+NET_WORTH_ESTIMATOR_FRONTEND_PATH="$PWD/frontend/dist" \
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
 The production server serves the frontend and API together on port `8787`. During frontend development, run the backend separately and use the Vite proxy:
 
 ```sh
-cd waypoint-frontend
+cd frontend
 VITE_WAYPOINT_MODE=server npm run dev
 ```
 
