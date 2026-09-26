@@ -22,7 +22,6 @@ type PageInputs = Pick<
 	| "setYears"
 	| "ranges"
 	| "setRanges"
-	| "serverMode"
 	| "serverStatus"
 	| "serverDocument"
 	| "onImportServerDocument"
@@ -57,7 +56,6 @@ export function WorkspacePage({
 		setYears,
 		ranges,
 		setRanges,
-		serverMode = false,
 		serverStatus = null,
 		serverDocument = null,
 		onImportServerDocument,
@@ -133,7 +131,6 @@ export function WorkspacePage({
 					savedProjection={savedProjection}
 					snapshot={workspace.snapshot}
 					years={years}
-					serverMode={serverMode}
 					readOnly={readOnly}
 					onCapture={state.capture}
 					onSave={() => Promise.resolve(state.save())}
@@ -145,8 +142,6 @@ export function WorkspacePage({
 				<SourcesPage
 					plan={plan}
 					workspace={workspace}
-					onReplace={state.replace}
-					serverMode={serverMode}
 					serverStatus={serverStatus}
 					serverDocument={serverDocument}
 					onImportServerDocument={onImportServerDocument}

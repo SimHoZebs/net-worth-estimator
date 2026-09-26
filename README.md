@@ -124,7 +124,7 @@ CGO_ENABLED=0 go -C backend run ./cmd/server
 ```bash
 # terminal 2
 npm --prefix frontend ci
-VITE_WAYPOINT_MODE=server npm --prefix frontend run dev
+npm --prefix frontend run dev
 ```
 
 The Vite server runs on `http://localhost:5178` and proxies `/v1` to `127.0.0.1:8787`. The default local database path is under the operating system's per-user configuration directory; `/tmp` keeps test runs isolated.

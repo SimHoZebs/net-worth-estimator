@@ -13,7 +13,6 @@ export function ComparePage({
 	savedProjection,
 	snapshot,
 	years,
-	serverMode = false,
 	readOnly = saved.readOnly,
 	onCapture,
 	onSave,
@@ -25,7 +24,6 @@ export function ComparePage({
 	savedProjection: Projection;
 	snapshot: Snapshot | null;
 	years: number;
-	serverMode?: boolean;
 	readOnly?: boolean;
 	onCapture: (snapshot: Snapshot) => void;
 	onSave: () => undefined | Promise<boolean>;
@@ -74,7 +72,6 @@ export function ComparePage({
 			/>
 			<ChangesPanel
 				changes={changes}
-				serverMode={serverMode}
 				readOnly={readOnly}
 				saving={saving}
 				onSave={() => {

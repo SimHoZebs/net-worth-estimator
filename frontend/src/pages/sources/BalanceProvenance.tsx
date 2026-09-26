@@ -2,23 +2,13 @@ import { Badge } from "../../components/ui.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 
-export function BalanceProvenance({
-	plan,
-	serverMode,
-}: {
-	plan: Plan;
-	serverMode: boolean;
-}) {
+export function BalanceProvenance({ plan }: { plan: Plan }) {
 	return (
 		<section className="panel provenance-panel">
 			<div className="section-top">
 				<div>
 					<h2>Behind the balances</h2>
-					<p>
-						{serverMode
-							? "Display view of the canonical server records."
-							: "Every starting value has a basis."}
-					</p>
+					<p>"Display view of the canonical server records."</p>
 				</div>
 			</div>
 			<div className="table-scroll">

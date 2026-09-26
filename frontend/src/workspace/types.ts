@@ -40,10 +40,9 @@ export type WorkspaceShellProps = {
 	setYears: (years: number) => void;
 	ranges: boolean;
 	setRanges: (ranges: boolean) => void;
-	serverMode?: boolean;
 	serverStatus?: ServerStatus | null;
 	serverDocument?: FinancialModelDocument | null;
-	onImportServerDocument?: (
+	onImportServerDocument: (
 		document: FinancialModelDocument,
 	) => Promise<boolean>;
 	readOnly?: boolean;

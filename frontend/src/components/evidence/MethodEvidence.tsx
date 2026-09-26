@@ -18,13 +18,7 @@ const steps = [
 			"Edit a temporary version, compare the outcome, and explicitly save or discard. Drafts stay in this browser between visits.",
 	},
 ];
-export function MethodEvidence({
-	serverMode,
-	onClose,
-}: {
-	serverMode: boolean;
-	onClose: () => void;
-}) {
+export function MethodEvidence({ onClose }: { onClose: () => void }) {
 	return (
 		<Modal
 			title="A considered view of your future"
@@ -45,9 +39,10 @@ export function MethodEvidence({
 			<div className="inline-notice">
 				<Info size={18} />
 				<span>
-					{serverMode
-						? "The saved financial model is loaded from the Waypoint server. Temporary edits stay in this browser until you explicitly save them. Projections are planning aids and do not provide investment, tax or legal advice."
-						: "This independent frontend uses a local financial model. No bank or server is connected. Projections are planning aids and do not provide investment, tax or legal advice."}
+					"The saved financial model is loaded from the Waypoint server.
+					Temporary edits stay in this browser until you explicitly save them.
+					Projections are planning aids and do not provide investment, tax or
+					legal advice."
 				</span>
 			</div>
 		</Modal>

@@ -10,13 +10,11 @@ export function WorkspaceEvidence({
 	plan,
 	projection,
 	temporary,
-	serverMode,
 }: {
 	overlays: WorkspaceOverlays;
 	plan: Plan;
 	projection: ProjectionState;
 	temporary: boolean;
-	serverMode: boolean;
 }) {
 	if (
 		!overlays.evidence ||
@@ -31,7 +29,6 @@ export function WorkspaceEvidence({
 			projection={projection.base}
 			range={projection.range}
 			temporary={temporary}
-			serverMode={serverMode}
 			onClose={overlays.closeEvidence}
 			onEdit={overlays.editFromEvidence}
 		/>

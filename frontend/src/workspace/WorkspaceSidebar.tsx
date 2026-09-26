@@ -15,7 +15,6 @@ export function WorkspaceSidebar({
 	page,
 	planName,
 	changeCount,
-	serverMode,
 	statusLabel,
 	onNavigate,
 	onMethod,
@@ -24,7 +23,6 @@ export function WorkspaceSidebar({
 	page: Page;
 	planName: string;
 	changeCount: number;
-	serverMode: boolean;
 	statusLabel: string;
 	onNavigate: (page: Page) => void;
 	onMethod: () => void;
@@ -52,9 +50,7 @@ export function WorkspaceSidebar({
 				<span className="household-avatar">H</span>
 				<span>
 					<strong>{planName}</strong>
-					<small>
-						{serverMode ? "Server household" : "Personal workspace"}
-					</small>
+					<small>{"Server household"}</small>
 				</span>
 				<ChevronDown size={14} />
 			</button>
@@ -88,9 +84,8 @@ export function WorkspaceSidebar({
 					</span>
 					<strong>A little more peace of mind.</strong>
 					<p>
-						{serverMode
-							? "Your canonical server model lives on the server. Temporary edits stay in this browser until you save."
-							: "Your plan stays on this device. Your decisions stay yours."}
+						"Your canonical server model lives on the server. Temporary edits
+						stay in this browser until you save."
 					</p>
 					<button type="button" className="text-button" onClick={onMethod}>
 						How it works <ArrowUpRight size={14} />

@@ -1,6 +1,6 @@
 # Waypoint
 
-A household financial planning frontend with a local fixture mode and a same-origin Go backend mode.
+A household financial planning frontend backed by the Go API.
 
 ## Run
 
@@ -17,13 +17,13 @@ Start the Vite frontend in a second terminal:
 
 ```sh
 npm --prefix frontend ci
-VITE_WAYPOINT_MODE=server npm --prefix frontend run dev
+npm --prefix frontend run dev
 ```
 
-The development server uses port `5178` and proxies `/v1` to `http://127.0.0.1:8787`. The fixture suite uses the same UI with explicitly selected local data:
+The development server uses port `5178` and proxies `/v1` to the backend named by `NET_WORTH_ESTIMATOR_BACKEND` (default `http://127.0.0.1:8787`).
 
 ```sh
-VITE_WAYPOINT_MODE=fixture npm --prefix frontend run dev
+
 ```
 
 ## Production build and containers
@@ -61,16 +61,16 @@ npm run typecheck
 npm test
 npx playwright install chromium
 npm run build
-VITE_WAYPOINT_MODE=fixture npm run test:browser
+npm run test:browser
 sh ../scripts/smoke-compose.sh
-TEST_PRODUCTION=1 VITE_WAYPOINT_MODE=fixture npm run test:browser
+TEST_PRODUCTION=1 npm run test:browser
 ```
 
 Browser tests cover plan editing, persistent drafts, deliberate save and discard, import validation, read-only sources, corrupt storage, storage failures, cross-tab protection, comparison snapshots, export, scenario failures, keyboard navigation, responsive layouts, and automated WCAG accessibility checks. Screenshots are written under `test-results/`.
 
 ## Workspace and data
 
-- Fixture mode starts with an explicitly labeled illustrative household and stores plans under `waypoint.workspace.v1`.
+- Browser tests run against the fixtureapi harness, which serves the real API from a recorded CSV fixture.
 - Server mode loads the canonical model from the Go API. Temporary versions and recovery snapshots stay in this browser under `waypoint.remote-workspace.v1` until an explicit save or discard.
 - Applying a form creates or changes a temporary version. Saving explicitly replaces the saved plan; discarding explicitly restores it.
 - A failed storage write retains the in-memory temporary version and offers export. A stale browser tab cannot overwrite a newer stored workspace.
@@ -90,7 +90,7 @@ The list contains the records available in the plan; it does not establish compl
 
 ## Calculation boundaries
 
-Fixture mode uses the independent local calculation model for its illustrative workspace. Server mode sends the canonical model and income snapshot to the Go backend for deterministic and stochastic projections; the frontend maps those results for display and keeps local edits as a temporary review layer.
+The canonical model and income snapshot go to the Go backend for deterministic and stochastic projections; the frontend maps those results for display and keeps local edits as a temporary review layer.
 
 The base case compounds account rates between dated movements. Monthly and yearly schedules preserve their intended day, clamped to month end where needed. Amount increases apply on schedule anniversaries. Protected balances limit withdrawals, account ceilings limit incoming movements, and debt payments stop at zero.
 
@@ -104,11 +104,11 @@ Income evidence uses recorded, enabled one-time external inflows. Similar amount
 
 ## Structure
 
-- `src/domain/`: validated plan types, example data, local fixture projections, scenario ranges and income evidence.
+- `src/domain/`: validated plan types, derived views, scenario ranges and income evidence.
 - `src/api/`: backend contracts, same-origin client, SSE parsing and display/document adapters.
-- `src/state/`: browser persistence, remote hydration, conditional saves and worker-backed calculation state.
+- `src/state/`: browser persistence, remote hydration, conditional saves and projection state.
 - `src/components/`: accessible controls, evidence dialogs, editing forms and visualization.
 - `src/pages/`: outlook, plan maintenance, goals, comparison and sources.
 - `tests/`: browser workflows and accessibility checks.
 
-The frontend is part of the repository and uses the Go API in server mode; fixture mode remains available for isolated UI work.
+The frontend is part of the repository and always uses the Go API.

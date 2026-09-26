@@ -12,8 +12,6 @@ import { SourcePortability } from "./sources/SourcePortability.tsx";
 export function SourcesPage({
 	plan,
 	workspace,
-	onReplace,
-	serverMode = false,
 	serverStatus = null,
 	readOnly = workspace.saved.readOnly || Boolean(serverStatus?.readOnly),
 	serverDocument = null,
@@ -21,20 +19,15 @@ export function SourcesPage({
 }: {
 	plan: Plan;
 	workspace: Workspace;
-	onReplace: (plan: Plan) => boolean;
-	serverMode?: boolean;
 	serverStatus?: ServerStatus | null;
 	readOnly?: boolean;
 	serverDocument?: FinancialModelDocument | null;
-	onImportServerDocument?: (
+	onImportServerDocument: (
 		document: FinancialModelDocument,
 	) => Promise<boolean>;
 }) {
 	const controller = useModelImport({
-		plan,
 		workspace,
-		onReplace,
-		serverMode,
 		readOnly,
 		serverDocument,
 		onImportServerDocument,
@@ -43,38 +36,29 @@ export function SourcesPage({
 		? "Read-only server"
 		: serverStatus?.authEnabled
 			? "Auth required"
-			: serverMode
-				? "Writable server"
-				: "Writable local copy";
+			: "Writable server";
 	const hasDraft = Boolean(workspace.draft);
 	const canImportServer = Boolean(onImportServerDocument);
 	return (
 		<>
-			<SourceBanner
-				plan={plan}
-				serverMode={serverMode}
-				sourceAccess={sourceAccess}
-			/>
+			<SourceBanner sourceAccess={sourceAccess} />
 			{controller.error && <ErrorNotice message={controller.error} />}
 			<div className="sources-grid">
 				<SourceHealth
 					plan={plan}
 					workspace={workspace}
-					serverMode={serverMode}
 					serverDocument={serverDocument}
 					sourceAccess={sourceAccess}
 				/>
 				<SourcePortability
-					serverMode={serverMode}
-					hasDraft={hasDraft}
 					hasServerDocument={Boolean(serverDocument)}
 					canImportServer={canImportServer}
 					readOnly={readOnly}
 					controller={controller}
 				/>
 			</div>
-			<BalanceProvenance plan={plan} serverMode={serverMode} />
-			<IncomeEvidence plan={plan} serverMode={serverMode} />
+			<BalanceProvenance plan={plan} />
+			<IncomeEvidence plan={plan} />
 			<SourceImportPreview
 				hasDraft={hasDraft}
 				canImportServer={canImportServer}
