@@ -132,32 +132,63 @@ describe("backend and display plan adapter", () => {
 		);
 	});
 
-	it("treats only explicit SimpleFIN postings as recorded", () => {
-		const modelDocument = documentFixture();
-		modelDocument.postings[0] = {
-			...modelDocument.postings[0]!,
+	// The backend has no provenance field, so it is inferred. A one-time
+	// movement dated at or before the projection start is recorded history
+	// whoever authored it; a recurring rule is a plan, not a past event.
+	it("infers recorded history from a one-time movement before the projection start", () => {
+		const past = documentFixture();
+		past.postings[0] = {
+			...past.postings[0]!,
 			frequency: "once",
 			startDate: "2026-01-01",
 			source: "model",
 		};
-		const modelConversion = backendToDisplayPlan({
-			document: modelDocument,
+		const pastConversion = backendToDisplayPlan({
+			document: past,
 			status: { readOnly: false, authEnabled: false },
 			projection: projectionFixture(),
 		});
+		expect(pastConversion.plan.movements[0]?.provenance).toBe("recorded");
+		// Inference is still provisional: the backend cannot confirm it.
+		expect(pastConversion.report.provisionalFields).toContain(
+			"movements.0.provenance",
+		);
 
-		expect(modelConversion.plan.movements[0]?.provenance).toBe("planned");
-		expect(modelConversion.report.warnings).toContainEqual(
+		const future = documentFixture();
+		future.postings[0] = {
+			...future.postings[0]!,
+			frequency: "once",
+			startDate: "2026-06-01",
+			source: "model",
+		};
+		const futureConversion = backendToDisplayPlan({
+			document: future,
+			status: { readOnly: false, authEnabled: false },
+			projection: projectionFixture(),
+		});
+		expect(futureConversion.plan.movements[0]?.provenance).toBe("planned");
+		expect(futureConversion.report.warnings).toContainEqual(
 			expect.objectContaining({
 				code: "posting-provenance-inferred",
 				path: "movements.0.provenance",
 			}),
 		);
-		expect(modelConversion.report.provisionalFields).toContain(
-			"movements.0.provenance",
-		);
 
-		const simplefinDocument = structuredClone(modelDocument);
+		const recurring = documentFixture();
+		recurring.postings[0] = {
+			...recurring.postings[0]!,
+			frequency: "monthly",
+			startDate: "2026-01-01",
+			source: "model",
+		};
+		const recurringConversion = backendToDisplayPlan({
+			document: recurring,
+			status: { readOnly: false, authEnabled: false },
+			projection: projectionFixture(),
+		});
+		expect(recurringConversion.plan.movements[0]?.provenance).toBe("planned");
+
+		const simplefinDocument = structuredClone(past);
 		simplefinDocument.postings[0]!.source = "simplefin";
 		const simplefinConversion = backendToDisplayPlan({
 			document: simplefinDocument,

@@ -250,6 +250,21 @@ function fallbackStartDate(
 	);
 }
 
+// A posting is recorded history when a bank supplied it, or when it is a
+// one-time movement that happened at or before the projection start. The
+// backend has no provenance field, so this is inferred from what the document
+// already carries. Inferring only from the source would label model-authored
+// past activity as a future plan.
+function postingProvenance(
+	posting: BackendPosting,
+	projectionStartDate: IsoDate,
+): Movement["provenance"] {
+	if (posting.source === "simplefin") return "recorded";
+	if (posting.frequency === "once" && posting.startDate <= projectionStartDate)
+		return "recorded";
+	return "planned";
+}
+
 function numericExpression(value: string | undefined): number | null {
 	if (typeof value !== "string") return null;
 	const trimmed = value.trim();
@@ -330,6 +345,7 @@ function accountDisplay(
 function movementDisplay(
 	posting: BackendPosting,
 	amount: number | null,
+	projectionStartDate: IsoDate,
 	previous?: MovementAdapterSidecar,
 ): Movement {
 	const destinations = posting.destinations ?? [];
@@ -349,8 +365,7 @@ function movementDisplay(
 			previous?.displayAnnualIncrease ?? posting.annualGrowthRate * 100,
 		enabled: posting.enabled,
 		provenance:
-			previous?.provenance ??
-			(posting.source === "simplefin" ? "recorded" : "planned"),
+			previous?.provenance ?? postingProvenance(posting, projectionStartDate),
 		readOnly:
 			previous?.readOnly ?? (amount === null || posting.source === "simplefin"),
 	};
@@ -498,6 +513,7 @@ function buildSidecarAccount(
 function buildSidecarPosting(
 	posting: BackendPosting,
 	amount: number | null,
+	projectionStartDate: IsoDate,
 	previous?: MovementAdapterSidecar,
 ): MovementAdapterSidecar {
 	const previousAmountMatches =
@@ -527,8 +543,7 @@ function buildSidecarPosting(
 		annualCap: previous?.annualCap ?? posting.annualCap,
 		priority: previous?.priority ?? posting.priority,
 		provenance:
-			previous?.provenance ??
-			(posting.source === "simplefin" ? "recorded" : "planned"),
+			previous?.provenance ?? postingProvenance(posting, projectionStartDate),
 		readOnly:
 			previous?.readOnly ?? (amount === null || posting.source === "simplefin"),
 		displayFrequency:
@@ -612,7 +627,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			);
 			provisional(conversionReport, `${path}.provenance`);
 		}
-		return movementDisplay(posting, amount, previous);
+		return movementDisplay(posting, amount, projectionStartDate, previous);
 	});
 
 	const thresholdGoals = document.evaluations.netWorthThreshold.map(
@@ -722,7 +737,10 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 				document.postings.map((posting) => {
 					const previous = previousPresentation?.movements[posting.id];
 					const amount = postingAmountValue(posting, projection);
-					return [posting.id, buildSidecarPosting(posting, amount, previous)];
+					return [
+						posting.id,
+						buildSidecarPosting(posting, amount, projectionStartDate, previous),
+					];
 				}),
 			),
 			provisionalFields: [...conversionReport.provisionalFields],
@@ -773,6 +791,7 @@ export function displayPlanToBackendDocument(
 	const movementSidecars = sidecar?.presentation.movements ?? {};
 	const sourcePath =
 		options.sourcePath ?? sourceDocument?.sourcePath ?? "frontend";
+	const projectionStartDate = plan.startDate;
 
 	const accounts = plan.accounts.map((account, index): BackendAccount => {
 		const original = sourceAccounts.get(account.id);
@@ -1065,7 +1084,7 @@ export function displayPlanToBackendDocument(
 		}
 		const previousProvenance =
 			metadata?.provenance ??
-			(original?.source === "simplefin" ? "recorded" : "planned");
+			(original ? postingProvenance(original, projectionStartDate) : "planned");
 		const previousReadOnly =
 			metadata?.readOnly ?? original?.source === "simplefin";
 		if (movement.provenance !== previousProvenance)
