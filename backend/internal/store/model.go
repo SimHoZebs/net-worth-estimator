@@ -2,10 +2,12 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -15,20 +17,83 @@ type queryer interface {
 	QueryRow(query string, args ...any) *sql.Row
 }
 
-// SaveDocument atomically replaces the canonical model document.
-func (s *sqliteStore) SaveDocument(document *types.FinancialModelDocument) error {
+// DocumentETag returns a content identity for the canonical model document.
+func DocumentETag(document *types.FinancialModelDocument) (string, error) {
+	if document == nil {
+		return `""`, nil
+	}
+	payload, err := json.Marshal(document)
+	if err != nil {
+		return "", fmt.Errorf("encode model ETag: %w", err)
+	}
+	digest := sha256.Sum256(payload)
+	return fmt.Sprintf(`"sha256-%x"`, digest), nil
+}
+
+func normalizeETag(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.TrimPrefix(value, "W/")
+	return strings.Trim(value, `"`)
+}
+
+func documentMatchesETag(current *types.FinancialModelDocument, expectedETag string) (bool, error) {
+	if expectedETag == "*" {
+		return current == nil, nil
+	}
+	currentETag, err := DocumentETag(current)
+	if err != nil {
+		return false, err
+	}
+	return normalizeETag(expectedETag) == normalizeETag(currentETag), nil
+}
+
+func (s *sqliteStore) saveDocument(document *types.FinancialModelDocument, expectedETag string) (bool, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
-		return fmt.Errorf("save begin: %w", err)
+		return false, fmt.Errorf("save begin: %w", err)
 	}
 	defer tx.Rollback()
+	if expectedETag != "" {
+		current, err := loadDocument(tx)
+		if err != nil {
+			return false, err
+		}
+		matches, err := documentMatchesETag(current, expectedETag)
+		if err != nil {
+			return false, err
+		}
+		if !matches {
+			return false, nil
+		}
+	}
 	if err := replaceDocument(tx, document); err != nil {
-		return err
+		return false, err
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("save commit: %w", err)
+		return false, fmt.Errorf("save commit: %w", err)
 	}
-	return nil
+	return true, nil
+}
+
+// SaveDocument atomically replaces the canonical model document.
+func (s *sqliteStore) SaveDocument(document *types.FinancialModelDocument) error {
+	_, err := s.saveDocument(document, "")
+	return err
+}
+
+// SaveDocumentIfUnchanged replaces the document only when its current content
+// identity matches expectedETag. An empty expectation preserves unconditional
+// writes for internal callers and legacy API clients.
+func (s *sqliteStore) SaveDocumentIfUnchanged(document *types.FinancialModelDocument, expectedETag string) (bool, error) {
+	return s.saveDocument(document, expectedETag)
+}
+
+func (s *sqliteStore) DocumentMatchesETag(expectedETag string) (bool, error) {
+	current, err := s.LoadDocument()
+	if err != nil {
+		return false, err
+	}
+	return documentMatchesETag(current, expectedETag)
 }
 
 func deleteDocumentRows(tx *sql.Tx) error {
@@ -70,12 +135,44 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 	if err != nil {
 		return err
 	}
+	storedDocument, err := loadDocument(tx)
+	if err != nil {
+		return err
+	}
+	accounts := append([]types.Account(nil), document.Accounts...)
+	accountIDs := make(map[string]struct{}, len(accounts))
+	for _, account := range accounts {
+		accountIDs[account.ID] = struct{}{}
+	}
+	preserveAccount := func(id string) {
+		if _, ok := accountIDs[id]; ok || storedDocument == nil {
+			return
+		}
+		for _, account := range storedDocument.Accounts {
+			if account.ID == id {
+				accounts = append(accounts, account)
+				accountIDs[id] = struct{}{}
+				return
+			}
+		}
+	}
+	for _, checkpoint := range syncedCheckpoints {
+		preserveAccount(checkpoint.AccountID)
+	}
+	for _, posting := range syncedPostings {
+		if posting.SourceAccountID != nil {
+			preserveAccount(*posting.SourceAccountID)
+		}
+		for _, destinationID := range posting.Destinations {
+			preserveAccount(destinationID)
+		}
+	}
 	if err := deleteDocumentRows(tx); err != nil {
 		return err
 	}
 
 	position := 0
-	for _, account := range document.Accounts {
+	for _, account := range accounts {
 		var minBalance, maxBalance any = types.NoFloor, types.NoCeiling
 		if account.MinBalance != nil {
 			minBalance = *account.MinBalance
@@ -105,6 +202,9 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 		return err
 	}
 	if err := saveEvaluationTable(tx, string(types.EvaluationTypeNetWorthThreshold), thresholdEvaluationRows(document)); err != nil {
+		return err
+	}
+	if err := saveEvaluationTable(tx, string(types.EvaluationTypeAccountBalance), accountBalanceEvaluationRows(document)); err != nil {
 		return err
 	}
 	if err := saveEvaluationTable(tx, string(types.EvaluationTypePostingFulfillment), fulfillmentEvaluationRows(document)); err != nil {
@@ -214,6 +314,14 @@ func fiEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
 func thresholdEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
 	rows := make([]evaluationRow, 0, len(d.Evaluations.NetWorthThreshold))
 	for position, item := range d.Evaluations.NetWorthThreshold {
+		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, label: item.Label, enabled: item.Enabled, configValue: item.Config})
+	}
+	return rows
+}
+
+func accountBalanceEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
+	rows := make([]evaluationRow, 0, len(d.Evaluations.AccountBalance))
+	for position, item := range d.Evaluations.AccountBalance {
 		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, label: item.Label, enabled: item.Enabled, configValue: item.Config})
 	}
 	return rows
@@ -392,6 +500,14 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 				return nil, fmt.Errorf("parse threshold config %s: %w", instanceID, err)
 			}
 			document.Evaluations.NetWorthThreshold = append(document.Evaluations.NetWorthThreshold, types.ThresholdEvaluation{
+				InstanceID: instanceID, Label: label, Enabled: enabled != 0, Config: config,
+			})
+		case types.EvaluationTypeAccountBalance:
+			config := map[string]any{}
+			if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+				return nil, fmt.Errorf("parse account balance config %s: %w", instanceID, err)
+			}
+			document.Evaluations.AccountBalance = append(document.Evaluations.AccountBalance, types.BalanceEvaluation{
 				InstanceID: instanceID, Label: label, Enabled: enabled != 0, Config: config,
 			})
 		case types.EvaluationTypePostingFulfillment:

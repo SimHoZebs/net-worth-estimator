@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Date helpers ported from utils/date.ts. All dates are UTC calendar dates
+// Date helpers. All dates are UTC calendar dates
 // formatted "YYYY-MM-DD".
 //
 // Hot-path note: simulation calls CompareIsoDates, DaysBetween,
@@ -96,7 +96,7 @@ func ProjectionYearIndex(projectionStartDate, date string) int {
 }
 
 // AddMonthsClamped adds months keeping day-of-month clamped to the target
-// month length (Jan-31 + 1mo -> Feb-28). Ported from addMonthsClamped.
+// month length (Jan-31 + 1mo -> Feb-28).
 func AddMonthsClamped(date string, monthsToAdd int) string {
 	year, month, day := splitIsoDate(date)
 	nextMonthIndex := (month - 1) + monthsToAdd

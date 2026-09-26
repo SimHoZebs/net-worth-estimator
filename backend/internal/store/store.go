@@ -13,8 +13,8 @@ import (
 // projection artifacts, and SimpleFIN sync state. The server, API handlers,
 // and sync runner depend only on this interface; the SQLite file backend
 // below is one implementation. A replacement backend (Turso, Postgres, …)
-// implements these twelve methods plus a constructor, then runs the
-// conformance suite (RunConformance) to prove it.
+// implements these methods plus a constructor, then runs the conformance
+// suite (RunConformance) to prove it.
 //
 // Contract notes for implementers:
 //   - Writes are single-threaded by the caller discipline (one server, one
@@ -28,6 +28,8 @@ import (
 type Store interface {
 	LoadDocument() (*types.FinancialModelDocument, error)
 	SaveDocument(document *types.FinancialModelDocument) error
+	SaveDocumentIfUnchanged(document *types.FinancialModelDocument, expectedETag string) (bool, error)
+	DocumentMatchesETag(expectedETag string) (bool, error)
 	DocumentExists() (bool, error)
 	LoadIncomeData() (*types.IncomeDataSnapshot, error)
 	SaveIncomeData(snapshot *types.IncomeDataSnapshot) error

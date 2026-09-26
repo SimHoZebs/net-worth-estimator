@@ -32,6 +32,7 @@ type EvaluationResultEnvelope struct {
 type EvaluationResultTables struct {
 	FinancialIndependence []EvaluationResultEnvelope `json:"financialIndependence"`
 	NetWorthThreshold     []EvaluationResultEnvelope `json:"netWorthThreshold"`
+	AccountBalance        []EvaluationResultEnvelope `json:"accountBalance"`
 	PostingFulfillment    []EvaluationResultEnvelope `json:"postingFulfillment"`
 }
 
@@ -39,7 +40,7 @@ type EvaluationResultCollection struct {
 	Evaluations EvaluationResultTables `json:"evaluations"`
 }
 
-// Model validation diagnostics (types/validation.ts).
+// Model validation diagnostics.
 
 type ValidationSeverity string
 

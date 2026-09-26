@@ -1,4 +1,4 @@
-// Package csvio imports/exports canonical CSV files for seeding and parity.
+// Package csvio reads canonical CSV files for seeding.
 package csvio
 
 import (
@@ -14,16 +14,17 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// FileNames mirror types/model.ts and types/income.ts.
+// Canonical CSV file names.
 const (
-	AccountsFile      = "accounts.csv"
-	CheckpointsFile   = "checkpoints.csv"
-	PostingsFile      = "postings.csv"
-	FIFile            = "behavior/financial-independence.csv"
-	ThresholdFile     = "behavior/net-worth-threshold.csv"
-	FulfillmentFile   = "behavior/posting-fulfillment.csv"
-	IncomeSourcesFile = "income-sources.csv"
-	TaxProfilesFile   = "tax-profiles.csv"
+	AccountsFile       = "accounts.csv"
+	CheckpointsFile    = "checkpoints.csv"
+	PostingsFile       = "postings.csv"
+	FIFile             = "behavior/financial-independence.csv"
+	ThresholdFile      = "behavior/net-worth-threshold.csv"
+	AccountBalanceFile = "behavior/account-balance.csv"
+	FulfillmentFile    = "behavior/posting-fulfillment.csv"
+	IncomeSourcesFile  = "income-sources.csv"
+	TaxProfilesFile    = "tax-profiles.csv"
 )
 
 func readCSV(path string) ([][]string, error) {
@@ -61,9 +62,9 @@ func parseBool(value string) bool {
 }
 
 func parseBound(value string) (*float64, error) {
-	// CSV sentinels map to the canonical finite sentinel constants
-	// (constants.ts NO_FLOOR / NO_CEILING). Any other non-finite spelling
-	// ("inf", "NaN", ...) is rejected: the canonical representation is finite.
+	// CSV sentinels map to the canonical finite sentinel constants. Any other
+	// non-finite spelling ("inf", "NaN", ...) is rejected: the canonical
+	// representation is finite.
 	switch value {
 	case "-Infinity":
 		v := types.NoFloor
@@ -214,6 +215,9 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 	if err := importThresholdEvaluations(csvPath, document); err != nil {
 		return nil, err
 	}
+	if err := importAccountBalanceEvaluations(csvPath, document); err != nil {
+		return nil, err
+	}
 	if err := importFulfillmentEvaluations(csvPath, document); err != nil {
 		return nil, err
 	}
@@ -287,6 +291,29 @@ func importThresholdEvaluations(csvPath string, document *types.FinancialModelDo
 	return nil
 }
 
+func importAccountBalanceEvaluations(csvPath string, document *types.FinancialModelDocument) error {
+	records, err := readCSV(filepath.Join(csvPath, AccountBalanceFile))
+	if err != nil {
+		return fmt.Errorf("read account balance behavior: %w", err)
+	}
+	index := headerIndex(records[0])
+	for _, record := range records[1:] {
+		if len(strings.Join(record, "")) == 0 {
+			continue
+		}
+		document.Evaluations.AccountBalance = append(document.Evaluations.AccountBalance, types.BalanceEvaluation{
+			InstanceID: field(record, index, "instanceId"),
+			Label:      field(record, index, "label"),
+			Enabled:    parseBool(field(record, index, "enabled")),
+			Config: map[string]any{
+				"accountId": field(record, index, "accountId"),
+				"target":    parseNumberOr(field(record, index, "target"), 0),
+			},
+		})
+	}
+	return nil
+}
+
 func importFulfillmentEvaluations(csvPath string, document *types.FinancialModelDocument) error {
 	records, err := readCSV(filepath.Join(csvPath, FulfillmentFile))
 	if err != nil {
@@ -324,8 +351,8 @@ func parseDestinations(raw string) []string {
 	if err := strictUnmarshal([]byte(raw), &destinations); err == nil {
 		return destinations
 	}
-	// Fallback: semicolon- or comma-separated plain list (TS CSV writer emits
-	// semicolon-separated destination IDs for multi-destination rows).
+	// Fallback: semicolon- or comma-separated plain list; JSON arrays are
+	// accepted by the strict parser.
 	separator := ";"
 	if !strings.Contains(raw, ";") {
 		separator = ","

@@ -7,7 +7,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Financial-model cross-validation ported from validation/*.ts.
+// Financial-model cross-validation.
 
 func addIssue(issues *[]types.ModelValidationIssue, severity types.ValidationSeverity, code, message string, path ...any) {
 	*issues = append(*issues, types.ModelValidationIssue{
@@ -31,7 +31,7 @@ func validateUniqueIDs(issues *[]types.ModelValidationIssue, ids []string, codeP
 }
 
 // ValidateFinancialModel runs all cross-field checks and returns issues in
-// TS-equivalent order.
+// stable validation order.
 func ValidateFinancialModel(document *types.FinancialModelDocument, incomeData *types.IncomeDataSnapshot) []types.ModelValidationIssue {
 	issues := []types.ModelValidationIssue{}
 	accountIDs := make(map[string]bool, len(document.Accounts))
@@ -99,6 +99,7 @@ func ValidateFinancialModel(document *types.FinancialModelDocument, incomeData *
 	validatePostingRoutes(&issues, document.Postings, accountIDs)
 	validateAccountBounds(&issues, document.Accounts)
 	validateEvaluationConfigs(&issues, document)
+	validateEvaluationAccountReferences(&issues, document, accountIDs)
 
 	return issues
 }
@@ -142,6 +143,10 @@ func evaluationInstances(document *types.FinancialModelDocument, evaluationType 
 		for _, item := range document.Evaluations.NetWorthThreshold {
 			refs = append(refs, instanceRef{evaluationType, item.InstanceID, item.Enabled, item.Config})
 		}
+	case types.EvaluationTypeAccountBalance:
+		for _, item := range document.Evaluations.AccountBalance {
+			refs = append(refs, instanceRef{evaluationType, item.InstanceID, item.Enabled, item.Config})
+		}
 	case types.EvaluationTypePostingFulfillment:
 		for _, item := range document.Evaluations.PostingFulfillment {
 			refs = append(refs, instanceRef{evaluationType, item.InstanceID, item.Enabled, item.Config})
@@ -159,6 +164,8 @@ func validateEvaluationConfigs(issues *[]types.ModelValidationIssue, document *t
 				err = ValidateFIPlanConfig(instance.Config)
 			case types.EvaluationTypeNetWorthThreshold:
 				err = ValidateThresholdConfig(instance.Config)
+			case types.EvaluationTypeAccountBalance:
+				err = ValidateAccountBalanceConfig(instance.Config)
 			case types.EvaluationTypePostingFulfillment:
 				err = ValidateFulfillmentConfig(instance.Config)
 			}
@@ -166,6 +173,23 @@ func validateEvaluationConfigs(issues *[]types.ModelValidationIssue, document *t
 				path := []any{"evaluations", evaluationType, index}
 				addIssue(issues, types.SeverityError, "evaluation.config.invalid", err.Error(), path...)
 			}
+		}
+	}
+}
+
+// validateEvaluationAccountReferences checks that an account balance goal names
+// an account the document actually contains. A dangling reference would
+// otherwise evaluate as never reached with no diagnostic.
+func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, accountIDs map[string]bool) {
+	for index, item := range document.Evaluations.AccountBalance {
+		parsed, err := ParseAccountBalanceConfig(item.Config)
+		if err != nil {
+			continue // reported by validateEvaluationConfigs
+		}
+		if !accountIDs[parsed.AccountID] {
+			addIssue(issues, types.SeverityError, "evaluation.accountBalance.accountId.invalid",
+				fmt.Sprintf("Account balance goal '%s' references account '%s', which does not exist.", item.InstanceID, parsed.AccountID),
+				"evaluations", types.EvaluationTypeAccountBalance, index, "config", "accountId")
 		}
 	}
 }
@@ -371,7 +395,7 @@ func formatBound(value float64) string {
 	return fmt.Sprintf("%v", value)
 }
 
-// SummarizeValidationIssues mirrors summarizeValidationIssues.
+// SummarizeValidationIssues separates errors and warnings and reports validity.
 func SummarizeValidationIssues(issues []types.ModelValidationIssue) (errors, warnings []types.ModelValidationIssue, isValid bool) {
 	errors = []types.ModelValidationIssue{}
 	warnings = []types.ModelValidationIssue{}

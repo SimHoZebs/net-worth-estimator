@@ -11,10 +11,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Golden parity tests: fixture pairs are produced by the TypeScript engine
-// (src/lib/projection/__tests__/__goldenDump.test.ts) and verified here.
-// Floats compare exactly unless produced through transcendentals (A10), where
-// a tight relative tolerance applies.
+// Golden fixture tests load fixture pairs from goldenDir and verify them here.
+// Every float comparison uses the scaled floatTolerance.
 
 const goldenDir = "../../testdata/golden"
 

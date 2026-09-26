@@ -1,0 +1,114 @@
+# Waypoint
+
+A household financial planning frontend backed by the Go API.
+
+## Run
+
+Use Node.js 24 or newer. The frontend runs in local development against the Go API at `127.0.0.1:8787`. From the repository root, start the backend:
+
+```sh
+NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
+NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs" \
+NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income" \
+CGO_ENABLED=0 go -C backend run ./cmd/server
+```
+
+Start the Vite frontend in a second terminal:
+
+```sh
+npm --prefix frontend ci
+npm --prefix frontend run dev
+```
+
+The development server uses port `5178` and proxies `/v1` to the backend named by `NET_WORTH_ESTIMATOR_BACKEND` (default `http://127.0.0.1:8787`).
+
+```sh
+
+```
+
+## Production build and containers
+
+Build static assets with a build-time API origin when the frontend is hosted separately:
+
+```sh
+VITE_API_BASE_URL=https://api.example.com npm --prefix frontend run build
+```
+
+The API base resolves in this order: `window.__WAYPOINT_CONFIG__`, `VITE_API_BASE_URL`, then same-origin `/v1`. Runtime configuration must be installed before the application bundle loads.
+
+Build the separate images from the repository root:
+
+```sh
+docker build -f backend/Dockerfile -t net-worth-estimator-backend .
+docker build -f frontend/Dockerfile -t net-worth-estimator-frontend .
+```
+
+Or run the complete split stack with Compose:
+
+```sh
+docker compose up --build
+```
+
+Compose publishes the frontend at `http://localhost:8080` and the API at `http://localhost:8787`. The frontend container proxies `/v1` to `BACKEND_URL` and preserves long-running stochastic SSE responses. The root `Dockerfile` is a legacy combined image for the existing Northflank deployment.
+
+Navigation uses URL fragments, so a static host does not need SPA route rewrites. Fonts and the scenario worker are served with the application. There are no external font, analytics, or bank requests.
+
+## Verification
+
+```sh
+npm run lint
+npm run typecheck
+npm test
+npx playwright install chromium
+npm run build
+npm run test:browser
+sh ../scripts/smoke-compose.sh
+TEST_PRODUCTION=1 npm run test:browser
+```
+
+Browser tests cover plan editing, persistent drafts, deliberate save and discard, import validation, read-only sources, corrupt storage, storage failures, cross-tab protection, comparison snapshots, export, scenario failures, keyboard navigation, responsive layouts, and automated WCAG accessibility checks. Screenshots are written under `test-results/`.
+
+## Workspace and data
+
+- Browser tests run against the fixtureapi harness, which serves the real API from a recorded CSV fixture.
+- Server mode loads the canonical model from the Go API. Temporary versions and recovery snapshots stay in this browser under `waypoint.remote-workspace.v1` until an explicit save or discard.
+- Applying a form creates or changes a temporary version. Saving explicitly replaces the saved plan; discarding explicitly restores it.
+- A failed storage write retains the in-memory temporary version and offers export. A stale browser tab cannot overwrite a newer stored workspace.
+- A server draft is also protected by the model content identity returned by the API. A concurrent server change blocks the save and preserves the draft for explicit recovery.
+- Read-only plans allow experimentation and export. Saving back to the read-only source is disabled. Source-owned read-only records cannot be edited or removed.
+- Imports accept a version 1 Waypoint plan JSON file, validate its structure and account references, and show a preview before replacement. Export the example plan to obtain a complete format reference.
+- Plan exports can be imported. Full workspace backups also contain the saved state, temporary version, and comparison measures; their individual `saved` or `draft` plan can be extracted for import.
+- Comparison snapshots store descriptive measures and their context. They do not contain another plan or offer plan restoration.
+
+## Account transactions
+
+Click an account on the outlook or its name in the plan to open its transaction history. Recorded movements and dated base-case occurrences are labeled separately. Transfers show the other account and their incoming or outgoing direction from the selected account's perspective.
+
+Search by transaction name, other account, or date. Filter by recorded/projected status, direction, or an upcoming date window, and page through the full projection horizon. Expand a transaction to inspect requested and funded amounts, shortfalls, and the source movement. Editing that movement returns to the account view and preserves the saved plan until an explicit save.
+
+The list contains the records available in the plan; it does not establish complete bank history. Growth and interest remain part of balance projections rather than appearing as invented recorded transactions. Zero-value scheduled debt payments after payoff are omitted. Excluded recorded movements remain visible and labeled.
+
+## Calculation boundaries
+
+The canonical model and income snapshot go to the Go backend for deterministic and stochastic projections; the frontend maps those results for display and keeps local edits as a temporary review layer.
+
+The base case compounds account rates between dated movements. Monthly and yearly schedules preserve their intended day, clamped to month end where needed. Amount increases apply on schedule anniversaries. Protected balances limit withdrawals, account ceilings limit incoming movements, and debt payments stop at zero.
+
+Starting balances establish the projection boundary. Older balance checks are carried forward unchanged. Historical recorded movements are evidence only; replaying them would count money already included in starting balances twice.
+
+The optional range uses 400 repeatable scenarios. Each calendar year shares one normally sampled market shock across investment accounts. Investment rates are capped between −50% and +50%; cash, property, and debt rates are fixed. The displayed band is the 10th to 90th percentile, with a separately calculated median. Inflation is used only for the optional today's-dollars chart; each movement has its own nominal annual increase.
+
+Goals check the first crossing of a net-worth or account-balance target. They do not implement financial-independence or retirement-sustainability evaluations. Taxes, fees, withdrawal eligibility, legal limits and unplanned events require additional model support or explicit plan movements. Cash timing is not a safe-to-spend recommendation. An underfunded movement is neither borrowed nor rescheduled automatically.
+
+Income evidence uses recorded, enabled one-time external inflows. Similar amounts and a monthly cadence can support a provisional annualized estimate. It does not independently establish a payer, payroll status, gross salary or bank provenance, and it never changes planned income.
+
+## Structure
+
+- `src/domain/`: validated plan types, derived views, scenario ranges and income evidence.
+- `src/api/`: backend contracts, same-origin client, SSE parsing and display/document adapters.
+- `src/state/`: browser persistence, remote hydration, conditional saves and projection state.
+- `src/components/`: accessible controls, evidence dialogs, editing forms and visualization.
+- `src/pages/`: outlook, plan maintenance, goals, comparison and sources.
+- `tests/`: browser workflows and accessibility checks.
+
+The frontend is part of the repository and always uses the Go API.

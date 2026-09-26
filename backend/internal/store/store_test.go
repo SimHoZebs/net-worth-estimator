@@ -14,6 +14,45 @@ func TestStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T) {
 	testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t, openTestStore)
 }
 
+func TestSaveDocumentIfUnchangedUsesContentIdentity(t *testing.T) {
+	store := openTestStore(t)
+	document := &types.FinancialModelDocument{
+		SourcePath:  "test-source",
+		Accounts:    []types.Account{{ID: "checking", Label: "Checking", Enabled: true}},
+		Checkpoints: []types.Checkpoint{{Date: "2026-04-30", AccountID: "checking", Balance: 200}},
+		Evaluations: types.EmptyEvaluationTables(),
+		Postings:    []types.Posting{},
+	}
+	saved, err := store.SaveDocumentIfUnchanged(document, "*")
+	if err != nil || !saved {
+		t.Fatalf("create with absent precondition = %t, err %v", saved, err)
+	}
+	stale := *document
+	stale.SourcePath = "stale-source"
+	saved, err = store.SaveDocumentIfUnchanged(&stale, "*")
+	if err != nil || saved {
+		t.Fatalf("create over existing document = %t, err %v", saved, err)
+	}
+	current, err := store.LoadDocument()
+	if err != nil || current == nil {
+		t.Fatalf("load current document = %+v, err %v", current, err)
+	}
+	revision, err := DocumentETag(current)
+	if err != nil {
+		t.Fatalf("compute current ETag: %v", err)
+	}
+	changed := *current
+	changed.SourcePath = "changed-source"
+	saved, err = store.SaveDocumentIfUnchanged(&changed, revision)
+	if err != nil || !saved {
+		t.Fatalf("save with current ETag = %t, err %v", saved, err)
+	}
+	saved, err = store.SaveDocumentIfUnchanged(&stale, revision)
+	if err != nil || saved {
+		t.Fatalf("save with stale ETag = %t, err %v", saved, err)
+	}
+}
+
 func TestOpenCreatesCurrentSchemaVersion(t *testing.T) {
 	store := openSQLiteStore(t)
 	var version int

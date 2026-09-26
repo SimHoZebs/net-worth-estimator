@@ -8,19 +8,19 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Stochastic session ported from analysis/projectStochastic.ts.
+// Stochastic session coordinates sample construction and ordered accumulation.
 //
 // Concurrency: sample simulation runs on a bounded goroutine pool; the LCG is
 // owned by the sampler and only touched by the coordinator goroutine when
-// building samples (mirroring the single-threaded TS sampler), so seeded runs
-// are deterministic and bit-identical to sequential execution.
+// building samples, so seeded runs are deterministic and bit-identical to
+// sequential execution.
 
 const (
 	stochasticProgressBatch         = 50
 	stochasticProgressTargetUpdates = 200
 )
 
-// GetStochasticProgressUpdateRunInterval mirrors the lightweight progress cadence.
+// GetStochasticProgressUpdateRunInterval returns the progress update cadence.
 func GetStochasticProgressUpdateRunInterval(runCount int) int {
 	interval := (runCount + stochasticProgressTargetUpdates - 1) / stochasticProgressTargetUpdates
 	if interval < 1 {

@@ -1,140 +1,208 @@
-# Net Worth Estimator
+# Net Worth Estimator Backend
 
-React app and Go API for inspecting a CSV-backed financial model and projecting net worth with deterministic and Monte Carlo simulation.
+Go API and SQLite persistence for financial-model validation, deterministic projection, stochastic projection, configured evaluations, and SimpleFIN balance synchronization.
 
-The product model is intentionally generic:
+## Domain Model
 
-- Projection-start balances are derived by replaying enabled one-time postings dated before the projection start; net worth then evolves through scheduled postings and daily-compounded growth between event dates.
-- Balance checkpoints are absolute end-of-day account observations. Historical postings are replayed chronologically, checkpoints correct the modeled balances on their dates, and later postings continue from the corrected state.
-- A posting can be an external inflow, an external outflow, or an account-to-account transfer.
-- Posting frequencies include explicit one-time (`once`) transactions.
-- Postings use explicit amount resolvers with validated inputs; the optional `income` resolver runs an ordered payroll pipeline from separate effective-dated income data.
-- Annual caps are generic, and source-funded rows clamp to the source account's available positive balance.
-- Financial independence is derived from annual expense coverage and a full principal-preservation cycle. Explicit continuing postings and shared account constraints drive reactive withdrawals.
-- Monte Carlo confidence is aggregated from complete run outcomes, never inferred from percentile-band slope.
-- Baseline edits are persisted by the active `FinancialModelRepository`. The Editor draft (`workingDocument` plus the `editingBaseline` snapshot in `src/store.ts`), shown as current changes, is session-only and never mutates the canonical document.
-- `ComparisonSnapshot` records read-only metrics for comparison. It does not store or restore an alternative model.
+A financial model contains:
 
-## CSV Files
+- **Accounts** with signed balances, generic minimum and maximum bounds, and enablement.
+- **Balance checkpoints** that record an absolute end-of-day account balance.
+- **Postings** that create external inflows, external outflows, or account-to-account transfers.
+- **Evaluations** that apply financial-independence, net-worth-threshold, and posting-fulfillment questions to a projection.
+- **Income data** with effective-dated annual gross income and tax profiles.
 
-The Go backend seeds its SQLite database from these CSV files under `public/configs/`; the browser never reads CSV directly:
+The domain rules are structural and general:
 
-- `accounts.csv`
-- `checkpoints.csv`
-- `postings.csv`
-- `behavior/financial-independence.csv`
-- `behavior/net-worth-threshold.csv`
-- `behavior/posting-fulfillment.csv`
+- Opening balances are produced by replaying enabled one-time postings dated before the projection start.
+- Historical postings and checkpoints execute chronologically. Same-date postings execute first by priority and declaration order; checkpoints then overwrite the observed accounts as end-of-day truth.
+- A checkpoint on the projection start suppresses projected start-date events because that date is already observed.
+- Posting frequency is one-time, daily, weekly, monthly, quarterly, or annual.
+- Source-funded movements cannot remove more than the source's positive withdrawable balance. Destinations cannot exceed their ceiling headroom. Annual caps apply per posting and calendar year.
+- Amount descriptors use explicit inputs and validated providers. The `income` resolver uses effective-dated income data and an ordered resolver pipeline.
+- Public projection values are rounded after exact simulation. Stochastic bands come from complete sorted run distributions, not from interpolation between a few sample points.
+- `ModelOverrides` can add or disable rows for one projection request without changing persisted model state.
 
-The bundled `public/` files provide the default model and income data. `NET_WORTH_ESTIMATOR_MODEL_PATH` and `NET_WORTH_ESTIMATOR_INCOME_PATH` can point the Go API at alternate source directories.
+`PRODUCT_INTENT.md` describes the product independently. This repository currently provides the backend contracts and semantics; it does not prescribe an interaction design.
 
-Each behavior file is a typed table. All tables start with `instanceId`, `label`, and `enabled`, followed by definition-specific columns. Financial independence stores its scalar plan fields directly and uses JSON only for `sources` and `continuingPostingIds`; net-worth threshold adds `target`; posting fulfillment adds `postingIds`. Evaluation types follow the global `EVALUATION_TYPE_ORDER`, while rows within a type retain their physical CSV ingestion order. `instanceId` must be unique across behavior files, and one file may contain multiple instances.
+## HTTP API
 
-`financial-independence.csv` configures branch simulation, including source selections, continuing postings, withdrawal policy, and confidence. `net-worth-threshold.csv` and `posting-fulfillment.csv` configure read-only path evaluations.
+The server listens on `127.0.0.1:8787` by default.
 
-Income source definitions and tax profiles are loaded from `public/data/income/` and are served through `/v1/income-data`.
+| Method and path | Contract |
+| --- | --- |
+| `GET /healthz` | returns `ok` |
+| `GET /v1/financial-model` | returns `{ "document": FinancialModelDocument | null, "issues": [], "revision": "sha256..." }` and an `ETag` header |
+| `PUT /v1/financial-model` | validates a `FinancialModelDocument`; requires an `If-Match` revision; returns the document, issues, and revision; persists only when no error-severity issue exists and the revision still matches |
+| `GET /v1/status` | returns `{ "readOnly": bool, "authEnabled": bool }` |
+| `GET /v1/income-data` | returns the effective `IncomeDataSnapshot` |
+| `POST /v1/projections/deterministic` | accepts optional `document`, `overrides`, and `incomeData` plus `settings`; returns `{ "result": ProjectionResult }`, validation issues, or an error; `X-Cache` is `hit` or `miss` |
+| `POST /v1/projections/stochastic` | accepts the same effective inputs plus `config: { "runCount": int, "seed": int64 | null }`; returns an SSE stream |
+| `POST /v1/sync/simplefin` | runs an immediate SimpleFIN synchronization and returns row counts; returns 503 when sync is unconfigured, 409 while a run is active, and 429 inside the manual-trigger interval |
 
-## Persistence
+When a projection omits both `document` and `incomeData`, it uses one stored snapshot. If only one is supplied, the other is loaded from storage.
 
-- The Go backend persists the canonical model and income data in SQLite. Set `NET_WORTH_ESTIMATOR_DB` to choose the database file.
-- An empty database is seeded from `public/configs/` and `public/data/income/`. Later bundled CSV changes do not replace persisted data. There is no reset endpoint; CSV files are seed-only (first boot plus the offline `cmd/importcsv` operator tool).
-- `NET_WORTH_ESTIMATOR_READ_ONLY=1` rejects canonical model writes with 403 while keeping reads and projections public.
-- Write access is guarded by a single bearer token (`NET_WORTH_ESTIMATOR_AUTH_TOKEN`), sent from Settings as an `Authorization` header on save only. Serve exclusively behind HTTPS; a token captured over plain HTTP permits world-write replay.
-- The optional SimpleFIN sync (daily scheduler plus bearer-guarded `POST /v1/sync/simplefin`) writes only balance checkpoints and projection-disabled pending card-charge seeds, all marked `source: "simplefin"`. It never materializes checking flows or posted history. Sync-owned rows cannot be edited through model saves; add your own checkpoint to override a synced balance. Removing a mapped account does not garbage-collect its sync rows — remap or delete them directly. Start with `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1`. For local development without Bridge credentials, `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK=1` fabricates Bridge responses (mock rows are identical to real sync rows by design); cutover purges all sync rows via `backend/scripts/purge-simplefin-sync.sql` before the first real sync.
-- Malformed persisted data is not silently replaced; parsing and validation diagnostics are returned to the UI.
-- Editor draft changes remain session-only and never mutate the canonical data.
-- Production deployments must place the SQLite database on durable storage.
+Stochastic SSE emits:
 
-## Run
+- `progress` with `{ "progress": StochasticProgress }`;
+- `partial` with `{ "progress": StochasticProgress, "partial": StochasticProjectionResult }`;
+- `result` with `{ "result": StochasticProjectionResult }`;
+- `error` with `{ "error": string }`.
 
-```bash
-npm install
-npm run dev
+A seeded miss sets `X-Cache: miss`; an attached in-process run sets `X-Cache: attach`; a completed cache hit sets `X-Cache: hit`. Partial results are cumulative snapshots and are not persisted. An unseeded run uses fresh draws, is not shared, and is canceled when the stream disconnects.
+
+## CSV Seed Data
+
+The server seeds an empty database from:
+
+```text
+public/configs/
+├── accounts.csv
+├── checkpoints.csv
+├── postings.csv
+└── behavior/
+    ├── financial-independence.csv
+    ├── net-worth-threshold.csv
+    └── posting-fulfillment.csv
+
+public/data/income/
+├── income-sources.csv
+└── tax-profiles.csv
 ```
 
-In a second terminal, run the backend from the repository root:
+Set `NET_WORTH_ESTIMATOR_MODEL_PATH` and `NET_WORTH_ESTIMATOR_INCOME_PATH` to use other seed directories. CSV files seed an empty database and support the explicit offline `cmd/importcsv` replacement tool. They do not resynchronize a populated database on server restart.
+
+Offline replacement from `backend/`:
 
 ```bash
-cd backend
-go run ./cmd/server
+go run ./cmd/importcsv \
+  -db /path/to/net-worth-estimator.db \
+  -model ../public/configs \
+  -income ../public/data/income
 ```
 
-## Deploy The Backend To Northflank
+## Persistence and Access
 
-The root `Dockerfile` builds only the Go API and includes the bundled seed CSVs. To run it locally with durable data:
+- `store.Open` uses the pure-Go SQLite driver, WAL mode, foreign keys, a 5-second busy timeout, one connection, and forward schema migrations.
+- The SQLite file is authoritative for the canonical model, income snapshot, sync state, and completed projection artifacts.
+- `SaveDocument` atomically replaces owner rows. `SaveDocumentIfUnchanged` performs the same replacement only when the caller's ETag still matches the stored content. Rows use `source: "model" | "simplefin"`. Stored sync-owned rows survive model saves, and owner checkpoints win key collisions.
+- `NET_WORTH_ESTIMATOR_READ_ONLY=1`, `true`, or `yes` rejects `PUT /v1/financial-model` and `POST /v1/sync/simplefin` with 403 before bearer validation.
+- When `NET_WORTH_ESTIMATOR_AUTH_TOKEN` is non-empty, guarded routes require `Authorization: Bearer <token>`. Missing or incorrect values return 401. Reads and projection computation remain available.
+- `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` accepts comma-separated exact HTTP/S origins. Same-origin requests are allowed automatically; configured origins are also allowed. A request carrying any other origin is rejected, while a request without an origin passes. Behind a TLS-terminating proxy, forward exactly one valid `X-Forwarded-Proto` and `X-Forwarded-Host` value, or configure the public HTTPS origin explicitly. Origin filtering is not authorization for direct API callers.
+- There is no HTTP reset route. Use a database backup and the offline import tool for operator-controlled replacement.
+- Completed projection artifacts are best-effort cached. The cache is bounded to 256 deterministic and stochastic rows combined. Cache failures fail open; requested projection computation still runs.
+- Canonical edits and cached artifacts survive redeployment only when the SQLite file is on durable storage.
+
+## SimpleFIN Synchronization
+
+SimpleFIN is optional and narrow:
+
+- mapped accounts produce balance checkpoints;
+- configured card accounts produce disabled one-time postings for pending negative charges;
+- checking transactions, positive card transactions, posted charges, and refunds are not materialized;
+- pending seeds use the reserved `sfin-pending-` namespace and snapshot replacement per card account;
+- the Access URL stays server-side and is absent from successful payloads; transport failures can wrap the request URL, so failed trigger responses and scheduler logs must be treated as sensitive;
+- `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1` returns planned counts and rolls back all writes;
+- a scheduler runs daily shortly after 03:00 local time with a random minute offset;
+- the guarded trigger endpoint permits one in-flight run and spaces successful manual runs by 20 hours;
+- fixture mode is for local verification only and follows the same mapping, ownership, and persistence path as a real run.
+
+A model save that removes an account referenced by sync-owned rows preserves that account so observations and postings cannot become orphaned. Sync rows are not garbage-collected; operators must keep mappings valid or purge affected source rows deliberately.
+
+## Run from Source
+
+Run the API and frontend as separate processes from the repository root:
 
 ```bash
-docker build -t net-worth-estimator-server .
-docker run --rm -p 8787:8787 \
-  -v net-worth-estimator-data:/data \
-  net-worth-estimator-server
+# terminal 1
+NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
+NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs" \
+NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income" \
+CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-Create a Northflank combined service from this repository with:
+```bash
+# terminal 2
+npm --prefix frontend ci
+npm --prefix frontend run dev
+```
 
-- **Build type:** Dockerfile
-- **Dockerfile:** `/Dockerfile`
-- **Build context:** `/`
-- **Port:** HTTP `8787`; make it public only when an authentication or trusted-access layer protects it
-- **Health check:** HTTP `GET /healthz` on port `8787`
-- **Persistent volume:** mount at `/data`
-- **Instances:** `1`, because the service uses one SQLite database file
-- **Runtime variable:** `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS=https://<frontend-host>` when a browser frontend calls this service directly; separate multiple exact origins with commas
-- **Command override:** none
+The Vite server runs on `http://localhost:5178` and proxies `/v1` to `127.0.0.1:8787`. The default local database path is under the operating system's per-user configuration directory; `/tmp` keeps test runs isolated.
 
-The image supplies container defaults for `HOST`, `PORT`, the database path, and both seed paths. If `PORT` is overridden in Northflank, update the configured service port and health check to match.
+## Container Images and Compose
 
-The browser uses same-origin `/v1` routes by default. For a separately deployed frontend, set `VITE_API_BASE_URL=https://<backend-host>` in the frontend build environment. The value may contain a path prefix but must not include `/v1`; it applies to model persistence, income data, deterministic projections, and stochastic SSE streams. Add the frontend's exact origin, without a path, to the backend's `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` runtime variable.
+The split deployment has two images:
 
-### Automatic deploys
+- `backend/Dockerfile` builds the Go API and includes the seed CSV directories.
+- `frontend/Dockerfile` builds the Waypoint bundle and serves it from Nginx. The image proxies `/v1` to the backend named by `BACKEND_URL` and keeps stochastic SSE streaming unbuffered.
 
-Pushes to `main` build and deploy automatically through the service's own Northflank CI — no GitHub-side deploy workflow needed. (A GHCR + `deploy-to-northflank` workflow was tried and removed: it targets deployment-type services and would fight the combined service's built-in CI.)
+Run both services with the persistent local volume:
 
-> **Durability gap (open):** the Northflank service currently has no persistent volume on `/data`, so the SQLite database (canonical model edits and the projection artifact cache) is ephemeral and reseeds from CSVs on every redeploy. Mount a persistent volume at `/data` (keeping 1 instance) to close it.
+```bash
+docker compose up --build
+```
 
-Reads and deterministic/stochastic projections are public by design. Canonical model writes require the bearer token above (or are rejected entirely when read-only mode is on). CORS restricts browser origins only; it does not protect the API from non-browser clients, which is why writes are token-guarded server-side.
+The frontend is available at `http://localhost:8080` and the API at `http://localhost:8787`. Stop the stack with `docker compose down`; use `docker compose down -v` only when you intend to delete the SQLite volume.
+
+The root `Dockerfile` remains a legacy combined image for the existing Northflank build. The split images do not embed or build one another, and the legacy image and Compose stack must not run against the same volume or port at the same time.
+
+For Vercel, set `VITE_API_BASE_URL` to the public backend origin. Add that exact frontend origin to `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`; Vercel preview origins require an explicit allowlist entry. A proxy or Nginx cut during a seeded stochastic run detaches the client without an error event, and the client can recover by repeating the same request.
+
+`NET_WORTH_ESTIMATOR_AUTH_TOKEN` is empty when unset, which leaves guarded writes unauthenticated. `NET_WORTH_ESTIMATOR_READ_ONLY` is writable when unset. Set both explicitly for any shared environment.
+
+Configure a Northflank backend service with this durable contract:
+
+| Setting | Value |
+| --- | --- |
+| Build | `backend/Dockerfile` with repository root context |
+| Port | `8787` |
+| Health check | `GET /healthz` on port `8787` |
+| Instances | `1` |
+| Persistent volume | `/data` |
+| Database | `NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db` |
+| Public exposure | only behind suitable access control |
+| Optional origin policy | exact origins in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` |
+| Optional write policy | `NET_WORTH_ESTIMATOR_READ_ONLY=1` or a secret-backed `NET_WORTH_ESTIMATOR_AUTH_TOKEN` |
+
+Keep one backend instance because the deployment contract uses one SQLite writer. Back up through SQLite-aware procedures and preserve the persistent volume across deploys.
 
 ## Scripts
 
-```bash
-npm run verify          # biome check + vitest run + typecheck
-npx vitest run <file>   # single-file frontend test
-npm run build           # also runs on pre-push
-```
-
-Backend (`backend/`, `CGO_ENABLED=0` baked in):
+Backend verification and benchmarks:
 
 ```bash
-backend/scripts/verify.sh [--help] [package]                   # gofmt -> go vet -> go test (default ./...)
-backend/scripts/bench-sim.sh [--help] [scenario] [-- flags...] # bench one projection/iter (default scenario: deterministic)
+backend/scripts/verify.sh ./internal/... # gofmt, vet, and test backend internals
+backend/scripts/verify.sh ./cmd/...      # gofmt, vet, and test backend commands
+backend/scripts/bench-sim.sh deterministic
 ```
 
-Ops (`scripts/`):
+The no-argument `backend/scripts/verify.sh` also discovers the copy-only benchmark template under `backend/scripts/`, which currently prevents a repository-wide gate. The hooks use the production-package commands above.
+
+Operator checks:
 
 ```bash
-scripts/nf-status.sh [--service ID] [--project ID]                                                  # Northflank service health + latest build (secrets redacted)
-node scripts/shots.mjs <url> [--out f.png] [--width N] [--height N] [--full-page] [--wait ms]       # screenshot via playwright-core (opt-in: npm i -D playwright-core)
-BASE_URL=http://localhost:8787 scripts/smoke-backend.sh [--help]                                     # canned healthz -> model -> sync smoke
+BASE_URL=http://127.0.0.1:8787 scripts/smoke-backend.sh
+scripts/nf-status.sh --help
 ```
 
-## Architecture
+The smoke script expects health, model, and sync endpoints to return 200. Run it against a writable, unauthenticated instance with SimpleFIN configured; otherwise exercise the guarded routes directly as described in `TESTING.md`.
 
-- `src/App.tsx`: persistent routed controller for document loading and projection execution
-- `src/runtime/`: narrow model, projection-artifact, and execution-status providers shared across routes
-- `src/pages/ResultsPage.tsx`: read-only projection and evaluation outputs
-- `src/pages/SettingsPage.tsx`: session-only projection and evaluation configuration
-- `src/pages/ModelInputsPage.tsx`: canonical model inputs, temporary changes, templates, and source actions
-- `src/hooks/useFinancialModel.ts`: TanStack Query wrappers for load and save
-- `src/store.ts`: Editor draft (`workingDocument` + `editingBaseline`), runtime settings, and read-only comparison metrics; theme lives in the separate `src/themeStore.ts` store
-- `src/engine/BackendProjectionEngine.ts`: HTTP/SSE client for backend deterministic and stochastic projection
-- `src/components/ProjectionDashboard.tsx`: projection dashboard
-- `src/components/ModelInputsInspector.tsx`: scheduled transactions, paginated one-time history, account rules, and canonical editing UI
-- `src/components/ModelValidationPanel.tsx`: parsing and validation diagnostics
-- `src/components/CurrentChangesControls.tsx`: session-only override controls
-- `src/components/CurrentChangesComparison.tsx`: read-only metric snapshots
-- `src/lib/projection/model/`: amount presentation and checkpoint-surrogate helpers
-- `backend/internal/domain/`: Go simulation kernel (request preparation, shared transitions, deterministic simulation, path adaptation)
-- `src/lib/projection/evaluation/`: evaluation config validation, result accessors, and evaluator definitions
-- `src/lib/analysis/`: posting-derived independent analyses (classification, payroll detection, salary estimation)
+## Go Architecture
 
-See `TECHNICAL_OVERVIEW.md` for the detailed data flow and engine contracts.
+- `backend/cmd/server/main.go`: environment parsing, first-boot seed, HTTP server, graceful shutdown.
+- `backend/internal/api/server.go`: `api.New`, `api.Config`, and route registration.
+- `backend/internal/api/projection_handlers.go`: deterministic request resolution and artifact lookup.
+- `backend/internal/api/stochastic_sse.go`: seeded shared runs, event serialization, and unseeded request-bound runs.
+- `backend/internal/store/store.go`: `Store` interface, `store.Open`, schema migrations, SQLite connection policy.
+- `backend/internal/store/model.go`: atomic canonical replacement and ordered reload.
+- `backend/internal/store/sync.go`: row ownership and transactional sync application.
+- `backend/internal/domain/validation.go`: authoritative model and income cross-validation.
+- `backend/internal/domain/prepare.go`: overrides, history, dates, and initial simulation state.
+- `backend/internal/domain/transitions.go`: shared movement and income execution.
+- `backend/internal/domain/simulate.go`: prepared deterministic kernel.
+- `backend/internal/domain/path.go`: historical/projected path adaptation and public rounding.
+- `backend/internal/domain/evaluation_runtime.go`: evaluator registry and deterministic/stochastic runtimes.
+- `backend/internal/domain/stochastic.go`: sampling, worker execution, ordered accumulation, and progress.
+- `backend/internal/simplefin/`: Bridge protocol, mapping, runner, fixture mode, and dry-run.
+
+See `TECHNICAL_OVERVIEW.md` for request and persistence flows, SSE details, simulation invariants, evaluations, and artifact identity.

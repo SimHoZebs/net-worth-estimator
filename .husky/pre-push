@@ -2,7 +2,8 @@
 set -e
 start=$(date +%s)
 
-npm run build
+backend/scripts/verify.sh ./internal/...
+backend/scripts/verify.sh ./cmd/...
 
 end=$(date +%s)
 echo "pre-push: done in $((end - start))s"

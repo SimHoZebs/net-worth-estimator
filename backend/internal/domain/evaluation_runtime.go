@@ -7,8 +7,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Evaluation runtime ported from evaluation/runtime.ts. Definitions register
-// by type; central coordinators never import evaluator-specific logic.
+// Evaluation runtime. Definitions register by type; central coordinators
+// never import evaluator-specific logic.
 
 // EvaluationContext is passed to every evaluation hook.
 type EvaluationContext struct {
@@ -25,7 +25,7 @@ type EvaluationFinalizeContext struct {
 	RunCount          int
 }
 
-// EvaluationWorkloadPlan describes stochastic work units for progress UI.
+// EvaluationWorkloadPlan describes stochastic work units for progress reporting.
 type EvaluationWorkloadPlan struct {
 	UnitsPerRun         int
 	UnitLabel           string
@@ -293,6 +293,15 @@ func rawInstances(tables *types.EvaluationTables) []rawInstance {
 			rawConfig:      item.Config,
 		})
 	}
+	for _, item := range tables.AccountBalance {
+		instances = append(instances, rawInstance{
+			evaluationType: types.EvaluationTypeAccountBalance,
+			instanceID:     item.InstanceID,
+			label:          item.Label,
+			enabled:        item.Enabled,
+			rawConfig:      item.Config,
+		})
+	}
 	for _, item := range tables.PostingFulfillment {
 		instances = append(instances, rawInstance{
 			evaluationType: types.EvaluationTypePostingFulfillment,
@@ -305,7 +314,7 @@ func rawInstances(tables *types.EvaluationTables) []rawInstance {
 	return instances
 }
 
-// NewEvaluationRuntimeSet mirrors the constructor logic of EvaluationRuntimeSet.
+// NewEvaluationRuntimeSet creates a runtime set from evaluation tables.
 func NewEvaluationRuntimeSet(tables *types.EvaluationTables, registry *EvaluationRegistry) *EvaluationRuntimeSet {
 	idCounts := map[string]int{}
 	for _, instance := range rawInstances(tables) {
@@ -421,6 +430,7 @@ func (s *EvaluationRuntimeSet) Result() types.EvaluationResultCollection {
 		Evaluations: types.EvaluationResultTables{
 			FinancialIndependence: []types.EvaluationResultEnvelope{},
 			NetWorthThreshold:     []types.EvaluationResultEnvelope{},
+			AccountBalance:        []types.EvaluationResultEnvelope{},
 			PostingFulfillment:    []types.EvaluationResultEnvelope{},
 		},
 	}
@@ -430,6 +440,8 @@ func (s *EvaluationRuntimeSet) Result() types.EvaluationResultCollection {
 			collection.Evaluations.FinancialIndependence = append(collection.Evaluations.FinancialIndependence, runtimeInstance.envelope())
 		case types.EvaluationTypeNetWorthThreshold:
 			collection.Evaluations.NetWorthThreshold = append(collection.Evaluations.NetWorthThreshold, runtimeInstance.envelope())
+		case types.EvaluationTypeAccountBalance:
+			collection.Evaluations.AccountBalance = append(collection.Evaluations.AccountBalance, runtimeInstance.envelope())
 		case types.EvaluationTypePostingFulfillment:
 			collection.Evaluations.PostingFulfillment = append(collection.Evaluations.PostingFulfillment, runtimeInstance.envelope())
 		}

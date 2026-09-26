@@ -12,6 +12,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
+const deterministicResultCacheVersion = 2
+
 // domainValidate avoids importing the domain package in multiple files.
 func domainValidate(document *types.FinancialModelDocument, incomeData *types.IncomeDataSnapshot) []types.ModelValidationIssue {
 	return domain.ValidateFinancialModel(document, incomeData)
@@ -80,10 +82,11 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 	// Key the RESOLVED document/income snapshot so omitted fields track the
 	// stored state: a model save changes stored content and therefore the key.
 	cacheKey := artifactKey("deterministic", map[string]any{
-		"document":   document,
-		"overrides":  input.Body.Overrides,
-		"settings":   projectionSettingsDescriptor(input.Body.Settings),
-		"incomeData": incomeData,
+		"publicResultVersion": deterministicResultCacheVersion,
+		"document":            document,
+		"overrides":           input.Body.Overrides,
+		"settings":            projectionSettingsDescriptor(input.Body.Settings),
+		"incomeData":          incomeData,
 	})
 	if cached, err := lookupArtifact[types.ProjectionResult](s.store, cacheKey); err == nil && cached.hit {
 		// huma writes Status verbatim; leaving it zero panics the writer.
@@ -104,8 +107,8 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 	if err != nil {
 		output.Body.Error = err.Error()
 		if preparationError, ok := err.(*domain.SimulationPreparationError); ok {
-			// Validation failures stay HTTP 200: the client reads the issue
-			// list from the body and surfaces it as model diagnostics.
+			// Validation failures stay HTTP 200: callers read the issue list from the
+			// body and surface it as model diagnostics.
 			output.Body.Issues = preparationError.Issues
 			return output, nil
 		}

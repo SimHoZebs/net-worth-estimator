@@ -1,0 +1,42 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+      NET_WORTH_ESTIMATOR_DB: /data/net-worth-estimator.db
+      NET_WORTH_ESTIMATOR_MODEL_PATH: /app/public/configs
+      NET_WORTH_ESTIMATOR_INCOME_PATH: /app/public/data/income
+      NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: ${NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS:-http://localhost:8080}
+      NET_WORTH_ESTIMATOR_READ_ONLY: ${NET_WORTH_ESTIMATOR_READ_ONLY:-}
+      NET_WORTH_ESTIMATOR_AUTH_TOKEN: ${NET_WORTH_ESTIMATOR_AUTH_TOKEN:-}
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL: ${NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL:-}
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS: ${NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS:-}
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS: ${NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS:-}
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN: ${NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN:-}
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK: ${NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK:-}
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE: ${NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE:-}
+    ports:
+      - "${BACKEND_PORT:-8787}:8787"
+    volumes:
+      - net-worth-estimator-data:/data
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+    environment:
+      BACKEND_URL: ${BACKEND_URL:-http://backend:8787}
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  net-worth-estimator-data:
+    name: net-worth-estimator-data

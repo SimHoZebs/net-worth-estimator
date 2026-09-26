@@ -1,6 +1,6 @@
-// Package types holds canonical wire/domain types ported from
-// src/lib/projection/types/*.ts. JSON shapes match the TypeScript public
-// contracts; see docs/backend-migration/ASSUMPTIONS.md.
+// Package types holds canonical wire and domain types used by the backend.
+// JSON fields and shapes are part of the API contract; account bounds use
+// finite NoFloor and NoCeiling sentinels.
 package types
 
 import (
@@ -13,6 +13,7 @@ type IsoDate = string
 const (
 	EvaluationTypeFinancialIndependence = "financialIndependence"
 	EvaluationTypeNetWorthThreshold     = "netWorthThreshold"
+	EvaluationTypeAccountBalance        = "accountBalance"
 	EvaluationTypePostingFulfillment    = "postingFulfillment"
 )
 
@@ -21,14 +22,15 @@ const (
 var EvaluationTypeOrder = []string{
 	EvaluationTypeFinancialIndependence,
 	EvaluationTypeNetWorthThreshold,
+	EvaluationTypeAccountBalance,
 	EvaluationTypePostingFulfillment,
 }
 
-// JsonValue mirrors the TS JsonValue union.
+// JsonValue represents arbitrary JSON values in wire payloads.
 type JsonValue = any
 
 // Account bound sentinels: the canonical representation uses finite sentinel
-// values (mirroring constants.ts), never null or IEEE infinity.
+// values, never null or IEEE infinity.
 const (
 	NoFloor   = -10_000_000_000_000.0
 	NoCeiling = 10_000_000_000_000.0
@@ -113,9 +115,9 @@ func (b *AmountInputBinding) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON emits the exact TS discriminated-union shape: literal bindings
+// MarshalJSON emits the exact discriminated-union shape: literal bindings
 // carry only {source,value}; provider bindings always carry arguments (even
-// empty), matching the strict Zod schemas.
+// empty), preserving the wire contract.
 func (b AmountInputBinding) MarshalJSON() ([]byte, error) {
 	if b.Source == "provider" {
 		arguments := b.Arguments
@@ -197,7 +199,7 @@ func EmptyModelOverrides() ModelOverrides {
 }
 
 // ApplyModelOverrides builds the effective document without mutating the
-// canonical input. Ported from applyModelOverrides.ts.
+// canonical input.
 func ApplyModelOverrides(document FinancialModelDocument, overrides ModelOverrides) FinancialModelDocument {
 	disabledAccounts := make(map[string]bool, len(overrides.DisabledAccountIDs))
 	for _, id := range overrides.DisabledAccountIDs {

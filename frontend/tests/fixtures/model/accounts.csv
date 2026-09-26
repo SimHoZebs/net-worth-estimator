@@ -1,0 +1,6 @@
+id,label,minBalance,maxBalance,color,enabled
+checking,Everyday checking,0,Infinity,#2f6f4f,true
+savings,Investment portfolio,0,Infinity,#3d7a5c,true
+brokerage,Brokerage,-Infinity,Infinity,#2b5f8a,true
+loan,Student loan,-Infinity,0,#8a4b2b,true
+home,Home value,-Infinity,Infinity,#7a5c2b,true

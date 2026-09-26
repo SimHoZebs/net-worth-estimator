@@ -1,6 +1,6 @@
 FROM golang:1.27-alpine AS build
 
-WORKDIR /src/backend
+WORKDIR /build/backend
 
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
@@ -11,6 +11,16 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w" \
     -o /out/server \
     ./cmd/server
+
+FROM node:24-alpine AS frontend-build
+
+WORKDIR /build/frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY frontend/ ./
+RUN npm run build
 
 FROM alpine:3.22
 
@@ -23,6 +33,7 @@ RUN apk add --no-cache ca-certificates \
 WORKDIR /app
 
 COPY --from=build --chown=app:app /out/server /app/server
+COPY --from=frontend-build --chown=app:app /build/frontend/dist /app/frontend
 COPY --chown=app:app public/configs /app/public/configs
 COPY --chown=app:app public/data/income /app/public/data/income
 
@@ -30,7 +41,8 @@ ENV HOST=0.0.0.0 \
     PORT=8787 \
     NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db \
     NET_WORTH_ESTIMATOR_MODEL_PATH=/app/public/configs \
-    NET_WORTH_ESTIMATOR_INCOME_PATH=/app/public/data/income
+    NET_WORTH_ESTIMATOR_INCOME_PATH=/app/public/data/income \
+    NET_WORTH_ESTIMATOR_FRONTEND_PATH=/app/frontend
 
 EXPOSE 8787
 

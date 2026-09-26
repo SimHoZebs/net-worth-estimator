@@ -7,7 +7,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Movement constraint reconstruction ported from evaluation/movementConstraints.ts.
+// Movement constraint reconstruction.
 
 const movementEpsilon = 1e-9
 

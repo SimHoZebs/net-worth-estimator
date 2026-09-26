@@ -6,8 +6,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Posting occurrence scheduling and movement resolution, ported from
-// simulation/postings.ts.
+// Posting occurrence scheduling and movement resolution.
 
 // DatedPostingOccurrence binds a posting to its declaration index.
 type DatedPostingOccurrence struct {
@@ -72,8 +71,8 @@ func advanceDate(date string, frequency types.PostingFrequency, periodCount int)
 }
 
 // AddOccurrences fills eventDates with occurrences in the projection window.
-// Mirrors addOccurrences: once postings execute exactly on their start date;
-// window inclusivity depends on includeStartDate.
+// Once postings execute exactly on their start date; window inclusivity
+// depends on includeStartDate.
 func AddOccurrences(postings []types.Posting, eventDates map[string][]DatedPostingOccurrence, projectionStartDate, projectionEndDate string, includeStartDate bool) {
 	for index := range postings {
 		posting := &postings[index]

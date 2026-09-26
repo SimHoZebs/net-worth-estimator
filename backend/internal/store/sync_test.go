@@ -107,6 +107,29 @@ func postingIDsFromDocument(document *types.FinancialModelDocument) (ids []strin
 	return ids, sources
 }
 
+func TestSavePreservesSyncReferencedAccount(t *testing.T) {
+	store := openTestStore(t)
+	seedSyncState(t, store)
+	withoutChecking := ownerDocument()
+	withoutChecking.Accounts = nil
+	if err := store.SaveDocument(withoutChecking); err != nil {
+		t.Fatalf("save removing sync account: %v", err)
+	}
+	loaded, err := store.LoadDocument()
+	if err != nil || loaded == nil {
+		t.Fatalf("load preserved document = %+v, err %v", loaded, err)
+	}
+	found := false
+	for _, account := range loaded.Accounts {
+		if account.ID == "checking" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("sync-referenced account was not preserved: %+v", loaded.Accounts)
+	}
+}
+
 func TestSaveDropsForgedSyncRowsAndMergesStored(t *testing.T) {
 	testSaveDropsForgedSyncRowsAndMergesStored(t, openTestStore)
 }
