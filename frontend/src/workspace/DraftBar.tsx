@@ -2,12 +2,10 @@ import { ArrowRight, GitBranch, RotateCcw } from "lucide-react";
 
 export function DraftBar({
 	count,
-	serverMode,
 	onDiscard,
 	onReview,
 }: {
 	count: number;
-	serverMode: boolean;
 	onDiscard: () => void;
 	onReview: () => void;
 }) {
@@ -21,8 +19,8 @@ export function DraftBar({
 				<span>
 					<strong>Exploring a temporary version</strong>
 					<small>
-						{count} unsaved {count === 1 ? "change" : "changes"} · saved{" "}
-						{serverMode ? "server " : ""}plan unchanged
+						{count} unsaved {count === 1 ? "change" : "changes"} · saved server
+						plan unchanged
 					</small>
 				</span>
 			</div>

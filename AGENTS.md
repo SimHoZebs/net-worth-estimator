@@ -15,7 +15,7 @@ CGO_ENABLED=0 go -C backend run ./cmd/server
 ```bash
 # terminal 2
 npm --prefix frontend ci
-VITE_WAYPOINT_MODE=server npm --prefix frontend run dev
+npm --prefix frontend run dev
 ```
 
 The Vite server runs on `http://localhost:5178` and proxies `/v1` to `127.0.0.1:8787`. The optional `NET_WORTH_ESTIMATOR_FRONTEND_PATH` remains available for binary-only all-in-one runs.

@@ -4,13 +4,7 @@ import { payEvidence } from "../../domain/evidence.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 
-export function IncomeEvidence({
-	plan,
-	serverMode,
-}: {
-	plan: Plan;
-	serverMode: boolean;
-}) {
+export function IncomeEvidence({ plan }: { plan: Plan }) {
 	const evidence = payEvidence(plan);
 	return (
 		<section className="panel pay-evidence">
@@ -102,9 +96,9 @@ export function IncomeEvidence({
 				<Info size={18} />
 				<span>
 					These inflows may include non-payroll income. This inference does not
-					establish gross salary or bank provenance and never changes{" "}
-					{serverMode ? "the canonical server model" : "your plan"}. Fewer than
-					six comparable records limit confidence.
+					establish gross salary or bank provenance and never changes the
+					canonical server model. Fewer than six comparable records limit
+					confidence.
 				</span>
 			</div>
 		</section>

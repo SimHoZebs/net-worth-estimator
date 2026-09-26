@@ -30,7 +30,6 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 		state,
 		projection,
 		ranges,
-		serverMode = false,
 		readOnly = false,
 		authRequired = false,
 		authTokenActive = false,
@@ -53,9 +52,7 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 					page={navigation.page}
 					planName={plan.name}
 					changeCount={changeCount}
-					serverMode={serverMode}
 					statusLabel={workspaceStatusLabel({
-						serverMode,
 						readOnly: sourceReadOnly,
 						authRequired,
 						authTokenActive,
@@ -71,7 +68,6 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 					example={plan.origin === "example"}
 					loading={loading}
 					changeCount={changeCount}
-					serverMode={serverMode}
 					onOpenNavigation={open}
 					onSources={() => navigation.navigate("sources")}
 				/>
@@ -79,7 +75,6 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 			draftBar={
 				<DraftBar
 					count={changeCount}
-					serverMode={serverMode}
 					onDiscard={overlays.openDiscard}
 					onReview={() => navigation.navigate("compare")}
 				/>
@@ -107,16 +102,10 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 			<WorkspaceNotices
 				state={state}
 				plan={plan}
-				serverMode={serverMode}
 				readOnly={sourceReadOnly}
 				authControl={authControl}
 			/>
-			<ProjectionBoundary
-				projection={projection}
-				ranges={ranges}
-				serverMode={serverMode}
-				onAssumptions={() => overlays.openEditor({ kind: "assumptions" })}
-			>
+			<ProjectionBoundary projection={projection} ranges={ranges}>
 				{(base) => (
 					<>
 						<WorkspacePage
@@ -133,12 +122,11 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 							plan={plan}
 							projection={projection}
 							temporary={Boolean(workspace.draft)}
-							serverMode={serverMode}
 						/>
 					</>
 				)}
 			</ProjectionBoundary>
-			<WorkspaceFooter serverMode={serverMode} onMethod={showMethod} />
+			<WorkspaceFooter onMethod={showMethod} />
 		</WorkspaceLayout>
 	);
 }

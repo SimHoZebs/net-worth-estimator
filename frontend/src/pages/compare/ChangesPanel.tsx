@@ -4,14 +4,12 @@ import { changeDetails, type PlanChange } from "../../domain/comparison.ts";
 
 export function ChangesPanel({
 	changes,
-	serverMode,
 	readOnly,
 	saving,
 	onSave,
 	onDiscard,
 }: {
 	changes: PlanChange[];
-	serverMode: boolean;
 	readOnly: boolean;
 	saving: boolean;
 	onSave: () => void;
@@ -24,7 +22,7 @@ export function ChangesPanel({
 					<h2>Your changes</h2>
 					<p>
 						{changes.length
-							? `Review what will be saved ${serverMode ? "on the server" : "in this browser"}.`
+							? `Review what will be saved on the server.`
 							: "No unsaved changes."}
 					</p>
 				</div>
@@ -76,9 +74,8 @@ export function ChangesPanel({
 			)}
 			{readOnly && (
 				<p className="section-note">
-					{serverMode
-						? "The server is read-only. Export the temporary version from Data & sources to keep a separate copy."
-						: "The source is read-only. Export the temporary version from Data & sources to keep a separate copy."}
+					"The server is read-only. Export the temporary version from Data &
+					sources to keep a separate copy."
 				</p>
 			)}
 		</section>

@@ -32,14 +32,10 @@ export function ProjectionLoading({
 export function ProjectionBoundary({
 	projection,
 	ranges,
-	serverMode,
-	onAssumptions,
 	children,
 }: {
 	projection: ProjectionState;
 	ranges: boolean;
-	serverMode: boolean;
-	onAssumptions: () => void;
 	children: (base: Projection) => ReactNode;
 }) {
 	if (projection.base === null)
@@ -48,8 +44,8 @@ export function ProjectionBoundary({
 		return (
 			<ErrorNotice
 				message={projection.base.message}
-				action={serverMode ? "Retry server calculation" : "Inspect assumptions"}
-				onAction={serverMode ? projection.retryProjection : onAssumptions}
+				action={"Retry server calculation"}
+				onAction={projection.retryProjection}
 			/>
 		);
 	return (

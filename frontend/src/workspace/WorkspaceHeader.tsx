@@ -8,7 +8,6 @@ export function WorkspaceTopbar({
 	example,
 	loading,
 	changeCount,
-	serverMode,
 	onOpenNavigation,
 	onSources,
 }: {
@@ -16,7 +15,6 @@ export function WorkspaceTopbar({
 	example: boolean;
 	loading: boolean;
 	changeCount: number;
-	serverMode: boolean;
 	onOpenNavigation: () => void;
 	onSources: () => void;
 }) {
@@ -49,11 +47,7 @@ export function WorkspaceTopbar({
 						className={`saved-indicator ${changeCount ? "draft-indicator" : ""}`}
 					>
 						{changeCount ? <GitBranch size={14} /> : <Check size={14} />}
-						{changeCount
-							? "Temporary version"
-							: serverMode
-								? "Saved server plan"
-								: "Saved plan"}
+						{changeCount ? "Temporary version" : "Saved server plan"}
 					</span>
 				)}
 				<span

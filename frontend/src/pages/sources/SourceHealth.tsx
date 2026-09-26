@@ -6,39 +6,22 @@ import { dateLabel } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { Workspace } from "../../state/storage.ts";
 
-export function SourceBanner({
-	plan,
-	serverMode,
-	sourceAccess,
-}: {
-	plan: Plan;
-	serverMode: boolean;
-	sourceAccess: string;
-}) {
+export function SourceBanner({ sourceAccess }: { sourceAccess: string }) {
 	return (
 		<section className="source-banner">
 			<span className="source-banner-icon">
 				<HardDrive size={25} />
 			</span>
 			<div>
-				<h2>
-					{serverMode
-						? "Your canonical server model lives on the server."
-						: plan.origin === "example"
-							? "An example plan. A real workspace."
-							: "Your plan stays in your browser."}
-				</h2>
+				<h2>Your canonical server model lives on the server.</h2>
 				<p>
-					{serverMode
-						? "Export the authoritative server document below. Temporary edits and workspace backups stay in this browser for recovery."
-						: plan.origin === "example"
-							? "All figures are illustrative. Explore freely, or import your own plan."
-							: "This workspace uses local data. There is no bank connection or server synchronization."}
+					Export the authoritative server document below. Temporary edits and
+					workspace backups stay in this browser for recovery.
 				</p>
 			</div>
-			<Badge tone={serverMode ? "outline" : "green"}>
+			<Badge tone="outline">
 				<LockKeyhole size={12} />
-				{serverMode ? sourceAccess : "Local only"}
+				{sourceAccess}
 			</Badge>
 		</section>
 	);
@@ -47,13 +30,11 @@ export function SourceBanner({
 export function SourceHealth({
 	plan,
 	workspace,
-	serverMode,
 	serverDocument,
 	sourceAccess,
 }: {
 	plan: Plan;
 	workspace: Workspace;
-	serverMode: boolean;
 	serverDocument: FinancialModelDocument | null;
 	sourceAccess: string;
 }) {
@@ -73,41 +54,26 @@ export function SourceHealth({
 			</div>
 			<dl className="detail-list">
 				<DetailRow label="Source">
-					{serverMode
-						? serverDocument
-							? serverDocument.sourcePath
-							: "Canonical server model unavailable"
-						: plan.origin === "example"
-							? "Illustrative household"
-							: "User-provided plan"}
+					{serverDocument
+						? serverDocument.sourcePath
+						: "Canonical server model unavailable"}
 				</DetailRow>
-				<DetailRow label={serverMode ? "Display start" : "Starting position"}>
+				<DetailRow label="Display start">
 					{dateLabel(plan.startDate, true)}
 					{age > 30 && <Badge tone="amber">{age} days old</Badge>}
 				</DetailRow>
-				<DetailRow
-					label={
-						serverMode ? "Display balance coverage" : "Balance-check coverage"
-					}
-				>
+				<DetailRow label={"Display balance coverage"}>
 					{recorded.length} of {serverAccountCount} accounts
 				</DetailRow>
-				{serverMode && (
-					<DetailRow label="Server postings">{serverPostingCount}</DetailRow>
-				)}
-				<DetailRow
-					label={serverMode ? "Display validation" : "Validation"}
-					className="inline-success"
-				>
+				{<DetailRow label="Server postings">{serverPostingCount}</DetailRow>}
+				<DetailRow label="Display validation" className="inline-success">
 					<Check size={15} />
 					All structural checks passed
 				</DetailRow>
-				<DetailRow
-					label={serverMode ? "Display revision date" : "Last local save"}
-				>
+				<DetailRow label="Display revision date">
 					{dateLabel(workspace.saved.updatedAt, true)}
 				</DetailRow>
-				<DetailRow label={serverMode ? "Display revision" : "Saved revision"}>
+				<DetailRow label="Display revision">
 					{workspace.saved.revision}
 				</DetailRow>
 				<DetailRow label="Source access">{sourceAccess}</DetailRow>

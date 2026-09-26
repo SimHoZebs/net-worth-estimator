@@ -5,13 +5,7 @@ import type { Plan } from "../domain/model.ts";
 import { download } from "../state/storage.ts";
 import type { WorkspaceController } from "./types.ts";
 
-function errorRecovery({
-	state,
-	serverMode,
-}: {
-	state: WorkspaceController;
-	serverMode: boolean;
-}) {
+function errorRecovery({ state }: { state: WorkspaceController }) {
 	if (state.stale)
 		return {
 			action: "Discard draft and load latest",
@@ -23,53 +17,44 @@ function errorRecovery({
 			onAction: () => window.location.reload(),
 		};
 	return {
-		action: serverMode ? "Retry server request" : "Retry browser save",
+		action: "Retry server request",
 		onAction: state.retry,
 	};
 }
 
 export function workspaceStatusLabel({
-	serverMode,
 	readOnly,
 	authTokenActive,
 	authRequired,
 }: {
-	serverMode: boolean;
 	readOnly: boolean;
 	authTokenActive: boolean;
 	authRequired: boolean;
 }) {
-	return !serverMode
-		? "Local workspace"
-		: readOnly
-			? "Server read-only"
-			: authTokenActive
-				? "Server · token in memory"
-				: authRequired
-					? "Auth required"
-					: "Server workspace";
+	return readOnly
+		? "Server read-only"
+		: authTokenActive
+			? "Server · token in memory"
+			: authRequired
+				? "Auth required"
+				: "Server workspace";
 }
 
 export function WorkspaceNotices({
 	state,
 	plan,
-	serverMode,
 	readOnly,
 	authControl,
 }: {
 	state: WorkspaceController;
 	plan: Plan;
-	serverMode: boolean;
 	readOnly: boolean;
 	authControl?: ReactNode;
 }) {
 	return (
 		<>
 			{state.error && (
-				<ErrorNotice
-					message={state.error}
-					{...errorRecovery({ state, serverMode })}
-				/>
+				<ErrorNotice message={state.error} {...errorRecovery({ state })} />
 			)}
 			{authControl}
 			{state.volatile && (
@@ -83,17 +68,14 @@ export function WorkspaceNotices({
 						})
 					}
 				>
-					{serverMode
-						? "Export local draft recovery"
-						: "Export work before leaving"}
+					"Export local draft recovery"
 				</button>
 			)}
 			{readOnly && (
 				<div className="inline-notice">
 					<LockKeyhole size={17} />
-					{serverMode
-						? "This server is read-only. You can test changes and export a copy; the saved server model cannot be replaced."
-						: "This source is read-only. You can test changes and export a copy; the saved source cannot be edited."}
+					"This server is read-only. You can test changes and export a copy; the
+					saved server model cannot be replaced."
 				</div>
 			)}
 		</>

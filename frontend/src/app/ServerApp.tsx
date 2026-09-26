@@ -84,7 +84,6 @@ export function ServerApp() {
 			setYears={setYears}
 			ranges={ranges}
 			setRanges={setRanges}
-			serverMode
 			serverStatus={remote.status}
 			serverDocument={remote.serverDocument}
 			onImportServerDocument={importDocument}

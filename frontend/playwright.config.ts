@@ -53,9 +53,7 @@ export default defineConfig({
 			stdout: "pipe",
 		},
 		{
-			command: production
-				? "VITE_WAYPOINT_MODE=server npm run preview"
-				: "VITE_WAYPOINT_MODE=server npm run dev",
+			command: production ? "npm run preview" : "npm run dev",
 			env: { NET_WORTH_ESTIMATOR_BACKEND: apiOrigin },
 			url: baseURL,
 			reuseExistingServer: !process.env.CI,

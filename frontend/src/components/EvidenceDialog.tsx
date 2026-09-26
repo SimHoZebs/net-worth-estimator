@@ -22,7 +22,6 @@ export function EvidenceDialog({
 	projection,
 	range,
 	temporary = false,
-	serverMode = false,
 	onClose,
 	onEdit,
 }: {
@@ -31,7 +30,6 @@ export function EvidenceDialog({
 	projection: Projection;
 	range: RangeResult | null;
 	temporary?: boolean;
-	serverMode?: boolean;
 	onClose: () => void;
 	onEdit: (target: EditorTarget) => void;
 }) {
@@ -62,7 +60,7 @@ export function EvidenceDialog({
 				<TimingEvidence plan={plan} projection={projection} onClose={onClose} />
 			);
 		case "method":
-			return <MethodEvidence serverMode={serverMode} onClose={onClose} />;
+			return <MethodEvidence onClose={onClose} />;
 		case "account": {
 			const account = plan.accounts.find((item) => item.id === target.id);
 			return account ? (

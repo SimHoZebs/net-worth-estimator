@@ -2,21 +2,17 @@ import { Download, FileJson, FileUp } from "lucide-react";
 import type { ModelImportController } from "../../state/useModelImport.ts";
 
 export function SourcePortability({
-	serverMode,
-	hasDraft,
 	hasServerDocument,
 	canImportServer,
 	readOnly,
 	controller,
 }: {
-	serverMode: boolean;
-	hasDraft: boolean;
 	hasServerDocument: boolean;
 	canImportServer: boolean;
 	readOnly: boolean;
 	controller: Pick<
 		ModelImportController,
-		| "exportPlan"
+		| "exportServerModel"
 		| "exportWorkspace"
 		| "inputRef"
 		| "onFile"
@@ -24,38 +20,31 @@ export function SourcePortability({
 		| "importing"
 	>;
 }) {
-	const { exportPlan, exportWorkspace, inputRef, onFile, reading, importing } =
-		controller;
+	const {
+		exportServerModel,
+		exportWorkspace,
+		inputRef,
+		onFile,
+		reading,
+		importing,
+	} = controller;
 	return (
 		<section className="panel portability">
-			<h2>
-				{serverMode
-					? "Server model and local recovery"
-					: "Your data, on your terms"}
-			</h2>
+			<h2>"Server model and local recovery"</h2>
 			<p>
-				{serverMode
-					? "Export the canonical server document. Browser drafts and workspace backups remain local recovery copies."
-					: "Download a plan for safekeeping, or review a new one before replacing this workspace."}
+				"Export the canonical server document. Browser drafts and workspace
+				backups remain local recovery copies."
 			</p>
 			<button
 				type="button"
 				className="portability-action"
-				onClick={exportPlan}
-				disabled={serverMode && !hasServerDocument}
+				onClick={exportServerModel}
+				disabled={!hasServerDocument}
 			>
 				<Download size={21} />
 				<span>
-					<strong>
-						{serverMode
-							? "Export server model"
-							: `Export ${hasDraft ? "temporary" : "saved"} plan`}
-					</strong>
-					<small>
-						{serverMode
-							? "Canonical FinancialModelDocument JSON"
-							: "Portable JSON · includes all plan records"}
-					</small>
+					<strong>"Export server model"</strong>
+					<small>"Canonical FinancialModelDocument JSON"</small>
 				</span>
 				<span>↗</span>
 			</button>
@@ -63,9 +52,7 @@ export function SourcePortability({
 				type="button"
 				className="portability-action"
 				onClick={() => inputRef.current?.click()}
-				disabled={
-					reading || importing || (serverMode && (readOnly || !canImportServer))
-				}
+				disabled={reading || importing || readOnly || !canImportServer}
 			>
 				<FileUp size={21} />
 				<span>
@@ -74,14 +61,10 @@ export function SourcePortability({
 							? "Reading your file…"
 							: importing
 								? "Importing model…"
-								: serverMode
-									? "Import server model"
-									: "Import a plan"}
+								: "Import server model"}
 					</strong>
 					<small>
-						{serverMode
-							? "Server model JSON · maximum 2 MB · explicit review before upload"
-							: "Waypoint JSON · maximum 2 MB · reviewed before applying"}
+						"Server model JSON · maximum 2 MB · explicit review before upload"
 					</small>
 				</span>
 				<span>↗</span>
@@ -92,23 +75,18 @@ export function SourcePortability({
 				onClick={exportWorkspace}
 			>
 				<FileJson size={15} />
-				{serverMode
-					? "Download local recovery backup"
-					: "Download full workspace backup"}
+				"Download local recovery backup"
 			</button>
 			<small className="muted">
-				{serverMode
-					? "Local recovery includes the display draft and comparison measures; it is not the canonical server model."
-					: "Workspace backups include the saved plan, draft, and comparison measures. To import a plan, use a plan export."}
+				"Local recovery includes the display draft and comparison measures; it
+				is not the canonical server model."
 			</small>
 			<input
 				className="sr-only"
 				ref={inputRef}
 				type="file"
 				accept=".json,application/json"
-				aria-label={
-					serverMode ? "Import Waypoint server model" : "Import Waypoint plan"
-				}
+				aria-label={"Import Waypoint server model"}
 				onChange={(event) => {
 					const file = event.target.files?.[0];
 					if (file) void onFile(file);
