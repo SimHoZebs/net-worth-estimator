@@ -19,9 +19,6 @@ export function AccountDetails({
 				<DetailRow label="Balance date">
 					{dateLabel(account.observedOn, true)}
 				</DetailRow>
-				<DetailRow label="Annual rate assumption">
-					{account.annualReturn}%
-				</DetailRow>
 				<DetailRow label="Protected from spending">
 					{money(account.floor)}
 				</DetailRow>

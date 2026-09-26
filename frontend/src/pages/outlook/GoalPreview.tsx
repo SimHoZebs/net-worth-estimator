@@ -1,7 +1,7 @@
 import { ArrowRight, ArrowUpRight, Flag } from "lucide-react";
 import { Progress } from "../../components/ui.tsx";
 import { dateLabel, money, percent } from "../../domain/format.ts";
-import type { GoalResult, RangeResult } from "../../domain/projection.ts";
+import type { GoalResult, RangeResult } from "../../domain/result.ts";
 
 export function GoalPreview({
 	result: goal,

@@ -1,6 +1,8 @@
-import type { Plan } from "./model.ts";
+import type { Plan } from "../domain/model.ts";
 
-export const examplePlan: Plan = {
+// A small household used only by unit tests. Production code has no
+// sample plan: every projection comes from the Go engine.
+export const testPlan: Plan = {
 	schemaVersion: 1,
 	name: "Our household",
 	origin: "example",
@@ -15,7 +17,6 @@ export const examplePlan: Plan = {
 			kind: "cash",
 			enabled: true,
 			balance: 18250,
-			annualReturn: 0.5,
 			floor: 2500,
 			ceiling: null,
 			observedOn: "2026-09-24",
@@ -29,7 +30,6 @@ export const examplePlan: Plan = {
 			kind: "cash",
 			enabled: true,
 			balance: 42000,
-			annualReturn: 3.8,
 			floor: 0,
 			ceiling: null,
 			observedOn: "2026-09-24",
@@ -43,7 +43,6 @@ export const examplePlan: Plan = {
 			kind: "investment",
 			enabled: true,
 			balance: 214800,
-			annualReturn: 6.5,
 			floor: 0,
 			ceiling: null,
 			observedOn: "2026-09-24",
@@ -57,7 +56,6 @@ export const examplePlan: Plan = {
 			kind: "investment",
 			enabled: true,
 			balance: 326000,
-			annualReturn: 6.5,
 			floor: 0,
 			ceiling: null,
 			observedOn: "2026-09-24",
@@ -71,7 +69,6 @@ export const examplePlan: Plan = {
 			kind: "property",
 			enabled: true,
 			balance: 480000,
-			annualReturn: 2,
 			floor: 0,
 			ceiling: null,
 			observedOn: "2026-09-01",
@@ -85,7 +82,6 @@ export const examplePlan: Plan = {
 			kind: "debt",
 			enabled: true,
 			balance: -278600,
-			annualReturn: 4.2,
 			floor: 0,
 			ceiling: 0,
 			observedOn: "2026-09-24",

@@ -1373,7 +1373,9 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("rejects a new account annual return edit without mutating the workspace", async () => {
+	// Adding an account is a first-class edit. It used to be rejected because
+	// the new account's presentation-only fields were reported as lost values.
+	it("accepts a new account and stages it as a draft", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const { client } = clientFixture(() => ({
@@ -1385,17 +1387,24 @@ describe("remote workspace state", () => {
 		const plan = rendered.result().plan!;
 		const edited = {
 			...plan,
-			accounts: plan.accounts.map((account) =>
-				account.id === "cash" ? { ...account, annualReturn: 3 } : account,
-			),
+			accounts: [
+				...plan.accounts,
+				{
+					...plan.accounts[0]!,
+					id: "travel",
+					name: "Travel savings",
+					balance: 2500,
+				},
+			],
 		};
 
-		expect(rendered.result().updatePlan(edited)).toBe(false);
+		expect(rendered.result().updatePlan(edited)).toBe(true);
 		await rendered.settle();
-		expect(rendered.result().workspace?.draft).toBeNull();
-		expect(rendered.result().plan?.accounts[0]?.annualReturn).toBe(0);
-		expect(rendered.result().error).toContain("annualReturn");
-		expect(rendered.result().error).toContain("annual return");
+		expect(rendered.result().workspace?.draft).not.toBeNull();
+		expect(
+			rendered.result().plan?.accounts.some((a) => a.id === "travel"),
+		).toBe(true);
+		expect(rendered.result().error).toBeNull();
 		rendered.unmount();
 	});
 

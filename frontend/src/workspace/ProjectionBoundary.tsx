@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Brand } from "../components/Brand.tsx";
 import { ErrorNotice } from "../components/ui.tsx";
-import type { Projection } from "../domain/projection.ts";
+import type { Projection } from "../domain/result.ts";
 import type { ProjectionState } from "./types.ts";
 
 export function ProjectionLoading({

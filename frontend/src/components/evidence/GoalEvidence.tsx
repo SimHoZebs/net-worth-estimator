@@ -1,7 +1,7 @@
 import { Pencil } from "lucide-react";
 import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { Account } from "../../domain/model.ts";
-import type { GoalResult, RangeResult } from "../../domain/projection.ts";
+import type { GoalResult, RangeResult } from "../../domain/result.ts";
 import { DetailRow } from "../DetailRow.tsx";
 import { Modal } from "../ui.tsx";
 

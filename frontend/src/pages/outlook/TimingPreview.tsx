@@ -2,7 +2,7 @@ import { ArrowUpRight, CalendarDays, Check } from "lucide-react";
 import { Badge, IconButton } from "../../components/ui.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
-import type { Projection } from "../../domain/projection.ts";
+import type { Projection } from "../../domain/result.ts";
 import { cashTiming } from "../../domain/timing.ts";
 
 export function TimingPreview({

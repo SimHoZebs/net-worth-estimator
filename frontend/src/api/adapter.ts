@@ -8,7 +8,6 @@ import {
 	type IsoDate,
 	type JsonObject,
 	type JsonValue,
-	type ModelValidationIssue,
 	NO_CEILING_SENTINEL,
 	NO_FLOOR_SENTINEL,
 	type PostingAmountResolution,
@@ -38,7 +37,6 @@ export interface AdapterReport {
 
 export interface AccountAdapterSidecar {
 	kind: Account["kind"];
-	annualReturn: number;
 	provenance: Account["provenance"];
 	source: string;
 	readOnly: boolean;
@@ -188,15 +186,6 @@ function sameCeilingValue(
 	return sameNullableNumber(backendValue, displayValue);
 }
 
-function emptyEvaluations(): EvaluationTables {
-	return {
-		financialIndependence: [],
-		netWorthThreshold: [],
-		accountBalance: [],
-		postingFulfillment: [],
-	};
-}
-
 function latestCheckpoint(
 	document: FinancialModelDocument,
 	accountId: string,
@@ -326,7 +315,6 @@ function accountDisplay(
 		kind: previous?.kind ?? accountKind(checkpoint?.Balance ?? 0),
 		enabled: account.enabled,
 		balance: checkpoint?.Balance ?? 0,
-		annualReturn: previous?.annualReturn ?? 0,
 		floor: floor === null || floor < 0 ? 0 : floor,
 		ceiling: maxBalance === null || maxBalance < 0 ? null : maxBalance,
 		observedOn,
@@ -492,7 +480,6 @@ function buildSidecarAccount(
 ): AccountAdapterSidecar {
 	return {
 		kind: previous?.kind ?? accountKind(checkpoint?.Balance ?? 0),
-		annualReturn: previous?.annualReturn ?? 0,
 		provenance: previous?.provenance ?? (checkpoint ? "recorded" : "modeled"),
 		source:
 			previous?.source ??
@@ -602,13 +589,6 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 				`${path}.kind`,
 			);
 			provisional(conversionReport, `${path}.kind`);
-			warn(
-				conversionReport,
-				"account-rate-default",
-				"The display account annual return defaults to zero because the backend account has no rate field.",
-				`${path}.annualReturn`,
-			);
-			provisional(conversionReport, `${path}.annualReturn`);
 		}
 		return display;
 	});
@@ -891,7 +871,6 @@ export function displayPlanToBackendDocument(
 		const previousKind =
 			metadata?.kind ??
 			accountKind(sourceCheckpoint?.Balance ?? account.balance);
-		const previousAnnualReturn = metadata?.annualReturn ?? 0;
 		const previousProvenance =
 			metadata?.provenance ?? (sourceCheckpoint ? "recorded" : "modeled");
 		// A newly added account has no prior display state, so a difference from
@@ -905,16 +884,6 @@ export function displayPlanToBackendDocument(
 				`accounts.${account.id}.kind`,
 				"Display account kind has no backend account field.",
 				`accounts.${index}.kind`,
-			);
-		if (
-			hasPriorDisplayState &&
-			!sameNumber(account.annualReturn ?? 0, previousAnnualReturn)
-		)
-			lose(
-				conversionReport,
-				`accounts.${account.id}.annualReturn`,
-				"Display account annual return has no backend account field.",
-				`accounts.${index}.annualReturn`,
 			);
 		if (hasPriorDisplayState && account.provenance !== previousProvenance)
 			lose(
@@ -938,7 +907,6 @@ export function displayPlanToBackendDocument(
 				`accounts.${index}.readOnly`,
 			);
 		provisional(conversionReport, `accounts.${account.id}.kind`);
-		provisional(conversionReport, `accounts.${account.id}.annualReturn`);
 		provisional(conversionReport, `accounts.${account.id}.provenance`);
 		provisional(conversionReport, `accounts.${account.id}.source`);
 		provisional(conversionReport, `accounts.${account.id}.readOnly`);
@@ -1333,178 +1301,3 @@ export function displayPlanToBackendDocument(
 		losses: conversionReport.losses,
 	};
 }
-
-export function financialModelToPlan(input: DisplayPlanInput): PlanConversion;
-export function financialModelToPlan(
-	document: FinancialModelDocument,
-	status: ServerStatus,
-	projection?: ProjectionResult | null,
-	sidecar?: PlanSidecar | null,
-	startDate?: IsoDate,
-): PlanConversion;
-export function financialModelToPlan(
-	inputOrDocument: DisplayPlanInput | FinancialModelDocument,
-	status?: ServerStatus,
-	projection?: ProjectionResult | null,
-	sidecar?: PlanSidecar | null,
-	startDate?: IsoDate,
-): PlanConversion {
-	if ("document" in inputOrDocument && "status" in inputOrDocument)
-		return backendToDisplayPlan(inputOrDocument);
-	return backendToDisplayPlan({
-		document: inputOrDocument,
-		status: status ?? { readOnly: false, authEnabled: false },
-		projection,
-		sidecar,
-		startDate,
-	});
-}
-
-export function planToFinancialModel(
-	plan: Plan,
-	options?: ReverseAdapterOptions,
-): BackendDocumentConversion;
-export function planToFinancialModel(
-	plan: Plan,
-	sidecar?: PlanSidecar | null,
-	options?: Omit<ReverseAdapterOptions, "sidecar">,
-): BackendDocumentConversion;
-export function planToFinancialModel(
-	plan: Plan,
-	sidecarOrOptions?: PlanSidecar | ReverseAdapterOptions | null,
-	options: Omit<ReverseAdapterOptions, "sidecar"> = {},
-): BackendDocumentConversion {
-	if (
-		sidecarOrOptions &&
-		"version" in sidecarOrOptions &&
-		"presentation" in sidecarOrOptions
-	)
-		return displayPlanToBackendDocument(plan, {
-			...options,
-			sidecar: sidecarOrOptions,
-		});
-	const sidecar =
-		sidecarOrOptions && "sidecar" in sidecarOrOptions
-			? (sidecarOrOptions.sidecar ?? null)
-			: null;
-	return displayPlanToBackendDocument(plan, { ...options, sidecar });
-}
-
-export function toDisplayPlan(input: DisplayPlanInput): PlanConversion;
-export function toDisplayPlan(
-	document: FinancialModelDocument,
-	status: ServerStatus,
-	projection?: ProjectionResult | null,
-	sidecar?: PlanSidecar | null,
-	startDate?: IsoDate,
-): PlanConversion;
-export function toDisplayPlan(
-	inputOrDocument: DisplayPlanInput | FinancialModelDocument,
-	status?: ServerStatus,
-	projection?: ProjectionResult | null,
-	sidecar?: PlanSidecar | null,
-	startDate?: IsoDate,
-): PlanConversion {
-	if ("document" in inputOrDocument && "status" in inputOrDocument)
-		return backendToDisplayPlan(inputOrDocument);
-	return backendToDisplayPlan({
-		document: inputOrDocument,
-		status: status ?? { readOnly: false, authEnabled: false },
-		projection,
-		sidecar,
-		startDate,
-	});
-}
-
-export function toBackendDocument(
-	plan: Plan,
-	options?: ReverseAdapterOptions,
-): BackendDocumentConversion;
-export function toBackendDocument(
-	plan: Plan,
-	sidecar?: PlanSidecar | null,
-	options?: Omit<ReverseAdapterOptions, "sidecar">,
-): BackendDocumentConversion;
-export function toBackendDocument(
-	plan: Plan,
-	sidecarOrOptions?: PlanSidecar | ReverseAdapterOptions | null,
-	options: Omit<ReverseAdapterOptions, "sidecar"> = {},
-): BackendDocumentConversion {
-	if (
-		sidecarOrOptions &&
-		"version" in sidecarOrOptions &&
-		"presentation" in sidecarOrOptions
-	)
-		return displayPlanToBackendDocument(plan, {
-			...options,
-			sidecar: sidecarOrOptions,
-		});
-	const sidecar =
-		sidecarOrOptions && "sidecar" in sidecarOrOptions
-			? (sidecarOrOptions.sidecar ?? null)
-			: null;
-	return displayPlanToBackendDocument(plan, { ...options, sidecar });
-}
-
-export const planToBackendDocument = displayPlanToBackendDocument;
-export const backendDocumentFromPlan = displayPlanToBackendDocument;
-
-export function planFromBackend(input: DisplayPlanInput): Plan;
-export function planFromBackend(
-	document: FinancialModelDocument,
-	status: ServerStatus,
-	projection?: ProjectionResult | null,
-	sidecar?: PlanSidecar | null,
-	startDate?: IsoDate,
-): Plan;
-export function planFromBackend(
-	inputOrDocument: DisplayPlanInput | FinancialModelDocument,
-	status?: ServerStatus,
-	projection?: ProjectionResult | null,
-	sidecar?: PlanSidecar | null,
-	startDate?: IsoDate,
-): Plan {
-	if ("document" in inputOrDocument && "status" in inputOrDocument)
-		return backendToDisplayPlan(inputOrDocument).plan;
-	return toDisplayPlan(
-		inputOrDocument,
-		status ?? { readOnly: false, authEnabled: false },
-		projection,
-		sidecar,
-		startDate,
-	).plan;
-}
-
-export function toPlan(input: DisplayPlanInput): Plan;
-export function toPlan(
-	document: FinancialModelDocument,
-	status: ServerStatus,
-	projection?: ProjectionResult | null,
-	sidecar?: PlanSidecar | null,
-	startDate?: IsoDate,
-): Plan;
-export function toPlan(
-	inputOrDocument: DisplayPlanInput | FinancialModelDocument,
-	status?: ServerStatus,
-	projection?: ProjectionResult | null,
-	sidecar?: PlanSidecar | null,
-	startDate?: IsoDate,
-): Plan {
-	if ("document" in inputOrDocument && "status" in inputOrDocument)
-		return backendToDisplayPlan(inputOrDocument).plan;
-	return toDisplayPlan(
-		inputOrDocument,
-		status ?? { readOnly: false, authEnabled: false },
-		projection,
-		sidecar,
-		startDate,
-	).plan;
-}
-
-export function emptyEvaluationTables(): EvaluationTables {
-	return emptyEvaluations();
-}
-
-export type PlanMetadata = PlanSidecar;
-export type PresentationSidecar = PlanSidecar;
-export type { ModelValidationIssue };

@@ -1,6 +1,6 @@
 import { shiftDate, sum } from "./format.ts";
 import type { Plan } from "./model.ts";
-import type { Projection } from "./projection.ts";
+import type { Projection } from "./result.ts";
 
 export function upcomingMovements({
 	startDate,

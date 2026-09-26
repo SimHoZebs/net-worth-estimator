@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { captureComparison, comparisonContext } from "../domain/comparison.ts";
 import type { Plan } from "../domain/model.ts";
-import type { Projection } from "../domain/projection.ts";
+import type { Projection } from "../domain/result.ts";
 import type { Snapshot } from "../state/storage.ts";
 import { ChangesPanel } from "./compare/ChangesPanel.tsx";
 import { ComparisonSummary } from "./compare/ComparisonSummary.tsx";

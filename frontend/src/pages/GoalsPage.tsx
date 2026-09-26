@@ -2,7 +2,7 @@ import { Flag, Plus } from "lucide-react";
 import { EmptyState } from "../components/ui.tsx";
 import type { Goal, Plan } from "../domain/model.ts";
 import { removeGoal, setGoalEnabled } from "../domain/planEdits.ts";
-import type { Projection, RangeResult } from "../domain/projection.ts";
+import type { Projection, RangeResult } from "../domain/result.ts";
 import { GoalCard } from "./goals/GoalCard.tsx";
 
 export function GoalsPage({

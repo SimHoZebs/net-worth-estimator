@@ -1,11 +1,11 @@
 import type { Snapshot } from "../state/storage.ts";
 import { money } from "./format.ts";
 import { changesBetween, type Plan } from "./model.ts";
-import { currentNetWorth, type Projection } from "./projection.ts";
+import { currentNetWorth, type Projection } from "./result.ts";
 
-export function comparisonMetrics(projection: Projection, plan: Plan) {
+export function comparisonMetrics(projection: Projection) {
 	return {
-		current: currentNetWorth({ projection, plan }),
+		current: currentNetWorth(projection),
 		final: projection.points.at(-1)?.total ?? 0,
 		goalDate:
 			projection.goals.find((g) => g.goal.kind === "net-worth")?.firstDate ??
@@ -22,8 +22,9 @@ function assumptionKey(plan: Plan) {
 		...plan.assumptions,
 		rates: plan.accounts.map((a) => ({
 			id: a.id,
-			rate: a.annualReturn,
 			balance: a.balance,
+			floor: a.floor,
+			ceiling: a.ceiling,
 			observedOn: a.observedOn,
 			source: a.source,
 		})),
@@ -45,8 +46,8 @@ export function comparisonContext({
 	snapshot: Snapshot | null;
 	years: number;
 }) {
-	const current = comparisonMetrics(projection, plan);
-	const previous = snapshot ?? comparisonMetrics(savedProjection, saved);
+	const current = comparisonMetrics(projection);
+	const previous = snapshot ?? comparisonMetrics(savedProjection);
 	return {
 		changes: changesBetween({ saved, current: plan }),
 		current,
@@ -93,7 +94,6 @@ const fieldNames: Record<string, string> = {
 	balance: "Balance",
 	floor: "Protected balance",
 	ceiling: "Maximum balance",
-	annualReturn: "Annual rate (%)",
 	annualIncrease: "Annual increase (%)",
 	startDate: "Start date",
 	endDate: "End date",

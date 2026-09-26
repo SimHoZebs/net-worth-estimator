@@ -2,7 +2,7 @@ import { Table2, X } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { projectionChartModel } from "../domain/chart.ts";
 import { dateLabel, money } from "../domain/format.ts";
-import type { Projection, RangeResult } from "../domain/projection.ts";
+import type { Projection, RangeResult } from "../domain/result.ts";
 import { useMediaQuery } from "../state/useMediaQuery.ts";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
 import { ProjectionTable } from "./chart/ProjectionTable.tsx";

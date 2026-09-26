@@ -1,7 +1,7 @@
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
 import { ErrorNotice } from "../components/ui.tsx";
-import type { Projection } from "../domain/projection.ts";
+import type { Projection } from "../domain/result.ts";
 import { ComparePage } from "../pages/ComparePage.tsx";
 import { GoalsPage } from "../pages/GoalsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";

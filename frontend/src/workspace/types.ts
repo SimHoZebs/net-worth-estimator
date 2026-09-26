@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { FinancialModelDocument, ServerStatus } from "../api/index.ts";
 import type { Plan } from "../domain/model.ts";
-import type { Projection, RangeResult } from "../domain/projection.ts";
+import type { Projection, RangeResult } from "../domain/result.ts";
 import type { Snapshot, Workspace } from "../state/storage.ts";
 
 export type WorkspaceController = {

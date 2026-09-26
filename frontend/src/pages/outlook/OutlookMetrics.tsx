@@ -12,7 +12,7 @@ import {
 	currentNetWorth,
 	type Projection,
 	type RangeResult,
-} from "../../domain/projection.ts";
+} from "../../domain/result.ts";
 
 export function OutlookMetrics({
 	plan,
@@ -35,7 +35,7 @@ export function OutlookMetrics({
 	onAssumptions: () => void;
 	onEnableRange: () => void;
 }) {
-	const current = currentNetWorth({ projection, plan });
+	const current = currentNetWorth(projection);
 	const final = projection.points.at(-1);
 	const band = range?.points.at(-1);
 	if (!final) return null;

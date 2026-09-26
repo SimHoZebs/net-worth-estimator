@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { testPlan as examplePlan } from "../test/plan.ts";
 import {
 	captureComparison,
 	changeDetails,
 	comparisonContext,
 	comparisonMetrics,
 } from "./comparison.ts";
-import { examplePlan } from "./example.ts";
 import { money } from "./format.ts";
-import { netWorth, type Plan } from "./model.ts";
-import type { Projection } from "./projection.ts";
+import type { Plan } from "./model.ts";
+import type { Projection } from "./result.ts";
 
 const projection: Projection = {
 	currentNetWorth: 120,
@@ -33,7 +33,7 @@ const snapshot = captureComparison({
 	revision: 7,
 	years: 10,
 	changes: 2,
-	current: comparisonMetrics(projection, examplePlan),
+	current: comparisonMetrics(projection),
 	capturedAt: "2026-09-26T12:00:00.000Z",
 });
 
@@ -41,39 +41,36 @@ describe("comparison measures and snapshots", () => {
 	it("uses projection starting wealth, last point, and first declared net-worth goal", () => {
 		const goal = { ...examplePlan.goals[0]!, kind: "net-worth" as const };
 		expect(
-			comparisonMetrics(
-				{
-					...projection,
-					goals: [
-						{
-							goal: { ...goal, kind: "reserve" },
-							current: 0,
-							final: 0,
-							firstDate: "2027-01-01",
-						},
-						{ goal, current: 0, final: 0, firstDate: "2030-01-01" },
-						{
-							goal: { ...goal, id: "earlier" },
-							current: 0,
-							final: 0,
-							firstDate: "2028-01-01",
-						},
-					],
-					firstFailure: {
-						date: "2029-01-01",
-						movementId: "payment",
-						name: "Payment",
-						requested: 2,
-						realized: 1,
-						fromId: null,
-						toId: null,
-						available: null,
-						constraint: null,
-						accountDeltas: [],
+			comparisonMetrics({
+				...projection,
+				goals: [
+					{
+						goal: { ...goal, kind: "reserve" },
+						current: 0,
+						final: 0,
+						firstDate: "2027-01-01",
 					},
+					{ goal, current: 0, final: 0, firstDate: "2030-01-01" },
+					{
+						goal: { ...goal, id: "earlier" },
+						current: 0,
+						final: 0,
+						firstDate: "2028-01-01",
+					},
+				],
+				firstFailure: {
+					date: "2029-01-01",
+					movementId: "payment",
+					name: "Payment",
+					requested: 2,
+					realized: 1,
+					fromId: null,
+					toId: null,
+					available: null,
+					constraint: null,
+					accountDeltas: [],
 				},
-				examplePlan,
-			),
+			}),
 		).toEqual({
 			current: 120,
 			final: 450,
@@ -81,21 +78,15 @@ describe("comparison measures and snapshots", () => {
 			shortfallDate: "2029-01-01",
 		});
 	});
-	it("preserves empty projection defaults and plan fallback without discarding zero wealth", () => {
-		expect(
-			comparisonMetrics(
-				{ ...projection, points: [], currentNetWorth: undefined },
-				examplePlan,
-			),
-		).toEqual({
-			current: netWorth(examplePlan),
+	it("keeps empty projection defaults and does not discard zero wealth", () => {
+		expect(comparisonMetrics({ ...projection, points: [] })).toEqual({
+			current: projection.currentNetWorth,
 			final: 0,
 			goalDate: null,
 			shortfallDate: null,
 		});
 		expect(
-			comparisonMetrics({ ...projection, currentNetWorth: 0 }, examplePlan)
-				.current,
+			comparisonMetrics({ ...projection, currentNetWorth: 0 }).current,
 		).toBe(0);
 	});
 	it("uses saved measures until a snapshot is present", () => {
@@ -120,8 +111,9 @@ describe("comparison measures and snapshots", () => {
 				...examplePlan.assumptions,
 				rates: examplePlan.accounts.map((account) => ({
 					id: account.id,
-					rate: account.annualReturn,
 					balance: account.balance,
+					floor: account.floor,
+					ceiling: account.ceiling,
 					observedOn: account.observedOn,
 					source: account.source,
 				})),
@@ -164,9 +156,9 @@ describe("comparison measures and snapshots", () => {
 			},
 		],
 		[
-			"rate",
+			"protected balance",
 			(plan) => {
-				plan.accounts[0]!.annualReturn++;
+				plan.accounts[0]!.floor++;
 			},
 		],
 		[

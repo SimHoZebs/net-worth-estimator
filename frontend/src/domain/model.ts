@@ -11,7 +11,6 @@ export const accountSchema = z.object({
 	kind: z.enum(["cash", "investment", "property", "debt"]),
 	enabled: z.boolean().default(true),
 	balance: z.number().finite().min(-1e10).max(1e10),
-	annualReturn: z.number().min(-50).max(50),
 	floor: money,
 	ceiling: money.nullable(),
 	observedOn: date,

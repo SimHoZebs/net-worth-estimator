@@ -1,5 +1,5 @@
 import type { Plan } from "./model.ts";
-import { quantile } from "./projection.ts";
+import { quantile } from "./result.ts";
 
 export function payEvidence(plan: Plan) {
 	const candidates = plan.movements.filter(

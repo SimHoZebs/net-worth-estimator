@@ -1,7 +1,7 @@
 import { Info } from "lucide-react";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
-import type { Projection } from "../../domain/projection.ts";
+import type { Projection } from "../../domain/result.ts";
 import { upcomingMovements } from "../../domain/timing.ts";
 import { Badge, Modal } from "../ui.tsx";
 

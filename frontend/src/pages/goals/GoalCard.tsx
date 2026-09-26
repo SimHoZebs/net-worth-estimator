@@ -2,7 +2,7 @@ import { ArrowUpRight, Check, Flag, Pencil, Trash2 } from "lucide-react";
 import { Badge, IconButton, Progress, Toggle } from "../../components/ui.tsx";
 import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { Goal } from "../../domain/model.ts";
-import type { GoalResult } from "../../domain/projection.ts";
+import type { GoalResult } from "../../domain/result.ts";
 
 export function GoalCard({
 	goal,
