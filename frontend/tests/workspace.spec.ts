@@ -199,6 +199,23 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 	page,
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
+	for (const { route, label } of [
+		{ route: "plan", label: "Your plan" },
+		{ route: "sources", label: "Data & sources" },
+	]) {
+		await page.goto(`/#${route}`);
+		const openNavigation = page.getByRole("button", {
+			name: "Open navigation",
+		});
+		await openNavigation.click();
+		await page.getByRole("link", { name: label, exact: true }).click();
+		await expect(page).toHaveURL(new RegExp(`#${route}$`));
+		await expect(
+			page.getByRole("dialog", { name: "Workspace navigation" }),
+		).not.toBeVisible();
+		await expect(openNavigation).toBeFocused();
+		await expect(page.locator(".workspace")).not.toHaveAttribute("inert", "");
+	}
 	await page.goto("/");
 	await expect(
 		page.getByRole("heading", { name: "Your financial outlook" }),
@@ -374,6 +391,9 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 	page,
 }) => {
 	await page.goto("/#plan");
+	await expect(
+		page.locator('.page-tabs[role="tablist"] > button[role="tab"]'),
+	).toHaveCount(4);
 	await page.getByRole("tab", { name: /Accounts/ }).focus();
 	await page.keyboard.press("ArrowRight");
 	await expect(page.getByRole("tab", { name: /Movements/ })).toBeFocused();

@@ -5,7 +5,13 @@ import {
 	type LucideIcon,
 	X,
 } from "lucide-react";
-import { type ReactNode, useEffect, useId, useRef } from "react";
+import {
+	type ComponentProps,
+	type ReactNode,
+	useEffect,
+	useId,
+	useRef,
+} from "react";
 
 export function IconButton({
 	icon: Icon,
@@ -13,16 +19,15 @@ export function IconButton({
 	onClick,
 	className = "",
 	disabled = false,
+	...buttonProps
 }: {
 	icon: LucideIcon;
 	label: string;
-	onClick: () => void;
-	className?: string;
-	disabled?: boolean;
-}) {
+} & Omit<ComponentProps<"button">, "children">) {
 	return (
 		<button
 			type="button"
+			{...buttonProps}
 			className={`icon-button ${className}`}
 			aria-label={label}
 			title={label}

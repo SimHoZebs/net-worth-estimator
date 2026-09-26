@@ -180,6 +180,12 @@ test("growth-only accounts have an honest empty state and retain account details
 	await expect(
 		dialog.getByRole("button", { name: "Add a planned movement" }),
 	).toBeVisible();
+	await expect(
+		dialog.locator('.account-view-tabs > button[role="tab"]'),
+	).toHaveCount(2);
+	await expect(
+		dialog.getByRole("searchbox", { name: "Search account transactions" }),
+	).toHaveCount(0);
 	await dialog.getByRole("tab", { name: /Transactions/ }).focus();
 	await page.keyboard.press("ArrowRight");
 	await expect(
