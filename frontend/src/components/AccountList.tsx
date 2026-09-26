@@ -1,7 +1,7 @@
 import { ArrowUpRight } from "lucide-react";
 import { money, sum } from "../domain/format.ts";
 import type { Account, Plan } from "../domain/model.ts";
-import type { Projection } from "../domain/projection.ts";
+import type { Projection } from "../domain/result.ts";
 import { AccountIcon } from "./AccountIcon.tsx";
 import { Badge } from "./ui.tsx";
 

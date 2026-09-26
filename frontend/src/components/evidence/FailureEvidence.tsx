@@ -2,7 +2,7 @@ import { ArrowRight, Info, TriangleAlert } from "lucide-react";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
-import type { MovementResult } from "../../domain/projection.ts";
+import type { MovementResult } from "../../domain/result.ts";
 import { DetailRow } from "../DetailRow.tsx";
 import { Modal } from "../ui.tsx";
 

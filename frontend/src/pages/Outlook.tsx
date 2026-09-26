@@ -1,7 +1,7 @@
 import { AccountList } from "../components/AccountList.tsx";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import type { Account, Plan } from "../domain/model.ts";
-import type { Projection, RangeResult } from "../domain/projection.ts";
+import type { Projection, RangeResult } from "../domain/result.ts";
 import { FundingInsight } from "./outlook/FundingInsight.tsx";
 import { GoalPreview } from "./outlook/GoalPreview.tsx";
 import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";

@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { testPlan as examplePlan } from "../test/plan.ts";
+import { activityProjection } from "../test/projection.ts";
 import {
 	accountTransactions,
 	defaultActivityFilters,
 	filterTransactions,
 } from "./accountActivity.ts";
-import { examplePlan } from "./example.ts";
 import { exactMoney } from "./format.ts";
-import { project } from "./projection.ts";
 
-const projection = project({ plan: examplePlan, years: 20 });
+const projection = activityProjection();
 
 describe("account-scoped transactions", () => {
 	it("preserves cents in transaction amounts", () => {
@@ -133,12 +133,14 @@ describe("account-scoped transactions", () => {
 
 	it("keeps excluded recorded facts visible and excludes disabled planned rules", () => {
 		const plan = structuredClone(examplePlan);
-		plan.movements[6]!.enabled = false;
-		plan.movements[3]!.enabled = false;
+		for (const movement of plan.movements) {
+			if (movement.id === "pay-record-0" || movement.id === "invest")
+				movement.enabled = false;
+		}
 		const rows = accountTransactions({
 			accountId: "checking",
 			plan,
-			projection: project({ plan, years: 1 }),
+			projection: activityProjection(plan),
 		});
 		expect(
 			rows.find((row) => row.movementId === "pay-record-0")?.excluded,

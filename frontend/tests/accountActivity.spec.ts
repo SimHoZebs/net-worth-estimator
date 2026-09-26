@@ -216,7 +216,6 @@ test("growth-only accounts have an honest empty state and retain account details
 	await expect(
 		dialog.getByRole("tab", { name: "Account details" }),
 	).toBeFocused();
-	await expect(dialog).toContainText("Annual rate assumption");
 	await expect(dialog).toContainText("No ceiling");
 	await expect(dialog).toContainText("$340,000");
 	await dialog

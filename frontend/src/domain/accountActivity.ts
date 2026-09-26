@@ -1,7 +1,7 @@
 import { shiftDate } from "./format.ts";
 import type { Plan } from "./model.ts";
-import type { Projection } from "./projection.ts";
-import { horizonDate } from "./projection.ts";
+import type { Projection } from "./result.ts";
+import { horizonDate } from "./result.ts";
 
 export interface AccountTransaction {
 	id: string;

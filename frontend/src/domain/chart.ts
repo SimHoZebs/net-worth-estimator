@@ -1,4 +1,4 @@
-import type { Projection, RangeResult } from "./projection.ts";
+import type { Projection, RangeResult } from "./result.ts";
 
 export function projectionChartModel({
 	projection,

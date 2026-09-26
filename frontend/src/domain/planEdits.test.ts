@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { examplePlan } from "./example.ts";
+import { testPlan } from "../test/plan.ts";
 import { changesBetween } from "./model.ts";
 import {
 	removeGoal,
@@ -11,38 +11,38 @@ import {
 
 describe("immutable plan edits", () => {
 	it("preserves unchanged item order and reports exactly one toggle", () => {
-		const before = JSON.stringify(examplePlan);
-		const current = toggleMovement({ plan: examplePlan, id: "invest" });
-		expect(changesBetween({ saved: examplePlan, current })).toMatchObject([
+		const before = JSON.stringify(testPlan);
+		const current = toggleMovement({ plan: testPlan, id: "invest" });
+		expect(changesBetween({ saved: testPlan, current })).toMatchObject([
 			{ kind: "Modified", label: "Monthly investing" },
 		]);
 		expect(
 			changesBetween({
-				saved: examplePlan,
+				saved: testPlan,
 				current: toggleMovement({ plan: current, id: "invest" }),
 			}),
 		).toEqual([]);
-		expect(JSON.stringify(examplePlan)).toBe(before);
+		expect(JSON.stringify(testPlan)).toBe(before);
 	});
 	it("does not create phantom changes when replacing an unchanged item", () => {
-		const item = examplePlan.accounts[0];
+		const item = testPlan.accounts[0];
 		if (!item) throw new Error("Missing test account");
 		const current = {
-			...examplePlan,
-			accounts: upsertItem({ items: examplePlan.accounts, item: { ...item } }),
+			...testPlan,
+			accounts: upsertItem({ items: testPlan.accounts, item: { ...item } }),
 		};
-		expect(changesBetween({ saved: examplePlan, current })).toEqual([]);
+		expect(changesBetween({ saved: testPlan, current })).toEqual([]);
 	});
 	it("reports exactly one removal and preserves all other records", () => {
 		const current = removePlanItem({
-			plan: examplePlan,
+			plan: testPlan,
 			target: { kind: "movements", id: "invest", name: "Monthly investing" },
 		});
 		if (current instanceof Error) throw current;
-		expect(changesBetween({ saved: examplePlan, current })).toMatchObject([
+		expect(changesBetween({ saved: testPlan, current })).toMatchObject([
 			{ kind: "Removed", label: "Monthly investing" },
 		]);
-		expect(current.accounts).toBe(examplePlan.accounts);
+		expect(current.accounts).toBe(testPlan.accounts);
 	});
 	it("rejects referenced and last-account deletions without mutating data", () => {
 		const target = {
@@ -50,10 +50,10 @@ describe("immutable plan edits", () => {
 			id: "checking",
 			name: "Checking",
 		};
-		expect(removePlanItem({ plan: examplePlan, target })).toBeInstanceOf(Error);
+		expect(removePlanItem({ plan: testPlan, target })).toBeInstanceOf(Error);
 		const plan = {
-			...examplePlan,
-			accounts: examplePlan.accounts.slice(0, 1),
+			...testPlan,
+			accounts: testPlan.accounts.slice(0, 1),
 			movements: [],
 			goals: [],
 		};
@@ -61,13 +61,13 @@ describe("immutable plan edits", () => {
 		expect(plan.accounts).toHaveLength(1);
 	});
 	it("isolates goal toggles and removal", () => {
-		const goal = examplePlan.goals[0];
+		const goal = testPlan.goals[0];
 		if (!goal) throw new Error("Missing test goal");
 		expect(
 			changesBetween({
-				saved: examplePlan,
+				saved: testPlan,
 				current: setGoalEnabled({
-					plan: examplePlan,
+					plan: testPlan,
 					id: goal.id,
 					enabled: !goal.enabled,
 				}),
@@ -75,8 +75,8 @@ describe("immutable plan edits", () => {
 		).toHaveLength(1);
 		expect(
 			changesBetween({
-				saved: examplePlan,
-				current: removeGoal({ plan: examplePlan, id: goal.id }),
+				saved: testPlan,
+				current: removeGoal({ plan: testPlan, id: goal.id }),
 			}),
 		).toMatchObject([{ kind: "Removed", label: goal.name }]);
 	});

@@ -1,7 +1,7 @@
 import { Info } from "lucide-react";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
-import { currentNetWorth, type Projection } from "../../domain/projection.ts";
+import { currentNetWorth, type Projection } from "../../domain/result.ts";
 import { DetailRow } from "../DetailRow.tsx";
 import { Modal } from "../ui.tsx";
 
@@ -21,7 +21,7 @@ export function PositionEvidence({
 			onClose={onClose}
 		>
 			<div className="evidence-amount">
-				{money(currentNetWorth({ projection, plan }))}
+				{money(currentNetWorth(projection))}
 			</div>
 			<p className="muted">
 				Assets minus debts · starting {dateLabel(plan.startDate, true)}

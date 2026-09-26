@@ -1,7 +1,7 @@
 import { ArrowUpRight, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Progress } from "../../components/ui.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
-import type { MovementResult } from "../../domain/projection.ts";
+import type { MovementResult } from "../../domain/result.ts";
 
 export function FundingInsight({
 	failure,

@@ -25,7 +25,6 @@ export function AccountEditor({
 					kind: textValue(data, "kind") as Account["kind"],
 					enabled: textValue(data, "enabled") === "on",
 					balance: numberValue(data, "balance"),
-					annualReturn: numberValue(data, "annualReturn"),
 					floor: numberValue(data, "floor"),
 					ceiling: textValue(data, "ceiling")
 						? numberValue(data, "ceiling")
@@ -78,16 +77,6 @@ export function AccountEditor({
 				min="-10000000000"
 				max="10000000000"
 				defaultValue={item?.balance ?? 0}
-			/>
-			<InputField
-				label="Annual growth / interest (%)"
-				name="annualReturn"
-				type="number"
-				required
-				min="-50"
-				max="50"
-				step="0.1"
-				defaultValue={item?.annualReturn ?? 0}
 			/>
 			<InputField
 				label="Protected balance (USD)"

@@ -61,7 +61,6 @@ export function AccountsPanel({
 								</button>
 							</th>
 							<td className="numeric">{money(account.balance)}</td>
-							<td>{account.annualReturn}%</td>
 							<td>{money(account.floor)}</td>
 							<td>
 								<div className="table-actions">

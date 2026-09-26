@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { projectionFixture } from "../test/projection.ts";
 import { projectionChartModel, projectionCsv } from "./chart.ts";
-import { examplePlan } from "./example.ts";
-import { project } from "./projection.ts";
 
-const projection = project({ plan: examplePlan, years: 1 });
+const projection = projectionFixture();
 const options = {
 	projection,
 	range: null,

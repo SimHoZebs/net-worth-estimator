@@ -15,7 +15,7 @@ import {
 	type StochasticProjectionRequest,
 	type StochasticProjectionResult,
 } from "../api/index.ts";
-import type { Projection, RangeResult } from "../domain/projection.ts";
+import type { Projection, RangeResult } from "../domain/result.ts";
 
 export interface RemoteProjectionClient {
 	projectDeterministic(

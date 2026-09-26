@@ -1,6 +1,6 @@
 import type { Plan } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/planEdits.ts";
-import type { Projection, RangeResult } from "../domain/projection.ts";
+import type { Projection, RangeResult } from "../domain/result.ts";
 import { AccountDialog } from "./AccountDialog.tsx";
 import { FailureEvidence } from "./evidence/FailureEvidence.tsx";
 import { GoalEvidence } from "./evidence/GoalEvidence.tsx";
