@@ -66,6 +66,16 @@ function sameDependencies(
 }
 
 function renderHook<T>(callback: () => T): Rendered<T> {
+	return renderHookWith(callback, { strictMode: false });
+}
+
+// React's development double-mount runs mount effects, tears them down, and
+// runs them again. `strictMode` reproduces that so cleanup paths are exercised
+// the way the browser runs them.
+function renderHookWith<T>(
+	callback: () => T,
+	options: { strictMode: boolean },
+): Rendered<T> {
 	const values: unknown[] = [];
 	const refs: { current: unknown }[] = [];
 	const memos: { dependencies?: readonly unknown[]; value: unknown }[] = [];
@@ -148,6 +158,15 @@ function renderHook<T>(callback: () => T): Rendered<T> {
 
 	runtime.current = hookRuntime;
 	render();
+	if (options.strictMode) {
+		// Tear every effect down, then run them again, which is what React's
+		// development double-mount does to a freshly mounted tree.
+		effects.forEach((entry) => {
+			entry.cleanup?.();
+			entry.initialized = false;
+		});
+		render();
+	}
 
 	return {
 		result: () => result,
@@ -446,6 +465,29 @@ afterEach(() => {
 });
 
 describe("remote workspace state", () => {
+	// Regression: the mount effect used to abort its in-flight load on cleanup.
+	// React's development double-mount tears that effect down immediately, and
+	// the remount reused the same in-flight promise, so hydration never
+	// completed and the app stayed on "Connecting to your Waypoint server".
+	it("completes hydration across a strict-mode remount", async () => {
+		const storage = memoryStorage();
+		vi.stubGlobal("localStorage", storage);
+		const { client } = clientFixture(() => ({
+			document: modelFixture(),
+			issues: [],
+		}));
+		const rendered = renderHookWith(() => useRemoteWorkspace({ client }), {
+			strictMode: true,
+		});
+		await rendered.settle();
+
+		expect(rendered.result().loading).toBe(false);
+		expect(rendered.result().workspace).not.toBeNull();
+		expect(rendered.result().plan).not.toBeNull();
+		expect(rendered.result().error).toBeNull();
+		rendered.unmount();
+	});
+
 	it("hydrates server state and persists a draft without storing the bearer token", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);

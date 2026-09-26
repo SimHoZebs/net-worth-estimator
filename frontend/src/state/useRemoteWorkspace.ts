@@ -594,7 +594,12 @@ export function useRemoteWorkspace({
 		void hydrate();
 		return () => {
 			mounted.current = false;
-			hydrationController.current?.abort();
+			// The in-flight load is deliberately not aborted here. React's
+			// development double-mount remounts this effect immediately, and
+			// aborting would cancel the only attempt while the remount reuses
+			// the same in-flight promise, leaving the app loading forever.
+			// Superseded loads are aborted by hydrate() itself; the
+			// mounted flag keeps a completed load from updating state.
 			saveController.current?.abort();
 		};
 	}, [hydrate]);
