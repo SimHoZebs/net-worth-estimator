@@ -13,7 +13,8 @@ export default defineConfig({
 		fs: { strict: true },
 		proxy: {
 			"/v1": {
-				target: "http://127.0.0.1:8787",
+				target:
+					process.env.NET_WORTH_ESTIMATOR_BACKEND ?? "http://127.0.0.1:8787",
 			},
 		},
 	},

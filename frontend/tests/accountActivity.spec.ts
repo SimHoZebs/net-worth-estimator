@@ -1,5 +1,14 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
+import {
+	readSavedServerPlan,
+	readTemporaryVersion,
+	resetFixture,
+} from "./fixture.ts";
+
+test.beforeEach(async () => {
+	await resetFixture();
+});
 
 async function openChecking(page: Page) {
 	await page.goto("/");
@@ -17,12 +26,14 @@ test("clicking an account opens its recorded history and projected transactions"
 	await expect(
 		dialog.getByRole("tab", { name: /Transactions/ }),
 	).toHaveAttribute("aria-selected", "true");
+	// The fixture records two payroll deposits and one take-home deposit before
+	// the projection starts.
 	await expect(
 		dialog.getByRole("button", { name: /Inspect Household payroll/ }),
-	).toHaveCount(3);
+	).toHaveCount(2);
 	await expect(
 		dialog.getByRole("button", {
-			name: "Inspect Household take-home pay on Sep 28, 2026",
+			name: "Inspect Household take-home pay on Jan 28, 2026",
 		}),
 	).toBeVisible();
 	await dialog.getByLabel("Transaction source").selectOption("recorded");
@@ -30,12 +41,24 @@ test("clicking an account opens its recorded history and projected transactions"
 		"Showing 1–3 of 3 transactions",
 	);
 	await expect(dialog.getByText("Projected", { exact: true })).toHaveCount(0);
-	await dialog.getByRole("button", { name: "Oldest first" }).click();
+	// Recorded activity is listed oldest first by default, and the control
+	// toggles rather than sets.
 	await expect(dialog.locator("tbody tr").first()).toContainText(
-		"Aug 28, 2026",
+		"Jan 15, 2026",
+	);
+	await dialog.getByRole("button", { name: "Oldest first" }).click();
+	await expect(
+		dialog.getByRole("button", { name: "Newest first" }),
+	).toBeVisible();
+	await expect(dialog.locator("tbody tr").first()).toContainText(
+		"Jan 29, 2026",
+	);
+	await dialog.getByRole("button", { name: "Newest first" }).click();
+	await expect(dialog.locator("tbody tr").first()).toContainText(
+		"Jan 15, 2026",
 	);
 	await dialog
-		.getByRole("button", { name: "Inspect Household payroll on Aug 28, 2026" })
+		.getByRole("button", { name: "Inspect Household payroll on Jan 15, 2026" })
 		.click();
 	await expect(dialog.locator(".transaction-details")).toContainText(
 		"Recorded amount",
@@ -60,12 +83,16 @@ test("account names in the plan open incoming transfers with the correct other a
 		.click();
 	const dialog = page.getByRole("dialog", { name: "Investment portfolio" });
 	await dialog.getByLabel("Transaction dates").selectOption("30-days");
+	// One monthly contribution lands inside the first 30 days.
 	await expect(dialog.getByRole("status")).toHaveText(
 		"Showing 1–1 of 1 transactions",
 	);
-	await expect(dialog.getByText("+$1,800.00", { exact: true })).toBeVisible();
+	// The only incoming movement to savings is the monthly contribution.
+	await expect(dialog.getByText("+$400.00", { exact: true })).toBeVisible();
 	await dialog
-		.getByRole("button", { name: "Inspect Monthly investing on Oct 3, 2026" })
+		.getByRole("button", {
+			name: "Inspect Retirement contribution on Feb 12, 2026",
+		})
 		.click();
 	await expect(dialog.locator(".transaction-details")).toContainText(
 		"Everyday checking",
@@ -97,17 +124,17 @@ test("a shortfall can be inspected and edited while preserving account context a
 	);
 	await expect(dialog.getByText("Shortfall", { exact: true })).toBeVisible();
 	await dialog
-		.getByRole("button", { name: "Inspect Home renovation on Jun 15, 2028" })
+		.getByRole("button", { name: "Inspect Home renovation on Mar 6, 2026" })
 		.click();
 	await expect(dialog.locator(".transaction-details")).toContainText(
 		"Protected account balance",
 	);
-	await expect(dialog.locator(".transaction-details")).toContainText("$48,000");
+	await expect(dialog.locator(".transaction-details")).toContainText("$9,000");
 	await dialog.getByRole("button", { name: "Edit planned movement" }).click();
 	await expect(
 		page.getByRole("dialog", { name: "Edit planned movement" }),
 	).toBeVisible();
-	await page.getByLabel("Amount (USD)").fill("30000");
+	await page.getByLabel("Amount (USD)").fill("3000");
 	await page
 		.getByRole("button", { name: "Apply to temporary version" })
 		.click();
@@ -117,21 +144,18 @@ test("a shortfall can be inspected and edited while preserving account context a
 	await dialog
 		.getByRole("searchbox", { name: "Search account transactions" })
 		.fill("renovation");
-	await expect(dialog.getByText("−$30,000.00", { exact: true })).toBeVisible();
+	await expect(dialog.getByText("−$3,000.00", { exact: true })).toBeVisible();
 	await expect(dialog.getByText("Shortfall", { exact: true })).toHaveCount(0);
-	const stored = await page.evaluate(() =>
-		JSON.parse(localStorage.getItem("waypoint.workspace.v1")!),
-	);
-	expect(
-		stored.saved.movements.find(
-			(movement: { id: string }) => movement.id === "renovation",
-		).amount,
-	).toBe(48000);
-	expect(
-		stored.draft.movements.find(
-			(movement: { id: string }) => movement.id === "renovation",
-		).amount,
-	).toBe(30000);
+	// The saved plan is untouched: only the temporary version changed.
+	const draft = await readTemporaryVersion(page);
+	const renovation = (plan: { movements: { id: string; amount: number }[] }) =>
+		plan.movements.find((movement) => movement.id === "renovation")?.amount;
+	expect(renovation(draft)).toBe(3000);
+	const saved = await readSavedServerPlan();
+	const savedExpression = saved.postings.find(
+		(posting) => posting.id === "renovation",
+	)?.amount.config.expression;
+	expect(savedExpression).toBe("9000");
 });
 
 test("filters reset pagination and keep projected transfers distinct from recorded income", async ({
@@ -142,25 +166,26 @@ test("filters reset pagination and keep projected transfers distinct from record
 	await expect(dialog.getByRole("status")).toContainText("Showing 11–20");
 	await dialog.getByLabel("Transaction dates").selectOption("30-days");
 	await expect(dialog.getByRole("status")).toHaveText(
-		"Showing 1–5 of 5 transactions",
+		"Showing 1–6 of 6 transactions",
 	);
 	await dialog.getByLabel("Transaction direction").selectOption("transfer");
 	await expect(dialog.getByRole("status")).toHaveText(
 		"Showing 1–3 of 3 transactions",
 	);
+	// Recorded income is not a transfer, so the filter must exclude it.
 	await expect(
 		dialog.getByRole("button", { name: /Inspect Household payroll/ }),
 	).toHaveCount(0);
 	await dialog
 		.getByRole("searchbox", { name: "Search account transactions" })
-		.fill("retirement savings");
+		.fill("retirement contribution");
 	await expect(dialog.getByRole("status")).toHaveText(
 		"Showing 1–1 of 1 transactions",
 	);
 	await expect(
 		dialog.getByRole("button", { name: /Inspect Retirement contribution/ }),
 	).toBeVisible();
-	await expect(dialog.getByText("−$1,100.00", { exact: true })).toBeVisible();
+	await expect(dialog.getByText("−$400.00", { exact: true })).toBeVisible();
 });
 
 test("growth-only accounts have an honest empty state and retain account details", async ({
@@ -192,7 +217,8 @@ test("growth-only accounts have an honest empty state and retain account details
 		dialog.getByRole("tab", { name: "Account details" }),
 	).toBeFocused();
 	await expect(dialog).toContainText("Annual rate assumption");
-	await expect(dialog).toContainText("Example home estimate");
+	await expect(dialog).toContainText("No ceiling");
+	await expect(dialog).toContainText("$340,000");
 	await dialog
 		.getByRole("button", { name: "Edit account", exact: true })
 		.click();
@@ -210,7 +236,7 @@ test("account transactions and expanded evidence are accessible on desktop and m
 			.getByRole("searchbox", { name: "Search account transactions" })
 			.fill("renovation");
 		await dialog
-			.getByRole("button", { name: "Inspect Home renovation on Jun 15, 2028" })
+			.getByRole("button", { name: "Inspect Home renovation on Mar 6, 2026" })
 			.click();
 		const results = await new AxeBuilder({ page })
 			.withTags(["wcag2a", "wcag2aa", "wcag21aa"])
