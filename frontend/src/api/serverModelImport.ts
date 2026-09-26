@@ -2,6 +2,9 @@ import * as errore from "errore";
 import { type ApiClient, ApiHttpError } from "./client.ts";
 import type { FinancialModelDocument } from "./contracts.ts";
 
+export const READ_ONLY_IMPORT_MESSAGE =
+	"The server is read-only. The selected model was not uploaded.";
+
 export class ServerModelImportError extends errore.createTaggedError({
 	name: "ServerModelImportError",
 	message: "$detail",
@@ -36,7 +39,7 @@ export async function importServerModel({
 	if (!preconditions.hasWorkspace) return recover(document);
 	if (preconditions.readOnly)
 		return new ServerModelImportError({
-			detail: "The server is read-only. The selected model was not uploaded.",
+			detail: READ_ONLY_IMPORT_MESSAGE,
 		});
 	if (preconditions.hasDraft)
 		return new ServerModelImportError({
