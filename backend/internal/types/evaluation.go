@@ -40,6 +40,15 @@ type NetWorthThresholdConfig struct {
 	Target float64 `json:"target"`
 }
 
+// AccountBalanceConfig targets one account's own balance. It answers a
+// different question from a net worth threshold: a household can clear a net
+// worth target while holding no liquid reserve, and can hold a full reserve
+// while net worth is negative.
+type AccountBalanceConfig struct {
+	AccountID string  `json:"accountId"`
+	Target    float64 `json:"target"`
+}
+
 type PostingFulfillmentConfig struct {
 	PostingIDs []string `json:"postingIds"` // nil = null (all)
 }
@@ -57,12 +66,14 @@ type EvaluationInstance[T any] struct {
 type (
 	FIEvaluation          = EvaluationInstance[JsonValue]
 	ThresholdEvaluation   = EvaluationInstance[JsonValue]
+	BalanceEvaluation     = EvaluationInstance[JsonValue]
 	FulfillmentEvaluation = EvaluationInstance[JsonValue]
 )
 
 type EvaluationTables struct {
 	FinancialIndependence []FIEvaluation          `json:"financialIndependence"`
 	NetWorthThreshold     []ThresholdEvaluation   `json:"netWorthThreshold"`
+	AccountBalance        []BalanceEvaluation     `json:"accountBalance"`
 	PostingFulfillment    []FulfillmentEvaluation `json:"postingFulfillment"`
 }
 
@@ -70,6 +81,7 @@ func EmptyEvaluationTables() EvaluationTables {
 	return EvaluationTables{
 		FinancialIndependence: []FIEvaluation{},
 		NetWorthThreshold:     []ThresholdEvaluation{},
+		AccountBalance:        []BalanceEvaluation{},
 		PostingFulfillment:    []FulfillmentEvaluation{},
 	}
 }

@@ -204,6 +204,9 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 	if err := saveEvaluationTable(tx, string(types.EvaluationTypeNetWorthThreshold), thresholdEvaluationRows(document)); err != nil {
 		return err
 	}
+	if err := saveEvaluationTable(tx, string(types.EvaluationTypeAccountBalance), accountBalanceEvaluationRows(document)); err != nil {
+		return err
+	}
 	if err := saveEvaluationTable(tx, string(types.EvaluationTypePostingFulfillment), fulfillmentEvaluationRows(document)); err != nil {
 		return err
 	}
@@ -311,6 +314,14 @@ func fiEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
 func thresholdEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
 	rows := make([]evaluationRow, 0, len(d.Evaluations.NetWorthThreshold))
 	for position, item := range d.Evaluations.NetWorthThreshold {
+		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, label: item.Label, enabled: item.Enabled, configValue: item.Config})
+	}
+	return rows
+}
+
+func accountBalanceEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
+	rows := make([]evaluationRow, 0, len(d.Evaluations.AccountBalance))
+	for position, item := range d.Evaluations.AccountBalance {
 		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, label: item.Label, enabled: item.Enabled, configValue: item.Config})
 	}
 	return rows
@@ -489,6 +500,14 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 				return nil, fmt.Errorf("parse threshold config %s: %w", instanceID, err)
 			}
 			document.Evaluations.NetWorthThreshold = append(document.Evaluations.NetWorthThreshold, types.ThresholdEvaluation{
+				InstanceID: instanceID, Label: label, Enabled: enabled != 0, Config: config,
+			})
+		case types.EvaluationTypeAccountBalance:
+			config := map[string]any{}
+			if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+				return nil, fmt.Errorf("parse account balance config %s: %w", instanceID, err)
+			}
+			document.Evaluations.AccountBalance = append(document.Evaluations.AccountBalance, types.BalanceEvaluation{
 				InstanceID: instanceID, Label: label, Enabled: enabled != 0, Config: config,
 			})
 		case types.EvaluationTypePostingFulfillment:

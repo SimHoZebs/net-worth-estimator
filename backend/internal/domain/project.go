@@ -12,6 +12,7 @@ var evaluationRegistryInstance = NewEvaluationRegistry()
 func init() {
 	evaluationRegistryInstance.Register(financialIndependenceDefinition)
 	evaluationRegistryInstance.Register(netWorthThresholdDefinition)
+	evaluationRegistryInstance.Register(accountBalanceDefinition)
 	evaluationRegistryInstance.Register(postingFulfillmentDefinition)
 }
 

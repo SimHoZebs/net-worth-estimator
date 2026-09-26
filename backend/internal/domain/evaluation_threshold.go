@@ -35,6 +35,51 @@ type thresholdAccumulator struct {
 	totalRuns    int
 }
 
+// reachedDateResult is shared by every evaluation whose outcome is "the first
+// date this measure crossed a target". It keeps the stochastic aggregation in
+// one place instead of per evaluation type.
+type reachedDateResult interface {
+	firstReached() *string
+}
+
+func (r *NetWorthThresholdPathResult) firstReached() *string { return r.FirstReachedDate }
+
+// accumulateReachedDate folds one run's result into the shared accumulator.
+func accumulateReachedDate(accumulator Accumulator, pathResult PathResult) error {
+	acc := accumulator.(*thresholdAccumulator)
+	acc.totalRuns++
+	if reached, ok := pathResult.(reachedDateResult); ok {
+		if date := reached.firstReached(); date != nil {
+			acc.reachedDates = append(acc.reachedDates, *date)
+		}
+	}
+	return nil
+}
+
+// finalizeReachedDates aggregates accumulated reached dates into the shared
+// probabilistic result shape.
+func finalizeReachedDates(acc *thresholdAccumulator) types.JsonValue {
+	dates := make([]string, len(acc.reachedDates))
+	copy(dates, acc.reachedDates)
+	sort.Strings(dates)
+	probability := 0.0
+	if acc.totalRuns > 0 {
+		probability = float64(len(dates)) / float64(acc.totalRuns)
+	}
+	result := NetWorthThresholdProbabilisticResult{
+		Probability:       probability,
+		P10ReachedDate:    datePercentile(dates, 0.1),
+		MedianReachedDate: datePercentile(dates, 0.5),
+		P90ReachedDate:    datePercentile(dates, 0.9),
+	}
+	return map[string]any{
+		"probability":       result.Probability,
+		"p10ReachedDate":    result.P10ReachedDate,
+		"medianReachedDate": result.MedianReachedDate,
+		"p90ReachedDate":    result.P90ReachedDate,
+	}
+}
+
 // EvaluateNetWorthThreshold finds the first projected date at/above target.
 func EvaluateNetWorthThreshold(path *types.ProjectionPath, target float64) NetWorthThresholdPathResult {
 	firstReachedDate := (*string)(nil)
@@ -85,36 +130,9 @@ var netWorthThresholdDefinition = &EvaluationDefinition{
 	CreateAccumulator: func(config any, deterministic PathResult) (Accumulator, error) {
 		return &thresholdAccumulator{reachedDates: []string{}}, nil
 	},
-	Accumulate: func(accumulator Accumulator, pathResult PathResult) error {
-		acc := accumulator.(*thresholdAccumulator)
-		result := pathResult.(*NetWorthThresholdPathResult)
-		acc.totalRuns++
-		if result.FirstReachedDate != nil {
-			acc.reachedDates = append(acc.reachedDates, *result.FirstReachedDate)
-		}
-		return nil
-	},
+	Accumulate: accumulateReachedDate,
 	Finalize: func(accumulator Accumulator, ctx *EvaluationFinalizeContext) (types.JsonValue, error) {
-		acc := accumulator.(*thresholdAccumulator)
-		dates := make([]string, len(acc.reachedDates))
-		copy(dates, acc.reachedDates)
-		sort.Strings(dates)
-		probability := 0.0
-		if acc.totalRuns > 0 {
-			probability = float64(len(dates)) / float64(acc.totalRuns)
-		}
-		result := NetWorthThresholdProbabilisticResult{
-			Probability:       probability,
-			P10ReachedDate:    datePercentile(dates, 0.1),
-			MedianReachedDate: datePercentile(dates, 0.5),
-			P90ReachedDate:    datePercentile(dates, 0.9),
-		}
-		return map[string]any{
-			"probability":       result.Probability,
-			"p10ReachedDate":    result.P10ReachedDate,
-			"medianReachedDate": result.MedianReachedDate,
-			"p90ReachedDate":    result.P90ReachedDate,
-		}, nil
+		return finalizeReachedDates(accumulator.(*thresholdAccumulator)), nil
 	},
 	Status: func(deterministic PathResult, probabilistic types.JsonValue) types.EvaluationResultStatus {
 		if probabilistic != nil {

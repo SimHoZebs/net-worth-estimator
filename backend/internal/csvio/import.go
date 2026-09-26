@@ -16,14 +16,15 @@ import (
 
 // Canonical CSV file names.
 const (
-	AccountsFile      = "accounts.csv"
-	CheckpointsFile   = "checkpoints.csv"
-	PostingsFile      = "postings.csv"
-	FIFile            = "behavior/financial-independence.csv"
-	ThresholdFile     = "behavior/net-worth-threshold.csv"
-	FulfillmentFile   = "behavior/posting-fulfillment.csv"
-	IncomeSourcesFile = "income-sources.csv"
-	TaxProfilesFile   = "tax-profiles.csv"
+	AccountsFile       = "accounts.csv"
+	CheckpointsFile    = "checkpoints.csv"
+	PostingsFile       = "postings.csv"
+	FIFile             = "behavior/financial-independence.csv"
+	ThresholdFile      = "behavior/net-worth-threshold.csv"
+	AccountBalanceFile = "behavior/account-balance.csv"
+	FulfillmentFile    = "behavior/posting-fulfillment.csv"
+	IncomeSourcesFile  = "income-sources.csv"
+	TaxProfilesFile    = "tax-profiles.csv"
 )
 
 func readCSV(path string) ([][]string, error) {
@@ -214,6 +215,9 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 	if err := importThresholdEvaluations(csvPath, document); err != nil {
 		return nil, err
 	}
+	if err := importAccountBalanceEvaluations(csvPath, document); err != nil {
+		return nil, err
+	}
 	if err := importFulfillmentEvaluations(csvPath, document); err != nil {
 		return nil, err
 	}
@@ -281,6 +285,29 @@ func importThresholdEvaluations(csvPath string, document *types.FinancialModelDo
 			Enabled:    parseBool(field(record, index, "enabled")),
 			Config: map[string]any{
 				"target": parseNumberOr(field(record, index, "target"), 0),
+			},
+		})
+	}
+	return nil
+}
+
+func importAccountBalanceEvaluations(csvPath string, document *types.FinancialModelDocument) error {
+	records, err := readCSV(filepath.Join(csvPath, AccountBalanceFile))
+	if err != nil {
+		return fmt.Errorf("read account balance behavior: %w", err)
+	}
+	index := headerIndex(records[0])
+	for _, record := range records[1:] {
+		if len(strings.Join(record, "")) == 0 {
+			continue
+		}
+		document.Evaluations.AccountBalance = append(document.Evaluations.AccountBalance, types.BalanceEvaluation{
+			InstanceID: field(record, index, "instanceId"),
+			Label:      field(record, index, "label"),
+			Enabled:    parseBool(field(record, index, "enabled")),
+			Config: map[string]any{
+				"accountId": field(record, index, "accountId"),
+				"target":    parseNumberOr(field(record, index, "target"), 0),
 			},
 		})
 	}

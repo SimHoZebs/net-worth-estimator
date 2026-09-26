@@ -13,6 +13,7 @@ type IsoDate = string
 const (
 	EvaluationTypeFinancialIndependence = "financialIndependence"
 	EvaluationTypeNetWorthThreshold     = "netWorthThreshold"
+	EvaluationTypeAccountBalance        = "accountBalance"
 	EvaluationTypePostingFulfillment    = "postingFulfillment"
 )
 
@@ -21,6 +22,7 @@ const (
 var EvaluationTypeOrder = []string{
 	EvaluationTypeFinancialIndependence,
 	EvaluationTypeNetWorthThreshold,
+	EvaluationTypeAccountBalance,
 	EvaluationTypePostingFulfillment,
 }
 
