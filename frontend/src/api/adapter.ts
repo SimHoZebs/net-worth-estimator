@@ -1,4 +1,4 @@
-import type { Account, Goal, Movement, Plan } from "../domain/model.ts";
+import type { Account, Movement, Plan } from "../domain/model.ts";
 import {
 	type BackendAccount,
 	type BackendCheckpoint,
@@ -75,7 +75,6 @@ export interface PlanPresentationSidecar {
 	assumptions?: Plan["assumptions"];
 	accounts: Record<string, AccountAdapterSidecar>;
 	movements: Record<string, MovementAdapterSidecar>;
-	reserveGoals: Goal[];
 	provisionalFields: ProvisionalField[];
 }
 
@@ -189,21 +188,11 @@ function sameCeilingValue(
 	return sameNullableNumber(backendValue, displayValue);
 }
 
-function sameGoal(left: Goal, right: Goal): boolean {
-	return (
-		left.id === right.id &&
-		left.name === right.name &&
-		left.kind === right.kind &&
-		left.target === right.target &&
-		left.accountId === right.accountId &&
-		left.enabled === right.enabled
-	);
-}
-
 function emptyEvaluations(): EvaluationTables {
 	return {
 		financialIndependence: [],
 		netWorthThreshold: [],
+		accountBalance: [],
 		postingFulfillment: [],
 	};
 }
@@ -648,18 +637,41 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			};
 		},
 	);
-	const sidecarReserveGoals = previousPresentation?.reserveGoals ?? [];
-	if (sidecarReserveGoals.length) {
-		warn(
-			conversionReport,
-			"reserve-goals-preserved",
-			"Reserve goals are retained as provisional local presentation metadata.",
-			"goals",
-		);
-		for (const goal of sidecarReserveGoals)
-			provisional(conversionReport, `goals.${goal.id}`);
-	}
-	const goals = [...thresholdGoals, ...sidecarReserveGoals];
+	const reserveGoals = document.evaluations.accountBalance.map(
+		(evaluation, index) => {
+			const config = objectValue(evaluation.config);
+			const accountId =
+				typeof config?.accountId === "string" ? config.accountId : null;
+			const target = targetFromEvaluation(evaluation.config);
+			if (accountId === null) {
+				warn(
+					conversionReport,
+					"invalid-goal-account",
+					"The account balance goal names no account and is shown provisionally.",
+					`goals.${index}.accountId`,
+				);
+				provisional(conversionReport, `goals.${index}.accountId`);
+			}
+			if (target === 0) {
+				warn(
+					conversionReport,
+					"invalid-goal-target",
+					"The account balance goal has no finite target and is shown provisionally as zero.",
+					`goals.${index}.target`,
+				);
+				provisional(conversionReport, `goals.${index}.target`);
+			}
+			return {
+				id: evaluation.instanceId,
+				name: evaluation.label || evaluation.instanceId,
+				kind: "reserve" as const,
+				target,
+				accountId,
+				enabled: evaluation.enabled,
+			};
+		},
+	);
+	const goals = [...thresholdGoals, ...reserveGoals];
 
 	if (
 		document.evaluations.financialIndependence.length ||
@@ -713,7 +725,6 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 					return [posting.id, buildSidecarPosting(posting, amount, previous)];
 				}),
 			),
-			reserveGoals: previousPresentation?.reserveGoals ?? [],
 			provisionalFields: [...conversionReport.provisionalFields],
 		},
 	};
@@ -1143,34 +1154,41 @@ export function displayPlanToBackendDocument(
 				} satisfies JsonObject,
 			};
 		});
-	const reserveGoals = plan.goals.filter((goal) => goal.kind === "reserve");
-	const sidecarReserveGoals = sidecar?.presentation.reserveGoals ?? [];
-	for (const goal of reserveGoals) {
-		const previous = sidecarReserveGoals.find((item) => item.id === goal.id);
-		if (!previous || !sameGoal(previous, goal))
-			lose(
-				conversionReport,
-				`goals.${goal.id}`,
-				"Reserve goals have no backend evaluation representation.",
-				`goals.${goal.id}`,
+	const accountBalance = plan.goals
+		.filter((goal) => goal.kind === "reserve")
+		.map((goal) => {
+			const original = sourceEvaluations?.accountBalance.find(
+				(evaluation) => evaluation.instanceId === goal.id,
 			);
-		provisional(conversionReport, `goals.${goal.id}`);
-		warn(
+			const originalConfig = original ? objectValue(original.config) : null;
+			return {
+				...(original ?? {}),
+				instanceId: goal.id,
+				label: goal.name,
+				enabled: goal.enabled,
+				config: {
+					...(originalConfig ?? {}),
+					accountId: goal.accountId,
+					target: goal.target,
+				} satisfies JsonObject,
+			};
+		});
+	const removedBalanceIDs = (sourceEvaluations?.accountBalance ?? [])
+		.filter(
+			(evaluation) =>
+				!plan.goals.some(
+					(goal) =>
+						goal.kind === "reserve" && goal.id === evaluation.instanceId,
+				),
+		)
+		.map((evaluation) => evaluation.instanceId);
+	for (const instanceId of removedBalanceIDs)
+		lose(
 			conversionReport,
-			"reserve-goal-provisional",
-			"Reserve goals are displayed from the local sidecar and are not uploaded.",
-			`goals.${goal.id}`,
+			`evaluations.accountBalance.${instanceId}`,
+			"The backend account balance goal is absent from the display plan and will not be uploaded.",
+			`evaluations.accountBalance.${instanceId}`,
 		);
-	}
-	for (const goal of sidecarReserveGoals) {
-		if (!reserveGoals.some((item) => item.id === goal.id))
-			lose(
-				conversionReport,
-				`goals.${goal.id}`,
-				"Reserve goals have no backend evaluation representation.",
-				`goals.${goal.id}`,
-			);
-	}
 	const removedThresholdIDs = (sourceEvaluations?.netWorthThreshold ?? [])
 		.filter(
 			(evaluation) =>
@@ -1187,7 +1205,7 @@ export function displayPlanToBackendDocument(
 			"The backend net-worth threshold is absent from the display plan and will not be uploaded.",
 			`evaluations.netWorthThreshold.${instanceId}`,
 		);
-	if (plan.goals.length !== netWorthThreshold.length + reserveGoals.length) {
+	if (plan.goals.length !== netWorthThreshold.length + accountBalance.length) {
 		lose(
 			conversionReport,
 			"goals",
@@ -1271,6 +1289,7 @@ export function displayPlanToBackendDocument(
 		...(sourceEvaluations ?? {}),
 		financialIndependence: [...financialIndependence],
 		netWorthThreshold,
+		accountBalance,
 		postingFulfillment: [...postingFulfillment],
 	};
 	return {

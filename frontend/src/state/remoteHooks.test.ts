@@ -221,6 +221,7 @@ function modelFixture(): FinancialModelDocument {
 					config: { target: 500 },
 				},
 			],
+			accountBalance: [],
 			postingFulfillment: [],
 		},
 		postings: [
@@ -354,6 +355,7 @@ function projectionFixture(): ProjectionResult {
 					diagnostics: [],
 				},
 			],
+			accountBalance: [],
 			postingFulfillment: [],
 		},
 		movementEvents: [
@@ -394,6 +396,7 @@ function stochasticFixture(): StochasticProjectionResult {
 					diagnostics: [],
 				},
 			],
+			accountBalance: [],
 			postingFulfillment: [
 				{
 					instanceId: "all",
@@ -1354,7 +1357,9 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("rejects a new reserve goal without mutating the workspace", async () => {
+	// A reserve goal is a backend account balance evaluation, so editing one
+	// into the plan is accepted and becomes a real draft.
+	it("accepts a new reserve goal and stages it as a draft", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const { client } = clientFixture(() => ({
@@ -1379,14 +1384,13 @@ describe("remote workspace state", () => {
 			],
 		};
 
-		expect(rendered.result().updatePlan(edited)).toBe(false);
+		expect(rendered.result().updatePlan(edited)).toBe(true);
 		await rendered.settle();
-		expect(rendered.result().workspace?.draft).toBeNull();
+		expect(rendered.result().workspace?.draft).not.toBeNull();
 		expect(
 			rendered.result().plan?.goals.some((goal) => goal.id === "reserve"),
-		).toBe(false);
-		expect(rendered.result().error).toContain("goals.reserve");
-		expect(rendered.result().error).toContain("Reserve goals");
+		).toBe(true);
+		expect(rendered.result().error).toBeNull();
 		rendered.unmount();
 	});
 

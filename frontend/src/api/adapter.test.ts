@@ -42,6 +42,7 @@ function documentFixture(): FinancialModelDocument {
 					config: { target: 500 },
 				},
 			],
+			accountBalance: [],
 			postingFulfillment: [],
 		},
 		postings: [
@@ -87,6 +88,7 @@ function projectionFixture(): ProjectionResult {
 		evaluations: {
 			financialIndependence: [],
 			netWorthThreshold: [],
+			accountBalance: [],
 			postingFulfillment: [],
 		},
 		movementEvents: [],
@@ -377,14 +379,61 @@ describe("backend and display plan adapter", () => {
 		expect(reverse.document.evaluations.netWorthThreshold[0]?.config).toEqual({
 			target: 500,
 		});
-		expect(JSON.stringify(reverse.document)).not.toContain('"origin"');
-		expect(JSON.stringify(reverse.document)).not.toContain('"assumptions"');
+		// A reserve goal is a first-class backend evaluation, so it uploads
+		// rather than being reported as a local-only loss.
+		expect(reverse.document.evaluations.accountBalance).toEqual([
+			{
+				instanceId: "reserve",
+				label: "Reserve",
+				enabled: true,
+				config: { accountId: "cash", target: 1000 },
+			},
+		]);
 		expect(
 			reverse.report.losses.some((loss) => loss.field === "goals.reserve"),
-		).toBe(true);
+		).toBe(false);
+		expect(JSON.stringify(reverse.document)).not.toContain('"origin"');
+		expect(JSON.stringify(reverse.document)).not.toContain('"assumptions"');
 		expect(
 			reverse.report.losses.some((loss) => loss.field === "assumptions"),
 		).toBe(true);
 		expect(reverse.report.hasLosses).toBe(true);
+	});
+
+	// A reserve goal must survive the round trip, not degrade to a sidecar
+	// entry that the backend never sees.
+	it("round-trips a reserve goal through the backend document", () => {
+		const base = documentFixture();
+		const conversion = backendToDisplayPlan({
+			document: {
+				...base,
+				evaluations: {
+					financialIndependence: [],
+					netWorthThreshold: [],
+					accountBalance: [
+						{
+							instanceId: "emergency",
+							label: "Emergency fund",
+							enabled: true,
+							config: { accountId: "cash", target: 30000 },
+						},
+					],
+					postingFulfillment: [],
+				},
+			},
+			status: { readOnly: false, authEnabled: false },
+		});
+
+		const goal = conversion.plan.goals.find((item) => item.id === "emergency");
+		expect(goal).toMatchObject({
+			kind: "reserve",
+			accountId: "cash",
+			target: 30000,
+		});
+		expect(
+			conversion.report.provisionalFields.some(
+				(field) => field === "goals.emergency",
+			),
+		).toBe(false);
 	});
 });

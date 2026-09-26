@@ -9,12 +9,12 @@ import {
 	type IncomeDataSnapshot,
 	type JsonValue,
 	type MovementEvent,
+	type ProjectionAccountSummary,
 	type ProjectionResult,
 	parseSSE,
 	type StochasticProjectionRequest,
 	type StochasticProjectionResult,
 } from "../api/index.ts";
-import type { Goal } from "../domain/model.ts";
 import type { Projection, RangeResult } from "../domain/projection.ts";
 
 export interface RemoteProjectionClient {
@@ -105,32 +105,75 @@ function evaluationProbability(
 	return value === null ? null : Math.max(0, Math.min(1, value));
 }
 
-function goalForEvaluation(
-	evaluation: FinancialModelDocument["evaluations"]["netWorthThreshold"][number],
+// Both goal-shaped evaluations (net worth threshold, account balance) share
+// this instance shape, so one mapper serves each kind.
+type GoalEvaluation = {
+	instanceId: string;
+	label: string;
+	enabled: boolean;
+	config: JsonValue;
+};
+
+// A goal whose evaluation produced no envelope is labelled indeterminate rather
+// than reported as unmet, so an unevaluated goal is never shown as a failure.
+function evaluatedGoal(
+	evaluation: GoalEvaluation,
+	envelope: EvaluationResultEnvelope | undefined,
+) {
+	const represented =
+		envelope?.status === "satisfied" || envelope?.status === "not-satisfied";
+	const label = evaluation.label || evaluation.instanceId;
+	return {
+		name: represented ? label : `${label} (indeterminate)`,
+		firstDate: represented ? evaluationDate(envelope) : null,
+	};
+}
+
+function thresholdGoal(
+	evaluation: GoalEvaluation,
 	envelope: EvaluationResultEnvelope | undefined,
 	current: number,
 	final: number,
 ) {
 	const config = valueRecord(evaluation.config);
-	const target = finite(config?.target) ?? 0;
-	const represented =
-		envelope?.status === "satisfied" || envelope?.status === "not-satisfied";
-	const name = represented
-		? evaluation.label || evaluation.instanceId
-		: `${evaluation.label || evaluation.instanceId} (indeterminate)`;
-	const goal: Goal = {
-		id: evaluation.instanceId,
-		name,
-		kind: "net-worth",
-		target,
-		accountId: null,
-		enabled: evaluation.enabled,
-	};
+	const { name, firstDate } = evaluatedGoal(evaluation, envelope);
 	return {
-		goal,
-		firstDate: represented ? evaluationDate(envelope) : null,
+		goal: {
+			id: evaluation.instanceId,
+			name,
+			kind: "net-worth" as const,
+			target: finite(config?.target) ?? 0,
+			accountId: null,
+			enabled: evaluation.enabled,
+		},
+		firstDate,
 		current,
 		final,
+	};
+}
+
+function balanceGoal(
+	evaluation: GoalEvaluation,
+	envelope: EvaluationResultEnvelope | undefined,
+	balances: Map<string, ProjectionAccountSummary>,
+) {
+	const config = valueRecord(evaluation.config);
+	const accountId =
+		typeof config?.accountId === "string" ? config.accountId : null;
+	const { name, firstDate } = evaluatedGoal(evaluation, envelope);
+	const summary = accountId === null ? undefined : balances.get(accountId);
+	return {
+		goal: {
+			id: evaluation.instanceId,
+			name,
+			kind: "reserve" as const,
+			target: finite(config?.target) ?? 0,
+			accountId,
+			enabled: evaluation.enabled,
+		},
+		firstDate,
+		current: summary?.startingBalance ?? 0,
+		final: summary?.endingBalance ?? 0,
 	};
 }
 
@@ -297,22 +340,42 @@ export function projectionResultToLocal(
 				...evidence,
 			};
 		});
-	const evaluationByID = new Map(
+	const balances = new Map(
+		result.accountSummaries.map((summary) => [summary.accountId, summary]),
+	);
+	const thresholdByID = new Map(
 		result.evaluations.netWorthThreshold.map((evaluation) => [
 			evaluation.instanceId,
 			evaluation,
 		]),
 	);
-	const goals = (document?.evaluations.netWorthThreshold ?? [])
-		.filter((evaluation) => evaluation.enabled)
-		.map((evaluation) =>
-			goalForEvaluation(
-				evaluation,
-				evaluationByID.get(evaluation.instanceId),
-				result.summary.currentNetWorth,
-				result.summary.finalNetWorth,
+	const balanceByID = new Map(
+		result.evaluations.accountBalance.map((evaluation) => [
+			evaluation.instanceId,
+			evaluation,
+		]),
+	);
+	const goals = [
+		...(document?.evaluations.netWorthThreshold ?? [])
+			.filter((evaluation) => evaluation.enabled)
+			.map((evaluation) =>
+				thresholdGoal(
+					evaluation,
+					thresholdByID.get(evaluation.instanceId),
+					result.summary.currentNetWorth,
+					result.summary.finalNetWorth,
+				),
 			),
-		);
+		...(document?.evaluations.accountBalance ?? [])
+			.filter((evaluation) => evaluation.enabled)
+			.map((evaluation) =>
+				balanceGoal(
+					evaluation,
+					balanceByID.get(evaluation.instanceId),
+					balances,
+				),
+			),
+	];
 	return {
 		points,
 		currentNetWorth: result.summary.currentNetWorth,

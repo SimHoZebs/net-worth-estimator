@@ -16,7 +16,6 @@ function isPlanSidecar(value: unknown): value is PlanSidecar {
 	return (
 		isRecord(presentation.accounts) &&
 		isRecord(presentation.movements) &&
-		Array.isArray(presentation.reserveGoals) &&
 		Array.isArray(presentation.provisionalFields) &&
 		presentation.provisionalFields.every((item) => typeof item === "string")
 	);

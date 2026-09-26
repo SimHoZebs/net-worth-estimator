@@ -146,6 +146,7 @@ describe("native API client", () => {
 				evaluations: {
 					financialIndependence: [],
 					netWorthThreshold: [],
+					accountBalance: [],
 					postingFulfillment: [],
 				},
 			},

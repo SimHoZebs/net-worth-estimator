@@ -171,7 +171,6 @@ function sidecarForPlan(plan: Plan, sidecar: PlanSidecar | null): PlanSidecar {
 		presentation: {
 			accounts: {},
 			movements: {},
-			reserveGoals: [],
 			provisionalFields: [],
 		},
 	};
@@ -198,7 +197,6 @@ function draftSidecarForPlan(
 		presentation: {
 			accounts: {},
 			movements: {},
-			reserveGoals: [],
 			provisionalFields: [],
 		},
 	};
