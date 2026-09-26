@@ -15,6 +15,7 @@ const document: FinancialModelDocument = {
 	evaluations: {
 		financialIndependence: [],
 		netWorthThreshold: [],
+		accountBalance: [],
 		postingFulfillment: [],
 	},
 };
