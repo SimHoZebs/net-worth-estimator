@@ -94,6 +94,14 @@ func numberField(obj map[string]any, key string) (float64, bool) {
 	return value, true
 }
 
+func stringField(obj map[string]any, key string) (string, bool) {
+	value, ok := obj[key].(string)
+	if !ok {
+		return "", false
+	}
+	return value, true
+}
+
 func stringArrayField(obj map[string]any, key string) ([]string, bool) {
 	raw, ok := obj[key]
 	if !ok {
@@ -281,6 +289,38 @@ func ParseThresholdConfig(config any) (types.NetWorthThresholdConfig, error) {
 	}
 	obj := config.(map[string]any)
 	target, _ := numberField(obj, "target")
+	parsed.Target = target
+	return parsed, nil
+}
+
+// ValidateAccountBalanceConfig validates account balance config JSON. The
+// account reference is checked against the document by the document validator;
+// this validates the config's own shape.
+func ValidateAccountBalanceConfig(config any) error {
+	obj, ok := asObject(config)
+	if !ok {
+		return fmt.Errorf("Account balance target must be an object.")
+	}
+	accountID, ok := stringField(obj, "accountId")
+	if !ok || accountID == "" {
+		return fmt.Errorf("Account balance goal must name an account.")
+	}
+	if _, ok := numberField(obj, "target"); !ok {
+		return fmt.Errorf("Account balance target must be a finite number.")
+	}
+	return nil
+}
+
+// ParseAccountBalanceConfig converts validated JSON into a typed config.
+func ParseAccountBalanceConfig(config any) (types.AccountBalanceConfig, error) {
+	var parsed types.AccountBalanceConfig
+	if err := ValidateAccountBalanceConfig(config); err != nil {
+		return parsed, err
+	}
+	obj := config.(map[string]any)
+	accountID, _ := stringField(obj, "accountId")
+	target, _ := numberField(obj, "target")
+	parsed.AccountID = accountID
 	parsed.Target = target
 	return parsed, nil
 }

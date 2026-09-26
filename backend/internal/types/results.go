@@ -32,6 +32,7 @@ type EvaluationResultEnvelope struct {
 type EvaluationResultTables struct {
 	FinancialIndependence []EvaluationResultEnvelope `json:"financialIndependence"`
 	NetWorthThreshold     []EvaluationResultEnvelope `json:"netWorthThreshold"`
+	AccountBalance        []EvaluationResultEnvelope `json:"accountBalance"`
 	PostingFulfillment    []EvaluationResultEnvelope `json:"postingFulfillment"`
 }
 
