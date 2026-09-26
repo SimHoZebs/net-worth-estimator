@@ -894,21 +894,29 @@ export function displayPlanToBackendDocument(
 		const previousAnnualReturn = metadata?.annualReturn ?? 0;
 		const previousProvenance =
 			metadata?.provenance ?? (sourceCheckpoint ? "recorded" : "modeled");
-		if (account.kind !== previousKind)
+		// A newly added account has no prior display state, so a difference from
+		// the inferred default is not a lost value: the field is simply not
+		// persisted and is re-inferred on the next load. Reporting it as a loss
+		// made adding an account impossible on a server-backed plan.
+		const hasPriorDisplayState = Boolean(metadata) || sourceCheckpoint !== null;
+		if (hasPriorDisplayState && account.kind !== previousKind)
 			lose(
 				conversionReport,
 				`accounts.${account.id}.kind`,
 				"Display account kind has no backend account field.",
 				`accounts.${index}.kind`,
 			);
-		if (!sameNumber(account.annualReturn ?? 0, previousAnnualReturn))
+		if (
+			hasPriorDisplayState &&
+			!sameNumber(account.annualReturn ?? 0, previousAnnualReturn)
+		)
 			lose(
 				conversionReport,
 				`accounts.${account.id}.annualReturn`,
 				"Display account annual return has no backend account field.",
 				`accounts.${index}.annualReturn`,
 			);
-		if (account.provenance !== previousProvenance)
+		if (hasPriorDisplayState && account.provenance !== previousProvenance)
 			lose(
 				conversionReport,
 				`accounts.${account.id}.provenance`,

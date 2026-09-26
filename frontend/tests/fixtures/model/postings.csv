@@ -1,0 +1,11 @@
+id,label,sourceAccountId,destinations,amount,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled
+payroll,Household payroll,,checking,"{""resolver"":""expression"",""config"":{""expression"":""1450.25""},""inputs"":{}}",once,0,0,0,2026-01-15,2026-01-15,,1,true
+payroll_2,Household payroll,,checking,"{""resolver"":""expression"",""config"":{""expression"":""1450.25""},""inputs"":{}}",once,0,0,0,2026-01-29,2026-01-29,,2,true
+take_home,Household take-home pay,,checking,"{""resolver"":""expression"",""config"":{""expression"":""3980.75""},""inputs"":{}}",once,0,0,0,2026-01-28,2026-01-28,,3,true
+salary,Salary,,checking,"{""resolver"":""expression"",""config"":{""expression"":""5600""},""inputs"":{}}",monthly,0,0,0,2026-02-01,,,4,true
+spend,Housing and living,checking,,"{""resolver"":""expression"",""config"":{""expression"":""3800""},""inputs"":{}}",monthly,0,0,0,2026-02-05,,,4,true
+invest,Monthly investing,checking,"[""brokerage""]","{""resolver"":""expression"",""config"":{""expression"":""600""},""inputs"":{}}",monthly,0,0,0,2026-02-10,,,5,true
+savings_contribution,Retirement contribution,checking,"[""savings""]","{""resolver"":""expression"",""config"":{""expression"":""400""},""inputs"":{}}",monthly,0,0,0,2026-02-12,,,6,true
+loan_payment,Student loan payment,checking,"[""loan""]","{""resolver"":""expression"",""config"":{""expression"":""450""},""inputs"":{}}",monthly,0,0,0,2026-02-20,,,7,true
+brokerage_growth,Brokerage Growth,,"[""brokerage""]","{""resolver"":""expression"",""config"":{""expression"":""brokerage * rate""},""inputs"":{""brokerage"":{""source"":""provider"",""provider"":""model-value"",""arguments"":{""id"":""brokerage""}},""rate"":{""source"":""provider"",""provider"":""occurrence-rate"",""arguments"":{}}}}",monthly,0.07,0,0.12,2026-02-15,,,8,true
+renovation,Home renovation,checking,,"{""resolver"":""expression"",""config"":{""expression"":""9000""},""inputs"":{}}",once,0,0,0,2026-03-06,2026-03-06,,9,true

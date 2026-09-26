@@ -1292,6 +1292,9 @@
 	}
 	.page-tabs button > span {
 		background: #e8eddf;
+		/* Inherits the tab colour, which lands at 4.48:1 on this background and
+		   fails WCAG AA. 4.70:1 keeps the same hue and passes. */
+		color: #596e46;
 		font-size: 9px;
 		border-radius: 4px;
 		min-width: 19px;
