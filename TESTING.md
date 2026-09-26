@@ -26,7 +26,7 @@ Run the repository-wide diagnostic only to expose copy-only or tooling failures:
 backend/scripts/verify.sh
 ```
 
-In this checkout, the no-argument command reaches `backend/scripts/bench-template_test.go`. That file currently stops `go vet` with an undefined `ProjectFinancialModelDocument` in the scripts directory. CI and hooks exclude that template and use the production-package commands above.
+In this checkout, the no-argument command reaches `backend/scripts/bench-template_test.go`. That file currently stops `go vet` with an undefined `ProjectFinancialModelDocument` in the scripts directory. The hooks exclude that template and use the production-package commands above.
 
 Direct commands are useful while diagnosing a failure:
 
@@ -38,7 +38,7 @@ CGO_ENABLED=0 go test ./internal/store -run 'TestStoreConformance|TestPurgeSyncS
 CGO_ENABLED=0 go build ./...
 ```
 
-In an environment with the race detector's supported CGO toolchain, CI runs the production packages:
+In an environment with the race detector's supported CGO toolchain, run the production packages with the race detector:
 
 ```bash
 go test -race ./internal/... ./cmd/...

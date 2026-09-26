@@ -176,7 +176,7 @@ backend/scripts/verify.sh ./cmd/...      # gofmt, vet, and test backend commands
 backend/scripts/bench-sim.sh deterministic
 ```
 
-The no-argument `backend/scripts/verify.sh` also discovers the copy-only benchmark template under `backend/scripts/`, which currently prevents a repository-wide gate. CI and hooks use the production-package commands above.
+The no-argument `backend/scripts/verify.sh` also discovers the copy-only benchmark template under `backend/scripts/`, which currently prevents a repository-wide gate. The hooks use the production-package commands above.
 
 Operator checks:
 
