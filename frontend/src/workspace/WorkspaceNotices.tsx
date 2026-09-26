@@ -12,12 +12,12 @@ function errorRecovery({
 	state: WorkspaceController;
 	serverMode: boolean;
 }) {
-	if (state.error?.includes("stale"))
+	if (state.stale)
 		return {
 			action: "Discard draft and load latest",
 			onAction: () => void state.reloadDraft(),
 		};
-	if (state.error?.includes("another tab"))
+	if (state.storageConflict)
 		return {
 			action: "Reload latest saved plan",
 			onAction: () => window.location.reload(),

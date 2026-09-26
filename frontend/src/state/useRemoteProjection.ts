@@ -36,6 +36,10 @@ export interface UseRemoteProjectionOptions {
 	ranges: boolean;
 	authToken?: string;
 	incomeData?: IncomeDataSnapshot | null;
+	// When false the hook issues no requests. The saved-plan projection is
+	// identical to the active one whenever there is no draft, so running it
+	// separately would compute the same projection twice.
+	enabled?: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -456,6 +460,7 @@ export function useRemoteProjection({
 	ranges,
 	authToken,
 	incomeData,
+	enabled = true,
 }: UseRemoteProjectionOptions) {
 	const api = useMemo(() => client ?? createApiClient(), [client]);
 	const activeDocument = draftDocument ?? document ?? null;
@@ -486,7 +491,7 @@ export function useRemoteProjection({
 	}, []);
 
 	useEffect(() => {
-		const current = activeDocumentRef.current;
+		const current = enabled ? activeDocumentRef.current : null;
 		const controller = new AbortController();
 		deterministicController.current?.abort();
 		deterministicController.current = controller;
@@ -556,10 +561,18 @@ export function useRemoteProjection({
 				setLoading(false);
 			});
 		return () => controller.abort();
-	}, [api, authToken, deterministicAttempt, documentKey, incomeDataKey, years]);
+	}, [
+		api,
+		authToken,
+		deterministicAttempt,
+		documentKey,
+		enabled,
+		incomeDataKey,
+		years,
+	]);
 
 	useEffect(() => {
-		const current = activeDocumentRef.current;
+		const current = enabled ? activeDocumentRef.current : null;
 		if (!ranges || !current) {
 			rangeController.current?.abort();
 			setRange(null);
@@ -636,7 +649,16 @@ export function useRemoteProjection({
 				);
 			});
 		return () => controller.abort();
-	}, [api, authToken, documentKey, incomeDataKey, rangeAttempt, ranges, years]);
+	}, [
+		api,
+		authToken,
+		documentKey,
+		enabled,
+		incomeDataKey,
+		rangeAttempt,
+		ranges,
+		years,
+	]);
 
 	const abort = useCallback(() => {
 		deterministicController.current?.abort();

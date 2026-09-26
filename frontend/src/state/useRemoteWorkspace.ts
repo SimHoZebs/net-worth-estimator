@@ -11,6 +11,7 @@ import {
 	type IncomeDataSnapshot,
 	type PlanConversion,
 	type PlanSidecar,
+	READ_ONLY_IMPORT_MESSAGE,
 	type ServerStatus,
 } from "../api/index.ts";
 import { changesBetween, type Plan, validatePlan } from "../domain/model.ts";
@@ -72,6 +73,7 @@ export interface RemoteWorkspaceState {
 	volatile: boolean;
 	stale: boolean;
 	draftStale: boolean;
+	storageConflict: boolean;
 	readOnly: boolean;
 	authRequired: boolean;
 	updatePlan: (next: Plan) => boolean;
@@ -937,9 +939,7 @@ export function useRemoteWorkspace({
 				return false;
 			}
 			if (statusRef.current?.readOnly || writeBlockedRef.current) {
-				setError(
-					"The server is read-only. The selected model was not uploaded.",
-				);
+				setError(READ_ONLY_IMPORT_MESSAGE);
 				return false;
 			}
 			if (hydrating.current) {
@@ -1215,6 +1215,9 @@ export function useRemoteWorkspace({
 		volatile,
 		stale: Boolean(workspace?.draftStale),
 		draftStale: Boolean(workspace?.draftStale),
+		storageConflict: Boolean(
+			error?.includes("changed in another tab") ?? false,
+		),
 		readOnly: Boolean(status?.readOnly || writeBlocked),
 		authRequired: authRequiredState,
 		updatePlan,

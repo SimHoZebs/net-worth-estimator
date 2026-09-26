@@ -34,14 +34,23 @@ export function ServerApp() {
 		authToken,
 		incomeData: remote.incomeData,
 	});
-	const savedProjection = useRemoteProjection({
+	// The saved-plan projection is only needed to compare against a draft.
+	// With no draft the active projection already is the saved one, so the
+	// second run is skipped rather than computing the same projection twice.
+	const hasDraft = Boolean(remote.draftDocument);
+	const saved = useRemoteProjection({
 		document: remote.serverDocument,
 		draftDocument: null,
 		years,
 		ranges: false,
 		authToken,
 		incomeData: remote.incomeData,
+		enabled: hasDraft,
 	});
+	const savedProjection = hasDraft ? saved.base : projection.base;
+	const retrySavedProjection = hasDraft
+		? saved.retryProjection
+		: projection.retryProjection;
 	const retryRemote = remote.retry;
 	useEffect(() => {
 		if (authToken) void retryRemote();
@@ -70,7 +79,7 @@ export function ServerApp() {
 			plan={remote.plan}
 			state={remote}
 			projection={projection}
-			savedProjection={savedProjection.base}
+			savedProjection={savedProjection}
 			years={years}
 			setYears={setYears}
 			ranges={ranges}
@@ -84,7 +93,7 @@ export function ServerApp() {
 			authTokenActive={Boolean(authToken)}
 			authControl={authControl}
 			loading={remote.loading || importing}
-			retrySavedProjection={savedProjection.retryProjection}
+			retrySavedProjection={retrySavedProjection}
 		/>
 	);
 }

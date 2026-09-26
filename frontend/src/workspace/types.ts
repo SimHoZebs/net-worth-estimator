@@ -5,6 +5,9 @@ import type { Projection, RangeResult } from "../domain/result.ts";
 import type { Snapshot, Workspace } from "../state/storage.ts";
 
 export type WorkspaceController = {
+	// Typed rather than recovered by matching prose in the error string.
+	stale: boolean;
+	storageConflict: boolean;
 	error: string | null;
 	notice: string;
 	volatile: boolean;
@@ -23,7 +26,6 @@ export type ProjectionState = {
 	range: RangeResult | null;
 	progress: number;
 	rangeError: string | null;
-	loading: boolean;
 	retryRange: () => void;
 	retryProjection: () => void;
 };
