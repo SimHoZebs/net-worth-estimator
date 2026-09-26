@@ -127,6 +127,8 @@ backend/scripts/verify.sh ./internal/...
 backend/scripts/verify.sh ./cmd/...
 ```
 
-The script runs `gofmt` checks, `go vet`, and `go test` with `CGO_ENABLED=0`. CI additionally runs `go mod tidy` checking, production-package `go build`, and `go test -race`. The no-argument script also discovers the copy-only benchmark template under `backend/scripts/`; that template currently prevents a repository-wide gate and is excluded from CI and hooks.
+The script runs `gofmt` checks, `go vet`, and `go test` with `CGO_ENABLED=0`. `go mod tidy` checking, production-package `go build`, and `go test -race` are manual steps. The no-argument script also discovers the copy-only benchmark template under `backend/scripts/`; that template currently prevents a repository-wide gate and is excluded from the hooks.
+
+The pre-commit hook verifies the backend packages containing staged Go files. The pre-push hook verifies `./internal/...` and `./cmd/...`. Frontend lint, typecheck, unit tests, build, and browser tests have no hook and run only when invoked directly.
 
 See `README.md`, `TECHNICAL_OVERVIEW.md`, and `TESTING.md` for runtime and verification detail. `PRODUCT_INTENT.md` defines product intent independently of this implementation.
