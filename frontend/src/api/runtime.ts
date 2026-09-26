@@ -20,14 +20,26 @@ function normalizeBaseUrl(value: string | null | undefined): string | null {
 	return trimmed.replace(/\/+$/, "") || DEFAULT_RUNTIME_API_BASE_URL;
 }
 
-export function getRuntimeConfig(): WaypointRuntimeConfig {
-	if (typeof window === "undefined")
-		return { apiBaseUrl: DEFAULT_RUNTIME_API_BASE_URL };
-	const configured = window.__WAYPOINT_CONFIG__;
-	const baseUrl = normalizeBaseUrl(
-		configured?.apiBaseUrl ?? configured?.apiBase ?? configured?.baseUrl,
+function buildApiBaseUrl(): string | null {
+	return normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL);
+}
+
+function configuredBaseUrl(
+	config: WaypointRuntimeConfig | null | undefined,
+): string | null {
+	return (
+		normalizeBaseUrl(
+			config?.apiBaseUrl ?? config?.apiBase ?? config?.baseUrl,
+		) ?? buildApiBaseUrl()
 	);
-	return { apiBaseUrl: baseUrl ?? DEFAULT_RUNTIME_API_BASE_URL };
+}
+
+export function getRuntimeConfig(): WaypointRuntimeConfig {
+	const configured =
+		typeof window === "undefined" ? undefined : window.__WAYPOINT_CONFIG__;
+	return {
+		apiBaseUrl: configuredBaseUrl(configured) ?? DEFAULT_RUNTIME_API_BASE_URL,
+	};
 }
 
 export function getApiBaseUrl(
@@ -35,11 +47,7 @@ export function getApiBaseUrl(
 ): string {
 	if (typeof config === "string")
 		return normalizeBaseUrl(config) ?? DEFAULT_RUNTIME_API_BASE_URL;
-	return (
-		normalizeBaseUrl(
-			config?.apiBaseUrl ?? config?.apiBase ?? config?.baseUrl,
-		) ?? DEFAULT_RUNTIME_API_BASE_URL
-	);
+	return configuredBaseUrl(config) ?? DEFAULT_RUNTIME_API_BASE_URL;
 }
 
 export const runtimeConfig = getRuntimeConfig;

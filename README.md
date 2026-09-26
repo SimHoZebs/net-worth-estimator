@@ -111,36 +111,50 @@ A model save that removes an account referenced by sync-owned rows preserves tha
 
 ## Run from Source
 
-From the repository root:
+Run the API and frontend as separate processes from the repository root:
 
 ```bash
+# terminal 1
 NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
 NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs" \
 NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income" \
-NET_WORTH_ESTIMATOR_FRONTEND_PATH="$PWD/frontend/dist" \
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-The `go -C` command changes the process working directory to `backend`, which is why the seed paths above are absolute. Build the frontend first, or omit `NET_WORTH_ESTIMATOR_FRONTEND_PATH` for an API-only process. The default local database path is under the operating system's per-user configuration directory; `/tmp` keeps test runs isolated.
-
-## Container and Northflank Contract
-
-The root `Dockerfile` builds the Go server and Waypoint frontend, runs the server as UID/GID `10001`, listens on `0.0.0.0:8787`, serves the frontend at `/`, and defaults SQLite to `/data/net-worth-estimator.db`.
-
-Local durable-container run:
-
 ```bash
-docker build -t net-worth-estimator-server .
-docker run --rm -p 8787:8787 \
-  -v net-worth-estimator-data:/data \
-  net-worth-estimator-server
+# terminal 2
+npm --prefix frontend ci
+VITE_WAYPOINT_MODE=server npm --prefix frontend run dev
 ```
 
-Configure a Northflank combined service with this durable contract:
+The Vite server runs on `http://localhost:5178` and proxies `/v1` to `127.0.0.1:8787`. The default local database path is under the operating system's per-user configuration directory; `/tmp` keeps test runs isolated.
+
+## Container Images and Compose
+
+The split deployment has two images:
+
+- `backend/Dockerfile` builds the Go API and includes the seed CSV directories.
+- `frontend/Dockerfile` builds the Waypoint bundle and serves it from Nginx. The image proxies `/v1` to the backend named by `BACKEND_URL` and keeps stochastic SSE streaming unbuffered.
+
+Run both services with the persistent local volume:
+
+```bash
+docker compose up --build
+```
+
+The frontend is available at `http://localhost:8080` and the API at `http://localhost:8787`. Stop the stack with `docker compose down`; use `docker compose down -v` only when you intend to delete the SQLite volume.
+
+The root `Dockerfile` remains a legacy combined image for the existing Northflank build. The split images do not embed or build one another, and the legacy image and Compose stack must not run against the same volume or port at the same time.
+
+For Vercel, set `VITE_API_BASE_URL` to the public backend origin. Add that exact frontend origin to `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`; Vercel preview origins require an explicit allowlist entry. A proxy or Nginx cut during a seeded stochastic run detaches the client without an error event, and the client can recover by repeating the same request.
+
+`NET_WORTH_ESTIMATOR_AUTH_TOKEN` is empty when unset, which leaves guarded writes unauthenticated. `NET_WORTH_ESTIMATOR_READ_ONLY` is writable when unset. Set both explicitly for any shared environment.
+
+Configure a Northflank backend service with this durable contract:
 
 | Setting | Value |
 | --- | --- |
-| Build | root `Dockerfile` |
+| Build | `backend/Dockerfile` with repository root context |
 | Port | `8787` |
 | Health check | `GET /healthz` on port `8787` |
 | Instances | `1` |
@@ -150,7 +164,7 @@ Configure a Northflank combined service with this durable contract:
 | Optional origin policy | exact origins in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` |
 | Optional write policy | `NET_WORTH_ESTIMATOR_READ_ONLY=1` or a secret-backed `NET_WORTH_ESTIMATOR_AUTH_TOKEN` |
 
-Keep one service instance because the deployment contract uses one SQLite writer. Back up through SQLite-aware procedures and preserve the persistent volume across deploys.
+Keep one backend instance because the deployment contract uses one SQLite writer. Back up through SQLite-aware procedures and preserve the persistent volume across deploys.
 
 ## Scripts
 

@@ -4,32 +4,54 @@ A household financial planning frontend with a local fixture mode and a same-ori
 
 ## Run
 
-Use Node.js 24 or newer. The default build uses server mode and expects the Go API on `127.0.0.1:8787`. From the repository root, start the backend with the frontend bundle available:
+Use Node.js 24 or newer. The frontend runs in local development against the Go API at `127.0.0.1:8787`. From the repository root, start the backend:
 
 ```sh
-npm --prefix frontend ci
-npm --prefix frontend run build
 NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
 NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs" \
 NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income" \
-NET_WORTH_ESTIMATOR_FRONTEND_PATH="$PWD/frontend/dist" \
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-The production server serves the frontend and API together on port `8787`. During frontend development, run the backend separately and use the Vite proxy:
+Start the Vite frontend in a second terminal:
 
 ```sh
-cd frontend
-VITE_WAYPOINT_MODE=server npm run dev
+npm --prefix frontend ci
+VITE_WAYPOINT_MODE=server npm --prefix frontend run dev
 ```
 
 The development server uses port `5178` and proxies `/v1` to `http://127.0.0.1:8787`. The fixture suite uses the same UI with explicitly selected local data:
 
 ```sh
-VITE_WAYPOINT_MODE=fixture npm run dev
+VITE_WAYPOINT_MODE=fixture npm --prefix frontend run dev
 ```
 
-Production assets are generated in `dist/`. A static host can serve `dist/` directly when the API is same-origin or configured through `window.__WAYPOINT_CONFIG__`. Navigation uses URL fragments, so server-side route rewrites are unnecessary. Fonts and the scenario worker are served with the application. There are no external font, analytics, or bank requests.
+## Production build and containers
+
+Build static assets with a build-time API origin when the frontend is hosted separately:
+
+```sh
+VITE_API_BASE_URL=https://api.example.com npm --prefix frontend run build
+```
+
+The API base resolves in this order: `window.__WAYPOINT_CONFIG__`, `VITE_API_BASE_URL`, then same-origin `/v1`. Runtime configuration must be installed before the application bundle loads.
+
+Build the separate images from the repository root:
+
+```sh
+docker build -f backend/Dockerfile -t net-worth-estimator-backend .
+docker build -f frontend/Dockerfile -t net-worth-estimator-frontend .
+```
+
+Or run the complete split stack with Compose:
+
+```sh
+docker compose up --build
+```
+
+Compose publishes the frontend at `http://localhost:8080` and the API at `http://localhost:8787`. The frontend container proxies `/v1` to `BACKEND_URL` and preserves long-running stochastic SSE responses. The root `Dockerfile` is a legacy combined image for the existing Northflank deployment.
+
+Navigation uses URL fragments, so a static host does not need SPA route rewrites. Fonts and the scenario worker are served with the application. There are no external font, analytics, or bank requests.
 
 ## Verification
 
@@ -40,6 +62,7 @@ npm test
 npx playwright install chromium
 npm run build
 VITE_WAYPOINT_MODE=fixture npm run test:browser
+sh ../scripts/smoke-compose.sh
 TEST_PRODUCTION=1 VITE_WAYPOINT_MODE=fixture npm run test:browser
 ```
 

@@ -41,3 +41,16 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config
+      - run: docker compose build
+      - run: docker compose up -d
+        env:
+          NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: http://allowed.example
+      - run: sh scripts/smoke-compose.sh
+      - if: always()
+        run: docker compose down -v

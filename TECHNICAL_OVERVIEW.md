@@ -27,7 +27,9 @@ The model aggregate is `types.FinancialModelDocument`. Income is stored separate
 
 ## 2. HTTP Contracts
 
-`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, bearer token, optional `simplefin.Runner`, and optional static frontend directory. When `FrontendDir` is set, the router serves built assets and falls back to `index.html` for non-asset GET paths while keeping API, health, docs, and OpenAPI routes reserved.
+`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, bearer token, optional `simplefin.Runner`, and optional static frontend directory. When `FrontendDir` is set, the router serves built assets and falls back to `index.html` for non-asset GET paths while keeping API, health, docs, and OpenAPI routes reserved. The split container deployment leaves `FrontendDir` empty: the frontend image serves the SPA and proxies `/v1` to the backend.
+
+The container boundary is split. `backend/Dockerfile` produces an API-only image. `frontend/Dockerfile` produces a static Nginx image whose `BACKEND_URL` runtime setting controls the `/v1` proxy. The proxy removes the browser `Origin` header, disables response buffering, and keeps the SSE connection open for long stochastic runs. `docker compose.yml` is the local full-stack composition; the root `Dockerfile` is retained as a legacy combined image for the existing Northflank deployment.
 
 ### Canonical model
 
