@@ -1,14 +1,9 @@
-import { ArrowUpRight, Check, Flag, Pencil, Plus, Trash2 } from "lucide-react";
-import {
-	Badge,
-	EmptyState,
-	IconButton,
-	Progress,
-	Toggle,
-} from "../components/ui.tsx";
-import { dateLabel, money, percent } from "../domain/format.ts";
+import { Flag, Plus } from "lucide-react";
+import { EmptyState } from "../components/ui.tsx";
 import type { Goal, Plan } from "../domain/model.ts";
+import { removeGoal, setGoalEnabled } from "../domain/planEdits.ts";
 import type { Projection, RangeResult } from "../domain/projection.ts";
+import { GoalCard } from "./goals/GoalCard.tsx";
 
 export function GoalsPage({
 	plan,
@@ -48,110 +43,25 @@ export function GoalsPage({
 				/>
 			)}
 			<div className="goals-grid">
-				{plan.goals.map((goal) => {
-					const result = projection.goals.find((g) => g.goal.id === goal.id);
-					const met = result && result.current >= goal.target;
-					return (
-						<section
-							className={`goal-card ${goal.enabled ? "" : "is-excluded"}`}
-							key={goal.id}
-						>
-							<div className="section-top">
-								<span className="goal-icon">
-									{met ? <Check size={23} /> : <Flag size={23} />}
-								</span>
-								<div className="table-actions">
-									<IconButton
-										icon={Pencil}
-										label={`Edit ${goal.name}`}
-										onClick={() => onEdit(goal)}
-									/>
-									<IconButton
-										icon={Trash2}
-										label={`Remove ${goal.name}`}
-										onClick={() =>
-											onUpdate({
-												...plan,
-												goals: plan.goals.filter((g) => g.id !== goal.id),
-											})
-										}
-									/>
-								</div>
-							</div>
-							<h2>{goal.name}</h2>
-							<p>
-								{goal.kind === "net-worth"
-									? "Household net worth"
-									: plan.accounts.find((a) => a.id === goal.accountId)
-											?.name}{" "}
-								· {money(goal.target)}
-							</p>
-							<div className="goal-card-outcome">
-								{!goal.enabled
-									? "Paused"
-									: met
-										? "Already reached"
-										: result?.firstDate
-											? dateLabel(result.firstDate)
-											: "Beyond this horizon"}
-							</div>
-							<Badge tone={met ? "green" : "neutral"}>
-								{!goal.enabled
-									? "Excluded from evaluation"
-									: met
-										? "Met at the start"
-										: result?.firstDate
-											? "First reached · base case"
-											: "Not reached · base case"}
-							</Badge>
-							<div className="goal-card-progress">
-								<div className="progress-label">
-									<span>{money(result?.current ?? 0)} today</span>
-									<span>
-										{Math.min(
-											100,
-											Math.round(((result?.current ?? 0) / goal.target) * 100),
-										)}
-										%
-									</span>
-								</div>
-								<Progress
-									value={((result?.current ?? 0) / goal.target) * 100}
-									label={goal.name}
-								/>
-							</div>
-							{range && goal.enabled && (
-								<p className="scenario-goal">
-									Reached in{" "}
-									<strong>{percent(range.goalSuccess[goal.id] ?? 0)}</strong> of
-									modeled scenarios.
-								</p>
-							)}
-							<div className="goal-card-footer">
-								<Toggle
-									label="Enabled"
-									checked={goal.enabled}
-									onChange={(enabled) =>
-										onUpdate({
-											...plan,
-											goals: plan.goals.map((g) =>
-												g.id === goal.id ? { ...g, enabled } : g,
-											),
-										})
-									}
-								/>
-								<button
-									type="button"
-									className="text-button"
-									disabled={!goal.enabled}
-									onClick={() => onEvidence(goal.id)}
-								>
-									Evidence <ArrowUpRight size={15} />
-								</button>
-							</div>
-						</section>
-					);
-				})}
+				{plan.goals.map((goal) => (
+					<GoalCard
+						key={goal.id}
+						goal={goal}
+						result={projection.goals.find((g) => g.goal.id === goal.id)}
+						measure={
+							goal.kind === "net-worth"
+								? "Household net worth"
+								: plan.accounts.find((a) => a.id === goal.accountId)?.name
+						}
+						probability={range ? (range.goalSuccess[goal.id] ?? 0) : null}
+						onEdit={() => onEdit(goal)}
+						onRemove={() => onUpdate(removeGoal({ plan, id: goal.id }))}
+						onEnabledChange={(enabled) =>
+							onUpdate(setGoalEnabled({ plan, id: goal.id, enabled }))
+						}
+						onEvidence={() => onEvidence(goal.id)}
+					/>
+				))}
 			</div>
 			<p className="bottom-note">
 				Goal dates mark the first time a threshold is reached. They do not
