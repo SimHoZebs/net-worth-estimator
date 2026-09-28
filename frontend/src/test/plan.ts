@@ -20,7 +20,7 @@ export const testPlan: Plan = {
 			floor: 2500,
 			ceiling: null,
 			observedOn: "2026-09-24",
-			provenance: "recorded",
+			balanceCheck: true,
 			source: "Example balance check",
 			readOnly: false,
 		},
@@ -33,7 +33,7 @@ export const testPlan: Plan = {
 			floor: 0,
 			ceiling: null,
 			observedOn: "2026-09-24",
-			provenance: "recorded",
+			balanceCheck: true,
 			source: "Example balance check",
 			readOnly: false,
 		},
@@ -46,7 +46,7 @@ export const testPlan: Plan = {
 			floor: 0,
 			ceiling: null,
 			observedOn: "2026-09-24",
-			provenance: "recorded",
+			balanceCheck: true,
 			source: "Example balance check",
 			readOnly: false,
 		},
@@ -59,7 +59,7 @@ export const testPlan: Plan = {
 			floor: 0,
 			ceiling: null,
 			observedOn: "2026-09-24",
-			provenance: "recorded",
+			balanceCheck: true,
 			source: "Example balance check",
 			readOnly: false,
 		},
@@ -72,7 +72,7 @@ export const testPlan: Plan = {
 			floor: 0,
 			ceiling: null,
 			observedOn: "2026-09-01",
-			provenance: "modeled",
+			balanceCheck: false,
 			source: "Example home estimate",
 			readOnly: false,
 		},
@@ -85,7 +85,7 @@ export const testPlan: Plan = {
 			floor: 0,
 			ceiling: 0,
 			observedOn: "2026-09-24",
-			provenance: "recorded",
+			balanceCheck: true,
 			source: "Example balance check",
 			readOnly: false,
 		},
@@ -103,7 +103,7 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 2.5,
 			enabled: true,
-			provenance: "planned",
+
 			readOnly: false,
 		},
 		{
@@ -118,7 +118,7 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 2.5,
 			enabled: true,
-			provenance: "planned",
+
 			readOnly: false,
 		},
 		{
@@ -133,7 +133,7 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 0,
 			enabled: true,
-			provenance: "planned",
+
 			readOnly: false,
 		},
 		{
@@ -148,7 +148,7 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 2.5,
 			enabled: true,
-			provenance: "planned",
+
 			readOnly: false,
 		},
 		{
@@ -163,7 +163,7 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 2.5,
 			enabled: true,
-			provenance: "planned",
+
 			readOnly: false,
 		},
 		{
@@ -178,7 +178,7 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 0,
 			enabled: true,
-			provenance: "planned",
+
 			readOnly: false,
 		},
 		...["2026-06-28", "2026-07-28", "2026-08-28"].map((startDate, index) => ({
@@ -193,7 +193,7 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 0,
 			enabled: true,
-			provenance: "recorded" as const,
+
 			readOnly: false,
 		})),
 	],

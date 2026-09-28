@@ -35,9 +35,7 @@ export function PlanPage({
 		{
 			id: "checks",
 			label: "Balance checks",
-			count: plan.accounts.filter(
-				(account) => account.provenance === "recorded",
-			).length,
+			count: plan.accounts.filter((account) => account.balanceCheck).length,
 		},
 		{ id: "assumptions", label: "Assumptions" },
 	];
@@ -116,6 +114,7 @@ export function PlanPage({
 					<MovementsPanel
 						movements={movements}
 						accounts={plan.accounts}
+						startDate={plan.startDate}
 						onEdit={(item) => onEdit({ kind: "movement", item })}
 						onRemove={(item) =>
 							requestRemoval({

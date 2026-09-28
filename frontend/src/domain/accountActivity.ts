@@ -1,5 +1,5 @@
 import { shiftDate } from "./format.ts";
-import type { Plan } from "./model.ts";
+import { isHistoricalMovement, type Plan } from "./model.ts";
 import type { Projection } from "./result.ts";
 import { horizonDate } from "./result.ts";
 
@@ -8,7 +8,7 @@ export interface AccountTransaction {
 	movementId: string;
 	date: string;
 	name: string;
-	source: "recorded" | "projected";
+	source: "historical" | "projected";
 	direction: "in" | "out";
 	category: "income" | "expense" | "transfer";
 	counterparty: string;
@@ -23,7 +23,7 @@ export interface AccountTransaction {
 
 export interface ActivityFilters {
 	query: string;
-	source: "all" | "recorded" | "projected";
+	source: "all" | "historical" | "projected";
 	direction: "all" | "in" | "out" | "transfer";
 	period: "all" | "30-days" | "12-months";
 	order: "oldest" | "newest";
@@ -100,8 +100,7 @@ export function accountTransactions({
 	const recorded: AccountTransaction[] = plan.movements
 		.filter(
 			(movement) =>
-				movement.provenance === "recorded" &&
-				movement.frequency === "once" &&
+				isHistoricalMovement(movement, plan.startDate) &&
 				(movement.fromId === accountId || movement.toId === accountId),
 		)
 		.map((movement) => ({
@@ -109,7 +108,7 @@ export function accountTransactions({
 			movementId: movement.id,
 			date: movement.startDate,
 			name: movement.name,
-			source: "recorded",
+			source: "historical",
 			...connection({
 				fromId: movement.fromId,
 				toId: movement.toId,

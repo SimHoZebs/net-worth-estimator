@@ -68,7 +68,7 @@ export function Transactions({
 			<EmptyState
 				icon={ArrowRightLeft}
 				title="No transactions for this account yet"
-				description="Recorded movements and scheduled transactions will appear here. Growth and interest are reflected in the balance projection separately."
+				description="Historical movements and scheduled transactions will appear here. Growth and interest are reflected in the balance projection separately."
 				action="Add a planned movement"
 				onAction={() => onEdit({ kind: "movement", item: null })}
 			/>
@@ -79,14 +79,14 @@ export function Transactions({
 				filters={filters}
 				recordedCount={
 					transactions.filter(
-						(transaction) => transaction.source === "recorded",
+						(transaction) => transaction.source === "historical",
 					).length
 				}
 				totalCount={transactions.length}
 				onChange={update}
 			/>
 			<p className="transaction-context">
-				Recorded history + the current base case through {dateLabel(horizon)}.
+				Historical record + the current base case through {dateLabel(horizon)}.
 				Upcoming dates are relative to {dateLabel(plan.startDate, true)}.
 			</p>
 			{filtered.length ? (
@@ -164,7 +164,7 @@ export function Transactions({
 			<div className="transaction-note">
 				<Info size={14} aria-hidden="true" />
 				<p>
-					Recorded history may be incomplete and is already included in the
+					Historical record may be incomplete and is already included in the
 					starting balance. Projected amounts show the funded portion; growth
 					and interest are included in the balance projection separately.
 				</p>

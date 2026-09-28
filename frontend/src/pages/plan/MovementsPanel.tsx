@@ -9,17 +9,23 @@ import {
 } from "lucide-react";
 import { Badge, EmptyState, IconButton } from "../../components/ui.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
-import type { Account, Movement } from "../../domain/model.ts";
+import {
+	type Account,
+	isHistoricalMovement,
+	type Movement,
+} from "../../domain/model.ts";
 
 export function MovementsPanel({
 	movements,
 	accounts,
+	startDate,
 	onEdit,
 	onRemove,
 	onToggle,
 }: {
 	movements: Movement[];
 	accounts: Account[];
+	startDate: string;
 	onEdit: (movement: Movement) => void;
 	onRemove: (movement: Movement) => void;
 	onToggle: (id: string) => void;
@@ -78,7 +84,9 @@ export function MovementsPanel({
 							{!movement.amountKnown
 								? "Provisional amount"
 								: movement.enabled
-									? movement.provenance
+									? isHistoricalMovement(movement, startDate)
+										? "Historical"
+										: "Projected"
 									: "Excluded"}
 						</Badge>
 					</div>

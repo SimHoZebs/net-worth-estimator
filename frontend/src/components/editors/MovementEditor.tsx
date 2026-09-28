@@ -38,7 +38,6 @@ export function MovementEditor({
 					endDate: textValue(data, "endDate") || null,
 					annualIncrease: numberValue(data, "annualIncrease"),
 					enabled: item?.enabled ?? true,
-					provenance: textValue(data, "provenance") as Movement["provenance"],
 					readOnly: false,
 				};
 				return {
@@ -109,17 +108,10 @@ export function MovementEditor({
 				step="0.1"
 				defaultValue={item?.annualIncrease ?? 0}
 			/>
-			<SelectField
-				label="Record type"
-				name="provenance"
-				defaultValue={item?.provenance ?? "planned"}
-			>
-				<option value="planned">Planned movement</option>
-				<option value="recorded">Recorded one-time movement</option>
-			</SelectField>
 			<p className="field-wide field-hint">
-				Recorded movements support evidence only; starting balances already
-				include them. Future movements begin after {plan.startDate}.
+				A one-time movement dated on or before {plan.startDate} is a historical
+				record. Starting balances already include it. Anything later is
+				projected.
 			</p>
 		</EditorForm>
 	);

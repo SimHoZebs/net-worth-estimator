@@ -36,7 +36,10 @@ export function PositionEvidence({
 								<>
 									{account.name}
 									<small>
-										{account.provenance} · {dateLabel(account.observedOn, true)}
+										{account.balanceCheck
+											? "Balance check"
+											: "Projected balance"}{" "}
+										· {dateLabel(account.observedOn, true)}
 									</small>
 								</>
 							}

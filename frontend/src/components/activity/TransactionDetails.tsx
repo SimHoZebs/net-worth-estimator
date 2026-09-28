@@ -20,7 +20,9 @@ export function TransactionDetails({
 				<DetailRow label="To">{transaction.to}</DetailRow>
 				<DetailRow
 					label={
-						transaction.source === "recorded" ? "Recorded amount" : "Requested"
+						transaction.source === "historical"
+							? "Historical amount"
+							: "Requested"
 					}
 				>
 					{exactMoney(transaction.requested)}
@@ -68,7 +70,7 @@ export function TransactionDetails({
 					<Pencil size={14} />
 					{movement.readOnly
 						? "Inspect source record"
-						: transaction.source === "recorded"
+						: transaction.source === "historical"
 							? "Edit recorded movement"
 							: "Edit planned movement"}
 				</button>

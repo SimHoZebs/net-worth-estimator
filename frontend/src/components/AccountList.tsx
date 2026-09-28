@@ -73,11 +73,7 @@ export function AccountList({
 							<span className="account-label">
 								<strong>{account.name}</strong>
 								<span>
-									{projected
-										? "Projected from last check"
-										: account.provenance === "recorded"
-											? "Balance check"
-											: "Estimated value"}
+									{projected ? "Projected from last check" : "Balance check"}
 								</span>
 							</span>
 							<span className="account-balance">
@@ -88,18 +84,14 @@ export function AccountList({
 											? "amber"
 											: projected
 												? "outline"
-												: account.provenance === "recorded"
-													? "neutral"
-													: "outline"
+												: "neutral"
 									}
 								>
 									{!account.enabled
 										? "Excluded"
 										: projected
 											? "Projected start"
-											: account.provenance === "recorded"
-												? "Recorded"
-												: "Modeled"}
+											: "Balance check"}
 								</Badge>
 							</span>
 						</button>

@@ -5,7 +5,7 @@ const steps = [
 	{
 		title: "Start with what you know",
 		description:
-			"Recorded balances and clearly marked estimates establish today’s position.",
+			"Balance checks and clearly marked estimates establish today’s position.",
 	},
 	{
 		title: "Follow the plan forward",

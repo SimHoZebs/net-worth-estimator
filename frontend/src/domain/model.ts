@@ -14,7 +14,7 @@ export const accountSchema = z.object({
 	floor: money,
 	ceiling: money.nullable(),
 	observedOn: date,
-	provenance: z.enum(["recorded", "modeled"]),
+	balanceCheck: z.boolean(),
 	source: name,
 	readOnly: z.boolean(),
 });
@@ -31,9 +31,21 @@ export const movementSchema = z.object({
 	endDate: date.nullable(),
 	annualIncrease: z.number().min(-50).max(50),
 	enabled: z.boolean(),
-	provenance: z.enum(["planned", "recorded"]),
 	readOnly: z.boolean(),
 });
+
+/**
+ * A movement is historical when it is a one-time dated record at or before the
+ * projection start. Recurring rules and later-dated movements are projected.
+ */
+export function isHistoricalMovement(
+	movement: Movement,
+	projectionStartDate: string,
+): boolean {
+	return (
+		movement.frequency === "once" && movement.startDate <= projectionStartDate
+	);
+}
 
 export const goalSchema = z.object({
 	id,
@@ -108,19 +120,6 @@ export const planSchema = z
 				issue(
 					["movements", index, "endDate"],
 					"End date must follow the first occurrence.",
-				);
-			if (movement.provenance === "recorded" && movement.frequency !== "once")
-				issue(
-					["movements", index, "frequency"],
-					"Recorded movements must be one-time records.",
-				);
-			if (
-				movement.provenance === "recorded" &&
-				movement.startDate > plan.startDate
-			)
-				issue(
-					["movements", index, "startDate"],
-					"Recorded movements cannot be in the future.",
 				);
 		}
 		const goalIds = new Set<string>();

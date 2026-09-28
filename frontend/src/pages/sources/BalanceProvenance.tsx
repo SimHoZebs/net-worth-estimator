@@ -29,12 +29,10 @@ export function BalanceProvenance({ plan }: { plan: Plan }) {
 								<td>{account.source}</td>
 								<td>{dateLabel(account.observedOn, true)}</td>
 								<td>
-									<Badge
-										tone={
-											account.provenance === "recorded" ? "green" : "outline"
-										}
-									>
-										{account.provenance}
+									<Badge tone={account.balanceCheck ? "green" : "outline"}>
+										{account.balanceCheck
+											? "Balance check"
+											: "Projected balance"}
 									</Badge>
 								</td>
 								<td className="numeric">{money(account.balance)}</td>

@@ -51,7 +51,7 @@ export function TransactionFilters({
 						}
 					>
 						<option value="all">All transactions</option>
-						<option value="recorded">Recorded ({recordedCount})</option>
+						<option value="historical">Historical ({recordedCount})</option>
 						<option value="projected">
 							Projected ({totalCount - recordedCount})
 						</option>

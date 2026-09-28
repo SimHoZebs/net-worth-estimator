@@ -104,7 +104,6 @@ const fieldNames: Record<string, string> = {
 	toId: "Destination account",
 	accountId: "Account",
 	observedOn: "Balance date",
-	provenance: "Basis",
 	source: "Source",
 	volatility: "Investment variability (%)",
 	inflation: "Inflation (%)",

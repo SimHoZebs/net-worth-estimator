@@ -38,9 +38,7 @@ export function SourceHealth({
 	serverDocument: FinancialModelDocument | null;
 	sourceAccess: string;
 }) {
-	const recorded = plan.accounts.filter(
-		(account) => account.provenance === "recorded",
-	);
+	const recorded = plan.accounts.filter((account) => account.balanceCheck);
 	const age = Math.floor((Date.now() - Date.parse(plan.startDate)) / 86400000);
 	const serverAccountCount =
 		serverDocument?.accounts.length ?? plan.accounts.length;
@@ -80,7 +78,7 @@ export function SourceHealth({
 			</dl>
 			<p className="section-note">
 				Validation checks structure and references. It does not independently
-				verify balances, bank provenance, or financial assumptions.
+				verify balance checks, bank sources, or financial assumptions.
 			</p>
 		</section>
 	);

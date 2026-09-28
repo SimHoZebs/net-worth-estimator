@@ -96,7 +96,7 @@ export function IncomeEvidence({ plan }: { plan: Plan }) {
 				<Info size={18} />
 				<span>
 					These inflows may include non-payroll income. This inference does not
-					establish gross salary or bank provenance and never changes the
+					establish gross salary or a bank source and never changes the
 					canonical server model. Fewer than six comparable records limit
 					confidence.
 				</span>
