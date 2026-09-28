@@ -1500,7 +1500,7 @@ describe("remote workspace state", () => {
 			persistRemoteState({
 				version: 1,
 				draft: lossyPlan,
-				draftSidecar: first.result().savedSidecar,
+				draftPresentation: first.result().savedPresentation,
 				baseFingerprint: serverDocumentFingerprint(modelFixture()),
 				baseRevision: '"sha256-test"',
 				snapshot: null,
@@ -1804,7 +1804,7 @@ describe("remote draft storage", () => {
 		const state = {
 			version: 1 as const,
 			draft: null,
-			draftSidecar: null,
+			draftPresentation: null,
 			snapshot: null,
 		};
 		expect(persistRemoteState(state)).toBeNull();

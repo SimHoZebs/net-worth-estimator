@@ -10,7 +10,7 @@ import {
 	type FinancialModelResponse,
 	type IncomeDataSnapshot,
 	type PlanConversion,
-	type PlanSidecar,
+	type PlanPresentation,
 	READ_ONLY_IMPORT_MESSAGE,
 	type ServerStatus,
 } from "../api/index.ts";
@@ -64,9 +64,8 @@ export interface RemoteWorkspaceState {
 	recoveryDraft: Plan | null;
 	incomeData: IncomeDataSnapshot | null;
 	adapterReport: AdapterReport | null;
-	sidecar: PlanSidecar | null;
-	savedSidecar: PlanSidecar | null;
-	draftSidecar: PlanSidecar | null;
+	savedPresentation: PlanPresentation | null;
+	draftPresentation: PlanPresentation | null;
 	loading: boolean;
 	error: string | null;
 	notice: string;
@@ -123,11 +122,14 @@ type ReverseConversion = ReturnType<typeof displayPlanToBackendDocument>;
 
 function conversionOrError(
 	plan: Plan,
-	sidecar: PlanSidecar | null,
-	sourcePath?: string,
+	sourceDocument: FinancialModelDocument | null,
+	presentation: PlanPresentation | null,
 ): ReverseConversion | Error {
 	try {
-		return displayPlanToBackendDocument(plan, { sidecar, sourcePath });
+		return displayPlanToBackendDocument(plan, {
+			sourceDocument,
+			presentation,
+		});
 	} catch (cause) {
 		return new Error(
 			messageFor(
@@ -155,58 +157,45 @@ const missingIdentityDraftMessage =
 
 function localStateFor(
 	workspace: RemoteWorkspace,
-	sidecar: PlanSidecar | null,
+	draftPresentation: PlanPresentation | null,
 ): RemoteLocalState {
 	return {
 		version: 1,
 		draft: workspace.draft,
-		draftSidecar: workspace.draft ? sidecar : null,
+		draftPresentation: workspace.draft ? draftPresentation : null,
 		baseFingerprint: workspace.draft ? workspace.baseFingerprint : null,
 		baseRevision: workspace.draft ? workspace.baseRevision : null,
 		snapshot: workspace.snapshot,
 	};
 }
 
-function sidecarForPlan(plan: Plan, sidecar: PlanSidecar | null): PlanSidecar {
-	const base = sidecar ?? {
-		version: 1 as const,
-		presentation: {
-			accounts: {},
-			movements: {},
-			provisionalFields: [],
-		},
-	};
+function emptyPresentation(): PlanPresentation {
+	return { accounts: {}, movements: {} };
+}
+
+/**
+ * The saved presentation tracks the plan's own metadata, so a renamed plan
+ * keeps its new name. The draft presentation deliberately does not: the draft
+ * converts against the server document, which still carries the saved name.
+ */
+function savedPresentationFor(
+	plan: Plan,
+	presentation: PlanPresentation | null,
+): PlanPresentation {
 	return {
-		...base,
-		projectionStartDate: plan.startDate,
-		presentation: {
-			...base.presentation,
-			name: plan.name,
-			origin: plan.origin,
-			updatedAt: plan.updatedAt,
-			revision: plan.revision,
-			assumptions: plan.assumptions,
-		},
+		...(presentation ?? emptyPresentation()),
+		name: plan.name,
+		origin: plan.origin,
+		updatedAt: plan.updatedAt,
+		revision: plan.revision,
+		assumptions: plan.assumptions,
 	};
 }
 
-function draftSidecarForPlan(
-	plan: Plan,
-	sidecar: PlanSidecar | null,
-): PlanSidecar {
-	const base = sidecar ?? {
-		version: 1 as const,
-		presentation: {
-			accounts: {},
-			movements: {},
-			provisionalFields: [],
-		},
-	};
-	return {
-		...base,
-		projectionStartDate: plan.startDate,
-		presentation: { ...base.presentation },
-	};
+function draftPresentationFor(
+	presentation: PlanPresentation | null,
+): PlanPresentation {
+	return { ...(presentation ?? emptyPresentation()) };
 }
 
 function planHasChanges(saved: Plan, next: Plan): boolean {
@@ -237,8 +226,10 @@ export function useRemoteWorkspace({
 	const [adapterReport, setAdapterReport] = useState<AdapterReport | null>(
 		null,
 	);
-	const [savedSidecar, setSavedSidecar] = useState<PlanSidecar | null>(null);
-	const [draftSidecar, setDraftSidecar] = useState<PlanSidecar | null>(null);
+	const [savedPresentation, setSavedPresentation] =
+		useState<PlanPresentation | null>(null);
+	const [draftPresentation, setDraftPresentation] =
+		useState<PlanPresentation | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [notice, setNotice] = useState("");
@@ -251,8 +242,8 @@ export function useRemoteWorkspace({
 	const saving = useRef(false);
 	const expectedRaw = useRef<string | null | undefined>(undefined);
 	const workspaceRef = useRef<RemoteWorkspace | null>(null);
-	const savedSidecarRef = useRef<PlanSidecar | null>(null);
-	const draftSidecarRef = useRef<PlanSidecar | null>(null);
+	const savedPresentationRef = useRef<PlanPresentation | null>(null);
+	const draftPresentationRef = useRef<PlanPresentation | null>(null);
 	const draftDocumentRef = useRef<FinancialModelDocument | null>(null);
 	const serverDocumentRef = useRef<FinancialModelDocument | null>(null);
 	const serverFingerprintRef = useRef<string | null>(null);
@@ -267,8 +258,8 @@ export function useRemoteWorkspace({
 	const hydrationPromise = useRef<Promise<void> | null>(null);
 	const pendingHydrationError = useRef<string | null>(null);
 	workspaceRef.current = workspace;
-	savedSidecarRef.current = savedSidecar;
-	draftSidecarRef.current = draftSidecar;
+	savedPresentationRef.current = savedPresentation;
+	draftPresentationRef.current = draftPresentation;
 	draftDocumentRef.current = draftDocument;
 	serverDocumentRef.current = serverDocument;
 	statusRef.current = status;
@@ -346,7 +337,7 @@ export function useRemoteWorkspace({
 			const storedState = stored instanceof Error ? null : stored;
 			const volatileState = volatileStateRef.current;
 			const inMemoryState = workspaceRef.current
-				? localStateFor(workspaceRef.current, draftSidecarRef.current)
+				? localStateFor(workspaceRef.current, draftPresentationRef.current)
 				: null;
 			const localState = volatileState ?? storedState ?? inMemoryState;
 			setRecoveryDraft(localState?.draft ?? null);
@@ -517,14 +508,13 @@ export function useRemoteWorkspace({
 			);
 			const draftStale =
 				identityMissing || fingerprintChanged || revisionChanged;
-			const sidecar = storedDraft
-				? draftSidecarForPlan(
-						storedDraft,
-						localState?.draftSidecar ?? conversion.sidecar,
+			const draftPresentation = storedDraft
+				? draftPresentationFor(
+						localState?.draftPresentation ?? conversion.presentation,
 					)
 				: null;
 			const convertedDraft = storedDraft
-				? conversionOrError(storedDraft, sidecar, model.sourcePath)
+				? conversionOrError(storedDraft, model, draftPresentation)
 				: null;
 			const convertedDraftDocument =
 				convertedDraft instanceof Error || convertedDraft === null
@@ -541,16 +531,16 @@ export function useRemoteWorkspace({
 				snapshot: localState?.snapshot ?? null,
 			};
 			workspaceRef.current = nextWorkspace;
-			savedSidecarRef.current = conversion.sidecar;
-			draftSidecarRef.current = sidecar;
+			savedPresentationRef.current = conversion.presentation;
+			draftPresentationRef.current = draftPresentation;
 			draftDocumentRef.current = convertedDraftDocument;
 			setWorkspace(nextWorkspace);
 			setStatus(statusResult);
 			setServerDocument(model);
 			setDraftDocument(convertedDraftDocument);
 			setAdapterReport(conversion.report);
-			setSavedSidecar(conversion.sidecar);
-			setDraftSidecar(sidecar);
+			setSavedPresentation(conversion.presentation);
+			setDraftPresentation(draftPresentation);
 			setAuthRequiredState(statusResult.authEnabled);
 			setWriteBlocked(false);
 			if (draftStale) setVolatile(true);
@@ -560,7 +550,7 @@ export function useRemoteWorkspace({
 					(!storedState && inMemoryState) ||
 					(storedDraft && storedBaseFingerprint === null),
 			);
-			const local = localStateFor(nextWorkspace, sidecar);
+			const local = localStateFor(nextWorkspace, draftPresentation);
 			const storageWriteFailed =
 				shouldRetryStorage && !writeLocalState(local, local);
 			if (draftStale) {
@@ -641,13 +631,13 @@ export function useRemoteWorkspace({
 				return false;
 			}
 			const draft = planHasChanges(current.saved, validated) ? validated : null;
-			const conversionSidecar =
-				draftSidecarRef.current ?? savedSidecarRef.current;
+			const conversionPresentation =
+				draftPresentationRef.current ?? savedPresentationRef.current;
 			const conversion = draft
 				? conversionOrError(
 						validated,
-						conversionSidecar,
-						serverDocumentRef.current?.sourcePath,
+						serverDocumentRef.current,
+						conversionPresentation,
 					)
 				: null;
 			if (conversion instanceof Error) {
@@ -663,8 +653,8 @@ export function useRemoteWorkspace({
 				);
 				return false;
 			}
-			const sidecar = draft
-				? draftSidecarForPlan(validated, conversionSidecar)
+			const nextDraftPresentation = draft
+				? draftPresentationFor(conversionPresentation)
 				: null;
 			const document = conversion?.document ?? null;
 			const nextWorkspace = {
@@ -681,10 +671,10 @@ export function useRemoteWorkspace({
 			workspaceRef.current = nextWorkspace;
 			draftDocumentRef.current = document;
 			setWorkspace(nextWorkspace);
-			setDraftSidecar(sidecar);
-			draftSidecarRef.current = sidecar;
+			setDraftPresentation(nextDraftPresentation);
+			draftPresentationRef.current = nextDraftPresentation;
 			setDraftDocument(document);
-			const nextLocal = localStateFor(nextWorkspace, sidecar);
+			const nextLocal = localStateFor(nextWorkspace, nextDraftPresentation);
 			const persisted = writeLocalState(nextLocal, nextLocal);
 			setNotice("Temporary version updated. Saved server plan unchanged.");
 			if (persisted) setError(null);
@@ -711,8 +701,8 @@ export function useRemoteWorkspace({
 		}
 		const conversion = conversionOrError(
 			current.draft,
-			draftSidecarRef.current ?? savedSidecarRef.current,
-			serverDocumentRef.current?.sourcePath,
+			serverDocumentRef.current,
+			draftPresentationRef.current ?? savedPresentationRef.current,
 		);
 		if (conversion instanceof Error) {
 			setError(
@@ -765,8 +755,8 @@ export function useRemoteWorkspace({
 					workspaceRef.current = conflicted;
 					setWorkspace(conflicted);
 					writeLocalState(
-						localStateFor(conflicted, draftSidecarRef.current),
-						localStateFor(current, draftSidecarRef.current),
+						localStateFor(conflicted, draftPresentationRef.current),
+						localStateFor(current, draftPresentationRef.current),
 					);
 					const message =
 						"The server model changed after this draft was created. The draft remains available locally, but saving is blocked until it is discarded or reloaded.";
@@ -827,7 +817,8 @@ export function useRemoteWorkspace({
 				authoritativeConversion = backendToDisplayPlan({
 					document: authoritative.document,
 					status: statusRef.current ?? { readOnly: false, authEnabled: false },
-					sidecar: draftSidecarRef.current ?? savedSidecarRef.current,
+					presentation:
+						draftPresentationRef.current ?? savedPresentationRef.current,
 				});
 			} catch (cause) {
 				const message = messageFor(
@@ -853,17 +844,19 @@ export function useRemoteWorkspace({
 			const nextLocal: RemoteLocalState = {
 				version: 1,
 				draft: null,
-				draftSidecar: null,
+				draftPresentation: null,
 				baseFingerprint: null,
 				baseRevision: null,
 				snapshot: current.snapshot,
 			};
 			const fallbackLocal = localStateFor(
 				current,
-				draftSidecarRef.current ?? savedSidecarRef.current,
+				draftPresentationRef.current ?? savedPresentationRef.current,
 			);
 			const persisted = writeLocalState(nextLocal, fallbackLocal);
-			const retainedSidecar = persisted ? null : fallbackLocal.draftSidecar;
+			const retainedPresentation = persisted
+				? null
+				: fallbackLocal.draftPresentation;
 			const retainedDocument = persisted ? null : draftDocumentRef.current;
 			const retainedWorkspace = persisted
 				? nextWorkspace
@@ -881,8 +874,8 @@ export function useRemoteWorkspace({
 						),
 					};
 			workspaceRef.current = retainedWorkspace;
-			savedSidecarRef.current = authoritativeConversion.sidecar;
-			draftSidecarRef.current = retainedSidecar;
+			savedPresentationRef.current = authoritativeConversion.presentation;
+			draftPresentationRef.current = retainedPresentation;
 			draftDocumentRef.current = retainedDocument;
 			serverDocumentRef.current = authoritative.document;
 			serverFingerprintRef.current = authoritativeFingerprint;
@@ -891,8 +884,8 @@ export function useRemoteWorkspace({
 			setServerRevision(authoritative.revision ?? null);
 			setDraftDocument(retainedDocument);
 			setAdapterReport(authoritativeConversion.report);
-			setSavedSidecar(authoritativeConversion.sidecar);
-			setDraftSidecar(retainedSidecar);
+			setSavedPresentation(authoritativeConversion.presentation);
+			setDraftPresentation(retainedPresentation);
 			setWorkspace(retainedWorkspace);
 			setWriteBlocked(false);
 			setNotice("Plan saved on the server.");
@@ -1035,14 +1028,14 @@ export function useRemoteWorkspace({
 			draftStale: false,
 		};
 		const nextLocal = localStateFor(nextWorkspace, null);
-		const fallbackLocal = localStateFor(current, draftSidecarRef.current);
+		const fallbackLocal = localStateFor(current, draftPresentationRef.current);
 		const persisted = writeLocalState(nextLocal, fallbackLocal);
 		if (!persisted) return false;
 		workspaceRef.current = nextWorkspace;
 		draftDocumentRef.current = null;
-		draftSidecarRef.current = null;
+		draftPresentationRef.current = null;
 		setWorkspace(nextWorkspace);
-		setDraftSidecar(null);
+		setDraftPresentation(null);
 		setDraftDocument(null);
 		setNotice("Temporary changes discarded. Saved server plan restored.");
 		setError(null);
@@ -1066,15 +1059,15 @@ export function useRemoteWorkspace({
 			draftStale: false,
 		};
 		const nextLocal = localStateFor(nextWorkspace, null);
-		const fallbackLocal = localStateFor(current, draftSidecarRef.current);
+		const fallbackLocal = localStateFor(current, draftPresentationRef.current);
 		const persisted = writeLocalState(nextLocal, fallbackLocal);
 		if (!persisted) return false;
 		workspaceRef.current = nextWorkspace;
 		draftDocumentRef.current = null;
-		draftSidecarRef.current = null;
+		draftPresentationRef.current = null;
 		setWorkspace(nextWorkspace);
 		setDraftDocument(null);
-		setDraftSidecar(null);
+		setDraftPresentation(null);
 		setError(null);
 		setNotice("Stale draft discarded. Loading the latest server model.");
 		await hydrate();
@@ -1108,8 +1101,8 @@ export function useRemoteWorkspace({
 			let conversion: ReturnType<typeof displayPlanToBackendDocument>;
 			try {
 				conversion = displayPlanToBackendDocument(validated, {
-					sidecar: savedSidecarRef.current,
-					sourcePath: serverDocumentRef.current?.sourcePath,
+					sourceDocument: serverDocumentRef.current,
+					presentation: savedPresentationRef.current,
 				});
 			} catch (cause) {
 				setError(
@@ -1135,14 +1128,16 @@ export function useRemoteWorkspace({
 				draftStale: false,
 				snapshot: null,
 			};
-			const sidecar = sidecarForPlan(validated, savedSidecarRef.current);
+			const draftPresentation = draftPresentationFor(
+				savedPresentationFor(validated, savedPresentationRef.current),
+			);
 			workspaceRef.current = nextWorkspace;
-			draftSidecarRef.current = sidecar;
+			draftPresentationRef.current = draftPresentation;
 			draftDocumentRef.current = conversion.document;
 			setWorkspace(nextWorkspace);
-			setDraftSidecar(sidecar);
+			setDraftPresentation(draftPresentation);
 			setDraftDocument(conversion.document);
-			const nextLocal = localStateFor(nextWorkspace, sidecar);
+			const nextLocal = localStateFor(nextWorkspace, draftPresentation);
 			const persisted = writeLocalState(nextLocal, nextLocal);
 			setNotice("Imported plan is ready for review and save.");
 			if (persisted) setError(null);
@@ -1164,7 +1159,10 @@ export function useRemoteWorkspace({
 			const nextWorkspace = { ...current, snapshot };
 			workspaceRef.current = nextWorkspace;
 			setWorkspace(nextWorkspace);
-			const nextLocal = localStateFor(nextWorkspace, draftSidecarRef.current);
+			const nextLocal = localStateFor(
+				nextWorkspace,
+				draftPresentationRef.current,
+			);
 			const persisted = writeLocalState(nextLocal, nextLocal);
 			setNotice("Comparison snapshot captured. It contains measures only.");
 			if (persisted) setError(null);
@@ -1206,9 +1204,9 @@ export function useRemoteWorkspace({
 		recoveryDraft,
 		incomeData,
 		adapterReport,
-		sidecar: savedSidecar,
-		savedSidecar,
-		draftSidecar,
+
+		savedPresentation,
+		draftPresentation,
 		loading,
 		error,
 		notice,

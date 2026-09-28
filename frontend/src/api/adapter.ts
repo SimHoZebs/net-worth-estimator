@@ -35,7 +35,7 @@ export interface AdapterReport {
 	hasLosses: boolean;
 }
 
-export interface AccountAdapterSidecar {
+export interface AccountPresentation {
 	kind: Account["kind"];
 	balanceCheck: boolean;
 	source: string;
@@ -47,7 +47,7 @@ export interface AccountAdapterSidecar {
 	observedOn: IsoDate;
 }
 
-export interface MovementAdapterSidecar {
+export interface MovementPresentation {
 	source?: string;
 	amount?: PostingAmountResolution;
 	amountValue?: number;
@@ -65,42 +65,46 @@ export interface MovementAdapterSidecar {
 	displayAnnualIncrease?: number;
 }
 
-export interface PlanPresentationSidecar {
+/**
+ * Display state the server has no field for. Kept in the browser and replayed
+ * into the next document, so a round trip through the display plan does not
+ * discard it.
+ */
+export interface PlanPresentation {
 	name?: string;
 	origin?: Plan["origin"];
 	updatedAt?: string;
 	revision?: number;
 	assumptions?: Plan["assumptions"];
-	accounts: Record<string, AccountAdapterSidecar>;
-	movements: Record<string, MovementAdapterSidecar>;
-	provisionalFields: ProvisionalField[];
-}
-
-export interface PlanSidecar {
-	version: 1;
-	sourceDocument?: FinancialModelDocument;
-	projectionStartDate?: IsoDate;
-	presentation: PlanPresentationSidecar;
+	accounts: Record<string, AccountPresentation>;
+	movements: Record<string, MovementPresentation>;
 }
 
 export interface DisplayPlanInput {
 	document: FinancialModelDocument;
 	status: ServerStatus;
 	projection?: ProjectionResult | null;
-	sidecar?: PlanSidecar | null;
+	presentation?: PlanPresentation | null;
 	startDate?: IsoDate;
 }
 
 export interface PlanConversion {
 	plan: Plan;
-	sidecar: PlanSidecar;
+	presentation: PlanPresentation;
 	report: AdapterReport;
 	warnings: AdapterWarning[];
 	losses: AdapterLoss[];
 }
 
 export interface ReverseAdapterOptions {
-	sidecar?: PlanSidecar | null;
+	/**
+	 * The document this plan was built from. The reverse conversion reads it to
+	 * preserve rows the display plan does not model, to carry checkpoint history
+	 * forward, and to detect deletions. It is the caller's copy of the server
+	 * document, not browser state.
+	 */
+	sourceDocument?: FinancialModelDocument | null;
+	presentation?: PlanPresentation | null;
 	sourcePath?: string;
 }
 
@@ -289,7 +293,7 @@ function accountDisplay(
 	checkpoint: BackendCheckpoint | null,
 	observedOn: IsoDate,
 	status: ServerStatus,
-	previous: AccountAdapterSidecar | undefined,
+	previous: AccountPresentation | undefined,
 	syncCheckpoint: boolean,
 ): Account {
 	const floor = boundValue(account.minBalance, NO_FLOOR_SENTINEL);
@@ -318,7 +322,7 @@ function accountDisplay(
 function movementDisplay(
 	posting: BackendPosting,
 	amount: number | null,
-	previous?: MovementAdapterSidecar,
+	previous?: MovementPresentation,
 ): Movement {
 	const destinations = posting.destinations ?? [];
 	const firstDestination = destinations[0] ?? null;
@@ -424,7 +428,7 @@ function addForwardPostingWarnings(
 		warn(
 			target,
 			"multiple-destinations",
-			"The display movement can show one destination; additional backend destinations remain in the sidecar.",
+			"The display movement can show one destination; additional backend destinations remain in the presentation state.",
 			`${path}.toId`,
 		);
 		provisional(target, `${path}.toId`);
@@ -437,7 +441,7 @@ function addForwardPostingWarnings(
 		warn(
 			target,
 			"posting-metadata",
-			"Backend annual rate, volatility, and annual cap are preserved as sidecar metadata.",
+			"Backend annual rate, volatility, and annual cap are preserved as presentation state.",
 			path,
 		);
 		provisional(target, `${path}.metadata`);
@@ -446,20 +450,20 @@ function addForwardPostingWarnings(
 		warn(
 			target,
 			"posting-source",
-			"Backend posting ownership is preserved as sidecar metadata.",
+			"Backend posting ownership is preserved as presentation state.",
 			`${path}.source`,
 		);
 		provisional(target, `${path}.source`);
 	}
 }
 
-function buildSidecarAccount(
+function buildPresentationAccount(
 	account: BackendAccount,
 	checkpoint: BackendCheckpoint | null,
 	observedOn: IsoDate,
 	status: ServerStatus,
-	previous?: AccountAdapterSidecar,
-): AccountAdapterSidecar {
+	previous?: AccountPresentation,
+): AccountPresentation {
 	return {
 		kind: previous?.kind ?? accountKind(checkpoint?.Balance ?? 0),
 		balanceCheck: previous?.balanceCheck ?? Boolean(checkpoint),
@@ -479,19 +483,19 @@ function buildSidecarAccount(
 	};
 }
 
-function buildSidecarPosting(
+function buildPresentationPosting(
 	posting: BackendPosting,
 	amount: number | null,
-	previous?: MovementAdapterSidecar,
-): MovementAdapterSidecar {
+	previous?: MovementPresentation,
+): MovementPresentation {
 	const previousAmountMatches =
 		previous?.amountValue !== undefined &&
 		amount !== null &&
 		sameNumber(previous.amountValue, amount);
-	const sidecarAmount = previousAmountMatches
+	const presentationAmount = previousAmountMatches
 		? (previous?.amount ?? posting.amount)
 		: posting.amount;
-	const sidecarDestinations =
+	const presentationDestinations =
 		previous && Object.hasOwn(previous, "destinations")
 			? previous.destinations
 			: posting.destinations;
@@ -499,11 +503,11 @@ function buildSidecarPosting(
 		...(posting.source === undefined && previous?.source === undefined
 			? {}
 			: { source: previous?.source ?? posting.source }),
-		amount: sidecarAmount,
+		amount: presentationAmount,
 		amountValue: previousAmountMatches
 			? (previous?.amountValue ?? amount)
 			: (amount ?? previous?.amountValue),
-		destinations: sidecarDestinations,
+		destinations: presentationDestinations,
 		frequency: previous?.frequency ?? posting.frequency,
 		annualRate: previous?.annualRate ?? posting.annualRate,
 		annualGrowthRate: previous?.annualGrowthRate ?? posting.annualGrowthRate,
@@ -529,9 +533,9 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 	const { document, status, projection } = input;
 	const projectionStartDate =
 		input.startDate ?? fallbackStartDate(document, projection);
-	const previousPresentation = input.sidecar?.presentation;
+	const previousPresentation = input.presentation ?? null;
 	const conversionReport = report();
-	const accountSidecars: Record<string, AccountAdapterSidecar> = {};
+	const accountPresentations: Record<string, AccountPresentation> = {};
 	const accounts = document.accounts.map((account, index) => {
 		const path = `accounts.${index}`;
 		const checkpoint = latestCheckpoint(
@@ -552,7 +556,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			previous,
 			syncCheckpoint,
 		);
-		accountSidecars[account.id] = buildSidecarAccount(
+		accountPresentations[account.id] = buildPresentationAccount(
 			account,
 			checkpoint,
 			observedOn,
@@ -645,7 +649,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		warn(
 			conversionReport,
 			"unsupported-evaluations",
-			"Financial-independence and posting-fulfillment evaluations remain in the sidecar and are not display goals.",
+			"Financial-independence and posting-fulfillment evaluations remain in the presentation state and are not display goals.",
 			"evaluations",
 		);
 		provisional(conversionReport, "evaluations");
@@ -669,29 +673,26 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 	provisional(conversionReport, "plan.revision");
 	provisional(conversionReport, "plan.readOnly");
 
-	const sidecar: PlanSidecar = {
-		version: 1,
-		sourceDocument: document,
-		projectionStartDate,
-		presentation: {
-			name: previousPresentation?.name ?? defaultPlanName(document),
-			origin: previousPresentation?.origin ?? "personal",
-			updatedAt: previousPresentation?.updatedAt ?? new Date(0).toISOString(),
-			revision: previousPresentation?.revision ?? 1,
-			assumptions: previousPresentation?.assumptions ?? {
-				inflation: 0,
-				volatility: 0,
-			},
-			accounts: accountSidecars,
-			movements: Object.fromEntries(
-				document.postings.map((posting) => {
-					const previous = previousPresentation?.movements[posting.id];
-					const amount = postingAmountValue(posting, projection);
-					return [posting.id, buildSidecarPosting(posting, amount, previous)];
-				}),
-			),
-			provisionalFields: [...conversionReport.provisionalFields],
+	const presentation: PlanPresentation = {
+		name: previousPresentation?.name ?? defaultPlanName(document),
+		origin: previousPresentation?.origin ?? "personal",
+		updatedAt: previousPresentation?.updatedAt ?? new Date(0).toISOString(),
+		revision: previousPresentation?.revision ?? 1,
+		assumptions: previousPresentation?.assumptions ?? {
+			inflation: 0,
+			volatility: 0,
 		},
+		accounts: accountPresentations,
+		movements: Object.fromEntries(
+			document.postings.map((posting) => {
+				const previous = previousPresentation?.movements[posting.id];
+				const amount = postingAmountValue(posting, projection);
+				return [
+					posting.id,
+					buildPresentationPosting(posting, amount, previous),
+				];
+			}),
+		),
 	};
 
 	const assumptions = previousPresentation?.assumptions ?? {
@@ -713,7 +714,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 	};
 	return {
 		plan,
-		sidecar,
+		presentation,
 		report: conversionReport,
 		warnings: conversionReport.warnings,
 		losses: conversionReport.losses,
@@ -724,8 +725,7 @@ export function displayPlanToBackendDocument(
 	plan: Plan,
 	options: ReverseAdapterOptions = {},
 ): BackendDocumentConversion {
-	const sidecar = options.sidecar ?? null;
-	const sourceDocument = sidecar?.sourceDocument ?? null;
+	const sourceDocument = options.sourceDocument ?? null;
 	const sourceAccounts = new Map(
 		(sourceDocument?.accounts ?? []).map((account) => [account.id, account]),
 	);
@@ -734,19 +734,19 @@ export function displayPlanToBackendDocument(
 	);
 	const conversionReport = report();
 	const checkpointByAccount = new Map<string, BackendCheckpoint[]>();
-	const accountSidecars = sidecar?.presentation.accounts ?? {};
-	const movementSidecars = sidecar?.presentation.movements ?? {};
+	const accountPresentations = options.presentation?.accounts ?? {};
+	const movementPresentations = options.presentation?.movements ?? {};
 	const sourcePath =
 		options.sourcePath ?? sourceDocument?.sourcePath ?? "frontend";
 
 	const accounts = plan.accounts.map((account, index): BackendAccount => {
 		const original = sourceAccounts.get(account.id);
-		const metadata = accountSidecars[account.id];
+		const metadata = accountPresentations[account.id];
 		const sourceCheckpoint = original
 			? latestCheckpoint(
 					sourceDocument as FinancialModelDocument,
 					account.id,
-					sidecar?.projectionStartDate ?? plan.startDate,
+					plan.startDate,
 				)
 			: null;
 		const floor =
@@ -765,8 +765,7 @@ export function displayPlanToBackendDocument(
 		const sourceCheckpoints = (sourceDocument?.checkpoints ?? [])
 			.filter((checkpoint) => checkpoint.AccountId === accountId)
 			.map((checkpoint) => ({ ...checkpoint }));
-		const sourceDisplayDate =
-			sourceCheckpoint?.Date ?? sidecar?.projectionStartDate ?? plan.startDate;
+		const sourceDisplayDate = sourceCheckpoint?.Date ?? plan.startDate;
 		const displayObservationChanged =
 			!original ||
 			sourceDisplayDate !== account.observedOn ||
@@ -918,7 +917,7 @@ export function displayPlanToBackendDocument(
 	}
 
 	const postings = plan.movements.map((movement, index): BackendPosting => {
-		const metadata = movementSidecars[movement.id];
+		const metadata = movementPresentations[movement.id];
 		const original = sourcePostings.get(movement.id);
 		if (movement.id.startsWith("sfin-")) {
 			lose(
@@ -1153,7 +1152,7 @@ export function displayPlanToBackendDocument(
 			"goals",
 		);
 	}
-	const previousAssumptions = sidecar?.presentation.assumptions ?? {
+	const previousAssumptions = options.presentation?.assumptions ?? {
 		inflation: 0,
 		volatility: 0,
 	};
@@ -1176,12 +1175,12 @@ export function displayPlanToBackendDocument(
 		"assumptions",
 	);
 	const previousName =
-		sidecar?.presentation.name ??
+		options.presentation?.name ??
 		(sourceDocument ? defaultPlanName(sourceDocument) : "Waypoint plan");
-	const previousOrigin = sidecar?.presentation.origin ?? "personal";
+	const previousOrigin = options.presentation?.origin ?? "personal";
 	const previousUpdatedAt =
-		sidecar?.presentation.updatedAt ?? new Date(0).toISOString();
-	const previousRevision = sidecar?.presentation.revision ?? 1;
+		options.presentation?.updatedAt ?? new Date(0).toISOString();
+	const previousRevision = options.presentation?.revision ?? 1;
 	if (plan.name !== previousName)
 		lose(
 			conversionReport,
