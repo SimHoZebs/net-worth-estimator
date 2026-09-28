@@ -738,9 +738,9 @@ export function displayPlanToBackendDocument(
 		options.sourcePath ?? sourceDocument?.sourcePath ?? "frontend";
 
 	const accounts = plan.accounts.map((account, index): BackendAccount => {
-		const original = sourceAccounts.get(account.id);
-		const metadata = accountPresentations[account.id];
-		const sourceCheckpoint = original
+		const storedAccount = sourceAccounts.get(account.id);
+		const storedExtras = accountPresentations[account.id];
+		const sourceCheckpoint = storedAccount
 			? latestCheckpoint(
 					sourceDocument as FinancialModelDocument,
 					account.id,
@@ -748,16 +748,18 @@ export function displayPlanToBackendDocument(
 				)
 			: null;
 		const floor =
-			metadata && sameFloorValue(metadata.minBalance, account.floor)
-				? metadata.minBalance
-				: original && sameFloorValue(original.minBalance, account.floor)
-					? original.minBalance
+			storedExtras && sameFloorValue(storedExtras.minBalance, account.floor)
+				? storedExtras.minBalance
+				: storedAccount &&
+						sameFloorValue(storedAccount.minBalance, account.floor)
+					? storedAccount.minBalance
 					: account.floor;
 		const maxBalance =
-			metadata && sameCeilingValue(metadata.maxBalance, account.ceiling)
-				? metadata.maxBalance
-				: original && sameCeilingValue(original.maxBalance, account.ceiling)
-					? original.maxBalance
+			storedExtras && sameCeilingValue(storedExtras.maxBalance, account.ceiling)
+				? storedExtras.maxBalance
+				: storedAccount &&
+						sameCeilingValue(storedAccount.maxBalance, account.ceiling)
+					? storedAccount.maxBalance
 					: account.ceiling;
 		const accountId = account.id;
 		const sourceCheckpoints = (sourceDocument?.checkpoints ?? [])
@@ -765,7 +767,7 @@ export function displayPlanToBackendDocument(
 			.map((checkpoint) => ({ ...checkpoint }));
 		const sourceDisplayDate = sourceCheckpoint?.Date ?? plan.startDate;
 		const displayObservationChanged =
-			!original ||
+			!storedAccount ||
 			sourceDisplayDate !== account.observedOn ||
 			!sameNumber(sourceCheckpoint?.Balance ?? 0, account.balance);
 		const targetCheckpointDate = account.observedOn || plan.startDate;
@@ -785,14 +787,14 @@ export function displayPlanToBackendDocument(
 			);
 		}
 		const sameCheckpoint = Boolean(
-			original &&
+			storedAccount &&
 				sourceCheckpoint &&
 				sourceCheckpoint.Date === account.observedOn &&
 				sameNumber(sourceCheckpoint.Balance, account.balance),
 		);
 		if (
 			sameCheckpoint ||
-			(original && !sourceCheckpoint && !displayObservationChanged)
+			(storedAccount && !sourceCheckpoint && !displayObservationChanged)
 		) {
 			checkpointByAccount.set(accountId, sourceCheckpoints);
 		} else if (
@@ -832,13 +834,14 @@ export function displayPlanToBackendDocument(
 			),
 		);
 		const previousKind =
-			metadata?.kind ??
+			storedExtras?.kind ??
 			accountKind(sourceCheckpoint?.Balance ?? account.balance);
 		// A newly added account has no prior display state, so a difference from
 		// the inferred default is not a lost value: the field is simply not
 		// persisted and is re-inferred on the next load. Reporting it as a loss
 		// made adding an account impossible on a server-backed plan.
-		const hasPriorDisplayState = Boolean(metadata) || sourceCheckpoint !== null;
+		const hasPriorDisplayState =
+			Boolean(storedExtras) || sourceCheckpoint !== null;
 		if (hasPriorDisplayState && account.kind !== previousKind)
 			lose(
 				conversionReport,
@@ -846,14 +849,14 @@ export function displayPlanToBackendDocument(
 				"Display account kind has no backend account field.",
 				`accounts.${index}.kind`,
 			);
-		if (metadata && account.source !== metadata.source)
+		if (storedExtras && account.source !== storedExtras.source)
 			lose(
 				conversionReport,
 				`accounts.${account.id}.source`,
 				"Display account source is not a backend account field.",
 				`accounts.${index}.source`,
 			);
-		if (metadata && account.readOnly !== metadata.readOnly)
+		if (storedExtras && account.readOnly !== storedExtras.readOnly)
 			lose(
 				conversionReport,
 				`accounts.${account.id}.readOnly`,
@@ -865,17 +868,17 @@ export function displayPlanToBackendDocument(
 		provisional(conversionReport, `accounts.${account.id}.readOnly`);
 		warn(
 			conversionReport,
-			"account-presentation-metadata",
-			"Display account kind, balance check basis, source, and read-only state remain local presentation metadata.",
+			"account-presentation-storedExtras",
+			"Display account kind, balance check basis, source, and read-only state remain local presentation storedExtras.",
 			`accounts.${index}`,
 		);
 		return {
-			...(original ?? {}),
+			...(storedAccount ?? {}),
 			id: account.id,
 			label: account.name,
 			minBalance: floor,
 			maxBalance,
-			color: original?.color ?? null,
+			color: storedAccount?.color ?? null,
 			enabled: account.enabled,
 		};
 	});
@@ -915,8 +918,8 @@ export function displayPlanToBackendDocument(
 	}
 
 	const postings = plan.movements.map((movement, index): BackendPosting => {
-		const metadata = movementPresentations[movement.id];
-		const original = sourcePostings.get(movement.id);
+		const storedExtras = movementPresentations[movement.id];
+		const storedPosting = sourcePostings.get(movement.id);
 		if (movement.id.startsWith("sfin-")) {
 			lose(
 				conversionReport,
@@ -925,7 +928,7 @@ export function displayPlanToBackendDocument(
 				`movements.${index}.id`,
 			);
 		}
-		if (original?.source === "simplefin" && movement.readOnly !== true) {
+		if (storedPosting?.source === "simplefin" && movement.readOnly !== true) {
 			lose(
 				conversionReport,
 				`movements.${movement.id}.readOnly`,
@@ -933,14 +936,15 @@ export function displayPlanToBackendDocument(
 				`movements.${index}.readOnly`,
 			);
 		}
-		const originalAmountValue = original
-			? postingAmountValue(original, null)
+		const originalAmountValue = storedPosting
+			? postingAmountValue(storedPosting, null)
 			: null;
-		const baselineAmountValue = metadata?.amountValue ?? originalAmountValue;
+		const baselineAmountValue =
+			storedExtras?.amountValue ?? originalAmountValue;
 		const sameAmount =
 			baselineAmountValue !== null &&
 			sameNumber(baselineAmountValue, movement.amount);
-		const preservedAmount = metadata?.amount ?? original?.amount;
+		const preservedAmount = storedExtras?.amount ?? storedPosting?.amount;
 		const amount: PostingAmountResolution =
 			movement.amountKnown === false
 				? (preservedAmount ?? {
@@ -964,20 +968,20 @@ export function displayPlanToBackendDocument(
 			);
 		}
 		const previousDisplayFrequency =
-			metadata?.displayFrequency ??
-			(original ? displayFrequency(original.frequency) : undefined);
+			storedExtras?.displayFrequency ??
+			(storedPosting ? displayFrequency(storedPosting.frequency) : undefined);
 		const sameFrequency = previousDisplayFrequency === movement.frequency;
 		const frequency = sameFrequency
-			? (metadata?.frequency ??
-				original?.frequency ??
+			? (storedExtras?.frequency ??
+				storedPosting?.frequency ??
 				backendFrequency(movement.frequency))
 			: backendFrequency(movement.frequency);
 		const originalDestinations =
-			metadata && Object.hasOwn(metadata, "destinations")
-				? metadata.destinations
-				: original?.destinations;
+			storedExtras && Object.hasOwn(storedExtras, "destinations")
+				? storedExtras.destinations
+				: storedPosting?.destinations;
 		const previousDisplayDestination =
-			metadata?.displayToId ?? original?.destinations?.[0] ?? null;
+			storedExtras?.displayToId ?? storedPosting?.destinations?.[0] ?? null;
 		const sameDestination = previousDisplayDestination === movement.toId;
 		const destinations =
 			sameDestination && originalDestinations !== undefined
@@ -986,20 +990,22 @@ export function displayPlanToBackendDocument(
 					? null
 					: [movement.toId];
 		const previousDisplayAnnualIncrease =
-			metadata?.displayAnnualIncrease ??
-			(original ? original.annualGrowthRate * 100 : undefined);
+			storedExtras?.displayAnnualIncrease ??
+			(storedPosting ? storedPosting.annualGrowthRate * 100 : undefined);
 		const sameGrowth =
 			previousDisplayAnnualIncrease !== undefined &&
 			sameNumber(previousDisplayAnnualIncrease, movement.annualIncrease);
 		const annualGrowthRate = sameGrowth
-			? (metadata?.annualGrowthRate ??
-				original?.annualGrowthRate ??
+			? (storedExtras?.annualGrowthRate ??
+				storedPosting?.annualGrowthRate ??
 				movement.annualIncrease / 100)
 			: movement.annualIncrease / 100;
-		const annualRate = metadata?.annualRate ?? original?.annualRate ?? 0;
-		const volatility = metadata?.volatility ?? original?.volatility ?? 0;
+		const annualRate =
+			storedExtras?.annualRate ?? storedPosting?.annualRate ?? 0;
+		const volatility =
+			storedExtras?.volatility ?? storedPosting?.volatility ?? 0;
 		if (
-			original &&
+			storedPosting &&
 			originalDestinations &&
 			originalDestinations.length > 1 &&
 			JSON.stringify(originalDestinations) !== JSON.stringify(destinations)
@@ -1007,12 +1013,12 @@ export function displayPlanToBackendDocument(
 			lose(
 				conversionReport,
 				`movements.${movement.id}.destinations`,
-				"The display movement can represent only one destination from the original backend posting.",
+				"The display movement can represent only one destination from the storedPosting backend posting.",
 				`movements.${index}.destinations`,
 			);
 		}
 		const previousReadOnly =
-			metadata?.readOnly ?? original?.source === "simplefin";
+			storedExtras?.readOnly ?? storedPosting?.source === "simplefin";
 		if (movement.readOnly !== previousReadOnly)
 			lose(
 				conversionReport,
@@ -1023,13 +1029,13 @@ export function displayPlanToBackendDocument(
 		provisional(conversionReport, `movements.${movement.id}.readOnly`);
 		warn(
 			conversionReport,
-			"movement-presentation-metadata",
-			"Display movement read-only state remains local presentation metadata.",
+			"movement-presentation-storedExtras",
+			"Display movement read-only state remains local presentation storedExtras.",
 			`movements.${index}`,
 		);
-		const source = metadata?.source ?? original?.source;
+		const source = storedExtras?.source ?? storedPosting?.source;
 		return {
-			...(original ?? {}),
+			...(storedPosting ?? {}),
 			id: movement.id,
 			label: movement.name,
 			sourceAccountId: movement.fromId,
@@ -1041,8 +1047,8 @@ export function displayPlanToBackendDocument(
 			volatility,
 			startDate: movement.startDate,
 			endDate: movement.endDate,
-			annualCap: metadata?.annualCap ?? original?.annualCap ?? null,
-			priority: metadata?.priority ?? original?.priority ?? index + 1,
+			annualCap: storedExtras?.annualCap ?? storedPosting?.annualCap ?? null,
+			priority: storedExtras?.priority ?? storedPosting?.priority ?? index + 1,
 			enabled: movement.enabled,
 			...(source === undefined ? {} : { source }),
 		};
@@ -1052,8 +1058,8 @@ export function displayPlanToBackendDocument(
 		.filter((posting) => !plan.movements.some((item) => item.id === posting.id))
 		.map((posting) => posting.id);
 	for (const postingId of removedPostingIDs) {
-		const original = sourcePostings.get(postingId);
-		if (original?.source === "simplefin") {
+		const storedPosting = sourcePostings.get(postingId);
+		if (storedPosting?.source === "simplefin") {
 			lose(
 				conversionReport,
 				`movements.${postingId}`,
@@ -1076,17 +1082,19 @@ export function displayPlanToBackendDocument(
 	const netWorthThreshold = plan.goals
 		.filter((goal) => goal.kind === "net-worth")
 		.map((goal) => {
-			const original = sourceEvaluations?.netWorthThreshold.find(
+			const storedEvaluation = sourceEvaluations?.netWorthThreshold.find(
 				(evaluation) => evaluation.instanceId === goal.id,
 			);
-			const originalConfig = original ? objectValue(original.config) : null;
+			const storedConfig = storedEvaluation
+				? objectValue(storedEvaluation.config)
+				: null;
 			return {
-				...(original ?? {}),
+				...(storedEvaluation ?? {}),
 				instanceId: goal.id,
 				label: goal.name,
 				enabled: goal.enabled,
 				config: {
-					...(originalConfig ?? {}),
+					...(storedConfig ?? {}),
 					target: goal.target,
 				} satisfies JsonObject,
 			};
@@ -1094,17 +1102,19 @@ export function displayPlanToBackendDocument(
 	const accountBalance = plan.goals
 		.filter((goal) => goal.kind === "reserve")
 		.map((goal) => {
-			const original = sourceEvaluations?.accountBalance.find(
+			const storedEvaluation = sourceEvaluations?.accountBalance.find(
 				(evaluation) => evaluation.instanceId === goal.id,
 			);
-			const originalConfig = original ? objectValue(original.config) : null;
+			const storedConfig = storedEvaluation
+				? objectValue(storedEvaluation.config)
+				: null;
 			return {
-				...(original ?? {}),
+				...(storedEvaluation ?? {}),
 				instanceId: goal.id,
 				label: goal.name,
 				enabled: goal.enabled,
 				config: {
-					...(originalConfig ?? {}),
+					...(storedConfig ?? {}),
 					accountId: goal.accountId,
 					target: goal.target,
 				} satisfies JsonObject,
