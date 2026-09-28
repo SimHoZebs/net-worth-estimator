@@ -113,12 +113,12 @@ function evaluationProbability(
 // this instance shape, so one mapper serves each kind.
 type GoalEvaluation = {
 	instanceId: string;
-	label: string;
+	name: string;
 	enabled: boolean;
 	config: JsonValue;
 };
 
-// A goal whose evaluation produced no envelope is labelled indeterminate rather
+// A goal whose evaluation produced no envelope is named indeterminate rather
 // than reported as unmet, so an unevaluated goal is never shown as a failure.
 function evaluatedGoal(
 	evaluation: GoalEvaluation,
@@ -126,9 +126,9 @@ function evaluatedGoal(
 ) {
 	const represented =
 		envelope?.status === "satisfied" || envelope?.status === "not-satisfied";
-	const label = evaluation.label || evaluation.instanceId;
+	const name = evaluation.name || evaluation.instanceId;
 	return {
-		name: represented ? label : `${label} (indeterminate)`,
+		name: represented ? name : `${name} (indeterminate)`,
 		firstDate: represented ? evaluationDate(envelope) : null,
 	};
 }
@@ -187,7 +187,7 @@ function movementName(
 ): string {
 	return (
 		document?.postings.find((posting) => posting.id === event.origin.postingId)
-			?.label || event.origin.postingId
+			?.name || event.origin.postingId
 	);
 }
 

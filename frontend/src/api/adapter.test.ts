@@ -13,7 +13,7 @@ function documentFixture(): FinancialModelDocument {
 		accounts: [
 			{
 				id: "cash",
-				label: "Cash",
+				name: "Cash",
 				minBalance: NO_FLOOR_SENTINEL,
 				maxBalance: NO_CEILING_SENTINEL,
 				color: null,
@@ -21,7 +21,7 @@ function documentFixture(): FinancialModelDocument {
 			},
 			{
 				id: "loan",
-				label: "Loan",
+				name: "Loan",
 				minBalance: null,
 				maxBalance: null,
 				color: null,
@@ -38,7 +38,7 @@ function documentFixture(): FinancialModelDocument {
 			netWorthThreshold: [
 				{
 					instanceId: "target",
-					label: "Reach target",
+					name: "Reach target",
 					enabled: true,
 					config: { target: 500 },
 				},
@@ -49,7 +49,7 @@ function documentFixture(): FinancialModelDocument {
 		postings: [
 			{
 				id: "salary",
-				label: "Salary",
+				name: "Salary",
 				sourceAccountId: null,
 				destinations: ["cash"],
 				amount: {
@@ -294,7 +294,7 @@ describe("backend and display plan adapter", () => {
 		const document = documentFixture();
 		document.accounts.push({
 			id: "unobserved",
-			label: "Unobserved",
+			name: "Unobserved",
 			minBalance: NO_FLOOR_SENTINEL,
 			maxBalance: NO_CEILING_SENTINEL,
 			color: null,
@@ -428,7 +428,7 @@ describe("backend and display plan adapter", () => {
 		expect(reverse.document.evaluations.accountBalance).toEqual([
 			{
 				instanceId: "reserve",
-				label: "Reserve",
+				name: "Reserve",
 				enabled: true,
 				config: { accountId: "cash", target: 1000 },
 			},
@@ -457,7 +457,7 @@ describe("backend and display plan adapter", () => {
 					accountBalance: [
 						{
 							instanceId: "emergency",
-							label: "Emergency fund",
+							name: "Emergency fund",
 							enabled: true,
 							config: { accountId: "cash", target: 30000 },
 						},

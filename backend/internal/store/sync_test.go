@@ -41,9 +41,9 @@ func execSyncSetup(t *testing.T, store *sqliteStore, statements []string) {
 func seedSyncRows(t *testing.T, store *sqliteStore) {
 	t.Helper()
 	execSyncSetup(t, store, []string{
-		`INSERT INTO accounts (id, position, label, enabled) VALUES ('prime_card', 1, 'Prime', 1)`,
+		`INSERT INTO accounts (id, position, name, enabled) VALUES ('prime_card', 1, 'Prime', 1)`,
 		`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (10, '2026-08-01', 'checking', 111, 'simplefin')`,
-		`INSERT INTO postings (id, position, label, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, priority, enabled, source)
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, priority, enabled, source)
 		 VALUES ('sfin-pending-prime_card-tx1', 10, 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', 'once', 0, 0, 0, '2026-08-02', 6, 0, 'simplefin')`,
 	})
 }
@@ -53,14 +53,14 @@ func ownerDocument() *types.FinancialModelDocument {
 	return &types.FinancialModelDocument{
 		SourcePath: "test-source",
 		Accounts: []types.Account{{
-			ID: "checking", Label: "Checking", Enabled: true,
+			ID: "checking", Name: "Checking", Enabled: true,
 		}},
 		Checkpoints: []types.Checkpoint{
 			{Date: "2026-07-01", AccountID: "checking", Balance: 500},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 		Postings: []types.Posting{{
-			ID: "owner-charge", Label: "Owner", SourceAccountID: &checking,
+			ID: "owner-charge", Name: "Owner", SourceAccountID: &checking,
 			Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 			Frequency: types.FrequencyOnce, StartDate: "2026-07-02", Priority: 6,
 		}},
@@ -72,7 +72,7 @@ func ownerDocument() *types.FinancialModelDocument {
 func seedSyncState(t *testing.T, store Store) {
 	t.Helper()
 	document := ownerDocument()
-	document.Accounts = append(document.Accounts, types.Account{ID: "prime_card", Label: "Prime", Enabled: true})
+	document.Accounts = append(document.Accounts, types.Account{ID: "prime_card", Name: "Prime", Enabled: true})
 	if err := store.SaveDocument(document); err != nil {
 		t.Fatalf("save owner document with card account: %v", err)
 	}
@@ -146,7 +146,7 @@ func testSaveDropsForgedSyncRowsAndMergesStored(t *testing.T, newStore func(*tes
 	forged.Checkpoints[0].Source = SourceSimpleFIN
 	prime := "prime_card"
 	forged.Postings = append(forged.Postings, types.Posting{
-		ID: "sfin-pending-prime_card-forged", Label: "Forged", SourceAccountID: &prime, Source: SourceSimpleFIN,
+		ID: "sfin-pending-prime_card-forged", Name: "Forged", SourceAccountID: &prime, Source: SourceSimpleFIN,
 		Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "999"}, Inputs: map[string]types.AmountInputBinding{}},
 		Frequency: types.FrequencyOnce, StartDate: "2026-08-03", Priority: 6,
 	})
@@ -307,7 +307,7 @@ func TestOpenMigratesVersionTwoSourceColumns(t *testing.T) {
 		t.Fatalf("migrated checkpoint = %+v, want balance 200 source model", checkpoint)
 	}
 	var version int
-	if err := store.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 3 {
+	if err := store.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != latestSchemaVersion {
 		t.Fatalf("migrated schema version = %d, err %v", version, err)
 	}
 }
@@ -315,7 +315,7 @@ func TestOpenMigratesVersionTwoSourceColumns(t *testing.T) {
 func syncPendingPosting(id, accountID, day string) types.Posting {
 	return types.Posting{
 		ID:              id,
-		Label:           "Pending",
+		Name:            "Pending",
 		SourceAccountID: &accountID,
 		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		Frequency:       types.FrequencyOnce,
@@ -507,7 +507,7 @@ func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
 	// so only raw SQL can set up this coexistence case.
 	store := openSQLiteStore(t)
 	execSyncSetup(t, store, []string{
-		`INSERT INTO postings (id, position, label, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, priority, enabled, source)
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, priority, enabled, source)
 		 VALUES ('sfin-pending-prime_card-manual', 0, 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', 'once', 0, 0, 0, '2026-08-02', 6, 1, 'model')`,
 	})
 	summary, err := store.ApplySyncPlan(nil, []types.Posting{

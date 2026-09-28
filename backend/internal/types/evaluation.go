@@ -56,7 +56,7 @@ type PostingFulfillmentConfig struct {
 // EvaluationInstance is the generic configured evaluation row.
 type EvaluationInstance[T any] struct {
 	InstanceID string `json:"instanceId"`
-	Label      string `json:"label"`
+	Name       string `json:"name"`
 	Enabled    bool   `json:"enabled"`
 	Config     T      `json:"config"`
 }

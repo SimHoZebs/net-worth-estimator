@@ -67,8 +67,8 @@ func accountBalanceInRow(row *types.ProjectionRow, accountID string) (float64, b
 func (r *AccountBalancePathResult) firstReached() *string { return r.FirstReachedDate }
 
 var accountBalanceDefinition = &EvaluationDefinition{
-	Type:  types.EvaluationTypeAccountBalance,
-	Label: "Account balance",
+	Type: types.EvaluationTypeAccountBalance,
+	Name: "Account balance",
 
 	ValidateConfig: ValidateAccountBalanceConfig,
 	ParseConfig: func(config any) (any, error) {

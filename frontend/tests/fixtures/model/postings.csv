@@ -1,4 +1,4 @@
-id,label,sourceAccountId,destinations,amount,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled
+id,name,sourceAccountId,destinations,amount,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled
 payroll,Household payroll,,checking,"{""resolver"":""expression"",""config"":{""expression"":""1450.25""},""inputs"":{}}",once,0,0,0,2026-01-15,2026-01-15,,1,true
 payroll_2,Household payroll,,checking,"{""resolver"":""expression"",""config"":{""expression"":""1450.25""},""inputs"":{}}",once,0,0,0,2026-01-29,2026-01-29,,2,true
 take_home,Household take-home pay,,checking,"{""resolver"":""expression"",""config"":{""expression"":""3980.75""},""inputs"":{}}",once,0,0,0,2026-01-28,2026-01-28,,3,true

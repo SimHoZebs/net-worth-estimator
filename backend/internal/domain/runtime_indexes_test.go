@@ -10,7 +10,7 @@ import (
 func TestReplayHistoricalStatePreservesOriginalPostingOrder(t *testing.T) {
 	checking := "checking"
 	document := &types.FinancialModelDocument{
-		Accounts: []types.Account{{ID: checking, Label: "Checking", Enabled: true}},
+		Accounts: []types.Account{{ID: checking, Name: "Checking", Enabled: true}},
 		Checkpoints: []types.Checkpoint{{
 			Date: "2026-01-01", AccountID: checking, Balance: 0,
 		}},
@@ -39,8 +39,8 @@ func TestIncomeRuntimeIndexSelectsEffectiveRowsAndPreservesErrors(t *testing.T) 
 			{ID: "salary", EffectiveFrom: "2026-07-01", AnnualGrossIncome: 200},
 		},
 		TaxProfiles: []types.IncomeTaxProfile{
-			{ID: "tax", Label: "First"},
-			{ID: "tax", Label: "Later duplicate"},
+			{ID: "tax", Name: "First"},
+			{ID: "tax", Name: "Later duplicate"},
 		},
 	}
 	index := newIncomeRuntimeIndex(data, map[string]types.Account{"checking": {ID: "checking"}})
@@ -54,7 +54,7 @@ func TestIncomeRuntimeIndexSelectsEffectiveRowsAndPreservesErrors(t *testing.T) 
 		t.Fatalf("second effective source = %+v, err %v", second, err)
 	}
 	profile, err := findTaxProfile(index, "tax")
-	if err != nil || profile.Label != "First" {
+	if err != nil || profile.Name != "First" {
 		t.Fatalf("tax profile = %+v, err %v", profile, err)
 	}
 
@@ -68,7 +68,7 @@ func TestIncomeRuntimeIndexSelectsEffectiveRowsAndPreservesErrors(t *testing.T) 
 
 func testExpressionPosting(id string, source *string, destinations []string, frequency types.PostingFrequency, enabled bool) types.Posting {
 	return types.Posting{
-		ID: id, Label: id, SourceAccountID: source, Destinations: destinations,
+		ID: id, Name: id, SourceAccountID: source, Destinations: destinations,
 		Amount: types.PostingAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": "100"},

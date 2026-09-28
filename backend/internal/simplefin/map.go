@@ -63,15 +63,15 @@ func absDecimal(raw string) (string, error) {
 }
 
 func truncateLabel(description string) string {
-	label := strings.TrimSpace(description)
-	if label == "" {
+	name := strings.TrimSpace(description)
+	if name == "" {
 		return "Pending card charge"
 	}
-	runes := []rune(label)
+	runes := []rune(name)
 	if len(runes) > 80 {
 		return string(runes[:80])
 	}
-	return label
+	return name
 }
 
 // Map converts an account set into checkpoints plus pending seed postings.
@@ -129,7 +129,7 @@ func Map(set *AccountSet, config Config, now time.Time) (*Plan, error) {
 			source := modelAccountID
 			plan.Pending = append(plan.Pending, types.Posting{
 				ID:              PendingPostingID(modelAccountID, transaction.ID),
-				Label:           truncateLabel(transaction.Description),
+				Name:            truncateLabel(transaction.Description),
 				SourceAccountID: &source,
 				Amount: types.PostingAmountResolution{
 					Resolver: "expression",

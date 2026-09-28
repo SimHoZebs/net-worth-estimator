@@ -284,21 +284,21 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 			}
 			sourceLabel := (*string)(nil)
 			if posting.SourceAccountID != nil {
-				label := *posting.SourceAccountID
+				name := *posting.SourceAccountID
 				if account, ok := accountByID[*posting.SourceAccountID]; ok {
-					label = account.Label
+					name = account.Name
 				}
-				sourceLabel = &label
+				sourceLabel = &name
 			}
 			var destinations any
 			if posting.Destinations != nil {
 				destList := []map[string]string{}
 				for _, accountID := range posting.Destinations {
-					label := accountID
+					name := accountID
 					if account, ok := accountByID[accountID]; ok {
-						label = account.Label
+						name = account.Name
 					}
-					destList = append(destList, map[string]string{"accountId": accountID, "label": label})
+					destList = append(destList, map[string]string{"accountId": accountID, "name": name})
 				}
 				destinations = destList
 			}
@@ -312,7 +312,7 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 			}
 			entry := map[string]any{
 				"postingId":                posting.ID,
-				"label":                    posting.Label,
+				"name":                     posting.Name,
 				"sourceAccountId":          posting.SourceAccountID,
 				"sourceAccountLabel":       sourceLabel,
 				"destinations":             destinations,
@@ -388,8 +388,8 @@ type fulfillmentAccumulator struct {
 }
 
 var postingFulfillmentDefinition = &EvaluationDefinition{
-	Type:  types.EvaluationTypePostingFulfillment,
-	Label: "Posting fulfillment",
+	Type: types.EvaluationTypePostingFulfillment,
+	Name: "Posting fulfillment",
 
 	ValidateConfig: ValidateFulfillmentConfig,
 	ParseConfig: func(config any) (any, error) {

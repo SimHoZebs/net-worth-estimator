@@ -48,7 +48,7 @@ type sqliteStore struct {
 	db *sql.DB
 }
 
-const latestSchemaVersion = 3
+const latestSchemaVersion = 4
 
 // Open opens (creating if needed) the SQLite database and applies
 // migrations. It returns the Store interface so callers never name the
@@ -110,6 +110,15 @@ func (s *sqliteStore) migrate() error {
 		}
 		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (3)`); err != nil {
 			return fmt.Errorf("record schema version 3: %w", err)
+		}
+		version = 3
+	}
+	if version < 4 {
+		if err := migrateV4(tx); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (4)`); err != nil {
+			return fmt.Errorf("record schema version 4: %w", err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -267,6 +276,24 @@ func (s *sqliteStore) Clear() error {
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("clear commit: %w", err)
+	}
+	return nil
+}
+
+// migrateV4 renames the "label" column to "name" on every table that carried
+// one, so the stored schema matches the CSV headers and the JSON contract.
+func migrateV4(tx *sql.Tx) error {
+	statements := []string{
+		`ALTER TABLE accounts RENAME COLUMN label TO name`,
+		`ALTER TABLE postings RENAME COLUMN label TO name`,
+		`ALTER TABLE evaluations RENAME COLUMN label TO name`,
+		`ALTER TABLE income_sources RENAME COLUMN label TO name`,
+		`ALTER TABLE tax_profiles RENAME COLUMN label TO name`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("migrate schema version 4: %w", err)
+		}
 	}
 	return nil
 }

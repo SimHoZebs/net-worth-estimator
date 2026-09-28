@@ -38,7 +38,7 @@ const (
 
 type Account struct {
 	ID         string   `json:"id"`
-	Label      string   `json:"label"`
+	Name       string   `json:"name"`
 	MinBalance *float64 `json:"minBalance"` // nil = NoFloor sentinel on the wire
 	MaxBalance *float64 `json:"maxBalance"` // nil = NoCeiling sentinel on the wire
 	Color      *string  `json:"color"`
@@ -156,7 +156,7 @@ type IncomeAmountConfig struct {
 
 type Posting struct {
 	ID               string                  `json:"id"`
-	Label            string                  `json:"label"`
+	Name             string                  `json:"name"`
 	SourceAccountID  *string                 `json:"sourceAccountId"`
 	Destinations     []string                `json:"destinations"`
 	Amount           PostingAmountResolution `json:"amount"`

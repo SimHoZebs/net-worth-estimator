@@ -96,7 +96,7 @@ func putArtifact[T any](st store.Store, key, kind string, value T) {
 	_ = st.PutArtifact(key, kind, string(payload))
 }
 
-// projectionSettingsDescriptor strips label-only fields from evaluation
+// projectionSettingsDescriptor strips name-only fields from evaluation
 // tables so renaming an instance does not invalidate cached computation.
 func projectionSettingsDescriptor(settings types.ProjectionRuntimeSettings) map[string]any {
 	return map[string]any{
@@ -114,7 +114,7 @@ func evaluationDescriptor(tables *types.EvaluationTables) map[string]any {
 	}
 }
 
-// enabledEvaluationConfigs strips label-only fields from evaluation tables
+// enabledEvaluationConfigs strips name-only fields from evaluation tables
 // so renaming an instance does not invalidate cached computation. Disabled
 // configs never affect computation.
 func enabledEvaluationConfigs(items []types.EvaluationInstance[types.JsonValue]) []map[string]any {

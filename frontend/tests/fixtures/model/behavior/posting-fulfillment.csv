@@ -1,2 +1,2 @@
-instanceId,label,enabled,postingIds
+instanceId,name,enabled,postingIds
 posting-fulfillment,Posting fulfillment,true,null

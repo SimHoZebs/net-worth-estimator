@@ -18,7 +18,7 @@ func TestSaveDocumentIfUnchangedUsesContentIdentity(t *testing.T) {
 	store := openTestStore(t)
 	document := &types.FinancialModelDocument{
 		SourcePath:  "test-source",
-		Accounts:    []types.Account{{ID: "checking", Label: "Checking", Enabled: true}},
+		Accounts:    []types.Account{{ID: "checking", Name: "Checking", Enabled: true}},
 		Checkpoints: []types.Checkpoint{{Date: "2026-04-30", AccountID: "checking", Balance: 200}},
 		Evaluations: types.EmptyEvaluationTables(),
 		Postings:    []types.Posting{},
@@ -67,7 +67,7 @@ func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore
 	document := &types.FinancialModelDocument{
 		SourcePath: "test-source",
 		Accounts: []types.Account{{
-			ID: "checking", Label: "Checking", Enabled: true,
+			ID: "checking", Name: "Checking", Enabled: true,
 		}},
 		Checkpoints: []types.Checkpoint{
 			{Date: "2026-04-30", AccountID: "checking", Balance: 200},
@@ -145,8 +145,8 @@ func testStorePersistsEffectiveDatedIncomeRowsWithSharedID(t *testing.T, newStor
 	juneEnd := types.IsoDate("2026-06-30")
 	snapshot := &types.IncomeDataSnapshot{
 		IncomeSources: []types.IncomeSourceDefinition{
-			{ID: "salary", Label: "First", EffectiveFrom: "2026-01-01", EffectiveTo: &juneEnd, AnnualGrossIncome: 100},
-			{ID: "salary", Label: "Second", EffectiveFrom: "2026-07-01", AnnualGrossIncome: 200},
+			{ID: "salary", Name: "First", EffectiveFrom: "2026-01-01", EffectiveTo: &juneEnd, AnnualGrossIncome: 100},
+			{ID: "salary", Name: "Second", EffectiveFrom: "2026-07-01", AnnualGrossIncome: 200},
 		},
 		TaxProfiles: []types.IncomeTaxProfile{},
 	}
@@ -219,7 +219,7 @@ func testImportCSVRollsBackModelWhenIncomeReplacementFails(t *testing.T, newStor
 	}
 
 	invalidIncomePath := t.TempDir()
-	duplicateSources := "id,label,effectiveFrom,effectiveTo,annualGrossIncome\n" +
+	duplicateSources := "id,name,effectiveFrom,effectiveTo,annualGrossIncome\n" +
 		"salary,First,2026-01-01,,100\n" +
 		"salary,Duplicate,2026-01-01,,200\n"
 	if err := os.WriteFile(filepath.Join(invalidIncomePath, "income-sources.csv"), []byte(duplicateSources), 0o600); err != nil {

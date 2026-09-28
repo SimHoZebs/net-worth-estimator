@@ -83,33 +83,33 @@ func parseResolverStep(stepMap map[string]any) (types.IncomeResolverStep, error)
 	return step, nil
 }
 
-func validatePercentageStep(config map[string]types.JsonValue, label string) error {
+func validatePercentageStep(config map[string]types.JsonValue, name string) error {
 	rateRaw, ok := config["rate"]
 	if !ok {
-		return incomeErrf("%s: rate required", label)
+		return incomeErrf("%s: rate required", name)
 	}
 	rate, ok := rateRaw.(float64)
 	if !ok || math.IsNaN(rate) || rate < 0 || rate > 1 {
-		return incomeErrf("%s: rate must be a number in [0,1]", label)
+		return incomeErrf("%s: rate must be a number in [0,1]", name)
 	}
 	if capRaw, present := config["annualCap"]; present {
 		switch capValue := capRaw.(type) {
 		case nil:
 		case float64:
 			if math.IsNaN(capValue) || capValue < 0 {
-				return incomeErrf("%s: annualCap must be non-negative or null", label)
+				return incomeErrf("%s: annualCap must be non-negative or null", name)
 			}
 		default:
-			return incomeErrf("%s: annualCap must be a number or null", label)
+			return incomeErrf("%s: annualCap must be a number or null", name)
 		}
 	}
 	return nil
 }
 
-func validateTaxStep(config map[string]types.JsonValue, label string) (string, error) {
+func validateTaxStep(config map[string]types.JsonValue, name string) (string, error) {
 	profileID, ok := config["profileId"].(string)
 	if !ok || trimSpace(profileID) == "" {
-		return "", incomeErrf("%s: profileId must be a non-empty string", label)
+		return "", incomeErrf("%s: profileId must be a non-empty string", name)
 	}
 	return profileID, nil
 }
@@ -131,7 +131,7 @@ func validateParsedIncomeAmountConfig(config types.IncomeAmountConfig, reference
 		return incomeErrf("Income source '%s' does not exist.", config.IncomeSourceID)
 	}
 	for index, step := range config.Resolvers {
-		label := fmt.Sprintf("Invalid income step %d", index+1)
+		name := fmt.Sprintf("Invalid income step %d", index+1)
 		if step.DestinationAccountID != nil && references != nil &&
 			!references.AccountIDs[*step.DestinationAccountID] {
 			return incomeErrf("Income step %d destination account '%s' does not exist.",
@@ -142,11 +142,11 @@ func validateParsedIncomeAmountConfig(config types.IncomeAmountConfig, reference
 		}
 		switch step.Resolver {
 		case "percentage":
-			if err := validatePercentageStep(step.Config, label); err != nil {
+			if err := validatePercentageStep(step.Config, name); err != nil {
 				return err
 			}
 		case "progressive-bracket":
-			profileID, err := validateTaxStep(step.Config, label)
+			profileID, err := validateTaxStep(step.Config, name)
 			if err != nil {
 				return err
 			}

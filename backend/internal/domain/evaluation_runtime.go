@@ -51,8 +51,8 @@ type Accumulator interface{}
 
 // EvaluationDefinition is the typed contract each evaluator implements.
 type EvaluationDefinition struct {
-	Type  string
-	Label string
+	Type string
+	Name string
 
 	ValidateConfig func(config any) error
 	ParseConfig    func(config any) (any, error)
@@ -98,11 +98,11 @@ func (r *EvaluationRegistry) Get(evaluationType string) (*EvaluationDefinition, 
 	return definition, ok
 }
 
-// List returns registered type/label pairs.
-func (r *EvaluationRegistry) List() []struct{ Type, Label string } {
-	out := make([]struct{ Type, Label string }, 0, len(r.order))
+// List returns registered type/name pairs.
+func (r *EvaluationRegistry) List() []struct{ Type, Name string } {
+	out := make([]struct{ Type, Name string }, 0, len(r.order))
 	for _, evaluationType := range r.order {
-		out = append(out, struct{ Type, Label string }{evaluationType, r.definitions[evaluationType].Label})
+		out = append(out, struct{ Type, Name string }{evaluationType, r.definitions[evaluationType].Name})
 	}
 	return out
 }
@@ -111,7 +111,7 @@ type instanceRuntime struct {
 	evaluationType string
 	configuredRaw  any // one of *types.FIEvaluation etc.
 	instanceID     string
-	label          string
+	name           string
 	definition     *EvaluationDefinition
 	diagnostics    []types.EvaluationDiagnostic
 
@@ -217,7 +217,7 @@ func (r *instanceRuntime) workloadProgress(completedRuns, totalRuns int) *types.
 	workload := &types.StochasticEvaluationWorkload{
 		Type:           r.evaluationType,
 		InstanceID:     r.instanceID,
-		Label:          r.label,
+		Name:           r.name,
 		CompletedUnits: completedUnits,
 		TotalUnits:     totalRuns * r.workloadPlan.UnitsPerRun,
 		UnitLabel:      r.workloadPlan.UnitLabel,
@@ -248,7 +248,7 @@ func (r *instanceRuntime) envelope() types.EvaluationResultEnvelope {
 	}
 	envelope := types.EvaluationResultEnvelope{
 		InstanceID:    r.instanceID,
-		Label:         r.label,
+		Name:          r.name,
 		Status:        status,
 		Deterministic: nil,
 		Probabilistic: r.probabilistic,
@@ -268,7 +268,7 @@ type EvaluationRuntimeSet struct {
 type rawInstance struct {
 	evaluationType string
 	instanceID     string
-	label          string
+	name           string
 	enabled        bool
 	rawConfig      any
 }
@@ -279,7 +279,7 @@ func rawInstances(tables *types.EvaluationTables) []rawInstance {
 		instances = append(instances, rawInstance{
 			evaluationType: types.EvaluationTypeFinancialIndependence,
 			instanceID:     item.InstanceID,
-			label:          item.Label,
+			name:           item.Name,
 			enabled:        item.Enabled,
 			rawConfig:      item.Config,
 		})
@@ -288,7 +288,7 @@ func rawInstances(tables *types.EvaluationTables) []rawInstance {
 		instances = append(instances, rawInstance{
 			evaluationType: types.EvaluationTypeNetWorthThreshold,
 			instanceID:     item.InstanceID,
-			label:          item.Label,
+			name:           item.Name,
 			enabled:        item.Enabled,
 			rawConfig:      item.Config,
 		})
@@ -297,7 +297,7 @@ func rawInstances(tables *types.EvaluationTables) []rawInstance {
 		instances = append(instances, rawInstance{
 			evaluationType: types.EvaluationTypeAccountBalance,
 			instanceID:     item.InstanceID,
-			label:          item.Label,
+			name:           item.Name,
 			enabled:        item.Enabled,
 			rawConfig:      item.Config,
 		})
@@ -306,7 +306,7 @@ func rawInstances(tables *types.EvaluationTables) []rawInstance {
 		instances = append(instances, rawInstance{
 			evaluationType: types.EvaluationTypePostingFulfillment,
 			instanceID:     item.InstanceID,
-			label:          item.Label,
+			name:           item.Name,
 			enabled:        item.Enabled,
 			rawConfig:      item.Config,
 		})
@@ -331,7 +331,7 @@ func NewEvaluationRuntimeSet(tables *types.EvaluationTables, registry *Evaluatio
 			evaluationType: instance.evaluationType,
 			configuredRaw:  instance.rawConfig,
 			instanceID:     instance.instanceID,
-			label:          instance.label,
+			name:           instance.name,
 		}
 		if trimSpace(instance.instanceID) == "" || idCounts[instance.instanceID] > 1 {
 			message := fmt.Sprintf("Evaluation instance ID %q is duplicated.", instance.instanceID)

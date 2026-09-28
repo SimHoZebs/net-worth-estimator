@@ -68,7 +68,7 @@ type ProjectionRow struct {
 
 type ProjectionAccountSummary struct {
 	AccountID       string  `json:"accountId"`
-	Label           string  `json:"label"`
+	Name            string  `json:"name"`
 	Color           *string `json:"color"`
 	Enabled         bool    `json:"enabled"`
 	StartingBalance float64 `json:"startingBalance"`

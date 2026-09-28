@@ -15,10 +15,10 @@ import (
 func stochasticTestDocument() *types.FinancialModelDocument {
 	end := "2027-01-01"
 	return &types.FinancialModelDocument{
-		Accounts: []types.Account{{ID: "checking", Label: "Checking", Enabled: true}},
+		Accounts: []types.Account{{ID: "checking", Name: "Checking", Enabled: true}},
 		Postings: []types.Posting{{
 			ID:           "salary",
-			Label:        "Salary",
+			Name:         "Salary",
 			Destinations: []string{"checking"},
 			Amount: types.PostingAmountResolution{
 				Resolver: "expression",

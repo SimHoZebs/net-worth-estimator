@@ -39,7 +39,7 @@ export const NO_CEILING_SENTINEL = 10_000_000_000_000;
 
 export interface BackendAccount extends HumaMetadata {
 	id: string;
-	label: string;
+	name: string;
 	minBalance: number | null;
 	maxBalance: number | null;
 	color: string | null;
@@ -93,7 +93,7 @@ export type PostingFrequency =
 
 export interface BackendPosting extends HumaMetadata {
 	id: string;
-	label: string;
+	name: string;
 	sourceAccountId: string | null;
 	destinations: string[] | null;
 	amount: PostingAmountResolution;
@@ -119,7 +119,7 @@ export interface EvaluationInstance<
 	TConfig extends EvaluationConfig = EvaluationConfig,
 > extends HumaMetadata {
 	instanceId: string;
-	label: string;
+	name: string;
 	enabled: boolean;
 	config: TConfig;
 }
@@ -166,7 +166,7 @@ export interface ProjectionRuntimeSettings extends HumaMetadata {
 
 export interface IncomeSourceDefinition extends HumaMetadata {
 	id: string;
-	label: string;
+	name: string;
 	effectiveFrom: IsoDate;
 	effectiveTo: IsoDate | null;
 	annualGrossIncome: number;
@@ -179,7 +179,7 @@ export interface IncomeTaxBracket extends HumaMetadata {
 
 export interface IncomeTaxProfile extends HumaMetadata {
 	id: string;
-	label: string;
+	name: string;
 	deduction: number;
 	brackets: IncomeTaxBracket[];
 	sourceUrl: string | null;
@@ -229,7 +229,7 @@ export interface ProjectionRow {
 
 export interface ProjectionAccountSummary {
 	accountId: string;
-	label: string;
+	name: string;
 	color: string | null;
 	enabled: boolean;
 	startingBalance: number;
@@ -314,7 +314,7 @@ export interface EvaluationDiagnostic {
 
 export interface EvaluationResultEnvelope extends HumaMetadata {
 	instanceId: string;
-	label: string;
+	name: string;
 	status: EvaluationResultStatus;
 	deterministic: EvaluationResultPayload;
 	probabilistic: EvaluationResultPayload;
@@ -383,7 +383,7 @@ export type StochasticProgressPhase =
 export interface StochasticEvaluationWorkload {
 	type: string;
 	instanceId: string;
-	label: string;
+	name: string;
 	completedUnits: number;
 	totalUnits: number;
 	unitLabel: string;

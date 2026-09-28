@@ -144,7 +144,7 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 		}
 		document.Accounts = append(document.Accounts, types.Account{
 			ID:         field(record, index, "id"),
-			Label:      field(record, index, "label"),
+			Name:       field(record, index, "name"),
 			MinBalance: minBalance,
 			MaxBalance: maxBalance,
 			Color:      parseOptionalString(field(record, index, "color")),
@@ -185,7 +185,7 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 		}
 		posting := types.Posting{
 			ID:              field(record, index, "id"),
-			Label:           field(record, index, "label"),
+			Name:            field(record, index, "name"),
 			SourceAccountID: parseOptionalString(field(record, index, "sourceAccountId")),
 			Destinations:    parseDestinations(field(record, index, "destinations")),
 			Frequency:       types.PostingFrequency(field(record, index, "frequency")),
@@ -261,7 +261,7 @@ func importFIEvaluations(csvPath string, document *types.FinancialModelDocument)
 		config["continuingPostingIds"] = continuing
 		document.Evaluations.FinancialIndependence = append(document.Evaluations.FinancialIndependence, types.FIEvaluation{
 			InstanceID: field(record, index, "instanceId"),
-			Label:      field(record, index, "label"),
+			Name:       field(record, index, "name"),
 			Enabled:    parseBool(field(record, index, "enabled")),
 			Config:     config,
 		})
@@ -281,7 +281,7 @@ func importThresholdEvaluations(csvPath string, document *types.FinancialModelDo
 		}
 		document.Evaluations.NetWorthThreshold = append(document.Evaluations.NetWorthThreshold, types.ThresholdEvaluation{
 			InstanceID: field(record, index, "instanceId"),
-			Label:      field(record, index, "label"),
+			Name:       field(record, index, "name"),
 			Enabled:    parseBool(field(record, index, "enabled")),
 			Config: map[string]any{
 				"target": parseNumberOr(field(record, index, "target"), 0),
@@ -303,7 +303,7 @@ func importAccountBalanceEvaluations(csvPath string, document *types.FinancialMo
 		}
 		document.Evaluations.AccountBalance = append(document.Evaluations.AccountBalance, types.BalanceEvaluation{
 			InstanceID: field(record, index, "instanceId"),
-			Label:      field(record, index, "label"),
+			Name:       field(record, index, "name"),
 			Enabled:    parseBool(field(record, index, "enabled")),
 			Config: map[string]any{
 				"accountId": field(record, index, "accountId"),
@@ -333,7 +333,7 @@ func importFulfillmentEvaluations(csvPath string, document *types.FinancialModel
 		}
 		document.Evaluations.PostingFulfillment = append(document.Evaluations.PostingFulfillment, types.FulfillmentEvaluation{
 			InstanceID: field(record, index, "instanceId"),
-			Label:      field(record, index, "label"),
+			Name:       field(record, index, "name"),
 			Enabled:    parseBool(field(record, index, "enabled")),
 			Config: map[string]any{
 				"postingIds": postingIDs,
@@ -394,7 +394,7 @@ func ImportIncomeData(incomePath string) (*types.IncomeDataSnapshot, error) {
 		gross := parseNumberOr(field(record, index, "annualGrossIncome"), 0)
 		snapshot.IncomeSources = append(snapshot.IncomeSources, types.IncomeSourceDefinition{
 			ID:                field(record, index, "id"),
-			Label:             field(record, index, "label"),
+			Name:              field(record, index, "name"),
 			EffectiveFrom:     field(record, index, "effectiveFrom"),
 			EffectiveTo:       parseOptionalDate(field(record, index, "effectiveTo")),
 			AnnualGrossIncome: gross,
@@ -415,7 +415,7 @@ func ImportIncomeData(incomePath string) (*types.IncomeDataSnapshot, error) {
 		}
 		snapshot.TaxProfiles = append(snapshot.TaxProfiles, types.IncomeTaxProfile{
 			ID:        field(record, profileIndex, "id"),
-			Label:     field(record, profileIndex, "label"),
+			Name:      field(record, profileIndex, "name"),
 			Deduction: parseNumberOr(field(record, profileIndex, "deduction"), 0),
 			Brackets:  brackets,
 			SourceURL: parseOptionalString(field(record, profileIndex, "sourceUrl")),

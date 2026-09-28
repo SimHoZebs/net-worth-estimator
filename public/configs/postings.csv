@@ -1,4 +1,4 @@
-id,label,sourceAccountId,destinations,amount,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled
+id,name,sourceAccountId,destinations,amount,frequency,annualRate,annualGrowthRate,volatility,startDate,endDate,annualCap,priority,enabled
 salary,Salary,,checking,"{""resolver"":""income"",""config"":{""incomeSourceId"":""salary"",""resolvers"":[{""resolver"":""percentage"",""config"":{""rate"":0.04,""annualCap"":23000},""destinationAccountId"":""k401"",""employerMatchRate"":0.5},{""resolver"":""progressive-bracket"",""config"":{""profileId"":""us-federal-married-jointly-2026""},""destinationAccountId"":null}]},""inputs"":{}}",monthly,0,0,0,2026-05-29,,,1,true
 housing,Housing,checking,,"{""resolver"":""expression"",""config"":{""expression"":""3200""},""inputs"":{}}",monthly,0,0,0,2026-05-01,,,4,true
 living,Living,checking,,"{""resolver"":""expression"",""config"":{""expression"":""2400""},""inputs"":{}}",monthly,0,0,0,2026-05-15,,,5,true
