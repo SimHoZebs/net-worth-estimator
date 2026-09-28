@@ -30,7 +30,7 @@ export function AccountEditor({
 						? numberValue(data, "ceiling")
 						: null,
 					observedOn: textValue(data, "observedOn"),
-					provenance: textValue(data, "provenance") as Account["provenance"],
+					balanceCheck: item?.balanceCheck ?? true,
 					source: textValue(data, "source"),
 					readOnly: false,
 				};
@@ -108,14 +108,10 @@ export function AccountEditor({
 				max={plan.startDate}
 				defaultValue={item?.observedOn ?? plan.startDate}
 			/>
-			<SelectField
-				label="Balance basis"
-				name="provenance"
-				defaultValue={item?.provenance ?? "recorded"}
-			>
-				<option value="recorded">Recorded balance check</option>
-				<option value="modeled">Modeled estimate</option>
-			</SelectField>
+			<p className="field-hint">
+				A balance and date is a balance check. The engine projects forward from
+				it.
+			</p>
 			<InputField
 				label="Source"
 				name="source"

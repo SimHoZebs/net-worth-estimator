@@ -51,8 +51,12 @@ export function AccountsPanel({
 									<span>
 										<strong>{account.name}</strong>
 										<small>
-											{account.kind} · {account.provenance}
-											{!account.enabled && " · excluded"}
+											{account.kind}
+											{!account.enabled
+												? " · excluded"
+												: account.balanceCheck
+													? " · balance check"
+													: " · projected balance"}
 										</small>
 									</span>
 									{account.readOnly && (
@@ -95,12 +99,12 @@ export function BalanceChecksPanel({
 	return (
 		<>
 			<p className="section-note">
-				Recorded end-of-day balances establish the starting position. Older
-				balances are carried forward unchanged and remain visibly dated.
+				Balance checks establish the starting position. Older balances are
+				carried forward unchanged and remain visibly dated.
 			</p>
 			<div className="movement-list">
 				{accounts
-					.filter((account) => account.provenance === "recorded")
+					.filter((account) => account.balanceCheck)
 					.map((account) => (
 						<div className="movement-row" key={account.id}>
 							<span className="movement-icon inflow">

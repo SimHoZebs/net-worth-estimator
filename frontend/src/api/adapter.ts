@@ -37,7 +37,7 @@ export interface AdapterReport {
 
 export interface AccountAdapterSidecar {
 	kind: Account["kind"];
-	provenance: Account["provenance"];
+	balanceCheck: boolean;
 	source: string;
 	readOnly: boolean;
 	color: string | null;
@@ -58,7 +58,7 @@ export interface MovementAdapterSidecar {
 	volatility?: number;
 	annualCap?: number | null;
 	priority?: number;
-	provenance: Movement["provenance"];
+
 	readOnly: boolean;
 	displayFrequency?: Movement["frequency"];
 	displayToId?: string | null;
@@ -239,21 +239,6 @@ function fallbackStartDate(
 	);
 }
 
-// A posting is recorded history when a bank supplied it, or when it is a
-// one-time movement that happened at or before the projection start. The
-// backend has no provenance field, so this is inferred from what the document
-// already carries. Inferring only from the source would label model-authored
-// past activity as a future plan.
-function postingProvenance(
-	posting: BackendPosting,
-	projectionStartDate: IsoDate,
-): Movement["provenance"] {
-	if (posting.source === "simplefin") return "recorded";
-	if (posting.frequency === "once" && posting.startDate <= projectionStartDate)
-		return "recorded";
-	return "planned";
-}
-
 function numericExpression(value: string | undefined): number | null {
 	if (typeof value !== "string") return null;
 	const trimmed = value.trim();
@@ -318,7 +303,7 @@ function accountDisplay(
 		floor: floor === null || floor < 0 ? 0 : floor,
 		ceiling: maxBalance === null || maxBalance < 0 ? null : maxBalance,
 		observedOn,
-		provenance: previous?.provenance ?? (checkpoint ? "recorded" : "modeled"),
+		balanceCheck: previous?.balanceCheck ?? Boolean(checkpoint),
 		source:
 			previous?.source ??
 			(checkpoint?.source === "simplefin"
@@ -333,7 +318,6 @@ function accountDisplay(
 function movementDisplay(
 	posting: BackendPosting,
 	amount: number | null,
-	projectionStartDate: IsoDate,
 	previous?: MovementAdapterSidecar,
 ): Movement {
 	const destinations = posting.destinations ?? [];
@@ -352,8 +336,6 @@ function movementDisplay(
 		annualIncrease:
 			previous?.displayAnnualIncrease ?? posting.annualGrowthRate * 100,
 		enabled: posting.enabled,
-		provenance:
-			previous?.provenance ?? postingProvenance(posting, projectionStartDate),
 		readOnly:
 			previous?.readOnly ?? (amount === null || posting.source === "simplefin"),
 	};
@@ -480,7 +462,7 @@ function buildSidecarAccount(
 ): AccountAdapterSidecar {
 	return {
 		kind: previous?.kind ?? accountKind(checkpoint?.Balance ?? 0),
-		provenance: previous?.provenance ?? (checkpoint ? "recorded" : "modeled"),
+		balanceCheck: previous?.balanceCheck ?? Boolean(checkpoint),
 		source:
 			previous?.source ??
 			(checkpoint?.source === "simplefin"
@@ -500,7 +482,6 @@ function buildSidecarAccount(
 function buildSidecarPosting(
 	posting: BackendPosting,
 	amount: number | null,
-	projectionStartDate: IsoDate,
 	previous?: MovementAdapterSidecar,
 ): MovementAdapterSidecar {
 	const previousAmountMatches =
@@ -529,8 +510,6 @@ function buildSidecarPosting(
 		volatility: previous?.volatility ?? posting.volatility,
 		annualCap: previous?.annualCap ?? posting.annualCap,
 		priority: previous?.priority ?? posting.priority,
-		provenance:
-			previous?.provenance ?? postingProvenance(posting, projectionStartDate),
 		readOnly:
 			previous?.readOnly ?? (amount === null || posting.source === "simplefin"),
 		displayFrequency:
@@ -598,16 +577,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		const amount = postingAmountValue(posting, projection);
 		const previous = previousPresentation?.movements[posting.id];
 		addForwardPostingWarnings(conversionReport, posting, amount, path);
-		if (!previous) {
-			warn(
-				conversionReport,
-				"posting-provenance-inferred",
-				"The display movement provenance is inferred; the backend has no provenance field.",
-				`${path}.provenance`,
-			);
-			provisional(conversionReport, `${path}.provenance`);
-		}
-		return movementDisplay(posting, amount, projectionStartDate, previous);
+		return movementDisplay(posting, amount, previous);
 	});
 
 	const thresholdGoals = document.evaluations.netWorthThreshold.map(
@@ -717,10 +687,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 				document.postings.map((posting) => {
 					const previous = previousPresentation?.movements[posting.id];
 					const amount = postingAmountValue(posting, projection);
-					return [
-						posting.id,
-						buildSidecarPosting(posting, amount, projectionStartDate, previous),
-					];
+					return [posting.id, buildSidecarPosting(posting, amount, previous)];
 				}),
 			),
 			provisionalFields: [...conversionReport.provisionalFields],
@@ -771,7 +738,6 @@ export function displayPlanToBackendDocument(
 	const movementSidecars = sidecar?.presentation.movements ?? {};
 	const sourcePath =
 		options.sourcePath ?? sourceDocument?.sourcePath ?? "frontend";
-	const projectionStartDate = plan.startDate;
 
 	const accounts = plan.accounts.map((account, index): BackendAccount => {
 		const original = sourceAccounts.get(account.id);
@@ -871,8 +837,6 @@ export function displayPlanToBackendDocument(
 		const previousKind =
 			metadata?.kind ??
 			accountKind(sourceCheckpoint?.Balance ?? account.balance);
-		const previousProvenance =
-			metadata?.provenance ?? (sourceCheckpoint ? "recorded" : "modeled");
 		// A newly added account has no prior display state, so a difference from
 		// the inferred default is not a lost value: the field is simply not
 		// persisted and is re-inferred on the next load. Reporting it as a loss
@@ -884,13 +848,6 @@ export function displayPlanToBackendDocument(
 				`accounts.${account.id}.kind`,
 				"Display account kind has no backend account field.",
 				`accounts.${index}.kind`,
-			);
-		if (hasPriorDisplayState && account.provenance !== previousProvenance)
-			lose(
-				conversionReport,
-				`accounts.${account.id}.provenance`,
-				"Display provenance is not a backend account field.",
-				`accounts.${index}.provenance`,
 			);
 		if (metadata && account.source !== metadata.source)
 			lose(
@@ -907,13 +864,12 @@ export function displayPlanToBackendDocument(
 				`accounts.${index}.readOnly`,
 			);
 		provisional(conversionReport, `accounts.${account.id}.kind`);
-		provisional(conversionReport, `accounts.${account.id}.provenance`);
 		provisional(conversionReport, `accounts.${account.id}.source`);
 		provisional(conversionReport, `accounts.${account.id}.readOnly`);
 		warn(
 			conversionReport,
 			"account-presentation-metadata",
-			"Display account kind, return, provenance, source, and read-only state remain local presentation metadata.",
+			"Display account kind, balance check basis, source, and read-only state remain local presentation metadata.",
 			`accounts.${index}`,
 		);
 		return {
@@ -1058,18 +1014,8 @@ export function displayPlanToBackendDocument(
 				`movements.${index}.destinations`,
 			);
 		}
-		const previousProvenance =
-			metadata?.provenance ??
-			(original ? postingProvenance(original, projectionStartDate) : "planned");
 		const previousReadOnly =
 			metadata?.readOnly ?? original?.source === "simplefin";
-		if (movement.provenance !== previousProvenance)
-			lose(
-				conversionReport,
-				`movements.${movement.id}.provenance`,
-				"Display movement provenance is not a backend posting field.",
-				`movements.${index}.provenance`,
-			);
 		if (movement.readOnly !== previousReadOnly)
 			lose(
 				conversionReport,
@@ -1077,12 +1023,11 @@ export function displayPlanToBackendDocument(
 				"Display movement read-only state is not a backend posting field.",
 				`movements.${index}.readOnly`,
 			);
-		provisional(conversionReport, `movements.${movement.id}.provenance`);
 		provisional(conversionReport, `movements.${movement.id}.readOnly`);
 		warn(
 			conversionReport,
 			"movement-presentation-metadata",
-			"Display movement provenance and read-only state remain local presentation metadata.",
+			"Display movement read-only state remains local presentation metadata.",
 			`movements.${index}`,
 		);
 		const source = metadata?.source ?? original?.source;

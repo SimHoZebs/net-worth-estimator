@@ -36,12 +36,12 @@ test("clicking an account opens its recorded history and projected transactions"
 			name: "Inspect Household take-home pay on Jan 28, 2026",
 		}),
 	).toBeVisible();
-	await dialog.getByLabel("Transaction source").selectOption("recorded");
+	await dialog.getByLabel("Transaction source").selectOption("historical");
 	await expect(dialog.getByRole("status")).toHaveText(
 		"Showing 1–3 of 3 transactions",
 	);
 	await expect(dialog.getByText("Projected", { exact: true })).toHaveCount(0);
-	// Recorded activity is listed oldest first by default, and the control
+	// Historical activity is listed oldest first by default, and the control
 	// toggles rather than sets.
 	await expect(dialog.locator("tbody tr").first()).toContainText(
 		"Jan 15, 2026",
@@ -61,7 +61,7 @@ test("clicking an account opens its recorded history and projected transactions"
 		.getByRole("button", { name: "Inspect Household payroll on Jan 15, 2026" })
 		.click();
 	await expect(dialog.locator(".transaction-details")).toContainText(
-		"Recorded amount",
+		"Historical amount",
 	);
 	await expect(
 		dialog.getByRole("button", { name: "Edit recorded movement" }),
@@ -172,7 +172,7 @@ test("filters reset pagination and keep projected transfers distinct from record
 	await expect(dialog.getByRole("status")).toHaveText(
 		"Showing 1–3 of 3 transactions",
 	);
-	// Recorded income is not a transfer, so the filter must exclude it.
+	// Historical income is not a transfer, so the filter must exclude it.
 	await expect(
 		dialog.getByRole("button", { name: /Inspect Household payroll/ }),
 	).toHaveCount(0);

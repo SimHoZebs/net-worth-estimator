@@ -72,9 +72,13 @@ export function TransactionRow({
 							</time>
 							<span className="transaction-badges">
 								<Badge
-									tone={transaction.source === "recorded" ? "green" : "outline"}
+									tone={
+										transaction.source === "historical" ? "green" : "outline"
+									}
 								>
-									{transaction.source === "recorded" ? "Recorded" : "Projected"}
+									{transaction.source === "historical"
+										? "Historical"
+										: "Projected"}
 								</Badge>
 								{transaction.excluded && (
 									<Badge tone="amber">Excluded from plan</Badge>

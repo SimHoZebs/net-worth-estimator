@@ -22,7 +22,7 @@ describe("account-scoped transactions", () => {
 			plan: examplePlan,
 			projection,
 		});
-		expect(rows.filter((row) => row.source === "recorded")).toHaveLength(3);
+		expect(rows.filter((row) => row.source === "historical")).toHaveLength(3);
 		expect(rows.some((row) => row.movementId === "renovation")).toBe(true);
 		expect(
 			rows.filter((row) => row.movementId === "invest").length,
@@ -197,7 +197,7 @@ describe("transaction filtering", () => {
 	});
 
 	it("separates recorded facts, projected activity and direction", () => {
-		expect(apply({ source: "recorded" })).toHaveLength(3);
+		expect(apply({ source: "historical" })).toHaveLength(3);
 		expect(
 			apply({ direction: "transfer" }).every(
 				(row) => row.category === "transfer",
@@ -206,7 +206,7 @@ describe("transaction filtering", () => {
 		expect(
 			apply({ direction: "out" }).every((row) => row.direction === "out"),
 		).toBe(true);
-		expect(apply({ source: "recorded", direction: "out" })).toHaveLength(0);
+		expect(apply({ source: "historical", direction: "out" })).toHaveLength(0);
 	});
 
 	it("filters the next 30 days from the plan date rather than the wall clock", () => {
@@ -219,7 +219,7 @@ describe("transaction filtering", () => {
 
 	it("sorts without mutating the complete transaction set", () => {
 		const before = JSON.stringify(transactions);
-		const rows = apply({ source: "recorded", order: "newest" });
+		const rows = apply({ source: "historical", order: "newest" });
 		expect(rows.map((row) => row.date)).toEqual([
 			"2026-08-28",
 			"2026-07-28",

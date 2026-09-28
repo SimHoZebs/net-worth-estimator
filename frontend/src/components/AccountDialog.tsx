@@ -54,10 +54,8 @@ export function AccountDialog({
 					</strong>
 				</div>
 				<div className="account-dialog-basis">
-					<Badge tone={account.provenance === "recorded" ? "green" : "outline"}>
-						{account.provenance === "recorded"
-							? "Recorded balance"
-							: "Modeled estimate"}
+					<Badge tone={account.balanceCheck ? "green" : "outline"}>
+						{account.balanceCheck ? "Balance check" : "Projected balance"}
 					</Badge>
 					<span>As of {dateLabel(account.observedOn, true)}</span>
 				</div>

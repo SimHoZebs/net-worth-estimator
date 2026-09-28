@@ -1,13 +1,9 @@
-import type { Plan } from "./model.ts";
+import { isHistoricalMovement, type Plan } from "./model.ts";
 import { quantile } from "./result.ts";
 
 export function payEvidence(plan: Plan) {
 	const candidates = plan.movements.filter(
-		(m) =>
-			m.provenance === "recorded" &&
-			m.frequency === "once" &&
-			!m.fromId &&
-			m.toId,
+		(m) => isHistoricalMovement(m, plan.startDate) && !m.fromId && m.toId,
 	);
 	const selected = candidates.filter(
 		(m) => m.enabled && m.amountKnown && m.startDate <= plan.startDate,

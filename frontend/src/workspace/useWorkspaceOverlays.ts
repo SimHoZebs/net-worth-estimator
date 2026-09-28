@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
-import type { Plan } from "../domain/model.ts";
+import { isHistoricalMovement, type Plan } from "../domain/model.ts";
 
 export function useWorkspaceOverlays({
 	plan,
@@ -20,7 +20,7 @@ export function useWorkspaceOverlays({
 			(movement) =>
 				movement.enabled &&
 				!movement.readOnly &&
-				movement.provenance === "planned",
+				!isHistoricalMovement(movement, plan.startDate),
 		);
 		setEditor({
 			kind: "movement",

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isHistoricalMovement } from "../domain/model.ts";
 import {
 	backendToDisplayPlan,
 	displayPlanToBackendDocument,
@@ -132,10 +133,11 @@ describe("backend and display plan adapter", () => {
 		);
 	});
 
-	// The backend has no provenance field, so it is inferred. A one-time
-	// movement dated at or before the projection start is recorded history
-	// whoever authored it; a recurring rule is a plan, not a past event.
-	it("infers recorded history from a one-time movement before the projection start", () => {
+	// A one-time movement dated at or before the projection start is historical
+	// whoever authored it; a recurring rule is a projection, not a past event.
+	// Nothing is stored: the display plan is judged by frequency and date.
+	it("classifies a one-time movement before the projection start as historical", () => {
+		const startDate = "2026-02-01";
 		const past = documentFixture();
 		past.postings[0] = {
 			...past.postings[0]!,
@@ -147,12 +149,15 @@ describe("backend and display plan adapter", () => {
 			document: past,
 			status: { readOnly: false, authEnabled: false },
 			projection: projectionFixture(),
+			startDate,
 		});
-		expect(pastConversion.plan.movements[0]?.provenance).toBe("recorded");
-		// Inference is still provisional: the backend cannot confirm it.
-		expect(pastConversion.report.provisionalFields).toContain(
-			"movements.0.provenance",
+		// Nothing is stored: the plan holds frequency and date only.
+		expect(Object.keys(pastConversion.plan.movements[0] ?? {})).not.toContain(
+			"provenance",
 		);
+		expect(
+			isHistoricalMovement(pastConversion.plan.movements[0]!, startDate),
+		).toBe(true);
 
 		const future = documentFixture();
 		future.postings[0] = {
@@ -165,14 +170,11 @@ describe("backend and display plan adapter", () => {
 			document: future,
 			status: { readOnly: false, authEnabled: false },
 			projection: projectionFixture(),
+			startDate,
 		});
-		expect(futureConversion.plan.movements[0]?.provenance).toBe("planned");
-		expect(futureConversion.report.warnings).toContainEqual(
-			expect.objectContaining({
-				code: "posting-provenance-inferred",
-				path: "movements.0.provenance",
-			}),
-		);
+		expect(
+			isHistoricalMovement(futureConversion.plan.movements[0]!, startDate),
+		).toBe(false);
 
 		const recurring = documentFixture();
 		recurring.postings[0] = {
@@ -185,8 +187,11 @@ describe("backend and display plan adapter", () => {
 			document: recurring,
 			status: { readOnly: false, authEnabled: false },
 			projection: projectionFixture(),
+			startDate,
 		});
-		expect(recurringConversion.plan.movements[0]?.provenance).toBe("planned");
+		expect(
+			isHistoricalMovement(recurringConversion.plan.movements[0]!, startDate),
+		).toBe(false);
 
 		const simplefinDocument = structuredClone(past);
 		simplefinDocument.postings[0]!.source = "simplefin";
@@ -194,11 +199,14 @@ describe("backend and display plan adapter", () => {
 			document: simplefinDocument,
 			status: { readOnly: false, authEnabled: false },
 			projection: projectionFixture(),
+			startDate,
 		});
 		expect(simplefinConversion.plan.movements[0]).toMatchObject({
-			provenance: "recorded",
 			readOnly: true,
 		});
+		expect(
+			isHistoricalMovement(simplefinConversion.plan.movements[0]!, startDate),
+		).toBe(true);
 	});
 
 	it("preserves unchanged backend rows and allows expression-backed amount edits", () => {
