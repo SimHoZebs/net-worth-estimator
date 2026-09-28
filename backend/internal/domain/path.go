@@ -334,7 +334,7 @@ func AdaptSimulationRun(prepared *types.PreparedProjection, run *types.Simulatio
 	for _, account := range accounts {
 		accountSummaries = append(accountSummaries, types.ProjectionAccountSummary{
 			AccountID:       account.ID,
-			Label:           account.Label,
+			Name:            account.Name,
 			Color:           account.Color,
 			Enabled:         account.Enabled,
 			StartingBalance: roundCurrency(run.InitialState.Balances[account.ID]),

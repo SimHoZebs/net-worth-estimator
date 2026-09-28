@@ -892,8 +892,8 @@ type FIProbabilisticResult struct {
 }
 
 var financialIndependenceDefinition = &EvaluationDefinition{
-	Type:  types.EvaluationTypeFinancialIndependence,
-	Label: "Financial independence",
+	Type: types.EvaluationTypeFinancialIndependence,
+	Name: "Financial independence",
 
 	ValidateConfig: ValidateFIPlanConfig,
 	ParseConfig: func(config any) (any, error) {

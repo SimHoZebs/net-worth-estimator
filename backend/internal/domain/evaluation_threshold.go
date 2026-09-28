@@ -109,8 +109,8 @@ func datePercentile(sortedDates []string, percentile float64) *string {
 }
 
 var netWorthThresholdDefinition = &EvaluationDefinition{
-	Type:  types.EvaluationTypeNetWorthThreshold,
-	Label: "Net worth threshold",
+	Type: types.EvaluationTypeNetWorthThreshold,
+	Name: "Net worth threshold",
 
 	ValidateConfig: ValidateThresholdConfig,
 	ParseConfig: func(config any) (any, error) {

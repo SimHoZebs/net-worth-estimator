@@ -3,7 +3,7 @@
 		"sourcePath": "/configs",
 		"accounts": [
 			{
-				"label": "checking",
+				"name": "checking",
 				"minBalance": -10000000000000,
 				"maxBalance": 10000000000000,
 				"color": null,
@@ -11,7 +11,7 @@
 				"id": "checking"
 			},
 			{
-				"label": "brokerage",
+				"name": "brokerage",
 				"minBalance": -10000000000000,
 				"maxBalance": 10000000000000,
 				"color": null,
@@ -19,7 +19,7 @@
 				"id": "brokerage"
 			},
 			{
-				"label": "loan",
+				"name": "loan",
 				"minBalance": -10000000000000,
 				"maxBalance": 10000000000000,
 				"color": null,
@@ -46,7 +46,7 @@
 		},
 		"postings": [
 			{
-				"label": "historical_checking",
+				"name": "historical_checking",
 				"sourceAccountId": null,
 				"destinations": ["checking"],
 				"amount": {
@@ -68,7 +68,7 @@
 				"id": "historical_checking"
 			},
 			{
-				"label": "historical_brokerage",
+				"name": "historical_brokerage",
 				"sourceAccountId": null,
 				"destinations": ["brokerage"],
 				"amount": {
@@ -90,7 +90,7 @@
 				"id": "historical_brokerage"
 			},
 			{
-				"label": "historical_loan",
+				"name": "historical_loan",
 				"sourceAccountId": "loan",
 				"destinations": null,
 				"amount": {
@@ -112,7 +112,7 @@
 				"id": "historical_loan"
 			},
 			{
-				"label": "salary",
+				"name": "salary",
 				"sourceAccountId": null,
 				"destinations": ["checking"],
 				"amount": {
@@ -134,7 +134,7 @@
 				"id": "salary"
 			},
 			{
-				"label": "spend",
+				"name": "spend",
 				"sourceAccountId": "checking",
 				"destinations": null,
 				"amount": {
@@ -156,7 +156,7 @@
 				"id": "spend"
 			},
 			{
-				"label": "invest",
+				"name": "invest",
 				"sourceAccountId": "checking",
 				"destinations": ["brokerage"],
 				"amount": {
@@ -178,7 +178,7 @@
 				"id": "invest"
 			},
 			{
-				"label": "paydown",
+				"name": "paydown",
 				"sourceAccountId": "checking",
 				"destinations": ["loan"],
 				"amount": {
@@ -217,7 +217,7 @@
 			"netWorthThreshold": [
 				{
 					"instanceId": "nw-500",
-					"label": "Net worth 500",
+					"name": "Net worth 500",
 					"enabled": true,
 					"config": {
 						"target": 500
@@ -227,7 +227,7 @@
 			"postingFulfillment": [
 				{
 					"instanceId": "pf-all",
-					"label": "Posting fulfillment",
+					"name": "Posting fulfillment",
 					"enabled": true,
 					"config": {
 						"postingIds": null
@@ -511,7 +511,7 @@
 			"sourcePath": "/configs",
 			"accounts": [
 				{
-					"label": "checking",
+					"name": "checking",
 					"minBalance": -10000000000000,
 					"maxBalance": 10000000000000,
 					"color": null,
@@ -519,7 +519,7 @@
 					"id": "checking"
 				},
 				{
-					"label": "brokerage",
+					"name": "brokerage",
 					"minBalance": -10000000000000,
 					"maxBalance": 10000000000000,
 					"color": null,
@@ -527,7 +527,7 @@
 					"id": "brokerage"
 				},
 				{
-					"label": "loan",
+					"name": "loan",
 					"minBalance": -10000000000000,
 					"maxBalance": 10000000000000,
 					"color": null,
@@ -554,7 +554,7 @@
 			},
 			"postings": [
 				{
-					"label": "historical_checking",
+					"name": "historical_checking",
 					"sourceAccountId": null,
 					"destinations": ["checking"],
 					"amount": {
@@ -576,7 +576,7 @@
 					"id": "historical_checking"
 				},
 				{
-					"label": "historical_brokerage",
+					"name": "historical_brokerage",
 					"sourceAccountId": null,
 					"destinations": ["brokerage"],
 					"amount": {
@@ -598,7 +598,7 @@
 					"id": "historical_brokerage"
 				},
 				{
-					"label": "historical_loan",
+					"name": "historical_loan",
 					"sourceAccountId": "loan",
 					"destinations": null,
 					"amount": {
@@ -620,7 +620,7 @@
 					"id": "historical_loan"
 				},
 				{
-					"label": "salary",
+					"name": "salary",
 					"sourceAccountId": null,
 					"destinations": ["checking"],
 					"amount": {
@@ -642,7 +642,7 @@
 					"id": "salary"
 				},
 				{
-					"label": "spend",
+					"name": "spend",
 					"sourceAccountId": "checking",
 					"destinations": null,
 					"amount": {
@@ -664,7 +664,7 @@
 					"id": "spend"
 				},
 				{
-					"label": "invest",
+					"name": "invest",
 					"sourceAccountId": "checking",
 					"destinations": ["brokerage"],
 					"amount": {
@@ -686,7 +686,7 @@
 					"id": "invest"
 				},
 				{
-					"label": "paydown",
+					"name": "paydown",
 					"sourceAccountId": "checking",
 					"destinations": ["loan"],
 					"amount": {
@@ -920,7 +920,7 @@
 		"accountSummaries": [
 			{
 				"accountId": "checking",
-				"label": "checking",
+				"name": "checking",
 				"color": null,
 				"enabled": true,
 				"startingBalance": 1500,
@@ -928,7 +928,7 @@
 			},
 			{
 				"accountId": "brokerage",
-				"label": "brokerage",
+				"name": "brokerage",
 				"color": null,
 				"enabled": true,
 				"startingBalance": 1200,
@@ -936,7 +936,7 @@
 			},
 			{
 				"accountId": "loan",
-				"label": "loan",
+				"name": "loan",
 				"color": null,
 				"enabled": true,
 				"startingBalance": -300,

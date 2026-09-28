@@ -9,9 +9,9 @@ import {
 
 const document = {
 	sourcePath: "models/household",
-	accounts: [{ id: "cash", label: "Cash", enabled: true }],
+	accounts: [{ id: "cash", name: "Cash", enabled: true }],
 	checkpoints: [{ Date: "2026-01-01", AccountId: "cash", Balance: 100 }],
-	postings: [{ id: "pay", label: "Pay", enabled: true }],
+	postings: [{ id: "pay", name: "Pay", enabled: true }],
 	evaluations: {
 		financialIndependence: [],
 		netWorthThreshold: [],
@@ -41,12 +41,12 @@ describe("server model import parsing", () => {
 			evaluations: { ...document.evaluations, postingFulfillment: null },
 		},
 		{ ...document, accounts: [null] },
-		{ ...document, accounts: [{ id: "cash", label: "Cash" }] },
+		{ ...document, accounts: [{ id: "cash", name: "Cash" }] },
 		{
 			...document,
 			checkpoints: [{ Date: "2026-01-01", AccountId: "cash", Balance: "100" }],
 		},
-		{ ...document, postings: [{ id: "pay", label: 1, enabled: true }] },
+		{ ...document, postings: [{ id: "pay", name: 1, enabled: true }] },
 	])("rejects an unsafe preview envelope: %j", (value) => {
 		expect(isFinancialModelDocument(value)).toBe(false);
 		const result = parseModelDocument({

@@ -42,7 +42,7 @@ export function isFinancialModelDocument(
 		(item) =>
 			isRecord(item) &&
 			typeof item.id === "string" &&
-			typeof item.label === "string" &&
+			typeof item.name === "string" &&
 			typeof item.enabled === "boolean",
 	);
 	const checkpointsValid = value.checkpoints.every(
@@ -56,7 +56,7 @@ export function isFinancialModelDocument(
 		(item) =>
 			isRecord(item) &&
 			typeof item.id === "string" &&
-			typeof item.label === "string" &&
+			typeof item.name === "string" &&
 			typeof item.enabled === "boolean",
 	);
 	return accountsValid && checkpointsValid && postingsValid;

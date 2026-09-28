@@ -22,7 +22,7 @@ type EvaluationDiagnostic struct {
 
 type EvaluationResultEnvelope struct {
 	InstanceID    string                 `json:"instanceId"`
-	Label         string                 `json:"label"`
+	Name          string                 `json:"name"`
 	Status        EvaluationResultStatus `json:"status"`
 	Deterministic JsonValue              `json:"deterministic"`
 	Probabilistic JsonValue              `json:"probabilistic"`

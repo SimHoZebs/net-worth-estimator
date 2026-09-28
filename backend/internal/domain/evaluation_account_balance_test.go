@@ -129,8 +129,8 @@ func TestAccountBalanceDefinitionIsRegistered(t *testing.T) {
 	if !ok {
 		t.Fatalf("account balance evaluator is not registered")
 	}
-	if definition.Label == "" {
-		t.Fatalf("account balance evaluator needs a label")
+	if definition.Name == "" {
+		t.Fatalf("account balance evaluator needs a name")
 	}
 }
 
@@ -161,14 +161,14 @@ func TestValidateFinancialModelFlagsDanglingAccountBalanceGoal(t *testing.T) {
 	document := &types.FinancialModelDocument{
 		SourcePath: "test",
 		Accounts: []types.Account{
-			{ID: "checking", Label: "Checking", Enabled: true},
+			{ID: "checking", Name: "Checking", Enabled: true},
 		},
 		Checkpoints: []types.Checkpoint{},
 		Postings:    []types.Posting{},
 		Evaluations: types.EvaluationTables{
 			AccountBalance: []types.BalanceEvaluation{{
 				InstanceID: "ghost-goal",
-				Label:      "Ghost",
+				Name:       "Ghost",
 				Enabled:    true,
 				Config:     map[string]any{"accountId": "does-not-exist", "target": 100.0},
 			}},

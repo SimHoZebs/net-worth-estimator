@@ -185,8 +185,8 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 			color = *account.Color
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO accounts (id, position, label, min_balance, max_balance, color, enabled) VALUES (?,?,?,?,?,?,?)`,
-			account.ID, position, account.Label, minBalance, maxBalance, color, boolToInt(account.Enabled),
+			`INSERT INTO accounts (id, position, name, min_balance, max_balance, color, enabled) VALUES (?,?,?,?,?,?,?)`,
+			account.ID, position, account.Name, minBalance, maxBalance, color, boolToInt(account.Enabled),
 		); err != nil {
 			return fmt.Errorf("insert account %s: %w", account.ID, err)
 		}
@@ -243,9 +243,9 @@ func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source stri
 		annualCap = *posting.AnnualCap
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO postings (id, position, label, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled, source)
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled, source)
 		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		posting.ID, position, posting.Label, sourceAccountID, string(destinationsJSON), string(amountJSON),
+		posting.ID, position, posting.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
 		string(posting.Frequency), posting.AnnualRate, posting.AnnualGrowthRate, posting.Volatility,
 		posting.StartDate, endDate, annualCap, posting.Priority, boolToInt(posting.Enabled), source,
 	); err != nil {
@@ -270,7 +270,7 @@ func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 	var enabled int64
 	var capNull sql.NullFloat64
 	var source sql.NullString
-	if err := rows.Scan(&posting.ID, &posting.Label, &sourceAccountID, &destinationsJSON, &amountJSON, &frequency, &posting.AnnualRate, &posting.AnnualGrowthRate, &posting.Volatility, &posting.StartDate, &endDate, &capNull, &posting.Priority, &enabled, &source); err != nil {
+	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &frequency, &posting.AnnualRate, &posting.AnnualGrowthRate, &posting.Volatility, &posting.StartDate, &endDate, &capNull, &posting.Priority, &enabled, &source); err != nil {
 		return types.Posting{}, err
 	}
 	if sourceAccountID.Valid {
@@ -306,7 +306,7 @@ func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 func fiEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
 	rows := make([]evaluationRow, 0, len(d.Evaluations.FinancialIndependence))
 	for position, item := range d.Evaluations.FinancialIndependence {
-		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, label: item.Label, enabled: item.Enabled, configValue: item.Config})
+		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, name: item.Name, enabled: item.Enabled, configValue: item.Config})
 	}
 	return rows
 }
@@ -314,7 +314,7 @@ func fiEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
 func thresholdEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
 	rows := make([]evaluationRow, 0, len(d.Evaluations.NetWorthThreshold))
 	for position, item := range d.Evaluations.NetWorthThreshold {
-		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, label: item.Label, enabled: item.Enabled, configValue: item.Config})
+		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, name: item.Name, enabled: item.Enabled, configValue: item.Config})
 	}
 	return rows
 }
@@ -322,7 +322,7 @@ func thresholdEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
 func accountBalanceEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
 	rows := make([]evaluationRow, 0, len(d.Evaluations.AccountBalance))
 	for position, item := range d.Evaluations.AccountBalance {
-		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, label: item.Label, enabled: item.Enabled, configValue: item.Config})
+		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, name: item.Name, enabled: item.Enabled, configValue: item.Config})
 	}
 	return rows
 }
@@ -330,7 +330,7 @@ func accountBalanceEvaluationRows(d *types.FinancialModelDocument) []evaluationR
 func fulfillmentEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
 	rows := make([]evaluationRow, 0, len(d.Evaluations.PostingFulfillment))
 	for position, item := range d.Evaluations.PostingFulfillment {
-		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, label: item.Label, enabled: item.Enabled, configValue: item.Config})
+		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, name: item.Name, enabled: item.Enabled, configValue: item.Config})
 	}
 	return rows
 }
@@ -338,7 +338,7 @@ func fulfillmentEvaluationRows(d *types.FinancialModelDocument) []evaluationRow 
 type evaluationRow struct {
 	instanceID  string
 	position    int
-	label       string
+	name        string
 	enabled     bool
 	configValue types.JsonValue
 }
@@ -350,8 +350,8 @@ func saveEvaluationTable(tx *sql.Tx, evaluationType string, rows []evaluationRow
 			return fmt.Errorf("marshal config %s: %w", row.instanceID, err)
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO evaluations (type, instance_id, position, label, enabled, config_json) VALUES (?,?,?,?,?,?)`,
-			evaluationType, row.instanceID, row.position, row.label, boolToInt(row.enabled), string(configJSON),
+			`INSERT INTO evaluations (type, instance_id, position, name, enabled, config_json) VALUES (?,?,?,?,?,?)`,
+			evaluationType, row.instanceID, row.position, row.name, boolToInt(row.enabled), string(configJSON),
 		); err != nil {
 			return fmt.Errorf("insert evaluation %s: %w", row.instanceID, err)
 		}
@@ -392,7 +392,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		SourcePath:  sourcePath,
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	accountRows, err := q.Query(`SELECT id, label, min_balance, max_balance, color, enabled FROM accounts ORDER BY position`)
+	accountRows, err := q.Query(`SELECT id, name, min_balance, max_balance, color, enabled FROM accounts ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +402,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		var minBalance, maxBalance sql.NullFloat64
 		var color sql.NullString
 		var enabled int64
-		if err := accountRows.Scan(&account.ID, &account.Label, &minBalance, &maxBalance, &color, &enabled); err != nil {
+		if err := accountRows.Scan(&account.ID, &account.Name, &minBalance, &maxBalance, &color, &enabled); err != nil {
 			return nil, err
 		}
 		if minBalance.Valid {
@@ -454,7 +454,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close checkpoints: %w", err)
 	}
 
-	postingRows, err := q.Query(`SELECT id, label, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled, source FROM postings ORDER BY position`)
+	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled, source FROM postings ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -474,15 +474,15 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close postings: %w", err)
 	}
 
-	evaluationRows, err := q.Query(`SELECT type, instance_id, label, enabled, config_json FROM evaluations ORDER BY type, position`)
+	evaluationRows, err := q.Query(`SELECT type, instance_id, name, enabled, config_json FROM evaluations ORDER BY type, position`)
 	if err != nil {
 		return nil, err
 	}
 	defer evaluationRows.Close()
 	for evaluationRows.Next() {
-		var evaluationType, instanceID, label, configJSON string
+		var evaluationType, instanceID, name, configJSON string
 		var enabled int64
-		if err := evaluationRows.Scan(&evaluationType, &instanceID, &label, &enabled, &configJSON); err != nil {
+		if err := evaluationRows.Scan(&evaluationType, &instanceID, &name, &enabled, &configJSON); err != nil {
 			return nil, err
 		}
 		switch types.EvaluationType(evaluationType) {
@@ -492,7 +492,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 				return nil, fmt.Errorf("parse FI config %s: %w", instanceID, err)
 			}
 			document.Evaluations.FinancialIndependence = append(document.Evaluations.FinancialIndependence, types.FIEvaluation{
-				InstanceID: instanceID, Label: label, Enabled: enabled != 0, Config: config,
+				InstanceID: instanceID, Name: name, Enabled: enabled != 0, Config: config,
 			})
 		case types.EvaluationTypeNetWorthThreshold:
 			config := map[string]any{}
@@ -500,7 +500,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 				return nil, fmt.Errorf("parse threshold config %s: %w", instanceID, err)
 			}
 			document.Evaluations.NetWorthThreshold = append(document.Evaluations.NetWorthThreshold, types.ThresholdEvaluation{
-				InstanceID: instanceID, Label: label, Enabled: enabled != 0, Config: config,
+				InstanceID: instanceID, Name: name, Enabled: enabled != 0, Config: config,
 			})
 		case types.EvaluationTypeAccountBalance:
 			config := map[string]any{}
@@ -508,7 +508,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 				return nil, fmt.Errorf("parse account balance config %s: %w", instanceID, err)
 			}
 			document.Evaluations.AccountBalance = append(document.Evaluations.AccountBalance, types.BalanceEvaluation{
-				InstanceID: instanceID, Label: label, Enabled: enabled != 0, Config: config,
+				InstanceID: instanceID, Name: name, Enabled: enabled != 0, Config: config,
 			})
 		case types.EvaluationTypePostingFulfillment:
 			config := map[string]any{}
@@ -516,7 +516,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 				return nil, fmt.Errorf("parse fulfillment config %s: %w", instanceID, err)
 			}
 			document.Evaluations.PostingFulfillment = append(document.Evaluations.PostingFulfillment, types.FulfillmentEvaluation{
-				InstanceID: instanceID, Label: label, Enabled: enabled != 0, Config: config,
+				InstanceID: instanceID, Name: name, Enabled: enabled != 0, Config: config,
 			})
 		}
 	}
@@ -582,8 +582,8 @@ func replaceIncomeData(tx *sql.Tx, snapshot *types.IncomeDataSnapshot) error {
 			effectiveTo = *source.EffectiveTo
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO income_sources (id, position, label, effective_from, effective_to, annual_gross_income) VALUES (?,?,?,?,?,?)`,
-			source.ID, position, source.Label, source.EffectiveFrom, effectiveTo, source.AnnualGrossIncome,
+			`INSERT INTO income_sources (id, position, name, effective_from, effective_to, annual_gross_income) VALUES (?,?,?,?,?,?)`,
+			source.ID, position, source.Name, source.EffectiveFrom, effectiveTo, source.AnnualGrossIncome,
 		); err != nil {
 			return err
 		}
@@ -598,8 +598,8 @@ func replaceIncomeData(tx *sql.Tx, snapshot *types.IncomeDataSnapshot) error {
 			sourceURL = *profile.SourceURL
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO tax_profiles (id, position, label, deduction, brackets_json, source_url) VALUES (?,?,?,?,?,?)`,
-			profile.ID, position, profile.Label, profile.Deduction, string(bracketsJSON), sourceURL,
+			`INSERT INTO tax_profiles (id, position, name, deduction, brackets_json, source_url) VALUES (?,?,?,?,?,?)`,
+			profile.ID, position, profile.Name, profile.Deduction, string(bracketsJSON), sourceURL,
 		); err != nil {
 			return err
 		}
@@ -629,7 +629,7 @@ func loadIncomeData(q queryer) (*types.IncomeDataSnapshot, error) {
 		IncomeSources: []types.IncomeSourceDefinition{},
 		TaxProfiles:   []types.IncomeTaxProfile{},
 	}
-	rows, err := q.Query(`SELECT id, label, effective_from, effective_to, annual_gross_income FROM income_sources ORDER BY position`)
+	rows, err := q.Query(`SELECT id, name, effective_from, effective_to, annual_gross_income FROM income_sources ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -637,7 +637,7 @@ func loadIncomeData(q queryer) (*types.IncomeDataSnapshot, error) {
 	for rows.Next() {
 		var source types.IncomeSourceDefinition
 		var effectiveTo sql.NullString
-		if err := rows.Scan(&source.ID, &source.Label, &source.EffectiveFrom, &effectiveTo, &source.AnnualGrossIncome); err != nil {
+		if err := rows.Scan(&source.ID, &source.Name, &source.EffectiveFrom, &effectiveTo, &source.AnnualGrossIncome); err != nil {
 			return nil, err
 		}
 		if effectiveTo.Valid {
@@ -653,7 +653,7 @@ func loadIncomeData(q queryer) (*types.IncomeDataSnapshot, error) {
 	if err := rows.Close(); err != nil {
 		return nil, fmt.Errorf("close income sources: %w", err)
 	}
-	profileRows, err := q.Query(`SELECT id, label, deduction, brackets_json, source_url FROM tax_profiles ORDER BY position`)
+	profileRows, err := q.Query(`SELECT id, name, deduction, brackets_json, source_url FROM tax_profiles ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -662,7 +662,7 @@ func loadIncomeData(q queryer) (*types.IncomeDataSnapshot, error) {
 		var profile types.IncomeTaxProfile
 		var bracketsJSON string
 		var sourceURL sql.NullString
-		if err := profileRows.Scan(&profile.ID, &profile.Label, &profile.Deduction, &bracketsJSON, &sourceURL); err != nil {
+		if err := profileRows.Scan(&profile.ID, &profile.Name, &profile.Deduction, &bracketsJSON, &sourceURL); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal([]byte(bracketsJSON), &profile.Brackets); err != nil {

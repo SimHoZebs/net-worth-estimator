@@ -299,7 +299,7 @@ function accountDisplay(
 	const maxBalance = boundValue(account.maxBalance, NO_CEILING_SENTINEL);
 	return {
 		id: account.id,
-		name: account.label || account.id,
+		name: account.name || account.id,
 		kind: previous?.kind ?? accountKind(checkpoint?.Balance ?? 0),
 		enabled: account.enabled,
 		balance: checkpoint?.Balance ?? 0,
@@ -327,7 +327,7 @@ function movementDisplay(
 	const firstDestination = destinations[0] ?? null;
 	return {
 		id: posting.id,
-		name: posting.label || posting.id,
+		name: posting.name || posting.id,
 		amount: Math.max(0, amount ?? 0),
 		amountKnown: amount !== null,
 		fromId: posting.sourceAccountId,
@@ -596,7 +596,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			}
 			return {
 				id: evaluation.instanceId,
-				name: evaluation.label || evaluation.instanceId,
+				name: evaluation.name || evaluation.instanceId,
 				kind: "net-worth" as const,
 				target,
 				accountId: null,
@@ -630,7 +630,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			}
 			return {
 				id: evaluation.instanceId,
-				name: evaluation.label || evaluation.instanceId,
+				name: evaluation.name || evaluation.instanceId,
 				kind: "reserve" as const,
 				target,
 				accountId,
@@ -875,7 +875,7 @@ export function displayPlanToBackendDocument(
 		return {
 			...(storedAccount ?? {}),
 			id: account.id,
-			label: account.name,
+			name: account.name,
 			minBalance: floor,
 			maxBalance,
 			color: storedAccount?.color ?? null,
@@ -1037,7 +1037,7 @@ export function displayPlanToBackendDocument(
 		return {
 			...(storedPosting ?? {}),
 			id: movement.id,
-			label: movement.name,
+			name: movement.name,
 			sourceAccountId: movement.fromId,
 			destinations,
 			amount,
@@ -1091,7 +1091,7 @@ export function displayPlanToBackendDocument(
 			return {
 				...(storedEvaluation ?? {}),
 				instanceId: goal.id,
-				label: goal.name,
+				name: goal.name,
 				enabled: goal.enabled,
 				config: {
 					...(storedConfig ?? {}),
@@ -1111,7 +1111,7 @@ export function displayPlanToBackendDocument(
 			return {
 				...(storedEvaluation ?? {}),
 				instanceId: goal.id,
-				label: goal.name,
+				name: goal.name,
 				enabled: goal.enabled,
 				config: {
 					...(storedConfig ?? {}),

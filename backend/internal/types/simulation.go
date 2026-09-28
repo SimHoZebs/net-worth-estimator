@@ -77,7 +77,7 @@ const (
 type StochasticEvaluationWorkload struct {
 	Type                    string `json:"type"`
 	InstanceID              string `json:"instanceId"`
-	Label                   string `json:"label"`
+	Name                    string `json:"name"`
 	CompletedUnits          int    `json:"completedUnits"`
 	TotalUnits              int    `json:"totalUnits"`
 	UnitLabel               string `json:"unitLabel"`

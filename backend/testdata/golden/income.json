@@ -3,7 +3,7 @@
 		"sourcePath": "/configs",
 		"accounts": [
 			{
-				"label": "checking",
+				"name": "checking",
 				"minBalance": -10000000000000,
 				"maxBalance": 10000000000000,
 				"color": null,
@@ -11,7 +11,7 @@
 				"id": "checking"
 			},
 			{
-				"label": "brokerage",
+				"name": "brokerage",
 				"minBalance": -10000000000000,
 				"maxBalance": 10000000000000,
 				"color": null,
@@ -19,7 +19,7 @@
 				"id": "brokerage"
 			},
 			{
-				"label": "loan",
+				"name": "loan",
 				"minBalance": -10000000000000,
 				"maxBalance": 10000000000000,
 				"color": null,
@@ -36,7 +36,7 @@
 		"postings": [
 			{
 				"id": "salary",
-				"label": "Salary",
+				"name": "Salary",
 				"sourceAccountId": null,
 				"destinations": ["checking"],
 				"amount": {
@@ -75,7 +75,7 @@
 				"enabled": true
 			},
 			{
-				"label": "spend",
+				"name": "spend",
 				"sourceAccountId": "checking",
 				"destinations": null,
 				"amount": {
@@ -107,7 +107,7 @@
 			"postingFulfillment": [
 				{
 					"instanceId": "pf-all",
-					"label": "Posting fulfillment",
+					"name": "Posting fulfillment",
 					"enabled": true,
 					"config": {
 						"postingIds": null
@@ -126,7 +126,7 @@
 		"incomeSources": [
 			{
 				"id": "salary",
-				"label": "Salary",
+				"name": "Salary",
 				"effectiveFrom": "2026-01-01",
 				"effectiveTo": null,
 				"annualGrossIncome": 120000
@@ -135,7 +135,7 @@
 		"taxProfiles": [
 			{
 				"id": "simple",
-				"label": "Simple",
+				"name": "Simple",
 				"deduction": 16100,
 				"brackets": [
 					{
@@ -158,7 +158,7 @@
 		"accountSummaries": [
 			{
 				"accountId": "checking",
-				"label": "checking",
+				"name": "checking",
 				"color": null,
 				"enabled": true,
 				"startingBalance": 0,
@@ -166,7 +166,7 @@
 			},
 			{
 				"accountId": "brokerage",
-				"label": "brokerage",
+				"name": "brokerage",
 				"color": null,
 				"enabled": true,
 				"startingBalance": 0,
@@ -174,7 +174,7 @@
 			},
 			{
 				"accountId": "loan",
-				"label": "loan",
+				"name": "loan",
 				"color": null,
 				"enabled": true,
 				"startingBalance": 0,
@@ -200,7 +200,7 @@
 			"postingFulfillment": [
 				{
 					"instanceId": "pf-all",
-					"label": "Posting fulfillment",
+					"name": "Posting fulfillment",
 					"status": "satisfied",
 					"deterministic": {
 						"requestedAmount": 0,
@@ -214,13 +214,13 @@
 						"postings": [
 							{
 								"postingId": "salary",
-								"label": "Salary",
+								"name": "Salary",
 								"sourceAccountId": null,
 								"sourceAccountLabel": null,
 								"destinations": [
 									{
 										"accountId": "checking",
-										"label": "checking"
+										"name": "checking"
 									}
 								],
 								"priority": 1,
@@ -235,7 +235,7 @@
 							},
 							{
 								"postingId": "spend",
-								"label": "spend",
+								"name": "spend",
 								"sourceAccountId": "checking",
 								"sourceAccountLabel": "checking",
 								"destinations": null,

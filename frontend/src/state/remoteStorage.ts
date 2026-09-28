@@ -70,9 +70,9 @@ export function serverDocumentFingerprint(
 	const semanticDocument = {
 		sourcePath: document.sourcePath,
 		accounts: document.accounts.map(
-			({ id, label, minBalance, maxBalance, color, enabled }) => ({
+			({ id, name, minBalance, maxBalance, color, enabled }) => ({
 				id,
-				label,
+				name,
 				minBalance,
 				maxBalance,
 				color,
@@ -89,25 +89,25 @@ export function serverDocumentFingerprint(
 		),
 		evaluations: {
 			financialIndependence: document.evaluations.financialIndependence.map(
-				({ instanceId, label, enabled, config }) => ({
+				({ instanceId, name, enabled, config }) => ({
 					instanceId,
-					label,
+					name,
 					enabled,
 					config,
 				}),
 			),
 			netWorthThreshold: document.evaluations.netWorthThreshold.map(
-				({ instanceId, label, enabled, config }) => ({
+				({ instanceId, name, enabled, config }) => ({
 					instanceId,
-					label,
+					name,
 					enabled,
 					config,
 				}),
 			),
 			postingFulfillment: document.evaluations.postingFulfillment.map(
-				({ instanceId, label, enabled, config }) => ({
+				({ instanceId, name, enabled, config }) => ({
 					instanceId,
-					label,
+					name,
 					enabled,
 					config,
 				}),
@@ -116,7 +116,7 @@ export function serverDocumentFingerprint(
 		postings: document.postings.map(
 			({
 				id,
-				label,
+				name,
 				sourceAccountId,
 				destinations,
 				amount,
@@ -132,7 +132,7 @@ export function serverDocumentFingerprint(
 				source,
 			}) => ({
 				id,
-				label,
+				name,
 				sourceAccountId,
 				destinations,
 				amount,

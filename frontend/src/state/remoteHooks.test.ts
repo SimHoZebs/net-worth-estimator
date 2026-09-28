@@ -211,7 +211,7 @@ function modelFixture(): FinancialModelDocument {
 		accounts: [
 			{
 				id: "cash",
-				label: "Cash",
+				name: "Cash",
 				minBalance: 0,
 				maxBalance: null,
 				color: null,
@@ -219,7 +219,7 @@ function modelFixture(): FinancialModelDocument {
 			},
 			{
 				id: "loan",
-				label: "Loan",
+				name: "Loan",
 				minBalance: 0,
 				maxBalance: null,
 				color: null,
@@ -235,7 +235,7 @@ function modelFixture(): FinancialModelDocument {
 			netWorthThreshold: [
 				{
 					instanceId: "target",
-					label: "Reach target",
+					name: "Reach target",
 					enabled: true,
 					config: { target: 500 },
 				},
@@ -246,7 +246,7 @@ function modelFixture(): FinancialModelDocument {
 		postings: [
 			{
 				id: "salary",
-				label: "Salary",
+				name: "Salary",
 				sourceAccountId: null,
 				destinations: ["cash"],
 				amount: { resolver: "expression", config: { expression: "100" } },
@@ -337,7 +337,7 @@ function projectionFixture(): ProjectionResult {
 		accountSummaries: [
 			{
 				accountId: "cash",
-				label: "Cash",
+				name: "Cash",
 				color: null,
 				enabled: true,
 				startingBalance: 100,
@@ -345,7 +345,7 @@ function projectionFixture(): ProjectionResult {
 			},
 			{
 				accountId: "loan",
-				label: "Loan",
+				name: "Loan",
 				color: null,
 				enabled: true,
 				startingBalance: -40,
@@ -367,7 +367,7 @@ function projectionFixture(): ProjectionResult {
 			netWorthThreshold: [
 				{
 					instanceId: "target",
-					label: "Reach target",
+					name: "Reach target",
 					status: "satisfied",
 					deterministic: { reached: true, firstReachedDate: "2026-02-01" },
 					probabilistic: null,
@@ -408,7 +408,7 @@ function stochasticFixture(): StochasticProjectionResult {
 			netWorthThreshold: [
 				{
 					instanceId: "target",
-					label: "Reach target",
+					name: "Reach target",
 					status: "satisfied",
 					deterministic: { reached: true, firstReachedDate: "2026-02-01" },
 					probabilistic: { probability: 0.75 },
@@ -419,7 +419,7 @@ function stochasticFixture(): StochasticProjectionResult {
 			postingFulfillment: [
 				{
 					instanceId: "all",
-					label: "All postings",
+					name: "All postings",
 					status: "satisfied",
 					deterministic: { postingIds: null },
 					probabilistic: { fullFulfillmentProbability: 0.6 },
@@ -1553,7 +1553,7 @@ describe("remote projection mapping and SSE", () => {
 					...document.evaluations.netWorthThreshold,
 					{
 						instanceId: "missing",
-						label: "Missing result",
+						name: "Missing result",
 						enabled: true,
 						config: { target: 900 },
 					},
