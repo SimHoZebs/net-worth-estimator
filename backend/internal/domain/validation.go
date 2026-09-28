@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -70,6 +71,11 @@ func ValidateFinancialModel(document *types.FinancialModelDocument, incomeData *
 			addIssue(&issues, types.SeverityWarning, "account.color.missing",
 				fmt.Sprintf("Enabled account '%s' has no chart color. Charts will use a neutral fallback until a color is provided.", account.ID),
 				pathWithField([]any{"accounts", index}, "color")...)
+		}
+		if !account.Kind.Valid() {
+			addIssue(&issues, types.SeverityError, "account.kind.unknown",
+				fmt.Sprintf("Account '%s' has kind '%s'. Expected one of %s.", account.ID, account.Kind, joinAccountKinds()),
+				pathWithField([]any{"accounts", index}, "kind")...)
 		}
 	}
 
@@ -407,4 +413,12 @@ func SummarizeValidationIssues(issues []types.ModelValidationIssue) (errors, war
 		}
 	}
 	return errors, warnings, len(errors) == 0
+}
+
+func joinAccountKinds() string {
+	names := make([]string, 0, len(types.AccountKinds()))
+	for _, kind := range types.AccountKinds() {
+		names = append(names, string(kind))
+	}
+	return strings.Join(names, ", ")
 }

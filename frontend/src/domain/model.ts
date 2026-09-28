@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export const accountKindSchema = z.enum([
+	"cash",
+	"investment",
+	"debt",
+	"property",
+]);
 const date = z.iso.date();
 const money = z.number().finite().min(0).max(1e10);
 const id = z.string().min(1).max(100);
@@ -8,11 +14,11 @@ const name = z.string().trim().min(1).max(100);
 export const accountSchema = z.object({
 	id,
 	name,
-	kind: z.enum(["cash", "investment", "property", "debt"]),
+	kind: accountKindSchema,
 	enabled: z.boolean().default(true),
 	balance: z.number().finite().min(-1e10).max(1e10),
-	floor: money,
-	ceiling: money.nullable(),
+	minBalance: money,
+	maxBalance: money.nullable(),
 	observedOn: date,
 	balanceCheck: z.boolean(),
 	source: name,
@@ -91,10 +97,13 @@ export const planSchema = z
 					["accounts", index, "balance"],
 					"Asset balances cannot be negative.",
 				);
-			if (account.ceiling !== null && account.ceiling < account.floor)
+			if (
+				account.maxBalance !== null &&
+				account.maxBalance < account.minBalance
+			)
 				issue(
-					["accounts", index, "ceiling"],
-					"The ceiling must be at least the protected balance.",
+					["accounts", index, "maxBalance"],
+					"The maxBalance must be at least the protected balance.",
 				);
 			if (account.observedOn > plan.startDate)
 				issue(

@@ -36,7 +36,6 @@ export interface AdapterReport {
 }
 
 export interface AccountPresentation {
-	kind: Account["kind"];
 	balanceCheck: boolean;
 	source: string;
 	readOnly: boolean;
@@ -278,10 +277,6 @@ function backendFrequency(frequency: Movement["frequency"]): PostingFrequency {
 	return frequency === "yearly" ? "annual" : frequency;
 }
 
-function accountKind(balance: number): Account["kind"] {
-	return balance < 0 ? "debt" : "cash";
-}
-
 function targetFromEvaluation(config: JsonValue | undefined): number {
 	const object = objectValue(config);
 	return finite(object?.target) ?? 0;
@@ -295,16 +290,16 @@ function accountDisplay(
 	previous: AccountPresentation | undefined,
 	syncCheckpoint: boolean,
 ): Account {
-	const floor = boundValue(account.minBalance, NO_FLOOR_SENTINEL);
+	const minBalance = boundValue(account.minBalance, NO_FLOOR_SENTINEL);
 	const maxBalance = boundValue(account.maxBalance, NO_CEILING_SENTINEL);
 	return {
 		id: account.id,
 		name: account.name || account.id,
-		kind: previous?.kind ?? accountKind(checkpoint?.Balance ?? 0),
+		kind: account.kind,
 		enabled: account.enabled,
 		balance: checkpoint?.Balance ?? 0,
-		floor: floor === null || floor < 0 ? 0 : floor,
-		ceiling: maxBalance === null || maxBalance < 0 ? null : maxBalance,
+		minBalance: minBalance === null || minBalance < 0 ? 0 : minBalance,
+		maxBalance: maxBalance === null || maxBalance < 0 ? null : maxBalance,
 		observedOn,
 		balanceCheck: previous?.balanceCheck ?? Boolean(checkpoint),
 		source:
@@ -363,10 +358,10 @@ function addForwardAccountWarnings(
 		warn(
 			target,
 			"sentinel-floor",
-			"The backend has no account floor; the display floor defaults to zero.",
-			`${path}.floor`,
+			"The backend has no account minBalance; the display value defaults to zero.",
+			`${path}.minBalance`,
 		);
-		provisional(target, `${path}.floor`);
+		provisional(target, `${path}.minBalance`);
 	}
 	if (
 		account.maxBalance === null ||
@@ -375,10 +370,10 @@ function addForwardAccountWarnings(
 		warn(
 			target,
 			"sentinel-ceiling",
-			"The backend has no account ceiling; the display ceiling is unbounded.",
-			`${path}.ceiling`,
+			"The backend has no account maxBalance; the display value is unbounded.",
+			`${path}.maxBalance`,
 		);
-		provisional(target, `${path}.ceiling`);
+		provisional(target, `${path}.maxBalance`);
 	}
 	if (
 		account.minBalance !== null &&
@@ -388,10 +383,10 @@ function addForwardAccountWarnings(
 		warn(
 			target,
 			"negative-floor",
-			"A negative backend floor cannot be represented by the display model and is shown as zero.",
-			`${path}.floor`,
+			"A negative backend minBalance cannot be represented by the display model and is shown as zero.",
+			`${path}.minBalance`,
 		);
-		provisional(target, `${path}.floor`);
+		provisional(target, `${path}.minBalance`);
 	}
 }
 
@@ -464,7 +459,6 @@ function buildPresentationAccount(
 	previous?: AccountPresentation,
 ): AccountPresentation {
 	return {
-		kind: previous?.kind ?? accountKind(checkpoint?.Balance ?? 0),
 		balanceCheck: previous?.balanceCheck ?? Boolean(checkpoint),
 		source:
 			previous?.source ??
@@ -562,15 +556,6 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			previous,
 		);
 		addForwardAccountWarnings(conversionReport, account, checkpoint, path);
-		if (!previous) {
-			warn(
-				conversionReport,
-				"account-kind-inferred",
-				"The display account kind is inferred from the checkpoint balance.",
-				`${path}.kind`,
-			);
-			provisional(conversionReport, `${path}.kind`);
-		}
 		return display;
 	});
 
@@ -747,20 +732,22 @@ export function displayPlanToBackendDocument(
 					plan.startDate,
 				)
 			: null;
-		const floor =
-			storedExtras && sameFloorValue(storedExtras.minBalance, account.floor)
+		const minBalance =
+			storedExtras &&
+			sameFloorValue(storedExtras.minBalance, account.minBalance)
 				? storedExtras.minBalance
 				: storedAccount &&
-						sameFloorValue(storedAccount.minBalance, account.floor)
+						sameFloorValue(storedAccount.minBalance, account.minBalance)
 					? storedAccount.minBalance
-					: account.floor;
+					: account.minBalance;
 		const maxBalance =
-			storedExtras && sameCeilingValue(storedExtras.maxBalance, account.ceiling)
+			storedExtras &&
+			sameCeilingValue(storedExtras.maxBalance, account.maxBalance)
 				? storedExtras.maxBalance
 				: storedAccount &&
-						sameCeilingValue(storedAccount.maxBalance, account.ceiling)
+						sameCeilingValue(storedAccount.maxBalance, account.maxBalance)
 					? storedAccount.maxBalance
-					: account.ceiling;
+					: account.maxBalance;
 		const accountId = account.id;
 		const sourceCheckpoints = (sourceDocument?.checkpoints ?? [])
 			.filter((checkpoint) => checkpoint.AccountId === accountId)
@@ -833,22 +820,6 @@ export function displayPlanToBackendDocument(
 				left.Date.localeCompare(right.Date),
 			),
 		);
-		const previousKind =
-			storedExtras?.kind ??
-			accountKind(sourceCheckpoint?.Balance ?? account.balance);
-		// A newly added account has no prior display state, so a difference from
-		// the inferred default is not a lost value: the field is simply not
-		// persisted and is re-inferred on the next load. Reporting it as a loss
-		// made adding an account impossible on a server-backed plan.
-		const hasPriorDisplayState =
-			Boolean(storedExtras) || sourceCheckpoint !== null;
-		if (hasPriorDisplayState && account.kind !== previousKind)
-			lose(
-				conversionReport,
-				`accounts.${account.id}.kind`,
-				"Display account kind has no backend account field.",
-				`accounts.${index}.kind`,
-			);
 		if (storedExtras && account.source !== storedExtras.source)
 			lose(
 				conversionReport,
@@ -868,15 +839,16 @@ export function displayPlanToBackendDocument(
 		provisional(conversionReport, `accounts.${account.id}.readOnly`);
 		warn(
 			conversionReport,
-			"account-presentation-storedExtras",
-			"Display account kind, balance check basis, source, and read-only state remain local presentation storedExtras.",
+			"account-presentation-metadata",
+			"Balance check basis, source, and read-only state remain local presentation metadata.",
 			`accounts.${index}`,
 		);
 		return {
 			...(storedAccount ?? {}),
 			id: account.id,
 			name: account.name,
-			minBalance: floor,
+			kind: account.kind,
+			minBalance: minBalance,
 			maxBalance,
 			color: storedAccount?.color ?? null,
 			enabled: account.enabled,
@@ -1030,7 +1002,7 @@ export function displayPlanToBackendDocument(
 		warn(
 			conversionReport,
 			"movement-presentation-storedExtras",
-			"Display movement read-only state remains local presentation storedExtras.",
+			"Display movement read-only state remains local presentation metadata.",
 			`movements.${index}`,
 		);
 		const source = storedExtras?.source ?? storedPosting?.source;

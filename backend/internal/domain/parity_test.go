@@ -87,7 +87,7 @@ func TestIsValidIsoDate(t *testing.T) {
 
 func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 	document := &types.FinancialModelDocument{
-		Accounts: []types.Account{{ID: "checking", Name: "Checking", Enabled: true}},
+		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
 		Postings: []types.Posting{{
 			ID:           "p1",
 			Name:         "Broken dates",
@@ -123,7 +123,7 @@ func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 
 func TestPrepareSimulationRejectsMalformedProjectionStart(t *testing.T) {
 	document := &types.FinancialModelDocument{
-		Accounts: []types.Account{{ID: "checking", Name: "Checking", Enabled: true}},
+		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
 	}
 	settings := &types.ProjectionRuntimeSettings{
 		FallbackProjectionStartDate: "01/02/2026",

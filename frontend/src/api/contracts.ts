@@ -37,9 +37,12 @@ export type OptionalString = string | null;
 export const NO_FLOOR_SENTINEL = -10_000_000_000_000;
 export const NO_CEILING_SENTINEL = 10_000_000_000_000;
 
+export type AccountKind = "cash" | "investment" | "debt" | "property";
+
 export interface BackendAccount extends HumaMetadata {
 	id: string;
 	name: string;
+	kind: AccountKind;
 	minBalance: number | null;
 	maxBalance: number | null;
 	color: string | null;

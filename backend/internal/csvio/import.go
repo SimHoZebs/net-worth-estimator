@@ -145,6 +145,7 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 		document.Accounts = append(document.Accounts, types.Account{
 			ID:         field(record, index, "id"),
 			Name:       field(record, index, "name"),
+			Kind:       types.AccountKind(field(record, index, "kind")),
 			MinBalance: minBalance,
 			MaxBalance: maxBalance,
 			Color:      parseOptionalString(field(record, index, "color")),

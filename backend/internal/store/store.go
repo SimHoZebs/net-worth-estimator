@@ -48,7 +48,7 @@ type sqliteStore struct {
 	db *sql.DB
 }
 
-const latestSchemaVersion = 4
+const latestSchemaVersion = 5
 
 // Open opens (creating if needed) the SQLite database and applies
 // migrations. It returns the Store interface so callers never name the
@@ -119,6 +119,15 @@ func (s *sqliteStore) migrate() error {
 		}
 		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (4)`); err != nil {
 			return fmt.Errorf("record schema version 4: %w", err)
+		}
+		version = 4
+	}
+	if version < 5 {
+		if err := migrateV5(tx); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (5)`); err != nil {
+			return fmt.Errorf("record schema version 5: %w", err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -293,6 +302,26 @@ func migrateV4(tx *sql.Tx) error {
 	for _, statement := range statements {
 		if _, err := tx.Exec(statement); err != nil {
 			return fmt.Errorf("migrate schema version 4: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateV5 adds the account kind column. Existing rows are classified from
+// their balance sign, which is what the editor inferred before the column
+// existed, so a migrated database opens with the same grouping the app
+// derived. Re-running the model with an authored kind column replaces it.
+func migrateV5(tx *sql.Tx) error {
+	statements := []string{
+		`ALTER TABLE accounts ADD COLUMN kind TEXT NOT NULL DEFAULT 'cash'`,
+		`UPDATE accounts SET kind = CASE WHEN (
+			SELECT COALESCE(SUM(balance), 0) FROM checkpoints
+			WHERE checkpoints.account_id = accounts.id
+		) < 0 THEN 'debt' ELSE 'cash' END`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("migrate schema version 5: %w", err)
 		}
 	}
 	return nil

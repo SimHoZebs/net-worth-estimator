@@ -14,6 +14,7 @@ function documentFixture(): FinancialModelDocument {
 			{
 				id: "cash",
 				name: "Cash",
+				kind: "cash",
 				minBalance: NO_FLOOR_SENTINEL,
 				maxBalance: NO_CEILING_SENTINEL,
 				color: null,
@@ -22,6 +23,7 @@ function documentFixture(): FinancialModelDocument {
 			{
 				id: "loan",
 				name: "Loan",
+				kind: "debt",
 				minBalance: null,
 				maxBalance: null,
 				color: null,
@@ -108,8 +110,8 @@ describe("backend and display plan adapter", () => {
 		expect(conversion.plan.startDate).toBe("2026-02-01");
 		expect(conversion.plan.accounts[0]?.balance).toBe(100);
 		expect(conversion.plan.accounts[0]?.observedOn).toBe("2026-01-31");
-		expect(conversion.plan.accounts[0]?.floor).toBe(0);
-		expect(conversion.plan.accounts[0]?.ceiling).toBeNull();
+		expect(conversion.plan.accounts[0]?.minBalance).toBe(0);
+		expect(conversion.plan.accounts[0]?.maxBalance).toBeNull();
 		expect(conversion.plan.accounts[1]?.kind).toBe("debt");
 		expect(conversion.plan.movements[0]).toMatchObject({
 			amount: 250,
@@ -128,7 +130,9 @@ describe("backend and display plan adapter", () => {
 				enabled: true,
 			},
 		]);
-		expect(conversion.report.provisionalFields).toContain("accounts.0.floor");
+		expect(conversion.report.provisionalFields).toContain(
+			"accounts.0.minBalance",
+		);
 		expect(conversion.report.provisionalFields).toContain(
 			"movements.0.metadata",
 		);
@@ -295,6 +299,7 @@ describe("backend and display plan adapter", () => {
 		document.accounts.push({
 			id: "unobserved",
 			name: "Unobserved",
+			kind: "cash",
 			minBalance: NO_FLOOR_SENTINEL,
 			maxBalance: NO_CEILING_SENTINEL,
 			color: null,

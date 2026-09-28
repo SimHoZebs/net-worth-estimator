@@ -185,8 +185,8 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 			color = *account.Color
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO accounts (id, position, name, min_balance, max_balance, color, enabled) VALUES (?,?,?,?,?,?,?)`,
-			account.ID, position, account.Name, minBalance, maxBalance, color, boolToInt(account.Enabled),
+			`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled) VALUES (?,?,?,?,?,?,?,?)`,
+			account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled),
 		); err != nil {
 			return fmt.Errorf("insert account %s: %w", account.ID, err)
 		}
@@ -392,19 +392,21 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		SourcePath:  sourcePath,
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	accountRows, err := q.Query(`SELECT id, name, min_balance, max_balance, color, enabled FROM accounts ORDER BY position`)
+	accountRows, err := q.Query(`SELECT id, name, kind, min_balance, max_balance, color, enabled FROM accounts ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
 	defer accountRows.Close()
 	for accountRows.Next() {
 		var account types.Account
+		var kind string
 		var minBalance, maxBalance sql.NullFloat64
 		var color sql.NullString
 		var enabled int64
-		if err := accountRows.Scan(&account.ID, &account.Name, &minBalance, &maxBalance, &color, &enabled); err != nil {
+		if err := accountRows.Scan(&account.ID, &account.Name, &kind, &minBalance, &maxBalance, &color, &enabled); err != nil {
 			return nil, err
 		}
+		account.Kind = types.AccountKind(kind)
 		if minBalance.Valid {
 			value := minBalance.Float64
 			account.MinBalance = &value

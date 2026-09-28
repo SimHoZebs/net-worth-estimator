@@ -79,12 +79,12 @@ export function FailureEvidence({
 				<DetailRow label="Binding constraint">{failure.constraint}</DetailRow>
 				{sourceFloor && (
 					<DetailRow label="Protected balance">
-						{money(source?.floor ?? 0)}
+						{money(source?.minBalance ?? 0)}
 					</DetailRow>
 				)}
 				{destinationCeiling && (
 					<DetailRow label="Destination ceiling">
-						{money(destination?.ceiling ?? 0)}
+						{money(destination?.maxBalance ?? 0)}
 					</DetailRow>
 				)}
 			</dl>

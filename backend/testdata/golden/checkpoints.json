@@ -4,6 +4,7 @@
 		"accounts": [
 			{
 				"name": "checking",
+				"kind": "cash",
 				"minBalance": -10000000000000,
 				"maxBalance": 10000000000000,
 				"color": null,
@@ -12,6 +13,7 @@
 			},
 			{
 				"name": "brokerage",
+				"kind": "investment",
 				"minBalance": -10000000000000,
 				"maxBalance": 10000000000000,
 				"color": null,
@@ -20,6 +22,7 @@
 			},
 			{
 				"name": "loan",
+				"kind": "debt",
 				"minBalance": -10000000000000,
 				"maxBalance": 10000000000000,
 				"color": null,
@@ -512,6 +515,7 @@
 			"accounts": [
 				{
 					"name": "checking",
+					"kind": "cash",
 					"minBalance": -10000000000000,
 					"maxBalance": 10000000000000,
 					"color": null,
@@ -520,6 +524,7 @@
 				},
 				{
 					"name": "brokerage",
+					"kind": "investment",
 					"minBalance": -10000000000000,
 					"maxBalance": 10000000000000,
 					"color": null,
@@ -528,6 +533,7 @@
 				},
 				{
 					"name": "loan",
+					"kind": "debt",
 					"minBalance": -10000000000000,
 					"maxBalance": 10000000000000,
 					"color": null,

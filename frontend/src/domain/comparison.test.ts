@@ -112,8 +112,8 @@ describe("comparison measures and snapshots", () => {
 				rates: examplePlan.accounts.map((account) => ({
 					id: account.id,
 					balance: account.balance,
-					floor: account.floor,
-					ceiling: account.ceiling,
+					minBalance: account.minBalance,
+					maxBalance: account.maxBalance,
 					observedOn: account.observedOn,
 					source: account.source,
 				})),
@@ -158,7 +158,7 @@ describe("comparison measures and snapshots", () => {
 		[
 			"protected balance",
 			(plan) => {
-				plan.accounts[0]!.floor++;
+				plan.accounts[0]!.minBalance++;
 			},
 		],
 		[
@@ -230,7 +230,7 @@ describe("change detail rows", () => {
 					name: "Same",
 					amount: 10,
 					enabled: true,
-					ceiling: null,
+					maxBalance: null,
 					custom: "old",
 					inflation: 2,
 				}),
@@ -240,7 +240,7 @@ describe("change detail rows", () => {
 					name: "Same",
 					amount: 20,
 					enabled: false,
-					ceiling: 50,
+					maxBalance: 50,
 					inflation: 3,
 					source: "Bank",
 				}),
@@ -251,7 +251,7 @@ describe("change detail rows", () => {
 				{ key: "amount", label: "Amount", before: money(10), after: money(20) },
 				{ key: "enabled", label: "Included", before: "Yes", after: "No" },
 				{
-					key: "ceiling",
+					key: "maxBalance",
 					label: "Maximum balance",
 					before: "None",
 					after: money(50),
