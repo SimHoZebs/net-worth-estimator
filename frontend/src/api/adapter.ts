@@ -40,7 +40,6 @@ export interface AccountPresentation {
 	balanceCheck: boolean;
 	source: string;
 	readOnly: boolean;
-	color: string | null;
 	enabled: boolean;
 	minBalance: number | null;
 	maxBalance: number | null;
@@ -475,7 +474,6 @@ function buildPresentationAccount(
 					? "Backend checkpoint"
 					: "Backend account"),
 		readOnly: previous?.readOnly ?? status.readOnly,
-		color: account.color,
 		enabled: account.enabled,
 		minBalance: account.minBalance,
 		maxBalance: account.maxBalance,
@@ -877,7 +875,7 @@ export function displayPlanToBackendDocument(
 			label: account.name,
 			minBalance: floor,
 			maxBalance,
-			color: metadata?.color ?? original?.color ?? null,
+			color: original?.color ?? null,
 			enabled: account.enabled,
 		};
 	});
