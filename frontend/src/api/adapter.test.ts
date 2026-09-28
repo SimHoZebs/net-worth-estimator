@@ -98,8 +98,9 @@ function projectionFixture(): ProjectionResult {
 
 describe("backend and display plan adapter", () => {
 	it("uses the latest checkpoint at or before projection start and maps bounds, postings, and goals", () => {
+		const document = documentFixture();
 		const conversion = backendToDisplayPlan({
-			document: documentFixture(),
+			document,
 			status: { readOnly: false, authEnabled: true },
 			projection: projectionFixture(),
 		});
@@ -210,14 +211,16 @@ describe("backend and display plan adapter", () => {
 	});
 
 	it("preserves unchanged backend rows and allows expression-backed amount edits", () => {
+		const document = documentFixture();
 		const conversion = backendToDisplayPlan({
-			document: documentFixture(),
+			document,
 			status: { readOnly: false, authEnabled: false },
 			projection: projectionFixture(),
 			startDate: "2026-02-01",
 		});
 		const reverse = displayPlanToBackendDocument(conversion.plan, {
-			sidecar: conversion.sidecar,
+			sourceDocument: document,
+			presentation: conversion.presentation,
 		});
 		const amountEdit = displayPlanToBackendDocument(
 			{
@@ -226,7 +229,7 @@ describe("backend and display plan adapter", () => {
 					movement.id === "salary" ? { ...movement, amount: 300 } : movement,
 				),
 			},
-			{ sidecar: conversion.sidecar },
+			{ sourceDocument: document, presentation: conversion.presentation },
 		);
 
 		expect(reverse.report.losses).toEqual([]);
@@ -240,11 +243,9 @@ describe("backend and display plan adapter", () => {
 		const reloaded = backendToDisplayPlan({
 			document: amountEdit.document,
 			status: { readOnly: false, authEnabled: false },
-			sidecar: conversion.sidecar,
+			presentation: conversion.presentation,
 		});
-		expect(reloaded.sidecar.presentation.movements.salary?.amountValue).toBe(
-			300,
-		);
+		expect(reloaded.presentation.movements.salary?.amountValue).toBe(300);
 	});
 
 	it("marks provider-backed amounts as provisional and read-only", () => {
@@ -282,7 +283,7 @@ describe("backend and display plan adapter", () => {
 					(account) => account.id !== "cash",
 				),
 			},
-			{ sidecar: conversion.sidecar },
+			{ sourceDocument: document, presentation: conversion.presentation },
 		);
 		expect(reverse.report.losses).toContainEqual(
 			expect.objectContaining({ field: "accounts.cash" }),
@@ -312,7 +313,8 @@ describe("backend and display plan adapter", () => {
 			),
 		};
 		const reverse = displayPlanToBackendDocument(edited, {
-			sidecar: conversion.sidecar,
+			sourceDocument: document,
+			presentation: conversion.presentation,
 		});
 		expect(reverse.report.losses).toEqual([]);
 		expect(
@@ -344,7 +346,8 @@ describe("backend and display plan adapter", () => {
 			movements: conversion.plan.movements.slice(0, 0),
 		};
 		const reverse = displayPlanToBackendDocument(edited, {
-			sidecar: conversion.sidecar,
+			sourceDocument: document,
+			presentation: conversion.presentation,
 		});
 		expect(reverse.report.losses).toEqual([]);
 		expect(
@@ -371,7 +374,7 @@ describe("backend and display plan adapter", () => {
 						: account,
 				),
 			},
-			{ sidecar: conversion.sidecar },
+			{ sourceDocument: document, presentation: conversion.presentation },
 		);
 		expect(conflicting.report.losses).toContainEqual(
 			expect.objectContaining({ field: "accounts.cash.checkpoints" }),
@@ -379,8 +382,9 @@ describe("backend and display plan adapter", () => {
 	});
 
 	it("returns a complete backend document and reports local-only losses instead of uploading them", () => {
+		const document = documentFixture();
 		const conversion = backendToDisplayPlan({
-			document: documentFixture(),
+			document,
 			status: { readOnly: false, authEnabled: false },
 			projection: projectionFixture(),
 			startDate: "2026-02-01",
@@ -401,7 +405,8 @@ describe("backend and display plan adapter", () => {
 			],
 		};
 		const reverse = displayPlanToBackendDocument(plan, {
-			sidecar: conversion.sidecar,
+			sourceDocument: document,
+			presentation: conversion.presentation,
 		});
 
 		expect(reverse.document.accounts.map((account) => account.id)).toEqual([
@@ -439,7 +444,7 @@ describe("backend and display plan adapter", () => {
 		expect(reverse.report.hasLosses).toBe(true);
 	});
 
-	// A reserve goal must survive the round trip, not degrade to a sidecar
+	// A reserve goal must survive the round trip, not degrade to browser-only metadata
 	// entry that the backend never sees.
 	it("round-trips a reserve goal through the backend document", () => {
 		const base = documentFixture();

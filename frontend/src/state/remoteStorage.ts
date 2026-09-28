@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { FinancialModelDocument, PlanSidecar } from "../api/index.ts";
+import type { FinancialModelDocument, PlanPresentation } from "../api/index.ts";
 import { type Plan, planSchema } from "../domain/model.ts";
 import { type Snapshot, StorageError, snapshotSchema } from "./storage.ts";
 
@@ -9,25 +9,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isPlanSidecar(value: unknown): value is PlanSidecar {
-	if (!isRecord(value) || value.version !== 1 || !isRecord(value.presentation))
-		return false;
-	const presentation = value.presentation;
+function isPlanPresentation(value: unknown): value is PlanPresentation {
 	return (
-		isRecord(presentation.accounts) &&
-		isRecord(presentation.movements) &&
-		Array.isArray(presentation.provisionalFields) &&
-		presentation.provisionalFields.every((item) => typeof item === "string")
+		isRecord(value) && isRecord(value.accounts) && isRecord(value.movements)
 	);
 }
 
-const planSidecarSchema = z.custom<PlanSidecar>(isPlanSidecar, {
-	message: "The stored plan sidecar could not be validated.",
+const planPresentationSchema = z.custom<PlanPresentation>(isPlanPresentation, {
+	message: "The stored plan presentation could not be validated.",
 });
 const remoteStateSchema = z.object({
 	version: z.literal(1),
 	draft: planSchema.nullable(),
-	draftSidecar: planSidecarSchema.nullable(),
+	draftPresentation: planPresentationSchema.nullable(),
 	baseFingerprint: z.string().min(1).nullable().optional(),
 	baseRevision: z.string().min(1).nullable().optional(),
 	snapshot: snapshotSchema.nullable(),
@@ -36,7 +30,7 @@ const remoteStateSchema = z.object({
 export interface RemoteLocalState {
 	version: 1;
 	draft: Plan | null;
-	draftSidecar: PlanSidecar | null;
+	draftPresentation: PlanPresentation | null;
 	baseFingerprint?: string | null;
 	baseRevision?: string | null;
 	snapshot: Snapshot | null;
