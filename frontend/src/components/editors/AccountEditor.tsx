@@ -25,9 +25,9 @@ export function AccountEditor({
 					kind: textValue(data, "kind") as Account["kind"],
 					enabled: textValue(data, "enabled") === "on",
 					balance: numberValue(data, "balance"),
-					floor: numberValue(data, "floor"),
-					ceiling: textValue(data, "ceiling")
-						? numberValue(data, "ceiling")
+					minBalance: numberValue(data, "minBalance"),
+					maxBalance: textValue(data, "maxBalance")
+						? numberValue(data, "maxBalance")
 						: null,
 					observedOn: textValue(data, "observedOn"),
 					balanceCheck: item?.balanceCheck ?? true,
@@ -81,23 +81,23 @@ export function AccountEditor({
 			<InputField
 				label="Protected balance (USD)"
 				hint="Movements cannot spend below this balance."
-				name="floor"
+				name="minBalance"
 				type="number"
 				required
 				min="0"
 				max="10000000000"
 				step="0.01"
-				defaultValue={item?.floor ?? 0}
+				defaultValue={item?.minBalance ?? 0}
 			/>
 			<InputField
 				label="Maximum balance (USD)"
 				hint="Optional. Limits incoming movements."
-				name="ceiling"
+				name="maxBalance"
 				type="number"
 				min="0"
 				max="10000000000"
 				step="0.01"
-				defaultValue={item?.ceiling ?? ""}
+				defaultValue={item?.maxBalance ?? ""}
 				placeholder="No ceiling"
 			/>
 			<InputField

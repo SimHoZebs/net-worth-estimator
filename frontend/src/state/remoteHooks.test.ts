@@ -212,6 +212,7 @@ function modelFixture(): FinancialModelDocument {
 			{
 				id: "cash",
 				name: "Cash",
+				kind: "cash",
 				minBalance: 0,
 				maxBalance: null,
 				color: null,
@@ -220,6 +221,7 @@ function modelFixture(): FinancialModelDocument {
 			{
 				id: "loan",
 				name: "Loan",
+				kind: "debt",
 				minBalance: 0,
 				maxBalance: null,
 				color: null,

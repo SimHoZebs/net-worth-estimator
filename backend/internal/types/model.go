@@ -36,13 +36,42 @@ const (
 	NoCeiling = 10_000_000_000_000.0
 )
 
+// AccountKind states what an account holds. It is authored in the accounts
+// file rather than inferred from a balance sign, so an account that happens to
+// hold zero still declares what it is and totals can group by it.
+type AccountKind string
+
+const (
+	AccountKindCash       AccountKind = "cash"
+	AccountKindInvestment AccountKind = "investment"
+	AccountKindDebt       AccountKind = "debt"
+	AccountKindProperty   AccountKind = "property"
+)
+
+var accountKinds = []AccountKind{
+	AccountKindCash,
+	AccountKindInvestment,
+	AccountKindDebt,
+	AccountKindProperty,
+}
+
+func (k AccountKind) Valid() bool {
+	for _, candidate := range accountKinds {
+		if k == candidate {
+			return true
+		}
+	}
+	return false
+}
+
 type Account struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	MinBalance *float64 `json:"minBalance"` // nil = NoFloor sentinel on the wire
-	MaxBalance *float64 `json:"maxBalance"` // nil = NoCeiling sentinel on the wire
-	Color      *string  `json:"color"`
-	Enabled    bool     `json:"enabled"`
+	ID         string      `json:"id"`
+	Name       string      `json:"name"`
+	Kind       AccountKind `json:"kind"`
+	MinBalance *float64    `json:"minBalance"` // nil = NoFloor sentinel on the wire
+	MaxBalance *float64    `json:"maxBalance"` // nil = NoCeiling sentinel on the wire
+	Color      *string     `json:"color"`
+	Enabled    bool        `json:"enabled"`
 }
 
 func (a *Account) MinBalanceValue() float64 {
@@ -239,4 +268,9 @@ func ApplyModelOverrides(document FinancialModelDocument, overrides ModelOverrid
 		Evaluations: document.Evaluations,
 		Postings:    postings,
 	}
+}
+
+// AccountKinds returns every kind an account may declare, in display order.
+func AccountKinds() []AccountKind {
+	return accountKinds
 }

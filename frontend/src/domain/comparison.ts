@@ -23,8 +23,8 @@ function assumptionKey(plan: Plan) {
 		rates: plan.accounts.map((a) => ({
 			id: a.id,
 			balance: a.balance,
-			floor: a.floor,
-			ceiling: a.ceiling,
+			minBalance: a.minBalance,
+			maxBalance: a.maxBalance,
 			observedOn: a.observedOn,
 			source: a.source,
 		})),
@@ -92,8 +92,8 @@ const fieldNames: Record<string, string> = {
 	name: "Name",
 	amount: "Amount",
 	balance: "Balance",
-	floor: "Protected balance",
-	ceiling: "Maximum balance",
+	minBalance: "Protected balance",
+	maxBalance: "Maximum balance",
 	annualIncrease: "Annual increase (%)",
 	startDate: "Start date",
 	endDate: "End date",
@@ -119,7 +119,9 @@ function display(value: FieldValue | undefined, key: string) {
 				? "Yes"
 				: "No"
 			: typeof value === "number" &&
-					["amount", "balance", "floor", "ceiling", "target"].includes(key)
+					["amount", "balance", "minBalance", "maxBalance", "target"].includes(
+						key,
+					)
 				? money(value)
 				: String(value);
 }

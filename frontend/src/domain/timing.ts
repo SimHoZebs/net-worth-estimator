@@ -35,7 +35,9 @@ export function cashTiming({
 	const ids = new Set(accounts.map((account) => account.id));
 	return {
 		cash: sum(
-			accounts.map((account) => Math.max(0, account.balance - account.floor)),
+			accounts.map((account) =>
+				Math.max(0, account.balance - account.minBalance),
+			),
 		),
 		commitments: sum(
 			events

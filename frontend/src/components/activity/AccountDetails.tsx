@@ -20,10 +20,12 @@ export function AccountDetails({
 					{dateLabel(account.observedOn, true)}
 				</DetailRow>
 				<DetailRow label="Protected from spending">
-					{money(account.floor)}
+					{money(account.minBalance)}
 				</DetailRow>
-				<DetailRow label="Incoming balance ceiling">
-					{account.ceiling === null ? "No ceiling" : money(account.ceiling)}
+				<DetailRow label="Incoming balance maxBalance">
+					{account.maxBalance === null
+						? "No maxBalance"
+						: money(account.maxBalance)}
 				</DetailRow>
 				<DetailRow label="Base case at horizon">
 					{money(endingBalance)}
