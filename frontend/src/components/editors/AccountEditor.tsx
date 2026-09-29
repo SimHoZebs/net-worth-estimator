@@ -29,6 +29,7 @@ export function AccountEditor({
 					maxBalance: textValue(data, "maxBalance")
 						? numberValue(data, "maxBalance")
 						: null,
+					color: item?.color ?? null,
 					observedOn: textValue(data, "observedOn"),
 					balanceCheck: item?.balanceCheck ?? true,
 					source: textValue(data, "source"),

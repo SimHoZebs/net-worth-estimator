@@ -138,6 +138,26 @@ describe("backend and display plan adapter", () => {
 		);
 	});
 
+	it("carries account colors to the display plan and back", () => {
+		const document = documentFixture();
+		document.accounts[0]!.color = "#4287f5";
+		const conversion = backendToDisplayPlan({
+			document,
+			status: { readOnly: false, authEnabled: false },
+			projection: projectionFixture(),
+			startDate: "2026-02-01",
+		});
+		expect(conversion.plan.accounts[0]?.color).toBe("#4287f5");
+		expect(conversion.plan.accounts[1]?.color).toBeNull();
+
+		const reverse = displayPlanToBackendDocument(conversion.plan, {
+			sourceDocument: document,
+			presentation: conversion.presentation,
+		});
+		expect(reverse.document.accounts[0]?.color).toBe("#4287f5");
+		expect(reverse.document.accounts[1]?.color).toBeNull();
+	});
+
 	// A one-time movement dated at or before the projection start is historical
 	// whoever authored it; a recurring rule is a projection, not a past event.
 	// Nothing is stored: the display plan is judged by frequency and date.

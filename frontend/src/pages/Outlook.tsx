@@ -50,18 +50,7 @@ export function Outlook({
 		projection.goals[0];
 	return (
 		<>
-			<OutlookMetrics
-				plan={plan}
-				projection={projection}
-				range={range}
-				ranges={ranges}
-				years={years}
-				rangeError={rangeError}
-				onEvidence={onEvidence}
-				onAssumptions={onAssumptions}
-				onEnableRange={() => setRanges(true)}
-			/>
-			<div className="outlook-main">
+			<div className="outlook-top">
 				<ProjectionChart
 					plan={plan}
 					projection={projection}
@@ -74,11 +63,24 @@ export function Outlook({
 					inflation={plan.assumptions.inflation}
 					rangeError={rangeError}
 				/>
-				<FundingInsight
-					failure={projection.firstFailure}
-					onFailure={onFailure}
-					onPlan={onPlan}
-				/>
+				<div className="outlook-rail">
+					<OutlookMetrics
+						plan={plan}
+						projection={projection}
+						range={range}
+						ranges={ranges}
+						years={years}
+						rangeError={rangeError}
+						onEvidence={onEvidence}
+						onAssumptions={onAssumptions}
+						onEnableRange={() => setRanges(true)}
+					/>
+					<FundingInsight
+						failure={projection.firstFailure}
+						onFailure={onFailure}
+						onPlan={onPlan}
+					/>
+				</div>
 			</div>
 			{ranges && range?.points.at(-1) && (
 				<div className="range-disclaimer">

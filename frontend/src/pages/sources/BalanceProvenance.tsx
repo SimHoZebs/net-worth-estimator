@@ -1,3 +1,4 @@
+import { AccountDot } from "../../components/AccountIcon.tsx";
 import { Badge } from "../../components/ui.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
@@ -25,7 +26,12 @@ export function BalanceProvenance({ plan }: { plan: Plan }) {
 					<tbody>
 						{plan.accounts.map((account) => (
 							<tr key={account.id}>
-								<th scope="row">{account.name}</th>
+								<th scope="row">
+									<span className="account-name-line">
+										<AccountDot color={account.color} />
+										{account.name}
+									</span>
+								</th>
 								<td>{account.source}</td>
 								<td>{dateLabel(account.observedOn, true)}</td>
 								<td>
