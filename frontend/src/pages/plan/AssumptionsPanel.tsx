@@ -11,10 +11,7 @@ export function AssumptionsPanel({
 	return (
 		<div className="assumptions-page">
 			<div className="section-top">
-				<div>
-					<h2>The inputs behind the outlook</h2>
-					<p>Visible assumptions. Deliberate changes.</p>
-				</div>
+				<h2>The inputs behind the outlook</h2>
 				<button type="button" className="button secondary" onClick={onEdit}>
 					<SlidersHorizontal size={16} />
 					Edit assumptions

@@ -38,10 +38,6 @@ export function AccountList({
 	return (
 		<section className="account-section">
 			<div className="section-top">
-				<div>
-					<h2>Where you stand</h2>
-					<p>{plan.accounts.length} accounts, one picture</p>
-				</div>
 				<button type="button" className="text-button" onClick={onAll}>
 					All accounts <ArrowUpRight size={16} />
 				</button>

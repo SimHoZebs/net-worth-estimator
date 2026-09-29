@@ -13,7 +13,6 @@ export type PageDefinition = {
 	label: string;
 	icon: typeof Compass;
 	title: string;
-	subtitle: string;
 };
 
 export const pages: PageDefinition[] = [
@@ -22,37 +21,30 @@ export const pages: PageDefinition[] = [
 		label: "Outlook",
 		icon: LayoutDashboard,
 		title: "Your financial outlook",
-		subtitle: "A little clarity for the road ahead.",
 	},
 	{
 		id: "plan",
 		label: "Your plan",
 		icon: Wallet,
 		title: "The plan behind the picture",
-		subtitle:
-			"The accounts, movements, and assumptions that shape your future.",
 	},
 	{
 		id: "goals",
 		label: "Goals",
 		icon: Flag,
 		title: "Make the future meaningful",
-		subtitle: "Know where you’re headed, and what it takes to get there.",
 	},
 	{
 		id: "compare",
 		label: "Compare",
 		icon: GitCompareArrows,
 		title: "Small changes. Clearer choices.",
-		subtitle: "See the consequence before you commit.",
 	},
 	{
 		id: "sources",
 		label: "Data & sources",
 		icon: HardDrive,
 		title: "Confidence starts at the source",
-		subtitle:
-			"Know what’s recorded, what’s assumed, and what needs a closer look.",
 	},
 ];
 

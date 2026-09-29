@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import {
 	REMOTE_STORAGE_KEY,
 	readSavedServerPlan,
@@ -10,6 +10,13 @@ import {
 test.beforeEach(async () => {
 	await resetFixture();
 });
+
+/** Open the movement editor for the fixture's investing transfer. */
+async function openInvestingMovementEditor(page: Page) {
+	await page.getByRole("link", { name: "Your plan", exact: true }).click();
+	await page.getByRole("tab", { name: /Movements/ }).click();
+	await page.getByRole("button", { name: "Edit Monthly investing" }).click();
+}
 
 const issues = (
 	violations: Awaited<ReturnType<AxeBuilder["analyze"]>>["violations"],
@@ -62,7 +69,7 @@ test("edits remain temporary, persist across reload, compare, and save deliberat
 	page,
 }) => {
 	await page.goto("/");
-	await page.getByRole("button", { name: "Try a change", exact: true }).click();
+	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
 	await page
 		.getByRole("button", { name: "Apply to temporary version" })
@@ -93,7 +100,7 @@ test("edits remain temporary, persist across reload, compare, and save deliberat
 
 test("discard is explicit and restores the saved plan", async ({ page }) => {
 	await page.goto("/");
-	await page.getByRole("button", { name: "Try a change", exact: true }).click();
+	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("999");
 	await page
 		.getByRole("button", { name: "Apply to temporary version" })
@@ -153,8 +160,7 @@ test("invalid imports and failed saves retain the intended plan", async ({
 	await expect(page.getByRole("alert")).toContainText("not valid JSON");
 	// A rejected import leaves the loaded plan in place.
 	await expect(page.getByLabel("Import Waypoint server model")).toBeVisible();
-	await page.getByRole("link", { name: "Outlook", exact: true }).click();
-	await page.getByRole("button", { name: "Try a change", exact: true }).click();
+	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
 	await page
 		.getByRole("button", { name: "Apply to temporary version" })
@@ -219,7 +225,7 @@ test("desktop pages and edit dialogs meet automated accessibility checks", async
 		expect(issues(results.violations), path).toEqual([]);
 	}
 	await page.goto("/");
-	await page.getByRole("button", { name: "Try a change", exact: true }).click();
+	await openInvestingMovementEditor(page);
 	const results = await new AxeBuilder({ page })
 		.withTags(["wcag2a", "wcag2aa", "wcag21aa"])
 		.analyze();
@@ -325,8 +331,7 @@ test("read-only plans can be explored but not saved", async ({ page }) => {
 	await resetFixture({ readOnly: true });
 	await page.goto("/#sources");
 	await expect(page.getByText(/read-only|read only/i).first()).toBeVisible();
-	await page.getByRole("link", { name: "Outlook", exact: true }).click();
-	await page.getByRole("button", { name: "Try a change", exact: true }).click();
+	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
 	await page
 		.getByRole("button", { name: "Apply to temporary version" })
@@ -368,14 +373,12 @@ test("a second tab cannot overwrite newer financial work", async ({
 	await page.goto("/");
 	const other = await context.newPage();
 	await other.goto("/");
-	await other
-		.getByRole("button", { name: "Try a change", exact: true })
-		.click();
+	await openInvestingMovementEditor(other);
 	await other.getByLabel("Amount (USD)").fill("1200");
 	await other
 		.getByRole("button", { name: "Apply to temporary version" })
 		.click();
-	await page.getByRole("button", { name: "Try a change", exact: true }).click();
+	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("1300");
 	await page
 		.getByRole("button", { name: "Apply to temporary version" })

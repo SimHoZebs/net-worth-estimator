@@ -18,18 +18,12 @@ export function FundingInsight({
 				<span className="insight-symbol">
 					{failure ? <TriangleAlert size={16} /> : <ShieldCheck size={16} />}
 				</span>
-				{failure ? "Worth a closer look" : "Room to move forward"}
 			</div>
-			<h2>
-				{failure
-					? "A future expense needs more room."
-					: "Your planned movements are covered."}
-			</h2>
 			{failure ? (
 				<>
+					<h2>{money(failure.requested - failure.realized)} short</h2>
 					<p>
-						<strong>{failure.name}</strong> is only partly funded in{" "}
-						{dateLabel(failure.date)}.
+						<strong>{failure.name}</strong> in {dateLabel(failure.date)}
 					</p>
 					<div className="funding-values">
 						<div>
@@ -46,10 +40,6 @@ export function FundingInsight({
 						label="Funded portion of first shortfall"
 						tone="amber"
 					/>
-					<div className="shortfall-line">
-						<TriangleAlert size={14} />
-						<span>{money(failure.requested - failure.realized)} shortfall</span>
-					</div>
 					<button
 						type="button"
 						className="button insight-button"
@@ -74,7 +64,6 @@ export function FundingInsight({
 					>
 						Review planned movements <ArrowUpRight size={16} />
 					</button>
-					<span className="insight-caption">Based on current assumptions</span>
 				</>
 			)}
 		</aside>

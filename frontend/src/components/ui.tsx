@@ -109,7 +109,6 @@ export function ErrorNotice({
 		<div className="error-notice" role="alert">
 			<AlertCircle size={20} aria-hidden="true" />
 			<div>
-				<strong>Something needs attention</strong>
 				<p>{message}</p>
 				{action && (
 					<button type="button" className="text-button" onClick={onAction}>
