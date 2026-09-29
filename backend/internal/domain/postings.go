@@ -177,6 +177,29 @@ func ResolvePostingMovement(posting *types.Posting, requestedAmount, annualCapRe
 	}, balances, accountByID)
 }
 
+// ResolveNegativeInflowMovement resolves a negative amount on a sourceless
+// inflow posting (an investment loss) against destination floors, in
+// destination order. Requested and realized amounts stay negative; realized
+// is bounded by the withdrawable amount above each destination floor.
+// Losses never consume annual caps: caps limit money moved in, not losses.
+func ResolveNegativeInflowMovement(posting *types.Posting, requestedLoss float64, balances map[string]float64, accountByID map[string]types.Account) AccountMovementResult {
+	remaining := -requestedLoss
+	withdrawn := 0.0
+	for _, destID := range posting.Destinations {
+		if remaining <= 0 {
+			break
+		}
+		withdrawable := GetWithdrawableAmount(balances, accountByID, destID)
+		if withdrawable <= 0 {
+			continue
+		}
+		take := math.Min(remaining, withdrawable)
+		withdrawn += take
+		remaining -= take
+	}
+	return AccountMovementResult{RequestedAmount: requestedLoss, RealizedAmount: -withdrawn}
+}
+
 // ApplyAccountMovement applies a realized amount to balances.
 func ApplyAccountMovement(action AccountMovementAction, realizedAmount float64, balances map[string]float64, accountByID map[string]types.Account) {
 	if realizedAmount <= 0 {
@@ -210,6 +233,28 @@ func ApplyPosting(posting *types.Posting, realizedAmount float64, balances map[s
 		Destinations:    posting.Destinations,
 		RequestedAmount: realizedAmount,
 	}, realizedAmount, balances, accountByID)
+}
+
+// ApplyNegativeInflow deducts a realized loss from destinations in order,
+// bounded by each destination floor. It mirrors the resolve step above, so
+// resolve-then-apply transfers the full realized loss.
+func ApplyNegativeInflow(posting *types.Posting, realizedLoss float64, balances map[string]float64, accountByID map[string]types.Account) {
+	if realizedLoss >= 0 {
+		return
+	}
+	remaining := -realizedLoss
+	for _, destID := range posting.Destinations {
+		if remaining <= 0 {
+			break
+		}
+		withdrawable := GetWithdrawableAmount(balances, accountByID, destID)
+		if withdrawable <= 0 {
+			continue
+		}
+		take := math.Min(remaining, withdrawable)
+		balances[destID] -= take
+		remaining -= take
+	}
 }
 
 func accountExists(accountByID map[string]types.Account, id string) bool {

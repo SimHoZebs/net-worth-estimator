@@ -324,7 +324,9 @@ func initializeBranchSimulationState(balances map[string]float64, events []types
 			yearMap = map[string]float64{}
 			byYear[postingID] = yearMap
 		}
-		yearMap[event.Date[:4]] += event.RealizedAmount
+		// Losses are balance adjustments, not cap consumption: only
+		// non-negative realizations accrue against the annual cap.
+		yearMap[event.Date[:4]] += math.Max(0, event.RealizedAmount)
 	}
 	return SimulationState{
 		Balances:                     balances,
