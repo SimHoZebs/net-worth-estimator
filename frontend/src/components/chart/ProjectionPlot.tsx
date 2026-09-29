@@ -50,9 +50,9 @@ export function ProjectionPlot({
 			<desc id={`${id}-description`}>
 				Base-case net worth starts at {money(start.total)} on{" "}
 				{dateLabel(start.date, true)} and ends at {money(last.total)} on{" "}
-				{dateLabel(last.date, true)}. The table below contains exact annual
-				values. Shading, when enabled, shows the 10th to 90th percentiles across
-				400 modeled scenarios.
+				{dateLabel(last.date, true)}. The solid $0 line marks no debt. The table
+				below contains exact annual values. Shading, when enabled, shows the
+				10th to 90th percentiles across 400 modeled scenarios.
 			</desc>
 			<defs>
 				<linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
@@ -105,6 +105,24 @@ export function ProjectionPlot({
 				strokeLinejoin="round"
 				strokeLinecap="round"
 			/>
+			<g>
+				<line
+					x1={left}
+					x2={width - right}
+					y1={y(0)}
+					y2={y(0)}
+					stroke="#7d8a76"
+					strokeWidth="1.5"
+				/>
+				<text
+					x={width - right - 6}
+					y={y(0) - 6}
+					textAnchor="end"
+					className="axis-label"
+				>
+					No debt · $0
+				</text>
+			</g>
 			{[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
 				const index = Math.round(fraction * (points.length - 1));
 				return (

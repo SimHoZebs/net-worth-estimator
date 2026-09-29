@@ -27,6 +27,9 @@ type PageInputs = Pick<
 	| "onImportServerDocument"
 	| "readOnly"
 	| "retrySavedProjection"
+	| "authControl"
+	| "authRequired"
+	| "authTokenActive"
 >;
 
 export function WorkspacePage({
@@ -61,6 +64,9 @@ export function WorkspacePage({
 		onImportServerDocument,
 		readOnly = false,
 		retrySavedProjection,
+		authControl = null,
+		authRequired = false,
+		authTokenActive = false,
 	} = inputs;
 	switch (page) {
 		case "outlook":
@@ -146,6 +152,9 @@ export function WorkspacePage({
 					serverDocument={serverDocument}
 					onImportServerDocument={onImportServerDocument}
 					readOnly={readOnly}
+					authControl={authControl}
+					authRequired={authRequired}
+					authTokenActive={authTokenActive}
 				/>
 			);
 	}

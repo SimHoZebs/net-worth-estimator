@@ -63,6 +63,7 @@ export function Outlook({
 			/>
 			<div className="outlook-main">
 				<ProjectionChart
+					plan={plan}
 					projection={projection}
 					range={range}
 					ranges={ranges}

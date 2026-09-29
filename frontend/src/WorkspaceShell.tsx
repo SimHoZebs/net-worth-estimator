@@ -33,7 +33,6 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 		readOnly = false,
 		authRequired = false,
 		authTokenActive = false,
-		authControl,
 		loading = false,
 	} = props;
 	const navigation = useWorkspaceNavigation();
@@ -90,12 +89,7 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 				page={navigation.currentPage}
 				headingRef={navigation.headingRef}
 			/>
-			<WorkspaceNotices
-				state={state}
-				plan={plan}
-				readOnly={sourceReadOnly}
-				authControl={authControl}
-			/>
+			<WorkspaceNotices state={state} plan={plan} readOnly={sourceReadOnly} />
 			<ProjectionBoundary projection={projection} ranges={ranges}>
 				{(base) => (
 					<>

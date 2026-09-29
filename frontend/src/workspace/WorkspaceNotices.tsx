@@ -1,5 +1,4 @@
 import { Check, LockKeyhole, X } from "lucide-react";
-import type { ReactNode } from "react";
 import { ErrorNotice, IconButton } from "../components/ui.tsx";
 import type { Plan } from "../domain/model.ts";
 import { download } from "../state/storage.ts";
@@ -44,19 +43,16 @@ export function WorkspaceNotices({
 	state,
 	plan,
 	readOnly,
-	authControl,
 }: {
 	state: WorkspaceController;
 	plan: Plan;
 	readOnly: boolean;
-	authControl?: ReactNode;
 }) {
 	return (
 		<>
 			{state.error && (
 				<ErrorNotice message={state.error} {...errorRecovery({ state })} />
 			)}
-			{authControl}
 			{state.volatile && (
 				<button
 					type="button"
