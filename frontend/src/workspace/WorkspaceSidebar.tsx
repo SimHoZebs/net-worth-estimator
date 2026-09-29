@@ -54,7 +54,6 @@ export function WorkspaceSidebar({
 				</span>
 				<ChevronDown size={14} />
 			</button>
-			<span className="nav-label">YOUR BIG PICTURE</span>
 			<nav aria-label="Main navigation">
 				<ul>
 					{pages
@@ -82,7 +81,6 @@ export function WorkspaceSidebar({
 					<span className="local-icon">
 						<ShieldCheck size={20} strokeWidth={1.5} />
 					</span>
-					<strong>A little more peace of mind.</strong>
 					<p>
 						"Your canonical server model lives on the server. Temporary edits
 						stay in this browser until you save."
@@ -103,7 +101,7 @@ export function WorkspaceSidebar({
 				</a>
 				<button type="button" className="nav-link help-link" onClick={onMethod}>
 					<CircleHelp size={19} strokeWidth={1.7} />
-					<span>A guide to your outlook</span>
+					<span>How it works</span>
 				</button>
 				<div className="sidebar-status">
 					<span className="status-dot" />

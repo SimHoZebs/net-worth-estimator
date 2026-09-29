@@ -20,11 +20,7 @@ const steps = [
 ];
 export function MethodEvidence({ onClose }: { onClose: () => void }) {
 	return (
-		<Modal
-			title="A considered view of your future"
-			eyebrow="How Waypoint works"
-			onClose={onClose}
-		>
+		<Modal title="How Waypoint works" onClose={onClose}>
 			<div className="method-steps">
 				{steps.map((step, index) => (
 					<div key={step.title}>

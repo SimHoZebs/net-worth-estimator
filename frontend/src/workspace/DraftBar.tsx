@@ -2,10 +2,12 @@ import { ArrowRight, GitBranch, RotateCcw } from "lucide-react";
 
 export function DraftBar({
 	count,
+	loading,
 	onDiscard,
 	onReview,
 }: {
 	count: number;
+	loading: boolean;
 	onDiscard: () => void;
 	onReview: () => void;
 }) {
@@ -14,10 +16,18 @@ export function DraftBar({
 		<div className="draft-bar">
 			<div>
 				<span className="draft-icon">
-					<GitBranch size={18} />
+					{loading ? (
+						<span className="spinner" aria-hidden="true" />
+					) : (
+						<GitBranch size={18} />
+					)}
 				</span>
 				<span>
-					<strong>Exploring a temporary version</strong>
+					<strong>
+						{loading
+							? "Updating the temporary version"
+							: "Exploring a temporary version"}
+					</strong>
 					<small>
 						{count} unsaved {count === 1 ? "change" : "changes"} · saved server
 						plan unchanged

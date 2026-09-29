@@ -17,9 +17,6 @@ export function GoalPreview({
 	return (
 		<section className="goal-preview">
 			<div className="section-top">
-				<h2>
-					<Flag size={18} />A goal on the horizon
-				</h2>
 				<button type="button" className="text-button" onClick={onGoals}>
 					All goals <ArrowUpRight size={16} />
 				</button>

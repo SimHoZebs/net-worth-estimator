@@ -1,13 +1,10 @@
 import { useState } from "react";
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
-import { isHistoricalMovement, type Plan } from "../domain/model.ts";
 
 export function useWorkspaceOverlays({
-	plan,
 	discard,
 }: {
-	plan: Plan;
 	discard: () => boolean | Promise<boolean>;
 }) {
 	const [editor, setEditor] = useState<EditorTarget | null>(null);
@@ -15,21 +12,6 @@ export function useWorkspaceOverlays({
 	const [evidence, setEvidence] = useState<EvidenceTarget | null>(null);
 	const [discardOpen, setDiscardOpen] = useState(false);
 	const [discarding, setDiscarding] = useState(false);
-	const tryChange = () => {
-		const editable = plan.movements.filter(
-			(movement) =>
-				movement.enabled &&
-				!movement.readOnly &&
-				!isHistoricalMovement(movement, plan.startDate),
-		);
-		setEditor({
-			kind: "movement",
-			item:
-				editable.find((movement) => movement.id === "invest") ??
-				editable[0] ??
-				null,
-		});
-	};
 	const editFromEvidence = (target: EditorTarget) => {
 		setReturnToAccount(evidence?.kind === "account" ? evidence.id : null);
 		setEditor(target);
@@ -55,7 +37,6 @@ export function useWorkspaceOverlays({
 		discarding,
 		openEditor: setEditor,
 		openEvidence: setEvidence,
-		tryChange,
 		editFromEvidence,
 		closeEditor,
 		closeEvidence: () => setEvidence(null),

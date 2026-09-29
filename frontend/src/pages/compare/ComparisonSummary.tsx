@@ -31,7 +31,6 @@ export function ComparisonSummary({
 					<GitCompareArrows size={26} />
 				</span>
 				<div>
-					<h2>A clearer view of what changed.</h2>
 					<p>
 						{changeCount
 							? `${changeCount} unsaved ${changeCount === 1 ? "change" : "changes"} · your saved plan is unchanged`
@@ -47,9 +46,8 @@ export function ComparisonSummary({
 				<div className="inline-notice amber">
 					<TriangleAlert size={20} />
 					<span>
-						<strong>The contexts differ.</strong> Source balances, rates,
-						inflation, plan name, or horizon changed. These values are not a
-						like-for-like comparison.
+						Source balances, rates, inflation, plan name, or horizon changed.
+						These values are not a like-for-like comparison.
 					</span>
 				</div>
 			)}

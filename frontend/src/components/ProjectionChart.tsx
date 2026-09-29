@@ -49,10 +49,7 @@ export function ProjectionChart({
 	return (
 		<section className="chart-card" aria-labelledby={`${id}-title`}>
 			<div className="section-top chart-top">
-				<div>
-					<h2 id={`${id}-title`}>The long view</h2>
-					<p>Net worth over time</p>
-				</div>
+				<h2 id={`${id}-title`}>Net worth over time</h2>
 				<div
 					className="segmented"
 					role="toolbar"

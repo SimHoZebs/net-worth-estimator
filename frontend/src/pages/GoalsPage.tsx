@@ -23,7 +23,6 @@ export function GoalsPage({
 	return (
 		<>
 			<div className="section-top page-section-top">
-				<p className="muted">Give the future a few meaningful milestones.</p>
 				<button
 					type="button"
 					className="button primary"

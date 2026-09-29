@@ -37,7 +37,7 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 		loading = false,
 	} = props;
 	const navigation = useWorkspaceNavigation();
-	const overlays = useWorkspaceOverlays({ plan, discard: state.discard });
+	const overlays = useWorkspaceOverlays({ discard: state.discard });
 	useBeforeUnload(state.volatile);
 	const changeCount = changesBetween({
 		saved: workspace.saved,
@@ -62,19 +62,11 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 					onClose={close}
 				/>
 			)}
-			header={(open) => (
-				<WorkspaceTopbar
-					label={navigation.currentPage.label}
-					example={plan.origin === "example"}
-					loading={loading}
-					changeCount={changeCount}
-					onOpenNavigation={open}
-					onSources={() => navigation.navigate("sources")}
-				/>
-			)}
+			header={(open) => <WorkspaceTopbar onOpenNavigation={open} />}
 			draftBar={
 				<DraftBar
 					count={changeCount}
+					loading={loading}
 					onDiscard={overlays.openDiscard}
 					onReview={() => navigation.navigate("compare")}
 				/>
@@ -97,7 +89,6 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 			<WorkspaceHeading
 				page={navigation.currentPage}
 				headingRef={navigation.headingRef}
-				onTryChange={overlays.tryChange}
 			/>
 			<WorkspaceNotices
 				state={state}
