@@ -2,6 +2,7 @@ import { Table2, X } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { projectionChartModel } from "../domain/chart.ts";
 import { dateLabel, money } from "../domain/format.ts";
+import type { Plan } from "../domain/model.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { useMediaQuery } from "../state/useMediaQuery.ts";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
@@ -9,6 +10,7 @@ import { ProjectionTable } from "./chart/ProjectionTable.tsx";
 import { IconButton, Toggle } from "./ui.tsx";
 
 export function ProjectionChart({
+	plan,
 	projection,
 	range,
 	ranges,
@@ -19,6 +21,7 @@ export function ProjectionChart({
 	inflation,
 	rangeError,
 }: {
+	plan: Plan;
 	projection: Projection;
 	range: RangeResult | null;
 	ranges: boolean;
@@ -39,13 +42,24 @@ export function ProjectionChart({
 			projectionChartModel({ projection, range, inflation, realTerms, narrow }),
 		[projection, range, inflation, realTerms, narrow],
 	);
-	if (!model) return null;
-	const selectedIndex = Math.min(
-		inspected ?? model.points.length - 1,
-		model.points.length - 1,
+	const selectedIndex = model
+		? Math.min(inspected ?? model.points.length - 1, model.points.length - 1)
+		: 0;
+	const point = model?.points[selectedIndex] ?? model?.last;
+	const selectedRange = model ? range?.points[selectedIndex] : undefined;
+	const contributions = useMemo(
+		() =>
+			point && model
+				? plan.accounts.map((account) => ({
+						id: account.id,
+						name: account.name,
+						enabled: account.enabled,
+						value: model.adjust(point.balances[account.id] ?? 0, point.date),
+					}))
+				: [],
+		[plan.accounts, model, point],
 	);
-	const point = model.points[selectedIndex] ?? model.last;
-	const selectedRange = range?.points[selectedIndex];
+	if (!model || !point) return null;
 	return (
 		<section className="chart-card" aria-labelledby={`${id}-title`}>
 			<div className="section-top chart-top">
@@ -82,6 +96,10 @@ export function ProjectionChart({
 							80% of scenarios
 						</span>
 					)}
+					<span>
+						<i className="legend-zero" />
+						$0 · no debt
+					</span>
 				</div>
 				<Toggle label="Show range" checked={ranges} onChange={setRanges} />
 			</div>
@@ -133,6 +151,20 @@ export function ProjectionChart({
 							</b>
 						</span>
 					)}
+					<ul
+						className="chart-accounts"
+						aria-label={`Account balances on ${dateLabel(point.date, true)}`}
+					>
+						{contributions.map((account) => (
+							<li key={account.id}>
+								<span>
+									{account.name}
+									{account.enabled ? "" : " (excluded)"}
+								</span>
+								<b>{money(account.value)}</b>
+							</li>
+						))}
+					</ul>
 				</div>
 			)}
 			<div className="chart-foot">

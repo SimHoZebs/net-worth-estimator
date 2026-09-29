@@ -54,8 +54,6 @@ export function OutlookMetrics({
 				<div className="metric-context">
 					<span className="status-dot" />
 					As of {dateLabel(plan.startDate, true)}
-					<span className="subtle-divider" />
-					USD
 				</div>
 			</section>
 			<section className="metric metric-destination">

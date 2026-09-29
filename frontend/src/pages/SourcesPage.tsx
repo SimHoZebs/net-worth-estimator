@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { FinancialModelDocument, ServerStatus } from "../api/index.ts";
 import { ErrorNotice } from "../components/ui.tsx";
 import type { Plan } from "../domain/model.ts";
@@ -16,6 +17,9 @@ export function SourcesPage({
 	readOnly = workspace.saved.readOnly || Boolean(serverStatus?.readOnly),
 	serverDocument = null,
 	onImportServerDocument,
+	authControl = null,
+	authRequired = false,
+	authTokenActive = false,
 }: {
 	plan: Plan;
 	workspace: Workspace;
@@ -25,6 +29,9 @@ export function SourcesPage({
 	onImportServerDocument: (
 		document: FinancialModelDocument,
 	) => Promise<boolean>;
+	authControl?: ReactNode;
+	authRequired?: boolean;
+	authTokenActive?: boolean;
 }) {
 	const controller = useModelImport({
 		workspace,
@@ -43,6 +50,23 @@ export function SourcesPage({
 		<>
 			<SourceBanner sourceAccess={sourceAccess} />
 			{controller.error && <ErrorNotice message={controller.error} />}
+			<section
+				className="panel portability"
+				aria-labelledby="server-access-heading"
+				style={{ marginBottom: 22 }}
+			>
+				<h2 id="server-access-heading">Server access</h2>
+				<p>
+					Protected saves use a bearer token that stays in this tab’s memory
+					only. Enter it here when the server requires authentication.
+				</p>
+				{authControl}
+				{!authRequired && !authTokenActive && (
+					<p className="muted">
+						This server does not require a token for protected saves.
+					</p>
+				)}
+			</section>
 			<div className="sources-grid">
 				<SourceHealth
 					plan={plan}

@@ -704,6 +704,12 @@
 		background: #dfe7cd;
 		display: inline-block;
 	}
+	.legend-zero {
+		width: 15px;
+		height: 0;
+		border-top: 2px solid #7d8a76;
+		display: inline-block;
+	}
 	.toggle-label {
 		display: inline-flex;
 		align-items: center;
@@ -791,6 +797,21 @@
 	.chart-inspection b {
 		color: #3c5032;
 		margin-left: 4px;
+	}
+	.chart-accounts {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 16px;
+		flex-basis: 100%;
+	}
+	.chart-accounts li {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 6px;
+		color: #78816b;
 	}
 	.range-loading {
 		position: absolute;
