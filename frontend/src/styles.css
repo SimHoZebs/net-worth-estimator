@@ -356,16 +356,25 @@
 		max-width: 1560px;
 		margin: auto;
 	}
-	.metrics-grid {
+	.outlook-top {
 		display: grid;
-		grid-template-columns: 1fr 1.13fr 1fr;
-		gap: 17px;
-		margin-bottom: 25px;
-	}
-	.outlook-main {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) 260px;
+		grid-template-columns: minmax(0, 1fr) 300px;
 		gap: 22px;
+		align-items: start;
+	}
+	.outlook-rail {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		min-width: 0;
+		position: sticky;
+		top: 20px;
+	}
+	.metrics-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin-bottom: 0;
 	}
 	.outlook-secondary {
 		display: grid;
@@ -527,8 +536,8 @@
 	.metric {
 		border: 1px solid var(--line);
 		border-radius: 10px;
-		padding: 16px 21px 19px;
-		min-height: 152px;
+		padding: 13px 15px 14px;
+		min-height: 0;
 		background: #fdfef9;
 	}
 	.metric-heading {
@@ -537,8 +546,8 @@
 		justify-content: space-between;
 		color: #717b67;
 		font-size: 11px;
-		margin-bottom: 12px;
-		min-height: 25px;
+		margin-bottom: 6px;
+		min-height: 22px;
 	}
 	.metric-heading .icon-button {
 		width: 23px;
@@ -549,14 +558,15 @@
 		height: 14px;
 	}
 	.metric-value {
-		font-size: clamp(27px, 2.5vw, 37px);
+		font-size: 26px;
 		font-weight: 550;
 		line-height: 1.2;
-		letter-spacing: -1.4px;
+		letter-spacing: -0.8px;
 		font-variant-numeric: tabular-nums;
 		display: flex;
 		align-items: center;
-		gap: 13px;
+		gap: 8px;
+		flex-wrap: wrap;
 	}
 	.metric-context {
 		display: flex;
@@ -564,7 +574,7 @@
 		gap: 7px;
 		font-size: 9px;
 		color: #7b8372;
-		margin-top: 15px;
+		margin-top: 8px;
 	}
 	.subtle-divider {
 		width: 1px;
@@ -592,19 +602,19 @@
 		padding: 5px 7px;
 	}
 	.metric-range {
-		border-color: transparent;
-		padding-left: 16px;
-		background: transparent;
+		border-color: var(--line);
+		background: #fdfef9;
 	}
 	.metric-range .metric-heading {
-		margin-bottom: 13px;
+		margin-bottom: 8px;
 	}
 	.range-value {
-		font-size: 24px;
-		letter-spacing: -0.8px;
+		font-size: 20px;
+		letter-spacing: -0.6px;
 		font-weight: 550;
-		line-height: 1.35;
+		line-height: 1.3;
 		white-space: nowrap;
+		font-variant-numeric: tabular-nums;
 	}
 	.metric-range p {
 		font-size: 9px;
@@ -783,13 +793,16 @@
 	}
 	.chart-inspection {
 		display: flex;
-		gap: 13px;
+		gap: 6px 13px;
 		flex-wrap: wrap;
 		font-size: 10px;
 		background: #f3f6eb;
 		margin: 3px 20px 10px;
 		padding: 8px 11px;
 		border-radius: 5px;
+		min-height: 58px;
+		align-content: center;
+		font-variant-numeric: tabular-nums;
 	}
 	.chart-inspection span {
 		color: #78816b;
@@ -809,7 +822,7 @@
 	}
 	.chart-accounts li {
 		display: inline-flex;
-		align-items: baseline;
+		align-items: center;
 		gap: 6px;
 		color: #78816b;
 	}
@@ -880,10 +893,32 @@
 	.insight-card {
 		border: 1px solid #e9e3d0;
 		border-radius: 10px;
-		padding: 24px 22px 19px;
+		padding: 18px 18px 15px;
 		background: #f3f0e4;
 		display: flex;
 		flex-direction: column;
+		position: relative;
+		transition:
+			border-color 0.15s,
+			box-shadow 0.15s;
+	}
+	.insight-card:has(.insight-stretched:hover) {
+		border-color: #c9c2a8;
+		box-shadow: 0 3px 12px #5c4f2a14;
+	}
+	.insight-card:has(.insight-stretched:focus-visible) {
+		outline: 3px solid #849c53;
+		outline-offset: 3px;
+	}
+	.insight-stretched {
+		margin-top: 10px;
+		align-self: flex-start;
+	}
+	.insight-stretched::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
 	}
 	.insight-card .eyebrow {
 		display: flex;
@@ -905,11 +940,11 @@
 	}
 	.insight-card h2 {
 		font-family: var(--serif);
-		font-size: 29px;
+		font-size: 24px;
 		font-weight: 450;
-		line-height: 1.13;
-		letter-spacing: -0.45px;
-		margin: 21px 0 14px;
+		line-height: 1.15;
+		letter-spacing: -0.4px;
+		margin: 12px 0 8px;
 	}
 	.insight-card > p {
 		font-size: 10px;
@@ -923,8 +958,8 @@
 		display: flex;
 		justify-content: space-between;
 		gap: 10px;
-		margin-top: 23px;
-		margin-bottom: 10px;
+		margin-top: 14px;
+		margin-bottom: 8px;
 	}
 	.funding-values div {
 		display: flex;
@@ -1148,7 +1183,21 @@
 		border-radius: 7px;
 		background: #edf0e4;
 		color: #869670;
+		border: 1px solid transparent;
 		flex-shrink: 0;
+	}
+	.account-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: #9aa48e;
+		display: inline-block;
+		flex-shrink: 0;
+	}
+	.account-name-line {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
 	}
 	.account-property {
 		background: #f0eee3;
@@ -2150,7 +2199,7 @@
 			min-height: 300px;
 		}
 		.insight-card h2 {
-			font-size: 32px;
+			font-size: 26px;
 		}
 	}
 	@media (max-width: 1250px) {
@@ -2165,23 +2214,23 @@
 			padding-left: 28px;
 			padding-right: 28px;
 		}
-		.outlook-main {
-			grid-template-columns: minmax(0, 1fr) 240px;
+		.outlook-top {
+			grid-template-columns: minmax(0, 1fr) 260px;
 			gap: 17px;
 		}
 		.metrics-grid {
-			gap: 12px;
+			gap: 10px;
 		}
 		.metric {
-			padding-left: 17px;
-			padding-right: 17px;
+			padding-left: 13px;
+			padding-right: 13px;
 		}
 		.metric-value {
-			font-size: 30px;
+			font-size: 24px;
 			gap: 8px;
 		}
 		.range-value {
-			font-size: 21px;
+			font-size: 18px;
 		}
 		.chart-top,
 		.chart-toolbar {
@@ -2209,7 +2258,7 @@
 			right: 28px;
 		}
 		.insight-card {
-			padding: 22px 19px 18px;
+			padding: 16px 15px 14px;
 		}
 		.growth-pill {
 			font-size: 8px;
@@ -2242,8 +2291,18 @@
 			width: 25px;
 			height: 27px;
 		}
+		.outlook-top {
+			grid-template-columns: 1fr;
+		}
+		.outlook-rail {
+			position: static;
+			display: flex;
+			flex-direction: column;
+		}
 		.metrics-grid {
+			display: grid;
 			grid-template-columns: 1fr 1fr;
+			gap: 12px;
 		}
 		.metric-range {
 			grid-column: 1 / -1;
@@ -2251,7 +2310,7 @@
 			display: flex;
 			align-items: center;
 			gap: 18px;
-			padding: 3px 0 8px;
+			padding: 12px 15px;
 		}
 		.metric-range .metric-heading {
 			margin: 0;
@@ -2269,17 +2328,15 @@
 		.metric-range .text-button {
 			margin-left: auto;
 		}
-		.outlook-main {
-			grid-template-columns: 1fr;
-		}
 		.insight-card {
 			display: grid;
 			grid-template-columns: 1.2fr 1fr;
 			gap: 8px 26px;
-			padding: 22px;
+			padding: 18px 20px;
+			align-items: center;
 		}
 		.insight-card .eyebrow {
-			grid-column: 1;
+			grid-column: 1 / -1;
 		}
 		.insight-card h2 {
 			font-size: 25px;
@@ -2292,7 +2349,7 @@
 		}
 		.funding-values {
 			grid-column: 2;
-			grid-row: 1 / 3;
+			grid-row: 2;
 			margin: 0 0 5px;
 			align-self: end;
 		}
@@ -2301,15 +2358,10 @@
 			grid-row: 3;
 			align-self: center;
 		}
-		.insight-button {
-			grid-column: 2;
-			margin-top: 10px;
-		}
-		.insight-caption {
-			grid-column: 1;
-			grid-row: 5;
-			margin: 10px 0 0;
-			text-align: left;
+		.insight-stretched {
+			grid-column: 1 / -1;
+			margin-top: 6px;
+			justify-self: start;
 		}
 		.outlook-secondary {
 			gap: 15px;
@@ -2412,12 +2464,11 @@
 		}
 		.metrics-grid {
 			gap: 10px;
-			margin-bottom: 16px;
 		}
 		.metric {
 			border-radius: 8px;
-			padding: 13px 13px 16px;
-			min-height: 138px;
+			padding: 13px 13px 14px;
+			min-height: 0;
 		}
 		.metric-heading {
 			font-size: 9px;
@@ -2456,7 +2507,7 @@
 			grid-template-columns: 1fr auto;
 			gap: 2px 8px;
 			min-height: auto;
-			padding: 9px 2px 0;
+			padding: 12px 13px;
 		}
 		.metric-range .metric-heading {
 			font-size: 10px;
@@ -2515,8 +2566,10 @@
 			padding: 9px 15px;
 		}
 		.insight-card {
-			padding: 20px;
-			gap: 8px 15px;
+			display: flex;
+			flex-direction: column;
+			padding: 18px;
+			gap: 8px;
 		}
 		.insight-card h2 {
 			font-size: 24px;
@@ -2535,6 +2588,7 @@
 		}
 		.funding-values {
 			gap: 8px;
+			margin-top: 10px;
 		}
 		.funding-values strong {
 			font-size: 14px;
@@ -2544,14 +2598,7 @@
 		}
 		.insight-caption {
 			font-size: 7px;
-		}
-		.insight-button {
-			font-size: 9px;
-			gap: 5px;
-			padding: 8px;
-		}
-		.insight-button > svg {
-			width: 12px;
+			text-align: left;
 		}
 		.range-disclaimer {
 			font-size: 7px;
@@ -2883,20 +2930,17 @@
 			font-size: 14px;
 		}
 		.insight-card {
-			grid-template-columns: 1fr;
-		}
-		.insight-card > * {
-			grid-column: auto !important;
-			grid-row: auto !important;
+			display: flex;
+			flex-direction: column;
 		}
 		.insight-card h2 {
-			font-size: 27px;
+			font-size: 22px;
 		}
 		.funding-values {
-			margin-top: 16px;
+			margin-top: 10px;
 		}
 		.insight-caption {
-			text-align: center;
+			text-align: left;
 		}
 		.form-grid {
 			grid-template-columns: 1fr;
@@ -2944,7 +2988,7 @@
 		.main-content {
 			padding: 0;
 		}
-		.outlook-main {
+		.outlook-top {
 			grid-template-columns: 1fr;
 		}
 		.metric,

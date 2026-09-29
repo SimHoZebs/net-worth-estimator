@@ -5,6 +5,7 @@ import { dateLabel, money } from "../domain/format.ts";
 import type { Plan } from "../domain/model.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { useMediaQuery } from "../state/useMediaQuery.ts";
+import { AccountDot } from "./AccountIcon.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
 import { ProjectionTable } from "./chart/ProjectionTable.tsx";
 import { IconButton, Toggle } from "./ui.tsx";
@@ -53,6 +54,7 @@ export function ProjectionChart({
 				? plan.accounts.map((account) => ({
 						id: account.id,
 						name: account.name,
+						color: account.color,
 						enabled: account.enabled,
 						value: model.adjust(point.balances[account.id] ?? 0, point.date),
 					}))
@@ -136,37 +138,36 @@ export function ProjectionChart({
 					</div>
 				)}
 			</div>
-			{inspected !== null && (
-				<div className="chart-inspection" aria-live="polite">
-					<strong>{dateLabel(point.date)}</strong>
+			<div className="chart-inspection" aria-live="polite">
+				<strong>{dateLabel(point.date)}</strong>
+				<span>
+					Base case <b>{money(model.adjust(point.total, point.date))}</b>
+				</span>
+				{selectedRange && (
 					<span>
-						Base case <b>{money(model.adjust(point.total, point.date))}</b>
+						80% range{" "}
+						<b>
+							{money(model.adjust(selectedRange.lower, point.date))} –{" "}
+							{money(model.adjust(selectedRange.upper, point.date))}
+						</b>
 					</span>
-					{selectedRange && (
-						<span>
-							80% range{" "}
-							<b>
-								{money(model.adjust(selectedRange.lower, point.date))} –{" "}
-								{money(model.adjust(selectedRange.upper, point.date))}
-							</b>
-						</span>
-					)}
-					<ul
-						className="chart-accounts"
-						aria-label={`Account balances on ${dateLabel(point.date, true)}`}
-					>
-						{contributions.map((account) => (
-							<li key={account.id}>
-								<span>
-									{account.name}
-									{account.enabled ? "" : " (excluded)"}
-								</span>
-								<b>{money(account.value)}</b>
-							</li>
-						))}
-					</ul>
-				</div>
-			)}
+				)}
+				<ul
+					className="chart-accounts"
+					aria-label={`Account balances on ${dateLabel(point.date, true)}`}
+				>
+					{contributions.map((account) => (
+						<li key={account.id}>
+							<AccountDot color={account.color} />
+							<span>
+								{account.name}
+								{account.enabled ? "" : " (excluded)"}
+							</span>
+							<b>{money(account.value)}</b>
+						</li>
+					))}
+				</ul>
+			</div>
 			<div className="chart-foot">
 				<button
 					type="button"

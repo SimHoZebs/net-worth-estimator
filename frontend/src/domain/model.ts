@@ -19,6 +19,7 @@ export const accountSchema = z.object({
 	balance: z.number().finite().min(-1e10).max(1e10),
 	minBalance: money,
 	maxBalance: money.nullable(),
+	color: z.string().max(100).nullable().default(null),
 	observedOn: date,
 	balanceCheck: z.boolean(),
 	source: name,

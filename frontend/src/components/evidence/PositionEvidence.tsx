@@ -2,6 +2,7 @@ import { Info } from "lucide-react";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import { currentNetWorth, type Projection } from "../../domain/result.ts";
+import { AccountDot } from "../AccountIcon.tsx";
 import { DetailRow } from "../DetailRow.tsx";
 import { Modal } from "../ui.tsx";
 
@@ -34,7 +35,10 @@ export function PositionEvidence({
 							key={account.id}
 							label={
 								<>
-									{account.name}
+									<span className="account-name-line">
+										<AccountDot color={account.color} />
+										{account.name}
+									</span>
 									<small>
 										{account.balanceCheck
 											? "Balance check"

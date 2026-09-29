@@ -12,12 +12,14 @@ export function FundingInsight({
 	onFailure: () => void;
 	onPlan: () => void;
 }) {
+	const action = failure ? onFailure : onPlan;
 	return (
-		<aside className={`insight-card ${failure ? "" : "insight-positive"}`}>
+		<article className={`insight-card ${failure ? "" : "insight-positive"}`}>
 			<div className="eyebrow">
 				<span className="insight-symbol">
 					{failure ? <TriangleAlert size={16} /> : <ShieldCheck size={16} />}
 				</span>
+				{failure && <span>First shortfall in the base case</span>}
 			</div>
 			{failure ? (
 				<>
@@ -42,14 +44,11 @@ export function FundingInsight({
 					/>
 					<button
 						type="button"
-						className="button insight-button"
-						onClick={onFailure}
+						className="text-button insight-stretched"
+						onClick={action}
 					>
-						Inspect this expense <ArrowUpRight size={16} />
+						Inspect this expense <ArrowUpRight size={14} />
 					</button>
-					<span className="insight-caption">
-						First shortfall in the base case
-					</span>
 				</>
 			) : (
 				<>
@@ -59,13 +58,13 @@ export function FundingInsight({
 					</p>
 					<button
 						type="button"
-						className="button insight-button"
-						onClick={onPlan}
+						className="text-button insight-stretched"
+						onClick={action}
 					>
-						Review planned transactions <ArrowUpRight size={16} />
+						Review planned transactions <ArrowUpRight size={14} />
 					</button>
 				</>
 			)}
-		</aside>
+		</article>
 	);
 }

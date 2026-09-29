@@ -300,6 +300,7 @@ function accountDisplay(
 		balance: checkpoint?.Balance ?? 0,
 		minBalance: minBalance === null || minBalance < 0 ? 0 : minBalance,
 		maxBalance: maxBalance === null || maxBalance < 0 ? null : maxBalance,
+		color: account.color ?? null,
 		observedOn,
 		balanceCheck: previous?.balanceCheck ?? Boolean(checkpoint),
 		source:
@@ -850,7 +851,7 @@ export function displayPlanToBackendDocument(
 			kind: account.kind,
 			minBalance: minBalance,
 			maxBalance,
-			color: storedAccount?.color ?? null,
+			color: account.color ?? storedAccount?.color ?? null,
 			enabled: account.enabled,
 		};
 	});
