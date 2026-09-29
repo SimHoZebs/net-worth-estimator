@@ -164,7 +164,9 @@ func publicMovementEvents(path *types.ProjectionPath) []types.MovementEvent {
 		key := event.Origin.PostingID + ":" + event.Date[:4]
 		remaining := math.Max(0, *posting.AnnualCap-realizedByPostingAndYear[key])
 		capRemainingBySequence[event.Sequence] = remaining
-		realizedByPostingAndYear[key] += event.RealizedAmount
+		// Losses are balance adjustments, not cap consumption: only
+		// non-negative realizations accrue against the annual cap.
+		realizedByPostingAndYear[key] += maxFloat(0, event.RealizedAmount)
 	}
 	events := make([]types.MovementEvent, len(path.MovementEvents))
 	for index, source := range path.MovementEvents {
@@ -227,6 +229,9 @@ func classifyAttempts(attempts []*types.MovementEvent, postingsByID map[string]*
 		}
 		switch {
 		case posting.SourceAccountID == nil && posting.Destinations != nil:
+			// Inflow totals are net of investment losses: a negative
+			// realized amount on a sourceless inflow posting is money
+			// actually lost, and balances already reflect it.
 			result.externalInflowAmount += attempt.RealizedAmount
 		case posting.SourceAccountID != nil && posting.Destinations == nil:
 			result.externalOutflowAmount += attempt.RealizedAmount

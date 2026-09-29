@@ -161,7 +161,9 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 		} else {
 			unfulfilledAmount = residual
 		}
-		realizedByPostingAndYear[capKey] = realizedBefore + event.RealizedAmount
+		// Losses are balance adjustments, not cap consumption: only
+		// non-negative realizations accrue against the annual cap.
+		realizedByPostingAndYear[capKey] = realizedBefore + maxFloat(0, event.RealizedAmount)
 		out = append(out, evaluatedMovementEvent{
 			event:              event,
 			bindingConstraints: bindingConstraints,

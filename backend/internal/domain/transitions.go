@@ -122,6 +122,14 @@ func (t *TransitionRuntime) observePosting(postingID string, realizedAmount floa
 	byYear[year] += realizedAmount
 }
 
+// observeLossPosting records a loss realization for dependent amount
+// resolution without touching the annual-cap ledger. Losses are balance
+// adjustments: they must neither consume nor inflate cap headroom, so only
+// the latest realized amount carries the (negative) value.
+func (t *TransitionRuntime) observeLossPosting(postingID string, realizedAmount float64) {
+	t.State.LatestRealizedPostingAmounts[postingID] = realizedAmount
+}
+
 func (t *TransitionRuntime) applyAndCollectDeltas(result AccountMovementResult, apply func()) AppliedMovementTransition {
 	beforeBalances := SnapshotBalances(t.State.Balances)
 	apply()
@@ -171,6 +179,21 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 	rawRequested, err := ComputeRequestedAmount(occurrence, date, t.State.LatestRealizedPostingAmounts, t.State.RealizedPostingAmountsByYear, t.State.Balances, sampledRate)
 	if err != nil {
 		return PostingExecutionTransition{}, err
+	}
+	// A negative amount on a sourceless inflow posting is an investment
+	// loss: it reduces destination balances instead of clamping to zero.
+	// Clamping discards the entire downside of sampled return
+	// distributions, which biases stochastic bands above the base case.
+	if rawRequested < 0 && posting.SourceAccountID == nil && posting.Destinations != nil {
+		result := ResolveNegativeInflowMovement(posting, rawRequested, t.State.Balances, t.accountByID)
+		transition := t.applyAndCollectDeltas(result, func() {
+			ApplyNegativeInflow(posting, result.RealizedAmount, t.State.Balances, t.accountByID)
+		})
+		t.observeLossPosting(posting.ID, result.RealizedAmount)
+		return PostingExecutionTransition{
+			AppliedMovementTransition: transition,
+			PostingID:                 posting.ID,
+		}, nil
 	}
 	requestedAmount := maxFloat(0, rawRequested)
 	year := date[:4]
