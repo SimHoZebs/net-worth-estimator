@@ -30,7 +30,7 @@ export function EditorForm({
 	return (
 		<Modal title={title} eyebrow="Try it before you keep it" onClose={close}>
 			<p className="form-intro">
-				Changes create a temporary version. Compare the outcome before saving.
+				An edit creates unsaved changes. Compare the outcome before saving.
 			</p>
 			{readOnlyReason && (
 				<div className="inline-notice">
@@ -81,7 +81,7 @@ export function EditorForm({
 							className="button primary"
 							disabled={Boolean(readOnlyReason)}
 						>
-							Apply to temporary version <ArrowRight size={16} />
+							Apply unsaved changes <ArrowRight size={16} />
 						</button>
 					</div>
 				)}

@@ -69,7 +69,7 @@ export function Transactions({
 				icon={ArrowRightLeft}
 				title="No transactions for this account yet"
 				description="Historical movements and scheduled transactions will appear here. Growth and interest are reflected in the balance projection separately."
-				action="Add a planned movement"
+				action="Add a planned transaction"
 				onAction={() => onEdit({ kind: "movement", item: null })}
 			/>
 		);

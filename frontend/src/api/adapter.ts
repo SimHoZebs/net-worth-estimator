@@ -413,7 +413,7 @@ function addForwardPostingWarnings(
 		warn(
 			target,
 			"unsupported-frequency",
-			"The display movement frequency is approximated as monthly.",
+			"The display transaction frequency is approximated as monthly.",
 			`${path}.frequency`,
 		);
 		provisional(target, `${path}.frequency`);
@@ -444,7 +444,7 @@ function addForwardPostingWarnings(
 		warn(
 			target,
 			"posting-source",
-			"Backend posting ownership is preserved as presentation state.",
+			"Backend deposit ownership is preserved as presentation state.",
 			`${path}.source`,
 		);
 		provisional(target, `${path}.source`);
@@ -1042,7 +1042,7 @@ export function displayPlanToBackendDocument(
 			warn(
 				conversionReport,
 				"posting-removed",
-				"The backend posting will be removed from the canonical model.",
+				"The backend deposit will be removed from the canonical model.",
 				`movements.${postingId}`,
 			);
 		}

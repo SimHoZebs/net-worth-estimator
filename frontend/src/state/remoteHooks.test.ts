@@ -1659,7 +1659,7 @@ describe("remote projection mapping and SSE", () => {
 		});
 		expect(local.movements[2]).toMatchObject({
 			available: null,
-			constraint: "Annual movement limit",
+			constraint: "Annual transaction limit",
 			constraintTypes: ["action-limit"],
 		});
 		expect(local.firstFailure).toBe(local.movements[0]);

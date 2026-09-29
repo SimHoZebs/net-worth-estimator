@@ -227,7 +227,7 @@ function movementConstraintLabel(type: string): string {
 		case "destination-ceiling":
 			return "Destination account ceiling";
 		case "action-limit":
-			return "Annual movement limit";
+			return "Annual transaction limit";
 		case "source-unavailable":
 			return "Funding account unavailable";
 		default:

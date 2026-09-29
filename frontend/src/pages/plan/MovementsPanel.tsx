@@ -34,7 +34,7 @@ export function MovementsPanel({
 		return (
 			<EmptyState
 				icon={ArrowRight}
-				title="No matching movements"
+				title="No matching transactions"
 				description="Add income, expenses, or transfers to see their effect on your plan."
 			/>
 		);

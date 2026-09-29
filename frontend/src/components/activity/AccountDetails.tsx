@@ -35,7 +35,7 @@ export function AccountDetails({
 						? "Excluded from net worth and projections"
 						: account.readOnly
 							? "Read-only source record"
-							: "Editable in a temporary version"}
+							: "Editable in unsaved changes"}
 				</DetailRow>
 			</dl>
 			<div className="modal-actions">

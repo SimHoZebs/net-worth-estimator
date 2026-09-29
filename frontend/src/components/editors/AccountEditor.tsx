@@ -80,7 +80,7 @@ export function AccountEditor({
 			/>
 			<InputField
 				label="Protected balance (USD)"
-				hint="Movements cannot spend below this balance."
+				hint="Transactions cannot spend below this balance."
 				name="minBalance"
 				type="number"
 				required
@@ -91,7 +91,7 @@ export function AccountEditor({
 			/>
 			<InputField
 				label="Maximum balance (USD)"
-				hint="Optional. Limits incoming movements."
+				hint="Optional. Limits incoming transactions."
 				name="maxBalance"
 				type="number"
 				min="0"

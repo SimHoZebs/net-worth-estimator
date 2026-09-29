@@ -25,7 +25,7 @@ export async function resetFixture(
 }
 
 /**
- * Server mode keeps the temporary version in this browser and the saved plan on
+ * Server mode keeps unsaved changes in this browser and the saved plan on
  * the server, so a test that needs both has to read both.
  */
 export async function readTemporaryVersion(page: Page) {

@@ -1,71 +1,75 @@
 # Terminology
 
-One name per concept. This file is normative: when another document disagrees, this file wins. It defines the words the product uses and nothing else — no file paths, no symbol names, no test files. A reader who finds a term here should be able to use it without knowing how anything is built.
+One name per concept. This file is normative: when another document or a string in the interface disagrees, this file wins. `PRODUCT_INTENT.md` §4 defines the concepts; the names live only here.
+
+The names are display names. The engine keeps its own vocabulary: the Go API, the CSV seed files, and the SQLite tables still say `posting`, `checkpoint`, and `draft`. Those are storage and wire names, not words shown to a user.
 
 ## A. Transaction
 
 A planned or recorded movement of money into, out of, or between accounts.
 
-Use **transaction**, qualified as **scheduled** or **one-time**. "Activity" names the screen that groups the transaction views; it is a grouping, not a transaction.
+Use **transaction**, qualified as **planned** or **recorded**. The plan's "Transactions" tab holds the rules you edit. An account's activity view holds the rows the engine computed from those rules.
 
-- Retired from the interface: posting, movement, money movement.
-- Retired from prose: posting, one-time movement, planned movement, projected transaction.
+- Retired from copy: posting, movement, money movement.
+- Retired from prose: one-time movement, planned movement, projected transaction.
+- A recurring rule is **scheduled**; a dated single entry is **one-time**.
+- A record supplied by a source is a **deposit** or **withdrawal**, not a transaction.
 
 ## B. Balance check
 
 A recorded end-of-day account balance that corrects modeled history for that account.
 
-Use **balance check**. Its date column is **balance**. "Reconcile" is a verb the user performs; "Balance checks" is the screen.
+Use **balance check**. Its date column is **balance**; its tab is "Balance checks".
 
-- Retired from the interface: checkpoint, balance checkpoint, observed balance.
+- Retired from copy: checkpoint, balance checkpoint, observed balance.
 - Retired from prose: balance checkpoints, reconciliation.
 
-## C. Projection and range
+## C. Projection, base case and range
 
-Two computations over the same plan. **Base projection** is the single calculated path. **Range** is a percentile band across sampled runs.
+Two computations over the same plan. The **base case** is the single calculated path. The **range** is a percentile band across modeled scenarios.
 
-- Retired from the interface: deterministic, Monte Carlo, stochastic, simulation, baseline projection.
-- "Scenario" names one sampled assumption set, as in "80% of scenarios fall in this range". It is never the name of the result.
-- Technical writing about the engine may name its own computation modes. This retirement applies to what the product says, not to how a computation is described internally.
+- Retired from copy: deterministic, Monte Carlo, stochastic, simulation, baseline projection.
+- Engine sections name the engine's own computation modes, so no prose term is retired there.
+- **Scenario** names one sampled assumption set, as in "80% of 400 scenarios". It is never the name of the result.
 
 ## D. Changes
 
-The edits in the current session that are not yet saved.
+The edits in the current session that are not yet saved to the server.
 
-Use **changes**, with **unsaved** as the state adjective. **Save** sends them onward; **discard** throws them away. Neither is spelled with another verb.
+Use **changes**, with **unsaved** as the state adjective. **Save** sends them to the server; **discard** throws them away.
 
-- Retired from the interface: draft, temporary, temporary version, current changes.
-- Retired from prose: temporary version, temporary change, staged draft, editing baseline.
-- "Baseline" labels the saved result in a comparison, not the edits.
+- Retired from copy: draft, temporary, temporary version, temporary plan, current changes.
+- Retired from prose: temporary change, staged draft, editing baseline.
+- The saved result in a comparison is the **saved plan**.
 
 ## E. Evaluation
 
-A named question asked of the projection, with a stored configuration and a result.
+A named question asked of a projection, with a stored configuration and a result.
 
-Use **evaluation**. Instance labels stay plain: "Financial independence", "Net worth threshold", "Planned transaction completion".
+Use **evaluation**. The three roles below are distinct and stay distinct:
+
+- **verdict** — the summary block on the outlook
+- **constraint** — the binding limit that stopped a transaction
+- **shortfall** — the gap between what a transaction requested and what funded it
+
+`EvaluationTypeOrder` in `backend/internal/types/model.go` fixes the display order of the four evaluation types: financial independence, net-worth threshold, account balance, posting fulfillment. `EvaluationRegistry` in `backend/internal/domain/evaluation_runtime.go` owns their definitions.
 
 - Retired from prose: goal check, evaluation blocker.
-- Three roles are distinct and stay distinct:
-  - **verdict** — the summary of the whole result
-  - **constraint** — the binding limit that stopped a transaction
-  - **shortfall** — the outcome of the planned-transaction-completion evaluation
 
-## F. Analysis
+## F. Income evidence
 
-A named computation over recorded deposits that never changes the plan. Three run in order: classification, payroll pattern, net pay.
+An inference from recorded one-time external inflows, such as an annualized estimate of net pay. It never changes planned income and does not establish bank provenance.
 
-Use **analysis**, and name each output for what it answers, as in "Net pay".
+Use **income evidence**. Its parts stay distinct: **deposit** (the record), **cadence** (the observed pattern), **estimate** (the annualized figure), **provenance** (where it came from).
 
-- Retired from the interface: posting-derived, observation, salary estimate, FI.
-- Retired from prose: evidence analysis, posting-derived, posting observation.
-- Sub-terms that stay distinct: **deposit** (the record), **payroll pattern** (detection), **net pay** (the estimate), **evidence** (provenance).
-- A payment rail is shown as "Payment method".
+- Retired from copy: posting-derived, observation, salary estimate, FI.
+- Retired from prose: evidence analysis, posting-derived net pay.
 
-## Evaluation and analysis are different things
+## Evaluation and income evidence are different things
 
-**Evaluation** asks a question of a projection. It is configured in Settings and shown on Results.
+**Evaluation** asks a question of a projection. It is configured on the plan and rendered on the outlook.
 
-**Analysis** computes from recorded deposits. It is configured nowhere and shown on Analysis.
+**Income evidence** computes from recorded deposits. It is not configured and is rendered under Data and sources.
 
 Both produce a result. Neither reads or writes the other's inputs.
 
@@ -73,11 +77,15 @@ Both produce a result. Neither reads or writes the other's inputs.
 
 | Action | Use | Do not use |
 | --- | --- | --- |
-| compute the single path | project, calculate | simulate, run, execute |
-| compute the sampled band | calculate | sample, Monte Carlo |
-| send edits onward | save | persist, commit, apply, write |
+| compute the single path | project (code, docs), calculate (copy) | simulate, run, execute |
+| compute the sampled band | calculate (copy) | sample, Monte Carlo |
+| send edits to the server | save | persist, commit, apply, write |
 | throw away unsaved edits | discard | revert, clear, reset |
-| fetch the model | load, read | fetch, pull, retrieve |
-| import source files | import | ingest, ingestion |
+| fetch the model | load (copy), read (code) | fetch, pull, retrieve |
+| import CSV into SQLite | import | ingest, ingestion |
 | sync a bank | sync | — |
-| report model problems | validate, fix | diagnose, check |
+| report model problems | validate (code), fix (copy) | diagnose, check |
+
+## Keeping the names
+
+The interface is the surface these names appear on, so the check is visual. `frontend/tests/workspace.spec.ts` exercises every route; when a name is retired, add a test asserting the new wording appears and the old one does not.

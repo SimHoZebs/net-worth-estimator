@@ -59,7 +59,7 @@ export function WorkspaceDialogs({
 			{overlays.discardOpen && (
 				<ConfirmDialog
 					title="Return to your saved plan?"
-					eyebrow="Discard temporary version"
+					eyebrow="Discard unsaved changes"
 					onCancel={overlays.closeDiscard}
 					onConfirm={() => void overlays.confirmDiscard()}
 					cancelLabel="Keep exploring"

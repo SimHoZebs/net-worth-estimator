@@ -676,7 +676,7 @@ export function useRemoteWorkspace({
 			setDraftDocument(document);
 			const nextLocal = localStateFor(nextWorkspace, nextDraftPresentation);
 			const persisted = writeLocalState(nextLocal, nextLocal);
-			setNotice("Temporary version updated. Saved server plan unchanged.");
+			setNotice("Unsaved changes updated. Saved server plan unchanged.");
 			if (persisted) setError(null);
 			return true;
 		},
@@ -686,7 +686,7 @@ export function useRemoteWorkspace({
 	const save = useCallback(async (): Promise<boolean> => {
 		const current = workspaceRef.current;
 		if (!current?.draft) {
-			setError("There is no temporary server plan to save.");
+			setError("There are no unsaved changes to save.");
 			return false;
 		}
 		if (current.draftStale) {
@@ -712,7 +712,7 @@ export function useRemoteWorkspace({
 		}
 		if (conversion.report.hasLosses) {
 			setError(
-				`${conversionLossError(conversion, "The temporary plan cannot be saved to the server")}. It remains available locally.`,
+				`${conversionLossError(conversion, "Unsaved changes cannot be saved to the server")}. It remains available locally.`,
 			);
 			return false;
 		}
@@ -1037,7 +1037,7 @@ export function useRemoteWorkspace({
 		setWorkspace(nextWorkspace);
 		setDraftPresentation(null);
 		setDraftDocument(null);
-		setNotice("Temporary changes discarded. Saved server plan restored.");
+		setNotice("Unsaved changes discarded. Saved server plan restored.");
 		setError(null);
 		return true;
 	}, [writeLocalState]);

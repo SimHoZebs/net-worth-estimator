@@ -23,7 +23,7 @@ export function MovementEditor({
 	return (
 		<EditorForm
 			{...props}
-			title={`${item ? "Edit" : "Add"} planned movement`}
+			title={`${item ? "Edit" : "Add"} planned transaction`}
 			readOnlyReason={readOnlyReason}
 			buildPlan={(data) => {
 				const movement: Movement = {
@@ -47,7 +47,7 @@ export function MovementEditor({
 			}}
 		>
 			<InputField
-				label="Movement name"
+				label="Transaction name"
 				wide
 				name="name"
 				required

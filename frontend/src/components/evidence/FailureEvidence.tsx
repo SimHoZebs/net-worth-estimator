@@ -28,8 +28,8 @@ export function FailureEvidence({
 }) {
 	if (!failure)
 		return (
-			<Modal title="All movements funded" onClose={onClose}>
-				<p>No underfunded movements occur in this base-case horizon.</p>
+			<Modal title="All transactions funded" onClose={onClose}>
+				<p>No underfunded transactions occur in this base-case horizon.</p>
 			</Modal>
 		);
 	const movement = plan.movements.find(
@@ -48,7 +48,7 @@ export function FailureEvidence({
 	return (
 		<Modal
 			title={failure.name}
-			eyebrow="First underfunded movement"
+			eyebrow="First underfunded transaction"
 			onClose={onClose}
 		>
 			<div className="evidence-date">
