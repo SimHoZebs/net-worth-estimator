@@ -45,7 +45,7 @@ export function TransactionDetails({
 			</dl>
 			{transaction.excluded && (
 				<p>
-					This recorded movement is excluded from plan evidence. It remains
+					This recorded transaction is excluded from plan evidence. It remains
 					visible as a source record.
 				</p>
 			)}
@@ -54,8 +54,8 @@ export function TransactionDetails({
 					{transaction.shortfall > 0.01
 						? "The unfunded amount is not automatically borrowed or rescheduled. "
 						: ""}
-					This is a dated occurrence of a planned movement, not a bank-confirmed
-					transaction.
+					This is a dated occurrence of a planned transaction, not a
+					bank-confirmed transaction.
 					{movement && movement.frequency !== "once"
 						? " Editing this movement changes every occurrence in its schedule."
 						: ""}
@@ -71,8 +71,8 @@ export function TransactionDetails({
 					{movement.readOnly
 						? "Inspect source record"
 						: transaction.source === "historical"
-							? "Edit recorded movement"
-							: "Edit planned movement"}
+							? "Edit recorded transaction"
+							: "Edit planned transaction"}
 				</button>
 			)}
 		</div>

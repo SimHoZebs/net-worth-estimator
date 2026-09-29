@@ -67,7 +67,7 @@ export function ComparisonSummary({
 					</div>
 					<div>
 						<Badge tone={changeCount ? "amber" : "green"}>
-							{changeCount ? "Temporary version" : "Current saved plan"}
+							{changeCount ? "Changes" : "Current saved plan"}
 						</Badge>
 						<span>
 							{years}-year horizon · {changeCount} unsaved
@@ -104,7 +104,7 @@ export function ComparisonSummary({
 					</strong>
 				</div>
 				<div className="comparison-grid">
-					<span>First underfunded movement</span>
+					<span>First underfunded transaction</span>
 					<strong>
 						{previous.shortfallDate
 							? dateLabel(previous.shortfallDate, true)

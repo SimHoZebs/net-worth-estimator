@@ -11,7 +11,7 @@ export function IncomeEvidence({ plan }: { plan: Plan }) {
 			<div className="section-top">
 				<div>
 					<h2>What the income records suggest</h2>
-					<p>Posting-derived evidence · independent of planned income</p>
+					<p>Deposit-derived evidence · independent of planned income</p>
 				</div>
 				<Badge tone="amber">
 					{evidence.strong ? "Moderate evidence" : "Limited evidence"}

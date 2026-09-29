@@ -31,7 +31,7 @@ export function PlanPage({
 	const [error, setError] = useState<string | null>(null);
 	const tabs: TabItem<Section>[] = [
 		{ id: "accounts", label: "Accounts", count: plan.accounts.length },
-		{ id: "movements", label: "Movements", count: plan.movements.length },
+		{ id: "movements", label: "Transactions", count: plan.movements.length },
 		{
 			id: "checks",
 			label: "Balance checks",
@@ -142,11 +142,11 @@ export function PlanPage({
 			{remove && (
 				<ConfirmDialog
 					title={`Remove ${remove.name}?`}
-					eyebrow="Temporary version"
+					eyebrow="Changes"
 					onCancel={() => setRemove(null)}
 					onConfirm={deleteItem}
 					cancelLabel="Keep item"
-					confirmLabel="Remove from temporary version"
+					confirmLabel="Remove from unsaved changes"
 					error={error}
 				>
 					<p>

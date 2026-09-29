@@ -67,7 +67,7 @@ export function SourceImportPreview({
 			{hasDraft && (
 				<div className="inline-notice amber">
 					<TriangleAlert size={18} />
-					Save or discard your temporary version before replacing the server
+					Save or discard your unsaved changes before replacing the server
 					model. The local recovery backup is available now.
 				</div>
 			)}

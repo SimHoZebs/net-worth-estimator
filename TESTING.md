@@ -1,6 +1,60 @@
-# Backend Testing
+# Testing
 
-The verification surface for this checkout is the Go backend, its HTTP/SSE contract, CSV seed path, and SQLite persistence. No application implementation exists outside this backend.
+This checkout holds two packages: the Go backend in `backend/`, and the Waypoint frontend in `frontend/`. Both have their own gates. The backend is the calculation authority; the frontend renders its results and keeps local edits as a temporary review layer.
+
+## Frontend Gates
+
+Run from the repository root:
+
+```bash
+npm --prefix frontend ci
+npm --prefix frontend run lint
+npm --prefix frontend run typecheck
+npm --prefix frontend test
+npm --prefix frontend run build
+```
+
+`typecheck` covers `frontend/tsconfig.json` and, separately, `frontend/tests/tsconfig.json`.
+
+## Frontend Browser Tests
+
+The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness on port 8799, seeded from `frontend/tests/fixtures/`, and the Vite dev server on 5178 pointed at it. No running backend of your own is needed, and none of your data is touched.
+
+```bash
+npm --prefix frontend exec playwright install chromium
+npm --prefix frontend run test:browser
+```
+
+Run it from a stopped dev server on 5178, or it will reuse yours and test the wrong backend. The suite is single-worker because it shares one seeded server.
+
+To exercise the production build instead of the dev server:
+
+```bash
+npm --prefix frontend run build
+TEST_PRODUCTION=1 npm --prefix frontend run test:browser
+```
+
+## Completion Gate
+
+For a frontend change, the gate is:
+
+```bash
+npm --prefix frontend run lint
+npm --prefix frontend run typecheck
+npm --prefix frontend test
+npm --prefix frontend run build
+npm --prefix frontend run test:browser
+```
+
+For a backend change, it is the Go gate below.
+
+The pre-commit hook verifies the backend packages containing staged Go files. The pre-push hook verifies `./internal/...` and `./cmd/...`. No hook runs the frontend gates; they run only when invoked directly.
+
+---
+
+# Backend
+
+The verification surface for the backend is its HTTP/SSE contract, CSV seed path, and SQLite persistence.
 
 ## Scoped Go Tests
 
@@ -281,7 +335,7 @@ BASE_URL=http://127.0.0.1:8787 scripts/smoke-backend.sh
 
 Use it only against a writable instance without bearer enforcement and with SimpleFIN configured. For read-only, bearer, CORS, or unconfigured-sync behavior, use the direct checks above so the expected status is explicit.
 
-## Completion Gate
+## Backend Completion Gate
 
 For a backend change, finish with:
 

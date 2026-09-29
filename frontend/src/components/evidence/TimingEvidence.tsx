@@ -34,7 +34,7 @@ export function TimingEvidence({
 					<thead>
 						<tr>
 							<th scope="col">Date</th>
-							<th scope="col">Movement</th>
+							<th scope="col">Transaction</th>
 							<th scope="col">Requested</th>
 							<th scope="col">Funded</th>
 						</tr>
@@ -54,7 +54,7 @@ export function TimingEvidence({
 					</tbody>
 				</table>
 			</div>
-			{!events.length && <p>No movements scheduled in this period.</p>}
+			{!events.length && <p>No transactions scheduled in this period.</p>}
 			<div className="inline-notice">
 				<Info size={18} />
 				<span>

@@ -37,7 +37,7 @@ export function AccountDialog({
 	return (
 		<Modal
 			title={account.name}
-			eyebrow={`Account activity · ${temporary ? "Temporary version" : "Saved plan"}`}
+			eyebrow={`Account activity · ${temporary ? "Changes" : "Saved plan"}`}
 			onClose={onClose}
 			wide
 		>

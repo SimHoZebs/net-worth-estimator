@@ -64,7 +64,7 @@ test("clicking an account opens its recorded history and projected transactions"
 		"Historical amount",
 	);
 	await expect(
-		dialog.getByRole("button", { name: "Edit recorded movement" }),
+		dialog.getByRole("button", { name: "Edit recorded transaction" }),
 	).toBeVisible();
 	await page.keyboard.press("Escape");
 	await expect(
@@ -130,23 +130,23 @@ test("a shortfall can be inspected and edited while preserving account context a
 		"Protected account balance",
 	);
 	await expect(dialog.locator(".transaction-details")).toContainText("$9,000");
-	await dialog.getByRole("button", { name: "Edit planned movement" }).click();
+	await dialog
+		.getByRole("button", { name: "Edit planned transaction" })
+		.click();
 	await expect(
-		page.getByRole("dialog", { name: "Edit planned movement" }),
+		page.getByRole("dialog", { name: "Edit planned transaction" }),
 	).toBeVisible();
 	await page.getByLabel("Amount (USD)").fill("3000");
-	await page
-		.getByRole("button", { name: "Apply to temporary version" })
-		.click();
+	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	dialog = page.getByRole("dialog", { name: "Everyday checking" });
 	await expect(dialog).toBeVisible();
-	await expect(dialog).toContainText("Account activity · Temporary version");
+	await expect(dialog).toContainText("Account activity · Changes");
 	await dialog
 		.getByRole("searchbox", { name: "Search account transactions" })
 		.fill("renovation");
 	await expect(dialog.getByText("−$3,000.00", { exact: true })).toBeVisible();
 	await expect(dialog.getByText("Shortfall", { exact: true })).toHaveCount(0);
-	// The saved plan is untouched: only the temporary version changed.
+	// The saved plan is untouched: only the unsaved changes changed.
 	const draft = await readTemporaryVersion(page);
 	const renovation = (plan: { movements: { id: string; amount: number }[] }) =>
 		plan.movements.find((movement) => movement.id === "renovation")?.amount;
@@ -203,7 +203,7 @@ test("growth-only accounts have an honest empty state and retain account details
 		}),
 	).toBeVisible();
 	await expect(
-		dialog.getByRole("button", { name: "Add a planned movement" }),
+		dialog.getByRole("button", { name: "Add a planned transaction" }),
 	).toBeVisible();
 	await expect(
 		dialog.locator('.account-view-tabs > button[role="tab"]'),

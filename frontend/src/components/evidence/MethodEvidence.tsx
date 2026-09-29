@@ -15,7 +15,7 @@ const steps = [
 	{
 		title: "Try a change, then decide",
 		description:
-			"Edit a temporary version, compare the outcome, and explicitly save or discard. Drafts stay in this browser between visits.",
+			"Edit unsaved changes, compare the outcome, and explicitly save or discard. They stay in this browser between visits.",
 	},
 ];
 export function MethodEvidence({ onClose }: { onClose: () => void }) {

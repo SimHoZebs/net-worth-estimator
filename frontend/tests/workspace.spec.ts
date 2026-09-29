@@ -14,7 +14,7 @@ test.beforeEach(async () => {
 /** Open the movement editor for the fixture's investing transfer. */
 async function openInvestingMovementEditor(page: Page) {
 	await page.getByRole("link", { name: "Your plan", exact: true }).click();
-	await page.getByRole("tab", { name: /Movements/ }).click();
+	await page.getByRole("tab", { name: /Transactions/ }).click();
 	await page.getByRole("button", { name: "Edit Monthly investing" }).click();
 }
 
@@ -71,10 +71,8 @@ test("edits remain temporary, persist across reload, compare, and save deliberat
 	await page.goto("/");
 	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
-	await page
-		.getByRole("button", { name: "Apply to temporary version" })
-		.click();
-	await expect(page.getByText("Exploring a temporary version")).toBeVisible();
+	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
+	await expect(page.getByText("Exploring unsaved changes")).toBeVisible();
 	await page.reload();
 	await expect(
 		page.getByText("1 unsaved change · saved server plan unchanged"),
@@ -89,7 +87,7 @@ test("edits remain temporary, persist across reload, compare, and save deliberat
 	await page.getByRole("button", { name: "Save this plan" }).click();
 	await expect(page.getByText("No unsaved changes.")).toBeVisible();
 	await page.reload();
-	// The save reached the server, and the temporary version is gone.
+	// The save reached the server, and the unsaved changes are gone.
 	const saved = await readSavedServerPlan();
 	expect(
 		saved.postings.find((posting) => posting.id === "invest")?.amount.config
@@ -102,22 +100,18 @@ test("discard is explicit and restores the saved plan", async ({ page }) => {
 	await page.goto("/");
 	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("999");
-	await page
-		.getByRole("button", { name: "Apply to temporary version" })
-		.click();
+	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await page.getByRole("button", { name: "Discard", exact: true }).click();
 	await expect(page.getByRole("dialog")).toContainText(
 		"Return to your saved plan?",
 	);
 	await page.getByRole("button", { name: "Keep exploring" }).click();
-	await expect(page.getByText("Exploring a temporary version")).toBeVisible();
+	await expect(page.getByText("Exploring unsaved changes")).toBeVisible();
 	await page.getByRole("button", { name: "Discard", exact: true }).click();
 	await page
 		.getByRole("button", { name: "Discard changes", exact: true })
 		.click();
-	await expect(
-		page.getByText("Exploring a temporary version"),
-	).not.toBeVisible();
+	await expect(page.getByText("Exploring unsaved changes")).not.toBeVisible();
 });
 
 test("account, movement and goal maintenance plus search work", async ({
@@ -127,9 +121,7 @@ test("account, movement and goal maintenance plus search work", async ({
 	await page.getByRole("button", { name: "Add account" }).click();
 	await page.getByLabel("Account name").fill("Travel savings");
 	await page.getByLabel("Balance (USD)", { exact: true }).fill("2500");
-	await page
-		.getByRole("button", { name: "Apply to temporary version" })
-		.click();
+	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await page.getByRole("textbox", { name: "Search plan" }).fill("Travel");
 	await expect(page.getByRole("row", { name: /Travel savings/ })).toBeVisible();
 	await page.getByRole("link", { name: "Goals", exact: true }).click();
@@ -140,9 +132,7 @@ test("account, movement and goal maintenance plus search work", async ({
 		.getByLabel("Account", { exact: true })
 		.selectOption({ label: "Travel savings" });
 	await page.getByLabel("Target (USD)").fill("5000");
-	await page
-		.getByRole("button", { name: "Apply to temporary version" })
-		.click();
+	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await expect(
 		page.getByRole("heading", { name: "Next big trip" }),
 	).toBeVisible();
@@ -162,11 +152,9 @@ test("invalid imports and failed saves retain the intended plan", async ({
 	await expect(page.getByLabel("Import Waypoint server model")).toBeVisible();
 	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
-	await page
-		.getByRole("button", { name: "Apply to temporary version" })
-		.click();
+	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await page.getByRole("button", { name: "Review & save" }).click();
-	// The server rejects the write, so the temporary version must survive.
+	// The server rejects the write, so the unsaved changes must survive.
 	await page.route("**/v1/financial-model", async (route) => {
 		if (route.request().method() === "PUT")
 			return route.fulfill({
@@ -180,7 +168,7 @@ test("invalid imports and failed saves retain the intended plan", async ({
 	await expect(
 		page.getByRole("alert").filter({ hasText: "HTTP 500" }),
 	).toBeVisible();
-	await expect(page.getByText("Exploring a temporary version")).toBeVisible();
+	await expect(page.getByText("Exploring unsaved changes")).toBeVisible();
 	const draft = await readTemporaryVersion(page);
 	expect(
 		draft?.movements.find(
@@ -192,7 +180,7 @@ test("invalid imports and failed saves retain the intended plan", async ({
 test("corrupt persisted data never silently falls back to example content", async ({
 	page,
 }) => {
-	// The remote workspace key holds the temporary version. Corrupt it and the
+	// The remote workspace key holds the unsaved changes. Corrupt it and the
 	// app must surface a recovery path rather than invent a plan.
 	await page.addInitScript((key) => {
 		window.localStorage.setItem(key, "invalid");
@@ -333,11 +321,9 @@ test("read-only plans can be explored but not saved", async ({ page }) => {
 	await expect(page.getByText(/read-only|read only/i).first()).toBeVisible();
 	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
-	await page
-		.getByRole("button", { name: "Apply to temporary version" })
-		.click();
-	// The temporary version is allowed; saving it back to the source is not.
-	await expect(page.getByText("Exploring a temporary version")).toBeVisible();
+	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
+	// Unsaved changes are allowed; saving them back to the source is not.
+	await expect(page.getByText("Exploring unsaved changes")).toBeVisible();
 	await page.getByRole("button", { name: "Review & save" }).click();
 	await expect(
 		page.getByRole("button", { name: "Save this plan" }),
@@ -375,14 +361,10 @@ test("a second tab cannot overwrite newer financial work", async ({
 	await other.goto("/");
 	await openInvestingMovementEditor(other);
 	await other.getByLabel("Amount (USD)").fill("1200");
-	await other
-		.getByRole("button", { name: "Apply to temporary version" })
-		.click();
+	await other.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("1300");
-	await page
-		.getByRole("button", { name: "Apply to temporary version" })
-		.click();
+	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await expect(page.getByRole("alert")).toContainText("another tab");
 	const stored = await page.evaluate(
 		(key) => JSON.parse(window.localStorage.getItem(key)!),
@@ -406,8 +388,8 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 	).toHaveCount(4);
 	await page.getByRole("tab", { name: /Accounts/ }).focus();
 	await page.keyboard.press("ArrowRight");
-	await expect(page.getByRole("tab", { name: /Movements/ })).toBeFocused();
-	await expect(page.getByRole("tab", { name: /Movements/ })).toHaveAttribute(
+	await expect(page.getByRole("tab", { name: /Transactions/ })).toBeFocused();
+	await expect(page.getByRole("tab", { name: /Transactions/ })).toHaveAttribute(
 		"aria-selected",
 		"true",
 	);

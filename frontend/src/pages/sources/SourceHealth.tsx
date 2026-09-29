@@ -63,7 +63,7 @@ export function SourceHealth({
 				<DetailRow label={"Display balance coverage"}>
 					{recorded.length} of {serverAccountCount} accounts
 				</DetailRow>
-				{<DetailRow label="Server postings">{serverPostingCount}</DetailRow>}
+				{<DetailRow label="Server deposits">{serverPostingCount}</DetailRow>}
 				<DetailRow label="Display validation" className="inline-success">
 					<Check size={15} />
 					All structural checks passed

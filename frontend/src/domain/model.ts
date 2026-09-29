@@ -114,7 +114,7 @@ export const planSchema = z
 		const movementIds = new Set<string>();
 		for (const [index, movement] of plan.movements.entries()) {
 			if (movementIds.has(movement.id))
-				issue(["movements", index, "id"], "Movement IDs must be unique.");
+				issue(["movements", index, "id"], "Transaction IDs must be unique.");
 			movementIds.add(movement.id);
 			if (!movement.fromId && !movement.toId)
 				issue(["movements", index], "Choose a source or destination account.");

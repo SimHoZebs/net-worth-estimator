@@ -24,9 +24,7 @@ export function DraftBar({
 				</span>
 				<span>
 					<strong>
-						{loading
-							? "Updating the temporary version"
-							: "Exploring a temporary version"}
+						{loading ? "Updating unsaved changes" : "Exploring unsaved changes"}
 					</strong>
 					<small>
 						{count} unsaved {count === 1 ? "change" : "changes"} · saved server

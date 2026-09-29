@@ -54,7 +54,7 @@ export function FundingInsight({
 			) : (
 				<>
 					<p>
-						No underfunded movements appear within the selected horizon.
+						No underfunded transactions appear within the selected horizon.
 						Investment returns remain uncertain.
 					</p>
 					<button
@@ -62,7 +62,7 @@ export function FundingInsight({
 						className="button insight-button"
 						onClick={onPlan}
 					>
-						Review planned movements <ArrowUpRight size={16} />
+						Review planned transactions <ArrowUpRight size={16} />
 					</button>
 				</>
 			)}

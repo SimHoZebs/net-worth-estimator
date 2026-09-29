@@ -74,7 +74,7 @@ export function ChangesPanel({
 			)}
 			{readOnly && (
 				<p className="section-note">
-					"The server is read-only. Export the temporary version from Data &
+					"The server is read-only. Export the unsaved changes from Data &
 					sources to keep a separate copy."
 				</p>
 			)}
