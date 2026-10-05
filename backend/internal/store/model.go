@@ -144,16 +144,21 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 	for _, account := range accounts {
 		accountIDs[account.ID] = struct{}{}
 	}
+	storedByID := make(map[string]types.Account, len(accounts))
+	if storedDocument != nil {
+		for _, account := range storedDocument.Accounts {
+			if _, ok := storedByID[account.ID]; !ok {
+				storedByID[account.ID] = account
+			}
+		}
+	}
 	preserveAccount := func(id string) {
 		if _, ok := accountIDs[id]; ok || storedDocument == nil {
 			return
 		}
-		for _, account := range storedDocument.Accounts {
-			if account.ID == id {
-				accounts = append(accounts, account)
-				accountIDs[id] = struct{}{}
-				return
-			}
+		if account, ok := storedByID[id]; ok {
+			accounts = append(accounts, account)
+			accountIDs[id] = struct{}{}
 		}
 	}
 	for _, checkpoint := range syncedCheckpoints {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -409,14 +410,17 @@ func validateExactKeys(actual map[string]types.AmountInputBinding, required []st
 }
 
 func joinStrings(items []string, sep string) string {
-	out := ""
+	if len(items) == 0 {
+		return ""
+	}
+	var builder strings.Builder
 	for i, item := range items {
 		if i > 0 {
-			out += sep
+			builder.WriteString(sep)
 		}
-		out += item
+		builder.WriteString(item)
 	}
-	return out
+	return builder.String()
 }
 
 // ValidateAmountDescriptor validates an amount descriptor and returns posting

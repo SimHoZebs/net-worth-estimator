@@ -188,18 +188,6 @@ func balancesAt(row *types.ProjectionRow, accounts []types.Account) map[string]f
 	return balances
 }
 
-func balanceAt(row *types.ProjectionRow, accountID string) float64 {
-	if row == nil {
-		return 0
-	}
-	for _, snapshot := range row.AccountSnapshots {
-		if snapshot.AccountID == accountID {
-			return snapshot.Balance
-		}
-	}
-	return 0
-}
-
 func expenseAt(plan *types.FIPlan, baselineDate, date IsoDate) float64 {
 	years := math.Max(0, float64(DaysBetween(baselineDate, date))/365.2425)
 	return plan.AnnualExpenseTarget * math.Pow(1+plan.AnnualExpenseGrowthRate, years)
@@ -401,7 +389,70 @@ type cycleOutcome struct {
 	runOutcome *FIRunOutcome
 }
 
+// fiCycleShared holds the candidate-independent inputs for FI branch-cycle
+// evaluation. EvaluateFinancialIndependence builds it once per evaluation;
+// per-candidate evaluateCycle calls previously rebuilt these maps (O(E))
+// for every candidate date (O(M*E) total). Sharing them is read-only and
+// bit-identical: branch execution never mutates postings, dispositions, or
+// base-event pointers.
+type fiCycleShared struct {
+	assetRates                   map[string]float64
+	assetRateOrder               []string
+	cashflowIDs                  map[string]bool
+	accountsByID                 map[string]types.Account
+	dispositions                 map[string]postingDisposition
+	branchPostings               []types.Posting
+	baseRealizedByDateAndPosting map[string]float64
+	baseEventsByDateAndPosting   map[string]*types.MovementEvent
+}
+
+func newFICycleShared(path *types.ProjectionPath, plan *types.FIPlan) *fiCycleShared {
+	assetRates := selectedAssetRates(plan)
+	assetRateOrder := selectedAssetRateOrder(plan, assetRates)
+	cashflowIDs := selectedCashflowIDs(plan)
+	accountsByID := make(map[string]types.Account, len(path.EffectiveDocument.Accounts))
+	for _, account := range path.EffectiveDocument.Accounts {
+		accountsByID[account.ID] = account
+	}
+	continuingIDs := map[string]bool{}
+	for _, id := range plan.ContinuingPostingIDs {
+		if !cashflowIDs[id] {
+			continuingIDs[id] = true
+		}
+	}
+	dispositions := classifyPostingDispositions(path, cashflowIDs, continuingIDs)
+	branchPostings := []types.Posting{}
+	for index := range path.EffectiveDocument.Postings {
+		posting := &path.EffectiveDocument.Postings[index]
+		if posting.Enabled && dispositions[posting.ID] != dispositionDisabled {
+			branchPostings = append(branchPostings, *posting)
+		}
+	}
+	baseRealizedByDateAndPosting := make(map[string]float64, len(path.MovementEvents))
+	baseEventsByDateAndPosting := make(map[string]*types.MovementEvent, len(path.MovementEvents))
+	for index := range path.MovementEvents {
+		event := &path.MovementEvents[index]
+		key := event.Date + ":" + event.Origin.PostingID
+		baseRealizedByDateAndPosting[key] = event.RealizedAmount
+		baseEventsByDateAndPosting[key] = event
+	}
+	return &fiCycleShared{
+		assetRates:                   assetRates,
+		assetRateOrder:               assetRateOrder,
+		cashflowIDs:                  cashflowIDs,
+		accountsByID:                 accountsByID,
+		dispositions:                 dispositions,
+		branchPostings:               branchPostings,
+		baseRealizedByDateAndPosting: baseRealizedByDateAndPosting,
+		baseEventsByDateAndPosting:   baseEventsByDateAndPosting,
+	}
+}
+
 func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FIRow, monteCarloSample *types.MonteCarloSample, captureBalanceTrajectory, summaryOnly bool) (*FIRunOutcome, error) {
+	return evaluateCycleWithShared(path, plan, newFICycleShared(path, plan), candidate, monteCarloSample, captureBalanceTrajectory, summaryOnly)
+}
+
+func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, shared *fiCycleShared, candidate *FIRow, monteCarloSample *types.MonteCarloSample, captureBalanceTrajectory, summaryOnly bool) (*FIRunOutcome, error) {
 	if !candidate.IsEligible && !captureBalanceTrajectory {
 		return &FIRunOutcome{
 			CandidateDate:                    candidate.Date,
@@ -421,14 +472,11 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 		}, nil
 	}
 	candidateRow := latestRowAtOrBefore(path.Rows, candidate.Date)
-	assetRates := selectedAssetRates(plan)
-	assetRateOrder := selectedAssetRateOrder(plan, assetRates)
+	assetRates := shared.assetRates
+	assetRateOrder := shared.assetRateOrder
 	expenseBaseline := expenseBaselineDate(plan, path.ProjectionStartDate, candidate.Date)
-	cashflowIDs := selectedCashflowIDs(plan)
-	accountsByID := map[string]types.Account{}
-	for _, account := range path.EffectiveDocument.Accounts {
-		accountsByID[account.ID] = account
-	}
+	cashflowIDs := shared.cashflowIDs
+	accountsByID := shared.accountsByID
 	candidateBalances := balancesAt(candidateRow, path.EffectiveDocument.Accounts)
 
 	if summaryOnly {
@@ -456,28 +504,10 @@ func evaluateCycle(path *types.ProjectionPath, plan *types.FIPlan, candidate *FI
 	for _, accountID := range assetRateOrder {
 		startingSelectedAssetBalance += math.Max(0, candidateBalances[accountID])
 	}
-	continuingIDs := map[string]bool{}
-	for _, id := range plan.ContinuingPostingIDs {
-		if !cashflowIDs[id] {
-			continuingIDs[id] = true
-		}
-	}
-	dispositions := classifyPostingDispositions(path, cashflowIDs, continuingIDs)
-	branchPostings := []types.Posting{}
-	for index := range path.EffectiveDocument.Postings {
-		posting := &path.EffectiveDocument.Postings[index]
-		if posting.Enabled && dispositions[posting.ID] != dispositionDisabled {
-			branchPostings = append(branchPostings, *posting)
-		}
-	}
-	baseRealizedByDateAndPosting := map[string]float64{}
-	baseEventsByDateAndPosting := map[string]*types.MovementEvent{}
-	for index := range path.MovementEvents {
-		event := &path.MovementEvents[index]
-		key := fmt.Sprintf("%s:%s", event.Date, event.Origin.PostingID)
-		baseRealizedByDateAndPosting[key] = event.RealizedAmount
-		baseEventsByDateAndPosting[key] = event
-	}
+	dispositions := shared.dispositions
+	branchPostings := shared.branchPostings
+	baseRealizedByDateAndPosting := shared.baseRealizedByDateAndPosting
+	baseEventsByDateAndPosting := shared.baseEventsByDateAndPosting
 	transitions, err := CreateTransitionRuntime(types.FinancialModel{
 		Accounts: path.EffectiveDocument.Accounts,
 		Postings: branchPostings,
@@ -768,9 +798,13 @@ func EvaluateFinancialIndependence(path *types.ProjectionPath, plan *types.FIPla
 		annualDirectIncome := realizedCashflowBetween(path.MovementEvents, cashflowIDs, date, AddYearsClamped(date, 1))
 		analysisRow := FIRow{Date: date}
 		analysisRow.MinimumNetWorth = plan.MinimumNetWorth
+		// One balance map per candidate (O(A)) instead of one snapshot scan
+		// per selected asset (O(S*A)). balancesAt zero-fills missing
+		// accounts, matching balanceAt's missing-as-zero semantics here.
+		rowBalances := balancesAt(row, path.EffectiveDocument.Accounts)
 		for _, accountID := range assetRateOrder {
 			rate := assetRates[accountID]
-			balance := math.Max(0, balanceAt(row, accountID))
+			balance := math.Max(0, rowBalances[accountID])
 			analysisRow.AssetContributions = append(analysisRow.AssetContributions, FIAssetContribution{
 				AccountID:                accountID,
 				Balance:                  balance,
@@ -803,9 +837,10 @@ func EvaluateFinancialIndependence(path *types.ProjectionPath, plan *types.FIPla
 		result.Rows = append(result.Rows, analysisRow)
 	}
 
+	shared := newFICycleShared(path, plan)
 	for index := range result.Rows {
 		candidate := &result.Rows[index]
-		outcome, err := evaluateCycle(path, plan, candidate, monteCarloSample, false, true)
+		outcome, err := evaluateCycleWithShared(path, plan, shared, candidate, monteCarloSample, false, true)
 		if err != nil {
 			return nil, fmt.Errorf("fi.cycle.summary: %w", err)
 		}
@@ -818,7 +853,7 @@ func EvaluateFinancialIndependence(path *types.ProjectionPath, plan *types.FIPla
 		selectedIndex := SelectFIOutcomeIndex(result.RunOutcomes)
 		if selectedIndex >= 0 && selectedIndex < len(result.Rows) {
 			candidate := &result.Rows[selectedIndex]
-			outcome, err := evaluateCycle(path, plan, candidate, monteCarloSample, monteCarloSample == nil, false)
+			outcome, err := evaluateCycleWithShared(path, plan, shared, candidate, monteCarloSample, monteCarloSample == nil, false)
 			if err != nil {
 				return nil, fmt.Errorf("fi.cycle.detailed: %w", err)
 			}

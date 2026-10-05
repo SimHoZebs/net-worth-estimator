@@ -36,12 +36,29 @@ type AccountBalanceProbabilisticResult struct {
 // report a spurious first crossing.
 func EvaluateAccountBalance(path *types.ProjectionPath, accountID string, target float64) AccountBalancePathResult {
 	firstReachedDate := (*string)(nil)
+	// Snapshots are built in effective-document account order, so resolve the
+	// expected position once and probe it per row (O(R+A)) instead of scanning
+	// every row (O(R*A)). Fall back to a scan when shapes diverge.
+	accountIndex := -1
+	for index, account := range path.EffectiveDocument.Accounts {
+		if account.ID == accountID {
+			accountIndex = index
+			break
+		}
+	}
 	for index := range path.Rows {
 		row := &path.Rows[index]
 		if row.IsHistorical {
 			continue
 		}
-		balance, ok := accountBalanceInRow(row, accountID)
+		var balance float64
+		var ok bool
+		if accountIndex >= 0 && accountIndex < len(row.AccountSnapshots) &&
+			row.AccountSnapshots[accountIndex].AccountID == accountID {
+			balance, ok = row.AccountSnapshots[accountIndex].Balance, true
+		} else {
+			balance, ok = accountBalanceInRow(row, accountID)
+		}
 		if !ok || balance < target {
 			continue
 		}

@@ -245,13 +245,14 @@ func ApplyModelOverrides(document FinancialModelDocument, overrides ModelOverrid
 		}
 	}
 	accounts = append(accounts, overrides.AddedAccounts...)
+	accountIDSet := make(map[string]bool, len(accounts))
+	for _, account := range accounts {
+		accountIDSet[account.ID] = true
+	}
 	checkpoints := make([]Checkpoint, 0, len(document.Checkpoints))
 	for _, checkpoint := range document.Checkpoints {
-		for _, account := range accounts {
-			if account.ID == checkpoint.AccountID {
-				checkpoints = append(checkpoints, checkpoint)
-				break
-			}
+		if accountIDSet[checkpoint.AccountID] {
+			checkpoints = append(checkpoints, checkpoint)
 		}
 	}
 	postings := make([]Posting, 0, len(document.Postings)+len(overrides.AddedPostings))

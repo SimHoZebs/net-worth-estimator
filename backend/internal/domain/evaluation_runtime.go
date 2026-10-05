@@ -316,13 +316,14 @@ func rawInstances(tables *types.EvaluationTables) []rawInstance {
 
 // NewEvaluationRuntimeSet creates a runtime set from evaluation tables.
 func NewEvaluationRuntimeSet(tables *types.EvaluationTables, registry *EvaluationRegistry) *EvaluationRuntimeSet {
+	instances := rawInstances(tables)
 	idCounts := map[string]int{}
-	for _, instance := range rawInstances(tables) {
+	for _, instance := range instances {
 		idCounts[instance.instanceID]++
 	}
 	set := &EvaluationRuntimeSet{}
 	seenIDs := map[string]bool{}
-	for _, instance := range rawInstances(tables) {
+	for _, instance := range instances {
 		if seenIDs[instance.instanceID] {
 			continue
 		}
