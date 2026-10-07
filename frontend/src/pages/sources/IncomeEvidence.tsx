@@ -1,11 +1,33 @@
 import { Info } from "lucide-react";
 import { Badge } from "../../components/ui.tsx";
-import { payEvidence } from "../../domain/evidence.ts";
+import { analyzePay } from "../../domain/analysis/index.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 
 export function IncomeEvidence({ plan }: { plan: Plan }) {
-	const evidence = payEvidence(plan);
+	const result = analyzePay(plan);
+	if (result.state === "error") {
+		return (
+			<section className="panel pay-evidence">
+				<div className="section-top">
+					<div>
+						<h2>What the income records suggest</h2>
+						<p>Deposit-derived evidence · independent of planned income</p>
+					</div>
+					<Badge tone="amber">No records</Badge>
+				</div>
+				<p className="section-note">
+					{result.diagnostics[0]?.message ??
+						"No recorded one-time external inflows are available."}{" "}
+					Add records in Plan to inspect income evidence.
+				</p>
+			</section>
+		);
+	}
+	const evidence = result.value;
+	const warnings = result.diagnostics.filter(
+		(diagnostic) => diagnostic.severity === "warning",
+	);
 	return (
 		<section className="panel pay-evidence">
 			<div className="section-top">
@@ -13,8 +35,12 @@ export function IncomeEvidence({ plan }: { plan: Plan }) {
 					<h2>What the income records suggest</h2>
 					<p>Deposit-derived evidence · independent of planned income</p>
 				</div>
-				<Badge tone="amber">
-					{evidence.strong ? "Moderate evidence" : "Limited evidence"}
+				<Badge tone={evidence.strength === "strong" ? "green" : "amber"}>
+					{evidence.strength === "strong"
+						? "Strong evidence"
+						: evidence.strength === "moderate"
+							? "Moderate evidence"
+							: "Limited evidence"}
 				</Badge>
 			</div>
 			{evidence.comparable.length ? (
@@ -47,6 +73,11 @@ export function IncomeEvidence({ plan }: { plan: Plan }) {
 							</p>
 						</div>
 					</div>
+					<ul className="evidence-items">
+						{evidence.evidence.map((item) => (
+							<li key={item.code}>{item.message}</li>
+						))}
+					</ul>
 					<details className="evidence-records">
 						<summary>
 							Inspect {evidence.candidates.length} supporting and excluded
@@ -91,6 +122,13 @@ export function IncomeEvidence({ plan }: { plan: Plan }) {
 					No recorded one-time external inflows are available. Add records in
 					Plan to inspect income evidence.
 				</p>
+			)}
+			{warnings.length > 0 && (
+				<ul className="evidence-warnings">
+					{warnings.map((warning) => (
+						<li key={warning.code}>{warning.message}</li>
+					))}
+				</ul>
 			)}
 			<div className="inline-notice">
 				<Info size={18} />
