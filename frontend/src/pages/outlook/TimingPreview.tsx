@@ -13,62 +13,51 @@ import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { Projection } from "../../domain/result.ts";
 
-const STORAGE_KEY = "nwe.card-cycle.v1";
+const STORAGE_KEY = "nwe.card-cycle.v2";
 
-interface AccountCycleSettings {
+interface TotalCycleSettings {
 	statementDay: number;
 	budget: number;
 	spentOverride: number | null;
+	/** Null means every debt account counts toward the total. */
+	accountIds: string[] | null;
 }
 
-interface PersistedCycleState {
-	selectedId: string | null;
-	settings: Record<string, AccountCycleSettings>;
-}
-
-const defaultSettings = (): AccountCycleSettings => ({
+const defaultSettings = (): TotalCycleSettings => ({
 	statementDay: 1,
 	budget: 0,
 	spentOverride: null,
+	accountIds: null,
 });
 
-function loadPersisted(): PersistedCycleState {
+function loadPersisted(): TotalCycleSettings {
 	if (typeof window === "undefined" || !window.localStorage)
-		return { selectedId: null, settings: {} };
+		return defaultSettings();
 	try {
 		const raw = window.localStorage.getItem(STORAGE_KEY);
-		if (!raw) return { selectedId: null, settings: {} };
-		const parsed = JSON.parse(raw) as Partial<PersistedCycleState>;
-		if (typeof parsed !== "object" || parsed === null)
-			return { selectedId: null, settings: {} };
-		const settings: Record<string, AccountCycleSettings> = {};
-		for (const [key, value] of Object.entries(parsed.settings ?? {})) {
-			if (typeof value !== "object" || value === null) continue;
-			const entry = value as Partial<AccountCycleSettings> & {
-				spentOverride?: number | null | string | undefined;
-			};
-			const rawOverride = entry.spentOverride as unknown;
-			settings[key] = {
-				statementDay: Math.min(
-					28,
-					Math.max(1, Math.floor(Number(entry.statementDay) || 1)),
-				),
-				budget: Math.max(0, Number(entry.budget) || 0),
-				spentOverride:
-					rawOverride === null ||
-					rawOverride === undefined ||
-					rawOverride === ""
-						? null
-						: Math.max(0, Number(rawOverride) || 0),
-			};
-		}
+		if (!raw) return defaultSettings();
+		const parsed = JSON.parse(raw) as Partial<TotalCycleSettings>;
+		if (typeof parsed !== "object" || parsed === null) return defaultSettings();
+		const rawOverride = parsed.spentOverride as unknown;
+		const accountIds = Array.isArray(parsed.accountIds)
+			? parsed.accountIds.filter(
+					(id): id is string => typeof id === "string" && id !== "",
+				)
+			: null;
 		return {
-			selectedId:
-				typeof parsed.selectedId === "string" ? parsed.selectedId : null,
-			settings,
+			statementDay: Math.min(
+				28,
+				Math.max(1, Math.floor(Number(parsed.statementDay) || 1)),
+			),
+			budget: Math.max(0, Number(parsed.budget) || 0),
+			spentOverride:
+				rawOverride === null || rawOverride === undefined || rawOverride === ""
+					? null
+					: Math.max(0, Number(rawOverride) || 0),
+			accountIds: accountIds?.length ? accountIds : null,
 		};
 	} catch {
-		return { selectedId: null, settings: {} };
+		return defaultSettings();
 	}
 }
 
@@ -83,49 +72,30 @@ export function TimingPreview({
 		() => plan.accounts.filter((account) => account.kind === "debt"),
 		[plan.accounts],
 	);
-	const [persisted, setPersisted] =
-		useState<PersistedCycleState>(loadPersisted);
+	const [settings, setSettings] = useState<TotalCycleSettings>(loadPersisted);
 	const [expanded, setExpanded] = useState(false);
 	const [configOpen, setConfigOpen] = useState(false);
-
-	const selectedId = useMemo(() => {
-		if (
-			persisted.selectedId &&
-			cards.some((card) => card.id === persisted.selectedId)
-		)
-			return persisted.selectedId;
-		return cards[0]?.id ?? null;
-	}, [persisted.selectedId, cards]);
-
-	const settings = useMemo<AccountCycleSettings>(
-		() =>
-			selectedId
-				? (persisted.settings[selectedId] ?? defaultSettings())
-				: defaultSettings(),
-		[selectedId, persisted.settings],
-	);
 
 	useEffect(() => {
 		if (typeof window === "undefined" || !window.localStorage) return;
 		try {
-			window.localStorage.setItem(
-				STORAGE_KEY,
-				JSON.stringify({ selectedId, settings: persisted.settings }),
-			);
+			window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 		} catch {
 			// Storage is best-effort; the tracker still works for this session.
 		}
-	}, [selectedId, persisted.settings]);
+	}, [settings]);
 
-	const selectedCard = cards.find((card) => card.id === selectedId) ?? null;
+	const trackedIds = useMemo(() => {
+		const known = new Set(cards.map((card) => card.id));
+		if (!settings.accountIds) return cards.map((card) => card.id);
+		const selected = settings.accountIds.filter((id) => known.has(id));
+		return selected.length ? selected : cards.map((card) => card.id);
+	}, [settings.accountIds, cards]);
 
-	const transactions = useMemo(
-		() =>
-			selectedId
-				? accountTransactions({ accountId: selectedId, plan, projection })
-				: [],
-		[selectedId, plan, projection],
-	);
+	const trackedCards = useMemo(() => {
+		const selected = new Set(trackedIds);
+		return cards.filter((card) => selected.has(card.id));
+	}, [trackedIds, cards]);
 
 	const cycle = useMemo(
 		() =>
@@ -136,43 +106,46 @@ export function TimingPreview({
 		[plan.startDate, settings.statementDay],
 	);
 
-	const derivedSpent = useMemo(
+	const perAccount = useMemo(
 		() =>
-			cycleSpentSoFar({
-				transactions,
-				cycleStart: cycle.cycleStart,
-				todayIso: plan.startDate,
+			trackedIds.map((accountId) => {
+				const transactions = accountTransactions({
+					accountId,
+					plan,
+					projection,
+				});
+				const name =
+					cards.find((card) => card.id === accountId)?.name ?? accountId;
+				return {
+					accountId,
+					name,
+					derived: cycleSpentSoFar({
+						transactions,
+						cycleStart: cycle.cycleStart,
+						todayIso: plan.startDate,
+					}),
+					scheduled: cycleScheduledRest({
+						transactions,
+						cycleEnd: cycle.cycleEnd,
+						todayIso: plan.startDate,
+					}),
+					groups: groupCycleSpending({
+						transactions,
+						cycleStart: cycle.cycleStart,
+						todayIso: plan.startDate,
+					}).map((group) => ({ ...group, accountId, accountName: name })),
+				};
 			}),
-		[transactions, cycle.cycleStart, plan.startDate],
+		[trackedIds, cards, plan, projection, cycle, plan.startDate],
 	);
 
-	const scheduledRest = useMemo(
-		() =>
-			cycleScheduledRest({
-				transactions,
-				cycleEnd: cycle.cycleEnd,
-				todayIso: plan.startDate,
-			}),
-		[transactions, cycle.cycleEnd, plan.startDate],
-	);
-
-	const groups = useMemo(
-		() =>
-			groupCycleSpending({
-				transactions,
-				cycleStart: cycle.cycleStart,
-				todayIso: plan.startDate,
-			}),
-		[transactions, cycle.cycleStart, plan.startDate],
-	);
-
-	if (!selectedCard || !selectedId) {
+	if (!cards.length) {
 		return (
-			<section className="timing-preview" aria-label="Current card cycle">
+			<section className="timing-preview" aria-label="Total card cycle">
 				<div className="section-top">
 					<h2>
 						<CalendarDays size={18} />
-						Current card cycle
+						Total card cycle
 					</h2>
 					<Badge tone="outline">Card timing</Badge>
 				</div>
@@ -183,6 +156,14 @@ export function TimingPreview({
 		);
 	}
 
+	const derivedSpent = perAccount.reduce((sum, item) => sum + item.derived, 0);
+	const scheduledRest = perAccount.reduce(
+		(sum, item) => sum + item.scheduled,
+		0,
+	);
+	const groups = perAccount
+		.flatMap((item) => item.groups)
+		.sort((a, b) => b.total - a.total || a.key.localeCompare(b.key));
 	const spent = settings.spentOverride ?? derivedSpent;
 	const remaining = settings.budget - spent;
 	const daily = dailyAllowance({
@@ -193,58 +174,46 @@ export function TimingPreview({
 	const progress =
 		settings.budget > 0 ? Math.min(100, (spent / settings.budget) * 100) : 0;
 
-	const updateSettings = (next: Partial<AccountCycleSettings>) => {
-		setPersisted((previous) => ({
-			selectedId,
-			settings: {
-				...previous.settings,
-				[selectedId]: {
-					statementDay: next.statementDay ?? settings.statementDay,
-					budget: next.budget ?? settings.budget,
-					spentOverride:
-						next.spentOverride !== undefined
-							? next.spentOverride
-							: settings.spentOverride,
-				},
-			},
+	const updateSettings = (next: Partial<TotalCycleSettings>) => {
+		setSettings((previous) => ({
+			statementDay: next.statementDay ?? previous.statementDay,
+			budget: next.budget ?? previous.budget,
+			spentOverride:
+				next.spentOverride !== undefined
+					? next.spentOverride
+					: previous.spentOverride,
+			accountIds:
+				next.accountIds !== undefined ? next.accountIds : previous.accountIds,
 		}));
 	};
 
+	const toggleAccount = (accountId: string) => {
+		const explicit = settings.accountIds ?? cards.map((card) => card.id);
+		const next = explicit.includes(accountId)
+			? explicit.filter((id) => id !== accountId)
+			: [...explicit, accountId];
+		updateSettings({ accountIds: next.length ? next : null });
+	};
+
+	const accountLabel =
+		trackedCards.length === cards.length
+			? `All ${cards.length} cards`
+			: trackedCards.map((card) => card.name).join(", ");
+
 	return (
-		<section className="timing-preview" aria-label="Current card cycle">
+		<section className="timing-preview" aria-label="Total card cycle">
 			<div className="section-top">
 				<h2>
 					<CalendarDays size={18} />
-					Current card cycle
+					Total card cycle
 				</h2>
 				<Badge tone="outline">Card timing</Badge>
 			</div>
-			<div className="cycle-card-row">
-				<label className="field cycle-card-select">
-					<span>Card</span>
-					<select
-						value={selectedId}
-						onChange={(event) =>
-							setPersisted((previous) => ({
-								selectedId: event.target.value,
-								settings: previous.settings,
-							}))
-						}
-						aria-label="Tracked card"
-					>
-						{cards.map((card) => (
-							<option key={card.id} value={card.id}>
-								{card.name}
-							</option>
-						))}
-					</select>
-				</label>
-				<p className="cycle-dates">
-					{dateLabel(cycle.cycleStart, true)} to{" "}
-					{dateLabel(cycle.cycleEnd, true)} · {cycle.daysLeft}{" "}
-					{cycle.daysLeft === 1 ? "day" : "days"} left
-				</p>
-			</div>
+			<p className="cycle-dates">
+				{dateLabel(cycle.cycleStart, true)} to {dateLabel(cycle.cycleEnd, true)}{" "}
+				· {cycle.daysLeft} {cycle.daysLeft === 1 ? "day" : "days"} left ·{" "}
+				{accountLabel}
+			</p>
 			<div className="timing-figures">
 				<div>
 					<span>Set aside for cycle</span>
@@ -268,7 +237,7 @@ export function TimingPreview({
 			<div className="cycle-progress">
 				<Progress
 					value={progress}
-					label={`${selectedCard.name} cycle spending`}
+					label="Total cycle spending"
 					tone={remaining < 0 ? "amber" : "green"}
 				/>
 				<p>
@@ -280,7 +249,7 @@ export function TimingPreview({
 								: ""}
 						</>
 					) : (
-						"Set a cycle budget to track daily room to spend."
+						"Set a total cycle budget to track daily room to spend."
 					)}
 				</p>
 			</div>
@@ -331,7 +300,7 @@ export function TimingPreview({
 						/>
 					</label>
 					<label className="field">
-						<span>Set aside for cycle ($)</span>
+						<span>Total set aside for cycle ($)</span>
 						<input
 							type="number"
 							min={0}
@@ -373,6 +342,22 @@ export function TimingPreview({
 							Use tracked {money(derivedSpent)} instead
 						</button>
 					)}
+					<fieldset className="cycle-accounts">
+						<legend>Accounts in this total</legend>
+						{cards.map((card) => {
+							const checked = trackedIds.includes(card.id);
+							return (
+								<label key={card.id} className="cycle-account-option">
+									<input
+										type="checkbox"
+										checked={checked}
+										onChange={() => toggleAccount(card.id)}
+									/>
+									<span>{card.name}</span>
+								</label>
+							);
+						})}
+					</fieldset>
 				</div>
 			)}
 			{expanded && (
@@ -380,11 +365,11 @@ export function TimingPreview({
 					{groups.length ? (
 						<ul>
 							{groups.map((group) => (
-								<li key={group.key}>
+								<li key={`${group.accountId}-${group.key}`}>
 									<span>
 										<strong>{group.name}</strong>
 										<small>
-											{group.counterparty} · {group.count}{" "}
+											{group.accountName} · {group.counterparty} · {group.count}{" "}
 											{group.count === 1 ? "charge" : "charges"}
 										</small>
 									</span>
@@ -394,8 +379,8 @@ export function TimingPreview({
 						</ul>
 					) : (
 						<p>
-							No {selectedCard.name} charges in this cycle yet. Tracked spend
-							covers {dateLabel(cycle.cycleStart, true)} through{" "}
+							No charges in this cycle yet. Tracked spend covers{" "}
+							{dateLabel(cycle.cycleStart, true)} through{" "}
 							{dateLabel(plan.startDate, true)}.
 						</p>
 					)}
