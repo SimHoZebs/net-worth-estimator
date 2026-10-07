@@ -1868,6 +1868,43 @@
 	.pay-evidence {
 		padding: 25px;
 	}
+	.evidence-items,
+	.evidence-warnings {
+		list-style: none;
+		padding: 0;
+		margin: 0 0 16px;
+		display: grid;
+		gap: 6px;
+		font-size: 11px;
+		color: #768363;
+	}
+	.evidence-warnings {
+		color: #8b7549;
+	}
+	.evidence-items li,
+	.evidence-warnings li {
+		display: flex;
+		gap: 8px;
+		align-items: baseline;
+	}
+	.evidence-items li::before {
+		content: "";
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: #829466;
+		flex-shrink: 0;
+		transform: translateY(-1px);
+	}
+	.evidence-warnings li::before {
+		content: "";
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: #b5a16a;
+		flex-shrink: 0;
+		transform: translateY(-1px);
+	}
 	.evidence-records {
 		border-top: 1px solid var(--line);
 		border-bottom: 1px solid var(--line);
