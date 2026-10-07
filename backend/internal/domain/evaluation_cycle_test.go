@@ -38,19 +38,21 @@ func TestValidateCycleFulfillmentConfig(t *testing.T) {
 		config  any
 		wantErr bool
 	}{
-		{"valid", map[string]any{"accountId": "prime_card", "statementDay": 15.0, "budget": 800.0}, false},
-		{"zero budget allowed", map[string]any{"accountId": "prime_card", "statementDay": 1.0, "budget": 0.0}, false},
-		{"missing account", map[string]any{"statementDay": 15.0, "budget": 800.0}, true},
-		{"empty account", map[string]any{"accountId": "", "statementDay": 15.0, "budget": 800.0}, true},
-		{"missing statement day", map[string]any{"accountId": "prime_card", "budget": 800.0}, true},
-		{"statement day zero", map[string]any{"accountId": "prime_card", "statementDay": 0.0, "budget": 800.0}, true},
-		{"statement day 29", map[string]any{"accountId": "prime_card", "statementDay": 29.0, "budget": 800.0}, true},
-		{"statement day fractional", map[string]any{"accountId": "prime_card", "statementDay": 15.5, "budget": 800.0}, true},
-		{"statement day string", map[string]any{"accountId": "prime_card", "statementDay": "15", "budget": 800.0}, true},
-		{"missing budget", map[string]any{"accountId": "prime_card", "statementDay": 15.0}, true},
-		{"negative budget", map[string]any{"accountId": "prime_card", "statementDay": 15.0, "budget": -1.0}, true},
-		{"non-numeric budget", map[string]any{"accountId": "prime_card", "statementDay": 15.0, "budget": "800"}, true},
-		{"nan budget", map[string]any{"accountId": "prime_card", "statementDay": 15.0, "budget": math.NaN()}, true},
+		{"valid", map[string]any{"accountIds": []any{"prime_card", "ultimate_card"}, "statementDay": 15.0, "budget": 800.0}, false},
+		{"zero budget allowed", map[string]any{"accountIds": []any{"prime_card"}, "statementDay": 1.0, "budget": 0.0}, false},
+		{"missing accounts", map[string]any{"statementDay": 15.0, "budget": 800.0}, true},
+		{"empty accounts", map[string]any{"accountIds": []any{}, "statementDay": 15.0, "budget": 800.0}, true},
+		{"null accounts", map[string]any{"accountIds": nil, "statementDay": 15.0, "budget": 800.0}, true},
+		{"blank account", map[string]any{"accountIds": []any{""}, "statementDay": 15.0, "budget": 800.0}, true},
+		{"missing statement day", map[string]any{"accountIds": []any{"prime_card"}, "budget": 800.0}, true},
+		{"statement day zero", map[string]any{"accountIds": []any{"prime_card"}, "statementDay": 0.0, "budget": 800.0}, true},
+		{"statement day 29", map[string]any{"accountIds": []any{"prime_card"}, "statementDay": 29.0, "budget": 800.0}, true},
+		{"statement day fractional", map[string]any{"accountIds": []any{"prime_card"}, "statementDay": 15.5, "budget": 800.0}, true},
+		{"statement day string", map[string]any{"accountIds": []any{"prime_card"}, "statementDay": "15", "budget": 800.0}, true},
+		{"missing budget", map[string]any{"accountIds": []any{"prime_card"}, "statementDay": 15.0}, true},
+		{"negative budget", map[string]any{"accountIds": []any{"prime_card"}, "statementDay": 15.0, "budget": -1.0}, true},
+		{"non-numeric budget", map[string]any{"accountIds": []any{"prime_card"}, "statementDay": 15.0, "budget": "800"}, true},
+		{"nan budget", map[string]any{"accountIds": []any{"prime_card"}, "statementDay": 15.0, "budget": math.NaN()}, true},
 		{"not an object", "prime_card", true},
 	}
 	for _, testCase := range cases {
@@ -67,11 +69,11 @@ func TestValidateCycleFulfillmentConfig(t *testing.T) {
 }
 
 func TestParseCycleFulfillmentConfig(t *testing.T) {
-	parsed, err := ParseCycleFulfillmentConfig(map[string]any{"accountId": "prime_card", "statementDay": 15.0, "budget": 800.0})
+	parsed, err := ParseCycleFulfillmentConfig(map[string]any{"accountIds": []any{"prime_card", "prime_card", "ultimate_card"}, "statementDay": 15.0, "budget": 800.0})
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	if parsed.AccountID != "prime_card" || parsed.StatementDay != 15 || parsed.Budget != 800 {
+	if len(parsed.AccountIDs) != 2 || parsed.AccountIDs[0] != "prime_card" || parsed.AccountIDs[1] != "ultimate_card" || parsed.StatementDay != 15 || parsed.Budget != 800 {
 		t.Fatalf("parsed = %+v", parsed)
 	}
 }
@@ -91,7 +93,7 @@ func TestValidateFinancialModelFlagsDanglingCycleFulfillmentGoal(t *testing.T) {
 				InstanceID: "ghost-cycle",
 				Name:       "Ghost",
 				Enabled:    true,
-				Config:     map[string]any{"accountId": "does-not-exist", "statementDay": 15.0, "budget": 100.0},
+				Config:     map[string]any{"accountIds": []any{"does-not-exist"}, "statementDay": 15.0, "budget": 100.0},
 			}},
 		},
 	}
@@ -122,7 +124,7 @@ func TestValidateFinancialModelAcceptsLiveCycleFulfillmentGoal(t *testing.T) {
 				InstanceID: "prime-cycle",
 				Name:       "Prime cycle",
 				Enabled:    true,
-				Config:     map[string]any{"accountId": "prime_card", "statementDay": 15.0, "budget": 800.0},
+				Config:     map[string]any{"accountIds": []any{"prime_card"}, "statementDay": 15.0, "budget": 800.0},
 			}},
 		},
 	}
@@ -158,7 +160,7 @@ func TestEvaluateCycleFulfillmentSumsRecordedAndScheduled(t *testing.T) {
 		cycleEvent("2026-10-20", "after-window", card, -500, 4),
 	}
 	path := cyclePath("2026-09-20", postings, events, buckets)
-	result := EvaluateCycleFulfillment(path, types.CycleFulfillmentConfig{AccountID: card, StatementDay: 15, Budget: 800})
+	result := EvaluateCycleFulfillment(path, types.CycleFulfillmentConfig{AccountIDs: []string{card}, StatementDay: 15, Budget: 800})
 	if result.CycleStart != "2026-09-15" || result.CycleEnd != "2026-10-14" {
 		t.Fatalf("window = %s/%s", result.CycleStart, result.CycleEnd)
 	}
@@ -176,8 +178,29 @@ func TestEvaluateCycleFulfillmentSumsRecordedAndScheduled(t *testing.T) {
 	}
 }
 
-func TestEvaluateCycleFulfillmentSkipsStartDateDoubleCount(t *testing.T) {
-	// A start-date occurrence covered by a movement event (no checkpoint
+func TestEvaluateCycleFulfillmentCombinesAccountSet(t *testing.T) {
+	// One total budget covers both cards: spend sums across the set while
+	// payments into either card stay out.
+	events := []types.MovementEvent{
+		cycleEvent("2026-09-22", "prime-charge", "prime_card", -300, 1),
+		cycleEvent("2026-09-23", "ultimate-charge", "ultimate_card", -250, 2),
+		cycleEvent("2026-09-24", "payment", "prime_card", 1000, 3),
+		cycleEvent("2026-09-25", "other-card", "other_card", -999, 4),
+	}
+	path := cyclePath("2026-09-20", nil, events, map[string]map[string]float64{})
+	result := EvaluateCycleFulfillment(path, types.CycleFulfillmentConfig{AccountIDs: []string{"prime_card", "ultimate_card"}, StatementDay: 15, Budget: 800})
+	if result.Spent != 550 {
+		t.Fatalf("spent = %v, want 550", result.Spent)
+	}
+	if !result.WithinBudget {
+		t.Fatalf("expected within budget, got %+v", result)
+	}
+	if len(result.AccountIDs) != 2 {
+		t.Fatalf("accountIds = %v", result.AccountIDs)
+	}
+}
+
+func TestEvaluateCycleFulfillmentSkipsStartDateDoubleCount(t *testing.T) { // A start-date occurrence covered by a movement event (no checkpoint
 	// suppression) must count once, through the event.
 	card := "prime_card"
 	postings := []types.Posting{{
@@ -187,7 +210,7 @@ func TestEvaluateCycleFulfillmentSkipsStartDateDoubleCount(t *testing.T) {
 	buckets := map[string]map[string]float64{"charge-start": {"2026": 25}}
 	events := []types.MovementEvent{cycleEvent("2026-09-20", "charge-start", card, -25, 1)}
 	path := cyclePath("2026-09-20", postings, events, buckets)
-	result := EvaluateCycleFulfillment(path, types.CycleFulfillmentConfig{AccountID: card, StatementDay: 15, Budget: 800})
+	result := EvaluateCycleFulfillment(path, types.CycleFulfillmentConfig{AccountIDs: []string{card}, StatementDay: 15, Budget: 800})
 	if result.Spent != 25 {
 		t.Fatalf("spent = %v, want 25", result.Spent)
 	}
@@ -197,7 +220,7 @@ func TestEvaluateCycleFulfillmentReportsShortfall(t *testing.T) {
 	card := "prime_card"
 	events := []types.MovementEvent{cycleEvent("2026-09-22", "big-charge", card, -900, 1)}
 	path := cyclePath("2026-09-20", nil, events, map[string]map[string]float64{})
-	result := EvaluateCycleFulfillment(path, types.CycleFulfillmentConfig{AccountID: card, StatementDay: 15, Budget: 800})
+	result := EvaluateCycleFulfillment(path, types.CycleFulfillmentConfig{AccountIDs: []string{card}, StatementDay: 15, Budget: 800})
 	if result.WithinBudget {
 		t.Fatalf("expected over budget, got %+v", result)
 	}

@@ -209,10 +209,12 @@ func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, d
 		if err != nil {
 			continue // reported by validateEvaluationConfigs
 		}
-		if !accountIDs[parsed.AccountID] {
-			addIssue(issues, types.SeverityError, "evaluation.cycleFulfillment.accountId.invalid",
-				fmt.Sprintf("Cycle fulfillment goal '%s' references account '%s', which does not exist.", item.InstanceID, parsed.AccountID),
-				"evaluations", types.EvaluationTypeCycleFulfillment, index, "config", "accountId")
+		for _, accountID := range parsed.AccountIDs {
+			if !accountIDs[accountID] {
+				addIssue(issues, types.SeverityError, "evaluation.cycleFulfillment.accountId.invalid",
+					fmt.Sprintf("Cycle fulfillment goal '%s' references account '%s', which does not exist.", item.InstanceID, accountID),
+					"evaluations", types.EvaluationTypeCycleFulfillment, index, "config", "accountIds")
+			}
 		}
 	}
 }
