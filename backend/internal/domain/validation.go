@@ -157,6 +157,10 @@ func evaluationInstances(document *types.FinancialModelDocument, evaluationType 
 		for _, item := range document.Evaluations.PostingFulfillment {
 			refs = append(refs, instanceRef{evaluationType, item.InstanceID, item.Enabled, item.Config})
 		}
+	case types.EvaluationTypeCycleFulfillment:
+		for _, item := range document.Evaluations.CycleFulfillment {
+			refs = append(refs, instanceRef{evaluationType, item.InstanceID, item.Enabled, item.Config})
+		}
 	}
 	return refs
 }
@@ -174,6 +178,8 @@ func validateEvaluationConfigs(issues *[]types.ModelValidationIssue, document *t
 				err = ValidateAccountBalanceConfig(instance.Config)
 			case types.EvaluationTypePostingFulfillment:
 				err = ValidateFulfillmentConfig(instance.Config)
+			case types.EvaluationTypeCycleFulfillment:
+				err = ValidateCycleFulfillmentConfig(instance.Config)
 			}
 			if err != nil {
 				path := []any{"evaluations", evaluationType, index}
@@ -196,6 +202,17 @@ func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, d
 			addIssue(issues, types.SeverityError, "evaluation.accountBalance.accountId.invalid",
 				fmt.Sprintf("Account balance goal '%s' references account '%s', which does not exist.", item.InstanceID, parsed.AccountID),
 				"evaluations", types.EvaluationTypeAccountBalance, index, "config", "accountId")
+		}
+	}
+	for index, item := range document.Evaluations.CycleFulfillment {
+		parsed, err := ParseCycleFulfillmentConfig(item.Config)
+		if err != nil {
+			continue // reported by validateEvaluationConfigs
+		}
+		if !accountIDs[parsed.AccountID] {
+			addIssue(issues, types.SeverityError, "evaluation.cycleFulfillment.accountId.invalid",
+				fmt.Sprintf("Cycle fulfillment goal '%s' references account '%s', which does not exist.", item.InstanceID, parsed.AccountID),
+				"evaluations", types.EvaluationTypeCycleFulfillment, index, "config", "accountId")
 		}
 	}
 }

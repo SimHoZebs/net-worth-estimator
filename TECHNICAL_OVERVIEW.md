@@ -397,9 +397,11 @@ The kernel:
 | --- | --- |
 | `financialIndependenceDefinition` | `financialIndependence` |
 | `netWorthThresholdDefinition` | `netWorthThreshold` |
+| `accountBalanceDefinition` | `accountBalance` |
 | `postingFulfillmentDefinition` | `postingFulfillment` |
+| `cycleFulfillmentDefinition` | `cycleFulfillment` |
 
-`types.EvaluationTypeOrder` fixes table order. Each table preserves stored order. Instance IDs are globally unique across all three tables.
+`types.EvaluationTypeOrder` fixes table order. Each table preserves stored order. Instance IDs are globally unique across all tables.
 
 `EvaluationRuntimeSet`:
 

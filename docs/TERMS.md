@@ -52,7 +52,7 @@ Use **evaluation**. The three roles below are distinct and stay distinct:
 - **constraint** — the binding limit that stopped a transaction
 - **shortfall** — the gap between what a transaction requested and what funded it
 
-`EvaluationTypeOrder` in `backend/internal/types/model.go` fixes the display order of the four evaluation types: financial independence, net-worth threshold, account balance, posting fulfillment. `EvaluationRegistry` in `backend/internal/domain/evaluation_runtime.go` owns their definitions.
+`EvaluationTypeOrder` in `backend/internal/types/model.go` fixes the display order of the five evaluation tables: financial independence, net-worth threshold, account balance, posting fulfillment, cycle fulfillment. `EvaluationRegistry` in `backend/internal/domain/evaluation_runtime.go` owns the registered definitions; the cycle fulfillment definition lands with its runtime.
 
 - Retired from prose: goal check, evaluation blocker.
 
