@@ -111,6 +111,7 @@ func evaluationDescriptor(tables *types.EvaluationTables) map[string]any {
 		"financialIndependence": enabledEvaluationConfigs(tables.FinancialIndependence),
 		"netWorthThreshold":     enabledEvaluationConfigs(tables.NetWorthThreshold),
 		"postingFulfillment":    enabledEvaluationConfigs(tables.PostingFulfillment),
+		"cycleFulfillment":      enabledEvaluationConfigs(tables.CycleFulfillment),
 	}
 }
 

@@ -15,6 +15,7 @@ const (
 	EvaluationTypeNetWorthThreshold     = "netWorthThreshold"
 	EvaluationTypeAccountBalance        = "accountBalance"
 	EvaluationTypePostingFulfillment    = "postingFulfillment"
+	EvaluationTypeCycleFulfillment      = "cycleFulfillment"
 )
 
 // EvaluationTypeOrder controls evaluation type ordering; table arrays
@@ -24,6 +25,7 @@ var EvaluationTypeOrder = []string{
 	EvaluationTypeNetWorthThreshold,
 	EvaluationTypeAccountBalance,
 	EvaluationTypePostingFulfillment,
+	EvaluationTypeCycleFulfillment,
 }
 
 // JsonValue represents arbitrary JSON values in wire payloads.

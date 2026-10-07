@@ -53,6 +53,16 @@ type PostingFulfillmentConfig struct {
 	PostingIDs []string `json:"postingIds"` // nil = null (all)
 }
 
+// CycleFulfillmentConfig targets one card account's statement cycle. It
+// answers whether cycle spend stays within the configured set-aside: the
+// statement window derives from StatementDay anchored at the projection
+// start, and spend derives from realized movement amounts.
+type CycleFulfillmentConfig struct {
+	AccountID    string  `json:"accountId"`
+	StatementDay int     `json:"statementDay"`
+	Budget       float64 `json:"budget"`
+}
+
 // EvaluationInstance is the generic configured evaluation row.
 type EvaluationInstance[T any] struct {
 	InstanceID string `json:"instanceId"`
@@ -68,6 +78,7 @@ type (
 	ThresholdEvaluation   = EvaluationInstance[JsonValue]
 	BalanceEvaluation     = EvaluationInstance[JsonValue]
 	FulfillmentEvaluation = EvaluationInstance[JsonValue]
+	CycleEvaluation       = EvaluationInstance[JsonValue]
 )
 
 type EvaluationTables struct {
@@ -75,6 +86,7 @@ type EvaluationTables struct {
 	NetWorthThreshold     []ThresholdEvaluation   `json:"netWorthThreshold"`
 	AccountBalance        []BalanceEvaluation     `json:"accountBalance"`
 	PostingFulfillment    []FulfillmentEvaluation `json:"postingFulfillment"`
+	CycleFulfillment      []CycleEvaluation       `json:"cycleFulfillment"`
 }
 
 func EmptyEvaluationTables() EvaluationTables {
@@ -83,6 +95,7 @@ func EmptyEvaluationTables() EvaluationTables {
 		NetWorthThreshold:     []ThresholdEvaluation{},
 		AccountBalance:        []BalanceEvaluation{},
 		PostingFulfillment:    []FulfillmentEvaluation{},
+		CycleFulfillment:      []CycleEvaluation{},
 	}
 }
 

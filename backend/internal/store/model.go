@@ -215,6 +215,9 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 	if err := saveEvaluationTable(tx, string(types.EvaluationTypePostingFulfillment), fulfillmentEvaluationRows(document)); err != nil {
 		return err
 	}
+	if err := saveEvaluationTable(tx, string(types.EvaluationTypeCycleFulfillment), cycleEvaluationRows(document)); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(
 		`UPDATE model_metadata SET source_path = ?, document_present = 1 WHERE id = 1`,
 		document.SourcePath,
@@ -335,6 +338,14 @@ func accountBalanceEvaluationRows(d *types.FinancialModelDocument) []evaluationR
 func fulfillmentEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
 	rows := make([]evaluationRow, 0, len(d.Evaluations.PostingFulfillment))
 	for position, item := range d.Evaluations.PostingFulfillment {
+		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, name: item.Name, enabled: item.Enabled, configValue: item.Config})
+	}
+	return rows
+}
+
+func cycleEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
+	rows := make([]evaluationRow, 0, len(d.Evaluations.CycleFulfillment))
+	for position, item := range d.Evaluations.CycleFulfillment {
 		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, name: item.Name, enabled: item.Enabled, configValue: item.Config})
 	}
 	return rows
@@ -523,6 +534,14 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 				return nil, fmt.Errorf("parse fulfillment config %s: %w", instanceID, err)
 			}
 			document.Evaluations.PostingFulfillment = append(document.Evaluations.PostingFulfillment, types.FulfillmentEvaluation{
+				InstanceID: instanceID, Name: name, Enabled: enabled != 0, Config: config,
+			})
+		case types.EvaluationTypeCycleFulfillment:
+			config := map[string]any{}
+			if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+				return nil, fmt.Errorf("parse cycle fulfillment config %s: %w", instanceID, err)
+			}
+			document.Evaluations.CycleFulfillment = append(document.Evaluations.CycleFulfillment, types.CycleEvaluation{
 				InstanceID: instanceID, Name: name, Enabled: enabled != 0, Config: config,
 			})
 		}

@@ -311,6 +311,15 @@ func rawInstances(tables *types.EvaluationTables) []rawInstance {
 			rawConfig:      item.Config,
 		})
 	}
+	for _, item := range tables.CycleFulfillment {
+		instances = append(instances, rawInstance{
+			evaluationType: types.EvaluationTypeCycleFulfillment,
+			instanceID:     item.InstanceID,
+			name:           item.Name,
+			enabled:        item.Enabled,
+			rawConfig:      item.Config,
+		})
+	}
 	return instances
 }
 
@@ -433,6 +442,7 @@ func (s *EvaluationRuntimeSet) Result() types.EvaluationResultCollection {
 			NetWorthThreshold:     []types.EvaluationResultEnvelope{},
 			AccountBalance:        []types.EvaluationResultEnvelope{},
 			PostingFulfillment:    []types.EvaluationResultEnvelope{},
+			CycleFulfillment:      []types.EvaluationResultEnvelope{},
 		},
 	}
 	for _, runtimeInstance := range s.runtimes {
@@ -445,6 +455,8 @@ func (s *EvaluationRuntimeSet) Result() types.EvaluationResultCollection {
 			collection.Evaluations.AccountBalance = append(collection.Evaluations.AccountBalance, runtimeInstance.envelope())
 		case types.EvaluationTypePostingFulfillment:
 			collection.Evaluations.PostingFulfillment = append(collection.Evaluations.PostingFulfillment, runtimeInstance.envelope())
+		case types.EvaluationTypeCycleFulfillment:
+			collection.Evaluations.CycleFulfillment = append(collection.Evaluations.CycleFulfillment, runtimeInstance.envelope())
 		}
 	}
 	return collection

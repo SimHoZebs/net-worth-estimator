@@ -14,6 +14,7 @@ func init() {
 	evaluationRegistryInstance.Register(netWorthThresholdDefinition)
 	evaluationRegistryInstance.Register(accountBalanceDefinition)
 	evaluationRegistryInstance.Register(postingFulfillmentDefinition)
+	evaluationRegistryInstance.Register(cycleFulfillmentDefinition)
 }
 
 // EvaluateProjectionPath runs configured deterministic evaluations over a path.

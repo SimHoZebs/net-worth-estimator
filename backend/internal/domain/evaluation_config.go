@@ -371,3 +371,46 @@ func ParseFulfillmentConfig(config any) (types.PostingFulfillmentConfig, error) 
 	}
 	return parsed, nil
 }
+
+// ValidateCycleFulfillmentConfig validates card cycle budget config JSON.
+// The account reference is checked against the document by the document
+// validator; this validates the config's own shape.
+func ValidateCycleFulfillmentConfig(config any) error {
+	obj, ok := asObject(config)
+	if !ok {
+		return fmt.Errorf("Cycle fulfillment configuration must be an object.")
+	}
+	accountID, ok := stringField(obj, "accountId")
+	if !ok || accountID == "" {
+		return fmt.Errorf("Cycle fulfillment goal must name an account.")
+	}
+	dayRaw, present := obj["statementDay"]
+	if !present {
+		return fmt.Errorf("Cycle fulfillment statementDay must be an integer between 1 and 28.")
+	}
+	day, ok := dayRaw.(float64)
+	if !ok || math.IsNaN(day) || math.IsInf(day, 0) || day != math.Trunc(day) || day < 1 || day > 28 {
+		return fmt.Errorf("Cycle fulfillment statementDay must be an integer between 1 and 28.")
+	}
+	budget, ok := numberField(obj, "budget")
+	if !ok || budget < 0 {
+		return fmt.Errorf("Cycle fulfillment budget must be a finite number at or above zero.")
+	}
+	return nil
+}
+
+// ParseCycleFulfillmentConfig converts validated JSON into a typed config.
+func ParseCycleFulfillmentConfig(config any) (types.CycleFulfillmentConfig, error) {
+	var parsed types.CycleFulfillmentConfig
+	if err := ValidateCycleFulfillmentConfig(config); err != nil {
+		return parsed, err
+	}
+	obj := config.(map[string]any)
+	accountID, _ := stringField(obj, "accountId")
+	day, _ := numberField(obj, "statementDay")
+	budget, _ := numberField(obj, "budget")
+	parsed.AccountID = accountID
+	parsed.StatementDay = int(day)
+	parsed.Budget = budget
+	return parsed, nil
+}
