@@ -415,7 +415,6 @@ test("evidence dialogs and the mobile navigation preserve accessible semantics",
 	for (const action of [
 		"Inspect current net worth evidence",
 		"Inspect this expense",
-		"Inspect next 30 days",
 	]) {
 		await page.getByRole("button", { name: action, exact: true }).click();
 		await expect(page.getByRole("dialog")).toBeVisible();

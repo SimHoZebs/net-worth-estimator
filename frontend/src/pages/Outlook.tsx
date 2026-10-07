@@ -23,7 +23,6 @@ export function Outlook({
 	onPlan,
 	onGoals,
 	onGoal,
-	onTiming,
 	onAssumptions,
 }: {
 	plan: Plan;
@@ -41,7 +40,6 @@ export function Outlook({
 	onPlan: () => void;
 	onGoals: () => void;
 	onGoal: (id: string) => void;
-	onTiming: () => void;
 	onAssumptions: () => void;
 }) {
 	if (!projection.points.length) return null;
@@ -96,11 +94,7 @@ export function Outlook({
 					onGoals={onGoals}
 					onGoal={onGoal}
 				/>
-				<TimingPreview
-					plan={plan}
-					projection={projection}
-					onTiming={onTiming}
-				/>
+				<TimingPreview plan={plan} projection={projection} />
 			</div>
 			<AccountList
 				plan={plan}

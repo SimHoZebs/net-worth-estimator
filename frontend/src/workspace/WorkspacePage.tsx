@@ -89,7 +89,6 @@ export function WorkspacePage({
 					onPlan={() => onNavigate("plan")}
 					onGoals={() => onNavigate("goals")}
 					onGoal={(id) => onEvidence({ kind: "goal", id })}
-					onTiming={() => onEvidence({ kind: "timing" })}
 					onAssumptions={() => onEdit({ kind: "assumptions" })}
 				/>
 			);
