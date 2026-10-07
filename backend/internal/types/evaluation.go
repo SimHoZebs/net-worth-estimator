@@ -53,14 +53,15 @@ type PostingFulfillmentConfig struct {
 	PostingIDs []string `json:"postingIds"` // nil = null (all)
 }
 
-// CycleFulfillmentConfig targets one card account's statement cycle. It
-// answers whether cycle spend stays within the configured set-aside: the
-// statement window derives from StatementDay anchored at the projection
-// start, and spend derives from realized movement amounts.
+// CycleFulfillmentConfig targets a statement cycle shared across a
+// configured account set. It answers whether combined cycle spend stays
+// within one total set-aside: the statement window derives from StatementDay
+// anchored at the projection start, and spend derives from realized movement
+// amounts across all listed accounts.
 type CycleFulfillmentConfig struct {
-	AccountID    string  `json:"accountId"`
-	StatementDay int     `json:"statementDay"`
-	Budget       float64 `json:"budget"`
+	AccountIDs   []string `json:"accountIds"`
+	StatementDay int      `json:"statementDay"`
+	Budget       float64  `json:"budget"`
 }
 
 // EvaluationInstance is the generic configured evaluation row.

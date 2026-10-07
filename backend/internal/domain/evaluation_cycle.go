@@ -7,12 +7,12 @@ import (
 )
 
 // Cycle fulfillment evaluation. It asks a forward question of the
-// projection: will this card account's statement-cycle spend stay within the
-// configured set-aside?
+// projection: will the configured account set's combined statement-cycle
+// spend stay within one total set-aside?
 //
 // The statement window derives from StatementDay anchored at the projection
-// start, matching the frontend cycle view. Spend is realized outflow for the
-// account inside the window clipped to the projection horizon
+// start, matching the frontend cycle view. Spend is realized outflow across
+// the account set inside the window clipped to the projection horizon
 // ([max(cycleStart, projectionStart), cycleEnd]). Recorded pre-start spend is
 // represented in starting balances, not in this verdict; the frontend
 // breakdown over recorded transactions remains the place to inspect what
@@ -20,25 +20,25 @@ import (
 
 // CycleFulfillmentPathResult is the deterministic result shape.
 type CycleFulfillmentPathResult struct {
-	AccountID      string  `json:"accountId"`
-	StatementDay   int     `json:"statementDay"`
-	Budget         float64 `json:"budget"`
-	CycleStart     IsoDate `json:"cycleStart"`
-	CycleEnd       IsoDate `json:"cycleEnd"`
-	WindowStart    IsoDate `json:"windowStart"`
-	DaysTotal      int     `json:"daysTotal"`
-	DaysLeft       int     `json:"daysLeft"`
-	RecordedSpend  float64 `json:"recordedSpend"`
-	ScheduledSpend float64 `json:"scheduledSpend"`
-	Spent          float64 `json:"spent"`
-	Remaining      float64 `json:"remaining"`
-	WithinBudget   bool    `json:"withinBudget"`
-	Shortfall      float64 `json:"shortfall"`
+	AccountIDs     []string `json:"accountIds"`
+	StatementDay   int      `json:"statementDay"`
+	Budget         float64  `json:"budget"`
+	CycleStart     IsoDate  `json:"cycleStart"`
+	CycleEnd       IsoDate  `json:"cycleEnd"`
+	WindowStart    IsoDate  `json:"windowStart"`
+	DaysTotal      int      `json:"daysTotal"`
+	DaysLeft       int      `json:"daysLeft"`
+	RecordedSpend  float64  `json:"recordedSpend"`
+	ScheduledSpend float64  `json:"scheduledSpend"`
+	Spent          float64  `json:"spent"`
+	Remaining      float64  `json:"remaining"`
+	WithinBudget   bool     `json:"withinBudget"`
+	Shortfall      float64  `json:"shortfall"`
 }
 
 func (r *CycleFulfillmentPathResult) ToJSON() types.JsonValue {
 	return map[string]any{
-		"accountId":      r.AccountID,
+		"accountIds":     r.AccountIDs,
 		"statementDay":   r.StatementDay,
 		"budget":         roundAmount(r.Budget),
 		"cycleStart":     r.CycleStart,
@@ -79,20 +79,19 @@ func resolveStatementCycle(todayIso string, statementDay int) (cycleStart, cycle
 	return cycleStart, AddMonthsClamped(cycleStart, 1)
 }
 
-// cycleOutflow sums realized outflow magnitude for one account on an event:
-// negative account deltas. Payments into the account are positive deltas and
-// never count as spend.
-func cycleOutflow(event *types.MovementEvent, accountID string) float64 {
+// cycleOutflow sums realized outflow magnitude for an account set on an
+// event: negative account deltas. Payments into an account are positive
+// deltas and never count as spend.
+func cycleOutflow(event *types.MovementEvent, accountIDs map[string]bool) float64 {
 	spent := 0.0
 	for _, delta := range event.AccountDeltas {
-		if delta.AccountID == accountID && delta.Delta < 0 {
+		if accountIDs[delta.AccountID] && delta.Delta < 0 {
 			spent += -delta.Delta
 		}
 	}
 	return spent
 }
 
-// EvaluateCycleFulfillment measures realized cycle spend against budget.
 // EvaluateCycleFulfillment measures realized cycle spend against budget.
 //
 // Spend has two parts. Recorded spend covers enabled one-time outflows dated
@@ -112,6 +111,10 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 	}
 	// Inclusive display end is the day before the exclusive anchor.
 	cycleEnd := FormatIsoDate(MustParseIsoDate(cycleEndExclusive).AddDate(0, 0, -1))
+	accountSet := make(map[string]bool, len(config.AccountIDs))
+	for _, id := range config.AccountIDs {
+		accountSet[id] = true
+	}
 	startDateEvents := map[string]bool{}
 	for index := range path.MovementEvents {
 		event := &path.MovementEvents[index]
@@ -125,7 +128,7 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 		if !posting.Enabled || posting.Frequency != types.FrequencyOnce {
 			continue
 		}
-		if posting.SourceAccountID == nil || *posting.SourceAccountID != config.AccountID {
+		if posting.SourceAccountID == nil || !accountSet[*posting.SourceAccountID] {
 			continue
 		}
 		if CompareIsoDates(posting.StartDate, cycleStart) < 0 || CompareIsoDates(posting.StartDate, projectionStart) > 0 {
@@ -144,7 +147,7 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 		if CompareIsoDates(event.Date, windowStart) < 0 || CompareIsoDates(event.Date, cycleEndExclusive) >= 0 {
 			continue
 		}
-		scheduled += cycleOutflow(event, config.AccountID)
+		scheduled += cycleOutflow(event, accountSet)
 	}
 	spent := recorded + scheduled
 	roundedSpent := roundAmount(spent)
@@ -155,7 +158,7 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 		shortfall = roundedSpent - roundedBudget
 	}
 	return &CycleFulfillmentPathResult{
-		AccountID:      config.AccountID,
+		AccountIDs:     append([]string(nil), config.AccountIDs...),
 		StatementDay:   config.StatementDay,
 		Budget:         config.Budget,
 		CycleStart:     IsoDate(cycleStart),
@@ -181,31 +184,29 @@ func maxInt(a, b int) int {
 
 func diagnoseCycleConfig(path *types.ProjectionPath, config types.CycleFulfillmentConfig) []types.EvaluationDiagnostic {
 	diagnostics := []types.EvaluationDiagnostic{}
-	known := false
-	enabled := false
+	byID := map[string]types.Account{}
 	for _, account := range path.EffectiveDocument.Accounts {
-		if account.ID == config.AccountID {
-			known = true
-			enabled = account.Enabled
-			break
+		byID[account.ID] = account
+	}
+	for _, accountID := range config.AccountIDs {
+		account, ok := byID[accountID]
+		if !ok {
+			diagnostics = append(diagnostics, types.EvaluationDiagnostic{
+				Code:              "cycle-fulfillment.account.missing",
+				Severity:          "warning",
+				Message:           "Account '" + accountID + "' does not exist.",
+				RelatedAccountIDs: []string{accountID},
+			})
+			continue
 		}
-	}
-	if !known {
-		diagnostics = append(diagnostics, types.EvaluationDiagnostic{
-			Code:              "cycle-fulfillment.account.missing",
-			Severity:          "warning",
-			Message:           "Account '" + config.AccountID + "' does not exist.",
-			RelatedAccountIDs: []string{config.AccountID},
-		})
-		return diagnostics
-	}
-	if !enabled {
-		diagnostics = append(diagnostics, types.EvaluationDiagnostic{
-			Code:              "cycle-fulfillment.account.disabled",
-			Severity:          "warning",
-			Message:           "Account '" + config.AccountID + "' is excluded, so cycle spend is not tracked.",
-			RelatedAccountIDs: []string{config.AccountID},
-		})
+		if !account.Enabled {
+			diagnostics = append(diagnostics, types.EvaluationDiagnostic{
+				Code:              "cycle-fulfillment.account.disabled",
+				Severity:          "warning",
+				Message:           "Account '" + accountID + "' is excluded, so its cycle spend is not tracked.",
+				RelatedAccountIDs: []string{accountID},
+			})
+		}
 	}
 	return diagnostics
 }

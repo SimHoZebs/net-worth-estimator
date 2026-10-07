@@ -373,16 +373,21 @@ func ParseFulfillmentConfig(config any) (types.PostingFulfillmentConfig, error) 
 }
 
 // ValidateCycleFulfillmentConfig validates card cycle budget config JSON.
-// The account reference is checked against the document by the document
+// The account references are checked against the document by the document
 // validator; this validates the config's own shape.
 func ValidateCycleFulfillmentConfig(config any) error {
 	obj, ok := asObject(config)
 	if !ok {
 		return fmt.Errorf("Cycle fulfillment configuration must be an object.")
 	}
-	accountID, ok := stringField(obj, "accountId")
-	if !ok || accountID == "" {
-		return fmt.Errorf("Cycle fulfillment goal must name an account.")
+	ids, ok := stringArrayField(obj, "accountIds")
+	if !ok || len(ids) == 0 {
+		return fmt.Errorf("Cycle fulfillment must list at least one account.")
+	}
+	for _, id := range ids {
+		if trimSpace(id) == "" {
+			return fmt.Errorf("Cycle fulfillment must list at least one account.")
+		}
 	}
 	dayRaw, present := obj["statementDay"]
 	if !present {
@@ -399,17 +404,25 @@ func ValidateCycleFulfillmentConfig(config any) error {
 	return nil
 }
 
-// ParseCycleFulfillmentConfig converts validated JSON into a typed config.
+// ParseCycleFulfillmentConfig converts validated JSON into a typed config,
+// de-duplicating IDs while preserving order.
 func ParseCycleFulfillmentConfig(config any) (types.CycleFulfillmentConfig, error) {
 	var parsed types.CycleFulfillmentConfig
 	if err := ValidateCycleFulfillmentConfig(config); err != nil {
 		return parsed, err
 	}
 	obj := config.(map[string]any)
-	accountID, _ := stringField(obj, "accountId")
+	ids, _ := stringArrayField(obj, "accountIds")
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		parsed.AccountIDs = append(parsed.AccountIDs, id)
+	}
 	day, _ := numberField(obj, "statementDay")
 	budget, _ := numberField(obj, "budget")
-	parsed.AccountID = accountID
 	parsed.StatementDay = int(day)
 	parsed.Budget = budget
 	return parsed, nil
