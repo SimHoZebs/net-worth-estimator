@@ -1,0 +1,46 @@
+/* Base typography: document defaults and unclassed element styling. */
+@layer base {
+	body {
+		min-width: 320px;
+		font-size: 13px;
+		line-height: 1.6;
+	}
+	::selection {
+		background: #dde8c9;
+		color: #193e2c;
+	}
+	:focus-visible {
+		outline: 3px solid #849c53;
+		outline-offset: 4px;
+		border-radius: 4px;
+	}
+	h1 {
+		font-family: var(--serif);
+		font-size: clamp(30px, 3.2vw, 43px);
+		font-weight: 450;
+		letter-spacing: -1.15px;
+		line-height: 1.15;
+	}
+	h1:focus {
+		outline: none;
+	}
+	h2 {
+		font-size: 15px;
+		font-weight: 700;
+		letter-spacing: -0.3px;
+	}
+	h3 {
+		font-size: 14px;
+		font-weight: 700;
+	}
+	p {
+		color: var(--muted);
+	}
+	strong,
+	b {
+		font-weight: 650;
+	}
+	small {
+		font-size: 11px;
+	}
+}

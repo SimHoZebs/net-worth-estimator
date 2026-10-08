@@ -1,0 +1,86 @@
+/* Co-located partial: owned by workspace/workspace.css. Global cascade order is set by the
+   @layer declaration in styles/index.css (reset, base, layout, components,
+   responsive, accessibility). Keep selectors inside @layer components. */
+@layer components {
+	.export-recovery {
+		margin-bottom: 20px;
+	}
+	.draft-bar {
+		position: fixed;
+		bottom: 20px;
+		left: calc(var(--sidebar) + 39px);
+		right: 39px;
+		z-index: 20;
+		background: #fcfdf5f5;
+		backdrop-filter: blur(8px);
+		border: 1px solid #d6dec8;
+		border-radius: 10px;
+		box-shadow: 0 4px 25px #263d261c;
+		padding: 16px 20px;
+		display: flex;
+		justify-content: space-between;
+		gap: 15px;
+	}
+	.draft-bar > div {
+		display: flex;
+		gap: 12px;
+		align-items: center;
+	}
+	.draft-icon {
+		background: #e9efdc;
+		color: #7c8f5e;
+		width: 37px;
+		height: 37px;
+		border-radius: 7px;
+		display: grid;
+		place-items: center;
+	}
+	.draft-bar > div > span:last-child {
+		display: flex;
+		flex-direction: column;
+	}
+	.draft-bar strong {
+		font-size: 12px;
+	}
+	.draft-bar small {
+		font-size: 9px;
+		color: #8a927a;
+		margin-top: 2px;
+	}
+	.draft-discard {
+		background: none;
+		color: #849074;
+	}
+	.toast {
+		position: fixed;
+		bottom: 25px;
+		right: 27px;
+		z-index: 50;
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		background: #2f513e;
+		border: 1px solid #577350;
+		color: #f3f6eb;
+		padding: 12px 10px 12px 17px;
+		max-width: min(470px, calc(100vw - 30px));
+		border-radius: 8px;
+		box-shadow: 0 6px 24px #15341b26;
+		font-size: 11px;
+	}
+	body:has(.draft-bar) .toast {
+		bottom: 111px;
+	}
+	.toast > svg {
+		color: #c1d3a5;
+	}
+	.toast .icon-button {
+		color: #cbd8ba;
+	}
+	.toast .icon-button:hover {
+		background: #42654b;
+	}
+	.nav-backdrop {
+		display: none;
+	}
+}

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ErrorNotice, Modal } from "./ui.tsx";
+import "./ui.css";
 
 export function ConfirmDialog({
 	title,

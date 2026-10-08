@@ -1,0 +1,15 @@
+/* Global manifest: layer order first, then one @import per semantic partial.
+   Component partials live next to their owners and import themselves; this file
+   owns only app-wide foundations. Keep the @layer declaration on line 1 so
+   cascade order never depends on bundler module order. */
+@layer reset, base, layout, components, responsive, accessibility;
+@import "./reset.css";
+@import "./tokens.css";
+@import "./typography.css";
+@import "./utilities.css";
+@import "./shell.css";
+@import "./sidebar.css";
+@import "./page-grids.css";
+@import "./recovery.css";
+@import "./responsive.css";
+@import "./accessibility.css";

@@ -1,4 +1,5 @@
 import { type ComponentProps, type ReactNode, useId } from "react";
+import "./ui.css";
 
 type FieldProps = { label: string; hint?: string; wide?: boolean };
 

@@ -1,0 +1,822 @@
+/* Global responsive overrides. Imported by the styles/index.css manifest; layer
+   order beats import order via the @layer declaration. */
+@layer responsive {
+	@media (min-width: 1600px) {
+		.chart-wrap > svg {
+			min-height: 300px;
+		}
+		.insight-card h2 {
+			font-size: 26px;
+		}
+	}
+	@media (max-width: 1250px) {
+		:root {
+			--sidebar: 200px;
+		}
+		.sidebar {
+			padding-left: 13px;
+			padding-right: 13px;
+		}
+		.main-content {
+			padding-left: 28px;
+			padding-right: 28px;
+		}
+		.outlook-top {
+			grid-template-columns: minmax(0, 1fr) 260px;
+			gap: 17px;
+		}
+		.metrics-grid {
+			gap: 10px;
+		}
+		.metric {
+			padding-left: 13px;
+			padding-right: 13px;
+		}
+		.metric-value {
+			font-size: 24px;
+			gap: 8px;
+		}
+		.range-value {
+			font-size: 18px;
+		}
+		.chart-top,
+		.chart-toolbar {
+			padding-left: 18px;
+			padding-right: 18px;
+		}
+		.chart-top {
+			align-items: flex-start;
+		}
+		.chart-top .segmented button {
+			font-size: 8px;
+			padding: 5px 6px;
+		}
+		.chart-foot-note {
+			display: none;
+		}
+		.chart-foot .icon-button {
+			margin-left: auto;
+		}
+		.accounts-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+		.draft-bar {
+			left: calc(var(--sidebar) + 28px);
+			right: 28px;
+		}
+		.insight-card {
+			padding: 16px 15px 14px;
+		}
+		.growth-pill {
+			font-size: 8px;
+		}
+	}
+	@media (max-width: 1050px) {
+		:root {
+			--sidebar: 186px;
+		}
+		.brand {
+			font-size: 22px;
+		}
+		.brand-mark {
+			width: 30px;
+			height: 31px;
+		}
+		.sidebar {
+			padding-left: 11px;
+			padding-right: 11px;
+		}
+		.nav-link {
+			padding-left: 10px;
+			gap: 10px;
+		}
+		.household-select {
+			padding-left: 8px;
+			gap: 7px;
+		}
+		.household-avatar {
+			width: 25px;
+			height: 27px;
+		}
+		.outlook-top {
+			grid-template-columns: 1fr;
+		}
+		.outlook-rail {
+			position: static;
+			display: flex;
+			flex-direction: column;
+		}
+		.metrics-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 12px;
+		}
+		.metric-range {
+			grid-column: 1 / -1;
+			min-height: auto;
+			display: flex;
+			align-items: center;
+			gap: 18px;
+			padding: 12px 15px;
+		}
+		.metric-range .metric-heading {
+			margin: 0;
+			gap: 8px;
+		}
+		.metric-range .metric-heading > svg {
+			display: none;
+		}
+		.metric-range p {
+			margin: 0;
+		}
+		.metric-range .range-value {
+			font-size: 17px;
+		}
+		.metric-range .text-button {
+			margin-left: auto;
+		}
+		.insight-card {
+			display: grid;
+			grid-template-columns: 1.2fr 1fr;
+			gap: 8px 26px;
+			padding: 18px 20px;
+			align-items: center;
+		}
+		.insight-card .eyebrow {
+			grid-column: 1 / -1;
+		}
+		.insight-card h2 {
+			font-size: 25px;
+			grid-column: 1;
+			grid-row: 2 / 4;
+			margin: 4px 0;
+		}
+		.insight-card > p {
+			grid-column: 1;
+		}
+		.funding-values {
+			grid-column: 2;
+			grid-row: 2;
+			margin: 0 0 5px;
+			align-self: end;
+		}
+		.insight-card .progress-track {
+			grid-column: 2;
+			grid-row: 3;
+			align-self: center;
+		}
+		.insight-stretched {
+			grid-column: 1 / -1;
+			margin-top: 6px;
+			justify-self: start;
+		}
+		.outlook-secondary {
+			gap: 15px;
+		}
+		.evaluation-preview,
+		.timing-preview {
+			padding: 20px 18px;
+		}
+		.evaluation-preview .section-top h2,
+		.timing-preview .section-top h2 {
+			font-size: 11px;
+		}
+		.timing-figures > div + div {
+			padding-left: 15px;
+		}
+		.evaluation-preview .section-top .text-button {
+			font-size: 9px;
+		}
+		.timing-figures strong {
+			font-size: 24px;
+		}
+		.evaluations-grid {
+			gap: 15px;
+		}
+		.evaluation-card {
+			padding: 22px;
+		}
+		.sources-grid {
+			grid-template-columns: 1fr;
+		}
+		.comparison-grid {
+			padding: 22px;
+		}
+		.comparison-hero {
+			flex-wrap: wrap;
+		}
+		.comparison-hero > button {
+			margin-left: 68px;
+		}
+	}
+	@media (max-width: 800px) {
+		:root {
+			--sidebar: 0px;
+		}
+		.sidebar {
+			transform: translateX(-100%);
+			width: 230px;
+			padding: 25px 18px 0;
+			transition: transform 0.2s;
+			box-shadow: 10px 0 60px #19332920;
+			overflow-y: auto;
+		}
+		.sidebar.sidebar-open {
+			transform: translateX(0);
+		}
+		.sidebar .mobile-only {
+			display: inline-grid !important;
+		}
+		.brand {
+			font-size: 25px;
+		}
+		.nav-backdrop {
+			display: block;
+			position: fixed;
+			inset: 0;
+			z-index: 29;
+			background: #1f392c66;
+			border: 0;
+			backdrop-filter: blur(2px);
+		}
+		.mobile-only {
+			display: inline-grid !important;
+		}
+		.topbar {
+			display: flex;
+		}
+		.main-content {
+			padding: 28px 24px;
+		}
+		.draft-bar {
+			left: 20px;
+			right: 20px;
+		}
+		.chart-wrap > svg {
+			min-height: 260px;
+		}
+		.skip-link {
+			left: 20px;
+		}
+		.local-card {
+			margin-top: 10px;
+		}
+		.sidebar-bottom {
+			padding-top: 35px;
+		}
+	}
+	@media (max-width: 600px) {
+		.main-content {
+			padding: 25px 19px;
+		}
+		.metrics-grid {
+			gap: 10px;
+		}
+		.metric {
+			border-radius: 8px;
+			padding: 13px 13px 14px;
+			min-height: 0;
+		}
+		.metric-heading {
+			font-size: 9px;
+			gap: 4px;
+			margin-bottom: 13px;
+		}
+		.metric-value {
+			font-size: 25px;
+			letter-spacing: -1px;
+			flex-wrap: wrap;
+			row-gap: 7px;
+		}
+		.metric-destination .metric-value {
+			font-size: 27px;
+		}
+		.growth-pill {
+			font-size: 7px;
+			padding: 3px 5px;
+		}
+		.metric-context {
+			font-size: 7px;
+			flex-wrap: wrap;
+			gap: 4px;
+			margin-top: 12px;
+		}
+		.metric-current .metric-heading .icon-button {
+			width: 18px;
+			height: 18px;
+			padding: 0;
+		}
+		.metric-destination .metric-heading > svg {
+			width: 15px;
+		}
+		.metric-range {
+			display: grid;
+			grid-template-columns: 1fr auto;
+			gap: 2px 8px;
+			min-height: auto;
+			padding: 12px 13px;
+		}
+		.metric-range .metric-heading {
+			font-size: 10px;
+		}
+		.metric-range .range-value {
+			font-size: 16px;
+			justify-self: end;
+		}
+		.metric-range > p {
+			font-size: 9px;
+			grid-column: 1 / -1;
+			margin-top: 5px;
+		}
+		.metric-range > .text-button {
+			font-size: 8px;
+			grid-column: 1 / -1;
+			margin: 6px 0 0;
+			justify-self: start;
+		}
+		.chart-top {
+			padding: 19px 15px 0;
+			gap: 10px;
+		}
+		.chart-top h2 {
+			font-size: 14px;
+		}
+		.chart-top p {
+			font-size: 9px;
+		}
+		.segmented {
+			gap: 0;
+			padding: 2px;
+		}
+		.chart-top .segmented button {
+			font-size: 8px;
+			padding: 5px;
+		}
+		.chart-toolbar {
+			padding: 21px 15px 8px;
+		}
+		.chart-legend {
+			gap: 11px;
+			font-size: 8px;
+		}
+		.toggle-label {
+			font-size: 8px;
+			gap: 5px;
+		}
+		.chart-wrap > svg {
+			min-height: 190px;
+		}
+		.axis-label {
+			font-size: 13px;
+		}
+		.chart-foot {
+			padding: 9px 15px;
+		}
+		.insight-card {
+			display: flex;
+			flex-direction: column;
+			padding: 18px;
+			gap: 8px;
+		}
+		.insight-card h2 {
+			font-size: 24px;
+		}
+		.insight-card .eyebrow {
+			font-size: 7px;
+			letter-spacing: 0.7px;
+			gap: 5px;
+		}
+		.insight-symbol {
+			width: 23px;
+			height: 23px;
+		}
+		.insight-card > p {
+			font-size: 9px;
+		}
+		.funding-values {
+			gap: 8px;
+			margin-top: 10px;
+		}
+		.funding-values strong {
+			font-size: 14px;
+		}
+		.funding-values span {
+			font-size: 8px;
+		}
+		.insight-caption {
+			font-size: 7px;
+			text-align: left;
+		}
+		.range-disclaimer {
+			font-size: 7px;
+			align-items: flex-start;
+			line-height: 1.75;
+		}
+		.range-disclaimer > span {
+			margin-top: 5px;
+			flex-shrink: 0;
+		}
+		.outlook-secondary {
+			grid-template-columns: 1fr;
+			margin-top: 20px;
+		}
+		.evaluation-preview,
+		.timing-preview {
+			padding: 21px;
+		}
+		.evaluation-preview .section-top h2,
+		.timing-preview .section-top h2 {
+			font-size: 13px;
+		}
+		.evaluation-preview-content {
+			padding: 19px 0 20px;
+		}
+		.evaluation-preview .section-top .text-button {
+			font-size: 10px;
+		}
+		.timing-figures {
+			padding: 23px 0;
+		}
+		.timing-figures strong {
+			font-size: 27px;
+		}
+		.accounts-grid {
+			grid-template-columns: 1fr;
+			gap: 9px;
+		}
+		.account-row {
+			padding: 14px;
+		}
+		.account-label strong {
+			font-size: 12px;
+		}
+		.account-label > span {
+			font-size: 9px;
+		}
+		.account-balance {
+			font-size: 14px;
+		}
+		.account-balance .badge {
+			font-size: 8px;
+		}
+		.account-summary {
+			gap: 18px;
+		}
+		.page-footer {
+			font-size: 8px;
+			gap: 10px;
+			margin-top: 25px;
+			align-items: flex-start;
+		}
+		.page-footer button {
+			font-size: 8px;
+			text-align: right;
+		}
+		.page-footer span {
+			white-space: nowrap;
+		}
+		.page-tabs {
+			gap: 21px;
+		}
+		.page-tabs > button {
+			font-size: 11px;
+		}
+		.page-tabs button > span {
+			font-size: 8px;
+		}
+		.plan-toolbar {
+			padding: 17px 15px;
+		}
+		.search-field input {
+			width: 130px;
+			font-size: 10px;
+		}
+		.plan-toolbar > button {
+			padding: 8px 10px;
+			font-size: 9px;
+		}
+		.movement-row {
+			flex-wrap: wrap;
+			padding: 16px;
+			gap: 10px;
+		}
+		.movement-name {
+			min-width: 150px;
+		}
+		.movement-name strong {
+			font-size: 11px;
+		}
+		.movement-name > span {
+			font-size: 8px;
+		}
+		.movement-amount {
+			margin-right: 0;
+		}
+		.movement-row > .table-actions {
+			width: 100%;
+			border-top: 1px solid #edf0e5;
+			margin-top: 2px;
+			padding-top: 5px;
+		}
+		.movement-row .table-actions > button {
+			width: 36px;
+			height: 33px;
+		}
+		.plan-table th,
+		.plan-table td {
+			padding: 15px;
+		}
+		.assumptions-page {
+			padding: 20px;
+		}
+		.assumptions-page .section-top {
+			flex-wrap: wrap;
+		}
+		.assumption-metrics {
+			grid-template-columns: 1fr;
+			gap: 23px;
+		}
+		.assumption-metrics > div {
+			padding-bottom: 17px;
+			border-bottom: 1px solid var(--line);
+		}
+		.assumption-metrics strong {
+			margin: 3px 0;
+		}
+		.evaluations-grid {
+			grid-template-columns: 1fr;
+		}
+		.page-section-top {
+			flex-wrap: wrap;
+		}
+		.page-section-top > p {
+			font-size: 11px;
+		}
+		.comparison-hero {
+			gap: 13px;
+		}
+		.comparison-icon {
+			width: 43px;
+			height: 43px;
+		}
+		.comparison-hero h2 {
+			font-size: 13px;
+		}
+		.comparison-hero p {
+			font-size: 9px;
+		}
+		.comparison-hero > button {
+			margin-left: 0;
+		}
+		.comparison-grid {
+			grid-template-columns: 1fr 1fr;
+			gap: 13px 18px;
+			padding: 18px;
+		}
+		.comparison-grid > span {
+			grid-column: 1 / -1;
+			font-size: 10px;
+		}
+		.comparison-grid strong {
+			font-size: 12px;
+		}
+		.comparison-grid.emphasis strong {
+			font-size: 20px;
+		}
+		.comparison-head > div > span:last-child {
+			font-size: 8px;
+		}
+		.comparison-panel .section-note {
+			padding: 17px;
+			font-size: 10px;
+		}
+		.changes-panel {
+			padding: 20px;
+		}
+		.change-item summary {
+			gap: 8px;
+		}
+		.change-item summary strong {
+			font-size: 11px;
+		}
+		.change-item summary > span:last-child {
+			font-size: 8px;
+		}
+		.change-details > div {
+			grid-template-columns: 1fr;
+			gap: 5px;
+		}
+		.source-banner {
+			padding: 20px;
+			flex-wrap: wrap;
+			gap: 12px;
+		}
+		.source-banner h2 {
+			font-size: 14px;
+		}
+		.source-banner > .badge {
+			margin-left: 0;
+		}
+		.source-banner p {
+			font-size: 10px;
+		}
+		.sources-grid {
+			gap: 17px;
+		}
+		.source-health,
+		.portability,
+		.pay-evidence {
+			padding: 20px;
+		}
+		.pay-evidence .section-top {
+			align-items: flex-start;
+		}
+		.pay-evidence .section-top h2 {
+			font-size: 14px;
+		}
+		.pay-evidence .section-top p {
+			font-size: 9px;
+		}
+		.detail-list > div {
+			gap: 15px;
+			font-size: 11px;
+		}
+		.detail-list dd {
+			font-size: 10px;
+			flex-wrap: wrap;
+			justify-content: flex-end;
+		}
+		.inline-notice {
+			padding: 13px;
+			font-size: 10px;
+		}
+		.draft-bar {
+			bottom: 10px;
+			left: 10px;
+			right: 10px;
+			padding: 12px;
+			flex-wrap: wrap;
+			gap: 12px;
+		}
+		.draft-icon {
+			width: 30px;
+			height: 32px;
+		}
+		.draft-bar strong {
+			font-size: 11px;
+		}
+		.draft-bar small {
+			font-size: 8px;
+		}
+		.draft-bar > div:last-child {
+			margin-left: auto;
+		}
+		.draft-bar .button {
+			font-size: 10px;
+			min-height: 33px;
+			padding: 7px 11px;
+		}
+		body:has(.draft-bar) .toast {
+			bottom: 143px;
+		}
+		body:has(.draft-bar) .main-content {
+			padding-bottom: 150px;
+		}
+		.toast {
+			right: 15px;
+			bottom: 15px;
+			font-size: 10px;
+		}
+		.modal {
+			max-height: 92dvh;
+			width: calc(100% - 20px);
+			border-radius: 11px;
+		}
+		.modal-drawer {
+			width: 100%;
+			max-width: 100%;
+			height: 100dvh;
+			max-height: 100dvh;
+			margin: 0;
+			inset: 0;
+			border: 0;
+			border-radius: 0;
+		}
+		.modal-header {
+			padding: 22px 20px 19px;
+		}
+		.modal-header h2 {
+			font-size: 26px;
+		}
+		.modal-body {
+			padding: 20px;
+		}
+		.form-grid {
+			gap: 17px 13px;
+		}
+		.field {
+			font-size: 10px;
+		}
+		.field input,
+		.field select {
+			font-size: 12px;
+			padding: 9px;
+		}
+		.modal-actions {
+			flex-wrap: wrap;
+			gap: 9px;
+		}
+		.modal-actions .button {
+			font-size: 10px;
+		}
+		.evidence-amount {
+			font-size: 34px;
+		}
+		.failure-comparison strong {
+			font-size: 26px;
+		}
+	}
+	@media (max-width: 370px) {
+		.metric-value {
+			font-size: 22px;
+		}
+		.metric-context {
+			font-size: 6px;
+		}
+		.metric-range .range-value {
+			font-size: 14px;
+		}
+		.insight-card {
+			display: flex;
+			flex-direction: column;
+		}
+		.insight-card h2 {
+			font-size: 22px;
+		}
+		.funding-values {
+			margin-top: 10px;
+		}
+		.insight-caption {
+			text-align: left;
+		}
+		.form-grid {
+			grid-template-columns: 1fr;
+		}
+		.chart-top {
+			flex-wrap: wrap;
+		}
+		.chart-toolbar {
+			gap: 10px;
+			flex-wrap: wrap;
+		}
+	}
+	@media (max-width: 600px) {
+		.auth-form {
+			width: 100%;
+			margin-left: 28px;
+		}
+		.auth-form input {
+			flex: 1;
+			width: auto;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		*::before,
+		*::after {
+			animation-duration: 0.01ms !important;
+			transition-duration: 0.01ms !important;
+			scroll-behavior: auto !important;
+		}
+	}
+	@media print {
+		.sidebar,
+		.topbar,
+		.button,
+		.draft-bar,
+		.toast,
+		.page-footer,
+		.chart-keyboard {
+			display: none !important;
+		}
+		.workspace {
+			margin-left: 0;
+		}
+		.main-content {
+			padding: 0;
+		}
+		.outlook-top {
+			grid-template-columns: 1fr;
+		}
+		.metric,
+		.panel,
+		.chart-card,
+		.evaluation-preview,
+		.timing-preview {
+			break-inside: avoid;
+		}
+		body {
+			background: white;
+		}
+	}
+}

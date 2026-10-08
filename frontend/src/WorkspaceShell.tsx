@@ -1,6 +1,7 @@
 import { changesBetween } from "./domain/model.ts";
 import { useBeforeUnload } from "./state/useBeforeUnload.ts";
 import { DraftBar } from "./workspace/DraftBar.tsx";
+import "./workspace/workspace.css";
 import { ProjectionBoundary } from "./workspace/ProjectionBoundary.tsx";
 import type { WorkspaceShellProps } from "./workspace/types.ts";
 import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation.ts";

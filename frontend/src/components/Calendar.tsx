@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { dateLabel, money } from "../domain/format.ts";
+import "./Calendar.css";
 
 export interface CalendarEvent {
 	date: string;

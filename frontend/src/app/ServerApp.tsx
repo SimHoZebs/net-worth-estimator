@@ -6,6 +6,7 @@ import { useServerModelImport } from "../state/useServerModelImport.ts";
 import { WorkspaceShell } from "../WorkspaceShell.tsx";
 import { RemoteAuthControl } from "./RemoteAuthControl.tsx";
 import { ServerWorkspaceRecovery } from "./ServerWorkspaceRecovery.tsx";
+import "./app.css";
 
 export function ServerApp() {
 	const [years, setYears] = useState(20);

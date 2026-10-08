@@ -10,6 +10,7 @@ import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Account, Movement } from "../../domain/model.ts";
 import type { ResolvedMovementAmount } from "../../domain/resolvedMovementAmounts.ts";
+import "./plan.css";
 
 export function MovementsPanel({
 	movements,

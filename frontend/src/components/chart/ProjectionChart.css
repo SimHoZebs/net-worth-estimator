@@ -1,0 +1,171 @@
+/* Co-located partial: owned by components/chart/ProjectionChart.css. Global cascade order is set by the
+   @layer declaration in styles/index.css (reset, base, layout, components,
+   responsive, accessibility). Keep selectors inside @layer components. */
+@layer components {
+	.chart-card {
+		background: #fffefa;
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		overflow: hidden;
+	}
+	.chart-top {
+		padding: 23px 23px 0;
+	}
+	.chart-toolbar {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 24px 23px 14px;
+	}
+	.chart-legend {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		font-size: 9px;
+		color: #7b816e;
+	}
+	.chart-legend span {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.legend-line {
+		width: 15px;
+		height: 2px;
+		background: #3c6144;
+		display: inline-block;
+	}
+	.legend-line.dashed {
+		background: repeating-linear-gradient(
+			90deg,
+			#8b997a 0 4px,
+			transparent 4px 7px
+		);
+	}
+	.legend-band {
+		width: 11px;
+		height: 9px;
+		border-radius: 2px;
+		background: #dfe7cd;
+		display: inline-block;
+	}
+	.legend-zero {
+		width: 15px;
+		height: 0;
+		border-top: 2px solid #7d8a76;
+		display: inline-block;
+	}
+	.chart-wrap {
+		position: relative;
+		padding: 0 6px;
+	}
+	.chart-wrap > svg {
+		width: 100%;
+		display: block;
+		overflow: visible;
+		min-height: 235px;
+	}
+	.axis-label {
+		fill: #8a907e;
+		font-size: 10px;
+		font-family: "Manrope Variable", sans-serif;
+	}
+	.chart-keyboard {
+		width: calc(100% - 80px);
+		position: absolute;
+		bottom: 0;
+		left: 55px;
+		opacity: 0;
+		height: 12px;
+		cursor: ew-resize;
+	}
+	.chart-keyboard:focus-visible {
+		opacity: 1;
+	}
+	.chart-inspection {
+		display: flex;
+		gap: 6px 13px;
+		flex-wrap: wrap;
+		font-size: 10px;
+		background: #f3f6eb;
+		margin: 3px 20px 10px;
+		padding: 8px 11px;
+		border-radius: 5px;
+		min-height: 58px;
+		align-content: center;
+		font-variant-numeric: tabular-nums;
+	}
+	.chart-inspection span {
+		color: #78816b;
+	}
+	.chart-inspection b {
+		color: #3c5032;
+		margin-left: 4px;
+	}
+	.chart-accounts {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 16px;
+		flex-basis: 100%;
+	}
+	.chart-accounts li {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		color: #78816b;
+	}
+	.range-loading {
+		position: absolute;
+		left: 50%;
+		top: 35%;
+		transform: translateX(-50%);
+		background: #fffffff5;
+		border: 1px solid #e3e8d9;
+		padding: 9px 15px;
+		box-shadow: 0 3px 13px #17352309;
+		border-radius: 7px;
+		white-space: nowrap;
+		font-size: 10px;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.chart-foot {
+		border-top: 1px solid #eceee4;
+		padding: 10px 21px;
+		display: flex;
+		align-items: center;
+		gap: 15px;
+	}
+	.chart-foot .text-button {
+		font-size: 9px;
+	}
+	.tiny-caret {
+		margin-left: 5px;
+	}
+	.chart-foot-note {
+		font-size: 8px;
+		color: #8d9382;
+		margin-left: auto;
+	}
+	.chart-foot .icon-button {
+		width: 23px;
+		height: 23px;
+	}
+	.chart-foot svg {
+		width: 13px;
+	}
+	.chart-data {
+		padding: 20px;
+		border-top: 1px solid var(--line);
+	}
+	.chart-data h3 {
+		font-size: 11px;
+	}
+	.chart-data table {
+		font-size: 10px;
+	}
+}

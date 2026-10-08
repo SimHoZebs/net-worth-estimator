@@ -1,0 +1,40 @@
+/* Page grids: two-column arrangements shared by the top-level pages. */
+@layer layout {
+	.outlook-top {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 300px;
+		gap: 22px;
+		align-items: start;
+	}
+	.outlook-rail {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		min-width: 0;
+		position: sticky;
+		top: 20px;
+	}
+	.metrics-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin-bottom: 0;
+	}
+	.outlook-secondary {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 22px;
+		margin-top: 25px;
+	}
+	.evaluations-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 22px;
+	}
+	.sources-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 22px;
+		margin-bottom: 24px;
+	}
+}

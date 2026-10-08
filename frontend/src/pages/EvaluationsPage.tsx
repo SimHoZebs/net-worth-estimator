@@ -1,5 +1,6 @@
 import { Check, Flag, Plus } from "lucide-react";
 import { Badge, EmptyState, Progress } from "../components/ui.tsx";
+import "./evaluations/evaluations.css";
 import { dateLabel } from "../domain/format.ts";
 import {
 	type Evaluation,

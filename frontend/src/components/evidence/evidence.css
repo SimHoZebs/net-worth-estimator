@@ -1,0 +1,109 @@
+/* Co-located partial: owned by components/evidence/evidence.css. Global cascade order is set by the
+   @layer declaration in styles/index.css (reset, base, layout, components,
+   responsive, accessibility). Keep selectors inside @layer components. */
+@layer components {
+	.evidence-items,
+	.evidence-warnings {
+		list-style: none;
+		padding: 0;
+		margin: 0 0 16px;
+		display: grid;
+		gap: 6px;
+		font-size: 11px;
+		color: #768363;
+	}
+	.evidence-warnings {
+		color: #8b7549;
+	}
+	.evidence-items li,
+	.evidence-warnings li {
+		display: flex;
+		gap: 8px;
+		align-items: baseline;
+	}
+	.evidence-items li::before {
+		content: "";
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: #829466;
+		flex-shrink: 0;
+		transform: translateY(-1px);
+	}
+	.evidence-warnings li::before {
+		content: "";
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		background: #b5a16a;
+		flex-shrink: 0;
+		transform: translateY(-1px);
+	}
+	.evidence-records {
+		border-top: 1px solid var(--line);
+		border-bottom: 1px solid var(--line);
+		margin: 24px 0 20px;
+	}
+	.evidence-records summary {
+		padding: 15px 0;
+		cursor: pointer;
+		font-size: 11px;
+		color: #687d54;
+	}
+	.evidence-amount {
+		font-family: var(--serif);
+		font-size: 41px;
+		line-height: 1.2;
+		letter-spacing: -1px;
+		margin-bottom: 9px;
+	}
+	.evidence-date {
+		color: #9a814f;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 11px;
+	}
+	.failure-comparison {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 26px 0 5px;
+		gap: 20px;
+	}
+	.failure-comparison > div {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+	}
+	.failure-comparison > div > span {
+		font-size: 11px;
+		color: #848a79;
+	}
+	.failure-comparison strong {
+		font-size: 28px;
+		font-weight: 500;
+		letter-spacing: -0.7px;
+	}
+	.failure-comparison > svg {
+		color: #a3ad94;
+	}
+	.method-steps {
+		display: grid;
+		gap: 26px;
+		margin-bottom: 25px;
+	}
+	.method-steps > div {
+		display: flex;
+		gap: 20px;
+	}
+	.method-steps > div > span {
+		font-family: var(--serif);
+		font-size: 28px;
+		color: #96a183;
+	}
+	.method-steps p {
+		font-size: 12px;
+		margin-top: 7px;
+	}
+}

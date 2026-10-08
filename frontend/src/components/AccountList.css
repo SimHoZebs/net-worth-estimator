@@ -1,0 +1,77 @@
+/* Co-located partial: owned by components/AccountList.css. Global cascade order is set by the
+   @layer declaration in styles/index.css (reset, base, layout, components,
+   responsive, accessibility). Keep selectors inside @layer components. */
+@layer components {
+	.account-section {
+		margin-top: 30px;
+	}
+	.account-section .section-top {
+		margin-bottom: 14px;
+	}
+	.account-summary {
+		display: flex;
+		gap: 20px;
+		font-size: 9px;
+		color: #87907c;
+		margin-bottom: 12px;
+	}
+	.account-summary b {
+		margin-left: 5px;
+		color: #68745a;
+		font-weight: 550;
+	}
+	.accounts-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 12px;
+	}
+	.account-row {
+		display: flex;
+		gap: 11px;
+		align-items: center;
+		padding: 15px 14px;
+		background: #fcfdf8;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		text-align: left;
+		min-width: 0;
+	}
+	.account-row:hover {
+		border-color: #becdad;
+		background: #fffefb;
+	}
+	.account-name-line {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+	}
+	.account-label {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		gap: 3px;
+	}
+	.account-label strong {
+		font-size: 10px;
+		font-weight: 600;
+	}
+	.account-label > span {
+		font-size: 8px;
+		color: #8b9281;
+	}
+	.account-balance {
+		margin-left: auto;
+		text-align: right;
+		font-size: 12px;
+		font-weight: 600;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 4px;
+		white-space: nowrap;
+	}
+	.account-balance .badge {
+		font-size: 7px;
+		padding: 1px 4px;
+	}
+}

@@ -9,6 +9,7 @@ import { AccountDot } from "./AccountIcon.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
 import { ProjectionTable } from "./chart/ProjectionTable.tsx";
 import { IconButton, Toggle } from "./ui.tsx";
+import "./chart/ProjectionChart.css";
 
 export function ProjectionChart({
 	plan,

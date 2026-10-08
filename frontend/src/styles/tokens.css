@@ -1,0 +1,19 @@
+/* Design tokens: typefaces, palette, and shared dimensions. Every other
+   stylesheet reads these via var(); no selectors live here. */
+@layer base {
+	:root {
+		font-family: "Manrope Variable", sans-serif;
+		color: #283b33;
+		background: #f7f8f3;
+		font-synthesis: none;
+		--forest: #254d3d;
+		--ink: #283b33;
+		--muted: #737970;
+		--subtle: #8d9388;
+		--line: #e4e7de;
+		--paper: #f7f8f3;
+		--white: #fffefa;
+		--serif: "Newsreader Variable", Georgia, serif;
+		--sidebar: 224px;
+	}
+}

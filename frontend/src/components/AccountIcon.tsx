@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { Account } from "../domain/model.ts";
+import "./AccountIcon.css";
 
 const icons: Record<Account["kind"], LucideIcon> = {
 	cash: Wallet,

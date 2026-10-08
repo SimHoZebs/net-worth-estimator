@@ -1,4 +1,5 @@
 import { type ReactNode, useId } from "react";
+import "./ui.css";
 
 export interface TabItem<T extends string> {
 	id: T;

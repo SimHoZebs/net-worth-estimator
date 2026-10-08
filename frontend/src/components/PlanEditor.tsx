@@ -4,6 +4,7 @@ import { AssumptionsEditor } from "./editors/AssumptionsEditor.tsx";
 import type { EditorProps } from "./editors/EditorForm.tsx";
 import { EvaluationEditor } from "./editors/EvaluationEditor.tsx";
 import { MovementEditor } from "./editors/MovementEditor.tsx";
+import "./editors/editors.css";
 
 export type { EditorTarget } from "../domain/planEdits.ts";
 

@@ -1,0 +1,123 @@
+/* Co-located partial: owned by pages/compare/compare.css. Global cascade order is set by the
+   @layer declaration in styles/index.css (reset, base, layout, components,
+   responsive, accessibility). Keep selectors inside @layer components. */
+@layer components {
+	.comparison-hero {
+		display: flex;
+		align-items: center;
+		gap: 18px;
+		margin: 10px 0 25px;
+	}
+	.comparison-icon {
+		background: #eaf0df;
+		width: 50px;
+		height: 50px;
+		border-radius: 12px;
+		display: grid;
+		place-items: center;
+		color: #83996b;
+	}
+	.comparison-hero p {
+		font-size: 11px;
+		margin-top: 5px;
+	}
+	.comparison-hero > button {
+		margin-left: auto;
+	}
+	.comparison-grid {
+		display: grid;
+		grid-template-columns: 1.2fr 1fr 1fr;
+		gap: 20px;
+		padding: 25px 30px;
+		border-bottom: 1px solid var(--line);
+	}
+	.comparison-grid > span {
+		font-size: 12px;
+		color: #7d8770;
+	}
+	.comparison-head {
+		background: #f3f5eb;
+		align-items: center;
+	}
+	.comparison-head > div {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 8px;
+	}
+	.comparison-head > div > span:last-child {
+		font-size: 9px;
+		color: #899279;
+	}
+	.comparison-grid strong {
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.comparison-grid.emphasis strong {
+		font-size: 22px;
+		font-weight: 500;
+		letter-spacing: -0.8px;
+	}
+	.comparison-grid small {
+		display: block;
+		font-size: 9px;
+		margin-top: 3px;
+	}
+	.comparison-grid.emphasis {
+		background: #fbfcf6;
+	}
+	.comparison-delta {
+		display: block;
+		font-size: 10px;
+		margin-top: 7px;
+	}
+	.changes-panel {
+		margin-top: 25px;
+		padding: 25px;
+	}
+	.change-list {
+		margin-top: 15px;
+	}
+	.change-item {
+		border-top: 1px solid var(--line);
+	}
+	.change-item > summary {
+		padding: 16px 0;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+	.change-item > summary > span:last-child {
+		font-size: 9px;
+		color: #8a937c;
+		margin-left: auto;
+	}
+	.change-details {
+		padding-bottom: 18px;
+	}
+	.change-details > div {
+		display: grid;
+		grid-template-columns: 1fr 2fr;
+		gap: 15px;
+		padding: 7px 12px;
+		background: #f8f9f2;
+		font-size: 10px;
+	}
+	.change-details dt {
+		color: #7b856d;
+	}
+	.change-details dd {
+		display: flex;
+		gap: 16px;
+		justify-content: space-between;
+	}
+	.review-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 10px;
+		padding-top: 22px;
+		border-top: 1px solid var(--line);
+		margin-top: 6px;
+	}
+}

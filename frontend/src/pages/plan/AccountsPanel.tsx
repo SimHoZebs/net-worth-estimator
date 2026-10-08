@@ -3,6 +3,7 @@ import { AccountIcon } from "../../components/AccountIcon.tsx";
 import { EmptyState, IconButton } from "../../components/ui.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Account } from "../../domain/model.ts";
+import "./plan.css";
 
 export function AccountsPanel({
 	accounts,

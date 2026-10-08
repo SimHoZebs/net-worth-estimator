@@ -7,6 +7,7 @@ import { FailureEvidence } from "./evidence/FailureEvidence.tsx";
 import { MethodEvidence } from "./evidence/MethodEvidence.tsx";
 import { PositionEvidence } from "./evidence/PositionEvidence.tsx";
 import { TimingEvidence } from "./evidence/TimingEvidence.tsx";
+import "./evidence/evidence.css";
 
 export type EvidenceTarget =
 	| { kind: "position" }
