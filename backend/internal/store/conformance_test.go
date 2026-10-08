@@ -66,20 +66,20 @@ func testArtifactsRoundTripAndKeepFirstWrite(t *testing.T, newStore func(*testin
 	if _, found, err := store.GetArtifact("missing"); err != nil || found {
 		t.Fatalf("missing artifact = found %v, err %v", found, err)
 	}
-	if err := store.PutArtifact("key-1", "stochastic", `{"runs":1000}`); err != nil {
+	if err := store.PutArtifact("key-1", "stochastic", "payload-v1"); err != nil {
 		t.Fatalf("put artifact: %v", err)
 	}
 	payload, found, err := store.GetArtifact("key-1")
-	if err != nil || !found || payload != `{"runs":1000}` {
+	if err != nil || !found || payload != "payload-v1" {
 		t.Fatalf("artifact = %q found %v err %v", payload, found, err)
 	}
 	// Cache identities are write-once: a repeated computation must not
 	// clobber the stored result.
-	if err := store.PutArtifact("key-1", "stochastic", `{"runs":1}`); err != nil {
+	if err := store.PutArtifact("key-1", "stochastic", "payload-v2"); err != nil {
 		t.Fatalf("repeat put artifact: %v", err)
 	}
 	payload, found, err = store.GetArtifact("key-1")
-	if err != nil || !found || payload != `{"runs":1000}` {
+	if err != nil || !found || payload != "payload-v1" {
 		t.Fatalf("artifact after repeat put = %q found %v err %v", payload, found, err)
 	}
 }

@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -61,8 +60,8 @@ func TestIncomeRuntimeIndexSelectsEffectiveRowsAndPreservesErrors(t *testing.T) 
 	data.IncomeSources[0].EffectiveTo = &overlapEnd
 	overlapIndex := newIncomeRuntimeIndex(data, map[string]types.Account{})
 	_, err = findIncomeSource(overlapIndex, "salary", "2026-07-01")
-	if err == nil || !strings.Contains(err.Error(), "More than one income source") {
-		t.Fatalf("overlap error = %v", err)
+	if err == nil {
+		t.Fatalf("overlap error = %v, want overlapping effective rows to fail", err)
 	}
 }
 

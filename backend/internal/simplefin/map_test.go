@@ -2,6 +2,8 @@ package simplefin
 
 import (
 	"encoding/json"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -103,8 +105,11 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 		t.Fatalf("pending source = %+v", pending.SourceAccountID)
 	}
 	expression, ok := pending.Amount.Config["expression"].(string)
-	if !ok || expression != "42.10" || pending.Amount.Resolver != "expression" {
-		t.Fatalf("pending amount = %+v", pending.Amount)
+	if !ok || pending.Amount.Resolver != "expression" {
+		t.Fatalf("pending amount = %+v, want expression resolver", pending.Amount)
+	}
+	if value, err := strconv.ParseFloat(strings.TrimSpace(expression), 64); err != nil || value != 42.10 {
+		t.Fatalf("pending amount = %+v, want 42.10", pending.Amount)
 	}
 	if pending.Frequency != "once" || pending.Priority != PendingPriority {
 		t.Fatalf("pending shape = %+v", pending)
