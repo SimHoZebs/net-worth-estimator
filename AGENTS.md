@@ -131,4 +131,4 @@ The script runs `gofmt` checks, `go vet`, and `go test` with `CGO_ENABLED=0`. `g
 
 The pre-commit hook verifies the backend packages containing staged Go files. The pre-push hook verifies `./internal/...` and `./cmd/...`. Frontend lint, typecheck, unit tests, build, and browser tests have no hook and run only when invoked directly.
 
-See `README.md`, `TECHNICAL_OVERVIEW.md`, and `TESTING.md` for runtime and verification detail. `PRODUCT_INTENT.md` defines product intent independently of this implementation.
+See `README.md`, `TECHNICAL_OVERVIEW.md`, and `TESTING.md` for runtime and verification detail. `PRODUCT_INTENT.md` defines product intent independently of this implementation. `docs/UI_UX_PRINCIPLES.md` governs frontend component design.
