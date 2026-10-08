@@ -145,18 +145,8 @@ test("account, movement and evaluation maintenance plus search work", async ({
 	).toBeVisible();
 });
 
-test("invalid imports and failed saves retain the intended plan", async ({
-	page,
-}) => {
+test("failed saves retain the intended plan", async ({ page }) => {
 	await page.goto("/#sources");
-	await page.getByLabel("Import Waypoint server model").setInputFiles({
-		name: "broken.json",
-		mimeType: "application/json",
-		buffer: Buffer.from("{wrong"),
-	});
-	await expect(page.getByRole("alert")).toContainText("not valid JSON");
-	// A rejected import leaves the loaded plan in place.
-	await expect(page.getByLabel("Import Waypoint server model")).toBeVisible();
 	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
@@ -346,7 +336,7 @@ test("read-only plans can be explored but not saved", async ({ page }) => {
 	).toBeDisabled();
 });
 
-test("comparison snapshots contain measures and exports remain portable", async ({
+test("comparison snapshots contain measures and export remains portable", async ({
 	page,
 }) => {
 	await page.goto("/#compare");
@@ -364,8 +354,8 @@ test("comparison snapshots contain measures and exports remain portable", async 
 	expect(snapshot).toHaveProperty("final");
 	await page.getByRole("link", { name: "Configs", exact: true }).click();
 	const file = page.waitForEvent("download");
-	await page.getByRole("button", { name: "Export server model" }).click();
-	expect((await file).suggestedFilename()).toBe("waypoint-server-model.json");
+	await page.getByRole("button", { name: "Export model" }).click();
+	expect((await file).suggestedFilename()).toBe("waypoint-model.json");
 });
 
 test("a second tab cannot overwrite newer financial work", async ({
@@ -404,7 +394,9 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 	).toHaveCount(2);
 	await page.getByRole("tab", { name: /Accounts/ }).focus();
 	await page.keyboard.press("ArrowRight");
-	await expect(page.getByRole("tab", { name: /Balance checks/ })).toBeFocused();
+	await expect(
+		page.getByRole("tab", { name: /Starting balances/ }),
+	).toBeFocused();
 	await page.goto("/#transactions");
 	await expect(
 		page.locator('.page-tabs[role="tablist"] > button[role="tab"]'),

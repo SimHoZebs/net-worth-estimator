@@ -63,9 +63,6 @@ export function ChangesPanel({
 					</button>
 				</div>
 			)}
-			{readOnly && (
-				<p className="section-note">"Export a copy from Data & sources."</p>
-			)}
 		</section>
 	);
 }
