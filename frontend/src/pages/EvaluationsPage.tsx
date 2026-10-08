@@ -32,7 +32,7 @@ function OtherEvaluationCard({ item }: { item: OtherEvaluation }) {
 				</span>
 			</div>
 			<h2>{item.name}</h2>
-			<p>{otherTypeLabels[item.type]}</p>
+			<p>{item.subtitle || otherTypeLabels[item.type]}</p>
 			<div className="evaluation-card-outcome">
 				{!item.enabled ? "Paused" : item.summary}
 			</div>
