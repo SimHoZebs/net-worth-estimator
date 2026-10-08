@@ -56,14 +56,6 @@ export function removePlanItem({
 	};
 }
 
-export function toggleMovement({ plan, id }: { plan: Plan; id: string }): Plan {
-	return {
-		...plan,
-		movements: plan.movements.map((item) =>
-			item.id === id ? { ...item, enabled: !item.enabled } : item,
-		),
-	};
-}
 export function setEvaluationEnabled({
 	plan,
 	id,
