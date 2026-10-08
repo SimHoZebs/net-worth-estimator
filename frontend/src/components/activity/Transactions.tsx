@@ -2,7 +2,6 @@ import {
 	ArrowRightLeft,
 	ChevronLeft,
 	ChevronRight,
-	Info,
 	ListFilter,
 } from "lucide-react";
 import { useId, useMemo, useState } from "react";
@@ -12,7 +11,6 @@ import {
 	defaultActivityFilters,
 	filterTransactions,
 } from "../../domain/accountActivity.ts";
-import { dateLabel } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
 import { EmptyState, IconButton } from "../ui.tsx";
@@ -23,7 +21,6 @@ const PAGE_SIZE = 10;
 export function Transactions({
 	transactions,
 	plan,
-	horizon,
 	onEdit,
 }: {
 	transactions: AccountTransaction[];
@@ -68,7 +65,6 @@ export function Transactions({
 			<EmptyState
 				icon={ArrowRightLeft}
 				title="No transactions for this account yet"
-				description="Historical movements and scheduled transactions will appear here. Growth and interest are reflected in the balance projection separately."
 				action="Add a planned transaction"
 				onAction={() => onEdit({ kind: "movement", item: null })}
 			/>
@@ -85,10 +81,6 @@ export function Transactions({
 				totalCount={transactions.length}
 				onChange={update}
 			/>
-			<p className="transaction-context">
-				Historical record + the current base case through {dateLabel(horizon)}.
-				Upcoming dates are relative to {dateLabel(plan.startDate, true)}.
-			</p>
 			{filtered.length ? (
 				<>
 					<div className="table-scroll" id={`${id}-table`}>
@@ -156,19 +148,10 @@ export function Transactions({
 				<EmptyState
 					icon={ListFilter}
 					title="No matching transactions"
-					description="Try another name, date window, or activity type. Your account data is unchanged."
 					action="Clear transaction filters"
 					onAction={() => update(defaultActivityFilters)}
 				/>
 			)}
-			<div className="transaction-note">
-				<Info size={14} aria-hidden="true" />
-				<p>
-					Historical record may be incomplete and is already included in the
-					starting balance. Projected amounts show the funded portion; growth
-					and interest are included in the balance projection separately.
-				</p>
-			</div>
 		</>
 	);
 }

@@ -34,26 +34,6 @@ export function AssumptionsPanel({
 					<p>A repeatable set of possible return paths.</p>
 				</div>
 			</div>
-			<div className="method-note">
-				<h3>How the projection works</h3>
-				<p>
-					Balances accrue growth between dated movements. Recurring movements
-					run on their scheduled day, clamped to month end when necessary.
-					Source accounts retain their protected balance; incoming movements
-					respect account ceilings. Debt payments stop when the debt reaches
-					zero.
-				</p>
-				<p>
-					Rates and movement increases are nominal. Taxes, investment fees,
-					withdrawal eligibility and lending rules need explicit movements or
-					constraints. Historical records are evidence; they are already
-					reflected in starting balances.
-				</p>
-				<p>
-					The range varies investment returns only. It does not model job loss,
-					unplanned spending, or every source of financial risk.
-				</p>
-			</div>
 		</div>
 	);
 }

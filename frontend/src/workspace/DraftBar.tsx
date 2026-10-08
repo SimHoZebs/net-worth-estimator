@@ -24,12 +24,10 @@ export function DraftBar({
 				</span>
 				<span>
 					<strong>
-						{loading ? "Updating unsaved changes" : "Exploring unsaved changes"}
+						{loading
+							? "Updating unsaved changes…"
+							: `${count} unsaved ${count === 1 ? "change" : "changes"} · saved plan unchanged`}
 					</strong>
-					<small>
-						{count} unsaved {count === 1 ? "change" : "changes"} · saved server
-						plan unchanged
-					</small>
 				</span>
 			</div>
 			<div>

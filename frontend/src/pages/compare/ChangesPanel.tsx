@@ -20,17 +20,8 @@ export function ChangesPanel({
 			<div className="section-top">
 				<div>
 					<h2>Your changes</h2>
-					<p>
-						{changes.length
-							? `Review what will be saved on the server.`
-							: "No unsaved changes."}
-					</p>
+					{!changes.length && <p>"No unsaved changes."</p>}
 				</div>
-				{changes.length > 0 && (
-					<Badge tone="amber">
-						{changes.length} {changes.length === 1 ? "change" : "changes"}
-					</Badge>
-				)}
 			</div>
 			<div className="change-list">
 				{changes.map((change) => (
@@ -73,10 +64,7 @@ export function ChangesPanel({
 				</div>
 			)}
 			{readOnly && (
-				<p className="section-note">
-					"The server is read-only. Export the unsaved changes from Data &
-					sources to keep a separate copy."
-				</p>
+				<p className="section-note">"Export a copy from Data & sources."</p>
 			)}
 		</section>
 	);

@@ -109,10 +109,6 @@ export function FailureEvidence({
 					destination does not mean the whole plan is affordable.
 				</span>
 			</div>
-			<p className="section-note">
-				Inspect the amount, date, funding account, destination, or protected
-				balance. The 30-day cash view is a separate timing check.
-			</p>
 			{movement && (
 				<div className="modal-actions">
 					<button

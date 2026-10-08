@@ -29,9 +29,6 @@ export function EditorForm({
 	const close = () => (dirty ? setConfirmCancel(true) : onClose());
 	return (
 		<Modal title={title} eyebrow="Try it before you keep it" onClose={close}>
-			<p className="form-intro">
-				An edit creates unsaved changes. Compare the outcome before saving.
-			</p>
 			{readOnlyReason && (
 				<div className="inline-notice">
 					<LockKeyhole size={18} />
@@ -91,4 +88,4 @@ export function EditorForm({
 }
 
 export const sourceReadOnlyReason =
-	"This record is owned by a read-only source. Edit it at the source and import a refreshed plan.";
+	"Edit it at the source and import a refreshed plan.";

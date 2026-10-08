@@ -1,4 +1,4 @@
-import { Check, LockKeyhole, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { ErrorNotice, IconButton } from "../components/ui.tsx";
 import type { Plan } from "../domain/model.ts";
 import { download } from "../state/storage.ts";
@@ -31,18 +31,17 @@ export function workspaceStatusLabel({
 	authRequired: boolean;
 }) {
 	return readOnly
-		? "Server read-only"
+		? "Read-only"
 		: authTokenActive
-			? "Server · token in memory"
+			? "Token in memory"
 			: authRequired
 				? "Auth required"
-				: "Server workspace";
+				: "Workspace";
 }
 
 export function WorkspaceNotices({
 	state,
 	plan,
-	readOnly,
 }: {
 	state: WorkspaceController;
 	plan: Plan;
@@ -66,13 +65,6 @@ export function WorkspaceNotices({
 				>
 					"Export local draft recovery"
 				</button>
-			)}
-			{readOnly && (
-				<div className="inline-notice">
-					<LockKeyhole size={17} />
-					"This server is read-only. You can test changes and export a copy; the
-					saved server model cannot be replaced."
-				</div>
 			)}
 		</>
 	);

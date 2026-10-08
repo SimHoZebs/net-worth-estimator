@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Movement } from "../../domain/model.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { InputField, SelectField } from "../Field.tsx";
@@ -16,10 +17,11 @@ export function MovementEditor({
 }: EditorProps & { item: Movement | null }) {
 	const readOnlyReason =
 		item?.amountKnown === false
-			? "This amount comes from a provider-backed resolver and has no fixed value in the display plan. Review the server projection instead of editing it here."
+			? "This amount has no fixed value here. Review it in the projection instead of editing it."
 			: item?.readOnly
 				? sourceReadOnlyReason
 				: undefined;
+	const [noEndDate, setNoEndDate] = useState(item?.endDate == null);
 	return (
 		<EditorForm
 			{...props}
@@ -35,7 +37,10 @@ export function MovementEditor({
 					toId: textValue(data, "toId") || null,
 					frequency: textValue(data, "frequency") as Movement["frequency"],
 					startDate: textValue(data, "startDate"),
-					endDate: textValue(data, "endDate") || null,
+					endDate:
+						textValue(data, "noEndDate") === "on"
+							? null
+							: textValue(data, "endDate") || null,
 					annualIncrease: numberValue(data, "annualIncrease"),
 					enabled: textValue(data, "enabled") === "on",
 					readOnly: false,
@@ -93,11 +98,20 @@ export function MovementEditor({
 			/>
 			<InputField
 				label="Last occurrence"
-				hint="Leave empty to continue through the horizon."
 				name="endDate"
 				type="date"
+				disabled={noEndDate}
 				defaultValue={item?.endDate ?? ""}
 			/>
+			<label className="checkbox-field">
+				<input
+					name="noEndDate"
+					type="checkbox"
+					checked={noEndDate}
+					onChange={(event) => setNoEndDate(event.target.checked)}
+				/>
+				No end date
+			</label>
 			<InputField
 				label="Annual amount increase (%)"
 				name="annualIncrease"
@@ -116,16 +130,6 @@ export function MovementEditor({
 				/>
 				Include in projections
 			</label>
-			<p className="field-wide field-hint">
-				Excluding a transaction keeps it visible but removes it from
-				projections. Only exclude deliberately, for example to compare an
-				outcome with and without this transaction.
-			</p>
-			<p className="field-wide field-hint">
-				A one-time movement dated on or before {plan.startDate} is a historical
-				record. Starting balances already include it. Anything later is
-				projected.
-			</p>
 		</EditorForm>
 	);
 }

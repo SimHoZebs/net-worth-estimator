@@ -20,8 +20,6 @@ export function SourcesPage({
 	serverDocument = null,
 	onImportServerDocument,
 	authControl = null,
-	authRequired = false,
-	authTokenActive = false,
 	onEdit,
 }: {
 	plan: Plan;
@@ -44,10 +42,10 @@ export function SourcesPage({
 		onImportServerDocument,
 	});
 	const sourceAccess = readOnly
-		? "Read-only server"
+		? "Read-only"
 		: serverStatus?.authEnabled
 			? "Auth required"
-			: "Writable server";
+			: "Writable";
 	const hasDraft = Boolean(workspace.draft);
 	const canImportServer = Boolean(onImportServerDocument);
 	return (
@@ -59,17 +57,12 @@ export function SourcesPage({
 				aria-labelledby="server-access-heading"
 				style={{ marginBottom: 22 }}
 			>
-				<h2 id="server-access-heading">Server access</h2>
+				<h2 id="server-access-heading">Access</h2>
 				<p>
 					Protected saves use a bearer token that stays in this tab’s memory
 					only. Enter it here when the server requires authentication.
 				</p>
 				{authControl}
-				{!authRequired && !authTokenActive && (
-					<p className="muted">
-						This server does not require a token for protected saves.
-					</p>
-				)}
 			</section>
 			<div className="sources-grid">
 				<SourceHealth

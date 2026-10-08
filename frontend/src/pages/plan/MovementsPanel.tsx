@@ -27,13 +27,7 @@ export function MovementsPanel({
 	onRemove: (movement: Movement) => void;
 }) {
 	if (!movements.length)
-		return (
-			<EmptyState
-				icon={ArrowRight}
-				title="No matching transactions"
-				description="Add income, expenses, or transfers to see their effect on your plan."
-			/>
-		);
+		return <EmptyState icon={ArrowRight} title="No matching transactions" />;
 	const names = new Map(accounts.map((account) => [account.id, account.name]));
 	return (
 		<div className="movement-list">

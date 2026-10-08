@@ -676,7 +676,7 @@ export function useRemoteWorkspace({
 			setDraftDocument(document);
 			const nextLocal = localStateFor(nextWorkspace, nextDraftPresentation);
 			const persisted = writeLocalState(nextLocal, nextLocal);
-			setNotice("Unsaved changes updated. Saved server plan unchanged.");
+			setNotice("Unsaved changes updated. Saved plan unchanged.");
 			if (persisted) setError(null);
 			return true;
 		},

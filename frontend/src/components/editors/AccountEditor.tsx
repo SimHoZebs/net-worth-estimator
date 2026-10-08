@@ -70,7 +70,6 @@ export function AccountEditor({
 			</label>
 			<InputField
 				label="Balance (USD)"
-				hint="Enter debts as negative amounts."
 				name="balance"
 				type="number"
 				required
@@ -81,7 +80,6 @@ export function AccountEditor({
 			/>
 			<InputField
 				label="Protected balance (USD)"
-				hint="Transactions cannot spend below this balance."
 				name="minBalance"
 				type="number"
 				required
@@ -92,7 +90,6 @@ export function AccountEditor({
 			/>
 			<InputField
 				label="Maximum balance (USD)"
-				hint="Optional. Limits incoming transactions."
 				name="maxBalance"
 				type="number"
 				min="0"
@@ -109,10 +106,6 @@ export function AccountEditor({
 				max={plan.startDate}
 				defaultValue={item?.observedOn ?? plan.startDate}
 			/>
-			<p className="field-hint">
-				A balance and date is a balance check. The engine projects forward from
-				it.
-			</p>
 			<InputField
 				label="Source"
 				name="source"

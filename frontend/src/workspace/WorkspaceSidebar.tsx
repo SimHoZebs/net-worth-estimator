@@ -1,11 +1,9 @@
 import {
-	ArrowUpRight,
 	ChevronDown,
 	CircleHelp,
 	LockKeyhole,
 	PanelLeftClose,
 	Settings,
-	ShieldCheck,
 } from "lucide-react";
 import { Brand } from "../components/Brand.tsx";
 import { IconButton } from "../components/ui.tsx";
@@ -50,7 +48,6 @@ export function WorkspaceSidebar({
 				<span className="household-avatar">H</span>
 				<span>
 					<strong>{planName}</strong>
-					<small>{"Server household"}</small>
 				</span>
 				<ChevronDown size={14} />
 			</button>
@@ -77,18 +74,6 @@ export function WorkspaceSidebar({
 				</ul>
 			</nav>
 			<div className="sidebar-bottom">
-				<div className="local-card">
-					<span className="local-icon">
-						<ShieldCheck size={20} strokeWidth={1.5} />
-					</span>
-					<p>
-						"Your canonical server model lives on the server. Temporary edits
-						stay in this browser until you save."
-					</p>
-					<button type="button" className="text-button" onClick={onMethod}>
-						How it works <ArrowUpRight size={14} />
-					</button>
-				</div>
 				{/* biome-ignore lint/a11y/useValidAnchor: The hash navigates to a workspace page; onClick only closes the mobile drawer. */}
 				<a
 					className={`nav-link ${page === "sources" ? "active" : ""}`}
