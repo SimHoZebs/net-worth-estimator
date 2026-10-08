@@ -1,5 +1,6 @@
-import { Flag, Plus } from "lucide-react";
-import { Badge, EmptyState } from "../components/ui.tsx";
+import { Check, Flag, Plus } from "lucide-react";
+import { Badge, EmptyState, Progress } from "../components/ui.tsx";
+import { dateLabel } from "../domain/format.ts";
 import type { Evaluation, Plan } from "../domain/model.ts";
 import { removeEvaluation, setEvaluationEnabled } from "../domain/planEdits.ts";
 import type {
@@ -16,6 +17,7 @@ const otherTypeLabels: Record<OtherEvaluation["type"], string> = {
 };
 
 function OtherEvaluationCard({ item }: { item: OtherEvaluation }) {
+	const satisfied = item.enabled && item.status === "satisfied";
 	const tone =
 		!item.enabled || item.status === "indeterminate"
 			? "neutral"
@@ -28,29 +30,41 @@ function OtherEvaluationCard({ item }: { item: OtherEvaluation }) {
 		<section className={`evaluation-card ${item.enabled ? "" : "is-excluded"}`}>
 			<div className="section-top">
 				<span className="evaluation-icon">
-					<Flag size={23} />
+					{satisfied ? <Check size={23} /> : <Flag size={23} />}
 				</span>
 			</div>
 			<h2>{item.name}</h2>
-			<p>{item.subtitle || otherTypeLabels[item.type]}</p>
+			<p>{item.goal || otherTypeLabels[item.type]}</p>
 			<div className="evaluation-card-outcome">
-				{!item.enabled ? "Paused" : item.summary}
+				{!item.enabled
+					? "Paused"
+					: item.outcomeDate
+						? dateLabel(item.outcomeDate)
+						: item.outcomeText}
 			</div>
+			{item.enabled && item.qualifier && (
+				<p className="section-note">{item.qualifier}</p>
+			)}
 			<Badge tone={tone}>
 				{!item.enabled
 					? "Excluded from evaluation"
 					: item.status === "satisfied"
-						? "Satisfied · base case"
+						? "Satisfied"
 						: item.status === "not-satisfied"
-							? "Not satisfied · base case"
+							? "Not satisfied"
 							: item.status === "warning"
 								? "Needs attention"
 								: "Indeterminate"}
 			</Badge>
-			<p className="section-note">
-				Configured on the server model. This workspace shows the outcome;
-				editing happens outside this plan.
-			</p>
+			{item.enabled && item.progress && (
+				<div className="evaluation-card-progress">
+					<div className="progress-label">
+						<span>{item.progress.current}</span>
+						{item.progress.share && <span>{item.progress.share}</span>}
+					</div>
+					<Progress value={item.progress.fraction * 100} label={item.name} />
+				</div>
+			)}
 		</section>
 	);
 }

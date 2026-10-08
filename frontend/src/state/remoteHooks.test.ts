@@ -1667,7 +1667,7 @@ describe("remote projection mapping and SSE", () => {
 		expect(local.firstFailure).toBe(local.movements[0]);
 	});
 
-	it("maps financial independence to a useful base-case summary", () => {
+	it("maps FI coverage to visual facts instead of prose", () => {
 		const document = {
 			...modelFixture(),
 			evaluations: {
@@ -1749,16 +1749,18 @@ describe("remote projection mapping and SSE", () => {
 		const item = local.otherEvaluations.find(
 			(entry) => entry.id === "financial-independence",
 		);
-		expect(item?.subtitle).toBe(
-			"$80,000/yr spend · 10-yr test · 4% withdrawal · needs $1.50M net worth",
-		);
-		expect(item?.summary).toContain("Needs $1.50M net worth");
-		expect(item?.summary).toContain("5% of $80,000/yr covered");
-		expect(item?.summary).toContain("best 15% on 2027-01-31");
-		expect(item?.summary).not.toContain("See the server evaluation detail");
+		expect(item?.goal).toBe("$80,000/yr spending");
+		expect(item?.outcomeDate).toBeNull();
+		expect(item?.outcomeText).toBe("Beyond this horizon");
+		expect(item?.qualifier).toBeNull();
+		expect(item?.progress).toEqual({
+			fraction: 0.05,
+			current: "$4,000",
+			share: "5%",
+		});
 	});
 
-	it("shows the annual shortfall when the net-worth gate is met", () => {
+	it("maps FI coverage to a bar without prose", () => {
 		const document = {
 			...modelFixture(),
 			evaluations: {
@@ -1815,8 +1817,14 @@ describe("remote projection mapping and SSE", () => {
 		expect(
 			local.otherEvaluations.find(
 				(entry) => entry.id === "financial-independence",
-			)?.summary,
-		).toBe("50% of $80,000/yr covered · short $40,000/yr");
+			),
+		).toMatchObject({
+			goal: "$80,000/yr spending",
+			outcomeDate: null,
+			outcomeText: "Beyond this horizon",
+			qualifier: null,
+			progress: { fraction: 0.5, current: "$40,000", share: "50%" },
+		});
 	});
 
 	it("prefers the self-sustaining date over first coverage for FI", () => {
@@ -1861,8 +1869,12 @@ describe("remote projection mapping and SSE", () => {
 		expect(
 			local.otherEvaluations.find(
 				(entry) => entry.id === "financial-independence",
-			)?.summary,
-		).toBe("Self-sustaining from 2031-06-30");
+			),
+		).toMatchObject({
+			outcomeDate: "2031-06-30",
+			qualifier: null,
+			progress: null,
+		});
 	});
 
 	it("explains coverage without a sustained cycle for FI", () => {
@@ -1913,10 +1925,162 @@ describe("remote projection mapping and SSE", () => {
 		expect(
 			local.otherEvaluations.find(
 				(entry) => entry.id === "financial-independence",
-			)?.summary,
-		).toBe(
-			"Covers spending 2030-01-31 · shortfall from 2034-02-01 in the 10-yr test",
-		);
+			),
+		).toMatchObject({
+			outcomeDate: "2030-01-31",
+			qualifier: "Shortfall from Feb 2034",
+			progress: null,
+		});
+	});
+
+	it("maps a posting shortfall to a date and fulfillment bar", () => {
+		const document = {
+			...modelFixture(),
+			evaluations: {
+				...modelFixture().evaluations,
+				postingFulfillment: [
+					{
+						instanceId: "fulfillment",
+						name: "Planned movements",
+						enabled: true,
+						config: { postingIds: null },
+					},
+				],
+			},
+		};
+		const result = {
+			...projectionFixture(),
+			evaluations: {
+				...projectionFixture().evaluations,
+				postingFulfillment: [
+					{
+						instanceId: "fulfillment",
+						name: "Planned movements",
+						status: "not-satisfied",
+						deterministic: {
+							firstUnderfulfilledDate: "2026-05-01",
+							completionRate: 0.87,
+						},
+						probabilistic: null,
+						diagnostics: [],
+					},
+				],
+			},
+		};
+		const local = projectionResultToLocal(result, document);
+		expect(
+			local.otherEvaluations.find((entry) => entry.id === "fulfillment"),
+		).toMatchObject({
+			outcomeDate: "2026-05-01",
+			qualifier: null,
+			progress: { fraction: 0.87, current: "87%", share: null },
+		});
+	});
+
+	it("maps full posting fulfillment to words without a bar", () => {
+		const document = {
+			...modelFixture(),
+			evaluations: {
+				...modelFixture().evaluations,
+				postingFulfillment: [
+					{
+						instanceId: "fulfillment",
+						name: "Planned movements",
+						enabled: true,
+						config: { postingIds: null },
+					},
+				],
+			},
+		};
+		const result = {
+			...projectionFixture(),
+			evaluations: {
+				...projectionFixture().evaluations,
+				postingFulfillment: [
+					{
+						instanceId: "fulfillment",
+						name: "Planned movements",
+						status: "satisfied",
+						deterministic: { completionRate: 1 },
+						probabilistic: null,
+						diagnostics: [],
+					},
+				],
+			},
+		};
+		const local = projectionResultToLocal(result, document);
+		expect(
+			local.otherEvaluations.find((entry) => entry.id === "fulfillment"),
+		).toMatchObject({
+			outcomeDate: null,
+			outcomeText: "Fully fulfilled",
+			progress: null,
+		});
+	});
+
+	it("maps cycle spend to a spent-versus-budget bar", () => {
+		const document = {
+			...modelFixture(),
+			evaluations: {
+				...modelFixture().evaluations,
+				cycleFulfillment: [
+					{
+						instanceId: "cycle",
+						name: "Monthly spend",
+						enabled: true,
+						config: { accountIds: ["cash"], statementDay: 1, budget: 5000 },
+					},
+				],
+			},
+		};
+		const over = {
+			...projectionFixture(),
+			evaluations: {
+				...projectionFixture().evaluations,
+				cycleFulfillment: [
+					{
+						instanceId: "cycle",
+						name: "Monthly spend",
+						status: "not-satisfied",
+						deterministic: { spent: 5600, budget: 5000, withinBudget: false },
+						probabilistic: null,
+						diagnostics: [],
+					},
+				],
+			},
+		};
+		const within = {
+			...projectionFixture(),
+			evaluations: {
+				...projectionFixture().evaluations,
+				cycleFulfillment: [
+					{
+						instanceId: "cycle",
+						name: "Monthly spend",
+						status: "satisfied",
+						deterministic: { spent: 4200, budget: 5000, withinBudget: true },
+						probabilistic: null,
+						diagnostics: [],
+					},
+				],
+			},
+		};
+		expect(
+			projectionResultToLocal(over, document).otherEvaluations.find(
+				(entry) => entry.id === "cycle",
+			),
+		).toMatchObject({
+			outcomeText: "Over budget",
+			progress: { fraction: 1.12, current: "$5,600", share: "112%" },
+		});
+		expect(
+			projectionResultToLocal(within, document).otherEvaluations.find(
+				(entry) => entry.id === "cycle",
+			),
+		).toMatchObject({
+			outcomeText: "Within budget",
+			progress: { fraction: 0.84, current: "$4,200", share: "84%" },
+		});
 	});
 
 	it("maps stochastic bands and evaluation envelopes to RangeResult", () => {
