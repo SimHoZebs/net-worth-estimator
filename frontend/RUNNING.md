@@ -108,7 +108,7 @@ Income evidence uses recorded, enabled one-time external inflows. Similar amount
 - `src/api/`: backend contracts, same-origin client, SSE parsing and display/document adapters.
 - `src/state/`: browser persistence, remote hydration, conditional saves and projection state.
 - `src/components/`: accessible controls, evidence dialogs, editing forms and visualization.
-- `src/pages/`: outlook, plan maintenance, evaluations, comparison and sources.
+- `src/pages/`: outlook, accounts, transactions, evaluations, comparison and configs (sources).
 - `tests/`: browser workflows and accessibility checks.
 
 The frontend is part of the repository and always uses the Go API.

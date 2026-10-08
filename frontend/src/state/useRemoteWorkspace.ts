@@ -927,7 +927,7 @@ export function useRemoteWorkspace({
 		async (document: FinancialModelDocument): Promise<boolean> => {
 			if (workspaceRef.current) {
 				setError(
-					"A server model is already loaded. Use the reviewed import action in Data & sources.",
+					"A server model is already loaded. Use the reviewed import action in Configs.",
 				);
 				return false;
 			}

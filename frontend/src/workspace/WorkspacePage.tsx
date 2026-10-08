@@ -168,6 +168,7 @@ export function WorkspacePage({
 					authControl={authControl}
 					authRequired={authRequired}
 					authTokenActive={authTokenActive}
+					onEdit={onEdit}
 				/>
 			);
 	}
