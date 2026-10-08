@@ -5,7 +5,6 @@ import { accountTransactions } from "../../domain/accountActivity.ts";
 import {
 	cycleScheduledRest,
 	cycleSpentSoFar,
-	dailyAllowance,
 	groupCycleSpending,
 	resolveStatementCycle,
 } from "../../domain/cardCycle.ts";
@@ -353,12 +352,39 @@ export function TimingPreview({
 		spent,
 		reserve: settings.reserve,
 	});
-	const daily = dailyAllowance({
-		budget,
-		spent,
-		daysLeft: cycle.daysLeft,
-	});
+	const theoretical = paycheck - fixedObligations - spent;
+	const fullDaysLeft = Math.max(1, cycle.daysLeft - 1);
+	const dailySafe = allowance / fullDaysLeft;
+	const dailyTheoretical = theoretical / fullDaysLeft;
 	const progress = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
+
+	const checkingAccount = checkingId
+		? (plan.accounts.find((account) => account.id === checkingId) ?? null)
+		: null;
+	const heroes = {
+		cushion,
+		cushionProvisional: !(checkingAccount?.balanceCheck ?? false),
+		checkingAmount: checking,
+		checkingObservedOn: checkingAccount?.balanceCheck
+			? (checkingAccount?.observedOn ?? null)
+			: null,
+		safe: allowance,
+		theoretical,
+		dailySafe,
+		dailyTheoretical,
+		fullDaysLeft,
+		cycleStart: cycle.cycleStart,
+		cycleEnd: cycle.cycleEnd,
+		committedTotal: spent,
+		committedByCard: perAccount.map((item) => ({
+			id: item.accountId,
+			name: item.name,
+			amount: item.derived,
+		})),
+		paycheckAmount: paycheck,
+		fixedAmount: fixedObligations,
+		reserveAmount: settings.reserve,
+	};
 
 	const updateSettings = (next: Partial<TotalCycleSettings>) => {
 		setSettings((previous) => ({
@@ -471,27 +497,32 @@ export function TimingPreview({
 			</div>
 			<p className="cycle-dates">
 				{dateLabel(cycle.cycleStart, true)} to {dateLabel(cycle.cycleEnd, true)}{" "}
-				· {cycle.daysLeft} {cycle.daysLeft === 1 ? "day" : "days"} left ·{" "}
+				· {fullDaysLeft} {fullDaysLeft === 1 ? "day" : "days"} left ·{" "}
 				{accountLabel}
 			</p>
 			<div className="timing-figures">
 				<div>
-					<span>Cash cushion</span>
+					<span>
+						Cash cushion{" "}
+						{heroes.cushionProvisional && (
+							<Badge tone="amber">Provisional</Badge>
+						)}
+					</span>
 					<strong>{money(cushion)}</strong>
 				</div>
 				<div>
-					<span>Daily allowance</span>
-					<strong>{money(Math.max(0, daily))}</strong>
+					<span>Safe room</span>
+					<strong>{money(allowance)}</strong>
 				</div>
 			</div>
 			<div className="cycle-remaining">
 				<div>
-					<span>{allowance >= 0 ? "Left to spend" : "Over budget by"}</span>
-					<strong>{money(Math.abs(allowance))}</strong>
+					<span>Daily safe</span>
+					<strong>{money(Math.max(0, dailySafe))}</strong>
 				</div>
 				<div>
-					<span>Mandatory bills left</span>
-					<strong>{money(remainingObligations)}</strong>
+					<span>Committed</span>
+					<strong>{money(spent)}</strong>
 				</div>
 			</div>
 			<div className="cycle-progress">
@@ -501,13 +532,8 @@ export function TimingPreview({
 					tone={allowance < 0 ? "amber" : "green"}
 				/>
 				<p>
-					{budget > 0 ? (
-						<>
-							{money(spent)} of {money(budget)} used
-						</>
-					) : (
-						"Enter your expected paycheck to track daily room to spend."
-					)}
+					{money(checking)} checking · paycheck {money(paycheck)} − fixed{" "}
+					{money(fixedObligations)} − reserve {money(settings.reserve)}
 				</p>
 			</div>
 			<div className="cycle-actions">
@@ -541,6 +567,7 @@ export function TimingPreview({
 				<TimingDetailDialog
 					eyebrow={`${dateLabel(cycle.cycleStart, true)} to ${dateLabel(cycle.cycleEnd, true)} · ${accountLabel}`}
 					today={plan.startDate.slice(0, 10)}
+					heroes={heroes}
 					cashNow={{
 						checking,
 						bills: remainingObligations,

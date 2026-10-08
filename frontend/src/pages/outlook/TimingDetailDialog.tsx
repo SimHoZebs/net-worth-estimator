@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { Calendar, type CalendarEvent } from "../../components/Calendar.tsx";
 import { Tabs } from "../../components/Tabs.tsx";
-import { Modal } from "../../components/ui.tsx";
+import { Badge, Modal } from "../../components/ui.tsx";
 import type { CycleSpendGroup } from "../../domain/cardCycle.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { MandatorySpendingGroup } from "../../domain/householdTiming.ts";
@@ -140,40 +139,6 @@ function dueLabel(date: string, today: string): string {
 	return `${dateLabel(date, true)} · in ${days} days`;
 }
 
-/** Month-grid view of the active mandatory sections. */
-function MandatoryCalendar({
-	today,
-	sections,
-}: {
-	today: string;
-	sections: TimingMandatorySection[];
-}) {
-	const events: CalendarEvent[] = sections.flatMap((section) =>
-		section.groups.flatMap((group) =>
-			group.dates.map((date) => ({
-				date,
-				label: group.name,
-				amount: group.total / Math.max(1, group.dates.length),
-			})),
-		),
-	);
-	if (!events.length) return null;
-	const end = events.reduce(
-		(latest, event) => (event.date > latest ? event.date : latest),
-		today,
-	);
-	const total = sections.reduce((sum, section) => sum + section.total, 0);
-	return (
-		<Calendar
-			start={today}
-			end={end}
-			events={events}
-			todayIso={today}
-			label={`Mandatory bills from ${dateLabel(today, true)} to ${dateLabel(end, true)}, totaling ${money(total)}`}
-		/>
-	);
-}
-
 function MandatorySectionView({
 	section,
 	today,
@@ -221,6 +186,25 @@ function MandatorySectionView({
 	);
 }
 
+export interface TimingHeroes {
+	cushion: number;
+	cushionProvisional: boolean;
+	checkingAmount: number;
+	checkingObservedOn: string | null;
+	safe: number;
+	theoretical: number;
+	dailySafe: number;
+	dailyTheoretical: number;
+	fullDaysLeft: number;
+	cycleStart: string;
+	cycleEnd: string;
+	committedTotal: number;
+	committedByCard: { id: string; name: string; amount: number }[];
+	paycheckAmount: number;
+	fixedAmount: number;
+	reserveAmount: number;
+}
+
 export interface TimingCycleGroup extends CycleSpendGroup {
 	accountId: string;
 	accountName: string;
@@ -246,6 +230,7 @@ export interface TimingConfigHints {
 export function TimingDetailDialog({
 	eyebrow,
 	today,
+	heroes,
 	cashNow,
 	paycheck,
 	frame,
@@ -267,6 +252,7 @@ export function TimingDetailDialog({
 }: {
 	eyebrow: string;
 	today: string;
+	heroes: TimingHeroes;
 	cashNow: CashNowDecomposition;
 	paycheck: PaycheckDecomposition;
 	frame: MandatoryFrame;
@@ -323,10 +309,66 @@ export function TimingDetailDialog({
 			>
 				{tab === "mandatory" ? (
 					<div className="timing-mandatory">
-						<h3>Cash now — checking covers existing bills</h3>
+						<h3>Cash cushion</h3>
+						<div className="timing-figures">
+							<div>
+								<span>
+									Cash cushion{" "}
+									{heroes.cushionProvisional && (
+										<Badge tone="amber">Provisional</Badge>
+									)}
+								</span>
+								<strong>{money(heroes.cushion)}</strong>
+							</div>
+							<div>
+								<span>Checking snapshot</span>
+								<strong>{money(heroes.checkingAmount)}</strong>
+							</div>
+						</div>
+						<p className="section-note">
+							{heroes.checkingObservedOn
+								? `As of ${dateLabel(heroes.checkingObservedOn, true)}`
+								: "No bank-reported as-of time — provisional"}
+						</p>
 						<CashNowBar parts={cashNow} />
-						<h3>Next paycheck — funds future card spending</h3>
+						<h3>Safe card room</h3>
+						<div className="timing-figures">
+							<div>
+								<span>Safe room</span>
+								<strong>{money(heroes.safe)}</strong>
+							</div>
+							<div>
+								<span>Theoretical room</span>
+								<strong>{money(heroes.theoretical)}</strong>
+							</div>
+						</div>
 						<PaycheckBar parts={paycheck} />
+						<div className="timing-figures">
+							<div>
+								<span>Daily safe · {heroes.fullDaysLeft} days</span>
+								<strong>{money(Math.max(0, heroes.dailySafe))}</strong>
+							</div>
+							<div>
+								<span>Daily theoretical</span>
+								<strong>{money(Math.max(0, heroes.dailyTheoretical))}</strong>
+							</div>
+						</div>
+						<AllocationBar
+							caption={`Committed ${money(heroes.committedTotal)} — payments toward prior balances excluded`}
+							segments={heroes.committedByCard.map((card, index) => ({
+								label: `${card.name} · ${money(card.amount)}`,
+								amount: card.amount,
+								className: index % 2 === 0 ? "funds-card-a" : "funds-card-b",
+							}))}
+							ariaLabel={`Committed cycle spend ${money(heroes.committedTotal)}: ${heroes.committedByCard.map((card) => `${card.name} ${money(card.amount)}`).join(", ")}`}
+						/>
+						<p className="section-note">
+							Paycheck {money(heroes.paycheckAmount)} − fixed{" "}
+							{money(heroes.fixedAmount)} − reserve{" "}
+							{money(heroes.reserveAmount)} ·{" "}
+							{dateLabel(heroes.cycleStart, true)} to{" "}
+							{dateLabel(heroes.cycleEnd, true)}
+						</p>
 						<Tabs
 							items={[
 								{ id: "calendar", label: "Calendar month" },
@@ -338,10 +380,6 @@ export function TimingDetailDialog({
 						>
 							{null}
 						</Tabs>
-						<MandatoryCalendar
-							today={today}
-							sections={[thisMonth, nextMonth]}
-						/>
 						<h3>{thisMonth.title}</h3>
 						<MandatorySectionView section={thisMonth} today={today} />
 						<h3>{nextMonth.title}</h3>

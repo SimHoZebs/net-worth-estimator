@@ -1373,6 +1373,12 @@
 	.funds-over {
 		background: #d97706;
 	}
+	.funds-card-a {
+		background: #4a5d43;
+	}
+	.funds-card-b {
+		background: #7a8f5e;
+	}
 	.funds-legend {
 		list-style: none;
 		padding: 0;
