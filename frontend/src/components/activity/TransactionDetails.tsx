@@ -18,13 +18,7 @@ export function TransactionDetails({
 			<dl>
 				<DetailRow label="From">{transaction.from}</DetailRow>
 				<DetailRow label="To">{transaction.to}</DetailRow>
-				<DetailRow
-					label={
-						transaction.source === "historical"
-							? "Historical amount"
-							: "Requested"
-					}
-				>
+				<DetailRow label="Amount">
 					{exactMoney(transaction.requested)}
 				</DetailRow>
 				{transaction.source === "projected" && (
@@ -68,11 +62,7 @@ export function TransactionDetails({
 					onClick={() => onEdit(movement)}
 				>
 					<Pencil size={14} />
-					{movement.readOnly
-						? "Inspect source record"
-						: transaction.source === "historical"
-							? "Edit recorded transaction"
-							: "Edit planned transaction"}
+					{movement.readOnly ? "Inspect source record" : "Edit transaction"}
 				</button>
 			)}
 		</div>

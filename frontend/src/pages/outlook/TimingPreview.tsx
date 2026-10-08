@@ -618,7 +618,6 @@ export function TimingPreview({
 					plan={plan}
 					onEdit={onEdit}
 					cycleTransactions={cycleTransactions}
-					cycleEnd={cycle.cycleEnd}
 					config={{
 						statementDay: settings.statementDay,
 						reserve: settings.reserve,
