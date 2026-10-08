@@ -179,13 +179,23 @@ func publicMovementEvents(path *types.ProjectionPath) []types.MovementEvent {
 			for constraintIndex, constraint := range constraints {
 				event.BindingConstraints[constraintIndex] = constraint.toTypes()
 			}
-			if posting := postingsByID[source.Origin.PostingID]; posting != nil && posting.SourceAccountID != nil {
-				if _, exists := accountsByID[*posting.SourceAccountID]; exists {
-					if balancesBefore, ok := balancesBeforeBySequence[source.Sequence]; ok {
-						available := GetWithdrawableAmount(balancesBefore, accountsByID, *posting.SourceAccountID)
-						if remaining, capped := capRemainingBySequence[source.Sequence]; capped && remaining < available {
-							available = remaining
+			if posting := postingsByID[source.Origin.PostingID]; posting != nil {
+				if balancesBefore, ok := balancesBeforeBySequence[source.Sequence]; ok {
+					available := math.Inf(1)
+					if posting.SourceAccountID != nil {
+						if _, exists := accountsByID[*posting.SourceAccountID]; exists {
+							available = math.Min(available, GetWithdrawableAmount(balancesBefore, accountsByID, *posting.SourceAccountID))
+						} else {
+							available = 0
 						}
+					}
+					if posting.Destinations != nil {
+						available = math.Min(available, GetTotalDestinationHeadroom(balancesBefore, accountsByID, posting.Destinations))
+					}
+					if remaining, capped := capRemainingBySequence[source.Sequence]; capped {
+						available = math.Min(available, remaining)
+					}
+					if !math.IsInf(available, 0) {
 						available = roundCurrency(available)
 						event.AvailableAmount = &available
 					}

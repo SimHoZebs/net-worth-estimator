@@ -73,7 +73,13 @@ export function FailureEvidence({
 				<DetailRow label="Funding account">
 					{source?.name ?? "External income"}
 				</DetailRow>
-				<DetailRow label="Funding evidence">
+				<DetailRow
+					label={
+						destinationCeiling && !sourceFloor
+							? "Available to receive"
+							: "Funding evidence"
+					}
+				>
 					{fundingEvidence(failure)}
 				</DetailRow>
 				<DetailRow label="Binding constraint">{failure.constraint}</DetailRow>
@@ -83,9 +89,16 @@ export function FailureEvidence({
 					</DetailRow>
 				)}
 				{destinationCeiling && (
-					<DetailRow label="Destination ceiling">
-						{money(destination?.maxBalance ?? 0)}
-					</DetailRow>
+					<>
+						<DetailRow label="Destination account">
+							{destination?.name ?? "External spending"}
+						</DetailRow>
+						<DetailRow label="Destination ceiling">
+							{destination?.maxBalance == null
+								? "No ceiling"
+								: money(destination.maxBalance)}
+						</DetailRow>
+					</>
 				)}
 			</dl>
 			<div className="inline-notice amber">
@@ -97,8 +110,8 @@ export function FailureEvidence({
 				</span>
 			</div>
 			<p className="section-note">
-				Inspect the amount, date, funding account, or protected balance. The
-				30-day cash view is a separate timing check.
+				Inspect the amount, date, funding account, destination, or protected
+				balance. The 30-day cash view is a separate timing check.
 			</p>
 			{movement && (
 				<div className="modal-actions">
