@@ -1291,6 +1291,109 @@
 	.timing-mandatory h3:first-child {
 		margin-top: 4px;
 	}
+	.calendar {
+		display: grid;
+		gap: 16px;
+		margin: 14px 0 4px;
+	}
+	.calendar h4 {
+		font-size: 11px;
+		font-weight: 650;
+		color: #374a31;
+		margin: 0 0 8px;
+	}
+	.calendar-grid {
+		display: grid;
+		grid-template-columns: repeat(7, 1fr);
+		gap: 3px;
+	}
+	.calendar-dow {
+		font-size: 8px;
+		font-weight: 700;
+		color: #8a927e;
+		text-align: center;
+		padding-bottom: 2px;
+	}
+	.calendar-blank {
+		min-height: 40px;
+	}
+	.calendar-cell {
+		min-height: 40px;
+		border: 1px solid #eef1e6;
+		border-radius: 6px;
+		padding: 3px 4px;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		background: #fffefa;
+	}
+	.calendar-has-events {
+		border-color: #c9d3b8;
+		background: #f4f6ec;
+	}
+	.calendar-today {
+		border: 2px solid #7a8f5e;
+		padding: 2px 3px;
+	}
+	.calendar-day {
+		font-size: 9px;
+		font-weight: 700;
+		color: #667359;
+	}
+	.calendar-total {
+		font-size: 8px;
+		font-weight: 650;
+		color: #4a5d43;
+	}
+	.funds-bar {
+		display: flex;
+		height: 14px;
+		border-radius: 7px;
+		overflow: hidden;
+		background: #eef1e6;
+		margin: 10px 0 8px;
+	}
+	.funds-bar > span {
+		display: block;
+		height: 100%;
+		min-width: 3px;
+	}
+	.funds-bills {
+		background: #7a8f5e;
+	}
+	.funds-reserve {
+		background: #c9d3b8;
+	}
+	.funds-spent {
+		background: #4a5d43;
+	}
+	.funds-left {
+		background: #e4e9d5;
+	}
+	.funds-over {
+		background: #d97706;
+	}
+	.funds-legend {
+		list-style: none;
+		padding: 0;
+		margin: 0 0 6px;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px 14px;
+		font-size: 10px;
+		color: #667359;
+	}
+	.funds-legend li {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.funds-dot {
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		display: inline-block;
+	}
 	.account-section {
 		margin-top: 30px;
 	}
