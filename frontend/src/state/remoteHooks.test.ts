@@ -1410,9 +1410,9 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	// A reserve goal is a backend account balance evaluation, so editing one
-	// into the plan is accepted and becomes a real draft.
-	it("accepts a new reserve goal and stages it as a draft", async () => {
+	// A reserve evaluation is a backend account balance evaluation, so editing
+	// one into the plan is accepted and becomes a real draft.
+	it("accepts a new reserve evaluation and stages it as a draft", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const { client } = clientFixture(() => ({
@@ -1424,8 +1424,8 @@ describe("remote workspace state", () => {
 		const plan = rendered.result().plan!;
 		const edited = {
 			...plan,
-			goals: [
-				...plan.goals,
+			evaluations: [
+				...plan.evaluations,
 				{
 					id: "reserve",
 					name: "Reserve",
@@ -1441,7 +1441,9 @@ describe("remote workspace state", () => {
 		await rendered.settle();
 		expect(rendered.result().workspace?.draft).not.toBeNull();
 		expect(
-			rendered.result().plan?.goals.some((goal) => goal.id === "reserve"),
+			rendered
+				.result()
+				.plan?.evaluations.some((evaluation) => evaluation.id === "reserve"),
 		).toBe(true);
 		expect(rendered.result().error).toBeNull();
 		rendered.unmount();
@@ -1545,7 +1547,7 @@ describe("remote projection mapping and SSE", () => {
 			available: null,
 		});
 		expect(local.firstFailure).toBeNull();
-		expect(local.goals[0]?.firstDate).toBe("2026-02-01");
+		expect(local.evaluations[0]?.firstDate).toBe("2026-02-01");
 		expect(local).toMatchObject({ inflows: 100, outflows: 0, transfers: 0 });
 		const documentWithoutResult = {
 			...document,
@@ -1572,9 +1574,9 @@ describe("remote projection mapping and SSE", () => {
 		const indeterminate = projectionResultToLocal(
 			withoutResult,
 			documentWithoutResult,
-		).goals.find((goal) => goal.goal.id === "missing");
+		).evaluations.find((evaluation) => evaluation.evaluation.id === "missing");
 		expect(indeterminate?.firstDate).toBeNull();
-		expect(indeterminate?.goal.name).toContain("indeterminate");
+		expect(indeterminate?.evaluation.name).toContain("indeterminate");
 	});
 
 	it("keeps start-date events when the start has no checkpoint", () => {
@@ -1670,7 +1672,7 @@ describe("remote projection mapping and SSE", () => {
 		expect(range).toEqual({
 			points: [{ date: "2026-02-01", lower: 10, median: 30, upper: 50 }],
 			count: 4,
-			goalSuccess: { target: 0.75 },
+			evaluationSuccess: { target: 0.75 },
 			failureShare: 0.4,
 		});
 	});
@@ -1712,7 +1714,7 @@ describe("remote projection mapping and SSE", () => {
 		expect(rendered.result().base).toMatchObject({ inflows: 100 });
 		expect(rendered.result().range).toMatchObject({
 			count: 4,
-			goalSuccess: { target: 0.75 },
+			evaluationSuccess: { target: 0.75 },
 			failureShare: 0.4,
 		});
 		expect(rendered.result().progress).toBe(1);

@@ -13,38 +13,47 @@ import { AccountsPanel, BalanceChecksPanel } from "./plan/AccountsPanel.tsx";
 import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
 import { MovementsPanel } from "./plan/MovementsPanel.tsx";
 
-type Section = "accounts" | "movements" | "checks" | "assumptions";
+export type PlanView = "accounts" | "transactions";
+type AccountsSection = "accounts" | "checks";
+type TransactionsSection = "movements" | "assumptions";
+
+type ScheduleFilter = "all" | "scheduled" | "once";
+
 export function PlanPage({
 	plan,
+	view,
 	onEdit,
 	onUpdate,
 	onAccount,
 }: {
 	plan: Plan;
+	view: PlanView;
 	onEdit: (target: EditorTarget) => void;
 	onUpdate: (plan: Plan) => boolean;
 	onAccount: (id: string) => void;
 }) {
-	const [tab, setTab] = useState<Section>("accounts");
-	const [query, setQuery] = useState("");
+	if (view === "accounts") {
+		return (
+			<AccountsView
+				plan={plan}
+				onEdit={onEdit}
+				onUpdate={onUpdate}
+				onAccount={onAccount}
+			/>
+		);
+	}
+	return <TransactionsView plan={plan} onEdit={onEdit} onUpdate={onUpdate} />;
+}
+
+function usePlanRemoval({
+	plan,
+	onUpdate,
+}: {
+	plan: Plan;
+	onUpdate: (plan: Plan) => boolean;
+}) {
 	const [remove, setRemove] = useState<RemovalTarget | null>(null);
 	const [error, setError] = useState<string | null>(null);
-	const tabs: TabItem<Section>[] = [
-		{ id: "accounts", label: "Accounts", count: plan.accounts.length },
-		{ id: "movements", label: "Transactions", count: plan.movements.length },
-		{
-			id: "checks",
-			label: "Balance checks",
-			count: plan.accounts.filter((account) => account.balanceCheck).length,
-		},
-		{ id: "assumptions", label: "Assumptions" },
-	];
-	const accounts = plan.accounts.filter((account) =>
-		account.name.toLowerCase().includes(query.toLowerCase()),
-	);
-	const movements = plan.movements.filter((movement) =>
-		movement.name.toLowerCase().includes(query.toLowerCase()),
-	);
 	const requestRemoval = (target: RemovalTarget) => {
 		setRemove(target);
 		setError(null);
@@ -61,6 +70,50 @@ export function PlanPage({
 			setError(null);
 		}
 	};
+	const dialog = remove && (
+		<ConfirmDialog
+			title={`Remove ${remove.name}?`}
+			eyebrow="Changes"
+			onCancel={() => setRemove(null)}
+			onConfirm={deleteItem}
+			cancelLabel="Keep item"
+			confirmLabel="Remove from unsaved changes"
+			error={error}
+		>
+			<p>
+				The item will be marked as removed in your changes. Your saved plan
+				stays intact until you explicitly save.
+			</p>
+		</ConfirmDialog>
+	);
+	return { requestRemoval, dialog };
+}
+
+function AccountsView({
+	plan,
+	onEdit,
+	onUpdate,
+	onAccount,
+}: {
+	plan: Plan;
+	onEdit: (target: EditorTarget) => void;
+	onUpdate: (plan: Plan) => boolean;
+	onAccount: (id: string) => void;
+}) {
+	const [tab, setTab] = useState<AccountsSection>("accounts");
+	const [query, setQuery] = useState("");
+	const { requestRemoval, dialog } = usePlanRemoval({ plan, onUpdate });
+	const tabs: TabItem<AccountsSection>[] = [
+		{ id: "accounts", label: "Accounts", count: plan.accounts.length },
+		{
+			id: "checks",
+			label: "Balance checks",
+			count: plan.accounts.filter((account) => account.balanceCheck).length,
+		},
+	];
+	const accounts = plan.accounts.filter((account) =>
+		account.name.toLowerCase().includes(query.toLowerCase()),
+	);
 	return (
 		<>
 			<Tabs
@@ -70,36 +123,29 @@ export function PlanPage({
 					setTab(next);
 					setQuery("");
 				}}
-				label="Plan sections"
+				label="Accounts sections"
 				panelAs="section"
 				panelClassName="panel plan-panel"
 			>
-				{tab !== "assumptions" && (
-					<div className="plan-toolbar">
-						<label className="search-field">
-							<Search size={17} />
-							<input
-								aria-label="Search plan"
-								value={query}
-								onChange={(event) => setQuery(event.target.value)}
-								placeholder={`Find ${tab === "movements" ? "a movement" : "an account"}…`}
-							/>
-						</label>
-						<button
-							type="button"
-							className="button primary small"
-							onClick={() =>
-								onEdit({
-									kind: tab === "movements" ? "movement" : "account",
-									item: null,
-								})
-							}
-						>
-							<Plus size={16} />
-							Add {tab === "movements" ? "movement" : "account"}
-						</button>
-					</div>
-				)}
+				<div className="plan-toolbar">
+					<label className="search-field">
+						<Search size={17} />
+						<input
+							aria-label="Search plan"
+							value={query}
+							onChange={(event) => setQuery(event.target.value)}
+							placeholder="Find an account…"
+						/>
+					</label>
+					<button
+						type="button"
+						className="button primary small"
+						onClick={() => onEdit({ kind: "account", item: null })}
+					>
+						<Plus size={16} />
+						Add account
+					</button>
+				</div>
 				{tab === "accounts" && (
 					<AccountsPanel
 						accounts={accounts}
@@ -109,6 +155,91 @@ export function PlanPage({
 							requestRemoval({ kind: "accounts", id: item.id, name: item.name })
 						}
 					/>
+				)}
+				{tab === "checks" && (
+					<BalanceChecksPanel
+						accounts={accounts}
+						onEdit={(item) => onEdit({ kind: "account", item })}
+					/>
+				)}
+			</Tabs>
+			{dialog}
+		</>
+	);
+}
+
+function TransactionsView({
+	plan,
+	onEdit,
+	onUpdate,
+}: {
+	plan: Plan;
+	onEdit: (target: EditorTarget) => void;
+	onUpdate: (plan: Plan) => boolean;
+}) {
+	const [tab, setTab] = useState<TransactionsSection>("movements");
+	const [query, setQuery] = useState("");
+	const [schedule, setSchedule] = useState<ScheduleFilter>("all");
+	const { requestRemoval, dialog } = usePlanRemoval({ plan, onUpdate });
+	const tabs: TabItem<TransactionsSection>[] = [
+		{ id: "movements", label: "Transactions", count: plan.movements.length },
+		{ id: "assumptions", label: "Assumptions" },
+	];
+	const movements = plan.movements.filter(
+		(movement) =>
+			movement.name.toLowerCase().includes(query.toLowerCase()) &&
+			(schedule === "all" ||
+				(schedule === "scheduled"
+					? movement.frequency !== "once"
+					: movement.frequency === "once")),
+	);
+	return (
+		<>
+			<Tabs
+				items={tabs}
+				value={tab}
+				onChange={(next) => {
+					setTab(next);
+					setQuery("");
+				}}
+				label="Transactions sections"
+				panelAs="section"
+				panelClassName="panel plan-panel"
+			>
+				{tab === "movements" && (
+					<div className="plan-toolbar">
+						<label className="search-field">
+							<Search size={17} />
+							<input
+								aria-label="Search plan"
+								value={query}
+								onChange={(event) => setQuery(event.target.value)}
+								placeholder="Find a transaction…"
+							/>
+						</label>
+						<label className="plan-schedule-filter">
+							<span className="sr-only">Transaction schedule</span>
+							<select
+								aria-label="Transaction schedule"
+								value={schedule}
+								onChange={(event) =>
+									setSchedule(event.target.value as ScheduleFilter)
+								}
+							>
+								<option value="all">All schedules</option>
+								<option value="scheduled">Scheduled (recurring)</option>
+								<option value="once">One-time</option>
+							</select>
+						</label>
+						<button
+							type="button"
+							className="button primary small"
+							onClick={() => onEdit({ kind: "movement", item: null })}
+						>
+							<Plus size={16} />
+							Add transaction
+						</button>
+					</div>
 				)}
 				{tab === "movements" && (
 					<MovementsPanel
@@ -126,12 +257,6 @@ export function PlanPage({
 						onToggle={(id) => onUpdate(toggleMovement({ plan, id }))}
 					/>
 				)}
-				{tab === "checks" && (
-					<BalanceChecksPanel
-						accounts={accounts}
-						onEdit={(item) => onEdit({ kind: "account", item })}
-					/>
-				)}
 				{tab === "assumptions" && (
 					<AssumptionsPanel
 						assumptions={plan.assumptions}
@@ -139,22 +264,7 @@ export function PlanPage({
 					/>
 				)}
 			</Tabs>
-			{remove && (
-				<ConfirmDialog
-					title={`Remove ${remove.name}?`}
-					eyebrow="Changes"
-					onCancel={() => setRemove(null)}
-					onConfirm={deleteItem}
-					cancelLabel="Keep item"
-					confirmLabel="Remove from unsaved changes"
-					error={error}
-				>
-					<p>
-						The item will be marked as removed in your changes. Your saved plan
-						stays intact until you explicitly save.
-					</p>
-				</ConfirmDialog>
-			)}
+			{dialog}
 		</>
 	);
 }

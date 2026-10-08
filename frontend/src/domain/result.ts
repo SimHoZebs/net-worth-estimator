@@ -1,5 +1,5 @@
 import { isoDate } from "./format.ts";
-import type { Goal } from "./model.ts";
+import type { Evaluation } from "./model.ts";
 
 export interface Point {
 	date: string;
@@ -28,18 +28,31 @@ export interface MovementResult {
 	accountDeltas: MovementAccountDelta[];
 	constraintTypes?: string[];
 }
-export interface GoalResult {
-	goal: Goal;
+export interface EvaluationResult {
+	evaluation: Evaluation;
 	firstDate: string | null;
 	current: number;
 	final: number;
+}
+export type OtherEvaluationType =
+	| "financialIndependence"
+	| "postingFulfillment"
+	| "cycleFulfillment";
+export interface OtherEvaluation {
+	id: string;
+	name: string;
+	type: OtherEvaluationType;
+	enabled: boolean;
+	status: string;
+	summary: string;
 }
 export interface Projection {
 	points: Point[];
 	currentNetWorth: number;
 	movements: MovementResult[];
 	firstFailure: MovementResult | null;
-	goals: GoalResult[];
+	evaluations: EvaluationResult[];
+	otherEvaluations: OtherEvaluation[];
 	inflows: number;
 	outflows: number;
 	transfers: number;
@@ -54,7 +67,7 @@ export interface RangePoint {
 export interface RangeResult {
 	points: RangePoint[];
 	count: number;
-	goalSuccess: Record<string, number>;
+	evaluationSuccess: Record<string, number>;
 	failureShare: number;
 }
 

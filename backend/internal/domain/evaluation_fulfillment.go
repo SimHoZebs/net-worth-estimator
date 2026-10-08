@@ -285,9 +285,9 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 				totals = &postingTotals{}
 			}
 			sourceLabel := (*string)(nil)
-			if posting.SourceAccountID != nil {
-				name := *posting.SourceAccountID
-				if account, ok := accountByID[*posting.SourceAccountID]; ok {
+			if sourceAccount, ok := PostingSourceAccount(posting); ok {
+				name := sourceAccount
+				if account, ok := accountByID[sourceAccount]; ok {
 					name = account.Name
 				}
 				sourceLabel = &name

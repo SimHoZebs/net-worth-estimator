@@ -102,7 +102,7 @@ var accountBalanceDefinition = &EvaluationDefinition{
 		return &result, nil
 	},
 
-	// Threshold and account balance goals aggregate identically, so they share
+	// Threshold and account balance evaluations aggregate identically, so they share
 	// the accumulator, the fold, and the finalize step.
 	CreateAccumulator: func(config any, deterministic PathResult) (Accumulator, error) {
 		return &thresholdAccumulator{reachedDates: []string{}}, nil

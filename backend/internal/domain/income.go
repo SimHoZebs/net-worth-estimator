@@ -311,7 +311,9 @@ type IncomeExecutionResult struct {
 // executeIncomePosting runs the ordered payroll pipeline for one occurrence.
 // The amount config is parsed and validated once per TransitionRuntime (see
 // TransitionRuntime.incomeConfig) and passed in pre-parsed.
-func executeIncomePosting(posting *types.Posting, config types.IncomeAmountConfig, date string, incomeIndex *incomeRuntimeIndex, balances map[string]float64, accountByID map[string]types.Account, order []string) (IncomeExecutionResult, error) {
+// annualCapRemaining bounds net cash deposited this calendar year; step
+// splits resolve through their own resolver-level caps first.
+func executeIncomePosting(posting *types.Posting, config types.IncomeAmountConfig, date string, annualCapRemaining float64, incomeIndex *incomeRuntimeIndex, balances map[string]float64, accountByID map[string]types.Account, order []string) (IncomeExecutionResult, error) {
 	result := IncomeExecutionResult{}
 	source, err := findIncomeSource(incomeIndex, config.IncomeSourceID, date)
 	if err != nil {
@@ -373,11 +375,12 @@ func executeIncomePosting(posting *types.Posting, config types.IncomeAmountConfi
 	}
 
 	netCashRequested := math.Max(0, annualRemaining/float64(divisor))
+	netCashCapped := math.Min(netCashRequested, math.Max(0, annualCapRemaining))
 	destinations := posting.Destinations
 	if destinations == nil {
 		destinations = []string{}
 	}
-	netMovement, netDeltas := applyIncomeMovement(destinations, netCashRequested, balances, accountByID, order)
+	netMovement, netDeltas := applyIncomeMovement(destinations, netCashCapped, balances, accountByID, order)
 	allDeltas = append(allDeltas, netDeltas...)
 
 	merged := map[string]float64{}

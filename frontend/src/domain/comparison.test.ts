@@ -13,7 +13,8 @@ import type { Projection } from "./result.ts";
 const projection: Projection = {
 	currentNetWorth: 120,
 	points: [{ date: "2030-01-01", total: 450, balances: {} }],
-	goals: [],
+	evaluations: [],
+	otherEvaluations: [],
 	movements: [],
 	firstFailure: null,
 	inflows: 0,
@@ -38,21 +39,24 @@ const snapshot = captureComparison({
 });
 
 describe("comparison measures and snapshots", () => {
-	it("uses projection starting wealth, last point, and first declared net-worth goal", () => {
-		const goal = { ...examplePlan.goals[0]!, kind: "net-worth" as const };
+	it("uses projection starting wealth, last point, and first declared net-worth evaluation", () => {
+		const evaluation = {
+			...examplePlan.evaluations[0]!,
+			kind: "net-worth" as const,
+		};
 		expect(
 			comparisonMetrics({
 				...projection,
-				goals: [
+				evaluations: [
 					{
-						goal: { ...goal, kind: "reserve" },
+						evaluation: { ...evaluation, kind: "reserve" as const },
 						current: 0,
 						final: 0,
 						firstDate: "2027-01-01",
 					},
-					{ goal, current: 0, final: 0, firstDate: "2030-01-01" },
+					{ evaluation, current: 0, final: 0, firstDate: "2030-01-01" },
 					{
-						goal: { ...goal, id: "earlier" },
+						evaluation: { ...evaluation, id: "earlier" },
 						current: 0,
 						final: 0,
 						firstDate: "2028-01-01",
@@ -74,7 +78,7 @@ describe("comparison measures and snapshots", () => {
 		).toEqual({
 			current: 120,
 			final: 450,
-			goalDate: "2030-01-01",
+			evaluationDate: "2030-01-01",
 			shortfallDate: "2029-01-01",
 		});
 	});
@@ -82,7 +86,7 @@ describe("comparison measures and snapshots", () => {
 		expect(comparisonMetrics({ ...projection, points: [] })).toEqual({
 			current: projection.currentNetWorth,
 			final: 0,
-			goalDate: null,
+			evaluationDate: null,
 			shortfallDate: null,
 		});
 		expect(
@@ -120,7 +124,7 @@ describe("comparison measures and snapshots", () => {
 			}),
 			current: 120,
 			final: 450,
-			goalDate: null,
+			evaluationDate: null,
 			shortfallDate: null,
 		});
 	});
@@ -186,12 +190,12 @@ describe("comparison measures and snapshots", () => {
 			false,
 		);
 	});
-	it("checks horizon while allowing goal and movement changes in the same context", () => {
+	it("checks horizon while allowing evaluation and movement changes in the same context", () => {
 		expect(comparisonContext({ ...input, snapshot, years: 5 }).comparable).toBe(
 			false,
 		);
 		const plan = structuredClone(examplePlan);
-		plan.goals[0]!.target++;
+		plan.evaluations[0]!.target++;
 		plan.movements[0]!.amount++;
 		plan.accounts[0]!.enabled = !plan.accounts[0]!.enabled;
 		expect(comparisonContext({ ...input, plan, snapshot }).comparable).toBe(
@@ -211,7 +215,11 @@ describe("comparison measures and snapshots", () => {
 		const plan = structuredClone(examplePlan);
 		plan.accounts[0]!.balance++;
 		plan.movements = plan.movements.slice(1);
-		plan.goals.push({ ...plan.goals[0]!, id: "new", name: "New goal" });
+		plan.evaluations.push({
+			...plan.evaluations[0]!,
+			id: "new",
+			name: "New evaluation",
+		});
 		plan.assumptions.inflation++;
 		plan.name += " changed";
 		expect(

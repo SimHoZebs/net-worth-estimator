@@ -311,7 +311,7 @@ Current general resolvers:
 
 `expression` can use posting annual rate, annual growth, and sampled annual volatility. Other resolvers require those posting-level rate fields to be zero.
 
-The `income` resolver is a separate ordered pipeline. It reads the effective income source for the occurrence date, executes configured resolver steps, routes configured outputs, and deposits the remaining net cash into posting destinations. Income posting validation permits at most one enabled income posting, requires destinations, forbids a source account, and forbids a posting annual cap.
+The `income` resolver is an ordered pipeline like any other resolver. It reads the effective income source for the occurrence date, executes configured resolver steps, routes configured outputs, and deposits the remaining net cash into posting destinations. Income postings validate like all postings: a source account contradicts the inflow shape, at least one destination is required, and posting annual caps bound net cash deposited per calendar year while step splits carry their own resolver-level caps.
 
 ### Constraints and movement records
 

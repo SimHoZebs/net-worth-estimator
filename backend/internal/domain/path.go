@@ -228,14 +228,14 @@ func classifyAttempts(attempts []*types.MovementEvent, postingsByID map[string]*
 			continue
 		}
 		switch {
-		case posting.SourceAccountID == nil && posting.Destinations != nil:
+		case IsExternalInflow(posting):
 			// Inflow totals are net of investment losses: a negative
 			// realized amount on a sourceless inflow posting is money
 			// actually lost, and balances already reflect it.
 			result.externalInflowAmount += attempt.RealizedAmount
-		case posting.SourceAccountID != nil && posting.Destinations == nil:
+		case IsExternalOutflow(posting):
 			result.externalOutflowAmount += attempt.RealizedAmount
-		case posting.SourceAccountID != nil && posting.Destinations != nil:
+		case IsInternalTransfer(posting):
 			result.internalTransferAmount += attempt.RealizedAmount
 		}
 	}

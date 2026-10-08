@@ -568,17 +568,17 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		return movementDisplay(posting, amount, previous);
 	});
 
-	const thresholdGoals = document.evaluations.netWorthThreshold.map(
+	const thresholdEvaluations = document.evaluations.netWorthThreshold.map(
 		(evaluation, index) => {
 			const target = targetFromEvaluation(evaluation.config);
 			if (target === 0) {
 				warn(
 					conversionReport,
-					"invalid-goal-target",
+					"invalid-evaluation-target",
 					"The net-worth threshold has no finite target and is shown provisionally as zero.",
-					`goals.${index}.target`,
+					`evaluations.${index}.target`,
 				);
-				provisional(conversionReport, `goals.${index}.target`);
+				provisional(conversionReport, `evaluations.${index}.target`);
 			}
 			return {
 				id: evaluation.instanceId,
@@ -590,7 +590,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			};
 		},
 	);
-	const reserveGoals = document.evaluations.accountBalance.map(
+	const reserveEvaluations = document.evaluations.accountBalance.map(
 		(evaluation, index) => {
 			const config = objectValue(evaluation.config);
 			const accountId =
@@ -599,20 +599,20 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			if (accountId === null) {
 				warn(
 					conversionReport,
-					"invalid-goal-account",
-					"The account balance goal names no account and is shown provisionally.",
-					`goals.${index}.accountId`,
+					"invalid-evaluation-account",
+					"The account balance evaluation names no account and is shown provisionally.",
+					`evaluations.${index}.accountId`,
 				);
-				provisional(conversionReport, `goals.${index}.accountId`);
+				provisional(conversionReport, `evaluations.${index}.accountId`);
 			}
 			if (target === 0) {
 				warn(
 					conversionReport,
-					"invalid-goal-target",
-					"The account balance goal has no finite target and is shown provisionally as zero.",
-					`goals.${index}.target`,
+					"invalid-evaluation-target",
+					"The account balance evaluation has no finite target and is shown provisionally as zero.",
+					`evaluations.${index}.target`,
 				);
-				provisional(conversionReport, `goals.${index}.target`);
+				provisional(conversionReport, `evaluations.${index}.target`);
 			}
 			return {
 				id: evaluation.instanceId,
@@ -624,16 +624,17 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			};
 		},
 	);
-	const goals = [...thresholdGoals, ...reserveGoals];
+	const evaluations = [...thresholdEvaluations, ...reserveEvaluations];
 
 	if (
 		document.evaluations.financialIndependence.length ||
-		document.evaluations.postingFulfillment.length
+		document.evaluations.postingFulfillment.length ||
+		(document.evaluations.cycleFulfillment ?? []).length
 	) {
 		warn(
 			conversionReport,
-			"unsupported-evaluations",
-			"Financial-independence and posting-fulfillment evaluations remain in the presentation state and are not display goals.",
+			"server-evaluations",
+			"Financial-independence, posting-fulfillment, and cycle-fulfillment evaluations are listed with the editable evaluations and are read-only in this workspace.",
 			"evaluations",
 		);
 		provisional(conversionReport, "evaluations");
@@ -693,7 +694,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		readOnly: status.readOnly,
 		accounts,
 		movements,
-		goals,
+		evaluations,
 		assumptions,
 	};
 	return {
@@ -1052,53 +1053,54 @@ export function displayPlanToBackendDocument(
 	const sourceEvaluations = sourceDocument?.evaluations;
 	const financialIndependence = sourceEvaluations?.financialIndependence ?? [];
 	const postingFulfillment = sourceEvaluations?.postingFulfillment ?? [];
-	const netWorthThreshold = plan.goals
-		.filter((goal) => goal.kind === "net-worth")
-		.map((goal) => {
+	const cycleFulfillment = sourceEvaluations?.cycleFulfillment ?? [];
+	const netWorthThreshold = plan.evaluations
+		.filter((evaluation) => evaluation.kind === "net-worth")
+		.map((evaluation) => {
 			const storedEvaluation = sourceEvaluations?.netWorthThreshold.find(
-				(evaluation) => evaluation.instanceId === goal.id,
+				(item) => item.instanceId === evaluation.id,
 			);
 			const storedConfig = storedEvaluation
 				? objectValue(storedEvaluation.config)
 				: null;
 			return {
 				...(storedEvaluation ?? {}),
-				instanceId: goal.id,
-				name: goal.name,
-				enabled: goal.enabled,
+				instanceId: evaluation.id,
+				name: evaluation.name,
+				enabled: evaluation.enabled,
 				config: {
 					...(storedConfig ?? {}),
-					target: goal.target,
+					target: evaluation.target,
 				} satisfies JsonObject,
 			};
 		});
-	const accountBalance = plan.goals
-		.filter((goal) => goal.kind === "reserve")
-		.map((goal) => {
+	const accountBalance = plan.evaluations
+		.filter((evaluation) => evaluation.kind === "reserve")
+		.map((evaluation) => {
 			const storedEvaluation = sourceEvaluations?.accountBalance.find(
-				(evaluation) => evaluation.instanceId === goal.id,
+				(item) => item.instanceId === evaluation.id,
 			);
 			const storedConfig = storedEvaluation
 				? objectValue(storedEvaluation.config)
 				: null;
 			return {
 				...(storedEvaluation ?? {}),
-				instanceId: goal.id,
-				name: goal.name,
-				enabled: goal.enabled,
+				instanceId: evaluation.id,
+				name: evaluation.name,
+				enabled: evaluation.enabled,
 				config: {
 					...(storedConfig ?? {}),
-					accountId: goal.accountId,
-					target: goal.target,
+					accountId: evaluation.accountId,
+					target: evaluation.target,
 				} satisfies JsonObject,
 			};
 		});
 	const removedBalanceIDs = (sourceEvaluations?.accountBalance ?? [])
 		.filter(
-			(evaluation) =>
-				!plan.goals.some(
-					(goal) =>
-						goal.kind === "reserve" && goal.id === evaluation.instanceId,
+			(item) =>
+				!plan.evaluations.some(
+					(evaluation) =>
+						evaluation.kind === "reserve" && evaluation.id === item.instanceId,
 				),
 		)
 		.map((evaluation) => evaluation.instanceId);
@@ -1106,15 +1108,16 @@ export function displayPlanToBackendDocument(
 		lose(
 			conversionReport,
 			`evaluations.accountBalance.${instanceId}`,
-			"The backend account balance goal is absent from the display plan and will not be uploaded.",
+			"The backend account balance evaluation is absent from the display plan and will not be uploaded.",
 			`evaluations.accountBalance.${instanceId}`,
 		);
 	const removedThresholdIDs = (sourceEvaluations?.netWorthThreshold ?? [])
 		.filter(
-			(evaluation) =>
-				!plan.goals.some(
-					(goal) =>
-						goal.kind === "net-worth" && goal.id === evaluation.instanceId,
+			(item) =>
+				!plan.evaluations.some(
+					(evaluation) =>
+						evaluation.kind === "net-worth" &&
+						evaluation.id === item.instanceId,
 				),
 		)
 		.map((evaluation) => evaluation.instanceId);
@@ -1125,12 +1128,15 @@ export function displayPlanToBackendDocument(
 			"The backend net-worth threshold is absent from the display plan and will not be uploaded.",
 			`evaluations.netWorthThreshold.${instanceId}`,
 		);
-	if (plan.goals.length !== netWorthThreshold.length + accountBalance.length) {
+	if (
+		plan.evaluations.length !==
+		netWorthThreshold.length + accountBalance.length
+	) {
 		lose(
 			conversionReport,
-			"goals",
-			"One or more display goals could not be converted to a backend evaluation.",
-			"goals",
+			"evaluations",
+			"One or more display evaluations could not be converted to a backend evaluation.",
+			"evaluations",
 		);
 	}
 	const previousAssumptions = options.presentation?.assumptions ?? {
@@ -1211,6 +1217,7 @@ export function displayPlanToBackendDocument(
 		netWorthThreshold,
 		accountBalance,
 		postingFulfillment: [...postingFulfillment],
+		cycleFulfillment: [...cycleFulfillment],
 	};
 	return {
 		document: {

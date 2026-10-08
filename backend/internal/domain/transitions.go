@@ -157,7 +157,14 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 		if err != nil {
 			return PostingExecutionTransition{}, err
 		}
-		execution, err := executeIncomePosting(posting, config, date, t.incomeIndex, t.State.Balances, t.accountByID, t.accountOrder)
+		// Posting-level caps limit net cash deposited per calendar year,
+		// mirroring ordinary postings. Step splits carry their own
+		// resolver-level caps. Accrual runs through observePosting below.
+		annualCapRemaining := inf()
+		if posting.AnnualCap != nil {
+			annualCapRemaining = maxFloat(0, *posting.AnnualCap-t.State.RealizedPostingAmountsByYear[posting.ID][date[:4]])
+		}
+		execution, err := executeIncomePosting(posting, config, date, annualCapRemaining, t.incomeIndex, t.State.Balances, t.accountByID, t.accountOrder)
 		if err != nil {
 			return PostingExecutionTransition{}, err
 		}
@@ -194,7 +201,7 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 	// loss: it reduces destination balances instead of clamping to zero.
 	// Clamping discards the entire downside of sampled return
 	// distributions, which biases stochastic bands above the base case.
-	if rawRequested < 0 && posting.SourceAccountID == nil && posting.Destinations != nil {
+	if rawRequested < 0 && IsExternalInflow(posting) {
 		result := ResolveNegativeInflowMovement(posting, rawRequested, t.State.Balances, t.accountByID)
 		transition := t.applyAndCollectDeltas(result, func() {
 			ApplyNegativeInflow(posting, result.RealizedAmount, t.State.Balances, t.accountByID)

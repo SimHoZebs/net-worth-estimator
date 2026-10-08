@@ -13,7 +13,7 @@ test.beforeEach(async () => {
 
 /** Open the movement editor for the fixture's investing transfer. */
 async function openInvestingMovementEditor(page: Page) {
-	await page.getByRole("link", { name: "Your plan", exact: true }).click();
+	await page.getByRole("link", { name: "Transactions", exact: true }).click();
 	await page.getByRole("tab", { name: /Transactions/ }).click();
 	await page.getByRole("button", { name: "Edit Monthly investing" }).click();
 }
@@ -114,19 +114,21 @@ test("discard is explicit and restores the saved plan", async ({ page }) => {
 	await expect(page.getByText("Exploring unsaved changes")).not.toBeVisible();
 });
 
-test("account, movement and goal maintenance plus search work", async ({
+test("account, movement and evaluation maintenance plus search work", async ({
 	page,
 }) => {
-	await page.goto("/#plan");
+	await page.goto("/#accounts");
 	await page.getByRole("button", { name: "Add account" }).click();
 	await page.getByLabel("Account name").fill("Travel savings");
 	await page.getByLabel("Balance (USD)", { exact: true }).fill("2500");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await page.getByRole("textbox", { name: "Search plan" }).fill("Travel");
 	await expect(page.getByRole("row", { name: /Travel savings/ })).toBeVisible();
-	await page.getByRole("link", { name: "Goals", exact: true }).click();
-	await page.getByRole("button", { name: "Add goal", exact: true }).click();
-	await page.getByLabel("Goal name").fill("Next big trip");
+	await page.getByRole("link", { name: "Evaluations", exact: true }).click();
+	await page
+		.getByRole("button", { name: "Add evaluation", exact: true })
+		.click();
+	await page.getByLabel("Evaluation name").fill("Next big trip");
 	await page.getByLabel("Measure", { exact: true }).selectOption("reserve");
 	await page
 		.getByLabel("Account", { exact: true })
@@ -204,7 +206,14 @@ test("corrupt persisted data never silently falls back to example content", asyn
 test("desktop pages and edit dialogs meet automated accessibility checks", async ({
 	page,
 }) => {
-	for (const path of ["/", "/#plan", "/#goals", "/#compare", "/#sources"]) {
+	for (const path of [
+		"/",
+		"/#accounts",
+		"/#transactions",
+		"/#evaluations",
+		"/#compare",
+		"/#sources",
+	]) {
 		await page.goto(path);
 		await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 		const results = await new AxeBuilder({ page })
@@ -225,7 +234,8 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	for (const { route, label } of [
-		{ route: "plan", label: "Your plan" },
+		{ route: "accounts", label: "Accounts" },
+		{ route: "transactions", label: "Transactions" },
 		{ route: "sources", label: "Data & sources" },
 	]) {
 		await page.goto(`/#${route}`);
@@ -251,7 +261,7 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 		),
 	).toBe(true);
 	await page.getByRole("button", { name: "Open navigation" }).click();
-	await page.getByRole("link", { name: "Your plan", exact: true }).click();
+	await page.getByRole("link", { name: "Accounts", exact: true }).click();
 	await page.getByRole("button", { name: "Add account" }).click();
 	await expect(page.getByRole("dialog")).toBeVisible();
 	const overflow = await page.evaluate(() => ({
@@ -382,22 +392,36 @@ test("a second tab cannot overwrite newer financial work", async ({
 test("tabs use arrow-key navigation and all main pages fit narrow screens", async ({
 	page,
 }) => {
-	await page.goto("/#plan");
+	await page.goto("/#accounts");
 	await expect(
 		page.locator('.page-tabs[role="tablist"] > button[role="tab"]'),
-	).toHaveCount(4);
+	).toHaveCount(2);
 	await page.getByRole("tab", { name: /Accounts/ }).focus();
 	await page.keyboard.press("ArrowRight");
-	await expect(page.getByRole("tab", { name: /Transactions/ })).toBeFocused();
-	await expect(page.getByRole("tab", { name: /Transactions/ })).toHaveAttribute(
+	await expect(page.getByRole("tab", { name: /Balance checks/ })).toBeFocused();
+	await page.goto("/#transactions");
+	await expect(
+		page.locator('.page-tabs[role="tablist"] > button[role="tab"]'),
+	).toHaveCount(2);
+	await page.getByRole("tab", { name: /Transactions/ }).focus();
+	await page.keyboard.press("ArrowRight");
+	await expect(page.getByRole("tab", { name: "Assumptions" })).toBeFocused();
+	await expect(page.getByRole("tab", { name: "Assumptions" })).toHaveAttribute(
 		"aria-selected",
 		"true",
 	);
-	await page.keyboard.press("End");
-	await expect(page.getByRole("tab", { name: "Assumptions" })).toBeFocused();
+	await page.keyboard.press("Home");
+	await expect(page.getByRole("tab", { name: /Transactions/ })).toBeFocused();
 	for (const width of [320, 768, 1280]) {
 		await page.setViewportSize({ width, height: 900 });
-		for (const route of ["outlook", "plan", "goals", "compare", "sources"]) {
+		for (const route of [
+			"outlook",
+			"accounts",
+			"transactions",
+			"evaluations",
+			"compare",
+			"sources",
+		]) {
 			await page.goto(`/#${route}`);
 			await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 			expect(

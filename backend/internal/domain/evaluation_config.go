@@ -303,7 +303,7 @@ func ValidateAccountBalanceConfig(config any) error {
 	}
 	accountID, ok := stringField(obj, "accountId")
 	if !ok || accountID == "" {
-		return fmt.Errorf("Account balance goal must name an account.")
+		return fmt.Errorf("Account balance evaluation must name an account.")
 	}
 	if _, ok := numberField(obj, "target"); !ok {
 		return fmt.Errorf("Account balance target must be a finite number.")

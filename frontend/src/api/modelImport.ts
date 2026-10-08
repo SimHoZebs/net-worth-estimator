@@ -17,7 +17,11 @@ function isEvaluationTables(value: unknown): boolean {
 		isRecord(value) &&
 		Array.isArray(value.financialIndependence) &&
 		Array.isArray(value.netWorthThreshold) &&
-		Array.isArray(value.postingFulfillment)
+		Array.isArray(value.postingFulfillment) &&
+		(value.accountBalance === undefined ||
+			Array.isArray(value.accountBalance)) &&
+		(value.cycleFulfillment === undefined ||
+			Array.isArray(value.cycleFulfillment))
 	);
 }
 

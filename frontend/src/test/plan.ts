@@ -203,7 +203,7 @@ export const testPlan: Plan = {
 			readOnly: false,
 		})),
 	],
-	goals: [
+	evaluations: [
 		{
 			id: "million",
 			name: "Build a $1.5M net worth",

@@ -98,7 +98,7 @@ Starting balances establish the projection boundary. Older balance checks are ca
 
 The optional range uses 400 repeatable scenarios. Each calendar year shares one normally sampled market shock across investment accounts. Investment rates are capped between −50% and +50%; cash, property, and debt rates are fixed. The displayed band is the 10th to 90th percentile, with a separately calculated median. Inflation is used only for the optional today's-dollars chart; each movement has its own nominal annual increase.
 
-Goals check the first crossing of a net-worth or account-balance target. They do not implement financial-independence or retirement-sustainability evaluations. Taxes, fees, withdrawal eligibility, legal limits and unplanned events require additional model support or explicit plan movements. Cash timing is not a safe-to-spend recommendation. An underfunded movement is neither borrowed nor rescheduled automatically.
+Evaluations check the first crossing of a net-worth or account-balance target. Threshold evaluations do not implement financial-independence or retirement-sustainability evaluations; those server evaluations are listed alongside them as read-only outcomes. Taxes, fees, withdrawal eligibility, legal limits and unplanned events require additional model support or explicit plan movements. Cash timing is not a safe-to-spend recommendation. An underfunded movement is neither borrowed nor rescheduled automatically.
 
 Income evidence uses recorded, enabled one-time external inflows. Similar amounts and a monthly cadence can support a provisional annualized estimate. It does not independently establish a payer, payroll status, gross salary or bank provenance, and it never changes planned income.
 
@@ -108,7 +108,7 @@ Income evidence uses recorded, enabled one-time external inflows. Similar amount
 - `src/api/`: backend contracts, same-origin client, SSE parsing and display/document adapters.
 - `src/state/`: browser persistence, remote hydration, conditional saves and projection state.
 - `src/components/`: accessible controls, evidence dialogs, editing forms and visualization.
-- `src/pages/`: outlook, plan maintenance, goals, comparison and sources.
+- `src/pages/`: outlook, plan maintenance, evaluations, comparison and sources.
 - `tests/`: browser workflows and accessibility checks.
 
 The frontend is part of the repository and always uses the Go API.

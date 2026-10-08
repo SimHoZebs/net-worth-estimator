@@ -77,7 +77,7 @@ test("clicking an account opens its recorded history and projected transactions"
 test("account names in the plan open incoming transfers with the correct other account", async ({
 	page,
 }) => {
-	await page.goto("/#plan");
+	await page.goto("/#accounts");
 	await page
 		.getByRole("button", { name: "Open Investment portfolio transactions" })
 		.click();

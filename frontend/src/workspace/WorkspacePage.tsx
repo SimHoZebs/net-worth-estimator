@@ -3,7 +3,7 @@ import type { EditorTarget } from "../components/PlanEditor.tsx";
 import { ErrorNotice } from "../components/ui.tsx";
 import type { Projection } from "../domain/result.ts";
 import { ComparePage } from "../pages/ComparePage.tsx";
-import { GoalsPage } from "../pages/GoalsPage.tsx";
+import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
 import { PlanPage } from "../pages/PlanPage.tsx";
 import { SourcesPage } from "../pages/SourcesPage.tsx";
@@ -86,30 +86,44 @@ export function WorkspacePage({
 					onAccount={(account) =>
 						onEvidence({ kind: "account", id: account.id })
 					}
-					onPlan={() => onNavigate("plan")}
-					onGoals={() => onNavigate("goals")}
-					onGoal={(id) => onEvidence({ kind: "goal", id })}
+					onAccounts={() => onNavigate("accounts")}
+					onTransactions={() => onNavigate("transactions")}
+					onEvaluations={() => onNavigate("evaluations")}
+					onEvaluation={(id) => onEvidence({ kind: "evaluation", id })}
 					onAssumptions={() => onEdit({ kind: "assumptions" })}
 				/>
 			);
-		case "plan":
+		case "accounts":
 			return (
 				<PlanPage
+					key="accounts"
 					plan={plan}
+					view="accounts"
 					onEdit={onEdit}
 					onUpdate={state.updatePlan}
 					onAccount={(id) => onEvidence({ kind: "account", id })}
 				/>
 			);
-		case "goals":
+		case "transactions":
 			return (
-				<GoalsPage
+				<PlanPage
+					key="transactions"
+					plan={plan}
+					view="transactions"
+					onEdit={onEdit}
+					onUpdate={state.updatePlan}
+					onAccount={(id) => onEvidence({ kind: "account", id })}
+				/>
+			);
+		case "evaluations":
+			return (
+				<EvaluationsPage
 					plan={plan}
 					projection={base}
 					range={projection.range}
-					onEdit={(item) => onEdit({ kind: "goal", item })}
+					onEdit={(item) => onEdit({ kind: "evaluation", item })}
 					onUpdate={state.updatePlan}
-					onEvidence={(id) => onEvidence({ kind: "goal", id })}
+					onEvidence={(id) => onEvidence({ kind: "evaluation", id })}
 				/>
 			);
 		case "compare":

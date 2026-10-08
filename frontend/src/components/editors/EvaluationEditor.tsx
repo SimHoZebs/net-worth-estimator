@@ -1,23 +1,23 @@
 import { useState } from "react";
-import type { Goal } from "../../domain/model.ts";
+import type { Evaluation } from "../../domain/model.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { InputField, SelectField } from "../Field.tsx";
 import { AccountOptions } from "./AccountOptions.tsx";
 import { EditorForm, type EditorProps } from "./EditorForm.tsx";
 import { numberValue, textValue } from "./formValues.ts";
 
-export function GoalEditor({
+export function EvaluationEditor({
 	item,
 	plan,
 	...props
-}: EditorProps & { item: Goal | null }) {
+}: EditorProps & { item: Evaluation | null }) {
 	const [kind, setKind] = useState(item?.kind ?? "net-worth");
 	return (
 		<EditorForm
 			{...props}
-			title={`${item ? "Edit" : "Add"} goal`}
+			title={`${item ? "Edit" : "Add"} evaluation`}
 			buildPlan={(data) => {
-				const goal: Goal = {
+				const evaluation: Evaluation = {
 					id: item?.id ?? crypto.randomUUID(),
 					name: textValue(data, "name"),
 					kind,
@@ -28,12 +28,15 @@ export function GoalEditor({
 				};
 				return {
 					...plan,
-					goals: upsertItem({ items: plan.goals, item: goal }),
+					evaluations: upsertItem({
+						items: plan.evaluations,
+						item: evaluation,
+					}),
 				};
 			}}
 		>
 			<InputField
-				label="Goal name"
+				label="Evaluation name"
 				wide
 				name="name"
 				required
@@ -45,7 +48,7 @@ export function GoalEditor({
 				label="Measure"
 				name="kind"
 				value={kind}
-				onChange={(event) => setKind(event.target.value as Goal["kind"])}
+				onChange={(event) => setKind(event.target.value as Evaluation["kind"])}
 			>
 				<option value="net-worth">Household net worth</option>
 				<option value="reserve">An account balance</option>
@@ -75,8 +78,8 @@ export function GoalEditor({
 				</SelectField>
 			)}
 			<p className="field-wide field-hint">
-				A goal is reached the first day the selected measure meets its target.
-				Reaching it once does not establish long-term sustainability.
+				An evaluation is reached the first day the selected measure meets its
+				target. Reaching it once does not establish long-term sustainability.
 			</p>
 		</EditorForm>
 	);

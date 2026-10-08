@@ -78,9 +78,9 @@ func TestParseCycleFulfillmentConfig(t *testing.T) {
 	}
 }
 
-// A cycle goal pointing at an account the document does not contain must be
+// A cycle evaluation pointing at an account the document does not contain must be
 // reported rather than silently evaluating against nothing.
-func TestValidateFinancialModelFlagsDanglingCycleFulfillmentGoal(t *testing.T) {
+func TestValidateFinancialModelFlagsDanglingCycleFulfillmentEvaluation(t *testing.T) {
 	document := &types.FinancialModelDocument{
 		SourcePath: "test",
 		Accounts: []types.Account{
@@ -109,9 +109,9 @@ func TestValidateFinancialModelFlagsDanglingCycleFulfillmentGoal(t *testing.T) {
 	}
 }
 
-// A valid cycle goal must not raise an account reference issue for its own
+// A valid cycle evaluation must not raise an account reference issue for its own
 // table.
-func TestValidateFinancialModelAcceptsLiveCycleFulfillmentGoal(t *testing.T) {
+func TestValidateFinancialModelAcceptsLiveCycleFulfillmentEvaluation(t *testing.T) {
 	document := &types.FinancialModelDocument{
 		SourcePath: "test",
 		Accounts: []types.Account{

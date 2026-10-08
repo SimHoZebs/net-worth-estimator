@@ -146,3 +146,34 @@ sapphire_20260915_miro_tea,Miro Tea,ultimate_card,,"{""resolver"":""expression""
 sapphire_20260916_pho_bac,Pho Bac,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.46""},""inputs"":{}}",once,0,0,0,2026-09-16,,,1,true
 sapphire_20260916_tous_les_jours,Tous Les Jours,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.10""},""inputs"":{}}",once,0,0,0,2026-09-16,,,1,true
 sapphire_20260917_shake_shack,Shake Shack,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""24.28""},""inputs"":{}}",once,0,0,0,2026-09-17,,,1,true
+checking_20260722_zelle_jennifer,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""200.00""},""inputs"":{}}",once,0,0,0,2026-07-22,,,1,true
+checking_20260731_sapphire_payment,Sapphire Card Payment,checking,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""1916.17""},""inputs"":{}}",once,0,0,0,2026-07-31,,,1,true
+checking_20260731_prime_payment,Prime Card Payment,checking,prime_card,"{""resolver"":""expression"",""config"":{""expression"":""407.01""},""inputs"":{}}",once,0,0,0,2026-07-31,,,1,true
+checking_20260803_zelle_lisa,Zelle to Lisa Tyler,checking,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",once,0,0,0,2026-08-03,,,1,true
+checking_20260803_zelle_jennifer,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""200.00""},""inputs"":{}}",once,0,0,0,2026-08-03,,,1,true
+checking_20260812_zelle_jennifer,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""400.00""},""inputs"":{}}",once,0,0,0,2026-08-12,,,1,true
+checking_20260817_amazon_payment,Amazon Payment,,checking,"{""resolver"":""expression"",""config"":{""expression"":""32.11""},""inputs"":{}}",once,0,0,0,2026-08-17,,,1,true
+checking_20260817_insurance,Progressive Insurance,checking,,"{""resolver"":""expression"",""config"":{""expression"":""63.58""},""inputs"":{}}",once,0,0,0,2026-08-17,,,1,true
+prime_20260820_amazon_7857,Amazon Order 7857,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""55.56""},""inputs"":{}}",once,0,0,0,2026-08-20,,,1,true
+prime_20260821_amazon_4607,Amazon Order 4607,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.47""},""inputs"":{}}",once,0,0,0,2026-08-21,,,1,true
+prime_20260821_amazon_2643,Amazon Order 2643,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""27.63""},""inputs"":{}}",once,0,0,0,2026-08-21,,,1,true
+prime_20260823_amazon_9469,Amazon Order 9469,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""32.05""},""inputs"":{}}",once,0,0,0,2026-08-23,,,1,true
+checking_20260824_zelle_jennifer_700,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""700.00""},""inputs"":{}}",once,0,0,0,2026-08-24,,,1,true
+checking_20260824_zelle_jennifer_100,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""100.00""},""inputs"":{}}",once,0,0,0,2026-08-24,,,1,true
+prime_20260826_amazon_2237,Amazon Order 2237,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""38.65""},""inputs"":{}}",once,0,0,0,2026-08-26,,,1,true
+prime_20260828_amazon_4601,Amazon Order 4601,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.72""},""inputs"":{}}",once,0,0,0,2026-08-28,,,1,true
+prime_20260828_amazon_8605,Amazon Order 8605,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""28.13""},""inputs"":{}}",once,0,0,0,2026-08-28,,,1,true
+prime_20260828_amazon_5463,Amazon Order 5463,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.90""},""inputs"":{}}",once,0,0,0,2026-08-28,,,1,true
+amazon_payroll_20260831_1,Amazon Development Payroll 2026-08-31 (1),,checking,"{""resolver"":""expression"",""config"":{""expression"":""7579.40""},""inputs"":{}}",once,0,0,0,2026-08-31,,,1,true
+prime_20260831_card_payment,Prime Card Payment,checking,prime_card,"{""resolver"":""expression"",""config"":{""expression"":""852.46""},""inputs"":{}}",once,0,0,0,2026-08-31,,,1,true
+prime_20260831_amazon_7823,Amazon Order 7823,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""38.47""},""inputs"":{}}",once,0,0,0,2026-08-31,,,1,true
+checking_20260901_zelle_lisa,Zelle to Lisa Tyler,checking,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",once,0,0,0,2026-09-01,,,1,true
+checking_20260902_zelle_jennifer,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""1000.00""},""inputs"":{}}",once,0,0,0,2026-09-02,,,1,true
+prime_20260903_amazon_1464,Amazon Order 1464,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.32""},""inputs"":{}}",once,0,0,0,2026-09-03,,,1,true
+prime_20260903_amazon_5023,Amazon Order 5023,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""14.20""},""inputs"":{}}",once,0,0,0,2026-09-03,,,1,true
+prime_20260904_amazon_6642,Amazon Order 6642,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""31.02""},""inputs"":{}}",once,0,0,0,2026-09-04,,,1,true
+prime_20260906_amazon_3861,Amazon Order 3861,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.08""},""inputs"":{}}",once,0,0,0,2026-09-06,,,1,true
+prime_20260911_amazon_1863,Amazon Order 1863,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""60.81""},""inputs"":{}}",once,0,0,0,2026-09-11,,,1,true
+prime_20260912_amazon_7016,Amazon Order 7016,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""10.99""},""inputs"":{}}",once,0,0,0,2026-09-12,,,1,true
+checking_20260916_insurance,Progressive Insurance,checking,,"{""resolver"":""expression"",""config"":{""expression"":""159.89""},""inputs"":{}}",once,0,0,0,2026-09-16,,,1,true
+prime_20260917_amazon_7840,Amazon Order 7840,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.44""},""inputs"":{}}",once,0,0,0,2026-09-17,,,1,true

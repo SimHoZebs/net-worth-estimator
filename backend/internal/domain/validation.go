@@ -191,7 +191,7 @@ func validateEvaluationConfigs(issues *[]types.ModelValidationIssue, document *t
 	}
 }
 
-// validateEvaluationAccountReferences checks that an account balance goal names
+// validateEvaluationAccountReferences checks that an account balance evaluation names
 // an account the document actually contains. A dangling reference would
 // otherwise evaluate as never reached with no diagnostic.
 func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, accountIDs map[string]bool) {
@@ -202,7 +202,7 @@ func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, d
 		}
 		if !accountIDs[parsed.AccountID] {
 			addIssue(issues, types.SeverityError, "evaluation.accountBalance.accountId.invalid",
-				fmt.Sprintf("Account balance goal '%s' references account '%s', which does not exist.", item.InstanceID, parsed.AccountID),
+				fmt.Sprintf("Account balance evaluation '%s' references account '%s', which does not exist.", item.InstanceID, parsed.AccountID),
 				"evaluations", types.EvaluationTypeAccountBalance, index, "config", "accountId")
 		}
 	}
@@ -214,7 +214,7 @@ func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, d
 		for _, accountID := range parsed.AccountIDs {
 			if !accountIDs[accountID] {
 				addIssue(issues, types.SeverityError, "evaluation.cycleFulfillment.accountId.invalid",
-					fmt.Sprintf("Cycle fulfillment goal '%s' references account '%s', which does not exist.", item.InstanceID, accountID),
+					fmt.Sprintf("Cycle fulfillment evaluation '%s' references account '%s', which does not exist.", item.InstanceID, accountID),
 					"evaluations", types.EvaluationTypeCycleFulfillment, index, "config", "accountIds")
 			}
 		}
@@ -310,18 +310,6 @@ func validatePostingDependencies(issues *[]types.ModelValidationIssue, postings 
 }
 
 func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []types.Posting, accountIDs map[string]bool) {
-	enabledIncomeCount := 0
-	for _, posting := range postings {
-		if posting.Enabled && posting.Amount.Resolver == "income" {
-			enabledIncomeCount++
-		}
-	}
-	if enabledIncomeCount > 1 {
-		addIssue(issues, types.SeverityError, "posting.income.multiple",
-			"Only one enabled income posting is supported for the household income pipeline.",
-			[]any{"postings"}...)
-	}
-
 	for index := range postings {
 		posting := &postings[index]
 		if posting.Amount.Resolver == "income" {
@@ -329,16 +317,6 @@ func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []type
 				addIssue(issues, types.SeverityError, "posting.income.source.invalid",
 					"Income postings cannot withdraw from an account.",
 					pathWithField([]any{"postings", index}, "sourceAccountId")...)
-			}
-			if len(posting.Destinations) == 0 {
-				addIssue(issues, types.SeverityError, "posting.income.destination.missing",
-					"Income postings must deposit their remaining amount into at least one account.",
-					pathWithField([]any{"postings", index}, "destinations")...)
-			}
-			if posting.AnnualCap != nil {
-				addIssue(issues, types.SeverityError, "posting.income.cap.invalid",
-					"Income postings use resolver-level caps, not a posting annual cap.",
-					pathWithField([]any{"postings", index}, "annualCap")...)
 			}
 		}
 		if posting.SourceAccountID != nil && !accountIDs[*posting.SourceAccountID] {
@@ -362,7 +340,7 @@ func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []type
 				seen[destinationID] = true
 			}
 		}
-		if posting.SourceAccountID == nil && posting.Destinations == nil {
+		if posting.SourceAccountID == nil && len(posting.Destinations) == 0 {
 			addIssue(issues, types.SeverityError, "posting.accounts.empty",
 				"Postings must set sourceAccountId, destinations, or both.",
 				[]any{"postings", index}...)

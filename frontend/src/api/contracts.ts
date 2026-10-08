@@ -131,6 +131,7 @@ export type FinancialIndependenceConfig = EvaluationConfig;
 export type NetWorthThresholdConfig = EvaluationConfig;
 export type AccountBalanceConfig = EvaluationConfig;
 export type PostingFulfillmentConfig = EvaluationConfig;
+export type CycleFulfillmentConfig = EvaluationConfig;
 export type FinancialIndependenceEvaluation =
 	EvaluationInstance<FinancialIndependenceConfig>;
 export type NetWorthThresholdEvaluation =
@@ -138,12 +139,15 @@ export type NetWorthThresholdEvaluation =
 export type AccountBalanceEvaluation = EvaluationInstance<AccountBalanceConfig>;
 export type PostingFulfillmentEvaluation =
 	EvaluationInstance<PostingFulfillmentConfig>;
+export type CycleFulfillmentEvaluation =
+	EvaluationInstance<CycleFulfillmentConfig>;
 
 export interface EvaluationTables extends HumaMetadata {
 	financialIndependence: FinancialIndependenceEvaluation[];
 	netWorthThreshold: NetWorthThresholdEvaluation[];
 	accountBalance: AccountBalanceEvaluation[];
 	postingFulfillment: PostingFulfillmentEvaluation[];
+	cycleFulfillment?: CycleFulfillmentEvaluation[];
 }
 
 export interface FinancialModelDocument extends HumaMetadata {
@@ -329,6 +333,7 @@ export interface EvaluationResultTables extends HumaMetadata {
 	netWorthThreshold: EvaluationResultEnvelope[];
 	accountBalance: EvaluationResultEnvelope[];
 	postingFulfillment: EvaluationResultEnvelope[];
+	cycleFulfillment?: EvaluationResultEnvelope[];
 }
 
 export interface ProjectionResult extends HumaMetadata {

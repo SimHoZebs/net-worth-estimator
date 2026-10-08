@@ -29,7 +29,7 @@ describe("chart presentation data", () => {
 				upper: point.total * 1.1,
 			})),
 			count: 10,
-			goalSuccess: {},
+			evaluationSuccess: {},
 			failureShare: 0,
 		};
 		const model = projectionChartModel({ ...options, range, realTerms: true });
@@ -67,7 +67,7 @@ describe("chart presentation data", () => {
 					upper: point.total * 1.1,
 				})),
 				count: 10,
-				goalSuccess: {},
+				evaluationSuccess: {},
 				failureShare: 0,
 			};
 			const model = projectionChartModel({ ...options, range, realTerms });
