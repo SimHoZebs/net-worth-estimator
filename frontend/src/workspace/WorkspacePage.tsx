@@ -90,7 +90,6 @@ export function WorkspacePage({
 					onTransactions={() => onNavigate("transactions")}
 					onEvaluations={() => onNavigate("evaluations")}
 					onEvaluation={(id) => onEvidence({ kind: "evaluation", id })}
-					onAssumptions={() => onEdit({ kind: "assumptions" })}
 				/>
 			);
 		case "accounts":

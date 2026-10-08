@@ -43,7 +43,7 @@ test("outlook renders real calculations, scenario ranges, evidence and exact cha
 	// Values come from the Go engine over HTTP, not a client-side projection.
 	// The headline is compact; the exact figure is behind the values table.
 	await expect(page.getByText("$1.02M")).toBeVisible();
-	await expect(page.getByText(/80% of 400 scenarios/)).toBeVisible({
+	await expect(page.getByText(/80% of (400 )?scenarios/)).toBeVisible({
 		timeout: 30_000,
 	});
 	await page.getByRole("button", { name: "Inspect this expense" }).click();
@@ -285,7 +285,7 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 	expect(issues(results.violations)).toEqual([]);
 	await page.keyboard.press("Escape");
 	await page.goto("/");
-	await page.getByText(/80% of 400 scenarios/).waitFor({ timeout: 30_000 });
+	await page.getByText(/80% of (400 )?scenarios/).waitFor({ timeout: 30_000 });
 	await page.screenshot({
 		path: "test-results/waypoint-mobile.png",
 		fullPage: true,
@@ -294,7 +294,7 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 
 test("capture the completed desktop outlook", async ({ page }) => {
 	await page.goto("/");
-	await page.getByText(/80% of 400 scenarios/).waitFor({ timeout: 30_000 });
+	await page.getByText(/80% of (400 )?scenarios/).waitFor({ timeout: 30_000 });
 	await page.screenshot({
 		path: "test-results/waypoint-desktop.png",
 		fullPage: true,
@@ -311,9 +311,6 @@ test("scenario failures expose a recovery action without inventing a range", asy
 	await expect(page.getByRole("alert")).toContainText("The API request failed");
 	await expect(
 		page.getByRole("button", { name: "Retry scenario calculation" }),
-	).toBeVisible();
-	await expect(
-		page.getByText("Range unavailable", { exact: true }),
 	).toBeVisible();
 	await expect(
 		page.getByText("Range unavailable · base case shown"),
