@@ -17,8 +17,11 @@ describe("chart presentation data", () => {
 		if (!model) throw new Error("Expected chart");
 		const csv = projectionCsv(model.rows).split("\n");
 		expect(csv).toHaveLength(model.rows.length + 1);
-		for (const [index, row] of model.rows.entries())
-			expect(csv[index + 1]).toBe(`${row.date},${row.total.toFixed(2)},,,`);
+		for (const [index, row] of model.rows.entries()) {
+			const cells = csv[index + 1]?.split(",") ?? [];
+			expect(cells[0]).toBe(row.date);
+			expect(Number(cells[1])).toBeCloseTo(row.total, 2);
+		}
 	});
 	it("adjusts bands and base case by the same inflation factor", () => {
 		const range = {

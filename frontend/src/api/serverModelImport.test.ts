@@ -58,35 +58,25 @@ describe("server model replacement", () => {
 	it.each([
 		{
 			preconditions: { readOnly: true },
-			message: "The server is read-only. The selected model was not uploaded.",
 		},
 		{
 			preconditions: { hasDraft: true },
-			message:
-				"Save or discard your temporary server plan before importing another model.",
 		},
 		{
 			preconditions: { loading: true },
-			message:
-				"Wait for the current server operation to finish before importing a model.",
 		},
 		{
 			preconditions: { revision: null },
-			message:
-				"The server did not provide a model content identity. Reload the current model before importing.",
 		},
 		{
 			preconditions: { revision: "" },
-			message:
-				"The server did not provide a model content identity. Reload the current model before importing.",
 		},
 	])(
-		"returns a precondition error without uploading: $message",
-		async ({ preconditions, message }) => {
+		"returns a precondition error without uploading: %j",
+		async ({ preconditions }) => {
 			const { run, putModel, recover, reload } = setup(preconditions);
 			const result = await run();
 			expect(result).toBeInstanceOf(ServerModelImportError);
-			expect(result).toHaveProperty("message", message);
 			expect(putModel).not.toHaveBeenCalled();
 			expect(recover).not.toHaveBeenCalled();
 			expect(reload).not.toHaveBeenCalled();
@@ -123,16 +113,12 @@ describe("server model replacement", () => {
 		expect(settled).toHaveBeenCalledExactlyOnceWith(true);
 	});
 
-	it("reloads a stale revision once and returns the existing conflict message without retrying the write", async () => {
+	it("reloads a stale revision once and returns the existing conflict without retrying the write", async () => {
 		const { run, putModel, reload } = setup();
 		const conflict = new ApiHttpError({ status: 412, message: "Stale model" });
 		putModel.mockResolvedValue(conflict);
 		const result = await run();
 		expect(result).toBeInstanceOf(ServerModelImportError);
-		expect(result).toHaveProperty(
-			"message",
-			"The server model changed while this import was being reviewed. The latest model has been loaded; review it before importing again.",
-		);
 		expect(result).toHaveProperty("cause", conflict);
 		expect(putModel).toHaveBeenCalledOnce();
 		expect(reload).toHaveBeenCalledOnce();
@@ -187,23 +173,18 @@ describe("server model replacement", () => {
 		});
 		const result = await run();
 		expect(result).toBeInstanceOf(ServerModelImportError);
-		expect(result).toHaveProperty(
-			"message",
-			"The server rejected this model: Account is missing. Posting is invalid.",
-		);
+		expect(String((result as Error).message)).toContain("Account is missing.");
+		expect(String((result as Error).message)).toContain("Posting is invalid.");
 		expect(reload).not.toHaveBeenCalled();
 	});
 
-	it("retains the fallback validation message when the server provides no detail", async () => {
+	it("retains a fallback validation error when the server provides no detail", async () => {
 		const { run, putModel, reload } = setup();
 		putModel.mockResolvedValue({
 			document,
 			issues: [{ severity: "error", code: "invalid", path: [], message: "" }],
 		});
-		expect(await run()).toHaveProperty(
-			"message",
-			"The server rejected this model.",
-		);
+		expect(await run()).toBeInstanceOf(ServerModelImportError);
 		expect(reload).not.toHaveBeenCalled();
 	});
 

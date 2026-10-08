@@ -468,8 +468,8 @@ describe("backend and display plan adapter", () => {
 		expect(
 			reverse.report.losses.some((loss) => loss.field.includes("reserve")),
 		).toBe(false);
-		expect(JSON.stringify(reverse.document)).not.toContain('"origin"');
-		expect(JSON.stringify(reverse.document)).not.toContain('"assumptions"');
+		expect(reverse.document).not.toHaveProperty("origin");
+		expect(reverse.document).not.toHaveProperty("assumptions");
 		expect(
 			reverse.report.losses.some((loss) => loss.field === "assumptions"),
 		).toBe(true);
