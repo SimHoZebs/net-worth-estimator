@@ -15,7 +15,7 @@ import {
 	type StochasticProjectionRequest,
 	type StochasticProjectionResult,
 } from "../api/index.ts";
-import { dateLabel, money, percent } from "../domain/format.ts";
+import { dateLabel, money, percent, todayIso } from "../domain/format.ts";
 import type {
 	OtherEvaluationProgress,
 	Projection,
@@ -75,7 +75,7 @@ export function projectionStartDate(document: FinancialModelDocument): string {
 	return (
 		latestDate(document.checkpoints.map((checkpoint) => checkpoint.Date)) ??
 		document.postings[0]?.startDate ??
-		new Date().toISOString().slice(0, 10)
+		todayIso()
 	);
 }
 

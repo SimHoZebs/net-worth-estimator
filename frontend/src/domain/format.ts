@@ -27,6 +27,8 @@ export const dateLabel = (value: string, full = false) =>
 export const percent = (value: number) => `${Math.round(value * 100)}%`;
 export const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
 export const isoDate = (value: Date) => value.toISOString().slice(0, 10);
+/** Real calendar day in UTC. Display timing anchors on this, never on stale data. */
+export const todayIso = () => isoDate(new Date());
 export function shiftDate({ date, days }: { date: string; days: number }) {
 	const value = new Date(`${date}T12:00:00Z`);
 	value.setUTCDate(value.getUTCDate() + days);
