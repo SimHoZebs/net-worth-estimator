@@ -56,11 +56,11 @@ export function MovementsPanel({
 							{movement.fromId
 								? names.get(movement.fromId)
 								: externalCounterpartyName("in")}
-							{movement.toId ? (
-								<> → {names.get(movement.toId)}</>
-							) : (
-								movement.fromId && <> → {externalCounterpartyName("out")}</>
-							)}
+							{movement.toId
+								? ` → ${names.get(movement.toId) ?? ""}`
+								: movement.fromId
+									? ` → ${externalCounterpartyName("out")}`
+									: null}
 						</span>
 					</div>
 					<div className="movement-amount">
