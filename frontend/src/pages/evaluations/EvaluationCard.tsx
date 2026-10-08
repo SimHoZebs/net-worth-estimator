@@ -64,8 +64,8 @@ export function EvaluationCard({
 					: met
 						? "Met at the start"
 						: result?.firstDate
-							? "First reached · base case"
-							: "Not reached · base case"}
+							? "First reached"
+							: "Not reached"}
 			</Badge>
 			<div className="evaluation-card-progress">
 				<div className="progress-label">

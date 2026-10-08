@@ -15,8 +15,12 @@ import {
 	type StochasticProjectionRequest,
 	type StochasticProjectionResult,
 } from "../api/index.ts";
-import { compactMoney, money } from "../domain/format.ts";
-import type { Projection, RangeResult } from "../domain/result.ts";
+import { dateLabel, money, percent } from "../domain/format.ts";
+import type {
+	OtherEvaluationProgress,
+	Projection,
+	RangeResult,
+} from "../domain/result.ts";
 
 export interface RemoteProjectionClient {
 	projectDeterministic(
@@ -188,132 +192,136 @@ function arrayValue(value: unknown): Record<string, unknown>[] {
 		: [];
 }
 
-function fiConfigSubtitle(
-	config: Record<string, unknown> | null,
-): string | null {
-	if (!config) return null;
-	const parts: string[] = [];
-	const expenseTarget = finite(config.annualExpenseTarget);
-	if (expenseTarget !== null && expenseTarget > 0)
-		parts.push(`${money(expenseTarget)}/yr spend`);
-	const evaluationYears = finite(config.evaluationYears);
-	if (evaluationYears !== null && evaluationYears > 0)
-		parts.push(`${Math.trunc(evaluationYears)}-yr test`);
-	const withdrawalRate = finite(config.withdrawalRate);
-	if (withdrawalRate !== null && withdrawalRate > 0)
-		parts.push(`${Math.round(withdrawalRate * 1000) / 10}% withdrawal`);
-	const minimumNetWorth = finite(config.minimumNetWorth);
-	if (minimumNetWorth !== null && minimumNetWorth > 0)
-		parts.push(`needs ${compactMoney(minimumNetWorth)} net worth`);
-	return parts.length ? parts.join(" · ") : null;
+interface OtherOutcome {
+	goal: string | null;
+	outcomeDate: string | null;
+	outcomeText: string;
+	qualifier: string | null;
+	progress: OtherEvaluationProgress | null;
 }
 
-function fiSummary(
-	deterministic: Record<string, unknown>,
+function fiOutcome(
+	deterministic: Record<string, unknown> | null,
 	config: Record<string, unknown> | null,
-): string {
+): OtherOutcome {
+	const expenseTarget = finite(config?.annualExpenseTarget);
+	const goal =
+		expenseTarget !== null && expenseTarget > 0
+			? `${money(expenseTarget)}/yr spending`
+			: null;
+	const evaluationYears =
+		Math.trunc(finite(config?.evaluationYears) ?? 0) || null;
+	const unresolved: OtherOutcome = {
+		goal,
+		outcomeDate: null,
+		outcomeText: "Beyond this horizon",
+		qualifier: null,
+		progress: null,
+	};
+	if (!deterministic) return unresolved;
 	const milestones = valueRecord(
 		deterministic.milestones as JsonValue | undefined,
 	);
 	const sustaining = stringValue(milestones?.firstSelfSustainingDate);
-	if (sustaining) return `Self-sustaining from ${sustaining}`;
-	const evaluationYears =
-		Math.trunc(finite(config?.evaluationYears) ?? 0) || null;
+	if (sustaining)
+		return {
+			goal,
+			outcomeDate: sustaining,
+			outcomeText: "Satisfied",
+			qualifier: null,
+			progress: null,
+		};
 	const coverage = stringValue(milestones?.firstCoverageDate);
-	const runOutcomes = arrayValue(deterministic.runOutcomes);
 	if (coverage) {
+		const runOutcomes = arrayValue(deterministic.runOutcomes);
 		const outcome = runOutcomes.find(
 			(item) => stringValue(item.candidateDate) === coverage,
 		);
 		const shortfallDate = stringValue(outcome?.firstShortfallDate);
-		const horizon = evaluationYears ? ` in the ${evaluationYears}-yr test` : "";
-		if (shortfallDate)
-			return `Covers spending ${coverage} · shortfall from ${shortfallDate}${horizon}`;
-		return `Covers spending ${coverage} · ${evaluationYears ? `${evaluationYears}-yr ` : ""}cycle not sustained`;
+		return {
+			goal,
+			outcomeDate: coverage,
+			outcomeText: "Covered",
+			qualifier: shortfallDate
+				? `Shortfall from ${dateLabel(shortfallDate)}`
+				: evaluationYears
+					? `Not sustained over ${evaluationYears} years`
+					: "Not sustained",
+			progress: null,
+		};
 	}
 	const rows = arrayValue(deterministic.rows);
-	if (!rows.length)
-		return evaluationYears
-			? `No complete ${evaluationYears}-yr window fits this horizon.`
-			: "No FI window fits this horizon.";
-	const first = rows[0]!;
-	const coverageRatio = finite(first.coverageRatio) ?? 0;
-	const coveredPercent = Math.max(0, Math.round(coverageRatio * 100));
-	let peak = first;
-	for (const row of rows) {
-		if ((finite(row.coverageRatio) ?? 0) > (finite(peak.coverageRatio) ?? 0))
-			peak = row;
-	}
-	const peakRatio = finite(peak.coverageRatio) ?? coverageRatio;
-	const peakPercent = Math.max(0, Math.round(peakRatio * 100));
-	const peakDate = stringValue(peak.date);
-	const expenseTarget =
-		finite(first.annualExpenseTarget) ??
-		finite(config?.annualExpenseTarget) ??
-		null;
-	const totalCapacity = finite(first.totalAnnualCapacity) ?? null;
-	const shortfall =
-		expenseTarget !== null && totalCapacity !== null
-			? Math.max(0, expenseTarget - totalCapacity)
-			: null;
-	const spendLabel =
-		expenseTarget !== null && expenseTarget > 0
-			? ` of ${money(expenseTarget)}/yr`
-			: "";
-	const netWorth = finite(first.netWorth) ?? null;
-	const minimumNetWorth =
-		finite(first.minimumNetWorth) ?? finite(config?.minimumNetWorth) ?? null;
-	const minimumMet =
-		first.minimumNetWorthMet === true ||
-		(netWorth !== null &&
-			minimumNetWorth !== null &&
-			netWorth >= minimumNetWorth);
-	if (
-		!minimumMet &&
-		minimumNetWorth !== null &&
-		minimumNetWorth > 0 &&
-		netWorth !== null
-	) {
-		const gap = `Needs ${compactMoney(minimumNetWorth)} net worth · has ${compactMoney(netWorth)}`;
-		if (peakDate && peakPercent > coveredPercent)
-			return `${gap} · ${coveredPercent}%${spendLabel} covered · best ${peakPercent}% on ${peakDate}`;
-		if (shortfall !== null && shortfall > 0)
-			return `${gap} · ${coveredPercent}%${spendLabel} covered · short ${money(shortfall)}/yr`;
-		return `${gap} · ${coveredPercent}%${spendLabel} covered`;
-	}
-	if (shortfall !== null && shortfall > 0) {
-		if (peakDate && peakPercent > coveredPercent)
-			return `${coveredPercent}%${spendLabel} covered · short ${money(shortfall)}/yr · best ${peakPercent}% on ${peakDate}`;
-		return `${coveredPercent}%${spendLabel} covered · short ${money(shortfall)}/yr`;
-	}
-	if (peakDate && peakPercent > coveredPercent)
-		return `${coveredPercent}%${spendLabel} covered · best ${peakPercent}% on ${peakDate}`;
-	return `${coveredPercent}%${spendLabel} covered`;
+	const first = rows[0];
+	const firstExpenseTarget =
+		(first ? finite(first.annualExpenseTarget) : null) ?? expenseTarget;
+	if (!first || firstExpenseTarget === null || firstExpenseTarget <= 0)
+		return {
+			...unresolved,
+			qualifier:
+				!first && evaluationYears
+					? `No ${evaluationYears}-year window fits`
+					: null,
+		};
+	const fraction = Math.max(0, finite(first.coverageRatio) ?? 0);
+	const capacity = finite(first.totalAnnualCapacity) ?? 0;
+	return {
+		...unresolved,
+		progress: {
+			fraction,
+			current: money(capacity),
+			share: percent(fraction),
+		},
+	};
 }
 
-function otherEvaluationSummary(
-	type: "financialIndependence" | "postingFulfillment" | "cycleFulfillment",
+function postingOutcome(
 	deterministic: Record<string, unknown> | null,
-	config?: Record<string, unknown> | null,
-): string {
-	if (!deterministic) return "No base-case detail yet.";
-	if (type === "postingFulfillment") {
-		const firstDate = stringValue(deterministic.firstUnderfulfilledDate);
-		const completion = finite(deterministic.completionRate);
-		if (firstDate) return `First shortfall ${firstDate}`;
-		if (completion !== null)
-			return `Completion ${Math.round(completion * 100)}% in the base case`;
-		return "Fully fulfilled in the base case.";
-	}
-	if (type === "cycleFulfillment") {
-		const spent = finite(deterministic.spent);
-		const budget = finite(deterministic.budget);
-		const within = deterministic.withinBudget === true;
-		if (spent !== null && budget !== null)
-			return `${within ? "Within" : "Over"} budget in the base case`;
-		return within ? "Within budget in the base case." : "Over budget.";
-	}
-	return fiSummary(deterministic, config ?? null);
+): OtherOutcome {
+	const fulfilled: OtherOutcome = {
+		goal: null,
+		outcomeDate: null,
+		outcomeText: "Fully fulfilled",
+		qualifier: null,
+		progress: null,
+	};
+	if (!deterministic) return fulfilled;
+	const firstDate = stringValue(deterministic.firstUnderfulfilledDate);
+	if (!firstDate) return fulfilled;
+	const completion = finite(deterministic.completionRate);
+	return {
+		...fulfilled,
+		outcomeDate: firstDate,
+		outcomeText: "Shortfall",
+		progress:
+			completion !== null && completion >= 0
+				? { fraction: completion, current: percent(completion), share: null }
+				: null,
+	};
+}
+
+function cycleOutcome(
+	deterministic: Record<string, unknown> | null,
+): OtherOutcome {
+	const within = deterministic?.withinBudget === true;
+	const base: OtherOutcome = {
+		goal: null,
+		outcomeDate: null,
+		outcomeText: within ? "Within budget" : "Over budget",
+		qualifier: null,
+		progress: null,
+	};
+	const spent = finite(deterministic?.spent);
+	const budget = finite(deterministic?.budget);
+	if (spent === null || budget === null || budget <= 0) return base;
+	const fraction = Math.max(0, spent / budget);
+	return {
+		...base,
+		progress: {
+			fraction,
+			current: money(spent),
+			share: `${Math.round(fraction * 100)}%`,
+		},
+	};
 }
 
 function movementName(
@@ -518,6 +526,14 @@ export function projectionResultToLocal(
 	const otherEvaluations = [
 		...(document?.evaluations.financialIndependence ?? []).map((evaluation) => {
 			const config = valueRecord(evaluation.config);
+			const outcome = fiOutcome(
+				valueRecord(
+					result.evaluations.financialIndependence.find(
+						(item) => item.instanceId === evaluation.instanceId,
+					)?.deterministic,
+				),
+				config,
+			);
 			return {
 				id: evaluation.instanceId,
 				name: evaluation.name || evaluation.instanceId,
@@ -527,16 +543,7 @@ export function projectionResultToLocal(
 					result.evaluations.financialIndependence.find(
 						(item) => item.instanceId === evaluation.instanceId,
 					)?.status ?? "indeterminate",
-				subtitle: fiConfigSubtitle(config),
-				summary: otherEvaluationSummary(
-					"financialIndependence",
-					valueRecord(
-						result.evaluations.financialIndependence.find(
-							(item) => item.instanceId === evaluation.instanceId,
-						)?.deterministic,
-					),
-					config,
-				),
+				...outcome,
 			};
 		}),
 		...(document?.evaluations.postingFulfillment ?? []).map((evaluation) => ({
@@ -548,8 +555,7 @@ export function projectionResultToLocal(
 				result.evaluations.postingFulfillment.find(
 					(item) => item.instanceId === evaluation.instanceId,
 				)?.status ?? "indeterminate",
-			summary: otherEvaluationSummary(
-				"postingFulfillment",
+			...postingOutcome(
 				valueRecord(
 					result.evaluations.postingFulfillment.find(
 						(item) => item.instanceId === evaluation.instanceId,
@@ -566,8 +572,7 @@ export function projectionResultToLocal(
 				(result.evaluations.cycleFulfillment ?? []).find(
 					(item) => item.instanceId === evaluation.instanceId,
 				)?.status ?? "indeterminate",
-			summary: otherEvaluationSummary(
-				"cycleFulfillment",
+			...cycleOutcome(
 				valueRecord(
 					(result.evaluations.cycleFulfillment ?? []).find(
 						(item) => item.instanceId === evaluation.instanceId,

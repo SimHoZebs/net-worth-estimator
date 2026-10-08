@@ -38,14 +38,22 @@ export type OtherEvaluationType =
 	| "financialIndependence"
 	| "postingFulfillment"
 	| "cycleFulfillment";
+export interface OtherEvaluationProgress {
+	fraction: number;
+	current: string;
+	share: string | null;
+}
 export interface OtherEvaluation {
 	id: string;
 	name: string;
 	type: OtherEvaluationType;
 	enabled: boolean;
 	status: string;
-	subtitle?: string | null;
-	summary: string;
+	goal: string | null;
+	outcomeDate: string | null;
+	outcomeText: string;
+	qualifier: string | null;
+	progress: OtherEvaluationProgress | null;
 }
 export interface Projection {
 	points: Point[];
