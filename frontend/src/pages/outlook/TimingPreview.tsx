@@ -9,7 +9,7 @@ import {
 	groupCycleSpending,
 	resolveStatementCycle,
 } from "../../domain/cardCycle.ts";
-import { dateLabel, money, shiftDate } from "../../domain/format.ts";
+import { dateLabel, money, shiftDate, sum } from "../../domain/format.ts";
 import {
 	cashCushion,
 	checkingAccountId,
@@ -46,6 +46,8 @@ interface TotalCycleSettings {
 	accountIds: string[] | null;
 	/** Null means every recurring checking outflow counts as a bill. */
 	movementIds: string[] | null;
+	/** Which window the drawer mandatory tab uses. Card figures stay calendar. */
+	mandatoryFrame: "calendar" | "cycle";
 }
 
 const defaultSettings = (): TotalCycleSettings => ({
@@ -58,6 +60,7 @@ const defaultSettings = (): TotalCycleSettings => ({
 	remainingOverride: null,
 	accountIds: null,
 	movementIds: null,
+	mandatoryFrame: "calendar",
 });
 
 function optionalMoney(value: unknown): number | null {
@@ -112,6 +115,7 @@ function loadPersisted(): TotalCycleSettings {
 			remainingOverride: optionalMoney(parsed.remainingOverride),
 			accountIds: accountIds?.length ? accountIds : null,
 			movementIds: movementIds?.length ? movementIds : null,
+			mandatoryFrame: parsed.mandatoryFrame === "cycle" ? "cycle" : "calendar",
 		};
 	} catch {
 		return defaultSettings();
@@ -273,6 +277,33 @@ export function TimingPreview({
 			end: fixedDerived.end,
 		});
 	}, [obligationMovements, checkingId, fixedDerived.start, fixedDerived.end]);
+	const nextCycle = useMemo(
+		() =>
+			resolveStatementCycle({
+				todayIso: shiftDate({ date: cycle.cycleEnd, days: 1 }),
+				statementDay: settings.statementDay,
+			}),
+		[cycle.cycleEnd, settings.statementDay],
+	);
+	const cycleThisGroups = useMemo(() => {
+		if (!checkingId) return [];
+		const today = plan.startDate.slice(0, 10);
+		return groupMandatorySpending({
+			movements: obligationMovements,
+			checkingId,
+			start: shiftDate({ date: today, days: 1 }),
+			end: cycle.cycleEnd,
+		});
+	}, [obligationMovements, checkingId, plan.startDate, cycle.cycleEnd]);
+	const cycleNextGroups = useMemo(() => {
+		if (!checkingId) return [];
+		return groupMandatorySpending({
+			movements: obligationMovements,
+			checkingId,
+			start: nextCycle.cycleStart,
+			end: nextCycle.cycleEnd,
+		});
+	}, [obligationMovements, checkingId, nextCycle]);
 
 	if (!cards.length) {
 		return (
@@ -359,6 +390,7 @@ export function TimingPreview({
 				next.movementIds !== undefined
 					? next.movementIds
 					: previous.movementIds,
+			mandatoryFrame: next.mandatoryFrame ?? previous.mandatoryFrame,
 		}));
 	};
 
@@ -398,6 +430,35 @@ export function TimingPreview({
 		trackedCards.length === cards.length
 			? `All ${cards.length} cards`
 			: trackedCards.map((card) => card.name).join(", ");
+
+	const activeThisMonth =
+		settings.mandatoryFrame === "calendar"
+			? {
+					title: "Due before month-end",
+					subtitle: `${dateLabel(plan.startDate, true)} to ${dateLabel(remainingDerived.monthEnd, true)}`,
+					total: remainingObligations,
+					groups: mandatoryThisMonth,
+				}
+			: {
+					title: "Due before cycle end",
+					subtitle: `${dateLabel(plan.startDate, true)} to ${dateLabel(cycle.cycleEnd, true)}`,
+					total: sum(cycleThisGroups.map((group) => group.total)),
+					groups: cycleThisGroups,
+				};
+	const activeNextMonth =
+		settings.mandatoryFrame === "calendar"
+			? {
+					title: "Next month fixed",
+					subtitle: `${dateLabel(fixedDerived.start, true)} to ${dateLabel(fixedDerived.end, true)}${billsFiltered ? ` · ${trackedBillIds.length} of ${billCandidates.length} bills` : ""}`,
+					total: fixedObligations,
+					groups: mandatoryNextMonth,
+				}
+			: {
+					title: "Next cycle fixed",
+					subtitle: `${dateLabel(nextCycle.cycleStart, true)} to ${dateLabel(nextCycle.cycleEnd, true)}${billsFiltered ? ` · ${trackedBillIds.length} of ${billCandidates.length} bills` : ""}`,
+					total: sum(cycleNextGroups.map((group) => group.total)),
+					groups: cycleNextGroups,
+				};
 
 	return (
 		<section className="timing-preview" aria-label="Total card cycle">
@@ -479,18 +540,23 @@ export function TimingPreview({
 			{detail && (
 				<TimingDetailDialog
 					eyebrow={`${dateLabel(cycle.cycleStart, true)} to ${dateLabel(cycle.cycleEnd, true)} · ${accountLabel}`}
-					thisMonth={{
-						title: "Due before month-end",
-						subtitle: `${dateLabel(plan.startDate, true)} to ${dateLabel(remainingDerived.monthEnd, true)}`,
-						total: remainingObligations,
-						groups: mandatoryThisMonth,
+					today={plan.startDate.slice(0, 10)}
+					cashNow={{
+						checking,
+						bills: remainingObligations,
+						cushion,
 					}}
-					nextMonth={{
-						title: "Next month fixed",
-						subtitle: `${dateLabel(fixedDerived.start, true)} to ${dateLabel(fixedDerived.end, true)}${billsFiltered ? ` · ${trackedBillIds.length} of ${billCandidates.length} bills` : ""}`,
-						total: fixedObligations,
-						groups: mandatoryNextMonth,
+					paycheck={{
+						paycheck,
+						fixed: fixedObligations,
+						reserve: settings.reserve,
+						spent,
+						allowance,
 					}}
+					thisMonth={activeThisMonth}
+					nextMonth={activeNextMonth}
+					frame={settings.mandatoryFrame}
+					onFrameChange={(frame) => updateSettings({ mandatoryFrame: frame })}
 					billsFiltered={billsFiltered}
 					billCandidates={billCandidates}
 					trackedBillIds={trackedBillIds}

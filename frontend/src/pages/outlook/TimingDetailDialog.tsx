@@ -1,17 +1,224 @@
 import { useState } from "react";
+import { Calendar, type CalendarEvent } from "../../components/Calendar.tsx";
 import { Tabs } from "../../components/Tabs.tsx";
-import { Modal, Progress } from "../../components/ui.tsx";
+import { Modal } from "../../components/ui.tsx";
 import type { CycleSpendGroup } from "../../domain/cardCycle.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { MandatorySpendingGroup } from "../../domain/householdTiming.ts";
 
 export type TimingDetailTab = "mandatory" | "cycle" | "configure";
 
+export type MandatoryFrame = "calendar" | "cycle";
+
 export interface TimingMandatorySection {
 	title: string;
 	subtitle: string;
 	total: number;
 	groups: MandatorySpendingGroup[];
+}
+export interface CashNowDecomposition {
+	checking: number;
+	bills: number;
+	cushion: number;
+}
+
+export interface PaycheckDecomposition {
+	paycheck: number;
+	fixed: number;
+	reserve: number;
+	spent: number;
+	allowance: number;
+}
+
+interface BarSegment {
+	label: string;
+	amount: number;
+	className: string;
+}
+
+/** A stacked bar splitting one pool of money into labeled segments. */
+function AllocationBar({
+	caption,
+	segments,
+	ariaLabel,
+}: {
+	caption: string;
+	segments: BarSegment[];
+	ariaLabel: string;
+}) {
+	const committed = segments.reduce((sum, segment) => sum + segment.amount, 0);
+	return (
+		<div>
+			<p className="section-note">{caption}</p>
+			<div className="funds-bar" role="img" aria-label={ariaLabel}>
+				{segments.map((segment) =>
+					segment.amount > 0 ? (
+						<span
+							key={segment.label}
+							className={segment.className}
+							style={{
+								width: `${(segment.amount / Math.max(committed, 1)) * 100}%`,
+							}}
+						/>
+					) : null,
+				)}
+			</div>
+			<ul className="funds-legend">
+				{segments.map((segment) => (
+					<li key={segment.label}>
+						<span className={`funds-dot ${segment.className}`} />
+						{segment.label} · {money(segment.amount)}
+					</li>
+				))}
+			</ul>
+		</div>
+	);
+}
+
+/** Bucket one: what checking covers right now. */
+function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
+	return (
+		<AllocationBar
+			caption={
+				parts.cushion >= 0
+					? `${money(parts.checking)} checking · ${money(parts.cushion)} cushion left`
+					: `${money(parts.checking)} checking · short ${money(-parts.cushion)}`
+			}
+			segments={[
+				{ label: "Bills due", amount: parts.bills, className: "funds-bills" },
+				{
+					label: parts.cushion >= 0 ? "Cushion" : "Short",
+					amount: Math.max(0, parts.cushion),
+					className: parts.cushion >= 0 ? "funds-left" : "funds-over",
+				},
+			]}
+			ariaLabel={`Checking ${money(parts.checking)}: bills due ${money(parts.bills)}, cushion ${money(Math.max(0, parts.cushion))}`}
+		/>
+	);
+}
+
+/** Bucket two: where the next paycheck goes. */
+function PaycheckBar({ parts }: { parts: PaycheckDecomposition }) {
+	return (
+		<AllocationBar
+			caption={
+				parts.allowance >= 0
+					? `${money(parts.paycheck)} paycheck · ${money(parts.allowance)} left`
+					: `${money(parts.paycheck)} paycheck · over by ${money(-parts.allowance)}`
+			}
+			segments={[
+				{ label: "Bills", amount: parts.fixed, className: "funds-bills" },
+				{
+					label: "Reserve",
+					amount: parts.reserve,
+					className: "funds-reserve",
+				},
+				{ label: "Spent", amount: parts.spent, className: "funds-spent" },
+				{
+					label: parts.allowance >= 0 ? "Left" : "Over",
+					amount: Math.max(0, parts.allowance),
+					className: parts.allowance >= 0 ? "funds-left" : "funds-over",
+				},
+			]}
+			ariaLabel={`Paycheck ${money(parts.paycheck)}: bills ${money(parts.fixed)}, reserve ${money(parts.reserve)}, spent ${money(parts.spent)}, left ${money(Math.max(0, parts.allowance))}`}
+		/>
+	);
+}
+
+function daysUntil(date: string, today: string): number {
+	return Math.round(
+		(new Date(`${date}T12:00:00Z`).getTime() -
+			new Date(`${today}T12:00:00Z`).getTime()) /
+			86_400_000,
+	);
+}
+
+function dueLabel(date: string, today: string): string {
+	const days = daysUntil(date, today);
+	if (days <= 0) return dateLabel(date, true);
+	if (days === 1) return `${dateLabel(date, true)} · tomorrow`;
+	return `${dateLabel(date, true)} · in ${days} days`;
+}
+
+/** Month-grid view of the active mandatory sections. */
+function MandatoryCalendar({
+	today,
+	sections,
+}: {
+	today: string;
+	sections: TimingMandatorySection[];
+}) {
+	const events: CalendarEvent[] = sections.flatMap((section) =>
+		section.groups.flatMap((group) =>
+			group.dates.map((date) => ({
+				date,
+				label: group.name,
+				amount: group.total / Math.max(1, group.dates.length),
+			})),
+		),
+	);
+	if (!events.length) return null;
+	const end = events.reduce(
+		(latest, event) => (event.date > latest ? event.date : latest),
+		today,
+	);
+	const total = sections.reduce((sum, section) => sum + section.total, 0);
+	return (
+		<Calendar
+			start={today}
+			end={end}
+			events={events}
+			todayIso={today}
+			label={`Mandatory bills from ${dateLabel(today, true)} to ${dateLabel(end, true)}, totaling ${money(total)}`}
+		/>
+	);
+}
+
+function MandatorySectionView({
+	section,
+	today,
+}: {
+	section: TimingMandatorySection;
+	today: string;
+}) {
+	if (!section.groups.length) {
+		return (
+			<div className="cycle-breakdown">
+				<p>No mandatory spending projected for this period.</p>
+			</div>
+		);
+	}
+	const ordered = [...section.groups].sort(
+		(a, b) =>
+			(a.dates[0] ?? "").localeCompare(b.dates[0] ?? "") || b.total - a.total,
+	);
+	return (
+		<div>
+			<p className="section-note">
+				{section.subtitle} · <strong>{money(section.total)}</strong>
+			</p>
+			<ul className="mandatory-list">
+				{ordered.map((group) => {
+					const first = group.dates[0] ?? today;
+					const when =
+						group.dates.length === 1
+							? dueLabel(first, today)
+							: `${dueLabel(first, today)} · ${group.count} charges`;
+					return (
+						<li key={group.movementId}>
+							<div className="mandatory-row">
+								<span>
+									<strong>{group.name}</strong>
+									<small>{when}</small>
+								</span>
+								<strong>{money(group.total)}</strong>
+							</div>
+						</li>
+					);
+				})}
+			</ul>
+		</div>
+	);
 }
 
 export interface TimingCycleGroup extends CycleSpendGroup {
@@ -36,58 +243,13 @@ export interface TimingConfigHints {
 	trackedIds: string[];
 }
 
-function MandatorySectionView({
-	section,
-}: {
-	section: TimingMandatorySection;
-}) {
-	if (!section.groups.length) {
-		return (
-			<div className="cycle-breakdown">
-				<p>No mandatory spending projected for this period.</p>
-			</div>
-		);
-	}
-	return (
-		<div>
-			<p className="section-note">
-				{section.subtitle} · <strong>{money(section.total)}</strong>
-			</p>
-			<ul className="mandatory-list">
-				{section.groups.map((group) => {
-					const share =
-						section.total > 0 ? (group.total / section.total) * 100 : 0;
-					const when =
-						group.dates.length === 1
-							? dateLabel(group.dates[0]!, true)
-							: `${dateLabel(group.dates[0]!, true)} → ${dateLabel(group.dates[group.dates.length - 1]!, true)}`;
-					return (
-						<li key={group.movementId}>
-							<div className="mandatory-row">
-								<span>
-									<strong>{group.name}</strong>
-									<small>
-										{when} · {group.count}{" "}
-										{group.count === 1 ? "charge" : "charges"}
-									</small>
-								</span>
-								<strong>{money(group.total)}</strong>
-							</div>
-							<Progress
-								value={share}
-								label={`${group.name} share of ${section.title}`}
-								tone="green"
-							/>
-						</li>
-					);
-				})}
-			</ul>
-		</div>
-	);
-}
-
 export function TimingDetailDialog({
 	eyebrow,
+	today,
+	cashNow,
+	paycheck,
+	frame,
+	onFrameChange,
 	thisMonth,
 	nextMonth,
 	cycleGroups,
@@ -104,6 +266,11 @@ export function TimingDetailDialog({
 	onClose,
 }: {
 	eyebrow: string;
+	today: string;
+	cashNow: CashNowDecomposition;
+	paycheck: PaycheckDecomposition;
+	frame: MandatoryFrame;
+	onFrameChange: (frame: MandatoryFrame) => void;
 	thisMonth: TimingMandatorySection;
 	nextMonth: TimingMandatorySection;
 	cycleGroups: TimingCycleGroup[];
@@ -156,10 +323,29 @@ export function TimingDetailDialog({
 			>
 				{tab === "mandatory" ? (
 					<div className="timing-mandatory">
+						<h3>Cash now — checking covers existing bills</h3>
+						<CashNowBar parts={cashNow} />
+						<h3>Next paycheck — funds future card spending</h3>
+						<PaycheckBar parts={paycheck} />
+						<Tabs
+							items={[
+								{ id: "calendar", label: "Calendar month" },
+								{ id: "cycle", label: "Card cycle" },
+							]}
+							value={frame}
+							onChange={onFrameChange}
+							label="Mandatory spending window"
+						>
+							{null}
+						</Tabs>
+						<MandatoryCalendar
+							today={today}
+							sections={[thisMonth, nextMonth]}
+						/>
 						<h3>{thisMonth.title}</h3>
-						<MandatorySectionView section={thisMonth} />
+						<MandatorySectionView section={thisMonth} today={today} />
 						<h3>{nextMonth.title}</h3>
-						<MandatorySectionView section={nextMonth} />
+						<MandatorySectionView section={nextMonth} today={today} />
 						<p className="section-note">
 							{billsFiltered
 								? "Filtered to your selected bills — change the set in Configure."
