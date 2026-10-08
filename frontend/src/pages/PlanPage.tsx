@@ -15,7 +15,7 @@ import { MovementsPanel } from "./plan/MovementsPanel.tsx";
 export type PlanView = "accounts" | "transactions";
 type AccountsSection = "accounts" | "checks";
 
-type ScheduleFilter = "all" | "scheduled" | "once";
+type ScheduleFilter = "all" | "recurring";
 
 export function PlanPage({
 	plan,
@@ -178,17 +178,31 @@ function TransactionsView({
 	const [query, setQuery] = useState("");
 	const [schedule, setSchedule] = useState<ScheduleFilter>("all");
 	const { requestRemoval, dialog } = usePlanRemoval({ plan, onUpdate });
+	const recurringCount = plan.movements.filter(
+		(movement) => movement.frequency !== "once",
+	).length;
+	const tabs: TabItem<ScheduleFilter>[] = [
+		{ id: "all", label: "All transactions", count: plan.movements.length },
+		{ id: "recurring", label: "Recurring", count: recurringCount },
+	];
 	const movements = plan.movements.filter(
 		(movement) =>
 			movement.name.toLowerCase().includes(query.toLowerCase()) &&
-			(schedule === "all" ||
-				(schedule === "scheduled"
-					? movement.frequency !== "once"
-					: movement.frequency === "once")),
+			(schedule === "all" || movement.frequency !== "once"),
 	);
 	return (
 		<>
-			<section className="panel plan-panel" aria-label="Transactions">
+			<Tabs
+				items={tabs}
+				value={schedule}
+				onChange={(next) => {
+					setSchedule(next);
+					setQuery("");
+				}}
+				label="Transactions sections"
+				panelAs="section"
+				panelClassName="panel plan-panel"
+			>
 				<div className="plan-toolbar">
 					<label className="search-field">
 						<Search size={17} />
@@ -198,20 +212,6 @@ function TransactionsView({
 							onChange={(event) => setQuery(event.target.value)}
 							placeholder="Find a transaction…"
 						/>
-					</label>
-					<label className="plan-schedule-filter">
-						<span className="sr-only">Transaction schedule</span>
-						<select
-							aria-label="Transaction schedule"
-							value={schedule}
-							onChange={(event) =>
-								setSchedule(event.target.value as ScheduleFilter)
-							}
-						>
-							<option value="all">All schedules</option>
-							<option value="scheduled">Scheduled (recurring)</option>
-							<option value="once">One-time</option>
-						</select>
 					</label>
 					<button
 						type="button"
@@ -236,7 +236,7 @@ function TransactionsView({
 					}
 					onToggle={(id) => onUpdate(toggleMovement({ plan, id }))}
 				/>
-			</section>
+			</Tabs>
 			{dialog}
 		</>
 	);
