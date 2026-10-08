@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Transactions } from "../../components/activity/Transactions.tsx";
+import { useId, useMemo, useState } from "react";
+import { TransactionRow } from "../../components/activity/TransactionRow.tsx";
 import { Tabs } from "../../components/Tabs.tsx";
 import { Badge, Modal } from "../../components/ui.tsx";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
@@ -238,7 +238,6 @@ export function TimingDetailDialog({
 	plan,
 	onEdit,
 	cycleTransactions,
-	cycleEnd,
 	config,
 	billsFiltered,
 	billCandidates,
@@ -262,7 +261,6 @@ export function TimingDetailDialog({
 	plan: Plan;
 	onEdit: (target: EditorTarget) => void;
 	cycleTransactions: AccountTransaction[];
-	cycleEnd: string;
 	config: TimingConfigHints;
 	billsFiltered: boolean;
 	billCandidates: {
@@ -292,6 +290,12 @@ export function TimingDetailDialog({
 	onClose: () => void;
 }) {
 	const [tab, setTab] = useState<TimingDetailTab>(initialTab);
+	const [expanded, setExpanded] = useState<string | null>(null);
+	const detailId = useId();
+	const movements = useMemo(
+		() => new Map(plan.movements.map((movement) => [movement.id, movement])),
+		[plan.movements],
+	);
 	return (
 		<Modal
 			title="Timing detail"
@@ -400,12 +404,45 @@ export function TimingDetailDialog({
 						</p>
 					</div>
 				) : tab === "cycle" ? (
-					<Transactions
-						transactions={cycleTransactions}
-						plan={plan}
-						horizon={cycleEnd}
-						onEdit={onEdit}
-					/>
+					cycleTransactions.length ? (
+						<div className="table-scroll">
+							<table className="account-activity-table">
+								<caption className="sr-only">
+									Card charges in this cycle, newest last
+								</caption>
+								<thead>
+									<tr>
+										<th scope="col" className="transaction-date-column">
+											Date
+										</th>
+										<th scope="col">Transaction</th>
+										<th scope="col" className="transaction-amount-column">
+											Amount
+										</th>
+									</tr>
+								</thead>
+								<tbody>
+									{cycleTransactions.map((transaction, index) => (
+										<TransactionRow
+											key={transaction.id}
+											transaction={transaction}
+											movement={movements.get(transaction.movementId) ?? null}
+											open={expanded === transaction.id}
+											detailId={`${detailId}-row-${index}`}
+											onToggle={() =>
+												setExpanded(
+													expanded === transaction.id ? null : transaction.id,
+												)
+											}
+											onEdit={(item) => onEdit({ kind: "movement", item })}
+										/>
+									))}
+								</tbody>
+							</table>
+						</div>
+					) : (
+						<p>No charges in this cycle yet.</p>
+					)
 				) : (
 					<div className="cycle-config">
 						<label className="field">

@@ -48,7 +48,7 @@ export function TransactionRow({
 					<button
 						type="button"
 						className="transaction-row-button"
-						aria-label={`Inspect ${transaction.name} on ${dateLabel(transaction.date, true)}; ${transaction.source}; ${transaction.direction === "in" ? "money in from" : "money out to"} ${transaction.counterparty}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.excluded ? "; excluded from plan" : ""}`}
+						aria-label={`Inspect ${transaction.name} on ${dateLabel(transaction.date, true)}; ${transaction.direction === "in" ? "money in from" : "money out to"} ${transaction.counterparty}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.excluded ? "; excluded from plan" : ""}`}
 						aria-expanded={open}
 						aria-controls={open ? detailId : undefined}
 						onClick={onToggle}
@@ -70,26 +70,19 @@ export function TransactionRow({
 							>
 								{dateLabel(transaction.date, true)}
 							</time>
-							<span className="transaction-badges">
-								<Badge
-									tone={
-										transaction.source === "historical" ? "green" : "outline"
-									}
-								>
-									{transaction.source === "historical"
-										? "Historical"
-										: "Projected"}
-								</Badge>
-								{transaction.excluded && (
-									<Badge tone="amber">Excluded from plan</Badge>
-								)}
-								{transaction.shortfall > 0.01 && (
-									<Badge tone="amber">
-										<TriangleAlert size={10} />
-										Shortfall
-									</Badge>
-								)}
-							</span>
+							{(transaction.excluded || transaction.shortfall > 0.01) && (
+								<span className="transaction-badges">
+									{transaction.excluded && (
+										<Badge tone="amber">Excluded from plan</Badge>
+									)}
+									{transaction.shortfall > 0.01 && (
+										<Badge tone="amber">
+											<TriangleAlert size={10} />
+											Shortfall
+										</Badge>
+									)}
+								</span>
+							)}
 						</span>
 						<ChevronDown
 							size={14}

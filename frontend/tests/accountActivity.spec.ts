@@ -40,7 +40,8 @@ test("clicking an account opens its recorded history and projected transactions"
 	await expect(dialog.getByRole("status")).toHaveText(
 		"Showing 1–3 of 3 transactions",
 	);
-	await expect(dialog.getByText("Projected", { exact: true })).toHaveCount(0);
+	// Rows carry no provenance badges; shortfalls and exclusions still do.
+	await expect(dialog.locator("tbody .badge")).toHaveCount(0);
 	// Historical activity is listed oldest first by default, and the control
 	// toggles rather than sets.
 	await expect(dialog.locator("tbody tr").first()).toContainText(
@@ -60,11 +61,9 @@ test("clicking an account opens its recorded history and projected transactions"
 	await dialog
 		.getByRole("button", { name: "Inspect Household payroll on Jan 15, 2026" })
 		.click();
-	await expect(dialog.locator(".transaction-details")).toContainText(
-		"Historical amount",
-	);
+	await expect(dialog.locator(".transaction-details")).toContainText("Amount");
 	await expect(
-		dialog.getByRole("button", { name: "Edit recorded transaction" }),
+		dialog.getByRole("button", { name: "Edit transaction" }),
 	).toBeVisible();
 	await page.keyboard.press("Escape");
 	await expect(
@@ -130,9 +129,7 @@ test("a shortfall can be inspected and edited while preserving account context a
 		"Protected account balance",
 	);
 	await expect(dialog.locator(".transaction-details")).toContainText("$9,000");
-	await dialog
-		.getByRole("button", { name: "Edit planned transaction" })
-		.click();
+	await dialog.getByRole("button", { name: "Edit transaction" }).click();
 	await expect(
 		page.getByRole("dialog", { name: "Edit planned transaction" }),
 	).toBeVisible();
