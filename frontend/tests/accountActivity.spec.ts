@@ -188,6 +188,14 @@ test("filters reset pagination and keep projected transfers distinct from record
 	await expect(dialog.getByText("−$400.00", { exact: true })).toBeVisible();
 });
 
+test("clicking outside the account panel closes it", async ({ page }) => {
+	const dialog = await openChecking(page);
+	await expect(dialog).toBeVisible();
+	// The drawer occupies the right side, so the far left is backdrop film.
+	await page.mouse.click(10, 300);
+	await expect(dialog).not.toBeVisible();
+});
+
 test("growth-only accounts have an honest empty state and retain account details", async ({
 	page,
 }) => {
