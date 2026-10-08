@@ -11,6 +11,7 @@ import {
 	useEffect,
 	useId,
 	useRef,
+	useState,
 } from "react";
 
 export function IconButton({
@@ -65,6 +66,8 @@ export function Modal({
 	className?: string;
 }) {
 	const ref = useRef<HTMLDialogElement>(null);
+	const [closing, setClosing] = useState(false);
+	const closeRequested = useRef(false);
 	const id = useId();
 	useEffect(() => {
 		const dialog = ref.current;
@@ -76,14 +79,30 @@ export function Modal({
 				previous.focus();
 		};
 	}, []);
+	const requestClose = () => {
+		if (closeRequested.current) return;
+		closeRequested.current = true;
+		setClosing(true);
+	};
 	return (
 		<dialog
 			ref={ref}
-			className={`modal ${wide ? "modal-wide" : ""} ${className}`}
+			className={`modal ${wide ? "modal-wide" : ""} ${className} ${closing ? "is-closing" : ""}`}
 			aria-labelledby={id}
 			onCancel={(event) => {
 				event.preventDefault();
-				onClose();
+				requestClose();
+			}}
+			onClick={(event) => {
+				if (event.target === event.currentTarget) requestClose();
+			}}
+			onAnimationEnd={(event) => {
+				if (
+					closing &&
+					(event.animationName === "dialog-out" ||
+						event.animationName === "drawer-out")
+				)
+					onClose();
 			}}
 		>
 			<div className="modal-header">
@@ -91,7 +110,7 @@ export function Modal({
 					{eyebrow && <p className="eyebrow">{eyebrow}</p>}
 					<h2 id={id}>{title}</h2>
 				</div>
-				<IconButton icon={X} label="Close dialog" onClick={onClose} />
+				<IconButton icon={X} label="Close dialog" onClick={requestClose} />
 			</div>
 			<div className="modal-body">{children}</div>
 		</dialog>
