@@ -1,5 +1,9 @@
 import { useId, useMemo, useState } from "react";
 import { TransactionRow } from "../../components/activity/TransactionRow.tsx";
+import {
+	type BarSegment,
+	SegmentedBar,
+} from "../../components/SegmentedBar.tsx";
 import { Tabs } from "../../components/Tabs.tsx";
 import { Badge, Modal } from "../../components/ui.tsx";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
@@ -32,68 +36,30 @@ export interface PaycheckDecomposition {
 	allowance: number;
 }
 
-interface BarSegment {
-	label: string;
-	amount: number;
-	className: string;
-}
-
-/** A stacked bar splitting one pool of money into labeled segments. */
-function AllocationBar({
-	caption,
-	segments,
-	ariaLabel,
-}: {
-	caption: string;
-	segments: BarSegment[];
-	ariaLabel: string;
-}) {
-	const committed = segments.reduce((sum, segment) => sum + segment.amount, 0);
-	return (
-		<div>
-			<p className="section-note">{caption}</p>
-			<div className="funds-bar" role="img" aria-label={ariaLabel}>
-				{segments.map((segment) =>
-					segment.amount > 0 ? (
-						<span
-							key={segment.label}
-							className={segment.className}
-							style={{
-								width: `${(segment.amount / Math.max(committed, 1)) * 100}%`,
-							}}
-						/>
-					) : null,
-				)}
-			</div>
-			<ul className="funds-legend">
-				{segments.map((segment) => (
-					<li key={segment.label}>
-						<span className={`funds-dot ${segment.className}`} />
-						{segment.label} · {money(segment.amount)}
-					</li>
-				))}
-			</ul>
-		</div>
-	);
-}
-
 /** Bucket one: what checking covers right now. */
 function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
+	const segments: BarSegment[] = [
+		{
+			label: "Bills due",
+			amount: parts.bills,
+			pattern: "stripes",
+			tone: "sage",
+		},
+		{
+			label: parts.cushion >= 0 ? "Cushion" : "Short",
+			amount: Math.max(0, parts.cushion),
+			pattern: parts.cushion >= 0 ? "solid" : "hatch",
+			tone: parts.cushion >= 0 ? "sage" : "amber",
+		},
+	];
 	return (
-		<AllocationBar
+		<SegmentedBar
 			caption={
 				parts.cushion >= 0
 					? `${money(parts.checking)} checking · ${money(parts.cushion)} cushion left`
 					: `${money(parts.checking)} checking · short ${money(-parts.cushion)}`
 			}
-			segments={[
-				{ label: "Bills due", amount: parts.bills, className: "funds-bills" },
-				{
-					label: parts.cushion >= 0 ? "Cushion" : "Short",
-					amount: Math.max(0, parts.cushion),
-					className: parts.cushion >= 0 ? "funds-left" : "funds-over",
-				},
-			]}
+			segments={segments}
 			ariaLabel={`Checking ${money(parts.checking)}: bills due ${money(parts.bills)}, cushion ${money(Math.max(0, parts.cushion))}`}
 		/>
 	);
@@ -101,27 +67,30 @@ function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 
 /** Bucket two: where the next paycheck goes. */
 function PaycheckBar({ parts }: { parts: PaycheckDecomposition }) {
+	const segments: BarSegment[] = [
+		{ label: "Bills", amount: parts.fixed, pattern: "stripes", tone: "sage" },
+		{
+			label: "Reserve",
+			amount: parts.reserve,
+			pattern: "dots",
+			tone: "pale",
+		},
+		{ label: "Spent", amount: parts.spent, pattern: "solid", tone: "dark" },
+		{
+			label: parts.allowance >= 0 ? "Left" : "Over",
+			amount: Math.max(0, parts.allowance),
+			pattern: parts.allowance >= 0 ? "solid" : "hatch",
+			tone: parts.allowance >= 0 ? "pale" : "amber",
+		},
+	];
 	return (
-		<AllocationBar
+		<SegmentedBar
 			caption={
 				parts.allowance >= 0
 					? `${money(parts.paycheck)} paycheck · ${money(parts.allowance)} left`
 					: `${money(parts.paycheck)} paycheck · over by ${money(-parts.allowance)}`
 			}
-			segments={[
-				{ label: "Bills", amount: parts.fixed, className: "funds-bills" },
-				{
-					label: "Reserve",
-					amount: parts.reserve,
-					className: "funds-reserve",
-				},
-				{ label: "Spent", amount: parts.spent, className: "funds-spent" },
-				{
-					label: parts.allowance >= 0 ? "Left" : "Over",
-					amount: Math.max(0, parts.allowance),
-					className: parts.allowance >= 0 ? "funds-left" : "funds-over",
-				},
-			]}
+			segments={segments}
 			ariaLabel={`Paycheck ${money(parts.paycheck)}: bills ${money(parts.fixed)}, reserve ${money(parts.reserve)}, spent ${money(parts.spent)}, left ${money(Math.max(0, parts.allowance))}`}
 		/>
 	);
@@ -364,12 +333,13 @@ export function TimingDetailDialog({
 								<strong>{money(Math.max(0, heroes.dailyTheoretical))}</strong>
 							</div>
 						</div>
-						<AllocationBar
+						<SegmentedBar
 							caption={`Committed ${money(heroes.committedTotal)} — payments toward prior balances excluded`}
 							segments={heroes.committedByCard.map((card, index) => ({
 								label: `${card.name} · ${money(card.amount)}`,
 								amount: card.amount,
-								className: index % 2 === 0 ? "funds-card-a" : "funds-card-b",
+								pattern: index % 2 === 0 ? "solid" : "stripes",
+								tone: index % 2 === 0 ? "dark" : "sage",
 							}))}
 							ariaLabel={`Committed cycle spend ${money(heroes.committedTotal)}: ${heroes.committedByCard.map((card) => `${card.name} ${money(card.amount)}`).join(", ")}`}
 						/>
