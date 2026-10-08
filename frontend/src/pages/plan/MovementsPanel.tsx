@@ -6,23 +6,18 @@ import {
 	Trash2,
 } from "lucide-react";
 import { Badge, EmptyState, IconButton } from "../../components/ui.tsx";
+import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, money } from "../../domain/format.ts";
-import {
-	type Account,
-	isHistoricalMovement,
-	type Movement,
-} from "../../domain/model.ts";
+import type { Account, Movement } from "../../domain/model.ts";
 
 export function MovementsPanel({
 	movements,
 	accounts,
-	startDate,
 	onEdit,
 	onRemove,
 }: {
 	movements: Movement[];
 	accounts: Account[];
-	startDate: string;
 	onEdit: (movement: Movement) => void;
 	onRemove: (movement: Movement) => void;
 }) {
@@ -58,27 +53,21 @@ export function MovementsPanel({
 									? "Monthly"
 									: "Yearly"}{" "}
 							·{" "}
-							{movement.fromId ? names.get(movement.fromId) : "External income"}
-							{movement.toId && <> → {names.get(movement.toId)}</>}
+							{movement.fromId
+								? names.get(movement.fromId)
+								: externalCounterpartyName("in")}
+							{movement.toId ? (
+								<> → {names.get(movement.toId)}</>
+							) : (
+								movement.fromId && <> → {externalCounterpartyName("out")}</>
+							)}
 						</span>
 					</div>
 					<div className="movement-amount">
 						<strong>
 							{movement.amountKnown ? money(movement.amount) : "Unavailable"}
 						</strong>
-						<Badge
-							tone={
-								!movement.amountKnown || !movement.enabled ? "amber" : "neutral"
-							}
-						>
-							{!movement.amountKnown
-								? "Provisional amount"
-								: movement.enabled
-									? isHistoricalMovement(movement, startDate)
-										? "Historical"
-										: "Projected"
-									: "Excluded"}
-						</Badge>
+						{!movement.enabled && <Badge tone="amber">Excluded</Badge>}
 					</div>
 					<div className="table-actions">
 						<IconButton

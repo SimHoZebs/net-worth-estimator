@@ -1056,6 +1056,27 @@
 	.timing-preview .section-top h2 {
 		font-size: 13px;
 	}
+	.spend-answer {
+		display: flex;
+		flex-direction: column;
+		padding: 26px 0 20px;
+	}
+	.spend-answer span {
+		color: #818975;
+		font-size: 10px;
+	}
+	.spend-answer span + strong {
+		margin-top: 6px;
+	}
+	.spend-answer strong {
+		font-size: 38px;
+		font-weight: 550;
+		letter-spacing: -1.5px;
+		line-height: 1.1;
+	}
+	.spend-answer strong + span {
+		margin-top: 6px;
+	}
 	.evaluation-preview-content {
 		display: flex;
 		align-items: center;

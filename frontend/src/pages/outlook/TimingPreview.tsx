@@ -528,29 +528,28 @@ export function TimingPreview({
 				· {fullDaysLeft} {fullDaysLeft === 1 ? "day" : "days"} left
 				{accountLabel ? ` · ${accountLabel}` : ""}
 			</p>
-			<div className="timing-figures">
+			<div className="spend-answer">
+				<span>
+					{allowance >= 0
+						? `You can spend until ${dateLabel(cycle.cycleEnd, true)}`
+						: `Over budget until ${dateLabel(cycle.cycleEnd, true)}`}
+				</span>
+				<strong>{money(Math.abs(allowance))}</strong>
+				<span>
+					{money(Math.max(0, dailySafe))} a day · {money(spent)} committed
+				</span>
+			</div>
+			<div className="cycle-remaining">
 				<div>
 					<span>
 						Cash cushion{" "}
-						{heroes.cushionProvisional && (
-							<Badge tone="amber">Provisional</Badge>
-						)}
+						{heroes.cushionProvisional && <Badge tone="amber">Provisional</Badge>}
 					</span>
 					<strong>{money(cushion)}</strong>
 				</div>
 				<div>
-					<span>Safe room</span>
-					<strong>{money(allowance)}</strong>
-				</div>
-			</div>
-			<div className="cycle-remaining">
-				<div>
-					<span>Daily safe</span>
-					<strong>{money(Math.max(0, dailySafe))}</strong>
-				</div>
-				<div>
-					<span>Committed</span>
-					<strong>{money(spent)}</strong>
+					<span>Checking snapshot</span>
+					<strong>{money(checking)}</strong>
 				</div>
 			</div>
 			<div className="cycle-progress">
