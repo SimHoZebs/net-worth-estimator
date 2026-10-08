@@ -1,8 +1,10 @@
 /* Global manifest: layer order first, then one @import per semantic partial.
    Component partials live next to their owners and import themselves; this file
-   owns only app-wide foundations. Keep the @layer declaration on line 1 so
-   cascade order never depends on bundler module order. */
-@layer reset, base, layout, components, responsive, accessibility;
+   owns only app-wide foundations. The @layer declaration stays on line 1 so the
+   foundation order never depends on bundler module order. Responsive and
+   accessibility overrides are intentionally unlayered: they must win over every
+   layer no matter which stylesheet the bundler injects first. */
+@layer reset, base, layout, components;
 @import "./reset.css";
 @import "./tokens.css";
 @import "./typography.css";

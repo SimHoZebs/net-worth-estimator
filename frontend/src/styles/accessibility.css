@@ -1,206 +1,206 @@
-/* Global contrast / touch-target remediation. Imported by the styles/index.css manifest. */
-@layer accessibility {
-	.mobile-only {
-		display: none;
-	}
-	:root {
-		--muted: #626e5e;
-		--subtle: #66715e;
-	}
-	.eyebrow,
-	.nav-label,
-	.nav-link,
-	.metric-heading,
-	.metric-context,
-	.segmented button,
-	.chart-legend,
-	.chart-foot-note,
-	.chart-inspection span,
-	.range-disclaimer,
-	.evaluation-preview-content p,
-	.progress-label,
-	.timing-figures span,
-	.timing-replenishment span > span,
-	.account-summary,
-	.account-label > span,
-	.page-footer,
-	.page-footer button,
-	.page-tabs > button,
-	.table-name small,
-	.movement-name > span,
-	.section-note,
-	.assumption-metrics > div > span,
-	.comparison-grid > span,
-	.comparison-head > div > span:last-child,
-	.change-item > summary > span:last-child,
-	.change-details dt,
-	.detail-list dt,
-	.portability-action small,
-	.form-intro,
-	.field small,
-	.field-hint,
-	.draft-bar small,
-	.draft-discard,
-	.field,
-	.failure-comparison > div > span {
-		color: #626f57;
-	}
-	.badge-neutral,
-	.badge-outline {
-		color: #5c6a4d;
-	}
-	.badge-green,
-	.inline-success,
-	.positive {
-		color: #4f7039;
-	}
-	.growth-pill {
-		color: #43632f;
-	}
-	thead {
-		color: #626f57;
-	}
-	.evidence-records summary {
-		color: #596e46;
-	}
-	.badge-amber,
-	.negative {
-		color: #785923;
-	}
-	.insight-card .eyebrow,
-	.insight-card > p,
-	.funding-values span,
-	.insight-caption,
-	.evidence-date {
-		color: #756039;
-	}
-	.inline-notice {
-		color: #566844;
-	}
-	.inline-notice.amber {
-		color: #785d30;
-	}
-	.axis-label {
-		fill: #657058;
-	}
-	.search-field input::placeholder,
-	.field input::placeholder {
-		color: #717a67;
-	}
-	.nav-link {
-		font-size: 13px;
-	}
-	.help-link {
-		font-size: 11px;
-	}
+/* Global contrast / touch-target remediation. Imported by the styles/index.css
+   manifest. Intentionally unlayered (see responsive.css): remediation must win
+   regardless of bundler stylesheet order. */
+.mobile-only {
+	display: none;
+}
+:root {
+	--muted: #626e5e;
+	--subtle: #66715e;
+}
+.eyebrow,
+.nav-label,
+.nav-link,
+.metric-heading,
+.metric-context,
+.segmented button,
+.chart-legend,
+.chart-foot-note,
+.chart-inspection span,
+.range-disclaimer,
+.evaluation-preview-content p,
+.progress-label,
+.timing-figures span,
+.timing-replenishment span > span,
+.account-summary,
+.account-label > span,
+.page-footer,
+.page-footer button,
+.page-tabs > button,
+.table-name small,
+.movement-name > span,
+.section-note,
+.assumption-metrics > div > span,
+.comparison-grid > span,
+.comparison-head > div > span:last-child,
+.change-item > summary > span:last-child,
+.change-details dt,
+.detail-list dt,
+.portability-action small,
+.form-intro,
+.field small,
+.field-hint,
+.draft-bar small,
+.draft-discard,
+.field,
+.failure-comparison > div > span {
+	color: #626f57;
+}
+.badge-neutral,
+.badge-outline {
+	color: #5c6a4d;
+}
+.badge-green,
+.inline-success,
+.positive {
+	color: #4f7039;
+}
+.growth-pill {
+	color: #43632f;
+}
+thead {
+	color: #626f57;
+}
+.evidence-records summary {
+	color: #596e46;
+}
+.badge-amber,
+.negative {
+	color: #785923;
+}
+.insight-card .eyebrow,
+.insight-card > p,
+.funding-values span,
+.insight-caption,
+.evidence-date {
+	color: #756039;
+}
+.inline-notice {
+	color: #566844;
+}
+.inline-notice.amber {
+	color: #785d30;
+}
+.axis-label {
+	fill: #657058;
+}
+.search-field input::placeholder,
+.field input::placeholder {
+	color: #717a67;
+}
+.nav-link {
+	font-size: 13px;
+}
+.help-link {
+	font-size: 11px;
+}
+.metric-heading {
+	font-size: 12px;
+}
+.metric-context {
+	font-size: 10px;
+}
+.metric-range p {
+	font-size: 11px;
+}
+.metric-range .text-button {
+	font-size: 10px;
+}
+.chart-legend,
+.toggle-label,
+.chart-foot .text-button,
+.segmented button {
+	font-size: 10px;
+}
+.section-top p,
+.chart-foot-note,
+.range-disclaimer {
+	font-size: 10px;
+}
+.insight-card > p,
+.evaluation-preview-content p,
+.timing-figures span {
+	font-size: 11px;
+}
+.insight-card .eyebrow,
+.funding-values span,
+.insight-caption {
+	font-size: 10px;
+}
+.progress-label,
+.evaluation-preview-content .muted,
+.evaluation-evidence-link {
+	font-size: 10px;
+}
+.account-label strong {
+	font-size: 11px;
+}
+.account-label > span,
+.account-balance .badge {
+	font-size: 9px;
+}
+.account-summary {
+	font-size: 10px;
+}
+.local-card p,
+.sidebar-status {
+	font-size: 10px;
+}
+.timing-replenishment strong {
+	font-size: 11px;
+}
+.timing-replenishment span > span {
+	font-size: 10px;
+}
+.field input,
+.field select {
+	font-size: 16px;
+}
+@media (max-width: 600px) {
 	.metric-heading {
-		font-size: 12px;
-	}
-	.metric-context {
 		font-size: 10px;
 	}
-	.metric-range p {
-		font-size: 11px;
+	.metric-context {
+		font-size: 9px;
 	}
-	.metric-range .text-button {
+	.metric-range > p {
+		font-size: 10px;
+	}
+	.metric-range > .text-button {
 		font-size: 10px;
 	}
 	.chart-legend,
 	.toggle-label,
-	.chart-foot .text-button,
-	.segmented button {
-		font-size: 10px;
-	}
-	.section-top p,
-	.chart-foot-note,
-	.range-disclaimer {
-		font-size: 10px;
-	}
-	.insight-card > p,
-	.evaluation-preview-content p,
-	.timing-figures span {
-		font-size: 11px;
-	}
-	.insight-card .eyebrow,
-	.funding-values span,
-	.insight-caption {
-		font-size: 10px;
-	}
-	.progress-label,
-	.evaluation-preview-content .muted,
-	.evaluation-evidence-link {
-		font-size: 10px;
-	}
-	.account-label strong {
-		font-size: 11px;
-	}
-	.account-label > span,
-	.account-balance .badge {
+	.chart-top .segmented button {
 		font-size: 9px;
 	}
-	.account-summary {
+	.range-disclaimer {
+		font-size: 9px;
+	}
+	.insight-card .eyebrow {
+		font-size: 8px;
+	}
+	.insight-card > p {
 		font-size: 10px;
 	}
-	.local-card p,
-	.sidebar-status {
-		font-size: 10px;
+	.insight-caption {
+		font-size: 9px;
 	}
-	.timing-replenishment strong {
-		font-size: 11px;
+	.funding-values span {
+		font-size: 9px;
 	}
-	.timing-replenishment span > span {
-		font-size: 10px;
+	.button {
+		min-height: 42px;
+	}
+	.icon-button {
+		min-width: 34px;
+		min-height: 34px;
+	}
+	.toggle-label {
+		min-height: 28px;
 	}
 	.field input,
 	.field select {
-		font-size: 16px;
-	}
-	@media (max-width: 600px) {
-		.metric-heading {
-			font-size: 10px;
-		}
-		.metric-context {
-			font-size: 9px;
-		}
-		.metric-range > p {
-			font-size: 10px;
-		}
-		.metric-range > .text-button {
-			font-size: 10px;
-		}
-		.chart-legend,
-		.toggle-label,
-		.chart-top .segmented button {
-			font-size: 9px;
-		}
-		.range-disclaimer {
-			font-size: 9px;
-		}
-		.insight-card .eyebrow {
-			font-size: 8px;
-		}
-		.insight-card > p {
-			font-size: 10px;
-		}
-		.insight-caption {
-			font-size: 9px;
-		}
-		.funding-values span {
-			font-size: 9px;
-		}
-		.button {
-			min-height: 42px;
-		}
-		.icon-button {
-			min-width: 34px;
-			min-height: 34px;
-		}
-		.toggle-label {
-			min-height: 28px;
-		}
-		.field input,
-		.field select {
-			min-height: 44px;
-		}
+		min-height: 44px;
 	}
 }
