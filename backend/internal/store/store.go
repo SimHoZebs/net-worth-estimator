@@ -48,7 +48,7 @@ type sqliteStore struct {
 	db *sql.DB
 }
 
-const latestSchemaVersion = 5
+const latestSchemaVersion = 6
 
 // Open opens (creating if needed) the SQLite database and applies
 // migrations. It returns the Store interface so callers never name the
@@ -128,6 +128,15 @@ func (s *sqliteStore) migrate() error {
 		}
 		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (5)`); err != nil {
 			return fmt.Errorf("record schema version 5: %w", err)
+		}
+		version = 5
+	}
+	if version < 6 {
+		if err := migrateV6(tx); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (6)`); err != nil {
+			return fmt.Errorf("record schema version 6: %w", err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -322,6 +331,28 @@ func migrateV5(tx *sql.Tx) error {
 	for _, statement := range statements {
 		if _, err := tx.Exec(statement); err != nil {
 			return fmt.Errorf("migrate schema version 5: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateV6 adds the payment-terms table. Terms are owner config keyed by
+// account, so no backfill runs: existing databases open with no terms rows,
+// exactly like a model with no evaluations.
+func migrateV6(tx *sql.Tx) error {
+	statements := []string{
+		`CREATE TABLE payment_terms (
+			account_id TEXT PRIMARY KEY,
+			position INTEGER NOT NULL,
+			minimum_fixed REAL NOT NULL,
+			minimum_percent REAL,
+			due_day INTEGER NOT NULL,
+			statement_day INTEGER
+		)`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("migrate schema version 6: %w", err)
 		}
 	}
 	return nil

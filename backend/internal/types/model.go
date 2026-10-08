@@ -206,11 +206,27 @@ type Posting struct {
 }
 
 type FinancialModelDocument struct {
-	SourcePath  string           `json:"sourcePath"`
-	Accounts    []Account        `json:"accounts"`
-	Checkpoints []Checkpoint     `json:"checkpoints"`
-	Evaluations EvaluationTables `json:"evaluations"`
-	Postings    []Posting        `json:"postings"`
+	SourcePath   string           `json:"sourcePath"`
+	Accounts     []Account        `json:"accounts"`
+	Checkpoints  []Checkpoint     `json:"checkpoints"`
+	Evaluations  EvaluationTables `json:"evaluations"`
+	Postings     []Posting        `json:"postings"`
+	PaymentTerms []PaymentTerms   `json:"paymentTerms"`
+}
+
+// PaymentTerms is mechanism config linked to one debt account. Accounts
+// stay values only (balances, bounds, kind); terms carry the payment
+// schedule: minimums, monthly due anchor, and the revolving statement anchor
+// for cards. Terms never move money themselves; postings remain the only
+// movement mechanism. The effective minimum combines MinimumFixed with
+// MinimumPercent of the balance magnitude when set; the balance basis is
+// resolved where terms are applied.
+type PaymentTerms struct {
+	AccountID      string   `json:"accountId"`
+	MinimumFixed   float64  `json:"minimumFixed"`
+	MinimumPercent *float64 `json:"minimumPercent,omitempty"`
+	DueDay         int      `json:"dueDay"`
+	StatementDay   *int     `json:"statementDay,omitempty"`
 }
 
 type ModelOverrides struct {

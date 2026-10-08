@@ -135,6 +135,54 @@ func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore
 	}
 }
 
+func TestStoreRoundTripsPaymentTerms(t *testing.T) {
+	store := openTestStore(t)
+	percent := 0.02
+	statementDay := 15
+	document := &types.FinancialModelDocument{
+		SourcePath: "terms-source",
+		Accounts: []types.Account{
+			{ID: "prime_card", Name: "Prime Card", Enabled: true},
+			{ID: "checking", Name: "Checking", Enabled: true},
+		},
+		Checkpoints: []types.Checkpoint{},
+		Evaluations: types.EmptyEvaluationTables(),
+		Postings:    []types.Posting{},
+		PaymentTerms: []types.PaymentTerms{
+			{AccountID: "prime_card", MinimumFixed: 25, MinimumPercent: &percent, DueDay: 10, StatementDay: &statementDay},
+			{AccountID: "checking", MinimumFixed: 0, DueDay: 1},
+		},
+	}
+	if err := store.SaveDocument(document); err != nil {
+		t.Fatalf("save document: %v", err)
+	}
+	loaded, err := store.LoadDocument()
+	if err != nil {
+		t.Fatalf("load document: %v", err)
+	}
+	if !reflect.DeepEqual(loaded.PaymentTerms, document.PaymentTerms) {
+		t.Fatalf("payment terms changed: got %+v, want %+v", loaded.PaymentTerms, document.PaymentTerms)
+	}
+
+	empty := &types.FinancialModelDocument{
+		SourcePath:  "empty-source",
+		Accounts:    []types.Account{},
+		Checkpoints: []types.Checkpoint{},
+		Evaluations: types.EmptyEvaluationTables(),
+		Postings:    []types.Posting{},
+	}
+	if err := store.SaveDocument(empty); err != nil {
+		t.Fatalf("save empty document: %v", err)
+	}
+	loaded, err = store.LoadDocument()
+	if err != nil {
+		t.Fatalf("load empty document: %v", err)
+	}
+	if loaded.PaymentTerms == nil {
+		t.Fatalf("payment terms were not normalized: %+v", loaded)
+	}
+}
+
 func TestStorePersistsEffectiveDatedIncomeRowsWithSharedID(t *testing.T) {
 	testStorePersistsEffectiveDatedIncomeRowsWithSharedID(t, openTestStore)
 }

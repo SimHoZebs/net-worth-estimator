@@ -109,6 +109,9 @@ func deleteDocumentRows(tx *sql.Tx) error {
 	if _, err := tx.Exec(`DELETE FROM evaluations`); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM payment_terms`); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -218,6 +221,9 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 	if err := saveEvaluationTable(tx, string(types.EvaluationTypeCycleFulfillment), cycleEvaluationRows(document)); err != nil {
 		return err
 	}
+	if err := savePaymentTerms(tx, document.PaymentTerms); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(
 		`UPDATE model_metadata SET source_path = ?, document_present = 1 WHERE id = 1`,
 		document.SourcePath,
@@ -258,6 +264,25 @@ func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source stri
 		posting.StartDate, endDate, annualCap, posting.Priority, boolToInt(posting.Enabled), source,
 	); err != nil {
 		return fmt.Errorf("insert posting %s: %w", posting.ID, err)
+	}
+	return nil
+}
+
+func savePaymentTerms(tx *sql.Tx, terms []types.PaymentTerms) error {
+	for position, term := range terms {
+		var minimumPercent, statementDay any
+		if term.MinimumPercent != nil {
+			minimumPercent = *term.MinimumPercent
+		}
+		if term.StatementDay != nil {
+			statementDay = *term.StatementDay
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO payment_terms (account_id, position, minimum_fixed, minimum_percent, due_day, statement_day) VALUES (?,?,?,?,?,?)`,
+			term.AccountID, position, term.MinimumFixed, minimumPercent, term.DueDay, statementDay,
+		); err != nil {
+			return fmt.Errorf("insert payment terms %s: %w", term.AccountID, err)
+		}
 	}
 	return nil
 }
@@ -554,6 +579,36 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close evaluations: %w", err)
 	}
 
+	termRows, err := q.Query(`SELECT account_id, minimum_fixed, minimum_percent, due_day, statement_day FROM payment_terms ORDER BY position`)
+	if err != nil {
+		return nil, err
+	}
+	defer termRows.Close()
+	for termRows.Next() {
+		var term types.PaymentTerms
+		var minimumPercent sql.NullFloat64
+		var statementDay sql.NullInt64
+		if err := termRows.Scan(&term.AccountID, &term.MinimumFixed, &minimumPercent, &term.DueDay, &statementDay); err != nil {
+			return nil, err
+		}
+		if minimumPercent.Valid {
+			value := minimumPercent.Float64
+			term.MinimumPercent = &value
+		}
+		if statementDay.Valid {
+			value := int(statementDay.Int64)
+			term.StatementDay = &value
+		}
+		document.PaymentTerms = append(document.PaymentTerms, term)
+	}
+	if err := termRows.Err(); err != nil {
+		termRows.Close()
+		return nil, fmt.Errorf("iterate payment terms: %w", err)
+	}
+	if err := termRows.Close(); err != nil {
+		return nil, fmt.Errorf("close payment terms: %w", err)
+	}
+
 	if document.Accounts == nil {
 		document.Accounts = []types.Account{}
 	}
@@ -562,6 +617,9 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 	}
 	if document.Postings == nil {
 		document.Postings = []types.Posting{}
+	}
+	if document.PaymentTerms == nil {
+		document.PaymentTerms = []types.PaymentTerms{}
 	}
 	return document, nil
 }
