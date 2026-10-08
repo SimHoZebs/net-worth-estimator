@@ -110,6 +110,7 @@ export function WorkspacePage({
 					key="transactions"
 					plan={plan}
 					view="transactions"
+					projection={base}
 					onEdit={onEdit}
 					onUpdate={state.updatePlan}
 					onAccount={(id) => onEvidence({ kind: "account", id })}

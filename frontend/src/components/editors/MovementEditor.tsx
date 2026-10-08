@@ -17,7 +17,7 @@ export function MovementEditor({
 }: EditorProps & { item: Movement | null }) {
 	const readOnlyReason =
 		item?.amountKnown === false
-			? "This amount has no fixed value here. Review it in the projection instead of editing it."
+			? "This amount is calculated each occurrence. See the transaction list and Outlook for the resolved amounts."
 			: item?.readOnly
 				? sourceReadOnlyReason
 				: undefined;

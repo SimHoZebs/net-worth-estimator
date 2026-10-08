@@ -1,5 +1,5 @@
 import { Plus, Search } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { type TabItem, Tabs } from "../components/Tabs.tsx";
 import {
@@ -12,6 +12,8 @@ import {
 	type RemovalTarget,
 	removePlanItem,
 } from "../domain/planEdits.ts";
+import { resolveMovementAmounts } from "../domain/resolvedMovementAmounts.ts";
+import type { Projection } from "../domain/result.ts";
 import { AccountsPanel, BalanceChecksPanel } from "./plan/AccountsPanel.tsx";
 import { MovementsPanel } from "./plan/MovementsPanel.tsx";
 
@@ -23,12 +25,14 @@ type ScheduleFilter = "all" | "recurring";
 export function PlanPage({
 	plan,
 	view,
+	projection,
 	onEdit,
 	onUpdate,
 	onAccount,
 }: {
 	plan: Plan;
 	view: PlanView;
+	projection?: Projection | null;
 	onEdit: (target: EditorTarget) => void;
 	onUpdate: (plan: Plan) => boolean;
 	onAccount: (id: string) => void;
@@ -43,7 +47,14 @@ export function PlanPage({
 			/>
 		);
 	}
-	return <TransactionsView plan={plan} onEdit={onEdit} onUpdate={onUpdate} />;
+	return (
+		<TransactionsView
+			plan={plan}
+			projection={projection}
+			onEdit={onEdit}
+			onUpdate={onUpdate}
+		/>
+	);
 }
 
 function usePlanRemoval({
@@ -172,16 +183,23 @@ function AccountsView({
 
 function TransactionsView({
 	plan,
+	projection,
 	onEdit,
 	onUpdate,
 }: {
 	plan: Plan;
+	projection?: Projection | null;
 	onEdit: (target: EditorTarget) => void;
 	onUpdate: (plan: Plan) => boolean;
 }) {
 	const [query, setQuery] = useState("");
 	const [schedule, setSchedule] = useState<ScheduleFilter>("all");
 	const { requestRemoval, dialog } = usePlanRemoval({ plan, onUpdate });
+	const resolvedAmounts = useMemo(
+		() =>
+			projection ? resolveMovementAmounts(projection.movements) : new Map(),
+		[projection],
+	);
 	const visible = visibleMovements({
 		movements: plan.movements,
 		accounts: plan.accounts,
@@ -233,6 +251,7 @@ function TransactionsView({
 				<MovementsPanel
 					movements={movements}
 					accounts={visibleAccounts(plan.accounts)}
+					resolvedAmounts={resolvedAmounts}
 					onEdit={(item) => onEdit({ kind: "movement", item })}
 					onRemove={(item) =>
 						requestRemoval({
