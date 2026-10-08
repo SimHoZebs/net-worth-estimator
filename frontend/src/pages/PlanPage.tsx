@@ -224,7 +224,6 @@ function TransactionsView({
 				<MovementsPanel
 					movements={movements}
 					accounts={plan.accounts}
-					startDate={plan.startDate}
 					onEdit={(item) => onEdit({ kind: "movement", item })}
 					onRemove={(item) =>
 						requestRemoval({
