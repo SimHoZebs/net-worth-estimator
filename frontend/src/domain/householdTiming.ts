@@ -4,6 +4,12 @@ import type { MovementResult } from "./result.ts";
 
 export const DEFAULT_CYCLE_STATEMENT_DAY = 20;
 export const DEFAULT_PROTECTED_RESERVE = 725;
+/**
+ * Virtual account staging gross pay before payroll splits. Take-home pay
+ * arrives in checking as a transfer from here, so it counts as a paycheck
+ * alongside external inflows.
+ */
+export const VIRTUAL_PAY_ACCOUNT_ID = "gross_pay";
 
 function utcDate(iso: string): Date {
 	return new Date(`${iso.slice(0, 10)}T12:00:00Z`);
@@ -105,8 +111,9 @@ export function nextMonthObligations({
 }
 
 /**
- * Expected next paycheck: total external inflow into checking on the earliest
- * date after today. Null when no upcoming inflow is projected.
+ * Expected next paycheck: total inflow into checking on the earliest date
+ * after today, from outside the household or from the virtual pay account
+ * (take-home transfer). Null when no upcoming inflow is projected.
  */
 export function nextPaycheck({
 	movements,
@@ -121,7 +128,7 @@ export function nextPaycheck({
 	const upcoming = movements.filter(
 		(movement) =>
 			movement.toId === checkingId &&
-			!movement.fromId &&
+			(!movement.fromId || movement.fromId === VIRTUAL_PAY_ACCOUNT_ID) &&
 			movement.date > today &&
 			movement.requested > 0,
 	);

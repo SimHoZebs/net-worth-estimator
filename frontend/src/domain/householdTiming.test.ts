@@ -246,3 +246,24 @@ describe("filterMovementsById", () => {
 		expect(filtered[0]!.movementId).toBe("living");
 	});
 });
+
+describe("nextPaycheck with virtual pay account", () => {
+	it("counts take-home transfers from gross_pay", () => {
+		const result = nextPaycheck({
+			movements: [
+				movementFixture({
+					date: "2026-10-29",
+					movementId: "salary_net",
+					name: "Take-Home Pay",
+					fromId: "gross_pay",
+					toId: "checking",
+					requested: 7499,
+					realized: 7499,
+				}),
+			],
+			checkingId: "checking",
+			todayIso: "2026-10-08",
+		});
+		expect(result).toEqual({ date: "2026-10-29", amount: 7499 });
+	});
+});
