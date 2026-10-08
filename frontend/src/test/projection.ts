@@ -1,5 +1,5 @@
 import type {
-	GoalResult,
+	EvaluationResult,
 	MovementResult,
 	Point,
 	Projection,
@@ -24,7 +24,8 @@ export function projectionFixture(
 		currentNetWorth: 1000,
 		movements: [],
 		firstFailure: null,
-		goals: [],
+		evaluations: [],
+		otherEvaluations: [],
 		inflows: 0,
 		outflows: 0,
 		transfers: 0,
@@ -51,9 +52,11 @@ export function movementFixture(
 	};
 }
 
-export function goalFixture(overrides: Partial<GoalResult> = {}): GoalResult {
+export function evaluationFixture(
+	overrides: Partial<EvaluationResult> = {},
+): EvaluationResult {
 	return {
-		goal: testPlan.goals[0]!,
+		evaluation: testPlan.evaluations[0]!,
 		firstDate: "2028-06-01",
 		current: 361200,
 		final: 1016195,

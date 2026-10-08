@@ -1,4 +1,5 @@
 import {
+	ArrowRightLeft,
 	type Compass,
 	Flag,
 	GitCompareArrows,
@@ -7,7 +8,13 @@ import {
 	Wallet,
 } from "lucide-react";
 
-export type Page = "outlook" | "plan" | "goals" | "compare" | "sources";
+export type Page =
+	| "outlook"
+	| "accounts"
+	| "transactions"
+	| "evaluations"
+	| "compare"
+	| "sources";
 export type PageDefinition = {
 	id: Page;
 	label: string;
@@ -23,16 +30,22 @@ export const pages: PageDefinition[] = [
 		title: "Your financial outlook",
 	},
 	{
-		id: "plan",
-		label: "Your plan",
+		id: "accounts",
+		label: "Accounts",
 		icon: Wallet,
-		title: "The plan behind the picture",
+		title: "Accounts and starting balances",
 	},
 	{
-		id: "goals",
-		label: "Goals",
+		id: "transactions",
+		label: "Transactions",
+		icon: ArrowRightLeft,
+		title: "Planned transactions and assumptions",
+	},
+	{
+		id: "evaluations",
+		label: "Evaluations",
 		icon: Flag,
-		title: "Make the future meaningful",
+		title: "Check what the plan supports",
 	},
 	{
 		id: "compare",
@@ -48,6 +61,9 @@ export const pages: PageDefinition[] = [
 	},
 ];
 
-export const getPage = (): Page =>
-	pages.find((page) => page.id === window.location.hash.slice(1))?.id ??
-	"outlook";
+export const getPage = (): Page => {
+	const hash = window.location.hash.slice(1);
+	if (hash === "plan") return "accounts";
+	if (hash === "goals") return "evaluations";
+	return pages.find((page) => page.id === hash)?.id ?? "outlook";
+};

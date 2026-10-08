@@ -1,9 +1,9 @@
-import type { Account, Goal, Movement, Plan } from "./model.ts";
+import type { Account, Evaluation, Movement, Plan } from "./model.ts";
 
 export type EditorTarget =
 	| { kind: "account"; item: Account | null }
 	| { kind: "movement"; item: Movement | null }
-	| { kind: "goal"; item: Goal | null }
+	| { kind: "evaluation"; item: Evaluation | null }
 	| { kind: "assumptions" };
 export type RemovalTarget = {
 	kind: "accounts" | "movements";
@@ -40,10 +40,10 @@ export function removePlanItem({
 				(movement) =>
 					movement.fromId === target.id || movement.toId === target.id,
 			) ||
-			plan.goals.some((goal) => goal.accountId === target.id)
+			plan.evaluations.some((evaluation) => evaluation.accountId === target.id)
 		)
 			return new Error(
-				"This account is used by a movement or goal. Update those references before removing it.",
+				"This account is used by a movement or evaluation. Update those references before removing it.",
 			);
 		return {
 			...plan,
@@ -64,7 +64,7 @@ export function toggleMovement({ plan, id }: { plan: Plan; id: string }): Plan {
 		),
 	};
 }
-export function setGoalEnabled({
+export function setEvaluationEnabled({
 	plan,
 	id,
 	enabled,
@@ -75,11 +75,20 @@ export function setGoalEnabled({
 }): Plan {
 	return {
 		...plan,
-		goals: plan.goals.map((item) =>
+		evaluations: plan.evaluations.map((item) =>
 			item.id === id ? { ...item, enabled } : item,
 		),
 	};
 }
-export function removeGoal({ plan, id }: { plan: Plan; id: string }): Plan {
-	return { ...plan, goals: plan.goals.filter((item) => item.id !== id) };
+export function removeEvaluation({
+	plan,
+	id,
+}: {
+	plan: Plan;
+	id: string;
+}): Plan {
+	return {
+		...plan,
+		evaluations: plan.evaluations.filter((item) => item.id !== id),
+	};
 }

@@ -382,7 +382,7 @@
 		gap: 22px;
 		margin-top: 25px;
 	}
-	.goals-grid {
+	.evaluations-grid {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 22px;
@@ -1027,38 +1027,38 @@
 		align-items: center;
 		gap: 6px;
 	}
-	.goal-preview,
+	.evaluation-preview,
 	.timing-preview {
 		background: #fffefa;
 		border: 1px solid var(--line);
 		border-radius: 10px;
 		padding: 22px 23px 18px;
 	}
-	.goal-preview .section-top h2,
+	.evaluation-preview .section-top h2,
 	.timing-preview .section-top h2 {
 		font-size: 13px;
 	}
-	.goal-preview-content {
+	.evaluation-preview-content {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		padding: 19px 0 17px;
 	}
-	.goal-preview-content p {
+	.evaluation-preview-content p {
 		font-size: 10px;
 		color: #77816a;
 	}
-	.goal-date {
+	.evaluation-date {
 		font-family: var(--serif);
 		font-size: 29px;
 		letter-spacing: -0.5px;
 		margin: 4px 0;
 		line-height: 1.3;
 	}
-	.goal-preview-content .muted {
+	.evaluation-preview-content .muted {
 		font-size: 9px;
 	}
-	.goal-glyph {
+	.evaluation-glyph {
 		background: #f0f3e5;
 		border: 1px solid #e4e9d5;
 		color: #8b9a67;
@@ -1078,7 +1078,7 @@
 		font-size: 9px;
 		margin-bottom: 8px;
 	}
-	.goal-evidence-link {
+	.evaluation-evidence-link {
 		margin-top: 14px;
 		font-size: 9px;
 	}
@@ -1582,13 +1582,13 @@
 	.page-section-top {
 		margin-bottom: 22px;
 	}
-	.goal-card {
+	.evaluation-card {
 		background: #fffefa;
 		border: 1px solid var(--line);
 		border-radius: 10px;
 		padding: 26px;
 	}
-	.goal-icon {
+	.evaluation-icon {
 		width: 45px;
 		height: 45px;
 		border-radius: 50%;
@@ -1597,25 +1597,25 @@
 		color: #7c925c;
 		background: #edf2e2;
 	}
-	.goal-card h2 {
+	.evaluation-card h2 {
 		margin-top: 20px;
 		font-size: 19px;
 		font-weight: 600;
 	}
-	.goal-card > p {
+	.evaluation-card > p {
 		font-size: 11px;
 		margin: 8px 0;
 	}
-	.goal-card-outcome {
+	.evaluation-card-outcome {
 		font-family: var(--serif);
 		font-size: 36px;
 		letter-spacing: -1px;
 		margin: 22px 0 4px;
 	}
-	.goal-card-progress {
+	.evaluation-card-progress {
 		margin: 25px 0 14px;
 	}
-	.goal-card-footer {
+	.evaluation-card-footer {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
@@ -1623,7 +1623,7 @@
 		margin-top: 18px;
 		border-top: 1px solid var(--line);
 	}
-	.goal-card .scenario-goal {
+	.evaluation-card .scenario-evaluation {
 		font-size: 10px;
 	}
 	.bottom-note {
@@ -2058,6 +2058,29 @@
 	}
 	.modal-wide {
 		width: min(780px, calc(100% - 32px));
+	}
+	.modal-drawer {
+		width: min(520px, calc(100vw - 64px));
+		max-width: 520px;
+		height: 100dvh;
+		max-height: 100dvh;
+		margin: 0 0 0 auto;
+		inset: 0 0 0 auto;
+		border-radius: 0;
+		border-top: 0;
+		border-right: 0;
+		border-bottom: 0;
+	}
+	.modal-drawer[open] {
+		animation: drawer-in 0.18s ease-out;
+	}
+	@keyframes drawer-in {
+		from {
+			transform: translateX(32px);
+		}
+		to {
+			transform: translateX(0);
+		}
 	}
 	.modal::backdrop {
 		background: #172d2b66;
@@ -2516,27 +2539,27 @@
 		.outlook-secondary {
 			gap: 15px;
 		}
-		.goal-preview,
+		.evaluation-preview,
 		.timing-preview {
 			padding: 20px 18px;
 		}
-		.goal-preview .section-top h2,
+		.evaluation-preview .section-top h2,
 		.timing-preview .section-top h2 {
 			font-size: 11px;
 		}
 		.timing-figures > div + div {
 			padding-left: 15px;
 		}
-		.goal-preview .section-top .text-button {
+		.evaluation-preview .section-top .text-button {
 			font-size: 9px;
 		}
 		.timing-figures strong {
 			font-size: 24px;
 		}
-		.goals-grid {
+		.evaluations-grid {
 			gap: 15px;
 		}
-		.goal-card {
+		.evaluation-card {
 			padding: 22px;
 		}
 		.sources-grid {
@@ -2763,18 +2786,18 @@
 			grid-template-columns: 1fr;
 			margin-top: 20px;
 		}
-		.goal-preview,
+		.evaluation-preview,
 		.timing-preview {
 			padding: 21px;
 		}
-		.goal-preview .section-top h2,
+		.evaluation-preview .section-top h2,
 		.timing-preview .section-top h2 {
 			font-size: 13px;
 		}
-		.goal-preview-content {
+		.evaluation-preview-content {
 			padding: 19px 0 20px;
 		}
-		.goal-preview .section-top .text-button {
+		.evaluation-preview .section-top .text-button {
 			font-size: 10px;
 		}
 		.timing-figures {
@@ -2886,7 +2909,7 @@
 		.assumption-metrics strong {
 			margin: 3px 0;
 		}
-		.goals-grid {
+		.evaluations-grid {
 			grid-template-columns: 1fr;
 		}
 		.page-section-top {
@@ -3035,6 +3058,16 @@
 			width: calc(100% - 20px);
 			border-radius: 11px;
 		}
+		.modal-drawer {
+			width: 100%;
+			max-width: 100%;
+			height: 100dvh;
+			max-height: 100dvh;
+			margin: 0;
+			inset: 0;
+			border: 0;
+			border-radius: 0;
+		}
 		.modal-header {
 			padding: 22px 20px 19px;
 		}
@@ -3144,7 +3177,7 @@
 		.metric,
 		.panel,
 		.chart-card,
-		.goal-preview,
+		.evaluation-preview,
 		.timing-preview {
 			break-inside: avoid;
 		}
@@ -3172,7 +3205,7 @@
 	.chart-foot-note,
 	.chart-inspection span,
 	.range-disclaimer,
-	.goal-preview-content p,
+	.evaluation-preview-content p,
 	.progress-label,
 	.timing-figures span,
 	.timing-replenishment span > span,
@@ -3272,7 +3305,7 @@
 		font-size: 10px;
 	}
 	.insight-card > p,
-	.goal-preview-content p,
+	.evaluation-preview-content p,
 	.timing-figures span {
 		font-size: 11px;
 	}
@@ -3282,8 +3315,8 @@
 		font-size: 10px;
 	}
 	.progress-label,
-	.goal-preview-content .muted,
-	.goal-evidence-link {
+	.evaluation-preview-content .muted,
+	.evaluation-evidence-link {
 		font-size: 10px;
 	}
 	.account-label strong {

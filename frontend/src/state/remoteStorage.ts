@@ -104,7 +104,23 @@ export function serverDocumentFingerprint(
 					config,
 				}),
 			),
+			accountBalance: document.evaluations.accountBalance.map(
+				({ instanceId, name, enabled, config }) => ({
+					instanceId,
+					name,
+					enabled,
+					config,
+				}),
+			),
 			postingFulfillment: document.evaluations.postingFulfillment.map(
+				({ instanceId, name, enabled, config }) => ({
+					instanceId,
+					name,
+					enabled,
+					config,
+				}),
+			),
+			cycleFulfillment: (document.evaluations.cycleFulfillment ?? []).map(
 				({ instanceId, name, enabled, config }) => ({
 					instanceId,
 					name,

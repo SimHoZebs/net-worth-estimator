@@ -2,7 +2,7 @@ import type { EditorTarget } from "../domain/planEdits.ts";
 import { AccountEditor } from "./editors/AccountEditor.tsx";
 import { AssumptionsEditor } from "./editors/AssumptionsEditor.tsx";
 import type { EditorProps } from "./editors/EditorForm.tsx";
-import { GoalEditor } from "./editors/GoalEditor.tsx";
+import { EvaluationEditor } from "./editors/EvaluationEditor.tsx";
 import { MovementEditor } from "./editors/MovementEditor.tsx";
 
 export type { EditorTarget } from "../domain/planEdits.ts";
@@ -28,10 +28,10 @@ export function PlanEditor({
 					{...props}
 				/>
 			);
-		case "goal":
+		case "evaluation":
 			return (
-				<GoalEditor
-					key={target.item?.id ?? "new-goal"}
+				<EvaluationEditor
+					key={target.item?.id ?? "new-evaluation"}
 					item={target.item}
 					{...props}
 				/>

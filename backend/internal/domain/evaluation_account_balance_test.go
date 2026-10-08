@@ -40,14 +40,14 @@ func TestEvaluateAccountBalanceFindsFirstProjectedCrossing(t *testing.T) {
 
 func TestEvaluateAccountBalanceIgnoresHistoricalRows(t *testing.T) {
 	// The account was above target in recorded history. That is a fact about
-	// the past, not a projection outcome, so it must not satisfy the goal.
+	// the past, not a projection outcome, so it must not satisfy the evaluation.
 	path := pathOf(
 		row("2025-01-01", true, 0, map[string]float64{"checking": 90000}),
 		row("2026-01-01", false, 0, map[string]float64{"checking": 1000}),
 	)
 	result := EvaluateAccountBalance(path, "checking", 30000)
 	if result.Reached {
-		t.Fatalf("historical balance must not satisfy a goal: %+v", result)
+		t.Fatalf("historical balance must not satisfy an evaluation: %+v", result)
 	}
 	if result.FirstReachedDate != nil {
 		t.Fatalf("first reached date = %v, want nil", *result.FirstReachedDate)
@@ -70,7 +70,7 @@ func TestEvaluateAccountBalanceSkipsRowsWithoutTheAccount(t *testing.T) {
 func TestEvaluateAccountBalanceCountsExactTarget(t *testing.T) {
 	path := pathOf(row("2026-03-01", false, 0, map[string]float64{"checking": 30000}))
 	if result := EvaluateAccountBalance(path, "checking", 30000); !result.Reached {
-		t.Fatalf("balance equal to target should satisfy the goal: %+v", result)
+		t.Fatalf("balance equal to target should satisfy the evaluation: %+v", result)
 	}
 }
 
@@ -81,7 +81,7 @@ func TestEvaluateAccountBalanceNotReached(t *testing.T) {
 	}
 }
 
-// A goal on an empty path must not report a crossing.
+// An evaluation on an empty path must not report a crossing.
 func TestEvaluateAccountBalanceEmptyPath(t *testing.T) {
 	if result := EvaluateAccountBalance(pathOf(), "checking", 1); result.Reached {
 		t.Fatalf("empty path must not be reached: %+v", result)
@@ -155,9 +155,9 @@ func TestAccountBalanceSharesThresholdAccumulatorShape(t *testing.T) {
 	}
 }
 
-// A goal pointing at an account the document does not contain must be reported
+// An evaluation pointing at an account the document does not contain must be reported
 // rather than silently evaluating as never reached.
-func TestValidateFinancialModelFlagsDanglingAccountBalanceGoal(t *testing.T) {
+func TestValidateFinancialModelFlagsDanglingAccountBalanceEvaluation(t *testing.T) {
 	document := &types.FinancialModelDocument{
 		SourcePath: "test",
 		Accounts: []types.Account{
@@ -167,7 +167,7 @@ func TestValidateFinancialModelFlagsDanglingAccountBalanceGoal(t *testing.T) {
 		Postings:    []types.Posting{},
 		Evaluations: types.EvaluationTables{
 			AccountBalance: []types.BalanceEvaluation{{
-				InstanceID: "ghost-goal",
+				InstanceID: "ghost-evaluation",
 				Name:       "Ghost",
 				Enabled:    true,
 				Config:     map[string]any{"accountId": "does-not-exist", "target": 100.0},

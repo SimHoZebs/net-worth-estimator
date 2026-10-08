@@ -7,9 +7,9 @@ export function comparisonMetrics(projection: Projection) {
 	return {
 		current: currentNetWorth(projection),
 		final: projection.points.at(-1)?.total ?? 0,
-		goalDate:
-			projection.goals.find((g) => g.goal.kind === "net-worth")?.firstDate ??
-			null,
+		evaluationDate:
+			projection.evaluations.find((g) => g.evaluation.kind === "net-worth")
+				?.firstDate ?? null,
 		shortfallDate: projection.firstFailure?.date ?? null,
 	};
 }

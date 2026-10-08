@@ -1,11 +1,11 @@
 import { ArrowUpRight, Check, Flag, Pencil, Trash2 } from "lucide-react";
 import { Badge, IconButton, Progress, Toggle } from "../../components/ui.tsx";
 import { dateLabel, money, percent } from "../../domain/format.ts";
-import type { Goal } from "../../domain/model.ts";
-import type { GoalResult } from "../../domain/result.ts";
+import type { Evaluation } from "../../domain/model.ts";
+import type { EvaluationResult } from "../../domain/result.ts";
 
-export function GoalCard({
-	goal,
+export function EvaluationCard({
+	evaluation,
 	result,
 	measure,
 	probability,
@@ -14,8 +14,8 @@ export function GoalCard({
 	onEnabledChange,
 	onEvidence,
 }: {
-	goal: Goal;
-	result: Pick<GoalResult, "current" | "firstDate"> | undefined;
+	evaluation: Evaluation;
+	result: Pick<EvaluationResult, "current" | "firstDate"> | undefined;
 	measure: string | undefined;
 	probability: number | null;
 	onEdit: () => void;
@@ -23,32 +23,34 @@ export function GoalCard({
 	onEnabledChange: (enabled: boolean) => void;
 	onEvidence: () => void;
 }) {
-	const met = result && result.current >= goal.target;
+	const met = result && result.current >= evaluation.target;
 	return (
-		<section className={`goal-card ${goal.enabled ? "" : "is-excluded"}`}>
+		<section
+			className={`evaluation-card ${evaluation.enabled ? "" : "is-excluded"}`}
+		>
 			<div className="section-top">
-				<span className="goal-icon">
+				<span className="evaluation-icon">
 					{met ? <Check size={23} /> : <Flag size={23} />}
 				</span>
 				<div className="table-actions">
 					<IconButton
 						icon={Pencil}
-						label={`Edit ${goal.name}`}
+						label={`Edit ${evaluation.name}`}
 						onClick={onEdit}
 					/>
 					<IconButton
 						icon={Trash2}
-						label={`Remove ${goal.name}`}
+						label={`Remove ${evaluation.name}`}
 						onClick={onRemove}
 					/>
 				</div>
 			</div>
-			<h2>{goal.name}</h2>
+			<h2>{evaluation.name}</h2>
 			<p>
-				{measure} · {money(goal.target)}
+				{measure} · {money(evaluation.target)}
 			</p>
-			<div className="goal-card-outcome">
-				{!goal.enabled
+			<div className="evaluation-card-outcome">
+				{!evaluation.enabled
 					? "Paused"
 					: met
 						? "Already reached"
@@ -57,7 +59,7 @@ export function GoalCard({
 							: "Beyond this horizon"}
 			</div>
 			<Badge tone={met ? "green" : "neutral"}>
-				{!goal.enabled
+				{!evaluation.enabled
 					? "Excluded from evaluation"
 					: met
 						? "Met at the start"
@@ -65,38 +67,38 @@ export function GoalCard({
 							? "First reached · base case"
 							: "Not reached · base case"}
 			</Badge>
-			<div className="goal-card-progress">
+			<div className="evaluation-card-progress">
 				<div className="progress-label">
 					<span>{money(result?.current ?? 0)} today</span>
 					<span>
 						{Math.min(
 							100,
-							Math.round(((result?.current ?? 0) / goal.target) * 100),
+							Math.round(((result?.current ?? 0) / evaluation.target) * 100),
 						)}
 						%
 					</span>
 				</div>
 				<Progress
-					value={((result?.current ?? 0) / goal.target) * 100}
-					label={goal.name}
+					value={((result?.current ?? 0) / evaluation.target) * 100}
+					label={evaluation.name}
 				/>
 			</div>
-			{probability !== null && goal.enabled && (
-				<p className="scenario-goal">
+			{probability !== null && evaluation.enabled && (
+				<p className="scenario-evaluation">
 					Reached in <strong>{percent(probability)}</strong> of modeled
 					scenarios.
 				</p>
 			)}
-			<div className="goal-card-footer">
+			<div className="evaluation-card-footer">
 				<Toggle
 					label="Enabled"
-					checked={goal.enabled}
+					checked={evaluation.enabled}
 					onChange={onEnabledChange}
 				/>
 				<button
 					type="button"
 					className="text-button"
-					disabled={!goal.enabled}
+					disabled={!evaluation.enabled}
 					onClick={onEvidence}
 				>
 					Evidence <ArrowUpRight size={15} />

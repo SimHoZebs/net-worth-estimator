@@ -2,8 +2,8 @@ import type { Plan } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/planEdits.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { AccountDialog } from "./AccountDialog.tsx";
+import { EvaluationEvidence } from "./evidence/EvaluationEvidence.tsx";
 import { FailureEvidence } from "./evidence/FailureEvidence.tsx";
-import { GoalEvidence } from "./evidence/GoalEvidence.tsx";
 import { MethodEvidence } from "./evidence/MethodEvidence.tsx";
 import { PositionEvidence } from "./evidence/PositionEvidence.tsx";
 import { TimingEvidence } from "./evidence/TimingEvidence.tsx";
@@ -12,7 +12,7 @@ export type EvidenceTarget =
 	| { kind: "position" }
 	| { kind: "account"; id: string }
 	| { kind: "failure" }
-	| { kind: "goal"; id: string }
+	| { kind: "evaluation"; id: string }
 	| { kind: "timing" }
 	| { kind: "method" };
 
@@ -75,17 +75,17 @@ export function EvidenceDialog({
 				/>
 			) : null;
 		}
-		case "goal": {
-			const result = projection.goals.find(
-				(item) => item.goal.id === target.id,
+		case "evaluation": {
+			const result = projection.evaluations.find(
+				(item) => item.evaluation.id === target.id,
 			);
 			return result ? (
-				<GoalEvidence
+				<EvaluationEvidence
 					result={result}
 					accounts={plan.accounts}
 					range={range}
 					onClose={onClose}
-					onEdit={() => edit({ kind: "goal", item: result.goal })}
+					onEdit={() => edit({ kind: "evaluation", item: result.evaluation })}
 				/>
 			) : null;
 		}

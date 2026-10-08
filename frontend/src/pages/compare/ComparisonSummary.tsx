@@ -95,12 +95,16 @@ export function ComparisonSummary({
 					</div>
 				</div>
 				<div className="comparison-grid">
-					<span>First net-worth goal reached</span>
+					<span>First net-worth evaluation reached</span>
 					<strong>
-						{previous.goalDate ? dateLabel(previous.goalDate) : "Not reached"}
+						{previous.evaluationDate
+							? dateLabel(previous.evaluationDate)
+							: "Not reached"}
 					</strong>
 					<strong>
-						{current.goalDate ? dateLabel(current.goalDate) : "Not reached"}
+						{current.evaluationDate
+							? dateLabel(current.evaluationDate)
+							: "Not reached"}
 					</strong>
 				</div>
 				<div className="comparison-grid">
@@ -118,8 +122,8 @@ export function ComparisonSummary({
 				</div>
 				<p className="section-note">
 					Comparison describes displayed measures, not causal proof. A snapshot
-					contains measures only and cannot restore a plan. Goal definitions may
-					also change between versions.
+					contains measures only and cannot restore a plan. Evaluation
+					definitions may also change between versions.
 				</p>
 			</section>
 		</>

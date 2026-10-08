@@ -128,7 +128,8 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 		if !posting.Enabled || posting.Frequency != types.FrequencyOnce {
 			continue
 		}
-		if posting.SourceAccountID == nil || !accountSet[*posting.SourceAccountID] {
+		sourceAccount, ok := PostingSourceAccount(posting)
+		if !ok || !accountSet[sourceAccount] {
 			continue
 		}
 		if CompareIsoDates(posting.StartDate, cycleStart) < 0 || CompareIsoDates(posting.StartDate, projectionStart) > 0 {

@@ -47,6 +47,7 @@ function documentFixture(): FinancialModelDocument {
 			],
 			accountBalance: [],
 			postingFulfillment: [],
+			cycleFulfillment: [],
 		},
 		postings: [
 			{
@@ -93,13 +94,14 @@ function projectionFixture(): ProjectionResult {
 			netWorthThreshold: [],
 			accountBalance: [],
 			postingFulfillment: [],
+			cycleFulfillment: [],
 		},
 		movementEvents: [],
 	};
 }
 
 describe("backend and display plan adapter", () => {
-	it("uses the latest checkpoint at or before projection start and maps bounds, postings, and goals", () => {
+	it("uses the latest checkpoint at or before projection start and maps bounds, postings, and evaluations", () => {
 		const document = documentFixture();
 		const conversion = backendToDisplayPlan({
 			document,
@@ -120,7 +122,7 @@ describe("backend and display plan adapter", () => {
 			frequency: "monthly",
 			annualIncrease: 2,
 		});
-		expect(conversion.plan.goals).toEqual([
+		expect(conversion.plan.evaluations).toEqual([
 			{
 				id: "target",
 				name: "Reach target",
@@ -417,8 +419,8 @@ describe("backend and display plan adapter", () => {
 		const plan = {
 			...conversion.plan,
 			assumptions: { inflation: 2, volatility: 10 },
-			goals: [
-				...conversion.plan.goals,
+			evaluations: [
+				...conversion.plan.evaluations,
 				{
 					id: "reserve",
 					name: "Reserve",
@@ -448,7 +450,7 @@ describe("backend and display plan adapter", () => {
 		expect(reverse.document.evaluations.netWorthThreshold[0]?.config).toEqual({
 			target: 500,
 		});
-		// A reserve goal is a first-class backend evaluation, so it uploads
+		// A reserve evaluation is a first-class backend evaluation, so it uploads
 		// rather than being reported as a local-only loss.
 		expect(reverse.document.evaluations.accountBalance).toEqual([
 			{
@@ -459,7 +461,7 @@ describe("backend and display plan adapter", () => {
 			},
 		]);
 		expect(
-			reverse.report.losses.some((loss) => loss.field === "goals.reserve"),
+			reverse.report.losses.some((loss) => loss.field.includes("reserve")),
 		).toBe(false);
 		expect(JSON.stringify(reverse.document)).not.toContain('"origin"');
 		expect(JSON.stringify(reverse.document)).not.toContain('"assumptions"');
@@ -469,9 +471,9 @@ describe("backend and display plan adapter", () => {
 		expect(reverse.report.hasLosses).toBe(true);
 	});
 
-	// A reserve goal must survive the round trip, not degrade to browser-only metadata
+	// A reserve evaluation must survive the round trip, not degrade to browser-only metadata
 	// entry that the backend never sees.
-	it("round-trips a reserve goal through the backend document", () => {
+	it("round-trips a reserve evaluation through the backend document", () => {
 		const base = documentFixture();
 		const conversion = backendToDisplayPlan({
 			document: {
@@ -493,15 +495,17 @@ describe("backend and display plan adapter", () => {
 			status: { readOnly: false, authEnabled: false },
 		});
 
-		const goal = conversion.plan.goals.find((item) => item.id === "emergency");
-		expect(goal).toMatchObject({
+		const evaluation = conversion.plan.evaluations.find(
+			(item) => item.id === "emergency",
+		);
+		expect(evaluation).toMatchObject({
 			kind: "reserve",
 			accountId: "cash",
 			target: 30000,
 		});
 		expect(
 			conversion.report.provisionalFields.some(
-				(field) => field === "goals.emergency",
+				(field) => field === "evaluations.emergency",
 			),
 		).toBe(false);
 	});

@@ -12,19 +12,34 @@ export class ImportError extends errore.createTaggedError({
 	message: "$detail Choose a valid Waypoint plan JSON file.",
 }) {}
 
-export const snapshotSchema = z.object({
-	capturedAt: z.string(),
-	name: z.string(),
-	years: z.number(),
-	startDate: z.string(),
-	final: z.number(),
-	current: z.number(),
-	goalDate: z.string().nullable(),
-	shortfallDate: z.string().nullable(),
-	revision: z.number(),
-	changes: z.number(),
-	assumptions: z.string(),
-});
+function migrateLegacySnapshot(value: unknown): unknown {
+	if (typeof value !== "object" || value === null || Array.isArray(value))
+		return value;
+	const record = value as Record<string, unknown>;
+	if (
+		record.evaluationDate === undefined &&
+		typeof record.goalDate !== "undefined"
+	)
+		return { ...record, evaluationDate: record.goalDate };
+	return value;
+}
+
+export const snapshotSchema = z.preprocess(
+	migrateLegacySnapshot,
+	z.object({
+		capturedAt: z.string(),
+		name: z.string(),
+		years: z.number(),
+		startDate: z.string(),
+		final: z.number(),
+		current: z.number(),
+		evaluationDate: z.string().nullable(),
+		shortfallDate: z.string().nullable(),
+		revision: z.number(),
+		changes: z.number(),
+		assumptions: z.string(),
+	}),
+);
 export type Snapshot = z.infer<typeof snapshotSchema>;
 const workspaceSchema = z.object({
 	version: z.literal(1),

@@ -42,6 +42,13 @@ type ConnectionMovement = Pick<
 	"fromId" | "toId" | "accountDeltas" | "requested" | "realized"
 >;
 
+// External counterparty names. A null endpoint means the external
+// counterparty sits on that side. This is the single definition; call sites
+// name endpoints through it instead of re-deriving null semantics.
+export function externalCounterpartyName(direction: "in" | "out"): string {
+	return direction === "in" ? "External income" : "External spending";
+}
+
 export function accountTransactions({
 	accountId,
 	plan,
@@ -81,13 +88,13 @@ export function accountTransactions({
 					: ("income" as const);
 		const from = movement.fromId
 			? (names.get(movement.fromId) ?? "Unknown account")
-			: "External income";
+			: externalCounterpartyName("in");
 		const selectedIsSource = movement.fromId === accountId;
 		const otherDestination = destinationIds.find((id) => id !== accountId);
 		const to = selectedIsSource
 			? otherDestination
 				? (names.get(otherDestination) ?? "Unknown account")
-				: "External spending"
+				: externalCounterpartyName("out")
 			: (names.get(accountId) ?? "Unknown account");
 		return {
 			direction,

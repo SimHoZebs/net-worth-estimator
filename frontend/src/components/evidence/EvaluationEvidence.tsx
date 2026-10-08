@@ -1,28 +1,32 @@
 import { Pencil } from "lucide-react";
 import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { Account } from "../../domain/model.ts";
-import type { GoalResult, RangeResult } from "../../domain/result.ts";
+import type { EvaluationResult, RangeResult } from "../../domain/result.ts";
 import { DetailRow } from "../DetailRow.tsx";
 import { Modal } from "../ui.tsx";
 
-export function GoalEvidence({
+export function EvaluationEvidence({
 	result,
 	accounts,
 	range,
 	onClose,
 	onEdit,
 }: {
-	result: GoalResult;
+	result: EvaluationResult;
 	accounts: Account[];
 	range: RangeResult | null;
 	onClose: () => void;
 	onEdit: () => void;
 }) {
 	return (
-		<Modal title={result.goal.name} eyebrow="Goal evidence" onClose={onClose}>
+		<Modal
+			title={result.evaluation.name}
+			eyebrow="Evaluation evidence"
+			onClose={onClose}
+		>
 			<div className="evidence-amount">
 				{result.firstDate
-					? result.current >= result.goal.target
+					? result.current >= result.evaluation.target
 						? "Already reached"
 						: dateLabel(result.firstDate)
 					: "Beyond this horizon"}
@@ -30,20 +34,22 @@ export function GoalEvidence({
 			<p className="muted">First reached in the base case</p>
 			<dl className="detail-list">
 				<DetailRow label="Measure">
-					{result.goal.kind === "net-worth"
+					{result.evaluation.kind === "net-worth"
 						? "Household net worth"
-						: accounts.find((account) => account.id === result.goal.accountId)
-								?.name}
+						: accounts.find(
+								(account) => account.id === result.evaluation.accountId,
+							)?.name}
 				</DetailRow>
-				<DetailRow label="Target">{money(result.goal.target)}</DetailRow>
+				<DetailRow label="Target">{money(result.evaluation.target)}</DetailRow>
 				<DetailRow label="At the start">{money(result.current)}</DetailRow>
 				<DetailRow label="At the horizon">{money(result.final)}</DetailRow>
 				<DetailRow label="Still met at horizon">
-					{result.final >= result.goal.target ? "Yes" : "No"}
+					{result.final >= result.evaluation.target ? "Yes" : "No"}
 				</DetailRow>
 				{range && (
 					<DetailRow label="Scenarios reaching the target">
-						{percent(range.goalSuccess[result.goal.id] ?? 0)} of {range.count}
+						{percent(range.evaluationSuccess[result.evaluation.id] ?? 0)} of{" "}
+						{range.count}
 					</DetailRow>
 				)}
 			</dl>
@@ -54,7 +60,7 @@ export function GoalEvidence({
 			<div className="modal-actions">
 				<button type="button" className="button primary" onClick={onEdit}>
 					<Pencil size={16} />
-					Edit goal
+					Edit evaluation
 				</button>
 			</div>
 		</Modal>

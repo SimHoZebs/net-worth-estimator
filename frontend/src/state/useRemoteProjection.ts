@@ -109,19 +109,19 @@ function evaluationProbability(
 	return value === null ? null : Math.max(0, Math.min(1, value));
 }
 
-// Both goal-shaped evaluations (net worth threshold, account balance) share
-// this instance shape, so one mapper serves each kind.
-type GoalEvaluation = {
+// Both threshold-shaped evaluations (net worth threshold, account balance)
+// share this instance shape, so one mapper serves each kind.
+type EditableEvaluation = {
 	instanceId: string;
 	name: string;
 	enabled: boolean;
 	config: JsonValue;
 };
 
-// A goal whose evaluation produced no envelope is named indeterminate rather
-// than reported as unmet, so an unevaluated goal is never shown as a failure.
-function evaluatedGoal(
-	evaluation: GoalEvaluation,
+// An evaluation whose envelope is missing is named indeterminate rather than
+// reported as unmet, so an unevaluated evaluation is never shown as a failure.
+function evaluatedEvaluation(
+	evaluation: EditableEvaluation,
 	envelope: EvaluationResultEnvelope | undefined,
 ) {
 	const represented =
@@ -133,16 +133,16 @@ function evaluatedGoal(
 	};
 }
 
-function thresholdGoal(
-	evaluation: GoalEvaluation,
+function thresholdEvaluation(
+	evaluation: EditableEvaluation,
 	envelope: EvaluationResultEnvelope | undefined,
 	current: number,
 	final: number,
 ) {
 	const config = valueRecord(evaluation.config);
-	const { name, firstDate } = evaluatedGoal(evaluation, envelope);
+	const { name, firstDate } = evaluatedEvaluation(evaluation, envelope);
 	return {
-		goal: {
+		evaluation: {
 			id: evaluation.instanceId,
 			name,
 			kind: "net-worth" as const,
@@ -156,18 +156,18 @@ function thresholdGoal(
 	};
 }
 
-function balanceGoal(
-	evaluation: GoalEvaluation,
+function balanceEvaluation(
+	evaluation: EditableEvaluation,
 	envelope: EvaluationResultEnvelope | undefined,
 	balances: Map<string, ProjectionAccountSummary>,
 ) {
 	const config = valueRecord(evaluation.config);
 	const accountId =
 		typeof config?.accountId === "string" ? config.accountId : null;
-	const { name, firstDate } = evaluatedGoal(evaluation, envelope);
+	const { name, firstDate } = evaluatedEvaluation(evaluation, envelope);
 	const summary = accountId === null ? undefined : balances.get(accountId);
 	return {
-		goal: {
+		evaluation: {
 			id: evaluation.instanceId,
 			name,
 			kind: "reserve" as const,
@@ -179,6 +179,38 @@ function balanceGoal(
 		current: summary?.startingBalance ?? 0,
 		final: summary?.endingBalance ?? 0,
 	};
+}
+
+function otherEvaluationSummary(
+	type: "financialIndependence" | "postingFulfillment" | "cycleFulfillment",
+	deterministic: Record<string, unknown> | null,
+): string {
+	if (!deterministic) return "No base-case detail yet.";
+	if (type === "postingFulfillment") {
+		const firstDate = stringValue(deterministic.firstUnderfulfilledDate);
+		const completion = finite(deterministic.completionRate);
+		if (firstDate) return `First shortfall ${firstDate}`;
+		if (completion !== null)
+			return `Completion ${Math.round(completion * 100)}% in the base case`;
+		return "Fully fulfilled in the base case.";
+	}
+	if (type === "cycleFulfillment") {
+		const spent = finite(deterministic.spent);
+		const budget = finite(deterministic.budget);
+		const within = deterministic.withinBudget === true;
+		if (spent !== null && budget !== null)
+			return `${within ? "Within" : "Over"} budget in the base case`;
+		return within ? "Within budget in the base case." : "Over budget.";
+	}
+	const milestones = valueRecord(
+		(deterministic.milestones as JsonValue | undefined) ??
+			(deterministic as unknown as JsonValue),
+	);
+	const coverage = stringValue(milestones?.firstCoverageDate);
+	const sustaining = stringValue(milestones?.firstSelfSustainingDate);
+	if (coverage) return `First coverage ${coverage}`;
+	if (sustaining) return `Self-sustaining from ${sustaining}`;
+	return "See the server evaluation detail.";
 }
 
 function movementName(
@@ -359,11 +391,11 @@ export function projectionResultToLocal(
 			evaluation,
 		]),
 	);
-	const goals = [
+	const evaluations = [
 		...(document?.evaluations.netWorthThreshold ?? [])
 			.filter((evaluation) => evaluation.enabled)
 			.map((evaluation) =>
-				thresholdGoal(
+				thresholdEvaluation(
 					evaluation,
 					thresholdByID.get(evaluation.instanceId),
 					result.summary.currentNetWorth,
@@ -373,12 +405,70 @@ export function projectionResultToLocal(
 		...(document?.evaluations.accountBalance ?? [])
 			.filter((evaluation) => evaluation.enabled)
 			.map((evaluation) =>
-				balanceGoal(
+				balanceEvaluation(
 					evaluation,
 					balanceByID.get(evaluation.instanceId),
 					balances,
 				),
 			),
+	];
+	const otherEvaluations = [
+		...(document?.evaluations.financialIndependence ?? []).map(
+			(evaluation) => ({
+				id: evaluation.instanceId,
+				name: evaluation.name || evaluation.instanceId,
+				type: "financialIndependence" as const,
+				enabled: evaluation.enabled,
+				status:
+					result.evaluations.financialIndependence.find(
+						(item) => item.instanceId === evaluation.instanceId,
+					)?.status ?? "indeterminate",
+				summary: otherEvaluationSummary(
+					"financialIndependence",
+					valueRecord(
+						result.evaluations.financialIndependence.find(
+							(item) => item.instanceId === evaluation.instanceId,
+						)?.deterministic,
+					),
+				),
+			}),
+		),
+		...(document?.evaluations.postingFulfillment ?? []).map((evaluation) => ({
+			id: evaluation.instanceId,
+			name: evaluation.name || evaluation.instanceId,
+			type: "postingFulfillment" as const,
+			enabled: evaluation.enabled,
+			status:
+				result.evaluations.postingFulfillment.find(
+					(item) => item.instanceId === evaluation.instanceId,
+				)?.status ?? "indeterminate",
+			summary: otherEvaluationSummary(
+				"postingFulfillment",
+				valueRecord(
+					result.evaluations.postingFulfillment.find(
+						(item) => item.instanceId === evaluation.instanceId,
+					)?.deterministic,
+				),
+			),
+		})),
+		...(document?.evaluations.cycleFulfillment ?? []).map((evaluation) => ({
+			id: evaluation.instanceId,
+			name: evaluation.name || evaluation.instanceId,
+			type: "cycleFulfillment" as const,
+			enabled: evaluation.enabled,
+			status:
+				(result.evaluations.cycleFulfillment ?? []).find(
+					(item) => item.instanceId === evaluation.instanceId,
+				)?.status ?? "indeterminate",
+			summary: otherEvaluationSummary(
+				"cycleFulfillment",
+				valueRecord(
+					(result.evaluations.cycleFulfillment ?? []).find(
+						(item) => item.instanceId === evaluation.instanceId,
+					)?.deterministic,
+				),
+			),
+		})),
 	];
 	return {
 		points,
@@ -386,7 +476,8 @@ export function projectionResultToLocal(
 		movements,
 		firstFailure:
 			movements.find((movement) => movement.constraint !== null) ?? null,
-		goals,
+		evaluations,
+		otherEvaluations,
 		inflows: result.totals.externalInflowAmount,
 		outflows: result.totals.externalOutflowAmount,
 		transfers: result.totals.internalTransferAmount,
@@ -409,10 +500,24 @@ function aggregateFulfillmentEvaluation(
 export function stochasticResultToLocal(
 	result: StochasticProjectionResult,
 ): RangeResult {
-	const goalSuccess: Record<string, number> = {};
+	const evaluationSuccess: Record<string, number> = {};
 	for (const evaluation of result.evaluations.netWorthThreshold) {
 		const probability = evaluationProbability(evaluation, "probability");
-		if (probability !== null) goalSuccess[evaluation.instanceId] = probability;
+		if (probability !== null)
+			evaluationSuccess[evaluation.instanceId] = probability;
+	}
+	for (const evaluation of result.evaluations.accountBalance) {
+		const probability = evaluationProbability(evaluation, "probability");
+		if (probability !== null)
+			evaluationSuccess[evaluation.instanceId] = probability;
+	}
+	for (const evaluation of result.evaluations.cycleFulfillment ?? []) {
+		const probability = evaluationProbability(
+			evaluation,
+			"withinBudgetProbability",
+		);
+		if (probability !== null)
+			evaluationSuccess[evaluation.instanceId] = probability;
 	}
 	const fulfillment = aggregateFulfillmentEvaluation(result);
 	const fulfillmentProbability = evaluationProbability(
@@ -427,7 +532,7 @@ export function stochasticResultToLocal(
 			upper: band.netWorth.p90,
 		})),
 		count: result.config.runCount,
-		goalSuccess,
+		evaluationSuccess,
 		failureShare:
 			fulfillmentProbability === null ? 0 : 1 - fulfillmentProbability,
 	};

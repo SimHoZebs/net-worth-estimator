@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { testPlan } from "../test/plan.ts";
 import { changesBetween } from "./model.ts";
 import {
-	removeGoal,
+	removeEvaluation,
 	removePlanItem,
-	setGoalEnabled,
+	setEvaluationEnabled,
 	toggleMovement,
 	upsertItem,
 } from "./planEdits.ts";
@@ -55,29 +55,29 @@ describe("immutable plan edits", () => {
 			...testPlan,
 			accounts: testPlan.accounts.slice(0, 1),
 			movements: [],
-			goals: [],
+			evaluations: [],
 		};
 		expect(removePlanItem({ plan, target })).toBeInstanceOf(Error);
 		expect(plan.accounts).toHaveLength(1);
 	});
-	it("isolates goal toggles and removal", () => {
-		const goal = testPlan.goals[0];
-		if (!goal) throw new Error("Missing test goal");
+	it("isolates evaluation toggles and removal", () => {
+		const evaluation = testPlan.evaluations[0];
+		if (!evaluation) throw new Error("Missing test evaluation");
 		expect(
 			changesBetween({
 				saved: testPlan,
-				current: setGoalEnabled({
+				current: setEvaluationEnabled({
 					plan: testPlan,
-					id: goal.id,
-					enabled: !goal.enabled,
+					id: evaluation.id,
+					enabled: !evaluation.enabled,
 				}),
 			}),
 		).toHaveLength(1);
 		expect(
 			changesBetween({
 				saved: testPlan,
-				current: removeGoal({ plan: testPlan, id: goal.id }),
+				current: removeEvaluation({ plan: testPlan, id: evaluation.id }),
 			}),
-		).toMatchObject([{ kind: "Removed", label: goal.name }]);
+		).toMatchObject([{ kind: "Removed", label: evaluation.name }]);
 	});
 });

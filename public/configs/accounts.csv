@@ -15,7 +15,7 @@ sallie_mae_principal,Sallie Mae (Principal),debt,-Infinity,0,#dc2626,true
 sallie_mae_interest,Sallie Mae (Interest),debt,-Infinity,0,#f87171,true
 car_loan_principal,Car Loan (Principal),debt,-Infinity,0,#dc2626,true
 car_loan_interest,Car Loan (Interest),debt,-Infinity,0,#f87171,true
-prime_card,Prime Card,debt,-Infinity,0,#0ea5e9,true
+prime_card,Prime Visa,debt,-Infinity,0,#0ea5e9,true
 ultimate_card,Sapphire Preferred,debt,-Infinity,0,#8b5cf6,true
 rsu,RSU (Unvested),investment,-Infinity,Infinity,#f59e0b,false
 rsu_vested,RSU (Vested),investment,-Infinity,Infinity,#d97706,true

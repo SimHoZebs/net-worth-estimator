@@ -2,8 +2,8 @@ import { AccountList } from "../components/AccountList.tsx";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import type { Account, Plan } from "../domain/model.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
+import { EvaluationPreview } from "./outlook/EvaluationPreview.tsx";
 import { FundingInsight } from "./outlook/FundingInsight.tsx";
-import { GoalPreview } from "./outlook/GoalPreview.tsx";
 import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
 import { TimingPreview } from "./outlook/TimingPreview.tsx";
 
@@ -20,9 +20,10 @@ export function Outlook({
 	onEvidence,
 	onFailure,
 	onAccount,
-	onPlan,
-	onGoals,
-	onGoal,
+	onAccounts,
+	onTransactions,
+	onEvaluations,
+	onEvaluation,
 	onAssumptions,
 }: {
 	plan: Plan;
@@ -37,15 +38,17 @@ export function Outlook({
 	onEvidence: () => void;
 	onFailure: () => void;
 	onAccount: (account: Account) => void;
-	onPlan: () => void;
-	onGoals: () => void;
-	onGoal: (id: string) => void;
+	onAccounts: () => void;
+	onTransactions: () => void;
+	onEvaluations: () => void;
+	onEvaluation: (id: string) => void;
 	onAssumptions: () => void;
 }) {
 	if (!projection.points.length) return null;
-	const goal =
-		projection.goals.find((result) => result.current < result.goal.target) ??
-		projection.goals[0];
+	const evaluation =
+		projection.evaluations.find(
+			(result) => result.current < result.evaluation.target,
+		) ?? projection.evaluations[0];
 	return (
 		<>
 			<div className="outlook-top">
@@ -76,7 +79,7 @@ export function Outlook({
 					<FundingInsight
 						failure={projection.firstFailure}
 						onFailure={onFailure}
-						onPlan={onPlan}
+						onPlan={onTransactions}
 					/>
 				</div>
 			</div>
@@ -88,11 +91,11 @@ export function Outlook({
 				</div>
 			)}
 			<div className="outlook-secondary">
-				<GoalPreview
-					result={goal ?? null}
+				<EvaluationPreview
+					result={evaluation ?? null}
 					range={range}
-					onGoals={onGoals}
-					onGoal={onGoal}
+					onEvaluations={onEvaluations}
+					onEvaluation={onEvaluation}
 				/>
 				<TimingPreview plan={plan} projection={projection} />
 			</div>
@@ -100,7 +103,7 @@ export function Outlook({
 				plan={plan}
 				projection={projection}
 				onAccount={onAccount}
-				onAll={onPlan}
+				onAll={onAccounts}
 			/>
 		</>
 	);

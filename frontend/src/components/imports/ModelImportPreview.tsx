@@ -35,7 +35,9 @@ export function ModelImportPreview({
 				<p>
 					{document.evaluations.financialIndependence.length +
 						document.evaluations.netWorthThreshold.length +
-						document.evaluations.postingFulfillment.length}{" "}
+						document.evaluations.accountBalance.length +
+						document.evaluations.postingFulfillment.length +
+						(document.evaluations.cycleFulfillment ?? []).length}{" "}
 					evaluations
 				</p>
 			</div>
