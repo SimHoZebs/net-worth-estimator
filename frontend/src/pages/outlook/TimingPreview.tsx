@@ -7,7 +7,13 @@ import {
 	isCycleOutflow,
 	resolveStatementCycle,
 } from "../../domain/cardCycle.ts";
-import { dateLabel, money, shiftDate, sum } from "../../domain/format.ts";
+import {
+	dateLabel,
+	money,
+	shiftDate,
+	sum,
+	todayIso,
+} from "../../domain/format.ts";
 import {
 	cashCushion,
 	checkingAccountId,
@@ -148,6 +154,16 @@ export function TimingPreview({
 	const [settings, setSettings] = useState<TotalCycleSettings>(loadPersisted);
 	const [detail, setDetail] = useState<TimingDetailTab | null>(null);
 
+	// Display timing follows the real calendar day so due dates read
+	// correctly, while the projection math stays on plan.startDate (the
+	// latest balance checkpoint). Never before the projection start.
+	const [displayToday] = useState(() => {
+		const today = todayIso();
+		const start = plan.startDate.slice(0, 10);
+		return today >= start ? today : start;
+	});
+	const staleData = displayToday > plan.startDate.slice(0, 10);
+
 	useEffect(() => {
 		if (typeof window === "undefined" || !window.localStorage) return;
 		try {
@@ -178,10 +194,10 @@ export function TimingPreview({
 	const cycle = useMemo(
 		() =>
 			resolveStatementCycle({
-				todayIso: plan.startDate,
+				todayIso: displayToday,
 				statementDay: settings.statementDay,
 			}),
-		[plan.startDate, settings.statementDay],
+		[displayToday, settings.statementDay],
 	);
 
 	const perAccount = useMemo(
@@ -194,24 +210,23 @@ export function TimingPreview({
 				});
 				const name =
 					cards.find((card) => card.id === accountId)?.name ?? accountId;
-				const today = plan.startDate.slice(0, 10);
 				return {
 					accountId,
 					name,
 					derived: cycleSpentSoFar({
 						transactions,
 						cycleStart: cycle.cycleStart,
-						todayIso: plan.startDate,
+						todayIso: displayToday,
 					}),
 					inCycle: transactions.filter(
 						(transaction) =>
 							isCycleOutflow(transaction) &&
 							transaction.date >= cycle.cycleStart &&
-							transaction.date <= today,
+							transaction.date <= displayToday,
 					),
 				};
 			}),
-		[trackedIds, cards, plan, projection, cycle, plan.startDate],
+		[trackedIds, cards, plan, projection, cycle, displayToday],
 	);
 	const cycleTransactions = useMemo(
 		() =>
@@ -232,30 +247,30 @@ export function TimingPreview({
 		[projection.movements, settings.movementIds],
 	);
 	const remainingDerived = useMemo(() => {
-		if (!checkingId) return { total: 0, monthEnd: plan.startDate.slice(0, 10) };
+		if (!checkingId) return { total: 0, monthEnd: displayToday.slice(0, 10) };
 		return remainingMonthlyObligations({
 			movements: obligationMovements,
 			checkingId,
-			todayIso: plan.startDate,
+			todayIso: displayToday,
 		});
-	}, [obligationMovements, checkingId, plan.startDate]);
+	}, [obligationMovements, checkingId, displayToday]);
 	const fixedDerived = useMemo(() => {
 		if (!checkingId)
-			return { total: 0, start: plan.startDate, end: plan.startDate };
+			return { total: 0, start: displayToday, end: displayToday };
 		return nextMonthObligations({
 			movements: obligationMovements,
 			checkingId,
-			todayIso: plan.startDate,
+			todayIso: displayToday,
 		});
-	}, [obligationMovements, checkingId, plan.startDate]);
+	}, [obligationMovements, checkingId, displayToday]);
 	const paycheckDerived = useMemo(() => {
 		if (!checkingId) return null;
 		return nextPaycheck({
 			movements: projection.movements,
 			checkingId,
-			todayIso: plan.startDate,
+			todayIso: displayToday,
 		});
-	}, [projection.movements, checkingId, plan.startDate]);
+	}, [projection.movements, checkingId, displayToday]);
 
 	const billCandidates = useMemo(() => {
 		if (!checkingId) return [];
@@ -281,17 +296,16 @@ export function TimingPreview({
 
 	const mandatoryThisMonth = useMemo(() => {
 		if (!checkingId) return [];
-		const today = plan.startDate.slice(0, 10);
 		return groupMandatorySpending({
 			movements: obligationMovements,
 			checkingId,
-			start: shiftDate({ date: today, days: 1 }),
+			start: shiftDate({ date: displayToday, days: 1 }),
 			end: remainingDerived.monthEnd,
 		});
 	}, [
 		obligationMovements,
 		checkingId,
-		plan.startDate,
+		displayToday,
 		remainingDerived.monthEnd,
 	]);
 	const mandatoryNextMonth = useMemo(() => {
@@ -313,14 +327,13 @@ export function TimingPreview({
 	);
 	const cycleThisGroups = useMemo(() => {
 		if (!checkingId) return [];
-		const today = plan.startDate.slice(0, 10);
 		return groupMandatorySpending({
 			movements: obligationMovements,
 			checkingId,
-			start: shiftDate({ date: today, days: 1 }),
+			start: shiftDate({ date: displayToday, days: 1 }),
 			end: cycle.cycleEnd,
 		});
-	}, [obligationMovements, checkingId, plan.startDate, cycle.cycleEnd]);
+	}, [obligationMovements, checkingId, displayToday, cycle.cycleEnd]);
 	const cycleNextGroups = useMemo(() => {
 		if (!checkingId) return [];
 		return groupMandatorySpending({
@@ -486,13 +499,13 @@ export function TimingPreview({
 		settings.mandatoryFrame === "calendar"
 			? {
 					title: "Due before month-end",
-					subtitle: `${dateLabel(plan.startDate, true)} to ${dateLabel(remainingDerived.monthEnd, true)}`,
+					subtitle: `${dateLabel(displayToday, true)} to ${dateLabel(remainingDerived.monthEnd, true)}`,
 					total: remainingObligations,
 					groups: mandatoryThisMonth,
 				}
 			: {
 					title: "Due before cycle end",
-					subtitle: `${dateLabel(plan.startDate, true)} to ${dateLabel(cycle.cycleEnd, true)}`,
+					subtitle: `${dateLabel(displayToday, true)} to ${dateLabel(cycle.cycleEnd, true)}`,
 					total: sum(cycleThisGroups.map((group) => group.total)),
 					groups: cycleThisGroups,
 				};
@@ -530,6 +543,7 @@ export function TimingPreview({
 			<p className="cycle-dates">
 				{dateLabel(cycle.cycleStart, true)} to {dateLabel(cycle.cycleEnd, true)}{" "}
 				· {fullDaysLeft} {fullDaysLeft === 1 ? "day" : "days"} left
+				{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
 				{accountLabel ? ` · ${accountLabel}` : ""}
 			</p>
 			<div className="spend-answer">
@@ -596,7 +610,7 @@ export function TimingPreview({
 			{detail && (
 				<TimingDetailDialog
 					eyebrow={`${dateLabel(cycle.cycleStart, true)} to ${dateLabel(cycle.cycleEnd, true)}${accountLabel ? ` · ${accountLabel}` : ""}`}
-					today={plan.startDate.slice(0, 10)}
+					today={displayToday}
 					heroes={heroes}
 					cashNow={{
 						checking,

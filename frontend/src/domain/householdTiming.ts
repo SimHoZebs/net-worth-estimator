@@ -1,3 +1,4 @@
+import { isoDate } from "./format.ts";
 import type { Plan } from "./model.ts";
 import type { MovementResult } from "./result.ts";
 
@@ -8,17 +9,13 @@ function utcDate(iso: string): Date {
 	return new Date(`${iso.slice(0, 10)}T12:00:00Z`);
 }
 
-function toIso(date: Date): string {
-	return date.toISOString().slice(0, 10);
-}
-
 /** Last calendar day of the month containing `todayIso`. */
 export function monthEndIso(todayIso: string): string {
 	const today = utcDate(todayIso);
 	const end = new Date(
 		Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0, 12, 0, 0),
 	);
-	return toIso(end);
+	return isoDate(end);
 }
 
 /** Inclusive [start, end] of the calendar month after `todayIso`. */
@@ -33,7 +30,7 @@ export function nextMonthRange(todayIso: string): {
 	const end = new Date(
 		Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 2, 0, 12, 0, 0),
 	);
-	return { start: toIso(start), end: toIso(end) };
+	return { start: isoDate(start), end: isoDate(end) };
 }
 
 export function checkingAccountId(plan: Plan): string | null {

@@ -1,3 +1,4 @@
+import { todayIso } from "../domain/format.ts";
 import type { Account, Movement, Plan } from "../domain/model.ts";
 import {
 	type BackendAccount,
@@ -237,7 +238,7 @@ function fallbackStartDate(
 		projection?.milestones.projectionStartDate ??
 		latestDate(document.checkpoints.map((checkpoint) => checkpoint.Date)) ??
 		document.postings[0]?.startDate ??
-		new Date().toISOString().slice(0, 10)
+		todayIso()
 	);
 }
 
