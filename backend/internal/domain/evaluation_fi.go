@@ -292,6 +292,10 @@ func initializeBranchSimulationState(balances map[string]float64, events []types
 	for id, amount := range startState.ProjectionStartPostingState.LatestRealizedPostingAmounts {
 		latest[id] = amount
 	}
+	dates := make(map[string]string, len(startState.ProjectionStartPostingState.LatestRealizedPostingDates))
+	for id, date := range startState.ProjectionStartPostingState.LatestRealizedPostingDates {
+		dates[id] = date
+	}
 	byYear := make(map[string]map[string]float64, len(startState.ProjectionStartPostingState.RealizedPostingAmountsByYear))
 	for postingID, years := range startState.ProjectionStartPostingState.RealizedPostingAmountsByYear {
 		yearMap := make(map[string]float64, len(years))
@@ -307,6 +311,7 @@ func initializeBranchSimulationState(balances map[string]float64, events []types
 		}
 		postingID := event.Origin.PostingID
 		latest[postingID] = event.RealizedAmount
+		dates[postingID] = string(event.Date)
 		yearMap, ok := byYear[postingID]
 		if !ok {
 			yearMap = map[string]float64{}
@@ -319,6 +324,7 @@ func initializeBranchSimulationState(balances map[string]float64, events []types
 	return SimulationState{
 		Balances:                     balances,
 		LatestRealizedPostingAmounts: latest,
+		LatestRealizedPostingDates:   dates,
 		RealizedPostingAmountsByYear: byYear,
 	}
 }
@@ -509,8 +515,9 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 	baseRealizedByDateAndPosting := shared.baseRealizedByDateAndPosting
 	baseEventsByDateAndPosting := shared.baseEventsByDateAndPosting
 	transitions, err := CreateTransitionRuntime(types.FinancialModel{
-		Accounts: path.EffectiveDocument.Accounts,
-		Postings: branchPostings,
+		Accounts:     path.EffectiveDocument.Accounts,
+		Postings:     branchPostings,
+		PaymentTerms: path.EffectiveDocument.PaymentTerms,
 	}, initializeBranchSimulationState(candidateBalances, path.MovementEvents, candidate.Date, path), path.ProjectionStartDate, monteCarloSample, path.IncomeData)
 	if err != nil {
 		return nil, err

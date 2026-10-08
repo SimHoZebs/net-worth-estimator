@@ -3,13 +3,15 @@ package types
 // Simulation and stochastic wire types.
 
 type FinancialModel struct {
-	Accounts []Account `json:"accounts"`
-	Postings []Posting `json:"postings"`
+	Accounts     []Account      `json:"accounts"`
+	Postings     []Posting      `json:"postings"`
+	PaymentTerms []PaymentTerms `json:"paymentTerms,omitempty"`
 }
 
 type SimulationState struct {
 	Balances                     map[string]float64            `json:"balances"`
 	LatestRealizedPostingAmounts map[string]float64            `json:"latestRealizedPostingAmounts"`
+	LatestRealizedPostingDates   map[string]string             `json:"latestRealizedPostingDates,omitempty"`
 	RealizedPostingAmountsByYear map[string]map[string]float64 `json:"realizedPostingAmountsByYear"`
 }
 

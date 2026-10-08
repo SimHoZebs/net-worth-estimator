@@ -125,6 +125,7 @@ type ProjectionPath struct {
 	IncomeData                  *IncomeDataSnapshot    `json:"incomeData,omitempty"`
 	ProjectionStartPostingState struct {
 		LatestRealizedPostingAmounts map[string]float64            `json:"latestRealizedPostingAmounts"`
+		LatestRealizedPostingDates   map[string]string             `json:"latestRealizedPostingDates,omitempty"`
 		RealizedPostingAmountsByYear map[string]map[string]float64 `json:"realizedPostingAmountsByYear"`
 	} `json:"projectionStartPostingState"`
 	ProjectionStartDate IsoDate `json:"projectionStartDate"`

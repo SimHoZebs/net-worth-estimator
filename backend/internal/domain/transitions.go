@@ -30,10 +30,14 @@ func CloneSimulationState(state SimulationState) SimulationState {
 	cloned := SimulationState{
 		Balances:                     SnapshotBalances(state.Balances),
 		LatestRealizedPostingAmounts: make(map[string]float64, len(state.LatestRealizedPostingAmounts)),
+		LatestRealizedPostingDates:   make(map[string]string, len(state.LatestRealizedPostingDates)),
 		RealizedPostingAmountsByYear: make(map[string]map[string]float64, len(state.RealizedPostingAmountsByYear)),
 	}
 	for id, amount := range state.LatestRealizedPostingAmounts {
 		cloned.LatestRealizedPostingAmounts[id] = amount
+	}
+	for id, date := range state.LatestRealizedPostingDates {
+		cloned.LatestRealizedPostingDates[id] = date
 	}
 	for postingID, byYear := range state.RealizedPostingAmountsByYear {
 		years := make(map[string]float64, len(byYear))
@@ -51,6 +55,7 @@ type TransitionRuntime struct {
 	model            types.FinancialModel
 	accountByID      map[string]types.Account
 	accountOrder     []string
+	paymentTerms     map[string]types.PaymentTerms
 	projectionStart  string
 	monteCarloSample *types.MonteCarloSample
 	incomeIndex      *incomeRuntimeIndex
@@ -86,6 +91,7 @@ func CreateTransitionRuntime(model types.FinancialModel, initialState Simulation
 		model:            model,
 		accountByID:      accountByID,
 		accountOrder:     accountOrder,
+		paymentTerms:     paymentTermsByAccount(model.PaymentTerms),
 		projectionStart:  projectionStartDate,
 		monteCarloSample: monteCarloSample,
 		incomeIndex:      newIncomeRuntimeIndex(incomeData, accountByID),
@@ -113,6 +119,10 @@ func (t *TransitionRuntime) incomeConfig(posting *types.Posting) (types.IncomeAm
 
 func (t *TransitionRuntime) observePosting(postingID string, realizedAmount float64, date string) {
 	t.State.LatestRealizedPostingAmounts[postingID] = realizedAmount
+	if t.State.LatestRealizedPostingDates == nil {
+		t.State.LatestRealizedPostingDates = map[string]string{}
+	}
+	t.State.LatestRealizedPostingDates[postingID] = date
 	year := date[:4]
 	byYear, ok := t.State.RealizedPostingAmountsByYear[postingID]
 	if !ok {
@@ -176,7 +186,7 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 		rate := rates[yearIndex]
 		sampledRate = &rate
 	}
-	rawRequested, err := ComputeRequestedAmount(occurrence, date, t.State.LatestRealizedPostingAmounts, t.State.RealizedPostingAmountsByYear, t.State.Balances, sampledRate)
+	rawRequested, err := ComputeRequestedAmount(occurrence, date, t.State.LatestRealizedPostingAmounts, t.State.LatestRealizedPostingDates, t.State.RealizedPostingAmountsByYear, t.State.Balances, t.paymentTerms, sampledRate)
 	if err != nil {
 		return PostingExecutionTransition{}, err
 	}

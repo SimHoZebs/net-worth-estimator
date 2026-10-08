@@ -114,7 +114,7 @@ func ApplyAnnualGrowth(amount, annualGrowthRate float64, daysElapsed int) float6
 }
 
 // ComputeRequestedAmount resolves the raw posting amount for one occurrence.
-func ComputeRequestedAmount(occurrence DatedPostingOccurrence, currentDate string, latestRealized map[string]float64, realizedByYear map[string]map[string]float64, balances map[string]float64, stochasticRate *float64) (float64, error) {
+func ComputeRequestedAmount(occurrence DatedPostingOccurrence, currentDate string, latestRealized map[string]float64, realizedDates map[string]string, realizedByYear map[string]map[string]float64, balances map[string]float64, paymentTerms map[string]types.PaymentTerms, stochasticRate *float64) (float64, error) {
 	posting := occurrence.Posting
 	daysElapsed := DaysBetween(posting.StartDate, currentDate)
 	effectiveAnnualRate := posting.AnnualRate
@@ -128,7 +128,9 @@ func ComputeRequestedAmount(occurrence DatedPostingOccurrence, currentDate strin
 	rawAmount, err := ResolvePostingAmountDescriptor(posting.Amount, &AmountProviderContext{
 		Balances:                     balances,
 		LatestRealizedPostingAmounts: latestRealized,
+		LatestRealizedPostingDates:   realizedDates,
 		RealizedPostingAmountsByYear: realizedByYear,
+		PaymentTerms:                 paymentTerms,
 		Date:                         currentDate,
 		OccurrenceRate:               ratePerOccurrence,
 	})
