@@ -396,10 +396,14 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 	await page.keyboard.press("ArrowRight");
 	await expect(page.getByRole("tab", { name: /Balance checks/ })).toBeFocused();
 	await page.goto("/#transactions");
-	await expect(page.locator('.page-tabs[role="tablist"]')).toHaveCount(0);
 	await expect(
-		page.getByRole("combobox", { name: "Transaction schedule" }),
-	).toBeVisible();
+		page.locator('.page-tabs[role="tablist"] > button[role="tab"]'),
+	).toHaveCount(2);
+	await page.getByRole("tab", { name: /Recurring/ }).click();
+	await expect(page.getByRole("tab", { name: /Recurring/ })).toHaveAttribute(
+		"aria-selected",
+		"true",
+	);
 	await expect(
 		page.getByRole("heading", { name: "The inputs behind the outlook" }),
 	).not.toBeVisible();
