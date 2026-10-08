@@ -55,7 +55,7 @@ export function AccountDialog({
 				</div>
 				<div className="account-dialog-basis">
 					<Badge tone={account.balanceCheck ? "green" : "outline"}>
-						{account.balanceCheck ? "Balance check" : "Projected balance"}
+						{account.balanceCheck ? "Confirmed balance" : "Estimated balance"}
 					</Badge>
 					<span>As of {dateLabel(account.observedOn, true)}</span>
 				</div>

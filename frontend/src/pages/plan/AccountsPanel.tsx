@@ -49,8 +49,8 @@ export function AccountsPanel({
 											{!account.enabled
 												? " · excluded"
 												: account.balanceCheck
-													? " · balance check"
-													: " · projected balance"}
+													? " · confirmed"
+													: " · estimated"}
 										</small>
 									</span>
 									{account.readOnly && (
@@ -108,7 +108,7 @@ export function BalanceChecksPanel({
 						<strong>{money(account.balance)}</strong>
 						<IconButton
 							icon={Pencil}
-							label={`Edit balance check for ${account.name}`}
+							label={`Edit starting balance for ${account.name}`}
 							onClick={() => onEdit(account)}
 						/>
 					</div>
