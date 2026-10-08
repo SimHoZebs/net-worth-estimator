@@ -6,6 +6,7 @@ import {
 	checkingAccountId,
 	cycleAllowance,
 	cycleBudget,
+	groupMandatorySpending,
 	monthEndIso,
 	nextMonthObligations,
 	nextMonthRange,
@@ -152,5 +153,78 @@ describe("projection-derived timing", () => {
 				todayIso: "2026-10-08",
 			}),
 		).toBeNull();
+	});
+});
+
+describe("groupMandatorySpending", () => {
+	const movements = [
+		movementFixture({
+			date: "2026-10-10",
+			movementId: "housing",
+			name: "Housing",
+			fromId: "checking",
+			toId: null,
+			requested: 3200,
+			realized: 3200,
+		}),
+		movementFixture({
+			date: "2026-10-20",
+			movementId: "living",
+			name: "Living",
+			fromId: "checking",
+			toId: null,
+			requested: 1000,
+			realized: 1000,
+		}),
+		movementFixture({
+			date: "2026-10-25",
+			movementId: "living",
+			name: "Living",
+			fromId: "checking",
+			toId: null,
+			requested: 500,
+			realized: 500,
+		}),
+		movementFixture({
+			date: "2026-11-01",
+			movementId: "housing",
+			name: "Housing",
+			fromId: "checking",
+			toId: null,
+			requested: 3200,
+			realized: 3200,
+		}),
+	];
+
+	it("groups a window by movement with totals and dates", () => {
+		const groups = groupMandatorySpending({
+			movements,
+			checkingId: "checking",
+			start: "2026-10-09",
+			end: "2026-10-31",
+		});
+		expect(groups).toHaveLength(2);
+		expect(groups[0]).toMatchObject({
+			movementId: "housing",
+			total: 3200,
+			count: 1,
+		});
+		expect(groups[1]).toMatchObject({
+			movementId: "living",
+			total: 1500,
+			count: 2,
+			dates: ["2026-10-20", "2026-10-25"],
+		});
+	});
+
+	it("excludes movements outside the window", () => {
+		const groups = groupMandatorySpending({
+			movements,
+			checkingId: "checking",
+			start: "2026-11-01",
+			end: "2026-11-30",
+		});
+		expect(groups).toHaveLength(1);
+		expect(groups[0]).toMatchObject({ movementId: "housing", total: 3200 });
 	});
 });

@@ -181,3 +181,56 @@ export function cycleAllowance({
 }): number {
 	return paycheck - fixedObligations - spent - reserve;
 }
+
+export interface MandatorySpendingGroup {
+	movementId: string;
+	name: string;
+	total: number;
+	count: number;
+	dates: string[];
+}
+
+/**
+ * Mandatory spendings in an inclusive date window: checking outflows
+ * grouped by movement, sorted by total descending. Powers the mandatory
+ * visualization (remaining bills this month, fixed obligations next month).
+ */
+export function groupMandatorySpending({
+	movements,
+	checkingId,
+	start,
+	end,
+}: {
+	movements: MovementResult[];
+	checkingId: string;
+	start: string;
+	end: string;
+}): MandatorySpendingGroup[] {
+	const groups = new Map<string, MandatorySpendingGroup>();
+	for (const movement of movements) {
+		if (movement.fromId !== checkingId) continue;
+		if (movement.requested <= 0) continue;
+		if (movement.date < start || movement.date > end) continue;
+		const key = movement.movementId;
+		const existing = groups.get(key);
+		if (existing) {
+			existing.total += movement.requested;
+			existing.count += 1;
+			if (!existing.dates.includes(movement.date)) {
+				existing.dates.push(movement.date);
+				existing.dates.sort();
+			}
+		} else {
+			groups.set(key, {
+				movementId: movement.movementId,
+				name: movement.name || movement.movementId,
+				total: movement.requested,
+				count: 1,
+				dates: [movement.date],
+			});
+		}
+	}
+	return [...groups.values()].sort(
+		(a, b) => b.total - a.total || a.name.localeCompare(b.name),
+	);
+}

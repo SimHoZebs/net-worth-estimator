@@ -1250,6 +1250,47 @@
 		color: #8a927e;
 		font-size: 9px;
 	}
+	.mandatory-list {
+		list-style: none;
+		padding: 0;
+		margin: 0 0 20px;
+		display: grid;
+		gap: 12px;
+	}
+	.mandatory-list li {
+		display: grid;
+		gap: 7px;
+		padding: 10px 0;
+		border-bottom: 1px solid #eef1e6;
+		font-size: 11px;
+	}
+	.mandatory-list li:last-child {
+		border-bottom: 0;
+	}
+	.mandatory-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 12px;
+	}
+	.mandatory-row > span {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.mandatory-row small {
+		color: #8a927e;
+		font-size: 9px;
+	}
+	.timing-mandatory h3 {
+		font-size: 12px;
+		font-weight: 650;
+		color: #374a31;
+		margin: 20px 0 8px;
+	}
+	.timing-mandatory h3:first-child {
+		margin-top: 4px;
+	}
 	.account-section {
 		margin-top: 30px;
 	}
@@ -2071,8 +2112,11 @@
 		border-right: 0;
 		border-bottom: 0;
 	}
-	.modal-drawer[open] {
+	.modal.modal-drawer[open] {
 		animation: drawer-in 0.18s ease-out;
+	}
+	.modal.modal-drawer.is-closing {
+		animation: drawer-out 0.15s ease-in forwards;
 	}
 	@keyframes drawer-in {
 		from {
@@ -2082,6 +2126,16 @@
 			transform: translateX(0);
 		}
 	}
+	@keyframes drawer-out {
+		from {
+			opacity: 1;
+			transform: translateX(0);
+		}
+		to {
+			opacity: 0;
+			transform: translateX(48px);
+		}
+	}
 	.modal::backdrop {
 		background: #172d2b66;
 		backdrop-filter: blur(3px);
@@ -2089,12 +2143,25 @@
 	.modal[open] {
 		animation: dialog-in 0.15s ease-out;
 	}
+	.modal.is-closing {
+		animation: dialog-out 0.12s ease-in forwards;
+	}
 	@keyframes dialog-in {
 		from {
 			transform: translateY(8px);
 		}
 		to {
 			transform: translateY(0);
+		}
+	}
+	@keyframes dialog-out {
+		from {
+			opacity: 1;
+			transform: translateY(0);
+		}
+		to {
+			opacity: 0;
+			transform: translateY(8px);
 		}
 	}
 	.modal-header {

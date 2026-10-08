@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronDown } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Progress } from "../../components/ui.tsx";
 import { accountTransactions } from "../../domain/accountActivity.ts";
@@ -9,7 +9,7 @@ import {
 	groupCycleSpending,
 	resolveStatementCycle,
 } from "../../domain/cardCycle.ts";
-import { dateLabel, money } from "../../domain/format.ts";
+import { dateLabel, money, shiftDate } from "../../domain/format.ts";
 import {
 	cashCushion,
 	checkingAccountId,
@@ -18,12 +18,17 @@ import {
 	cycleBudget,
 	DEFAULT_CYCLE_STATEMENT_DAY,
 	DEFAULT_PROTECTED_RESERVE,
+	groupMandatorySpending,
 	nextMonthObligations,
 	nextPaycheck,
 	remainingMonthlyObligations,
 } from "../../domain/householdTiming.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { Projection } from "../../domain/result.ts";
+import {
+	TimingDetailDialog,
+	type TimingDetailTab,
+} from "./TimingDetailDialog.tsx";
 
 const STORAGE_KEY = "nwe.card-cycle.v3";
 const LEGACY_STORAGE_KEY = "nwe.card-cycle.v2";
@@ -115,8 +120,7 @@ export function TimingPreview({
 		[plan.accounts],
 	);
 	const [settings, setSettings] = useState<TotalCycleSettings>(loadPersisted);
-	const [expanded, setExpanded] = useState(false);
-	const [configOpen, setConfigOpen] = useState(false);
+	const [detail, setDetail] = useState<TimingDetailTab | null>(null);
 
 	useEffect(() => {
 		if (typeof window === "undefined" || !window.localStorage) return;
@@ -209,6 +213,31 @@ export function TimingPreview({
 		});
 	}, [projection.movements, checkingId, plan.startDate]);
 
+	const mandatoryThisMonth = useMemo(() => {
+		if (!checkingId) return [];
+		const today = plan.startDate.slice(0, 10);
+		return groupMandatorySpending({
+			movements: projection.movements,
+			checkingId,
+			start: shiftDate({ date: today, days: 1 }),
+			end: remainingDerived.monthEnd,
+		});
+	}, [
+		projection.movements,
+		checkingId,
+		plan.startDate,
+		remainingDerived.monthEnd,
+	]);
+	const mandatoryNextMonth = useMemo(() => {
+		if (!checkingId) return [];
+		return groupMandatorySpending({
+			movements: projection.movements,
+			checkingId,
+			start: fixedDerived.start,
+			end: fixedDerived.end,
+		});
+	}, [projection.movements, checkingId, fixedDerived.start, fixedDerived.end]);
+
 	if (!cards.length) {
 		return (
 			<section className="timing-preview" aria-label="Total card cycle">
@@ -293,6 +322,12 @@ export function TimingPreview({
 		}));
 	};
 
+	const resetConfig = (
+		key: "paycheck" | "fixed" | "spent" | "checking" | "remaining",
+	) => {
+		updateSettings({ [`${key}Override`]: null } as Partial<TotalCycleSettings>);
+	};
+
 	const toggleAccount = (accountId: string) => {
 		const explicit = settings.accountIds ?? cards.map((card) => card.id);
 		const next = explicit.includes(accountId)
@@ -326,24 +361,8 @@ export function TimingPreview({
 					<strong>{money(cushion)}</strong>
 				</div>
 				<div>
-					<span>Checking after bills</span>
-					<strong>
-						{money(checking)} − {money(remainingObligations)}
-					</strong>
-				</div>
-			</div>
-			<p className="section-note">
-				Cash cushion covers existing obligations. Card purchases do not reduce
-				it here; they are budgeted against your next paycheck below.
-			</p>
-			<div className="timing-figures">
-				<div>
-					<span>Set aside for cycle</span>
-					<strong>{money(budget)}</strong>
-				</div>
-				<div>
-					<span>Spent so far</span>
-					<strong>{money(spent)}</strong>
+					<span>Daily allowance</span>
+					<strong>{money(Math.max(0, daily))}</strong>
 				</div>
 			</div>
 			<div className="cycle-remaining">
@@ -352,8 +371,8 @@ export function TimingPreview({
 					<strong>{money(Math.abs(allowance))}</strong>
 				</div>
 				<div>
-					<span>Daily allowance</span>
-					<strong>{money(Math.max(0, daily))}</strong>
+					<span>Mandatory bills left</span>
+					<strong>{money(remainingObligations)}</strong>
 				</div>
 			</div>
 			<div className="cycle-progress">
@@ -366,10 +385,6 @@ export function TimingPreview({
 					{budget > 0 ? (
 						<>
 							{money(spent)} of {money(budget)} used
-							{` · paycheck ${money(paycheck)} − fixed ${money(fixedObligations)} − reserve ${money(settings.reserve)}`}
-							{scheduledRest > 0
-								? ` · ${money(scheduledRest)} scheduled before ${dateLabel(cycle.cycleEnd, true)}`
-								: ""}
 						</>
 					) : (
 						"Enter your expected paycheck to track daily room to spend."
@@ -380,256 +395,64 @@ export function TimingPreview({
 				<button
 					type="button"
 					className="text-button"
-					aria-expanded={expanded}
-					onClick={() => setExpanded((value) => !value)}
+					onClick={() => setDetail("mandatory")}
 				>
-					<ChevronDown
-						size={15}
-						style={{
-							transform: expanded ? "rotate(180deg)" : undefined,
-							transition: "transform 0.15s",
-						}}
-					/>
-					{expanded
-						? "Hide cycle breakdown"
-						: `Where the cycle went (${groups.length})`}
+					Mandatory spending ({money(fixedObligations)} next month)
 				</button>
 				<button
 					type="button"
 					className="text-button"
-					aria-expanded={configOpen}
-					onClick={() => setConfigOpen((value) => !value)}
+					onClick={() => setDetail("cycle")}
+				>
+					{`Where the cycle went (${groups.length})`}
+				</button>
+				<button
+					type="button"
+					className="text-button"
+					onClick={() => setDetail("configure")}
 				>
 					Configure cycle
 				</button>
 			</div>
-			{configOpen && (
-				<div className="cycle-config">
-					<label className="field">
-						<span>Statement starts on day (1–28)</span>
-						<input
-							type="number"
-							min={1}
-							max={28}
-							value={settings.statementDay}
-							onChange={(event) =>
-								updateSettings({
-									statementDay: Math.min(
-										28,
-										Math.max(1, Math.floor(Number(event.target.value) || 20)),
-									),
-								})
-							}
-						/>
-					</label>
-					<label className="field">
-						<span>
-							Expected next paycheck ($) —{" "}
-							{paycheckDerived
-								? `${money(paycheckDerived.amount)} on ${dateLabel(paycheckDerived.date, true)}`
-								: "no upcoming inflow in projection"}
-						</span>
-						<input
-							type="number"
-							min={0}
-							step="10"
-							placeholder={String(Math.round(paycheckDerived?.amount ?? 0))}
-							value={settings.paycheckOverride ?? ""}
-							onChange={(event) =>
-								updateSettings({
-									paycheckOverride:
-										event.target.value === ""
-											? null
-											: Math.max(0, Number(event.target.value) || 0),
-								})
-							}
-						/>
-					</label>
-					{settings.paycheckOverride !== null && (
-						<button
-							type="button"
-							className="text-button"
-							onClick={() => updateSettings({ paycheckOverride: null })}
-						>
-							Use projected {money(paycheckDerived?.amount ?? 0)} instead
-						</button>
-					)}
-					<label className="field">
-						<span>
-							Next month fixed obligations ($) — {money(fixedDerived.total)} for{" "}
-							{dateLabel(fixedDerived.start, true)} to{" "}
-							{dateLabel(fixedDerived.end, true)}
-						</span>
-						<input
-							type="number"
-							min={0}
-							step="10"
-							placeholder={String(Math.round(fixedDerived.total))}
-							value={settings.fixedOverride ?? ""}
-							onChange={(event) =>
-								updateSettings({
-									fixedOverride:
-										event.target.value === ""
-											? null
-											: Math.max(0, Number(event.target.value) || 0),
-								})
-							}
-						/>
-					</label>
-					{settings.fixedOverride !== null && (
-						<button
-							type="button"
-							className="text-button"
-							onClick={() => updateSettings({ fixedOverride: null })}
-						>
-							Use projected {money(fixedDerived.total)} instead
-						</button>
-					)}
-					<label className="field">
-						<span>Protected reserve ($)</span>
-						<input
-							type="number"
-							min={0}
-							step="5"
-							value={settings.reserve}
-							onChange={(event) =>
-								updateSettings({
-									reserve: Math.max(0, Number(event.target.value) || 0),
-								})
-							}
-						/>
-					</label>
-					<label className="field">
-						<span>
-							Actual spent ($) — empty uses {money(derivedSpent)} tracked
-						</span>
-						<input
-							type="number"
-							min={0}
-							step="1"
-							placeholder={String(Math.round(derivedSpent))}
-							value={settings.spentOverride ?? ""}
-							onChange={(event) =>
-								updateSettings({
-									spentOverride:
-										event.target.value === ""
-											? null
-											: Math.max(0, Number(event.target.value) || 0),
-								})
-							}
-						/>
-					</label>
-					{settings.spentOverride !== null && (
-						<button
-							type="button"
-							className="text-button"
-							onClick={() => updateSettings({ spentOverride: null })}
-						>
-							Use tracked {money(derivedSpent)} instead
-						</button>
-					)}
-					<label className="field">
-						<span>
-							Checking balance ($) — {money(checkingDerived ?? 0)} in plan
-						</span>
-						<input
-							type="number"
-							min={0}
-							step="10"
-							placeholder={String(Math.round(checkingDerived ?? 0))}
-							value={settings.checkingOverride ?? ""}
-							onChange={(event) =>
-								updateSettings({
-									checkingOverride:
-										event.target.value === ""
-											? null
-											: Math.max(0, Number(event.target.value) || 0),
-								})
-							}
-						/>
-					</label>
-					{settings.checkingOverride !== null && (
-						<button
-							type="button"
-							className="text-button"
-							onClick={() => updateSettings({ checkingOverride: null })}
-						>
-							Use plan {money(checkingDerived ?? 0)} instead
-						</button>
-					)}
-					<label className="field">
-						<span>
-							Remaining bills this month ($) — {money(remainingDerived.total)}{" "}
-							through {dateLabel(remainingDerived.monthEnd, true)}
-						</span>
-						<input
-							type="number"
-							min={0}
-							step="10"
-							placeholder={String(Math.round(remainingDerived.total))}
-							value={settings.remainingOverride ?? ""}
-							onChange={(event) =>
-								updateSettings({
-									remainingOverride:
-										event.target.value === ""
-											? null
-											: Math.max(0, Number(event.target.value) || 0),
-								})
-							}
-						/>
-					</label>
-					{settings.remainingOverride !== null && (
-						<button
-							type="button"
-							className="text-button"
-							onClick={() => updateSettings({ remainingOverride: null })}
-						>
-							Use projected {money(remainingDerived.total)} instead
-						</button>
-					)}
-					<fieldset className="cycle-accounts">
-						<legend>Accounts in this total</legend>
-						{cards.map((card) => {
-							const checked = trackedIds.includes(card.id);
-							return (
-								<label key={card.id} className="cycle-account-option">
-									<input
-										type="checkbox"
-										checked={checked}
-										onChange={() => toggleAccount(card.id)}
-									/>
-									<span>{card.name}</span>
-								</label>
-							);
-						})}
-					</fieldset>
-				</div>
-			)}
-			{expanded && (
-				<div className="cycle-breakdown">
-					{groups.length ? (
-						<ul>
-							{groups.map((group) => (
-								<li key={`${group.accountId}-${group.key}`}>
-									<span>
-										<strong>{group.name}</strong>
-										<small>
-											{group.accountName} · {group.counterparty} · {group.count}{" "}
-											{group.count === 1 ? "charge" : "charges"}
-										</small>
-									</span>
-									<strong>{money(group.total)}</strong>
-								</li>
-							))}
-						</ul>
-					) : (
-						<p>
-							No charges in this cycle yet. Tracked spend covers{" "}
-							{dateLabel(cycle.cycleStart, true)} through{" "}
-							{dateLabel(plan.startDate, true)}.
-						</p>
-					)}
-				</div>
+			{detail && (
+				<TimingDetailDialog
+					eyebrow={`${dateLabel(cycle.cycleStart, true)} to ${dateLabel(cycle.cycleEnd, true)} · ${accountLabel}`}
+					thisMonth={{
+						title: "Due before month-end",
+						subtitle: `${dateLabel(plan.startDate, true)} to ${dateLabel(remainingDerived.monthEnd, true)}`,
+						total: remainingObligations,
+						groups: mandatoryThisMonth,
+					}}
+					nextMonth={{
+						title: "Next month fixed",
+						subtitle: `${dateLabel(fixedDerived.start, true)} to ${dateLabel(fixedDerived.end, true)}`,
+						total: fixedObligations,
+						groups: mandatoryNextMonth,
+					}}
+					cycleGroups={groups}
+					cycleSummary={`${money(spent)} of ${money(budget)} used · paycheck ${money(paycheck)} − fixed ${money(fixedObligations)} − reserve ${money(settings.reserve)}${scheduledRest > 0 ? ` · ${money(scheduledRest)} scheduled before ${dateLabel(cycle.cycleEnd, true)}` : ""}`}
+					config={{
+						statementDay: settings.statementDay,
+						reserve: settings.reserve,
+						spentOverride: settings.spentOverride,
+						paycheckOverride: settings.paycheckOverride,
+						fixedOverride: settings.fixedOverride,
+						checkingOverride: settings.checkingOverride,
+						remainingOverride: settings.remainingOverride,
+						paycheckHint: paycheckDerived,
+						fixedHint: fixedDerived,
+						checkingHint: checkingDerived,
+						remainingHint: remainingDerived,
+						spentHint: derivedSpent,
+						cards: cards.map((card) => ({ id: card.id, name: card.name })),
+						trackedIds,
+					}}
+					onToggleAccount={toggleAccount}
+					onUpdateConfig={updateSettings}
+					onResetConfig={resetConfig}
+					initialTab={detail}
+					onClose={() => setDetail(null)}
+				/>
 			)}
 		</section>
 	);
