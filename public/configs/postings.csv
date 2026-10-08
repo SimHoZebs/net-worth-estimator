@@ -259,3 +259,4 @@ accident_ins,Accident Insurance,gross_pay,,"{""resolver"":""expression"",""confi
 critical_illness,Critical Illness,gross_pay,,"{""resolver"":""expression"",""config"":{""expression"":""2.43""},""inputs"":{}}",monthly,0,0,0,2026-05-29,,,12,true
 slifsp,Slifsp,gross_pay,,"{""resolver"":""expression"",""config"":{""expression"":""1.05""},""inputs"":{}}",monthly,0,0,0,2026-05-29,,,13,true
 salary_net,Take-Home Pay,gross_pay,checking,"{""resolver"":""expression"",""config"":{""expression"":""abs(gross_pay)""},""inputs"":{""gross_pay"":{""source"":""provider"",""provider"":""account-balance"",""arguments"":{""id"":""gross_pay""}}}}",monthly,0,0,0,2026-05-29,,,20,true
+phone,Phone,checking,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",monthly,0,0,0,2026-10-01,,,6,true
