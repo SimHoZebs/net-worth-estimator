@@ -1,6 +1,7 @@
 /* Co-located partial: owned by app/app.css. Global cascade order is set by the
-   @layer declaration in styles/index.css (reset, base, layout, components,
-   responsive, accessibility). Keep selectors inside @layer components. */
+   @layer declaration in styles/index.css (reset, base, layout, components).
+   Responsive and accessibility overrides are unlayered and always win.
+   Keep selectors inside @layer components. */
 @layer components {
 	.auth-notice {
 		align-items: center;
