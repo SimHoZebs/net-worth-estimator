@@ -1667,6 +1667,258 @@ describe("remote projection mapping and SSE", () => {
 		expect(local.firstFailure).toBe(local.movements[0]);
 	});
 
+	it("maps financial independence to a useful base-case summary", () => {
+		const document = {
+			...modelFixture(),
+			evaluations: {
+				...modelFixture().evaluations,
+				financialIndependence: [
+					{
+						instanceId: "financial-independence",
+						name: "Financial independence",
+						enabled: true,
+						config: {
+							minimumNetWorth: 1500000,
+							annualExpenseTarget: 80000,
+							annualExpenseGrowthRate: 0.025,
+							withdrawalRate: 0.04,
+							evaluationYears: 10,
+							requiredConfidence: 0.9,
+							sources: [],
+							continuingPostingIds: [],
+							principalPolicy: "preserve-real-principal",
+							annualExpenseTargetBasis: "fi-date-dollars",
+						},
+					},
+				],
+			},
+		};
+		const result = {
+			...projectionFixture(),
+			evaluations: {
+				...projectionFixture().evaluations,
+				financialIndependence: [
+					{
+						instanceId: "financial-independence",
+						name: "Financial independence",
+						status: "not-satisfied",
+						deterministic: {
+							rows: [
+								{
+									date: "2026-01-31",
+									netWorth: 60000,
+									minimumNetWorth: 1500000,
+									minimumNetWorthMet: false,
+									annualDirectIncome: 0,
+									selectedAssetBalance: 100000,
+									annualWithdrawalCapacity: 4000,
+									totalAnnualCapacity: 4000,
+									annualExpenseTarget: 80000,
+									coverageRatio: 0.05,
+									isCovered: false,
+									isEligible: false,
+								},
+								{
+									date: "2027-01-31",
+									netWorth: 200000,
+									minimumNetWorth: 1500000,
+									minimumNetWorthMet: false,
+									annualDirectIncome: 0,
+									selectedAssetBalance: 300000,
+									annualWithdrawalCapacity: 12000,
+									totalAnnualCapacity: 12000,
+									annualExpenseTarget: 82000,
+									coverageRatio: 0.146,
+									isCovered: false,
+									isEligible: false,
+								},
+							],
+							runOutcomes: [],
+							milestones: {
+								firstCoverageDate: null,
+								firstSelfSustainingDate: null,
+							},
+						},
+						probabilistic: null,
+						diagnostics: [],
+					},
+				],
+			},
+		};
+		const local = projectionResultToLocal(result, document);
+		const item = local.otherEvaluations.find(
+			(entry) => entry.id === "financial-independence",
+		);
+		expect(item?.subtitle).toBe(
+			"$80,000/yr spend · 10-yr test · 4% withdrawal · needs $1.50M net worth",
+		);
+		expect(item?.summary).toContain("Needs $1.50M net worth");
+		expect(item?.summary).toContain("5% of $80,000/yr covered");
+		expect(item?.summary).toContain("best 15% on 2027-01-31");
+		expect(item?.summary).not.toContain("See the server evaluation detail");
+	});
+
+	it("shows the annual shortfall when the net-worth gate is met", () => {
+		const document = {
+			...modelFixture(),
+			evaluations: {
+				...modelFixture().evaluations,
+				financialIndependence: [
+					{
+						instanceId: "financial-independence",
+						name: "Financial independence",
+						enabled: true,
+						config: { annualExpenseTarget: 80000, evaluationYears: 10 },
+					},
+				],
+			},
+		};
+		const result = {
+			...projectionFixture(),
+			evaluations: {
+				...projectionFixture().evaluations,
+				financialIndependence: [
+					{
+						instanceId: "financial-independence",
+						name: "Financial independence",
+						status: "not-satisfied",
+						deterministic: {
+							rows: [
+								{
+									date: "2026-01-31",
+									netWorth: 2000000,
+									minimumNetWorth: 1500000,
+									minimumNetWorthMet: true,
+									annualDirectIncome: 0,
+									selectedAssetBalance: 1000000,
+									annualWithdrawalCapacity: 40000,
+									totalAnnualCapacity: 40000,
+									annualExpenseTarget: 80000,
+									coverageRatio: 0.5,
+									isCovered: false,
+									isEligible: false,
+								},
+							],
+							runOutcomes: [],
+							milestones: {
+								firstCoverageDate: null,
+								firstSelfSustainingDate: null,
+							},
+						},
+						probabilistic: null,
+						diagnostics: [],
+					},
+				],
+			},
+		};
+		const local = projectionResultToLocal(result, document);
+		expect(
+			local.otherEvaluations.find(
+				(entry) => entry.id === "financial-independence",
+			)?.summary,
+		).toBe("50% of $80,000/yr covered · short $40,000/yr");
+	});
+
+	it("prefers the self-sustaining date over first coverage for FI", () => {
+		const document = {
+			...modelFixture(),
+			evaluations: {
+				...modelFixture().evaluations,
+				financialIndependence: [
+					{
+						instanceId: "financial-independence",
+						name: "Financial independence",
+						enabled: true,
+						config: { evaluationYears: 10, withdrawalRate: 0.04 },
+					},
+				],
+			},
+		};
+		const result = {
+			...projectionFixture(),
+			evaluations: {
+				...projectionFixture().evaluations,
+				financialIndependence: [
+					{
+						instanceId: "financial-independence",
+						name: "Financial independence",
+						status: "satisfied",
+						deterministic: {
+							rows: [],
+							runOutcomes: [],
+							milestones: {
+								firstCoverageDate: "2030-01-31",
+								firstSelfSustainingDate: "2031-06-30",
+							},
+						},
+						probabilistic: null,
+						diagnostics: [],
+					},
+				],
+			},
+		};
+		const local = projectionResultToLocal(result, document);
+		expect(
+			local.otherEvaluations.find(
+				(entry) => entry.id === "financial-independence",
+			)?.summary,
+		).toBe("Self-sustaining from 2031-06-30");
+	});
+
+	it("explains coverage without a sustained cycle for FI", () => {
+		const document = {
+			...modelFixture(),
+			evaluations: {
+				...modelFixture().evaluations,
+				financialIndependence: [
+					{
+						instanceId: "financial-independence",
+						name: "Financial independence",
+						enabled: true,
+						config: { evaluationYears: 10 },
+					},
+				],
+			},
+		};
+		const result = {
+			...projectionFixture(),
+			evaluations: {
+				...projectionFixture().evaluations,
+				financialIndependence: [
+					{
+						instanceId: "financial-independence",
+						name: "Financial independence",
+						status: "not-satisfied",
+						deterministic: {
+							rows: [],
+							runOutcomes: [
+								{
+									candidateDate: "2030-01-31",
+									status: "summary",
+									firstShortfallDate: "2034-02-01",
+								},
+							],
+							milestones: {
+								firstCoverageDate: "2030-01-31",
+								firstSelfSustainingDate: null,
+							},
+						},
+						probabilistic: null,
+						diagnostics: [],
+					},
+				],
+			},
+		};
+		const local = projectionResultToLocal(result, document);
+		expect(
+			local.otherEvaluations.find(
+				(entry) => entry.id === "financial-independence",
+			)?.summary,
+		).toBe(
+			"Covers spending 2030-01-31 · shortfall from 2034-02-01 in the 10-yr test",
+		);
+	});
+
 	it("maps stochastic bands and evaluation envelopes to RangeResult", () => {
 		const range = stochasticResultToLocal(stochasticFixture());
 		expect(range).toEqual({

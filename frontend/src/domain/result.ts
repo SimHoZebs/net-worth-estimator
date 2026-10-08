@@ -44,6 +44,7 @@ export interface OtherEvaluation {
 	type: OtherEvaluationType;
 	enabled: boolean;
 	status: string;
+	subtitle?: string | null;
 	summary: string;
 }
 export interface Projection {
