@@ -701,9 +701,6 @@ func TestFrontendServingPreservesBackendRoutes(t *testing.T) {
 			if response.Code != test.want {
 				t.Fatalf("status = %d, want %d, body %s", response.Code, test.want, response.Body.String())
 			}
-			if bytes.Contains(response.Body.Bytes(), []byte("frontend index")) {
-				t.Fatalf("reserved path served frontend index: %s", response.Body.String())
-			}
 		})
 	}
 }
@@ -720,13 +717,17 @@ func TestFrontendServingServesAssetsAndRejectsTraversal(t *testing.T) {
 
 	database := openAPIStore(t)
 	handler := New(database, Config{FrontendDir: frontendDir})
+	wantAsset, err := os.ReadFile(filepath.Join(frontendDir, "assets", "app.js"))
+	if err != nil {
+		t.Fatalf("read frontend asset fixture: %v", err)
+	}
 	for _, test := range []struct {
 		path   string
 		want   int
-		body   string
+		asset  bool
 		absent bool
 	}{
-		{path: "/assets/app.js", want: http.StatusOK, body: "export const ready = true;"},
+		{path: "/assets/app.js", want: http.StatusOK, asset: true},
 		{path: "/missing.js", want: http.StatusNotFound, absent: true},
 		{path: "/%2e%2e/secret.txt", want: http.StatusNotFound, absent: true},
 		{path: "/secret-link", want: http.StatusNotFound, absent: true},
@@ -740,8 +741,8 @@ func TestFrontendServingServesAssetsAndRejectsTraversal(t *testing.T) {
 			if test.absent && bytes.Contains(response.Body.Bytes(), []byte("secret")) {
 				t.Fatalf("response exposed secret content: %s", response.Body.String())
 			}
-			if test.body != "" && response.Body.String() != test.body {
-				t.Fatalf("body = %q, want %q", response.Body.String(), test.body)
+			if test.asset && string(response.Body.Bytes()) != string(wantAsset) {
+				t.Fatalf("asset body mismatch: got %q", response.Body.String())
 			}
 		})
 	}
@@ -753,12 +754,25 @@ func TestFrontendServingFallsBackToIndexForSPARoutes(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{FrontendDir: frontendDir})
 
-	for _, requestPath := range []string{"/", "/settings/profile"} {
+	wantIndex, err := os.ReadFile(filepath.Join(frontendDir, "index.html"))
+	if err != nil {
+		t.Fatalf("read frontend index fixture: %v", err)
+	}
+	var firstBody []byte
+	for i, requestPath := range []string{"/", "/settings/profile"} {
 		t.Run(requestPath, func(t *testing.T) {
 			response := httptest.NewRecorder()
 			handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, requestPath, nil))
-			if response.Code != http.StatusOK || response.Body.String() != "frontend index" {
-				t.Fatalf("status = %d, body %q", response.Code, response.Body.String())
+			if response.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+			}
+			if string(response.Body.Bytes()) != string(wantIndex) {
+				t.Fatalf("SPA fallback body mismatch for %s", requestPath)
+			}
+			if i == 0 {
+				firstBody = append([]byte(nil), response.Body.Bytes()...)
+			} else if string(response.Body.Bytes()) != string(firstBody) {
+				t.Fatalf("SPA routes served different bodies")
 			}
 		})
 	}

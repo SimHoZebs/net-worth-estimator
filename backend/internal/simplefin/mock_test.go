@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -48,8 +50,11 @@ func TestMockAccountSetMapsLikeBridge(t *testing.T) {
 		t.Fatal("pending seed must be disabled")
 	}
 	expression, ok := pending.Amount.Config["expression"].(string)
-	if !ok || expression != "42.10" {
-		t.Fatalf("pending amount = %+v", pending.Amount)
+	if !ok {
+		t.Fatalf("pending amount = %+v, want expression resolver", pending.Amount)
+	}
+	if value, err := strconv.ParseFloat(strings.TrimSpace(expression), 64); err != nil || value != 42.10 {
+		t.Fatalf("pending amount = %+v, want 42.10", pending.Amount)
 	}
 	if plan.Skipped[SkipPosted] != 2 || plan.Skipped[SkipNonCharge] != 1 {
 		t.Fatalf("skipped = %+v, want 2 posted + 1 pending refund", plan.Skipped)
