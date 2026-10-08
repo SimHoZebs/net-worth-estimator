@@ -5,21 +5,26 @@ import {
 	removeEvaluation,
 	removePlanItem,
 	setEvaluationEnabled,
-	toggleMovement,
 	upsertItem,
 } from "./planEdits.ts";
 
 describe("immutable plan edits", () => {
 	it("preserves unchanged item order and reports exactly one toggle", () => {
 		const before = JSON.stringify(testPlan);
-		const current = toggleMovement({ plan: testPlan, id: "invest" });
+		const toggleEnabled = (enabled: boolean) => ({
+			...testPlan,
+			movements: testPlan.movements.map((item) =>
+				item.id === "invest" ? { ...item, enabled } : item,
+			),
+		});
+		const current = toggleEnabled(false);
 		expect(changesBetween({ saved: testPlan, current })).toMatchObject([
 			{ kind: "Modified", label: "Monthly investing" },
 		]);
 		expect(
 			changesBetween({
 				saved: testPlan,
-				current: toggleMovement({ plan: current, id: "invest" }),
+				current: toggleEnabled(true),
 			}),
 		).toEqual([]);
 		expect(JSON.stringify(testPlan)).toBe(before);

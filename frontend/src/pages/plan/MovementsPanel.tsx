@@ -2,8 +2,6 @@ import {
 	ArrowDownLeft,
 	ArrowRight,
 	ArrowUpRight,
-	Check,
-	CirclePause,
 	Pencil,
 	Trash2,
 } from "lucide-react";
@@ -21,14 +19,12 @@ export function MovementsPanel({
 	startDate,
 	onEdit,
 	onRemove,
-	onToggle,
 }: {
 	movements: Movement[];
 	accounts: Account[];
 	startDate: string;
 	onEdit: (movement: Movement) => void;
 	onRemove: (movement: Movement) => void;
-	onToggle: (id: string) => void;
 }) {
 	if (!movements.length)
 		return (
@@ -91,12 +87,6 @@ export function MovementsPanel({
 						</Badge>
 					</div>
 					<div className="table-actions">
-						<IconButton
-							icon={movement.enabled ? CirclePause : Check}
-							label={`${movement.enabled ? "Exclude" : "Include"} ${movement.name}`}
-							disabled={movement.readOnly}
-							onClick={() => onToggle(movement.id)}
-						/>
 						<IconButton
 							icon={Pencil}
 							label={`Edit ${movement.name}`}

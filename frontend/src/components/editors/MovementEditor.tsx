@@ -37,7 +37,7 @@ export function MovementEditor({
 					startDate: textValue(data, "startDate"),
 					endDate: textValue(data, "endDate") || null,
 					annualIncrease: numberValue(data, "annualIncrease"),
-					enabled: item?.enabled ?? true,
+					enabled: textValue(data, "enabled") === "on",
 					readOnly: false,
 				};
 				return {
@@ -108,6 +108,19 @@ export function MovementEditor({
 				step="0.1"
 				defaultValue={item?.annualIncrease ?? 0}
 			/>
+			<label className="checkbox-field">
+				<input
+					name="enabled"
+					type="checkbox"
+					defaultChecked={item?.enabled ?? true}
+				/>
+				Include in projections
+			</label>
+			<p className="field-wide field-hint">
+				Excluding a transaction keeps it visible but removes it from
+				projections. Only exclude deliberately, for example to compare an
+				outcome with and without this transaction.
+			</p>
 			<p className="field-wide field-hint">
 				A one-time movement dated on or before {plan.startDate} is a historical
 				record. Starting balances already include it. Anything later is

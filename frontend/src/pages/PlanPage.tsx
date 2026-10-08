@@ -7,7 +7,6 @@ import {
 	type EditorTarget,
 	type RemovalTarget,
 	removePlanItem,
-	toggleMovement,
 } from "../domain/planEdits.ts";
 import { AccountsPanel, BalanceChecksPanel } from "./plan/AccountsPanel.tsx";
 import { MovementsPanel } from "./plan/MovementsPanel.tsx";
@@ -234,7 +233,6 @@ function TransactionsView({
 							name: item.name,
 						})
 					}
-					onToggle={(id) => onUpdate(toggleMovement({ plan, id }))}
 				/>
 			</Tabs>
 			{dialog}
