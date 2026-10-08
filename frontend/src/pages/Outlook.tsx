@@ -24,7 +24,6 @@ export function Outlook({
 	onTransactions,
 	onEvaluations,
 	onEvaluation,
-	onAssumptions,
 }: {
 	plan: Plan;
 	projection: Projection;
@@ -42,7 +41,6 @@ export function Outlook({
 	onTransactions: () => void;
 	onEvaluations: () => void;
 	onEvaluation: (id: string) => void;
-	onAssumptions: () => void;
 }) {
 	if (!projection.points.length) return null;
 	const evaluation =
@@ -68,13 +66,8 @@ export function Outlook({
 					<OutlookMetrics
 						plan={plan}
 						projection={projection}
-						range={range}
-						ranges={ranges}
 						years={years}
-						rangeError={rangeError}
 						onEvidence={onEvidence}
-						onAssumptions={onAssumptions}
-						onEnableRange={() => setRanges(true)}
 					/>
 					<FundingInsight
 						failure={projection.firstFailure}
