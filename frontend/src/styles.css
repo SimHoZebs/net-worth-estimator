@@ -2060,8 +2060,8 @@
 		width: min(780px, calc(100% - 32px));
 	}
 	.modal-drawer {
-		width: min(520px, calc(100vw - 64px));
-		max-width: 520px;
+		width: min(760px, calc(100vw - 64px));
+		max-width: 760px;
 		height: 100dvh;
 		max-height: 100dvh;
 		margin: 0 0 0 auto;
