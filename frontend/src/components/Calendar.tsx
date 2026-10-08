@@ -123,11 +123,12 @@ export function Calendar({
 													? "calendar-cell calendar-has-events"
 													: "calendar-cell"
 										}
-										aria-label={
-											dayEvents.length
-												? `${dateLabel(date, true)}, ${money(total)} in bills: ${names}`
-												: dateLabel(date, true)
-										}
+										{...(dayEvents.length > 0
+											? {
+													role: "img" as const,
+													"aria-label": `${dateLabel(date, true)}, ${money(total)} in bills: ${names}`,
+												}
+											: {})}
 									>
 										<span className="calendar-day">{dayNumber}</span>
 										{dayEvents.length > 0 && (
