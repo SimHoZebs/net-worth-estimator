@@ -106,6 +106,8 @@ func ValidateFinancialModel(document *types.FinancialModelDocument, incomeData *
 	validateAccountBounds(&issues, document.Accounts)
 	validateEvaluationConfigs(&issues, document)
 	validateEvaluationAccountReferences(&issues, document, accountIDs)
+	validatePaymentTerms(&issues, document, accountIDs)
+	validatePaymentTermsCoverage(&issues, document)
 
 	return issues
 }
