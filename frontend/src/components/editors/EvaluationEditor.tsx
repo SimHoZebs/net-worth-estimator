@@ -77,10 +77,6 @@ export function EvaluationEditor({
 					<AccountOptions accounts={plan.accounts} />
 				</SelectField>
 			)}
-			<p className="field-wide field-hint">
-				An evaluation is reached the first day the selected measure meets its
-				target. Reaching it once does not establish long-term sustainability.
-			</p>
 		</EditorForm>
 	);
 }

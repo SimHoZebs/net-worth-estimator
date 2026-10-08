@@ -26,8 +26,7 @@ export function TimingEvidence({
 			wide
 		>
 			<p className="form-intro">
-				Planned cash timing from the same starting balances. These amounts are
-				scheduled, not bank-confirmed.
+				These amounts are scheduled, not bank-confirmed.
 			</p>
 			<div className="table-scroll">
 				<table>

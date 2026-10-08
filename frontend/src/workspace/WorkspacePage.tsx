@@ -130,7 +130,7 @@ export function WorkspacePage({
 			if (!savedProjection)
 				return (
 					<ProjectionLoading
-						label="Loading the saved server comparison"
+						label="Loading the saved comparison"
 						onRetry={retrySavedProjection}
 					/>
 				);
@@ -138,7 +138,7 @@ export function WorkspacePage({
 				return (
 					<ErrorNotice
 						message={savedProjection.message}
-						action="Retry saved server calculation"
+						action="Retry saved calculation"
 						onAction={retrySavedProjection}
 					/>
 				);

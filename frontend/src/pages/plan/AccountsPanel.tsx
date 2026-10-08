@@ -16,13 +16,7 @@ export function AccountsPanel({
 	onRemove: (account: Account) => void;
 }) {
 	if (!accounts.length)
-		return (
-			<EmptyState
-				icon={Wallet}
-				title="No matching accounts"
-				description="Try another name or add an account to the plan."
-			/>
-		);
+		return <EmptyState icon={Wallet} title="No matching accounts" />;
 	return (
 		<div className="table-scroll">
 			<table className="plan-table">
@@ -97,34 +91,28 @@ export function BalanceChecksPanel({
 	onEdit: (account: Account) => void;
 }) {
 	return (
-		<>
-			<p className="section-note">
-				Balance checks establish the starting position. Older balances are
-				carried forward unchanged and remain visibly dated.
-			</p>
-			<div className="movement-list">
-				{accounts
-					.filter((account) => account.balanceCheck)
-					.map((account) => (
-						<div className="movement-row" key={account.id}>
-							<span className="movement-icon inflow">
-								<FileCheck2 size={19} />
+		<div className="movement-list">
+			{accounts
+				.filter((account) => account.balanceCheck)
+				.map((account) => (
+					<div className="movement-row" key={account.id}>
+						<span className="movement-icon inflow">
+							<FileCheck2 size={19} />
+						</span>
+						<div className="movement-name">
+							<strong>{account.name}</strong>
+							<span>
+								{dateLabel(account.observedOn, true)} · {account.source}
 							</span>
-							<div className="movement-name">
-								<strong>{account.name}</strong>
-								<span>
-									{dateLabel(account.observedOn, true)} · {account.source}
-								</span>
-							</div>
-							<strong>{money(account.balance)}</strong>
-							<IconButton
-								icon={Pencil}
-								label={`Edit balance check for ${account.name}`}
-								onClick={() => onEdit(account)}
-							/>
 						</div>
-					))}
-			</div>
-		</>
+						<strong>{money(account.balance)}</strong>
+						<IconButton
+							icon={Pencil}
+							label={`Edit balance check for ${account.name}`}
+							onClick={() => onEdit(account)}
+						/>
+					</div>
+				))}
+		</div>
 	);
 }

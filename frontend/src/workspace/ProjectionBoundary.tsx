@@ -5,7 +5,7 @@ import type { Projection } from "../domain/result.ts";
 import type { ProjectionState } from "./types.ts";
 
 export function ProjectionLoading({
-	label = "Calculating your server outlook",
+	label = "Calculating your outlook",
 	onRetry,
 }: {
 	label?: string;
@@ -17,12 +17,11 @@ export function ProjectionLoading({
 			<h1>{label}.</h1>
 			<div className="recovery-progress" role="status">
 				<span className="spinner" aria-hidden="true" />
-				Connecting the displayed plan to the projection service.
+				Loading the projection.
 			</div>
-			<p>The saved server model has not been changed.</p>
 			<div className="recovery-actions">
 				<button type="button" className="button secondary" onClick={onRetry}>
-					Retry server calculation
+					Retry calculation
 				</button>
 			</div>
 		</div>
@@ -44,7 +43,7 @@ export function ProjectionBoundary({
 		return (
 			<ErrorNotice
 				message={projection.base.message}
-				action={"Retry server calculation"}
+				action={"Retry calculation"}
 				onAction={projection.retryProjection}
 			/>
 		);

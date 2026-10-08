@@ -31,10 +31,6 @@ export function SourcePortability({
 	return (
 		<section className="panel portability">
 			<h2>"Server model and local recovery"</h2>
-			<p>
-				"Export the canonical server document. Browser drafts and workspace
-				backups remain local recovery copies."
-			</p>
 			<button
 				type="button"
 				className="portability-action"
@@ -44,7 +40,6 @@ export function SourcePortability({
 				<Download size={21} />
 				<span>
 					<strong>"Export server model"</strong>
-					<small>"Canonical FinancialModelDocument JSON"</small>
 				</span>
 				<span>↗</span>
 			</button>
@@ -63,9 +58,7 @@ export function SourcePortability({
 								? "Importing model…"
 								: "Import server model"}
 					</strong>
-					<small>
-						"Server model JSON · maximum 2 MB · explicit review before upload"
-					</small>
+					<small>"Maximum 2 MB"</small>
 				</span>
 				<span>↗</span>
 			</button>
@@ -77,10 +70,6 @@ export function SourcePortability({
 				<FileJson size={15} />
 				"Download local recovery backup"
 			</button>
-			<small className="muted">
-				"Local recovery includes the display draft and comparison measures; it
-				is not the canonical server model."
-			</small>
 			<input
 				className="sr-only"
 				ref={inputRef}

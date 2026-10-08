@@ -15,7 +15,7 @@ const steps = [
 	{
 		title: "Try a change, then decide",
 		description:
-			"Edit unsaved changes, compare the outcome, and explicitly save or discard. They stay in this browser between visits.",
+			"Edit unsaved changes, compare the outcome, and explicitly save or discard.",
 	},
 ];
 export function MethodEvidence({ onClose }: { onClose: () => void }) {
@@ -35,9 +35,7 @@ export function MethodEvidence({ onClose }: { onClose: () => void }) {
 			<div className="inline-notice">
 				<Info size={18} />
 				<span>
-					"The saved financial model is loaded from the Waypoint server.
-					Temporary edits stay in this browser until you explicitly save them.
-					Projections are planning aids and do not provide investment, tax or
+					"Projections are planning aids and do not provide investment, tax or
 					legal advice."
 				</span>
 			</div>

@@ -37,12 +37,6 @@ export function TransactionDetails({
 					</>
 				)}
 			</dl>
-			{transaction.excluded && (
-				<p>
-					This recorded transaction is excluded from plan evidence. It remains
-					visible as a source record.
-				</p>
-			)}
 			{transaction.source === "projected" && (
 				<p>
 					{transaction.shortfall > 0.01

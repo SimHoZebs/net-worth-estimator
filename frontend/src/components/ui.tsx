@@ -150,7 +150,7 @@ export function EmptyState({
 }: {
 	icon: LucideIcon;
 	title: string;
-	description: string;
+	description?: string;
 	action?: string;
 	onAction?: () => void;
 }) {
@@ -160,7 +160,7 @@ export function EmptyState({
 				<Icon size={28} />
 			</span>
 			<h3>{title}</h3>
-			<p>{description}</p>
+			{description && <p>{description}</p>}
 			{action && (
 				<button type="button" className="button primary" onClick={onAction}>
 					{action}

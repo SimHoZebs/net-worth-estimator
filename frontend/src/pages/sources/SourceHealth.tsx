@@ -13,11 +13,7 @@ export function SourceBanner({ sourceAccess }: { sourceAccess: string }) {
 				<HardDrive size={25} />
 			</span>
 			<div>
-				<h2>Your canonical server model lives on the server.</h2>
-				<p>
-					Export the authoritative server document below. Temporary edits and
-					workspace backups stay in this browser for recovery.
-				</p>
+				<h2>Your saved model.</h2>
 			</div>
 			<Badge tone="outline">
 				<LockKeyhole size={12} />
@@ -31,7 +27,6 @@ export function SourceHealth({
 	plan,
 	workspace,
 	serverDocument,
-	sourceAccess,
 }: {
 	plan: Plan;
 	workspace: Workspace;
@@ -56,30 +51,23 @@ export function SourceHealth({
 						? serverDocument.sourcePath
 						: "Canonical server model unavailable"}
 				</DetailRow>
-				<DetailRow label="Display start">
+				<DetailRow label="Start date">
 					{dateLabel(plan.startDate, true)}
 					{age > 30 && <Badge tone="amber">{age} days old</Badge>}
 				</DetailRow>
-				<DetailRow label={"Display balance coverage"}>
+				<DetailRow label={"Balance check coverage"}>
 					{recorded.length} of {serverAccountCount} accounts
 				</DetailRow>
-				{<DetailRow label="Server deposits">{serverPostingCount}</DetailRow>}
-				<DetailRow label="Display validation" className="inline-success">
+				{<DetailRow label="Deposits">{serverPostingCount}</DetailRow>}
+				<DetailRow label="Validation" className="inline-success">
 					<Check size={15} />
 					All structural checks passed
 				</DetailRow>
-				<DetailRow label="Display revision date">
+				<DetailRow label="Revision date">
 					{dateLabel(workspace.saved.updatedAt, true)}
 				</DetailRow>
-				<DetailRow label="Display revision">
-					{workspace.saved.revision}
-				</DetailRow>
-				<DetailRow label="Source access">{sourceAccess}</DetailRow>
+				<DetailRow label="Revision">{workspace.saved.revision}</DetailRow>
 			</dl>
-			<p className="section-note">
-				Validation checks structure and references. It does not independently
-				verify balance checks, bank sources, or financial assumptions.
-			</p>
 		</section>
 	);
 }

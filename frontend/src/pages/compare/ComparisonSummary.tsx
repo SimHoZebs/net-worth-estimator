@@ -31,11 +31,7 @@ export function ComparisonSummary({
 					<GitCompareArrows size={26} />
 				</span>
 				<div>
-					<p>
-						{changeCount
-							? `${changeCount} unsaved ${changeCount === 1 ? "change" : "changes"} · your saved plan is unchanged`
-							: "Capture a point of reference, then explore a change."}
-					</p>
+					<p>Capture a point of reference, then explore a change.</p>
 				</div>
 				<button type="button" className="button secondary" onClick={onCapture}>
 					<Camera size={16} />
@@ -121,9 +117,8 @@ export function ComparisonSummary({
 					</strong>
 				</div>
 				<p className="section-note">
-					Comparison describes displayed measures, not causal proof. A snapshot
-					contains measures only and cannot restore a plan. Evaluation
-					definitions may also change between versions.
+					Comparison describes displayed measures. A snapshot contains measures
+					only and cannot restore a plan.
 				</p>
 			</section>
 		</>

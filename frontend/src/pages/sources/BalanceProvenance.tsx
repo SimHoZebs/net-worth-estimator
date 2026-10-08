@@ -9,7 +9,6 @@ export function BalanceProvenance({ plan }: { plan: Plan }) {
 			<div className="section-top">
 				<div>
 					<h2>Behind the balances</h2>
-					<p>"Display view of the canonical server records."</p>
 				</div>
 			</div>
 			<div className="table-scroll">

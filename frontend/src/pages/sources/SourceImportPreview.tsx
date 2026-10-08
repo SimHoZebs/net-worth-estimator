@@ -59,23 +59,20 @@ export function SourceImportPreview({
 			<div className="inline-notice">
 				<LockKeyhole size={18} />
 				<span>
-					The server validates the canonical accounts, checkpoints, postings,
-					and evaluations before activation. The file is sent only after you
-					confirm.
+					Validated before activation. Nothing is sent until you confirm.
 				</span>
 			</div>
 			{hasDraft && (
 				<div className="inline-notice amber">
 					<TriangleAlert size={18} />
-					Save or discard your unsaved changes before replacing the server
-					model. The local recovery backup is available now.
+					Save or discard your unsaved changes before replacing the saved model.
 				</div>
 			)}
 			{!canImportServer && (
 				<div className="inline-notice amber">
 					<TriangleAlert size={18} />
-					Server model import is unavailable in this view. Use the server
-					recovery importer to restore a model.
+					Import is unavailable in this view. Use the recovery importer to
+					restore a model.
 				</div>
 			)}
 		</ModelImportPreview>

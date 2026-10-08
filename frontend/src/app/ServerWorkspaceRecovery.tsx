@@ -81,19 +81,14 @@ export function ServerWorkspaceRecovery({
 						/>
 					)}
 					{missingModel && (
-						<p>
-							Import a reviewed server model JSON file to continue. Any browser
-							draft remains available for recovery after a model is loaded. No
-							example data has been substituted.
-						</p>
+						<p>Import a reviewed model JSON file to continue.</p>
 					)}
 					{showRecoveryDraft && remote.recoveryDraft && (
 						<div className="inline-notice">
 							<FileJson size={18} />
 							<span>
-								A browser draft is available for recovery. Export it before
-								retrying the server connection; it will not be uploaded
-								automatically.
+								A draft is available for recovery. Export it before retrying; it
+								will not be uploaded automatically.
 							</span>
 							<button
 								type="button"
@@ -153,8 +148,7 @@ export function ServerWorkspaceRecovery({
 					<div className="inline-notice">
 						<LockKeyhole size={18} />
 						<span>
-							The server validates this document before making it active. The
-							file is sent only after you confirm.
+							Validated before activation. Nothing is sent until you confirm.
 						</span>
 					</div>
 				</ModelImportPreview>
@@ -232,7 +226,6 @@ function ServerRecovery({
 						<span className="spinner" aria-hidden="true" />
 						Loading the saved model, status, and income snapshot.
 					</div>
-					<p>No example data will be substituted.</p>
 					<div className="recovery-actions">
 						<button
 							type="button"

@@ -71,10 +71,12 @@ test("edits remain temporary, persist across reload, compare, and save deliberat
 	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await expect(page.getByText("Exploring unsaved changes")).toBeVisible();
+	await expect(
+		page.getByText("1 unsaved change · saved plan unchanged"),
+	).toBeVisible();
 	await page.reload();
 	await expect(
-		page.getByText("1 unsaved change · saved server plan unchanged"),
+		page.getByText("1 unsaved change · saved plan unchanged"),
 	).toBeVisible();
 	await page.getByRole("button", { name: "Review & save" }).click();
 	await expect(
@@ -105,12 +107,16 @@ test("discard is explicit and restores the saved plan", async ({ page }) => {
 		"Return to your saved plan?",
 	);
 	await page.getByRole("button", { name: "Keep exploring" }).click();
-	await expect(page.getByText("Exploring unsaved changes")).toBeVisible();
+	await expect(
+		page.getByText("1 unsaved change · saved plan unchanged"),
+	).toBeVisible();
 	await page.getByRole("button", { name: "Discard", exact: true }).click();
 	await page
 		.getByRole("button", { name: "Discard changes", exact: true })
 		.click();
-	await expect(page.getByText("Exploring unsaved changes")).not.toBeVisible();
+	await expect(
+		page.getByText("1 unsaved change · saved plan unchanged"),
+	).not.toBeVisible();
 });
 
 test("account, movement and evaluation maintenance plus search work", async ({
@@ -169,7 +175,9 @@ test("invalid imports and failed saves retain the intended plan", async ({
 	await expect(
 		page.getByRole("alert").filter({ hasText: "HTTP 500" }),
 	).toBeVisible();
-	await expect(page.getByText("Exploring unsaved changes")).toBeVisible();
+	await expect(
+		page.getByText("1 unsaved change · saved plan unchanged"),
+	).toBeVisible();
 	const draft = await readTemporaryVersion(page);
 	expect(
 		draft?.movements.find(
@@ -329,7 +337,9 @@ test("read-only plans can be explored but not saved", async ({ page }) => {
 	await page.getByLabel("Amount (USD)").fill("900");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	// Unsaved changes are allowed; saving them back to the source is not.
-	await expect(page.getByText("Exploring unsaved changes")).toBeVisible();
+	await expect(
+		page.getByText("1 unsaved change · saved plan unchanged"),
+	).toBeVisible();
 	await page.getByRole("button", { name: "Review & save" }).click();
 	await expect(
 		page.getByRole("button", { name: "Save this plan" }),
