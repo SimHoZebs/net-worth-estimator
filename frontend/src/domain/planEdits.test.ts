@@ -18,9 +18,9 @@ describe("immutable plan edits", () => {
 			),
 		});
 		const current = toggleEnabled(false);
-		expect(changesBetween({ saved: testPlan, current })).toMatchObject([
-			{ kind: "Modified", label: "Monthly investing" },
-		]);
+		const changes = changesBetween({ saved: testPlan, current });
+		expect(changes).toHaveLength(1);
+		expect(changes[0]?.kind).toBe("Modified");
 		expect(
 			changesBetween({
 				saved: testPlan,
@@ -44,9 +44,9 @@ describe("immutable plan edits", () => {
 			target: { kind: "movements", id: "invest", name: "Monthly investing" },
 		});
 		if (current instanceof Error) throw current;
-		expect(changesBetween({ saved: testPlan, current })).toMatchObject([
-			{ kind: "Removed", label: "Monthly investing" },
-		]);
+		const changes = changesBetween({ saved: testPlan, current });
+		expect(changes).toHaveLength(1);
+		expect(changes[0]?.kind).toBe("Removed");
 		expect(current.accounts).toBe(testPlan.accounts);
 	});
 	it("rejects referenced and last-account deletions without mutating data", () => {

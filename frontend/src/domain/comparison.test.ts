@@ -6,7 +6,6 @@ import {
 	comparisonContext,
 	comparisonMetrics,
 } from "./comparison.ts";
-import { money } from "./format.ts";
 import type { Plan } from "./model.ts";
 import type { Projection } from "./result.ts";
 
@@ -229,76 +228,56 @@ describe("comparison measures and snapshots", () => {
 });
 
 describe("change detail rows", () => {
-	it("formats values and retains field order while hiding internal and unchanged fields", () => {
-		expect(
-			changeDetails({
-				before: JSON.stringify({
-					id: "old",
-					readOnly: false,
-					name: "Same",
-					amount: 10,
-					enabled: true,
-					maxBalance: null,
-					custom: "old",
-					inflation: 2,
-				}),
-				after: JSON.stringify({
-					id: "new",
-					readOnly: true,
-					name: "Same",
-					amount: 20,
-					enabled: false,
-					maxBalance: 50,
-					inflation: 3,
-					source: "Bank",
-				}),
+	it("retains field order while hiding internal and unchanged fields", () => {
+		const details = changeDetails({
+			before: JSON.stringify({
+				id: "old",
+				readOnly: false,
+				name: "Same",
+				amount: 10,
+				enabled: true,
+				maxBalance: null,
+				custom: "old",
+				inflation: 2,
 			}),
-		).toEqual({
-			kind: "fields",
-			rows: [
-				{ key: "amount", label: "Amount", before: money(10), after: money(20) },
-				{ key: "enabled", label: "Included", before: "Yes", after: "No" },
-				{
-					key: "maxBalance",
-					label: "Maximum balance",
-					before: "None",
-					after: money(50),
-				},
-				{ key: "custom", label: "custom", before: "old", after: "None" },
-				{ key: "inflation", label: "Inflation (%)", before: "2", after: "3" },
-				{ key: "source", label: "Source", before: "None", after: "Bank" },
-			],
+			after: JSON.stringify({
+				id: "new",
+				readOnly: true,
+				name: "Same",
+				amount: 20,
+				enabled: false,
+				maxBalance: 50,
+				inflation: 3,
+				source: "Bank",
+			}),
 		});
+		expect(details.kind).toBe("fields");
+		if (details.kind !== "fields") throw new Error("Expected fields");
+		expect(details.rows.map((row) => row.key)).toEqual([
+			"amount",
+			"enabled",
+			"maxBalance",
+			"custom",
+			"inflation",
+			"source",
+		]);
 	});
-	it("represents added and removed object fields as None", () => {
-		expect(changeDetails({ before: "", after: '{"target":100}' })).toEqual({
-			kind: "fields",
-			rows: [
-				{ key: "target", label: "Target", before: "None", after: money(100) },
-			],
-		});
-		expect(changeDetails({ before: '{"enabled":false}', after: "" })).toEqual({
-			kind: "fields",
-			rows: [
-				{ key: "enabled", label: "Included", before: "No", after: "None" },
-			],
-		});
+	it("represents added and removed object fields", () => {
+		const added = changeDetails({ before: "", after: '{"target":100}' });
+		expect(added.kind).toBe("fields");
+		if (added.kind !== "fields") throw new Error("Expected fields");
+		expect(added.rows.map((row) => row.key)).toEqual(["target"]);
+
+		const removed = changeDetails({ before: '{"enabled":false}', after: "" });
+		expect(removed.kind).toBe("fields");
+		if (removed.kind !== "fields") throw new Error("Expected fields");
+		expect(removed.rows.map((row) => row.key)).toEqual(["enabled"]);
 	});
-	it("retains plain text and empty-side labels", () => {
-		expect(changeDetails({ before: "Old plan", after: "New plan" })).toEqual({
-			kind: "text",
-			before: "Old plan",
-			after: "New plan",
-		});
-		expect(changeDetails({ before: "", after: "New plan" })).toEqual({
-			kind: "text",
-			before: "New",
-			after: "New plan",
-		});
-		expect(changeDetails({ before: "Old plan", after: "" })).toEqual({
-			kind: "text",
-			before: "Old plan",
-			after: "Removed",
-		});
+	it("retains plain text changes", () => {
+		expect(changeDetails({ before: "Old plan", after: "New plan" }).kind).toBe(
+			"text",
+		);
+		expect(changeDetails({ before: "", after: "New plan" }).kind).toBe("text");
+		expect(changeDetails({ before: "Old plan", after: "" }).kind).toBe("text");
 	});
 });

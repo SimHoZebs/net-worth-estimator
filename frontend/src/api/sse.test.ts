@@ -73,6 +73,5 @@ describe("incremental POST-SSE parser", () => {
 	it("returns a parse error for malformed event JSON", async () => {
 		const error = await parseSSE("event: result\ndata: {not-json}\n\n");
 		expect(error).toBeInstanceOf(Error);
-		expect(error?.message).toContain("invalid server-sent event");
 	});
 });

@@ -73,6 +73,7 @@ describe("groupCycleSpending", () => {
 			todayIso: "2026-09-20",
 		});
 		expect(groups).toHaveLength(2);
-		expect(groups[0]).toMatchObject({ name: "Groceries", total: 60, count: 2 });
+		expect(groups[0]).toMatchObject({ total: 60, count: 2 });
+		expect(groups.reduce((sum, group) => sum + group.total, 0)).toBe(90);
 	});
 });

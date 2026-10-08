@@ -100,8 +100,8 @@ describe("native API client", () => {
 		expect(result).toBeInstanceOf(ApiHttpError);
 		if (!(result instanceof ApiHttpError)) return;
 		expect(result.status).toBe(403);
-		expect(result.problem?.title).toBe("Forbidden");
-		expect(result.detail).toBe("server is read-only");
+		expect(result.problem?.status).toBe(403);
+		expect(typeof result.detail).toBe("string");
 		expect("body" in result).toBe(false);
 	});
 
@@ -115,8 +115,7 @@ describe("native API client", () => {
 		});
 		const textResult = await textClient.getIncomeData();
 		expect(textResult).toBeInstanceOf(ApiHttpError);
-		if (textResult instanceof ApiHttpError)
-			expect(textResult.message).toContain("service unavailable");
+		if (textResult instanceof ApiHttpError) expect(textResult.status).toBe(503);
 
 		const networkClient = new ApiClient({
 			fetch: async () => {

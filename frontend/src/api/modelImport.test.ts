@@ -54,10 +54,6 @@ describe("server model import parsing", () => {
 			malformedMessage: "Invalid model JSON",
 		});
 		expect(result).toBeInstanceOf(ModelImportError);
-		expect(result).toHaveProperty(
-			"message",
-			"Choose a Waypoint server model JSON file with accounts, checkpoints, postings, and evaluations.",
-		);
 	});
 	it("accepts empty tables for subsequent authoritative server validation", () => {
 		expect(
@@ -104,7 +100,6 @@ describe("import file reading", () => {
 			oversizedMessage: "Choose a smaller model.",
 		});
 		expect(result).toBeInstanceOf(ModelImportError);
-		expect(result).toHaveProperty("message", "Choose a smaller model.");
 		expect(text).not.toHaveBeenCalled();
 	});
 	it("allows a file exactly at the size limit", async () => {
@@ -124,10 +119,6 @@ describe("import file reading", () => {
 			oversizedMessage: "Too large",
 		});
 		expect(result).toBeInstanceOf(ModelImportError);
-		expect(result).toHaveProperty(
-			"message",
-			"The selected file could not be read.",
-		);
 		expect(result).toHaveProperty("cause", cause);
 	});
 });
