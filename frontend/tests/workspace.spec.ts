@@ -14,7 +14,6 @@ test.beforeEach(async () => {
 /** Open the movement editor for the fixture's investing transfer. */
 async function openInvestingMovementEditor(page: Page) {
 	await page.getByRole("link", { name: "Transactions", exact: true }).click();
-	await page.getByRole("tab", { name: /Transactions/ }).click();
 	await page.getByRole("button", { name: "Edit Monthly investing" }).click();
 }
 
@@ -236,7 +235,7 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 	for (const { route, label } of [
 		{ route: "accounts", label: "Accounts" },
 		{ route: "transactions", label: "Transactions" },
-		{ route: "sources", label: "Data & sources" },
+		{ route: "sources", label: "Configs" },
 	]) {
 		await page.goto(`/#${route}`);
 		const openNavigation = page.getByRole("button", {
@@ -356,7 +355,7 @@ test("comparison snapshots contain measures and exports remain portable", async 
 	expect(snapshot).not.toHaveProperty("accounts");
 	expect(snapshot).not.toHaveProperty("movements");
 	expect(snapshot).toHaveProperty("final");
-	await page.getByRole("link", { name: "Data & sources", exact: true }).click();
+	await page.getByRole("link", { name: "Configs", exact: true }).click();
 	const file = page.waitForEvent("download");
 	await page.getByRole("button", { name: "Export server model" }).click();
 	expect((await file).suggestedFilename()).toBe("waypoint-server-model.json");
@@ -400,18 +399,20 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 	await page.keyboard.press("ArrowRight");
 	await expect(page.getByRole("tab", { name: /Balance checks/ })).toBeFocused();
 	await page.goto("/#transactions");
+	await expect(page.locator('.page-tabs[role="tablist"]')).toHaveCount(0);
 	await expect(
-		page.locator('.page-tabs[role="tablist"] > button[role="tab"]'),
-	).toHaveCount(2);
-	await page.getByRole("tab", { name: /Transactions/ }).focus();
-	await page.keyboard.press("ArrowRight");
-	await expect(page.getByRole("tab", { name: "Assumptions" })).toBeFocused();
-	await expect(page.getByRole("tab", { name: "Assumptions" })).toHaveAttribute(
-		"aria-selected",
-		"true",
-	);
-	await page.keyboard.press("Home");
-	await expect(page.getByRole("tab", { name: /Transactions/ })).toBeFocused();
+		page.getByRole("combobox", { name: "Transaction schedule" }),
+	).toBeVisible();
+	await expect(
+		page.getByRole("heading", { name: "The inputs behind the outlook" }),
+	).not.toBeVisible();
+	await page.goto("/#sources");
+	await expect(
+		page.getByRole("heading", { name: "The inputs behind the outlook" }),
+	).toBeVisible();
+	await expect(
+		page.getByRole("button", { name: "Edit assumptions" }),
+	).toBeVisible();
 	for (const width of [320, 768, 1280]) {
 		await page.setViewportSize({ width, height: 900 });
 		for (const route of [

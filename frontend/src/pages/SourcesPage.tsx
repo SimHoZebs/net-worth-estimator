@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 import type { FinancialModelDocument, ServerStatus } from "../api/index.ts";
 import { ErrorNotice } from "../components/ui.tsx";
 import type { Plan } from "../domain/model.ts";
+import type { EditorTarget } from "../domain/planEdits.ts";
 import type { Workspace } from "../state/storage.ts";
 import { useModelImport } from "../state/useModelImport.ts";
+import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
 import { BalanceProvenance } from "./sources/BalanceProvenance.tsx";
 import { IncomeEvidence } from "./sources/IncomeEvidence.tsx";
 import { SourceBanner, SourceHealth } from "./sources/SourceHealth.tsx";
@@ -20,6 +22,7 @@ export function SourcesPage({
 	authControl = null,
 	authRequired = false,
 	authTokenActive = false,
+	onEdit,
 }: {
 	plan: Plan;
 	workspace: Workspace;
@@ -32,6 +35,7 @@ export function SourcesPage({
 	authControl?: ReactNode;
 	authRequired?: boolean;
 	authTokenActive?: boolean;
+	onEdit: (target: EditorTarget) => void;
 }) {
 	const controller = useModelImport({
 		workspace,
@@ -83,6 +87,10 @@ export function SourcesPage({
 			</div>
 			<BalanceProvenance plan={plan} />
 			<IncomeEvidence plan={plan} />
+			<AssumptionsPanel
+				assumptions={plan.assumptions}
+				onEdit={() => onEdit({ kind: "assumptions" })}
+			/>
 			<SourceImportPreview
 				hasDraft={hasDraft}
 				canImportServer={canImportServer}

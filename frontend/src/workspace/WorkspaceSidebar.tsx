@@ -2,9 +2,9 @@ import {
 	ArrowUpRight,
 	ChevronDown,
 	CircleHelp,
-	HardDrive,
 	LockKeyhole,
 	PanelLeftClose,
+	Settings,
 	ShieldCheck,
 } from "lucide-react";
 import { Brand } from "../components/Brand.tsx";
@@ -96,8 +96,8 @@ export function WorkspaceSidebar({
 					onClick={onClose}
 					aria-current={page === "sources" ? "page" : undefined}
 				>
-					<HardDrive size={19} strokeWidth={1.7} />
-					<span>Data & sources</span>
+					<Settings size={19} strokeWidth={1.7} />
+					<span>Configs</span>
 				</a>
 				<button type="button" className="nav-link help-link" onClick={onMethod}>
 					<CircleHelp size={19} strokeWidth={1.7} />

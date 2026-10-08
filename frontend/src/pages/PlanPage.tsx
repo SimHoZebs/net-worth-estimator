@@ -10,12 +10,10 @@ import {
 	toggleMovement,
 } from "../domain/planEdits.ts";
 import { AccountsPanel, BalanceChecksPanel } from "./plan/AccountsPanel.tsx";
-import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
 import { MovementsPanel } from "./plan/MovementsPanel.tsx";
 
 export type PlanView = "accounts" | "transactions";
 type AccountsSection = "accounts" | "checks";
-type TransactionsSection = "movements" | "assumptions";
 
 type ScheduleFilter = "all" | "scheduled" | "once";
 
@@ -177,14 +175,9 @@ function TransactionsView({
 	onEdit: (target: EditorTarget) => void;
 	onUpdate: (plan: Plan) => boolean;
 }) {
-	const [tab, setTab] = useState<TransactionsSection>("movements");
 	const [query, setQuery] = useState("");
 	const [schedule, setSchedule] = useState<ScheduleFilter>("all");
 	const { requestRemoval, dialog } = usePlanRemoval({ plan, onUpdate });
-	const tabs: TabItem<TransactionsSection>[] = [
-		{ id: "movements", label: "Transactions", count: plan.movements.length },
-		{ id: "assumptions", label: "Assumptions" },
-	];
 	const movements = plan.movements.filter(
 		(movement) =>
 			movement.name.toLowerCase().includes(query.toLowerCase()) &&
@@ -195,75 +188,55 @@ function TransactionsView({
 	);
 	return (
 		<>
-			<Tabs
-				items={tabs}
-				value={tab}
-				onChange={(next) => {
-					setTab(next);
-					setQuery("");
-				}}
-				label="Transactions sections"
-				panelAs="section"
-				panelClassName="panel plan-panel"
-			>
-				{tab === "movements" && (
-					<div className="plan-toolbar">
-						<label className="search-field">
-							<Search size={17} />
-							<input
-								aria-label="Search plan"
-								value={query}
-								onChange={(event) => setQuery(event.target.value)}
-								placeholder="Find a transaction…"
-							/>
-						</label>
-						<label className="plan-schedule-filter">
-							<span className="sr-only">Transaction schedule</span>
-							<select
-								aria-label="Transaction schedule"
-								value={schedule}
-								onChange={(event) =>
-									setSchedule(event.target.value as ScheduleFilter)
-								}
-							>
-								<option value="all">All schedules</option>
-								<option value="scheduled">Scheduled (recurring)</option>
-								<option value="once">One-time</option>
-							</select>
-						</label>
-						<button
-							type="button"
-							className="button primary small"
-							onClick={() => onEdit({ kind: "movement", item: null })}
+			<section className="panel plan-panel" aria-label="Transactions">
+				<div className="plan-toolbar">
+					<label className="search-field">
+						<Search size={17} />
+						<input
+							aria-label="Search plan"
+							value={query}
+							onChange={(event) => setQuery(event.target.value)}
+							placeholder="Find a transaction…"
+						/>
+					</label>
+					<label className="plan-schedule-filter">
+						<span className="sr-only">Transaction schedule</span>
+						<select
+							aria-label="Transaction schedule"
+							value={schedule}
+							onChange={(event) =>
+								setSchedule(event.target.value as ScheduleFilter)
+							}
 						>
-							<Plus size={16} />
-							Add transaction
-						</button>
-					</div>
-				)}
-				{tab === "movements" && (
-					<MovementsPanel
-						movements={movements}
-						accounts={plan.accounts}
-						startDate={plan.startDate}
-						onEdit={(item) => onEdit({ kind: "movement", item })}
-						onRemove={(item) =>
-							requestRemoval({
-								kind: "movements",
-								id: item.id,
-								name: item.name,
-							})
-						}
-						onToggle={(id) => onUpdate(toggleMovement({ plan, id }))}
-					/>
-				)}
-				{tab === "assumptions" && (
-					<AssumptionsPanel
-						assumptions={plan.assumptions}
-						onEdit={() => onEdit({ kind: "assumptions" })}
-					/>
-				)}
-			</Tabs>
+							<option value="all">All schedules</option>
+							<option value="scheduled">Scheduled (recurring)</option>
+							<option value="once">One-time</option>
+						</select>
+					</label>
+					<button
+						type="button"
+						className="button primary small"
+						onClick={() => onEdit({ kind: "movement", item: null })}
+					>
+						<Plus size={16} />
+						Add transaction
+					</button>
+				</div>
+				<MovementsPanel
+					movements={movements}
+					accounts={plan.accounts}
+					startDate={plan.startDate}
+					onEdit={(item) => onEdit({ kind: "movement", item })}
+					onRemove={(item) =>
+						requestRemoval({
+							kind: "movements",
+							id: item.id,
+							name: item.name,
+						})
+					}
+					onToggle={(id) => onUpdate(toggleMovement({ plan, id }))}
+				/>
+			</section>
 			{dialog}
 		</>
 	);

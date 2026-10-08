@@ -3,8 +3,8 @@ import {
 	type Compass,
 	Flag,
 	GitCompareArrows,
-	HardDrive,
 	LayoutDashboard,
+	Settings,
 	Wallet,
 } from "lucide-react";
 
@@ -39,7 +39,7 @@ export const pages: PageDefinition[] = [
 		id: "transactions",
 		label: "Transactions",
 		icon: ArrowRightLeft,
-		title: "Planned transactions and assumptions",
+		title: "Planned transactions",
 	},
 	{
 		id: "evaluations",
@@ -55,9 +55,9 @@ export const pages: PageDefinition[] = [
 	},
 	{
 		id: "sources",
-		label: "Data & sources",
-		icon: HardDrive,
-		title: "Confidence starts at the source",
+		label: "Configs",
+		icon: Settings,
+		title: "How the plan is configured",
 	},
 ];
 
