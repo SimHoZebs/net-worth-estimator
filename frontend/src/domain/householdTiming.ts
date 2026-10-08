@@ -144,18 +144,21 @@ export function nextPaycheck({
 }
 
 /**
- * Cash cushion: checking balance minus remaining unpaid monthly obligations.
- * Card purchases do not reduce the cushion here; they are budgeted against
- * the next paycheck in the cycle allowance.
+ * Cash cushion: checking balance minus spending since the checkpoint and
+ * remaining unpaid monthly obligations. Card purchases do not reduce the
+ * cushion here; they are budgeted against the next paycheck in the cycle
+ * allowance.
  */
 export function cashCushion({
 	checking,
+	spentSinceStart,
 	remainingObligations,
 }: {
 	checking: number;
+	spentSinceStart: number;
 	remainingObligations: number;
 }): number {
-	return checking - remainingObligations;
+	return checking - spentSinceStart - remainingObligations;
 }
 
 /** Amount set aside for the card cycle before spending. */
@@ -209,6 +212,37 @@ export function filterMovementsById(
 	if (!movementIds) return movements;
 	const selected = new Set(movementIds);
 	return movements.filter((movement) => selected.has(movement.movementId));
+}
+
+/**
+ * Realized checking outflows inside (after, through]: money the projection
+ * shows as already left between the checkpoint and today. The cash cushion
+ * subtracts these so logged actuals dated after the projection start still
+ * move today's figures.
+ */
+export function realizedCheckingOutflows({
+	movements,
+	checkingId,
+	after,
+	through,
+}: {
+	movements: MovementResult[];
+	checkingId: string;
+	after: string;
+	through: string;
+}): number {
+	const start = after.slice(0, 10);
+	const end = through.slice(0, 10);
+	if (end <= start) return 0;
+	return movements
+		.filter(
+			(movement) =>
+				movement.fromId === checkingId &&
+				movement.date > start &&
+				movement.date <= end &&
+				movement.realized > 0,
+		)
+		.reduce((sum, movement) => sum + movement.realized, 0);
 }
 
 /**

@@ -24,6 +24,7 @@ export interface TimingMandatorySection {
 }
 export interface CashNowDecomposition {
 	checking: number;
+	spentSinceStart: number;
 	bills: number;
 	cushion: number;
 }
@@ -39,6 +40,12 @@ export interface PaycheckDecomposition {
 /** Bucket one: what checking covers right now. */
 function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 	const segments: BarSegment[] = [
+		{
+			label: "Spent since checkpoint",
+			amount: parts.spentSinceStart,
+			pattern: "solid",
+			tone: "dark",
+		},
 		{
 			label: "Bills due",
 			amount: parts.bills,
@@ -60,7 +67,7 @@ function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 					: `${money(parts.checking)} checking · short ${money(-parts.cushion)}`
 			}
 			segments={segments}
-			ariaLabel={`Checking ${money(parts.checking)}: bills due ${money(parts.bills)}, cushion ${money(Math.max(0, parts.cushion))}`}
+			ariaLabel={`Checking ${money(parts.checking)}: spent since checkpoint ${money(parts.spentSinceStart)}, bills due ${money(parts.bills)}, cushion ${money(Math.max(0, parts.cushion))}`}
 		/>
 	);
 }

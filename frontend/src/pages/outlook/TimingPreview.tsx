@@ -26,6 +26,7 @@ import {
 	groupMandatorySpending,
 	nextMonthObligations,
 	nextPaycheck,
+	realizedCheckingOutflows,
 	remainingMonthlyObligations,
 } from "../../domain/householdTiming.ts";
 import type { Plan } from "../../domain/model.ts";
@@ -271,6 +272,18 @@ export function TimingPreview({
 			todayIso: displayToday,
 		});
 	}, [projection.movements, checkingId, displayToday]);
+	const spentSinceStart = useMemo(
+		() =>
+			checkingId
+				? realizedCheckingOutflows({
+						movements: obligationMovements,
+						checkingId,
+						after: plan.startDate,
+						through: displayToday,
+					})
+				: 0,
+		[obligationMovements, checkingId, plan.startDate, displayToday],
+	);
 
 	const billCandidates = useMemo(() => {
 		if (!checkingId) return [];
@@ -368,6 +381,7 @@ export function TimingPreview({
 		settings.remainingOverride ?? remainingDerived.total;
 	const cushion = cashCushion({
 		checking,
+		spentSinceStart,
 		remainingObligations,
 	});
 
@@ -614,6 +628,7 @@ export function TimingPreview({
 					heroes={heroes}
 					cashNow={{
 						checking,
+						spentSinceStart,
 						bills: remainingObligations,
 						cushion,
 					}}
