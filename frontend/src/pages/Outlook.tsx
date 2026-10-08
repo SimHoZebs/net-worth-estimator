@@ -1,6 +1,7 @@
 import { AccountList } from "../components/AccountList.tsx";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import type { Account, Plan } from "../domain/model.ts";
+import type { EditorTarget } from "../domain/planEdits.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { EvaluationPreview } from "./outlook/EvaluationPreview.tsx";
 import { FundingInsight } from "./outlook/FundingInsight.tsx";
@@ -24,6 +25,7 @@ export function Outlook({
 	onTransactions,
 	onEvaluations,
 	onEvaluation,
+	onEdit,
 }: {
 	plan: Plan;
 	projection: Projection;
@@ -41,6 +43,7 @@ export function Outlook({
 	onTransactions: () => void;
 	onEvaluations: () => void;
 	onEvaluation: (id: string) => void;
+	onEdit: (target: EditorTarget) => void;
 }) {
 	if (!projection.points.length) return null;
 	const evaluation =
@@ -90,7 +93,7 @@ export function Outlook({
 					onEvaluations={onEvaluations}
 					onEvaluation={onEvaluation}
 				/>
-				<TimingPreview plan={plan} projection={projection} />
+				<TimingPreview plan={plan} projection={projection} onEdit={onEdit} />
 			</div>
 			<AccountList
 				plan={plan}

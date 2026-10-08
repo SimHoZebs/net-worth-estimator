@@ -1033,6 +1033,24 @@
 		border: 1px solid var(--line);
 		border-radius: 10px;
 		padding: 22px 23px 18px;
+		position: relative;
+	}
+	.timing-open {
+		position: absolute;
+		inset: 0;
+		border-radius: 10px;
+		background: transparent;
+		border: 0;
+		padding: 0;
+		cursor: pointer;
+	}
+	.timing-open:focus-visible {
+		outline: 2px solid #607e4b;
+		outline-offset: 2px;
+	}
+	.timing-preview .cycle-actions {
+		position: relative;
+		z-index: 1;
 	}
 	.evaluation-preview .section-top h2,
 	.timing-preview .section-top h2 {

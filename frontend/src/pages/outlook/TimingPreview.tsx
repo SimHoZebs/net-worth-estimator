@@ -3,9 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge, Progress } from "../../components/ui.tsx";
 import { accountTransactions } from "../../domain/accountActivity.ts";
 import {
-	cycleScheduledRest,
 	cycleSpentSoFar,
-	groupCycleSpending,
+	isCycleOutflow,
 	resolveStatementCycle,
 } from "../../domain/cardCycle.ts";
 import { dateLabel, money, shiftDate, sum } from "../../domain/format.ts";
@@ -24,6 +23,7 @@ import {
 	remainingMonthlyObligations,
 } from "../../domain/householdTiming.ts";
 import type { Plan } from "../../domain/model.ts";
+import type { EditorTarget } from "../../domain/planEdits.ts";
 import type { Projection } from "../../domain/result.ts";
 import {
 	TimingDetailDialog,
@@ -47,6 +47,8 @@ interface TotalCycleSettings {
 	movementIds: string[] | null;
 	/** Which window the drawer mandatory tab uses. Card figures stay calendar. */
 	mandatoryFrame: "calendar" | "cycle";
+	/** True once the statement day is explicitly chosen. Untouched legacy 1st falls back to the household 20th. */
+	statementDaySet: boolean;
 }
 
 const defaultSettings = (): TotalCycleSettings => ({
@@ -60,6 +62,7 @@ const defaultSettings = (): TotalCycleSettings => ({
 	accountIds: null,
 	movementIds: null,
 	mandatoryFrame: "calendar",
+	statementDaySet: false,
 });
 
 function optionalMoney(value: unknown): number | null {
@@ -91,16 +94,20 @@ function loadPersisted(): TotalCycleSettings {
 					(id): id is string => typeof id === "string" && id !== "",
 				)
 			: null;
-		return {
-			statementDay: Math.min(
-				28,
-				Math.max(
-					1,
-					Math.floor(
-						Number(parsed.statementDay) || DEFAULT_CYCLE_STATEMENT_DAY,
-					),
-				),
+		const statementDaySet = parsed.statementDaySet === true;
+		const storedDay = Math.min(
+			28,
+			Math.max(
+				1,
+				Math.floor(Number(parsed.statementDay) || DEFAULT_CYCLE_STATEMENT_DAY),
 			),
+		);
+		return {
+			statementDay:
+				!statementDaySet && storedDay === 1
+					? DEFAULT_CYCLE_STATEMENT_DAY
+					: storedDay,
+			statementDaySet,
 			reserve: Math.max(
 				0,
 				Number.isFinite(Number(parsed.reserve))
@@ -124,9 +131,11 @@ function loadPersisted(): TotalCycleSettings {
 export function TimingPreview({
 	plan,
 	projection,
+	onEdit,
 }: {
 	plan: Plan;
 	projection: Projection;
+	onEdit: (target: EditorTarget) => void;
 }) {
 	const cards = useMemo(
 		() => plan.accounts.filter((account) => account.kind === "debt"),
@@ -146,9 +155,15 @@ export function TimingPreview({
 
 	const trackedIds = useMemo(() => {
 		const known = new Set(cards.map((card) => card.id));
-		if (!settings.accountIds) return cards.map((card) => card.id);
+		// Spending cards are debt accounts by convention (`*_card`); loans
+		// and other debt fall back to the full set when no card is present.
+		const cardLike = cards
+			.map((card) => card.id)
+			.filter((id) => id.endsWith("_card"));
+		const fallback = cardLike.length ? cardLike : cards.map((card) => card.id);
+		if (!settings.accountIds) return fallback.filter((id) => known.has(id));
 		const selected = settings.accountIds.filter((id) => known.has(id));
-		return selected.length ? selected : cards.map((card) => card.id);
+		return selected.length ? selected : fallback.filter((id) => known.has(id));
 	}, [settings.accountIds, cards]);
 
 	const trackedCards = useMemo(() => {
@@ -175,6 +190,7 @@ export function TimingPreview({
 				});
 				const name =
 					cards.find((card) => card.id === accountId)?.name ?? accountId;
+				const today = plan.startDate.slice(0, 10);
 				return {
 					accountId,
 					name,
@@ -183,19 +199,26 @@ export function TimingPreview({
 						cycleStart: cycle.cycleStart,
 						todayIso: plan.startDate,
 					}),
-					scheduled: cycleScheduledRest({
-						transactions,
-						cycleEnd: cycle.cycleEnd,
-						todayIso: plan.startDate,
-					}),
-					groups: groupCycleSpending({
-						transactions,
-						cycleStart: cycle.cycleStart,
-						todayIso: plan.startDate,
-					}).map((group) => ({ ...group, accountId, accountName: name })),
+					inCycle: transactions.filter(
+						(transaction) =>
+							isCycleOutflow(transaction) &&
+							transaction.date >= cycle.cycleStart &&
+							transaction.date <= today,
+					),
 				};
 			}),
 		[trackedIds, cards, plan, projection, cycle, plan.startDate],
+	);
+	const cycleTransactions = useMemo(
+		() =>
+			perAccount
+				.flatMap((item) => item.inCycle)
+				.sort(
+					(left, right) =>
+						left.date.localeCompare(right.date) ||
+						left.id.localeCompare(right.id),
+				),
+		[perAccount],
 	);
 
 	const checkingId = useMemo(() => checkingAccountId(plan), [plan]);
@@ -322,13 +345,6 @@ export function TimingPreview({
 	}
 
 	const derivedSpent = perAccount.reduce((sum, item) => sum + item.derived, 0);
-	const scheduledRest = perAccount.reduce(
-		(sum, item) => sum + item.scheduled,
-		0,
-	);
-	const groups = perAccount
-		.flatMap((item) => item.groups)
-		.sort((a, b) => b.total - a.total || a.key.localeCompare(b.key));
 
 	const checking = settings.checkingOverride ?? checkingDerived ?? 0;
 	const remainingObligations =
@@ -389,6 +405,7 @@ export function TimingPreview({
 	const updateSettings = (next: Partial<TotalCycleSettings>) => {
 		setSettings((previous) => ({
 			statementDay: next.statementDay ?? previous.statementDay,
+			statementDaySet: next.statementDaySet ?? previous.statementDaySet,
 			reserve: next.reserve ?? previous.reserve,
 			spentOverride:
 				next.spentOverride !== undefined
@@ -427,7 +444,11 @@ export function TimingPreview({
 	};
 
 	const toggleAccount = (accountId: string) => {
-		const explicit = settings.accountIds ?? cards.map((card) => card.id);
+		const cardLike = cards
+			.map((card) => card.id)
+			.filter((id) => id.endsWith("_card"));
+		const fallback = cardLike.length ? cardLike : cards.map((card) => card.id);
+		const explicit = settings.accountIds ?? fallback;
 		const next = explicit.includes(accountId)
 			? explicit.filter((id) => id !== accountId)
 			: [...explicit, accountId];
@@ -452,10 +473,10 @@ export function TimingPreview({
 		});
 	};
 
-	const accountLabel =
-		trackedCards.length === cards.length
-			? `All ${cards.length} cards`
-			: trackedCards.map((card) => card.name).join(", ");
+	const narrowedAccounts = trackedIds.length !== cards.length;
+	const accountLabel = narrowedAccounts
+		? trackedCards.map((card) => card.name).join(", ")
+		: null;
 
 	const activeThisMonth =
 		settings.mandatoryFrame === "calendar"
@@ -488,6 +509,13 @@ export function TimingPreview({
 
 	return (
 		<section className="timing-preview" aria-label="Total card cycle">
+			<button
+				type="button"
+				className="timing-open"
+				onClick={() => setDetail("mandatory")}
+			>
+				<span className="sr-only">Open timing details</span>
+			</button>
 			<div className="section-top">
 				<h2>
 					<CalendarDays size={18} />
@@ -497,8 +525,8 @@ export function TimingPreview({
 			</div>
 			<p className="cycle-dates">
 				{dateLabel(cycle.cycleStart, true)} to {dateLabel(cycle.cycleEnd, true)}{" "}
-				· {fullDaysLeft} {fullDaysLeft === 1 ? "day" : "days"} left ·{" "}
-				{accountLabel}
+				· {fullDaysLeft} {fullDaysLeft === 1 ? "day" : "days"} left
+				{accountLabel ? ` · ${accountLabel}` : ""}
 			</p>
 			<div className="timing-figures">
 				<div>
@@ -540,7 +568,10 @@ export function TimingPreview({
 				<button
 					type="button"
 					className="text-button"
-					onClick={() => setDetail("mandatory")}
+					onClick={(event) => {
+						event.stopPropagation();
+						setDetail("mandatory");
+					}}
 				>
 					Mandatory spending ({money(fixedObligations)} next month
 					{billsFiltered
@@ -551,21 +582,17 @@ export function TimingPreview({
 				<button
 					type="button"
 					className="text-button"
-					onClick={() => setDetail("cycle")}
+					onClick={(event) => {
+						event.stopPropagation();
+						setDetail("cycle");
+					}}
 				>
-					{`Where the cycle went (${groups.length})`}
-				</button>
-				<button
-					type="button"
-					className="text-button"
-					onClick={() => setDetail("configure")}
-				>
-					Configure cycle
+					{`Where the cycle went (${cycleTransactions.length})`}
 				</button>
 			</div>
 			{detail && (
 				<TimingDetailDialog
-					eyebrow={`${dateLabel(cycle.cycleStart, true)} to ${dateLabel(cycle.cycleEnd, true)} · ${accountLabel}`}
+					eyebrow={`${dateLabel(cycle.cycleStart, true)} to ${dateLabel(cycle.cycleEnd, true)}${accountLabel ? ` · ${accountLabel}` : ""}`}
 					today={plan.startDate.slice(0, 10)}
 					heroes={heroes}
 					cashNow={{
@@ -588,8 +615,10 @@ export function TimingPreview({
 					billCandidates={billCandidates}
 					trackedBillIds={trackedBillIds}
 					onToggleBill={toggleBill}
-					cycleGroups={groups}
-					cycleSummary={`${money(spent)} of ${money(budget)} used · paycheck ${money(paycheck)} − fixed ${money(fixedObligations)} − reserve ${money(settings.reserve)}${scheduledRest > 0 ? ` · ${money(scheduledRest)} scheduled before ${dateLabel(cycle.cycleEnd, true)}` : ""}`}
+					plan={plan}
+					onEdit={onEdit}
+					cycleTransactions={cycleTransactions}
+					cycleEnd={cycle.cycleEnd}
 					config={{
 						statementDay: settings.statementDay,
 						reserve: settings.reserve,
