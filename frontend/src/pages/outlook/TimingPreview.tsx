@@ -18,6 +18,7 @@ import {
 	cycleBudget,
 	DEFAULT_CYCLE_STATEMENT_DAY,
 	DEFAULT_PROTECTED_RESERVE,
+	filterMovementsById,
 	groupMandatorySpending,
 	nextMonthObligations,
 	nextPaycheck,
@@ -43,6 +44,8 @@ interface TotalCycleSettings {
 	remainingOverride: number | null;
 	/** Null means every debt account counts toward the total. */
 	accountIds: string[] | null;
+	/** Null means every recurring checking outflow counts as a bill. */
+	movementIds: string[] | null;
 }
 
 const defaultSettings = (): TotalCycleSettings => ({
@@ -54,6 +57,7 @@ const defaultSettings = (): TotalCycleSettings => ({
 	checkingOverride: null,
 	remainingOverride: null,
 	accountIds: null,
+	movementIds: null,
 });
 
 function optionalMoney(value: unknown): number | null {
@@ -80,6 +84,11 @@ function loadPersisted(): TotalCycleSettings {
 					(id): id is string => typeof id === "string" && id !== "",
 				)
 			: null;
+		const movementIds = Array.isArray(parsed.movementIds)
+			? parsed.movementIds.filter(
+					(id): id is string => typeof id === "string" && id !== "",
+				)
+			: null;
 		return {
 			statementDay: Math.min(
 				28,
@@ -102,6 +111,7 @@ function loadPersisted(): TotalCycleSettings {
 			checkingOverride: optionalMoney(parsed.checkingOverride),
 			remainingOverride: optionalMoney(parsed.remainingOverride),
 			accountIds: accountIds?.length ? accountIds : null,
+			movementIds: movementIds?.length ? movementIds : null,
 		};
 	} catch {
 		return defaultSettings();
@@ -187,23 +197,27 @@ export function TimingPreview({
 
 	const checkingId = useMemo(() => checkingAccountId(plan), [plan]);
 	const checkingDerived = useMemo(() => checkingBalance(plan), [plan]);
+	const obligationMovements = useMemo(
+		() => filterMovementsById(projection.movements, settings.movementIds),
+		[projection.movements, settings.movementIds],
+	);
 	const remainingDerived = useMemo(() => {
 		if (!checkingId) return { total: 0, monthEnd: plan.startDate.slice(0, 10) };
 		return remainingMonthlyObligations({
-			movements: projection.movements,
+			movements: obligationMovements,
 			checkingId,
 			todayIso: plan.startDate,
 		});
-	}, [projection.movements, checkingId, plan.startDate]);
+	}, [obligationMovements, checkingId, plan.startDate]);
 	const fixedDerived = useMemo(() => {
 		if (!checkingId)
 			return { total: 0, start: plan.startDate, end: plan.startDate };
 		return nextMonthObligations({
-			movements: projection.movements,
+			movements: obligationMovements,
 			checkingId,
 			todayIso: plan.startDate,
 		});
-	}, [projection.movements, checkingId, plan.startDate]);
+	}, [obligationMovements, checkingId, plan.startDate]);
 	const paycheckDerived = useMemo(() => {
 		if (!checkingId) return null;
 		return nextPaycheck({
@@ -213,17 +227,39 @@ export function TimingPreview({
 		});
 	}, [projection.movements, checkingId, plan.startDate]);
 
+	const billCandidates = useMemo(() => {
+		if (!checkingId) return [];
+		return plan.movements
+			.filter(
+				(movement) =>
+					movement.fromId === checkingId && movement.frequency !== "once",
+			)
+			.map((movement) => ({
+				id: movement.id,
+				name: movement.name,
+				amount: movement.amount,
+				frequency: movement.frequency,
+			}));
+	}, [plan.movements, checkingId]);
+
+	const trackedBillIds = useMemo(() => {
+		const known = new Set(billCandidates.map((bill) => bill.id));
+		if (!settings.movementIds) return billCandidates.map((bill) => bill.id);
+		const selected = settings.movementIds.filter((id) => known.has(id));
+		return selected.length ? selected : billCandidates.map((bill) => bill.id);
+	}, [settings.movementIds, billCandidates]);
+
 	const mandatoryThisMonth = useMemo(() => {
 		if (!checkingId) return [];
 		const today = plan.startDate.slice(0, 10);
 		return groupMandatorySpending({
-			movements: projection.movements,
+			movements: obligationMovements,
 			checkingId,
 			start: shiftDate({ date: today, days: 1 }),
 			end: remainingDerived.monthEnd,
 		});
 	}, [
-		projection.movements,
+		obligationMovements,
 		checkingId,
 		plan.startDate,
 		remainingDerived.monthEnd,
@@ -231,12 +267,12 @@ export function TimingPreview({
 	const mandatoryNextMonth = useMemo(() => {
 		if (!checkingId) return [];
 		return groupMandatorySpending({
-			movements: projection.movements,
+			movements: obligationMovements,
 			checkingId,
 			start: fixedDerived.start,
 			end: fixedDerived.end,
 		});
-	}, [projection.movements, checkingId, fixedDerived.start, fixedDerived.end]);
+	}, [obligationMovements, checkingId, fixedDerived.start, fixedDerived.end]);
 
 	if (!cards.length) {
 		return (
@@ -319,6 +355,10 @@ export function TimingPreview({
 					: previous.remainingOverride,
 			accountIds:
 				next.accountIds !== undefined ? next.accountIds : previous.accountIds,
+			movementIds:
+				next.movementIds !== undefined
+					? next.movementIds
+					: previous.movementIds,
 		}));
 	};
 
@@ -334,6 +374,24 @@ export function TimingPreview({
 			? explicit.filter((id) => id !== accountId)
 			: [...explicit, accountId];
 		updateSettings({ accountIds: next.length ? next : null });
+	};
+
+	const billsFiltered =
+		settings.movementIds !== null &&
+		settings.movementIds.length !== billCandidates.length;
+
+	const toggleBill = (movementId: string) => {
+		const explicit =
+			settings.movementIds ?? billCandidates.map((bill) => bill.id);
+		const next = explicit.includes(movementId)
+			? explicit.filter((id) => id !== movementId)
+			: [...explicit, movementId];
+		updateSettings({
+			movementIds:
+				next.length === billCandidates.length || next.length === 0
+					? null
+					: next,
+		});
 	};
 
 	const accountLabel =
@@ -397,7 +455,11 @@ export function TimingPreview({
 					className="text-button"
 					onClick={() => setDetail("mandatory")}
 				>
-					Mandatory spending ({money(fixedObligations)} next month)
+					Mandatory spending ({money(fixedObligations)} next month
+					{billsFiltered
+						? ` · ${trackedBillIds.length} of ${billCandidates.length} bills`
+						: ""}
+					)
 				</button>
 				<button
 					type="button"
@@ -425,10 +487,14 @@ export function TimingPreview({
 					}}
 					nextMonth={{
 						title: "Next month fixed",
-						subtitle: `${dateLabel(fixedDerived.start, true)} to ${dateLabel(fixedDerived.end, true)}`,
+						subtitle: `${dateLabel(fixedDerived.start, true)} to ${dateLabel(fixedDerived.end, true)}${billsFiltered ? ` · ${trackedBillIds.length} of ${billCandidates.length} bills` : ""}`,
 						total: fixedObligations,
 						groups: mandatoryNextMonth,
 					}}
+					billsFiltered={billsFiltered}
+					billCandidates={billCandidates}
+					trackedBillIds={trackedBillIds}
+					onToggleBill={toggleBill}
 					cycleGroups={groups}
 					cycleSummary={`${money(spent)} of ${money(budget)} used · paycheck ${money(paycheck)} − fixed ${money(fixedObligations)} − reserve ${money(settings.reserve)}${scheduledRest > 0 ? ` · ${money(scheduledRest)} scheduled before ${dateLabel(cycle.cycleEnd, true)}` : ""}`}
 					config={{

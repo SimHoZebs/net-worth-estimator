@@ -6,6 +6,7 @@ import {
 	checkingAccountId,
 	cycleAllowance,
 	cycleBudget,
+	filterMovementsById,
 	groupMandatorySpending,
 	monthEndIso,
 	nextMonthObligations,
@@ -226,5 +227,22 @@ describe("groupMandatorySpending", () => {
 		});
 		expect(groups).toHaveLength(1);
 		expect(groups[0]).toMatchObject({ movementId: "housing", total: 3200 });
+	});
+});
+
+describe("filterMovementsById", () => {
+	const movements = [
+		movementFixture({ movementId: "housing", date: "2026-10-10" }),
+		movementFixture({ movementId: "living", date: "2026-10-11" }),
+	];
+
+	it("keeps every movement when no selection exists", () => {
+		expect(filterMovementsById(movements, null)).toHaveLength(2);
+	});
+
+	it("keeps only selected bills", () => {
+		const filtered = filterMovementsById(movements, ["living"]);
+		expect(filtered).toHaveLength(1);
+		expect(filtered[0]!.movementId).toBe("living");
 	});
 });

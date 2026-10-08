@@ -191,6 +191,19 @@ export interface MandatorySpendingGroup {
 }
 
 /**
+ * Narrow projection movements to a selected bill set. Null keeps every
+ * movement, so the timing card counts all checking outflows by default.
+ */
+export function filterMovementsById(
+	movements: MovementResult[],
+	movementIds: string[] | null,
+): MovementResult[] {
+	if (!movementIds) return movements;
+	const selected = new Set(movementIds);
+	return movements.filter((movement) => selected.has(movement.movementId));
+}
+
+/**
  * Mandatory spendings in an inclusive date window: checking outflows
  * grouped by movement, sorted by total descending. Powers the mandatory
  * visualization (remaining bills this month, fixed obligations next month).

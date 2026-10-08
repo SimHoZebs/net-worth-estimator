@@ -93,6 +93,10 @@ export function TimingDetailDialog({
 	cycleGroups,
 	cycleSummary,
 	config,
+	billsFiltered,
+	billCandidates,
+	trackedBillIds,
+	onToggleBill,
 	onToggleAccount,
 	onUpdateConfig,
 	onResetConfig,
@@ -105,6 +109,15 @@ export function TimingDetailDialog({
 	cycleGroups: TimingCycleGroup[];
 	cycleSummary: string;
 	config: TimingConfigHints;
+	billsFiltered: boolean;
+	billCandidates: {
+		id: string;
+		name: string;
+		amount: number;
+		frequency: string;
+	}[];
+	trackedBillIds: string[];
+	onToggleBill: (movementId: string) => void;
 	onToggleAccount: (accountId: string) => void;
 	onUpdateConfig: (next: {
 		statementDay?: number;
@@ -148,9 +161,11 @@ export function TimingDetailDialog({
 						<h3>{nextMonth.title}</h3>
 						<MandatorySectionView section={nextMonth} />
 						<p className="section-note">
-							Mandatory spending leaves checking. Card charges do not appear
-							here; they are budgeted against your next paycheck in the cycle
-							allowance.
+							{billsFiltered
+								? "Filtered to your selected bills — change the set in Configure."
+								: "Counting every recurring checking outflow. "}
+							Card charges do not appear here; they are budgeted against your
+							next paycheck in the cycle allowance.
 						</p>
 					</div>
 				) : tab === "cycle" ? (
@@ -378,6 +393,30 @@ export function TimingDetailDialog({
 									</label>
 								);
 							})}
+						</fieldset>
+						<fieldset className="cycle-accounts">
+							<legend>Recurring payments in this total</legend>
+							{billCandidates.length ? (
+								billCandidates.map((bill) => {
+									const checked = trackedBillIds.includes(bill.id);
+									return (
+										<label key={bill.id} className="cycle-account-option">
+											<input
+												type="checkbox"
+												checked={checked}
+												onChange={() => onToggleBill(bill.id)}
+											/>
+											<span>
+												{bill.name} · {money(bill.amount)} · {bill.frequency}
+											</span>
+										</label>
+									);
+								})
+							) : (
+								<p className="section-note">
+									No recurring checking outflows found in the plan.
+								</p>
+							)}
 						</fieldset>
 					</div>
 				)}
