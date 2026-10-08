@@ -101,7 +101,7 @@ export function IncomeEvidence({ plan }: { plan: Plan }) {
 											<td>
 												{movement.amountKnown
 													? money(movement.amount)
-													: "Unavailable"}
+													: "Varies"}
 											</td>
 											<td>
 												{evidence.excluded.includes(movement)

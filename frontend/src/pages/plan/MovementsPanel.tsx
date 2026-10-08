@@ -9,15 +9,18 @@ import { Badge, EmptyState, IconButton } from "../../components/ui.tsx";
 import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Account, Movement } from "../../domain/model.ts";
+import type { ResolvedMovementAmount } from "../../domain/resolvedMovementAmounts.ts";
 
 export function MovementsPanel({
 	movements,
 	accounts,
+	resolvedAmounts,
 	onEdit,
 	onRemove,
 }: {
 	movements: Movement[];
 	accounts: Account[];
+	resolvedAmounts?: Map<string, ResolvedMovementAmount>;
 	onEdit: (movement: Movement) => void;
 	onRemove: (movement: Movement) => void;
 }) {
@@ -64,9 +67,10 @@ export function MovementsPanel({
 						</span>
 					</div>
 					<div className="movement-amount">
-						<strong>
-							{movement.amountKnown ? money(movement.amount) : "Unavailable"}
-						</strong>
+						<MovementAmount
+							movement={movement}
+							resolved={resolvedAmounts?.get(movement.id)}
+						/>
 						{!movement.enabled && <Badge tone="amber">Excluded</Badge>}
 					</div>
 					<div className="table-actions">
@@ -86,5 +90,32 @@ export function MovementsPanel({
 				</div>
 			))}
 		</div>
+	);
+}
+
+function MovementAmount({
+	movement,
+	resolved,
+}: {
+	movement: Movement;
+	resolved: ResolvedMovementAmount | undefined;
+}) {
+	if (movement.amountKnown) return <strong>{money(movement.amount)}</strong>;
+	if (resolved) {
+		const label =
+			movement.frequency === "once"
+				? `Calculated for ${dateLabel(resolved.date, true)}`
+				: `Next calculated amount ${dateLabel(resolved.date, true)} · varies each occurrence`;
+		return (
+			<>
+				<strong title={label}>{money(resolved.amount)}</strong>
+				<Badge tone="neutral">Varies</Badge>
+			</>
+		);
+	}
+	return (
+		<strong title="Calculated during projection · varies each occurrence">
+			Varies
+		</strong>
 	);
 }

@@ -422,7 +422,7 @@ function addForwardPostingWarnings(
 		warn(
 			target,
 			"nonliteral-amount",
-			"This transaction amount has no fixed number and is shown as unavailable.",
+			"This transaction amount is calculated each occurrence and is shown as varying.",
 			`${path}.amount`,
 		);
 		provisional(target, `${path}.amount`);
