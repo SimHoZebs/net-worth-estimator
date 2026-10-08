@@ -12,6 +12,7 @@ import {
 	nextMonthObligations,
 	nextMonthRange,
 	nextPaycheck,
+	realizedCheckingOutflows,
 	remainingMonthlyObligations,
 } from "./householdTiming.ts";
 
@@ -40,10 +41,87 @@ describe("checking", () => {
 });
 
 describe("cashCushion", () => {
-	it("subtracts remaining obligations from checking", () => {
-		expect(cashCushion({ checking: 5000, remainingObligations: 3200 })).toBe(
-			1800,
-		);
+	it("subtracts spending since the checkpoint and remaining obligations", () => {
+		expect(
+			cashCushion({
+				checking: 5000,
+				spentSinceStart: 700,
+				remainingObligations: 3200,
+			}),
+		).toBe(1100);
+	});
+
+	it("ignores the blind window when the checkpoint is current", () => {
+		expect(
+			cashCushion({
+				checking: 5000,
+				spentSinceStart: 0,
+				remainingObligations: 0,
+			}),
+		).toBe(5000);
+	});
+});
+
+describe("realizedCheckingOutflows", () => {
+	const movements = [
+		movementFixture({
+			date: "2026-10-02",
+			movementId: "start-day",
+			name: "Start day",
+			fromId: "checking",
+			toId: null,
+			requested: 100,
+			realized: 100,
+		}),
+		movementFixture({
+			date: "2026-10-05",
+			movementId: "rent",
+			name: "Rent",
+			fromId: "checking",
+			toId: null,
+			requested: 2874,
+			realized: 2874,
+		}),
+		movementFixture({
+			date: "2026-10-05",
+			movementId: "shortfall-bill",
+			name: "Shortfall",
+			fromId: "checking",
+			toId: null,
+			requested: 500,
+			realized: 200,
+		}),
+		movementFixture({
+			date: "2026-10-20",
+			movementId: "later",
+			name: "Later",
+			fromId: "checking",
+			toId: null,
+			requested: 300,
+			realized: 300,
+		}),
+	];
+
+	it("sums realized outflows after the start through today", () => {
+		expect(
+			realizedCheckingOutflows({
+				movements,
+				checkingId: "checking",
+				after: "2026-10-02",
+				through: "2026-10-08",
+			}),
+		).toBe(3074);
+	});
+
+	it("returns zero when today is the projection start", () => {
+		expect(
+			realizedCheckingOutflows({
+				movements,
+				checkingId: "checking",
+				after: "2026-10-02",
+				through: "2026-10-02",
+			}),
+		).toBe(0);
 	});
 });
 
