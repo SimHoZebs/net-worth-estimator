@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Evaluation } from "../../domain/model.ts";
+import { type Evaluation, visibleAccounts } from "../../domain/model.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { InputField, SelectField } from "../Field.tsx";
 import { AccountOptions } from "./AccountOptions.tsx";
@@ -74,7 +74,7 @@ export function EvaluationEditor({
 					<option value="" disabled>
 						Select an account
 					</option>
-					<AccountOptions accounts={plan.accounts} />
+					<AccountOptions accounts={visibleAccounts(plan.accounts)} />
 				</SelectField>
 			)}
 		</EditorForm>

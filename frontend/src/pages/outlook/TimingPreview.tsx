@@ -23,6 +23,7 @@ import {
 	remainingMonthlyObligations,
 } from "../../domain/householdTiming.ts";
 import type { Plan } from "../../domain/model.ts";
+import { visibleAccounts } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
 import type { Projection } from "../../domain/result.ts";
 import {
@@ -138,7 +139,10 @@ export function TimingPreview({
 	onEdit: (target: EditorTarget) => void;
 }) {
 	const cards = useMemo(
-		() => plan.accounts.filter((account) => account.kind === "debt"),
+		() =>
+			visibleAccounts(plan.accounts).filter(
+				(account) => account.kind === "debt",
+			),
 		[plan.accounts],
 	);
 	const [settings, setSettings] = useState<TotalCycleSettings>(loadPersisted);
@@ -543,7 +547,7 @@ export function TimingPreview({
 				<div>
 					<span>
 						Cash cushion{" "}
-						{heroes.cushionProvisional && <Badge tone="amber">Provisional</Badge>}
+						{heroes.cushionProvisional && <Badge tone="amber">Estimated</Badge>}
 					</span>
 					<strong>{money(cushion)}</strong>
 				</div>

@@ -2,7 +2,11 @@ import { Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { type TabItem, Tabs } from "../components/Tabs.tsx";
-import type { Plan } from "../domain/model.ts";
+import {
+	type Plan,
+	visibleAccounts,
+	visibleMovements,
+} from "../domain/model.ts";
 import {
 	type EditorTarget,
 	type RemovalTarget,
@@ -100,15 +104,16 @@ function AccountsView({
 	const [tab, setTab] = useState<AccountsSection>("accounts");
 	const [query, setQuery] = useState("");
 	const { requestRemoval, dialog } = usePlanRemoval({ plan, onUpdate });
+	const visible = visibleAccounts(plan.accounts);
 	const tabs: TabItem<AccountsSection>[] = [
-		{ id: "accounts", label: "Accounts", count: plan.accounts.length },
+		{ id: "accounts", label: "Accounts", count: visible.length },
 		{
 			id: "checks",
-			label: "Balance checks",
-			count: plan.accounts.filter((account) => account.balanceCheck).length,
+			label: "Starting balances",
+			count: visible.filter((account) => account.balanceCheck).length,
 		},
 	];
-	const accounts = plan.accounts.filter((account) =>
+	const accounts = visible.filter((account) =>
 		account.name.toLowerCase().includes(query.toLowerCase()),
 	);
 	return (
@@ -177,14 +182,18 @@ function TransactionsView({
 	const [query, setQuery] = useState("");
 	const [schedule, setSchedule] = useState<ScheduleFilter>("all");
 	const { requestRemoval, dialog } = usePlanRemoval({ plan, onUpdate });
-	const recurringCount = plan.movements.filter(
+	const visible = visibleMovements({
+		movements: plan.movements,
+		accounts: plan.accounts,
+	});
+	const recurringCount = visible.filter(
 		(movement) => movement.frequency !== "once",
 	).length;
 	const tabs: TabItem<ScheduleFilter>[] = [
-		{ id: "all", label: "All transactions", count: plan.movements.length },
+		{ id: "all", label: "All transactions", count: visible.length },
 		{ id: "recurring", label: "Recurring", count: recurringCount },
 	];
-	const movements = plan.movements.filter(
+	const movements = visible.filter(
 		(movement) =>
 			movement.name.toLowerCase().includes(query.toLowerCase()) &&
 			(schedule === "all" || movement.frequency !== "once"),
@@ -223,7 +232,7 @@ function TransactionsView({
 				</div>
 				<MovementsPanel
 					movements={movements}
-					accounts={plan.accounts}
+					accounts={visibleAccounts(plan.accounts)}
 					onEdit={(item) => onEdit({ kind: "movement", item })}
 					onRemove={(item) =>
 						requestRemoval({

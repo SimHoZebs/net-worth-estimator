@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Movement } from "../../domain/model.ts";
+import { type Movement, visibleAccounts } from "../../domain/model.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { InputField, SelectField } from "../Field.tsx";
 import { AccountOptions } from "./AccountOptions.tsx";
@@ -82,12 +82,14 @@ export function MovementEditor({
 			<SelectField label="From" name="fromId" defaultValue={item?.fromId ?? ""}>
 				<option value="">External income</option>
 				<AccountOptions
-					accounts={plan.accounts.filter((account) => account.kind !== "debt")}
+					accounts={visibleAccounts(plan.accounts).filter(
+						(account) => account.kind !== "debt",
+					)}
 				/>
 			</SelectField>
 			<SelectField label="To" name="toId" defaultValue={item?.toId ?? ""}>
 				<option value="">External expense</option>
-				<AccountOptions accounts={plan.accounts} />
+				<AccountOptions accounts={visibleAccounts(plan.accounts)} />
 			</SelectField>
 			<InputField
 				label="First occurrence"

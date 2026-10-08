@@ -2,7 +2,7 @@ import { Table2, X } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { projectionChartModel } from "../domain/chart.ts";
 import { dateLabel, money } from "../domain/format.ts";
-import type { Plan } from "../domain/model.ts";
+import { type Plan, visibleAccounts } from "../domain/model.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { useMediaQuery } from "../state/useMediaQuery.ts";
 import { AccountDot } from "./AccountIcon.tsx";
@@ -51,7 +51,7 @@ export function ProjectionChart({
 	const contributions = useMemo(
 		() =>
 			point && model
-				? plan.accounts.map((account) => ({
+				? visibleAccounts(plan.accounts).map((account) => ({
 						id: account.id,
 						name: account.name,
 						color: account.color,

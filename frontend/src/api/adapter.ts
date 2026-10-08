@@ -282,6 +282,24 @@ function targetFromEvaluation(config: JsonValue | undefined): number {
 	return finite(object?.target) ?? 0;
 }
 
+function isZeroBalance(value: number): boolean {
+	return Math.abs(value) < 0.005;
+}
+
+function isArchivedDebt(
+	account: BackendAccount,
+	document: FinancialModelDocument,
+	projectionStartDate: IsoDate,
+): boolean {
+	if (account.kind !== "debt") return false;
+	return document.checkpoints.some(
+		(checkpoint) =>
+			checkpoint.AccountId === account.id &&
+			checkpoint.Date <= projectionStartDate &&
+			isZeroBalance(checkpoint.Balance),
+	);
+}
+
 function accountDisplay(
 	account: BackendAccount,
 	checkpoint: BackendCheckpoint | null,
@@ -289,6 +307,7 @@ function accountDisplay(
 	status: ServerStatus,
 	previous: AccountPresentation | undefined,
 	syncCheckpoint: boolean,
+	archived: boolean,
 ): Account {
 	const minBalance = boundValue(account.minBalance, NO_FLOOR_SENTINEL);
 	const maxBalance = boundValue(account.maxBalance, NO_CEILING_SENTINEL);
@@ -297,6 +316,7 @@ function accountDisplay(
 		name: account.name || account.id,
 		kind: account.kind,
 		enabled: account.enabled,
+		archived,
 		balance: checkpoint?.Balance ?? 0,
 		minBalance: minBalance === null || minBalance < 0 ? 0 : minBalance,
 		maxBalance: maxBalance === null || maxBalance < 0 ? null : maxBalance,
@@ -401,7 +421,7 @@ function addForwardPostingWarnings(
 		warn(
 			target,
 			"nonliteral-amount",
-			"The posting amount resolver is not a fixed number; the display amount is provisional.",
+			"This transaction amount has no fixed number and is shown as unavailable.",
 			`${path}.amount`,
 		);
 		provisional(target, `${path}.amount`);
@@ -541,6 +561,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		const syncCheckpoint = document.checkpoints.some(
 			(item) => item.AccountId === account.id && item.source === "simplefin",
 		);
+		const archived = isArchivedDebt(account, document, projectionStartDate);
 		const display = accountDisplay(
 			account,
 			checkpoint,
@@ -548,6 +569,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			status,
 			previous,
 			syncCheckpoint,
+			archived,
 		);
 		accountPresentations[account.id] = buildPresentationAccount(
 			account,
@@ -575,7 +597,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 				warn(
 					conversionReport,
 					"invalid-evaluation-target",
-					"The net-worth threshold has no finite target and is shown provisionally as zero.",
+					"This net-worth evaluation has no usable target and is shown as zero.",
 					`evaluations.${index}.target`,
 				);
 				provisional(conversionReport, `evaluations.${index}.target`);
@@ -600,7 +622,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 				warn(
 					conversionReport,
 					"invalid-evaluation-account",
-					"The account balance evaluation names no account and is shown provisionally.",
+					"This account evaluation names no account.",
 					`evaluations.${index}.accountId`,
 				);
 				provisional(conversionReport, `evaluations.${index}.accountId`);
@@ -609,7 +631,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 				warn(
 					conversionReport,
 					"invalid-evaluation-target",
-					"The account balance evaluation has no finite target and is shown provisionally as zero.",
+					"This account evaluation has no usable target and is shown as zero.",
 					`evaluations.${index}.target`,
 				);
 				provisional(conversionReport, `evaluations.${index}.target`);
@@ -649,7 +671,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 	warn(
 		conversionReport,
 		"display-metadata",
-		"Plan name, origin, timestamp, revision, and read-only state are local presentation metadata.",
+		"Plan name, origin, timestamp, revision, and read-only state stay local and are not imported.",
 		"plan",
 	);
 	provisional(conversionReport, "plan.name");
@@ -842,7 +864,7 @@ export function displayPlanToBackendDocument(
 		warn(
 			conversionReport,
 			"account-presentation-metadata",
-			"Balance check basis, source, and read-only state remain local presentation metadata.",
+			"Whether a balance is confirmed, its source, and its read-only state stay local and are not imported.",
 			`accounts.${index}`,
 		);
 		return {
@@ -1004,7 +1026,7 @@ export function displayPlanToBackendDocument(
 		warn(
 			conversionReport,
 			"movement-presentation-storedExtras",
-			"Display movement read-only state remains local presentation metadata.",
+			"Transaction read-only state stays local and is not imported.",
 			`movements.${index}`,
 		);
 		const source = storedExtras?.source ?? storedPosting?.source;
@@ -1158,7 +1180,7 @@ export function displayPlanToBackendDocument(
 	warn(
 		conversionReport,
 		"assumptions-provisional",
-		"Display inflation and volatility assumptions remain local presentation metadata.",
+		"Inflation and variability assumptions stay local and are not imported.",
 		"assumptions",
 	);
 	const previousName =
@@ -1204,7 +1226,7 @@ export function displayPlanToBackendDocument(
 	warn(
 		conversionReport,
 		"plan-presentation-metadata",
-		"Plan name, origin, timestamp, revision, and read-only state remain local presentation metadata.",
+		"Plan name, origin, timestamp, revision, and read-only state stay local and are not imported.",
 		"plan",
 	);
 

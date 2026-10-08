@@ -37,20 +37,24 @@ export function nextMonthRange(todayIso: string): {
 }
 
 export function checkingAccountId(plan: Plan): string | null {
-	const byId = plan.accounts.find((account) => account.id === "checking");
+	const visible = plan.accounts.filter((account) => !account.archived);
+	const byId = visible.find((account) => account.id === "checking");
 	if (byId) return byId.id;
-	const cash = plan.accounts.find(
+	const cash = visible.find(
 		(account) => account.kind === "cash" && account.enabled,
 	);
 	if (cash) return cash.id;
-	const anyCash = plan.accounts.find((account) => account.kind === "cash");
+	const anyCash = visible.find((account) => account.kind === "cash");
 	return anyCash?.id ?? null;
 }
 
 export function checkingBalance(plan: Plan): number | null {
 	const id = checkingAccountId(plan);
 	if (!id) return null;
-	return plan.accounts.find((account) => account.id === id)?.balance ?? null;
+	return (
+		plan.accounts.find((account) => account.id === id && !account.archived)
+			?.balance ?? null
+	);
 }
 
 /**

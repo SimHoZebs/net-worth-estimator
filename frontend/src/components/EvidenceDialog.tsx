@@ -62,7 +62,9 @@ export function EvidenceDialog({
 		case "method":
 			return <MethodEvidence onClose={onClose} />;
 		case "account": {
-			const account = plan.accounts.find((item) => item.id === target.id);
+			const account = plan.accounts.find(
+				(item) => item.id === target.id && !item.archived,
+			);
 			return account ? (
 				<AccountDialog
 					key={account.id}
@@ -82,7 +84,7 @@ export function EvidenceDialog({
 			return result ? (
 				<EvaluationEvidence
 					result={result}
-					accounts={plan.accounts}
+					accounts={plan.accounts.filter((account) => !account.archived)}
 					range={range}
 					onClose={onClose}
 					onEdit={() => edit({ kind: "evaluation", item: result.evaluation })}

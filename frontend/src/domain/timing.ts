@@ -30,7 +30,8 @@ export function cashTiming({
 		projection,
 	});
 	const accounts = plan.accounts.filter(
-		(account) => account.enabled && account.kind === "cash",
+		(account) =>
+			account.enabled && !account.archived && account.kind === "cash",
 	);
 	const ids = new Set(accounts.map((account) => account.id));
 	return {

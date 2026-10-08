@@ -1,6 +1,6 @@
 import { Info } from "lucide-react";
 import { dateLabel, money } from "../../domain/format.ts";
-import type { Plan } from "../../domain/model.ts";
+import { type Plan, visibleAccounts } from "../../domain/model.ts";
 import { currentNetWorth, type Projection } from "../../domain/result.ts";
 import { AccountDot } from "../AccountIcon.tsx";
 import { DetailRow } from "../DetailRow.tsx";
@@ -28,7 +28,7 @@ export function PositionEvidence({
 				Assets minus debts · starting {dateLabel(plan.startDate, true)}
 			</p>
 			<dl className="detail-list">
-				{plan.accounts
+				{visibleAccounts(plan.accounts)
 					.filter((account) => account.enabled)
 					.map((account) => (
 						<DetailRow
@@ -40,10 +40,8 @@ export function PositionEvidence({
 										{account.name}
 									</span>
 									<small>
-										{account.balanceCheck
-											? "Balance check"
-											: "Projected balance"}{" "}
-										· {dateLabel(account.observedOn, true)}
+										{account.balanceCheck ? "Confirmed" : "Estimated"} ·{" "}
+										{dateLabel(account.observedOn, true)}
 									</small>
 								</>
 							}
@@ -58,8 +56,8 @@ export function PositionEvidence({
 					{plan.origin === "example"
 						? "All balances are illustrative example data. "
 						: ""}
-					Starting values mix balance checks and estimates. Older checks are
-					carried forward without reconstructing missing history.
+					Some starting balances are confirmed and others are estimated. Older
+					values carry forward unchanged.
 				</span>
 			</div>
 		</Modal>

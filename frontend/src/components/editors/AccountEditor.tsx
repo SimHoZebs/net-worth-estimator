@@ -24,6 +24,7 @@ export function AccountEditor({
 					name: textValue(data, "name"),
 					kind: textValue(data, "kind") as Account["kind"],
 					enabled: textValue(data, "enabled") === "on",
+					archived: item?.archived ?? false,
 					balance: numberValue(data, "balance"),
 					minBalance: numberValue(data, "minBalance"),
 					maxBalance: textValue(data, "maxBalance")
@@ -99,7 +100,7 @@ export function AccountEditor({
 				placeholder="No ceiling"
 			/>
 			<InputField
-				label="Balance check date"
+				label="As of date"
 				name="observedOn"
 				type="date"
 				required
@@ -111,7 +112,7 @@ export function AccountEditor({
 				name="source"
 				required
 				maxLength={100}
-				defaultValue={item?.source ?? "Manual balance check"}
+				defaultValue={item?.source ?? "Manual entry"}
 			/>
 		</EditorForm>
 	);

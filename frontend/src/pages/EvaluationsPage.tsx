@@ -1,7 +1,11 @@
 import { Check, Flag, Plus } from "lucide-react";
 import { Badge, EmptyState, Progress } from "../components/ui.tsx";
 import { dateLabel } from "../domain/format.ts";
-import type { Evaluation, Plan } from "../domain/model.ts";
+import {
+	type Evaluation,
+	type Plan,
+	visibleAccounts,
+} from "../domain/model.ts";
 import { removeEvaluation, setEvaluationEnabled } from "../domain/planEdits.ts";
 import type {
 	OtherEvaluation,
@@ -85,6 +89,14 @@ export function EvaluationsPage({
 	onEvidence: (id: string) => void;
 }) {
 	const others = projection.otherEvaluations;
+	const visible = visibleAccounts(plan.accounts);
+	const archivedIds = new Set(
+		plan.accounts.filter((a) => a.archived).map((a) => a.id),
+	);
+	const evaluations = plan.evaluations.filter(
+		(evaluation) =>
+			!evaluation.accountId || !archivedIds.has(evaluation.accountId),
+	);
 	return (
 		<>
 			<div className="section-top page-section-top">
@@ -97,17 +109,11 @@ export function EvaluationsPage({
 					Add evaluation
 				</button>
 			</div>
-			{!plan.evaluations.length && !others.length && (
-				<EmptyState
-					icon={Flag}
-					title="What are you working toward?"
-					description="Set a net-worth milestone or an account balance target."
-					action="Add your first evaluation"
-					onAction={() => onEdit(null)}
-				/>
+			{!evaluations.length && !others.length && (
+				<EmptyState icon={Flag} title="What are you working toward?" />
 			)}
 			<div className="evaluations-grid">
-				{plan.evaluations.map((evaluation) => (
+				{evaluations.map((evaluation) => (
 					<EvaluationCard
 						key={evaluation.id}
 						evaluation={evaluation}
@@ -117,7 +123,7 @@ export function EvaluationsPage({
 						measure={
 							evaluation.kind === "net-worth"
 								? "Household net worth"
-								: plan.accounts.find((a) => a.id === evaluation.accountId)?.name
+								: visible.find((a) => a.id === evaluation.accountId)?.name
 						}
 						probability={
 							range ? (range.evaluationSuccess[evaluation.id] ?? 0) : null
@@ -138,10 +144,6 @@ export function EvaluationsPage({
 					<OtherEvaluationCard key={item.id} item={item} />
 				))}
 			</div>
-			<p className="bottom-note">
-				Evaluation dates mark the first time a threshold is reached. They do not
-				establish retirement readiness or sustained expense coverage.
-			</p>
 		</>
 	);
 }

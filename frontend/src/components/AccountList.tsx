@@ -1,6 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import { money, sum } from "../domain/format.ts";
-import type { Account, Plan } from "../domain/model.ts";
+import { type Account, type Plan, visibleAccounts } from "../domain/model.ts";
 import type { Projection } from "../domain/result.ts";
 import { AccountIcon } from "./AccountIcon.tsx";
 import { Badge } from "./ui.tsx";
@@ -19,6 +19,7 @@ export function AccountList({
 	const startingBalances = projection?.points.find(
 		(point) => point.date === plan.startDate,
 	)?.balances;
+	const accounts = visibleAccounts(plan.accounts);
 	const balanceFor = (account: Account) => {
 		const startingBalance = startingBalances?.[account.id];
 		return account.enabled && startingBalance !== undefined
@@ -26,12 +27,12 @@ export function AccountList({
 			: account.balance;
 	};
 	const assets = sum(
-		plan.accounts
+		accounts
 			.filter((a) => a.enabled && balanceFor(a) > 0)
 			.map((a) => balanceFor(a)),
 	);
 	const debt = sum(
-		plan.accounts
+		accounts
 			.filter((a) => a.enabled && balanceFor(a) < 0)
 			.map((a) => balanceFor(a)),
 	);
@@ -51,7 +52,7 @@ export function AccountList({
 				</span>
 			</div>
 			<div className="accounts-grid">
-				{plan.accounts.map((account) => {
+				{accounts.map((account) => {
 					const startingBalance = startingBalances?.[account.id];
 					const balance = balanceFor(account);
 					const projected =
@@ -69,26 +70,12 @@ export function AccountList({
 							<span className="account-label">
 								<strong>{account.name}</strong>
 								<span>
-									{projected ? "Projected from last check" : "Balance check"}
+									{projected ? "Estimated balance" : "Confirmed balance"}
 								</span>
 							</span>
 							<span className="account-balance">
 								{money(balance)}
-								<Badge
-									tone={
-										!account.enabled
-											? "amber"
-											: projected
-												? "outline"
-												: "neutral"
-									}
-								>
-									{!account.enabled
-										? "Excluded"
-										: projected
-											? "Projected start"
-											: "Balance check"}
-								</Badge>
+								{!account.enabled && <Badge tone="amber">Excluded</Badge>}
 							</span>
 						</button>
 					);

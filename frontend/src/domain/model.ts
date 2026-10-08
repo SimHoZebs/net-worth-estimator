@@ -16,6 +16,7 @@ export const accountSchema = z.object({
 	name,
 	kind: accountKindSchema,
 	enabled: z.boolean().default(true),
+	archived: z.boolean().default(false),
 	balance: z.number().finite().min(-1e10).max(1e10),
 	minBalance: money,
 	maxBalance: money.nullable(),
@@ -120,7 +121,7 @@ export const planSchema = z.preprocess(
 				if (account.observedOn > plan.startDate)
 					issue(
 						["accounts", index, "observedOn"],
-						"A balance check cannot follow the projection start.",
+						"A confirmed balance cannot be dated after the projection start.",
 					);
 			}
 			const movementIds = new Set<string>();
@@ -181,8 +182,34 @@ export function validatePlan(value: unknown): Plan | Error {
 
 export function netWorth(plan: Plan) {
 	return plan.accounts
-		.filter((account) => account.enabled)
+		.filter((account) => account.enabled && !account.archived)
 		.reduce((sum, account) => sum + account.balance, 0);
+}
+
+export function isArchivedAccount(account: Pick<Account, "archived">): boolean {
+	return account.archived === true;
+}
+
+export function visibleAccounts(accounts: Account[]): Account[] {
+	return accounts.filter((account) => !account.archived);
+}
+
+export function visibleMovements({
+	movements,
+	accounts,
+}: {
+	movements: Movement[];
+	accounts: Account[];
+}): Movement[] {
+	const archivedIds = new Set(
+		accounts.filter((account) => account.archived).map((account) => account.id),
+	);
+	if (!archivedIds.size) return movements;
+	return movements.filter(
+		(movement) =>
+			!(movement.fromId && archivedIds.has(movement.fromId)) &&
+			!(movement.toId && archivedIds.has(movement.toId)),
+	);
 }
 
 export function changesBetween({
