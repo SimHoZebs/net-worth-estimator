@@ -1,7 +1,7 @@
 import { AccountDot } from "../../components/AccountIcon.tsx";
 import { Badge } from "../../components/ui.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
-import type { Plan } from "../../domain/model.ts";
+import { type Plan, visibleAccounts } from "../../domain/model.ts";
 
 export function BalanceProvenance({ plan }: { plan: Plan }) {
 	return (
@@ -18,12 +18,12 @@ export function BalanceProvenance({ plan }: { plan: Plan }) {
 							<th scope="col">Account</th>
 							<th scope="col">Source</th>
 							<th scope="col">As of</th>
-							<th scope="col">Basis</th>
+							<th scope="col">Status</th>
 							<th scope="col">Balance</th>
 						</tr>
 					</thead>
 					<tbody>
-						{plan.accounts.map((account) => (
+						{visibleAccounts(plan.accounts).map((account) => (
 							<tr key={account.id}>
 								<th scope="row">
 									<span className="account-name-line">
@@ -35,9 +35,7 @@ export function BalanceProvenance({ plan }: { plan: Plan }) {
 								<td>{dateLabel(account.observedOn, true)}</td>
 								<td>
 									<Badge tone={account.balanceCheck ? "green" : "outline"}>
-										{account.balanceCheck
-											? "Balance check"
-											: "Projected balance"}
+										{account.balanceCheck ? "Confirmed" : "Estimated"}
 									</Badge>
 								</td>
 								<td className="numeric">{money(account.balance)}</td>

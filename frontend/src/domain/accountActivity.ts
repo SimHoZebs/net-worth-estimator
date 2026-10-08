@@ -58,7 +58,12 @@ export function accountTransactions({
 	plan: Plan;
 	projection: Projection;
 }): AccountTransaction[] {
-	if (!plan.accounts.some((account) => account.id === accountId)) return [];
+	if (
+		!plan.accounts.some(
+			(account) => account.id === accountId && !account.archived,
+		)
+	)
+		return [];
 	const names = new Map(
 		plan.accounts.map((account) => [account.id, account.name]),
 	);

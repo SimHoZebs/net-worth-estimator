@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isHistoricalMovement } from "../domain/model.ts";
+import {
+	isHistoricalMovement,
+	netWorth,
+	visibleAccounts,
+	visibleMovements,
+} from "../domain/model.ts";
 import {
 	backendToDisplayPlan,
 	displayPlanToBackendDocument,
@@ -508,5 +513,79 @@ describe("backend and display plan adapter", () => {
 				(field) => field === "evaluations.emergency",
 			),
 		).toBe(false);
+	});
+
+	it("marks a debt with a past zero checkpoint as archived while keeping cash zero visible", () => {
+		const document = documentFixture();
+		document.checkpoints.push(
+			{ Date: "2026-01-15", AccountId: "loan", Balance: 0 },
+			{ Date: "2026-01-20", AccountId: "cash", Balance: 0 },
+		);
+		const conversion = backendToDisplayPlan({
+			document,
+			status: { readOnly: false, authEnabled: false },
+			projection: projectionFixture(),
+			startDate: "2026-02-01",
+		});
+		expect(
+			conversion.plan.accounts.find((account) => account.id === "loan")
+				?.archived,
+		).toBe(true);
+		expect(
+			conversion.plan.accounts.find((account) => account.id === "cash")
+				?.archived,
+		).toBe(false);
+	});
+
+	it("does not archive a debt without a past zero checkpoint and preserves archived rows on save", () => {
+		const document = documentFixture();
+		const conversion = backendToDisplayPlan({
+			document,
+			status: { readOnly: false, authEnabled: false },
+			projection: projectionFixture(),
+			startDate: "2026-02-01",
+		});
+		expect(
+			conversion.plan.accounts.find((account) => account.id === "loan")
+				?.archived,
+		).toBe(false);
+		const reverse = displayPlanToBackendDocument(conversion.plan, {
+			sourceDocument: document,
+			presentation: conversion.presentation,
+		});
+		expect(reverse.report.losses).toEqual([]);
+		expect(reverse.document.accounts.map((account) => account.id)).toEqual([
+			"cash",
+			"loan",
+		]);
+	});
+
+	it("hides archived accounts and their movements from display helpers", () => {
+		const document = documentFixture();
+		document.checkpoints.push({
+			Date: "2026-01-15",
+			AccountId: "loan",
+			Balance: 0,
+		});
+		const conversion = backendToDisplayPlan({
+			document,
+			status: { readOnly: false, authEnabled: false },
+			projection: projectionFixture(),
+			startDate: "2026-02-01",
+		});
+		expect(visibleAccounts(conversion.plan.accounts).map((a) => a.id)).toEqual([
+			"cash",
+		]);
+		expect(
+			visibleMovements({
+				movements: conversion.plan.movements,
+				accounts: conversion.plan.accounts,
+			}),
+		).toEqual(conversion.plan.movements);
+		expect(netWorth(conversion.plan)).toBe(
+			conversion.plan.accounts
+				.filter((a) => a.enabled && !a.archived)
+				.reduce((sum, a) => sum + a.balance, 0),
+		);
 	});
 });
