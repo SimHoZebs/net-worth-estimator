@@ -3,8 +3,7 @@ import { createRoot } from "react-dom/client";
 import "@fontsource-variable/manrope";
 import "@fontsource-variable/newsreader";
 import App from "./App.tsx";
-import "./styles.css";
-import "./account-activity.css";
+import "./styles/index.css";
 
 class ErrorBoundary extends Component<
 	{ children: ReactNode },

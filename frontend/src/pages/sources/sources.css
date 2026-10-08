@@ -1,0 +1,96 @@
+/* Co-located partial: owned by pages/sources/sources.css. Global cascade order is set by the
+   @layer declaration in styles/index.css (reset, base, layout, components,
+   responsive, accessibility). Keep selectors inside @layer components. */
+@layer components {
+	.source-banner {
+		display: flex;
+		align-items: center;
+		gap: 17px;
+		border: 1px solid #dce4cc;
+		background: #edf2e3;
+		border-radius: 9px;
+		padding: 23px;
+		margin-bottom: 25px;
+	}
+	.source-banner-icon {
+		color: #799060;
+	}
+	.source-banner h2 {
+		font-size: 15px;
+	}
+	.source-banner p {
+		font-size: 11px;
+		margin-top: 5px;
+	}
+	.source-banner > .badge {
+		margin-left: auto;
+	}
+	.source-health,
+	.portability {
+		padding: 25px;
+	}
+	.source-health .section-top > svg {
+		color: #8ca073;
+	}
+	.source-health .section-note {
+		padding: 0;
+		font-size: 10px;
+	}
+	.portability > p {
+		font-size: 11px;
+		margin: 8px 0 25px;
+	}
+	.portability-action {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		background: #fbfcf6;
+		border: 1px solid var(--line);
+		border-radius: 7px;
+		width: 100%;
+		text-align: left;
+		padding: 18px 16px;
+		margin-bottom: 13px;
+	}
+	.portability-action > svg {
+		color: #84946b;
+	}
+	.portability-action > span {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+	}
+	.portability-action strong {
+		font-size: 12px;
+	}
+	.portability-action small {
+		font-size: 9px;
+		color: #8d947f;
+	}
+	.portability-action > span:last-child {
+		margin-left: auto;
+		color: #7b8d65;
+	}
+	.portability-action:hover {
+		background: #f0f4e6;
+		border-color: #d5dfc5;
+	}
+	.backup-button {
+		margin-top: 10px;
+		margin-bottom: 10px;
+	}
+	.portability > small {
+		display: block;
+		line-height: 1.8;
+		font-size: 9px;
+	}
+	.provenance-panel {
+		margin-bottom: 25px;
+	}
+	.provenance-panel .section-top {
+		padding: 24px;
+	}
+	.pay-evidence {
+		padding: 25px;
+	}
+}

@@ -1,0 +1,49 @@
+/* App shell: workspace frame, topbar, content gutter, and footer. */
+@layer layout {
+	.app-shell {
+		min-height: 100vh;
+	}
+	.workspace {
+		margin-left: var(--sidebar);
+	}
+	.topbar {
+		display: none;
+		height: 62px;
+		padding: 0 23px;
+		align-items: center;
+		border-bottom: 1px solid var(--line);
+		background: #fbfcf7;
+	}
+	.main-content {
+		padding: 34px 39px 26px;
+		max-width: 1560px;
+		margin: auto;
+	}
+	.page-footer {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 20px;
+		border-top: 1px solid var(--line);
+		padding-top: 21px;
+		margin-top: 30px;
+		font-size: 9px;
+		color: #828a7a;
+	}
+	.page-footer span,
+	.page-footer button {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+	}
+	.page-footer button {
+		border: 0;
+		background: none;
+		color: #828a7a;
+		font-size: 9px;
+		padding: 4px 0;
+	}
+	body:has(.draft-bar) .main-content {
+		padding-bottom: 130px;
+	}
+}

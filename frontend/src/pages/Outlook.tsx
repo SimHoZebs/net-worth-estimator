@@ -7,6 +7,7 @@ import { EvaluationPreview } from "./outlook/EvaluationPreview.tsx";
 import { FundingInsight } from "./outlook/FundingInsight.tsx";
 import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
 import { TimingPreview } from "./outlook/TimingPreview.tsx";
+import "./outlook/outlook.css";
 
 export function Outlook({
 	plan,

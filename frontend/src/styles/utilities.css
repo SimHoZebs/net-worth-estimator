@@ -1,0 +1,42 @@
+/* Shared utilities: single-purpose helpers any component may use. */
+@layer base {
+	.muted {
+		color: var(--muted);
+	}
+	.eyebrow {
+		font-size: 10px;
+		letter-spacing: 1.4px;
+		font-weight: 750;
+		color: #737e69;
+	}
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+	.numeric {
+		font-variant-numeric: tabular-nums;
+	}
+	.mobile-only {
+		display: none;
+	}
+	.skip-link {
+		position: fixed;
+		z-index: 100;
+		left: 240px;
+		top: -70px;
+		padding: 12px 20px;
+		background: var(--forest);
+		color: white;
+		border-radius: 6px;
+	}
+	.skip-link:focus {
+		top: 12px;
+	}
+}

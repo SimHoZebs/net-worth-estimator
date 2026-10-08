@@ -1,0 +1,59 @@
+/* Co-located partial: owned by components/Calendar.css. Global cascade order is set by the
+   @layer declaration in styles/index.css (reset, base, layout, components,
+   responsive, accessibility). Keep selectors inside @layer components. */
+@layer components {
+	.calendar {
+		display: grid;
+		gap: 16px;
+		margin: 14px 0 4px;
+	}
+	.calendar h4 {
+		font-size: 11px;
+		font-weight: 650;
+		color: #374a31;
+		margin: 0 0 8px;
+	}
+	.calendar-grid {
+		display: grid;
+		grid-template-columns: repeat(7, 1fr);
+		gap: 3px;
+	}
+	.calendar-dow {
+		font-size: 8px;
+		font-weight: 700;
+		color: #8a927e;
+		text-align: center;
+		padding-bottom: 2px;
+	}
+	.calendar-blank {
+		min-height: 40px;
+	}
+	.calendar-cell {
+		min-height: 40px;
+		border: 1px solid #eef1e6;
+		border-radius: 6px;
+		padding: 3px 4px;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		background: #fffefa;
+	}
+	.calendar-has-events {
+		border-color: #c9d3b8;
+		background: #f4f6ec;
+	}
+	.calendar-today {
+		border: 2px solid #7a8f5e;
+		padding: 2px 3px;
+	}
+	.calendar-day {
+		font-size: 9px;
+		font-weight: 700;
+		color: #667359;
+	}
+	.calendar-total {
+		font-size: 8px;
+		font-weight: 650;
+		color: #4a5d43;
+	}
+}

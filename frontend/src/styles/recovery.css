@@ -1,0 +1,28 @@
+/* Recovery fallback: renders in the main.tsx error boundary, which mounts
+   outside WorkspaceShell, so it stays in the global manifest. */
+@layer components {
+	.recovery-screen {
+		max-width: 620px;
+		margin: 12vh auto;
+		padding: 25px;
+	}
+	.recovery-screen h1 {
+		margin: 45px 0 22px;
+	}
+	.recovery-screen p {
+		margin-bottom: 25px;
+	}
+	.recovery-progress {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		color: #637058;
+		font-size: 12px;
+		margin-bottom: 14px;
+	}
+	.recovery-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px;
+	}
+}

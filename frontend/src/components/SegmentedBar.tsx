@@ -1,4 +1,5 @@
 import { money } from "../domain/format.ts";
+import "./SegmentedBar.css";
 
 /**
  * Fill texture for a bar segment. Texture carries the meaning alongside

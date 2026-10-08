@@ -5,6 +5,7 @@ import type { Projection } from "../domain/result.ts";
 import type { Snapshot } from "../state/storage.ts";
 import { ChangesPanel } from "./compare/ChangesPanel.tsx";
 import { ComparisonSummary } from "./compare/ComparisonSummary.tsx";
+import "./compare/compare.css";
 
 export function ComparePage({
 	saved,

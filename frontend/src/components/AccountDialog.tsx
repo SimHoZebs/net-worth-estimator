@@ -9,6 +9,7 @@ import { AccountDetails } from "./activity/AccountDetails.tsx";
 import { Transactions } from "./activity/Transactions.tsx";
 import { Tabs } from "./Tabs.tsx";
 import { Badge, Modal } from "./ui.tsx";
+import "./activity/account-activity.css";
 
 export function AccountDialog({
 	account,

@@ -1,0 +1,36 @@
+/* Co-located partial: owned by components/AccountIcon.css. Global cascade order is set by the
+   @layer declaration in styles/index.css (reset, base, layout, components,
+   responsive, accessibility). Keep selectors inside @layer components. */
+@layer components {
+	.account-icon {
+		display: grid;
+		place-items: center;
+		width: 34px;
+		height: 35px;
+		border-radius: 7px;
+		background: #edf0e4;
+		color: #869670;
+		border: 1px solid transparent;
+		flex-shrink: 0;
+	}
+	.account-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: #9aa48e;
+		display: inline-block;
+		flex-shrink: 0;
+	}
+	.account-property {
+		background: #f0eee3;
+		color: #99906c;
+	}
+	.account-debt {
+		background: #eeede7;
+		color: #9a9684;
+	}
+	.account-investment {
+		background: #e8ede3;
+		color: #6b8863;
+	}
+}

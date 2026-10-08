@@ -1,0 +1,49 @@
+/* Co-located partial: owned by pages/evaluations/evaluations.css. Global cascade order is set by the
+   @layer declaration in styles/index.css (reset, base, layout, components,
+   responsive, accessibility). Keep selectors inside @layer components. */
+@layer components {
+	.evaluation-card {
+		background: #fffefa;
+		border: 1px solid var(--line);
+		border-radius: 10px;
+		padding: 26px;
+	}
+	.evaluation-icon {
+		width: 45px;
+		height: 45px;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		color: #7c925c;
+		background: #edf2e2;
+	}
+	.evaluation-card h2 {
+		margin-top: 20px;
+		font-size: 19px;
+		font-weight: 600;
+	}
+	.evaluation-card > p {
+		font-size: 11px;
+		margin: 8px 0;
+	}
+	.evaluation-card-outcome {
+		font-family: var(--serif);
+		font-size: 36px;
+		letter-spacing: -1px;
+		margin: 22px 0 4px;
+	}
+	.evaluation-card-progress {
+		margin: 25px 0 14px;
+	}
+	.evaluation-card-footer {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding-top: 18px;
+		margin-top: 18px;
+		border-top: 1px solid var(--line);
+	}
+	.evaluation-card .scenario-evaluation {
+		font-size: 10px;
+	}
+}

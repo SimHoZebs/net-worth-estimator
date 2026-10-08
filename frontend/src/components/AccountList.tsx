@@ -4,6 +4,7 @@ import { type Account, type Plan, visibleAccounts } from "../domain/model.ts";
 import type { Projection } from "../domain/result.ts";
 import { AccountIcon } from "./AccountIcon.tsx";
 import { Badge } from "./ui.tsx";
+import "./AccountList.css";
 
 export function AccountList({
 	plan,

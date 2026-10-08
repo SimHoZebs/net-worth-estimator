@@ -1,5 +1,6 @@
 import { SlidersHorizontal } from "lucide-react";
 import type { Plan } from "../../domain/model.ts";
+import "./plan.css";
 
 export function AssumptionsPanel({
 	assumptions,

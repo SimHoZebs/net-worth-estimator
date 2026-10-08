@@ -7,6 +7,7 @@ import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
 import { BalanceProvenance } from "./sources/BalanceProvenance.tsx";
 import { IncomeEvidence } from "./sources/IncomeEvidence.tsx";
 import { SourceBanner } from "./sources/SourceHealth.tsx";
+import "./sources/sources.css";
 
 export function SourcesPage({
 	plan,
