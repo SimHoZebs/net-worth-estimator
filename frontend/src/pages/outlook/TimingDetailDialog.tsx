@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { Transactions } from "../../components/activity/Transactions.tsx";
 import { Tabs } from "../../components/Tabs.tsx";
 import { Badge, Modal } from "../../components/ui.tsx";
-import type { CycleSpendGroup } from "../../domain/cardCycle.ts";
+import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { MandatorySpendingGroup } from "../../domain/householdTiming.ts";
+import type { Plan } from "../../domain/model.ts";
+import type { EditorTarget } from "../../domain/planEdits.ts";
 
 export type TimingDetailTab = "mandatory" | "cycle" | "configure";
 
@@ -205,11 +208,6 @@ export interface TimingHeroes {
 	reserveAmount: number;
 }
 
-export interface TimingCycleGroup extends CycleSpendGroup {
-	accountId: string;
-	accountName: string;
-}
-
 export interface TimingConfigHints {
 	statementDay: number;
 	reserve: number;
@@ -237,8 +235,10 @@ export function TimingDetailDialog({
 	onFrameChange,
 	thisMonth,
 	nextMonth,
-	cycleGroups,
-	cycleSummary,
+	plan,
+	onEdit,
+	cycleTransactions,
+	cycleEnd,
 	config,
 	billsFiltered,
 	billCandidates,
@@ -259,8 +259,10 @@ export function TimingDetailDialog({
 	onFrameChange: (frame: MandatoryFrame) => void;
 	thisMonth: TimingMandatorySection;
 	nextMonth: TimingMandatorySection;
-	cycleGroups: TimingCycleGroup[];
-	cycleSummary: string;
+	plan: Plan;
+	onEdit: (target: EditorTarget) => void;
+	cycleTransactions: AccountTransaction[];
+	cycleEnd: string;
 	config: TimingConfigHints;
 	billsFiltered: boolean;
 	billCandidates: {
@@ -274,6 +276,7 @@ export function TimingDetailDialog({
 	onToggleAccount: (accountId: string) => void;
 	onUpdateConfig: (next: {
 		statementDay?: number;
+		statementDaySet?: boolean;
 		reserve?: number;
 		spentOverride?: number | null;
 		paycheckOverride?: number | null;
@@ -299,7 +302,11 @@ export function TimingDetailDialog({
 			<Tabs
 				items={[
 					{ id: "mandatory", label: "Mandatory spending" },
-					{ id: "cycle", label: "Cycle breakdown", count: cycleGroups.length },
+					{
+						id: "cycle",
+						label: "Cycle breakdown",
+						count: cycleTransactions.length,
+					},
 					{ id: "configure", label: "Configure" },
 				]}
 				value={tab}
@@ -393,27 +400,12 @@ export function TimingDetailDialog({
 						</p>
 					</div>
 				) : tab === "cycle" ? (
-					<div className="cycle-breakdown">
-						<p className="section-note">{cycleSummary}</p>
-						{cycleGroups.length ? (
-							<ul>
-								{cycleGroups.map((group) => (
-									<li key={`${group.accountId}-${group.key}`}>
-										<span>
-											<strong>{group.name}</strong>
-											<small>
-												{group.accountName} · {group.counterparty} ·{" "}
-												{group.count} {group.count === 1 ? "charge" : "charges"}
-											</small>
-										</span>
-										<strong>{money(group.total)}</strong>
-									</li>
-								))}
-							</ul>
-						) : (
-							<p>No charges in this cycle yet.</p>
-						)}
-					</div>
+					<Transactions
+						transactions={cycleTransactions}
+						plan={plan}
+						horizon={cycleEnd}
+						onEdit={onEdit}
+					/>
 				) : (
 					<div className="cycle-config">
 						<label className="field">
@@ -429,6 +421,7 @@ export function TimingDetailDialog({
 											28,
 											Math.max(1, Math.floor(Number(event.target.value) || 20)),
 										),
+										statementDaySet: true,
 									})
 								}
 							/>
