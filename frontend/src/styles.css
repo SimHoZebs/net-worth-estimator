@@ -1384,7 +1384,7 @@
 		font-weight: 650;
 		color: #4a5d43;
 	}
-	.funds-bar {
+	.seg-bar {
 		display: flex;
 		height: 14px;
 		border-radius: 7px;
@@ -1392,33 +1392,67 @@
 		background: #eef1e6;
 		margin: 10px 0 8px;
 	}
-	.funds-bar > span {
+	.seg-bar > span {
 		display: block;
 		height: 100%;
 		min-width: 3px;
 	}
-	.funds-bills {
-		background: #7a8f5e;
+	.seg-sage {
+		background-color: #7a8f5e;
 	}
-	.funds-reserve {
-		background: #c9d3b8;
+	.seg-pale {
+		background-color: #c9d3b8;
 	}
-	.funds-spent {
-		background: #4a5d43;
+	.seg-dark {
+		background-color: #4a5d43;
 	}
-	.funds-left {
-		background: #e4e9d5;
+	.seg-amber {
+		background-color: #d97706;
 	}
-	.funds-over {
-		background: #d97706;
+	.pat-stripes {
+		background-image: repeating-linear-gradient(
+			45deg,
+			rgba(255, 255, 255, 0.5) 0 3px,
+			transparent 3px 8px
+		);
 	}
-	.funds-card-a {
-		background: #4a5d43;
+	.seg-pale.pat-stripes {
+		background-image: repeating-linear-gradient(
+			45deg,
+			rgba(74, 93, 67, 0.4) 0 3px,
+			transparent 3px 8px
+		);
 	}
-	.funds-card-b {
-		background: #7a8f5e;
+	.pat-dots {
+		background-image: radial-gradient(
+			circle,
+			rgba(255, 255, 255, 0.6) 1.5px,
+			transparent 1.6px
+		);
+		background-size: 8px 8px;
 	}
-	.funds-legend {
+	.seg-pale.pat-dots {
+		background-image: radial-gradient(
+			circle,
+			rgba(74, 93, 67, 0.45) 1.5px,
+			transparent 1.6px
+		);
+		background-size: 8px 8px;
+	}
+	.pat-hatch {
+		background-image:
+			repeating-linear-gradient(
+				45deg,
+				rgba(255, 255, 255, 0.5) 0 2px,
+				transparent 2px 6px
+			),
+			repeating-linear-gradient(
+				-45deg,
+				rgba(255, 255, 255, 0.5) 0 2px,
+				transparent 2px 6px
+			);
+	}
+	.seg-legend {
 		list-style: none;
 		padding: 0;
 		margin: 0 0 6px;
@@ -1428,16 +1462,17 @@
 		font-size: 10px;
 		color: #667359;
 	}
-	.funds-legend li {
+	.seg-legend li {
 		display: flex;
 		align-items: center;
 		gap: 6px;
 	}
-	.funds-dot {
-		width: 10px;
+	.seg-swatch {
+		width: 14px;
 		height: 10px;
-		border-radius: 50%;
+		border-radius: 2px;
 		display: inline-block;
+		flex: none;
 	}
 	.account-section {
 		margin-top: 30px;
