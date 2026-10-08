@@ -63,3 +63,86 @@ adjustment_20260727_roth_ira,Roth IRA balance adjustment,,roth_ira,"{""resolver"
 amazon_payroll_20260430,Amazon Development Payroll 2026-04-30,,checking,"{""resolver"":""expression"",""config"":{""expression"":""41330.61""},""inputs"":{}}",once,0,0,0,2026-04-30,,,1,true
 amazon_payroll_20260630_1,Amazon Development Payroll 2026-06-30 (1),,checking,"{""resolver"":""expression"",""config"":{""expression"":""7455.96""},""inputs"":{}}",once,0,0,0,2026-06-30,,,1,true
 amazon_payroll_20260731_1,Amazon Development Payroll 2026-07-31 (1),,checking,"{""resolver"":""expression"",""config"":{""expression"":""7579.38""},""inputs"":{}}",once,0,0,0,2026-07-31,,,1,true
+sapphire_20260818_dominos,Dominos 7063,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.94""},""inputs"":{}}",once,0,0,0,2026-08-18,,,1,true
+sapphire_20260819_parks_refund,WA Parks Reservation Refund,,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""19.55""},""inputs"":{}}",once,0,0,0,2026-08-19,,,1,true
+sapphire_20260819_chase_travel,Chase Travel,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""30.98""},""inputs"":{}}",once,0,0,0,2026-08-19,,,1,true
+sapphire_20260821_walgreens_6194,Walgreens 6194,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.25""},""inputs"":{}}",once,0,0,0,2026-08-21,,,1,true
+sapphire_20260821_hmart,H Mart,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.52""},""inputs"":{}}",once,0,0,0,2026-08-21,,,1,true
+sapphire_20260822_yardhouse,Yard House 0108343,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""71.18""},""inputs"":{}}",once,0,0,0,2026-08-22,,,1,true
+sapphire_20260822_costco,Costco WHSE 0001,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""275.91""},""inputs"":{}}",once,0,0,0,2026-08-22,,,1,true
+sapphire_20260822_kobuta,Kobuta and Ookami Kats,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""62.98""},""inputs"":{}}",once,0,0,0,2026-08-22,,,1,true
+sapphire_20260823_regal_meridian,Reg Meridian 16,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.76""},""inputs"":{}}",once,0,0,0,2026-08-23,,,1,true
+sapphire_20260823_orange_goose,Orange Goose Coffee,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.36""},""inputs"":{}}",once,0,0,0,2026-08-23,,,1,true
+sapphire_20260823_regal_cinemas,Regal Cinemas,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""33.58""},""inputs"":{}}",once,0,0,0,2026-08-23,,,1,true
+sapphire_20260823_hmart,H Mart,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.97""},""inputs"":{}}",once,0,0,0,2026-08-23,,,1,true
+sapphire_20260823_racha_thai,Racha Thai Cuisine,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""42.48""},""inputs"":{}}",once,0,0,0,2026-08-23,,,1,true
+sapphire_20260825_dental,Salt Lake Union Dental,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""12.40""},""inputs"":{}}",once,0,0,0,2026-08-25,,,1,true
+sapphire_20260825_impeckable,Impeckable Chicken,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""41.43""},""inputs"":{}}",once,0,0,0,2026-08-25,,,1,true
+sapphire_20260826_openai_chatgpt,OpenAI ChatGPT,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.11""},""inputs"":{}}",once,0,0,0,2026-08-26,,,1,true
+sapphire_20260826_qfc,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""6.99""},""inputs"":{}}",once,0,0,0,2026-08-26,,,1,true
+sapphire_20260828_mcdonalds_35920,McDonalds F35920,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.18""},""inputs"":{}}",once,0,0,0,2026-08-28,,,1,true
+sapphire_20260828_miero,Miero Coffee Bar,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.77""},""inputs"":{}}",once,0,0,0,2026-08-28,,,1,true
+sapphire_20260828_rolled_flour,Rolled Flour,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.34""},""inputs"":{}}",once,0,0,0,2026-08-28,,,1,true
+sapphire_20260828_ummadak,Ummadak,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.83""},""inputs"":{}}",once,0,0,0,2026-08-28,,,1,true
+sapphire_20260828_multnomah_falls,Multnomah Falls,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""12.94""},""inputs"":{}}",once,0,0,0,2026-08-28,,,1,true
+sapphire_20260829_mcmenamins,McMenamins Edgefield,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""62.54""},""inputs"":{}}",once,0,0,0,2026-08-29,,,1,true
+sapphire_20260829_walgreens_5816,Walgreens 5816,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""1.25""},""inputs"":{}}",once,0,0,0,2026-08-29,,,1,true
+sapphire_20260829_st_helens_gifts,Mt St Helens Gifts,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""24.77""},""inputs"":{}}",once,0,0,0,2026-08-29,,,1,true
+sapphire_20260829_safeway,Safeway 0424,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.77""},""inputs"":{}}",once,0,0,0,2026-08-29,,,1,true
+sapphire_20260829_ktown_bbq,K-Town Korean BBQ,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""78.20""},""inputs"":{}}",once,0,0,0,2026-08-29,,,1,true
+sapphire_20260829_starbucks,Starbucks 13327,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.95""},""inputs"":{}}",once,0,0,0,2026-08-29,,,1,true
+sapphire_20260829_deli_store,Deli Store LLC,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""27.13""},""inputs"":{}}",once,0,0,0,2026-08-29,,,1,true
+sapphire_20260830_walgreens_10056,Walgreens 10056,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""12.76""},""inputs"":{}}",once,0,0,0,2026-08-30,,,1,true
+sapphire_20260830_mcdonalds_17185,McDonalds F17185,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.48""},""inputs"":{}}",once,0,0,0,2026-08-30,,,1,true
+sapphire_20260830_lime_ride,Lime Ride,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.34""},""inputs"":{}}",once,0,0,0,2026-08-30,,,1,true
+sapphire_20260830_kozy_korner,Kozy Korner,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""40.25""},""inputs"":{}}",once,0,0,0,2026-08-30,,,1,true
+sapphire_20260830_best_buy,Best Buy 0001491,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.00""},""inputs"":{}}",once,0,0,0,2026-08-30,,,1,true
+sapphire_20260830_pelican_brewing,Pelican Brewing,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""65.64""},""inputs"":{}}",once,0,0,0,2026-08-30,,,1,true
+sapphire_20260831_card_payment,Sapphire Card Payment,checking,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""2000.76""},""inputs"":{}}",once,0,0,0,2026-08-31,,,1,true
+sapphire_20260831_brooktree,Brooktree Film Lab,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""57.75""},""inputs"":{}}",once,0,0,0,2026-08-31,,,1,true
+sapphire_20260831_vanmoof,Vanmoof Rybit,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""179.00""},""inputs"":{}}",once,0,0,0,2026-08-31,,,1,true
+sapphire_20260831_wholefds_1104,Whole Foods WSL 10216,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.04""},""inputs"":{}}",once,0,0,0,2026-08-31,,,1,true
+sapphire_20260831_wholefds_1826,Whole Foods WSL 10216,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.26""},""inputs"":{}}",once,0,0,0,2026-08-31,,,1,true
+sapphire_20260831_costco_instacart,Costco Instacart,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""49.93""},""inputs"":{}}",once,0,0,0,2026-08-31,,,1,true
+sapphire_20260901_vanmoof_refund,Vanmoof Rybit Refund,,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""179.00""},""inputs"":{}}",once,0,0,0,2026-09-01,,,1,true
+sapphire_20260901_opencode,Opencode Anomaly,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""10.00""},""inputs"":{}}",once,0,0,0,2026-09-01,,,1,true
+sapphire_20260901_midori,Midori Teriyaki,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""20.54""},""inputs"":{}}",once,0,0,0,2026-09-01,,,1,true
+sapphire_20260901_lime_pass,Lime Pass,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""47.53""},""inputs"":{}}",once,0,0,0,2026-09-01,,,1,true
+sapphire_20260901_annual_fee,Annual Membership Fee,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""95.00""},""inputs"":{}}",once,0,0,0,2026-09-01,,,1,true
+sapphire_20260902_aws,Amazon Web Services,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""1.57""},""inputs"":{}}",once,0,0,0,2026-09-02,,,1,true
+sapphire_20260902_lime_rides,Lime 2 Rides,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.96""},""inputs"":{}}",once,0,0,0,2026-09-02,,,1,true
+sapphire_20260903_qfc,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""35.63""},""inputs"":{}}",once,0,0,0,2026-09-03,,,1,true
+sapphire_20260903_shake_shack,Shake Shack,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""32.57""},""inputs"":{}}",once,0,0,0,2026-09-03,,,1,true
+sapphire_20260904_usda,USDA Forest Service,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.00""},""inputs"":{}}",once,0,0,0,2026-09-04,,,1,true
+sapphire_20260905_regal_meridian,Reg Meridian 16,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.21""},""inputs"":{}}",once,0,0,0,2026-09-05,,,1,true
+sapphire_20260905_regal_cinemas,Regal Cinemas,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""37.78""},""inputs"":{}}",once,0,0,0,2026-09-05,,,1,true
+sapphire_20260905_qfc,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.68""},""inputs"":{}}",once,0,0,0,2026-09-05,,,1,true
+sapphire_20260905_heytea,Heytea South Lake Union,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.83""},""inputs"":{}}",once,0,0,0,2026-09-05,,,1,true
+sapphire_20260906_steam,Steam Games,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.99""},""inputs"":{}}",once,0,0,0,2026-09-06,,,1,true
+sapphire_20260906_yardhouse,Yard House 0108343,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""64.00""},""inputs"":{}}",once,0,0,0,2026-09-06,,,1,true
+sapphire_20260906_hudson_news,Hudson News Seatac,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.58""},""inputs"":{}}",once,0,0,0,2026-09-06,,,1,true
+sapphire_20260906_levy_dbacks,Levy Dbacks Concession,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""30.65""},""inputs"":{}}",once,0,0,0,2026-09-06,,,1,true
+sapphire_20260907_chase_field,Chase Field,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""54.55""},""inputs"":{}}",once,0,0,0,2026-09-07,,,1,true
+sapphire_20260907_toasted_bagels,Toasted Bagels and Coffee,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.65""},""inputs"":{}}",once,0,0,0,2026-09-07,,,1,true
+sapphire_20260907_plaid_pantry,Plaid Pantry 309,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.18""},""inputs"":{}}",once,0,0,0,2026-09-07,,,1,true
+sapphire_20260907_valley_metro,Valley Metro Mobile,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.00""},""inputs"":{}}",once,0,0,0,2026-09-07,,,1,true
+sapphire_20260908_caffe_vita,Caffe Vita KEXP,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.28""},""inputs"":{}}",once,0,0,0,2026-09-08,,,1,true
+sapphire_20260910_qfc,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""6.99""},""inputs"":{}}",once,0,0,0,2026-09-10,,,1,true
+sapphire_20260910_tsuki,Tsuki Shokudo,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""63.57""},""inputs"":{}}",once,0,0,0,2026-09-10,,,1,true
+sapphire_20260911_openai,OpenAI,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""21.71""},""inputs"":{}}",once,0,0,0,2026-09-11,,,1,true
+sapphire_20260911_mcdonalds_39974,McDonalds F39974,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.90""},""inputs"":{}}",once,0,0,0,2026-09-11,,,1,true
+sapphire_20260911_glazers,Glazers Camera,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""44.73""},""inputs"":{}}",once,0,0,0,2026-09-11,,,1,true
+sapphire_20260912_costco_instacart,Costco Instacart,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""49.18""},""inputs"":{}}",once,0,0,0,2026-09-12,,,1,true
+sapphire_20260912_urban_animal,Urban Animal,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""207.21""},""inputs"":{}}",once,0,0,0,2026-09-12,,,1,true
+sapphire_20260912_cafe_hagen,Cafe Hagen Uptown,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""16.02""},""inputs"":{}}",once,0,0,0,2026-09-12,,,1,true
+sapphire_20260913_qfc_744,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.44""},""inputs"":{}}",once,0,0,0,2026-09-13,,,1,true
+sapphire_20260913_qfc_1814,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.14""},""inputs"":{}}",once,0,0,0,2026-09-13,,,1,true
+sapphire_20260913_target,Target T-0627,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.04""},""inputs"":{}}",once,0,0,0,2026-09-13,,,1,true
+sapphire_20260913_goodwill,Goodwill Seattle,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.53""},""inputs"":{}}",once,0,0,0,2026-09-13,,,1,true
+sapphire_20260914_bjs,BJs Restaurants,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""103.41""},""inputs"":{}}",once,0,0,0,2026-09-14,,,1,true
+sapphire_20260915_impeckable_2,Impeckable Chicken 2,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.89""},""inputs"":{}}",once,0,0,0,2026-09-15,,,1,true
+sapphire_20260915_made_in_house,Made In House,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""40.44""},""inputs"":{}}",once,0,0,0,2026-09-15,,,1,true
+sapphire_20260915_miro_tea,Miro Tea,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.64""},""inputs"":{}}",once,0,0,0,2026-09-15,,,1,true
+sapphire_20260916_pho_bac,Pho Bac,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.46""},""inputs"":{}}",once,0,0,0,2026-09-16,,,1,true
+sapphire_20260916_tous_les_jours,Tous Les Jours,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.10""},""inputs"":{}}",once,0,0,0,2026-09-16,,,1,true
+sapphire_20260917_shake_shack,Shake Shack,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""24.28""},""inputs"":{}}",once,0,0,0,2026-09-17,,,1,true
