@@ -296,7 +296,10 @@ Current providers:
 - `posting-year-to-date`;
 - `posting-prior-year-to-date`;
 - `account-balance`;
-- `occurrence-rate`.
+- `occurrence-rate`;
+- `terms-minimum`;
+- `late-fee`;
+- `balance-fee`.
 
 Current general resolvers:
 

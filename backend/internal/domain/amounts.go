@@ -24,7 +24,9 @@ func amtErrf(format string, args ...any) *AmountResolutionError {
 type AmountProviderContext struct {
 	Balances                     map[string]float64
 	LatestRealizedPostingAmounts map[string]float64
+	LatestRealizedPostingDates   map[string]string
 	RealizedPostingAmountsByYear map[string]map[string]float64
+	PaymentTerms                 map[string]types.PaymentTerms
 	Date                         string
 	OccurrenceRate               float64
 }
@@ -172,6 +174,149 @@ var amountProviders = map[string]providerDefinition{
 			return ctx.OccurrenceRate, nil
 		},
 	},
+	// terms-minimum resolves a payment-terms minimum for one account: the
+	// fixed minimum, or the percent share of the balance magnitude when set,
+	// whichever is larger. Terms stay the single source for minimums; the
+	// payment posting carries schedule and destinations only.
+	"terms-minimum": {
+		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
+			id, err := validateIDArgument(args)
+			if err != nil {
+				return 0, err
+			}
+			terms, ok := ctx.PaymentTerms[id]
+			if !ok {
+				return 0, amtErrf("Account '%s' has no payment terms.", id)
+			}
+			return termsMinimum(terms, ctx.Balances[id]), nil
+		},
+		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
+			id, err := validateIDArgument(args)
+			if err != nil {
+				return err
+			}
+			if !refs.AccountIDs[id] {
+				return amtErrf("Account '%s' does not exist.", id)
+			}
+			return nil
+		},
+	},
+	// late-fee resolves a flat fee when the referenced payment posting fell
+	// short of its terms minimum in the fee's calendar month, and zero
+	// otherwise. The same-month guard keeps pre-history occurrences and
+	// disabled shells from charging stale shortfalls: no payment execution
+	// this month means no fee. Monthly dues assumed.
+	"late-fee": {
+		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
+			paymentID, ok := args["payment"].(string)
+			if !ok || trimSpace(paymentID) == "" {
+				return 0, amtErrf("Late fee 'payment' must be a non-empty posting ID.")
+			}
+			accountID, ok := args["account"].(string)
+			if !ok || trimSpace(accountID) == "" {
+				return 0, amtErrf("Late fee 'account' must be a non-empty account ID.")
+			}
+			fee, ok := args["fee"].(float64)
+			if !ok || math.IsNaN(fee) || math.IsInf(fee, 0) || fee < 0 {
+				return 0, amtErrf("Late fee 'fee' must be a finite number at or above zero.")
+			}
+			terms, ok := ctx.PaymentTerms[accountID]
+			if !ok {
+				return 0, amtErrf("Account '%s' has no payment terms.", accountID)
+			}
+			lastDate, ok := ctx.LatestRealizedPostingDates[paymentID]
+			if !ok || len(lastDate) < 7 || len(ctx.Date) < 7 || lastDate[:7] != ctx.Date[:7] {
+				return 0, nil
+			}
+			paid := ctx.LatestRealizedPostingAmounts[paymentID]
+			if math.Max(0, termsMinimum(terms, ctx.Balances[accountID])-paid) > 0 {
+				return fee, nil
+			}
+			return 0, nil
+		},
+		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
+			paymentID, ok := args["payment"].(string)
+			if !ok || trimSpace(paymentID) == "" {
+				return amtErrf("Late fee 'payment' must be a non-empty posting ID.")
+			}
+			if !refs.PostingIDs[paymentID] {
+				return amtErrf("Posting '%s' does not exist.", paymentID)
+			}
+			accountID, ok := args["account"].(string)
+			if !ok || trimSpace(accountID) == "" {
+				return amtErrf("Late fee 'account' must be a non-empty account ID.")
+			}
+			if !refs.AccountIDs[accountID] {
+				return amtErrf("Account '%s' does not exist.", accountID)
+			}
+			fee, ok := args["fee"].(float64)
+			if !ok || math.IsNaN(fee) || math.IsInf(fee, 0) || fee < 0 {
+				return amtErrf("Late fee 'fee' must be a finite number at or above zero.")
+			}
+			return nil
+		},
+		postingDependencies: func(args map[string]types.JsonValue) []string {
+			if id, ok := args["payment"].(string); ok {
+				return []string{id}
+			}
+			return nil
+		},
+	},
+	// balance-fee resolves a flat fee when an account's live balance sits
+	// below a threshold at the occurrence date, and zero otherwise. The
+	// balance read is live, so unlike ledger conditions there is no
+	// staleness guard to maintain: each monthly assessment sees the current
+	// balance. At exactly the threshold no fee applies.
+	"balance-fee": {
+		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
+			accountID, ok := args["account"].(string)
+			if !ok || trimSpace(accountID) == "" {
+				return 0, amtErrf("Balance fee 'account' must be a non-empty account ID.")
+			}
+			threshold, ok := args["threshold"].(float64)
+			if !ok || math.IsNaN(threshold) || math.IsInf(threshold, 0) {
+				return 0, amtErrf("Balance fee 'threshold' must be a finite number.")
+			}
+			fee, ok := args["fee"].(float64)
+			if !ok || math.IsNaN(fee) || math.IsInf(fee, 0) || fee < 0 {
+				return 0, amtErrf("Balance fee 'fee' must be a finite number at or above zero.")
+			}
+			if ctx.Balances[accountID] < threshold {
+				return fee, nil
+			}
+			return 0, nil
+		},
+		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
+			accountID, ok := args["account"].(string)
+			if !ok || trimSpace(accountID) == "" {
+				return amtErrf("Balance fee 'account' must be a non-empty account ID.")
+			}
+			if !refs.AccountIDs[accountID] {
+				return amtErrf("Account '%s' does not exist.", accountID)
+			}
+			threshold, ok := args["threshold"].(float64)
+			if !ok || math.IsNaN(threshold) || math.IsInf(threshold, 0) {
+				return amtErrf("Balance fee 'threshold' must be a finite number.")
+			}
+			fee, ok := args["fee"].(float64)
+			if !ok || math.IsNaN(fee) || math.IsInf(fee, 0) || fee < 0 {
+				return amtErrf("Balance fee 'fee' must be a finite number at or above zero.")
+			}
+			return nil
+		},
+	},
+}
+
+// termsMinimum is the effective minimum for a terms row against a balance:
+// the fixed minimum, or the percent share of the balance magnitude when set,
+// whichever is larger. Percent is a ratio in [0,1].
+func termsMinimum(terms types.PaymentTerms, balance float64) float64 {
+	minimum := math.Max(0, terms.MinimumFixed)
+	if terms.MinimumPercent != nil {
+		percent := math.Min(1, math.Max(0, *terms.MinimumPercent))
+		minimum = math.Max(minimum, percent*math.Abs(balance))
+	}
+	return minimum
 }
 
 type resolverDefinition struct {

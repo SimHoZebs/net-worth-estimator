@@ -305,6 +305,7 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 	}
 	initialStateClone := CloneSimulationState(run.InitialState)
 	path.ProjectionStartPostingState.LatestRealizedPostingAmounts = initialStateClone.LatestRealizedPostingAmounts
+	path.ProjectionStartPostingState.LatestRealizedPostingDates = initialStateClone.LatestRealizedPostingDates
 	path.ProjectionStartPostingState.RealizedPostingAmountsByYear = initialStateClone.RealizedPostingAmountsByYear
 	return path
 }

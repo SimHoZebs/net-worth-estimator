@@ -86,8 +86,9 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 	}
 
 	transitions, err := CreateTransitionRuntime(types.FinancialModel{
-		Accounts: document.Accounts,
-		Postings: document.Postings,
+		Accounts:     document.Accounts,
+		Postings:     document.Postings,
+		PaymentTerms: document.PaymentTerms,
 	}, SimulationState{
 		Balances:                     InitAccountBalances(document.Accounts),
 		LatestRealizedPostingAmounts: map[string]float64{},
@@ -215,8 +216,9 @@ func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *
 		HistoricalSnapshots: historicalSnapshots,
 		Request: types.SimulationRequest{
 			Model: types.FinancialModel{
-				Accounts: effectiveDocument.Accounts,
-				Postings: effectiveDocument.Postings,
+				Accounts:     effectiveDocument.Accounts,
+				Postings:     effectiveDocument.Postings,
+				PaymentTerms: effectiveDocument.PaymentTerms,
 			},
 			InitialState:           *state,
 			StartDate:              startDate,
