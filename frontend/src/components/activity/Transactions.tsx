@@ -8,7 +8,7 @@ import { useId, useMemo, useState } from "react";
 import {
 	type AccountTransaction,
 	type ActivityFilters,
-	defaultActivityFilters,
+	defaultAccountViewFilters,
 	filterTransactions,
 } from "../../domain/accountActivity.ts";
 import type { Plan } from "../../domain/model.ts";
@@ -29,7 +29,7 @@ export function Transactions({
 	onEdit: (target: EditorTarget) => void;
 }) {
 	const [filters, setFilters] = useState<ActivityFilters>(
-		defaultActivityFilters,
+		defaultAccountViewFilters,
 	);
 	const [page, setPage] = useState(0);
 	const [expanded, setExpanded] = useState<string | null>(null);
@@ -149,7 +149,7 @@ export function Transactions({
 					icon={ListFilter}
 					title="No matching transactions"
 					action="Clear transaction filters"
-					onAction={() => update(defaultActivityFilters)}
+					onAction={() => update(defaultAccountViewFilters)}
 				/>
 			)}
 		</>

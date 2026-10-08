@@ -37,6 +37,13 @@ export const defaultActivityFilters: ActivityFilters = {
 	order: "oldest",
 };
 
+// Account dialog default: recorded facts only. Projected occurrences stay
+// accessible via the Activity filter but no longer mix into the first view.
+export const defaultAccountViewFilters: ActivityFilters = {
+	...defaultActivityFilters,
+	source: "historical",
+};
+
 type ConnectionMovement = Pick<
 	Projection["movements"][number],
 	"fromId" | "toId" | "accountDeltas" | "requested" | "realized"
