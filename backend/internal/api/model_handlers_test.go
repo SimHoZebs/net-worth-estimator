@@ -521,6 +521,83 @@ func TestDeterministicMovementEvidenceCarriesHistoricalAnnualCapUsage(t *testing
 	t.Fatal("post-start investment movement was not returned")
 }
 
+func TestDeterministicMovementEvidenceReportsDestinationHeadroom(t *testing.T) {
+	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "checkpoints.json")
+	fixtureBytes, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read projection fixture: %v", err)
+	}
+	var fixture struct {
+		Document *types.FinancialModelDocument   `json:"document"`
+		Settings types.ProjectionRuntimeSettings `json:"settings"`
+	}
+	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
+		t.Fatalf("decode projection fixture: %v", err)
+	}
+	if fixture.Document == nil {
+		t.Fatal("projection fixture has no document")
+	}
+	ceiling := 0.0
+	for index := range fixture.Document.Accounts {
+		if fixture.Document.Accounts[index].ID == "loan" {
+			fixture.Document.Accounts[index].MaxBalance = &ceiling
+		}
+	}
+	for index := range fixture.Document.Postings {
+		if fixture.Document.Postings[index].ID == "paydown" {
+			fixture.Document.Postings[index].Amount.Config = map[string]any{"expression": "711"}
+			fixture.Document.Postings[index].Amount.Inputs = map[string]types.AmountInputBinding{}
+		}
+	}
+	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings})
+	if err != nil {
+		t.Fatalf("encode projection request: %v", err)
+	}
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("projection status = %d, body %s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Result *types.ProjectionResult `json:"result"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode projection response: %v", err)
+	}
+	for _, event := range payload.Result.MovementEvents {
+		if event.Origin.PostingID != "paydown" {
+			continue
+		}
+		if event.RealizedAmount >= event.RequestedAmount {
+			t.Fatalf("paydown was not destination-capped = %+v", event)
+		}
+		foundCeiling := false
+		for _, constraint := range event.BindingConstraints {
+			if constraintMap, ok := constraint.(map[string]any); ok && constraintMap["type"] == "destination-ceiling" {
+				foundCeiling = true
+			}
+		}
+		if !foundCeiling {
+			t.Fatalf("paydown binding constraints = %+v", event.BindingConstraints)
+		}
+		if event.AvailableAmount == nil {
+			t.Fatalf("destination-capped movement has no available amount = %+v", event)
+		}
+		if *event.AvailableAmount != event.RealizedAmount {
+			t.Fatalf("destination available %v != realized %v", *event.AvailableAmount, event.RealizedAmount)
+		}
+		if math.Abs(*event.AvailableAmount) >= 1e12 {
+			t.Fatalf("destination available carries a bound sentinel: %v", *event.AvailableAmount)
+		}
+		return
+	}
+	t.Fatal("paydown movement was not returned")
+}
+
 func TestDeterministicMovementEvidenceRoundsIncomeFields(t *testing.T) {
 	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "income.json")
 	fixtureBytes, err := os.ReadFile(fixturePath)
