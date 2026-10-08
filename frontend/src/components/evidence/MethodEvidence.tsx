@@ -4,8 +4,7 @@ import { Modal } from "../ui.tsx";
 const steps = [
 	{
 		title: "Start with what you know",
-		description:
-			"Balance checks and clearly marked estimates establish today’s position.",
+		description: "Confirmed balances and estimates establish today’s position.",
 	},
 	{
 		title: "Follow the plan forward",

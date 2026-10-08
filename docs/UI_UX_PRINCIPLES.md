@@ -364,6 +364,9 @@ Everything else goes:
 - no empty-state descriptions where the title plus the action button already guides,
 - no duplicated warnings in both the editor and the evidence view; keep the single on-demand instance closest to the decision,
 - no adjacent duplicates: one fact lives in one place; a count, a status, or an action shown nearby is not shown again.
+- no domain jargon as labels: name things the way the user would (confirmed
+  vs estimated balances, starting balances, as-of dates), not the way the
+  model stores them.
 
 Error messages, read-only locks, destructive-action confirmations, and empty states with no guiding action are not hints; they are state and remain.
 

@@ -326,7 +326,7 @@ export function TimingDetailDialog({
 								<span>
 									Cash cushion{" "}
 									{heroes.cushionProvisional && (
-										<Badge tone="amber">Provisional</Badge>
+										<Badge tone="amber">Estimated</Badge>
 									)}
 								</span>
 								<strong>{money(heroes.cushion)}</strong>
@@ -339,7 +339,7 @@ export function TimingDetailDialog({
 						<p className="section-note">
 							{heroes.checkingObservedOn
 								? `As of ${dateLabel(heroes.checkingObservedOn, true)}`
-								: "No bank-reported as-of time — provisional"}
+								: "No confirmed balance — estimated"}
 						</p>
 						<CashNowBar parts={cashNow} />
 						<h3>Safe card room</h3>
