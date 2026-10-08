@@ -19,3 +19,4 @@ prime_card,Prime Visa,debt,-Infinity,0,#0ea5e9,true
 ultimate_card,Sapphire Preferred,debt,-Infinity,0,#8b5cf6,true
 rsu,RSU (Unvested),investment,-Infinity,Infinity,#f59e0b,false
 rsu_vested,RSU (Vested),investment,-Infinity,Infinity,#d97706,true
+gross_pay,Gross Pay (virtual),cash,0,Infinity,#9aa39b,true
