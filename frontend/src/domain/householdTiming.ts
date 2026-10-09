@@ -61,24 +61,38 @@ export function checkingBalance(plan: Plan): number | null {
 }
 
 /**
- * Remaining unpaid monthly obligations: requested checking outflows dated
- * after today through the end of the current calendar month.
+ * Available-balance total: the summed balance of the accounts the user
+ * counts as spendable. An empty set holds nothing.
+ */
+export function spendingBalance(plan: Plan, accountIds: string[]): number {
+	const selected = new Set(accountIds);
+	return plan.accounts
+		.filter((account) => selected.has(account.id) && !account.archived)
+		.reduce((sum, account) => sum + account.balance, 0);
+}
+
+/**
+ * Remaining unpaid monthly obligations: requested outflows from the
+ * spendable accounts dated after today through the end of the current
+ * calendar month.
  */
 export function remainingMonthlyObligations({
 	movements,
-	checkingId,
+	checkingIds,
 	todayIso,
 }: {
 	movements: MovementResult[];
-	checkingId: string;
+	checkingIds: string[];
 	todayIso: string;
 }): { total: number; monthEnd: string } {
 	const today = todayIso.slice(0, 10);
 	const monthEnd = monthEndIso(today);
+	const sources = new Set(checkingIds);
 	const total = movements
 		.filter(
 			(movement) =>
-				movement.fromId === checkingId &&
+				movement.fromId !== null &&
+				sources.has(movement.fromId) &&
 				movement.date > today &&
 				movement.date <= monthEnd &&
 				movement.requested > 0,
@@ -87,21 +101,23 @@ export function remainingMonthlyObligations({
 	return { total, monthEnd };
 }
 
-/** Next calendar month's fixed obligations from checking. */
+/** Next calendar month's fixed obligations from the spendable accounts. */
 export function nextMonthObligations({
 	movements,
-	checkingId,
+	checkingIds,
 	todayIso,
 }: {
 	movements: MovementResult[];
-	checkingId: string;
+	checkingIds: string[];
 	todayIso: string;
 }): { total: number; start: string; end: string } {
 	const { start, end } = nextMonthRange(todayIso);
+	const sources = new Set(checkingIds);
 	const total = movements
 		.filter(
 			(movement) =>
-				movement.fromId === checkingId &&
+				movement.fromId !== null &&
+				sources.has(movement.fromId) &&
 				movement.date >= start &&
 				movement.date <= end &&
 				movement.requested > 0,
@@ -111,23 +127,26 @@ export function nextMonthObligations({
 }
 
 /**
- * Expected next paycheck: total inflow into checking on the earliest date
- * after today, from outside the household or from the virtual pay account
- * (take-home transfer). Null when no upcoming inflow is projected.
+ * Expected next paycheck: total inflow into the spendable accounts on the
+ * earliest date after today, from outside the household or from the
+ * virtual pay account (take-home transfer). Null when no upcoming inflow
+ * is projected.
  */
 export function nextPaycheck({
 	movements,
-	checkingId,
+	checkingIds,
 	todayIso,
 }: {
 	movements: MovementResult[];
-	checkingId: string;
+	checkingIds: string[];
 	todayIso: string;
 }): { date: string; amount: number } | null {
 	const today = todayIso.slice(0, 10);
+	const destinations = new Set(checkingIds);
 	const upcoming = movements.filter(
 		(movement) =>
-			movement.toId === checkingId &&
+			movement.toId !== null &&
+			destinations.has(movement.toId) &&
 			(!movement.fromId || movement.fromId === VIRTUAL_PAY_ACCOUNT_ID) &&
 			movement.date > today &&
 			movement.requested > 0,
@@ -144,10 +163,10 @@ export function nextPaycheck({
 }
 
 /**
- * Cash cushion: checking balance minus spending since the checkpoint and
- * remaining unpaid monthly obligations. Card purchases do not reduce the
- * cushion here; they are budgeted against the next paycheck in the cycle
- * allowance.
+ * Available balance: the selected balance minus spending since it was
+ * confirmed and remaining unpaid monthly obligations. Card purchases do
+ * not reduce it here; they are budgeted against the next paycheck in the
+ * cycle allowance.
  */
 export function cashCushion({
 	checking,
@@ -177,7 +196,7 @@ export function cycleBudget({
 /**
  * Credit-card cycle allowance: expected next paycheck minus next month's
  * fixed obligations, spending already committed this cycle, and the
- * protected reserve. Independent of the current checking balance.
+ * protected reserve. Independent of the current available balance.
  */
 export function cycleAllowance({
 	paycheck,
@@ -203,7 +222,8 @@ export interface MandatorySpendingGroup {
 
 /**
  * Narrow projection movements to a selected bill set. Null keeps every
- * movement, so the timing card counts all checking outflows by default.
+ * movement, so the timing card counts all spendable-account outflows by
+ * default.
  */
 export function filterMovementsById(
 	movements: MovementResult[],
@@ -215,29 +235,31 @@ export function filterMovementsById(
 }
 
 /**
- * Realized checking outflows inside (after, through]: money the projection
- * shows as already left between the checkpoint and today. The cash cushion
- * subtracts these so logged actuals dated after the projection start still
- * move today's figures.
+ * Realized outflows from the spendable accounts inside (after, through]:
+ * money the projection shows as already left between confirmation and
+ * today. The available balance subtracts these so logged actuals dated
+ * after the projection start still move today's figures.
  */
 export function realizedCheckingOutflows({
 	movements,
-	checkingId,
+	checkingIds,
 	after,
 	through,
 }: {
 	movements: MovementResult[];
-	checkingId: string;
+	checkingIds: string[];
 	after: string;
 	through: string;
 }): number {
 	const start = after.slice(0, 10);
 	const end = through.slice(0, 10);
 	if (end <= start) return 0;
+	const sources = new Set(checkingIds);
 	return movements
 		.filter(
 			(movement) =>
-				movement.fromId === checkingId &&
+				movement.fromId !== null &&
+				sources.has(movement.fromId) &&
 				movement.date > start &&
 				movement.date <= end &&
 				movement.realized > 0,
@@ -246,24 +268,25 @@ export function realizedCheckingOutflows({
 }
 
 /**
- * Mandatory spendings in an inclusive date window: checking outflows
- * grouped by movement, sorted by total descending. Powers the mandatory
+ * Bills in an inclusive date window: outflows from the spendable accounts
+ * grouped by movement, sorted by total descending. Powers the bills
  * visualization (remaining bills this month, fixed obligations next month).
  */
 export function groupMandatorySpending({
 	movements,
-	checkingId,
+	checkingIds,
 	start,
 	end,
 }: {
 	movements: MovementResult[];
-	checkingId: string;
+	checkingIds: string[];
 	start: string;
 	end: string;
 }): MandatorySpendingGroup[] {
+	const sources = new Set(checkingIds);
 	const groups = new Map<string, MandatorySpendingGroup>();
 	for (const movement of movements) {
-		if (movement.fromId !== checkingId) continue;
+		if (movement.fromId === null || !sources.has(movement.fromId)) continue;
 		if (movement.requested <= 0) continue;
 		if (movement.date < start || movement.date > end) continue;
 		const key = movement.movementId;

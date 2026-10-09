@@ -41,7 +41,7 @@ export interface PaycheckDecomposition {
 function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 	const segments: BarSegment[] = [
 		{
-			label: "Spent since checkpoint",
+			label: "Already spent",
 			amount: parts.spentSinceStart,
 			pattern: "solid",
 			tone: "dark",
@@ -53,7 +53,7 @@ function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 			tone: "sage",
 		},
 		{
-			label: parts.cushion >= 0 ? "Cushion" : "Short",
+			label: parts.cushion >= 0 ? "Left to spend" : "Short",
 			amount: Math.max(0, parts.cushion),
 			pattern: parts.cushion >= 0 ? "solid" : "hatch",
 			tone: parts.cushion >= 0 ? "sage" : "amber",
@@ -63,11 +63,11 @@ function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 		<SegmentedBar
 			caption={
 				parts.cushion >= 0
-					? `${money(parts.checking)} checking · ${money(parts.cushion)} cushion left`
-					: `${money(parts.checking)} checking · short ${money(-parts.cushion)}`
+					? `${money(parts.checking)} total · ${money(parts.cushion)} left to spend`
+					: `${money(parts.checking)} total · short ${money(-parts.cushion)}`
 			}
 			segments={segments}
-			ariaLabel={`Checking ${money(parts.checking)}: spent since checkpoint ${money(parts.spentSinceStart)}, bills due ${money(parts.bills)}, cushion ${money(Math.max(0, parts.cushion))}`}
+			ariaLabel={`Available balance ${money(parts.checking)}: already spent ${money(parts.spentSinceStart)}, bills due ${money(parts.bills)}, left to spend ${money(Math.max(0, parts.cushion))}`}
 		/>
 	);
 }
@@ -128,7 +128,7 @@ function MandatorySectionView({
 	if (!section.groups.length) {
 		return (
 			<div className="cycle-breakdown">
-				<p>No mandatory spending projected for this period.</p>
+				<p>No bills due in this period.</p>
 			</div>
 		);
 	}
@@ -199,6 +199,8 @@ export interface TimingConfigHints {
 	spentHint: number;
 	cards: { id: string; name: string }[];
 	trackedIds: string[];
+	spendingAccounts: { id: string; name: string }[];
+	trackedSpendingIds: string[];
 }
 
 export function TimingDetailDialog({
@@ -220,6 +222,7 @@ export function TimingDetailDialog({
 	trackedBillIds,
 	onToggleBill,
 	onToggleAccount,
+	onToggleSpendingAccount,
 	onUpdateConfig,
 	onResetConfig,
 	initialTab,
@@ -248,6 +251,7 @@ export function TimingDetailDialog({
 	trackedBillIds: string[];
 	onToggleBill: (movementId: string) => void;
 	onToggleAccount: (accountId: string) => void;
+	onToggleSpendingAccount: (accountId: string) => void;
 	onUpdateConfig: (next: {
 		statementDay?: number;
 		statementDaySet?: boolean;
@@ -258,6 +262,7 @@ export function TimingDetailDialog({
 		checkingOverride?: number | null;
 		remainingOverride?: number | null;
 		accountIds?: string[] | null;
+		spendingAccountIds?: string[] | null;
 	}) => void;
 	onResetConfig: (
 		key: "paycheck" | "fixed" | "spent" | "checking" | "remaining",
@@ -281,7 +286,7 @@ export function TimingDetailDialog({
 		>
 			<Tabs
 				items={[
-					{ id: "mandatory", label: "Mandatory spending" },
+					{ id: "mandatory", label: "Bills" },
 					{
 						id: "cycle",
 						label: "Cycle breakdown",
@@ -296,41 +301,46 @@ export function TimingDetailDialog({
 			>
 				{tab === "mandatory" ? (
 					<div className="timing-mandatory">
-						<h3>Cash cushion</h3>
-						<div className="timing-figures">
-							<div>
-								<span>
-									Cash cushion{" "}
-									{heroes.cushionProvisional && (
-										<Badge tone="amber">Estimated</Badge>
-									)}
-								</span>
-								<strong>{money(heroes.cushion)}</strong>
-							</div>
-							<div>
-								<span>Checking snapshot</span>
-								<strong>{money(heroes.checkingAmount)}</strong>
-							</div>
-						</div>
+						<h3>
+							Available balance{" "}
+							{heroes.cushionProvisional && (
+								<Badge tone="amber">Estimated</Badge>
+							)}
+						</h3>
 						<p className="section-note">
 							{heroes.checkingObservedOn
 								? `As of ${dateLabel(heroes.checkingObservedOn, true)}`
 								: "No confirmed balance — estimated"}
 						</p>
 						<CashNowBar parts={cashNow} />
+						<Tabs
+							items={[
+								{ id: "calendar", label: "Calendar month" },
+								{ id: "cycle", label: "Card cycle" },
+							]}
+							value={frame}
+							onChange={onFrameChange}
+							label="Bills window"
+						>
+							{null}
+						</Tabs>
+						<h3>{thisMonth.title}</h3>
+						<MandatorySectionView section={thisMonth} today={today} />
+						<h3>{nextMonth.title}</h3>
+						<MandatorySectionView section={nextMonth} today={today} />
+						<p className="section-note">
+							{billsFiltered
+								? "Filtered to your selected bills — change the set in Configure."
+								: "Counting every recurring bill. "}
+							Card charges are not bills; they come out of your next paycheck.
+						</p>
 						<h3>Safe card room</h3>
+						<PaycheckBar parts={paycheck} />
 						<div className="timing-figures">
-							<div>
-								<span>Safe room</span>
-								<strong>{money(heroes.safe)}</strong>
-							</div>
 							<div>
 								<span>Theoretical room</span>
 								<strong>{money(heroes.theoretical)}</strong>
 							</div>
-						</div>
-						<PaycheckBar parts={paycheck} />
-						<div className="timing-figures">
 							<div>
 								<span>Daily safe · {heroes.fullDaysLeft} days</span>
 								<strong>{money(Math.max(0, heroes.dailySafe))}</strong>
@@ -350,35 +360,6 @@ export function TimingDetailDialog({
 							}))}
 							ariaLabel={`Committed cycle spend ${money(heroes.committedTotal)}: ${heroes.committedByCard.map((card) => `${card.name} ${money(card.amount)}`).join(", ")}`}
 						/>
-						<p className="section-note">
-							Paycheck {money(heroes.paycheckAmount)} − fixed{" "}
-							{money(heroes.fixedAmount)} − reserve{" "}
-							{money(heroes.reserveAmount)} ·{" "}
-							{dateLabel(heroes.cycleStart, true)} to{" "}
-							{dateLabel(heroes.cycleEnd, true)}
-						</p>
-						<Tabs
-							items={[
-								{ id: "calendar", label: "Calendar month" },
-								{ id: "cycle", label: "Card cycle" },
-							]}
-							value={frame}
-							onChange={onFrameChange}
-							label="Mandatory spending window"
-						>
-							{null}
-						</Tabs>
-						<h3>{thisMonth.title}</h3>
-						<MandatorySectionView section={thisMonth} today={today} />
-						<h3>{nextMonth.title}</h3>
-						<MandatorySectionView section={nextMonth} today={today} />
-						<p className="section-note">
-							{billsFiltered
-								? "Filtered to your selected bills — change the set in Configure."
-								: "Counting every recurring checking outflow. "}
-							Card charges do not appear here; they are budgeted against your
-							next paycheck in the cycle allowance.
-						</p>
 					</div>
 				) : tab === "cycle" ? (
 					cycleTransactions.length ? (
@@ -551,7 +532,8 @@ export function TimingDetailDialog({
 						)}
 						<label className="field">
 							<span>
-								Checking balance ($) — {money(config.checkingHint ?? 0)} in plan
+								Available balance ($) — {money(config.checkingHint ?? 0)} in
+								plan
 							</span>
 							<input
 								type="number"
@@ -578,6 +560,22 @@ export function TimingDetailDialog({
 								Use plan {money(config.checkingHint ?? 0)} instead
 							</button>
 						)}
+						<fieldset className="cycle-accounts">
+							<legend>Accounts in available balance</legend>
+							{config.spendingAccounts.map((account) => {
+								const checked = config.trackedSpendingIds.includes(account.id);
+								return (
+									<label key={account.id} className="cycle-account-option">
+										<input
+											type="checkbox"
+											checked={checked}
+											onChange={() => onToggleSpendingAccount(account.id)}
+										/>
+										<span>{account.name}</span>
+									</label>
+								);
+							})}
+						</fieldset>
 						<label className="field">
 							<span>
 								Remaining bills this month ($) —{" "}
@@ -610,7 +608,7 @@ export function TimingDetailDialog({
 							</button>
 						)}
 						<fieldset className="cycle-accounts">
-							<legend>Accounts in this total</legend>
+							<legend>Cards in cycle total</legend>
 							{config.cards.map((card) => {
 								const checked = config.trackedIds.includes(card.id);
 								return (

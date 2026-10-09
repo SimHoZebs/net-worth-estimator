@@ -14,6 +14,7 @@ import {
 	nextPaycheck,
 	realizedCheckingOutflows,
 	remainingMonthlyObligations,
+	spendingBalance,
 } from "./householdTiming.ts";
 
 describe("month helpers", () => {
@@ -106,7 +107,7 @@ describe("realizedCheckingOutflows", () => {
 		expect(
 			realizedCheckingOutflows({
 				movements,
-				checkingId: "checking",
+				checkingIds: ["checking"],
 				after: "2026-10-02",
 				through: "2026-10-08",
 			}),
@@ -117,7 +118,7 @@ describe("realizedCheckingOutflows", () => {
 		expect(
 			realizedCheckingOutflows({
 				movements,
-				checkingId: "checking",
+				checkingIds: ["checking"],
 				after: "2026-10-02",
 				through: "2026-10-02",
 			}),
@@ -198,7 +199,7 @@ describe("projection-derived timing", () => {
 		expect(
 			remainingMonthlyObligations({
 				movements,
-				checkingId: "checking",
+				checkingIds: ["checking"],
 				todayIso: "2026-10-08",
 			}),
 		).toEqual({ total: 4200, monthEnd: "2026-10-31" });
@@ -208,7 +209,7 @@ describe("projection-derived timing", () => {
 		expect(
 			nextMonthObligations({
 				movements,
-				checkingId: "checking",
+				checkingIds: ["checking"],
 				todayIso: "2026-10-08",
 			}),
 		).toEqual({ total: 3200, start: "2026-11-01", end: "2026-11-30" });
@@ -218,7 +219,7 @@ describe("projection-derived timing", () => {
 		expect(
 			nextPaycheck({
 				movements,
-				checkingId: "checking",
+				checkingIds: ["checking"],
 				todayIso: "2026-10-08",
 			}),
 		).toEqual({ date: "2026-10-15", amount: 7579 });
@@ -228,7 +229,7 @@ describe("projection-derived timing", () => {
 		expect(
 			nextPaycheck({
 				movements: movements.filter((item) => item.fromId === "checking"),
-				checkingId: "checking",
+				checkingIds: ["checking"],
 				todayIso: "2026-10-08",
 			}),
 		).toBeNull();
@@ -278,7 +279,7 @@ describe("groupMandatorySpending", () => {
 	it("groups a window by movement with totals and dates", () => {
 		const groups = groupMandatorySpending({
 			movements,
-			checkingId: "checking",
+			checkingIds: ["checking"],
 			start: "2026-10-09",
 			end: "2026-10-31",
 		});
@@ -299,12 +300,46 @@ describe("groupMandatorySpending", () => {
 	it("excludes movements outside the window", () => {
 		const groups = groupMandatorySpending({
 			movements,
-			checkingId: "checking",
+			checkingIds: ["checking"],
 			start: "2026-11-01",
 			end: "2026-11-30",
 		});
 		expect(groups).toHaveLength(1);
 		expect(groups[0]).toMatchObject({ movementId: "housing", total: 3200 });
+	});
+
+	it("combines outflows from every selected account", () => {
+		const groups = groupMandatorySpending({
+			movements: [
+				...movements,
+				movementFixture({
+					date: "2026-10-12",
+					movementId: "savings-transfer",
+					name: "Savings transfer",
+					fromId: "savings",
+					toId: null,
+					requested: 400,
+					realized: 400,
+				}),
+			],
+			checkingIds: ["checking", "savings"],
+			start: "2026-10-09",
+			end: "2026-10-31",
+		});
+		expect(groups).toHaveLength(3);
+		expect(groups.map((group) => group.movementId).sort()).toEqual([
+			"housing",
+			"living",
+			"savings-transfer",
+		]);
+	});
+});
+
+describe("spendingBalance", () => {
+	it("sums the selected accounts and ignores unknown ids", () => {
+		expect(spendingBalance(testPlan, ["checking", "savings"])).toBe(60250);
+		expect(spendingBalance(testPlan, ["checking", "missing"])).toBe(18250);
+		expect(spendingBalance(testPlan, [])).toBe(0);
 	});
 });
 
@@ -339,7 +374,7 @@ describe("nextPaycheck with virtual pay account", () => {
 					realized: 7499,
 				}),
 			],
-			checkingId: "checking",
+			checkingIds: ["checking"],
 			todayIso: "2026-10-08",
 		});
 		expect(result).toEqual({ date: "2026-10-29", amount: 7499 });
