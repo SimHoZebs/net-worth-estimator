@@ -8,12 +8,42 @@ export function EvaluationPreview({
 	range,
 	onEvaluations,
 	onEvaluation,
+	pending = false,
 }: {
 	result: EvaluationResult | null;
 	range: RangeResult | null;
 	onEvaluations: () => void;
 	onEvaluation: (id: string) => void;
+	pending?: boolean;
 }) {
+	// A null result with settled data genuinely means "nothing configured";
+	// a null result with pending data is unknowable, so the card keeps its
+	// frame and navigation while only outcome slots skeletonize.
+	if (pending)
+		return (
+			<section className="evaluation-preview" aria-busy="true">
+				<div className="section-top">
+					<button type="button" className="text-button" onClick={onEvaluations}>
+						All evaluations <ArrowUpRight size={16} />
+					</button>
+				</div>
+				<span
+					className="skeleton"
+					style={{ width: 170, height: 18 }}
+					aria-hidden="true"
+				/>
+				<span
+					className="skeleton"
+					style={{ width: 120, height: 30 }}
+					aria-hidden="true"
+				/>
+				<span
+					className="skeleton"
+					style={{ width: "100%", height: 44 }}
+					aria-hidden="true"
+				/>
+			</section>
+		);
 	return (
 		<section className="evaluation-preview">
 			<div className="section-top">

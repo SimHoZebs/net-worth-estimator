@@ -9,12 +9,57 @@ export function OutlookMetrics({
 	projection,
 	years,
 	onEvidence,
+	pending = false,
 }: {
 	plan: Plan;
-	projection: Projection;
+	projection: Projection | null;
 	years: number;
 	onEvidence: () => void;
+	pending?: boolean;
 }) {
+	if (!projection) {
+		// Frames, headings, and plan-derived context render regardless; only
+		// computed values skeletonize. The horizon year derives from the plan
+		// start plus horizon, matching the loaded heading exactly.
+		if (!pending) return null;
+		const finalYear = Number.parseInt(plan.startDate.slice(0, 4), 10) + years;
+		return (
+			<div className="metrics-grid" aria-busy="true">
+				<section className="metric metric-current">
+					<div className="metric-heading">
+						<span>Current net worth</span>
+						<IconButton
+							icon={CircleHelp}
+							label="Inspect current net worth evidence"
+							onClick={onEvidence}
+							disabled
+						/>
+					</div>
+					<span
+						className="skeleton"
+						style={{ width: 120, height: 28 }}
+						aria-hidden="true"
+					/>
+					<div className="metric-context">
+						<span className="status-dot" />
+						As of {dateLabel(plan.startDate, true)}
+					</div>
+				</section>
+				<section className="metric metric-destination">
+					<div className="metric-heading">
+						<span>Base case in {finalYear}</span>
+						<TrendingUp size={19} />
+					</div>
+					<span
+						className="skeleton"
+						style={{ width: 140, height: 28 }}
+						aria-hidden="true"
+					/>
+					<div className="metric-context">{years}-year projection</div>
+				</section>
+			</div>
+		);
+	}
 	const current = currentNetWorth(projection);
 	const final = projection.points.at(-1);
 	if (!final) return null;
