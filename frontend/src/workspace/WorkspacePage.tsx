@@ -1,17 +1,13 @@
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
-import { ErrorNotice } from "../components/ui.tsx";
+import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
+import type { Projection } from "../domain/result.ts";
 import { ComparePage } from "../pages/ComparePage.tsx";
 import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
 import { PlanPage } from "../pages/PlanPage.tsx";
 import { SourcesPage } from "../pages/SourcesPage.tsx";
 import type { Page } from "./navigation.ts";
-import {
-	ProjectionBoundary,
-	ProjectionLoading,
-	ProjectionUpdating,
-} from "./ProjectionBoundary.tsx";
 import type { ProjectionState, WorkspaceShellProps } from "./types.ts";
 
 type PageInputs = Pick<
@@ -67,30 +63,63 @@ export function WorkspacePage({
 		readOnly = false,
 		retrySavedProjection,
 	} = inputs;
+	// Pages take a nullable projection and skeletonize their own data slots.
+	// Error notices are terminal states with retry; pending data never blocks.
+	// Failures always resolve with loading=false, so an error under load is
+	// superseded by the pending skeletons instead of flashing a stale error.
+	const base: Projection | null =
+		projection.base instanceof Error ? null : projection.base;
+	const baseLoadError: Error | null =
+		projection.base instanceof Error && !projection.loading
+			? projection.base
+			: null;
+	const rangeNotice = (key: string) =>
+		projection.rangeError && ranges ? (
+			<ErrorNotice
+				key={key}
+				message={projection.rangeError}
+				action="Retry scenario calculation"
+				onAction={projection.retryRange}
+			/>
+		) : null;
 	switch (page) {
 		case "outlook":
 			return (
-				<ProjectionBoundary projection={projection} ranges={ranges}>
-					{(base) => (
-						<Outlook
-							plan={plan}
-							projection={base}
-							range={projection.range}
-							ranges={ranges}
-							setRanges={setRanges}
-							years={years}
-							setYears={setYears}
-							progress={projection.progress}
-							rangeError={projection.rangeError}
-							onEvidence={() => onEvidence({ kind: "position" })}
-							onFailure={() => onEvidence({ kind: "failure" })}
-							onTransactions={() => onNavigate("transactions")}
-							onEvaluations={() => onNavigate("evaluations")}
-							onEvaluation={(id) => onEvidence({ kind: "evaluation", id })}
-							onEdit={onEdit}
+				<>
+					{baseLoadError && (
+						<ErrorNotice
+							message={baseLoadError.message}
+							action="Retry calculation"
+							onAction={projection.retryProjection}
 						/>
 					)}
-				</ProjectionBoundary>
+					{projection.baseError && base && (
+						<ErrorNotice
+							message={projection.baseError}
+							action="Retry calculation"
+							onAction={projection.retryProjection}
+						/>
+					)}
+					{rangeNotice("outlook-range")}
+					{projection.loading && base && <ProjectionUpdating />}
+					<Outlook
+						plan={plan}
+						projection={base}
+						range={projection.range}
+						ranges={ranges}
+						setRanges={setRanges}
+						years={years}
+						setYears={setYears}
+						progress={projection.progress}
+						rangeError={projection.rangeError}
+						onEvidence={() => onEvidence({ kind: "position" })}
+						onFailure={() => onEvidence({ kind: "failure" })}
+						onTransactions={() => onNavigate("transactions")}
+						onEvaluations={() => onNavigate("evaluations")}
+						onEvaluation={(id) => onEvidence({ kind: "evaluation", id })}
+						onEdit={onEdit}
+					/>
+				</>
 			);
 		case "accounts":
 			return (
@@ -106,15 +135,11 @@ export function WorkspacePage({
 		case "transactions": {
 			// Transactions render from the plan directly; projection only resolves
 			// realized amounts. Never block this page on the calculation.
-			const base =
-				projection.base && !(projection.base instanceof Error)
-					? projection.base
-					: null;
 			return (
 				<>
-					{projection.base instanceof Error && (
+					{baseLoadError && (
 						<ErrorNotice
-							message={projection.base.message}
+							message={baseLoadError.message}
 							action="Retry calculation"
 							onAction={projection.retryProjection}
 						/>
@@ -141,55 +166,82 @@ export function WorkspacePage({
 		}
 		case "evaluations":
 			return (
-				<ProjectionBoundary projection={projection} ranges={ranges}>
-					{(base) => (
-						<EvaluationsPage
-							plan={plan}
-							projection={base}
-							range={projection.range}
-							onEdit={(item) => onEdit({ kind: "evaluation", item })}
-							onUpdate={state.updatePlan}
-							onEvidence={(id) => onEvidence({ kind: "evaluation", id })}
+				<>
+					{baseLoadError && (
+						<ErrorNotice
+							message={baseLoadError.message}
+							action="Retry calculation"
+							onAction={projection.retryProjection}
 						/>
 					)}
-				</ProjectionBoundary>
+					{projection.baseError && base && (
+						<ErrorNotice
+							message={projection.baseError}
+							action="Retry calculation"
+							onAction={projection.retryProjection}
+						/>
+					)}
+					{rangeNotice("evaluations-range")}
+					{projection.loading && base && <ProjectionUpdating />}
+					<EvaluationsPage
+						plan={plan}
+						projection={base}
+						range={projection.range}
+						onEdit={(item) => onEdit({ kind: "evaluation", item })}
+						onUpdate={state.updatePlan}
+						onEvidence={(id) => onEvidence({ kind: "evaluation", id })}
+					/>
+				</>
 			);
-		case "compare":
+		case "compare": {
+			// The saved projection only runs against a draft; without one it
+			// aliases the active projection, so its error notice is gated on
+			// having a draft to avoid duplicating the base notice.
+			const hasDraft = workspace.draft !== null;
+			const saved: Projection | null =
+				savedProjection instanceof Error || savedProjection === null
+					? null
+					: savedProjection;
 			return (
-				<ProjectionBoundary projection={projection} ranges={ranges}>
-					{(base) => {
-						if (!savedProjection)
-							return (
-								<ProjectionLoading
-									label="Loading the saved comparison"
-									onRetry={retrySavedProjection}
-								/>
-							);
-						if (savedProjection instanceof Error)
-							return (
-								<ErrorNotice
-									message={savedProjection.message}
-									action="Retry saved calculation"
-									onAction={retrySavedProjection}
-								/>
-							);
-						return (
-							<ComparePage
-								saved={workspace.saved}
-								plan={plan}
-								projection={base}
-								savedProjection={savedProjection}
-								snapshot={workspace.snapshot}
-								years={years}
-								readOnly={readOnly}
-								onCapture={state.capture}
-								onSave={() => Promise.resolve(state.save())}
-								onDiscard={onDiscard}
-							/>
-						);
-					}}
-				</ProjectionBoundary>
+				<>
+					{baseLoadError && (
+						<ErrorNotice
+							message={baseLoadError.message}
+							action="Retry calculation"
+							onAction={projection.retryProjection}
+						/>
+					)}
+					{hasDraft && savedProjection instanceof Error && (
+						<ErrorNotice
+							message={savedProjection.message}
+							action="Retry saved calculation"
+							onAction={retrySavedProjection}
+						/>
+					)}
+					{projection.baseError && base && (
+						<ErrorNotice
+							message={projection.baseError}
+							action="Retry calculation"
+							onAction={projection.retryProjection}
+						/>
+					)}
+					{rangeNotice("compare-range")}
+					{projection.loading && base && <ProjectionUpdating />}
+					<ComparePage
+						saved={workspace.saved}
+						plan={plan}
+						projection={base}
+						savedProjection={saved}
+						snapshot={workspace.snapshot}
+						years={years}
+						readOnly={readOnly}
+						onCapture={state.capture}
+						onSave={() => Promise.resolve(state.save())}
+						onDiscard={onDiscard}
+					/>
+				</>
 			);
+		}
 		case "sources":
 			return (
 				<SourcesPage

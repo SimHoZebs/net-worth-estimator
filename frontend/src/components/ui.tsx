@@ -118,6 +118,15 @@ export function Modal({
 	);
 }
 
+export function ProjectionUpdating() {
+	return (
+		<div className="projection-updating" role="status">
+			<span className="spinner" aria-hidden="true" />
+			Updating projection…
+		</div>
+	);
+}
+
 export function ErrorNotice({
 	message,
 	action,
