@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Permanent perf harness (replaces ad-hoc zz_* heredocs).
-# Copies bench-template_test.go into internal/domain as a temp _test.go file,
-# runs go test -bench, then removes it.
+# Permanent perf harness over the committed benchmark in
+# internal/domain/bench_sim_test.go (inert unless -bench is passed).
 # Usage: bench-sim.sh [--help] [scenario] [-- go test flags...]
 #   scenario defaults to $BENCH_SCENARIO or "deterministic" and must match
 #   backend/testdata/golden/<scenario>.json.
@@ -32,9 +31,5 @@ if [ ! -f "testdata/golden/$scenario.json" ]; then
 	echo "unknown scenario '$scenario': testdata/golden/$scenario.json not found" >&2
 	exit 1
 fi
-
-tmp="internal/domain/zz_bench_tmp_test.go"
-cp "scripts/bench-template_test.go" "$tmp"
-trap 'rm -f "$tmp"' EXIT
 
 BENCH_SCENARIO="$scenario" go test ./internal/domain/ -run '^$' -bench '^BenchmarkSim$' "$@"

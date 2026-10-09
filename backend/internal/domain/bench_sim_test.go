@@ -1,10 +1,11 @@
 package domain
 
-// Perf harness template. Not run in place: scripts/bench-sim.sh copies this
-// file to internal/domain/zz_bench_tmp_test.go, runs it, then deletes it.
-// BENCH_SCENARIO selects backend/testdata/golden/<scenario>.json
+// Perf harness. BENCH_SCENARIO selects backend/testdata/golden/<scenario>.json
 // (default "deterministic"); the workload is one full deterministic
-// projection per iteration.
+// projection per iteration. Run with backend/scripts/bench-sim.sh or
+// directly: BENCH_SCENARIO=checkpoints go test ./internal/domain/ -run '^$'
+// -bench '^BenchmarkSim$'. Benchmarks only run under -bench, so this file
+// is inert during normal test runs.
 
 import (
 	"encoding/json"
