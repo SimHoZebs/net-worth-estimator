@@ -23,9 +23,6 @@ export function ServerLoadingShell({
 			navigation={(close) => (
 				<WorkspaceSidebar
 					page={navigation.page}
-					planName=""
-					changeCount={0}
-					statusLabel=""
 					onNavigate={navigation.navigate}
 					onClose={close}
 					pending

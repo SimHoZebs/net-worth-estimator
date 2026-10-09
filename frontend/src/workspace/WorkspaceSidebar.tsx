@@ -7,25 +7,36 @@ import {
 import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { IconButton } from "../components/ui.tsx";
+import { changesBetween } from "../domain/model.ts";
+import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { type Page, pages } from "./navigation.ts";
+import { workspaceStatusLabel } from "./WorkspaceNotices.tsx";
 
 export function WorkspaceSidebar({
 	page,
-	planName,
-	changeCount,
-	statusLabel,
 	onNavigate,
 	onClose,
 	pending = false,
 }: {
 	page: Page;
-	planName: string;
-	changeCount: number;
-	statusLabel: string;
 	onNavigate: (page: Page) => void;
 	onClose: () => void;
 	pending?: boolean;
 }) {
+	// Plan display values subscribe here so navigation never waits on props.
+	const workspace = useWorkspaceStore((state) => state.workspace);
+	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const statusReadOnly = useWorkspaceStore(
+		(state) => state.status?.readOnly ?? false,
+	);
+	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
+	const readOnly = statusReadOnly || writeBlocked || (plan?.readOnly ?? true);
+	const changeCount =
+		workspace && plan
+			? changesBetween({ saved: workspace.saved, current: plan }).length
+			: 0;
+	const planName = plan?.name ?? "";
+	const statusLabel = workspaceStatusLabel({ readOnly });
 	return (
 		<>
 			<div className="brand-row">

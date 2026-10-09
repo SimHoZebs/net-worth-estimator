@@ -1,17 +1,16 @@
 import { LockKeyhole } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { useUiStore } from "../state/uiStore.ts";
+import { useWorkspaceStore } from "../state/workspaceStore.ts";
 
-export function RemoteAuthControl({
-	tokenActive,
-	required,
-	onApply,
-	onClear,
-}: {
-	tokenActive: boolean;
-	required: boolean;
-	onApply: (token: string) => void;
-	onClear: () => void;
-}) {
+export function RemoteAuthControl() {
+	// Token and auth state subscribe here; saving unlocks without prop
+	// threading. Applying retries the workspace load, mirroring the previous
+	// app-level effect on token changes.
+	const tokenActive = useUiStore((state) => state.authToken) !== "";
+	const required = useWorkspaceStore((state) => state.authRequiredState);
+	const setAuthToken = useUiStore((state) => state.setAuthToken);
+	const retry = useWorkspaceStore((state) => state.retry);
 	if (tokenActive)
 		return (
 			<div className="inline-notice auth-notice">
@@ -19,12 +18,23 @@ export function RemoteAuthControl({
 				<span>
 					<strong>Saving unlocked.</strong>
 				</span>
-				<button type="button" className="text-button" onClick={onClear}>
+				<button
+					type="button"
+					className="text-button"
+					onClick={() => setAuthToken("")}
+				>
 					Lock
 				</button>
 			</div>
 		);
-	return required ? <RemoteAuthPrompt onApply={onApply} /> : null;
+	return required ? (
+		<RemoteAuthPrompt
+			onApply={(token) => {
+				setAuthToken(token);
+				void retry();
+			}}
+		/>
+	) : null;
 }
 
 function RemoteAuthPrompt({ onApply }: { onApply: (token: string) => void }) {
