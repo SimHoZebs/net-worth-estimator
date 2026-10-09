@@ -260,3 +260,9 @@ critical_illness,Critical Illness,gross_pay,,"{""resolver"":""expression"",""con
 slifsp,Slifsp,gross_pay,,"{""resolver"":""expression"",""config"":{""expression"":""1.05""},""inputs"":{}}",monthly,0,0,0,2026-05-29,,,13,true
 salary_net,Take-Home Pay,gross_pay,checking,"{""resolver"":""expression"",""config"":{""expression"":""abs(gross_pay)""},""inputs"":{""gross_pay"":{""source"":""provider"",""provider"":""account-balance"",""arguments"":{""id"":""gross_pay""}}}}",monthly,0,0,0,2026-05-29,,,20,true
 phone,Phone,checking,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",monthly,0,0,0,2026-10-01,,,6,true
+checking_20260925_zelle_golden_in,Zelle from Golden Lin,,checking,"{""resolver"":""expression"",""config"":{""expression"":""9.00""},""inputs"":{}}",once,0,0,0,2026-09-25,,,1,true
+checking_20260925_zelle_golden,Zelle to Golden,checking,,"{""resolver"":""expression"",""config"":{""expression"":""38.00""},""inputs"":{}}",once,0,0,0,2026-09-25,,,1,true
+checking_20260928_zelle_phillip,Zelle to Phillip,checking,,"{""resolver"":""expression"",""config"":{""expression"":""20.00""},""inputs"":{}}",once,0,0,0,2026-09-28,,,1,true
+checking_20261001_zelle_lisa,Zelle to Lisa Tyler,checking,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",once,0,0,0,2026-10-01,,,1,true
+checking_20261001_bilt_rent,BILT Rent Payment,checking,,"{""resolver"":""expression"",""config"":{""expression"":""2874.67""},""inputs"":{}}",once,0,0,0,2026-10-01,,,1,true
+checking_20261002_zelle_jennifer_500,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""500.00""},""inputs"":{}}",once,0,0,0,2026-10-02,,,1,true
