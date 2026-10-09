@@ -462,6 +462,9 @@
 	.plan-toolbar {
 		padding: 17px 15px;
 	}
+	.plan-transactions .plan-toolbar {
+		padding: 0 2px 14px;
+	}
 	.search-field input {
 		width: 130px;
 		font-size: 10px;
@@ -474,6 +477,10 @@
 		flex-wrap: wrap;
 		padding: 16px;
 		gap: 10px;
+	}
+	.plan-transactions .movement-row {
+		padding-left: 2px;
+		padding-right: 2px;
 	}
 	.movement-name {
 		min-width: 150px;

@@ -227,7 +227,7 @@ function TransactionsView({
 				}}
 				label="Transactions sections"
 				panelAs="section"
-				panelClassName="panel plan-panel"
+				panelClassName="plan-transactions"
 			>
 				<div className="plan-toolbar">
 					<label className="search-field">
