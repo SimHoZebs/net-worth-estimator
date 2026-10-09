@@ -18,6 +18,7 @@ export function WorkspaceSidebar({
 	onNavigate,
 	onMethod,
 	onClose,
+	pending = false,
 }: {
 	page: Page;
 	planName: string;
@@ -26,6 +27,7 @@ export function WorkspaceSidebar({
 	onNavigate: (page: Page) => void;
 	onMethod: () => void;
 	onClose: () => void;
+	pending?: boolean;
 }) {
 	return (
 		<>
@@ -48,7 +50,15 @@ export function WorkspaceSidebar({
 			>
 				<span className="household-avatar">H</span>
 				<span>
-					<strong>{planName}</strong>
+					{pending ? (
+						<span
+							className="skeleton"
+							style={{ width: 110, height: 14 }}
+							aria-hidden="true"
+						/>
+					) : (
+						<strong>{planName}</strong>
+					)}
 				</span>
 				<ChevronDown size={14} />
 			</button>
@@ -85,14 +95,29 @@ export function WorkspaceSidebar({
 					<Settings size={19} strokeWidth={1.7} />
 					<span>Configs</span>
 				</a>
-				<button type="button" className="nav-link help-link" onClick={onMethod}>
+				<button
+					type="button"
+					className="nav-link help-link"
+					onClick={onMethod}
+					disabled={pending}
+				>
 					<CircleHelp size={19} strokeWidth={1.7} />
 					<span>How it works</span>
 				</button>
 				<ThemeToggle />
 				<div className="sidebar-status">
 					<span className="status-dot" />
-					{statusLabel} <LockKeyhole size={12} />
+					{pending ? (
+						<span
+							className="skeleton"
+							style={{ width: 80, height: 10 }}
+							aria-hidden="true"
+						/>
+					) : (
+						<>
+							{statusLabel} <LockKeyhole size={12} />
+						</>
+					)}
 				</div>
 			</div>
 		</>

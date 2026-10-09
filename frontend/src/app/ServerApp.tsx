@@ -4,7 +4,9 @@ import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useRemoteWorkspace } from "../state/useRemoteWorkspace.ts";
 import { useServerModelImport } from "../state/useServerModelImport.ts";
 import { WorkspaceShell } from "../WorkspaceShell.tsx";
+import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { RemoteAuthControl } from "./RemoteAuthControl.tsx";
+import { ServerLoadingShell } from "./ServerLoadingShell.tsx";
 import { ServerWorkspaceRecovery } from "./ServerWorkspaceRecovery.tsx";
 import "./app.css";
 
@@ -13,6 +15,7 @@ export function ServerApp() {
 	const [ranges, setRanges] = useState(true);
 	const [authToken, setAuthToken] = useState("");
 	const serverApi = useMemo(() => createApiClient(), []);
+	const navigation = useWorkspaceNavigation();
 	const remote = useRemoteWorkspace({ authToken, client: serverApi });
 	const { importing, importDocument } = useServerModelImport({
 		client: serverApi,
@@ -65,15 +68,20 @@ export function ServerApp() {
 		/>
 	);
 
-	if (!remote.workspace || !remote.plan)
+	// Transient waits render the shell chrome with a loading panel so
+	// navigation stays usable. Only terminal load failures reach the
+	// dedicated recovery screen.
+	if (!remote.workspace || !remote.plan) {
+		if (remote.loading || importing)
+			return <ServerLoadingShell navigation={navigation} />;
 		return (
 			<ServerWorkspaceRecovery
 				remote={remote}
-				importing={importing}
 				authControl={authControl}
 				onImport={importDocument}
 			/>
 		);
+	}
 	return (
 		<WorkspaceShell
 			workspace={remote.workspace}

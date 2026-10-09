@@ -7,6 +7,14 @@
 		align-items: center;
 		flex-wrap: wrap;
 	}
+	.workspace-loading {
+		max-width: 620px;
+		margin: 12vh auto;
+		padding: 25px;
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
 	.auth-notice > span {
 		flex: 1;
 		min-width: 220px;
