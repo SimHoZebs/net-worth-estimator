@@ -5,6 +5,7 @@ import { createElement, Fragment, type ReactNode, StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	ApiHttpError,
+	ApiNetworkError,
 	type FinancialModelDocument,
 	type FinancialModelResponse,
 	type IncomeDataSnapshot,
@@ -19,6 +20,7 @@ import {
 	REMOTE_STORAGE_KEY,
 	serverDocumentFingerprint,
 } from "./remoteStorage.ts";
+import { resetServerQueryCache } from "./serverQuery.ts";
 import { resetUiStore } from "./uiStore.ts";
 import {
 	projectionResultToLocal,
@@ -348,6 +350,7 @@ function clientFixture(
 
 afterEach(() => {
 	vi.unstubAllGlobals();
+	resetServerQueryCache();
 	resetUiStore();
 	resetWorkspaceStore();
 });
@@ -2016,6 +2019,48 @@ describe("remote projection mapping and SSE", () => {
 			expect.objectContaining({ config: { runCount: 400, seed: 42 } }),
 			expect.objectContaining({ authToken: "projection-token" }),
 		);
+		rendered.unmount();
+	});
+
+	it("redrives the range stream when a shared fetch dies under remount", async () => {
+		// A remount can attach to an in-flight shared fetch that another
+		// mount's cleanup then aborts. The client disguises the abortion as a
+		// connection failure, so the effect must recognize the cause chain
+		// and re-issue instead of reporting a failed range.
+		const stochastic = stochasticFixture();
+		const stream = `event: result\ndata: ${JSON.stringify({ result: stochastic })}\n\n`;
+		const aborted = new ApiNetworkError(
+			new DOMException("This operation was aborted.", "AbortError"),
+		);
+		let calls = 0;
+		const client = {
+			projectDeterministic: vi.fn(async () => ({
+				result: projectionFixture(),
+				issues: [],
+			})),
+			projectStochastic: vi.fn(async () => {
+				calls += 1;
+				if (calls === 1) throw aborted;
+				return new Response(stream, {
+					status: 200,
+					headers: { "content-type": "text/event-stream" },
+				});
+			}),
+		};
+		const rendered = renderHook(() =>
+			useRemoteProjection({
+				client,
+				document: modelFixture(),
+				years: 2,
+				ranges: true,
+			}),
+		);
+		await rendered.settle();
+		await rendered.settle();
+		expect(client.projectStochastic).toHaveBeenCalledTimes(2);
+		expect(rendered.result().range).toMatchObject({ count: 4 });
+		expect(rendered.result().rangeError).toBeNull();
+		expect(rendered.result().progress).toBe(1);
 		rendered.unmount();
 	});
 

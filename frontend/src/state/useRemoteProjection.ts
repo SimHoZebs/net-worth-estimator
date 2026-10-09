@@ -717,6 +717,21 @@ function randomRunCount(): number {
 	return 400;
 }
 
+// Abortion travels disguised: the API client wraps every fetch rejection,
+// including aborts, in ApiNetworkError carrying the original as cause.
+// Walk the chain instead of matching the surface type.
+function isAbortError(cause: unknown): boolean {
+	let current: unknown = cause;
+	for (let depth = 0; depth < 5; depth++) {
+		if (typeof DOMException !== "undefined" && current instanceof DOMException)
+			return current.name === "AbortError";
+		if (!(current instanceof Error)) return false;
+		if (current.name === "AbortError") return true;
+		current = (current as { cause?: unknown }).cause;
+	}
+	return false;
+}
+
 export function useRemoteProjection({
 	client,
 	document: documentOverride,
@@ -873,32 +888,46 @@ export function useRemoteProjection({
 					"The range stream ended before returning a result. Retry the calculation.",
 			);
 		};
-		void serverQueryClient()
-			.fetchQuery({
-				queryKey: stochasticQueryKey(
-					documentKey,
-					incomeDataKey,
-					years,
-					runCount,
-					seed,
-					rangeAttempt,
-				),
-				queryFn: streamStochastic,
-			})
-			.then((finalRange) => {
-				if (!mounted.current || controller.signal.aborted) return;
-				setProgress(1);
-				setRange(finalRange);
-				setRangeError(null);
-			})
-			.catch((cause: unknown) => {
-				if (!mounted.current || controller.signal.aborted) return;
-				setRangeError(
-					cause instanceof Error
-						? cause.message
-						: "The range request failed. Retry the calculation.",
-				);
-			});
+		let redriven = false;
+		const runStream = (): void => {
+			void serverQueryClient()
+				.fetchQuery({
+					queryKey: stochasticQueryKey(
+						documentKey,
+						incomeDataKey,
+						years,
+						runCount,
+						seed,
+						rangeAttempt,
+					),
+					queryFn: streamStochastic,
+				})
+				.then((finalRange) => {
+					if (!mounted.current || controller.signal.aborted) return;
+					setProgress(1);
+					setRange(finalRange);
+					setRangeError(null);
+				})
+				.catch((cause: unknown) => {
+					if (!mounted.current || controller.signal.aborted) return;
+					// A remount can attach to an in-flight fetch that another
+					// mount's cleanup then aborts. That shared death is not a
+					// genuine failure, so re-issue once: the previous rejection is
+					// settled, the new fetch re-attaches to (or restarts) the
+					// server run, and the per-run flag bounds the redrive.
+					if (isAbortError(cause) && !redriven) {
+						redriven = true;
+						runStream();
+						return;
+					}
+					setRangeError(
+						cause instanceof Error
+							? cause.message
+							: "The range request failed. Retry the calculation.",
+					);
+				});
+		};
+		runStream();
 		return () => controller.abort();
 	}, [
 		api,
