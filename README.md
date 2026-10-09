@@ -8,17 +8,17 @@ A financial model contains:
 
 - **Accounts** with signed balances, generic minimum and maximum bounds, and enablement.
 - **Balance checkpoints** that record an absolute end-of-day account balance.
-- **Postings** that create external inflows, external outflows, or account-to-account transfers.
+- **Postings** that record one dated movement: an external inflow, external outflow, or account-to-account transfer. A posting may claim one scheduled occurrence of a recurrence rule as its actual.
+- **Recurrence rules** that expand a movement template into scheduled occurrences (daily, weekly, monthly, quarterly, or annual).
 - **Evaluations** that apply financial-independence, net-worth-threshold, and posting-fulfillment questions to a projection.
 - **Income data** with effective-dated annual gross income and tax profiles.
 
 The domain rules are structural and general:
 
-- Opening balances are produced by replaying enabled one-time postings dated before the projection start.
-- Historical postings and checkpoints execute chronologically. Same-date postings execute first by priority and declaration order; checkpoints then overwrite the observed accounts as end-of-day truth.
+- Opening balances are produced by replaying enabled postings dated before the projection start, plus the rule occurrences needed for checkpoint replay. A claimed occurrence is skipped so history takes one hit, not two.
+- Historical movements and checkpoints execute chronologically. Same-date movements execute first by priority and resolution sequence; checkpoints then overwrite the observed accounts as end-of-day truth.
 - A checkpoint on the projection start suppresses projected start-date events because that date is already observed.
-- Posting frequency is one-time, daily, weekly, monthly, quarterly, or annual.
-- Source-funded movements cannot remove more than the source's positive withdrawable balance. Destinations cannot exceed their ceiling headroom. Annual caps apply per posting and calendar year.
+- Source-funded movements cannot remove more than the source's positive withdrawable balance. Destinations cannot exceed their ceiling headroom. Annual caps apply per rule and calendar year.
 - Amount descriptors use explicit inputs and validated providers. The `income` resolver uses effective-dated income data and an ordered resolver pipeline.
 - Public projection values are rounded after exact simulation. Stochastic bands come from complete sorted run distributions, not from interpolation between a few sample points.
 - `ModelOverrides` can add or disable rows for one projection request without changing persisted model state.
@@ -60,6 +60,7 @@ public/configs/
 ├── accounts.csv
 ├── checkpoints.csv
 ├── postings.csv
+├── recurrence-rules.csv
 └── behavior/
     ├── financial-independence.csv
     ├── net-worth-threshold.csv

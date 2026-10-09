@@ -33,7 +33,7 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 | `backend/cmd/server/` | configuration, startup, graceful shutdown, SimpleFIN scheduler |
 | `backend/cmd/importcsv/` | offline CSV replacement into an existing SQLite database |
 | `backend/internal/api/` | HTTP routes, CORS, bearer guard, deterministic API, stochastic SSE, artifact identity |
-| `backend/internal/types/` | persisted model, income, request, result, evaluation, and validation types |
+| `backend/internal/types/` | persisted model (postings, recurrence rules, claims), income, request, result, evaluation, and validation types |
 | `backend/internal/store/` | `Store`, SQLite migrations, model/income persistence, sync ownership, bounded artifacts |
 | `backend/internal/domain/` | validation, request preparation, shared transitions, simulation, evaluations, stochastic kernels |
 | `backend/internal/csvio/` | canonical model and income CSV import |
@@ -71,7 +71,7 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 - `PUT /v1/financial-model` validates against the stored income snapshot. Error diagnostics return the document and issues without persisting it; warning-only documents are persisted.
 - `api.Config.FrontendDir` optionally serves the built Waypoint frontend with same-origin static assets and SPA fallback for binary-only runs; the split container path leaves it empty.
 - The read-only guard runs before bearer validation on model saves and sync triggers. A missing or wrong bearer returns 401 when a token is configured. Reads and projection computation remain unguarded.
-- `store.Open` applies schema migrations and enables SQLite WAL, foreign keys, a 5-second busy timeout, and one connection. An empty database is seeded once from CSV by `cmd/server`; later CSV edits do not replace stored data.
+- `store.Open` applies schema migrations and enables SQLite WAL, foreign keys, a 5-second busy timeout, and one connection. An empty database is seeded once from CSV by `cmd/server`; later CSV edits do not replace stored data. V7 splits postings into dated postings plus recurrence rules; `Open` copies a `.pre-v7-backup` beside the database before migrating.
 - `store.Store` is the persistence boundary. `SaveDocument` atomically replaces owner rows while preserving sync-owned rows; `SaveDocumentIfUnchanged` rejects stale content identities. Checkpoints and postings carry `source: "model" | "simplefin"`; sync-owned checkpoint collisions yield to owner rows.
 - Completed deterministic and seeded stochastic results are best-effort cached in `projection_artifacts`. The cache is bounded to 256 rows across both kinds. Partial results are not persisted. Unseeded stochastic runs are neither shared nor cached.
 - `backend/Dockerfile` runs as UID/GID `10001`, listens on `0.0.0.0:8787`, and stores SQLite at `/data/net-worth-estimator.db`. Compose supplies the persistent volume; production durability requires `/data` on persistent storage and one backend instance.
@@ -80,9 +80,9 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 ## Simulation Rules
 
 - `types.ApplyModelOverrides` creates the effective request document without mutating canonical state. `ModelOverrides` is request-scoped and is never stored.
-- `domain.ValidateFinancialModel` is the authoritative cross-field validator. IDs, references, dates, amount descriptors, dependencies, account bounds, and evaluation configs are validated before simulation.
+- `domain.ValidateFinancialModel` is the authoritative cross-field validator. IDs share one namespace across accounts, postings, and rules; references, dates, amount descriptors, dependencies, account bounds, rule schedules, claim validity (named rule exists, date is a real scheduled occurrence, no double claims), and evaluation configs are validated before simulation.
 - `PrepareSimulationRequest` applies overrides, replays history, resolves the projection dates, and creates one `SimulationRequest`.
-- Historical preparation merges enabled one-time postings and recurring occurrences needed for checkpoint replay with checkpoints. Same-date postings execute first by ascending priority and declaration order; checkpoints then overwrite observed account balances. A checkpoint on the projection start suppresses start-date events.
+- Historical preparation merges enabled postings dated at or before the start with the rule occurrences needed for checkpoint replay. A posting may claim one scheduled occurrence (`ruleId` plus `occurrenceDate`, both manual); the claimed occurrence is skipped so history takes one hit, not two. Same-date movements execute first by ascending priority and resolution sequence; checkpoints then overwrite observed account balances. A checkpoint on the projection start suppresses start-date events.
 - Historical execution carries balances, latest realized posting amounts, and annual-cap state. It does not emit projected movement or evaluation events.
 - `Simulate` accepts only a prepared request. Posting structure, not IDs, labels, or account categories, selects external inflow, external outflow, or transfer behavior.
 - All deterministic, financial-independence branch, and stochastic execution uses `TransitionRuntime` in `domain/transitions.go`. Behavior-generated withdrawals emit `AccountMovementAction`; they do not mutate balances directly.
@@ -127,7 +127,7 @@ backend/scripts/verify.sh ./internal/...
 backend/scripts/verify.sh ./cmd/...
 ```
 
-The script runs `gofmt` checks, `go vet`, and `go test` with `CGO_ENABLED=0`. `go mod tidy` checking, production-package `go build`, and `go test -race` are manual steps. The no-argument script also discovers the copy-only benchmark template under `backend/scripts/`; that template currently prevents a repository-wide gate and is excluded from the hooks.
+The script runs `gofmt` checks, `go vet`, and `go test` with `CGO_ENABLED=0`. `go mod tidy` checking, production-package `go build`, and `go test -race` are manual steps. The benchmark in `backend/internal/domain/bench_sim_test.go` is inert unless `-bench` is passed.
 
 The pre-commit hook verifies the backend packages containing staged Go files. The pre-push hook verifies `./internal/...` and `./cmd/...`. Frontend lint, typecheck, unit tests, build, and browser tests have no hook and run only when invoked directly.
 

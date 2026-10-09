@@ -271,9 +271,15 @@ Accounts are ordered rows with a unique ID, label, bounds, optional color, and e
 - A destination can receive only `max(0, maxBalance - balance)`.
 - Bounds are structural constraints, not labels or categories.
 
-### Posting structure
+### Posting and recurrence-rule structure
 
-Posting behavior is selected only by source and destination presence:
+Postings are pure dated movements: one record of money moved on one `date`.
+Repetition is owned by recurrence rules, which expand into occurrences at
+projection time. A posting with a `claim` (`ruleId` plus `occurrenceDate`,
+both set manually) records the actual for one scheduled occurrence; history
+replays the actual and skips the generated occurrence.
+
+Posting and rule behavior is selected only by source and destination presence:
 
 | Source | Destinations | Behavior |
 | --- | --- | --- |
@@ -281,9 +287,9 @@ Posting behavior is selected only by source and destination presence:
 | present | absent | external outflow |
 | present | present | account-to-account transfer |
 
-`enabled` controls participation. `priority` controls same-date order. A declaration index breaks priority ties.
+`enabled` controls participation. `priority` controls same-date order. A resolution sequence breaks priority ties.
 
-`once` executes exactly on `startDate`, whether or not `endDate` is nil or equal to that date. Recurring schedules use 365-day years, 52-week years, and clamped calendar-month/year addition.
+A rule occurrence executes exactly on its scheduled date. Schedules use 365-day years, 52-week years, and clamped calendar-month/year addition.
 
 ### Amount resolution
 
@@ -309,9 +315,9 @@ Current general resolvers:
 - `capped-percentage`;
 - `threshold-percentage`.
 
-`expression` can use posting annual rate, annual growth, and sampled annual volatility. Other resolvers require those posting-level rate fields to be zero.
+`expression` can use rule annual rate, annual growth, and sampled annual volatility. Other resolvers require those rule-level rate fields to be zero. Posting references (`posting-latest` and relatives) may name posting or rule IDs; a rule reference resolves to its latest realized occurrence.
 
-The `income` resolver is an ordered pipeline like any other resolver. It reads the effective income source for the occurrence date, executes configured resolver steps, routes configured outputs, and deposits the remaining net cash into posting destinations. Income postings validate like all postings: a source account contradicts the inflow shape, at least one destination is required, and posting annual caps bound net cash deposited per calendar year while step splits carry their own resolver-level caps.
+The `income` resolver is an ordered pipeline like any other resolver. It reads the effective income source for the occurrence date, executes configured resolver steps, routes configured outputs, and deposits the remaining net cash into rule or posting destinations. Income rules and postings validate alike: a source account contradicts the inflow shape, at least one destination is required, and rule annual caps bound net cash deposited per calendar year while step splits carry their own resolver-level caps. Rule instances divide annual figures by their rule's frequency; manual postings resolve the whole annual figure at once.
 
 ### Constraints and movement records
 
@@ -323,17 +329,17 @@ The `income` resolver is an ordered pipeline like any other resolver. It reads t
 
 `TransitionRuntime` applies the realized amount and records ordered account deltas. Every movement exposes requested and realized amounts, which is the causal evidence used by fulfillment and financial-independence diagnostics.
 
-Annual-cap usage is observed from realized amounts by posting and calendar year.
+Annual-cap usage is observed from realized amounts by movement ID (posting or rule) and calendar year. Caps live on rules only; a claimed actual accrues under its own posting ID, matching how one-time postings behaved before rules existed.
 
 ## 6. Validation and Preparation
 
 `domain.ValidateFinancialModel` is the authoritative validator. It checks:
 
-- duplicate account, posting, and cross-type evaluation IDs;
-- account/posting ID collisions;
+- duplicate account, posting, rule, and cross-type evaluation IDs;
+- account/posting/rule ID collisions (one shared namespace);
 - checkpoint account, date, and duplicate key validity;
-- amount resolver config, exact required inputs, provider references, and posting dependency cycles;
-- posting source/destination references, duplicate destinations, same-account routing, and schedules;
+- amount resolver config, exact required inputs, provider references, and movement dependency cycles spanning postings and rules;
+- posting and rule source/destination references, duplicate destinations, same-account routing, rule schedules, and claim validity (named rule exists, date is a real scheduled occurrence, no double claims);
 - account bounds;
 - evaluation instance IDs and config;
 - income references when income data is supplied.
@@ -343,7 +349,7 @@ Warnings and errors share the ordered `ModelValidationIssue` shape. `SeverityErr
 `PrepareSimulationRequest`:
 
 1. applies request overrides without mutating the input document;
-2. requires income data when an enabled income posting exists;
+2. requires income data when an enabled income rule or posting exists;
 3. validates the effective model;
 4. validates `fallbackProjectionStartDate`;
 5. replays historical state;
@@ -355,13 +361,13 @@ Warnings and errors share the ordered `ModelValidationIssue` shape. `SeverityErr
 Historical preparation uses the same `TransitionRuntime` as projection execution.
 
 - Checkpoints after the projection start are invalid.
-- Enabled `once` postings before the projection start are replayed.
-- A `once` posting on the projection start joins history only when a checkpoint exists that day.
-- When the earliest checkpoint exists, recurring occurrences needed between that date and the projection start are replayed.
+- Enabled postings dated before the projection start are replayed.
+- A posting dated on the projection start joins history only when a checkpoint exists that day.
+- When the earliest checkpoint exists, rule occurrences needed between that date and the projection start are replayed, except occurrences claimed by a manual posting.
 - Without a start-date checkpoint, projection includes start-date occurrences.
 - With a start-date checkpoint, projection excludes start-date occurrences.
 - Historical dates execute in ascending calendar order.
-- Same-date postings execute by ascending priority, then declaration index.
+- Same-date movements execute by ascending priority, then resolution sequence.
 - Checkpoints execute after same-date postings and overwrite only their account balance.
 
 Each historical correction records observed balance, modeled balance, and adjustment. Historical rows carry no projected movement totals. Replay still updates balances, latest realized posting amounts, and annual-cap state for later projection and amount providers.
@@ -426,7 +432,7 @@ An evaluator failure is isolated to that instance as an error diagnostic. Other 
 The full principal-preservation cycle uses the generic monthly behavior loop and `TransitionRuntime`:
 
 - selected cashflow sources are observed from the base path;
-- only explicitly selected continuing postings execute in the branch;
+- only explicitly selected continuing movements (postings or rules) execute in the branch;
 - monthly expenses are covered by reactive withdrawals;
 - withdrawals obey account floors, nonnegative balance, and annual withdrawal limits;
 - a cycle fails at the first unresolved expense shortfall;
@@ -435,7 +441,7 @@ The full principal-preservation cycle uses the generic monthly behavior loop and
 - detailed deterministic output reruns the selected candidate with full withdrawal and balance evidence;
 - stochastic output aggregates first-success dates and coverage distributions against required confidence.
 
-Continuing postings are never inferred from IDs, labels, categories, or nonzero rates.
+Continuing movements are never inferred from IDs, labels, categories, or nonzero rates.
 
 ### Net-worth threshold
 
@@ -453,7 +459,7 @@ A residual below 0.5 is not reportable. Deterministic output includes first unde
 
 1. prepares and runs the deterministic baseline;
 2. evaluates deterministic baseline evaluations in summary mode;
-3. counts required annual rates per posting from enabled occurrences and horizon;
+3. counts required annual rates per rule from enabled occurrences and horizon;
 4. creates annual-rate samples for each run;
 5. simulates sample paths on a worker pool sized to available CPUs;
 6. consumes completed paths in submission order;
@@ -478,7 +484,7 @@ The seed controls the state sequence. Run-count normalization and seed-null beha
 - Fixture mode and a real Access URL are mutually exclusive.
 - An invalid account map is fatal at startup.
 
-`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. `Map` emits one balance checkpoint per mapped account/date and only pending negative card charges as disabled `once` postings. Posted, positive, non-USD, invalid-amount, and unmapped rows are counted by reason without logging descriptions or amounts.
+`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. `Map` emits one balance checkpoint per mapped account/date and only pending negative card charges as disabled postings. Posted, positive, non-USD, invalid-amount, and unmapped rows are counted by reason without logging descriptions or amounts.
 
 `Store.ApplySyncPlan` applies checkpoints and the pending snapshot in one transaction. Owner checkpoints win key collisions. Pending deletion is constrained by owner, account, and the escaped reserved prefix. Dry-run returns before commit, so the transaction rolls back.
 

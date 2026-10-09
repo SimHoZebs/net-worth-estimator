@@ -74,13 +74,11 @@ backend/scripts/verify.sh ./cmd/server
 2. `go vet`;
 3. `go test`.
 
-Run the repository-wide diagnostic only to expose copy-only or tooling failures:
+Run the repository-wide gate to catch cross-package breakage:
 
 ```bash
 backend/scripts/verify.sh
 ```
-
-In this checkout, the no-argument command reaches `backend/scripts/bench-template_test.go`. That file currently stops `go vet` with an undefined `ProjectFinancialModelDocument` in the scripts directory. The hooks exclude that template and use the production-package commands above.
 
 Direct commands are useful while diagnosing a failure:
 
