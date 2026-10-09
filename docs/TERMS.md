@@ -2,13 +2,13 @@
 
 One name per concept. This file is normative: when another document or a string in the interface disagrees, this file wins. `PRODUCT_INTENT.md` §4 defines the concepts; the names live only here.
 
-The names are display names. The engine keeps its own vocabulary: the Go API, the CSV seed files, and the SQLite tables still say `posting`, `checkpoint`, and `draft`. Those are storage and wire names, not words shown to a user.
+The names are display names. The engine keeps its own vocabulary: the Go API, the CSV seed files, and the SQLite tables still say `posting`, `recurrence-rule`, `checkpoint`, and `draft`. Those are storage and wire names, not words shown to a user.
 
 ## A. Transaction
 
 A planned or recorded movement of money into, out of, or between accounts.
 
-Use **transaction**, qualified as **planned** or **recorded**. The plan's "Transactions" tab holds the rules you edit. An account's activity view holds the rows the engine computed from those rules.
+Use **transaction**, qualified as **planned** or **recorded**. The plan's "Transactions" tab holds the rules and dated entries you edit. An account's activity view holds the rows the engine computed from those rules.
 
 - Retired from copy: posting, movement, money movement.
 - Retired from prose: one-time movement, planned movement, projected transaction.
