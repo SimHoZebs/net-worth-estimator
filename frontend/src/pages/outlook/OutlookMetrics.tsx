@@ -47,9 +47,7 @@ export function OutlookMetrics({
 						{compactMoney(final.total - current)}
 					</span>
 				</div>
-				<div className="metric-context">
-					{years}-year projection · future dollars
-				</div>
+				<div className="metric-context">{years}-year projection</div>
 			</section>
 		</div>
 	);

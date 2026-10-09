@@ -77,7 +77,7 @@ export function ComparisonSummary({
 				</div>
 				<div className="comparison-grid emphasis">
 					<span>
-						Projected net worth<small>Future dollars · base case</small>
+						Projected net worth<small>Base case</small>
 					</span>
 					<strong>{money(previous.final)}</strong>
 					<div>

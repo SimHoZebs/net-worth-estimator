@@ -413,8 +413,9 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 	await expect(
 		page.getByRole("heading", { name: "The inputs behind the outlook" }),
 	).toBeVisible();
+	await expect(page.getByLabel("Annual inflation (%)")).toBeVisible();
 	await expect(
-		page.getByRole("button", { name: "Edit assumptions" }),
+		page.getByLabel("Investment return variability (%)"),
 	).toBeVisible();
 	for (const width of [320, 768, 1280]) {
 		await page.setViewportSize({ width, height: 900 });

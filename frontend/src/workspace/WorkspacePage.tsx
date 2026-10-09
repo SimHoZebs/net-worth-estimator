@@ -199,7 +199,7 @@ export function WorkspacePage({
 					serverDocument={serverDocument}
 					onImportServerDocument={onImportServerDocument}
 					readOnly={readOnly}
-					onEdit={onEdit}
+					onUpdatePlan={state.updatePlan}
 				/>
 			);
 	}

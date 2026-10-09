@@ -1,6 +1,5 @@
 import type { EditorTarget } from "../domain/planEdits.ts";
 import { AccountEditor } from "./editors/AccountEditor.tsx";
-import { AssumptionsEditor } from "./editors/AssumptionsEditor.tsx";
 import type { EditorProps } from "./editors/EditorForm.tsx";
 import { EvaluationEditor } from "./editors/EvaluationEditor.tsx";
 import { MovementEditor } from "./editors/MovementEditor.tsx";
@@ -37,7 +36,5 @@ export function PlanEditor({
 					{...props}
 				/>
 			);
-		case "assumptions":
-			return <AssumptionsEditor {...props} />;
 	}
 }

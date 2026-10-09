@@ -5,19 +5,15 @@ import { download } from "../../state/storage.ts";
 
 export function ProjectionTable({
 	rows,
-	realTerms,
 	hasRange,
 }: {
 	rows: ChartModel["rows"];
-	realTerms: boolean;
 	hasRange: boolean;
 }) {
 	return (
 		<div className="chart-data">
 			<div className="section-top">
-				<h3>
-					Annual values · {realTerms ? "today’s dollars" : "future dollars"}
-				</h3>
+				<h3>Annual values</h3>
 				<button
 					type="button"
 					className="text-button"

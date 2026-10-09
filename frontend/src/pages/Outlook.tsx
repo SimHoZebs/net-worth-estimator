@@ -58,7 +58,6 @@ export function Outlook({
 					years={years}
 					setYears={setYears}
 					progress={progress}
-					inflation={plan.assumptions.inflation}
 					rangeError={rangeError}
 				/>
 				<div className="outlook-rail">
