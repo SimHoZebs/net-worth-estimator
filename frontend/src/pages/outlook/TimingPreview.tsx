@@ -684,6 +684,7 @@ export function TimingPreview({
 						spentSinceStart,
 						bills: remainingObligations,
 						cushion,
+						since: plan.startDate.slice(0, 10),
 					}}
 					paycheck={{
 						paycheck,

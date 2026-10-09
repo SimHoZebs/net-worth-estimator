@@ -27,6 +27,8 @@ export interface CashNowDecomposition {
 	spentSinceStart: number;
 	bills: number;
 	cushion: number;
+	/** Projection-start date anchoring spentSinceStart, for caption context. */
+	since: string;
 }
 
 export interface PaycheckDecomposition {
@@ -37,15 +39,12 @@ export interface PaycheckDecomposition {
 	allowance: number;
 }
 
-/** Bucket one: what checking covers right now. */
+/** Bucket one: what checking covers right now. The walk-forward adjustment
+ * (outflows since the balance snapshot) stays in the cushion math but only
+ * appears in the bar when nonzero — a $0 segment next to real card activity
+ * carries no information. */
 function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 	const segments: BarSegment[] = [
-		{
-			label: "Already spent",
-			amount: parts.spentSinceStart,
-			pattern: "solid",
-			tone: "dark",
-		},
 		{
 			label: "Bills due",
 			amount: parts.bills,
@@ -54,20 +53,28 @@ function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 		},
 		{
 			label: parts.cushion >= 0 ? "Left to spend" : "Short",
-			amount: Math.max(0, parts.cushion),
+			amount: parts.cushion >= 0 ? parts.cushion : -parts.cushion,
 			pattern: parts.cushion >= 0 ? "solid" : "hatch",
 			tone: parts.cushion >= 0 ? "sage" : "amber",
 		},
 	];
+	const paidNote =
+		parts.spentSinceStart > 0
+			? ` · ${money(parts.spentSinceStart)} paid since ${dateLabel(parts.since, true)}`
+			: "";
 	return (
 		<SegmentedBar
 			caption={
 				parts.cushion >= 0
-					? `${money(parts.checking)} total · ${money(parts.cushion)} left to spend`
-					: `${money(parts.checking)} total · short ${money(-parts.cushion)}`
+					? `${money(parts.checking)} total${paidNote} · ${money(parts.cushion)} left to spend`
+					: `${money(parts.checking)} total${paidNote} · short ${money(-parts.cushion)}`
 			}
 			segments={segments}
-			ariaLabel={`Available balance ${money(parts.checking)}: already spent ${money(parts.spentSinceStart)}, bills due ${money(parts.bills)}, left to spend ${money(Math.max(0, parts.cushion))}`}
+			ariaLabel={
+				parts.cushion >= 0
+					? `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, left to spend ${money(parts.cushion)}${paidNote}`
+					: `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, short ${money(-parts.cushion)}${paidNote}`
+			}
 		/>
 	);
 }
@@ -85,7 +92,7 @@ function PaycheckBar({ parts }: { parts: PaycheckDecomposition }) {
 		{ label: "Spent", amount: parts.spent, pattern: "solid", tone: "dark" },
 		{
 			label: parts.allowance >= 0 ? "Left" : "Over",
-			amount: Math.max(0, parts.allowance),
+			amount: parts.allowance >= 0 ? parts.allowance : -parts.allowance,
 			pattern: parts.allowance >= 0 ? "solid" : "hatch",
 			tone: parts.allowance >= 0 ? "pale" : "amber",
 		},
@@ -98,7 +105,11 @@ function PaycheckBar({ parts }: { parts: PaycheckDecomposition }) {
 					: `${money(parts.paycheck)} paycheck · over by ${money(-parts.allowance)}`
 			}
 			segments={segments}
-			ariaLabel={`Paycheck ${money(parts.paycheck)}: bills ${money(parts.fixed)}, reserve ${money(parts.reserve)}, spent ${money(parts.spent)}, left ${money(Math.max(0, parts.allowance))}`}
+			ariaLabel={
+				parts.allowance >= 0
+					? `Paycheck ${money(parts.paycheck)}: bills ${money(parts.fixed)}, reserve ${money(parts.reserve)}, spent ${money(parts.spent)}, left ${money(parts.allowance)}`
+					: `Paycheck ${money(parts.paycheck)}: bills ${money(parts.fixed)}, reserve ${money(parts.reserve)}, spent ${money(parts.spent)}, over by ${money(-parts.allowance)}`
+			}
 		/>
 	);
 }
@@ -289,7 +300,7 @@ export function TimingDetailDialog({
 					{ id: "mandatory", label: "Bills" },
 					{
 						id: "cycle",
-						label: "Cycle breakdown",
+						label: "Where the cycle went",
 						count: cycleTransactions.length,
 					},
 					{ id: "configure", label: "Configure" },
@@ -302,7 +313,7 @@ export function TimingDetailDialog({
 				{tab === "mandatory" ? (
 					<div className="timing-mandatory">
 						<h3>
-							Available balance{" "}
+							Left to spend{" "}
 							{heroes.cushionProvisional && (
 								<Badge tone="amber">Estimated</Badge>
 							)}
