@@ -1,3 +1,4 @@
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	type ApiRequestOptions,
@@ -23,8 +24,11 @@ import type {
 } from "../domain/result.ts";
 import {
 	deterministicQueryKey,
-	projectionQueryClient,
-} from "./projectionQuery.ts";
+	serverQueryClient,
+	stochasticQueryKey,
+} from "./serverQuery.ts";
+import { useUiStore } from "./uiStore.ts";
+import { useWorkspaceStore } from "./workspaceStore.ts";
 
 export interface RemoteProjectionClient {
 	projectDeterministic(
@@ -41,14 +45,55 @@ export interface UseRemoteProjectionOptions {
 	client?: RemoteProjectionClient;
 	document?: FinancialModelDocument | null;
 	draftDocument?: FinancialModelDocument | null;
-	years: number;
-	ranges: boolean;
+	years?: number;
+	ranges?: boolean;
 	authToken?: string;
 	incomeData?: IncomeDataSnapshot | null;
 	// When false the hook issues no requests. The saved-plan projection is
 	// identical to the active one whenever there is no draft, so running it
 	// separately would compute the same projection twice.
 	enabled?: boolean;
+}
+
+const MISSING_DOCUMENT_MESSAGE =
+	"No server financial model is available for projection. Load or replace a model before calculating.";
+
+let defaultProjectionClient: RemoteProjectionClient | null = null;
+
+function defaultApiClient(): RemoteProjectionClient {
+	if (!defaultProjectionClient) defaultProjectionClient = createApiClient();
+	return defaultProjectionClient;
+}
+
+async function runDeterministic(
+	api: RemoteProjectionClient,
+	document: FinancialModelDocument,
+	years: number,
+	incomeData: IncomeDataSnapshot | null,
+	authToken: string | undefined,
+	signal: AbortSignal,
+): Promise<Projection> {
+	const request = projectionRequest(document, years, incomeData);
+	const response = await api.projectDeterministic(request, {
+		authToken,
+		signal,
+	});
+	if (response instanceof Error) throw response;
+	const responseError = projectionResponseError(response);
+	if (responseError) throw responseError;
+	if (!response.result)
+		throw new Error(
+			"The server returned no deterministic projection result. Retry the request.",
+		);
+	try {
+		return projectionResultToLocal(response.result, document);
+	} catch (cause) {
+		throw cause instanceof Error
+			? cause
+			: new Error(
+					"The deterministic projection could not be mapped for display.",
+				);
+	}
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -674,34 +719,83 @@ function randomRunCount(): number {
 
 export function useRemoteProjection({
 	client,
-	document,
-	draftDocument,
-	years,
-	ranges,
-	authToken,
-	incomeData,
+	document: documentOverride,
+	draftDocument: draftOverride,
+	years: yearsOverride,
+	ranges: rangesOverride,
+	authToken: tokenOverride,
+	incomeData: incomeOverride,
 	enabled = true,
-}: UseRemoteProjectionOptions) {
-	const api = useMemo(() => client ?? createApiClient(), [client]);
+}: UseRemoteProjectionOptions = {}) {
+	const api = useMemo(() => client ?? defaultApiClient(), [client]);
+	// Explicit inputs win; undefined inherits the shared stores so consuming
+	// components subscribe where the query is declared instead of receiving
+	// fetched data as props. Null stays explicit: it means "none", not
+	// "fall back".
+	const storeDraftDocument = useWorkspaceStore((state) => state.draftDocument);
+	const storeDocument = useWorkspaceStore((state) => state.serverDocument);
+	const storeIncomeData = useWorkspaceStore((state) => state.incomeData);
+	const storeYears = useUiStore((state) => state.years);
+	const storeRanges = useUiStore((state) => state.ranges);
+	const storeToken = useUiStore((state) => state.authToken);
+	const draftDocument =
+		draftOverride !== undefined ? draftOverride : storeDraftDocument;
+	const document =
+		documentOverride !== undefined ? documentOverride : storeDocument;
+	const years = yearsOverride ?? storeYears;
+	const ranges = rangesOverride ?? storeRanges;
+	const authToken = tokenOverride ?? storeToken;
+	const incomeData =
+		incomeOverride !== undefined ? incomeOverride : storeIncomeData;
 	const activeDocument = draftDocument ?? document ?? null;
 	const documentKey = activeDocument ? JSON.stringify(activeDocument) : "null";
 	const incomeDataKey = incomeData ? JSON.stringify(incomeData) : "null";
+	// Refs give the streaming effect latest values without keying it on
+	// object identity (callers may rebuild equivalent documents per render).
 	const activeDocumentRef = useRef(activeDocument);
 	const incomeDataRef = useRef(incomeData ?? null);
 	activeDocumentRef.current = activeDocument;
 	incomeDataRef.current = incomeData ?? null;
-	const [base, setBase] = useState<Projection | Error | null>(null);
+	const hasDocument = activeDocument !== null;
+	const deterministic = useQuery({
+		queryKey: deterministicQueryKey(documentKey, incomeDataKey, years),
+		queryFn: ({ signal }) => {
+			const current = activeDocument;
+			if (!current) throw new Error(MISSING_DOCUMENT_MESSAGE);
+			return runDeterministic(
+				api,
+				current,
+				years,
+				incomeData,
+				authToken,
+				signal,
+			);
+		},
+		enabled: enabled && hasDocument,
+		placeholderData: keepPreviousData,
+		retry: false,
+	});
+	const missingDocument = enabled && !hasDocument;
+	const missingError = useMemo(() => new Error(MISSING_DOCUMENT_MESSAGE), []);
+	// Failures resolve with fetching false, so an error under load is
+	// superseded by the pending skeletons instead of flashing stale errors.
+	const base: Projection | Error | null = missingDocument
+		? missingError
+		: (deterministic.data ?? null);
+	const baseError =
+		missingDocument || deterministic.error === null
+			? missingDocument
+				? MISSING_DOCUMENT_MESSAGE
+				: null
+			: (deterministic.error.message ??
+				"The deterministic projection request failed. Retry the connection.");
+	const loading = deterministic.isFetching;
 	const [range, setRange] = useState<RangeResult | null>(null);
 	const [progress, setProgress] = useState(0);
 	const [rangeError, setRangeError] = useState<string | null>(null);
-	const [baseError, setBaseError] = useState<string | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [deterministicAttempt, setDeterministicAttempt] = useState(0);
 	const [rangeAttempt, setRangeAttempt] = useState(0);
 	const mounted = useRef(true);
 	const rangeController = useRef<AbortController | null>(null);
-	const abortRequested = useRef(false);
-	const latestDeterministicKey = useRef<readonly unknown[] | null>(null);
 
 	useEffect(() => {
 		mounted.current = true;
@@ -710,103 +804,6 @@ export function useRemoteProjection({
 			rangeController.current?.abort();
 		};
 	}, []);
-
-	useEffect(() => {
-		const current = enabled ? activeDocumentRef.current : null;
-		if (!current) {
-			setBase(
-				new Error(
-					"No server financial model is available for projection. Load or replace a model before calculating.",
-				),
-			);
-			setBaseError(
-				"No server financial model is available for projection. Load or replace a model before calculating.",
-			);
-			setLoading(false);
-			return;
-		}
-		// Stale-while-revalidate: keep the previous base visible while the next
-		// deterministic result loads. The shared query cache dedupes identical
-		// concurrent requests onto one fetch; the attempt in the key forces a
-		// fresh computation on explicit retry. Superseded completions are
-		// ignored via the cancelled flag rather than aborting the shared
-		// fetch, so a late arrival still warms the cache for remounts.
-		let cancelled = false;
-		setLoading(true);
-		setBaseError(null);
-		abortRequested.current = false;
-		const failBase = (message: string) => {
-			setBaseError(message);
-			setBase((previous) =>
-				previous && !(previous instanceof Error)
-					? previous
-					: new Error(message),
-			);
-			setLoading(false);
-		};
-		const runDeterministic = async (
-			querySignal: AbortSignal,
-		): Promise<Projection> => {
-			const request = projectionRequest(current, years, incomeDataRef.current);
-			const response = await api.projectDeterministic(request, {
-				authToken,
-				signal: querySignal,
-			});
-			if (response instanceof Error) throw response;
-			const responseError = projectionResponseError(response);
-			if (responseError) throw responseError;
-			if (!response.result)
-				throw new Error(
-					"The server returned no deterministic projection result. Retry the request.",
-				);
-			try {
-				return projectionResultToLocal(response.result, current);
-			} catch (cause) {
-				throw cause instanceof Error
-					? cause
-					: new Error(
-							"The deterministic projection could not be mapped for display.",
-						);
-			}
-		};
-		const queryKey = deterministicQueryKey(
-			documentKey,
-			incomeDataKey,
-			years,
-			deterministicAttempt,
-		);
-		latestDeterministicKey.current = queryKey;
-		void projectionQueryClient()
-			.fetchQuery({
-				queryKey,
-				queryFn: ({ signal }) => runDeterministic(signal),
-			})
-			.then((result) => {
-				if (!mounted.current || cancelled) return;
-				setBase(result);
-				setBaseError(null);
-				setLoading(false);
-			})
-			.catch((cause: unknown) => {
-				if (!mounted.current || cancelled || abortRequested.current) return;
-				failBase(
-					cause instanceof Error
-						? cause.message
-						: "The deterministic projection request failed. Retry the connection.",
-				);
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [
-		api,
-		authToken,
-		deterministicAttempt,
-		documentKey,
-		enabled,
-		incomeDataKey,
-		years,
-	]);
 
 	useEffect(() => {
 		const current = enabled ? activeDocumentRef.current : null;
@@ -823,59 +820,76 @@ export function useRemoteProjection({
 		setRange(null);
 		setProgress(0);
 		setRangeError(null);
-		let receivedResult = false;
-		let receivedError = false;
+		const runCount = randomRunCount();
+		const seed = 42;
 		const request: StochasticProjectionRequest = {
 			...projectionRequest(current, years, incomeDataRef.current),
-			config: { runCount: randomRunCount(), seed: 42 },
+			config: { runCount, seed },
 		};
-		void Promise.resolve()
-			.then(() =>
-				api.projectStochastic(request, {
-					authToken,
-					signal: controller.signal,
-				}),
-			)
-			.then(async (response) => {
-				if (!mounted.current || controller.signal.aborted) return;
-				if (response instanceof Error) {
-					setRangeError(response.message);
-					return;
-				}
-				const parseResult = await parseSSE(
-					response,
-					{
-						onProgress: (data) => {
-							if (!mounted.current || controller.signal.aborted) return;
-							setProgress(progressValue(data.progress.fraction));
-						},
-						onPartial: (data) => {
-							if (!mounted.current || controller.signal.aborted) return;
-							setProgress(progressValue(data.progress.fraction));
-							setRange(stochasticResultToLocal(data.partial));
-						},
-						onResult: (data) => {
-							if (!mounted.current || controller.signal.aborted) return;
-							receivedResult = true;
-							setProgress(1);
-							setRange(stochasticResultToLocal(data.result));
-							setRangeError(null);
-						},
-						onError: (data) => {
-							if (!mounted.current || controller.signal.aborted) return;
-							receivedError = true;
-							setRangeError(data.error);
-						},
+		// The stream runs through the shared query cache: identical
+		// concurrent streams attach to one fetch, and the final bands are
+		// reused across remounts (e.g. hopping between Outlook and
+		// Evaluations) instead of recomputing hundreds of runs. Progress and
+		// partials stay local; only the final result is cached.
+		const streamStochastic = async (): Promise<RangeResult> => {
+			const response = await api.projectStochastic(request, {
+				authToken,
+				signal: controller.signal,
+			});
+			if (response instanceof Error) throw new Error(response.message);
+			let finalRange: RangeResult | null = null;
+			let streamError: string | null = null;
+			const parseResult = await parseSSE(
+				response,
+				{
+					onProgress: (data) => {
+						if (!mounted.current || controller.signal.aborted) return;
+						setProgress(progressValue(data.progress.fraction));
 					},
-					controller.signal,
-				);
+					onPartial: (data) => {
+						if (!mounted.current || controller.signal.aborted) return;
+						setProgress(progressValue(data.progress.fraction));
+						setRange(stochasticResultToLocal(data.partial));
+					},
+					onResult: (data) => {
+						if (!mounted.current || controller.signal.aborted) return;
+						finalRange = stochasticResultToLocal(data.result);
+						setProgress(1);
+						setRange(finalRange);
+						setRangeError(null);
+					},
+					onError: (data) => {
+						if (!mounted.current || controller.signal.aborted) return;
+						streamError = data.error;
+						setRangeError(data.error);
+					},
+				},
+				controller.signal,
+			);
+			if (finalRange) return finalRange;
+			throw new Error(
+				streamError ??
+					parseResult?.message ??
+					"The range stream ended before returning a result. Retry the calculation.",
+			);
+		};
+		void serverQueryClient()
+			.fetchQuery({
+				queryKey: stochasticQueryKey(
+					documentKey,
+					incomeDataKey,
+					years,
+					runCount,
+					seed,
+					rangeAttempt,
+				),
+				queryFn: streamStochastic,
+			})
+			.then((finalRange) => {
 				if (!mounted.current || controller.signal.aborted) return;
-				if (parseResult && !receivedResult && !receivedError)
-					setRangeError(parseResult.message);
-				if (!parseResult && !receivedResult && !receivedError)
-					setRangeError(
-						"The range stream ended before returning a result. Retry the calculation.",
-					);
+				setProgress(1);
+				setRange(finalRange);
+				setRangeError(null);
 			})
 			.catch((cause: unknown) => {
 				if (!mounted.current || controller.signal.aborted) return;
@@ -898,9 +912,8 @@ export function useRemoteProjection({
 	]);
 
 	const abort = useCallback(() => {
-		abortRequested.current = true;
-		const key = latestDeterministicKey.current;
-		if (key) void projectionQueryClient().cancelQueries({ queryKey: key });
+		// Deterministic cancellation is Query-managed; only the streaming
+		// range request needs an explicit signal here.
 		rangeController.current?.abort();
 	}, []);
 
@@ -911,7 +924,9 @@ export function useRemoteProjection({
 		rangeError,
 		baseError,
 		retryRange: () => setRangeAttempt((value) => value + 1),
-		retryProjection: () => setDeterministicAttempt((value) => value + 1),
+		retryProjection: () => {
+			void deterministic.refetch();
+		},
 		loading,
 		abort,
 	};
