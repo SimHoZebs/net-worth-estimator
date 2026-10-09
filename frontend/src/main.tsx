@@ -2,8 +2,13 @@ import { Component, type ErrorInfo, type ReactNode, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "@fontsource-variable/manrope";
 import "@fontsource-variable/newsreader";
-import App from "./App.tsx";
+// Foundation first: this import must stay above App so the @layer order
+// declared in styles/index.css is established before any component partial
+// (imported transitively through App) declares its layer. Otherwise the
+// components layer sorts before reset/base and generic rules like
+// `button { color: inherit }` silently beat `.button.primary`.
 import "./styles/index.css";
+import App from "./App.tsx";
 
 class ErrorBoundary extends Component<
 	{ children: ReactNode },
