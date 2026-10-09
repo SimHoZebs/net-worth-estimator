@@ -2,6 +2,7 @@ import { Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { type TabItem, Tabs } from "../components/Tabs.tsx";
+import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
 import {
 	type Plan,
 	visibleAccounts,
@@ -14,6 +15,8 @@ import {
 } from "../domain/planEdits.ts";
 import { resolveMovementAmounts } from "../domain/resolvedMovementAmounts.ts";
 import type { Projection } from "../domain/result.ts";
+import { useRemoteProjection } from "../state/useRemoteProjection.ts";
+import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { AccountsPanel, BalanceChecksPanel } from "./plan/AccountsPanel.tsx";
 import { MovementsPanel } from "./plan/MovementsPanel.tsx";
 
@@ -23,37 +26,84 @@ type AccountsSection = "accounts" | "checks";
 type ScheduleFilter = "all" | "recurring";
 
 export function PlanPage({
-	plan,
 	view,
-	projection,
 	onEdit,
-	onUpdate,
 	onAccount,
 }: {
-	plan: Plan;
 	view: PlanView;
-	projection?: Projection | null;
 	onEdit: (target: EditorTarget) => void;
-	onUpdate: (plan: Plan) => boolean;
 	onAccount: (id: string) => void;
 }) {
+	// Plan data and actions subscribe here; only the viewed tab and UI
+	// callbacks arrive as props.
+	const workspace = useWorkspaceStore((state) => state.workspace);
+	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
+	if (!plan) return null;
 	if (view === "accounts") {
 		return (
 			<AccountsView
 				plan={plan}
 				onEdit={onEdit}
-				onUpdate={onUpdate}
+				onUpdate={updatePlan}
 				onAccount={onAccount}
 			/>
 		);
 	}
 	return (
-		<TransactionsView
+		<TransactionsWithProjection
 			plan={plan}
-			projection={projection}
 			onEdit={onEdit}
-			onUpdate={onUpdate}
+			onUpdate={updatePlan}
 		/>
+	);
+}
+
+// The transaction list resolves realized amounts from the projection, so it
+// subscribes with scenarios disabled: the range stream would only duplicate
+// the page that actually charts it.
+function TransactionsWithProjection({
+	plan,
+	onEdit,
+	onUpdate,
+}: {
+	plan: Plan;
+	onEdit: (target: EditorTarget) => void;
+	onUpdate: (plan: Plan) => boolean;
+}) {
+	const projection = useRemoteProjection({ ranges: false });
+	const baseLoadError =
+		projection.base instanceof Error && !projection.loading
+			? projection.base
+			: null;
+	const base =
+		projection.base instanceof Error || projection.base === null
+			? null
+			: projection.base;
+	return (
+		<>
+			{baseLoadError && (
+				<ErrorNotice
+					message={baseLoadError.message}
+					action="Retry calculation"
+					onAction={projection.retryProjection}
+				/>
+			)}
+			{projection.baseError && base && (
+				<ErrorNotice
+					message={projection.baseError}
+					action="Retry calculation"
+					onAction={projection.retryProjection}
+				/>
+			)}
+			{projection.loading && base && <ProjectionUpdating />}
+			<TransactionsView
+				plan={plan}
+				projection={base}
+				onEdit={onEdit}
+				onUpdate={onUpdate}
+			/>
+		</>
 	);
 }
 

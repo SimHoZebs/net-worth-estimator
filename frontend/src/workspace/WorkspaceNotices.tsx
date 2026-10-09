@@ -1,23 +1,30 @@
 import { Check, X } from "lucide-react";
 import { ErrorNotice, IconButton } from "../components/ui.tsx";
-import type { Plan } from "../domain/model.ts";
 import { download } from "../state/storage.ts";
-import type { WorkspaceController } from "./types.ts";
+import { useWorkspaceStore } from "../state/workspaceStore.ts";
 
-function errorRecovery({ state }: { state: WorkspaceController }) {
-	if (state.stale)
+function useErrorRecovery(): { action: string; onAction: () => void } {
+	const stale = useWorkspaceStore(
+		(state) => state.workspace?.draftStale ?? false,
+	);
+	const storageConflict = useWorkspaceStore(
+		(state) => state.error?.includes("changed in another tab") ?? false,
+	);
+	const reloadDraft = useWorkspaceStore((state) => state.reloadDraft);
+	const retry = useWorkspaceStore((state) => state.retry);
+	if (stale)
 		return {
 			action: "Discard draft and load latest",
-			onAction: () => void state.reloadDraft(),
+			onAction: () => void reloadDraft(),
 		};
-	if (state.storageConflict)
+	if (storageConflict)
 		return {
 			action: "Reload latest saved plan",
 			onAction: () => window.location.reload(),
 		};
 	return {
 		action: "Retry server request",
-		onAction: state.retry,
+		onAction: () => void retry(),
 	};
 }
 
@@ -31,20 +38,18 @@ export function workspaceStatusLabel({
 	return readOnly ? "Read-only" : "Workspace";
 }
 
-export function WorkspaceNotices({
-	state,
-	plan,
-}: {
-	state: WorkspaceController;
-	plan: Plan;
-	readOnly: boolean;
-}) {
+export function WorkspaceNotices() {
+	const error = useWorkspaceStore((state) => state.error);
+	const volatile = useWorkspaceStore((state) => state.volatile);
+	const plan = useWorkspaceStore((state) => {
+		const workspace = state.workspace;
+		return workspace?.draft ?? workspace?.saved ?? null;
+	});
+	const recovery = useErrorRecovery();
 	return (
 		<>
-			{state.error && (
-				<ErrorNotice message={state.error} {...errorRecovery({ state })} />
-			)}
-			{state.volatile && (
+			{error && <ErrorNotice message={error} {...recovery} />}
+			{volatile && plan && (
 				<button
 					type="button"
 					className="button secondary export-recovery"
@@ -62,18 +67,18 @@ export function WorkspaceNotices({
 	);
 }
 
-export function WorkspaceNotification({
-	notice,
-	onDismiss,
-}: {
-	notice: string;
-	onDismiss: () => void;
-}) {
+export function WorkspaceNotification() {
+	const notice = useWorkspaceStore((state) => state.notice);
+	const dismissNotice = useWorkspaceStore((state) => state.dismissNotice);
 	return notice ? (
 		<div className="toast" role="status">
 			<Check size={17} />
 			<span>{notice}</span>
-			<IconButton icon={X} label="Dismiss notification" onClick={onDismiss} />
+			<IconButton
+				icon={X}
+				label="Dismiss notification"
+				onClick={dismissNotice}
+			/>
 		</div>
 	) : null;
 }

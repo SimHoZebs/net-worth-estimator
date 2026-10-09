@@ -1,5 +1,7 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Component, type ErrorInfo, type ReactNode, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { serverQueryClient } from "./state/serverQuery.ts";
 import "@fontsource-variable/manrope";
 import "@fontsource-variable/newsreader";
 // Foundation first: this import must stay above App so the @layer order
@@ -46,7 +48,9 @@ class ErrorBoundary extends Component<
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>
 		<ErrorBoundary>
-			<App />
+			<QueryClientProvider client={serverQueryClient()}>
+				<App />
+			</QueryClientProvider>
 		</ErrorBoundary>
 	</StrictMode>,
 );

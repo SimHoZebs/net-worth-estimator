@@ -6,18 +6,41 @@ import { Brand } from "../components/Brand.tsx";
 import { ModelImportPreview } from "../components/imports/ModelImportPreview.tsx";
 import { ErrorNotice } from "../components/ui.tsx";
 import { download } from "../state/storage.ts";
+import { useUiStore } from "../state/uiStore.ts";
 import { useFileReview } from "../state/useFileReview.ts";
-import type { useRemoteWorkspace } from "../state/useRemoteWorkspace.ts";
+import { useServerModelImport } from "../state/useServerModelImport.ts";
+import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { RemoteAuthControl } from "./RemoteAuthControl.tsx";
 
-export function ServerWorkspaceRecovery({
-	remote,
-	authControl,
-	onImport,
-}: {
-	remote: ReturnType<typeof useRemoteWorkspace>;
-	authControl: ReactNode;
-	onImport: (document: FinancialModelDocument) => Promise<boolean>;
-}) {
+export function ServerWorkspaceRecovery() {
+	// Terminal load states subscribe everything they display, including the
+	// model import flow and access control.
+	const status = useWorkspaceStore((state) => state.status);
+	const serverDocument = useWorkspaceStore((state) => state.serverDocument);
+	const recoveryDraft = useWorkspaceStore((state) => state.recoveryDraft);
+	const statusReadOnly = useWorkspaceStore(
+		(state) => state.status?.readOnly ?? false,
+	);
+	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
+	const readOnly = statusReadOnly || writeBlocked;
+	const workspaceError = useWorkspaceStore((state) => state.error);
+	const retry = useWorkspaceStore((state) => state.retry);
+	const importServerDocument = useWorkspaceStore(
+		(state) => state.importServerDocument,
+	);
+	const authToken = useUiStore((state) => state.authToken);
+	const { importDocument } = useServerModelImport({
+		authToken,
+		preconditions: {
+			hasWorkspace: false,
+			readOnly,
+			hasDraft: false,
+			loading: false,
+			revision: null,
+		},
+		recover: importServerDocument,
+		reload: retry,
+	});
 	const { candidate, error, reading, setError, readFile, clearCandidate } =
 		useFileReview<FinancialModelDocument>({
 			parse: (text) =>
@@ -29,13 +52,13 @@ export function ServerWorkspaceRecovery({
 				"The model file is larger than 2 MB. Choose a smaller JSON file.",
 		});
 	const inputRef = useRef<HTMLInputElement>(null);
-	const missingModel = remote.status !== null && remote.serverDocument === null;
-	const showRecoveryDraft = Boolean(remote.recoveryDraft);
+	const missingModel = status !== null && serverDocument === null;
+	const showRecoveryDraft = Boolean(recoveryDraft);
 	const importCandidate = async () => {
-		if (!candidate || remote.readOnly) return;
+		if (!candidate || readOnly) return;
 		clearCandidate();
 		setError(null);
-		const imported = await onImport(candidate);
+		const imported = await importDocument(candidate);
 		if (!imported)
 			setError(
 				"The server did not activate this model. Review the recovery message before trying again.",
@@ -50,22 +73,22 @@ export function ServerWorkspaceRecovery({
 						: "Your server workspace needs attention"
 				}
 				onRetry={() => {
-					void remote.retry();
+					void retry();
 				}}
 			>
-				{!remote.error?.includes("no financial model") && (
+				{!workspaceError?.includes("no financial model") && (
 					<ErrorNotice
 						message={
-							remote.error ?? "The server workspace could not be loaded."
+							workspaceError ?? "The server workspace could not be loaded."
 						}
 						action="Retry server load"
 						onAction={() => {
-							void remote.retry();
+							void retry();
 						}}
 					/>
 				)}
 				{missingModel && <p>Import a reviewed model JSON file to continue.</p>}
-				{showRecoveryDraft && remote.recoveryDraft && (
+				{showRecoveryDraft && recoveryDraft && (
 					<div className="inline-notice">
 						<FileJson size={18} />
 						<span>
@@ -78,7 +101,7 @@ export function ServerWorkspaceRecovery({
 							onClick={() =>
 								download({
 									name: "waypoint-remote-draft-recovery.json",
-									content: JSON.stringify(remote.recoveryDraft, null, 2),
+									content: JSON.stringify(recoveryDraft, null, 2),
 								})
 							}
 						>
@@ -86,10 +109,10 @@ export function ServerWorkspaceRecovery({
 						</button>
 					</div>
 				)}
-				{authControl}
+				<RemoteAuthControl />
 				{missingModel && (
 					<ServerModelImport
-						readOnly={remote.readOnly}
+						readOnly={readOnly}
 						reading={reading}
 						error={error}
 						inputRef={inputRef}

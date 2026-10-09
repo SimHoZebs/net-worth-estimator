@@ -1,5 +1,11 @@
 import { Check, Flag, Plus } from "lucide-react";
-import { Badge, EmptyState, Progress } from "../components/ui.tsx";
+import {
+	Badge,
+	EmptyState,
+	ErrorNotice,
+	Progress,
+	ProjectionUpdating,
+} from "../components/ui.tsx";
 import "./evaluations/evaluations.css";
 import { dateLabel } from "../domain/format.ts";
 import type { Evaluation, Plan } from "../domain/model.ts";
@@ -9,6 +15,9 @@ import type {
 	Projection,
 	RangeResult,
 } from "../domain/result.ts";
+import { useUiStore } from "../state/uiStore.ts";
+import { useRemoteProjection } from "../state/useRemoteProjection.ts";
+import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { EvaluationCard } from "./evaluations/EvaluationCard.tsx";
 
 function OtherEvaluationCard({ item }: { item: OtherEvaluation }) {
@@ -65,6 +74,63 @@ function OtherEvaluationCard({ item }: { item: OtherEvaluation }) {
 }
 
 export function EvaluationsPage({
+	onEdit,
+	onEvidence,
+}: {
+	onEdit: (evaluation: Evaluation | null) => void;
+	onEvidence: (id: string) => void;
+}) {
+	// Plan, actions, and projection subscribe where the query is declared;
+	// only UI callbacks arrive as props.
+	const workspace = useWorkspaceStore((state) => state.workspace);
+	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const onUpdate = useWorkspaceStore((state) => state.updatePlan);
+	const ranges = useUiStore((state) => state.ranges);
+	const projection = useRemoteProjection();
+	if (!plan) return null;
+	const baseLoadError =
+		projection.base instanceof Error && !projection.loading
+			? projection.base
+			: null;
+	const base: Projection | null =
+		projection.base instanceof Error ? null : projection.base;
+	return (
+		<>
+			{baseLoadError && (
+				<ErrorNotice
+					message={baseLoadError.message}
+					action="Retry calculation"
+					onAction={projection.retryProjection}
+				/>
+			)}
+			{projection.baseError && base && (
+				<ErrorNotice
+					message={projection.baseError}
+					action="Retry calculation"
+					onAction={projection.retryProjection}
+				/>
+			)}
+			{projection.rangeError && ranges && (
+				<ErrorNotice
+					message={projection.rangeError}
+					action="Retry scenario calculation"
+					onAction={projection.retryRange}
+				/>
+			)}
+			{projection.loading && base && <ProjectionUpdating />}
+			<EvaluationsContent
+				plan={plan}
+				projection={base}
+				range={projection.range}
+				onEdit={onEdit}
+				onUpdate={onUpdate}
+				onEvidence={onEvidence}
+			/>
+		</>
+	);
+}
+
+function EvaluationsContent({
 	plan,
 	projection,
 	range,

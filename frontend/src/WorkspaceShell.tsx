@@ -1,8 +1,7 @@
-import { changesBetween } from "./domain/model.ts";
 import { useBeforeUnload } from "./state/useBeforeUnload.ts";
 import { DraftBar } from "./workspace/DraftBar.tsx";
 import "./workspace/workspace.css";
-import type { WorkspaceShellProps } from "./workspace/types.ts";
+import { useWorkspaceStore } from "./state/workspaceStore.ts";
 import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation.ts";
 import { useWorkspaceOverlays } from "./workspace/useWorkspaceOverlays.ts";
 import {
@@ -17,42 +16,23 @@ import { WorkspaceLayout } from "./workspace/WorkspaceLayout.tsx";
 import {
 	WorkspaceNotices,
 	WorkspaceNotification,
-	workspaceStatusLabel,
 } from "./workspace/WorkspaceNotices.tsx";
 import { WorkspacePage } from "./workspace/WorkspacePage.tsx";
 import { WorkspaceSidebar } from "./workspace/WorkspaceSidebar.tsx";
 
-export function WorkspaceShell(props: WorkspaceShellProps) {
-	const {
-		workspace,
-		plan,
-		state,
-		projection,
-		readOnly = false,
-		authRequired = false,
-		authTokenActive = false,
-		loading = false,
-	} = props;
+// The shell owns only local interface state (navigation, overlays). Every
+// data display subscribes to the stores; this component takes no props.
+export function WorkspaceShell() {
 	const navigation = useWorkspaceNavigation();
-	const overlays = useWorkspaceOverlays({ discard: state.discard });
-	useBeforeUnload(state.volatile);
-	const changeCount = changesBetween({
-		saved: workspace.saved,
-		current: plan,
-	}).length;
-	const sourceReadOnly = readOnly || workspace.saved.readOnly;
+	const volatile = useWorkspaceStore((state) => state.volatile);
+	const discard = useWorkspaceStore((state) => state.discard);
+	const overlays = useWorkspaceOverlays({ discard });
+	useBeforeUnload(volatile);
 	return (
 		<WorkspaceLayout
 			navigation={(close) => (
 				<WorkspaceSidebar
 					page={navigation.page}
-					planName={plan.name}
-					changeCount={changeCount}
-					statusLabel={workspaceStatusLabel({
-						readOnly: sourceReadOnly,
-						authRequired,
-						authTokenActive,
-					})}
 					onNavigate={navigation.navigate}
 					onClose={close}
 				/>
@@ -60,47 +40,26 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 			header={(open) => <WorkspaceTopbar onOpenNavigation={open} />}
 			draftBar={
 				<DraftBar
-					count={changeCount}
-					loading={loading}
 					onDiscard={overlays.openDiscard}
 					onReview={() => navigation.navigate("compare")}
 				/>
 			}
-			overlays={
-				<WorkspaceDialogs
-					overlays={overlays}
-					plan={plan}
-					changeCount={changeCount}
-					onUpdate={state.updatePlan}
-				/>
-			}
-			notification={
-				<WorkspaceNotification
-					notice={state.notice}
-					onDismiss={state.dismissNotice}
-				/>
-			}
+			overlays={<WorkspaceDialogs overlays={overlays} />}
+			notification={<WorkspaceNotification />}
 		>
 			<WorkspaceHeading
 				page={navigation.currentPage}
 				headingRef={navigation.headingRef}
 			/>
-			<WorkspaceNotices state={state} plan={plan} readOnly={sourceReadOnly} />
+			<WorkspaceNotices />
 			<WorkspacePage
 				page={navigation.page}
-				projection={projection}
-				inputs={{ ...props, readOnly: sourceReadOnly }}
 				onEdit={overlays.openEditor}
 				onEvidence={overlays.openEvidence}
 				onDiscard={overlays.openDiscard}
 				onNavigate={navigation.navigate}
 			/>
-			<WorkspaceEvidence
-				overlays={overlays}
-				plan={plan}
-				projection={projection}
-				temporary={Boolean(workspace.draft)}
-			/>
+			<WorkspaceEvidence overlays={overlays} />
 		</WorkspaceLayout>
 	);
 }
