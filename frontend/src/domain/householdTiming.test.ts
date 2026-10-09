@@ -4,6 +4,7 @@ import { movementFixture } from "../test/projection.ts";
 import {
 	cashCushion,
 	checkingAccountId,
+	checkingShortfall,
 	cycleAllowance,
 	cycleBudget,
 	filterMovementsById,
@@ -123,6 +124,80 @@ describe("realizedCheckingOutflows", () => {
 				through: "2026-10-02",
 			}),
 		).toBe(0);
+	});
+});
+
+describe("checkingShortfall", () => {
+	const movements = [
+		movementFixture({
+			date: "2026-10-13",
+			movementId: "car-loan",
+			name: "Car loan",
+			fromId: "checking",
+			toId: null,
+			requested: 403,
+			realized: 276,
+		}),
+		movementFixture({
+			date: "2026-10-15",
+			movementId: "living",
+			name: "Living",
+			fromId: "checking",
+			toId: null,
+			requested: 2400,
+			realized: 0,
+		}),
+		movementFixture({
+			date: "2026-10-15",
+			movementId: "paid",
+			name: "Paid",
+			fromId: "checking",
+			toId: null,
+			requested: 91,
+			realized: 91,
+		}),
+		movementFixture({
+			date: "2026-11-15",
+			movementId: "later",
+			name: "Later",
+			fromId: "checking",
+			toId: null,
+			requested: 2400,
+			realized: 0,
+		}),
+	];
+
+	it("sums requested-minus-realized gaps with the first short date", () => {
+		expect(
+			checkingShortfall({
+				movements,
+				checkingIds: ["checking"],
+				after: "2026-10-09",
+				through: "2026-10-31",
+			}),
+		).toEqual({ total: 2527, firstDate: "2026-10-13" });
+	});
+
+	it("ignores fully paid movements and other windows", () => {
+		expect(
+			checkingShortfall({
+				movements,
+				checkingIds: ["checking"],
+				after: "2026-10-31",
+				through: "2026-11-30",
+			}),
+		).toEqual({ total: 2400, firstDate: "2026-11-15" });
+	});
+
+	it("returns zero when nothing is short", () => {
+		expect(
+			checkingShortfall({
+				movements: movements.filter((item) => item.movementId === "paid"),
+				checkingIds: ["checking"],
+				after: "2026-10-09",
+				through: "2026-10-31",
+			}),
+		).toEqual({ total: 0, firstDate: null });
 	});
 });
 

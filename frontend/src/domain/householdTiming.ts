@@ -268,6 +268,43 @@ export function realizedCheckingOutflows({
 }
 
 /**
+ * Bills the simulation cannot fully pay inside (after, through]: the same
+ * requested-minus-realized gaps the posting-fulfillment evaluation
+ * aggregates, scoped to the spendable accounts and the bills window. This
+ * is the established shortfall signal — not a re-derivation of the
+ * cushion. Returns the total gap with the first short date.
+ */
+export function checkingShortfall({
+	movements,
+	checkingIds,
+	after,
+	through,
+}: {
+	movements: MovementResult[];
+	checkingIds: string[];
+	after: string;
+	through: string;
+}): { total: number; firstDate: string | null } {
+	const start = after.slice(0, 10);
+	const end = through.slice(0, 10);
+	if (end <= start) return { total: 0, firstDate: null };
+	const sources = new Set(checkingIds);
+	let total = 0;
+	let firstDate: string | null = null;
+	for (const movement of movements) {
+		if (movement.fromId === null || !sources.has(movement.fromId)) continue;
+		if (movement.date <= start || movement.date > end) continue;
+		const gap = movement.requested - movement.realized;
+		if (gap <= 0) continue;
+		total += gap;
+		if (firstDate === null || movement.date < firstDate) {
+			firstDate = movement.date;
+		}
+	}
+	return { total: Math.round(total * 100) / 100, firstDate };
+}
+
+/**
  * Bills in an inclusive date window: outflows from the spendable accounts
  * grouped by movement, sorted by total descending. Powers the bills
  * visualization (remaining bills this month, fixed obligations next month).
