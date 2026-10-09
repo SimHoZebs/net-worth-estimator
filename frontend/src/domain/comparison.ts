@@ -31,6 +31,24 @@ function assumptionKey(plan: Plan) {
 	});
 }
 
+export function comparisonComparable({
+	snapshot,
+	plan,
+	years,
+}: {
+	snapshot: Snapshot | null;
+	plan: Plan;
+	years: number;
+}): boolean {
+	return (
+		!snapshot ||
+		(snapshot.years === years &&
+			snapshot.startDate === plan.startDate &&
+			snapshot.assumptions === assumptionKey(plan) &&
+			snapshot.name === plan.name)
+	);
+}
+
 export function comparisonContext({
 	saved,
 	plan,
@@ -52,12 +70,7 @@ export function comparisonContext({
 		changes: changesBetween({ saved, current: plan }),
 		current,
 		previous,
-		comparable:
-			!snapshot ||
-			(snapshot.years === years &&
-				snapshot.startDate === plan.startDate &&
-				snapshot.assumptions === assumptionKey(plan) &&
-				snapshot.name === plan.name),
+		comparable: comparisonComparable({ snapshot, plan, years }),
 	};
 }
 

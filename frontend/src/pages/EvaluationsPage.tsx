@@ -73,13 +73,16 @@ export function EvaluationsPage({
 	onEvidence,
 }: {
 	plan: Plan;
-	projection: Projection;
+	projection: Projection | null;
 	range: RangeResult | null;
 	onEdit: (evaluation: Evaluation | null) => void;
 	onUpdate: (plan: Plan) => boolean;
 	onEvidence: (id: string) => void;
 }) {
-	const others = projection.otherEvaluations;
+	const pending = projection === null;
+	// Other evaluation kinds are configured server-side, so their count is
+	// unknowable until the projection lands; they join the grid on arrival.
+	const others = projection?.otherEvaluations ?? [];
 	const archivedIds = new Set(
 		plan.accounts.filter((a) => a.archived).map((a) => a.id),
 	);
@@ -99,20 +102,28 @@ export function EvaluationsPage({
 					Add evaluation
 				</button>
 			</div>
-			{!evaluations.length && !others.length && (
+			{!pending && !evaluations.length && !others.length && (
 				<EmptyState icon={Flag} title="What are you working toward?" />
 			)}
-			<div className="evaluations-grid">
+			{pending && (
+				<p className="sr-only" role="status">
+					Loading evaluation outcomes.
+				</p>
+			)}
+			<div className="evaluations-grid" aria-busy={pending}>
 				{evaluations.map((evaluation) => (
 					<EvaluationCard
 						key={evaluation.id}
 						evaluation={evaluation}
-						result={projection.evaluations.find(
+						result={projection?.evaluations.find(
 							(g) => g.evaluation.id === evaluation.id,
 						)}
 						probability={
-							range ? (range.evaluationSuccess[evaluation.id] ?? 0) : null
+							projection && range
+								? (range.evaluationSuccess[evaluation.id] ?? 0)
+								: null
 						}
+						pending={pending}
 						onEdit={() => onEdit(evaluation)}
 						onRemove={() =>
 							onUpdate(removeEvaluation({ plan, id: evaluation.id }))

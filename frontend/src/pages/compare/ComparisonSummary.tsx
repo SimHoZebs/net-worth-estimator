@@ -14,8 +14,8 @@ export function ComparisonSummary({
 	changeCount,
 	onCapture,
 }: {
-	current: ComparisonMetrics;
-	previous: ComparisonMetrics;
+	current: ComparisonMetrics | null;
+	previous: ComparisonMetrics | null;
 	comparable: boolean;
 	snapshot: Pick<Snapshot, "capturedAt" | "years"> | null;
 	revision: number;
@@ -23,7 +23,12 @@ export function ComparisonSummary({
 	changeCount: number;
 	onCapture: () => void;
 }) {
-	const delta = current.final - previous.final;
+	// Panel headings are plan data and stay live; only metric cells await
+	// projections. Capture needs current metrics, so it waits too.
+	const pending = current === null || previous === null;
+	const prev = pending ? null : previous;
+	const curr = pending ? null : current;
+	const delta = curr !== null && prev !== null ? curr.final - prev.final : 0;
 	return (
 		<>
 			<section className="comparison-hero">
@@ -33,12 +38,17 @@ export function ComparisonSummary({
 				<div>
 					<p>Capture a point of reference, then explore a change.</p>
 				</div>
-				<button type="button" className="button secondary" onClick={onCapture}>
+				<button
+					type="button"
+					className="button secondary"
+					onClick={onCapture}
+					disabled={pending}
+				>
 					<Camera size={16} />
 					{snapshot ? "Replace snapshot" : "Capture snapshot"}
 				</button>
 			</section>
-			{!comparable && (
+			{!comparable && !pending && (
 				<div className="inline-notice amber">
 					<TriangleAlert size={20} />
 					<span>
@@ -47,7 +57,12 @@ export function ComparisonSummary({
 					</span>
 				</div>
 			)}
-			<section className="panel comparison-panel">
+			{pending && (
+				<p className="sr-only" role="status">
+					Loading comparison measures.
+				</p>
+			)}
+			<section className="panel comparison-panel" aria-busy={pending}>
 				<div className="comparison-grid comparison-head">
 					<span>Measure</span>
 					<div>
@@ -72,49 +87,113 @@ export function ComparisonSummary({
 				</div>
 				<div className="comparison-grid">
 					<span>Current net worth</span>
-					<strong>{money(previous.current)}</strong>
-					<strong>{money(current.current)}</strong>
+					{prev === null ? (
+						<span
+							className="skeleton"
+							style={{ width: 90, height: 16 }}
+							aria-hidden="true"
+						/>
+					) : (
+						<strong>{money(prev.current)}</strong>
+					)}
+					{curr === null ? (
+						<span
+							className="skeleton"
+							style={{ width: 90, height: 16 }}
+							aria-hidden="true"
+						/>
+					) : (
+						<strong>{money(curr.current)}</strong>
+					)}
 				</div>
 				<div className="comparison-grid emphasis">
 					<span>
 						Projected net worth<small>Base case</small>
 					</span>
-					<strong>{money(previous.final)}</strong>
-					<div>
-						<strong>{money(current.final)}</strong>
+					{prev === null ? (
 						<span
-							className={`comparison-delta ${delta >= 0 ? "positive" : "negative"}`}
-						>
-							{delta > 0 ? "+" : ""}
-							{money(delta)} difference
-						</span>
-					</div>
+							className="skeleton"
+							style={{ width: 90, height: 16 }}
+							aria-hidden="true"
+						/>
+					) : (
+						<strong>{money(prev.final)}</strong>
+					)}
+					{curr === null ? (
+						<span
+							className="skeleton"
+							style={{ width: 90, height: 16 }}
+							aria-hidden="true"
+						/>
+					) : (
+						<div>
+							<strong>{money(curr.final)}</strong>
+							<span
+								className={`comparison-delta ${delta >= 0 ? "positive" : "negative"}`}
+							>
+								{delta > 0 ? "+" : ""}
+								{money(delta)} difference
+							</span>
+						</div>
+					)}
 				</div>
 				<div className="comparison-grid">
 					<span>First net-worth evaluation reached</span>
-					<strong>
-						{previous.evaluationDate
-							? dateLabel(previous.evaluationDate)
-							: "Not reached"}
-					</strong>
-					<strong>
-						{current.evaluationDate
-							? dateLabel(current.evaluationDate)
-							: "Not reached"}
-					</strong>
+					{prev === null ? (
+						<span
+							className="skeleton"
+							style={{ width: 90, height: 16 }}
+							aria-hidden="true"
+						/>
+					) : (
+						<strong>
+							{prev.evaluationDate
+								? dateLabel(prev.evaluationDate)
+								: "Not reached"}
+						</strong>
+					)}
+					{curr === null ? (
+						<span
+							className="skeleton"
+							style={{ width: 90, height: 16 }}
+							aria-hidden="true"
+						/>
+					) : (
+						<strong>
+							{curr.evaluationDate
+								? dateLabel(curr.evaluationDate)
+								: "Not reached"}
+						</strong>
+					)}
 				</div>
 				<div className="comparison-grid">
 					<span>First underfunded transaction</span>
-					<strong>
-						{previous.shortfallDate
-							? dateLabel(previous.shortfallDate, true)
-							: "None in horizon"}
-					</strong>
-					<strong>
-						{current.shortfallDate
-							? dateLabel(current.shortfallDate, true)
-							: "None in horizon"}
-					</strong>
+					{prev === null ? (
+						<span
+							className="skeleton"
+							style={{ width: 90, height: 16 }}
+							aria-hidden="true"
+						/>
+					) : (
+						<strong>
+							{prev.shortfallDate
+								? dateLabel(prev.shortfallDate, true)
+								: "None in horizon"}
+						</strong>
+					)}
+					{curr === null ? (
+						<span
+							className="skeleton"
+							style={{ width: 90, height: 16 }}
+							aria-hidden="true"
+						/>
+					) : (
+						<strong>
+							{curr.shortfallDate
+								? dateLabel(curr.shortfallDate, true)
+								: "None in horizon"}
+						</strong>
+					)}
 				</div>
 			</section>
 		</>
