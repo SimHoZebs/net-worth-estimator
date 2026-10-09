@@ -9,6 +9,13 @@
 		gap: 15px;
 		padding: 20px 23px;
 	}
+	.plan-transactions .plan-toolbar {
+		padding: 0 2px 16px;
+	}
+	.plan-transactions .movement-row {
+		padding-left: 2px;
+		padding-right: 2px;
+	}
 	.movement-row {
 		padding: 17px 23px;
 		border-top: 1px solid var(--line);
