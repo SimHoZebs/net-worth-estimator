@@ -123,7 +123,8 @@ function latestDate(values: string[]): string | null {
 export function projectionStartDate(document: FinancialModelDocument): string {
 	return (
 		latestDate(document.checkpoints.map((checkpoint) => checkpoint.Date)) ??
-		document.postings[0]?.startDate ??
+		(document.recurrenceRules ?? [])[0]?.startDate ??
+		document.postings[0]?.date ??
 		todayIso()
 	);
 }
@@ -373,14 +374,40 @@ function cycleOutcome(
 	};
 }
 
+function movementSource(
+	event: MovementEvent,
+	document: FinancialModelDocument | null,
+): {
+	name: string;
+	sourceAccountId: string | null;
+	destinations: string[] | null;
+} | null {
+	const posting = document?.postings.find(
+		(item) => item.id === event.origin.postingId,
+	);
+	if (posting)
+		return {
+			name: posting.name,
+			sourceAccountId: posting.sourceAccountId,
+			destinations: posting.destinations,
+		};
+	const rule = (document?.recurrenceRules ?? []).find(
+		(item) => item.id === event.origin.postingId,
+	);
+	if (rule)
+		return {
+			name: rule.name,
+			sourceAccountId: rule.sourceAccountId,
+			destinations: rule.destinations,
+		};
+	return null;
+}
+
 function movementName(
 	event: MovementEvent,
 	document: FinancialModelDocument | null,
 ): string {
-	return (
-		document?.postings.find((posting) => posting.id === event.origin.postingId)
-			?.name || event.origin.postingId
-	);
+	return movementSource(event, document)?.name || event.origin.postingId;
 }
 
 function movementEndpoints(
@@ -390,12 +417,10 @@ function movementEndpoints(
 	const deltas = event.accountDeltas ?? [];
 	const negative = deltas.find((delta) => delta.delta < 0)?.accountId ?? null;
 	const positive = deltas.find((delta) => delta.delta > 0)?.accountId ?? null;
-	const posting = document?.postings.find(
-		(item) => item.id === event.origin.postingId,
-	);
+	const source = movementSource(event, document);
 	return {
-		fromId: posting?.sourceAccountId ?? negative,
-		toId: posting?.destinations?.[0] ?? positive,
+		fromId: source?.sourceAccountId ?? negative,
+		toId: source?.destinations?.[0] ?? positive,
 	};
 }
 

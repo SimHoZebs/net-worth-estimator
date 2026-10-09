@@ -22,12 +22,20 @@ export function MovementEditor({
 				? sourceReadOnlyReason
 				: undefined;
 	const [noEndDate, setNoEndDate] = useState(item?.endDate == null);
+	const [frequency, setFrequency] = useState(item?.frequency ?? "monthly");
+	const isOnce = frequency === "once";
+	const claimRules = plan.movements.filter(
+		(movement) => movement.frequency !== "once" && movement.id !== item?.id,
+	);
 	return (
 		<EditorForm
 			{...props}
 			title={`${item ? "Edit" : "Add"} planned transaction`}
 			readOnlyReason={readOnlyReason}
 			buildPlan={(data) => {
+				const claimRuleId = textValue(data, "claimRuleId") || null;
+				const claimOccurrenceDate =
+					textValue(data, "claimOccurrenceDate") || null;
 				const movement: Movement = {
 					id: item?.id ?? crypto.randomUUID(),
 					name: textValue(data, "name"),
@@ -44,6 +52,8 @@ export function MovementEditor({
 					annualIncrease: numberValue(data, "annualIncrease"),
 					enabled: textValue(data, "enabled") === "on",
 					readOnly: false,
+					claimRuleId,
+					claimOccurrenceDate,
 				};
 				return {
 					...plan,
@@ -74,6 +84,9 @@ export function MovementEditor({
 				label="Frequency"
 				name="frequency"
 				defaultValue={item?.frequency ?? "monthly"}
+				onChange={(event) =>
+					setFrequency(event.target.value as Movement["frequency"])
+				}
 			>
 				<option value="monthly">Monthly</option>
 				<option value="yearly">Yearly</option>
@@ -92,28 +105,53 @@ export function MovementEditor({
 				<AccountOptions accounts={visibleAccounts(plan.accounts)} />
 			</SelectField>
 			<InputField
-				label="First occurrence"
+				label={isOnce ? "Date" : "First occurrence"}
 				name="startDate"
 				type="date"
 				required
 				defaultValue={item?.startDate ?? plan.startDate}
 			/>
-			<InputField
-				label="Last occurrence"
-				name="endDate"
-				type="date"
-				disabled={noEndDate}
-				defaultValue={item?.endDate ?? ""}
-			/>
-			<label className="checkbox-field">
-				<input
-					name="noEndDate"
-					type="checkbox"
-					checked={noEndDate}
-					onChange={(event) => setNoEndDate(event.target.checked)}
-				/>
-				No end date
-			</label>
+			{isOnce ? (
+				<>
+					<SelectField
+						label="Records an occurrence of"
+						name="claimRuleId"
+						defaultValue={item?.claimRuleId ?? ""}
+					>
+						<option value="">No link — standalone record</option>
+						{claimRules.map((rule) => (
+							<option key={rule.id} value={rule.id}>
+								{rule.name}
+							</option>
+						))}
+					</SelectField>
+					<InputField
+						label="Replaces occurrence on"
+						name="claimOccurrenceDate"
+						type="date"
+						defaultValue={item?.claimOccurrenceDate ?? ""}
+					/>
+				</>
+			) : (
+				<>
+					<InputField
+						label="Last occurrence"
+						name="endDate"
+						type="date"
+						disabled={noEndDate}
+						defaultValue={item?.endDate ?? ""}
+					/>
+					<label className="checkbox-field">
+						<input
+							name="noEndDate"
+							type="checkbox"
+							checked={noEndDate}
+							onChange={(event) => setNoEndDate(event.target.checked)}
+						/>
+						No end date
+					</label>
+				</>
+			)}
 			<InputField
 				label="Annual amount increase (%)"
 				name="annualIncrease"

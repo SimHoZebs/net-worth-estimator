@@ -12,6 +12,7 @@ const document = {
 	accounts: [{ id: "cash", name: "Cash", enabled: true }],
 	checkpoints: [{ Date: "2026-01-01", AccountId: "cash", Balance: 100 }],
 	postings: [{ id: "pay", name: "Pay", enabled: true }],
+	recurrenceRules: [{ id: "salary", name: "Salary", enabled: true }],
 	evaluations: {
 		financialIndependence: [],
 		netWorthThreshold: [],
@@ -47,6 +48,10 @@ describe("server model import parsing", () => {
 			checkpoints: [{ Date: "2026-01-01", AccountId: "cash", Balance: "100" }],
 		},
 		{ ...document, postings: [{ id: "pay", name: 1, enabled: true }] },
+		{
+			...document,
+			recurrenceRules: [{ id: "salary", name: 1, enabled: true }],
+		},
 	])("rejects an unsafe preview envelope: %j", (value) => {
 		expect(isFinancialModelDocument(value)).toBe(false);
 		const result = parseModelDocument({
@@ -62,6 +67,7 @@ describe("server model import parsing", () => {
 				accounts: [],
 				checkpoints: [],
 				postings: [],
+				recurrenceRules: [],
 			}),
 		).toBe(true);
 	});

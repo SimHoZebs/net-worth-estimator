@@ -86,13 +86,17 @@ export type PostingAmountResolution =
 	| OtherPostingAmountResolution;
 export type AmountResolution = PostingAmountResolution;
 
-export type PostingFrequency =
-	| "once"
+export type RecurrenceFrequency =
 	| "daily"
 	| "weekly"
 	| "monthly"
 	| "quarterly"
 	| "annual";
+
+export interface PostingClaim extends HumaMetadata {
+	ruleId: string;
+	occurrenceDate: IsoDate;
+}
 
 export interface BackendPosting extends HumaMetadata {
 	id: string;
@@ -100,7 +104,21 @@ export interface BackendPosting extends HumaMetadata {
 	sourceAccountId: string | null;
 	destinations: string[] | null;
 	amount: PostingAmountResolution;
-	frequency: PostingFrequency;
+	date: IsoDate;
+	claim?: PostingClaim | null;
+	priority: number;
+	enabled: boolean;
+	source?: string;
+}
+export type Posting = BackendPosting;
+
+export interface BackendRecurrenceRule extends HumaMetadata {
+	id: string;
+	name: string;
+	sourceAccountId: string | null;
+	destinations: string[] | null;
+	amount: PostingAmountResolution;
+	frequency: RecurrenceFrequency;
 	annualRate: number;
 	annualGrowthRate: number;
 	volatility: number;
@@ -109,9 +127,8 @@ export interface BackendPosting extends HumaMetadata {
 	annualCap: number | null;
 	priority: number;
 	enabled: boolean;
-	source?: string;
 }
-export type Posting = BackendPosting;
+export type RecurrenceRule = BackendRecurrenceRule;
 
 export type EvaluationConfig = JsonValue;
 export type EvaluationResultPayload = JsonValue;
@@ -156,13 +173,16 @@ export interface FinancialModelDocument extends HumaMetadata {
 	checkpoints: BackendCheckpoint[];
 	evaluations: EvaluationTables;
 	postings: BackendPosting[];
+	recurrenceRules: BackendRecurrenceRule[];
 }
 
 export interface ModelOverrides extends HumaMetadata {
 	addedAccounts: BackendAccount[];
 	addedPostings: BackendPosting[];
+	addedRules: BackendRecurrenceRule[];
 	disabledAccountIds: string[];
 	disabledPostingIds: string[];
+	disabledRuleIds: string[];
 }
 
 export interface ProjectionRuntimeSettings extends HumaMetadata {

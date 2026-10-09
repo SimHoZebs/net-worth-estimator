@@ -40,6 +40,10 @@ export const movementSchema = z.object({
 	annualIncrease: z.number().min(-50).max(50),
 	enabled: z.boolean(),
 	readOnly: z.boolean(),
+	// Manual link to a recurrence rule occurrence. Only meaningful for
+	// one-time movements; the server validates the named occurrence.
+	claimRuleId: id.nullable().default(null),
+	claimOccurrenceDate: date.nullable().default(null),
 });
 
 /**

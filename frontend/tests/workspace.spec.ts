@@ -91,8 +91,8 @@ test("edits remain temporary, persist across reload, compare, and save deliberat
 	// The save reached the server, and the unsaved changes are gone.
 	const saved = await readSavedServerPlan();
 	expect(
-		saved.postings.find((posting) => posting.id === "invest")?.amount.config
-			.expression,
+		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
+			.config.expression,
 	).toBe("900");
 	expect(await readTemporaryVersion(page)).toBeNull();
 });

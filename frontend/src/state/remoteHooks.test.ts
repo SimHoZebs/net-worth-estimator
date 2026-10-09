@@ -132,7 +132,8 @@ function modelFixture(): FinancialModelDocument {
 			accountBalance: [],
 			postingFulfillment: [],
 		},
-		postings: [
+		postings: [],
+		recurrenceRules: [
 			{
 				id: "salary",
 				name: "Salary",
@@ -979,7 +980,7 @@ describe("remote workspace state", () => {
 		expect(client.putModel).toHaveBeenCalledWith(
 			expect.objectContaining({
 				sourcePath: "/configs/household.json",
-				postings: [
+				recurrenceRules: [
 					expect.objectContaining({
 						amount: expect.objectContaining({
 							resolver: "expression",
@@ -1342,17 +1343,19 @@ describe("remote workspace state", () => {
 		expect(rendered.result().updatePlan(edited)).toBe(true);
 		await rendered.settle();
 		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
-		expect(rendered.result().draftDocument?.postings[0]?.amount).toEqual({
-			resolver: "expression",
-			config: { expression: "125" },
-			inputs: {},
-		});
+		expect(rendered.result().draftDocument?.recurrenceRules[0]?.amount).toEqual(
+			{
+				resolver: "expression",
+				config: { expression: "125" },
+				inputs: {},
+			},
+		);
 		expect(rendered.result().error).toBeNull();
 
 		expect(await rendered.result().save()).toBe(true);
 		expect(client.putModel).toHaveBeenCalledWith(
 			expect.objectContaining({
-				postings: [
+				recurrenceRules: [
 					expect.objectContaining({
 						amount: expect.objectContaining({
 							resolver: "expression",
@@ -2107,14 +2110,15 @@ describe("remote draft storage", () => {
 		const document = modelFixture();
 		const reordered = {
 			postings: document.postings,
+			recurrenceRules: document.recurrenceRules,
 			evaluations: document.evaluations,
 			checkpoints: document.checkpoints,
 			accounts: document.accounts,
 			sourcePath: document.sourcePath,
 		};
 		const changed = modelFixture();
-		changed.postings[0] = {
-			...changed.postings[0]!,
+		changed.recurrenceRules[0] = {
+			...changed.recurrenceRules[0]!,
 			amount: {
 				resolver: "expression",
 				config: { expression: "200" },

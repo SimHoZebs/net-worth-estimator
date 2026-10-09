@@ -12,6 +12,7 @@ const document: FinancialModelDocument = {
 	accounts: [],
 	checkpoints: [],
 	postings: [],
+	recurrenceRules: [],
 	evaluations: {
 		financialIndependence: [],
 		netWorthThreshold: [],
