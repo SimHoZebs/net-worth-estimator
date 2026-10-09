@@ -7,7 +7,6 @@ import type { EvaluationResult } from "../../domain/result.ts";
 export function EvaluationCard({
 	evaluation,
 	result,
-	measure,
 	probability,
 	onEdit,
 	onRemove,
@@ -16,7 +15,6 @@ export function EvaluationCard({
 }: {
 	evaluation: Evaluation;
 	result: Pick<EvaluationResult, "current" | "firstDate"> | undefined;
-	measure: string | undefined;
 	probability: number | null;
 	onEdit: () => void;
 	onRemove: () => void;
@@ -46,9 +44,6 @@ export function EvaluationCard({
 				</div>
 			</div>
 			<h2>{evaluation.name}</h2>
-			<p>
-				{measure} · {money(evaluation.target)}
-			</p>
 			<div className="evaluation-card-outcome">
 				{!evaluation.enabled
 					? "Paused"

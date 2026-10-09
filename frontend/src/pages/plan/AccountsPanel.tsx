@@ -47,11 +47,7 @@ export function AccountsPanel({
 										<strong>{account.name}</strong>
 										<small>
 											{account.kind}
-											{!account.enabled
-												? " · excluded"
-												: account.balanceCheck
-													? " · confirmed"
-													: " · estimated"}
+											{!account.enabled ? " · excluded" : ""}
 										</small>
 									</span>
 									{account.readOnly && (

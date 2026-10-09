@@ -57,9 +57,6 @@
 	.chart-foot .icon-button {
 		margin-left: auto;
 	}
-	.accounts-grid {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
 	.draft-bar {
 		left: calc(var(--sidebar) + 28px);
 		right: 28px;
@@ -439,28 +436,6 @@
 	}
 	.timing-figures strong {
 		font-size: 27px;
-	}
-	.accounts-grid {
-		grid-template-columns: 1fr;
-		gap: 9px;
-	}
-	.account-row {
-		padding: 14px;
-	}
-	.account-label strong {
-		font-size: 12px;
-	}
-	.account-label > span {
-		font-size: 9px;
-	}
-	.account-balance {
-		font-size: 14px;
-	}
-	.account-balance .badge {
-		font-size: 8px;
-	}
-	.account-summary {
-		gap: 18px;
 	}
 	.page-footer {
 		font-size: 8px;

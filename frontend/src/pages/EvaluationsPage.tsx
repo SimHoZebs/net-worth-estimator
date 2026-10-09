@@ -2,11 +2,7 @@ import { Check, Flag, Plus } from "lucide-react";
 import { Badge, EmptyState, Progress } from "../components/ui.tsx";
 import "./evaluations/evaluations.css";
 import { dateLabel } from "../domain/format.ts";
-import {
-	type Evaluation,
-	type Plan,
-	visibleAccounts,
-} from "../domain/model.ts";
+import type { Evaluation, Plan } from "../domain/model.ts";
 import { removeEvaluation, setEvaluationEnabled } from "../domain/planEdits.ts";
 import type {
 	OtherEvaluation,
@@ -14,12 +10,6 @@ import type {
 	RangeResult,
 } from "../domain/result.ts";
 import { EvaluationCard } from "./evaluations/EvaluationCard.tsx";
-
-const otherTypeLabels: Record<OtherEvaluation["type"], string> = {
-	financialIndependence: "Financial independence",
-	postingFulfillment: "Posting fulfillment",
-	cycleFulfillment: "Cycle fulfillment",
-};
 
 function OtherEvaluationCard({ item }: { item: OtherEvaluation }) {
 	const satisfied = item.enabled && item.status === "satisfied";
@@ -39,7 +29,7 @@ function OtherEvaluationCard({ item }: { item: OtherEvaluation }) {
 				</span>
 			</div>
 			<h2>{item.name}</h2>
-			<p>{item.goal || otherTypeLabels[item.type]}</p>
+			{item.goal && item.goal !== item.name && <p>{item.goal}</p>}
 			<div className="evaluation-card-outcome">
 				{!item.enabled
 					? "Paused"
@@ -90,7 +80,6 @@ export function EvaluationsPage({
 	onEvidence: (id: string) => void;
 }) {
 	const others = projection.otherEvaluations;
-	const visible = visibleAccounts(plan.accounts);
 	const archivedIds = new Set(
 		plan.accounts.filter((a) => a.archived).map((a) => a.id),
 	);
@@ -121,11 +110,6 @@ export function EvaluationsPage({
 						result={projection.evaluations.find(
 							(g) => g.evaluation.id === evaluation.id,
 						)}
-						measure={
-							evaluation.kind === "net-worth"
-								? "Household net worth"
-								: visible.find((a) => a.id === evaluation.accountId)?.name
-						}
 						probability={
 							range ? (range.evaluationSuccess[evaluation.id] ?? 0) : null
 						}

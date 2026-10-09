@@ -11,10 +11,9 @@ test.beforeEach(async () => {
 });
 
 async function openChecking(page: Page) {
-	await page.goto("/");
+	await page.goto("/#accounts");
 	await page
-		.locator(".accounts-grid")
-		.getByRole("button", { name: /Everyday checking/ })
+		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
 	return page.getByRole("dialog", { name: "Everyday checking" });
 }
@@ -67,9 +66,7 @@ test("clicking an account opens its recorded history and projected transactions"
 	).toBeVisible();
 	await page.keyboard.press("Escape");
 	await expect(
-		page
-			.locator(".accounts-grid")
-			.getByRole("button", { name: /Everyday checking/ }),
+		page.getByRole("button", { name: "Open Everyday checking transactions" }),
 	).toBeFocused();
 });
 
@@ -196,10 +193,9 @@ test("clicking outside the account panel closes it", async ({ page }) => {
 test("growth-only accounts have an honest empty state and retain account details", async ({
 	page,
 }) => {
-	await page.goto("/");
+	await page.goto("/#accounts");
 	await page
-		.locator(".accounts-grid")
-		.getByRole("button", { name: /Home value/ })
+		.getByRole("button", { name: "Open Home value transactions" })
 		.click();
 	const dialog = page.getByRole("dialog", { name: "Home value" });
 	await expect(

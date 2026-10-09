@@ -5,7 +5,7 @@ import {
 	SegmentedBar,
 } from "../../components/SegmentedBar.tsx";
 import { Tabs } from "../../components/Tabs.tsx";
-import { Badge, Modal } from "../../components/ui.tsx";
+import { Modal } from "../../components/ui.tsx";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { MandatorySpendingGroup } from "../../domain/householdTiming.ts";
@@ -312,16 +312,11 @@ export function TimingDetailDialog({
 			>
 				{tab === "mandatory" ? (
 					<div className="timing-mandatory">
-						<h3>
-							Left to spend{" "}
-							{heroes.cushionProvisional && (
-								<Badge tone="amber">Estimated</Badge>
-							)}
-						</h3>
+						<h3>Left to spend</h3>
 						<p className="section-note">
 							{heroes.checkingObservedOn
 								? `As of ${dateLabel(heroes.checkingObservedOn, true)}`
-								: "No confirmed balance — estimated"}
+								: ""}
 						</p>
 						<CashNowBar parts={cashNow} />
 						<Tabs

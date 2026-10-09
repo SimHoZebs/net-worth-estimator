@@ -865,7 +865,7 @@ export function displayPlanToBackendDocument(
 		warn(
 			conversionReport,
 			"account-presentation-metadata",
-			"Whether a balance is confirmed, its source, and its read-only state stay local and are not imported.",
+			"Balance verification, source, and read-only state stay local and are not imported.",
 			`accounts.${index}`,
 		);
 		return {

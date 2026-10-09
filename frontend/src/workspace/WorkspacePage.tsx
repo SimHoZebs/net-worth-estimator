@@ -66,9 +66,6 @@ export function WorkspacePage({
 		onImportServerDocument,
 		readOnly = false,
 		retrySavedProjection,
-		authControl = null,
-		authRequired = false,
-		authTokenActive = false,
 	} = inputs;
 	switch (page) {
 		case "outlook":
@@ -87,10 +84,6 @@ export function WorkspacePage({
 							rangeError={projection.rangeError}
 							onEvidence={() => onEvidence({ kind: "position" })}
 							onFailure={() => onEvidence({ kind: "failure" })}
-							onAccount={(account) =>
-								onEvidence({ kind: "account", id: account.id })
-							}
-							onAccounts={() => onNavigate("accounts")}
 							onTransactions={() => onNavigate("transactions")}
 							onEvaluations={() => onNavigate("evaluations")}
 							onEvaluation={(id) => onEvidence({ kind: "evaluation", id })}
@@ -206,9 +199,6 @@ export function WorkspacePage({
 					serverDocument={serverDocument}
 					onImportServerDocument={onImportServerDocument}
 					readOnly={readOnly}
-					authControl={authControl}
-					authRequired={authRequired}
-					authTokenActive={authTokenActive}
 					onEdit={onEdit}
 				/>
 			);

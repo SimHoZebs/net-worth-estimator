@@ -1,4 +1,4 @@
-import { ArrowRight, Info, TriangleAlert } from "lucide-react";
+import { ArrowRight, TriangleAlert } from "lucide-react";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
@@ -101,14 +101,6 @@ export function FailureEvidence({
 					</>
 				)}
 			</dl>
-			<div className="inline-notice amber">
-				<Info size={19} />
-				<span>
-					The unpaid amount is not automatically borrowed or rescheduled. Later
-					balances include only the realized movement, so the projected
-					destination does not mean the whole plan is affordable.
-				</span>
-			</div>
 			{movement && (
 				<div className="modal-actions">
 					<button

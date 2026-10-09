@@ -9,7 +9,6 @@ import {
 	WorkspaceDialogs,
 	WorkspaceEvidence,
 } from "./workspace/WorkspaceDialogs.tsx";
-import { WorkspaceFooter } from "./workspace/WorkspaceFooter.tsx";
 import {
 	WorkspaceHeading,
 	WorkspaceTopbar,
@@ -104,7 +103,6 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 				projection={projection}
 				temporary={Boolean(workspace.draft)}
 			/>
-			<WorkspaceFooter onMethod={showMethod} />
 		</WorkspaceLayout>
 	);
 }

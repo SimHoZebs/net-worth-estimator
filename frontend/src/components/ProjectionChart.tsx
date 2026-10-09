@@ -179,9 +179,7 @@ export function ProjectionChart({
 					<span className="tiny-caret">⌄</span>
 				</button>
 				<span className="chart-foot-note">
-					{realTerms
-						? `${inflation}% inflation adjustment`
-						: "Projection from recorded + estimated balances"}
+					{realTerms ? `${inflation}% inflation adjustment` : ""}
 				</span>
 				<IconButton
 					icon={showTable ? X : Table2}

@@ -39,10 +39,7 @@ export function PositionEvidence({
 										<AccountDot color={account.color} />
 										{account.name}
 									</span>
-									<small>
-										{account.balanceCheck ? "Confirmed" : "Estimated"} ·{" "}
-										{dateLabel(account.observedOn, true)}
-									</small>
+									<small>{dateLabel(account.observedOn, true)}</small>
 								</>
 							}
 						>
@@ -56,8 +53,7 @@ export function PositionEvidence({
 					{plan.origin === "example"
 						? "All balances are illustrative example data. "
 						: ""}
-					Some starting balances are confirmed and others are estimated. Older
-					values carry forward unchanged.
+					Older values carry forward unchanged.
 				</span>
 			</div>
 		</Modal>
