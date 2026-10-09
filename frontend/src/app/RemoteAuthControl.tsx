@@ -17,11 +17,10 @@ export function RemoteAuthControl({
 			<div className="inline-notice auth-notice">
 				<LockKeyhole size={18} aria-hidden="true" />
 				<span>
-					<strong>Server access token ready.</strong> It stays in this tab’s
-					memory and is cleared when this page closes.
+					<strong>Saving unlocked.</strong>
 				</span>
 				<button type="button" className="text-button" onClick={onClear}>
-					Clear token
+					Lock
 				</button>
 			</div>
 		);
@@ -39,13 +38,11 @@ function RemoteAuthPrompt({ onApply }: { onApply: (token: string) => void }) {
 		<div className="inline-notice auth-notice">
 			<LockKeyhole size={18} aria-hidden="true" />
 			<span>
-				<strong>Server authentication required.</strong> Enter the bearer token
-				to enable protected saves. It stays in React memory only and is never
-				stored or added to the URL.
+				<strong>Saving is locked.</strong>
 			</span>
 			<form className="auth-form" onSubmit={submit}>
 				<label className="sr-only" htmlFor="waypoint-server-token">
-					Server bearer token
+					Password
 				</label>
 				<input
 					id="waypoint-server-token"
@@ -54,10 +51,11 @@ function RemoteAuthPrompt({ onApply }: { onApply: (token: string) => void }) {
 					onChange={(event) => setToken(event.target.value)}
 					autoComplete="off"
 					spellCheck={false}
+					placeholder="Password"
 					required
 				/>
 				<button type="submit" className="button primary small">
-					Use token
+					Unlock
 				</button>
 			</form>
 		</div>
