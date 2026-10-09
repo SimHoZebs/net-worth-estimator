@@ -632,26 +632,30 @@ export function TimingPreview({
 				<span>
 					{allowance >= 0
 						? `You can spend on cards until ${dateLabel(cycle.cycleEnd, true)}`
-						: `Cards over budget until ${dateLabel(cycle.cycleEnd, true)}`}
+						: `Over budget on cards until ${dateLabel(cycle.cycleEnd, true)}`}
 				</span>
 				<strong>{money(Math.abs(allowance))}</strong>
 				<span>
 					{allowance >= 0
 						? `${money(dailySafe)} a day`
 						: `${money(-dailySafe)} a day over`}{" "}
-					· {money(spent)} committed
+					· {money(spent)} card charges
 				</span>
 			</div>
 			<div className="cycle-remaining">
 				<div>
-					<span>Checking left</span>
-					<strong>
-						{money(shortWindow.total > 0 ? -shortWindow.total : cushion)}
-					</strong>
-				</div>
-				<div>
 					<span>Balance</span>
 					<strong>{money(checking)}</strong>
+				</div>
+				<div>
+					<span>Bills due</span>
+					<strong>{money(remainingObligations)}</strong>
+				</div>
+				<div>
+					<span>{shortWindow.total > 0 ? "Short" : "Left to spend"}</span>
+					<strong>
+						{money(shortWindow.total > 0 ? shortWindow.total : cushion)}
+					</strong>
 				</div>
 			</div>
 			<div className="cycle-progress">
