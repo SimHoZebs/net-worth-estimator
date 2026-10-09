@@ -41,7 +41,6 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 		current: plan,
 	}).length;
 	const sourceReadOnly = readOnly || workspace.saved.readOnly;
-	const showMethod = () => overlays.openEvidence({ kind: "method" });
 	return (
 		<WorkspaceLayout
 			navigation={(close) => (
@@ -55,7 +54,6 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 						authTokenActive,
 					})}
 					onNavigate={navigation.navigate}
-					onMethod={showMethod}
 					onClose={close}
 				/>
 			)}

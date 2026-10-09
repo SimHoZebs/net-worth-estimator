@@ -1,6 +1,5 @@
 import {
 	ChevronDown,
-	CircleHelp,
 	LockKeyhole,
 	PanelLeftClose,
 	Settings,
@@ -16,7 +15,6 @@ export function WorkspaceSidebar({
 	changeCount,
 	statusLabel,
 	onNavigate,
-	onMethod,
 	onClose,
 	pending = false,
 }: {
@@ -25,7 +23,6 @@ export function WorkspaceSidebar({
 	changeCount: number;
 	statusLabel: string;
 	onNavigate: (page: Page) => void;
-	onMethod: () => void;
 	onClose: () => void;
 	pending?: boolean;
 }) {
@@ -95,15 +92,6 @@ export function WorkspaceSidebar({
 					<Settings size={19} strokeWidth={1.7} />
 					<span>Configs</span>
 				</a>
-				<button
-					type="button"
-					className="nav-link help-link"
-					onClick={onMethod}
-					disabled={pending}
-				>
-					<CircleHelp size={19} strokeWidth={1.7} />
-					<span>How it works</span>
-				</button>
 				<ThemeToggle />
 				<div className="sidebar-status">
 					<span className="status-dot" />
