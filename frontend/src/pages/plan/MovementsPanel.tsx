@@ -1,11 +1,5 @@
-import {
-	ArrowDownLeft,
-	ArrowRight,
-	ArrowUpRight,
-	Pencil,
-	Trash2,
-} from "lucide-react";
-import { Badge, EmptyState, IconButton } from "../../components/ui.tsx";
+import { ArrowDownLeft, ArrowRight, ArrowUpRight } from "lucide-react";
+import { Badge, EmptyState } from "../../components/ui.tsx";
 import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Account, Movement } from "../../domain/model.ts";
@@ -17,13 +11,11 @@ export function MovementsPanel({
 	accounts,
 	resolvedAmounts,
 	onEdit,
-	onRemove,
 }: {
 	movements: Movement[];
 	accounts: Account[];
 	resolvedAmounts?: Map<string, ResolvedMovementAmount>;
 	onEdit: (movement: Movement) => void;
-	onRemove: (movement: Movement) => void;
 }) {
 	if (!movements.length)
 		return <EmptyState icon={ArrowRight} title="No matching transactions" />;
@@ -31,9 +23,11 @@ export function MovementsPanel({
 	return (
 		<div className="movement-list">
 			{movements.map((movement) => (
-				<div
+				<button
+					type="button"
 					className={`movement-row ${movement.enabled ? "" : "is-excluded"}`}
 					key={movement.id}
+					onClick={() => onEdit(movement)}
 				>
 					<span
 						className={`movement-icon ${movement.fromId ? (movement.toId ? "transfer" : "outflow") : "inflow"}`}
@@ -79,21 +73,7 @@ export function MovementsPanel({
 						)}
 						{!movement.enabled && <Badge tone="amber">Excluded</Badge>}
 					</div>
-					<div className="table-actions">
-						<IconButton
-							icon={Pencil}
-							label={`Edit ${movement.name}`}
-							disabled={movement.readOnly}
-							onClick={() => onEdit(movement)}
-						/>
-						<IconButton
-							icon={Trash2}
-							label={`Remove ${movement.name}`}
-							disabled={movement.readOnly}
-							onClick={() => onRemove(movement)}
-						/>
-					</div>
-				</div>
+				</button>
 			))}
 		</div>
 	);

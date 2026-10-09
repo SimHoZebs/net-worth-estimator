@@ -28,7 +28,7 @@ export function EditorForm({
 	useBeforeUnload(dirty);
 	const close = () => (dirty ? setConfirmCancel(true) : onClose());
 	return (
-		<Modal title={title} eyebrow="Try it before you keep it" onClose={close}>
+		<Modal title={title} onClose={close}>
 			{readOnlyReason && (
 				<div className="inline-notice">
 					<LockKeyhole size={18} />
@@ -56,16 +56,16 @@ export function EditorForm({
 				{error && <ErrorNotice message={error} />}
 				{confirmCancel ? (
 					<div className="confirm-inline" role="alert">
-						<p>Discard the edits in this form?</p>
+						<p>Discard the changes in this form?</p>
 						<button
 							type="button"
 							className="button secondary"
 							onClick={() => setConfirmCancel(false)}
 						>
-							Keep editing
+							Continue
 						</button>
 						<button type="button" className="button danger" onClick={onClose}>
-							Discard form edits
+							Discard changes
 						</button>
 					</div>
 				) : (
@@ -88,4 +88,4 @@ export function EditorForm({
 }
 
 export const sourceReadOnlyReason =
-	"Edit it at the source and import a refreshed plan.";
+	"Change it at the source and import a refreshed plan.";

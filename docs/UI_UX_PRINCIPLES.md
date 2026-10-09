@@ -354,7 +354,7 @@ Never announce a state the structure already shows.
 A disabled control, a lock icon, and a status readout together say "read-only";
 a sentence saying it again is not information.
 Text may only add the recourse the structure does not offer: where to go instead,
-what to do instead. "Edit it at the source and import a refreshed plan" stays;
+what to do instead. "Change it at the source and import a refreshed plan" stays;
 "This record is owned by a read-only source" goes.
 
 Everything else goes:

@@ -128,7 +128,7 @@ test("a shortfall can be inspected and edited while preserving account context a
 	await expect(dialog.locator(".transaction-details")).toContainText("$9,000");
 	await dialog.getByRole("button", { name: "Edit transaction" }).click();
 	await expect(
-		page.getByRole("dialog", { name: "Edit planned transaction" }),
+		page.getByRole("dialog", { name: "Home renovation" }),
 	).toBeVisible();
 	await page.getByLabel("Amount (USD)").fill("3000");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();

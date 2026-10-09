@@ -56,13 +56,7 @@ export function PlanPage({
 			/>
 		);
 	}
-	return (
-		<TransactionsWithProjection
-			plan={plan}
-			onEdit={onEdit}
-			onUpdate={updatePlan}
-		/>
-	);
+	return <TransactionsWithProjection plan={plan} onEdit={onEdit} />;
 }
 
 // The transaction list resolves realized amounts from the projection, so it
@@ -71,11 +65,9 @@ export function PlanPage({
 function TransactionsWithProjection({
 	plan,
 	onEdit,
-	onUpdate,
 }: {
 	plan: Plan;
 	onEdit: (target: EditorTarget) => void;
-	onUpdate: (plan: Plan) => boolean;
 }) {
 	const projection = useRemoteProjection({ ranges: false });
 	const baseLoadError =
@@ -103,12 +95,7 @@ function TransactionsWithProjection({
 				/>
 			)}
 			{projection.loading && base && <ProjectionUpdating />}
-			<TransactionsView
-				plan={plan}
-				projection={base}
-				onEdit={onEdit}
-				onUpdate={onUpdate}
-			/>
+			<TransactionsView plan={plan} projection={base} onEdit={onEdit} />
 		</>
 	);
 }
@@ -241,18 +228,15 @@ function TransactionsView({
 	plan,
 	projection,
 	onEdit,
-	onUpdate,
 }: {
 	plan: Plan;
 	projection?: Projection | null;
 	onEdit: (target: EditorTarget) => void;
-	onUpdate: (plan: Plan) => boolean;
 }) {
 	const [query, setQuery] = useState("");
 	const [schedule, setSchedule] = useState<ScheduleFilter>("all");
 	const [page, setPage] = useState(0);
 	const listId = useId();
-	const { requestRemoval, dialog } = usePlanRemoval({ plan, onUpdate });
 	const resolvedAmounts = useMemo(
 		() =>
 			projection ? resolveMovementAmounts(projection.movements) : new Map(),
@@ -297,80 +281,70 @@ function TransactionsView({
 		document.getElementById(listId)?.scrollIntoView({ block: "nearest" });
 	};
 	return (
-		<>
-			<Tabs
-				items={tabs}
-				value={schedule}
-				onChange={resetFilters}
-				label="Transactions sections"
-				panelAs="section"
-				panelClassName="plan-transactions"
-			>
-				<div className="plan-toolbar">
-					<label className="search-field">
-						<Search size={17} />
-						<input
-							aria-label="Search plan"
-							value={query}
-							onChange={(event) => search(event.target.value)}
-							placeholder="Find a transaction…"
-						/>
-					</label>
-					<button
-						type="button"
-						className="button primary small"
-						onClick={() => onEdit({ kind: "movement", item: null })}
-					>
-						<Plus size={16} />
-						Add transaction
-					</button>
-				</div>
-				<div id={listId}>
-					<MovementsPanel
-						movements={pagedMovements}
-						accounts={visibleAccounts(plan.accounts)}
-						resolvedAmounts={resolvedAmounts}
-						onEdit={(item) => onEdit({ kind: "movement", item })}
-						onRemove={(item) =>
-							requestRemoval({
-								kind: "movements",
-								id: item.id,
-								name: item.name,
-							})
-						}
+		<Tabs
+			items={tabs}
+			value={schedule}
+			onChange={resetFilters}
+			label="Transactions sections"
+			panelAs="section"
+			panelClassName="plan-transactions"
+		>
+			<div className="plan-toolbar">
+				<label className="search-field">
+					<Search size={17} />
+					<input
+						aria-label="Search plan"
+						value={query}
+						onChange={(event) => search(event.target.value)}
+						placeholder="Find a transaction…"
 					/>
-				</div>
-				{pageCount > 1 && (
-					<div className="transaction-pagination">
-						<span role="status">
-							Showing {currentPage * TRANSACTIONS_PAGE_SIZE + 1}–
-							{Math.min(
-								(currentPage + 1) * TRANSACTIONS_PAGE_SIZE,
-								movements.length,
-							)}{" "}
-							of {movements.length} transactions
+				</label>
+				<button
+					type="button"
+					className="button primary small"
+					onClick={() => onEdit({ kind: "movement", item: null })}
+				>
+					<Plus size={16} />
+					Add transaction
+				</button>
+			</div>
+			<div id={listId}>
+				<MovementsPanel
+					movements={pagedMovements}
+					accounts={visibleAccounts(plan.accounts)}
+					resolvedAmounts={resolvedAmounts}
+					onEdit={(item) => onEdit({ kind: "movement", item })}
+				/>
+			</div>
+			{pageCount > 1 && (
+				<div className="transaction-pagination">
+					<span role="status">
+						Showing {currentPage * TRANSACTIONS_PAGE_SIZE + 1}–
+						{Math.min(
+							(currentPage + 1) * TRANSACTIONS_PAGE_SIZE,
+							movements.length,
+						)}{" "}
+						of {movements.length} transactions
+					</span>
+					<div>
+						<IconButton
+							icon={ChevronLeft}
+							label="Previous transaction page"
+							disabled={currentPage === 0}
+							onClick={() => turnPage(currentPage - 1)}
+						/>
+						<span>
+							{currentPage + 1} / {pageCount}
 						</span>
-						<div>
-							<IconButton
-								icon={ChevronLeft}
-								label="Previous transaction page"
-								disabled={currentPage === 0}
-								onClick={() => turnPage(currentPage - 1)}
-							/>
-							<span>
-								{currentPage + 1} / {pageCount}
-							</span>
-							<IconButton
-								icon={ChevronRight}
-								label="Next transaction page"
-								disabled={currentPage === pageCount - 1}
-								onClick={() => turnPage(currentPage + 1)}
-							/>
-						</div>
+						<IconButton
+							icon={ChevronRight}
+							label="Next transaction page"
+							disabled={currentPage === pageCount - 1}
+							onClick={() => turnPage(currentPage + 1)}
+						/>
 					</div>
-				)}
-			</Tabs>
-			{dialog}
-		</>
+				</div>
+			)}
+		</Tabs>
 	);
 }
