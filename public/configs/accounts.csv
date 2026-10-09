@@ -1,5 +1,5 @@
 id,name,kind,minBalance,maxBalance,color,enabled
-checking,Checking,cash,-Infinity,Infinity,#4287f5,true
+checking,Checking,cash,0,Infinity,#4287f5,true
 k401,401(k),investment,-Infinity,Infinity,#2563eb,true
 brokerage,Brokerage,investment,-Infinity,Infinity,#16a34a,true
 student_loan1_principal,Student Loan 1 (Principal),debt,-Infinity,0,#dc2626,true
