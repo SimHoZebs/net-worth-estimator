@@ -690,6 +690,7 @@ export function useRemoteProjection({
 	const [range, setRange] = useState<RangeResult | null>(null);
 	const [progress, setProgress] = useState(0);
 	const [rangeError, setRangeError] = useState<string | null>(null);
+	const [baseError, setBaseError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [deterministicAttempt, setDeterministicAttempt] = useState(0);
 	const [rangeAttempt, setRangeAttempt] = useState(0);
@@ -717,11 +718,27 @@ export function useRemoteProjection({
 					"No server financial model is available for projection. Load or replace a model before calculating.",
 				),
 			);
+			setBaseError(
+				"No server financial model is available for projection. Load or replace a model before calculating.",
+			);
 			setLoading(false);
 			return () => controller.abort();
 		}
-		setBase(null);
+		// Stale-while-revalidate: keep the previous base visible while the next
+		// deterministic result loads. Only the initial load (base === null)
+		// shows the full-screen loader; refetches render stale content with
+		// loading=true so per-page gates can show an inline updating notice.
 		setLoading(true);
+		setBaseError(null);
+		const failBase = (message: string) => {
+			setBaseError(message);
+			setBase((previous) =>
+				previous && !(previous instanceof Error)
+					? previous
+					: new Error(message),
+			);
+			setLoading(false);
+		};
 		const request = projectionRequest(current, years, incomeDataRef.current);
 		void Promise.resolve()
 			.then(() =>
@@ -733,48 +750,40 @@ export function useRemoteProjection({
 			.then((response) => {
 				if (!mounted.current || controller.signal.aborted) return;
 				if (response instanceof Error) {
-					setBase(response);
-					setLoading(false);
+					failBase(response.message);
 					return;
 				}
 				const responseError = projectionResponseError(response);
 				if (responseError) {
-					setBase(responseError);
-					setLoading(false);
+					failBase(responseError.message);
 					return;
 				}
 				if (!response.result) {
-					setBase(
-						new Error(
-							"The server returned no deterministic projection result. Retry the request.",
-						),
+					failBase(
+						"The server returned no deterministic projection result. Retry the request.",
 					);
-					setLoading(false);
 					return;
 				}
 				try {
 					setBase(projectionResultToLocal(response.result, current));
+					setBaseError(null);
 				} catch (cause) {
-					setBase(
+					failBase(
 						cause instanceof Error
-							? cause
-							: new Error(
-									"The deterministic projection could not be mapped for display.",
-								),
+							? cause.message
+							: "The deterministic projection could not be mapped for display.",
 					);
+					return;
 				}
 				setLoading(false);
 			})
 			.catch((cause: unknown) => {
 				if (!mounted.current || controller.signal.aborted) return;
-				setBase(
+				failBase(
 					cause instanceof Error
-						? cause
-						: new Error(
-								"The deterministic projection request failed. Retry the connection.",
-							),
+						? cause.message
+						: "The deterministic projection request failed. Retry the connection.",
 				);
-				setLoading(false);
 			});
 		return () => controller.abort();
 	}, [
@@ -886,6 +895,7 @@ export function useRemoteProjection({
 		range,
 		progress,
 		rangeError,
+		baseError,
 		retryRange: () => setRangeAttempt((value) => value + 1),
 		retryProjection: () => setDeterministicAttempt((value) => value + 1),
 		loading,

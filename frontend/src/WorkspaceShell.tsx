@@ -2,7 +2,6 @@ import { changesBetween } from "./domain/model.ts";
 import { useBeforeUnload } from "./state/useBeforeUnload.ts";
 import { DraftBar } from "./workspace/DraftBar.tsx";
 import "./workspace/workspace.css";
-import { ProjectionBoundary } from "./workspace/ProjectionBoundary.tsx";
 import type { WorkspaceShellProps } from "./workspace/types.ts";
 import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation.ts";
 import { useWorkspaceOverlays } from "./workspace/useWorkspaceOverlays.ts";
@@ -30,7 +29,6 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 		plan,
 		state,
 		projection,
-		ranges,
 		readOnly = false,
 		authRequired = false,
 		authTokenActive = false,
@@ -91,27 +89,21 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
 				headingRef={navigation.headingRef}
 			/>
 			<WorkspaceNotices state={state} plan={plan} readOnly={sourceReadOnly} />
-			<ProjectionBoundary projection={projection} ranges={ranges}>
-				{(base) => (
-					<>
-						<WorkspacePage
-							page={navigation.page}
-							base={base}
-							inputs={{ ...props, readOnly: sourceReadOnly }}
-							onEdit={overlays.openEditor}
-							onEvidence={overlays.openEvidence}
-							onDiscard={overlays.openDiscard}
-							onNavigate={navigation.navigate}
-						/>
-						<WorkspaceEvidence
-							overlays={overlays}
-							plan={plan}
-							projection={projection}
-							temporary={Boolean(workspace.draft)}
-						/>
-					</>
-				)}
-			</ProjectionBoundary>
+			<WorkspacePage
+				page={navigation.page}
+				projection={projection}
+				inputs={{ ...props, readOnly: sourceReadOnly }}
+				onEdit={overlays.openEditor}
+				onEvidence={overlays.openEvidence}
+				onDiscard={overlays.openDiscard}
+				onNavigate={navigation.navigate}
+			/>
+			<WorkspaceEvidence
+				overlays={overlays}
+				plan={plan}
+				projection={projection}
+				temporary={Boolean(workspace.draft)}
+			/>
 			<WorkspaceFooter onMethod={showMethod} />
 		</WorkspaceLayout>
 	);

@@ -1,15 +1,18 @@
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
 import { ErrorNotice } from "../components/ui.tsx";
-import type { Projection } from "../domain/result.ts";
 import { ComparePage } from "../pages/ComparePage.tsx";
 import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
 import { PlanPage } from "../pages/PlanPage.tsx";
 import { SourcesPage } from "../pages/SourcesPage.tsx";
 import type { Page } from "./navigation.ts";
-import { ProjectionLoading } from "./ProjectionBoundary.tsx";
-import type { WorkspaceShellProps } from "./types.ts";
+import {
+	ProjectionBoundary,
+	ProjectionLoading,
+	ProjectionUpdating,
+} from "./ProjectionBoundary.tsx";
+import type { ProjectionState, WorkspaceShellProps } from "./types.ts";
 
 type PageInputs = Pick<
 	WorkspaceShellProps,
@@ -34,7 +37,7 @@ type PageInputs = Pick<
 
 export function WorkspacePage({
 	page,
-	base,
+	projection,
 	inputs,
 	onEdit,
 	onEvidence,
@@ -42,7 +45,7 @@ export function WorkspacePage({
 	onNavigate,
 }: {
 	page: Page;
-	base: Projection;
+	projection: ProjectionState;
 	inputs: PageInputs;
 	onEdit: (target: EditorTarget) => void;
 	onEvidence: (target: EvidenceTarget) => void;
@@ -53,7 +56,6 @@ export function WorkspacePage({
 		workspace,
 		plan,
 		state,
-		projection,
 		savedProjection,
 		years,
 		setYears,
@@ -71,27 +73,31 @@ export function WorkspacePage({
 	switch (page) {
 		case "outlook":
 			return (
-				<Outlook
-					plan={plan}
-					projection={base}
-					range={projection.range}
-					ranges={ranges}
-					setRanges={setRanges}
-					years={years}
-					setYears={setYears}
-					progress={projection.progress}
-					rangeError={projection.rangeError}
-					onEvidence={() => onEvidence({ kind: "position" })}
-					onFailure={() => onEvidence({ kind: "failure" })}
-					onAccount={(account) =>
-						onEvidence({ kind: "account", id: account.id })
-					}
-					onAccounts={() => onNavigate("accounts")}
-					onTransactions={() => onNavigate("transactions")}
-					onEvaluations={() => onNavigate("evaluations")}
-					onEvaluation={(id) => onEvidence({ kind: "evaluation", id })}
-					onEdit={onEdit}
-				/>
+				<ProjectionBoundary projection={projection} ranges={ranges}>
+					{(base) => (
+						<Outlook
+							plan={plan}
+							projection={base}
+							range={projection.range}
+							ranges={ranges}
+							setRanges={setRanges}
+							years={years}
+							setYears={setYears}
+							progress={projection.progress}
+							rangeError={projection.rangeError}
+							onEvidence={() => onEvidence({ kind: "position" })}
+							onFailure={() => onEvidence({ kind: "failure" })}
+							onAccount={(account) =>
+								onEvidence({ kind: "account", id: account.id })
+							}
+							onAccounts={() => onNavigate("accounts")}
+							onTransactions={() => onNavigate("transactions")}
+							onEvaluations={() => onNavigate("evaluations")}
+							onEvaluation={(id) => onEvidence({ kind: "evaluation", id })}
+							onEdit={onEdit}
+						/>
+					)}
+				</ProjectionBoundary>
 			);
 		case "accounts":
 			return (
@@ -104,58 +110,92 @@ export function WorkspacePage({
 					onAccount={(id) => onEvidence({ kind: "account", id })}
 				/>
 			);
-		case "transactions":
+		case "transactions": {
+			// Transactions render from the plan directly; projection only resolves
+			// realized amounts. Never block this page on the calculation.
+			const base =
+				projection.base && !(projection.base instanceof Error)
+					? projection.base
+					: null;
 			return (
-				<PlanPage
-					key="transactions"
-					plan={plan}
-					view="transactions"
-					projection={base}
-					onEdit={onEdit}
-					onUpdate={state.updatePlan}
-					onAccount={(id) => onEvidence({ kind: "account", id })}
-				/>
+				<>
+					{projection.base instanceof Error && (
+						<ErrorNotice
+							message={projection.base.message}
+							action="Retry calculation"
+							onAction={projection.retryProjection}
+						/>
+					)}
+					{projection.baseError && base && (
+						<ErrorNotice
+							message={projection.baseError}
+							action="Retry calculation"
+							onAction={projection.retryProjection}
+						/>
+					)}
+					{projection.loading && base && <ProjectionUpdating />}
+					<PlanPage
+						key="transactions"
+						plan={plan}
+						view="transactions"
+						projection={base}
+						onEdit={onEdit}
+						onUpdate={state.updatePlan}
+						onAccount={(id) => onEvidence({ kind: "account", id })}
+					/>
+				</>
 			);
+		}
 		case "evaluations":
 			return (
-				<EvaluationsPage
-					plan={plan}
-					projection={base}
-					range={projection.range}
-					onEdit={(item) => onEdit({ kind: "evaluation", item })}
-					onUpdate={state.updatePlan}
-					onEvidence={(id) => onEvidence({ kind: "evaluation", id })}
-				/>
+				<ProjectionBoundary projection={projection} ranges={ranges}>
+					{(base) => (
+						<EvaluationsPage
+							plan={plan}
+							projection={base}
+							range={projection.range}
+							onEdit={(item) => onEdit({ kind: "evaluation", item })}
+							onUpdate={state.updatePlan}
+							onEvidence={(id) => onEvidence({ kind: "evaluation", id })}
+						/>
+					)}
+				</ProjectionBoundary>
 			);
 		case "compare":
-			if (!savedProjection)
-				return (
-					<ProjectionLoading
-						label="Loading the saved comparison"
-						onRetry={retrySavedProjection}
-					/>
-				);
-			if (savedProjection instanceof Error)
-				return (
-					<ErrorNotice
-						message={savedProjection.message}
-						action="Retry saved calculation"
-						onAction={retrySavedProjection}
-					/>
-				);
 			return (
-				<ComparePage
-					saved={workspace.saved}
-					plan={plan}
-					projection={base}
-					savedProjection={savedProjection}
-					snapshot={workspace.snapshot}
-					years={years}
-					readOnly={readOnly}
-					onCapture={state.capture}
-					onSave={() => Promise.resolve(state.save())}
-					onDiscard={onDiscard}
-				/>
+				<ProjectionBoundary projection={projection} ranges={ranges}>
+					{(base) => {
+						if (!savedProjection)
+							return (
+								<ProjectionLoading
+									label="Loading the saved comparison"
+									onRetry={retrySavedProjection}
+								/>
+							);
+						if (savedProjection instanceof Error)
+							return (
+								<ErrorNotice
+									message={savedProjection.message}
+									action="Retry saved calculation"
+									onAction={retrySavedProjection}
+								/>
+							);
+						return (
+							<ComparePage
+								saved={workspace.saved}
+								plan={plan}
+								projection={base}
+								savedProjection={savedProjection}
+								snapshot={workspace.snapshot}
+								years={years}
+								readOnly={readOnly}
+								onCapture={state.capture}
+								onSave={() => Promise.resolve(state.save())}
+								onDiscard={onDiscard}
+							/>
+						);
+					}}
+				</ProjectionBoundary>
 			);
 		case "sources":
 			return (
