@@ -9,6 +9,7 @@ import {
 	type StochasticProjectionResult,
 } from "../api/index.ts";
 import type { Plan } from "../domain/model.ts";
+import { resetProjectionQueryCache } from "./projectionQuery.ts";
 import {
 	loadRemoteState,
 	persistRemoteState,
@@ -464,6 +465,7 @@ function clientFixture(
 afterEach(() => {
 	vi.unstubAllGlobals();
 	runtime.current = null;
+	resetProjectionQueryCache();
 });
 
 describe("remote workspace state", () => {

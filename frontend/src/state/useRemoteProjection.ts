@@ -21,6 +21,10 @@ import type {
 	Projection,
 	RangeResult,
 } from "../domain/result.ts";
+import {
+	deterministicQueryKey,
+	projectionQueryClient,
+} from "./projectionQuery.ts";
 
 export interface RemoteProjectionClient {
 	projectDeterministic(
@@ -695,23 +699,20 @@ export function useRemoteProjection({
 	const [deterministicAttempt, setDeterministicAttempt] = useState(0);
 	const [rangeAttempt, setRangeAttempt] = useState(0);
 	const mounted = useRef(true);
-	const deterministicController = useRef<AbortController | null>(null);
 	const rangeController = useRef<AbortController | null>(null);
+	const abortRequested = useRef(false);
+	const latestDeterministicKey = useRef<readonly unknown[] | null>(null);
 
 	useEffect(() => {
 		mounted.current = true;
 		return () => {
 			mounted.current = false;
-			deterministicController.current?.abort();
 			rangeController.current?.abort();
 		};
 	}, []);
 
 	useEffect(() => {
 		const current = enabled ? activeDocumentRef.current : null;
-		const controller = new AbortController();
-		deterministicController.current?.abort();
-		deterministicController.current = controller;
 		if (!current) {
 			setBase(
 				new Error(
@@ -722,14 +723,18 @@ export function useRemoteProjection({
 				"No server financial model is available for projection. Load or replace a model before calculating.",
 			);
 			setLoading(false);
-			return () => controller.abort();
+			return;
 		}
 		// Stale-while-revalidate: keep the previous base visible while the next
-		// deterministic result loads. Only the initial load (base === null)
-		// shows the full-screen loader; refetches render stale content with
-		// loading=true so per-page gates can show an inline updating notice.
+		// deterministic result loads. The shared query cache dedupes identical
+		// concurrent requests onto one fetch; the attempt in the key forces a
+		// fresh computation on explicit retry. Superseded completions are
+		// ignored via the cancelled flag rather than aborting the shared
+		// fetch, so a late arrival still warms the cache for remounts.
+		let cancelled = false;
 		setLoading(true);
 		setBaseError(null);
+		abortRequested.current = false;
 		const failBase = (message: string) => {
 			setBaseError(message);
 			setBase((previous) =>
@@ -739,53 +744,60 @@ export function useRemoteProjection({
 			);
 			setLoading(false);
 		};
-		const request = projectionRequest(current, years, incomeDataRef.current);
-		void Promise.resolve()
-			.then(() =>
-				api.projectDeterministic(request, {
-					authToken,
-					signal: controller.signal,
-				}),
-			)
-			.then((response) => {
-				if (!mounted.current || controller.signal.aborted) return;
-				if (response instanceof Error) {
-					failBase(response.message);
-					return;
-				}
-				const responseError = projectionResponseError(response);
-				if (responseError) {
-					failBase(responseError.message);
-					return;
-				}
-				if (!response.result) {
-					failBase(
-						"The server returned no deterministic projection result. Retry the request.",
-					);
-					return;
-				}
-				try {
-					setBase(projectionResultToLocal(response.result, current));
-					setBaseError(null);
-				} catch (cause) {
-					failBase(
-						cause instanceof Error
-							? cause.message
-							: "The deterministic projection could not be mapped for display.",
-					);
-					return;
-				}
+		const runDeterministic = async (
+			querySignal: AbortSignal,
+		): Promise<Projection> => {
+			const request = projectionRequest(current, years, incomeDataRef.current);
+			const response = await api.projectDeterministic(request, {
+				authToken,
+				signal: querySignal,
+			});
+			if (response instanceof Error) throw response;
+			const responseError = projectionResponseError(response);
+			if (responseError) throw responseError;
+			if (!response.result)
+				throw new Error(
+					"The server returned no deterministic projection result. Retry the request.",
+				);
+			try {
+				return projectionResultToLocal(response.result, current);
+			} catch (cause) {
+				throw cause instanceof Error
+					? cause
+					: new Error(
+							"The deterministic projection could not be mapped for display.",
+						);
+			}
+		};
+		const queryKey = deterministicQueryKey(
+			documentKey,
+			incomeDataKey,
+			years,
+			deterministicAttempt,
+		);
+		latestDeterministicKey.current = queryKey;
+		void projectionQueryClient()
+			.fetchQuery({
+				queryKey,
+				queryFn: ({ signal }) => runDeterministic(signal),
+			})
+			.then((result) => {
+				if (!mounted.current || cancelled) return;
+				setBase(result);
+				setBaseError(null);
 				setLoading(false);
 			})
 			.catch((cause: unknown) => {
-				if (!mounted.current || controller.signal.aborted) return;
+				if (!mounted.current || cancelled || abortRequested.current) return;
 				failBase(
 					cause instanceof Error
 						? cause.message
 						: "The deterministic projection request failed. Retry the connection.",
 				);
 			});
-		return () => controller.abort();
+		return () => {
+			cancelled = true;
+		};
 	}, [
 		api,
 		authToken,
@@ -886,7 +898,9 @@ export function useRemoteProjection({
 	]);
 
 	const abort = useCallback(() => {
-		deterministicController.current?.abort();
+		abortRequested.current = true;
+		const key = latestDeterministicKey.current;
+		if (key) void projectionQueryClient().cancelQueries({ queryKey: key });
 		rangeController.current?.abort();
 	}, []);
 
