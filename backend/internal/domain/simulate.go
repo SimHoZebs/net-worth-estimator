@@ -32,10 +32,10 @@ func Simulate(request types.SimulationRequest) (types.SimulationRun, error) {
 	}
 	movementAttempts := []types.MovementEvent{}
 	snapshots := []types.SimulationSnapshot{}
-	eventDates := map[string][]DatedPostingOccurrence{}
 	movementSequence := 0
 
-	AddOccurrences(request.Model.Postings, eventDates, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
+	resolved := ResolveOccurrences(request.Model.RecurrenceRules, request.Model.Postings, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
+	eventDates := resolved.ByDate
 
 	dates := make([]string, 0, len(eventDates))
 	for date := range eventDates {

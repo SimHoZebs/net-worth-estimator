@@ -16,7 +16,8 @@ func multiIncomeModel() (types.FinancialModel, *types.IncomeDataSnapshot) {
 			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true},
 		},
-		Postings: []types.Posting{
+		Postings: []types.Posting{},
+		RecurrenceRules: []types.RecurrenceRule{
 			{
 				ID: "salary", Name: "Salary", Destinations: []string{"checking"},
 				Amount: types.PostingAmountResolution{
@@ -62,11 +63,12 @@ func multiIncomeModel() (types.FinancialModel, *types.IncomeDataSnapshot) {
 func TestTwoEnabledIncomePostingsValidate(t *testing.T) {
 	model, _ := multiIncomeModel()
 	document := &types.FinancialModelDocument{
-		SourcePath:  "test",
-		Accounts:    model.Accounts,
-		Checkpoints: []types.Checkpoint{},
-		Evaluations: types.EmptyEvaluationTables(),
-		Postings:    model.Postings,
+		SourcePath:      "test",
+		Accounts:        model.Accounts,
+		Checkpoints:     []types.Checkpoint{},
+		Evaluations:     types.EmptyEvaluationTables(),
+		Postings:        model.Postings,
+		RecurrenceRules: model.RecurrenceRules,
 	}
 	for _, issue := range ValidateFinancialModel(document, nil) {
 		if issue.Code == "posting.income.multiple" {
@@ -78,13 +80,14 @@ func TestTwoEnabledIncomePostingsValidate(t *testing.T) {
 func TestOtherIncomeRulesStillApply(t *testing.T) {
 	model, _ := multiIncomeModel()
 	withSource := "checking"
-	model.Postings[0].SourceAccountID = &withSource
+	model.RecurrenceRules[0].SourceAccountID = &withSource
 	document := &types.FinancialModelDocument{
-		SourcePath:  "test",
-		Accounts:    model.Accounts,
-		Checkpoints: []types.Checkpoint{},
-		Evaluations: types.EmptyEvaluationTables(),
-		Postings:    model.Postings,
+		SourcePath:      "test",
+		Accounts:        model.Accounts,
+		Checkpoints:     []types.Checkpoint{},
+		Evaluations:     types.EmptyEvaluationTables(),
+		Postings:        model.Postings,
+		RecurrenceRules: model.RecurrenceRules,
 	}
 	found := false
 	for _, issue := range ValidateFinancialModel(document, nil) {
@@ -107,11 +110,11 @@ func TestTwoIncomeSourcesResolveIndependently(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create runtime: %v", err)
 	}
-	salary, err := runtime.ExecutePosting(DatedPostingOccurrence{Posting: &model.Postings[0], Index: 0}, "2026-09-01")
+	salary, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "salary", "2026-09-01"), "2026-09-01")
 	if err != nil {
 		t.Fatalf("execute salary: %v", err)
 	}
-	contract, err := runtime.ExecutePosting(DatedPostingOccurrence{Posting: &model.Postings[1], Index: 1}, "2026-09-01")
+	contract, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "contract", "2026-09-01"), "2026-09-01")
 	if err != nil {
 		t.Fatalf("execute contract: %v", err)
 	}
@@ -132,7 +135,7 @@ func TestTwoIncomeSourcesResolveIndependently(t *testing.T) {
 func TestIncomePostingAnnualCapBindsNetCash(t *testing.T) {
 	model, incomeData := multiIncomeModel()
 	cap := 15000.0
-	model.Postings[0].AnnualCap = &cap
+	model.RecurrenceRules[0].AnnualCap = &cap
 	runtime, err := CreateTransitionRuntime(model, SimulationState{
 		Balances:                     map[string]float64{"checking": 0, "savings": 0},
 		LatestRealizedPostingAmounts: map[string]float64{},
@@ -141,14 +144,14 @@ func TestIncomePostingAnnualCapBindsNetCash(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create runtime: %v", err)
 	}
-	first, err := runtime.ExecutePosting(DatedPostingOccurrence{Posting: &model.Postings[0], Index: 0}, "2026-09-01")
+	first, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "salary", "2026-09-01"), "2026-09-01")
 	if err != nil {
 		t.Fatalf("execute first: %v", err)
 	}
 	if first.Result.RealizedAmount != 10000 {
 		t.Fatalf("first realized = %v, want 10000", first.Result.RealizedAmount)
 	}
-	second, err := runtime.ExecutePosting(DatedPostingOccurrence{Posting: &model.Postings[0], Index: 0}, "2026-10-01")
+	second, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "salary", "2026-10-01"), "2026-10-01")
 	if err != nil {
 		t.Fatalf("execute second: %v", err)
 	}
@@ -163,18 +166,19 @@ func TestIncomePostingAnnualCapBindsNetCash(t *testing.T) {
 
 func TestSourcelessDestinationlessPostingFailsForAnyResolver(t *testing.T) {
 	model, _ := multiIncomeModel()
-	model.Postings[0].Amount = types.PostingAmountResolution{
+	model.RecurrenceRules[0].Amount = types.PostingAmountResolution{
 		Resolver: "expression",
 		Config:   map[string]any{"expression": "700"},
 		Inputs:   map[string]types.AmountInputBinding{},
 	}
-	model.Postings[0].Destinations = []string{}
+	model.RecurrenceRules[0].Destinations = []string{}
 	document := &types.FinancialModelDocument{
-		SourcePath:  "test",
-		Accounts:    model.Accounts,
-		Checkpoints: []types.Checkpoint{},
-		Evaluations: types.EmptyEvaluationTables(),
-		Postings:    model.Postings[:1],
+		SourcePath:      "test",
+		Accounts:        model.Accounts,
+		Checkpoints:     []types.Checkpoint{},
+		Evaluations:     types.EmptyEvaluationTables(),
+		Postings:        model.Postings,
+		RecurrenceRules: model.RecurrenceRules[:1],
 	}
 	found := false
 	for _, issue := range ValidateFinancialModel(document, nil) {

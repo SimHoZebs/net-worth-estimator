@@ -3,6 +3,8 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 
@@ -48,12 +50,20 @@ type sqliteStore struct {
 	db *sql.DB
 }
 
-const latestSchemaVersion = 6
+const latestSchemaVersion = 7
+
+// ruleMigrationBackupSuffix marks the pre-V7 database copy. V7 splits the
+// postings table into dated postings plus recurrence rules; the copy lets an
+// operator restore the exact pre-migration file with a single rename.
+const ruleMigrationBackupSuffix = ".pre-v7-backup"
 
 // Open opens (creating if needed) the SQLite database and applies
 // migrations. It returns the Store interface so callers never name the
 // implementation.
 func Open(path string) (Store, error) {
+	if err := backupBeforeRuleMigration(path); err != nil {
+		return nil, err
+	}
 	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
@@ -65,6 +75,54 @@ func Open(path string) (Store, error) {
 		return nil, err
 	}
 	return store, nil
+}
+
+// backupBeforeRuleMigration copies the database file before V7 runs. It is
+// a no-op for fresh databases, already-migrated ones, probe failures, and
+// when a backup already exists.
+func backupBeforeRuleMigration(path string) error {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return nil
+	}
+	version, err := readSchemaVersionReadOnly(path)
+	if err != nil || version >= 7 {
+		return nil
+	}
+	backupPath := path + ruleMigrationBackupSuffix
+	if _, err := os.Stat(backupPath); err == nil {
+		return nil
+	}
+	source, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open database for backup: %w", err)
+	}
+	defer source.Close()
+	destination, err := os.OpenFile(backupPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return fmt.Errorf("create database backup: %w", err)
+	}
+	defer destination.Close()
+	if _, err := io.Copy(destination, source); err != nil {
+		return fmt.Errorf("copy database backup: %w", err)
+	}
+	return nil
+}
+
+// readSchemaVersionReadOnly probes the migration version without writing.
+// Any failure (missing file, older layout, locked database) reports an
+// error and the caller proceeds without a backup.
+func readSchemaVersionReadOnly(path string) (int, error) {
+	db, err := sql.Open("sqlite", path+"?mode=ro")
+	if err != nil {
+		return 0, err
+	}
+	defer db.Close()
+	var version int
+	if err := db.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_version`).Scan(&version); err != nil {
+		return 0, err
+	}
+	return version, nil
 }
 
 // Close closes the database.
@@ -137,6 +195,15 @@ func (s *sqliteStore) migrate() error {
 		}
 		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (6)`); err != nil {
 			return fmt.Errorf("record schema version 6: %w", err)
+		}
+		version = 6
+	}
+	if version < 7 {
+		if err := migrateV7(tx); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (7)`); err != nil {
+			return fmt.Errorf("record schema version 7: %w", err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -331,6 +398,60 @@ func migrateV5(tx *sql.Tx) error {
 	for _, statement := range statements {
 		if _, err := tx.Exec(statement); err != nil {
 			return fmt.Errorf("migrate schema version 5: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateV7 splits repetition out of postings. Rows with frequency 'once'
+// become dated postings; every other row becomes a recurrence rule carrying
+// the schedule fields. Claim columns start empty: no historical row can
+// reference a rule that did not exist yet.
+func migrateV7(tx *sql.Tx) error {
+	statements := []string{
+		`CREATE TABLE recurrence_rules (
+			id TEXT PRIMARY KEY,
+			position INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			source_account_id TEXT,
+			destinations TEXT,
+			amount_json TEXT NOT NULL,
+			frequency TEXT NOT NULL,
+			annual_rate REAL NOT NULL,
+			annual_growth_rate REAL NOT NULL,
+			volatility REAL NOT NULL,
+			start_date TEXT NOT NULL,
+			end_date TEXT,
+			annual_cap REAL,
+			priority INTEGER NOT NULL,
+			enabled INTEGER NOT NULL
+		)`,
+		`INSERT INTO recurrence_rules (id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled)
+		 SELECT id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled
+		 FROM postings WHERE frequency != 'once' ORDER BY position`,
+		`CREATE TABLE postings_v7 (
+			id TEXT PRIMARY KEY,
+			position INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			source_account_id TEXT,
+			destinations TEXT,
+			amount_json TEXT NOT NULL,
+			date TEXT NOT NULL,
+			claim_rule_id TEXT,
+			claim_occurrence_date TEXT,
+			priority INTEGER NOT NULL,
+			enabled INTEGER NOT NULL,
+			source TEXT NOT NULL DEFAULT 'model'
+		)`,
+		`INSERT INTO postings_v7 (id, position, name, source_account_id, destinations, amount_json, date, claim_rule_id, claim_occurrence_date, priority, enabled, source)
+		 SELECT id, position, name, source_account_id, destinations, amount_json, start_date, NULL, NULL, priority, enabled, source
+		 FROM postings WHERE frequency = 'once' ORDER BY position`,
+		`DROP TABLE postings`,
+		`ALTER TABLE postings_v7 RENAME TO postings`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("migrate schema version 7: %w", err)
 		}
 	}
 	return nil

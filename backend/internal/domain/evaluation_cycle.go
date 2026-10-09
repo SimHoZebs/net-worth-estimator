@@ -125,21 +125,21 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 	recorded := 0.0
 	for index := range path.EffectiveDocument.Postings {
 		posting := &path.EffectiveDocument.Postings[index]
-		if !posting.Enabled || posting.Frequency != types.FrequencyOnce {
+		if !posting.Enabled {
 			continue
 		}
 		sourceAccount, ok := PostingSourceAccount(posting)
 		if !ok || !accountSet[sourceAccount] {
 			continue
 		}
-		if CompareIsoDates(posting.StartDate, cycleStart) < 0 || CompareIsoDates(posting.StartDate, projectionStart) > 0 {
+		if CompareIsoDates(posting.Date, cycleStart) < 0 || CompareIsoDates(posting.Date, projectionStart) > 0 {
 			continue
 		}
-		if posting.StartDate == projectionStart && startDateEvents[posting.ID] {
+		if posting.Date == projectionStart && startDateEvents[posting.ID] {
 			continue
 		}
 		if byYear, ok := path.ProjectionStartPostingState.RealizedPostingAmountsByYear[posting.ID]; ok {
-			recorded += maxFloat(0, byYear[posting.StartDate[:4]])
+			recorded += maxFloat(0, byYear[posting.Date[:4]])
 		}
 	}
 	scheduled := 0.0

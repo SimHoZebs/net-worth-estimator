@@ -14,9 +14,11 @@ func TestReplayHistoricalStatePreservesOriginalPostingOrder(t *testing.T) {
 			Date: "2026-01-01", AccountID: checking, Balance: 0,
 		}},
 		Postings: []types.Posting{
-			testExpressionPosting("deposit", nil, []string{checking}, types.FrequencyMonthly, true),
-			testExpressionPosting("interleaved-once", nil, []string{checking}, types.FrequencyOnce, false),
-			testExpressionPosting("withdrawal", &checking, nil, types.FrequencyMonthly, true),
+			testExpressionPosting("interleaved-once", nil, []string{checking}, false),
+		},
+		RecurrenceRules: []types.RecurrenceRule{
+			testExpressionRule("deposit", nil, []string{checking}, true),
+			testExpressionRule("withdrawal", &checking, nil, true),
 		},
 	}
 
@@ -65,13 +67,24 @@ func TestIncomeRuntimeIndexSelectsEffectiveRowsAndPreservesErrors(t *testing.T) 
 	}
 }
 
-func testExpressionPosting(id string, source *string, destinations []string, frequency types.PostingFrequency, enabled bool) types.Posting {
+func testExpressionPosting(id string, source *string, destinations []string, enabled bool) types.Posting {
 	return types.Posting{
 		ID: id, Name: id, SourceAccountID: source, Destinations: destinations,
 		Amount: types.PostingAmountResolution{
 			Resolver: "expression",
 			Config:   map[string]any{"expression": "100"},
 		},
-		Frequency: frequency, StartDate: "2026-01-15", Priority: 1, Enabled: enabled,
+		Date: "2026-01-15", Priority: 1, Enabled: enabled,
+	}
+}
+
+func testExpressionRule(id string, source *string, destinations []string, enabled bool) types.RecurrenceRule {
+	return types.RecurrenceRule{
+		ID: id, Name: id, SourceAccountID: source, Destinations: destinations,
+		Amount: types.PostingAmountResolution{
+			Resolver: "expression",
+			Config:   map[string]any{"expression": "100"},
+		},
+		Frequency: types.FrequencyMonthly, StartDate: "2026-01-15", Priority: 1, Enabled: enabled,
 	}
 }

@@ -19,6 +19,7 @@ const (
 	AccountsFile       = "accounts.csv"
 	CheckpointsFile    = "checkpoints.csv"
 	PostingsFile       = "postings.csv"
+	RulesFile          = "recurrence-rules.csv"
 	FIFile             = "behavior/financial-independence.csv"
 	ThresholdFile      = "behavior/net-worth-threshold.csv"
 	AccountBalanceFile = "behavior/account-balance.csv"
@@ -179,7 +180,9 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("read postings: %w", err)
 	}
 	index = headerIndex(records[0])
-	annualRateIndex := index["annualRate"]
+	if _, legacy := index["frequency"]; legacy {
+		return nil, fmt.Errorf("postings.csv uses the legacy frequency column: move repeating rows to recurrence-rules.csv with a date column for one-time rows")
+	}
 	for _, record := range records[1:] {
 		if len(strings.Join(record, "")) == 0 {
 			continue
@@ -189,9 +192,7 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 			Name:            field(record, index, "name"),
 			SourceAccountID: parseOptionalString(field(record, index, "sourceAccountId")),
 			Destinations:    parseDestinations(field(record, index, "destinations")),
-			Frequency:       types.PostingFrequency(field(record, index, "frequency")),
-			StartDate:       field(record, index, "startDate"),
-			EndDate:         parseOptionalDate(field(record, index, "endDate")),
+			Date:            field(record, index, "date"),
 			Priority:        int(parseNumberOr(field(record, index, "priority"), 1)),
 			Enabled:         parseBool(field(record, index, "enabled")),
 		}
@@ -201,13 +202,53 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 			return nil, fmt.Errorf("posting %s amount: %w", posting.ID, err)
 		}
 		posting.Amount = amount
-		if annualRateIndex >= 0 && annualRateIndex < len(record) {
-			posting.AnnualRate = parseNumberOr(record[annualRateIndex], 0)
+		if ruleID := field(record, index, "ruleId"); ruleID != "" {
+			occurrenceDate := field(record, index, "occurrenceDate")
+			posting.Claim = &types.PostingClaim{RuleID: ruleID, OccurrenceDate: occurrenceDate}
 		}
-		posting.AnnualGrowthRate = parseNumberOr(field(record, index, "annualGrowthRate"), 0)
-		posting.Volatility = parseNumberOr(field(record, index, "volatility"), 0)
-		posting.AnnualCap = parseOptionalFloat(field(record, index, "annualCap"))
 		document.Postings = append(document.Postings, posting)
+	}
+
+	records, err = readCSV(filepath.Join(csvPath, RulesFile))
+	if err != nil {
+		if os.IsNotExist(err) {
+			records = [][]string{}
+		} else {
+			return nil, fmt.Errorf("read recurrence rules: %w", err)
+		}
+	}
+	if len(records) > 0 {
+		index = headerIndex(records[0])
+		annualRateIndex := index["annualRate"]
+		for _, record := range records[1:] {
+			if len(strings.Join(record, "")) == 0 {
+				continue
+			}
+			rule := types.RecurrenceRule{
+				ID:              field(record, index, "id"),
+				Name:            field(record, index, "name"),
+				SourceAccountID: parseOptionalString(field(record, index, "sourceAccountId")),
+				Destinations:    parseDestinations(field(record, index, "destinations")),
+				Frequency:       types.RecurrenceFrequency(field(record, index, "frequency")),
+				StartDate:       field(record, index, "startDate"),
+				EndDate:         parseOptionalDate(field(record, index, "endDate")),
+				Priority:        int(parseNumberOr(field(record, index, "priority"), 1)),
+				Enabled:         parseBool(field(record, index, "enabled")),
+			}
+			var amount types.PostingAmountResolution
+			amountRaw := field(record, index, "amount")
+			if err := strictUnmarshal([]byte(amountRaw), &amount); err != nil {
+				return nil, fmt.Errorf("rule %s amount: %w", rule.ID, err)
+			}
+			rule.Amount = amount
+			if annualRateIndex >= 0 && annualRateIndex < len(record) {
+				rule.AnnualRate = parseNumberOr(record[annualRateIndex], 0)
+			}
+			rule.AnnualGrowthRate = parseNumberOr(field(record, index, "annualGrowthRate"), 0)
+			rule.Volatility = parseNumberOr(field(record, index, "volatility"), 0)
+			rule.AnnualCap = parseOptionalFloat(field(record, index, "annualCap"))
+			document.RecurrenceRules = append(document.RecurrenceRules, rule)
+		}
 	}
 
 	if err := importFIEvaluations(csvPath, document); err != nil {

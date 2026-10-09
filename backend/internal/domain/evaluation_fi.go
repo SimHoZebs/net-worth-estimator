@@ -273,15 +273,14 @@ const (
 
 func classifyPostingDispositions(path *types.ProjectionPath, cashflowIDs, continuingIDs map[string]bool) map[string]postingDisposition {
 	dispositions := map[string]postingDisposition{}
-	for index := range path.EffectiveDocument.Postings {
-		posting := &path.EffectiveDocument.Postings[index]
+	for id := range MovementIDs(&path.EffectiveDocument) {
 		switch {
-		case cashflowIDs[posting.ID]:
-			dispositions[posting.ID] = dispositionObserveBasePath
-		case continuingIDs[posting.ID]:
-			dispositions[posting.ID] = dispositionReplayInBranch
+		case cashflowIDs[id]:
+			dispositions[id] = dispositionObserveBasePath
+		case continuingIDs[id]:
+			dispositions[id] = dispositionReplayInBranch
 		default:
-			dispositions[posting.ID] = dispositionDisabled
+			dispositions[id] = dispositionDisabled
 		}
 	}
 	return dispositions
@@ -408,6 +407,7 @@ type fiCycleShared struct {
 	accountsByID                 map[string]types.Account
 	dispositions                 map[string]postingDisposition
 	branchPostings               []types.Posting
+	branchRules                  []types.RecurrenceRule
 	baseRealizedByDateAndPosting map[string]float64
 	baseEventsByDateAndPosting   map[string]*types.MovementEvent
 }
@@ -434,6 +434,13 @@ func newFICycleShared(path *types.ProjectionPath, plan *types.FIPlan) *fiCycleSh
 			branchPostings = append(branchPostings, *posting)
 		}
 	}
+	branchRules := []types.RecurrenceRule{}
+	for index := range path.EffectiveDocument.RecurrenceRules {
+		rule := &path.EffectiveDocument.RecurrenceRules[index]
+		if rule.Enabled && dispositions[rule.ID] != dispositionDisabled {
+			branchRules = append(branchRules, *rule)
+		}
+	}
 	baseRealizedByDateAndPosting := make(map[string]float64, len(path.MovementEvents))
 	baseEventsByDateAndPosting := make(map[string]*types.MovementEvent, len(path.MovementEvents))
 	for index := range path.MovementEvents {
@@ -449,6 +456,7 @@ func newFICycleShared(path *types.ProjectionPath, plan *types.FIPlan) *fiCycleSh
 		accountsByID:                 accountsByID,
 		dispositions:                 dispositions,
 		branchPostings:               branchPostings,
+		branchRules:                  branchRules,
 		baseRealizedByDateAndPosting: baseRealizedByDateAndPosting,
 		baseEventsByDateAndPosting:   baseEventsByDateAndPosting,
 	}
@@ -512,12 +520,14 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 	}
 	dispositions := shared.dispositions
 	branchPostings := shared.branchPostings
+	branchRules := shared.branchRules
 	baseRealizedByDateAndPosting := shared.baseRealizedByDateAndPosting
 	baseEventsByDateAndPosting := shared.baseEventsByDateAndPosting
 	transitions, err := CreateTransitionRuntime(types.FinancialModel{
-		Accounts:     path.EffectiveDocument.Accounts,
-		Postings:     branchPostings,
-		PaymentTerms: path.EffectiveDocument.PaymentTerms,
+		Accounts:        path.EffectiveDocument.Accounts,
+		Postings:        branchPostings,
+		RecurrenceRules: branchRules,
+		PaymentTerms:    path.EffectiveDocument.PaymentTerms,
 	}, initializeBranchSimulationState(candidateBalances, path.MovementEvents, candidate.Date, path), path.ProjectionStartDate, monteCarloSample, path.IncomeData)
 	if err != nil {
 		return nil, err
@@ -535,9 +545,8 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 		return map[string]any{"date": date, "accounts": accountsPayload}
 	}
 
-	eventDates := map[string][]DatedPostingOccurrence{}
 	cycleEnd := AddYearsClamped(candidate.Date, plan.EvaluationYears)
-	AddOccurrences(branchPostings, eventDates, candidate.Date, cycleEnd, false)
+	eventDates := ResolveOccurrences(branchRules, branchPostings, candidate.Date, cycleEnd, false).ByDate
 	periods := make([]BehaviorPeriod, plan.EvaluationYears*12)
 	for index := range periods {
 		periods[index] = BehaviorPeriod{
@@ -892,10 +901,7 @@ func AvailableFIPlan(path *types.ProjectionPath, config *types.FIPlan) *types.FI
 	for _, account := range path.EffectiveDocument.Accounts {
 		accountIDs[account.ID] = true
 	}
-	postingIDs := map[string]bool{}
-	for _, posting := range path.EffectiveDocument.Postings {
-		postingIDs[posting.ID] = true
-	}
+	postingIDs := MovementIDs(&path.EffectiveDocument)
 	filtered := *config
 	filtered.Sources = []types.FISource{}
 	for _, source := range config.Sources {
@@ -970,10 +976,7 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 		for _, account := range ctx.Path.EffectiveDocument.Accounts {
 			accountIDs[account.ID] = true
 		}
-		postingIDs := map[string]bool{}
-		for _, posting := range ctx.Path.EffectiveDocument.Postings {
-			postingIDs[posting.ID] = true
-		}
+		postingIDs := MovementIDs(&ctx.Path.EffectiveDocument)
 		diagnostics := []types.EvaluationDiagnostic{}
 		for _, source := range typed.Sources {
 			if !source.Included {

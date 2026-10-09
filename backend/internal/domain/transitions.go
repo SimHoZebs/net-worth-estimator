@@ -152,19 +152,28 @@ func (t *TransitionRuntime) applyAndCollectDeltas(result AccountMovementResult, 
 // ExecutePosting executes one occurrence through the shared transitions.
 func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, date string) (PostingExecutionTransition, error) {
 	posting := occurrence.Posting
+	// Rate behavior (volatility sampling, annual caps) belongs to rules.
+	// Manual postings execute literally; only rule instances sample and
+	// only rules carry caps.
+	var ruleAnnualCap *float64
+	volatility := 0.0
+	if occurrence.Rule != nil {
+		ruleAnnualCap = occurrence.Rule.AnnualCap
+		volatility = occurrence.Rule.Volatility
+	}
 	if posting.Amount.Resolver == "income" {
 		config, err := t.incomeConfig(posting)
 		if err != nil {
 			return PostingExecutionTransition{}, err
 		}
-		// Posting-level caps limit net cash deposited per calendar year,
+		// Rule-level caps limit net cash deposited per calendar year,
 		// mirroring ordinary postings. Step splits carry their own
 		// resolver-level caps. Accrual runs through observePosting below.
 		annualCapRemaining := inf()
-		if posting.AnnualCap != nil {
-			annualCapRemaining = maxFloat(0, *posting.AnnualCap-t.State.RealizedPostingAmountsByYear[posting.ID][date[:4]])
+		if ruleAnnualCap != nil {
+			annualCapRemaining = maxFloat(0, *ruleAnnualCap-t.State.RealizedPostingAmountsByYear[posting.ID][date[:4]])
 		}
-		execution, err := executeIncomePosting(posting, config, date, annualCapRemaining, t.incomeIndex, t.State.Balances, t.accountByID, t.accountOrder)
+		execution, err := executeIncomePosting(posting, config, date, annualCapRemaining, t.incomeIndex, t.State.Balances, t.accountByID, t.accountOrder, incomeDivisor(occurrence))
 		if err != nil {
 			return PostingExecutionTransition{}, err
 		}
@@ -184,7 +193,7 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 	}
 	yearIndex := ProjectionYearIndex(t.projectionStart, date)
 	var sampledRate *float64
-	if posting.Volatility > 0 && t.monteCarloSample != nil {
+	if volatility > 0 && t.monteCarloSample != nil {
 		rates, ok := t.monteCarloSample.AnnualRatesByPostingID[posting.ID]
 		if !ok || yearIndex >= len(rates) {
 			return PostingExecutionTransition{}, fmt.Errorf(
@@ -216,8 +225,8 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 	year := date[:4]
 	realizedThisYear := t.State.RealizedPostingAmountsByYear[posting.ID][year]
 	annualCapRemaining := inf()
-	if posting.AnnualCap != nil {
-		annualCapRemaining = maxFloat(0, *posting.AnnualCap-realizedThisYear)
+	if ruleAnnualCap != nil {
+		annualCapRemaining = maxFloat(0, *ruleAnnualCap-realizedThisYear)
 	}
 	result := ResolvePostingMovement(posting, requestedAmount, annualCapRemaining, t.State.Balances, t.accountByID)
 	transition := t.applyAndCollectDeltas(result, func() {

@@ -313,13 +313,12 @@ type IncomeExecutionResult struct {
 // TransitionRuntime.incomeConfig) and passed in pre-parsed.
 // annualCapRemaining bounds net cash deposited this calendar year; step
 // splits resolve through their own resolver-level caps first.
-func executeIncomePosting(posting *types.Posting, config types.IncomeAmountConfig, date string, annualCapRemaining float64, incomeIndex *incomeRuntimeIndex, balances map[string]float64, accountByID map[string]types.Account, order []string) (IncomeExecutionResult, error) {
+func executeIncomePosting(posting *types.Posting, config types.IncomeAmountConfig, date string, annualCapRemaining float64, incomeIndex *incomeRuntimeIndex, balances map[string]float64, accountByID map[string]types.Account, order []string, divisor int) (IncomeExecutionResult, error) {
 	result := IncomeExecutionResult{}
 	source, err := findIncomeSource(incomeIndex, config.IncomeSourceID, date)
 	if err != nil {
 		return result, err
 	}
-	divisor := FrequencyDivisor(posting.Frequency)
 	grossAmount := source.AnnualGrossIncome / float64(divisor)
 	annualRemaining := source.AnnualGrossIncome
 	resolvers := []types.IncomeResolverEvent{}

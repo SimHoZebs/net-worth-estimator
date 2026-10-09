@@ -42,16 +42,14 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 	if _, ok := checkpointsByDate[projectionStartDate]; ok {
 		hasStartDateCheckpoint = true
 	}
+	// History merges manual postings dated at or before the start with the
+	// rule occurrences needed for checkpoint replay. A manual posting
+	// dated exactly on the start replays only when a start checkpoint
+	// exists; claimed rule occurrences never replay because the claiming
+	// actual stands in for them. Same-date order is rules first in rule
+	// order, then manuals in document order (matching Simulate), via one
+	// shared resolution sequence.
 	occurrencesByDate := map[string][]DatedPostingOccurrence{}
-
-	for index := range document.Postings {
-		posting := &document.Postings[index]
-		isBeforeStart := CompareIsoDates(posting.StartDate, projectionStartDate) < 0
-		isStartWithCheckpoint := hasStartDateCheckpoint && posting.StartDate == projectionStartDate
-		if posting.Enabled && posting.Frequency == types.FrequencyOnce && (isBeforeStart || isStartWithCheckpoint) {
-			occurrencesByDate[posting.StartDate] = append(occurrencesByDate[posting.StartDate], DatedPostingOccurrence{Posting: posting, Index: index})
-		}
-	}
 
 	earliestCheckpointDate := ""
 	for index, checkpoint := range document.Checkpoints {
@@ -59,36 +57,47 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 			earliestCheckpointDate = checkpoint.Date
 		}
 	}
+	manualIndexBase := 0
+	var history ResolvedOccurrences
 	if earliestCheckpointDate != "" {
-		recurringPostings := []types.Posting{}
-		recurringOriginalIndexes := []int{}
-		for index := range document.Postings {
-			posting := &document.Postings[index]
-			if posting.Frequency != types.FrequencyOnce {
-				recurringPostings = append(recurringPostings, *posting)
-				recurringOriginalIndexes = append(recurringOriginalIndexes, index)
-			}
+		// The history value stays reachable through occurrencesByDate,
+		// so instance pointers outlive replay.
+		history = ResolveOccurrences(document.RecurrenceRules, document.Postings, earliestCheckpointDate, projectionStartDate, true)
+		for _, occurrences := range history.ByDate {
+			manualIndexBase += len(occurrences)
 		}
-		recurringOccurrencesByDate := map[string][]DatedPostingOccurrence{}
-		AddOccurrences(recurringPostings, recurringOccurrencesByDate, earliestCheckpointDate, projectionStartDate, true)
-		for date, occurrences := range recurringOccurrencesByDate {
+	}
+
+	for index := range document.Postings {
+		posting := &document.Postings[index]
+		isBeforeStart := CompareIsoDates(posting.Date, projectionStartDate) < 0
+		isStartWithCheckpoint := hasStartDateCheckpoint && posting.Date == projectionStartDate
+		if posting.Enabled && (isBeforeStart || isStartWithCheckpoint) {
+			occurrencesByDate[posting.Date] = append(occurrencesByDate[posting.Date], DatedPostingOccurrence{Posting: posting, Index: manualIndexBase + index, Rule: nil, DocPath: []any{"postings", index}})
+		}
+	}
+
+	if earliestCheckpointDate != "" {
+		// Manual postings merge above with start-date checkpoint
+		// semantics; only rule instances transfer here.
+		for date, occurrences := range history.ByDate {
 			if !hasStartDateCheckpoint && date == projectionStartDate {
 				continue
 			}
 			for _, occurrence := range occurrences {
-				originalIndex := recurringOriginalIndexes[occurrence.Index]
-				occurrencesByDate[date] = append(occurrencesByDate[date], DatedPostingOccurrence{
-					Posting: &document.Postings[originalIndex],
-					Index:   originalIndex,
-				})
+				if occurrence.Rule == nil {
+					continue
+				}
+				occurrencesByDate[date] = append(occurrencesByDate[date], occurrence)
 			}
 		}
 	}
 
 	transitions, err := CreateTransitionRuntime(types.FinancialModel{
-		Accounts:     document.Accounts,
-		Postings:     document.Postings,
-		PaymentTerms: document.PaymentTerms,
+		Accounts:        document.Accounts,
+		Postings:        document.Postings,
+		RecurrenceRules: document.RecurrenceRules,
+		PaymentTerms:    document.PaymentTerms,
 	}, SimulationState{
 		Balances:                     InitAccountBalances(document.Accounts),
 		LatestRealizedPostingAmounts: map[string]float64{},
@@ -139,7 +148,7 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 					Code:     "posting.history.execution",
 					Message: fmt.Sprintf("Could not replay posting '%s' on %s: %s",
 						occurrence.Posting.ID, date, message),
-					Path: []any{"postings", occurrence.Index},
+					Path: occurrence.DocPath,
 				}}}
 			}
 		}
@@ -176,6 +185,14 @@ func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *
 		if posting.Enabled && posting.Amount.Resolver == "income" {
 			hasEnabledIncome = true
 			break
+		}
+	}
+	if !hasEnabledIncome {
+		for _, rule := range effectiveDocument.RecurrenceRules {
+			if rule.Enabled && rule.Amount.Resolver == "income" {
+				hasEnabledIncome = true
+				break
+			}
 		}
 	}
 	if hasEnabledIncome && incomeData == nil {
@@ -216,9 +233,10 @@ func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *
 		HistoricalSnapshots: historicalSnapshots,
 		Request: types.SimulationRequest{
 			Model: types.FinancialModel{
-				Accounts:     effectiveDocument.Accounts,
-				Postings:     effectiveDocument.Postings,
-				PaymentTerms: effectiveDocument.PaymentTerms,
+				Accounts:        effectiveDocument.Accounts,
+				Postings:        effectiveDocument.Postings,
+				RecurrenceRules: effectiveDocument.RecurrenceRules,
+				PaymentTerms:    effectiveDocument.PaymentTerms,
 			},
 			InitialState:           *state,
 			StartDate:              startDate,

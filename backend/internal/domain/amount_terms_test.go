@@ -145,7 +145,8 @@ func termsPaymentModel() types.FinancialModel {
 			{ID: checking, Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 			{ID: card, Name: "Prime Card", Kind: types.AccountKindDebt, Enabled: true},
 		},
-		Postings: []types.Posting{
+		Postings: []types.Posting{},
+		RecurrenceRules: []types.RecurrenceRule{
 			{
 				ID: "pay-prime", Name: "Prime payment",
 				SourceAccountID: &checking,
@@ -179,11 +180,25 @@ func executeTermsOccurrence(t *testing.T, model types.FinancialModel, balances m
 	if err != nil {
 		t.Fatalf("create runtime: %v", err)
 	}
-	transition, err := runtime.ExecutePosting(DatedPostingOccurrence{Posting: &model.Postings[0], Index: 0}, date)
+	transition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "pay-prime", date), date)
 	if err != nil {
 		t.Fatalf("execute posting: %v", err)
 	}
 	return transition
+}
+
+// resolveTestRuleOccurrence expands one rule occurrence for direct
+// execution tests. The resolved value keeps the instance slice alive.
+func resolveTestRuleOccurrence(t *testing.T, rules []types.RecurrenceRule, ruleID, date string) DatedPostingOccurrence {
+	t.Helper()
+	resolved := ResolveOccurrences(rules, nil, date, date, true)
+	for _, occurrence := range resolved.ByDate[date] {
+		if occurrence.Posting.ID == ruleID {
+			return occurrence
+		}
+	}
+	t.Fatalf("no occurrence of rule %q on %s", ruleID, date)
+	return DatedPostingOccurrence{}
 }
 
 func TestPaymentAmountDefersToTerms(t *testing.T) {
@@ -205,7 +220,7 @@ func TestLateFeePostingAssessesShortfall(t *testing.T) {
 	floor := 0.0
 	model.Accounts[0].MinBalance = &floor
 	fee := 30.0
-	model.Postings = append(model.Postings, types.Posting{
+	model.RecurrenceRules = append(model.RecurrenceRules, types.RecurrenceRule{
 		ID: "fee-prime", Name: "Prime late fee",
 		Destinations: []string{"prime_card"},
 		Amount: types.PostingAmountResolution{
@@ -230,14 +245,14 @@ func TestLateFeePostingAssessesShortfall(t *testing.T) {
 	}
 	// Checking holds 50 above a zero floor against a 100 minimum: the payment
 	// realizes 50.
-	payment, err := runtime.ExecutePosting(DatedPostingOccurrence{Posting: &model.Postings[0], Index: 0}, "2026-09-10")
+	payment, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "pay-prime", "2026-09-10"), "2026-09-10")
 	if err != nil {
 		t.Fatalf("execute payment: %v", err)
 	}
 	if payment.Result.RealizedAmount != 50 {
 		t.Fatalf("realized = %v, want 50", payment.Result.RealizedAmount)
 	}
-	assessed, err := runtime.ExecutePosting(DatedPostingOccurrence{Posting: &model.Postings[1], Index: 1}, "2026-09-11")
+	assessed, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "fee-prime", "2026-09-11"), "2026-09-11")
 	if err != nil {
 		t.Fatalf("execute fee: %v", err)
 	}
@@ -305,7 +320,8 @@ func TestBalanceFeePostingDebitsChecking(t *testing.T) {
 		Accounts: []types.Account{
 			{ID: checking, Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 		},
-		Postings: []types.Posting{
+		Postings: []types.Posting{},
+		RecurrenceRules: []types.RecurrenceRule{
 			{
 				ID: "checking-fee", Name: "Checking maintenance fee",
 				SourceAccountID: &checking,
@@ -331,7 +347,7 @@ func TestBalanceFeePostingDebitsChecking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create runtime: %v", err)
 	}
-	assessed, err := runtime.ExecutePosting(DatedPostingOccurrence{Posting: &model.Postings[0], Index: 0}, "2026-09-01")
+	assessed, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "checking-fee", "2026-09-01"), "2026-09-01")
 	if err != nil {
 		t.Fatalf("execute fee: %v", err)
 	}

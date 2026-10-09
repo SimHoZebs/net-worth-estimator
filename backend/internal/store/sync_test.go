@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -43,8 +44,8 @@ func seedSyncRows(t *testing.T, store *sqliteStore) {
 	execSyncSetup(t, store, []string{
 		`INSERT INTO accounts (id, position, name, enabled) VALUES ('prime_card', 1, 'Prime', 1)`,
 		`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (10, '2026-08-01', 'checking', 111, 'simplefin')`,
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, priority, enabled, source)
-		 VALUES ('sfin-pending-prime_card-tx1', 10, 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', 'once', 0, 0, 0, '2026-08-02', 6, 0, 'simplefin')`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, date, priority, enabled, source)
+		 VALUES ('sfin-pending-prime_card-tx1', 10, 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', '2026-08-02', 6, 0, 'simplefin')`,
 	})
 }
 
@@ -61,8 +62,8 @@ func ownerDocument() *types.FinancialModelDocument {
 		Evaluations: types.EmptyEvaluationTables(),
 		Postings: []types.Posting{{
 			ID: "owner-charge", Name: "Owner", SourceAccountID: &checking,
-			Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
-			Frequency: types.FrequencyOnce, StartDate: "2026-07-02", Priority: 6,
+			Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+			Date:   "2026-07-02", Priority: 6,
 		}},
 	}
 }
@@ -147,8 +148,8 @@ func testSaveDropsForgedSyncRowsAndMergesStored(t *testing.T, newStore func(*tes
 	prime := "prime_card"
 	forged.Postings = append(forged.Postings, types.Posting{
 		ID: "sfin-pending-prime_card-forged", Name: "Forged", SourceAccountID: &prime, Source: SourceSimpleFIN,
-		Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "999"}, Inputs: map[string]types.AmountInputBinding{}},
-		Frequency: types.FrequencyOnce, StartDate: "2026-08-03", Priority: 6,
+		Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "999"}, Inputs: map[string]types.AmountInputBinding{}},
+		Date:   "2026-08-03", Priority: 6,
 	})
 	if err := store.SaveDocument(forged); err != nil {
 		t.Fatalf("save forged document: %v", err)
@@ -312,14 +313,82 @@ func TestOpenMigratesVersionTwoSourceColumns(t *testing.T) {
 	}
 }
 
+func TestOpenMigratesVersionSixPostingsIntoRules(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "version-six.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open version six database: %v", err)
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("begin version six database: %v", err)
+	}
+	for _, migrate := range []func(*sql.Tx) error{migrateV1, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6} {
+		if err := migrate(tx); err != nil {
+			t.Fatalf("create version six schema: %v", err)
+		}
+	}
+	for _, statement := range []string{
+		`CREATE TABLE schema_version (version INTEGER NOT NULL)`,
+		`INSERT INTO schema_version (version) VALUES (1)`,
+		`INSERT INTO schema_version (version) VALUES (2)`,
+		`INSERT INTO schema_version (version) VALUES (3)`,
+		`INSERT INTO schema_version (version) VALUES (4)`,
+		`INSERT INTO schema_version (version) VALUES (5)`,
+		`INSERT INTO schema_version (version) VALUES (6)`,
+		`INSERT INTO accounts (id, position, name, kind, enabled) VALUES ('checking', 0, 'Checking', 'cash', 1)`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled, source)
+		 VALUES ('once-actual', 0, 'Actual', NULL, '["checking"]', '{}', 'once', 0, 0, 0, '2026-08-02', NULL, NULL, 1, 1, 'model')`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled, source)
+		 VALUES ('monthly-rule', 1, 'Rule', NULL, '["checking"]', '{}', 'monthly', 0.05, 0, 0.1, '2026-08-01', NULL, 100, 2, 1, 'model')`,
+		`UPDATE model_metadata SET document_present = 1 WHERE id = 1`,
+	} {
+		if _, err := tx.Exec(statement); err != nil {
+			t.Fatalf("seed version six database %q: %v", statement, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit version six database: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close version six database: %v", err)
+	}
+
+	opened, err := Open(path)
+	if err != nil {
+		t.Fatalf("open migrates version six: %v", err)
+	}
+	t.Cleanup(func() { _ = opened.Close() })
+	document, err := opened.LoadDocument()
+	if err != nil {
+		t.Fatalf("load migrated document: %v", err)
+	}
+	if document == nil || len(document.Postings) != 1 || len(document.RecurrenceRules) != 1 {
+		t.Fatalf("migrated document = %+v", document)
+	}
+	posting := document.Postings[0]
+	if posting.ID != "once-actual" || posting.Date != "2026-08-02" || posting.Claim != nil {
+		t.Fatalf("migrated posting = %+v", posting)
+	}
+	rule := document.RecurrenceRules[0]
+	if rule.ID != "monthly-rule" || rule.Frequency != types.FrequencyMonthly || rule.StartDate != "2026-08-01" {
+		t.Fatalf("migrated rule = %+v", rule)
+	}
+	if rule.AnnualRate != 0.05 || rule.Volatility != 0.1 || rule.AnnualCap == nil || *rule.AnnualCap != 100 {
+		t.Fatalf("migrated rule rates/cap = %+v", rule)
+	}
+	if _, err := os.Stat(path + ruleMigrationBackupSuffix); err != nil {
+		t.Fatalf("expected pre-migration backup: %v", err)
+	}
+}
+
 func syncPendingPosting(id, accountID, day string) types.Posting {
 	return types.Posting{
 		ID:              id,
 		Name:            "Pending",
 		SourceAccountID: &accountID,
 		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
-		Frequency:       types.FrequencyOnce,
-		StartDate:       types.IsoDate(day),
+		Date:            types.IsoDate(day),
 		Priority:        6,
 	}
 }
@@ -507,8 +576,8 @@ func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
 	// so only raw SQL can set up this coexistence case.
 	store := openSQLiteStore(t)
 	execSyncSetup(t, store, []string{
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, priority, enabled, source)
-		 VALUES ('sfin-pending-prime_card-manual', 0, 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', 'once', 0, 0, 0, '2026-08-02', 6, 1, 'model')`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, date, priority, enabled, source)
+		 VALUES ('sfin-pending-prime_card-manual', 0, 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', '2026-08-02', 6, 1, 'model')`,
 	})
 	summary, err := store.ApplySyncPlan(nil, []types.Posting{
 		syncPendingPosting("sfin-pending-prime_card-a", "prime_card", "2026-08-02"),

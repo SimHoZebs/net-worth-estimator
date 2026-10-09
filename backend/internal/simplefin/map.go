@@ -136,10 +136,9 @@ func Map(set *AccountSet, config Config, now time.Time) (*Plan, error) {
 					Config:   map[string]any{"expression": abs},
 					Inputs:   map[string]types.AmountInputBinding{},
 				},
-				Frequency: types.FrequencyOnce,
-				StartDate: types.IsoDate(transaction.PostedDay(now)),
-				Priority:  PendingPriority,
-				Enabled:   false,
+				Date:     types.IsoDate(transaction.PostedDay(now)),
+				Priority: PendingPriority,
+				Enabled:  false,
 			})
 		}
 	}

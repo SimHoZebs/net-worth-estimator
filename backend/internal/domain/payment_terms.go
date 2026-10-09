@@ -78,16 +78,16 @@ func isNonFinite(value float64) bool {
 }
 
 // validatePaymentTermsCoverage warns when a termed account has no enabled
-// recurring payment shell behind it. Terms declare what is owed; an enabled
-// non-once posting naming the account as a destination moves it. The warning
-// keeps half-configured terms saveable while refusing silent no-ops.
+// rule behind it. Terms declare what is owed; an enabled rule naming the
+// account as a destination moves it. The warning keeps half-configured terms
+// saveable while refusing silent no-ops.
 func validatePaymentTermsCoverage(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument) {
 	covered := map[string]bool{}
-	for _, posting := range document.Postings {
-		if !posting.Enabled || posting.Frequency == types.FrequencyOnce {
+	for _, rule := range document.RecurrenceRules {
+		if !rule.Enabled {
 			continue
 		}
-		for _, destination := range posting.Destinations {
+		for _, destination := range rule.Destinations {
 			covered[destination] = true
 		}
 	}
