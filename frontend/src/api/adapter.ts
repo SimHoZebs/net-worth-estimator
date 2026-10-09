@@ -4,6 +4,7 @@ import {
 	type BackendAccount,
 	type BackendCheckpoint,
 	type BackendPosting,
+	type BackendRecurrenceRule,
 	type EvaluationTables,
 	type FinancialModelDocument,
 	type IsoDate,
@@ -12,8 +13,8 @@ import {
 	NO_CEILING_SENTINEL,
 	NO_FLOOR_SENTINEL,
 	type PostingAmountResolution,
-	type PostingFrequency,
 	type ProjectionResult,
+	type RecurrenceFrequency,
 	type ServerStatus,
 } from "./contracts.ts";
 
@@ -51,7 +52,7 @@ export interface MovementPresentation {
 	amount?: PostingAmountResolution;
 	amountValue?: number;
 	destinations?: string[] | null;
-	frequency?: PostingFrequency;
+	frequency?: RecurrenceFrequency;
 	annualRate?: number;
 	annualGrowthRate?: number;
 	volatility?: number;
@@ -237,7 +238,8 @@ function fallbackStartDate(
 	return (
 		projection?.milestones.projectionStartDate ??
 		latestDate(document.checkpoints.map((checkpoint) => checkpoint.Date)) ??
-		document.postings[0]?.startDate ??
+		(document.recurrenceRules ?? [])[0]?.startDate ??
+		document.postings[0]?.date ??
 		todayIso()
 	);
 }
@@ -250,7 +252,7 @@ function numericExpression(value: string | undefined): number | null {
 }
 
 function postingAmountValue(
-	posting: BackendPosting,
+	posting: Pick<BackendPosting, "id" | "amount">,
 	projection: ProjectionResult | null | undefined,
 ): number | null {
 	const config = objectValue(posting.amount.config);
@@ -268,14 +270,18 @@ function postingAmountValue(
 	return finite(event?.requestedAmount) ?? null;
 }
 
-function displayFrequency(frequency: PostingFrequency): Movement["frequency"] {
+function displayFrequency(
+	frequency: RecurrenceFrequency,
+): Movement["frequency"] {
 	if (frequency === "annual") return "yearly";
-	if (frequency === "once" || frequency === "monthly") return frequency;
+	if (frequency === "monthly") return frequency;
 	return "monthly";
 }
 
-function backendFrequency(frequency: Movement["frequency"]): PostingFrequency {
-	return frequency === "yearly" ? "annual" : frequency;
+function backendFrequency(
+	frequency: Movement["frequency"],
+): RecurrenceFrequency {
+	return frequency === "yearly" ? "annual" : "monthly";
 }
 
 function targetFromEvaluation(config: JsonValue | undefined): number {
@@ -335,7 +341,33 @@ function accountDisplay(
 	};
 }
 
-function movementDisplay(
+function movementDisplayFromRule(
+	rule: BackendRecurrenceRule,
+	amount: number | null,
+	previous?: MovementPresentation,
+): Movement {
+	const destinations = rule.destinations ?? [];
+	const firstDestination = destinations[0] ?? null;
+	return {
+		id: rule.id,
+		name: rule.name || rule.id,
+		amount: Math.max(0, amount ?? 0),
+		amountKnown: amount !== null,
+		fromId: rule.sourceAccountId,
+		toId: firstDestination,
+		frequency: previous?.displayFrequency ?? displayFrequency(rule.frequency),
+		startDate: rule.startDate,
+		endDate: rule.endDate,
+		annualIncrease:
+			previous?.displayAnnualIncrease ?? rule.annualGrowthRate * 100,
+		enabled: rule.enabled,
+		readOnly: previous?.readOnly ?? amount === null,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+	};
+}
+
+function movementDisplayFromPosting(
 	posting: BackendPosting,
 	amount: number | null,
 	previous?: MovementPresentation,
@@ -349,15 +381,15 @@ function movementDisplay(
 		amountKnown: amount !== null,
 		fromId: posting.sourceAccountId,
 		toId: firstDestination,
-		frequency:
-			previous?.displayFrequency ?? displayFrequency(posting.frequency),
-		startDate: posting.startDate,
-		endDate: posting.endDate,
-		annualIncrease:
-			previous?.displayAnnualIncrease ?? posting.annualGrowthRate * 100,
+		frequency: "once",
+		startDate: posting.date,
+		endDate: null,
+		annualIncrease: previous?.displayAnnualIncrease ?? 0,
 		enabled: posting.enabled,
 		readOnly:
 			previous?.readOnly ?? (amount === null || posting.source === "simplefin"),
+		claimRuleId: posting.claim?.ruleId ?? null,
+		claimOccurrenceDate: posting.claim?.occurrenceDate ?? null,
 	};
 }
 
@@ -412,6 +444,58 @@ function addForwardAccountWarnings(
 	}
 }
 
+function addForwardRuleWarnings(
+	target: AdapterReport,
+	rule: BackendRecurrenceRule,
+	amount: number | null,
+	path: string,
+): void {
+	if (amount === null) {
+		warn(
+			target,
+			"nonliteral-amount",
+			"This transaction amount is calculated each occurrence and is shown as varying.",
+			`${path}.amount`,
+		);
+		provisional(target, `${path}.amount`);
+	}
+	if (
+		rule.frequency === "daily" ||
+		rule.frequency === "weekly" ||
+		rule.frequency === "quarterly"
+	) {
+		warn(
+			target,
+			"unsupported-frequency",
+			"The display transaction frequency is approximated as monthly.",
+			`${path}.frequency`,
+		);
+		provisional(target, `${path}.frequency`);
+	}
+	if ((rule.destinations?.length ?? 0) > 1) {
+		warn(
+			target,
+			"multiple-destinations",
+			"The display movement can show one destination; additional backend destinations remain in the presentation state.",
+			`${path}.toId`,
+		);
+		provisional(target, `${path}.toId`);
+	}
+	if (
+		rule.annualRate !== 0 ||
+		rule.volatility !== 0 ||
+		rule.annualCap !== null
+	) {
+		warn(
+			target,
+			"posting-metadata",
+			"Backend annual rate, volatility, and annual cap are preserved as presentation state.",
+			path,
+		);
+		provisional(target, `${path}.metadata`);
+	}
+}
+
 function addForwardPostingWarnings(
 	target: AdapterReport,
 	posting: BackendPosting,
@@ -427,19 +511,6 @@ function addForwardPostingWarnings(
 		);
 		provisional(target, `${path}.amount`);
 	}
-	if (
-		posting.frequency === "daily" ||
-		posting.frequency === "weekly" ||
-		posting.frequency === "quarterly"
-	) {
-		warn(
-			target,
-			"unsupported-frequency",
-			"The display transaction frequency is approximated as monthly.",
-			`${path}.frequency`,
-		);
-		provisional(target, `${path}.frequency`);
-	}
 	if ((posting.destinations?.length ?? 0) > 1) {
 		warn(
 			target,
@@ -448,19 +519,6 @@ function addForwardPostingWarnings(
 			`${path}.toId`,
 		);
 		provisional(target, `${path}.toId`);
-	}
-	if (
-		posting.annualRate !== 0 ||
-		posting.volatility !== 0 ||
-		posting.annualCap !== null
-	) {
-		warn(
-			target,
-			"posting-metadata",
-			"Backend annual rate, volatility, and annual cap are preserved as presentation state.",
-			path,
-		);
-		provisional(target, `${path}.metadata`);
 	}
 	if (posting.source) {
 		warn(
@@ -497,6 +555,43 @@ function buildPresentationAccount(
 	};
 }
 
+function buildPresentationRule(
+	rule: BackendRecurrenceRule,
+	amount: number | null,
+	previous?: MovementPresentation,
+): MovementPresentation {
+	const previousAmountMatches =
+		previous?.amountValue !== undefined &&
+		amount !== null &&
+		sameNumber(previous.amountValue, amount);
+	const presentationAmount = previousAmountMatches
+		? (previous?.amount ?? rule.amount)
+		: rule.amount;
+	const presentationDestinations =
+		previous && Object.hasOwn(previous, "destinations")
+			? previous.destinations
+			: rule.destinations;
+	return {
+		amount: presentationAmount,
+		amountValue: previousAmountMatches
+			? (previous?.amountValue ?? amount)
+			: (amount ?? previous?.amountValue),
+		destinations: presentationDestinations,
+		frequency: previous?.frequency ?? rule.frequency,
+		annualRate: previous?.annualRate ?? rule.annualRate,
+		annualGrowthRate: previous?.annualGrowthRate ?? rule.annualGrowthRate,
+		volatility: previous?.volatility ?? rule.volatility,
+		annualCap: previous?.annualCap ?? rule.annualCap,
+		priority: previous?.priority ?? rule.priority,
+		readOnly: previous?.readOnly ?? amount === null,
+		displayFrequency:
+			previous?.displayFrequency ?? displayFrequency(rule.frequency),
+		displayToId: previous?.displayToId ?? rule.destinations?.[0] ?? null,
+		displayAnnualIncrease:
+			previous?.displayAnnualIncrease ?? rule.annualGrowthRate * 100,
+	};
+}
+
 function buildPresentationPosting(
 	posting: BackendPosting,
 	amount: number | null,
@@ -522,19 +617,11 @@ function buildPresentationPosting(
 			? (previous?.amountValue ?? amount)
 			: (amount ?? previous?.amountValue),
 		destinations: presentationDestinations,
-		frequency: previous?.frequency ?? posting.frequency,
-		annualRate: previous?.annualRate ?? posting.annualRate,
-		annualGrowthRate: previous?.annualGrowthRate ?? posting.annualGrowthRate,
-		volatility: previous?.volatility ?? posting.volatility,
-		annualCap: previous?.annualCap ?? posting.annualCap,
 		priority: previous?.priority ?? posting.priority,
 		readOnly:
 			previous?.readOnly ?? (amount === null || posting.source === "simplefin"),
-		displayFrequency:
-			previous?.displayFrequency ?? displayFrequency(posting.frequency),
 		displayToId: previous?.displayToId ?? posting.destinations?.[0] ?? null,
-		displayAnnualIncrease:
-			previous?.displayAnnualIncrease ?? posting.annualGrowthRate * 100,
+		displayAnnualIncrease: previous?.displayAnnualIncrease ?? 0,
 	};
 }
 
@@ -583,13 +670,26 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		return display;
 	});
 
-	const movements = document.postings.map((posting, index) => {
-		const path = `movements.${index}`;
-		const amount = postingAmountValue(posting, projection);
-		const previous = previousPresentation?.movements[posting.id];
-		addForwardPostingWarnings(conversionReport, posting, amount, path);
-		return movementDisplay(posting, amount, previous);
-	});
+	const movements: Movement[] = [
+		...(document.recurrenceRules ?? []).map((rule, index) => {
+			const amount = postingAmountValue(rule, projection);
+			const previous = previousPresentation?.movements[rule.id];
+			addForwardRuleWarnings(
+				conversionReport,
+				rule,
+				amount,
+				`movements.${index}`,
+			);
+			return movementDisplayFromRule(rule, amount, previous);
+		}),
+		...document.postings.map((posting, index) => {
+			const path = `movements.${(document.recurrenceRules ?? []).length + index}`;
+			const amount = postingAmountValue(posting, projection);
+			const previous = previousPresentation?.movements[posting.id];
+			addForwardPostingWarnings(conversionReport, posting, amount, path);
+			return movementDisplayFromPosting(posting, amount, previous);
+		}),
+	];
 
 	const thresholdEvaluations = document.evaluations.netWorthThreshold.map(
 		(evaluation, index) => {
@@ -691,16 +791,24 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			volatility: 0,
 		},
 		accounts: accountPresentations,
-		movements: Object.fromEntries(
-			document.postings.map((posting) => {
+		movements: Object.fromEntries([
+			...(document.recurrenceRules ?? []).map((rule) => {
+				const previous = previousPresentation?.movements[rule.id];
+				const amount = postingAmountValue(rule, projection);
+				return [
+					rule.id,
+					buildPresentationRule(rule, amount, previous),
+				] as const;
+			}),
+			...document.postings.map((posting) => {
 				const previous = previousPresentation?.movements[posting.id];
 				const amount = postingAmountValue(posting, projection);
 				return [
 					posting.id,
 					buildPresentationPosting(posting, amount, previous),
-				];
+				] as const;
 			}),
-		),
+		]),
 	};
 
 	const assumptions = previousPresentation?.assumptions ?? {
@@ -739,6 +847,9 @@ export function displayPlanToBackendDocument(
 	);
 	const sourcePostings = new Map(
 		(sourceDocument?.postings ?? []).map((posting) => [posting.id, posting]),
+	);
+	const sourceRules = new Map(
+		(sourceDocument?.recurrenceRules ?? []).map((rule) => [rule.id, rule]),
 	);
 	const conversionReport = report();
 	const checkpointByAccount = new Map<string, BackendCheckpoint[]>();
@@ -914,9 +1025,13 @@ export function displayPlanToBackendDocument(
 		}
 	}
 
-	const postings = plan.movements.map((movement, index): BackendPosting => {
+	const postings: BackendPosting[] = [];
+	const recurrenceRules: BackendRecurrenceRule[] = [];
+	plan.movements.forEach((movement, index) => {
 		const storedExtras = movementPresentations[movement.id];
 		const storedPosting = sourcePostings.get(movement.id);
+		const storedRule = sourceRules.get(movement.id);
+		const storedAmount = storedPosting ?? storedRule;
 		if (movement.id.startsWith("sfin-")) {
 			lose(
 				conversionReport,
@@ -933,15 +1048,15 @@ export function displayPlanToBackendDocument(
 				`movements.${index}.readOnly`,
 			);
 		}
-		const originalAmountValue = storedPosting
-			? postingAmountValue(storedPosting, null)
+		const originalAmountValue = storedAmount
+			? postingAmountValue(storedAmount, null)
 			: null;
 		const baselineAmountValue =
 			storedExtras?.amountValue ?? originalAmountValue;
 		const sameAmount =
 			baselineAmountValue !== null &&
 			sameNumber(baselineAmountValue, movement.amount);
-		const preservedAmount = storedExtras?.amount ?? storedPosting?.amount;
+		const preservedAmount = storedExtras?.amount ?? storedAmount?.amount;
 		const amount: PostingAmountResolution =
 			movement.amountKnown === false
 				? (preservedAmount ?? {
@@ -964,21 +1079,12 @@ export function displayPlanToBackendDocument(
 				`movements.${index}.amount`,
 			);
 		}
-		const previousDisplayFrequency =
-			storedExtras?.displayFrequency ??
-			(storedPosting ? displayFrequency(storedPosting.frequency) : undefined);
-		const sameFrequency = previousDisplayFrequency === movement.frequency;
-		const frequency = sameFrequency
-			? (storedExtras?.frequency ??
-				storedPosting?.frequency ??
-				backendFrequency(movement.frequency))
-			: backendFrequency(movement.frequency);
 		const originalDestinations =
 			storedExtras && Object.hasOwn(storedExtras, "destinations")
 				? storedExtras.destinations
-				: storedPosting?.destinations;
+				: storedAmount?.destinations;
 		const previousDisplayDestination =
-			storedExtras?.displayToId ?? storedPosting?.destinations?.[0] ?? null;
+			storedExtras?.displayToId ?? storedAmount?.destinations?.[0] ?? null;
 		const sameDestination = previousDisplayDestination === movement.toId;
 		const destinations =
 			sameDestination && originalDestinations !== undefined
@@ -986,23 +1092,8 @@ export function displayPlanToBackendDocument(
 				: movement.toId === null
 					? null
 					: [movement.toId];
-		const previousDisplayAnnualIncrease =
-			storedExtras?.displayAnnualIncrease ??
-			(storedPosting ? storedPosting.annualGrowthRate * 100 : undefined);
-		const sameGrowth =
-			previousDisplayAnnualIncrease !== undefined &&
-			sameNumber(previousDisplayAnnualIncrease, movement.annualIncrease);
-		const annualGrowthRate = sameGrowth
-			? (storedExtras?.annualGrowthRate ??
-				storedPosting?.annualGrowthRate ??
-				movement.annualIncrease / 100)
-			: movement.annualIncrease / 100;
-		const annualRate =
-			storedExtras?.annualRate ?? storedPosting?.annualRate ?? 0;
-		const volatility =
-			storedExtras?.volatility ?? storedPosting?.volatility ?? 0;
 		if (
-			storedPosting &&
+			storedAmount &&
 			originalDestinations &&
 			originalDestinations.length > 1 &&
 			JSON.stringify(originalDestinations) !== JSON.stringify(destinations)
@@ -1010,7 +1101,7 @@ export function displayPlanToBackendDocument(
 			lose(
 				conversionReport,
 				`movements.${movement.id}.destinations`,
-				"The display movement can represent only one destination from the storedPosting backend posting.",
+				"The display movement can represent only one destination from the stored backend movement.",
 				`movements.${index}.destinations`,
 			);
 		}
@@ -1030,9 +1121,58 @@ export function displayPlanToBackendDocument(
 			"Transaction read-only state stays local and is not imported.",
 			`movements.${index}`,
 		);
-		const source = storedExtras?.source ?? storedPosting?.source;
-		return {
-			...(storedPosting ?? {}),
+		const priority =
+			storedExtras?.priority ??
+			storedPosting?.priority ??
+			storedRule?.priority ??
+			index + 1;
+		if (movement.frequency === "once") {
+			const source = storedExtras?.source ?? storedPosting?.source;
+			postings.push({
+				...(storedPosting ?? {}),
+				id: movement.id,
+				name: movement.name,
+				sourceAccountId: movement.fromId,
+				destinations,
+				amount,
+				date: movement.startDate,
+				claim:
+					movement.claimRuleId && movement.claimOccurrenceDate
+						? {
+								ruleId: movement.claimRuleId,
+								occurrenceDate: movement.claimOccurrenceDate,
+							}
+						: null,
+				priority,
+				enabled: movement.enabled,
+				...(source === undefined ? {} : { source }),
+			});
+			return;
+		}
+		const previousDisplayFrequency =
+			storedExtras?.displayFrequency ??
+			(storedRule ? displayFrequency(storedRule.frequency) : undefined);
+		const sameFrequency = previousDisplayFrequency === movement.frequency;
+		const frequency = sameFrequency
+			? (storedExtras?.frequency ??
+				storedRule?.frequency ??
+				backendFrequency(movement.frequency))
+			: backendFrequency(movement.frequency);
+		const previousDisplayAnnualIncrease =
+			storedExtras?.displayAnnualIncrease ??
+			(storedRule ? storedRule.annualGrowthRate * 100 : undefined);
+		const sameGrowth =
+			previousDisplayAnnualIncrease !== undefined &&
+			sameNumber(previousDisplayAnnualIncrease, movement.annualIncrease);
+		const annualGrowthRate = sameGrowth
+			? (storedExtras?.annualGrowthRate ??
+				storedRule?.annualGrowthRate ??
+				movement.annualIncrease / 100)
+			: movement.annualIncrease / 100;
+		const annualRate = storedExtras?.annualRate ?? storedRule?.annualRate ?? 0;
+		const volatility = storedExtras?.volatility ?? storedRule?.volatility ?? 0;
+		recurrenceRules.push({
+			...(storedRule ?? {}),
 			id: movement.id,
 			name: movement.name,
 			sourceAccountId: movement.fromId,
@@ -1044,17 +1184,17 @@ export function displayPlanToBackendDocument(
 			volatility,
 			startDate: movement.startDate,
 			endDate: movement.endDate,
-			annualCap: storedExtras?.annualCap ?? storedPosting?.annualCap ?? null,
-			priority: storedExtras?.priority ?? storedPosting?.priority ?? index + 1,
+			annualCap: storedExtras?.annualCap ?? storedRule?.annualCap ?? null,
+			priority,
 			enabled: movement.enabled,
-			...(source === undefined ? {} : { source }),
-		};
+		});
 	});
 
-	const removedPostingIDs = (sourceDocument?.postings ?? [])
-		.filter((posting) => !plan.movements.some((item) => item.id === posting.id))
-		.map((posting) => posting.id);
-	for (const postingId of removedPostingIDs) {
+	const removedMovementIDs = (ids: string[]) =>
+		ids.filter((id) => !plan.movements.some((item) => item.id === id));
+	for (const postingId of removedMovementIDs(
+		(sourceDocument?.postings ?? []).map((posting) => posting.id),
+	)) {
 		const storedPosting = sourcePostings.get(postingId);
 		if (storedPosting?.source === "simplefin") {
 			lose(
@@ -1071,6 +1211,16 @@ export function displayPlanToBackendDocument(
 				`movements.${postingId}`,
 			);
 		}
+	}
+	for (const ruleId of removedMovementIDs(
+		(sourceDocument?.recurrenceRules ?? []).map((rule) => rule.id),
+	)) {
+		warn(
+			conversionReport,
+			"rule-removed",
+			"The backend recurrence rule will be removed from the canonical model.",
+			`movements.${ruleId}`,
+		);
 	}
 
 	const sourceEvaluations = sourceDocument?.evaluations;
@@ -1250,6 +1400,7 @@ export function displayPlanToBackendDocument(
 			checkpoints,
 			evaluations,
 			postings,
+			recurrenceRules,
 		},
 		report: conversionReport,
 		warnings: conversionReport.warnings,

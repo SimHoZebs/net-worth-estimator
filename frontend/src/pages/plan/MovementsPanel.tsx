@@ -72,6 +72,11 @@ export function MovementsPanel({
 							movement={movement}
 							resolved={resolvedAmounts?.get(movement.id)}
 						/>
+						{movement.claimRuleId && (
+							<Badge tone="neutral">
+								Records {movement.claimOccurrenceDate}
+							</Badge>
+						)}
 						{!movement.enabled && <Badge tone="amber">Excluded</Badge>}
 					</div>
 					<div className="table-actions">

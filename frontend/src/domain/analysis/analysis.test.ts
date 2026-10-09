@@ -17,6 +17,8 @@ function deposit(overrides: Partial<Movement> & { id: string }): Movement {
 		annualIncrease: 0,
 		enabled: true,
 		readOnly: false,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
 		...overrides,
 	};
 }

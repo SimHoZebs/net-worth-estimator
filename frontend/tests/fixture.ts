@@ -42,11 +42,13 @@ export async function readSavedServerPlan() {
 		if (!response.ok())
 			throw new Error(`model read failed: ${response.status()}`);
 		const body = await response.json();
+		type movement = {
+			id: string;
+			amount: { config: { expression?: string } };
+		};
 		return {
-			postings: body.document.postings as {
-				id: string;
-				amount: { config: { expression?: string } };
-			}[],
+			postings: body.document.postings as movement[],
+			recurrenceRules: (body.document.recurrenceRules ?? []) as movement[],
 		};
 	} finally {
 		await api.dispose();

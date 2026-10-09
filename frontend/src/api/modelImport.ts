@@ -39,7 +39,9 @@ export function isFinancialModelDocument(
 	if (
 		!Array.isArray(value.accounts) ||
 		!Array.isArray(value.checkpoints) ||
-		!Array.isArray(value.postings)
+		!Array.isArray(value.postings) ||
+		(value.recurrenceRules !== undefined &&
+			!Array.isArray(value.recurrenceRules))
 	)
 		return false;
 	const accountsValid = value.accounts.every(
@@ -63,7 +65,16 @@ export function isFinancialModelDocument(
 			typeof item.name === "string" &&
 			typeof item.enabled === "boolean",
 	);
-	return accountsValid && checkpointsValid && postingsValid;
+	const rulesValid =
+		value.recurrenceRules === undefined ||
+		value.recurrenceRules.every(
+			(item) =>
+				isRecord(item) &&
+				typeof item.id === "string" &&
+				typeof item.name === "string" &&
+				typeof item.enabled === "boolean",
+		);
+	return accountsValid && checkpointsValid && postingsValid && rulesValid;
 }
 
 export function parseModelDocument({

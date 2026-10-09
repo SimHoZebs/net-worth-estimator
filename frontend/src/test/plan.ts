@@ -115,7 +115,8 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 2.5,
 			enabled: true,
-
+			claimRuleId: null,
+			claimOccurrenceDate: null,
 			readOnly: false,
 		},
 		{
@@ -130,7 +131,8 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 2.5,
 			enabled: true,
-
+			claimRuleId: null,
+			claimOccurrenceDate: null,
 			readOnly: false,
 		},
 		{
@@ -145,7 +147,8 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 0,
 			enabled: true,
-
+			claimRuleId: null,
+			claimOccurrenceDate: null,
 			readOnly: false,
 		},
 		{
@@ -160,7 +163,8 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 2.5,
 			enabled: true,
-
+			claimRuleId: null,
+			claimOccurrenceDate: null,
 			readOnly: false,
 		},
 		{
@@ -175,7 +179,8 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 2.5,
 			enabled: true,
-
+			claimRuleId: null,
+			claimOccurrenceDate: null,
 			readOnly: false,
 		},
 		{
@@ -190,7 +195,8 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 0,
 			enabled: true,
-
+			claimRuleId: null,
+			claimOccurrenceDate: null,
 			readOnly: false,
 		},
 		...["2026-06-28", "2026-07-28", "2026-08-28"].map((startDate, index) => ({
@@ -205,7 +211,8 @@ export const testPlan: Plan = {
 			endDate: null,
 			annualIncrease: 0,
 			enabled: true,
-
+			claimRuleId: null,
+			claimOccurrenceDate: null,
 			readOnly: false,
 		})),
 	],

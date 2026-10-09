@@ -54,7 +54,8 @@ function documentFixture(): FinancialModelDocument {
 			postingFulfillment: [],
 			cycleFulfillment: [],
 		},
-		postings: [
+		postings: [],
+		recurrenceRules: [
 			{
 				id: "salary",
 				name: "Salary",
@@ -74,7 +75,6 @@ function documentFixture(): FinancialModelDocument {
 				annualCap: null,
 				priority: 3,
 				enabled: true,
-				source: "model",
 			},
 		],
 	};
@@ -171,12 +171,23 @@ describe("backend and display plan adapter", () => {
 	it("classifies a one-time movement before the projection start as historical", () => {
 		const startDate = "2026-02-01";
 		const past = documentFixture();
-		past.postings[0] = {
-			...past.postings[0]!,
-			frequency: "once",
-			startDate: "2026-01-01",
-			source: "model",
-		};
+		past.postings = [
+			{
+				id: "bonus",
+				name: "Bonus",
+				sourceAccountId: null,
+				destinations: ["cash"],
+				amount: {
+					resolver: "expression",
+					config: { expression: "250" },
+					inputs: {},
+				},
+				date: "2026-01-01",
+				claim: null,
+				priority: 3,
+				enabled: true,
+			},
+		];
 		const pastConversion = backendToDisplayPlan({
 			document: past,
 			status: { readOnly: false, authEnabled: false },
@@ -184,36 +195,35 @@ describe("backend and display plan adapter", () => {
 			startDate,
 		});
 		// Nothing is stored: the plan holds frequency and date only.
-		expect(Object.keys(pastConversion.plan.movements[0] ?? {})).not.toContain(
-			"provenance",
-		);
-		expect(
-			isHistoricalMovement(pastConversion.plan.movements[0]!, startDate),
-		).toBe(true);
+		const pastMovement = pastConversion.plan.movements.find(
+			(movement) => movement.id === "bonus",
+		)!;
+		expect(Object.keys(pastMovement ?? {})).not.toContain("provenance");
+		expect(isHistoricalMovement(pastMovement, startDate)).toBe(true);
 
 		const future = documentFixture();
-		future.postings[0] = {
-			...future.postings[0]!,
-			frequency: "once",
-			startDate: "2026-06-01",
-			source: "model",
-		};
+		future.postings = [
+			{
+				...past.postings[0]!,
+				id: "future-bonus",
+				date: "2026-06-01",
+			},
+		];
 		const futureConversion = backendToDisplayPlan({
 			document: future,
 			status: { readOnly: false, authEnabled: false },
 			projection: projectionFixture(),
 			startDate,
 		});
-		expect(
-			isHistoricalMovement(futureConversion.plan.movements[0]!, startDate),
-		).toBe(false);
+		const futureMovement = futureConversion.plan.movements.find(
+			(movement) => movement.id === "future-bonus",
+		)!;
+		expect(isHistoricalMovement(futureMovement, startDate)).toBe(false);
 
 		const recurring = documentFixture();
-		recurring.postings[0] = {
-			...recurring.postings[0]!,
-			frequency: "monthly",
+		recurring.recurrenceRules[0] = {
+			...recurring.recurrenceRules[0]!,
 			startDate: "2026-01-01",
-			source: "model",
 		};
 		const recurringConversion = backendToDisplayPlan({
 			document: recurring,
@@ -233,12 +243,13 @@ describe("backend and display plan adapter", () => {
 			projection: projectionFixture(),
 			startDate,
 		});
-		expect(simplefinConversion.plan.movements[0]).toMatchObject({
+		const simplefinMovement = simplefinConversion.plan.movements.find(
+			(movement) => movement.id === "bonus",
+		)!;
+		expect(simplefinMovement).toMatchObject({
 			readOnly: true,
 		});
-		expect(
-			isHistoricalMovement(simplefinConversion.plan.movements[0]!, startDate),
-		).toBe(true);
+		expect(isHistoricalMovement(simplefinMovement, startDate)).toBe(true);
 	});
 
 	it("preserves unchanged backend rows and allows expression-backed amount edits", () => {
@@ -266,7 +277,7 @@ describe("backend and display plan adapter", () => {
 		expect(reverse.report.losses).toEqual([]);
 		expect(reverse.document).toEqual(documentFixture());
 		expect(amountEdit.report.losses).toEqual([]);
-		expect(amountEdit.document.postings[0]?.amount).toEqual({
+		expect(amountEdit.document.recurrenceRules[0]?.amount).toEqual({
 			resolver: "expression",
 			config: { expression: "300" },
 			inputs: {},
@@ -279,9 +290,72 @@ describe("backend and display plan adapter", () => {
 		expect(reloaded.presentation.movements.salary?.amountValue).toBe(300);
 	});
 
+	it("round-trips a claim from a posting through the display movement", () => {
+		const document = documentFixture();
+		document.postings = [
+			{
+				id: "rent-actual",
+				name: "February rent",
+				sourceAccountId: "cash",
+				destinations: null,
+				amount: {
+					resolver: "expression",
+					config: { expression: "950" },
+					inputs: {},
+				},
+				date: "2026-02-05",
+				claim: { ruleId: "salary", occurrenceDate: "2026-02-05" },
+				priority: 1,
+				enabled: true,
+			},
+		];
+		const conversion = backendToDisplayPlan({
+			document,
+			status: { readOnly: false, authEnabled: false },
+			projection: projectionFixture(),
+			startDate: "2026-02-01",
+		});
+		expect(
+			conversion.plan.movements.find(
+				(movement) => movement.id === "rent-actual",
+			),
+		).toMatchObject({
+			frequency: "once",
+			claimRuleId: "salary",
+			claimOccurrenceDate: "2026-02-05",
+		});
+		const untouched = displayPlanToBackendDocument(conversion.plan, {
+			sourceDocument: document,
+			presentation: conversion.presentation,
+		});
+		expect(untouched.report.losses).toEqual([]);
+		expect(
+			untouched.document.postings.find(
+				(posting) => posting.id === "rent-actual",
+			)?.claim,
+		).toEqual({ ruleId: "salary", occurrenceDate: "2026-02-05" });
+		const cleared = {
+			...conversion.plan,
+			movements: conversion.plan.movements.map((movement) =>
+				movement.id === "rent-actual"
+					? { ...movement, claimRuleId: null, claimOccurrenceDate: null }
+					: movement,
+			),
+		};
+		const reverse = displayPlanToBackendDocument(cleared, {
+			sourceDocument: document,
+			presentation: conversion.presentation,
+		});
+		expect(reverse.report.losses).toEqual([]);
+		expect(
+			reverse.document.postings.find((posting) => posting.id === "rent-actual")
+				?.claim,
+		).toBeNull();
+	});
+
 	it("marks provider-backed amounts as provisional and read-only", () => {
 		const document = documentFixture();
-		document.postings[0]!.amount = {
+		document.recurrenceRules[0]!.amount = {
 			resolver: "income",
 			config: { incomeSourceId: "salary", resolvers: [] },
 			inputs: {},
@@ -397,6 +471,7 @@ describe("backend and display plan adapter", () => {
 			"cash",
 		]);
 		expect(reverse.document.postings).toEqual([]);
+		expect(reverse.document.recurrenceRules).toEqual([]);
 		const conflicting = displayPlanToBackendDocument(
 			{
 				...edited,
@@ -447,7 +522,7 @@ describe("backend and display plan adapter", () => {
 		]);
 		expect(reverse.document.accounts[0]?.minBalance).toBe(NO_FLOOR_SENTINEL);
 		expect(reverse.document.accounts[0]?.maxBalance).toBe(NO_CEILING_SENTINEL);
-		expect(reverse.document.postings[0]).toMatchObject({
+		expect(reverse.document.recurrenceRules[0]).toMatchObject({
 			id: "salary",
 			destinations: ["cash"],
 			frequency: "monthly",
