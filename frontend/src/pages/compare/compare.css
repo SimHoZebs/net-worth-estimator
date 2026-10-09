@@ -10,13 +10,13 @@
 		margin: 10px 0 25px;
 	}
 	.comparison-icon {
-		background: #eaf0df;
+		background: var(--accent-green-bg);
 		width: 50px;
 		height: 50px;
 		border-radius: 12px;
 		display: grid;
 		place-items: center;
-		color: #83996b;
+		color: var(--accent-green-text);
 	}
 	.comparison-hero p {
 		font-size: 11px;
@@ -34,10 +34,10 @@
 	}
 	.comparison-grid > span {
 		font-size: 12px;
-		color: #7d8770;
+		color: var(--muted);
 	}
 	.comparison-head {
-		background: #f3f5eb;
+		background: var(--surface-2);
 		align-items: center;
 	}
 	.comparison-head > div {
@@ -48,7 +48,7 @@
 	}
 	.comparison-head > div > span:last-child {
 		font-size: 9px;
-		color: #899279;
+		color: var(--muted);
 	}
 	.comparison-grid strong {
 		font-size: 14px;
@@ -65,7 +65,7 @@
 		margin-top: 3px;
 	}
 	.comparison-grid.emphasis {
-		background: #fbfcf6;
+		background: var(--surface);
 	}
 	.comparison-delta {
 		display: block;
@@ -91,7 +91,7 @@
 	}
 	.change-item > summary > span:last-child {
 		font-size: 9px;
-		color: #8a937c;
+		color: var(--muted);
 		margin-left: auto;
 	}
 	.change-details {
@@ -102,11 +102,11 @@
 		grid-template-columns: 1fr 2fr;
 		gap: 15px;
 		padding: 7px 12px;
-		background: #f8f9f2;
+		background: var(--surface-2);
 		font-size: 10px;
 	}
 	.change-details dt {
-		color: #7b856d;
+		color: var(--muted);
 	}
 	.change-details dd {
 		display: flex;

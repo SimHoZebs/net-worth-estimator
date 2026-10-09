@@ -1,0 +1,145 @@
+/* Theme overrides: dark palette. Intentionally unlayered so it wins over
+   layered component styles and accessibility remediation. Light theme is the
+   default defined in tokens.css; dark applies via [data-theme="dark"].
+   System preference only sets the initial data-theme (see useTheme); all
+   styling keys off the attribute. */
+:root[data-theme="dark"] {
+	color-scheme: dark;
+	--forest: #a4c488;
+	--forest-hover: #bad49b;
+	--on-forest: #152015;
+	--ink: #e8edde;
+	--muted: #a9b3a2;
+	--subtle: #8f9a8b;
+	--line: #2b362d;
+	--line-strong: #3c4a3e;
+	--paper: #0f1411;
+	--surface: #1a211c;
+	--surface-2: #222b24;
+	--surface-3: #2a352c;
+	--sidebar-bg: #131917;
+	--topbar-bg: #131917;
+	--input-bg: #202822;
+	--hover: #253026;
+	--active: #2f3d31;
+	--nav-idle: #a9b3a2;
+	--field-border: #3c4a3e;
+	--field-text: #e8edde;
+	--accent-green-bg: #22331f;
+	--accent-green-text: #b5cf8e;
+	--accent-green-border: #35492e;
+	--accent-amber-bg: #33291a;
+	--accent-amber-text: #e0bd6d;
+	--accent-amber-border: #5a4a26;
+	--danger-bg: #2e1f1a;
+	--danger-text: #e8a08a;
+	--danger-border: #5a352a;
+	--chart-grid: #2e3a30;
+	--chart-line: #9dc184;
+	--chart-band: #2c3a26;
+	--chart-axis: #93a08c;
+	--chart-median: #8fa07e;
+	--track: #2a352c;
+	--track-fill: #9dbd7d;
+}
+
+/* Dark mirrors of accessibility remediation (unlayered, must win). */
+:root[data-theme="dark"] body,
+[data-theme="dark"] body {
+	color: var(--ink);
+	background: var(--paper);
+}
+
+[data-theme="dark"] .eyebrow,
+[data-theme="dark"] .nav-label,
+[data-theme="dark"] .nav-link,
+[data-theme="dark"] .metric-heading,
+[data-theme="dark"] .metric-context,
+[data-theme="dark"] .segmented button,
+[data-theme="dark"] .chart-legend,
+[data-theme="dark"] .chart-foot-note,
+[data-theme="dark"] .chart-inspection span,
+[data-theme="dark"] .range-disclaimer,
+[data-theme="dark"] .evaluation-preview-content p,
+[data-theme="dark"] .progress-label,
+[data-theme="dark"] .timing-figures span,
+[data-theme="dark"] .timing-replenishment span > span,
+[data-theme="dark"] .account-summary,
+[data-theme="dark"] .account-label > span,
+[data-theme="dark"] .page-footer,
+[data-theme="dark"] .page-footer button,
+[data-theme="dark"] .page-tabs > button,
+[data-theme="dark"] .table-name small,
+[data-theme="dark"] .movement-name > span,
+[data-theme="dark"] .section-note,
+[data-theme="dark"] .assumption-metrics > div > span,
+[data-theme="dark"] .comparison-grid > span,
+[data-theme="dark"] .comparison-head > div > span:last-child,
+[data-theme="dark"] .change-item > summary > span:last-child,
+[data-theme="dark"] .change-details dt,
+[data-theme="dark"] .detail-list dt,
+[data-theme="dark"] .portability-action small,
+[data-theme="dark"] .form-intro,
+[data-theme="dark"] .field small,
+[data-theme="dark"] .field-hint,
+[data-theme="dark"] .draft-bar small,
+[data-theme="dark"] .draft-discard,
+[data-theme="dark"] .field,
+[data-theme="dark"] .failure-comparison > div > span {
+	color: var(--muted);
+}
+
+[data-theme="dark"] .badge-neutral,
+[data-theme="dark"] .badge-outline {
+	color: var(--muted);
+}
+
+[data-theme="dark"] .badge-green,
+[data-theme="dark"] .inline-success,
+[data-theme="dark"] .positive,
+[data-theme="dark"] .growth-pill {
+	color: var(--accent-green-text);
+}
+
+[data-theme="dark"] thead {
+	color: var(--muted);
+}
+
+[data-theme="dark"] .evidence-records summary {
+	color: var(--accent-green-text);
+}
+
+[data-theme="dark"] .badge-amber,
+[data-theme="dark"] .negative {
+	color: var(--accent-amber-text);
+}
+
+[data-theme="dark"] .insight-card .eyebrow,
+[data-theme="dark"] .insight-card > p,
+[data-theme="dark"] .funding-values span,
+[data-theme="dark"] .insight-caption,
+[data-theme="dark"] .evidence-date {
+	color: var(--accent-amber-text);
+}
+
+[data-theme="dark"] .inline-notice {
+	color: var(--accent-green-text);
+}
+
+[data-theme="dark"] .inline-notice.amber {
+	color: var(--accent-amber-text);
+}
+
+[data-theme="dark"] .axis-label {
+	fill: var(--chart-axis);
+}
+
+[data-theme="dark"] .search-field input::placeholder,
+[data-theme="dark"] .field input::placeholder {
+	color: var(--subtle);
+}
+
+[data-theme="dark"] ::selection {
+	background: #35492e;
+	color: #eaf2dc;
+}

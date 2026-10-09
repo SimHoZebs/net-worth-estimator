@@ -13,12 +13,12 @@
 		display: flex;
 		gap: 20px;
 		font-size: 9px;
-		color: #87907c;
+		color: var(--muted);
 		margin-bottom: 12px;
 	}
 	.account-summary b {
 		margin-left: 5px;
-		color: #68745a;
+		color: var(--ink);
 		font-weight: 550;
 	}
 	.accounts-grid {
@@ -31,15 +31,15 @@
 		gap: 11px;
 		align-items: center;
 		padding: 15px 14px;
-		background: #fcfdf8;
+		background: var(--surface);
 		border: 1px solid var(--line);
 		border-radius: 8px;
 		text-align: left;
 		min-width: 0;
 	}
 	.account-row:hover {
-		border-color: #becdad;
-		background: #fffefb;
+		border-color: var(--line-strong);
+		background: var(--hover);
 	}
 	.account-name-line {
 		display: inline-flex;
@@ -58,7 +58,7 @@
 	}
 	.account-label > span {
 		font-size: 8px;
-		color: #8b9281;
+		color: var(--muted);
 	}
 	.account-balance {
 		margin-left: auto;

@@ -7,14 +7,14 @@
 		display: flex;
 		align-items: center;
 		gap: 17px;
-		border: 1px solid #dce4cc;
-		background: #edf2e3;
+		border: 1px solid var(--accent-green-border);
+		background: var(--accent-green-bg);
 		border-radius: 9px;
 		padding: 23px;
 		margin-bottom: 25px;
 	}
 	.source-banner-icon {
-		color: #799060;
+		color: var(--accent-green-text);
 	}
 	.source-banner h2 {
 		font-size: 15px;
@@ -31,7 +31,7 @@
 		padding: 25px;
 	}
 	.source-health .section-top > svg {
-		color: #8ca073;
+		color: var(--accent-green-text);
 	}
 	.source-health .section-note {
 		padding: 0;
@@ -45,7 +45,7 @@
 		display: flex;
 		align-items: center;
 		gap: 14px;
-		background: #fbfcf6;
+		background: var(--surface);
 		border: 1px solid var(--line);
 		border-radius: 7px;
 		width: 100%;
@@ -54,7 +54,7 @@
 		margin-bottom: 13px;
 	}
 	.portability-action > svg {
-		color: #84946b;
+		color: var(--accent-green-text);
 	}
 	.portability-action > span {
 		display: flex;
@@ -66,15 +66,15 @@
 	}
 	.portability-action small {
 		font-size: 9px;
-		color: #8d947f;
+		color: var(--muted);
 	}
 	.portability-action > span:last-child {
 		margin-left: auto;
-		color: #7b8d65;
+		color: var(--accent-green-text);
 	}
 	.portability-action:hover {
-		background: #f0f4e6;
-		border-color: #d5dfc5;
+		background: var(--hover);
+		border-color: var(--line-strong);
 	}
 	.backup-button {
 		margin-top: 10px;

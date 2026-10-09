@@ -20,14 +20,14 @@
 	.auth-form input {
 		width: 190px;
 		min-height: 36px;
-		border: 1px solid #d4ddc9;
+		border: 1px solid var(--field-border);
 		border-radius: 6px;
-		background: #fffefa;
+		background: var(--surface);
 		padding: 8px 10px;
-		color: #374a31;
+		color: var(--field-text);
 	}
 	.auth-form input:focus {
-		outline: 2px solid #819967;
+		outline: 2px solid var(--track-fill);
 		outline-offset: 2px;
 	}
 	.server-import {
@@ -38,7 +38,7 @@
 		margin-top: 24px;
 	}
 	.server-import small {
-		color: #7e8872;
+		color: var(--muted);
 		text-align: center;
 	}
 	.import-summary {
@@ -46,7 +46,7 @@
 		padding: 20px 0;
 	}
 	.import-summary svg {
-		color: #80946a;
+		color: var(--track-fill);
 		margin-bottom: 12px;
 	}
 	.import-summary h3 {

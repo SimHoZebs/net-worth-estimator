@@ -1,18 +1,50 @@
 /* Design tokens: typefaces, palette, and shared dimensions. Every other
-   stylesheet reads these via var(); no selectors live here. */
+   stylesheet reads these via var(); no selectors live here.
+   Dark overrides live in themes.css (unlayered) so they win over layered
+   values and accessibility remediation. */
 @layer base {
 	:root {
+		color-scheme: light;
 		font-family: "Manrope Variable", sans-serif;
-		color: #283b33;
-		background: #f7f8f3;
+		color: var(--ink);
+		background: var(--paper);
 		font-synthesis: none;
 		--forest: #254d3d;
+		--forest-hover: #193d2d;
+		--on-forest: #fafcf5;
 		--ink: #283b33;
 		--muted: #737970;
 		--subtle: #8d9388;
 		--line: #e4e7de;
+		--line-strong: #d4d9c9;
 		--paper: #f7f8f3;
-		--white: #fffefa;
+		--surface: #fffefa;
+		--surface-2: #f6f7f0;
+		--surface-3: #eef1e6;
+		--sidebar-bg: #fcfcf8;
+		--topbar-bg: #fbfcf7;
+		--input-bg: #fdfef8;
+		--hover: #f0f2e9;
+		--active: #e9efdf;
+		--nav-idle: #71786c;
+		--field-border: #dce2d2;
+		--field-text: #374a31;
+		--accent-green-bg: #eaf0df;
+		--accent-green-text: #52713b;
+		--accent-green-border: #dce5cb;
+		--accent-amber-bg: #f5ead2;
+		--accent-amber-text: #87642b;
+		--accent-amber-border: #e1d7b8;
+		--danger-bg: #fbefe7;
+		--danger-text: #9b493a;
+		--danger-border: #edd4c8;
+		--chart-grid: #e5e8e0;
+		--chart-line: #315f47;
+		--chart-band: #dde6c7;
+		--chart-axis: #8a907e;
+		--chart-median: #8c997c;
+		--track: #e9eddf;
+		--track-fill: #7f965c;
 		--serif: "Newsreader Variable", Georgia, serif;
 		--sidebar: 224px;
 	}

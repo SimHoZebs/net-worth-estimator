@@ -4,7 +4,7 @@
    Keep selectors inside @layer components. */
 @layer components {
 	.chart-card {
-		background: #fffefa;
+		background: var(--surface);
 		border: 1px solid var(--line);
 		border-radius: 10px;
 		overflow: hidden;
@@ -23,7 +23,7 @@
 		align-items: center;
 		gap: 16px;
 		font-size: 9px;
-		color: #7b816e;
+		color: var(--muted);
 	}
 	.chart-legend span {
 		display: flex;
@@ -33,13 +33,13 @@
 	.legend-line {
 		width: 15px;
 		height: 2px;
-		background: #3c6144;
+		background: var(--chart-line);
 		display: inline-block;
 	}
 	.legend-line.dashed {
 		background: repeating-linear-gradient(
 			90deg,
-			#8b997a 0 4px,
+			var(--chart-median) 0 4px,
 			transparent 4px 7px
 		);
 	}
@@ -47,13 +47,13 @@
 		width: 11px;
 		height: 9px;
 		border-radius: 2px;
-		background: #dfe7cd;
+		background: var(--chart-band);
 		display: inline-block;
 	}
 	.legend-zero {
 		width: 15px;
 		height: 0;
-		border-top: 2px solid #7d8a76;
+		border-top: 2px solid var(--muted);
 		display: inline-block;
 	}
 	.chart-wrap {
@@ -67,7 +67,7 @@
 		min-height: 235px;
 	}
 	.axis-label {
-		fill: #8a907e;
+		fill: var(--chart-axis);
 		font-size: 10px;
 		font-family: "Manrope Variable", sans-serif;
 	}
@@ -88,7 +88,7 @@
 		gap: 6px 13px;
 		flex-wrap: wrap;
 		font-size: 10px;
-		background: #f3f6eb;
+		background: var(--surface-2);
 		margin: 3px 20px 10px;
 		padding: 8px 11px;
 		border-radius: 5px;
@@ -97,10 +97,10 @@
 		font-variant-numeric: tabular-nums;
 	}
 	.chart-inspection span {
-		color: #78816b;
+		color: var(--muted);
 	}
 	.chart-inspection b {
-		color: #3c5032;
+		color: var(--ink);
 		margin-left: 4px;
 	}
 	.chart-accounts {
@@ -116,15 +116,15 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
-		color: #78816b;
+		color: var(--muted);
 	}
 	.range-loading {
 		position: absolute;
 		left: 50%;
 		top: 35%;
 		transform: translateX(-50%);
-		background: #fffffff5;
-		border: 1px solid #e3e8d9;
+		background: var(--surface);
+		border: 1px solid var(--line-strong);
 		padding: 9px 15px;
 		box-shadow: 0 3px 13px #17352309;
 		border-radius: 7px;
@@ -135,7 +135,7 @@
 		gap: 8px;
 	}
 	.chart-foot {
-		border-top: 1px solid #eceee4;
+		border-top: 1px solid var(--line);
 		padding: 10px 21px;
 		display: flex;
 		align-items: center;
@@ -149,7 +149,7 @@
 	}
 	.chart-foot-note {
 		font-size: 8px;
-		color: #8d9382;
+		color: var(--muted);
 		margin-left: auto;
 	}
 	.chart-foot .icon-button {
