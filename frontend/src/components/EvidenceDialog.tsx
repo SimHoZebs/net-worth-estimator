@@ -4,7 +4,6 @@ import type { Projection, RangeResult } from "../domain/result.ts";
 import { AccountDialog } from "./AccountDialog.tsx";
 import { EvaluationEvidence } from "./evidence/EvaluationEvidence.tsx";
 import { FailureEvidence } from "./evidence/FailureEvidence.tsx";
-import { MethodEvidence } from "./evidence/MethodEvidence.tsx";
 import { PositionEvidence } from "./evidence/PositionEvidence.tsx";
 import { TimingEvidence } from "./evidence/TimingEvidence.tsx";
 import "./evidence/evidence.css";
@@ -14,8 +13,7 @@ export type EvidenceTarget =
 	| { kind: "account"; id: string }
 	| { kind: "failure" }
 	| { kind: "evaluation"; id: string }
-	| { kind: "timing" }
-	| { kind: "method" };
+	| { kind: "timing" };
 
 export function EvidenceDialog({
 	target,
@@ -60,8 +58,6 @@ export function EvidenceDialog({
 			return (
 				<TimingEvidence plan={plan} projection={projection} onClose={onClose} />
 			);
-		case "method":
-			return <MethodEvidence onClose={onClose} />;
 		case "account": {
 			const account = plan.accounts.find(
 				(item) => item.id === target.id && !item.archived,

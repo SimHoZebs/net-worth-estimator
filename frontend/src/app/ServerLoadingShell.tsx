@@ -27,7 +27,6 @@ export function ServerLoadingShell({
 					changeCount={0}
 					statusLabel=""
 					onNavigate={navigation.navigate}
-					onMethod={() => undefined}
 					onClose={close}
 					pending
 				/>

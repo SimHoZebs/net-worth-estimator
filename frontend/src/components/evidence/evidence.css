@@ -89,22 +89,4 @@
 	.failure-comparison > svg {
 		color: var(--subtle);
 	}
-	.method-steps {
-		display: grid;
-		gap: 26px;
-		margin-bottom: 25px;
-	}
-	.method-steps > div {
-		display: flex;
-		gap: 20px;
-	}
-	.method-steps > div > span {
-		font-family: var(--serif);
-		font-size: 28px;
-		color: var(--subtle);
-	}
-	.method-steps p {
-		font-size: 12px;
-		margin-top: 7px;
-	}
 }
