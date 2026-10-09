@@ -8,7 +8,7 @@
 		border-radius: 5px;
 	}
 	.account-name-button:hover strong {
-		color: #315f3e;
+		color: var(--chart-line);
 		text-decoration: underline;
 		text-underline-offset: 4px;
 	}
@@ -34,7 +34,7 @@
 	}
 	.account-dialog-summary > div > span {
 		font-size: 10px;
-		color: #626f57;
+		color: var(--muted);
 	}
 	.account-dialog-summary strong {
 		font-size: 30px;
@@ -54,7 +54,7 @@
 		margin-bottom: 17px;
 	}
 	.account-view-tabs button > span {
-		color: #526144;
+		color: var(--accent-green-text);
 	}
 	.account-activity-toolbar {
 		display: flex;
@@ -89,12 +89,12 @@
 	}
 	.account-activity-filters label > span {
 		font-size: 10px;
-		color: #626f57;
+		color: var(--muted);
 	}
 	.account-activity-filters select {
-		border: 1px solid #dce2d2;
-		background: #f9fbf2;
-		color: #526144;
+		border: 1px solid var(--field-border);
+		background: var(--input-bg);
+		color: var(--accent-green-text);
 		padding: 8px 9px;
 		border-radius: 5px;
 		width: 100%;
@@ -104,7 +104,7 @@
 	.transaction-context {
 		font-size: 10px;
 		line-height: 1.8;
-		color: #626f57;
+		color: var(--muted);
 		padding: 15px 0;
 	}
 	.account-activity-table {
@@ -123,7 +123,7 @@
 		padding-left: 0;
 		width: 105px;
 		font-size: 10px;
-		color: #626f57;
+		color: var(--muted);
 		white-space: nowrap;
 	}
 	.account-activity-table thead .transaction-date-column {
@@ -157,7 +157,7 @@
 	.transaction-name > span:not(.transaction-badges),
 	.transaction-mobile-date {
 		font-size: 10px;
-		color: #626f57;
+		color: var(--muted);
 	}
 	.transaction-badges {
 		display: flex;
@@ -170,7 +170,7 @@
 	}
 	.transaction-chevron {
 		margin-left: auto;
-		color: #667458;
+		color: var(--muted);
 		transition: transform 0.15s;
 	}
 	.transaction-row-open .transaction-chevron {
@@ -178,7 +178,7 @@
 	}
 	.transaction-row:hover,
 	.transaction-row-open {
-		background: #f6f8ee;
+		background: var(--surface-2);
 	}
 	.account-activity-table .transaction-amount-column {
 		padding-right: 3px;
@@ -193,7 +193,7 @@
 	}
 	.transaction-amount-column > small {
 		display: block;
-		color: #785d30;
+		color: var(--accent-amber-text);
 		font-size: 9px;
 		margin-top: 5px;
 	}
@@ -204,8 +204,8 @@
 		padding: 0 0 15px;
 	}
 	.transaction-details {
-		background: #f3f6e9;
-		border: 1px solid #e2e8d5;
+		background: var(--surface-2);
+		border: 1px solid var(--line-strong);
 		border-radius: 7px;
 		padding: 18px;
 	}
@@ -216,7 +216,7 @@
 	}
 	.transaction-details dt {
 		font-size: 10px;
-		color: #626f57;
+		color: var(--muted);
 		margin-bottom: 4px;
 	}
 	.transaction-details dd {
@@ -225,7 +225,7 @@
 		overflow-wrap: anywhere;
 	}
 	.transaction-details > p {
-		color: #626f57;
+		color: var(--muted);
 		font-size: 10px;
 		margin-top: 16px;
 		line-height: 1.8;
@@ -243,7 +243,7 @@
 		border-bottom: 1px solid var(--line);
 	}
 	.transaction-pagination > span {
-		color: #626f57;
+		color: var(--muted);
 		font-size: 10px;
 	}
 	.transaction-pagination > div {
@@ -253,7 +253,7 @@
 	}
 	.transaction-pagination > div > span {
 		font-size: 10px;
-		color: #626f57;
+		color: var(--muted);
 		font-variant-numeric: tabular-nums;
 	}
 	.transaction-note {
@@ -261,7 +261,7 @@
 		align-items: flex-start;
 		gap: 8px;
 		margin-top: 17px;
-		color: #626f57;
+		color: var(--muted);
 	}
 	.transaction-note svg {
 		margin-top: 2px;
@@ -269,7 +269,7 @@
 	.transaction-note p {
 		font-size: 10px;
 		line-height: 1.8;
-		color: #626f57;
+		color: var(--muted);
 	}
 }
 

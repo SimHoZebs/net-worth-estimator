@@ -514,7 +514,7 @@
 	}
 	.movement-row > .table-actions {
 		width: 100%;
-		border-top: 1px solid #edf0e5;
+		border-top: 1px solid var(--line);
 		margin-top: 2px;
 		padding-top: 5px;
 	}

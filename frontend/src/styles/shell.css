@@ -12,7 +12,7 @@
 		padding: 0 23px;
 		align-items: center;
 		border-bottom: 1px solid var(--line);
-		background: #fbfcf7;
+		background: var(--topbar-bg);
 	}
 	.main-content {
 		padding: 34px 39px 26px;
@@ -28,7 +28,7 @@
 		padding-top: 21px;
 		margin-top: 30px;
 		font-size: 9px;
-		color: #828a7a;
+		color: var(--muted);
 	}
 	.page-footer span,
 	.page-footer button {
@@ -39,7 +39,7 @@
 	.page-footer button {
 		border: 0;
 		background: none;
-		color: #828a7a;
+		color: var(--muted);
 		font-size: 9px;
 		padding: 4px 0;
 	}

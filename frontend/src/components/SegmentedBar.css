@@ -8,7 +8,7 @@
 		height: 14px;
 		border-radius: 7px;
 		overflow: hidden;
-		background: #eef1e6;
+		background: var(--surface-3);
 		margin: 10px 0 8px;
 	}
 	.seg-bar > span {
@@ -23,7 +23,7 @@
 		background-color: #c9d3b8;
 	}
 	.seg-dark {
-		background-color: #4a5d43;
+		background-color: var(--track-fill);
 	}
 	.seg-amber {
 		background-color: #d97706;
@@ -79,7 +79,7 @@
 		flex-wrap: wrap;
 		gap: 6px 14px;
 		font-size: 10px;
-		color: #667359;
+		color: var(--muted);
 	}
 	.seg-legend li {
 		display: flex;

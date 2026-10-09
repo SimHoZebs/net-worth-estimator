@@ -25,8 +25,8 @@ export function AccountIcon({
 	const Icon = account.id === "savings" ? PiggyBank : icons[account.kind];
 	const style: CSSProperties | undefined = account.color
 		? {
-				backgroundColor: `color-mix(in srgb, ${account.color} 16%, #fcfdf8)`,
-				borderColor: `color-mix(in srgb, ${account.color} 38%, #e4e7de)`,
+				backgroundColor: `color-mix(in srgb, ${account.color} 22%, var(--surface))`,
+				borderColor: `color-mix(in srgb, ${account.color} 42%, var(--line))`,
 				color: account.color,
 			}
 		: undefined;

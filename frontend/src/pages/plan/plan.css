@@ -11,7 +11,7 @@
 	}
 	.movement-row {
 		padding: 17px 23px;
-		border-top: 1px solid #e8ebdf;
+		border-top: 1px solid var(--line);
 		display: flex;
 		align-items: center;
 		gap: 15px;
@@ -25,16 +25,16 @@
 		flex-shrink: 0;
 	}
 	.inflow {
-		background: #ecf2e1;
-		color: #7b9558;
+		background: var(--accent-green-bg);
+		color: var(--accent-green-text);
 	}
 	.outflow {
-		background: #f3eee0;
-		color: #a38c5a;
+		background: var(--accent-amber-bg);
+		color: var(--accent-amber-text);
 	}
 	.transfer {
-		background: #eef0e6;
-		color: #829074;
+		background: var(--surface-3);
+		color: var(--muted);
 	}
 	.movement-name {
 		display: flex;
@@ -48,7 +48,7 @@
 	}
 	.movement-name > span {
 		font-size: 9px;
-		color: #8b937e;
+		color: var(--muted);
 	}
 	.movement-amount {
 		display: flex;
@@ -61,7 +61,7 @@
 		font-size: 13px;
 	}
 	.is-excluded {
-		background: #f7f7f1 !important;
+		background: var(--surface-2) !important;
 	}
 	.is-excluded .movement-name strong {
 		text-decoration: line-through;
@@ -82,7 +82,7 @@
 	}
 	.assumption-metrics > div > span {
 		font-size: 11px;
-		color: #7f8971;
+		color: var(--muted);
 	}
 	.assumption-metrics strong {
 		font-size: 28px;

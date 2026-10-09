@@ -20,9 +20,9 @@
 		left: calc(var(--sidebar) + 39px);
 		right: 39px;
 		z-index: 20;
-		background: #fcfdf5f5;
+		background: var(--surface);
 		backdrop-filter: blur(8px);
-		border: 1px solid #d6dec8;
+		border: 1px solid var(--line-strong);
 		border-radius: 10px;
 		box-shadow: 0 4px 25px #263d261c;
 		padding: 16px 20px;
@@ -36,8 +36,8 @@
 		align-items: center;
 	}
 	.draft-icon {
-		background: #e9efdc;
-		color: #7c8f5e;
+		background: var(--accent-green-bg);
+		color: var(--accent-green-text);
 		width: 37px;
 		height: 37px;
 		border-radius: 7px;
@@ -53,12 +53,12 @@
 	}
 	.draft-bar small {
 		font-size: 9px;
-		color: #8a927a;
+		color: var(--muted);
 		margin-top: 2px;
 	}
 	.draft-discard {
 		background: none;
-		color: #849074;
+		color: var(--muted);
 	}
 	.toast {
 		position: fixed;
@@ -68,9 +68,9 @@
 		display: flex;
 		align-items: center;
 		gap: 9px;
-		background: #2f513e;
-		border: 1px solid #577350;
-		color: #f3f6eb;
+		background: var(--forest);
+		border: 1px solid var(--track-fill);
+		color: var(--on-forest);
 		padding: 12px 10px 12px 17px;
 		max-width: min(470px, calc(100vw - 30px));
 		border-radius: 8px;
@@ -81,13 +81,13 @@
 		bottom: 111px;
 	}
 	.toast > svg {
-		color: #c1d3a5;
+		color: var(--on-forest);
 	}
 	.toast .icon-button {
-		color: #cbd8ba;
+		color: var(--on-forest);
 	}
 	.toast .icon-button:hover {
-		background: #42654b;
+		background: rgba(0, 0, 0, 0.15);
 	}
 	.nav-backdrop {
 		display: none;

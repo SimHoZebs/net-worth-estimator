@@ -4,9 +4,9 @@
    Keep selectors inside @layer components. */
 @layer components {
 	.method-note {
-		background: #f4f6ec;
+		background: var(--surface-2);
 		padding: 20px;
-		border: 1px solid #e8ecdb;
+		border: 1px solid var(--line);
 		border-radius: 8px;
 	}
 	.method-note h3 {

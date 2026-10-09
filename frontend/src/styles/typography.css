@@ -6,11 +6,11 @@
 		line-height: 1.6;
 	}
 	::selection {
-		background: #dde8c9;
-		color: #193e2c;
+		background: var(--active);
+		color: var(--ink);
 	}
 	:focus-visible {
-		outline: 3px solid #849c53;
+		outline: 3px solid var(--track-fill);
 		outline-offset: 4px;
 		border-radius: 4px;
 	}

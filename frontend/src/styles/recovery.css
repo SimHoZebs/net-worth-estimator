@@ -16,7 +16,7 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		color: #637058;
+		color: var(--muted);
 		font-size: 12px;
 		margin-bottom: 14px;
 	}

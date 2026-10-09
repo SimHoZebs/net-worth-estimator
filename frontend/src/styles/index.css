@@ -3,7 +3,8 @@
    owns only app-wide foundations. The @layer declaration stays on line 1 so the
    foundation order never depends on bundler module order. Responsive and
    accessibility overrides are intentionally unlayered: they must win over every
-   layer no matter which stylesheet the bundler injects first. */
+   layer no matter which stylesheet the bundler injects first. Theme overrides
+   are unlayered and last so dark wins. */
 @layer reset, base, layout, components;
 @import "./reset.css";
 @import "./tokens.css";
@@ -15,3 +16,4 @@
 @import "./recovery.css";
 @import "./responsive.css";
 @import "./accessibility.css";
+@import "./themes.css";

@@ -4,7 +4,7 @@
    Keep selectors inside @layer components. */
 @layer components {
 	.evaluation-card {
-		background: #fffefa;
+		background: var(--surface);
 		border: 1px solid var(--line);
 		border-radius: 10px;
 		padding: 26px;
@@ -15,8 +15,8 @@
 		border-radius: 50%;
 		display: grid;
 		place-items: center;
-		color: #7c925c;
-		background: #edf2e2;
+		color: var(--accent-green-text);
+		background: var(--accent-green-bg);
 	}
 	.evaluation-card h2 {
 		margin-top: 20px;

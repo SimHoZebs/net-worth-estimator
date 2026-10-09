@@ -56,8 +56,16 @@ export function ProjectionPlot({
 			</desc>
 			<defs>
 				<linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
-					<stop offset="0%" stopColor="#dce6bc" stopOpacity=".55" />
-					<stop offset="100%" stopColor="#e9efdb" stopOpacity=".1" />
+					<stop
+						offset="0%"
+						style={{ stopColor: "var(--chart-band)" }}
+						stopOpacity=".55"
+					/>
+					<stop
+						offset="100%"
+						style={{ stopColor: "var(--chart-band)" }}
+						stopOpacity=".1"
+					/>
 				</linearGradient>
 			</defs>
 			{Array.from(
@@ -70,7 +78,7 @@ export function ProjectionPlot({
 						x2={width - right}
 						y1={y(value)}
 						y2={y(value)}
-						stroke="#e5e8e0"
+						style={{ stroke: "var(--chart-grid)" }}
 						strokeDasharray="3 5"
 					/>
 					<text
@@ -84,7 +92,7 @@ export function ProjectionPlot({
 				</g>
 			))}
 			{ranges && model.hasRange ? (
-				<path d={area} fill="#dde6c7" fillOpacity=".7" />
+				<path d={area} style={{ fill: "var(--chart-band)" }} fillOpacity=".7" />
 			) : (
 				<path d={filledBasePath} fill={`url(#${id}-fill)`} />
 			)}
@@ -92,7 +100,7 @@ export function ProjectionPlot({
 				<path
 					d={medianPath}
 					fill="none"
-					stroke="#8c997c"
+					style={{ stroke: "var(--chart-median)" }}
 					strokeWidth="1.5"
 					strokeDasharray="4 5"
 				/>
@@ -100,7 +108,7 @@ export function ProjectionPlot({
 			<path
 				d={basePath}
 				fill="none"
-				stroke="#315f47"
+				style={{ stroke: "var(--chart-line)" }}
 				strokeWidth="3"
 				strokeLinejoin="round"
 				strokeLinecap="round"
@@ -111,7 +119,7 @@ export function ProjectionPlot({
 					x2={width - right}
 					y1={y(0)}
 					y2={y(0)}
-					stroke="#7d8a76"
+					style={{ stroke: "var(--muted)" }}
 					strokeWidth="1.5"
 				/>
 				<text
@@ -143,8 +151,7 @@ export function ProjectionPlot({
 				cx={x(points.length - 1)}
 				cy={y(values.at(-1) ?? 0)}
 				r="5"
-				fill="#315f47"
-				stroke="white"
+				style={{ fill: "var(--chart-line)", stroke: "var(--surface)" }}
 				strokeWidth="3"
 			/>
 			{inspected !== null && (
@@ -154,15 +161,14 @@ export function ProjectionPlot({
 						x2={x(selectedIndex)}
 						y1={top}
 						y2={height - bottom}
-						stroke="#6c8174"
+						style={{ stroke: "var(--muted)" }}
 						strokeDasharray="4 4"
 					/>
 					<circle
 						cx={x(selectedIndex)}
 						cy={y(values[selectedIndex] ?? 0)}
 						r="5"
-						fill="#214c3d"
-						stroke="white"
+						style={{ fill: "var(--forest)", stroke: "var(--surface)" }}
 						strokeWidth="2"
 					/>
 				</g>

@@ -11,10 +11,10 @@
 		display: grid;
 		gap: 6px;
 		font-size: 11px;
-		color: #768363;
+		color: var(--accent-green-text);
 	}
 	.evidence-warnings {
-		color: #8b7549;
+		color: var(--accent-amber-text);
 	}
 	.evidence-items li,
 	.evidence-warnings li {
@@ -27,7 +27,7 @@
 		width: 5px;
 		height: 5px;
 		border-radius: 50%;
-		background: #829466;
+		background: var(--track-fill);
 		flex-shrink: 0;
 		transform: translateY(-1px);
 	}
@@ -36,7 +36,7 @@
 		width: 5px;
 		height: 5px;
 		border-radius: 50%;
-		background: #b5a16a;
+		background: var(--accent-amber-text);
 		flex-shrink: 0;
 		transform: translateY(-1px);
 	}
@@ -49,7 +49,7 @@
 		padding: 15px 0;
 		cursor: pointer;
 		font-size: 11px;
-		color: #687d54;
+		color: var(--accent-green-text);
 	}
 	.evidence-amount {
 		font-family: var(--serif);
@@ -59,7 +59,7 @@
 		margin-bottom: 9px;
 	}
 	.evidence-date {
-		color: #9a814f;
+		color: var(--accent-amber-text);
 		display: flex;
 		align-items: center;
 		gap: 8px;
@@ -79,7 +79,7 @@
 	}
 	.failure-comparison > div > span {
 		font-size: 11px;
-		color: #848a79;
+		color: var(--muted);
 	}
 	.failure-comparison strong {
 		font-size: 28px;
@@ -87,7 +87,7 @@
 		letter-spacing: -0.7px;
 	}
 	.failure-comparison > svg {
-		color: #a3ad94;
+		color: var(--subtle);
 	}
 	.method-steps {
 		display: grid;
@@ -101,7 +101,7 @@
 	.method-steps > div > span {
 		font-family: var(--serif);
 		font-size: 28px;
-		color: #96a183;
+		color: var(--subtle);
 	}
 	.method-steps p {
 		font-size: 12px;

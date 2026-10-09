@@ -6,6 +6,7 @@ import {
 	Settings,
 } from "lucide-react";
 import { Brand } from "../components/Brand.tsx";
+import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { IconButton } from "../components/ui.tsx";
 import { type Page, pages } from "./navigation.ts";
 
@@ -88,6 +89,7 @@ export function WorkspaceSidebar({
 					<CircleHelp size={19} strokeWidth={1.7} />
 					<span>How it works</span>
 				</button>
+				<ThemeToggle />
 				<div className="sidebar-status">
 					<span className="status-dot" />
 					{statusLabel} <LockKeyhole size={12} />

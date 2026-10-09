@@ -11,7 +11,7 @@
 	.calendar h4 {
 		font-size: 11px;
 		font-weight: 650;
-		color: #374a31;
+		color: var(--ink);
 		margin: 0 0 8px;
 	}
 	.calendar-grid {
@@ -22,7 +22,7 @@
 	.calendar-dow {
 		font-size: 8px;
 		font-weight: 700;
-		color: #8a927e;
+		color: var(--muted);
 		text-align: center;
 		padding-bottom: 2px;
 	}
@@ -31,30 +31,30 @@
 	}
 	.calendar-cell {
 		min-height: 40px;
-		border: 1px solid #eef1e6;
+		border: 1px solid var(--line);
 		border-radius: 6px;
 		padding: 3px 4px;
 		display: flex;
 		flex-direction: column;
 		gap: 1px;
-		background: #fffefa;
+		background: var(--surface);
 	}
 	.calendar-has-events {
-		border-color: #c9d3b8;
-		background: #f4f6ec;
+		border-color: var(--line-strong);
+		background: var(--surface-2);
 	}
 	.calendar-today {
-		border: 2px solid #7a8f5e;
+		border: 2px solid var(--track-fill);
 		padding: 2px 3px;
 	}
 	.calendar-day {
 		font-size: 9px;
 		font-weight: 700;
-		color: #667359;
+		color: var(--muted);
 	}
 	.calendar-total {
 		font-size: 8px;
 		font-weight: 650;
-		color: #4a5d43;
+		color: var(--ink);
 	}
 }
