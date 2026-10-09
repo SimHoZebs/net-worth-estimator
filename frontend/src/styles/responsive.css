@@ -503,16 +503,6 @@
 	.movement-amount {
 		margin-right: 0;
 	}
-	.movement-row > .table-actions {
-		width: 100%;
-		border-top: 1px solid var(--line);
-		margin-top: 2px;
-		padding-top: 5px;
-	}
-	.movement-row .table-actions > button {
-		width: 36px;
-		height: 33px;
-	}
 	.plan-table th,
 	.plan-table td {
 		padding: 15px;

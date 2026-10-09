@@ -17,11 +17,21 @@
 		padding-right: 2px;
 	}
 	.movement-row {
+		width: 100%;
 		padding: 17px 23px;
+		border: 0;
 		border-top: 1px solid var(--line);
+		background: none;
+		color: inherit;
+		font: inherit;
+		text-align: left;
 		display: flex;
 		align-items: center;
 		gap: 15px;
+		cursor: pointer;
+	}
+	.movement-row:hover {
+		background: var(--surface-2);
 	}
 	.movement-icon {
 		display: grid;

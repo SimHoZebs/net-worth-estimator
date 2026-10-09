@@ -30,7 +30,7 @@ export function MovementEditor({
 	return (
 		<EditorForm
 			{...props}
-			title={`${item ? "Edit" : "Add"} planned transaction`}
+			title={item ? item.name : "Add planned transaction"}
 			readOnlyReason={readOnlyReason}
 			buildPlan={(data) => {
 				const claimRuleId = textValue(data, "claimRuleId") || null;

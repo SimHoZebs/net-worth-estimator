@@ -14,7 +14,7 @@ test.beforeEach(async () => {
 /** Open the movement editor for the fixture's investing transfer. */
 async function openInvestingMovementEditor(page: Page) {
 	await page.getByRole("link", { name: "Transactions", exact: true }).click();
-	await page.getByRole("button", { name: "Edit Monthly investing" }).click();
+	await page.getByRole("button", { name: "Monthly investing" }).click();
 }
 
 const issues = (
