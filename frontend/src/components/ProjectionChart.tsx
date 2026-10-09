@@ -20,7 +20,6 @@ export function ProjectionChart({
 	years,
 	setYears,
 	progress,
-	inflation,
 	rangeError,
 }: {
 	plan: Plan;
@@ -31,18 +30,22 @@ export function ProjectionChart({
 	years: number;
 	setYears: (value: number) => void;
 	progress: number;
-	inflation: number;
 	rangeError: string | null;
 }) {
 	const [inspected, setInspected] = useState<number | null>(null);
 	const [showTable, setShowTable] = useState(false);
-	const [realTerms, setRealTerms] = useState(false);
 	const narrow = useMediaQuery("(max-width: 600px)");
 	const id = useId().replaceAll(":", "");
 	const model = useMemo(
 		() =>
-			projectionChartModel({ projection, range, inflation, realTerms, narrow }),
-		[projection, range, inflation, realTerms, narrow],
+			projectionChartModel({
+				projection,
+				range,
+				inflation: 0,
+				realTerms: false,
+				narrow,
+			}),
+		[projection, range, narrow],
 	);
 	const selectedIndex = model
 		? Math.min(inspected ?? model.points.length - 1, model.points.length - 1)
@@ -170,17 +173,6 @@ export function ProjectionChart({
 				</ul>
 			</div>
 			<div className="chart-foot">
-				<button
-					type="button"
-					className="text-button muted"
-					onClick={() => setRealTerms(!realTerms)}
-				>
-					{realTerms ? "Today's dollars" : "Future dollars"}{" "}
-					<span className="tiny-caret">⌄</span>
-				</button>
-				<span className="chart-foot-note">
-					{realTerms ? `${inflation}% inflation adjustment` : ""}
-				</span>
 				<IconButton
 					icon={showTable ? X : Table2}
 					label={
@@ -190,11 +182,7 @@ export function ProjectionChart({
 				/>
 			</div>
 			{showTable && (
-				<ProjectionTable
-					rows={model.rows}
-					realTerms={realTerms}
-					hasRange={Boolean(range)}
-				/>
+				<ProjectionTable rows={model.rows} hasRange={Boolean(range)} />
 			)}
 		</section>
 	);

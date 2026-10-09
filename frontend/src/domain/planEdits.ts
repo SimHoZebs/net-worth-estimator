@@ -3,8 +3,7 @@ import type { Account, Evaluation, Movement, Plan } from "./model.ts";
 export type EditorTarget =
 	| { kind: "account"; item: Account | null }
 	| { kind: "movement"; item: Movement | null }
-	| { kind: "evaluation"; item: Evaluation | null }
-	| { kind: "assumptions" };
+	| { kind: "evaluation"; item: Evaluation | null };
 export type RemovalTarget = {
 	kind: "accounts" | "movements";
 	id: string;
