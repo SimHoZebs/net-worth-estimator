@@ -1,8 +1,12 @@
-import { Plus, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
+import { useId, useMemo, useState } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { type TabItem, Tabs } from "../components/Tabs.tsx";
-import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
+import {
+	ErrorNotice,
+	IconButton,
+	ProjectionUpdating,
+} from "../components/ui.tsx";
 import {
 	type Plan,
 	visibleAccounts,
@@ -24,6 +28,8 @@ export type PlanView = "accounts" | "transactions";
 type AccountsSection = "accounts" | "checks";
 
 type ScheduleFilter = "all" | "recurring";
+
+const TRANSACTIONS_PAGE_SIZE = 10;
 
 export function PlanPage({
 	view,
@@ -244,6 +250,8 @@ function TransactionsView({
 }) {
 	const [query, setQuery] = useState("");
 	const [schedule, setSchedule] = useState<ScheduleFilter>("all");
+	const [page, setPage] = useState(0);
+	const listId = useId();
 	const { requestRemoval, dialog } = usePlanRemoval({ plan, onUpdate });
 	const resolvedAmounts = useMemo(
 		() =>
@@ -266,15 +274,34 @@ function TransactionsView({
 			movement.name.toLowerCase().includes(query.toLowerCase()) &&
 			(schedule === "all" || movement.frequency !== "once"),
 	);
+	const pageCount = Math.max(
+		1,
+		Math.ceil(movements.length / TRANSACTIONS_PAGE_SIZE),
+	);
+	const currentPage = Math.min(page, pageCount - 1);
+	const pagedMovements = movements.slice(
+		currentPage * TRANSACTIONS_PAGE_SIZE,
+		(currentPage + 1) * TRANSACTIONS_PAGE_SIZE,
+	);
+	const resetFilters = (next: ScheduleFilter) => {
+		setSchedule(next);
+		setQuery("");
+		setPage(0);
+	};
+	const search = (value: string) => {
+		setQuery(value);
+		setPage(0);
+	};
+	const turnPage = (next: number) => {
+		setPage(next);
+		document.getElementById(listId)?.scrollIntoView({ block: "nearest" });
+	};
 	return (
 		<>
 			<Tabs
 				items={tabs}
 				value={schedule}
-				onChange={(next) => {
-					setSchedule(next);
-					setQuery("");
-				}}
+				onChange={resetFilters}
 				label="Transactions sections"
 				panelAs="section"
 				panelClassName="plan-transactions"
@@ -285,7 +312,7 @@ function TransactionsView({
 						<input
 							aria-label="Search plan"
 							value={query}
-							onChange={(event) => setQuery(event.target.value)}
+							onChange={(event) => search(event.target.value)}
 							placeholder="Find a transaction…"
 						/>
 					</label>
@@ -298,19 +325,50 @@ function TransactionsView({
 						Add transaction
 					</button>
 				</div>
-				<MovementsPanel
-					movements={movements}
-					accounts={visibleAccounts(plan.accounts)}
-					resolvedAmounts={resolvedAmounts}
-					onEdit={(item) => onEdit({ kind: "movement", item })}
-					onRemove={(item) =>
-						requestRemoval({
-							kind: "movements",
-							id: item.id,
-							name: item.name,
-						})
-					}
-				/>
+				<div id={listId}>
+					<MovementsPanel
+						movements={pagedMovements}
+						accounts={visibleAccounts(plan.accounts)}
+						resolvedAmounts={resolvedAmounts}
+						onEdit={(item) => onEdit({ kind: "movement", item })}
+						onRemove={(item) =>
+							requestRemoval({
+								kind: "movements",
+								id: item.id,
+								name: item.name,
+							})
+						}
+					/>
+				</div>
+				{pageCount > 1 && (
+					<div className="transaction-pagination">
+						<span role="status">
+							Showing {currentPage * TRANSACTIONS_PAGE_SIZE + 1}–
+							{Math.min(
+								(currentPage + 1) * TRANSACTIONS_PAGE_SIZE,
+								movements.length,
+							)}{" "}
+							of {movements.length} transactions
+						</span>
+						<div>
+							<IconButton
+								icon={ChevronLeft}
+								label="Previous transaction page"
+								disabled={currentPage === 0}
+								onClick={() => turnPage(currentPage - 1)}
+							/>
+							<span>
+								{currentPage + 1} / {pageCount}
+							</span>
+							<IconButton
+								icon={ChevronRight}
+								label="Next transaction page"
+								disabled={currentPage === pageCount - 1}
+								onClick={() => turnPage(currentPage + 1)}
+							/>
+						</div>
+					</div>
+				)}
 			</Tabs>
 			{dialog}
 		</>

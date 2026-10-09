@@ -73,6 +73,28 @@
 	.is-excluded .movement-name strong {
 		text-decoration: line-through;
 	}
+	.plan-transactions .transaction-pagination {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 15px;
+		padding: 15px 2px;
+		border-top: 1px solid var(--line);
+	}
+	.plan-transactions .transaction-pagination > span {
+		color: var(--muted);
+		font-size: 10px;
+	}
+	.plan-transactions .transaction-pagination > div {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.plan-transactions .transaction-pagination > div > span {
+		font-size: 10px;
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
+	}
 	.assumptions-page {
 		padding: 25px;
 	}

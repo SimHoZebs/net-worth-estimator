@@ -465,6 +465,15 @@
 	.plan-transactions .plan-toolbar {
 		padding: 0 2px 14px;
 	}
+	.plan-transactions .transaction-pagination {
+		gap: 8px;
+	}
+	.plan-transactions .transaction-pagination > span {
+		font-size: 9px;
+	}
+	.plan-transactions .transaction-pagination > div {
+		gap: 5px;
+	}
 	.search-field input {
 		width: 130px;
 		font-size: 10px;
