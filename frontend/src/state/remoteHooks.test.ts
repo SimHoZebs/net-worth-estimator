@@ -1,3 +1,7 @@
+// @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook as renderHookRTL } from "@testing-library/react";
+import { createElement, Fragment, type ReactNode, StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	ApiHttpError,
@@ -9,47 +13,20 @@ import {
 	type StochasticProjectionResult,
 } from "../api/index.ts";
 import type { Plan } from "../domain/model.ts";
-import { resetProjectionQueryCache } from "./projectionQuery.ts";
 import {
 	loadRemoteState,
 	persistRemoteState,
 	REMOTE_STORAGE_KEY,
 	serverDocumentFingerprint,
 } from "./remoteStorage.ts";
+import { resetUiStore } from "./uiStore.ts";
 import {
 	projectionResultToLocal,
 	stochasticResultToLocal,
 	useRemoteProjection,
 } from "./useRemoteProjection.ts";
 import { useRemoteWorkspace } from "./useRemoteWorkspace.ts";
-
-interface Runtime {
-	useState<T>(
-		initial: T | (() => T),
-	): [T, (value: T | ((previous: T) => T)) => void];
-	useEffect(
-		effect: () => undefined | (() => void),
-		dependencies?: readonly unknown[],
-	): void;
-	useRef<T>(initial: T): { current: T };
-	useMemo<T>(factory: () => T, dependencies?: readonly unknown[]): T;
-	useCallback<T>(callback: T, dependencies?: readonly unknown[]): T;
-}
-
-const runtime = vi.hoisted(() => ({ current: null as Runtime | null }));
-
-vi.mock("react", () => ({
-	useState: <T>(initial: T | (() => T)) => runtime.current!.useState(initial),
-	useEffect: (
-		effect: () => undefined | (() => void),
-		dependencies?: readonly unknown[],
-	) => runtime.current!.useEffect(effect, dependencies),
-	useRef: <T>(initial: T) => runtime.current!.useRef(initial),
-	useMemo: <T>(factory: () => T, dependencies?: readonly unknown[]) =>
-		runtime.current!.useMemo(factory, dependencies),
-	useCallback: <T>(callback: T, dependencies?: readonly unknown[]) =>
-		runtime.current!.useCallback(callback, dependencies),
-}));
+import { resetWorkspaceStore } from "./workspaceStore.ts";
 
 interface Rendered<T> {
 	result: () => T;
@@ -57,13 +34,8 @@ interface Rendered<T> {
 	unmount: () => void;
 }
 
-function sameDependencies(
-	left: readonly unknown[] | undefined,
-	right: readonly unknown[] | undefined,
-): boolean {
-	if (left === right) return true;
-	if (!left || !right || left.length !== right.length) return false;
-	return left.every((value, index) => Object.is(value, right[index]));
+function Passthrough({ children }: { children: ReactNode }) {
+	return createElement(Fragment, null, children);
 }
 
 function renderHook<T>(callback: () => T): Rendered<T> {
@@ -77,113 +49,25 @@ function renderHookWith<T>(
 	callback: () => T,
 	options: { strictMode: boolean },
 ): Rendered<T> {
-	const values: unknown[] = [];
-	const refs: { current: unknown }[] = [];
-	const memos: { dependencies?: readonly unknown[]; value: unknown }[] = [];
-	const effects: {
-		dependencies?: readonly unknown[];
-		cleanup?: () => void;
-		effect: () => undefined | (() => void);
-		initialized: boolean;
-	}[] = [];
-	let cursor = 0;
-	let result!: T;
-	let disposed = false;
-
-	const hookRuntime: Runtime = {
-		useState<T>(initial: T | (() => T)) {
-			const index = cursor++;
-			if (!(index in values))
-				values[index] =
-					typeof initial === "function" ? (initial as () => T)() : initial;
-			return [
-				values[index] as T,
-				(value: T | ((previous: T) => T)) => {
-					values[index] =
-						typeof value === "function"
-							? (value as (previous: T) => T)(values[index] as T)
-							: value;
-				},
-			];
-		},
-		useEffect(effect, dependencies) {
-			const index = cursor++;
-			const previous = effects[index];
-			if (!previous)
-				effects[index] = { dependencies, effect, initialized: false };
-			else
-				effects[index] = {
-					dependencies,
-					cleanup: previous.cleanup,
-					effect,
-					initialized: previous.initialized,
-				};
-		},
-		useRef<T>(initial: T) {
-			const index = cursor++;
-			if (!refs[index]) refs[index] = { current: initial };
-			return refs[index] as { current: T };
-		},
-		useMemo<T>(factory: () => T, dependencies?: readonly unknown[]) {
-			const index = cursor++;
-			const previous = memos[index];
-			if (!previous || !sameDependencies(previous.dependencies, dependencies))
-				memos[index] = { dependencies, value: factory() };
-			return memos[index]!.value as T;
-		},
-		useCallback<T>(callback: T, dependencies?: readonly unknown[]) {
-			cursor++;
-			void dependencies;
-			return callback;
-		},
-	};
-
-	const render = () => {
-		if (disposed) return;
-		cursor = 0;
-		result = callback();
-		effects.forEach((entry, index) => {
-			const previous = effects[index];
-			if (!previous) return;
-			if (
-				previous.initialized &&
-				sameDependencies(previous.dependencies, entry.dependencies)
-			)
-				return;
-			previous.cleanup?.();
-			entry.initialized = true;
-			const cleanup = entry.effect();
-			if (typeof cleanup === "function") effects[index] = { ...entry, cleanup };
-		});
-	};
-
-	runtime.current = hookRuntime;
-	render();
-	if (options.strictMode) {
-		// Tear every effect down, then run them again, which is what React's
-		// development double-mount does to a freshly mounted tree.
-		effects.forEach((entry) => {
-			entry.cleanup?.();
-			entry.initialized = false;
-		});
-		render();
+	// Fresh cache per render: cases stay isolated without relying on resets.
+	const client = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	function Wrapper({ children }: { children: ReactNode }) {
+		const tree = createElement(QueryClientProvider, { client }, children);
+		return options.strictMode
+			? createElement(StrictMode, null, tree)
+			: createElement(Passthrough, null, tree);
 	}
-
+	const rendered = renderHookRTL(callback, { wrapper: Wrapper });
 	return {
-		result: () => result,
+		result: () => rendered.result.current,
 		settle: async () => {
-			for (let index = 0; index < 12; index++) {
-				await Promise.resolve();
-				render();
-			}
-		},
-		unmount: () => {
-			disposed = true;
-			effects.forEach((entry) => {
-				entry.cleanup?.();
+			await act(async () => {
+				await new Promise((resolve) => setTimeout(resolve, 0));
 			});
-			runtime.current = null;
 		},
+		unmount: () => rendered.unmount(),
 	};
 }
 
@@ -464,8 +348,8 @@ function clientFixture(
 
 afterEach(() => {
 	vi.unstubAllGlobals();
-	runtime.current = null;
-	resetProjectionQueryCache();
+	resetUiStore();
+	resetWorkspaceStore();
 });
 
 describe("remote workspace state", () => {
