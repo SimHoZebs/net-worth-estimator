@@ -8,7 +8,7 @@ import { AccountIcon } from "./AccountIcon.tsx";
 import { AccountDetails } from "./activity/AccountDetails.tsx";
 import { Transactions } from "./activity/Transactions.tsx";
 import { Tabs } from "./Tabs.tsx";
-import { Badge, Modal } from "./ui.tsx";
+import { Modal } from "./ui.tsx";
 import "./activity/account-activity.css";
 
 export function AccountDialog({
@@ -55,9 +55,6 @@ export function AccountDialog({
 					</strong>
 				</div>
 				<div className="account-dialog-basis">
-					<Badge tone={account.balanceCheck ? "green" : "outline"}>
-						{account.balanceCheck ? "Confirmed balance" : "Estimated balance"}
-					</Badge>
 					<span>As of {dateLabel(account.observedOn, true)}</span>
 				</div>
 			</div>

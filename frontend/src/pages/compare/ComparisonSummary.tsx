@@ -116,10 +116,6 @@ export function ComparisonSummary({
 							: "None in horizon"}
 					</strong>
 				</div>
-				<p className="section-note">
-					Comparison describes displayed measures. A snapshot contains measures
-					only and cannot restore a plan.
-				</p>
 			</section>
 		</>
 	);

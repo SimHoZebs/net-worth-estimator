@@ -442,17 +442,14 @@ export function TimingPreview({
 	const spendingAccounts = spendingIds
 		.map((id) => plan.accounts.find((account) => account.id === id))
 		.filter((account) => account !== undefined);
-	const confirmedObservedOn = spendingAccounts
-		.filter((account) => account.balanceCheck)
+	const observedOn = spendingAccounts
 		.map((account) => account.observedOn)
 		.sort();
 	const heroes = {
 		cushion,
-		cushionProvisional:
-			spendingAccounts.length === 0 ||
-			spendingAccounts.some((account) => !account.balanceCheck),
+		cushionProvisional: false,
 		checkingAmount: checking,
-		checkingObservedOn: confirmedObservedOn.at(-1) ?? null,
+		checkingObservedOn: observedOn.at(-1) ?? null,
 		safe: allowance,
 		theoretical,
 		dailySafe,
@@ -626,10 +623,7 @@ export function TimingPreview({
 			</div>
 			<div className="cycle-remaining">
 				<div>
-					<span>
-						Left to spend{" "}
-						{heroes.cushionProvisional && <Badge tone="amber">Estimated</Badge>}
-					</span>
+					<span>Left to spend</span>
 					<strong>{money(cushion)}</strong>
 				</div>
 				<div>

@@ -121,7 +121,7 @@ export const planSchema = z.preprocess(
 				if (account.observedOn > plan.startDate)
 					issue(
 						["accounts", index, "observedOn"],
-						"A confirmed balance cannot be dated after the projection start.",
+						"A balance cannot be dated after the projection start.",
 					);
 			}
 			const movementIds = new Set<string>();

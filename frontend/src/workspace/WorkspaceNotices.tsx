@@ -23,20 +23,12 @@ function errorRecovery({ state }: { state: WorkspaceController }) {
 
 export function workspaceStatusLabel({
 	readOnly,
-	authTokenActive,
-	authRequired,
 }: {
 	readOnly: boolean;
-	authTokenActive: boolean;
-	authRequired: boolean;
+	authTokenActive?: boolean;
+	authRequired?: boolean;
 }) {
-	return readOnly
-		? "Read-only"
-		: authTokenActive
-			? "Token in memory"
-			: authRequired
-				? "Auth required"
-				: "Workspace";
+	return readOnly ? "Read-only" : "Workspace";
 }
 
 export function WorkspaceNotices({

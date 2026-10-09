@@ -25,9 +25,7 @@ export function TimingEvidence({
 			onClose={onClose}
 			wide
 		>
-			<p className="form-intro">
-				These amounts are scheduled, not bank-confirmed.
-			</p>
+			<p className="form-intro">These amounts are scheduled.</p>
 			<div className="table-scroll">
 				<table>
 					<thead>

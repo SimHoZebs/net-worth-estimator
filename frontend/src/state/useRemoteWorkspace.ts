@@ -1164,7 +1164,7 @@ export function useRemoteWorkspace({
 				draftPresentationRef.current,
 			);
 			const persisted = writeLocalState(nextLocal, nextLocal);
-			setNotice("Comparison snapshot captured. It contains measures only.");
+			setNotice("Comparison snapshot captured.");
 			if (persisted) setError(null);
 		},
 		[writeLocalState],

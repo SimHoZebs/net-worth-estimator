@@ -1,6 +1,5 @@
-import { AccountList } from "../components/AccountList.tsx";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
-import type { Account, Plan } from "../domain/model.ts";
+import type { Plan } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/planEdits.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { EvaluationPreview } from "./outlook/EvaluationPreview.tsx";
@@ -21,8 +20,6 @@ export function Outlook({
 	rangeError,
 	onEvidence,
 	onFailure,
-	onAccount,
-	onAccounts,
 	onTransactions,
 	onEvaluations,
 	onEvaluation,
@@ -39,8 +36,6 @@ export function Outlook({
 	rangeError: string | null;
 	onEvidence: () => void;
 	onFailure: () => void;
-	onAccount: (account: Account) => void;
-	onAccounts: () => void;
 	onTransactions: () => void;
 	onEvaluations: () => void;
 	onEvaluation: (id: string) => void;
@@ -80,13 +75,6 @@ export function Outlook({
 					/>
 				</div>
 			</div>
-			{ranges && range?.points.at(-1) && (
-				<div className="range-disclaimer">
-					<span className="legend-line dashed" />
-					Dashed line: median. Shaded band: 10th–90th percentiles. Scenarios are
-					modeled possibilities, not guarantees.
-				</div>
-			)}
 			<div className="outlook-secondary">
 				<EvaluationPreview
 					result={evaluation ?? null}
@@ -96,12 +84,6 @@ export function Outlook({
 				/>
 				<TimingPreview plan={plan} projection={projection} onEdit={onEdit} />
 			</div>
-			<AccountList
-				plan={plan}
-				projection={projection}
-				onAccount={onAccount}
-				onAll={onAccounts}
-			/>
 		</>
 	);
 }

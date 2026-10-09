@@ -39,11 +39,8 @@ export function TransactionDetails({
 			</dl>
 			{transaction.source === "projected" && (
 				<p>
-					{transaction.shortfall > 0.01
-						? "The unfunded amount is not automatically borrowed or rescheduled. "
-						: ""}
-					This is a dated occurrence of a planned transaction, not a
-					bank-confirmed transaction.
+					This is a dated occurrence of a planned transaction, not a bank
+					transaction.
 					{movement && movement.frequency !== "once"
 						? " Editing this movement changes every occurrence in its schedule."
 						: ""}
