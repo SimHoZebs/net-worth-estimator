@@ -17,7 +17,6 @@ import {
 import {
 	cashCushion,
 	checkingAccountId,
-	checkingBalance,
 	cycleAllowance,
 	cycleBudget,
 	DEFAULT_CYCLE_STATEMENT_DAY,
@@ -28,6 +27,7 @@ import {
 	nextPaycheck,
 	realizedCheckingOutflows,
 	remainingMonthlyObligations,
+	spendingBalance,
 } from "../../domain/householdTiming.ts";
 import type { Plan } from "../../domain/model.ts";
 import { visibleAccounts } from "../../domain/model.ts";
@@ -38,8 +38,8 @@ import {
 	type TimingDetailTab,
 } from "./TimingDetailDialog.tsx";
 
-const STORAGE_KEY = "nwe.card-cycle.v3";
-const LEGACY_STORAGE_KEY = "nwe.card-cycle.v2";
+const STORAGE_KEY = "nwe.card-cycle.v4";
+const LEGACY_STORAGE_KEYS = ["nwe.card-cycle.v3", "nwe.card-cycle.v2"];
 
 interface TotalCycleSettings {
 	statementDay: number;
@@ -51,9 +51,11 @@ interface TotalCycleSettings {
 	remainingOverride: number | null;
 	/** Null means every debt account counts toward the total. */
 	accountIds: string[] | null;
-	/** Null means every recurring checking outflow counts as a bill. */
+	/** Null means the detected checking account alone counts as spendable. */
+	spendingAccountIds: string[] | null;
+	/** Null means every recurring outflow counts as a bill. */
 	movementIds: string[] | null;
-	/** Which window the drawer mandatory tab uses. Card figures stay calendar. */
+	/** Which window the drawer bills tab uses. Card figures stay calendar. */
 	mandatoryFrame: "calendar" | "cycle";
 	/** True once the statement day is explicitly chosen. Untouched legacy 1st falls back to the household 20th. */
 	statementDaySet: boolean;
@@ -68,6 +70,7 @@ const defaultSettings = (): TotalCycleSettings => ({
 	checkingOverride: null,
 	remainingOverride: null,
 	accountIds: null,
+	spendingAccountIds: null,
 	movementIds: null,
 	mandatoryFrame: "calendar",
 	statementDaySet: false,
@@ -86,7 +89,10 @@ function loadPersisted(): TotalCycleSettings {
 	try {
 		const raw =
 			window.localStorage.getItem(STORAGE_KEY) ??
-			window.localStorage.getItem(LEGACY_STORAGE_KEY);
+			LEGACY_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find(
+				(value) => value !== null && value !== undefined,
+			) ??
+			null;
 		if (!raw) return defaultSettings();
 		const parsed = JSON.parse(raw) as Partial<TotalCycleSettings> & {
 			budget?: unknown;
@@ -99,6 +105,11 @@ function loadPersisted(): TotalCycleSettings {
 			: null;
 		const movementIds = Array.isArray(parsed.movementIds)
 			? parsed.movementIds.filter(
+					(id): id is string => typeof id === "string" && id !== "",
+				)
+			: null;
+		const spendingAccountIds = Array.isArray(parsed.spendingAccountIds)
+			? parsed.spendingAccountIds.filter(
 					(id): id is string => typeof id === "string" && id !== "",
 				)
 			: null;
@@ -128,6 +139,9 @@ function loadPersisted(): TotalCycleSettings {
 			checkingOverride: optionalMoney(parsed.checkingOverride),
 			remainingOverride: optionalMoney(parsed.remainingOverride),
 			accountIds: accountIds?.length ? accountIds : null,
+			spendingAccountIds: spendingAccountIds?.length
+				? spendingAccountIds
+				: null,
 			movementIds: movementIds?.length ? movementIds : null,
 			mandatoryFrame: parsed.mandatoryFrame === "cycle" ? "cycle" : "calendar",
 		};
@@ -241,56 +255,76 @@ export function TimingPreview({
 		[perAccount],
 	);
 
-	const checkingId = useMemo(() => checkingAccountId(plan), [plan]);
-	const checkingDerived = useMemo(() => checkingBalance(plan), [plan]);
+	const spendableAccounts = useMemo(
+		() =>
+			visibleAccounts(plan.accounts).filter(
+				(account) => account.kind !== "debt",
+			),
+		[plan.accounts],
+	);
+	const spendingIds = useMemo(() => {
+		const known = new Set(spendableAccounts.map((account) => account.id));
+		const fallbackId = checkingAccountId(plan);
+		const fallback = fallbackId && known.has(fallbackId) ? [fallbackId] : [];
+		if (!settings.spendingAccountIds) return fallback;
+		const selected = settings.spendingAccountIds.filter((id) => known.has(id));
+		return selected.length ? selected : fallback;
+	}, [settings.spendingAccountIds, spendableAccounts, plan]);
+	const spendingDerived = useMemo(
+		() => spendingBalance(plan, spendingIds),
+		[plan, spendingIds],
+	);
 	const obligationMovements = useMemo(
 		() => filterMovementsById(projection.movements, settings.movementIds),
 		[projection.movements, settings.movementIds],
 	);
 	const remainingDerived = useMemo(() => {
-		if (!checkingId) return { total: 0, monthEnd: displayToday.slice(0, 10) };
+		if (!spendingIds.length)
+			return { total: 0, monthEnd: displayToday.slice(0, 10) };
 		return remainingMonthlyObligations({
 			movements: obligationMovements,
-			checkingId,
+			checkingIds: spendingIds,
 			todayIso: displayToday,
 		});
-	}, [obligationMovements, checkingId, displayToday]);
+	}, [obligationMovements, spendingIds, displayToday]);
 	const fixedDerived = useMemo(() => {
-		if (!checkingId)
+		if (!spendingIds.length)
 			return { total: 0, start: displayToday, end: displayToday };
 		return nextMonthObligations({
 			movements: obligationMovements,
-			checkingId,
+			checkingIds: spendingIds,
 			todayIso: displayToday,
 		});
-	}, [obligationMovements, checkingId, displayToday]);
+	}, [obligationMovements, spendingIds, displayToday]);
 	const paycheckDerived = useMemo(() => {
-		if (!checkingId) return null;
+		if (!spendingIds.length) return null;
 		return nextPaycheck({
 			movements: projection.movements,
-			checkingId,
+			checkingIds: spendingIds,
 			todayIso: displayToday,
 		});
-	}, [projection.movements, checkingId, displayToday]);
+	}, [projection.movements, spendingIds, displayToday]);
 	const spentSinceStart = useMemo(
 		() =>
-			checkingId
+			spendingIds.length
 				? realizedCheckingOutflows({
 						movements: obligationMovements,
-						checkingId,
+						checkingIds: spendingIds,
 						after: plan.startDate,
 						through: displayToday,
 					})
 				: 0,
-		[obligationMovements, checkingId, plan.startDate, displayToday],
+		[obligationMovements, spendingIds, plan.startDate, displayToday],
 	);
 
 	const billCandidates = useMemo(() => {
-		if (!checkingId) return [];
+		if (!spendingIds.length) return [];
 		return plan.movements
 			.filter(
 				(movement) =>
-					movement.fromId === checkingId && movement.frequency !== "once",
+					movement.fromId !== null &&
+					spendingIds.includes(movement.fromId) &&
+					movement.frequency !== "once",
 			)
 			.map((movement) => ({
 				id: movement.id,
@@ -298,7 +332,7 @@ export function TimingPreview({
 				amount: movement.amount,
 				frequency: movement.frequency,
 			}));
-	}, [plan.movements, checkingId]);
+	}, [plan.movements, spendingIds]);
 
 	const trackedBillIds = useMemo(() => {
 		const known = new Set(billCandidates.map((bill) => bill.id));
@@ -308,28 +342,28 @@ export function TimingPreview({
 	}, [settings.movementIds, billCandidates]);
 
 	const mandatoryThisMonth = useMemo(() => {
-		if (!checkingId) return [];
+		if (!spendingIds.length) return [];
 		return groupMandatorySpending({
 			movements: obligationMovements,
-			checkingId,
+			checkingIds: spendingIds,
 			start: shiftDate({ date: displayToday, days: 1 }),
 			end: remainingDerived.monthEnd,
 		});
 	}, [
 		obligationMovements,
-		checkingId,
+		spendingIds,
 		displayToday,
 		remainingDerived.monthEnd,
 	]);
 	const mandatoryNextMonth = useMemo(() => {
-		if (!checkingId) return [];
+		if (!spendingIds.length) return [];
 		return groupMandatorySpending({
 			movements: obligationMovements,
-			checkingId,
+			checkingIds: spendingIds,
 			start: fixedDerived.start,
 			end: fixedDerived.end,
 		});
-	}, [obligationMovements, checkingId, fixedDerived.start, fixedDerived.end]);
+	}, [obligationMovements, spendingIds, fixedDerived.start, fixedDerived.end]);
 	const nextCycle = useMemo(
 		() =>
 			resolveStatementCycle({
@@ -339,23 +373,23 @@ export function TimingPreview({
 		[cycle.cycleEnd, settings.statementDay],
 	);
 	const cycleThisGroups = useMemo(() => {
-		if (!checkingId) return [];
+		if (!spendingIds.length) return [];
 		return groupMandatorySpending({
 			movements: obligationMovements,
-			checkingId,
+			checkingIds: spendingIds,
 			start: shiftDate({ date: displayToday, days: 1 }),
 			end: cycle.cycleEnd,
 		});
-	}, [obligationMovements, checkingId, displayToday, cycle.cycleEnd]);
+	}, [obligationMovements, spendingIds, displayToday, cycle.cycleEnd]);
 	const cycleNextGroups = useMemo(() => {
-		if (!checkingId) return [];
+		if (!spendingIds.length) return [];
 		return groupMandatorySpending({
 			movements: obligationMovements,
-			checkingId,
+			checkingIds: spendingIds,
 			start: nextCycle.cycleStart,
 			end: nextCycle.cycleEnd,
 		});
-	}, [obligationMovements, checkingId, nextCycle]);
+	}, [obligationMovements, spendingIds, nextCycle]);
 
 	if (!cards.length) {
 		return (
@@ -376,7 +410,7 @@ export function TimingPreview({
 
 	const derivedSpent = perAccount.reduce((sum, item) => sum + item.derived, 0);
 
-	const checking = settings.checkingOverride ?? checkingDerived ?? 0;
+	const checking = settings.checkingOverride ?? spendingDerived;
 	const remainingObligations =
 		settings.remainingOverride ?? remainingDerived.total;
 	const cushion = cashCushion({
@@ -405,16 +439,20 @@ export function TimingPreview({
 	const dailyTheoretical = theoretical / fullDaysLeft;
 	const progress = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
 
-	const checkingAccount = checkingId
-		? (plan.accounts.find((account) => account.id === checkingId) ?? null)
-		: null;
+	const spendingAccounts = spendingIds
+		.map((id) => plan.accounts.find((account) => account.id === id))
+		.filter((account) => account !== undefined);
+	const confirmedObservedOn = spendingAccounts
+		.filter((account) => account.balanceCheck)
+		.map((account) => account.observedOn)
+		.sort();
 	const heroes = {
 		cushion,
-		cushionProvisional: !(checkingAccount?.balanceCheck ?? false),
+		cushionProvisional:
+			spendingAccounts.length === 0 ||
+			spendingAccounts.some((account) => !account.balanceCheck),
 		checkingAmount: checking,
-		checkingObservedOn: checkingAccount?.balanceCheck
-			? (checkingAccount?.observedOn ?? null)
-			: null,
+		checkingObservedOn: confirmedObservedOn.at(-1) ?? null,
 		safe: allowance,
 		theoretical,
 		dailySafe,
@@ -460,6 +498,10 @@ export function TimingPreview({
 					: previous.remainingOverride,
 			accountIds:
 				next.accountIds !== undefined ? next.accountIds : previous.accountIds,
+			spendingAccountIds:
+				next.spendingAccountIds !== undefined
+					? next.spendingAccountIds
+					: previous.spendingAccountIds,
 			movementIds:
 				next.movementIds !== undefined
 					? next.movementIds
@@ -502,6 +544,17 @@ export function TimingPreview({
 					? null
 					: next,
 		});
+	};
+
+	const toggleSpendingAccount = (accountId: string) => {
+		const known = new Set(spendableAccounts.map((account) => account.id));
+		const fallbackId = checkingAccountId(plan);
+		const fallback = fallbackId && known.has(fallbackId) ? [fallbackId] : [];
+		const explicit = settings.spendingAccountIds ?? fallback;
+		const next = explicit.includes(accountId)
+			? explicit.filter((id) => id !== accountId)
+			: [...explicit, accountId];
+		updateSettings({ spendingAccountIds: next.length ? next : null });
 	};
 
 	const narrowedAccounts = trackedIds.length !== cards.length;
@@ -574,13 +627,13 @@ export function TimingPreview({
 			<div className="cycle-remaining">
 				<div>
 					<span>
-						Cash cushion{" "}
+						Left to spend{" "}
 						{heroes.cushionProvisional && <Badge tone="amber">Estimated</Badge>}
 					</span>
 					<strong>{money(cushion)}</strong>
 				</div>
 				<div>
-					<span>Checking snapshot</span>
+					<span>Balance</span>
 					<strong>{money(checking)}</strong>
 				</div>
 			</div>
@@ -591,7 +644,7 @@ export function TimingPreview({
 					tone={allowance < 0 ? "amber" : "green"}
 				/>
 				<p>
-					{money(checking)} checking · paycheck {money(paycheck)} − fixed{" "}
+					{money(checking)} balance · paycheck {money(paycheck)} − fixed{" "}
 					{money(fixedObligations)} − reserve {money(settings.reserve)}
 				</p>
 			</div>
@@ -604,7 +657,7 @@ export function TimingPreview({
 						setDetail("mandatory");
 					}}
 				>
-					Mandatory spending ({money(fixedObligations)} next month
+					Bills ({money(fixedObligations)} next month
 					{billsFiltered
 						? ` · ${trackedBillIds.length} of ${billCandidates.length} bills`
 						: ""}
@@ -660,13 +713,19 @@ export function TimingPreview({
 						remainingOverride: settings.remainingOverride,
 						paycheckHint: paycheckDerived,
 						fixedHint: fixedDerived,
-						checkingHint: checkingDerived,
+						checkingHint: spendingDerived,
 						remainingHint: remainingDerived,
 						spentHint: derivedSpent,
 						cards: cards.map((card) => ({ id: card.id, name: card.name })),
 						trackedIds,
+						spendingAccounts: spendableAccounts.map((account) => ({
+							id: account.id,
+							name: account.name,
+						})),
+						trackedSpendingIds: spendingIds,
 					}}
 					onToggleAccount={toggleAccount}
+					onToggleSpendingAccount={toggleSpendingAccount}
 					onUpdateConfig={updateSettings}
 					onResetConfig={resetConfig}
 					initialTab={detail}
