@@ -60,7 +60,7 @@ function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 			tone: "sage",
 		},
 		{
-			label: isShort ? "Short" : "Checking left",
+			label: isShort ? "Short" : "Left to spend",
 			amount: isShort ? shortAmount : parts.cushion,
 			pattern: isShort ? "hatch" : "solid",
 			tone: isShort ? "amber" : "sage",
@@ -79,13 +79,13 @@ function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 			caption={
 				isShort
 					? `${money(parts.checking)} total${paidNote} · short ${money(shortAmount)}${shortNote}`
-					: `${money(parts.checking)} total${paidNote} · ${money(parts.cushion)} checking left`
+					: `${money(parts.checking)} total${paidNote} · ${money(parts.cushion)} left to spend`
 			}
 			segments={segments}
 			ariaLabel={
 				isShort
 					? `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, short ${money(shortAmount)}${shortNote}${paidNote}`
-					: `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, checking left ${money(parts.cushion)}${paidNote}`
+					: `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, left to spend ${money(parts.cushion)}${paidNote}`
 			}
 		/>
 	);
@@ -324,7 +324,7 @@ export function TimingDetailDialog({
 			>
 				{tab === "mandatory" ? (
 					<div className="timing-mandatory">
-						<h3>Checking left</h3>
+						<h3>Available balance</h3>
 						<p className="section-note">
 							{heroes.checkingObservedOn
 								? `As of ${dateLabel(heroes.checkingObservedOn, true)}`
@@ -369,14 +369,14 @@ export function TimingDetailDialog({
 							</div>
 						</div>
 						<SegmentedBar
-							caption={`Committed ${money(heroes.committedTotal)} — payments toward prior balances excluded`}
+							caption={`Card charges ${money(heroes.committedTotal)} — payments toward prior balances excluded`}
 							segments={heroes.committedByCard.map((card, index) => ({
 								label: `${card.name} · ${money(card.amount)}`,
 								amount: card.amount,
 								pattern: index % 2 === 0 ? "solid" : "stripes",
 								tone: index % 2 === 0 ? "dark" : "sage",
 							}))}
-							ariaLabel={`Committed cycle spend ${money(heroes.committedTotal)}: ${heroes.committedByCard.map((card) => `${card.name} ${money(card.amount)}`).join(", ")}`}
+							ariaLabel={`Card charges ${money(heroes.committedTotal)}: ${heroes.committedByCard.map((card) => `${card.name} ${money(card.amount)}`).join(", ")}`}
 						/>
 					</div>
 				) : tab === "cycle" ? (
