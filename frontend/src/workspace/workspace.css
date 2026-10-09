@@ -6,6 +6,14 @@
 	.export-recovery {
 		margin-bottom: 20px;
 	}
+	.projection-updating {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		color: var(--muted);
+		font-size: 12px;
+		margin-bottom: 14px;
+	}
 	.draft-bar {
 		position: fixed;
 		bottom: 20px;

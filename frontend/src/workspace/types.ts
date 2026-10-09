@@ -26,6 +26,8 @@ export type ProjectionState = {
 	range: RangeResult | null;
 	progress: number;
 	rangeError: string | null;
+	baseError: string | null;
+	loading: boolean;
 	retryRange: () => void;
 	retryProjection: () => void;
 };

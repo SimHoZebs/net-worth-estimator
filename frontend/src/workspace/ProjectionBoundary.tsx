@@ -28,6 +28,15 @@ export function ProjectionLoading({
 	);
 }
 
+export function ProjectionUpdating() {
+	return (
+		<div className="projection-updating" role="status">
+			<span className="spinner" aria-hidden="true" />
+			Updating projection…
+		</div>
+	);
+}
+
 export function ProjectionBoundary({
 	projection,
 	ranges,
@@ -49,6 +58,14 @@ export function ProjectionBoundary({
 		);
 	return (
 		<>
+			{projection.loading && <ProjectionUpdating />}
+			{projection.baseError && (
+				<ErrorNotice
+					message={projection.baseError}
+					action="Retry calculation"
+					onAction={projection.retryProjection}
+				/>
+			)}
 			{projection.rangeError && ranges && (
 				<ErrorNotice
 					message={projection.rangeError}
