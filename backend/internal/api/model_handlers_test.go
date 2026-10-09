@@ -432,9 +432,9 @@ func TestDeterministicMovementEvidenceReportsAnnualCapAvailability(t *testing.T)
 		t.Fatalf("decode projection fixture: %v", err)
 	}
 	cap := 500.0
-	for index := range fixture.Document.Postings {
-		if fixture.Document.Postings[index].ID == "invest" {
-			fixture.Document.Postings[index].AnnualCap = &cap
+	for index := range fixture.Document.RecurrenceRules {
+		if fixture.Document.RecurrenceRules[index].ID == "invest" {
+			fixture.Document.RecurrenceRules[index].AnnualCap = &cap
 		}
 	}
 	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings})
@@ -483,11 +483,11 @@ func TestDeterministicMovementEvidenceCarriesHistoricalAnnualCapUsage(t *testing
 	}
 	cap := 500.0
 	endDate := types.IsoDate("2026-03-31")
-	for index := range fixture.Document.Postings {
-		if fixture.Document.Postings[index].ID == "invest" {
-			fixture.Document.Postings[index].StartDate = "2026-01-31"
-			fixture.Document.Postings[index].EndDate = &endDate
-			fixture.Document.Postings[index].AnnualCap = &cap
+	for index := range fixture.Document.RecurrenceRules {
+		if fixture.Document.RecurrenceRules[index].ID == "invest" {
+			fixture.Document.RecurrenceRules[index].StartDate = "2026-01-31"
+			fixture.Document.RecurrenceRules[index].EndDate = &endDate
+			fixture.Document.RecurrenceRules[index].AnnualCap = &cap
 		}
 	}
 	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings})
@@ -543,10 +543,10 @@ func TestDeterministicMovementEvidenceReportsDestinationHeadroom(t *testing.T) {
 			fixture.Document.Accounts[index].MaxBalance = &ceiling
 		}
 	}
-	for index := range fixture.Document.Postings {
-		if fixture.Document.Postings[index].ID == "paydown" {
-			fixture.Document.Postings[index].Amount.Config = map[string]any{"expression": "711"}
-			fixture.Document.Postings[index].Amount.Inputs = map[string]types.AmountInputBinding{}
+	for index := range fixture.Document.RecurrenceRules {
+		if fixture.Document.RecurrenceRules[index].ID == "paydown" {
+			fixture.Document.RecurrenceRules[index].Amount.Config = map[string]any{"expression": "711"}
+			fixture.Document.RecurrenceRules[index].Amount.Inputs = map[string]types.AmountInputBinding{}
 		}
 	}
 	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings})

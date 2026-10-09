@@ -39,10 +39,6 @@ func ValidateFinancialModel(document *types.FinancialModelDocument, incomeData *
 	for _, account := range document.Accounts {
 		accountIDs[account.ID] = true
 	}
-	postingIDs := make(map[string]bool, len(document.Postings))
-	for _, posting := range document.Postings {
-		postingIDs[posting.ID] = true
-	}
 
 	accountIDList := make([]string, len(document.Accounts))
 	for i, account := range document.Accounts {
@@ -58,13 +54,35 @@ func ValidateFinancialModel(document *types.FinancialModelDocument, incomeData *
 	validateUniqueIDs(&issues, postingIDList, "posting.id", func(index int, field string) []any {
 		return pathWithField([]any{"postings", index}, field)
 	})
+	ruleIDList := make([]string, len(document.RecurrenceRules))
+	for i, rule := range document.RecurrenceRules {
+		ruleIDList[i] = rule.ID
+	}
+	validateUniqueIDs(&issues, ruleIDList, "rule.id", func(index int, field string) []any {
+		return pathWithField([]any{"recurrenceRules", index}, field)
+	})
 	validateEvaluationInstanceIDs(&issues, document)
+
+	// Movement identity checks: posting and rule IDs share one namespace
+	// with account IDs.
+	movementIDs := make(map[string]bool, len(document.Postings)+len(document.RecurrenceRules))
+	for _, posting := range document.Postings {
+		movementIDs[posting.ID] = true
+	}
+	for index, rule := range document.RecurrenceRules {
+		if movementIDs[rule.ID] {
+			addIssue(&issues, types.SeverityError, "rule.id.collision",
+				fmt.Sprintf("Rule ID '%s' collides with a posting ID. Posting and rule IDs share one namespace.", rule.ID),
+				pathWithField([]any{"recurrenceRules", index}, "id")...)
+		}
+		movementIDs[rule.ID] = true
+	}
 
 	// Account identity checks.
 	for index, account := range document.Accounts {
-		if postingIDs[account.ID] {
+		if movementIDs[account.ID] {
 			addIssue(&issues, types.SeverityError, "account.id.collision",
-				fmt.Sprintf("Account ID '%s' collides with a posting ID. IDs must be unique across accounts and postings.", account.ID),
+				fmt.Sprintf("Account ID '%s' collides with a posting or rule ID. IDs must be unique across accounts, postings, and rules.", account.ID),
 				pathWithField([]any{"accounts", index}, "id")...)
 		}
 		if account.Enabled && account.Color == nil {
@@ -100,9 +118,11 @@ func ValidateFinancialModel(document *types.FinancialModelDocument, incomeData *
 		checkpointKeys[key] = true
 	}
 
-	dependencies := validatePostingAmounts(&issues, document.Postings, accountIDs, incomeData)
-	validatePostingDependencies(&issues, document.Postings, dependencies)
+	dependencies := validateMovementAmounts(&issues, document, accountIDs, incomeData)
+	validatePostingDependencies(&issues, document, dependencies)
 	validatePostingRoutes(&issues, document.Postings, accountIDs)
+	validateRuleSchedules(&issues, document, accountIDs)
+	validatePostingClaims(&issues, document)
 	validateAccountBounds(&issues, document.Accounts)
 	validateEvaluationConfigs(&issues, document)
 	validateEvaluationAccountReferences(&issues, document, accountIDs)
@@ -221,11 +241,11 @@ func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, d
 	}
 }
 
-func validatePostingAmounts(issues *[]types.ModelValidationIssue, postings []types.Posting, accountIDs map[string]bool, incomeData *types.IncomeDataSnapshot) map[string][]string {
-	postingIDsSet := make(map[string]bool, len(postings))
-	for _, posting := range postings {
-		postingIDsSet[posting.ID] = true
-	}
+// validateMovementAmounts validates amount descriptors for manual postings
+// and rule templates together. References may name posting or rule IDs, so
+// the dependency graph spans both.
+func validateMovementAmounts(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, accountIDs map[string]bool, incomeData *types.IncomeDataSnapshot) map[string][]string {
+	movementIDsSet := MovementIDs(document)
 	var incomeSourceIDs, taxProfileIDs map[string]bool
 	if incomeData != nil {
 		incomeSourceIDs = make(map[string]bool, len(incomeData.IncomeSources))
@@ -238,11 +258,10 @@ func validatePostingAmounts(issues *[]types.ModelValidationIssue, postings []typ
 		}
 	}
 	dependencies := map[string][]string{}
-	for index := range postings {
-		posting := &postings[index]
-		deps, err := ValidateAmountDescriptor(posting.Amount, &AmountReferenceContext{
+	validateAmount := func(id string, amount types.PostingAmountResolution, path []any) {
+		deps, err := ValidateAmountDescriptor(amount, &AmountReferenceContext{
 			AccountIDs:      accountIDs,
-			PostingIDs:      postingIDsSet,
+			PostingIDs:      movementIDsSet,
 			IncomeSourceIDs: incomeSourceIDs,
 			TaxProfileIDs:   taxProfileIDs,
 		})
@@ -256,21 +275,29 @@ func validatePostingAmounts(issues *[]types.ModelValidationIssue, postings []typ
 				message = parseErr.Error()
 			}
 			addIssue(issues, types.SeverityError, "posting.amount.invalid", message,
-				pathWithField([]any{"postings", index}, "amount")...)
-			continue
+				pathWithField(path, "amount")...)
+			return
 		}
-		dependencies[posting.ID] = deps
-		if posting.Amount.Resolver != "expression" &&
-			(posting.AnnualRate != 0 || posting.AnnualGrowthRate != 0 || posting.Volatility != 0) {
+		dependencies[id] = deps
+	}
+	for index := range document.Postings {
+		posting := &document.Postings[index]
+		validateAmount(posting.ID, posting.Amount, []any{"postings", index})
+	}
+	for index := range document.RecurrenceRules {
+		rule := &document.RecurrenceRules[index]
+		validateAmount(rule.ID, rule.Amount, []any{"recurrenceRules", index})
+		if rule.Amount.Resolver != "expression" &&
+			(rule.AnnualRate != 0 || rule.AnnualGrowthRate != 0 || rule.Volatility != 0) {
 			addIssue(issues, types.SeverityError, "posting.amount.non_expression_rates",
 				"Non-expression amount resolvers require annualRate, annualGrowthRate, and volatility to be zero.",
-				pathWithField([]any{"postings", index}, "amount")...)
+				pathWithField([]any{"recurrenceRules", index}, "amount")...)
 		}
 	}
 	return dependencies
 }
 
-func validatePostingDependencies(issues *[]types.ModelValidationIssue, postings []types.Posting, dependencies map[string][]string) {
+func validatePostingDependencies(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, dependencies map[string][]string) {
 	visiting := map[string]bool{}
 	visited := map[string]bool{}
 	cyclic := map[string]bool{}
@@ -298,14 +325,23 @@ func validatePostingDependencies(issues *[]types.ModelValidationIssue, postings 
 		return hasCycle
 	}
 
-	for index := range postings {
-		posting := &postings[index]
+	for index := range document.Postings {
+		posting := &document.Postings[index]
 		if !visit(posting.ID) {
 			continue
 		}
 		addIssue(issues, types.SeverityError, "posting.amount.circular",
 			fmt.Sprintf("Amount resolution for '%s' creates a circular posting dependency.", posting.ID),
 			pathWithField([]any{"postings", index}, "amount")...)
+	}
+	for index := range document.RecurrenceRules {
+		rule := &document.RecurrenceRules[index]
+		if !visit(rule.ID) {
+			continue
+		}
+		addIssue(issues, types.SeverityError, "posting.amount.circular",
+			fmt.Sprintf("Amount resolution for '%s' creates a circular posting dependency.", rule.ID),
+			pathWithField([]any{"recurrenceRules", index}, "amount")...)
 	}
 }
 
@@ -350,24 +386,139 @@ func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []type
 				"Posting sourceAccountId must not appear in destinations.",
 				[]any{"postings", index}...)
 		}
-		if !IsValidIsoDate(posting.StartDate) {
-			addIssue(issues, types.SeverityError, "posting.start-date.format",
-				fmt.Sprintf("Posting '%s' startDate must be a YYYY-MM-DD calendar date.", posting.ID),
-				pathWithField([]any{"postings", index}, "startDate")...)
+		if !IsValidIsoDate(posting.Date) {
+			addIssue(issues, types.SeverityError, "posting.date.format",
+				fmt.Sprintf("Posting '%s' date must be a YYYY-MM-DD calendar date.", posting.ID),
+				pathWithField([]any{"postings", index}, "date")...)
 		}
-		if posting.EndDate != nil && !IsValidIsoDate(*posting.EndDate) {
-			addIssue(issues, types.SeverityError, "posting.end-date.format",
-				fmt.Sprintf("Posting '%s' endDate must be a YYYY-MM-DD calendar date.", posting.ID),
-				pathWithField([]any{"postings", index}, "endDate")...)
+	}
+}
+
+// validateRuleSchedules checks rule routes, frequencies, and schedule bounds.
+func validateRuleSchedules(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, accountIDs map[string]bool) {
+	for index := range document.RecurrenceRules {
+		rule := &document.RecurrenceRules[index]
+		base := []any{"recurrenceRules", index}
+		if rule.Amount.Resolver == "income" {
+			if rule.SourceAccountID != nil {
+				addIssue(issues, types.SeverityError, "posting.income.source.invalid",
+					"Income rules cannot withdraw from an account.",
+					pathWithField(base, "sourceAccountId")...)
+			}
 		}
-		if posting.EndDate != nil &&
-			IsValidIsoDate(posting.StartDate) &&
-			IsValidIsoDate(*posting.EndDate) &&
-			CompareIsoDates(*posting.EndDate, posting.StartDate) < 0 {
-			addIssue(issues, types.SeverityError, "posting.schedule.invalid",
-				"Posting endDate must be the same as or later than startDate.",
-				pathWithField([]any{"postings", index}, "endDate")...)
+		if rule.SourceAccountID != nil && !accountIDs[*rule.SourceAccountID] {
+			addIssue(issues, types.SeverityError, "posting.source.missing",
+				fmt.Sprintf("Rule source account '%s' does not exist.", *rule.SourceAccountID),
+				pathWithField(base, "sourceAccountId")...)
 		}
+		if rule.Destinations != nil {
+			seen := map[string]bool{}
+			for _, destinationID := range rule.Destinations {
+				if !accountIDs[destinationID] {
+					addIssue(issues, types.SeverityError, "posting.destination.missing",
+						fmt.Sprintf("Rule destination account '%s' does not exist.", destinationID),
+						pathWithField(base, "destinations")...)
+				}
+				if seen[destinationID] {
+					addIssue(issues, types.SeverityError, "posting.destinations.duplicate",
+						fmt.Sprintf("Destination account '%s' appears more than once.", destinationID),
+						pathWithField(base, "destinations")...)
+				}
+				seen[destinationID] = true
+			}
+		}
+		if rule.SourceAccountID == nil && len(rule.Destinations) == 0 {
+			addIssue(issues, types.SeverityError, "posting.accounts.empty",
+				"Rules must set sourceAccountId, destinations, or both.",
+				base...)
+		}
+		if rule.SourceAccountID != nil && containsString(rule.Destinations, *rule.SourceAccountID) {
+			addIssue(issues, types.SeverityError, "posting.accounts.same",
+				"Rule sourceAccountId must not appear in destinations.",
+				base...)
+		}
+		switch rule.Frequency {
+		case types.FrequencyDaily, types.FrequencyWeekly, types.FrequencyMonthly, types.FrequencyQuarterly, types.FrequencyAnnual:
+		default:
+			addIssue(issues, types.SeverityError, "rule.frequency.invalid",
+				fmt.Sprintf("Rule '%s' has frequency '%s'. Expected daily, weekly, monthly, quarterly, or annual.", rule.ID, rule.Frequency),
+				pathWithField(base, "frequency")...)
+		}
+		if !IsValidIsoDate(rule.StartDate) {
+			addIssue(issues, types.SeverityError, "rule.start-date.format",
+				fmt.Sprintf("Rule '%s' startDate must be a YYYY-MM-DD calendar date.", rule.ID),
+				pathWithField(base, "startDate")...)
+		}
+		if rule.EndDate != nil && !IsValidIsoDate(*rule.EndDate) {
+			addIssue(issues, types.SeverityError, "rule.end-date.format",
+				fmt.Sprintf("Rule '%s' endDate must be a YYYY-MM-DD calendar date.", rule.ID),
+				pathWithField(base, "endDate")...)
+		}
+		if rule.EndDate != nil &&
+			IsValidIsoDate(rule.StartDate) &&
+			IsValidIsoDate(*rule.EndDate) &&
+			CompareIsoDates(*rule.EndDate, rule.StartDate) < 0 {
+			addIssue(issues, types.SeverityError, "rule.schedule.invalid",
+				"Rule endDate must be the same as or later than startDate.",
+				pathWithField(base, "endDate")...)
+		}
+	}
+}
+
+// validatePostingClaims checks that each claim names a real scheduled
+// occurrence of its rule, and that no occurrence is claimed twice. Claims
+// are manual: validation only verifies the named occurrence exists.
+func validatePostingClaims(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument) {
+	rulesByID := make(map[string]*types.RecurrenceRule, len(document.RecurrenceRules))
+	for index := range document.RecurrenceRules {
+		rule := &document.RecurrenceRules[index]
+		rulesByID[rule.ID] = rule
+	}
+	claimed := map[string]bool{}
+	for index := range document.Postings {
+		posting := &document.Postings[index]
+		if posting.Claim == nil {
+			continue
+		}
+		base := []any{"postings", index, "claim"}
+		claim := posting.Claim
+		rule, ok := rulesByID[claim.RuleID]
+		if !ok {
+			addIssue(issues, types.SeverityError, "posting.claim.rule.missing",
+				fmt.Sprintf("Posting '%s' claims rule '%s', which does not exist.", posting.ID, claim.RuleID),
+				append(base, "ruleId")...)
+			continue
+		}
+		if !IsValidIsoDate(claim.OccurrenceDate) {
+			addIssue(issues, types.SeverityError, "posting.claim.date.format",
+				fmt.Sprintf("Posting '%s' claim occurrenceDate must be a YYYY-MM-DD calendar date.", posting.ID),
+				append(base, "occurrenceDate")...)
+			continue
+		}
+		if !IsValidIsoDate(rule.StartDate) {
+			continue // reported by validateRuleSchedules
+		}
+		if CompareIsoDates(claim.OccurrenceDate, rule.StartDate) < 0 {
+			addIssue(issues, types.SeverityError, "posting.claim.date.range",
+				fmt.Sprintf("Posting '%s' claims %s, which is before rule '%s' starts.", posting.ID, claim.OccurrenceDate, rule.ID),
+				append(base, "occurrenceDate")...)
+			continue
+		}
+		scheduled := RuleScheduleDates(rule, claim.OccurrenceDate)
+		if len(scheduled) == 0 || scheduled[len(scheduled)-1] != claim.OccurrenceDate {
+			addIssue(issues, types.SeverityError, "posting.claim.date.unscheduled",
+				fmt.Sprintf("Posting '%s' claims %s, which is not a scheduled occurrence of rule '%s'.", posting.ID, claim.OccurrenceDate, rule.ID),
+				append(base, "occurrenceDate")...)
+			continue
+		}
+		key := claim.RuleID + "\x00" + claim.OccurrenceDate
+		if claimed[key] {
+			addIssue(issues, types.SeverityError, "posting.claim.duplicate",
+				fmt.Sprintf("Rule '%s' occurrence on %s is claimed more than once.", claim.RuleID, claim.OccurrenceDate),
+				base...)
+			continue
+		}
+		claimed[key] = true
 	}
 }
 

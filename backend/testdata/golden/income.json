@@ -1,263 +1,266 @@
 {
-	"document": {
-		"sourcePath": "/configs",
-		"accounts": [
-			{
-				"name": "checking",
-				"kind": "cash",
-				"minBalance": -10000000000000,
-				"maxBalance": 10000000000000,
-				"color": null,
-				"enabled": true,
-				"id": "checking"
-			},
-			{
-				"name": "brokerage",
-				"kind": "investment",
-				"minBalance": -10000000000000,
-				"maxBalance": 10000000000000,
-				"color": null,
-				"enabled": true,
-				"id": "brokerage"
-			},
-			{
-				"name": "loan",
-				"kind": "debt",
-				"minBalance": -10000000000000,
-				"maxBalance": 10000000000000,
-				"color": null,
-				"enabled": true,
-				"id": "loan"
-			}
-		],
-		"checkpoints": [],
-		"evaluations": {
-			"financialIndependence": [],
-			"netWorthThreshold": [],
-			"postingFulfillment": []
-		},
-		"postings": [
-			{
-				"id": "salary",
-				"name": "Salary",
-				"sourceAccountId": null,
-				"destinations": ["checking"],
-				"amount": {
-					"resolver": "income",
-					"config": {
-						"incomeSourceId": "salary",
-						"resolvers": [
-							{
-								"resolver": "percentage",
-								"config": {
-									"rate": 0.04,
-									"annualCap": 23000
-								},
-								"destinationAccountId": "brokerage",
-								"employerMatchRate": 0.5
-							},
-							{
-								"resolver": "progressive-bracket",
-								"config": {
-									"profileId": "simple"
-								},
-								"destinationAccountId": null
-							}
-						]
-					},
-					"inputs": {}
-				},
-				"frequency": "monthly",
-				"annualRate": 0,
-				"annualGrowthRate": 0,
-				"volatility": 0,
-				"startDate": "2026-02-05",
-				"endDate": null,
-				"annualCap": null,
-				"priority": 1,
-				"enabled": true
-			},
-			{
-				"name": "spend",
-				"sourceAccountId": "checking",
-				"destinations": null,
-				"amount": {
-					"resolver": "expression",
-					"config": {
-						"expression": "700"
-					},
-					"inputs": {}
-				},
-				"frequency": "monthly",
-				"annualRate": 0,
-				"annualGrowthRate": 0,
-				"volatility": 0,
-				"startDate": "2026-02-06",
-				"endDate": "2026-02-06",
-				"annualCap": null,
-				"priority": 1,
-				"enabled": true,
-				"id": "spend"
-			}
-		]
-	},
-	"settings": {
-		"fallbackProjectionStartDate": "2026-02-01",
-		"horizonYears": 0,
-		"evaluations": {
-			"financialIndependence": [],
-			"netWorthThreshold": [],
-			"postingFulfillment": [
-				{
-					"instanceId": "pf-all",
-					"name": "Posting fulfillment",
-					"enabled": true,
-					"config": {
-						"postingIds": null
-					}
-				}
-			]
-		}
-	},
-	"overrides": {
-		"addedAccounts": [],
-		"addedPostings": [],
-		"disabledAccountIds": [],
-		"disabledPostingIds": []
-	},
-	"incomeData": {
-		"incomeSources": [
-			{
-				"id": "salary",
-				"name": "Salary",
-				"effectiveFrom": "2026-01-01",
-				"effectiveTo": null,
-				"annualGrossIncome": 120000
-			}
-		],
-		"taxProfiles": [
-			{
-				"id": "simple",
-				"name": "Simple",
-				"deduction": 16100,
-				"brackets": [
-					{
-						"upTo": 24800,
-						"rate": 0.1
-					},
-					{
-						"upTo": null,
-						"rate": 0.12
-					}
-				],
-				"sourceUrl": null
-			}
-		]
-	},
-	"result": {
-		"timeline": {
-			"rows": []
-		},
-		"accountSummaries": [
-			{
-				"accountId": "checking",
-				"name": "checking",
-				"color": null,
-				"enabled": true,
-				"startingBalance": 0,
-				"endingBalance": 0
-			},
-			{
-				"accountId": "brokerage",
-				"name": "brokerage",
-				"color": null,
-				"enabled": true,
-				"startingBalance": 0,
-				"endingBalance": 0
-			},
-			{
-				"accountId": "loan",
-				"name": "loan",
-				"color": null,
-				"enabled": true,
-				"startingBalance": 0,
-				"endingBalance": 0
-			}
-		],
-		"totals": {
-			"externalInflowAmount": 0,
-			"externalOutflowAmount": 0,
-			"internalTransferAmount": 0
-		},
-		"milestones": {
-			"latestHistoricalDate": null,
-			"projectionStartDate": "2026-02-01"
-		},
-		"summary": {
-			"currentNetWorth": 0,
-			"finalNetWorth": 0
-		},
-		"evaluations": {
-			"financialIndependence": [],
-			"netWorthThreshold": [],
-			"postingFulfillment": [
-				{
-					"instanceId": "pf-all",
-					"name": "Posting fulfillment",
-					"status": "satisfied",
-					"deterministic": {
-						"requestedAmount": 0,
-						"realizedAmount": 0,
-						"destinationLimitedAmount": 0,
-						"unfulfilledAmount": 0,
-						"completionRate": 1,
-						"firstUnderfulfilledDate": null,
-						"events": [],
-						"dates": [],
-						"postings": [
-							{
-								"postingId": "salary",
-								"name": "Salary",
-								"sourceAccountId": null,
-								"sourceAccountLabel": null,
-								"destinations": [
-									{
-										"accountId": "checking",
-										"name": "checking"
-									}
-								],
-								"priority": 1,
-								"annualCap": null,
-								"requestedAmount": 0,
-								"realizedAmount": 0,
-								"destinationLimitedAmount": 0,
-								"utilizationRate": 0,
-								"completionRate": 1,
-								"firstUnderfulfilledDate": null,
-								"unfulfilledAmount": 0
-							},
-							{
-								"postingId": "spend",
-								"name": "spend",
-								"sourceAccountId": "checking",
-								"sourceAccountLabel": "checking",
-								"destinations": null,
-								"priority": 1,
-								"annualCap": null,
-								"requestedAmount": 0,
-								"realizedAmount": 0,
-								"destinationLimitedAmount": 0,
-								"utilizationRate": 0,
-								"completionRate": 1,
-								"firstUnderfulfilledDate": null,
-								"unfulfilledAmount": 0
-							}
-						]
-					},
-					"probabilistic": null,
-					"diagnostics": []
-				}
-			]
-		}
-	}
+  "document": {
+    "sourcePath": "/configs",
+    "accounts": [
+      {
+        "name": "checking",
+        "kind": "cash",
+        "minBalance": -10000000000000,
+        "maxBalance": 10000000000000,
+        "color": null,
+        "enabled": true,
+        "id": "checking"
+      },
+      {
+        "name": "brokerage",
+        "kind": "investment",
+        "minBalance": -10000000000000,
+        "maxBalance": 10000000000000,
+        "color": null,
+        "enabled": true,
+        "id": "brokerage"
+      },
+      {
+        "name": "loan",
+        "kind": "debt",
+        "minBalance": -10000000000000,
+        "maxBalance": 10000000000000,
+        "color": null,
+        "enabled": true,
+        "id": "loan"
+      }
+    ],
+    "checkpoints": [],
+    "evaluations": {
+      "financialIndependence": [],
+      "netWorthThreshold": [],
+      "postingFulfillment": []
+    },
+    "postings": [],
+    "recurrenceRules": [
+      {
+        "id": "salary",
+        "name": "Salary",
+        "sourceAccountId": null,
+        "destinations": [
+          "checking"
+        ],
+        "amount": {
+          "resolver": "income",
+          "config": {
+            "incomeSourceId": "salary",
+            "resolvers": [
+              {
+                "resolver": "percentage",
+                "config": {
+                  "rate": 0.04,
+                  "annualCap": 23000
+                },
+                "destinationAccountId": "brokerage",
+                "employerMatchRate": 0.5
+              },
+              {
+                "resolver": "progressive-bracket",
+                "config": {
+                  "profileId": "simple"
+                },
+                "destinationAccountId": null
+              }
+            ]
+          },
+          "inputs": {}
+        },
+        "frequency": "monthly",
+        "annualRate": 0,
+        "annualGrowthRate": 0,
+        "volatility": 0,
+        "startDate": "2026-02-05",
+        "endDate": null,
+        "annualCap": null,
+        "priority": 1,
+        "enabled": true
+      },
+      {
+        "name": "spend",
+        "sourceAccountId": "checking",
+        "destinations": null,
+        "amount": {
+          "resolver": "expression",
+          "config": {
+            "expression": "700"
+          },
+          "inputs": {}
+        },
+        "frequency": "monthly",
+        "annualRate": 0,
+        "annualGrowthRate": 0,
+        "volatility": 0,
+        "startDate": "2026-02-06",
+        "endDate": "2026-02-06",
+        "annualCap": null,
+        "priority": 1,
+        "enabled": true,
+        "id": "spend"
+      }
+    ]
+  },
+  "settings": {
+    "fallbackProjectionStartDate": "2026-02-01",
+    "horizonYears": 0,
+    "evaluations": {
+      "financialIndependence": [],
+      "netWorthThreshold": [],
+      "postingFulfillment": [
+        {
+          "instanceId": "pf-all",
+          "name": "Posting fulfillment",
+          "enabled": true,
+          "config": {
+            "postingIds": null
+          }
+        }
+      ]
+    }
+  },
+  "overrides": {
+    "addedAccounts": [],
+    "addedPostings": [],
+    "disabledAccountIds": [],
+    "disabledPostingIds": []
+  },
+  "incomeData": {
+    "incomeSources": [
+      {
+        "id": "salary",
+        "name": "Salary",
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": null,
+        "annualGrossIncome": 120000
+      }
+    ],
+    "taxProfiles": [
+      {
+        "id": "simple",
+        "name": "Simple",
+        "deduction": 16100,
+        "brackets": [
+          {
+            "upTo": 24800,
+            "rate": 0.1
+          },
+          {
+            "upTo": null,
+            "rate": 0.12
+          }
+        ],
+        "sourceUrl": null
+      }
+    ]
+  },
+  "result": {
+    "timeline": {
+      "rows": []
+    },
+    "accountSummaries": [
+      {
+        "accountId": "checking",
+        "name": "checking",
+        "color": null,
+        "enabled": true,
+        "startingBalance": 0,
+        "endingBalance": 0
+      },
+      {
+        "accountId": "brokerage",
+        "name": "brokerage",
+        "color": null,
+        "enabled": true,
+        "startingBalance": 0,
+        "endingBalance": 0
+      },
+      {
+        "accountId": "loan",
+        "name": "loan",
+        "color": null,
+        "enabled": true,
+        "startingBalance": 0,
+        "endingBalance": 0
+      }
+    ],
+    "totals": {
+      "externalInflowAmount": 0,
+      "externalOutflowAmount": 0,
+      "internalTransferAmount": 0
+    },
+    "milestones": {
+      "latestHistoricalDate": null,
+      "projectionStartDate": "2026-02-01"
+    },
+    "summary": {
+      "currentNetWorth": 0,
+      "finalNetWorth": 0
+    },
+    "evaluations": {
+      "financialIndependence": [],
+      "netWorthThreshold": [],
+      "postingFulfillment": [
+        {
+          "instanceId": "pf-all",
+          "name": "Posting fulfillment",
+          "status": "satisfied",
+          "deterministic": {
+            "requestedAmount": 0,
+            "realizedAmount": 0,
+            "destinationLimitedAmount": 0,
+            "unfulfilledAmount": 0,
+            "completionRate": 1,
+            "firstUnderfulfilledDate": null,
+            "events": [],
+            "dates": [],
+            "postings": [
+              {
+                "postingId": "salary",
+                "name": "Salary",
+                "sourceAccountId": null,
+                "sourceAccountLabel": null,
+                "destinations": [
+                  {
+                    "accountId": "checking",
+                    "name": "checking"
+                  }
+                ],
+                "priority": 1,
+                "annualCap": null,
+                "requestedAmount": 0,
+                "realizedAmount": 0,
+                "destinationLimitedAmount": 0,
+                "utilizationRate": 0,
+                "completionRate": 1,
+                "firstUnderfulfilledDate": null,
+                "unfulfilledAmount": 0
+              },
+              {
+                "postingId": "spend",
+                "name": "spend",
+                "sourceAccountId": "checking",
+                "sourceAccountLabel": "checking",
+                "destinations": null,
+                "priority": 1,
+                "annualCap": null,
+                "requestedAmount": 0,
+                "realizedAmount": 0,
+                "destinationLimitedAmount": 0,
+                "utilizationRate": 0,
+                "completionRate": 1,
+                "firstUnderfulfilledDate": null,
+                "unfulfilledAmount": 0
+              }
+            ]
+          },
+          "probabilistic": null,
+          "diagnostics": []
+        }
+      ]
+    }
+  }
 }

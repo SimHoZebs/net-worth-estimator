@@ -6,13 +6,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Posting occurrence scheduling and movement resolution.
-
-// DatedPostingOccurrence binds a posting to its declaration index.
-type DatedPostingOccurrence struct {
-	Posting *types.Posting
-	Index   int
-}
+// Posting occurrence movement resolution. Scheduling lives in
+// recurrence.go; this file resolves and applies single movements.
 
 // AccountMovementAction is a generic movement request against accounts.
 type AccountMovementAction struct {
@@ -28,83 +23,6 @@ type AccountMovementResult struct {
 	RealizedAmount  float64
 }
 
-// FrequencyDivisor converts annual rates to per-occurrence rates.
-func FrequencyDivisor(frequency types.PostingFrequency) int {
-	switch frequency {
-	case types.FrequencyOnce:
-		return 1
-	case types.FrequencyDaily:
-		return 365
-	case types.FrequencyWeekly:
-		return 52
-	case types.FrequencyMonthly:
-		return 12
-	case types.FrequencyQuarterly:
-		return 4
-	case types.FrequencyAnnual:
-		return 1
-	default:
-		return 1
-	}
-}
-
-func advanceDate(date string, frequency types.PostingFrequency, periodCount int) string {
-	switch frequency {
-	case types.FrequencyOnce:
-		return date
-	case types.FrequencyDaily, types.FrequencyWeekly:
-		days := 7
-		if frequency == types.FrequencyDaily {
-			days = 1
-		}
-		t := MustParseIsoDate(date).AddDate(0, 0, days*periodCount)
-		return FormatIsoDate(t)
-	case types.FrequencyMonthly:
-		return AddMonthsClamped(date, periodCount)
-	case types.FrequencyQuarterly:
-		return AddMonthsClamped(date, periodCount*3)
-	case types.FrequencyAnnual:
-		return AddMonthsClamped(date, periodCount*12)
-	default:
-		return date
-	}
-}
-
-// AddOccurrences fills eventDates with occurrences in the projection window.
-// Once postings execute exactly on their start date; window inclusivity
-// depends on includeStartDate.
-func AddOccurrences(postings []types.Posting, eventDates map[string][]DatedPostingOccurrence, projectionStartDate, projectionEndDate string, includeStartDate bool) {
-	for index := range postings {
-		posting := &postings[index]
-		if !posting.Enabled {
-			continue
-		}
-		effectiveEndDate := projectionEndDate
-		if posting.EndDate != nil && CompareIsoDates(*posting.EndDate, projectionEndDate) < 0 {
-			effectiveEndDate = *posting.EndDate
-		}
-		for periodCount := 0; ; periodCount++ {
-			if posting.Frequency == types.FrequencyOnce && periodCount > 0 {
-				break
-			}
-			occurrenceDate := advanceDate(posting.StartDate, posting.Frequency, periodCount)
-			if CompareIsoDates(occurrenceDate, effectiveEndDate) > 0 {
-				break
-			}
-			var startsInWindow bool
-			if includeStartDate {
-				startsInWindow = CompareIsoDates(occurrenceDate, projectionStartDate) >= 0
-			} else {
-				startsInWindow = CompareIsoDates(occurrenceDate, projectionStartDate) > 0
-			}
-			if !startsInWindow {
-				continue
-			}
-			eventDates[occurrenceDate] = append(eventDates[occurrenceDate], DatedPostingOccurrence{Posting: posting, Index: index})
-		}
-	}
-}
-
 // ApplyAnnualGrowth compounds an amount over elapsed days at an annual rate.
 func ApplyAnnualGrowth(amount, annualGrowthRate float64, daysElapsed int) float64 {
 	if amount == 0 || annualGrowthRate == 0 || daysElapsed <= 0 {
@@ -114,17 +32,28 @@ func ApplyAnnualGrowth(amount, annualGrowthRate float64, daysElapsed int) float6
 }
 
 // ComputeRequestedAmount resolves the raw posting amount for one occurrence.
+// Rule-generated instances compound the rule's schedule: the per-occurrence
+// rate derives from the rule's annual rate and frequency, and expression
+// amounts grow from the rule's start date. Manual postings carry no rates,
+// so their resolved amount stands as authored.
 func ComputeRequestedAmount(occurrence DatedPostingOccurrence, currentDate string, latestRealized map[string]float64, realizedDates map[string]string, realizedByYear map[string]map[string]float64, balances map[string]float64, paymentTerms map[string]types.PaymentTerms, stochasticRate *float64) (float64, error) {
 	posting := occurrence.Posting
-	daysElapsed := DaysBetween(posting.StartDate, currentDate)
-	effectiveAnnualRate := posting.AnnualRate
-	if stochasticRate != nil {
-		effectiveAnnualRate = *stochasticRate
-	}
+	daysElapsed := 0
+	annualGrowthRate := 0.0
 	ratePerOccurrence := 0.0
-	if posting.AnnualRate != 0 {
-		ratePerOccurrence = effectiveAnnualRate / float64(FrequencyDivisor(posting.Frequency))
+	if occurrence.Rule != nil {
+		daysElapsed = DaysBetween(occurrence.Rule.StartDate, currentDate)
+		effectiveAnnualRate := occurrence.Rule.AnnualRate
+		if stochasticRate != nil {
+			effectiveAnnualRate = *stochasticRate
+		}
+		if occurrence.Rule.AnnualRate != 0 {
+			ratePerOccurrence = effectiveAnnualRate / float64(FrequencyDivisor(occurrence.Rule.Frequency))
+		}
+		annualGrowthRate = occurrence.Rule.AnnualGrowthRate
 	}
+	// Manual postings carry no rates: stochastic sampling only produces
+	// rates for volatile rules, so a nil rule always resolves literally.
 	rawAmount, err := ResolvePostingAmountDescriptor(posting.Amount, &AmountProviderContext{
 		Balances:                     balances,
 		LatestRealizedPostingAmounts: latestRealized,
@@ -138,7 +67,7 @@ func ComputeRequestedAmount(occurrence DatedPostingOccurrence, currentDate strin
 		return 0, err
 	}
 	if posting.Amount.Resolver == "expression" {
-		rawAmount = ApplyAnnualGrowth(rawAmount, posting.AnnualGrowthRate, daysElapsed)
+		rawAmount = ApplyAnnualGrowth(rawAmount, annualGrowthRate, daysElapsed)
 	}
 	return rawAmount, nil
 }

@@ -134,11 +134,13 @@ func publicMovementEvents(path *types.ProjectionPath) []types.MovementEvent {
 	for _, account := range path.EffectiveDocument.Accounts {
 		accountsByID[account.ID] = account
 	}
-	postingsByID := make(map[string]*types.Posting, len(path.EffectiveDocument.Postings))
-	for index := range path.EffectiveDocument.Postings {
-		posting := &path.EffectiveDocument.Postings[index]
+	movements := ResolvedMovementPostings(&path.EffectiveDocument)
+	postingsByID := make(map[string]*types.Posting, len(movements))
+	for index := range movements {
+		posting := &movements[index]
 		postingsByID[posting.ID] = posting
 	}
+	capsByID := RuleCapsByID(&path.EffectiveDocument)
 	capRemainingBySequence := map[int]float64{}
 	realizedByPostingAndYear := map[string]float64{}
 	for postingID, byYear := range path.ProjectionStartPostingState.RealizedPostingAmountsByYear {
@@ -158,11 +160,12 @@ func publicMovementEvents(path *types.ProjectionPath) []types.MovementEvent {
 	})
 	for _, event := range orderedEvents {
 		posting := postingsByID[event.Origin.PostingID]
-		if posting == nil || posting.AnnualCap == nil {
+		cap, capped := capsByID[event.Origin.PostingID]
+		if posting == nil || !capped {
 			continue
 		}
 		key := event.Origin.PostingID + ":" + event.Date[:4]
-		remaining := math.Max(0, *posting.AnnualCap-realizedByPostingAndYear[key])
+		remaining := math.Max(0, cap-realizedByPostingAndYear[key])
 		capRemainingBySequence[event.Sequence] = remaining
 		// Losses are balance adjustments, not cap consumption: only
 		// non-negative realizations accrue against the annual cap.
@@ -272,9 +275,10 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 	var postingsByID map[string]*types.Posting
 	var attemptsByDate map[string][]*types.MovementEvent
 	if detailed {
+		movements := ResolvedMovementPostings(&effectiveDocument)
 		postingsByID = map[string]*types.Posting{}
-		for index := range effectiveDocument.Postings {
-			posting := &effectiveDocument.Postings[index]
+		for index := range movements {
+			posting := &movements[index]
 			postingsByID[posting.ID] = posting
 		}
 		attemptsByDate = map[string][]*types.MovementEvent{}

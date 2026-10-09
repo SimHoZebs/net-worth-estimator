@@ -16,7 +16,8 @@ func stochasticTestDocument() *types.FinancialModelDocument {
 	end := "2027-01-01"
 	return &types.FinancialModelDocument{
 		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
-		Postings: []types.Posting{{
+		Postings: []types.Posting{},
+		RecurrenceRules: []types.RecurrenceRule{{
 			ID:           "salary",
 			Name:         "Salary",
 			Destinations: []string{"checking"},

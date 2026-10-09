@@ -150,7 +150,7 @@ func TestEvaluateCycleFulfillmentSumsRecordedAndScheduled(t *testing.T) {
 	card := "prime_card"
 	postings := []types.Posting{{
 		ID: "charge-sep-16", Name: "Groceries", SourceAccountID: &card,
-		Frequency: types.FrequencyOnce, StartDate: "2026-09-16", Enabled: true,
+		Date: "2026-09-16", Enabled: true,
 	}}
 	buckets := map[string]map[string]float64{"charge-sep-16": {"2026": 60}}
 	events := []types.MovementEvent{
@@ -205,7 +205,7 @@ func TestEvaluateCycleFulfillmentSkipsStartDateDoubleCount(t *testing.T) { // A 
 	card := "prime_card"
 	postings := []types.Posting{{
 		ID: "charge-start", Name: "Start charge", SourceAccountID: &card,
-		Frequency: types.FrequencyOnce, StartDate: "2026-09-20", Enabled: true,
+		Date: "2026-09-20", Enabled: true,
 	}}
 	buckets := map[string]map[string]float64{"charge-start": {"2026": 25}}
 	events := []types.MovementEvent{cycleEvent("2026-09-20", "charge-start", card, -25, 1)}

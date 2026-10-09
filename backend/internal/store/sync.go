@@ -134,7 +134,7 @@ func loadSyncedCheckpoints(tx *sql.Tx) ([]types.Checkpoint, error) {
 }
 
 func loadSyncedPostings(tx *sql.Tx) ([]types.Posting, error) {
-	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled, source FROM postings WHERE source = ? ORDER BY position`, SourceSimpleFIN)
+	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_json, date, claim_rule_id, claim_occurrence_date, priority, enabled, source FROM postings WHERE source = ? ORDER BY position`, SourceSimpleFIN)
 	if err != nil {
 		return nil, err
 	}

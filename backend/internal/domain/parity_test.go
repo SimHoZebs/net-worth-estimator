@@ -88,13 +88,13 @@ func TestIsValidIsoDate(t *testing.T) {
 func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 	document := &types.FinancialModelDocument{
 		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
-		Postings: []types.Posting{{
+		Postings: []types.Posting{},
+		RecurrenceRules: []types.RecurrenceRule{{
 			ID:           "p1",
 			Name:         "Broken dates",
 			StartDate:    "not-a-date",
 			EndDate:      ptrIsoDate("2026-01-01"),
 			Frequency:    types.FrequencyMonthly,
-			AnnualRate:   0,
 			Priority:     1,
 			Enabled:      true,
 			Destinations: []string{"checking"},
@@ -114,7 +114,7 @@ func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 			found[issue.Code] = true
 		}
 	}
-	for _, code := range []string{"posting.start-date.format", "checkpoint.date.format"} {
+	for _, code := range []string{"rule.start-date.format", "checkpoint.date.format"} {
 		if !found[code] {
 			t.Errorf("expected validation issue %q for malformed dates, got issues %v", code, found)
 		}

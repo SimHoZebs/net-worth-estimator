@@ -36,7 +36,8 @@ func TestValidatePaymentTermsAcceptsCardRow(t *testing.T) {
 		DueDay: 10, StatementDay: &statementDay,
 	}}
 	checking := "checking"
-	document.Postings = []types.Posting{{
+	document.Postings = []types.Posting{}
+	document.RecurrenceRules = []types.RecurrenceRule{{
 		ID: "pay-prime", Name: "Prime payment", SourceAccountID: &checking,
 		Destinations: []string{"prime_card"}, Frequency: types.FrequencyMonthly,
 		StartDate: "2026-09-10", Enabled: true,
@@ -116,10 +117,15 @@ func TestValidatePaymentTermsCoverageWarnsWithoutPaymentShell(t *testing.T) {
 		t.Fatalf("expected a terms.payment.missing warning")
 	}
 	checking := "checking"
-	document.Postings = []types.Posting{{
+	document.Postings = []types.Posting{}
+	document.RecurrenceRules = []types.RecurrenceRule{{
 		ID: "pay-prime", Name: "Prime payment", SourceAccountID: &checking,
 		Destinations: []string{"prime_card"}, Frequency: types.FrequencyMonthly,
 		StartDate: "2026-09-10", Enabled: true,
+		Amount: types.PostingAmountResolution{
+			Resolver: "expression",
+			Config:   map[string]any{"expression": "25"},
+		},
 	}}
 	for _, issue := range ValidateFinancialModel(document, nil) {
 		if issue.Code == "terms.payment.missing" {

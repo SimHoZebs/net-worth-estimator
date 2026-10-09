@@ -106,6 +106,9 @@ func deleteDocumentRows(tx *sql.Tx) error {
 	if _, err := tx.Exec(`DELETE FROM postings`); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM recurrence_rules`); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM evaluations`); err != nil {
 		return err
 	}
@@ -206,6 +209,13 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 	if _, err := remergePostings(tx, document.Postings, syncedPostings, 0); err != nil {
 		return err
 	}
+	position = 0
+	for _, rule := range document.RecurrenceRules {
+		if err := insertRule(tx, position, &rule); err != nil {
+			return err
+		}
+		position++
+	}
 	if err := saveEvaluationTable(tx, string(types.EvaluationTypeFinancialIndependence), fiEvaluationRows(document)); err != nil {
 		return err
 	}
@@ -246,24 +256,56 @@ func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source stri
 	if err != nil {
 		return fmt.Errorf("marshal amount %s: %w", posting.ID, err)
 	}
-	var sourceAccountID, endDate, annualCap any
+	var sourceAccountID, claimRuleID, claimOccurrenceDate any
 	if posting.SourceAccountID != nil {
 		sourceAccountID = *posting.SourceAccountID
 	}
-	if posting.EndDate != nil {
-		endDate = *posting.EndDate
-	}
-	if posting.AnnualCap != nil {
-		annualCap = *posting.AnnualCap
+	if posting.Claim != nil {
+		claimRuleID = posting.Claim.RuleID
+		claimOccurrenceDate = posting.Claim.OccurrenceDate
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled, source)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, date, claim_rule_id, claim_occurrence_date, priority, enabled, source)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
 		posting.ID, position, posting.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
-		string(posting.Frequency), posting.AnnualRate, posting.AnnualGrowthRate, posting.Volatility,
-		posting.StartDate, endDate, annualCap, posting.Priority, boolToInt(posting.Enabled), source,
+		posting.Date, claimRuleID, claimOccurrenceDate, posting.Priority, boolToInt(posting.Enabled), source,
 	); err != nil {
 		return fmt.Errorf("insert posting %s: %w", posting.ID, err)
+	}
+	return nil
+}
+
+func insertRule(tx *sql.Tx, position int, rule *types.RecurrenceRule) error {
+	destinationsJSON := []byte("null")
+	if rule.Destinations != nil {
+		var err error
+		destinationsJSON, err = json.Marshal(rule.Destinations)
+		if err != nil {
+			return fmt.Errorf("marshal rule destinations %s: %w", rule.ID, err)
+		}
+	}
+	amountJSON, err := json.Marshal(rule.Amount)
+	if err != nil {
+		return fmt.Errorf("marshal rule amount %s: %w", rule.ID, err)
+	}
+	var sourceAccountID, endDate, annualCap any
+	if rule.SourceAccountID != nil {
+		sourceAccountID = *rule.SourceAccountID
+	}
+	if rule.EndDate != nil {
+		endDate = *rule.EndDate
+	}
+	if rule.AnnualCap != nil {
+		annualCap = *rule.AnnualCap
+	}
+	if _, err := tx.Exec(
+		`INSERT INTO recurrence_rules (id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		rule.ID, position, rule.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
+		string(rule.Frequency), rule.AnnualRate, rule.AnnualGrowthRate, rule.Volatility,
+		rule.StartDate, endDate, annualCap, rule.Priority, boolToInt(rule.Enabled),
+	); err != nil {
+		return fmt.Errorf("insert recurrence rule %s: %w", rule.ID, err)
 	}
 	return nil
 }
@@ -297,13 +339,11 @@ func scanCheckpointRow(rows *sql.Rows) (types.Checkpoint, error) {
 
 func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 	var posting types.Posting
-	var sourceAccountID, endDate sql.NullString
+	var sourceAccountID, claimRuleID, claimOccurrenceDate sql.NullString
 	var destinationsJSON, amountJSON string
-	var frequency string
 	var enabled int64
-	var capNull sql.NullFloat64
 	var source sql.NullString
-	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &frequency, &posting.AnnualRate, &posting.AnnualGrowthRate, &posting.Volatility, &posting.StartDate, &endDate, &capNull, &posting.Priority, &enabled, &source); err != nil {
+	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &posting.Date, &claimRuleID, &claimOccurrenceDate, &posting.Priority, &enabled, &source); err != nil {
 		return types.Posting{}, err
 	}
 	if sourceAccountID.Valid {
@@ -320,20 +360,51 @@ func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 	if err := json.Unmarshal([]byte(amountJSON), &posting.Amount); err != nil {
 		return types.Posting{}, fmt.Errorf("parse amount %s: %w", posting.ID, err)
 	}
-	posting.Frequency = types.PostingFrequency(frequency)
-	if endDate.Valid {
-		value := endDate.String
-		posting.EndDate = &value
-	}
-	if capNull.Valid {
-		value := capNull.Float64
-		posting.AnnualCap = &value
+	if claimRuleID.Valid && claimOccurrenceDate.Valid {
+		posting.Claim = &types.PostingClaim{RuleID: claimRuleID.String, OccurrenceDate: claimOccurrenceDate.String}
 	}
 	posting.Enabled = enabled != 0
 	if source.Valid {
 		posting.Source = source.String
 	}
 	return posting, nil
+}
+
+func scanRuleRow(rows *sql.Rows) (types.RecurrenceRule, error) {
+	var rule types.RecurrenceRule
+	var sourceAccountID, endDate sql.NullString
+	var destinationsJSON, amountJSON string
+	var frequency string
+	var enabled int64
+	var capNull sql.NullFloat64
+	if err := rows.Scan(&rule.ID, &rule.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &frequency, &rule.AnnualRate, &rule.AnnualGrowthRate, &rule.Volatility, &rule.StartDate, &endDate, &capNull, &rule.Priority, &enabled); err != nil {
+		return types.RecurrenceRule{}, err
+	}
+	if sourceAccountID.Valid {
+		value := sourceAccountID.String
+		rule.SourceAccountID = &value
+	}
+	if destinationsJSON != "null" {
+		if err := json.Unmarshal([]byte(destinationsJSON), &rule.Destinations); err != nil {
+			return types.RecurrenceRule{}, fmt.Errorf("parse rule destinations %s: %w", rule.ID, err)
+		}
+	} else {
+		rule.Destinations = nil
+	}
+	if err := json.Unmarshal([]byte(amountJSON), &rule.Amount); err != nil {
+		return types.RecurrenceRule{}, fmt.Errorf("parse rule amount %s: %w", rule.ID, err)
+	}
+	rule.Frequency = types.RecurrenceFrequency(frequency)
+	if endDate.Valid {
+		value := endDate.String
+		rule.EndDate = &value
+	}
+	if capNull.Valid {
+		value := capNull.Float64
+		rule.AnnualCap = &value
+	}
+	rule.Enabled = enabled != 0
+	return rule, nil
 }
 
 func fiEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
@@ -497,7 +568,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close checkpoints: %w", err)
 	}
 
-	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled, source FROM postings ORDER BY position`)
+	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_json, date, claim_rule_id, claim_occurrence_date, priority, enabled, source FROM postings ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -515,6 +586,26 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 	}
 	if err := postingRows.Close(); err != nil {
 		return nil, fmt.Errorf("close postings: %w", err)
+	}
+
+	ruleRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules ORDER BY position`)
+	if err != nil {
+		return nil, err
+	}
+	defer ruleRows.Close()
+	for ruleRows.Next() {
+		rule, err := scanRuleRow(ruleRows)
+		if err != nil {
+			return nil, err
+		}
+		document.RecurrenceRules = append(document.RecurrenceRules, rule)
+	}
+	if err := ruleRows.Err(); err != nil {
+		ruleRows.Close()
+		return nil, fmt.Errorf("iterate recurrence rules: %w", err)
+	}
+	if err := ruleRows.Close(); err != nil {
+		return nil, fmt.Errorf("close recurrence rules: %w", err)
 	}
 
 	evaluationRows, err := q.Query(`SELECT type, instance_id, name, enabled, config_json FROM evaluations ORDER BY type, position`)
@@ -617,6 +708,9 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 	}
 	if document.Postings == nil {
 		document.Postings = []types.Posting{}
+	}
+	if document.RecurrenceRules == nil {
+		document.RecurrenceRules = []types.RecurrenceRule{}
 	}
 	if document.PaymentTerms == nil {
 		document.PaymentTerms = []types.PaymentTerms{}

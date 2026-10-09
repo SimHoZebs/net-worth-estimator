@@ -86,10 +86,12 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 		accountsByID[account.ID] = account
 	}
 	postingsByID := map[string]*types.Posting{}
-	for index := range path.EffectiveDocument.Postings {
-		posting := &path.EffectiveDocument.Postings[index]
+	movements := ResolvedMovementPostings(&path.EffectiveDocument)
+	for index := range movements {
+		posting := &movements[index]
 		postingsByID[posting.ID] = posting
 	}
+	capsByID := RuleCapsByID(&path.EffectiveDocument)
 	realizedByPostingAndYear := map[string]float64{}
 	for postingID, byYear := range path.ProjectionStartPostingState.RealizedPostingAmountsByYear {
 		for year, amount := range byYear {
@@ -114,8 +116,8 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 		capKey := event.Origin.PostingID + ":" + event.Date[:4]
 		realizedBefore := realizedByPostingAndYear[capKey]
 		var bindingConstraints []accountMovementConstraint
-		if posting != nil && posting.AnnualCap != nil {
-			limitRemaining := math.Max(0, *posting.AnnualCap-realizedBefore)
+		if cap, capped := capsByID[event.Origin.PostingID]; capped {
+			limitRemaining := math.Max(0, cap-realizedBefore)
 			beforeBalances := balancesBeforeBySequence[event.Sequence]
 			if beforeBalances == nil {
 				beforeBalances = map[string]float64{}
@@ -275,8 +277,10 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 		}
 	}
 	if includeDetails {
-		for index := range path.EffectiveDocument.Postings {
-			posting := &path.EffectiveDocument.Postings[index]
+		detailMovements := ResolvedMovementPostings(&path.EffectiveDocument)
+		detailCaps := RuleCapsByID(&path.EffectiveDocument)
+		for index := range detailMovements {
+			posting := &detailMovements[index]
 			if selectedIDs != nil && !selectedIDs[posting.ID] {
 				continue
 			}
@@ -312,6 +316,10 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 			if totals.requestedAmount > 0 {
 				completionRate = math.Max(0, 1-totals.unfulfilledAmount/totals.requestedAmount)
 			}
+			var annualCap any
+			if cap, ok := detailCaps[posting.ID]; ok {
+				annualCap = cap
+			}
 			entry := map[string]any{
 				"postingId":                posting.ID,
 				"name":                     posting.Name,
@@ -319,7 +327,7 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 				"sourceAccountLabel":       sourceLabel,
 				"destinations":             destinations,
 				"priority":                 posting.Priority,
-				"annualCap":                posting.AnnualCap,
+				"annualCap":                annualCap,
 				"requestedAmount":          roundAmount(totals.requestedAmount),
 				"realizedAmount":           roundAmount(totals.realizedAmount),
 				"destinationLimitedAmount": roundAmount(totals.destinationLimitedAmount),
@@ -365,10 +373,7 @@ func diagnoseFulfillmentConfig(path *types.ProjectionPath, config types.PostingF
 	if config.PostingIDs == nil {
 		return nil
 	}
-	postingIDs := map[string]bool{}
-	for _, posting := range path.EffectiveDocument.Postings {
-		postingIDs[posting.ID] = true
-	}
+	postingIDs := MovementIDs(&path.EffectiveDocument)
 	diagnostics := []types.EvaluationDiagnostic{}
 	for _, postingID := range config.PostingIDs {
 		if !postingIDs[postingID] {
