@@ -7,11 +7,38 @@ export function FundingInsight({
 	failure,
 	onFailure,
 	onPlan,
+	pending = false,
 }: {
 	failure: MovementResult | null;
 	onFailure: () => void;
 	onPlan: () => void;
+	pending?: boolean;
 }) {
+	// A null failure with settled data is genuinely good news; a null failure
+	// with pending data is unknowable, so the card stays neutral instead of
+	// claiming either branch.
+	if (pending)
+		return (
+			<article className="insight-card" aria-busy="true">
+				<div className="eyebrow">
+					<span
+						className="skeleton"
+						style={{ width: 150, height: 14 }}
+						aria-hidden="true"
+					/>
+				</div>
+				<span
+					className="skeleton"
+					style={{ width: 110, height: 30 }}
+					aria-hidden="true"
+				/>
+				<span
+					className="skeleton"
+					style={{ width: "100%", height: 44 }}
+					aria-hidden="true"
+				/>
+			</article>
+		);
 	const action = failure ? onFailure : onPlan;
 	return (
 		<article className={`insight-card ${failure ? "" : "insight-positive"}`}>

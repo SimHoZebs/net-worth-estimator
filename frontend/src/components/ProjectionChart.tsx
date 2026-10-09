@@ -21,9 +21,10 @@ export function ProjectionChart({
 	setYears,
 	progress,
 	rangeError,
+	pending = false,
 }: {
 	plan: Plan;
-	projection: Projection;
+	projection: Projection | null;
 	range: RangeResult | null;
 	ranges: boolean;
 	setRanges: (value: boolean) => void;
@@ -31,6 +32,7 @@ export function ProjectionChart({
 	setYears: (value: number) => void;
 	progress: number;
 	rangeError: string | null;
+	pending?: boolean;
 }) {
 	const [inspected, setInspected] = useState<number | null>(null);
 	const [showTable, setShowTable] = useState(false);
@@ -38,13 +40,15 @@ export function ProjectionChart({
 	const id = useId().replaceAll(":", "");
 	const model = useMemo(
 		() =>
-			projectionChartModel({
-				projection,
-				range,
-				inflation: 0,
-				realTerms: false,
-				narrow,
-			}),
+			projection
+				? projectionChartModel({
+						projection,
+						range,
+						inflation: 0,
+						realTerms: false,
+						narrow,
+					})
+				: null,
 		[projection, range, narrow],
 	);
 	const selectedIndex = model
@@ -65,7 +69,71 @@ export function ProjectionChart({
 				: [],
 		[plan.accounts, model, point],
 	);
-	if (!model || !point) return null;
+	if (!model || !point) {
+		// Static chrome (title, horizon, legend, toggles) renders regardless;
+		// only data slots skeletonize, and only while data is absent.
+		if (!pending) return null;
+		return (
+			<section className="chart-card" aria-label="Net worth over time">
+				<div className="section-top chart-top">
+					<h2>Net worth over time</h2>
+					<div
+						className="segmented"
+						role="toolbar"
+						aria-label="Projection horizon"
+					>
+						{[10, 20, 30].map((year) => (
+							<button
+								type="button"
+								key={year}
+								aria-pressed={years === year}
+								onClick={() => {
+									setYears(year);
+									setInspected(null);
+								}}
+							>
+								{year} years
+							</button>
+						))}
+					</div>
+				</div>
+				<div className="chart-toolbar">
+					<div className="chart-legend">
+						<span>
+							<i className="legend-line" />
+							Base case
+						</span>
+						{ranges && (
+							<span>
+								<i className="legend-band" />
+								80% of scenarios
+							</span>
+						)}
+						<span>
+							<i className="legend-zero" />
+							$0 · no debt
+						</span>
+					</div>
+					<Toggle label="Show range" checked={ranges} onChange={setRanges} />
+				</div>
+				<div aria-busy="true">
+					<span
+						className="skeleton"
+						style={{ width: "100%", height: 220 }}
+						aria-hidden="true"
+					/>
+				</div>
+				<div className="chart-foot">
+					<IconButton
+						icon={Table2}
+						label="View exact projection values"
+						disabled
+						onClick={() => setShowTable(!showTable)}
+					/>
+				</div>
+			</section>
+		);
+	}
 	return (
 		<section className="chart-card" aria-labelledby={`${id}-title`}>
 			<div className="section-top chart-top">

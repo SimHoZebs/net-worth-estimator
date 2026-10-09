@@ -42,6 +42,10 @@ import {
 const STORAGE_KEY = "nwe.card-cycle.v4";
 const LEGACY_STORAGE_KEYS = ["nwe.card-cycle.v3", "nwe.card-cycle.v2"];
 
+// Stable empty input so pending derivations stay null-safe without
+// re-running memos on identity churn.
+const EMPTY_MOVEMENTS: Projection["movements"] = [];
+
 interface TotalCycleSettings {
 	statementDay: number;
 	reserve: number;
@@ -155,11 +159,14 @@ export function TimingPreview({
 	plan,
 	projection,
 	onEdit,
+	pending = false,
 }: {
 	plan: Plan;
-	projection: Projection;
+	projection: Projection | null;
 	onEdit: (target: EditorTarget) => void;
+	pending?: boolean;
 }) {
+	const movements = projection?.movements ?? EMPTY_MOVEMENTS;
 	const cards = useMemo(
 		() =>
 			visibleAccounts(plan.accounts).filter(
@@ -218,30 +225,32 @@ export function TimingPreview({
 
 	const perAccount = useMemo(
 		() =>
-			trackedIds.map((accountId) => {
-				const transactions = accountTransactions({
-					accountId,
-					plan,
-					projection,
-				});
-				const name =
-					cards.find((card) => card.id === accountId)?.name ?? accountId;
-				return {
-					accountId,
-					name,
-					derived: cycleSpentSoFar({
-						transactions,
-						cycleStart: cycle.cycleStart,
-						todayIso: displayToday,
+			!projection
+				? []
+				: trackedIds.map((accountId) => {
+						const transactions = accountTransactions({
+							accountId,
+							plan,
+							projection,
+						});
+						const name =
+							cards.find((card) => card.id === accountId)?.name ?? accountId;
+						return {
+							accountId,
+							name,
+							derived: cycleSpentSoFar({
+								transactions,
+								cycleStart: cycle.cycleStart,
+								todayIso: displayToday,
+							}),
+							inCycle: transactions.filter(
+								(transaction) =>
+									isCycleOutflow(transaction) &&
+									transaction.date >= cycle.cycleStart &&
+									transaction.date <= displayToday,
+							),
+						};
 					}),
-					inCycle: transactions.filter(
-						(transaction) =>
-							isCycleOutflow(transaction) &&
-							transaction.date >= cycle.cycleStart &&
-							transaction.date <= displayToday,
-					),
-				};
-			}),
 		[trackedIds, cards, plan, projection, cycle, displayToday],
 	);
 	const cycleTransactions = useMemo(
@@ -276,8 +285,8 @@ export function TimingPreview({
 		[plan, spendingIds],
 	);
 	const obligationMovements = useMemo(
-		() => filterMovementsById(projection.movements, settings.movementIds),
-		[projection.movements, settings.movementIds],
+		() => filterMovementsById(movements, settings.movementIds),
+		[movements, settings.movementIds],
 	);
 	const remainingDerived = useMemo(() => {
 		if (!spendingIds.length)
@@ -300,11 +309,11 @@ export function TimingPreview({
 	const paycheckDerived = useMemo(() => {
 		if (!spendingIds.length) return null;
 		return nextPaycheck({
-			movements: projection.movements,
+			movements,
 			checkingIds: spendingIds,
 			todayIso: displayToday,
 		});
-	}, [projection.movements, spendingIds, displayToday]);
+	}, [movements, spendingIds, displayToday]);
 	const spentSinceStart = useMemo(
 		() =>
 			spendingIds.length
@@ -605,6 +614,35 @@ export function TimingPreview({
 					total: sum(cycleNextGroups.map((group) => group.total)),
 					groups: cycleNextGroups,
 				};
+
+	// Plan-derived frame (header, cycle dates) renders regardless; only the
+	// computed timing body skeletonizes while the projection is absent.
+	if (pending)
+		return (
+			<section className="timing-preview" aria-label="Total card cycle">
+				<div className="section-top">
+					<h2>
+						<CalendarDays size={18} />
+						Total card cycle
+					</h2>
+					<Badge tone="outline">Card timing</Badge>
+				</div>
+				<p className="cycle-dates">
+					{dateLabel(cycle.cycleStart, true)} to{" "}
+					{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
+					{fullDaysLeft === 1 ? "day" : "days"} left
+					{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
+					{accountLabel ? ` · ${accountLabel}` : ""}
+				</p>
+				<div aria-busy="true">
+					<span
+						className="skeleton"
+						style={{ width: "100%", height: 120 }}
+						aria-hidden="true"
+					/>
+				</div>
+			</section>
+		);
 
 	return (
 		<section className="timing-preview" aria-label="Total card cycle">
