@@ -29,6 +29,10 @@ export interface CashNowDecomposition {
 	cushion: number;
 	/** Projection-start date anchoring spentSinceStart, for caption context. */
 	since: string;
+	/** Simulated unpaid bills in the due window (fulfillment gaps). */
+	short: number;
+	/** First date the simulation leaves a bill unpaid, if any. */
+	firstShort: string | null;
 }
 
 export interface PaycheckDecomposition {
@@ -39,11 +43,15 @@ export interface PaycheckDecomposition {
 	allowance: number;
 }
 
-/** Bucket one: what checking covers right now. The walk-forward adjustment
- * (outflows since the balance snapshot) stays in the cushion math but only
- * appears in the bar when nonzero — a $0 segment next to real card activity
- * carries no information. */
+/** Bucket one: what checking covers right now. Short comes from the
+ * simulated unpaid bills (the fulfillment signal), not the cushion: with a
+ * floor the simulation pays partially and reports the gap. The cushion only
+ * stands in when the plan permits invisible overdraft (no gaps to report).
+ * The walk-forward adjustment stays in the math but only appears in the bar
+ * when nonzero. */
 function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
+	const isShort = parts.short > 0 || parts.cushion < 0;
+	const shortAmount = parts.short > 0 ? parts.short : -parts.cushion;
 	const segments: BarSegment[] = [
 		{
 			label: "Bills due",
@@ -52,28 +60,32 @@ function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 			tone: "sage",
 		},
 		{
-			label: parts.cushion >= 0 ? "Left to spend" : "Short",
-			amount: parts.cushion >= 0 ? parts.cushion : -parts.cushion,
-			pattern: parts.cushion >= 0 ? "solid" : "hatch",
-			tone: parts.cushion >= 0 ? "sage" : "amber",
+			label: isShort ? "Short" : "Checking left",
+			amount: isShort ? shortAmount : parts.cushion,
+			pattern: isShort ? "hatch" : "solid",
+			tone: isShort ? "amber" : "sage",
 		},
 	];
 	const paidNote =
 		parts.spentSinceStart > 0
 			? ` · ${money(parts.spentSinceStart)} paid since ${dateLabel(parts.since, true)}`
 			: "";
+	const shortNote =
+		isShort && parts.short > 0 && parts.firstShort
+			? ` from ${dateLabel(parts.firstShort, true)}`
+			: "";
 	return (
 		<SegmentedBar
 			caption={
-				parts.cushion >= 0
-					? `${money(parts.checking)} total${paidNote} · ${money(parts.cushion)} left to spend`
-					: `${money(parts.checking)} total${paidNote} · short ${money(-parts.cushion)}`
+				isShort
+					? `${money(parts.checking)} total${paidNote} · short ${money(shortAmount)}${shortNote}`
+					: `${money(parts.checking)} total${paidNote} · ${money(parts.cushion)} checking left`
 			}
 			segments={segments}
 			ariaLabel={
-				parts.cushion >= 0
-					? `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, left to spend ${money(parts.cushion)}${paidNote}`
-					: `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, short ${money(-parts.cushion)}${paidNote}`
+				isShort
+					? `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, short ${money(shortAmount)}${shortNote}${paidNote}`
+					: `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, checking left ${money(parts.cushion)}${paidNote}`
 			}
 		/>
 	);
@@ -312,7 +324,7 @@ export function TimingDetailDialog({
 			>
 				{tab === "mandatory" ? (
 					<div className="timing-mandatory">
-						<h3>Left to spend</h3>
+						<h3>Checking left</h3>
 						<p className="section-note">
 							{heroes.checkingObservedOn
 								? `As of ${dateLabel(heroes.checkingObservedOn, true)}`

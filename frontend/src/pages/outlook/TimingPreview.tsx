@@ -17,6 +17,7 @@ import {
 import {
 	cashCushion,
 	checkingAccountId,
+	checkingShortfall,
 	cycleAllowance,
 	cycleBudget,
 	DEFAULT_CYCLE_STATEMENT_DAY,
@@ -316,6 +317,18 @@ export function TimingPreview({
 				: 0,
 		[obligationMovements, spendingIds, plan.startDate, displayToday],
 	);
+	const shortWindow = useMemo(
+		() =>
+			spendingIds.length
+				? checkingShortfall({
+						movements: obligationMovements,
+						checkingIds: spendingIds,
+						after: displayToday,
+						through: remainingDerived.monthEnd,
+					})
+				: { total: 0, firstDate: null as string | null },
+		[obligationMovements, spendingIds, displayToday, remainingDerived.monthEnd],
+	);
 
 	const billCandidates = useMemo(() => {
 		if (!spendingIds.length) return [];
@@ -437,7 +450,12 @@ export function TimingPreview({
 	const fullDaysLeft = Math.max(1, cycle.daysLeft - 1);
 	const dailySafe = allowance / fullDaysLeft;
 	const dailyTheoretical = theoretical / fullDaysLeft;
-	const progress = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
+	const progress =
+		allowance < 0
+			? 100
+			: budget > 0
+				? Math.min(100, (spent / budget) * 100)
+				: 0;
 
 	const spendingAccounts = spendingIds
 		.map((id) => plan.accounts.find((account) => account.id === id))
@@ -613,18 +631,23 @@ export function TimingPreview({
 			<div className="spend-answer">
 				<span>
 					{allowance >= 0
-						? `You can spend until ${dateLabel(cycle.cycleEnd, true)}`
-						: `Over budget until ${dateLabel(cycle.cycleEnd, true)}`}
+						? `You can spend on cards until ${dateLabel(cycle.cycleEnd, true)}`
+						: `Cards over budget until ${dateLabel(cycle.cycleEnd, true)}`}
 				</span>
 				<strong>{money(Math.abs(allowance))}</strong>
 				<span>
-					{money(Math.max(0, dailySafe))} a day · {money(spent)} committed
+					{allowance >= 0
+						? `${money(dailySafe)} a day`
+						: `${money(-dailySafe)} a day over`}{" "}
+					· {money(spent)} committed
 				</span>
 			</div>
 			<div className="cycle-remaining">
 				<div>
-					<span>Left to spend</span>
-					<strong>{money(cushion)}</strong>
+					<span>Checking left</span>
+					<strong>
+						{money(shortWindow.total > 0 ? -shortWindow.total : cushion)}
+					</strong>
 				</div>
 				<div>
 					<span>Balance</span>
@@ -679,6 +702,8 @@ export function TimingPreview({
 						bills: remainingObligations,
 						cushion,
 						since: plan.startDate.slice(0, 10),
+						short: shortWindow.total,
+						firstShort: shortWindow.firstDate,
 					}}
 					paycheck={{
 						paycheck,
