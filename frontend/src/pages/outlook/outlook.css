@@ -382,17 +382,19 @@
 	}
 	.cycle-remaining {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0 16px;
 		border-top: 1px solid var(--line);
 		padding-top: 16px;
 	}
 	.cycle-remaining > div {
 		display: flex;
 		flex-direction: column;
+		min-width: 0;
 	}
 	.cycle-remaining > div + div {
 		border-left: 1px solid var(--line);
-		padding-left: 24px;
+		padding-left: 16px;
 	}
 	.cycle-remaining span {
 		color: var(--muted);
@@ -403,6 +405,8 @@
 		font-size: 20px;
 		font-weight: 550;
 		letter-spacing: -0.8px;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
 	}
 	.cycle-progress {
 		margin-top: 14px;

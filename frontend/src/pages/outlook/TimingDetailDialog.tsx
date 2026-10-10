@@ -60,8 +60,8 @@ function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 			tone: "sage",
 		},
 		{
-			label: isShort ? "Short" : "Left to spend",
-			amount: isShort ? shortAmount : parts.cushion,
+			label: "Left to spend",
+			amount: isShort ? -shortAmount : parts.cushion,
 			pattern: isShort ? "hatch" : "solid",
 			tone: isShort ? "amber" : "sage",
 		},
@@ -78,13 +78,13 @@ function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 		<SegmentedBar
 			caption={
 				isShort
-					? `${money(parts.checking)} total${paidNote} · short ${money(shortAmount)}${shortNote}`
+					? `${money(parts.checking)} total${paidNote} · ${money(-shortAmount)} left to spend${shortNote}`
 					: `${money(parts.checking)} total${paidNote} · ${money(parts.cushion)} left to spend`
 			}
 			segments={segments}
 			ariaLabel={
 				isShort
-					? `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, short ${money(shortAmount)}${shortNote}${paidNote}`
+					? `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, left to spend ${money(-shortAmount)}${shortNote}${paidNote}`
 					: `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, left to spend ${money(parts.cushion)}${paidNote}`
 			}
 		/>
