@@ -3,55 +3,108 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
 <title>Net Worth Estimator — Primitive interactions</title>
 <style>
-  :root { --ink:#283b33; --muted:#737970; }
+  :root {
+    color-scheme: light dark;
+    --ink:#283b33; --muted:#737970; --bg:#f7f8f3; --panel:#fffefa; --line:#e4e7de;
+    --lane:#8d9388; --node-fill:#ffffff; --node-stroke:#d8dcd0;
+    --data-top:#eef3f6; --data-edge:#b9c9d4; --data-body:#f4f8fa;
+    --cfg-fill:#faf6ec; --cfg-edge:#8a7a4d;
+    --ref-body:#f7f8f3; --ref-top:#eef1f4; --kid-fill:#f4f6ec;
+    --edge:#8a9a72; --edge-hot:#4e7138;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ink:#e4e9df; --muted:#9aa392; --bg:#141812; --panel:#1b211a; --line:#2c352a;
+    --lane:#7d8a76; --node-fill:#1e251d; --node-stroke:#3a4536;
+    --data-top:#243140; --data-edge:#4d6a84; --data-body:#1b2530;
+    --cfg-fill:#2b2517; --cfg-edge:#a68c4d;
+    --ref-body:#181d17; --ref-top:#232b33; --kid-fill:#1c231a;
+    --edge:#7d9a66; --edge-hot:#9ccc65;
+  }
   * { box-sizing: border-box; }
   body { font-family: "Manrope", system-ui, sans-serif; color: var(--ink);
-    background:#f7f8f3; margin:0; padding:28px 20px 64px; font-size:14px; }
+    background: var(--bg); margin:0; padding:28px 20px 64px; font-size:14px; }
   main { max-width: 1280px; margin: 0 auto; }
+  .topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
   h1 { font-size:26px; margin:0 0 4px; letter-spacing:-.4px; }
+  #theme { flex:none; margin-top:4px; font:inherit; font-size:12px; color:var(--ink);
+    background:var(--panel); border:1px solid var(--line); border-radius:20px;
+    padding:5px 14px; cursor:pointer; }
+  #theme:hover { border-color: var(--muted); }
   .sub { color:var(--muted); margin:0 0 8px; }
-  #graph { width:100%; height:auto; background:#fffefa; border:1px solid #e4e7de;
+  #graph { width:100%; height:auto; background:var(--panel); border:1px solid var(--line);
     border-radius:12px; }
-  .lane-label { font-size:11px; letter-spacing:1.5px; fill:#8d9388; font-weight:700; }
-  .node rect { fill:#fff; stroke:#d8dcd0; }
-  .node .t { font-size:12px; font-weight:700; }
+  .lane-label { font-size:11px; letter-spacing:1.5px; fill:var(--lane); font-weight:700; }
+  .node rect { fill:var(--node-fill); stroke:var(--node-stroke); }
+  .node .t { font-size:12px; font-weight:700; fill:var(--ink); }
   .node .s { font-size:10.5px; fill:var(--muted); }
-  .node.data .top { fill:#eef3f6; stroke:#b9c9d4; }
-  .node.data .body { fill:#f4f8fa; stroke:#b9c9d4; }
-  .node.cfg .doc { fill:#faf6ec; stroke:#8a7a4d; stroke-width:1.6; }
-  .node.cfg .fold { fill:none; stroke:#8a7a4d; stroke-width:1.6; }
-  .node.ref .body { stroke-dasharray:2 3; fill:#f7f8f3; }
-  .node.ref .top { stroke-dasharray:2 3; fill:#eef1f4; }
-  .node.kid rect { fill:#f4f6ec; }
-  .edge { fill:none; stroke:#8a9a72; stroke-width:1.6; }
-  .edge.hot { stroke:#4e7138; stroke-width:2.6; }
+  .node.data .top { fill:var(--data-top); stroke:var(--data-edge); }
+  .node.data .body { fill:var(--data-body); stroke:var(--data-edge); }
+  .node.cfg .doc { fill:var(--cfg-fill); stroke:var(--cfg-edge); stroke-width:1.6; }
+  .node.cfg .fold { fill:none; stroke:var(--cfg-edge); stroke-width:1.6; }
+  .node.ref .body { stroke-dasharray:2 3; fill:var(--ref-body); }
+  .node.ref .top { stroke-dasharray:2 3; fill:var(--ref-top); }
+  .node.kid rect { fill:var(--kid-fill); }
+  .edge { fill:none; stroke:var(--edge); stroke-width:1.6; }
+  .edge.hot { stroke:var(--edge-hot); stroke-width:2.6; }
+  #ah path { fill: var(--edge); }
   .edge.dim { opacity:.18; }
   .node.dim { opacity:.25; }
   .hint { font-size:12px; color:var(--muted); margin:10px 2px 0; }
+  .hint .sw { stroke-width:1.4; }
+  .hint .sw-data { fill:var(--data-body); stroke:var(--data-edge); }
+  .hint .sw-data-top { fill:var(--data-top); stroke:var(--data-edge); }
+  .hint .sw-cfg { fill:var(--cfg-fill); stroke:var(--cfg-edge); }
+  .hint .sw-code { fill:var(--node-fill); stroke:var(--node-stroke); }
+  .hint text { fill:var(--muted); }
   @media (max-width:900px){ #graph{ min-width:900px; } }
 </style>
 </head>
 <body>
 <main>
-  <h1>Primitive interactions</h1>
-  <p class="sub">Cylinders are data. Folded documents are deterministic config. Boxes are code.</p>
+  <div class="topbar">
+    <div>
+      <h1>Primitive interactions</h1>
+      <p class="sub">Cylinders are data. Folded documents are deterministic config. Boxes are code.</p>
+    </div>
+    <button id="theme" type="button" aria-pressed="false">Dark</button>
+  </div>
   <p class="hint"><svg width="360" height="22" style="vertical-align:middle" aria-hidden="true">
-    <g><path d="M2 8 L2 16 A 11 7 0 0 0 24 16 L 24 8" fill="#f4f8fa" stroke="#b9c9d4"/>
-    <ellipse cx="13" cy="8" rx="11" ry="7" fill="#eef3f6" stroke="#b9c9d4"/>
-    <text x="30" y="15" font-size="11" fill="#737970">data at rest</text></g>
-    <g><path d="M114 8 L124 8 L136 20 L136 22 L114 22 Z" fill="#faf6ec" stroke="#8a7a4d" stroke-width="1.4"/>
-    <path d="M124 8 L124 20 L136 20" fill="none" stroke="#8a7a4d" stroke-width="1.4"/>
-    <text x="142" y="15" font-size="11" fill="#737970">deterministic config</text></g>
-    <g><rect x="292" y="3" width="22" height="16" rx="4" fill="#fff" stroke="#d8dcd0"/>
-    <text x="320" y="16" font-size="11" fill="#737970">code</text></g>
+    <g><path class="sw sw-data" d="M2 8 L2 16 A 11 7 0 0 0 24 16 L 24 8"/>
+    <ellipse class="sw sw-data-top" cx="13" cy="8" rx="11" ry="7"/>
+    <text x="30" y="15" font-size="11">data at rest</text></g>
+    <g><path class="sw sw-cfg" d="M114 8 L124 8 L136 20 L136 22 L114 22 Z"/>
+    <path class="sw sw-cfg" style="fill:none" d="M124 8 L124 20 L136 20"/>
+    <text x="142" y="15" font-size="11">deterministic config</text></g>
+    <g><rect class="sw sw-code" x="292" y="3" width="22" height="16" rx="4"/>
+    <text x="320" y="16" font-size="11">code</text></g>
   </svg></p>
   <svg id="graph" viewBox="0 0 1280 760" role="img"
     aria-label="Graph of core abstractions and their interactions"></svg>
   <p class="hint">Hover a node to isolate its flows. Hover an edge for its meaning.</p>
 </main>
 <script>
+const rootEl = document.documentElement;
+const themeBtn = document.getElementById("theme");
+function setTheme(mode) {
+  rootEl.dataset.theme = mode;
+  themeBtn.setAttribute("aria-pressed", mode === "dark" ? "true" : "false");
+  themeBtn.textContent = mode === "dark" ? "Light" : "Dark";
+  try { localStorage.setItem("nwe-primitives-theme", mode); } catch (e) {}
+}
+let initialTheme = "light";
+try {
+  initialTheme = localStorage.getItem("nwe-primitives-theme") ||
+    (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+} catch (e) {
+  if (window.matchMedia("(prefers-color-scheme: dark)").matches) initialTheme = "dark";
+}
+setTheme(initialTheme);
+themeBtn.addEventListener("click", () =>
+  setTheme(rootEl.dataset.theme === "dark" ? "light" : "dark"));
 const LANES = ["Stored", "Prepare", "Execute", "Read"];
 const NODES = [
   { id:"account",  lane:0, label:"Account",        sub:"Owns balances and bounds", data:true },
@@ -144,7 +197,7 @@ function el(name, attrs, parent) {
 }
 el("defs", {}).innerHTML =
   '<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" ' +
-  'markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#8a9a72"/></marker>';
+  'markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z"/></marker>';
 EDGES.forEach(e => {
   const a = pos[e.f], b = pos[e.t];
   const aw = a.w || NW, ah = a.h || NH, bw = b.w || NW, bh = b.h || NH;
@@ -204,8 +257,12 @@ function focus(id, on) {
   if (self.kids) self.kids.forEach(k => linked.add(k));
   EDGES.forEach(e => { if (e.f === id) linked.add(e.t); if (e.t === id) linked.add(e.f); });
   const roots = new Set([...linked].map(rootOf));
-  const keepEdge = (f, t) => linked.has(f) || linked.has(t) ||
-    (roots.has(rootOf(f)) && roots.has(rootOf(t)) && rootOf(f) === rootOf(t));
+  // Keep only flows directly touching the hovered node, plus edges fully
+  // inside one linked group (e.g. runtime -> memory under the engine).
+  // A neighbor's other flows stay dim: hovering Claim shows
+  // posting -> claim -> occurrence, not posting's unrelated outflows.
+  const keepEdge = (f, t) => f === id || t === id ||
+    (linked.has(f) && linked.has(t) && roots.has(rootOf(f)) && rootOf(f) === rootOf(t));
   NODES.forEach(n => nodeEls[n.id].classList.toggle("dim", on && !linked.has(n.id)));
   svg.querySelectorAll(".edge").forEach(p =>
     p.classList.toggle("dim", on && !keepEdge(p.dataset.f, p.dataset.t)));
