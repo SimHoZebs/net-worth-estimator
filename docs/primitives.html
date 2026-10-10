@@ -57,6 +57,10 @@
   .node.kid rect { fill:var(--kid-fill); }
   .edge { fill:none; stroke:var(--edge); stroke-width:1.6; }
   .edge.hot { stroke:var(--edge-hot); stroke-width:2.6; }
+  .edge-label { font-size:10px; fill:var(--muted); text-anchor:middle;
+    dominant-baseline:central; pointer-events:none;
+    paint-order:stroke; stroke:var(--panel); stroke-width:3px; }
+  .edge-label.dim { opacity:.18; }
   #ah path { fill: var(--edge); }
   .edge.dim { opacity:.18; }
   .node.dim { opacity:.25; }
@@ -91,7 +95,7 @@
   </svg></p>
   <svg id="graph" viewBox="0 0 1280 760" role="img"
     aria-label="Graph of core abstractions and their interactions"></svg>
-  <p class="hint">Hover a node to isolate its flows. Hover an edge for its meaning.</p>
+  <p class="hint">Hover a node to isolate its flows. Hover any flow for the code symbol behind it.</p>
 </main>
 <script>
 const rootEl = document.documentElement;
@@ -304,7 +308,41 @@ EDGES.forEach(e => {
   p.dataset.f = e.f; p.dataset.t = e.t;
   const tip = el("title", {}, p);
   tip.textContent = `${e.f} → ${e.t}: ${e.l}${e.src ? " — " + e.src : ""}`;
+  const plen = p.getTotalLength();
+  const mid = p.getPointAtLength(plen / 2);
+  const lab = el("text", { x: mid.x, y: mid.y, class: "edge-label" });
+  lab.dataset.f = e.f; lab.dataset.t = e.t;
+  lab.textContent = e.l;
 });
+// Place each label on the on-curve slot farthest from labels placed
+// before it. Single greedy pass in document order: deterministic, always
+// on-arrow, and later additions only take remaining slots. Halo covers
+// whatever will not separate.
+{
+  const paths = {};
+  svg.querySelectorAll(".edge").forEach(p => { paths[p.dataset.f + " " + p.dataset.t] = p; });
+  const FRACS = [0.5, 0.38, 0.62, 0.3, 0.7, 0.24, 0.76, 0.18, 0.82];
+  const placed = [];
+  svg.querySelectorAll(".edge-label").forEach(l => {
+    const p = paths[l.dataset.f + " " + l.dataset.t];
+    const L = p.getTotalLength();
+    const hw = l.getComputedTextLength() / 2 + 2;
+    let best = null, bestScore = -1;
+    for (const f of FRACS) {
+      const pt = p.getPointAtLength(L * f);
+      let score = Infinity;
+      for (const q of placed) {
+        const dx = Math.abs(pt.x - q.x) / (hw + q.hw);
+        const dy = Math.abs(pt.y - q.y) / 12;
+        score = Math.min(score, Math.max(dx, dy));
+      }
+      if (score > bestScore) { bestScore = score; best = pt; }
+    }
+    l.setAttribute("x", best.x);
+    l.setAttribute("y", best.y);
+    placed.push({ x: best.x, y: best.y, hw });
+  });
+}
 const nodeEls = {};
 NODES.forEach(n => {
   const p = pos[n.id];
@@ -338,6 +376,9 @@ NODES.forEach(n => {
   g.addEventListener("mouseenter", () => focus(n.id, true));
   g.addEventListener("mouseleave", () => focus(n.id, false));
 });
+// Edges paint above nodes: the router guarantees no unrelated crossings,
+// so arrowheads and labels never bury under a box.
+svg.querySelectorAll(".edge, .edge-label").forEach(n => svg.appendChild(n));
 function focus(id, on) {
   const linked = new Set([id]);
   const self = byId[id];
@@ -359,6 +400,8 @@ function focus(id, on) {
     p.classList.toggle("dim", on && !keepEdge(p.dataset.f, p.dataset.t)));
   svg.querySelectorAll(".edge").forEach(p =>
     p.classList.toggle("hot", on && keepEdge(p.dataset.f, p.dataset.t)));
+  svg.querySelectorAll(".edge-label").forEach(l =>
+    l.classList.toggle("dim", on && !keepEdge(l.dataset.f, l.dataset.t)));
 }
 </script>
 </body>
