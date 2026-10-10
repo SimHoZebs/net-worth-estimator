@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Net Worth Estimator — Primitive interactions</title>
+<style>
+  :root { --ink:#283b33; --muted:#737970; }
+  * { box-sizing: border-box; }
+  body { font-family: "Manrope", system-ui, sans-serif; color: var(--ink);
+    background:#f7f8f3; margin:0; padding:28px 20px 64px; font-size:14px; }
+  main { max-width: 1280px; margin: 0 auto; }
+  h1 { font-size:26px; margin:0 0 4px; letter-spacing:-.4px; }
+  .sub { color:var(--muted); margin:0 0 8px; }
+  #graph { width:100%; height:auto; background:#fffefa; border:1px solid #e4e7de;
+    border-radius:12px; }
+  .lane-label { font-size:11px; letter-spacing:1.5px; fill:#8d9388; font-weight:700; }
+  .node rect { fill:#fff; stroke:#d8dcd0; }
+  .node .t { font-size:12px; font-weight:700; }
+  .node .s { font-size:10.5px; fill:var(--muted); }
+  .node.data .top { fill:#eef3f6; stroke:#b9c9d4; }
+  .node.data .body { fill:#f4f8fa; stroke:#b9c9d4; }
+  .node.cfg .doc { fill:#faf6ec; stroke:#8a7a4d; stroke-width:1.6; }
+  .node.cfg .fold { fill:none; stroke:#8a7a4d; stroke-width:1.6; }
+  .node.ref .body { stroke-dasharray:2 3; fill:#f7f8f3; }
+  .node.ref .top { stroke-dasharray:2 3; fill:#eef1f4; }
+  .node.kid rect { fill:#f4f6ec; }
+  .edge { fill:none; stroke:#8a9a72; stroke-width:1.6; }
+  .edge.hot { stroke:#4e7138; stroke-width:2.6; }
+  .edge.dim { opacity:.18; }
+  .node.dim { opacity:.25; }
+  .hint { font-size:12px; color:var(--muted); margin:10px 2px 0; }
+  @media (max-width:900px){ #graph{ min-width:900px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Primitive interactions</h1>
+  <p class="sub">Cylinders are data. Folded documents are deterministic config. Boxes are code.</p>
+  <p class="hint"><svg width="360" height="22" style="vertical-align:middle" aria-hidden="true">
+    <g><path d="M2 8 L2 16 A 11 7 0 0 0 24 16 L 24 8" fill="#f4f8fa" stroke="#b9c9d4"/>
+    <ellipse cx="13" cy="8" rx="11" ry="7" fill="#eef3f6" stroke="#b9c9d4"/>
+    <text x="30" y="15" font-size="11" fill="#737970">data at rest</text></g>
+    <g><path d="M114 8 L124 8 L136 20 L136 22 L114 22 Z" fill="#faf6ec" stroke="#8a7a4d" stroke-width="1.4"/>
+    <path d="M124 8 L124 20 L136 20" fill="none" stroke="#8a7a4d" stroke-width="1.4"/>
+    <text x="142" y="15" font-size="11" fill="#737970">deterministic config</text></g>
+    <g><rect x="292" y="3" width="22" height="16" rx="4" fill="#fff" stroke="#d8dcd0"/>
+    <text x="320" y="16" font-size="11" fill="#737970">code</text></g>
+  </svg></p>
+  <svg id="graph" viewBox="0 0 1280 760" role="img"
+    aria-label="Graph of core abstractions and their interactions"></svg>
+  <p class="hint">Hover a node to isolate its flows. Hover an edge for its meaning.</p>
+</main>
+<script>
+const LANES = ["Stored", "Prepare", "Execute", "Read"];
+const NODES = [
+  { id:"account",  lane:0, label:"Account",        sub:"Owns balances and bounds", data:true },
+  { id:"checkpoint",lane:0, label:"Checkpoint",    sub:"Declares end-of-day truth", data:true },
+  { id:"posting",  lane:0, label:"Posting",        sub:"One dated movement of money", data:true },
+  { id:"rule",     lane:0, label:"RecurrenceRule", sub:"Schedule plus movement template", data:true },
+  { id:"claim",    lane:0, label:"Claim",          sub:"Actual names one occurrence", data:true },
+  { id:"terms",    lane:0, label:"PaymentTerms",   sub:"Owns minimums, dues, windows", data:true, cfg:true },
+  { id:"evalcfg",  lane:0, label:"Eval configs",    sub:"Owns the questions asked", data:true, cfg:true },
+  { id:"prepare",  lane:1, label:"Prepare", kids:["replay", "request"] },
+  { id:"replay",   lane:1, parent:"prepare", label:"History replay", sub:"History into opening balances" },
+  { id:"request",  lane:1, parent:"prepare", label:"SimulationRequest", sub:"Model, state, window for one run" },
+  { id:"engine",   lane:2, label:"Projection engine", kids:["runtime", "memory"] },
+  { id:"runtime",  lane:2, parent:"engine", label:"TransitionRuntime", sub:"Executes; clamps and records" },
+  { id:"memory",   lane:2, parent:"engine", label:"Run memory", sub:"Remembers what moved so far" },
+  { id:"resolvers",lane:2, label:"Resolvers", kids:["pipeline", "income"] },
+  { id:"pipeline", lane:2, parent:"resolvers", label:"Income pipeline", sub:"Runs ordered steps with routing" },
+  { id:"income",   lane:2, parent:"resolvers", label:"IncomeData", sub:"Read-only reference data", ref:true, data:true },
+  { id:"providers",lane:2, label:"Providers", sub:"Binds named values for resolvers" },
+  { id:"events",   lane:3, label:"MovementEvents", sub:"Dated requested-vs-realized", data:true },
+  { id:"evalout",  lane:3, label:"Eval results", sub:"One verdict per question", data:true },
+  { id:"analysis", lane:3, label:"Analysis", sub:"Grades inferences with evidence" },
+  { id:"timing",   lane:3, label:"Timing card", sub:"TimingPreview plus grouping" },
+];
+const EDGES = [
+  { f:"account", t:"replay", l:"balances" },
+  { f:"checkpoint", t:"replay", l:"corrections" },
+  { f:"posting", t:"replay", l:"dated actuals" },
+  { f:"rule", t:"replay", l:"occurrences" },
+  { f:"rule", t:"request", l:"occurrences" },
+  { f:"posting", t:"claim", l:"names occurrence" },
+  { f:"claim", t:"replay", l:"skips generated" },
+  { f:"replay", t:"request", l:"initial state" },
+  { f:"request", t:"engine", l:"executes" },
+  { f:"posting", t:"resolvers", l:"every amount" },
+  { f:"rule", t:"resolvers", l:"template amounts" },
+  { f:"terms", t:"providers", l:"minimums and policy" },
+  { f:"evalcfg", t:"evalout", l:"configured questions" },
+  { f:"providers", t:"resolvers", l:"amount inputs" },
+  { f:"resolvers", t:"runtime", l:"requested" },
+  { f:"runtime", t:"events", l:"emits" },
+  { f:"runtime", t:"memory", l:"records" },
+  { f:"providers", t:"memory", l:"reads" },
+  { f:"evalout", t:"runtime", l:"FI branch runs" },
+  { f:"events", t:"evalout", l:"classify" },
+  { f:"posting", t:"analysis", l:"recorded inflows" },
+  { f:"events", t:"timing", l:"group" },
+];
+const W = 1280, H = 760, LANEW = W / 4, NW = 196, NH = 52, GAP = 16;
+const svg = document.getElementById("graph");
+const NS = "http://www.w3.org/2000/svg";
+const byId = {};
+NODES.forEach(n => byId[n.id] = n);
+function rootOf(id) {
+  let n = byId[id], guard = 0;
+  while (n && n.parent && guard++ < 5) n = byId[n.parent];
+  return n ? n.id : id;
+}
+// stack top-level nodes per lane, vertically centered; parents grow to hold kids
+const lanes = LANES.map(() => []);
+NODES.forEach(n => { if (!n.parent) lanes[n.lane].push(n); });
+const pos = {};
+const PAD = 10, KIDH = 32;
+lanes.forEach((list, li) => {
+  const heightOf = n => (n.kids ? n.kids.length * (KIDH + 8) + 40 : n.data && !n.parent ? 56 : 44);
+  const total = list.reduce((s, n) => s + heightOf(n) + GAP, -GAP);
+  let y = (H - total) / 2 + 24;
+  list.forEach(n => {
+    const h = heightOf(n);
+    pos[n.id] = { x: li * LANEW + (LANEW - NW) / 2, y, h };
+    (n.kids || []).forEach((kid, i) => {
+      pos[kid] = { x: pos[n.id].x + PAD, y: y + 30 + i * (KIDH + 8), h: KIDH, w: NW - PAD * 2 };
+    });
+    y += h + GAP;
+  });
+});
+LANES.forEach((name, i) => {
+  const t = document.createElementNS(NS, "text");
+  t.setAttribute("x", i * LANEW + 18); t.setAttribute("y", 30);
+  t.setAttribute("class", "lane-label"); t.textContent = (i + 1) + " · " + name.toUpperCase();
+  svg.appendChild(t);
+});
+function el(name, attrs, parent) {
+  const e = document.createElementNS(NS, name);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  (parent || svg).appendChild(e); return e;
+}
+el("defs", {}).innerHTML =
+  '<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" ' +
+  'markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#8a9a72"/></marker>';
+EDGES.forEach(e => {
+  const a = pos[e.f], b = pos[e.t];
+  const aw = a.w || NW, ah = a.h || NH, bw = b.w || NW, bh = b.h || NH;
+  const x1 = a.x + aw, y1 = a.y + ah / 2, x2 = b.x, y2 = b.y + bh / 2;
+  let d;
+  if (rootOf(e.f) === rootOf(e.t) && e.f !== e.t) {
+    d = `M ${x1} ${y1} L ${x2 - 4} ${y2}`;
+  } else {
+    const mx = (x1 + x2) / 2;
+    d = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2 - 4} ${y2}`;
+  }
+  const p = el("path", { d, class: "edge", "marker-end": "url(#ah)" });
+  p.dataset.f = e.f; p.dataset.t = e.t;
+  const tip = el("title", {}, p);
+  tip.textContent = e.l;
+});
+const nodeEls = {};
+NODES.forEach(n => {
+  const p = pos[n.id];
+  const w = p.w || NW, h = p.h || NH;
+  const g = el("g", { class: "node" + (n.ref ? " ref" : "") + (n.parent ? " kid" : "") + (n.data ? " data" : "") + (n.cfg ? " cfg" : ""), id: "n-" + n.id });
+  if (n.data && n.cfg && !n.parent) {
+    const f = 12;
+    el("path", { d: `M ${p.x} ${p.y} L ${p.x + w - f} ${p.y} L ${p.x + w} ${p.y + f} ` +
+      `L ${p.x + w} ${p.y + h} L ${p.x} ${p.y + h} Z`, class: "doc" }, g);
+    el("path", { d: `M ${p.x + w - f} ${p.y} L ${p.x + w - f} ${p.y + f} L ${p.x + w} ${p.y + f}`,
+      class: "fold" }, g);
+  } else if (n.data) {
+    const cx = p.x + w / 2, rim = 9;
+    el("path", { d: `M ${p.x} ${p.y + rim} L ${p.x} ${p.y + h - rim} ` +
+      `A ${w / 2} ${rim} 0 0 0 ${p.x + w} ${p.y + h - rim} L ${p.x + w} ${p.y + rim}`,
+      class: "body" }, g);
+    el("ellipse", { cx, cy: p.y + rim, rx: w / 2, ry: rim, class: "top" }, g);
+  } else {
+    el("rect", { x: p.x, y: p.y, width: w, height: h, rx: 8 }, g);
+  }
+  const cx = p.x + w / 2;
+  const t1 = el("text", { x: cx, y: p.y + (n.data && !n.parent ? 30 : n.parent ? 21 : 24), class: "t", "text-anchor": "middle" }, g);
+  t1.textContent = n.label;
+  if (!n.kids && !n.parent) {
+    const t2 = el("text", { x: cx, y: p.y + (n.data ? 46 : 39), class: "s", "text-anchor": "middle" }, g);
+    t2.textContent = n.sub;
+  }
+  const tip = el("title", {}, g);
+  tip.textContent = n.label + " — " + (n.sub || n.label);
+  nodeEls[n.id] = g;
+  g.addEventListener("mouseenter", () => focus(n.id, true));
+  g.addEventListener("mouseleave", () => focus(n.id, false));
+});
+function focus(id, on) {
+  const linked = new Set([id]);
+  const self = byId[id];
+  if (self.parent) {
+    linked.add(self.parent);
+    NODES.forEach(n => { if (n.parent === self.parent) linked.add(n.id); });
+  }
+  if (self.kids) self.kids.forEach(k => linked.add(k));
+  EDGES.forEach(e => { if (e.f === id) linked.add(e.t); if (e.t === id) linked.add(e.f); });
+  const roots = new Set([...linked].map(rootOf));
+  const keepEdge = (f, t) => linked.has(f) || linked.has(t) ||
+    (roots.has(rootOf(f)) && roots.has(rootOf(t)) && rootOf(f) === rootOf(t));
+  NODES.forEach(n => nodeEls[n.id].classList.toggle("dim", on && !linked.has(n.id)));
+  svg.querySelectorAll(".edge").forEach(p =>
+    p.classList.toggle("dim", on && !keepEdge(p.dataset.f, p.dataset.t)));
+  svg.querySelectorAll(".edge").forEach(p =>
+    p.classList.toggle("hot", on && keepEdge(p.dataset.f, p.dataset.t)));
+}
+</script>
+</body>
+</html>
