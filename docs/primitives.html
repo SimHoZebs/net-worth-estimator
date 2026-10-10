@@ -111,7 +111,6 @@ const NODES = [
   { id:"checkpoint",lane:0, label:"Checkpoint",    sub:"Declares end-of-day truth", data:true },
   { id:"posting",  lane:0, label:"Posting",        sub:"One dated movement of money", data:true },
   { id:"rule",     lane:0, label:"RecurrenceRule", sub:"Schedule plus movement template", data:true },
-  { id:"claim",    lane:0, label:"Claim",          sub:"Actual names one occurrence", data:true },
   { id:"terms",    lane:0, label:"PaymentTerms",   sub:"Owns minimums, dues, windows", data:true, cfg:true },
   { id:"evalcfg",  lane:0, label:"Eval configs",    sub:"Owns the questions asked", data:true, cfg:true },
   { id:"prepare",  lane:1, label:"Prepare", kids:["replay", "request"] },
@@ -139,8 +138,7 @@ const EDGES = [
   { f:"occurrence", t:"replay", l:"history instances" },
   { f:"occurrence", t:"runtime", l:"executes as posting" },
   { f:"occurrence", t:"resolvers", l:"resolves each amount" },
-  { f:"posting", t:"claim", l:"names occurrence" },
-  { f:"claim", t:"occurrence", l:"replaces" },
+  { f:"posting", t:"occurrence", l:"claims occurrence" },
   { f:"replay", t:"request", l:"initial state" },
   { f:"request", t:"engine", l:"executes" },
   { f:"posting", t:"resolvers", l:"every amount" },
@@ -260,7 +258,7 @@ function focus(id, on) {
   // Keep only flows directly touching the hovered node, plus edges fully
   // inside one linked group (e.g. runtime -> memory under the engine).
   // A neighbor's other flows stay dim: hovering Claim shows
-  // posting -> claim -> occurrence, not posting's unrelated outflows.
+  // posting -> occurrence, not posting's unrelated outflows.
   const keepEdge = (f, t) => f === id || t === id ||
     (linked.has(f) && linked.has(t) && roots.has(rootOf(f)) && rootOf(f) === rootOf(t));
   NODES.forEach(n => nodeEls[n.id].classList.toggle("dim", on && !linked.has(n.id)));
