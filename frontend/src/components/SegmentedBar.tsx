@@ -27,18 +27,21 @@ export function SegmentedBar({
 	segments: BarSegment[];
 	ariaLabel: string;
 }) {
-	const total = segments.reduce((sum, segment) => sum + segment.amount, 0);
+	const total = segments.reduce(
+		(sum, segment) => sum + Math.abs(segment.amount),
+		0,
+	);
 	return (
 		<div>
 			<p className="section-note">{caption}</p>
 			<div className="seg-bar" role="img" aria-label={ariaLabel}>
 				{segments.map((segment) =>
-					segment.amount > 0 ? (
+					segment.amount !== 0 ? (
 						<span
 							key={segment.label}
 							className={`seg seg-${segment.tone} pat-${segment.pattern}`}
 							style={{
-								width: `${(segment.amount / Math.max(total, 1)) * 100}%`,
+								width: `${(Math.abs(segment.amount) / Math.max(total, 1)) * 100}%`,
 							}}
 						/>
 					) : null,

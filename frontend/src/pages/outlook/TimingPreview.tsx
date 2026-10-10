@@ -415,11 +415,11 @@ export function TimingPreview({
 
 	if (!cards.length) {
 		return (
-			<section className="timing-preview" aria-label="Total card cycle">
+			<section className="timing-preview" aria-label="Safe card spending">
 				<div className="section-top">
 					<h2>
 						<CalendarDays size={18} />
-						Total card cycle
+						Safe card spending
 					</h2>
 					<Badge tone="outline">Card timing</Badge>
 				</div>
@@ -619,11 +619,11 @@ export function TimingPreview({
 	// computed timing body skeletonizes while the projection is absent.
 	if (pending)
 		return (
-			<section className="timing-preview" aria-label="Total card cycle">
+			<section className="timing-preview" aria-label="Safe card spending">
 				<div className="section-top">
 					<h2>
 						<CalendarDays size={18} />
-						Total card cycle
+						Safe card spending
 					</h2>
 					<Badge tone="outline">Card timing</Badge>
 				</div>
@@ -645,7 +645,7 @@ export function TimingPreview({
 		);
 
 	return (
-		<section className="timing-preview" aria-label="Total card cycle">
+		<section className="timing-preview" aria-label="Safe card spending">
 			<button
 				type="button"
 				className="timing-open"
@@ -656,7 +656,7 @@ export function TimingPreview({
 			<div className="section-top">
 				<h2>
 					<CalendarDays size={18} />
-					Total card cycle
+					Safe card spending
 				</h2>
 				<Badge tone="outline">Card timing</Badge>
 			</div>
@@ -690,9 +690,9 @@ export function TimingPreview({
 					<strong>{money(remainingObligations)}</strong>
 				</div>
 				<div>
-					<span>{shortWindow.total > 0 ? "Short" : "Left to spend"}</span>
+					<span>Left to spend</span>
 					<strong>
-						{money(shortWindow.total > 0 ? shortWindow.total : cushion)}
+						{money(shortWindow.total > 0 ? -shortWindow.total : cushion)}
 					</strong>
 				</div>
 			</div>

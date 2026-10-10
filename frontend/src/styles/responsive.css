@@ -721,6 +721,15 @@
 	.metric-value {
 		font-size: 22px;
 	}
+	.cycle-remaining {
+		gap: 0 12px;
+	}
+	.cycle-remaining > div + div {
+		padding-left: 12px;
+	}
+	.cycle-remaining strong {
+		font-size: 17px;
+	}
 	.metric-context {
 		font-size: 6px;
 	}
