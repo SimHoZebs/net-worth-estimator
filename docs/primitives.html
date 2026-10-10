@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light dark" />
 <title>Net Worth Estimator — Primitive interactions</title>
+<!--
+  Source of truth: the Go engine and its docs. Every node and edge below
+  carries a `src` citing the code symbol it depicts (rendered in hover
+  tooltips). Change this graph only alongside the code it cites:
+  stored nodes mirror backend/internal/types/model.go, flows mirror
+  backend/internal/domain, and the narrative mirrors TECHNICAL_OVERVIEW.md.
+-->
 <style>
   :root {
     color-scheme: light dark;
@@ -107,54 +114,54 @@ themeBtn.addEventListener("click", () =>
   setTheme(rootEl.dataset.theme === "dark" ? "light" : "dark"));
 const LANES = ["Stored", "Prepare", "Execute", "Read"];
 const NODES = [
-  { id:"account",  lane:0, label:"Account",        sub:"Owns balances and bounds", data:true },
-  { id:"checkpoint",lane:0, label:"Checkpoint",    sub:"Declares end-of-day truth", data:true },
-  { id:"posting",  lane:0, label:"Posting",        sub:"One dated movement of money", data:true },
-  { id:"rule",     lane:0, label:"RecurrenceRule", sub:"Schedule plus movement template", data:true },
-  { id:"terms",    lane:0, label:"PaymentTerms",   sub:"Owns minimums, dues, windows", data:true, cfg:true },
-  { id:"evalcfg",  lane:0, label:"Eval configs",    sub:"Owns the questions asked", data:true, cfg:true },
-  { id:"occurrence",lane:1, label:"Occurrence", sub:"Rule instance, executes as posting" },
-  { id:"prepare",  lane:1, label:"Prepare", kids:["replay", "request"] },
-  { id:"replay",   lane:1, parent:"prepare", label:"History replay", sub:"History into opening balances" },
-  { id:"request",  lane:1, parent:"prepare", label:"SimulationRequest", sub:"Model, state, window for one run" },
-  { id:"engine",   lane:2, label:"Projection engine", kids:["runtime", "memory"] },
-  { id:"runtime",  lane:2, parent:"engine", label:"TransitionRuntime", sub:"Executes; clamps and records" },
-  { id:"memory",   lane:2, parent:"engine", label:"Run memory", sub:"Remembers what moved so far" },
-  { id:"resolvers",lane:2, label:"Resolvers", kids:["pipeline", "income"] },
-  { id:"pipeline", lane:2, parent:"resolvers", label:"Income pipeline", sub:"Runs ordered steps with routing" },
-  { id:"income",   lane:2, parent:"resolvers", label:"IncomeData", sub:"Read-only reference data", ref:true, data:true },
-  { id:"providers",lane:2, label:"Providers", sub:"Binds named values for resolvers" },
-  { id:"events",   lane:3, label:"MovementEvents", sub:"Dated requested-vs-realized", data:true },
-  { id:"evalout",  lane:3, label:"Eval results", sub:"One verdict per question", data:true },
-  { id:"analysis", lane:3, label:"Analysis", sub:"Grades inferences with evidence" },
-  { id:"timing",   lane:3, label:"Timing card", sub:"TimingPreview plus grouping" },
+  { id:"account",  lane:0, label:"Account",        sub:"Owns balances and bounds", data:true, src:"types.Account" },
+  { id:"checkpoint",lane:0, label:"Checkpoint",    sub:"Declares end-of-day truth", data:true, src:"types.Checkpoint" },
+  { id:"posting",  lane:0, label:"Posting",        sub:"One dated movement of money", data:true, src:"types.Posting" },
+  { id:"rule",     lane:0, label:"RecurrenceRule", sub:"Schedule plus movement template", data:true, src:"types.RecurrenceRule" },
+  { id:"terms",    lane:0, label:"PaymentTerms",   sub:"Owns minimums, dues, windows", data:true, cfg:true, src:"types.PaymentTerms" },
+  { id:"evalcfg",  lane:0, label:"Eval configs",    sub:"Owns the questions asked", data:true, cfg:true, src:"types.EvaluationTables" },
+  { id:"occurrence",lane:1, label:"Occurrence", sub:"Rule instance, executes as posting", src:"domain.ResolveOccurrences" },
+  { id:"prepare",  lane:1, label:"Prepare", kids:["replay", "request"], src:"domain.PrepareSimulationRequest" },
+  { id:"replay",   lane:1, parent:"prepare", label:"History replay", sub:"History into opening balances", src:"domain.replayHistoricalState" },
+  { id:"request",  lane:1, parent:"prepare", label:"SimulationRequest", sub:"Model, state, window for one run", src:"types.SimulationRequest" },
+  { id:"engine",   lane:2, label:"Projection engine", kids:["runtime", "memory"], src:"domain.Simulate" },
+  { id:"runtime",  lane:2, parent:"engine", label:"TransitionRuntime", sub:"Executes; clamps and records", src:"domain.TransitionRuntime" },
+  { id:"memory",   lane:2, parent:"engine", label:"Run memory", sub:"Remembers what moved so far", src:"types.SimulationState" },
+  { id:"resolvers",lane:2, label:"Resolvers", kids:["pipeline", "income"], src:"domain.ComputeRequestedAmount" },
+  { id:"pipeline", lane:2, parent:"resolvers", label:"Income pipeline", sub:"Runs ordered steps with routing", src:"domain.executeIncomePosting" },
+  { id:"income",   lane:2, parent:"resolvers", label:"IncomeData", sub:"Read-only reference data", ref:true, data:true, src:"types.IncomeDataSnapshot" },
+  { id:"providers",lane:2, label:"Providers", sub:"Binds named values for resolvers", src:"domain.amountProviders" },
+  { id:"events",   lane:3, label:"MovementEvents", sub:"Dated requested-vs-realized", data:true, src:"types.MovementEvent" },
+  { id:"evalout",  lane:3, label:"Eval results", sub:"One verdict per question", data:true, src:"domain.EvaluationRegistry" },
+  { id:"analysis", lane:3, label:"Analysis", sub:"Grades inferences with evidence", src:"domain.analyzePay" },
+  { id:"timing",   lane:3, label:"Timing card", sub:"TimingPreview plus grouping", src:"TimingPreview" },
 ];
 const EDGES = [
-  { f:"account", t:"replay", l:"balances" },
-  { f:"checkpoint", t:"replay", l:"corrections" },
-  { f:"posting", t:"replay", l:"history actuals" },
-  { f:"posting", t:"request", l:"future actuals" },
-  { f:"rule", t:"occurrence", l:"expands into" },
-  { f:"rule", t:"request", l:"carries rules" },
-  { f:"occurrence", t:"replay", l:"history instances" },
-  { f:"occurrence", t:"runtime", l:"executes as posting" },
-  { f:"occurrence", t:"resolvers", l:"resolves each amount" },
-  { f:"posting", t:"occurrence", l:"claims occurrence" },
-  { f:"posting", t:"rule", l:"names rule" },
-  { f:"replay", t:"request", l:"initial state" },
-  { f:"request", t:"engine", l:"executes" },
-  { f:"posting", t:"resolvers", l:"every amount" },
-  { f:"posting", t:"analysis", l:"recorded inflows" },
-  { f:"terms", t:"providers", l:"minimums and policy" },
-  { f:"evalcfg", t:"evalout", l:"configured questions" },
-  { f:"providers", t:"resolvers", l:"amount inputs" },
-  { f:"resolvers", t:"runtime", l:"requested" },
-  { f:"runtime", t:"events", l:"emits" },
-  { f:"runtime", t:"memory", l:"records" },
-  { f:"providers", t:"memory", l:"reads" },
-  { f:"evalout", t:"runtime", l:"FI branch runs" },
-  { f:"events", t:"evalout", l:"classify" },
-  { f:"events", t:"timing", l:"group" },
+  { f:"account", t:"replay", l:"balances", src:"domain.InitAccountBalances" },
+  { f:"checkpoint", t:"replay", l:"corrections", src:"types.CheckpointCorrection" },
+  { f:"posting", t:"replay", l:"history actuals", src:"domain.replayHistoricalState" },
+  { f:"posting", t:"request", l:"future actuals", src:"types.SimulationRequest" },
+  { f:"rule", t:"occurrence", l:"expands into", src:"domain.ResolveOccurrences" },
+  { f:"rule", t:"request", l:"carries rules", src:"types.SimulationRequest" },
+  { f:"occurrence", t:"replay", l:"history instances", src:"domain.ResolveOccurrences" },
+  { f:"occurrence", t:"runtime", l:"executes as posting", src:"domain.TransitionRuntime" },
+  { f:"occurrence", t:"resolvers", l:"resolves each amount", src:"domain.ComputeRequestedAmount" },
+  { f:"posting", t:"occurrence", l:"claims occurrence", src:"types.PostingClaim" },
+  { f:"posting", t:"rule", l:"names rule", src:"types.PostingClaim" },
+  { f:"replay", t:"request", l:"initial state", src:"domain.PrepareSimulationRequest" },
+  { f:"request", t:"engine", l:"executes", src:"domain.Simulate" },
+  { f:"posting", t:"resolvers", l:"every amount", src:"domain.ComputeRequestedAmount" },
+  { f:"posting", t:"analysis", l:"recorded inflows", src:"domain.analyzePay" },
+  { f:"terms", t:"providers", l:"minimums and policy", src:"domain/payment_terms.go" },
+  { f:"evalcfg", t:"evalout", l:"configured questions", src:"domain.EvaluationRegistry" },
+  { f:"providers", t:"resolvers", l:"amount inputs", src:"domain.AmountProviderContext" },
+  { f:"resolvers", t:"runtime", l:"requested", src:"domain.TransitionRuntime" },
+  { f:"runtime", t:"events", l:"emits", src:"types.SimulationRun" },
+  { f:"runtime", t:"memory", l:"records", src:"domain.TransitionRuntime" },
+  { f:"providers", t:"memory", l:"reads", src:"types.SimulationState" },
+  { f:"evalout", t:"runtime", l:"FI branch runs", src:"domain/evaluation_fi.go" },
+  { f:"events", t:"evalout", l:"classify", src:"domain.EvaluateProjectionPath" },
+  { f:"events", t:"timing", l:"group", src:"TimingPreview" },
 ];
 const W = 1280, H = 760, LANEW = W / 4, NW = 196, NH = 52, GAP = 16;
 const svg = document.getElementById("graph");
@@ -296,7 +303,7 @@ EDGES.forEach(e => {
   const p = el("path", { d, class: "edge", "marker-end": "url(#ah)" });
   p.dataset.f = e.f; p.dataset.t = e.t;
   const tip = el("title", {}, p);
-  tip.textContent = e.l;
+  tip.textContent = `${e.f} → ${e.t}: ${e.l}${e.src ? " — " + e.src : ""}`;
 });
 const nodeEls = {};
 NODES.forEach(n => {
@@ -326,7 +333,7 @@ NODES.forEach(n => {
     t2.textContent = n.sub;
   }
   const tip = el("title", {}, g);
-  tip.textContent = n.label + " — " + (n.sub || n.label);
+  tip.textContent = n.label + " — " + (n.sub || n.label) + (n.src ? " — " + n.src : "");
   nodeEls[n.id] = g;
   g.addEventListener("mouseenter", () => focus(n.id, true));
   g.addEventListener("mouseleave", () => focus(n.id, false));
