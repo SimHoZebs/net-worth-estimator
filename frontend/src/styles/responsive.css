@@ -51,12 +51,6 @@
 		font-size: 8px;
 		padding: 5px 6px;
 	}
-	.chart-foot-note {
-		display: none;
-	}
-	.chart-foot .icon-button {
-		margin-left: auto;
-	}
 	.draft-bar {
 		left: calc(var(--sidebar) + 28px);
 		right: 28px;
@@ -86,14 +80,6 @@
 	.nav-link {
 		padding-left: 10px;
 		gap: 10px;
-	}
-	.household-select {
-		padding-left: 8px;
-		gap: 7px;
-	}
-	.household-avatar {
-		width: 25px;
-		height: 27px;
 	}
 	.outlook-top {
 		grid-template-columns: 1fr;
@@ -365,9 +351,6 @@
 	}
 	.axis-label {
 		font-size: 13px;
-	}
-	.chart-foot {
-		padding: 9px 15px;
 	}
 	.insight-card {
 		display: flex;

@@ -31,11 +31,7 @@ export function WorkspaceShell() {
 	return (
 		<WorkspaceLayout
 			navigation={(close) => (
-				<WorkspaceSidebar
-					page={navigation.page}
-					onNavigate={navigation.navigate}
-					onClose={close}
-				/>
+				<WorkspaceSidebar page={navigation.page} onClose={close} />
 			)}
 			header={(open) => <WorkspaceTopbar onOpenNavigation={open} />}
 			draftBar={

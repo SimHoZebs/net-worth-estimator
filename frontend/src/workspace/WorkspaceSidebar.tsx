@@ -1,9 +1,4 @@
-import {
-	ChevronDown,
-	LockKeyhole,
-	PanelLeftClose,
-	Settings,
-} from "lucide-react";
+import { LockKeyhole, PanelLeftClose, Settings } from "lucide-react";
 import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { IconButton } from "../components/ui.tsx";
@@ -14,12 +9,10 @@ import { workspaceStatusLabel } from "./WorkspaceNotices.tsx";
 
 export function WorkspaceSidebar({
 	page,
-	onNavigate,
 	onClose,
 	pending = false,
 }: {
 	page: Page;
-	onNavigate: (page: Page) => void;
 	onClose: () => void;
 	pending?: boolean;
 }) {
@@ -35,7 +28,6 @@ export function WorkspaceSidebar({
 		workspace && plan
 			? changesBetween({ saved: workspace.saved, current: plan }).length
 			: 0;
-	const planName = plan?.name ?? "";
 	const statusLabel = workspaceStatusLabel({ readOnly });
 	return (
 		<>
@@ -48,28 +40,6 @@ export function WorkspaceSidebar({
 					onClick={onClose}
 				/>
 			</div>
-			<button
-				type="button"
-				className="household-select"
-				onClick={() => {
-					onNavigate("sources");
-					onClose();
-				}}
-			>
-				<span className="household-avatar">H</span>
-				<span>
-					{pending ? (
-						<span
-							className="skeleton"
-							style={{ width: 110, height: 14 }}
-							aria-hidden="true"
-						/>
-					) : (
-						<strong>{planName}</strong>
-					)}
-				</span>
-				<ChevronDown size={14} />
-			</button>
 			<nav aria-label="Main navigation">
 				<ul>
 					{pages
