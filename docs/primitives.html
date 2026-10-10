@@ -141,31 +141,33 @@ const NODES = [
   { id:"timing",   lane:3, label:"Timing card", sub:"TimingPreview plus grouping", src:"TimingPreview" },
 ];
 const EDGES = [
-  { f:"account", t:"replay", l:"balances", src:"domain.InitAccountBalances" },
-  { f:"checkpoint", t:"replay", l:"corrections", src:"types.CheckpointCorrection" },
-  { f:"posting", t:"replay", l:"history actuals", src:"domain.replayHistoricalState" },
-  { f:"posting", t:"request", l:"future actuals", src:"types.SimulationRequest" },
-  { f:"rule", t:"occurrence", l:"expands into", src:"domain.ResolveOccurrences" },
-  { f:"rule", t:"request", l:"carries rules", src:"types.SimulationRequest" },
-  { f:"occurrence", t:"replay", l:"history instances", src:"domain.ResolveOccurrences" },
-  { f:"occurrence", t:"runtime", l:"executes as posting", src:"domain.TransitionRuntime" },
-  { f:"occurrence", t:"resolvers", l:"resolves each amount", src:"domain.ComputeRequestedAmount" },
-  { f:"posting", t:"occurrence", l:"claims occurrence", src:"types.PostingClaim" },
-  { f:"posting", t:"rule", l:"names rule", src:"types.PostingClaim" },
-  { f:"replay", t:"request", l:"initial state", src:"domain.PrepareSimulationRequest" },
-  { f:"request", t:"engine", l:"executes", src:"domain.Simulate" },
-  { f:"posting", t:"resolvers", l:"every amount", src:"domain.ComputeRequestedAmount" },
-  { f:"posting", t:"analysis", l:"recorded inflows", src:"domain.analyzePay" },
-  { f:"terms", t:"providers", l:"minimums and policy", src:"domain/payment_terms.go" },
-  { f:"evalcfg", t:"evalout", l:"configured questions", src:"domain.EvaluationRegistry" },
-  { f:"providers", t:"resolvers", l:"amount inputs", src:"domain.AmountProviderContext" },
-  { f:"resolvers", t:"runtime", l:"requested", src:"domain.TransitionRuntime" },
-  { f:"runtime", t:"events", l:"emits", src:"types.SimulationRun" },
-  { f:"runtime", t:"memory", l:"records", src:"domain.TransitionRuntime" },
-  { f:"providers", t:"memory", l:"reads", src:"types.SimulationState" },
-  { f:"evalout", t:"runtime", l:"FI branch runs", src:"domain/evaluation_fi.go" },
-  { f:"events", t:"evalout", l:"classify", src:"domain.EvaluateProjectionPath" },
-  { f:"events", t:"timing", l:"group", src:"TimingPreview" },
+  // Steps follow one run in causal order: standing references, history,
+  // request assembly, the per-occurrence execution loop, then readout.
+  { f:"posting", t:"rule", l:"names rule", step:1, src:"types.PostingClaim" },
+  { f:"terms", t:"providers", l:"minimums and policy", step:2, src:"domain/payment_terms.go" },
+  { f:"evalcfg", t:"evalout", l:"configured questions", step:3, src:"domain.EvaluationRegistry" },
+  { f:"account", t:"replay", l:"balances", step:4, src:"domain.InitAccountBalances" },
+  { f:"checkpoint", t:"replay", l:"corrections", step:5, src:"types.CheckpointCorrection" },
+  { f:"posting", t:"replay", l:"history actuals", step:6, src:"domain.replayHistoricalState" },
+  { f:"rule", t:"occurrence", l:"expands into", step:7, src:"domain.ResolveOccurrences" },
+  { f:"posting", t:"occurrence", l:"claims occurrence", step:8, src:"types.PostingClaim" },
+  { f:"occurrence", t:"replay", l:"history instances", step:9, src:"domain.ResolveOccurrences" },
+  { f:"replay", t:"request", l:"initial state", step:10, src:"domain.PrepareSimulationRequest" },
+  { f:"posting", t:"request", l:"future actuals", step:11, src:"types.SimulationRequest" },
+  { f:"rule", t:"request", l:"carries rules", step:12, src:"types.SimulationRequest" },
+  { f:"request", t:"engine", l:"executes", step:13, src:"domain.Simulate" },
+  { f:"providers", t:"resolvers", l:"amount inputs", step:14, src:"domain.AmountProviderContext" },
+  { f:"occurrence", t:"resolvers", l:"resolves each amount", step:15, src:"domain.ComputeRequestedAmount" },
+  { f:"posting", t:"resolvers", l:"every amount", step:16, src:"domain.ComputeRequestedAmount" },
+  { f:"resolvers", t:"runtime", l:"requested", step:17, src:"domain.TransitionRuntime" },
+  { f:"occurrence", t:"runtime", l:"executes as posting", step:18, src:"domain.TransitionRuntime" },
+  { f:"providers", t:"memory", l:"reads", step:19, src:"types.SimulationState" },
+  { f:"runtime", t:"memory", l:"records", step:20, src:"domain.TransitionRuntime" },
+  { f:"runtime", t:"events", l:"emits", step:21, src:"types.SimulationRun" },
+  { f:"events", t:"evalout", l:"classify", step:22, src:"domain.EvaluateProjectionPath" },
+  { f:"evalout", t:"runtime", l:"FI branch runs", step:23, src:"domain/evaluation_fi.go" },
+  { f:"events", t:"timing", l:"group", step:24, src:"TimingPreview" },
+  { f:"posting", t:"analysis", l:"recorded inflows", step:25, src:"domain.analyzePay" },
 ];
 const W = 1280, H = 760, LANEW = W / 4, NW = 196, NH = 52, GAP = 16;
 const svg = document.getElementById("graph");
@@ -312,7 +314,7 @@ EDGES.forEach(e => {
   const mid = p.getPointAtLength(plen / 2);
   const lab = el("text", { x: mid.x, y: mid.y, class: "edge-label" });
   lab.dataset.f = e.f; lab.dataset.t = e.t;
-  lab.textContent = e.l;
+  lab.textContent = e.step + " · " + e.l;
 });
 // Place each label on the on-curve slot farthest from labels placed
 // before it. Single greedy pass in document order: deterministic, always
