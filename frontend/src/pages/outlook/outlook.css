@@ -408,13 +408,6 @@
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
-	.cycle-progress {
-		margin-top: 14px;
-	}
-	.cycle-progress p {
-		font-size: 10px;
-		margin-top: 8px;
-	}
 	.cycle-actions {
 		display: flex;
 		align-items: center;

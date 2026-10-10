@@ -1,6 +1,5 @@
 import { CalendarDays } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Progress } from "../../components/ui.tsx";
 import { accountTransactions } from "../../domain/accountActivity.ts";
 import {
 	cycleSpentSoFar,
@@ -19,7 +18,6 @@ import {
 	checkingAccountId,
 	checkingShortfall,
 	cycleAllowance,
-	cycleBudget,
 	DEFAULT_CYCLE_STATEMENT_DAY,
 	DEFAULT_PROTECTED_RESERVE,
 	filterMovementsById,
@@ -421,7 +419,6 @@ export function TimingPreview({
 						<CalendarDays size={18} />
 						Safe card spending
 					</h2>
-					<Badge tone="outline">Card timing</Badge>
 				</div>
 				<p className="section-note">
 					Add a debt account to track a card statement cycle here.
@@ -443,11 +440,6 @@ export function TimingPreview({
 
 	const paycheck = settings.paycheckOverride ?? paycheckDerived?.amount ?? 0;
 	const fixedObligations = settings.fixedOverride ?? fixedDerived.total;
-	const budget = cycleBudget({
-		paycheck,
-		fixedObligations,
-		reserve: settings.reserve,
-	});
 	const spent = settings.spentOverride ?? derivedSpent;
 	const allowance = cycleAllowance({
 		paycheck,
@@ -459,12 +451,6 @@ export function TimingPreview({
 	const fullDaysLeft = Math.max(1, cycle.daysLeft - 1);
 	const dailySafe = allowance / fullDaysLeft;
 	const dailyTheoretical = theoretical / fullDaysLeft;
-	const progress =
-		allowance < 0
-			? 100
-			: budget > 0
-				? Math.min(100, (spent / budget) * 100)
-				: 0;
 
 	const spendingAccounts = spendingIds
 		.map((id) => plan.accounts.find((account) => account.id === id))
@@ -625,14 +611,11 @@ export function TimingPreview({
 						<CalendarDays size={18} />
 						Safe card spending
 					</h2>
-					<Badge tone="outline">Card timing</Badge>
 				</div>
 				<p className="cycle-dates">
-					{dateLabel(cycle.cycleStart, true)} to{" "}
 					{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
 					{fullDaysLeft === 1 ? "day" : "days"} left
 					{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
-					{accountLabel ? ` · ${accountLabel}` : ""}
 				</p>
 				<div aria-busy="true">
 					<span
@@ -658,26 +641,21 @@ export function TimingPreview({
 					<CalendarDays size={18} />
 					Safe card spending
 				</h2>
-				<Badge tone="outline">Card timing</Badge>
 			</div>
 			<p className="cycle-dates">
-				{dateLabel(cycle.cycleStart, true)} to {dateLabel(cycle.cycleEnd, true)}{" "}
-				· {fullDaysLeft} {fullDaysLeft === 1 ? "day" : "days"} left
+				{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
+				{fullDaysLeft === 1 ? "day" : "days"} left
 				{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
-				{accountLabel ? ` · ${accountLabel}` : ""}
 			</p>
 			<div className="spend-answer">
 				<span>
-					{allowance >= 0
-						? `You can spend on cards until ${dateLabel(cycle.cycleEnd, true)}`
-						: `Over budget on cards until ${dateLabel(cycle.cycleEnd, true)}`}
+					{allowance >= 0 ? "You can spend" : "Over budget"}
 				</span>
 				<strong>{money(Math.abs(allowance))}</strong>
 				<span>
 					{allowance >= 0
 						? `${money(dailySafe)} a day`
-						: `${money(-dailySafe)} a day over`}{" "}
-					· {money(spent)} card charges
+						: `${money(-dailySafe)} a day over`}
 				</span>
 			</div>
 			<div className="cycle-remaining">
@@ -696,17 +674,6 @@ export function TimingPreview({
 					</strong>
 				</div>
 			</div>
-			<div className="cycle-progress">
-				<Progress
-					value={progress}
-					label="Total cycle spending"
-					tone={allowance < 0 ? "amber" : "green"}
-				/>
-				<p>
-					{money(checking)} balance · paycheck {money(paycheck)} − fixed{" "}
-					{money(fixedObligations)} − reserve {money(settings.reserve)}
-				</p>
-			</div>
 			<div className="cycle-actions">
 				<button
 					type="button"
@@ -716,11 +683,7 @@ export function TimingPreview({
 						setDetail("mandatory");
 					}}
 				>
-					Bills ({money(fixedObligations)} next month
-					{billsFiltered
-						? ` · ${trackedBillIds.length} of ${billCandidates.length} bills`
-						: ""}
-					)
+					Bills
 				</button>
 				<button
 					type="button"
@@ -730,7 +693,7 @@ export function TimingPreview({
 						setDetail("cycle");
 					}}
 				>
-					{`Where the cycle went (${cycleTransactions.length})`}
+					Charges
 				</button>
 			</div>
 			{detail && (
