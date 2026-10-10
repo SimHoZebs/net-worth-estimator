@@ -95,7 +95,7 @@
   </svg></p>
   <svg id="graph" viewBox="0 0 1280 760" role="img"
     aria-label="Graph of core abstractions and their interactions"></svg>
-  <p class="hint">Hover a node to isolate its flows. Hover any flow for the code symbol behind it.</p>
+  <p class="hint">Hover a node to isolate its flows. Hover any flow for the code symbol behind it. Numbers are phases — flows sharing one run together, not in sequence.</p>
 </main>
 <script>
 const rootEl = document.documentElement;
@@ -141,33 +141,34 @@ const NODES = [
   { id:"timing",   lane:3, label:"Timing card", sub:"TimingPreview plus grouping", src:"TimingPreview" },
 ];
 const EDGES = [
-  // Steps follow one run in causal order: standing references, history,
-  // request assembly, the per-occurrence execution loop, then readout.
-  { f:"posting", t:"rule", l:"names rule", step:1, src:"types.PostingClaim" },
-  { f:"terms", t:"providers", l:"minimums and policy", step:2, src:"domain/payment_terms.go" },
-  { f:"evalcfg", t:"evalout", l:"configured questions", step:3, src:"domain.EvaluationRegistry" },
-  { f:"account", t:"replay", l:"balances", step:4, src:"domain.InitAccountBalances" },
-  { f:"checkpoint", t:"replay", l:"corrections", step:5, src:"types.CheckpointCorrection" },
-  { f:"posting", t:"replay", l:"history actuals", step:6, src:"domain.replayHistoricalState" },
-  { f:"rule", t:"occurrence", l:"expands into", step:7, src:"domain.ResolveOccurrences" },
-  { f:"posting", t:"occurrence", l:"claims occurrence", step:8, src:"types.PostingClaim" },
-  { f:"occurrence", t:"replay", l:"history instances", step:9, src:"domain.ResolveOccurrences" },
-  { f:"replay", t:"request", l:"initial state", step:10, src:"domain.PrepareSimulationRequest" },
-  { f:"posting", t:"request", l:"future actuals", step:11, src:"types.SimulationRequest" },
-  { f:"rule", t:"request", l:"carries rules", step:12, src:"types.SimulationRequest" },
-  { f:"request", t:"engine", l:"executes", step:13, src:"domain.Simulate" },
-  { f:"providers", t:"resolvers", l:"amount inputs", step:14, src:"domain.AmountProviderContext" },
-  { f:"occurrence", t:"resolvers", l:"resolves each amount", step:15, src:"domain.ComputeRequestedAmount" },
-  { f:"posting", t:"resolvers", l:"every amount", step:16, src:"domain.ComputeRequestedAmount" },
-  { f:"resolvers", t:"runtime", l:"requested", step:17, src:"domain.TransitionRuntime" },
-  { f:"occurrence", t:"runtime", l:"executes as posting", step:18, src:"domain.TransitionRuntime" },
-  { f:"providers", t:"memory", l:"reads", step:19, src:"types.SimulationState" },
-  { f:"runtime", t:"memory", l:"records", step:20, src:"domain.TransitionRuntime" },
-  { f:"runtime", t:"events", l:"emits", step:21, src:"types.SimulationRun" },
-  { f:"events", t:"evalout", l:"classify", step:22, src:"domain.EvaluateProjectionPath" },
-  { f:"evalout", t:"runtime", l:"FI branch runs", step:23, src:"domain/evaluation_fi.go" },
-  { f:"events", t:"timing", l:"group", step:24, src:"TimingPreview" },
-  { f:"posting", t:"analysis", l:"recorded inflows", step:25, src:"domain.analyzePay" },
+  // Phases follow one run: references validated, history replayed, request
+  // assembled, the per-occurrence execution loop, evaluation, readout.
+  // Flows sharing a phase run together, not in sequence.
+  { f:"posting", t:"rule", l:"names rule", phase:1, src:"types.PostingClaim" },
+  { f:"terms", t:"providers", l:"minimums and policy", phase:1, src:"domain/payment_terms.go" },
+  { f:"evalcfg", t:"evalout", l:"configured questions", phase:1, src:"domain.EvaluationRegistry" },
+  { f:"account", t:"replay", l:"balances", phase:2, src:"domain.InitAccountBalances" },
+  { f:"checkpoint", t:"replay", l:"corrections", phase:2, src:"types.CheckpointCorrection" },
+  { f:"posting", t:"replay", l:"history actuals", phase:2, src:"domain.replayHistoricalState" },
+  { f:"rule", t:"occurrence", l:"expands into", phase:2, src:"domain.ResolveOccurrences" },
+  { f:"posting", t:"occurrence", l:"claims occurrence", phase:2, src:"types.PostingClaim" },
+  { f:"occurrence", t:"replay", l:"history instances", phase:2, src:"domain.ResolveOccurrences" },
+  { f:"replay", t:"request", l:"initial state", phase:3, src:"domain.PrepareSimulationRequest" },
+  { f:"posting", t:"request", l:"future actuals", phase:3, src:"types.SimulationRequest" },
+  { f:"rule", t:"request", l:"carries rules", phase:3, src:"types.SimulationRequest" },
+  { f:"request", t:"engine", l:"executes", phase:4, src:"domain.Simulate" },
+  { f:"providers", t:"resolvers", l:"amount inputs", phase:4, src:"domain.AmountProviderContext" },
+  { f:"occurrence", t:"resolvers", l:"resolves each amount", phase:4, src:"domain.ComputeRequestedAmount" },
+  { f:"posting", t:"resolvers", l:"every amount", phase:4, src:"domain.ComputeRequestedAmount" },
+  { f:"resolvers", t:"runtime", l:"requested", phase:4, src:"domain.TransitionRuntime" },
+  { f:"occurrence", t:"runtime", l:"executes as posting", phase:4, src:"domain.TransitionRuntime" },
+  { f:"providers", t:"memory", l:"reads", phase:4, src:"types.SimulationState" },
+  { f:"runtime", t:"memory", l:"records", phase:4, src:"domain.TransitionRuntime" },
+  { f:"runtime", t:"events", l:"emits", phase:4, src:"types.SimulationRun" },
+  { f:"events", t:"evalout", l:"classify", phase:5, src:"domain.EvaluateProjectionPath" },
+  { f:"evalout", t:"runtime", l:"FI branch runs", phase:5, src:"domain/evaluation_fi.go" },
+  { f:"events", t:"timing", l:"group", phase:6, src:"TimingPreview" },
+  { f:"posting", t:"analysis", l:"recorded inflows", phase:6, src:"domain.analyzePay" },
 ];
 const W = 1280, H = 760, LANEW = W / 4, NW = 196, NH = 52, GAP = 16;
 const svg = document.getElementById("graph");
@@ -274,10 +275,17 @@ function curveHits(f, t, x1, y1, mx, x2, y2) {
 const busTop = Math.max(56, Math.min(...lanes.flat().map(n => pos[n.id].y)) - 40);
 let busCount = 0;
 const corridorCount = {};
+// Outflows sharing a source fan out across its edge instead of leaving one
+// point, so sibling curves — and their labels — diverge immediately.
+const fanRank = {};
+EDGES.forEach(e => { (fanRank[e.f] = fanRank[e.f] || []).push(e); });
 EDGES.forEach(e => {
   const a = pos[e.f], b = pos[e.t];
   const aw = a.w || NW, ah = a.h || NH, bw = b.w || NW, bh = b.h || NH;
-  const x1 = a.x + aw, y1 = a.y + ah / 2, x2 = b.x, y2 = b.y + bh / 2;
+  const sibs = fanRank[e.f];
+  const fstep = sibs.length > 1 ? Math.min(14, 44 / (sibs.length - 1)) : 0;
+  const x1 = a.x + aw, y1 = a.y + ah / 2 + (sibs.indexOf(e) - (sibs.length - 1) / 2) * fstep;
+  const x2 = b.x, y2 = b.y + bh / 2;
   let d;
   if (rootOf(e.f) === rootOf(e.t) && e.f !== e.t) {
     d = `M ${x1} ${y1} L ${x2 - 4} ${y2}`;
@@ -314,7 +322,7 @@ EDGES.forEach(e => {
   const mid = p.getPointAtLength(plen / 2);
   const lab = el("text", { x: mid.x, y: mid.y, class: "edge-label" });
   lab.dataset.f = e.f; lab.dataset.t = e.t;
-  lab.textContent = e.step + " · " + e.l;
+  lab.textContent = e.phase + " · " + e.l;
 });
 // Place each label on the on-curve slot farthest from labels placed
 // before it. Single greedy pass in document order: deterministic, always
