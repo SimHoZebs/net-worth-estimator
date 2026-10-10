@@ -28,7 +28,7 @@ const issues = (
 		})),
 	}));
 
-test("outlook renders real calculations, scenario ranges, evidence and exact chart values", async ({
+test("outlook renders real calculations, scenario ranges and evidence", async ({
 	page,
 }) => {
 	const errors: string[] = [];
@@ -41,7 +41,6 @@ test("outlook renders real calculations, scenario ranges, evidence and exact cha
 		page.getByRole("button", { name: "Open navigation" }),
 	).not.toBeVisible();
 	// Values come from the Go engine over HTTP, not a client-side projection.
-	// The headline is compact; the exact figure is behind the values table.
 	await expect(page.getByText("$1.02M")).toBeVisible();
 	await expect(page.getByText(/80% of (400 )?scenarios/)).toBeVisible({
 		timeout: 30_000,
@@ -55,10 +54,6 @@ test("outlook renders real calculations, scenario ranges, evidence and exact cha
 	await expect(
 		page.getByRole("button", { name: "Inspect this expense" }),
 	).toBeFocused();
-	await page
-		.getByRole("button", { name: "View exact projection values" })
-		.click();
-	await expect(page.getByRole("table")).toContainText("$1,016,195");
 	await page.getByRole("button", { name: "10 years", exact: true }).click();
 	await expect(page.getByText("Base case in 2036")).toBeVisible();
 	expect(errors).toEqual([]);
@@ -91,8 +86,8 @@ test("edits remain temporary, persist across reload, compare, and save deliberat
 	// The save reached the server, and the unsaved changes are gone.
 	const saved = await readSavedServerPlan();
 	expect(
-		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
-			.config.expression,
+		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+			.expression,
 	).toBe("900");
 	expect(await readTemporaryVersion(page)).toBeNull();
 });

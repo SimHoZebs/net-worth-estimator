@@ -1,4 +1,4 @@
-/* Sidebar chrome: brand, household switcher, nav, and status regions. */
+/* Sidebar chrome: brand, nav, and status regions. */
 @layer layout {
 	.sidebar {
 		width: var(--sidebar);
@@ -44,45 +44,8 @@
 	.brand-period {
 		color: var(--track-fill);
 	}
-	.household-select {
-		display: flex;
-		align-items: center;
-		gap: 9px;
-		text-align: left;
-		border: 1px solid var(--line);
-		background: transparent;
-		border-radius: 8px;
-		padding: 12px 10px;
+	nav {
 		margin-top: 38px;
-		margin-bottom: 33px;
-		width: 100%;
-	}
-	.household-select > span:nth-child(2) {
-		display: flex;
-		flex: 1;
-		flex-direction: column;
-		min-width: 0;
-	}
-	.household-select strong {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		font-size: 11px;
-	}
-	.household-select small {
-		color: var(--muted);
-		font-size: 10px;
-		margin-top: 2px;
-	}
-	.household-avatar {
-		background: var(--surface-3);
-		border-radius: 6px;
-		width: 30px;
-		height: 31px;
-		display: grid;
-		place-items: center;
-		font-size: 11px;
-		font-weight: 700;
 	}
 	nav ul {
 		padding: 0;

@@ -15,7 +15,6 @@
 .metric-context,
 .segmented button,
 .chart-legend,
-.chart-foot-note,
 .chart-inspection span,
 .range-disclaimer,
 .evaluation-preview-content p,
@@ -105,12 +104,10 @@ thead {
 }
 .chart-legend,
 .toggle-label,
-.chart-foot .text-button,
 .segmented button {
 	font-size: 10px;
 }
 .section-top p,
-.chart-foot-note,
 .range-disclaimer {
 	font-size: 10px;
 }

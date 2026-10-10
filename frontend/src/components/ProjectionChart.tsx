@@ -1,4 +1,3 @@
-import { Table2, X } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { projectionChartModel } from "../domain/chart.ts";
 import { dateLabel, money } from "../domain/format.ts";
@@ -7,8 +6,7 @@ import type { Projection, RangeResult } from "../domain/result.ts";
 import { useMediaQuery } from "../state/useMediaQuery.ts";
 import { AccountDot } from "./AccountIcon.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
-import { ProjectionTable } from "./chart/ProjectionTable.tsx";
-import { IconButton, Toggle } from "./ui.tsx";
+import { Toggle } from "./ui.tsx";
 import "./chart/ProjectionChart.css";
 
 export function ProjectionChart({
@@ -35,7 +33,6 @@ export function ProjectionChart({
 	pending?: boolean;
 }) {
 	const [inspected, setInspected] = useState<number | null>(null);
-	const [showTable, setShowTable] = useState(false);
 	const narrow = useMediaQuery("(max-width: 600px)");
 	const id = useId().replaceAll(":", "");
 	const model = useMemo(
@@ -121,14 +118,6 @@ export function ProjectionChart({
 						className="skeleton"
 						style={{ width: "100%", height: 220 }}
 						aria-hidden="true"
-					/>
-				</div>
-				<div className="chart-foot">
-					<IconButton
-						icon={Table2}
-						label="View exact projection values"
-						disabled
-						onClick={() => setShowTable(!showTable)}
 					/>
 				</div>
 			</section>
@@ -240,18 +229,6 @@ export function ProjectionChart({
 					))}
 				</ul>
 			</div>
-			<div className="chart-foot">
-				<IconButton
-					icon={showTable ? X : Table2}
-					label={
-						showTable ? "Hide projection table" : "View exact projection values"
-					}
-					onClick={() => setShowTable(!showTable)}
-				/>
-			</div>
-			{showTable && (
-				<ProjectionTable rows={model.rows} hasRange={Boolean(range)} />
-			)}
 		</section>
 	);
 }
