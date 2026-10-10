@@ -113,6 +113,7 @@ const NODES = [
   { id:"rule",     lane:0, label:"RecurrenceRule", sub:"Schedule plus movement template", data:true },
   { id:"terms",    lane:0, label:"PaymentTerms",   sub:"Owns minimums, dues, windows", data:true, cfg:true },
   { id:"evalcfg",  lane:0, label:"Eval configs",    sub:"Owns the questions asked", data:true, cfg:true },
+  { id:"occurrence",lane:1, label:"Occurrence", sub:"Rule instance, executes as posting" },
   { id:"prepare",  lane:1, label:"Prepare", kids:["replay", "request"] },
   { id:"replay",   lane:1, parent:"prepare", label:"History replay", sub:"History into opening balances" },
   { id:"request",  lane:1, parent:"prepare", label:"SimulationRequest", sub:"Model, state, window for one run" },
@@ -123,7 +124,6 @@ const NODES = [
   { id:"pipeline", lane:2, parent:"resolvers", label:"Income pipeline", sub:"Runs ordered steps with routing" },
   { id:"income",   lane:2, parent:"resolvers", label:"IncomeData", sub:"Read-only reference data", ref:true, data:true },
   { id:"providers",lane:2, label:"Providers", sub:"Binds named values for resolvers" },
-  { id:"occurrence",lane:1, label:"Occurrence", sub:"Rule instance, executes as posting" },
   { id:"events",   lane:3, label:"MovementEvents", sub:"Dated requested-vs-realized", data:true },
   { id:"evalout",  lane:3, label:"Eval results", sub:"One verdict per question", data:true },
   { id:"analysis", lane:3, label:"Analysis", sub:"Grades inferences with evidence" },
@@ -132,7 +132,8 @@ const NODES = [
 const EDGES = [
   { f:"account", t:"replay", l:"balances" },
   { f:"checkpoint", t:"replay", l:"corrections" },
-  { f:"posting", t:"replay", l:"dated actuals" },
+  { f:"posting", t:"replay", l:"history actuals" },
+  { f:"posting", t:"request", l:"future actuals" },
   { f:"rule", t:"occurrence", l:"expands into" },
   { f:"rule", t:"request", l:"carries rules" },
   { f:"occurrence", t:"replay", l:"history instances" },
@@ -342,8 +343,8 @@ function focus(id, on) {
   const roots = new Set([...linked].map(rootOf));
   // Keep only flows directly touching the hovered node, plus edges fully
   // inside one linked group (e.g. runtime -> memory under the engine).
-  // A neighbor's other flows stay dim: hovering Claim shows
-  // posting -> occurrence, not posting's unrelated outflows.
+  // A neighbor's other flows stay dim: hovering Posting shows its own
+  // outflows, not its neighbors'.
   const keepEdge = (f, t) => f === id || t === id ||
     (linked.has(f) && linked.has(t) && roots.has(rootOf(f)) && rootOf(f) === rootOf(t));
   NODES.forEach(n => nodeEls[n.id].classList.toggle("dim", on && !linked.has(n.id)));
