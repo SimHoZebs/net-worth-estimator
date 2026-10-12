@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -341,7 +342,7 @@ func ValidateFulfillmentConfig(config any) error {
 	}
 	for _, item := range list {
 		id, ok := item.(string)
-		if !ok || trimSpace(id) == "" {
+		if !ok || strings.TrimSpace(id) == "" {
 			return fmt.Errorf("Posting fulfillment postingIds must be null or an array of IDs.")
 		}
 	}
@@ -385,7 +386,7 @@ func ValidateCycleFulfillmentConfig(config any) error {
 		return fmt.Errorf("Cycle fulfillment must list at least one account.")
 	}
 	for _, id := range ids {
-		if trimSpace(id) == "" {
+		if strings.TrimSpace(id) == "" {
 			return fmt.Errorf("Cycle fulfillment must list at least one account.")
 		}
 	}

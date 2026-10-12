@@ -3,12 +3,21 @@ package domain
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 // Evaluation runtime. Definitions register by type; central coordinators
 // never import evaluator-specific logic.
+//
+// Plugin contract: a new check adds one type plus one definition, core loop
+// untouched. Core hooks (required): ParseConfig parses once and returns a
+// typed config or error; EvaluatePath answers over one path; Accumulate plus
+// Finalize aggregate sampled paths; Status drives the UI verdict.
+// Optional hooks: DescribeStochasticWork and MeasureStochasticWork only tune
+// progress-bar labels and default to one unit per run; DiagnoseConfig folds
+// into ParseConfig when absent.
 
 // EvaluationContext is passed to every evaluation hook.
 type EvaluationContext struct {
@@ -275,51 +284,22 @@ type rawInstance struct {
 
 func rawInstances(tables *types.EvaluationTables) []rawInstance {
 	var instances []rawInstance
-	for _, item := range tables.FinancialIndependence {
-		instances = append(instances, rawInstance{
-			evaluationType: types.EvaluationTypeFinancialIndependence,
-			instanceID:     item.InstanceID,
-			name:           item.Name,
-			enabled:        item.Enabled,
-			rawConfig:      item.Config,
-		})
+	appendTable := func(evaluationType string, items []types.EvaluationInstance[types.JsonValue]) {
+		for _, item := range items {
+			instances = append(instances, rawInstance{
+				evaluationType: evaluationType,
+				instanceID:     item.InstanceID,
+				name:           item.Name,
+				enabled:        item.Enabled,
+				rawConfig:      item.Config,
+			})
+		}
 	}
-	for _, item := range tables.NetWorthThreshold {
-		instances = append(instances, rawInstance{
-			evaluationType: types.EvaluationTypeNetWorthThreshold,
-			instanceID:     item.InstanceID,
-			name:           item.Name,
-			enabled:        item.Enabled,
-			rawConfig:      item.Config,
-		})
-	}
-	for _, item := range tables.AccountBalance {
-		instances = append(instances, rawInstance{
-			evaluationType: types.EvaluationTypeAccountBalance,
-			instanceID:     item.InstanceID,
-			name:           item.Name,
-			enabled:        item.Enabled,
-			rawConfig:      item.Config,
-		})
-	}
-	for _, item := range tables.PostingFulfillment {
-		instances = append(instances, rawInstance{
-			evaluationType: types.EvaluationTypePostingFulfillment,
-			instanceID:     item.InstanceID,
-			name:           item.Name,
-			enabled:        item.Enabled,
-			rawConfig:      item.Config,
-		})
-	}
-	for _, item := range tables.CycleFulfillment {
-		instances = append(instances, rawInstance{
-			evaluationType: types.EvaluationTypeCycleFulfillment,
-			instanceID:     item.InstanceID,
-			name:           item.Name,
-			enabled:        item.Enabled,
-			rawConfig:      item.Config,
-		})
-	}
+	appendTable(types.EvaluationTypeFinancialIndependence, tables.FinancialIndependence)
+	appendTable(types.EvaluationTypeNetWorthThreshold, tables.NetWorthThreshold)
+	appendTable(types.EvaluationTypeAccountBalance, tables.AccountBalance)
+	appendTable(types.EvaluationTypePostingFulfillment, tables.PostingFulfillment)
+	appendTable(types.EvaluationTypeCycleFulfillment, tables.CycleFulfillment)
 	return instances
 }
 
@@ -343,9 +323,9 @@ func NewEvaluationRuntimeSet(tables *types.EvaluationTables, registry *Evaluatio
 			instanceID:     instance.instanceID,
 			name:           instance.name,
 		}
-		if trimSpace(instance.instanceID) == "" || idCounts[instance.instanceID] > 1 {
+		if strings.TrimSpace(instance.instanceID) == "" || idCounts[instance.instanceID] > 1 {
 			message := fmt.Sprintf("Evaluation instance ID %q is duplicated.", instance.instanceID)
-			if trimSpace(instance.instanceID) == "" {
+			if strings.TrimSpace(instance.instanceID) == "" {
 				message = "Evaluation instance ID is required."
 			}
 			runtimeInstance.diagnostics = append(runtimeInstance.diagnostics, types.EvaluationDiagnostic{

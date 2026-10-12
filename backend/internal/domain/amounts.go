@@ -62,6 +62,16 @@ func validateIDArgument(args map[string]types.JsonValue) (string, error) {
 	return id, nil
 }
 
+// Design: accounts stay dumb, movements carry behavior. Accounts expose
+// only floor/ceiling/withdrawable/headroom (see accounts.go). Fees and
+// minimums live in PaymentTerms plus the providers below, and a posting or
+// rule reads them to move money. Terms declare what is owed; an enabled
+// movement behind them moves it.
+//
+// Live plan uses: model-value, account-balance, occurrence-rate with the
+// expression resolver. Debt feature (tested, unused in seed CSVs): terms-minimum,
+// late-fee, balance-fee. Income pipeline in income.go has its own
+// percentage/progressive-bracket steps; there are no other generic resolvers.
 var amountProviders = map[string]providerDefinition{
 	"model-value": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
@@ -87,69 +97,6 @@ var amountProviders = map[string]providerDefinition{
 		postingDependencies: func(args map[string]types.JsonValue) []string {
 			if id, ok := args["id"].(string); ok {
 				return []string{id}
-			}
-			return nil
-		},
-	},
-	"posting-latest": {
-		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
-			return ctx.LatestRealizedPostingAmounts[args["id"].(string)], nil
-		},
-		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
-			id, err := validateIDArgument(args)
-			if err != nil {
-				return err
-			}
-			if !refs.PostingIDs[id] {
-				return amtErrf("Posting '%s' does not exist.", id)
-			}
-			return nil
-		},
-		postingDependencies: func(args map[string]types.JsonValue) []string {
-			if id, ok := args["id"].(string); ok {
-				return []string{id}
-			}
-			return nil
-		},
-	},
-	"posting-year-to-date": {
-		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
-			id := args["id"].(string)
-			year := ctx.Date[:4]
-			if byYear, ok := ctx.RealizedPostingAmountsByYear[id]; ok {
-				return byYear[year], nil
-			}
-			return 0, nil
-		},
-		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
-			id, err := validateIDArgument(args)
-			if err != nil {
-				return err
-			}
-			if !refs.PostingIDs[id] {
-				return amtErrf("Posting '%s' does not exist.", id)
-			}
-			return nil
-		},
-	},
-	"posting-prior-year-to-date": {
-		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
-			id := args["id"].(string)
-			year := ctx.Date[:4]
-			var ytd float64
-			if byYear, ok := ctx.RealizedPostingAmountsByYear[id]; ok {
-				ytd = byYear[year]
-			}
-			latest := ctx.LatestRealizedPostingAmounts[id]
-			return math.Max(0, ytd-latest), nil
-		},
-		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
-			id, err := validateIDArgument(args)
-			if err != nil {
-				return err
-			}
-			if !refs.PostingIDs[id] {
-				return amtErrf("Posting '%s' does not exist.", id)
 			}
 			return nil
 		},
@@ -209,11 +156,11 @@ var amountProviders = map[string]providerDefinition{
 	"late-fee": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
 			paymentID, ok := args["payment"].(string)
-			if !ok || trimSpace(paymentID) == "" {
+			if !ok || strings.TrimSpace(paymentID) == "" {
 				return 0, amtErrf("Late fee 'payment' must be a non-empty posting ID.")
 			}
 			accountID, ok := args["account"].(string)
-			if !ok || trimSpace(accountID) == "" {
+			if !ok || strings.TrimSpace(accountID) == "" {
 				return 0, amtErrf("Late fee 'account' must be a non-empty account ID.")
 			}
 			fee, ok := args["fee"].(float64)
@@ -236,14 +183,14 @@ var amountProviders = map[string]providerDefinition{
 		},
 		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
 			paymentID, ok := args["payment"].(string)
-			if !ok || trimSpace(paymentID) == "" {
+			if !ok || strings.TrimSpace(paymentID) == "" {
 				return amtErrf("Late fee 'payment' must be a non-empty posting ID.")
 			}
 			if !refs.PostingIDs[paymentID] {
 				return amtErrf("Posting '%s' does not exist.", paymentID)
 			}
 			accountID, ok := args["account"].(string)
-			if !ok || trimSpace(accountID) == "" {
+			if !ok || strings.TrimSpace(accountID) == "" {
 				return amtErrf("Late fee 'account' must be a non-empty account ID.")
 			}
 			if !refs.AccountIDs[accountID] {
@@ -270,7 +217,7 @@ var amountProviders = map[string]providerDefinition{
 	"balance-fee": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
 			accountID, ok := args["account"].(string)
-			if !ok || trimSpace(accountID) == "" {
+			if !ok || strings.TrimSpace(accountID) == "" {
 				return 0, amtErrf("Balance fee 'account' must be a non-empty account ID.")
 			}
 			threshold, ok := args["threshold"].(float64)
@@ -288,7 +235,7 @@ var amountProviders = map[string]providerDefinition{
 		},
 		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
 			accountID, ok := args["account"].(string)
-			if !ok || trimSpace(accountID) == "" {
+			if !ok || strings.TrimSpace(accountID) == "" {
 				return amtErrf("Balance fee 'account' must be a non-empty account ID.")
 			}
 			if !refs.AccountIDs[accountID] {
@@ -324,128 +271,6 @@ type resolverDefinition struct {
 	resolve        func(config map[string]types.JsonValue, inputs map[string]float64) (float64, error)
 }
 
-// progressiveLiability computes tax over ascending brackets; final bracket's
-// UpTo may be nil (open-ended).
-func progressiveLiability(taxableAmount float64, brackets []struct {
-	UpTo *float64
-	Rate float64
-}) float64 {
-	previousLimit := 0.0
-	liability := 0.0
-	for _, bracket := range brackets {
-		upper := taxableAmount
-		if bracket.UpTo != nil {
-			upper = *bracket.UpTo
-		}
-		width := math.Max(0, math.Min(taxableAmount, upper)-previousLimit)
-		liability += width * bracket.Rate
-		if taxableAmount <= upper {
-			break
-		}
-		previousLimit = upper
-	}
-	return liability
-}
-
-type simpleBracket struct {
-	UpTo *float64
-	Rate float64
-}
-
-func liabilityFor(taxable float64, brackets []simpleBracket) float64 {
-	previousLimit := 0.0
-	liability := 0.0
-	for _, b := range brackets {
-		upper := taxable
-		if b.UpTo != nil {
-			upper = *b.UpTo
-		}
-		width := math.Max(0, math.Min(taxable, upper)-previousLimit)
-		liability += width * b.Rate
-		if taxable <= upper {
-			break
-		}
-		previousLimit = upper
-	}
-	return liability
-}
-
-func numberConfig(config map[string]types.JsonValue, keys ...string) ([]float64, error) {
-	values := make([]float64, len(keys))
-	for i, key := range keys {
-		v, ok := config[key]
-		if !ok {
-			return nil, amtErrf("Invalid input: expected number at %q", key)
-		}
-		n, ok := v.(float64)
-		if !ok || math.IsNaN(n) || math.IsInf(n, 0) {
-			return nil, amtErrf("Invalid input: expected finite number at %q", key)
-		}
-		values[i] = n
-	}
-	return values, nil
-}
-
-func validateProgressiveBrackets(config map[string]types.JsonValue) ([]simpleBracket, error) {
-	raw, ok := config["brackets"]
-	if !ok {
-		return nil, amtErrf("Invalid 'progressive-bracket' config: Required")
-	}
-	list, ok := raw.([]any)
-	if !ok {
-		return nil, amtErrf("Invalid 'progressive-bracket' config: Expected array")
-	}
-	deductionRaw, ok := config["deduction"]
-	if !ok {
-		return nil, amtErrf("Invalid 'progressive-bracket' config: deduction required")
-	}
-	deduction, ok := deductionRaw.(float64)
-	if !ok || deduction < 0 || math.IsNaN(deduction) {
-		return nil, amtErrf("Invalid 'progressive-bracket' config: deduction must be a non-negative number")
-	}
-	brackets := make([]simpleBracket, 0, len(list))
-	for _, item := range list {
-		entry, ok := item.(map[string]any)
-		if !ok {
-			return nil, amtErrf("Invalid 'progressive-bracket' config: bracket must be an object")
-		}
-		rate, ok := entry["rate"].(float64)
-		if !ok || rate < 0 || rate > 1 {
-			return nil, amtErrf("Invalid 'progressive-bracket' config: rate out of range")
-		}
-		bracket := simpleBracket{Rate: rate}
-		switch upTo := entry["upTo"].(type) {
-		case nil:
-			bracket.UpTo = nil
-		case float64:
-			if math.IsNaN(upTo) || math.IsInf(upTo, 0) {
-				return nil, amtErrf("Invalid 'progressive-bracket' config: upTo must be finite or null")
-			}
-			bracket.UpTo = &upTo
-		default:
-			return nil, amtErrf("Invalid 'progressive-bracket' config: upTo must be a number or null")
-		}
-		brackets = append(brackets, bracket)
-	}
-	if len(brackets) == 0 || brackets[len(brackets)-1].UpTo != nil {
-		return nil, amtErrf("The final bracket must have upTo null.")
-	}
-	previous := 0.0
-	for i, bracket := range brackets {
-		if bracket.UpTo == nil {
-			if i != len(brackets)-1 {
-				return nil, amtErrf("Only the final bracket may have upTo null.")
-			}
-			continue
-		}
-		if *bracket.UpTo <= previous {
-			return nil, amtErrf("Bracket limits must be strictly ascending.")
-		}
-		previous = *bracket.UpTo
-	}
-	return brackets, nil
-}
-
 var amountResolvers = map[string]resolverDefinition{
 	"expression": {
 		requiredInputs: func(config map[string]types.JsonValue) ([]string, error) {
@@ -459,62 +284,6 @@ var amountResolvers = map[string]resolverDefinition{
 		resolve: func(config map[string]types.JsonValue, inputs map[string]float64) (float64, error) {
 			expression, _ := config["expression"].(string)
 			return EvaluateArithmetic(expression, inputs)
-		},
-	},
-	"percentage": {
-		requiredInputs: func(map[string]types.JsonValue) ([]string, error) {
-			return []string{"amount"}, nil
-		},
-		resolve: func(config map[string]types.JsonValue, inputs map[string]float64) (float64, error) {
-			vals, err := numberConfig(config, "rate")
-			if err != nil {
-				return 0, err
-			}
-			return math.Max(0, inputs["amount"]) * vals[0], nil
-		},
-	},
-	"progressive-bracket": {
-		requiredInputs: func(map[string]types.JsonValue) ([]string, error) {
-			return []string{"currentAmount", "yearToDateAmount", "yearToDateResolvedAmount"}, nil
-		},
-		resolve: func(config map[string]types.JsonValue, inputs map[string]float64) (float64, error) {
-			brackets, err := validateProgressiveBrackets(config)
-			if err != nil {
-				return 0, err
-			}
-			taxable := math.Max(0, inputs["yearToDateAmount"]+inputs["currentAmount"]-config["deduction"].(float64))
-			resolved := math.Max(0, inputs["yearToDateResolvedAmount"])
-			return math.Max(0, liabilityFor(taxable, brackets)-resolved), nil
-		},
-	},
-	"capped-percentage": {
-		requiredInputs: func(map[string]types.JsonValue) ([]string, error) {
-			return []string{"currentAmount", "yearToDateAmount"}, nil
-		},
-		resolve: func(config map[string]types.JsonValue, inputs map[string]float64) (float64, error) {
-			vals, err := numberConfig(config, "rate", "cap")
-			if err != nil {
-				return 0, err
-			}
-			rate, capValue := vals[0], vals[1]
-			return math.Min(
-				math.Max(0, inputs["currentAmount"]),
-				math.Max(0, capValue-math.Max(0, inputs["yearToDateAmount"])),
-			) * rate, nil
-		},
-	},
-	"threshold-percentage": {
-		requiredInputs: func(map[string]types.JsonValue) ([]string, error) {
-			return []string{"currentAmount", "yearToDateAmount"}, nil
-		},
-		resolve: func(config map[string]types.JsonValue, inputs map[string]float64) (float64, error) {
-			vals, err := numberConfig(config, "rate", "threshold")
-			if err != nil {
-				return 0, err
-			}
-			rate, threshold := vals[0], vals[1]
-			return (math.Max(0, inputs["yearToDateAmount"]+inputs["currentAmount"]-threshold) -
-				math.Max(0, inputs["yearToDateAmount"]-threshold)) * rate, nil
 		},
 	},
 }
@@ -543,29 +312,15 @@ func validateExactKeys(actual map[string]types.AmountInputBinding, required []st
 	if len(missing) > 0 || len(extra) > 0 {
 		missingText := "none"
 		if len(missing) > 0 {
-			missingText = joinStrings(missing, ", ")
+			missingText = strings.Join(missing, ", ")
 		}
 		extraText := "none"
 		if len(extra) > 0 {
-			extraText = joinStrings(extra, ", ")
+			extraText = strings.Join(extra, ", ")
 		}
 		return amtErrf("Amount inputs do not match requirements. Missing: %s. Extra: %s.", missingText, extraText)
 	}
 	return nil
-}
-
-func joinStrings(items []string, sep string) string {
-	if len(items) == 0 {
-		return ""
-	}
-	var builder strings.Builder
-	for i, item := range items {
-		if i > 0 {
-			builder.WriteString(sep)
-		}
-		builder.WriteString(item)
-	}
-	return builder.String()
 }
 
 // ValidateAmountDescriptor validates an amount descriptor and returns posting
