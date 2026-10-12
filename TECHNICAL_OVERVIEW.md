@@ -134,6 +134,8 @@ A `partial` result is a cumulative snapshot. A slow attached stream may skip int
 
 An attached seeded request receives the latest cumulative snapshot, if one exists, and then remaining events. A stream disconnect detaches only that stream. The shared seeded computation continues. Completed seeded runs remain in the in-process registry for 60 seconds and in SQLite afterward.
 
+Walk-away rule: seeded runs are walk-away safe. Start on your phone, lose Wi-Fi or background the browser, repeat the same body later to attach or read the saved result. Unseeded runs are quick checks only and cancel on disconnect.
+
 An unseeded run does not use the shared registry or artifact cache. Its context follows the request, so disconnect cancels computation and no result is persisted.
 
 ### SimpleFIN trigger
@@ -298,9 +300,6 @@ A rule occurrence executes exactly on its scheduled date. Schedules use 365-day 
 Current providers:
 
 - `model-value`;
-- `posting-latest`;
-- `posting-year-to-date`;
-- `posting-prior-year-to-date`;
 - `account-balance`;
 - `occurrence-rate`;
 - `terms-minimum`;
@@ -309,13 +308,9 @@ Current providers:
 
 Current general resolvers:
 
-- `expression`;
-- `percentage`;
-- `progressive-bracket`;
-- `capped-percentage`;
-- `threshold-percentage`.
+- `expression`.
 
-`expression` can use rule annual rate, annual growth, and sampled annual volatility. Other resolvers require those rule-level rate fields to be zero. Posting references (`posting-latest` and relatives) may name posting or rule IDs; a rule reference resolves to its latest realized occurrence.
+`expression` can use rule annual rate, annual growth, and sampled annual volatility. Posting references (`model-value`) may name posting or rule IDs; a rule reference resolves to its latest realized occurrence.
 
 The `income` resolver is an ordered pipeline like any other resolver. It reads the effective income source for the occurrence date, executes configured resolver steps, routes configured outputs, and deposits the remaining net cash into rule or posting destinations. Income rules and postings validate alike: a source account contradicts the inflow shape, at least one destination is required, and rule annual caps bound net cash deposited per calendar year while step splits carry their own resolver-level caps. Rule instances divide annual figures by their rule's frequency; manual postings resolve the whole annual figure at once.
 
