@@ -23,6 +23,13 @@ var allowedCORSMethods = map[string]struct{}{
 	http.MethodOptions: {},
 }
 
+// Two deploy modes: Nginx proxy strips Origin so same-origin requests pass
+// without an allowlist entry; direct Vercel mode enforces the exact
+// NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS list. Disallowed origins get an
+// explicit 403 (not a silent header omit) so tests and direct callers see
+// the rejection. Preflight answers 204 with a 600s cache. Single-value
+// X-Forwarded-Host/Proto only; multiples or comma lists are rejected to
+// block host poisoning behind the TLS proxy. Requests without Origin pass.
 func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 	origins := make(map[string]struct{}, len(allowedOrigins))
 	for _, origin := range allowedOrigins {

@@ -17,6 +17,12 @@ import (
 // stochasticSSE streams StochasticProgress events plus optional partial
 // results over SSE.
 //
+// Walk-away guarantee: seeded runs are walk-away safe. They keep computing
+// after your stream drops, finished results persist in SQLite, and repeating
+// the same body attaches to the live run or returns the saved result.
+// Unseeded runs are quick checks only: they cancel on disconnect and are
+// never saved. Use a seed when you lock your phone or lose Wi-Fi.
+//
 // Recovery contract: seeded computations run once per content key in the
 // shared-run registry below. A caller that drops its stream re-POSTs the same
 // body and attaches to the still-running computation: it immediately receives
