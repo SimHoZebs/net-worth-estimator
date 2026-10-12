@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -22,7 +23,7 @@ func incomeErrf(format string, args ...any) *IncomeResolutionError {
 func ParseIncomeAmountConfig(value map[string]types.JsonValue) (types.IncomeAmountConfig, error) {
 	config := types.IncomeAmountConfig{}
 	sourceID, ok := value["incomeSourceId"].(string)
-	if !ok || trimSpace(sourceID) == "" {
+	if !ok || strings.TrimSpace(sourceID) == "" {
 		return config, incomeErrf("Invalid income config: incomeSourceId must be a non-empty string")
 	}
 	config.IncomeSourceID = sourceID
@@ -47,7 +48,7 @@ func ParseIncomeAmountConfig(value map[string]types.JsonValue) (types.IncomeAmou
 func parseResolverStep(stepMap map[string]any) (types.IncomeResolverStep, error) {
 	var step types.IncomeResolverStep
 	resolver, ok := stepMap["resolver"].(string)
-	if !ok || trimSpace(resolver) == "" {
+	if !ok || strings.TrimSpace(resolver) == "" {
 		return step, incomeErrf("Invalid income config: resolver must be a non-empty string")
 	}
 	step.Resolver = resolver
@@ -60,7 +61,7 @@ func parseResolverStep(stepMap map[string]any) (types.IncomeResolverStep, error)
 	case nil:
 		step.DestinationAccountID = nil
 	case string:
-		if trimSpace(dest) == "" {
+		if strings.TrimSpace(dest) == "" {
 			return step, incomeErrf("Invalid income config: destinationAccountId must be a non-empty string or null")
 		}
 		step.DestinationAccountID = &dest
@@ -108,7 +109,7 @@ func validatePercentageStep(config map[string]types.JsonValue, name string) erro
 
 func validateTaxStep(config map[string]types.JsonValue, name string) (string, error) {
 	profileID, ok := config["profileId"].(string)
-	if !ok || trimSpace(profileID) == "" {
+	if !ok || strings.TrimSpace(profileID) == "" {
 		return "", incomeErrf("%s: profileId must be a non-empty string", name)
 	}
 	return profileID, nil
@@ -410,15 +411,4 @@ func executeIncomePosting(posting *types.Posting, config types.IncomeAmountConfi
 		EmployerMatchRealized:  employerMatchRealized,
 	}
 	return result, nil
-}
-
-func trimSpace(value string) string {
-	start, end := 0, len(value)
-	for start < end && (value[start] == ' ' || value[start] == '\t') {
-		start++
-	}
-	for end > start && (value[end-1] == ' ' || value[end-1] == '\t') {
-		end--
-	}
-	return value[start:end]
 }

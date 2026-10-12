@@ -42,10 +42,6 @@ func GetWithdrawableAmount(balances map[string]float64, accountByID map[string]t
 	if !ok {
 		return 0
 	}
-	if account.MinBalance == nil && account.MaxBalance == nil && false {
-		// unreachable; bounds are always set in canonical data (validated)
-		return 0
-	}
 	return math.Max(0, balances[accountID]-account.MinBalanceValue())
 }
 

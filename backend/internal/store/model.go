@@ -129,10 +129,12 @@ func clearDocument(tx *sql.Tx) error {
 }
 
 func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
-	// Sync-owned rows are managed by the SimpleFIN sync, never by model
-	// PUT/seed payloads: snapshot them, drop forged sfin- rows from the
-	// incoming document, then re-merge. Incoming owner checkpoints win key
-	// collisions, so owners always keep an override path.
+	// Invariant: bank lines survive your saves. Sync-owned rows are managed
+	// only by the sync, never by model PUT/seed payloads: snapshot them, drop
+	// forged sfin- rows from the incoming document, then re-merge. Incoming
+	// owner checkpoints win key collisions, so owners always keep an override
+	// path. Accounts referenced only by sync rows are preserved so history
+	// never orphans.
 	syncedCheckpoints, err := loadSyncedCheckpoints(tx)
 	if err != nil {
 		return err
@@ -216,19 +218,19 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 		}
 		position++
 	}
-	if err := saveEvaluationTable(tx, string(types.EvaluationTypeFinancialIndependence), fiEvaluationRows(document)); err != nil {
+	if err := saveEvaluationTable(tx, string(types.EvaluationTypeFinancialIndependence), evaluationRowsOf(document.Evaluations.FinancialIndependence)); err != nil {
 		return err
 	}
-	if err := saveEvaluationTable(tx, string(types.EvaluationTypeNetWorthThreshold), thresholdEvaluationRows(document)); err != nil {
+	if err := saveEvaluationTable(tx, string(types.EvaluationTypeNetWorthThreshold), evaluationRowsOf(document.Evaluations.NetWorthThreshold)); err != nil {
 		return err
 	}
-	if err := saveEvaluationTable(tx, string(types.EvaluationTypeAccountBalance), accountBalanceEvaluationRows(document)); err != nil {
+	if err := saveEvaluationTable(tx, string(types.EvaluationTypeAccountBalance), evaluationRowsOf(document.Evaluations.AccountBalance)); err != nil {
 		return err
 	}
-	if err := saveEvaluationTable(tx, string(types.EvaluationTypePostingFulfillment), fulfillmentEvaluationRows(document)); err != nil {
+	if err := saveEvaluationTable(tx, string(types.EvaluationTypePostingFulfillment), evaluationRowsOf(document.Evaluations.PostingFulfillment)); err != nil {
 		return err
 	}
-	if err := saveEvaluationTable(tx, string(types.EvaluationTypeCycleFulfillment), cycleEvaluationRows(document)); err != nil {
+	if err := saveEvaluationTable(tx, string(types.EvaluationTypeCycleFulfillment), evaluationRowsOf(document.Evaluations.CycleFulfillment)); err != nil {
 		return err
 	}
 	if err := savePaymentTerms(tx, document.PaymentTerms); err != nil {
@@ -407,41 +409,9 @@ func scanRuleRow(rows *sql.Rows) (types.RecurrenceRule, error) {
 	return rule, nil
 }
 
-func fiEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
-	rows := make([]evaluationRow, 0, len(d.Evaluations.FinancialIndependence))
-	for position, item := range d.Evaluations.FinancialIndependence {
-		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, name: item.Name, enabled: item.Enabled, configValue: item.Config})
-	}
-	return rows
-}
-
-func thresholdEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
-	rows := make([]evaluationRow, 0, len(d.Evaluations.NetWorthThreshold))
-	for position, item := range d.Evaluations.NetWorthThreshold {
-		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, name: item.Name, enabled: item.Enabled, configValue: item.Config})
-	}
-	return rows
-}
-
-func accountBalanceEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
-	rows := make([]evaluationRow, 0, len(d.Evaluations.AccountBalance))
-	for position, item := range d.Evaluations.AccountBalance {
-		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, name: item.Name, enabled: item.Enabled, configValue: item.Config})
-	}
-	return rows
-}
-
-func fulfillmentEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
-	rows := make([]evaluationRow, 0, len(d.Evaluations.PostingFulfillment))
-	for position, item := range d.Evaluations.PostingFulfillment {
-		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, name: item.Name, enabled: item.Enabled, configValue: item.Config})
-	}
-	return rows
-}
-
-func cycleEvaluationRows(d *types.FinancialModelDocument) []evaluationRow {
-	rows := make([]evaluationRow, 0, len(d.Evaluations.CycleFulfillment))
-	for position, item := range d.Evaluations.CycleFulfillment {
+func evaluationRowsOf(items []types.EvaluationInstance[types.JsonValue]) []evaluationRow {
+	rows := make([]evaluationRow, 0, len(items))
+	for position, item := range items {
 		rows = append(rows, evaluationRow{instanceID: item.InstanceID, position: position, name: item.Name, enabled: item.Enabled, configValue: item.Config})
 	}
 	return rows
