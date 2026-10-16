@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
 import { TransactionRow } from "../../components/activity/TransactionRow.tsx";
 import {
@@ -326,8 +326,6 @@ export function TimingDetailDialog({
 	onClose: () => void;
 }) {
 	const [tab, setTab] = useState<TimingDetailTab>(initialTab);
-	const [expanded, setExpanded] = useState<string | null>(null);
-	const detailId = useId();
 	const movements = useMemo(
 		() => new Map(plan.movements.map((movement) => [movement.id, movement])),
 		[plan.movements],
@@ -466,18 +464,11 @@ export function TimingDetailDialog({
 										</tr>
 									</thead>
 									<tbody>
-										{cycleTransactions.map((transaction, index) => (
+										{cycleTransactions.map((transaction) => (
 											<TransactionRow
 												key={transaction.id}
 												transaction={transaction}
 												movement={movements.get(transaction.movementId) ?? null}
-												open={expanded === transaction.id}
-												detailId={`${detailId}-row-${index}`}
-												onToggle={() =>
-													setExpanded(
-														expanded === transaction.id ? null : transaction.id,
-													)
-												}
 												onEdit={(item) => onEdit({ kind: "movement", item })}
 											/>
 										))}

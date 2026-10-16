@@ -32,7 +32,6 @@ export function Transactions({
 		defaultAccountViewFilters,
 	);
 	const [page, setPage] = useState(0);
-	const [expanded, setExpanded] = useState<string | null>(null);
 	const id = useId();
 	const filtered = useMemo(
 		() =>
@@ -51,11 +50,9 @@ export function Transactions({
 	const update = (change: Partial<ActivityFilters>) => {
 		setFilters((previous) => ({ ...previous, ...change }));
 		setPage(0);
-		setExpanded(null);
 	};
 	const turnPage = (next: number) => {
 		setPage(next);
-		setExpanded(null);
 		document
 			.getElementById(`${id}-table`)
 			?.scrollIntoView({ block: "nearest" });
@@ -101,18 +98,11 @@ export function Transactions({
 								</tr>
 							</thead>
 							<tbody>
-								{rows.map((transaction, index) => (
+								{rows.map((transaction) => (
 									<TransactionRow
 										key={transaction.id}
 										transaction={transaction}
 										movement={movements.get(transaction.movementId) ?? null}
-										open={expanded === transaction.id}
-										detailId={`${id}-row-${index}`}
-										onToggle={() =>
-											setExpanded(
-												expanded === transaction.id ? null : transaction.id,
-											)
-										}
 										onEdit={(item) => onEdit({ kind: "movement", item })}
 									/>
 								))}
