@@ -33,7 +33,7 @@ The server listens on `127.0.0.1:8787` by default.
 | --- | --- |
 | `GET /healthz` | returns `ok` |
 | `GET /v1/financial-model` | returns `{ "document": FinancialModelDocument | null, "issues": [], "revision": "sha256..." }` and an `ETag` header |
-| `PUT /v1/financial-model` | validates a `FinancialModelDocument`; requires an `If-Match` revision; returns the document, issues, and revision; persists only when no error-severity issue exists and the revision still matches |
+| row writes under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms` | create (`POST`), replace (`PATCH`), delete (`DELETE`), and move (`POST .../reorder`) single rows; each write validates against the stored income snapshot and returns `{ "row", "issues", "persisted", "revision" }`; error-severity issues persist nothing |
 | `GET /v1/status` | returns `{ "readOnly": bool, "authEnabled": bool }` |
 | `GET /v1/income-data` | returns the effective `IncomeDataSnapshot` |
 | `POST /v1/projections/deterministic` | accepts optional `document`, `overrides`, and `incomeData` plus `settings`; returns `{ "result": ProjectionResult }`, validation issues, or an error; `X-Cache` is `hit` or `miss` |
@@ -86,8 +86,8 @@ go run ./cmd/importcsv \
 
 - `store.Open` uses the pure-Go SQLite driver, WAL mode, foreign keys, a 5-second busy timeout, one connection, and forward schema migrations.
 - The SQLite file is authoritative for the canonical model, income snapshot, sync state, and completed projection artifacts.
-- `SaveDocument` atomically replaces owner rows. `SaveDocumentIfUnchanged` performs the same replacement only when the caller's ETag still matches the stored content. Rows use `source: "model" | "simplefin"`. Stored sync-owned rows survive model saves, and owner checkpoints win key collisions.
-- `NET_WORTH_ESTIMATOR_READ_ONLY=1`, `true`, or `yes` rejects `PUT /v1/financial-model` and `POST /v1/sync/simplefin` with 403 before bearer validation.
+- Row writes create, replace, delete, or move one row per request; IDs are server-generated UUIDv7 when omitted and unique across accounts, postings, rules, and evaluations via the `entity_ids` registry. Rows use `source: "model" | "simplefin"`. Stored sync-owned rows survive owner deletes, and owner checkpoints win key collisions.
+- `NET_WORTH_ESTIMATOR_READ_ONLY=1`, `true`, or `yes` rejects row writes and `POST /v1/sync/simplefin` with 403 before bearer validation.
 - When `NET_WORTH_ESTIMATOR_AUTH_TOKEN` is non-empty, guarded routes require `Authorization: Bearer <token>`. Missing or incorrect values return 401. Reads and projection computation remain available.
 - `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` accepts comma-separated exact HTTP/S origins. Same-origin requests are allowed automatically; configured origins are also allowed. A request carrying any other origin is rejected, while a request without an origin passes. Behind a TLS-terminating proxy, forward exactly one valid `X-Forwarded-Proto` and `X-Forwarded-Host` value, or configure the public HTTPS origin explicitly. Origin filtering is not authorization for direct API callers.
 - There is no HTTP reset route. Use a database backup and the offline import tool for operator-controlled replacement.

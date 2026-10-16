@@ -201,7 +201,7 @@ A small seeded run should terminate with one `result` event. It may include `pro
 
 Exercise each row against a disposable database and record the status and whether stored state changed.
 
-| Mode | Authorization | `PUT /v1/financial-model` | `POST /v1/sync/simplefin` |
+| Mode | Authorization | row writes (`POST /v1/accounts`, …) | `POST /v1/sync/simplefin` |
 | --- | --- | --- | --- |
 | writable, no token configured | absent | normal handling | 503 when sync is unconfigured |
 | writable, token configured | absent | 401 | 401 |
@@ -226,31 +226,28 @@ export NET_WORTH_ESTIMATOR_AUTH_TOKEN=test-token-123
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-Save a model payload, then compare the three requests:
+Create one account, then compare the three requests:
 
 ```bash
-curl -fsS "$BASE_URL/v1/financial-model" \
-  | jq '.document' > /tmp/model.json
-
 curl -sS -o /tmp/no-token.json -w '%{http_code}\n' \
-  -X PUT -H 'Content-Type: application/json' \
-  --data-binary @/tmp/model.json \
-  "$BASE_URL/v1/financial-model"
+  -X POST -H 'Content-Type: application/json' \
+  -d '{"name":"Probe","kind":"cash","enabled":true}' \
+  "$BASE_URL/v1/accounts"
 
 curl -sS -o /tmp/wrong-token.json -w '%{http_code}\n' \
-  -X PUT -H 'Content-Type: application/json' \
+  -X POST -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer wrong' \
-  --data-binary @/tmp/model.json \
-  "$BASE_URL/v1/financial-model"
+  -d '{"name":"Probe","kind":"cash","enabled":true}' \
+  "$BASE_URL/v1/accounts"
 
 curl -sS -o /tmp/valid-token.json -w '%{http_code}\n' \
-  -X PUT -H 'Content-Type: application/json' \
+  -X POST -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer test-token-123' \
-  --data-binary @/tmp/model.json \
-  "$BASE_URL/v1/financial-model"
+  -d '{"name":"Probe","kind":"cash","enabled":true}' \
+  "$BASE_URL/v1/accounts"
 ```
 
-Expected statuses are 401, 401, and 200. Repeat with `NET_WORTH_ESTIMATOR_READ_ONLY=1` and the valid token; expected status is 403. After every rejected save, reload the model and confirm it is unchanged.
+Expected statuses are 401, 401, and 200. Repeat with `NET_WORTH_ESTIMATOR_READ_ONLY=1` and the valid token; expected status is 403. After every rejected write, reload the model and confirm it is unchanged. Row writes validate one change: an invalid row returns 200 with error-severity issues and `persisted: false`.
 
 Use a cryptographically random token outside this disposable test setup. Store production values in a secret manager and serve guarded endpoints only through encrypted transport.
 
@@ -270,7 +267,7 @@ Allowed preflight with bearer support:
 ```bash
 curl -sS -o /dev/null -D - -X OPTIONS \
   -H 'Origin: https://app.example.com' \
-  -H 'Access-Control-Request-Method: PUT' \
+  -H 'Access-Control-Request-Method: PATCH' \
   -H 'Access-Control-Request-Headers: Content-Type, Authorization' \
   "$BASE_URL/v1/financial-model"
 ```
