@@ -5,12 +5,21 @@
 @layer components {
 	.plan-toolbar {
 		display: flex;
+		align-items: center;
 		justify-content: space-between;
+		flex-wrap: wrap;
 		gap: 15px;
 		padding: 20px 23px;
 	}
 	.plan-transactions .plan-toolbar {
 		padding: 0 2px 16px;
+	}
+	.plan-toolbar-actions {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 12px;
+		flex-shrink: 0;
 	}
 	.plan-transactions .movement-row {
 		padding-left: 2px;

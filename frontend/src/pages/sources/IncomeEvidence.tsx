@@ -1,11 +1,21 @@
 import { Info } from "lucide-react";
+import { useState } from "react";
 import { Badge } from "../../components/ui.tsx";
 import { analyzePay } from "../../domain/analysis/index.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
+import {
+	DEFAULT_TRANSACTION_ORDER,
+	sortTransactionsByDate,
+	type TransactionOrder,
+} from "../../domain/transactionSort.ts";
+import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
 
 export function IncomeEvidence({ plan }: { plan: Plan }) {
 	const result = analyzePay(plan);
+	const [order, setOrder] = useState<TransactionOrder>(
+		DEFAULT_TRANSACTION_ORDER,
+	);
 	if (result.state === "error") {
 		return (
 			<section className="panel pay-evidence">
@@ -28,6 +38,12 @@ export function IncomeEvidence({ plan }: { plan: Plan }) {
 	const warnings = result.diagnostics.filter(
 		(diagnostic) => diagnostic.severity === "warning",
 	);
+	const orderedCandidates = sortTransactionsByDate({
+		items: evidence.candidates,
+		getDate: (movement) => movement.startDate,
+		getId: (movement) => movement.id,
+		order,
+	});
 	return (
 		<section className="panel pay-evidence">
 			<div className="section-top">
@@ -83,6 +99,15 @@ export function IncomeEvidence({ plan }: { plan: Plan }) {
 							Inspect {evidence.candidates.length} supporting and excluded
 							records
 						</summary>
+						<div
+							style={{
+								display: "flex",
+								justifyContent: "flex-end",
+								margin: "8px 0",
+							}}
+						>
+							<TransactionSortButton order={order} onChange={setOrder} />
+						</div>
 						<div className="table-scroll">
 							<table>
 								<thead>
@@ -94,7 +119,7 @@ export function IncomeEvidence({ plan }: { plan: Plan }) {
 									</tr>
 								</thead>
 								<tbody>
-									{evidence.candidates.map((movement) => (
+									{orderedCandidates.map((movement) => (
 										<tr key={movement.id}>
 											<th scope="row">{movement.name}</th>
 											<td>{dateLabel(movement.startDate, true)}</td>

@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from "react";
+import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
 import { TransactionRow } from "../../components/activity/TransactionRow.tsx";
 import {
 	type BarSegment,
@@ -11,6 +12,10 @@ import { dateLabel, money } from "../../domain/format.ts";
 import type { MandatorySpendingGroup } from "../../domain/householdTiming.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
+import {
+	compareTransactionDates,
+	type TransactionOrder,
+} from "../../domain/transactionSort.ts";
 
 export type TimingDetailTab = "mandatory" | "cycle" | "configure";
 
@@ -159,9 +164,11 @@ function dueLabel(date: string, today: string): string {
 function MandatorySectionView({
 	section,
 	today,
+	order,
 }: {
 	section: TimingMandatorySection;
 	today: string;
+	order: TransactionOrder;
 }) {
 	if (!section.groups.length) {
 		return (
@@ -172,7 +179,13 @@ function MandatorySectionView({
 	}
 	const ordered = [...section.groups].sort(
 		(a, b) =>
-			(a.dates[0] ?? "").localeCompare(b.dates[0] ?? "") || b.total - a.total,
+			compareTransactionDates({
+				aDate: a.dates[0] ?? "",
+				bDate: b.dates[0] ?? "",
+				aId: a.movementId,
+				bId: b.movementId,
+				order,
+			}) || b.total - a.total,
 	);
 	return (
 		<div>
@@ -264,6 +277,8 @@ export function TimingDetailDialog({
 	onUpdateConfig,
 	onResetConfig,
 	initialTab,
+	transactionOrder,
+	onTransactionOrderChange,
 	onClose,
 }: {
 	eyebrow: string;
@@ -306,6 +321,8 @@ export function TimingDetailDialog({
 		key: "paycheck" | "fixed" | "spent" | "checking" | "remaining",
 	) => void;
 	initialTab: TimingDetailTab;
+	transactionOrder: TransactionOrder;
+	onTransactionOrderChange: (order: TransactionOrder) => void;
 	onClose: () => void;
 }) {
 	const [tab, setTab] = useState<TimingDetailTab>(initialTab);
@@ -357,10 +374,30 @@ export function TimingDetailDialog({
 						>
 							{null}
 						</Tabs>
+						<div
+							style={{
+								display: "flex",
+								justifyContent: "flex-end",
+								margin: "8px 0",
+							}}
+						>
+							<TransactionSortButton
+								order={transactionOrder}
+								onChange={onTransactionOrderChange}
+							/>
+						</div>
 						<h3>{thisMonth.title}</h3>
-						<MandatorySectionView section={thisMonth} today={today} />
+						<MandatorySectionView
+							section={thisMonth}
+							today={today}
+							order={transactionOrder}
+						/>
 						<h3>{nextMonth.title}</h3>
-						<MandatorySectionView section={nextMonth} today={today} />
+						<MandatorySectionView
+							section={nextMonth}
+							today={today}
+							order={transactionOrder}
+						/>
 						<p className="section-note">
 							{billsFiltered
 								? "Filtered to your selected bills — change the set in Configure."
@@ -396,40 +433,57 @@ export function TimingDetailDialog({
 					</div>
 				) : tab === "cycle" ? (
 					cycleTransactions.length ? (
-						<div className="table-scroll">
-							<table className="account-activity-table">
-								<caption className="sr-only">
-									Card charges in this cycle, newest last
-								</caption>
-								<thead>
-									<tr>
-										<th scope="col" className="transaction-date-column">
-											Date
-										</th>
-										<th scope="col">Transaction</th>
-										<th scope="col" className="transaction-amount-column">
-											Amount
-										</th>
-									</tr>
-								</thead>
-								<tbody>
-									{cycleTransactions.map((transaction, index) => (
-										<TransactionRow
-											key={transaction.id}
-											transaction={transaction}
-											movement={movements.get(transaction.movementId) ?? null}
-											open={expanded === transaction.id}
-											detailId={`${detailId}-row-${index}`}
-											onToggle={() =>
-												setExpanded(
-													expanded === transaction.id ? null : transaction.id,
-												)
-											}
-											onEdit={(item) => onEdit({ kind: "movement", item })}
-										/>
-									))}
-								</tbody>
-							</table>
+						<div>
+							<div
+								style={{
+									display: "flex",
+									justifyContent: "flex-end",
+									marginBottom: 8,
+								}}
+							>
+								<TransactionSortButton
+									order={transactionOrder}
+									onChange={onTransactionOrderChange}
+								/>
+							</div>
+							<div className="table-scroll">
+								<table className="account-activity-table">
+									<caption className="sr-only">
+										Card charges in this cycle,{" "}
+										{transactionOrder === "oldest"
+											? "oldest first"
+											: "newest first"}
+									</caption>
+									<thead>
+										<tr>
+											<th scope="col" className="transaction-date-column">
+												Date
+											</th>
+											<th scope="col">Transaction</th>
+											<th scope="col" className="transaction-amount-column">
+												Amount
+											</th>
+										</tr>
+									</thead>
+									<tbody>
+										{cycleTransactions.map((transaction, index) => (
+											<TransactionRow
+												key={transaction.id}
+												transaction={transaction}
+												movement={movements.get(transaction.movementId) ?? null}
+												open={expanded === transaction.id}
+												detailId={`${detailId}-row-${index}`}
+												onToggle={() =>
+													setExpanded(
+														expanded === transaction.id ? null : transaction.id,
+													)
+												}
+												onEdit={(item) => onEdit({ kind: "movement", item })}
+											/>
+										))}
+									</tbody>
+								</table>
+							</div>
 						</div>
 					) : (
 						<p>No charges in this cycle yet.</p>

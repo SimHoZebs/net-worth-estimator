@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { useId, useMemo, useState } from "react";
+import { TransactionSortButton } from "../components/activity/TransactionSortButton.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { type TabItem, Tabs } from "../components/Tabs.tsx";
 import {
@@ -7,6 +8,11 @@ import {
 	IconButton,
 	ProjectionUpdating,
 } from "../components/ui.tsx";
+import {
+	DEFAULT_TRANSACTION_ORDER,
+	sortTransactionsByDate,
+	type TransactionOrder,
+} from "../domain/transactionSort.ts";
 import {
 	type Plan,
 	visibleAccounts,
@@ -235,6 +241,9 @@ function TransactionsView({
 }) {
 	const [query, setQuery] = useState("");
 	const [schedule, setSchedule] = useState<ScheduleFilter>("all");
+	const [order, setOrder] = useState<TransactionOrder>(
+		DEFAULT_TRANSACTION_ORDER,
+	);
 	const [page, setPage] = useState(0);
 	const listId = useId();
 	const resolvedAmounts = useMemo(
@@ -253,10 +262,19 @@ function TransactionsView({
 		{ id: "all", label: "All transactions", count: visible.length },
 		{ id: "recurring", label: "Recurring", count: recurringCount },
 	];
-	const movements = visible.filter(
-		(movement) =>
-			movement.name.toLowerCase().includes(query.toLowerCase()) &&
-			(schedule === "all" || movement.frequency !== "once"),
+	const movements = useMemo(
+		() =>
+			sortTransactionsByDate({
+				items: visible.filter(
+					(movement) =>
+						movement.name.toLowerCase().includes(query.toLowerCase()) &&
+						(schedule === "all" || movement.frequency !== "once"),
+				),
+				getDate: (movement) => movement.startDate,
+				getId: (movement) => movement.id,
+				order,
+			}),
+		[visible, query, schedule, order],
 	);
 	const pageCount = Math.max(
 		1,
@@ -274,6 +292,10 @@ function TransactionsView({
 	};
 	const search = (value: string) => {
 		setQuery(value);
+		setPage(0);
+	};
+	const changeOrder = (next: TransactionOrder) => {
+		setOrder(next);
 		setPage(0);
 	};
 	const turnPage = (next: number) => {
@@ -299,14 +321,17 @@ function TransactionsView({
 						placeholder="Find a transaction…"
 					/>
 				</label>
-				<button
-					type="button"
-					className="button primary small"
-					onClick={() => onEdit({ kind: "movement", item: null })}
-				>
-					<Plus size={16} />
-					Add transaction
-				</button>
+				<div className="plan-toolbar-actions">
+					<TransactionSortButton order={order} onChange={changeOrder} />
+					<button
+						type="button"
+						className="button primary small"
+						onClick={() => onEdit({ kind: "movement", item: null })}
+					>
+						<Plus size={16} />
+						Add transaction
+					</button>
+				</div>
 			</div>
 			<div id={listId}>
 				<MovementsPanel

@@ -1,5 +1,6 @@
-import { ArrowDownUp, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import type { ActivityFilters } from "../../domain/accountActivity.ts";
+import { TransactionSortButton } from "./TransactionSortButton.tsx";
 
 export function TransactionFilters({
 	filters,
@@ -25,18 +26,10 @@ export function TransactionFilters({
 						onChange={(event) => onChange({ query: event.target.value })}
 					/>
 				</label>
-				<button
-					type="button"
-					className="text-button transaction-order"
-					onClick={() =>
-						onChange({
-							order: filters.order === "oldest" ? "newest" : "oldest",
-						})
-					}
-				>
-					<ArrowDownUp size={14} />
-					{filters.order === "oldest" ? "Oldest first" : "Newest first"}
-				</button>
+				<TransactionSortButton
+					order={filters.order}
+					onChange={(order) => onChange({ order })}
+				/>
 			</div>
 			<div className="account-activity-filters">
 				<label>
