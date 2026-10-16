@@ -32,7 +32,7 @@ func TestParseMockModeStrict(t *testing.T) {
 
 func TestMockAccountSetMapsLikeBridge(t *testing.T) {
 	now := time.Unix(1785628800, 0).UTC()
-	plan, err := Map(MockAccountSet(now), mockTestConfig(false), now)
+	plan, err := Map(MockAccountSet(now), mockTestConfig(false), map[string]string{"mock-checking": "checking", "mock-prime": "prime_card"}, now)
 	if err != nil {
 		t.Fatalf("map mock set: %v", err)
 	}
@@ -63,6 +63,7 @@ func TestMockAccountSetMapsLikeBridge(t *testing.T) {
 
 func TestMockRunnerSyncPersistsAcrossRuns(t *testing.T) {
 	database := openRunnerStore(t)
+	seedRunnerAccounts(t, database)
 	runner := NewMockRunner(database, mockTestConfig(false))
 	first, err := runner.Sync(context.Background())
 	if err != nil {
@@ -85,6 +86,7 @@ func TestMockRunnerSyncPersistsAcrossRuns(t *testing.T) {
 
 func TestMockRunnerDryRunWritesNothing(t *testing.T) {
 	database := openRunnerStore(t)
+	seedRunnerAccounts(t, database)
 	runner := NewMockRunner(database, mockTestConfig(true))
 	summary, err := runner.Sync(context.Background())
 	if err != nil {

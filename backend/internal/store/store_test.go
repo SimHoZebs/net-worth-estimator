@@ -14,42 +14,28 @@ func TestStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T) {
 	testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t, openTestStore)
 }
 
-func TestSaveDocumentIfUnchangedUsesContentIdentity(t *testing.T) {
+func TestRowWritesMarkDocumentPresent(t *testing.T) {
 	store := openTestStore(t)
-	document := &types.FinancialModelDocument{
-		SourcePath:  "test-source",
-		Accounts:    []types.Account{{ID: "checking", Name: "Checking", Enabled: true}},
-		Checkpoints: []types.Checkpoint{{Date: "2026-04-30", AccountID: "checking", Balance: 200}},
-		Evaluations: types.EmptyEvaluationTables(),
-		Postings:    []types.Posting{},
+	exists, err := store.DocumentExists()
+	if err != nil || exists {
+		t.Fatalf("fresh presence = %v, err %v", exists, err)
 	}
-	saved, err := store.SaveDocumentIfUnchanged(document, "*")
-	if err != nil || !saved {
-		t.Fatalf("create with absent precondition = %t, err %v", saved, err)
+	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking"}); err != nil {
+		t.Fatalf("create account: %v", err)
 	}
-	stale := *document
-	stale.SourcePath = "stale-source"
-	saved, err = store.SaveDocumentIfUnchanged(&stale, "*")
-	if err != nil || saved {
-		t.Fatalf("create over existing document = %t, err %v", saved, err)
+	exists, err = store.DocumentExists()
+	if err != nil || !exists {
+		t.Fatalf("presence after write = %v, err %v", exists, err)
 	}
-	current, err := store.LoadDocument()
-	if err != nil || current == nil {
-		t.Fatalf("load current document = %+v, err %v", current, err)
+	if err := store.Clear(); err != nil {
+		t.Fatalf("clear: %v", err)
 	}
-	revision, err := DocumentETag(current)
-	if err != nil {
-		t.Fatalf("compute current ETag: %v", err)
+	exists, err = store.DocumentExists()
+	if err != nil || exists {
+		t.Fatalf("presence after clear = %v, err %v", exists, err)
 	}
-	changed := *current
-	changed.SourcePath = "changed-source"
-	saved, err = store.SaveDocumentIfUnchanged(&changed, revision)
-	if err != nil || !saved {
-		t.Fatalf("save with current ETag = %t, err %v", saved, err)
-	}
-	saved, err = store.SaveDocumentIfUnchanged(&stale, revision)
-	if err != nil || saved {
-		t.Fatalf("save with stale ETag = %t, err %v", saved, err)
+	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking"}); err != nil {
+		t.Fatalf("recreate after clear: %v", err)
 	}
 }
 
@@ -64,21 +50,16 @@ func TestOpenCreatesCurrentSchemaVersion(t *testing.T) {
 func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore func(*testing.T) Store) {
 	t.Helper()
 	store := newStore(t)
-	document := &types.FinancialModelDocument{
-		SourcePath: "test-source",
-		Accounts: []types.Account{{
-			ID: "checking", Name: "Checking", Enabled: true,
-		}},
-		Checkpoints: []types.Checkpoint{
-			{Date: "2026-04-30", AccountID: "checking", Balance: 200},
-			{Date: "2026-04-06", AccountID: "checking", Balance: 100},
-		},
-		Evaluations: types.EmptyEvaluationTables(),
-		Postings:    []types.Posting{},
+	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
+		t.Fatalf("create account: %v", err)
 	}
-
-	if err := store.SaveDocument(document); err != nil {
-		t.Fatalf("save document: %v", err)
+	for _, checkpoint := range []types.Checkpoint{
+		{Date: "2026-04-30", AccountID: "checking", Balance: 200},
+		{Date: "2026-04-06", AccountID: "checking", Balance: 100},
+	} {
+		if _, err := store.SaveCheckpoint(checkpoint); err != nil {
+			t.Fatalf("save checkpoint: %v", err)
+		}
 	}
 	loaded, err := store.LoadDocument()
 	if err != nil {
@@ -87,11 +68,11 @@ func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore
 	if loaded == nil {
 		t.Fatal("loaded document is nil")
 	}
-	if loaded.SourcePath != document.SourcePath {
-		t.Fatalf("source path = %q, want %q", loaded.SourcePath, document.SourcePath)
-	}
-	if !reflect.DeepEqual(loaded.Checkpoints, withSourceModel(document.Checkpoints)) {
-		t.Fatalf("checkpoint order changed: got %+v, want %+v", loaded.Checkpoints, document.Checkpoints)
+	if !reflect.DeepEqual(loaded.Checkpoints, withSourceModel([]types.Checkpoint{
+		{Date: "2026-04-30", AccountID: "checking", Balance: 200},
+		{Date: "2026-04-06", AccountID: "checking", Balance: 100},
+	})) {
+		t.Fatalf("checkpoint order changed: got %+v", loaded.Checkpoints)
 	}
 	if loaded.Accounts[0].MinBalance == nil || *loaded.Accounts[0].MinBalance != types.NoFloor {
 		t.Fatalf("minimum balance was not normalized: %+v", loaded.Accounts[0].MinBalance)
@@ -100,32 +81,18 @@ func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore
 		t.Fatalf("maximum balance was not normalized: %+v", loaded.Accounts[0].MaxBalance)
 	}
 
-	empty := &types.FinancialModelDocument{
-		SourcePath:  "empty-source",
-		Accounts:    []types.Account{},
-		Checkpoints: []types.Checkpoint{},
-		Evaluations: types.EmptyEvaluationTables(),
-		Postings:    []types.Posting{},
+	empty, err := store.LoadDocument()
+	if err != nil || empty == nil {
+		t.Fatalf("load document = %+v, err %v", empty, err)
 	}
-	if err := store.SaveDocument(empty); err != nil {
-		t.Fatalf("save empty document: %v", err)
-	}
-	exists, err := store.DocumentExists()
-	if err != nil || !exists {
-		t.Fatalf("empty document presence = %v, err %v", exists, err)
-	}
-	loaded, err = store.LoadDocument()
-	if err != nil || loaded == nil || loaded.SourcePath != "empty-source" {
-		t.Fatalf("load empty document = %+v, err %v", loaded, err)
-	}
-	if loaded.Accounts == nil || loaded.Checkpoints == nil || loaded.Postings == nil {
-		t.Fatalf("empty collections were not normalized: %+v", loaded)
+	if empty.Accounts == nil || empty.Checkpoints == nil || empty.Postings == nil {
+		t.Fatalf("empty collections were not normalized: %+v", empty)
 	}
 
 	if err := store.Clear(); err != nil {
 		t.Fatalf("clear document: %v", err)
 	}
-	exists, err = store.DocumentExists()
+	exists, err := store.DocumentExists()
 	if err != nil || exists {
 		t.Fatalf("cleared document presence = %v, err %v", exists, err)
 	}
@@ -139,47 +106,27 @@ func TestStoreRoundTripsPaymentTerms(t *testing.T) {
 	store := openTestStore(t)
 	percent := 0.02
 	statementDay := 15
-	document := &types.FinancialModelDocument{
-		SourcePath: "terms-source",
-		Accounts: []types.Account{
-			{ID: "prime_card", Name: "Prime Card", Enabled: true},
-			{ID: "checking", Name: "Checking", Enabled: true},
-		},
-		Checkpoints: []types.Checkpoint{},
-		Evaluations: types.EmptyEvaluationTables(),
-		Postings:    []types.Posting{},
-		PaymentTerms: []types.PaymentTerms{
-			{AccountID: "prime_card", MinimumFixed: 25, MinimumPercent: &percent, DueDay: 10, StatementDay: &statementDay},
-			{AccountID: "checking", MinimumFixed: 0, DueDay: 1},
-		},
+	if _, err := store.CreateAccount(types.Account{ID: "prime_card", Name: "Prime Card", Enabled: true}); err != nil {
+		t.Fatalf("create prime: %v", err)
 	}
-	if err := store.SaveDocument(document); err != nil {
-		t.Fatalf("save document: %v", err)
+	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
+		t.Fatalf("create checking: %v", err)
+	}
+	want := []types.PaymentTerms{
+		{AccountID: "prime_card", MinimumFixed: 25, MinimumPercent: &percent, DueDay: 10, StatementDay: &statementDay},
+		{AccountID: "checking", MinimumFixed: 0, DueDay: 1},
+	}
+	for _, terms := range want {
+		if _, err := store.SavePaymentTerms(terms); err != nil {
+			t.Fatalf("save terms: %v", err)
+		}
 	}
 	loaded, err := store.LoadDocument()
 	if err != nil {
 		t.Fatalf("load document: %v", err)
 	}
-	if !reflect.DeepEqual(loaded.PaymentTerms, document.PaymentTerms) {
-		t.Fatalf("payment terms changed: got %+v, want %+v", loaded.PaymentTerms, document.PaymentTerms)
-	}
-
-	empty := &types.FinancialModelDocument{
-		SourcePath:  "empty-source",
-		Accounts:    []types.Account{},
-		Checkpoints: []types.Checkpoint{},
-		Evaluations: types.EmptyEvaluationTables(),
-		Postings:    []types.Posting{},
-	}
-	if err := store.SaveDocument(empty); err != nil {
-		t.Fatalf("save empty document: %v", err)
-	}
-	loaded, err = store.LoadDocument()
-	if err != nil {
-		t.Fatalf("load empty document: %v", err)
-	}
-	if loaded.PaymentTerms == nil {
-		t.Fatalf("payment terms were not normalized: %+v", loaded)
+	if !reflect.DeepEqual(loaded.PaymentTerms, want) {
+		t.Fatalf("payment terms changed: got %+v, want %+v", loaded.PaymentTerms, want)
 	}
 }
 

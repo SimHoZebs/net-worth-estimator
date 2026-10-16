@@ -3,11 +3,12 @@ package simplefin
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
-	"path/filepath"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 var errBridgeDown = errors.New("bridge down")
@@ -20,6 +21,50 @@ func openRunnerStore(t *testing.T) store.Store {
 	}
 	t.Cleanup(func() { _ = database.Close() })
 	return database
+}
+
+// seedRunnerAccounts creates the model accounts a sync map targets.
+// Like production (seeded DB), sync bootstrap validates manual targets.
+func seedRunnerAccounts(t *testing.T, database store.Store) {
+	t.Helper()
+	for _, account := range []types.Account{
+		{ID: "checking", Name: "Checking"},
+		{ID: "prime_card", Name: "Prime"},
+	} {
+		if _, err := database.CreateAccount(account); err != nil {
+			t.Fatalf("seed account %s: %v", account.ID, err)
+		}
+	}
+}
+
+func TestSyncProvisionsUnmappedBridgeAccounts(t *testing.T) {
+	database := openRunnerStore(t)
+	seedRunnerAccounts(t, database)
+	runner := NewRunner(database, Config{
+		AccountMap: map[string]string{"mock-checking": "checking"},
+	}, nil)
+	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
+		return &AccountSet{Accounts: []Account{
+			{ID: "mock-checking", Name: "Checking", Currency: "USD", Balance: "100.00"},
+			{ID: "mock-new", Name: "New Savings", Currency: "USD", Balance: "10.00"},
+		}}, nil
+	}
+	summary, err := runner.Sync(context.Background())
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if summary.AccountsProvisioned != 1 || summary.CheckpointsInserted != 2 {
+		t.Fatalf("summary = %+v, want 1 provisioned + 2 checkpoints", summary)
+	}
+	links, err := database.ListAccountLinks()
+	if err != nil || len(links) != 2 {
+		t.Fatalf("links = %+v, err %v", links, err)
+	}
+	for _, link := range links {
+		if link.BridgeAccountID == "mock-new" && link.Origin != "auto" {
+			t.Fatalf("provisioned link = %+v, want auto origin", link)
+		}
+	}
 }
 
 func TestTriggerGuardsInterval(t *testing.T) {

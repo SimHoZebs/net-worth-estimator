@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 // writeAuthMiddleware guards canonical model writes and the SimpleFIN sync
@@ -12,13 +13,39 @@ import (
 // configured (dev default) guarded routes stay open. Reads and compute
 // endpoints always pass through.
 func writeAuthMiddleware(readOnly bool, token string) func(http.Handler) http.Handler {
-	guarded := map[string]struct{}{
-		http.MethodPut + " /v1/financial-model": {},
-		http.MethodPost + " /v1/sync/simplefin": {},
+	guardedPrefixes := []string{
+		http.MethodPost + " /v1/accounts",
+		http.MethodPatch + " /v1/accounts/",
+		http.MethodDelete + " /v1/accounts/",
+		http.MethodPost + " /v1/postings",
+		http.MethodPatch + " /v1/postings/",
+		http.MethodDelete + " /v1/postings/",
+		http.MethodPost + " /v1/recurrence-rules",
+		http.MethodPatch + " /v1/recurrence-rules/",
+		http.MethodDelete + " /v1/recurrence-rules/",
+		http.MethodPost + " /v1/checkpoints",
+		http.MethodDelete + " /v1/checkpoints",
+		http.MethodPost + " /v1/evaluations",
+		http.MethodPatch + " /v1/evaluations/",
+		http.MethodDelete + " /v1/evaluations/",
+		http.MethodPost + " /v1/payment-terms",
+		http.MethodDelete + " /v1/payment-terms/",
+		http.MethodPost + " /v1/sync/simplefin",
+		http.MethodPut + " /v1/sync/simplefin/accounts/",
+		http.MethodDelete + " /v1/sync/simplefin/accounts/",
+	}
+	isGuarded := func(method, requestPath string) bool {
+		key := method + " " + requestPath
+		for _, prefix := range guardedPrefixes {
+			if key == prefix || strings.HasPrefix(key, prefix) {
+				return true
+			}
+		}
+		return false
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if _, ok := guarded[r.Method+" "+r.URL.Path]; !ok {
+			if !isGuarded(r.Method, r.URL.Path) {
 				next.ServeHTTP(w, r)
 				return
 			}

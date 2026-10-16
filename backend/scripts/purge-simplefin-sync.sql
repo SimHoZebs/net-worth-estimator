@@ -26,3 +26,7 @@
 
 DELETE FROM postings WHERE source = 'simplefin';
 DELETE FROM checkpoints WHERE source = 'simplefin';
+-- Release sync-namespace IDs so the first real sync can re-claim them.
+-- Owner rows can never hold sfin- IDs (row writes reject them), so this
+-- cannot release an owner row.
+DELETE FROM entity_ids WHERE id LIKE 'sfin-%';

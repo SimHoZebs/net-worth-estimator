@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -28,72 +27,6 @@ func DocumentETag(document *types.FinancialModelDocument) (string, error) {
 	}
 	digest := sha256.Sum256(payload)
 	return fmt.Sprintf(`"sha256-%x"`, digest), nil
-}
-
-func normalizeETag(value string) string {
-	value = strings.TrimSpace(value)
-	value = strings.TrimPrefix(value, "W/")
-	return strings.Trim(value, `"`)
-}
-
-func documentMatchesETag(current *types.FinancialModelDocument, expectedETag string) (bool, error) {
-	if expectedETag == "*" {
-		return current == nil, nil
-	}
-	currentETag, err := DocumentETag(current)
-	if err != nil {
-		return false, err
-	}
-	return normalizeETag(expectedETag) == normalizeETag(currentETag), nil
-}
-
-func (s *sqliteStore) saveDocument(document *types.FinancialModelDocument, expectedETag string) (bool, error) {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return false, fmt.Errorf("save begin: %w", err)
-	}
-	defer tx.Rollback()
-	if expectedETag != "" {
-		current, err := loadDocument(tx)
-		if err != nil {
-			return false, err
-		}
-		matches, err := documentMatchesETag(current, expectedETag)
-		if err != nil {
-			return false, err
-		}
-		if !matches {
-			return false, nil
-		}
-	}
-	if err := replaceDocument(tx, document); err != nil {
-		return false, err
-	}
-	if err := tx.Commit(); err != nil {
-		return false, fmt.Errorf("save commit: %w", err)
-	}
-	return true, nil
-}
-
-// SaveDocument atomically replaces the canonical model document.
-func (s *sqliteStore) SaveDocument(document *types.FinancialModelDocument) error {
-	_, err := s.saveDocument(document, "")
-	return err
-}
-
-// SaveDocumentIfUnchanged replaces the document only when its current content
-// identity matches expectedETag. An empty expectation preserves unconditional
-// writes for internal callers and legacy API clients.
-func (s *sqliteStore) SaveDocumentIfUnchanged(document *types.FinancialModelDocument, expectedETag string) (bool, error) {
-	return s.saveDocument(document, expectedETag)
-}
-
-func (s *sqliteStore) DocumentMatchesETag(expectedETag string) (bool, error) {
-	current, err := s.LoadDocument()
-	if err != nil {
-		return false, err
-	}
-	return documentMatchesETag(current, expectedETag)
 }
 
 func deleteDocumentRows(tx *sql.Tx) error {
@@ -122,15 +55,23 @@ func clearDocument(tx *sql.Tx) error {
 	if err := deleteDocumentRows(tx); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM entity_ids`); err != nil {
+		return fmt.Errorf("clear entity ids: %w", err)
+	}
+	if _, err := tx.Exec(`DELETE FROM account_links`); err != nil {
+		return fmt.Errorf("clear account links: %w", err)
+	}
 	if _, err := tx.Exec(`UPDATE model_metadata SET source_path = '', document_present = 0 WHERE id = 1`); err != nil {
 		return fmt.Errorf("clear model metadata: %w", err)
 	}
 	return nil
 }
 
+// replaceDocument is the seed/import path: it wholesale replaces owner
+// rows while preserving sync-owned rows. Runtime writes use row CRUD.
 func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 	// Invariant: bank lines survive your saves. Sync-owned rows are managed
-	// only by the sync, never by model PUT/seed payloads: snapshot them, drop
+	// only by the sync, never by seed payloads: snapshot them, drop
 	// forged sfin- rows from the incoming document, then re-merge. Incoming
 	// owner checkpoints win key collisions, so owners always keep an override
 	// path. Accounts referenced only by sync rows are preserved so history

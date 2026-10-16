@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -43,10 +42,34 @@ func seedSyncRows(t *testing.T, store *sqliteStore) {
 	t.Helper()
 	execSyncSetup(t, store, []string{
 		`INSERT INTO accounts (id, position, name, enabled) VALUES ('prime_card', 1, 'Prime', 1)`,
+		`INSERT INTO entity_ids (id, kind) VALUES ('prime_card', 'account')`,
 		`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (10, '2026-08-01', 'checking', 111, 'simplefin')`,
 		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, date, priority, enabled, source)
 		 VALUES ('sfin-pending-prime_card-tx1', 10, 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', '2026-08-02', 6, 0, 'simplefin')`,
+		`INSERT INTO entity_ids (id, kind) VALUES ('sfin-pending-prime_card-tx1', 'posting')`,
 	})
+}
+
+// seedOwnerDocument writes the owner fixture through row CRUD, replacing
+// the retired whole-document save in tests.
+func seedOwnerDocument(t *testing.T, store Store) {
+	t.Helper()
+	document := ownerDocument()
+	for _, account := range document.Accounts {
+		if _, err := store.CreateAccount(account); err != nil {
+			t.Fatalf("seed account %s: %v", account.ID, err)
+		}
+	}
+	for _, checkpoint := range document.Checkpoints {
+		if _, err := store.SaveCheckpoint(checkpoint); err != nil {
+			t.Fatalf("seed checkpoint: %v", err)
+		}
+	}
+	for _, posting := range document.Postings {
+		if _, err := store.CreatePosting(posting); err != nil {
+			t.Fatalf("seed posting %s: %v", posting.ID, err)
+		}
+	}
 }
 
 func ownerDocument() *types.FinancialModelDocument {
@@ -72,10 +95,8 @@ func ownerDocument() *types.FinancialModelDocument {
 // posting through the public API, so conformance tests never depend on SQL.
 func seedSyncState(t *testing.T, store Store) {
 	t.Helper()
-	document := ownerDocument()
-	document.Accounts = append(document.Accounts, types.Account{ID: "prime_card", Name: "Prime", Enabled: true})
-	if err := store.SaveDocument(document); err != nil {
-		t.Fatalf("save owner document with card account: %v", err)
+	if _, err := store.CreateAccount(types.Account{ID: "prime_card", Name: "Prime", Enabled: true}); err != nil {
+		t.Fatalf("seed card account: %v", err)
 	}
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-01", Balance: 111}},
@@ -108,53 +129,88 @@ func postingIDsFromDocument(document *types.FinancialModelDocument) (ids []strin
 	return ids, sources
 }
 
-func TestSavePreservesSyncReferencedAccount(t *testing.T) {
+func TestDeleteAccountLeavesSyncRows(t *testing.T) {
 	store := openTestStore(t)
+	seedOwnerDocument(t, store)
 	seedSyncState(t, store)
-	withoutChecking := ownerDocument()
-	withoutChecking.Accounts = nil
-	if err := store.SaveDocument(withoutChecking); err != nil {
-		t.Fatalf("save removing sync account: %v", err)
+	if err := store.DeleteAccount("checking"); err != nil {
+		t.Fatalf("delete sync-referenced account: %v", err)
 	}
 	loaded, err := store.LoadDocument()
 	if err != nil || loaded == nil {
-		t.Fatalf("load preserved document = %+v, err %v", loaded, err)
+		t.Fatalf("load after account delete = %+v, err %v", loaded, err)
 	}
-	found := false
 	for _, account := range loaded.Accounts {
 		if account.ID == "checking" {
+			t.Fatalf("deleted account survived: %+v", loaded.Accounts)
+		}
+	}
+	if _, ok := findCheckpoint(loaded, "checking", "2026-08-01"); !ok {
+		t.Fatalf("sync checkpoint was garbage-collected: %+v", loaded.Checkpoints)
+	}
+	ids, _ := loadPostingIDs(t, store)
+	found := false
+	for _, id := range ids {
+		if id == "sfin-pending-prime_card-tx1" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("sync-referenced account was not preserved: %+v", loaded.Accounts)
+		t.Fatalf("sync pending posting was garbage-collected: %v", ids)
 	}
 }
 
-func TestSaveDropsForgedSyncRowsAndMergesStored(t *testing.T) {
-	testSaveDropsForgedSyncRowsAndMergesStored(t, openTestStore)
+func TestRowWritesRejectForgedSyncNamespace(t *testing.T) {
+	testRowWritesRejectForgedSyncNamespace(t, openTestStore)
 }
 
-func testSaveDropsForgedSyncRowsAndMergesStored(t *testing.T, newStore func(*testing.T) Store) {
+func testRowWritesRejectForgedSyncNamespace(t *testing.T, newStore func(*testing.T) Store) {
 	t.Helper()
 	store := newStore(t)
-	if err := store.SaveDocument(ownerDocument()); err != nil {
-		t.Fatalf("save owner document: %v", err)
-	}
+	seedOwnerDocument(t, store)
 	seedSyncState(t, store)
 
-	forged := ownerDocument()
-	forged.Checkpoints[0].Source = SourceSimpleFIN
+	// Owner creates cannot claim the sync namespace.
 	prime := "prime_card"
-	forged.Postings = append(forged.Postings, types.Posting{
-		ID: "sfin-pending-prime_card-forged", Name: "Forged", SourceAccountID: &prime, Source: SourceSimpleFIN,
-		Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "999"}, Inputs: map[string]types.AmountInputBinding{}},
-		Date:   "2026-08-03", Priority: 6,
-	})
-	if err := store.SaveDocument(forged); err != nil {
-		t.Fatalf("save forged document: %v", err)
+	forged := syncPendingPosting("sfin-pending-prime_card-forged", prime, "2026-08-03")
+	if _, err := store.CreatePosting(forged); !IsReservedID(err) {
+		t.Fatalf("create forged sync posting err = %v, want reserved-id", err)
+	}
+	if _, err := store.CreateAccount(types.Account{ID: "sfin-checking", Name: "Forged"}); !IsReservedID(err) {
+		t.Fatalf("create forged sync account err = %v, want reserved-id", err)
+	}
+	if _, err := store.CreateRule(types.RecurrenceRule{ID: "sfin-rule", Name: "Forged"}); !IsReservedID(err) {
+		t.Fatalf("create forged sync rule err = %v, want reserved-id", err)
 	}
 
+	// Sync-owned rows refuse owner updates and deletes.
+	stored, err := store.LoadDocument()
+	if err != nil {
+		t.Fatalf("load document: %v", err)
+	}
+	var synced types.Posting
+	for _, posting := range stored.Postings {
+		if posting.ID == "sfin-pending-prime_card-tx1" {
+			synced = posting
+		}
+	}
+	synced.Name = "Edited"
+	if _, err := store.UpdatePosting(synced); !IsSyncOwned(err) {
+		t.Fatalf("update sync posting err = %v, want sync-owned", err)
+	}
+	if err := store.DeletePosting(synced.ID); !IsSyncOwned(err) {
+		t.Fatalf("delete sync posting err = %v, want sync-owned", err)
+	}
+
+	// A checkpoint save with a forged source flag still stores owner rows.
+	correction := types.Checkpoint{Date: "2026-07-01", AccountID: "checking", Balance: 500, Source: SourceSimpleFIN}
+	saved, err := store.SaveCheckpoint(correction)
+	if err != nil {
+		t.Fatalf("save checkpoint: %v", err)
+	}
+	if saved.Source != SourceModel {
+		t.Fatalf("checkpoint source = %q, want recomputed owner", saved.Source)
+	}
 	loaded, err := store.LoadDocument()
 	if err != nil {
 		t.Fatalf("load document: %v", err)
@@ -163,9 +219,6 @@ func testSaveDropsForgedSyncRowsAndMergesStored(t *testing.T, newStore func(*tes
 		t.Fatalf("checkpoints = %+v, want owner + synced", loaded.Checkpoints)
 	}
 	for _, checkpoint := range loaded.Checkpoints {
-		if checkpoint.Source != SourceModel && checkpoint.Source != SourceSimpleFIN {
-			t.Fatalf("checkpoint source = %q", checkpoint.Source)
-		}
 		if checkpoint.AccountID == "checking" && checkpoint.Date == "2026-07-01" && checkpoint.Source != SourceModel {
 			t.Fatalf("forged checkpoint flag persisted: %+v", checkpoint)
 		}
@@ -191,16 +244,12 @@ func TestOwnerCheckpointWinsKeyCollision(t *testing.T) {
 func testOwnerCheckpointWinsKeyCollision(t *testing.T, newStore func(*testing.T) Store) {
 	t.Helper()
 	store := newStore(t)
-	if err := store.SaveDocument(ownerDocument()); err != nil {
-		t.Fatalf("save owner document: %v", err)
-	}
+	seedOwnerDocument(t, store)
 	seedSyncState(t, store)
 
-	correction := ownerDocument()
-	correction.Checkpoints = append(correction.Checkpoints, types.Checkpoint{
+	if _, err := store.SaveCheckpoint(types.Checkpoint{
 		Date: "2026-08-01", AccountID: "checking", Balance: 222,
-	})
-	if err := store.SaveDocument(correction); err != nil {
+	}); err != nil {
 		t.Fatalf("save correction: %v", err)
 	}
 
@@ -219,43 +268,6 @@ func testOwnerCheckpointWinsKeyCollision(t *testing.T, newStore func(*testing.T)
 	}
 	if count != 1 {
 		t.Fatalf("collision key rows = %d, want 1", count)
-	}
-}
-
-func TestRoundTripPreservesSyncRows(t *testing.T) {
-	testRoundTripPreservesSyncRows(t, openTestStore)
-}
-
-func testRoundTripPreservesSyncRows(t *testing.T, newStore func(*testing.T) Store) {
-	t.Helper()
-	store := newStore(t)
-	if err := store.SaveDocument(ownerDocument()); err != nil {
-		t.Fatalf("save owner document: %v", err)
-	}
-	seedSyncState(t, store)
-
-	loaded, err := store.LoadDocument()
-	if err != nil {
-		t.Fatalf("load document: %v", err)
-	}
-	if err := store.SaveDocument(loaded); err != nil {
-		t.Fatalf("save round-tripped document: %v", err)
-	}
-
-	again, err := store.LoadDocument()
-	if err != nil {
-		t.Fatalf("reload document: %v", err)
-	}
-	if !reflect.DeepEqual(again.Checkpoints, loaded.Checkpoints) {
-		t.Fatalf("round trip changed checkpoints:\n got %+v\nwant %+v", again.Checkpoints, loaded.Checkpoints)
-	}
-	gotIDs, _ := loadPostingIDs(t, store)
-	wantIDs := []string{}
-	for _, posting := range loaded.Postings {
-		wantIDs = append(wantIDs, posting.ID)
-	}
-	if !reflect.DeepEqual(gotIDs, wantIDs) {
-		t.Fatalf("round trip changed postings: got %v, want %v", gotIDs, wantIDs)
 	}
 }
 
@@ -458,9 +470,7 @@ func testApplySyncPlanCheckpointLifecycle(t *testing.T, newStore func(*testing.T
 	store := newStore(t)
 	// An owner document first, mirroring production (seeded DB): sync rows
 	// merge into the visible document instead of an empty store.
-	if err := store.SaveDocument(ownerDocument()); err != nil {
-		t.Fatalf("save owner document: %v", err)
-	}
+	seedOwnerDocument(t, store)
 	cards := []string{"prime_card"}
 
 	summary, err := store.ApplySyncPlan(
@@ -504,13 +514,14 @@ func TestApplySyncPlanSkipsUserCheckpoint(t *testing.T) {
 func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T) Store) {
 	t.Helper()
 	store := newStore(t)
-	document := ownerDocument()
-	document.Checkpoints = append(document.Checkpoints, types.Checkpoint{
+	seedOwnerDocument(t, store)
+	extra, err := store.SaveCheckpoint(types.Checkpoint{
 		Date: "2026-08-05", AccountID: "checking", Balance: 999,
 	})
-	if err := store.SaveDocument(document); err != nil {
+	if err != nil {
 		t.Fatalf("save user checkpoint: %v", err)
 	}
+	_ = extra
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
 		nil, []string{"checking"}, false,
@@ -535,9 +546,7 @@ func TestApplySyncPlanRefreshesPendingSnapshot(t *testing.T) {
 func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*testing.T) Store) {
 	t.Helper()
 	store := newStore(t)
-	if err := store.SaveDocument(ownerDocument()); err != nil {
-		t.Fatalf("save owner document: %v", err)
-	}
+	seedOwnerDocument(t, store)
 	cards := []string{"prime_card"}
 
 	first, err := store.ApplySyncPlan(nil, []types.Posting{
@@ -572,7 +581,7 @@ func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*test
 
 func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
 	// SQLite-only: a model-source row with a colliding sync-prefix ID can
-	// only exist as legacy data (SaveDocument drops such rows by design),
+	// only exist as legacy data (row writes reject the sfin- namespace),
 	// so only raw SQL can set up this coexistence case.
 	store := openSQLiteStore(t)
 	execSyncSetup(t, store, []string{
@@ -597,9 +606,7 @@ func TestApplySyncPlanDryRunWritesNothing(t *testing.T) {
 func testApplySyncPlanDryRunWritesNothing(t *testing.T, newStore func(*testing.T) Store) {
 	t.Helper()
 	store := newStore(t)
-	if err := store.SaveDocument(ownerDocument()); err != nil {
-		t.Fatalf("save owner document: %v", err)
-	}
+	seedOwnerDocument(t, store)
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
 		[]types.Posting{syncPendingPosting("sfin-pending-prime_card-a", "prime_card", "2026-08-02")},

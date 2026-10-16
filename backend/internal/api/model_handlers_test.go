@@ -90,7 +90,7 @@ func TestReadOnlyRejectsWritesButServesReads(t *testing.T) {
 	}
 }
 
-func TestReadOnlyRejectsPutWithSeededDocument(t *testing.T) {
+func TestReadOnlyRejectsRowWrites(t *testing.T) {
 	database := openAPIStore(t)
 	root := apiProjectRoot(t)
 	if _, _, err := database.ImportCSV(
@@ -103,9 +103,6 @@ func TestReadOnlyRejectsPutWithSeededDocument(t *testing.T) {
 
 	get := httptest.NewRecorder()
 	handler.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
-	if get.Code != http.StatusOK {
-		t.Fatalf("GET status = %d, body %s", get.Code, get.Body.String())
-	}
 	var payload struct {
 		Document json.RawMessage `json:"document"`
 	}
@@ -113,19 +110,16 @@ func TestReadOnlyRejectsPutWithSeededDocument(t *testing.T) {
 		t.Fatalf("decode GET response: %v", err)
 	}
 
-	put := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPut, "/v1/financial-model", bytes.NewReader(payload.Document))
+	post := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/accounts", bytes.NewReader([]byte(`{"name":"Probe","kind":"cash","enabled":true}`)))
 	request.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(put, request)
-	if put.Code != http.StatusForbidden {
-		t.Fatalf("PUT status = %d, want 403, body %s", put.Code, put.Body.String())
+	handler.ServeHTTP(post, request)
+	if post.Code != http.StatusForbidden {
+		t.Fatalf("POST status = %d, want 403, body %s", post.Code, post.Body.String())
 	}
 
 	verify := httptest.NewRecorder()
 	handler.ServeHTTP(verify, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
-	if verify.Code != http.StatusOK {
-		t.Fatalf("verify GET status = %d, body %s", verify.Code, verify.Body.String())
-	}
 	var after struct {
 		Document json.RawMessage `json:"document"`
 	}
@@ -133,11 +127,11 @@ func TestReadOnlyRejectsPutWithSeededDocument(t *testing.T) {
 		t.Fatalf("decode verify response: %v", err)
 	}
 	if string(after.Document) != string(payload.Document) {
-		t.Fatalf("rejected PUT changed stored document")
+		t.Fatalf("rejected write changed stored document")
 	}
 }
 
-func TestPutModelReturnsPersistedContentIdentity(t *testing.T) {
+func TestRowWriteReturnsRevision(t *testing.T) {
 	database := openAPIStore(t)
 	if _, _, err := database.ImportCSV(
 		filepath.Join(apiProjectRoot(t), "public", "configs"),
@@ -147,64 +141,34 @@ func TestPutModelReturnsPersistedContentIdentity(t *testing.T) {
 	}
 	handler := New(database, Config{})
 
-	get := httptest.NewRecorder()
-	handler.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
-	var before struct {
-		Document json.RawMessage `json:"document"`
-		Revision string          `json:"revision"`
-	}
-	if err := json.Unmarshal(get.Body.Bytes(), &before); err != nil {
-		t.Fatalf("decode GET response: %v", err)
-	}
-	put := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPut, "/v1/financial-model", bytes.NewReader(before.Document))
+	post := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/accounts", bytes.NewReader([]byte(`{"name":"Probe","kind":"cash","enabled":true}`)))
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("If-Match", before.Revision)
-	handler.ServeHTTP(put, request)
-	if put.Code != http.StatusOK {
-		t.Fatalf("PUT status = %d, body %s", put.Code, put.Body.String())
+	handler.ServeHTTP(post, request)
+	if post.Code != http.StatusOK {
+		t.Fatalf("POST status = %d, body %s", post.Code, post.Body.String())
 	}
-	var afterPut struct {
-		Revision string `json:"revision"`
+	var created struct {
+		Row struct {
+			ID string `json:"id"`
+		} `json:"row"`
+		Persisted bool   `json:"persisted"`
+		Revision  string `json:"revision"`
 	}
-	if err := json.Unmarshal(put.Body.Bytes(), &afterPut); err != nil {
-		t.Fatalf("decode PUT response: %v", err)
+	if err := json.Unmarshal(post.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode POST response: %v", err)
+	}
+	if !created.Persisted || created.Row.ID == "" || created.Revision == "" {
+		t.Fatalf("create response = %+v", created)
 	}
 	afterGet := httptest.NewRecorder()
 	handler.ServeHTTP(afterGet, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
-	if afterPut.Revision == "" || afterPut.Revision != afterGet.Header().Get("ETag") {
-		t.Fatalf("PUT revision = %q, persisted ETag = %q", afterPut.Revision, afterGet.Header().Get("ETag"))
+	if created.Revision != afterGet.Header().Get("ETag") {
+		t.Fatalf("revision = %q, persisted ETag = %q", created.Revision, afterGet.Header().Get("ETag"))
 	}
 }
 
-func TestPutModelRequiresContentIdentity(t *testing.T) {
-	database := openAPIStore(t)
-	if _, _, err := database.ImportCSV(
-		filepath.Join(apiProjectRoot(t), "public", "configs"),
-		filepath.Join(apiProjectRoot(t), "public", "data", "income"),
-	); err != nil {
-		t.Fatalf("seed store: %v", err)
-	}
-	handler := New(database, Config{})
-	get := httptest.NewRecorder()
-	handler.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
-	var before struct {
-		Document json.RawMessage `json:"document"`
-	}
-	if err := json.Unmarshal(get.Body.Bytes(), &before); err != nil {
-		t.Fatalf("decode GET response: %v", err)
-	}
-
-	put := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPut, "/v1/financial-model", bytes.NewReader(before.Document))
-	request.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(put, request)
-	if put.Code != http.StatusPreconditionRequired {
-		t.Fatalf("PUT without If-Match status = %d, want 428, body %s", put.Code, put.Body.String())
-	}
-}
-
-func TestPutModelRejectsStaleContentIdentity(t *testing.T) {
+func TestRowWriteRejectsInvalidRow(t *testing.T) {
 	database := openAPIStore(t)
 	if _, _, err := database.ImportCSV(
 		filepath.Join(apiProjectRoot(t), "public", "configs"),
@@ -214,39 +178,72 @@ func TestPutModelRejectsStaleContentIdentity(t *testing.T) {
 	}
 	handler := New(database, Config{})
 
-	get := httptest.NewRecorder()
-	handler.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
-	if get.Code != http.StatusOK {
-		t.Fatalf("GET status = %d, body %s", get.Code, get.Body.String())
-	}
-	var before struct {
+	before := httptest.NewRecorder()
+	handler.ServeHTTP(before, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
+	var beforePayload struct {
 		Document json.RawMessage `json:"document"`
-		Revision string          `json:"revision"`
 	}
-	if err := json.Unmarshal(get.Body.Bytes(), &before); err != nil {
+	if err := json.Unmarshal(before.Body.Bytes(), &beforePayload); err != nil {
 		t.Fatalf("decode GET response: %v", err)
 	}
-	if before.Revision == "" || get.Header().Get("ETag") != before.Revision {
-		t.Fatalf("model revision = %q, ETag = %q", before.Revision, get.Header().Get("ETag"))
-	}
 
-	stored, err := database.LoadDocument()
-	if err != nil || stored == nil {
-		t.Fatalf("load stored document: %v", err)
-	}
-	changed := *stored
-	changed.SourcePath = stored.SourcePath + ".changed"
-	if err := database.SaveDocument(&changed); err != nil {
-		t.Fatalf("save changed document: %v", err)
-	}
-
-	put := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPut, "/v1/financial-model", bytes.NewReader(before.Document))
+	// A checkpoint for an unknown account fails validation: nothing persists.
+	post := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/checkpoints", bytes.NewReader([]byte(`{"date":"2026-08-05","accountId":"ghost","balance":10}`)))
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("If-Match", before.Revision)
-	handler.ServeHTTP(put, request)
-	if put.Code != http.StatusPreconditionFailed {
-		t.Fatalf("stale PUT status = %d, want 412, body %s", put.Code, put.Body.String())
+	handler.ServeHTTP(post, request)
+	if post.Code != http.StatusOK {
+		t.Fatalf("POST status = %d, body %s", post.Code, post.Body.String())
+	}
+	var rejected struct {
+		Issues    []types.ModelValidationIssue `json:"issues"`
+		Persisted bool                         `json:"persisted"`
+	}
+	if err := json.Unmarshal(post.Body.Bytes(), &rejected); err != nil {
+		t.Fatalf("decode POST response: %v", err)
+	}
+	if rejected.Persisted || len(rejected.Issues) == 0 {
+		t.Fatalf("invalid write response = %+v", rejected)
+	}
+
+	after := httptest.NewRecorder()
+	handler.ServeHTTP(after, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
+	var afterPayload struct {
+		Document json.RawMessage `json:"document"`
+	}
+	if err := json.Unmarshal(after.Body.Bytes(), &afterPayload); err != nil {
+		t.Fatalf("decode verify response: %v", err)
+	}
+	if string(afterPayload.Document) != string(beforePayload.Document) {
+		t.Fatalf("rejected write changed stored document")
+	}
+}
+
+func TestRowWriteNotFoundAndConflict(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+
+	patch := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/v1/accounts/missing", bytes.NewReader([]byte(`{"id":"missing","name":"Missing","kind":"cash","enabled":true}`)))
+	request.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(patch, request)
+	if patch.Code != http.StatusNotFound {
+		t.Fatalf("PATCH missing status = %d, want 404, body %s", patch.Code, patch.Body.String())
+	}
+
+	first := httptest.NewRecorder()
+	create := httptest.NewRequest(http.MethodPost, "/v1/accounts", bytes.NewReader([]byte(`{"id":"probe","name":"Probe","kind":"cash","enabled":true}`)))
+	create.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(first, create)
+	if first.Code != http.StatusOK {
+		t.Fatalf("first POST status = %d, body %s", first.Code, first.Body.String())
+	}
+	second := httptest.NewRecorder()
+	duplicate := httptest.NewRequest(http.MethodPost, "/v1/accounts", bytes.NewReader([]byte(`{"id":"probe","name":"Probe","kind":"cash","enabled":true}`)))
+	duplicate.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(second, duplicate)
+	if second.Code != http.StatusConflict {
+		t.Fatalf("duplicate POST status = %d, want 409, body %s", second.Code, second.Body.String())
 	}
 }
 

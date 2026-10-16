@@ -26,14 +26,14 @@ func RunConformance(t *testing.T, newStore func(*testing.T) Store) {
 	t.Run("ImportCSVRollsBackModelWhenIncomeReplacementFails", func(t *testing.T) {
 		testImportCSVRollsBackModelWhenIncomeReplacementFails(t, newStore)
 	})
-	t.Run("SaveDropsForgedSyncRowsAndMergesStored", func(t *testing.T) {
-		testSaveDropsForgedSyncRowsAndMergesStored(t, newStore)
+	t.Run("RowWritesRejectForgedSyncNamespace", func(t *testing.T) {
+		testRowWritesRejectForgedSyncNamespace(t, newStore)
 	})
 	t.Run("OwnerCheckpointWinsKeyCollision", func(t *testing.T) {
 		testOwnerCheckpointWinsKeyCollision(t, newStore)
 	})
-	t.Run("RoundTripPreservesSyncRows", func(t *testing.T) {
-		testRoundTripPreservesSyncRows(t, newStore)
+	t.Run("RowRoundTripsPreserveOrder", func(t *testing.T) {
+		testRowRoundTripsPreserveOrder(t, newStore)
 	})
 	t.Run("ApplySyncPlanCheckpointLifecycle", func(t *testing.T) {
 		testApplySyncPlanCheckpointLifecycle(t, newStore)

@@ -9,12 +9,10 @@ import (
 	"testing"
 )
 
-func putDocument(handler http.Handler, document json.RawMessage, authorization, ifMatch string) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(http.MethodPut, "/v1/financial-model", bytes.NewReader(document))
+func postAccount(handler http.Handler, authorization string) *httptest.ResponseRecorder {
+	body := `{"name":"Probe","kind":"cash","enabled":true}`
+	request := httptest.NewRequest(http.MethodPost, "/v1/accounts", bytes.NewReader([]byte(body)))
 	request.Header.Set("Content-Type", "application/json")
-	if ifMatch != "" {
-		request.Header.Set("If-Match", ifMatch)
-	}
 	if authorization != "" {
 		request.Header.Set("Authorization", authorization)
 	}
@@ -23,7 +21,7 @@ func putDocument(handler http.Handler, document json.RawMessage, authorization, 
 	return response
 }
 
-func TestPutAuthMatrix(t *testing.T) {
+func TestRowWriteAuthMatrix(t *testing.T) {
 	const token = "test-token-123"
 	for _, test := range []struct {
 		name       string
@@ -54,15 +52,14 @@ func TestPutAuthMatrix(t *testing.T) {
 			handler.ServeHTTP(before, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
 			var beforePayload struct {
 				Document json.RawMessage `json:"document"`
-				Revision string          `json:"revision"`
 			}
 			if err := json.Unmarshal(before.Body.Bytes(), &beforePayload); err != nil {
 				t.Fatalf("decode GET response: %v", err)
 			}
 
-			response := putDocument(handler, beforePayload.Document, test.authHeader, beforePayload.Revision)
+			response := postAccount(handler, test.authHeader)
 			if response.Code != test.want {
-				t.Fatalf("PUT status = %d, want %d, body %s", response.Code, test.want, response.Body.String())
+				t.Fatalf("POST status = %d, want %d, body %s", response.Code, test.want, response.Body.String())
 			}
 
 			after := httptest.NewRecorder()
@@ -74,7 +71,7 @@ func TestPutAuthMatrix(t *testing.T) {
 				t.Fatalf("decode verify response: %v", err)
 			}
 			if test.want != http.StatusOK && string(afterPayload.Document) != string(beforePayload.Document) {
-				t.Fatalf("rejected PUT changed stored document")
+				t.Fatalf("rejected write changed stored document")
 			}
 		})
 	}

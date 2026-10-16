@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 // Summary describes one sync run for logs and the trigger endpoint.
@@ -16,6 +17,7 @@ type Summary struct {
 	CheckpointsSkipped  int            `json:"checkpointsSkipped"`
 	PendingDeleted      int            `json:"pendingDeleted"`
 	PendingInserted     int            `json:"pendingInserted"`
+	AccountsProvisioned int            `json:"accountsProvisioned"`
 	Skipped             map[string]int `json:"skipped"`
 	DryRun              bool           `json:"dryRun"`
 }
@@ -60,8 +62,9 @@ func NewRunner(database store.Store, config Config, client *Client) *Runner {
 	return &Runner{store: database, config: config, fetch: fetch, now: time.Now}
 }
 
-// Sync runs fetch, map, and apply. Scheduler and first-live-run flows call it
-// directly; manual triggers go through Trigger for interval guarding.
+// Sync runs fetch, link resolution, provisioning, map, and apply.
+// Scheduler and first-live-run flows call it directly; manual triggers go
+// through Trigger for interval guarding.
 func (r *Runner) Sync(ctx context.Context) (*Summary, error) {
 	now := r.now()
 	end := now.Add(24 * time.Hour)
@@ -70,12 +73,61 @@ func (r *Runner) Sync(ctx context.Context) (*Summary, error) {
 	if err != nil {
 		return nil, err
 	}
-	plan, err := Map(set, r.config, now)
+	resolved := map[string]string{}
+	links, err := r.store.ListAccountLinks()
 	if err != nil {
 		return nil, err
 	}
+	for _, link := range links {
+		resolved[link.BridgeAccountID] = link.ModelAccountID
+	}
+	// Env entries bootstrap manual links; they win over nothing stored
+	// because stored links already populate resolved above.
+	for bridgeID, modelID := range r.config.AccountMap {
+		if _, ok := resolved[bridgeID]; !ok {
+			resolved[bridgeID] = modelID
+		}
+	}
+	plan, err := Map(set, r.config, resolved, now)
+	if err != nil {
+		return nil, err
+	}
+	provisions := make([]store.SyncProvision, 0, len(plan.Provisions)+len(r.config.AccountMap))
+	byBridge := map[string]Account{}
+	for _, account := range set.Accounts {
+		byBridge[account.ID] = account
+	}
+	for bridgeID, modelID := range r.config.AccountMap {
+		account := byBridge[bridgeID]
+		provisions = append(provisions, store.SyncProvision{
+			BridgeID: bridgeID, ModelAccountID: modelID,
+			Name: account.Name, Currency: account.Currency,
+		})
+	}
+	for _, provision := range plan.Provisions {
+		provisions = append(provisions, store.SyncProvision{
+			BridgeID: provision.BridgeID, Name: provision.Name,
+			Currency: provision.Currency, Kind: types.AccountKind(provision.Kind),
+		})
+	}
+	resolved, provisioned, err := r.store.ProvisionSyncAccounts(provisions, r.config.DryRun)
+	if err != nil {
+		return nil, err
+	}
+	for i := range plan.Checkpoints {
+		if plan.Checkpoints[i].AccountID == "" {
+			modelID, ok := resolved[plan.Checkpoints[i].BridgeID]
+			if !ok {
+				continue
+			}
+			plan.Checkpoints[i].AccountID = modelID
+		}
+	}
 	checkpoints := make([]store.SyncCheckpoint, 0, len(plan.Checkpoints))
 	for _, checkpoint := range plan.Checkpoints {
+		if checkpoint.AccountID == "" {
+			continue
+		}
 		checkpoints = append(checkpoints, store.SyncCheckpoint{
 			AccountID: checkpoint.AccountID,
 			Date:      checkpoint.Date,
@@ -100,6 +152,7 @@ func (r *Runner) Sync(ctx context.Context) (*Summary, error) {
 		CheckpointsSkipped:  applied.CheckpointsSkipped,
 		PendingDeleted:      applied.PendingDeleted,
 		PendingInserted:     applied.PendingInserted,
+		AccountsProvisioned: provisioned,
 		Skipped:             skipped,
 		DryRun:              applied.DryRun,
 	}, nil
