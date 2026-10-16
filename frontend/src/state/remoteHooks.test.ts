@@ -378,25 +378,19 @@ function clientFixture(put?: PutCallback) {
 		return tables[evaluationType] ?? [];
 	};
 	const client = {
-		getStatus: vi.fn(
-			async (): Promise<ServerStatus> => ({
-				readOnly: false,
-				authEnabled: true,
-			}),
-		),
-		getModel: vi.fn(
-			async (): Promise<FinancialModelResponse> => ({
-				document: structuredClone(current),
-				issues: [],
-				revision: '"sha256-test"',
-			}),
-		),
-		getIncomeData: vi.fn(
-			async (): Promise<IncomeDataSnapshot> => ({
-				incomeSources: [],
-				taxProfiles: [],
-			}),
-		),
+		getStatus: vi.fn(async (): Promise<ServerStatus> => ({
+			readOnly: false,
+			authEnabled: true,
+		})),
+		getModel: vi.fn(async (): Promise<FinancialModelResponse> => ({
+			document: structuredClone(current),
+			issues: [],
+			revision: '"sha256-test"',
+		})),
+		getIncomeData: vi.fn(async (): Promise<IncomeDataSnapshot> => ({
+			incomeSources: [],
+			taxProfiles: [],
+		})),
 		createAccount: vi.fn(async (row: BackendAccount) => {
 			current.accounts.push(structuredClone(row));
 			return viaPut(row);

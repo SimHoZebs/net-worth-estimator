@@ -119,7 +119,9 @@ describe("native API client", () => {
 		});
 		const textResult = await textClient.getIncomeData();
 		expect(textResult).toBeInstanceOf(ApiHttpError);
-		if (textResult instanceof ApiHttpError) expect(textResult.status).toBe(503);
+		if (!(textResult instanceof ApiHttpError))
+			throw new Error("Expected ApiHttpError for plain-text error");
+		expect(textResult.status).toBe(503);
 
 		const networkClient = new ApiClient({
 			fetch: async () => {

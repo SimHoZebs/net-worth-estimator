@@ -36,8 +36,8 @@ func ParseMockMode(value string) bool {
 // MockAccountSet returns a deterministic bridge-shaped fixture: a checking
 // balance, a card balance with one pending charge, plus one posted charge
 // and one positive pending transaction that the mapper must skip. IDs are
-// stable (mock-checking, mock-prime) so operators can map them with
-// NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS=mock-checking=checking,mock-prime=prime_card.
+// stable (mock-checking, mock-prime) so tests link them with
+// SaveAccountLink.
 func MockAccountSet(now time.Time) *AccountSet {
 	stamp := now.UTC().Unix()
 	pending := true

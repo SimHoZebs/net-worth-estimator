@@ -57,12 +57,10 @@ function rowResponse<T>(row: T): RowWriteResponse<T> {
 function setup(
 	preconditions: Partial<ServerModelImportOptions["preconditions"]> = {},
 ) {
-	const getModel = vi.fn(
-		async (): Promise<Error | FinancialModelResponse> => ({
-			document: emptyDocument,
-			issues: [],
-		}),
-	);
+	const getModel = vi.fn(async (): Promise<Error | FinancialModelResponse> => ({
+		document: emptyDocument,
+		issues: [],
+	}));
 	const echoRow = (row: unknown) => rowResponse(row);
 	const mocks = {
 		getModel,

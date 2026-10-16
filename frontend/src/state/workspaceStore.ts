@@ -558,22 +558,20 @@ export const useWorkspaceStore = create<
 		const storedBaseRevision = localState?.baseRevision ?? null;
 		const identityMissing = Boolean(
 			storedDraft &&
-				(!storedBaseFingerprint ||
-					!storedBaseRevision ||
-					!modelResult.revision),
+			(!storedBaseFingerprint || !storedBaseRevision || !modelResult.revision),
 		);
 		const baseFingerprint = storedDraft ? storedBaseFingerprint : null;
 		const baseRevision = storedDraft ? storedBaseRevision : null;
 		const fingerprintChanged = Boolean(
 			storedDraft &&
-				storedBaseFingerprint &&
-				storedBaseFingerprint !== fingerprint,
+			storedBaseFingerprint &&
+			storedBaseFingerprint !== fingerprint,
 		);
 		const revisionChanged = Boolean(
 			storedDraft &&
-				storedBaseRevision &&
-				modelResult.revision &&
-				storedBaseRevision !== modelResult.revision,
+			storedBaseRevision &&
+			modelResult.revision &&
+			storedBaseRevision !== modelResult.revision,
 		);
 		const draftStale = identityMissing || fingerprintChanged || revisionChanged;
 		const draftPresentation = storedDraft
@@ -613,8 +611,8 @@ export const useWorkspaceStore = create<
 
 		const shouldRetryStorage = Boolean(
 			volatileState ||
-				(!storedState && inMemoryState) ||
-				(storedDraft && storedBaseFingerprint === null),
+			(!storedState && inMemoryState) ||
+			(storedDraft && storedBaseFingerprint === null),
 		);
 		const local = localStateFor(nextWorkspace, draftPresentation);
 		const storageWriteFailed =
@@ -905,9 +903,9 @@ export const useWorkspaceStore = create<
 						draftStale: Boolean(
 							(current.baseFingerprint &&
 								current.baseFingerprint !== authoritativeFingerprint) ||
-								(current.baseRevision &&
-									authoritative.revision &&
-									current.baseRevision !== authoritative.revision),
+							(current.baseRevision &&
+								authoritative.revision &&
+								current.baseRevision !== authoritative.revision),
 						),
 					};
 			set({

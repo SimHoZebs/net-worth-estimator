@@ -439,8 +439,7 @@ export interface StochasticProjectionResult extends HumaMetadata {
 	evaluations: EvaluationResultTables;
 }
 
-export interface StochasticProjectionRequest
-	extends DeterministicProjectionRequest {
+export interface StochasticProjectionRequest extends DeterministicProjectionRequest {
 	config: StochasticConfig;
 }
 

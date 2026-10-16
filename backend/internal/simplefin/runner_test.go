@@ -23,8 +23,8 @@ func openRunnerStore(t *testing.T) store.Store {
 	return database
 }
 
-// seedRunnerAccounts creates the model accounts a sync map targets.
-// Like production (seeded DB), sync bootstrap validates manual targets.
+// seedRunnerAccounts creates the model accounts a sync targets plus the
+// links the removed env map used to provide.
 func seedRunnerAccounts(t *testing.T, database store.Store) {
 	t.Helper()
 	for _, account := range []types.Account{
@@ -35,14 +35,20 @@ func seedRunnerAccounts(t *testing.T, database store.Store) {
 			t.Fatalf("seed account %s: %v", account.ID, err)
 		}
 	}
+	for _, link := range []store.AccountLink{
+		{BridgeAccountID: "mock-checking", ModelAccountID: "checking", Origin: store.LinkOriginManual},
+		{BridgeAccountID: "mock-prime", ModelAccountID: "prime_card", Origin: store.LinkOriginManual},
+	} {
+		if _, err := database.SaveAccountLink(link); err != nil {
+			t.Fatalf("seed link %s: %v", link.BridgeAccountID, err)
+		}
+	}
 }
 
 func TestSyncProvisionsUnmappedBridgeAccounts(t *testing.T) {
 	database := openRunnerStore(t)
 	seedRunnerAccounts(t, database)
-	runner := NewRunner(database, Config{
-		AccountMap: map[string]string{"mock-checking": "checking"},
-	}, nil)
+	runner := NewRunner(database, Config{}, nil)
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return &AccountSet{Accounts: []Account{
 			{ID: "mock-checking", Name: "Checking", Currency: "USD", Balance: "100.00"},
@@ -57,7 +63,7 @@ func TestSyncProvisionsUnmappedBridgeAccounts(t *testing.T) {
 		t.Fatalf("summary = %+v, want 1 provisioned + 2 checkpoints", summary)
 	}
 	links, err := database.ListAccountLinks()
-	if err != nil || len(links) != 2 {
+	if err != nil || len(links) != 3 {
 		t.Fatalf("links = %+v, err %v", links, err)
 	}
 	for _, link := range links {
@@ -98,8 +104,7 @@ func TestTriggerGuardsInterval(t *testing.T) {
 	database := openRunnerStore(t)
 	calls := 0
 	runner := NewRunner(database, Config{
-		AccountMap: map[string]string{},
-		DryRun:     true,
+		DryRun: true,
 	}, nil)
 	runner.fetch = func(ctx context.Context, start, end time.Time) (*AccountSet, error) {
 		calls++
@@ -123,8 +128,7 @@ func TestTriggerRetriesAfterFailure(t *testing.T) {
 	database := openRunnerStore(t)
 	calls := 0
 	runner := NewRunner(database, Config{
-		AccountMap: map[string]string{},
-		DryRun:     true,
+		DryRun: true,
 	}, nil)
 	runner.fetch = func(ctx context.Context, start, end time.Time) (*AccountSet, error) {
 		calls++
@@ -150,8 +154,7 @@ func TestTriggerRefusesConcurrentRun(t *testing.T) {
 	release := make(chan struct{})
 	entered := make(chan struct{})
 	runner := NewRunner(database, Config{
-		AccountMap: map[string]string{},
-		DryRun:     true,
+		DryRun: true,
 	}, nil)
 	runner.fetch = func(ctx context.Context, start, end time.Time) (*AccountSet, error) {
 		close(entered)

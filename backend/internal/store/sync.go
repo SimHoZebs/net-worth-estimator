@@ -178,19 +178,18 @@ func escapeLike(value string) string {
 	return value
 }
 
-// SyncProvision is one bridge account needing link resolution: a manual
-// bootstrap entry when ModelAccountID is set, auto-provisioning otherwise.
+// SyncProvision is one bridge account needing link resolution: an
+// existing link is touched, otherwise the account is auto-provisioned.
+// Manual bindings are made through SaveAccountLink, never here.
 type SyncProvision struct {
-	BridgeID       string
-	ModelAccountID string
-	Name           string
-	Currency       string
-	Kind           types.AccountKind
+	BridgeID string
+	Name     string
+	Currency string
+	Kind     types.AccountKind
 }
 
 // ProvisionSyncAccounts resolves every seen bridge account to a model
 // account in one transaction: existing links get a snapshot touch,
-// manual entries are bootstrapped after validating the model account,
 // and unknown accounts get a provisioned account plus an auto link.
 // A link whose model account no longer exists resolves to nothing and
 // is reported stale: no checkpoints are written for it, nothing is
@@ -223,26 +222,6 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision, dryRun bool) 
 			continue
 		} else if err != sql.ErrNoRows {
 			return nil, 0, nil, fmt.Errorf("read account link %s: %w", item.BridgeID, err)
-		}
-		if item.ModelAccountID != "" {
-			exists, err := accountExists(tx, item.ModelAccountID)
-			if err != nil {
-				return nil, 0, nil, err
-			}
-			if !exists {
-				return nil, 0, nil, &rowError{code: "account-missing", id: item.ModelAccountID}
-			}
-			if _, err := tx.Exec(
-				`INSERT INTO account_links (bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at) VALUES (?,?,?,?,?,?)`,
-				item.BridgeID, item.ModelAccountID, item.Name, item.Currency, LinkOriginManual, utcToday(),
-			); err != nil {
-				if isUniqueViolation(err) {
-					return nil, 0, nil, &rowError{code: "id-conflict", id: item.ModelAccountID}
-				}
-				return nil, 0, nil, fmt.Errorf("bootstrap account link %s: %w", item.BridgeID, err)
-			}
-			resolved[item.BridgeID] = item.ModelAccountID
-			continue
 		}
 		modelAccountID, created, err := EnsureLinkedAccount(tx, item.BridgeID, item.Name, item.Currency, item.Kind)
 		if err != nil {

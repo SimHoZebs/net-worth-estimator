@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -74,9 +75,13 @@ func TestSyncTriggerRunsDryRunAndGuardsInterval(t *testing.T) {
 			t.Fatalf("seed account: %v", err)
 		}
 	}
+	for _, link := range [][2]string{{"sfin-checking", "checking"}, {"sfin-prime", "prime_card"}} {
+		if _, err := database.SaveAccountLink(store.AccountLink{BridgeAccountID: link[0], ModelAccountID: link[1], Origin: store.LinkOriginManual}); err != nil {
+			t.Fatalf("seed link: %v", err)
+		}
+	}
 	runner := simplefin.NewRunner(database, simplefin.Config{
 		AccessURL:    bridge.URL,
-		AccountMap:   map[string]string{"sfin-checking": "checking", "sfin-prime": "prime_card"},
 		CardAccounts: map[string]struct{}{"prime_card": {}},
 		DryRun:       true,
 	}, &simplefin.Client{AccessURL: bridge.URL})

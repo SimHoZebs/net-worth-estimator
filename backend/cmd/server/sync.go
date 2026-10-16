@@ -15,11 +15,12 @@ import (
 
 // configureSync builds the SimpleFIN runner from environment. An empty
 // access URL disables the sync (nil runner, trigger returns 503), unless
-// mock mode fabricates Bridge responses for local development. An
-// unparseable account map is fatal: a half-configured sync must not run.
-// Mock and real sources are mutually exclusive: mock rows are intentionally
-// identical to real sync rows, so cutover is a documented DB purge
-// (backend/scripts/purge-simplefin-sync.sql), never a code branch.
+// mock mode fabricates Bridge responses for local development.
+// Account links live in the database: unmapped bridge accounts are
+// auto-provisioned, and disaster recovery is a database backup, never an
+// env map. Mock and real sources are mutually exclusive: mock rows are
+// intentionally identical to real sync rows, so cutover is a documented
+// DB purge (backend/scripts/purge-simplefin-sync.sql), never a code branch.
 func configureSync(database store.Store) (*simplefin.Runner, func()) {
 	mockMode := simplefin.ParseMockMode(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK"))
 	mockFile := strings.TrimSpace(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE"))
@@ -31,12 +32,7 @@ func configureSync(database store.Store) (*simplefin.Runner, func()) {
 		log.Fatalf("simplefin mock file requires NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK=1")
 	}
 	if mockMode {
-		accountMap, err := simplefin.ParseAccountMap(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS"))
-		if err != nil {
-			log.Fatalf("configure simplefin mock account map: %v", err)
-		}
 		config := simplefin.Config{
-			AccountMap:   accountMap,
 			CardAccounts: simplefin.ParseCardAccounts(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS")),
 			DryRun:       simplefin.ParseDryRun(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN")),
 		}
@@ -56,13 +52,8 @@ func configureSync(database store.Store) (*simplefin.Runner, func()) {
 	if accessURL == "" {
 		return nil, func() {}
 	}
-	accountMap, err := simplefin.ParseAccountMap(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS"))
-	if err != nil {
-		log.Fatalf("configure simplefin account map: %v", err)
-	}
 	config := simplefin.Config{
 		AccessURL:    accessURL,
-		AccountMap:   accountMap,
 		CardAccounts: simplefin.ParseCardAccounts(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS")),
 		DryRun:       simplefin.ParseDryRun(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN")),
 	}

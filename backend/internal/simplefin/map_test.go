@@ -47,24 +47,7 @@ const fixtureAccountSet = `{
 
 func fixtureConfig() Config {
 	return Config{
-		AccountMap:   map[string]string{"sfin-checking": "checking", "sfin-prime": "prime_card"},
 		CardAccounts: map[string]struct{}{"prime_card": {}},
-	}
-}
-
-func TestParseAccountMap(t *testing.T) {
-	mapping, err := ParseAccountMap("a=b, c=d")
-	if err != nil || mapping["a"] != "b" || mapping["c"] != "d" {
-		t.Fatalf("parse = %v, %v", mapping, err)
-	}
-	if _, err := ParseAccountMap("no-equals"); err == nil {
-		t.Fatal("expected error for bare entry")
-	}
-	if _, err := ParseAccountMap("a="); err == nil {
-		t.Fatal("expected error for empty value")
-	}
-	if mapping, err := ParseAccountMap(""); err != nil || len(mapping) != 0 {
-		t.Fatalf("empty parse = %v, %v", mapping, err)
 	}
 }
 
