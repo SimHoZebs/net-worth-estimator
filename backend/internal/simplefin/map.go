@@ -23,6 +23,10 @@ const (
 	SkipPosted          SkipReason = "posted-not-materialized"
 	SkipNonCharge       SkipReason = "non-charge"
 	SkipBadAmount       SkipReason = "bad-amount"
+	// SkipStaleLink counts bridge accounts whose link points at a
+	// deleted model account. Nothing is written for them; the link
+	// stays for relinking.
+	SkipStaleLink SkipReason = "linked-account-missing"
 )
 
 // Checkpoint is a balance observation for one model account and day.

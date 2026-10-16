@@ -261,7 +261,7 @@ func TestProvisionSyncAccounts(t *testing.T) {
 	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking"}); err != nil {
 		t.Fatalf("create account: %v", err)
 	}
-	resolved, provisioned, err := store.ProvisionSyncAccounts([]SyncProvision{
+	resolved, provisioned, stale, err := store.ProvisionSyncAccounts([]SyncProvision{
 		{BridgeID: "bridge-checking", ModelAccountID: "checking", Name: "College", Currency: "USD"},
 		{BridgeID: "bridge-new", Name: "New Card", Currency: "USD", Kind: types.AccountKind("debt")},
 	}, true)
@@ -274,7 +274,7 @@ func TestProvisionSyncAccounts(t *testing.T) {
 	if links, err := store.ListAccountLinks(); err != nil || len(links) != 0 {
 		t.Fatalf("dry run wrote links: %+v, err %v", links, err)
 	}
-	resolved, provisioned, err = store.ProvisionSyncAccounts([]SyncProvision{
+	resolved, provisioned, stale, err = store.ProvisionSyncAccounts([]SyncProvision{
 		{BridgeID: "bridge-checking", ModelAccountID: "checking", Name: "College", Currency: "USD"},
 		{BridgeID: "bridge-new", Name: "New Card", Currency: "USD", Kind: types.AccountKind("debt")},
 	}, false)
@@ -303,7 +303,7 @@ func TestProvisionSyncAccounts(t *testing.T) {
 		t.Fatalf("links = %+v, err %v", links, err)
 	}
 	// Re-running is idempotent: links resolve, nothing new is created.
-	_, provisioned, err = store.ProvisionSyncAccounts([]SyncProvision{
+	_, provisioned, stale, err = store.ProvisionSyncAccounts([]SyncProvision{
 		{BridgeID: "bridge-new", Name: "Renamed Card", Currency: "USD", Kind: types.AccountKind("debt")},
 	}, false)
 	if err != nil || provisioned != 0 {
@@ -318,10 +318,51 @@ func TestProvisionSyncAccounts(t *testing.T) {
 			t.Fatalf("snapshot not refreshed: %+v", link)
 		}
 	}
-	if _, _, err := store.ProvisionSyncAccounts([]SyncProvision{
+	if len(stale) != 0 {
+		t.Fatalf("stale links = %v, want none", stale)
+	}
+	if _, _, _, err := store.ProvisionSyncAccounts([]SyncProvision{
 		{BridgeID: "bridge-ghost", ModelAccountID: "ghost", Name: "Ghost"},
 	}, false); !IsAccountMissing(err) {
 		t.Fatalf("bootstrap missing account err = %v, want account-missing", err)
+	}
+}
+
+func TestProvisionReportsStaleLinks(t *testing.T) {
+	store := openTestStore(t)
+	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking"}); err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	if _, err := store.SaveAccountLink(AccountLink{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", BridgeName: "College"}); err != nil {
+		t.Fatalf("save link: %v", err)
+	}
+	if err := store.DeleteAccount("checking"); err != nil {
+		t.Fatalf("delete account: %v", err)
+	}
+	resolved, provisioned, stale, err := store.ProvisionSyncAccounts([]SyncProvision{
+		{BridgeID: "bridge-checking", Name: "College", Currency: "USD", Kind: types.AccountKind("cash")},
+	}, false)
+	if err != nil {
+		t.Fatalf("provision: %v", err)
+	}
+	if provisioned != 0 {
+		t.Fatalf("provisioned = %d, want 0 (link exists, account gone)", provisioned)
+	}
+	if len(resolved) != 0 {
+		t.Fatalf("resolved = %v, want nothing for a deleted account", resolved)
+	}
+	if len(stale) != 1 || stale[0] != "bridge-checking" {
+		t.Fatalf("stale = %v, want [bridge-checking]", stale)
+	}
+	// Recreating the account under its ID resumes flow through the kept link.
+	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking"}); err != nil {
+		t.Fatalf("recreate account: %v", err)
+	}
+	resolved, _, stale, err = store.ProvisionSyncAccounts([]SyncProvision{
+		{BridgeID: "bridge-checking", Name: "College", Currency: "USD", Kind: types.AccountKind("cash")},
+	}, false)
+	if err != nil || resolved["bridge-checking"] != "checking" || len(stale) != 0 {
+		t.Fatalf("relink resolved = %v stale = %v err %v", resolved, stale, err)
 	}
 }
 

@@ -57,7 +57,7 @@ type Store interface {
 	ListAccountLinks() ([]AccountLink, error)
 	SaveAccountLink(link AccountLink) (AccountLink, error)
 	DeleteAccountLink(bridgeAccountID string) error
-	ProvisionSyncAccounts(items []SyncProvision, dryRun bool) (map[string]string, int, error)
+	ProvisionSyncAccounts(items []SyncProvision, dryRun bool) (map[string]string, int, []string, error)
 	GetArtifact(identity string) (string, bool, error)
 	PutArtifact(identity, kind, payload string) error
 	ApplySyncPlan(checkpoints []SyncCheckpoint, pending []types.Posting, cardAccounts []string, dryRun bool) (SyncApplySummary, error)

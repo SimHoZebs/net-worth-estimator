@@ -67,6 +67,33 @@ func TestSyncProvisionsUnmappedBridgeAccounts(t *testing.T) {
 	}
 }
 
+func TestSyncSkipsStaleLinksWithoutWriting(t *testing.T) {
+	database := openRunnerStore(t)
+	seedRunnerAccounts(t, database)
+	if _, err := database.CreateAccount(types.Account{ID: "ghost", Name: "Ghost"}); err != nil {
+		t.Fatalf("create ghost: %v", err)
+	}
+	if _, err := database.SaveAccountLink(store.AccountLink{BridgeAccountID: "mock-old", ModelAccountID: "ghost", BridgeName: "Old"}); err != nil {
+		t.Fatalf("save link: %v", err)
+	}
+	if err := database.DeleteAccount("ghost"); err != nil {
+		t.Fatalf("delete ghost: %v", err)
+	}
+	runner := NewRunner(database, Config{}, nil)
+	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
+		return &AccountSet{Accounts: []Account{
+			{ID: "mock-old", Name: "Old", Currency: "USD", Balance: "10.00"},
+		}}, nil
+	}
+	summary, err := runner.Sync(context.Background())
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if summary.Skipped["linked-account-missing"] != 1 || summary.CheckpointsInserted != 0 {
+		t.Fatalf("summary = %+v, want 1 stale skip and no checkpoints", summary)
+	}
+}
+
 func TestTriggerGuardsInterval(t *testing.T) {
 	database := openRunnerStore(t)
 	calls := 0
