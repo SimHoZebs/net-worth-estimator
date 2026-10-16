@@ -36,6 +36,7 @@ type Account struct {
 	Balance          string        `json:"balance"`
 	AvailableBalance *string       `json:"available-balance"`
 	BalanceDate      int64         `json:"balance-date"`
+	Holdings         []any         `json:"holdings"`
 	Transactions     []Transaction `json:"transactions"`
 }
 

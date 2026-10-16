@@ -26,16 +26,30 @@ const (
 )
 
 // Checkpoint is a balance observation for one model account and day.
+// BridgeID carries the source account; AccountID is empty when the bridge
+// account has no resolved model account yet (the runner provisions one,
+// then fills it in before apply).
 type Checkpoint struct {
 	AccountID string
+	BridgeID  string
 	Date      string
 	Balance   float64
+}
+
+// Provision asks the store to create a model account plus an auto link
+// for an unmapped bridge account.
+type Provision struct {
+	BridgeID string
+	Name     string
+	Currency string
+	Kind     string
 }
 
 // Plan is the mapped sync output before applying.
 type Plan struct {
 	Checkpoints []Checkpoint
 	Pending     []types.Posting
+	Provisions  []Provision
 	Skipped     map[SkipReason]int
 }
 
@@ -44,6 +58,11 @@ var idSanitizer = regexp.MustCompile(`[^A-Za-z0-9_-]`)
 // PendingPostingID builds the stable sync-namespace ID for a pending charge.
 func PendingPostingID(modelAccountID, transactionID string) string {
 	return store.SyncPostingPrefix + "pending-" + modelAccountID + "-" + idSanitizer.ReplaceAllString(transactionID, "_")
+}
+
+// parseBalance parses a bridge balance decimal.
+func parseBalance(raw string) (float64, error) {
+	return strconv.ParseFloat(strings.TrimSpace(raw), 64)
 }
 
 // absDecimal returns the absolute decimal value without float formatting.
@@ -62,6 +81,24 @@ func absDecimal(raw string) (string, error) {
 	return digits, nil
 }
 
+func checkpointDay(balanceDate int64, now time.Time) string {
+	if balanceDate > 0 {
+		return time.Unix(balanceDate, 0).UTC().Format("2006-01-02")
+	}
+	return now.UTC().Format("2006-01-02")
+}
+
+// provisionKind picks the model account kind for an auto-provisioned
+// account: investment when the bridge reports holdings, cash otherwise.
+// Card (debt) status is model-side configuration; a provisioned account
+// becomes card-eligible once linked and added to the card set.
+func provisionKind(account Account) string {
+	if len(account.Holdings) > 0 {
+		return "investment"
+	}
+	return "cash"
+}
+
 func truncateLabel(description string) string {
 	name := strings.TrimSpace(description)
 	if name == "" {
@@ -75,33 +112,55 @@ func truncateLabel(description string) string {
 }
 
 // Map converts an account set into checkpoints plus pending seed postings.
-// Posted transactions are never materialized; neither are checking flows.
-func Map(set *AccountSet, config Config, now time.Time) (*Plan, error) {
+// resolved maps bridge account IDs to model account IDs (links plus env
+// bootstrap). Mapped accounts emit checkpoints with model IDs; mappable
+// USD accounts without a resolution emit bridge-keyed checkpoints plus a
+// Provision the runner fulfills before apply. Posted transactions are
+// never materialized; neither are checking flows.
+func Map(set *AccountSet, config Config, resolved map[string]string, now time.Time) (*Plan, error) {
 	plan := &Plan{Skipped: map[SkipReason]int{}}
 	seenCheckpoints := map[string]struct{}{}
 	for _, account := range set.Accounts {
-		modelAccountID, mapped := config.AccountMap[account.ID]
+		modelAccountID, mapped := resolved[account.ID]
 		if !mapped {
+			if account.Currency != "" && account.Currency != "USD" {
+				plan.Skipped[SkipNonUSD] += len(account.Transactions) + 1
+				continue
+			}
+			if _, err := parseBalance(account.Balance); err != nil {
+				plan.Skipped[SkipBadAmount]++
+				continue
+			}
 			plan.Skipped[SkipUnmappedAccount] += len(account.Transactions) + 1
+			plan.Provisions = append(plan.Provisions, Provision{
+				BridgeID: account.ID,
+				Name:     account.Name,
+				Currency: account.Currency,
+				Kind:     provisionKind(account),
+			})
+			day := checkpointDay(account.BalanceDate, now)
+			key := account.ID + "\x00" + day
+			if _, seen := seenCheckpoints[key]; !seen {
+				seenCheckpoints[key] = struct{}{}
+				balance, _ := parseBalance(account.Balance)
+				plan.Checkpoints = append(plan.Checkpoints, Checkpoint{BridgeID: account.ID, Date: day, Balance: balance})
+			}
 			continue
 		}
 		if account.Currency != "" && account.Currency != "USD" {
 			plan.Skipped[SkipNonUSD] += len(account.Transactions) + 1
 			continue
 		}
-		balance, err := strconv.ParseFloat(strings.TrimSpace(account.Balance), 64)
+		balance, err := parseBalance(account.Balance)
 		if err != nil {
 			plan.Skipped[SkipBadAmount]++
 			continue
 		}
-		day := now.UTC().Format("2006-01-02")
-		if account.BalanceDate > 0 {
-			day = time.Unix(account.BalanceDate, 0).UTC().Format("2006-01-02")
-		}
+		day := checkpointDay(account.BalanceDate, now)
 		key := modelAccountID + "\x00" + day
 		if _, seen := seenCheckpoints[key]; !seen {
 			seenCheckpoints[key] = struct{}{}
-			plan.Checkpoints = append(plan.Checkpoints, Checkpoint{AccountID: modelAccountID, Date: day, Balance: balance})
+			plan.Checkpoints = append(plan.Checkpoints, Checkpoint{AccountID: modelAccountID, BridgeID: account.ID, Date: day, Balance: balance})
 		}
 
 		if _, isCard := config.CardAccounts[modelAccountID]; !isCard {

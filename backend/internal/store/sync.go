@@ -178,6 +178,78 @@ func escapeLike(value string) string {
 	return value
 }
 
+// SyncProvision is one bridge account needing link resolution: a manual
+// bootstrap entry when ModelAccountID is set, auto-provisioning otherwise.
+type SyncProvision struct {
+	BridgeID       string
+	ModelAccountID string
+	Name           string
+	Currency       string
+	Kind           types.AccountKind
+}
+
+// ProvisionSyncAccounts resolves every seen bridge account to a model
+// account in one transaction: existing links get a snapshot touch,
+// manual entries are bootstrapped after validating the model account,
+// and unknown accounts get a provisioned account plus an auto link.
+// dryRun rolls everything back and still returns the resolved map.
+func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision, dryRun bool) (map[string]string, int, error) {
+	resolved := map[string]string{}
+	provisioned := 0
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, 0, fmt.Errorf("provision begin: %w", err)
+	}
+	defer tx.Rollback()
+	for _, item := range items {
+		var modelAccountID string
+		if err := tx.QueryRow(`SELECT model_account_id FROM account_links WHERE bridge_account_id = ?`, item.BridgeID).Scan(&modelAccountID); err == nil {
+			if err := TouchAccountLink(tx, item.BridgeID, item.Name, item.Currency); err != nil {
+				return nil, 0, err
+			}
+			resolved[item.BridgeID] = modelAccountID
+			continue
+		} else if err != sql.ErrNoRows {
+			return nil, 0, fmt.Errorf("read account link %s: %w", item.BridgeID, err)
+		}
+		if item.ModelAccountID != "" {
+			exists, err := accountExists(tx, item.ModelAccountID)
+			if err != nil {
+				return nil, 0, err
+			}
+			if !exists {
+				return nil, 0, &rowError{code: "account-missing", id: item.ModelAccountID}
+			}
+			if _, err := tx.Exec(
+				`INSERT INTO account_links (bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at) VALUES (?,?,?,?,?,?)`,
+				item.BridgeID, item.ModelAccountID, item.Name, item.Currency, LinkOriginManual, utcToday(),
+			); err != nil {
+				if isUniqueViolation(err) {
+					return nil, 0, &rowError{code: "id-conflict", id: item.ModelAccountID}
+				}
+				return nil, 0, fmt.Errorf("bootstrap account link %s: %w", item.BridgeID, err)
+			}
+			resolved[item.BridgeID] = item.ModelAccountID
+			continue
+		}
+		modelAccountID, created, err := EnsureLinkedAccount(tx, item.BridgeID, item.Name, item.Currency, item.Kind)
+		if err != nil {
+			return nil, 0, err
+		}
+		if created {
+			provisioned++
+		}
+		resolved[item.BridgeID] = modelAccountID
+	}
+	if dryRun {
+		return resolved, provisioned, nil
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, 0, fmt.Errorf("provision commit: %w", err)
+	}
+	return resolved, provisioned, nil
+}
+
 // ApplySyncPlan upserts sync checkpoints and refreshes pending seed postings
 // in one transaction. Owner rows always win key conflicts. Pending rows are
 // snapshot-scoped per card account: existing sync pending rows for the given
@@ -237,6 +309,27 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []type
 	pendingPrefix := SyncPostingPrefix + "pending-"
 	for _, accountID := range cardAccounts {
 		pattern := pendingPrefix + escapeLike(accountID) + `-%`
+		rows, err := tx.Query(
+			`SELECT id FROM postings WHERE source = ? AND source_account_id = ? AND id LIKE ? ESCAPE '\'`,
+			SourceSimpleFIN, accountID, pattern,
+		)
+		if err != nil {
+			return summary, fmt.Errorf("sync read pending: %w", err)
+		}
+		var stale []string
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return summary, err
+			}
+			stale = append(stale, id)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return summary, fmt.Errorf("sync read pending rows: %w", err)
+		}
+		rows.Close()
 		result, err := tx.Exec(
 			`DELETE FROM postings WHERE source = ? AND source_account_id = ? AND id LIKE ? ESCAPE '\'`,
 			SourceSimpleFIN, accountID, pattern,
@@ -249,12 +342,22 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []type
 			return summary, fmt.Errorf("sync pending rows: %w", err)
 		}
 		summary.PendingDeleted += int(deleted)
+		for _, id := range stale {
+			if err := releaseRowID(tx, id); err != nil {
+				return summary, err
+			}
+		}
 	}
 	nextPostingPosition, err := nextTablePosition(tx, "postings")
 	if err != nil {
 		return summary, err
 	}
 	for i := range pending {
+		// Sync-owned IDs live in the sfin- namespace, which owner writes
+		// cannot claim, so idempotent re-claim is safe here.
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO entity_ids (id, kind) VALUES (?, 'posting')`, pending[i].ID); err != nil {
+			return summary, fmt.Errorf("sync claim pending id: %w", err)
+		}
 		if err := insertPosting(tx, nextPostingPosition, &pending[i], SourceSimpleFIN); err != nil {
 			return summary, fmt.Errorf("sync insert pending: %w", err)
 		}

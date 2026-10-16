@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	corsAllowedHeaders = "Content-Type, Authorization, If-Match"
-	corsAllowedMethods = "GET, POST, PUT, OPTIONS"
+	corsAllowedHeaders = "Content-Type, Authorization"
+	corsAllowedMethods = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
 	corsExposedHeaders = "ETag, X-Cache, Link"
 )
 
@@ -20,6 +20,8 @@ var allowedCORSMethods = map[string]struct{}{
 	http.MethodGet:     {},
 	http.MethodPost:    {},
 	http.MethodPut:     {},
+	http.MethodPatch:   {},
+	http.MethodDelete:  {},
 	http.MethodOptions: {},
 }
 
@@ -230,7 +232,7 @@ func corsHeadersAllowed(value string) bool {
 		if trimmed == "" {
 			continue
 		}
-		if strings.EqualFold(trimmed, "Content-Type") || strings.EqualFold(trimmed, "Authorization") || strings.EqualFold(trimmed, "If-Match") {
+		if strings.EqualFold(trimmed, "Content-Type") || strings.EqualFold(trimmed, "Authorization") {
 			continue
 		}
 		return false

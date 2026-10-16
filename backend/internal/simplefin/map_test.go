@@ -73,11 +73,11 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if err := json.Unmarshal([]byte(fixtureAccountSet), &set); err != nil {
 		t.Fatalf("decode fixture: %v", err)
 	}
-	plan, err := Map(&set, fixtureConfig(), time.Unix(1785628800, 0).UTC())
+	plan, err := Map(&set, fixtureConfig(), map[string]string{"sfin-checking": "checking", "sfin-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
 	if err != nil {
 		t.Fatalf("map: %v", err)
 	}
-	if len(plan.Checkpoints) != 2 {
+	if len(plan.Checkpoints) != 3 {
 		t.Fatalf("checkpoints = %+v", plan.Checkpoints)
 	}
 	for _, checkpoint := range plan.Checkpoints {
@@ -103,6 +103,16 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	}
 	if pending.SourceAccountID == nil || *pending.SourceAccountID != "prime_card" {
 		t.Fatalf("pending source = %+v", pending.SourceAccountID)
+	}
+	if len(plan.Provisions) != 1 || plan.Provisions[0].BridgeID != "sfin-other" || plan.Provisions[0].Kind != "cash" {
+		t.Fatalf("provisions = %+v, want sfin-other cash", plan.Provisions)
+	}
+	unmapped := plan.Checkpoints[2]
+	if unmapped.AccountID != "" || unmapped.BridgeID != "sfin-other" || unmapped.Balance != 1.00 {
+		t.Fatalf("unmapped checkpoint = %+v, want bridge-keyed", unmapped)
+	}
+	if plan.Skipped[SkipUnmappedAccount] != 2 {
+		t.Fatalf("skipped = %+v, want 2 unmapped rows", plan.Skipped)
 	}
 	expression, ok := pending.Amount.Config["expression"].(string)
 	if !ok || pending.Amount.Resolver != "expression" {

@@ -14,9 +14,7 @@ import (
 // re-inserts fresh state.
 func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	store := openSQLiteStore(t)
-	if err := store.SaveDocument(ownerDocument()); err != nil {
-		t.Fatalf("save owner document: %v", err)
-	}
+	seedOwnerDocument(t, store)
 	seedSyncRows(t, store)
 	if got := countRows(t, store, "postings", "source = 'simplefin'"); got != 1 {
 		t.Fatalf("sync postings before purge = %d, want 1", got)
@@ -36,8 +34,8 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 			statements = append(statements, strings.TrimSuffix(trimmed, ";"))
 		}
 	}
-	if len(statements) != 2 {
-		t.Fatalf("purge script DELETEs = %d, want 2 (postings + checkpoints)", len(statements))
+	if len(statements) != 3 {
+		t.Fatalf("purge script DELETEs = %d, want 3 (postings + checkpoints + entity ids)", len(statements))
 	}
 	for _, statement := range statements {
 		if _, err := store.db.Exec(statement); err != nil {
@@ -50,6 +48,12 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	}
 	if got := countRows(t, store, "checkpoints", "source = 'simplefin'"); got != 0 {
 		t.Fatalf("sync checkpoints after purge = %d, want 0", got)
+	}
+	if got := countRows(t, store, "entity_ids", "id LIKE 'sfin-%'"); got != 0 {
+		t.Fatalf("sync registry rows after purge = %d, want 0", got)
+	}
+	if got := countRows(t, store, "entity_ids", "id = 'owner-charge'"); got != 1 {
+		t.Fatal("owner registry row was purged")
 	}
 	if got := countRows(t, store, "postings", "id = 'owner-charge'"); got != 1 {
 		t.Fatal("owner posting was purged")

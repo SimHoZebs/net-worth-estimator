@@ -33,7 +33,7 @@ type Server struct {
 type Config struct {
 	AllowedOrigins []string
 	ReadOnly       bool
-	// AuthToken guards PUT /v1/financial-model. Empty means auth disabled.
+	// AuthToken guards row writes. Empty means auth disabled.
 	AuthToken string
 	// SyncRunner runs the SimpleFIN sync on trigger. Nil when unconfigured.
 	SyncRunner  *simplefin.Runner
@@ -145,12 +145,79 @@ func New(store store.Store, serverConfig Config) http.Handler {
 		Summary:     "Load the canonical financial model with diagnostics",
 	}, server.getModel)
 
-	huma.Register(api, huma.Operation{
-		OperationID: "put-financial-model",
-		Method:      "PUT",
-		Path:        "/v1/financial-model",
-		Summary:     "Validate and persist the canonical financial model",
-	}, server.putModel)
+	for _, registerOp := range []func(){
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "create-account", Method: "POST", Path: "/v1/accounts", Summary: "Create one account"}, server.createAccount)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "update-account", Method: "PATCH", Path: "/v1/accounts/{id}", Summary: "Replace one account"}, server.updateAccount)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "delete-account", Method: "DELETE", Path: "/v1/accounts/{id}", Summary: "Delete one account"}, server.deleteAccount)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "move-account", Method: "POST", Path: "/v1/accounts/reorder", Summary: "Move one account"}, server.moveAccount)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "create-posting", Method: "POST", Path: "/v1/postings", Summary: "Create one posting"}, server.createPosting)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "update-posting", Method: "PATCH", Path: "/v1/postings/{id}", Summary: "Replace one posting"}, server.updatePosting)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "delete-posting", Method: "DELETE", Path: "/v1/postings/{id}", Summary: "Delete one posting"}, server.deletePosting)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "move-posting", Method: "POST", Path: "/v1/postings/reorder", Summary: "Move one posting"}, server.movePosting)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "create-rule", Method: "POST", Path: "/v1/recurrence-rules", Summary: "Create one recurrence rule"}, server.createRule)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "update-rule", Method: "PATCH", Path: "/v1/recurrence-rules/{id}", Summary: "Replace one recurrence rule"}, server.updateRule)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "delete-rule", Method: "DELETE", Path: "/v1/recurrence-rules/{id}", Summary: "Delete one recurrence rule"}, server.deleteRule)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "move-rule", Method: "POST", Path: "/v1/recurrence-rules/reorder", Summary: "Move one recurrence rule"}, server.moveRule)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "save-checkpoint", Method: "POST", Path: "/v1/checkpoints", Summary: "Upsert one balance checkpoint"}, server.saveCheckpoint)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "delete-checkpoint", Method: "DELETE", Path: "/v1/checkpoints", Summary: "Delete one balance checkpoint"}, server.deleteCheckpoint)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "create-evaluation", Method: "POST", Path: "/v1/evaluations", Summary: "Create one evaluation"}, server.createEvaluation)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "update-evaluation", Method: "PATCH", Path: "/v1/evaluations/{instanceId}", Summary: "Replace one evaluation"}, server.updateEvaluation)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "delete-evaluation", Method: "DELETE", Path: "/v1/evaluations/{instanceId}", Summary: "Delete one evaluation"}, server.deleteEvaluation)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "move-evaluation", Method: "POST", Path: "/v1/evaluations/reorder", Summary: "Move one evaluation"}, server.moveEvaluation)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "save-payment-terms", Method: "POST", Path: "/v1/payment-terms", Summary: "Upsert payment terms for one account"}, server.savePaymentTerms)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "delete-payment-terms", Method: "DELETE", Path: "/v1/payment-terms/{accountId}", Summary: "Delete payment terms for one account"}, server.deletePaymentTerms)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "list-account-links", Method: "GET", Path: "/v1/sync/simplefin/accounts", Summary: "List bridge-to-model account links"}, server.listAccountLinks)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "save-account-link", Method: "PUT", Path: "/v1/sync/simplefin/accounts/{bridgeAccountId}", Summary: "Link one bridge account"}, server.saveAccountLink)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "delete-account-link", Method: "DELETE", Path: "/v1/sync/simplefin/accounts/{bridgeAccountId}", Summary: "Unlink one bridge account"}, server.deleteAccountLink)
+		},
+	} {
+		registerOp()
+	}
 
 	huma.Register(api, huma.Operation{
 		OperationID: "get-server-status",

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 const syncTriggerFixture = `{
@@ -68,6 +69,11 @@ func TestSyncTriggerRunsDryRunAndGuardsInterval(t *testing.T) {
 	t.Cleanup(bridge.Close)
 
 	database := openAPIStore(t)
+	for _, account := range []types.Account{{ID: "checking", Name: "Checking"}, {ID: "prime_card", Name: "Prime"}} {
+		if _, err := database.CreateAccount(account); err != nil {
+			t.Fatalf("seed account: %v", err)
+		}
+	}
 	runner := simplefin.NewRunner(database, simplefin.Config{
 		AccessURL:    bridge.URL,
 		AccountMap:   map[string]string{"sfin-checking": "checking", "sfin-prime": "prime_card"},

@@ -29,14 +29,35 @@ import (
 //   - Clear resets all persisted state; the conformance suite relies on it.
 type Store interface {
 	LoadDocument() (*types.FinancialModelDocument, error)
-	SaveDocument(document *types.FinancialModelDocument) error
-	SaveDocumentIfUnchanged(document *types.FinancialModelDocument, expectedETag string) (bool, error)
-	DocumentMatchesETag(expectedETag string) (bool, error)
 	DocumentExists() (bool, error)
 	LoadIncomeData() (*types.IncomeDataSnapshot, error)
 	SaveIncomeData(snapshot *types.IncomeDataSnapshot) error
 	LoadDocumentAndIncomeData() (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error)
 	ImportCSV(modelPath, incomePath string) (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error)
+	CreateAccount(account types.Account) (types.Account, error)
+	UpdateAccount(account types.Account) (types.Account, error)
+	DeleteAccount(id string) error
+	MoveAccount(id, beforeID string) error
+	CreatePosting(posting types.Posting) (types.Posting, error)
+	UpdatePosting(posting types.Posting) (types.Posting, error)
+	DeletePosting(id string) error
+	MovePosting(id, beforeID string) error
+	CreateRule(rule types.RecurrenceRule) (types.RecurrenceRule, error)
+	UpdateRule(rule types.RecurrenceRule) (types.RecurrenceRule, error)
+	DeleteRule(id string) error
+	MoveRule(id, beforeID string) error
+	SaveCheckpoint(checkpoint types.Checkpoint) (types.Checkpoint, error)
+	DeleteCheckpoint(accountID, date string) error
+	CreateEvaluation(item EvaluationUpdate) (EvaluationUpdate, error)
+	UpdateEvaluation(item EvaluationUpdate) (EvaluationUpdate, error)
+	DeleteEvaluation(instanceID string) error
+	MoveEvaluation(evalType, instanceID, beforeID string) error
+	SavePaymentTerms(terms types.PaymentTerms) (types.PaymentTerms, error)
+	DeletePaymentTerms(accountID string) error
+	ListAccountLinks() ([]AccountLink, error)
+	SaveAccountLink(link AccountLink) (AccountLink, error)
+	DeleteAccountLink(bridgeAccountID string) error
+	ProvisionSyncAccounts(items []SyncProvision, dryRun bool) (map[string]string, int, error)
 	GetArtifact(identity string) (string, bool, error)
 	PutArtifact(identity, kind, payload string) error
 	ApplySyncPlan(checkpoints []SyncCheckpoint, pending []types.Posting, cardAccounts []string, dryRun bool) (SyncApplySummary, error)
@@ -50,7 +71,7 @@ type sqliteStore struct {
 	db *sql.DB
 }
 
-const latestSchemaVersion = 7
+const latestSchemaVersion = 8
 
 // ruleMigrationBackupSuffix marks the pre-V7 database copy. V7 splits the
 // postings table into dated postings plus recurrence rules; the copy lets an
@@ -204,6 +225,14 @@ func (s *sqliteStore) migrate() error {
 		}
 		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (7)`); err != nil {
 			return fmt.Errorf("record schema version 7: %w", err)
+		}
+	}
+	if version < 8 {
+		if err := migrateV8(tx); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (8)`); err != nil {
+			return fmt.Errorf("record schema version 8: %w", err)
 		}
 	}
 	if err := tx.Commit(); err != nil {

@@ -263,6 +263,25 @@ func TestCORSMiddlewareHandlesPreflight(t *testing.T) {
 	}
 }
 
+func TestCORSMiddlewareAllowsRowMethodPreflights(t *testing.T) {
+	for _, method := range []string{http.MethodPatch, http.MethodDelete} {
+		handler := corsMiddleware([]string{allowedTestOrigin})(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			t.Fatal("preflight reached the application handler")
+		}))
+		request := httptest.NewRequest(http.MethodOptions, "/v1/accounts/x", nil)
+		request.Header.Set("Origin", allowedTestOrigin)
+		request.Header.Set("Access-Control-Request-Method", method)
+		request.Header.Set("Access-Control-Request-Headers", "content-type, authorization")
+		response := httptest.NewRecorder()
+
+		handler.ServeHTTP(response, request)
+
+		if response.Code != http.StatusNoContent {
+			t.Fatalf("%s preflight status = %d, body %s", method, response.Code, response.Body.String())
+		}
+	}
+}
+
 func TestCORSMiddlewareRejectsUnconfiguredOrigin(t *testing.T) {
 	called := false
 	handler := corsMiddleware(nil)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
@@ -285,7 +304,7 @@ func TestCORSMiddlewareRejectsUnsupportedPreflight(t *testing.T) {
 		method  string
 		headers string
 	}{
-		{name: "method", method: http.MethodDelete},
+		{name: "method", method: "TRACE"},
 		{name: "header", method: http.MethodPost, headers: "X-Custom-Header"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
