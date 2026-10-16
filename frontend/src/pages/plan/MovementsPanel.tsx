@@ -2,7 +2,11 @@ import { ArrowDownLeft, ArrowRight, ArrowUpRight } from "lucide-react";
 import { Badge, EmptyState } from "../../components/ui.tsx";
 import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, money } from "../../domain/format.ts";
-import type { Account, Movement } from "../../domain/model.ts";
+import {
+	isPendingMovement,
+	type Account,
+	type Movement,
+} from "../../domain/model.ts";
 import type { ResolvedMovementAmount } from "../../domain/resolvedMovementAmounts.ts";
 import "./plan.css";
 
@@ -22,59 +26,66 @@ export function MovementsPanel({
 	const names = new Map(accounts.map((account) => [account.id, account.name]));
 	return (
 		<div className="movement-list">
-			{movements.map((movement) => (
-				<button
-					type="button"
-					className={`movement-row ${movement.enabled ? "" : "is-excluded"}`}
-					key={movement.id}
-					onClick={() => onEdit(movement)}
-				>
-					<span
-						className={`movement-icon ${movement.fromId ? (movement.toId ? "transfer" : "outflow") : "inflow"}`}
+			{movements.map((movement) => {
+				const pending = isPendingMovement(movement);
+				return (
+					<button
+						type="button"
+						className={`movement-row ${movement.enabled || pending ? "" : "is-excluded"}`}
+						key={movement.id}
+						onClick={() => onEdit(movement)}
 					>
-						{movement.fromId ? (
-							movement.toId ? (
-								<ArrowRight size={19} />
+						<span
+							className={`movement-icon ${movement.fromId ? (movement.toId ? "transfer" : "outflow") : "inflow"}`}
+						>
+							{movement.fromId ? (
+								movement.toId ? (
+									<ArrowRight size={19} />
+								) : (
+									<ArrowUpRight size={19} />
+								)
 							) : (
-								<ArrowUpRight size={19} />
-							)
-						) : (
-							<ArrowDownLeft size={19} />
-						)}
-					</span>
-					<div className="movement-name">
-						<strong>{movement.name}</strong>
-						<span>
-							{movement.frequency === "once"
-								? dateLabel(movement.startDate, true)
-								: movement.frequency === "monthly"
-									? "Monthly"
-									: "Yearly"}{" "}
-							·{" "}
-							{movement.fromId
-								? names.get(movement.fromId)
-								: externalCounterpartyName("in")}
-							{movement.toId
-								? ` → ${names.get(movement.toId) ?? ""}`
-								: movement.fromId
-									? ` → ${externalCounterpartyName("out")}`
-									: null}
+								<ArrowDownLeft size={19} />
+							)}
 						</span>
-					</div>
-					<div className="movement-amount">
-						<MovementAmount
-							movement={movement}
-							resolved={resolvedAmounts?.get(movement.id)}
-						/>
-						{movement.claimRuleId && (
-							<Badge tone="neutral">
-								Records {movement.claimOccurrenceDate}
-							</Badge>
-						)}
-						{!movement.enabled && <Badge tone="amber">Excluded</Badge>}
-					</div>
-				</button>
-			))}
+						<div className="movement-name">
+							<strong>{movement.name}</strong>
+							<span>
+								{movement.frequency === "once"
+									? dateLabel(movement.startDate, true)
+									: movement.frequency === "monthly"
+										? "Monthly"
+										: "Yearly"}{" "}
+								·{" "}
+								{movement.fromId
+									? names.get(movement.fromId)
+									: externalCounterpartyName("in")}
+								{movement.toId
+									? ` → ${names.get(movement.toId) ?? ""}`
+									: movement.fromId
+										? ` → ${externalCounterpartyName("out")}`
+										: null}
+							</span>
+						</div>
+						<div className="movement-amount">
+							<MovementAmount
+								movement={movement}
+								resolved={resolvedAmounts?.get(movement.id)}
+							/>
+							{movement.claimRuleId && (
+								<Badge tone="neutral">
+									Records {movement.claimOccurrenceDate}
+								</Badge>
+							)}
+							{pending ? (
+								<Badge tone="neutral">Pending</Badge>
+							) : (
+								!movement.enabled && <Badge tone="amber">Excluded</Badge>
+							)}
+						</div>
+					</button>
+				);
+			})}
 		</div>
 	);
 }

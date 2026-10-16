@@ -59,6 +59,20 @@ export function isHistoricalMovement(
 	);
 }
 
+/**
+ * Sync-owned pending card charges use the reserved `sfin-pending-` namespace.
+ * They are stored disabled (excluded from projections) until they post, so
+ * callers use this to show a Pending tag instead of an Excluded tag.
+ */
+export const PENDING_MOVEMENT_PREFIX = "sfin-pending-";
+
+export function isPendingMovement(
+	movement: Pick<Movement, "id"> | string,
+): boolean {
+	const id = typeof movement === "string" ? movement : movement.id;
+	return id.startsWith(PENDING_MOVEMENT_PREFIX);
+}
+
 export const evaluationSchema = z.object({
 	id,
 	name,

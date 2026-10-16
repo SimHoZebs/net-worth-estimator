@@ -23,6 +23,7 @@ const transaction = (
 	shortfall: 0,
 	constraint: null,
 	excluded: false,
+	pending: false,
 	...overrides,
 });
 

@@ -37,6 +37,12 @@ export function TransactionDetails({
 					</>
 				)}
 			</dl>
+			{transaction.pending && (
+				<p>
+					This is a pending card charge from SimpleFIN. It is not included in
+					projections yet.
+				</p>
+			)}
 			{transaction.source === "projected" && (
 				<p>
 					This is a dated occurrence of a planned transaction, not a bank
