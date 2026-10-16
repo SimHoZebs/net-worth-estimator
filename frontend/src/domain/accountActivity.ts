@@ -1,5 +1,5 @@
 import { shiftDate } from "./format.ts";
-import { isHistoricalMovement, type Plan } from "./model.ts";
+import { isHistoricalMovement, isPendingMovement, type Plan } from "./model.ts";
 import type { Projection } from "./result.ts";
 import { horizonDate } from "./result.ts";
 
@@ -19,6 +19,7 @@ export interface AccountTransaction {
 	shortfall: number;
 	constraint: string | null;
 	excluded: boolean;
+	pending: boolean;
 }
 
 export interface ActivityFilters {
@@ -140,6 +141,7 @@ export function accountTransactions({
 			shortfall: 0,
 			constraint: null,
 			excluded: !movement.enabled,
+			pending: isPendingMovement(movement),
 		}));
 	const startDateHasCheckpoint = projection.startDateHasCheckpoint ?? true;
 	const projected: AccountTransaction[] = projection.movements
@@ -182,6 +184,7 @@ export function accountTransactions({
 				shortfall: Math.max(0, accountRequested - accountAmount),
 				constraint: movement.constraint,
 				excluded: false,
+				pending: isPendingMovement(movement.movementId),
 			};
 		});
 	return [...recorded, ...projected];
