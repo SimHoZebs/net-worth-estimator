@@ -1,8 +1,15 @@
 import { Info } from "lucide-react";
+import { useMemo, useState } from "react";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { Projection } from "../../domain/result.ts";
 import { upcomingMovements } from "../../domain/timing.ts";
+import {
+	DEFAULT_TRANSACTION_ORDER,
+	sortTransactionsByDate,
+	type TransactionOrder,
+} from "../../domain/transactionSort.ts";
+import { TransactionSortButton } from "../activity/TransactionSortButton.tsx";
 import { Badge, Modal } from "../ui.tsx";
 
 export function TimingEvidence({
@@ -18,6 +25,19 @@ export function TimingEvidence({
 		startDate: plan.startDate,
 		projection,
 	});
+	const [order, setOrder] = useState<TransactionOrder>(
+		DEFAULT_TRANSACTION_ORDER,
+	);
+	const ordered = useMemo(
+		() =>
+			sortTransactionsByDate({
+				items: events,
+				getDate: (event) => event.date,
+				getId: (event) => event.movementId,
+				order,
+			}),
+		[events, order],
+	);
 	return (
 		<Modal
 			title="The next 30 days"
@@ -26,6 +46,11 @@ export function TimingEvidence({
 			wide
 		>
 			<p className="form-intro">These amounts are scheduled.</p>
+			<div
+				style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}
+			>
+				<TransactionSortButton order={order} onChange={setOrder} />
+			</div>
 			<div className="table-scroll">
 				<table>
 					<thead>
@@ -37,7 +62,7 @@ export function TimingEvidence({
 						</tr>
 					</thead>
 					<tbody>
-						{events.map((event, index) => (
+						{ordered.map((event, index) => (
 							<tr key={`${event.movementId}-${index}`}>
 								<td>{dateLabel(event.date, true)}</td>
 								<th scope="row">{event.name}</th>

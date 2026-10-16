@@ -2,6 +2,11 @@ import { CalendarDays } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { accountTransactions } from "../../domain/accountActivity.ts";
 import {
+	DEFAULT_TRANSACTION_ORDER,
+	sortTransactionsByDate,
+	type TransactionOrder,
+} from "../../domain/transactionSort.ts";
+import {
 	cycleSpentSoFar,
 	isCycleOutflow,
 	resolveStatementCycle,
@@ -174,6 +179,9 @@ export function TimingPreview({
 	);
 	const [settings, setSettings] = useState<TotalCycleSettings>(loadPersisted);
 	const [detail, setDetail] = useState<TimingDetailTab | null>(null);
+	const [transactionOrder, setTransactionOrder] = useState<TransactionOrder>(
+		DEFAULT_TRANSACTION_ORDER,
+	);
 
 	// Display timing follows the real calendar day so due dates read
 	// correctly, while the projection math stays on plan.startDate (the
@@ -253,14 +261,13 @@ export function TimingPreview({
 	);
 	const cycleTransactions = useMemo(
 		() =>
-			perAccount
-				.flatMap((item) => item.inCycle)
-				.sort(
-					(left, right) =>
-						left.date.localeCompare(right.date) ||
-						left.id.localeCompare(right.id),
-				),
-		[perAccount],
+			sortTransactionsByDate({
+				items: perAccount.flatMap((item) => item.inCycle),
+				getDate: (transaction) => transaction.date,
+				getId: (transaction) => transaction.id,
+				order: transactionOrder,
+			}),
+		[perAccount, transactionOrder],
 	);
 
 	const spendableAccounts = useMemo(
@@ -752,6 +759,8 @@ export function TimingPreview({
 					onUpdateConfig={updateSettings}
 					onResetConfig={resetConfig}
 					initialTab={detail}
+					transactionOrder={transactionOrder}
+					onTransactionOrderChange={setTransactionOrder}
 					onClose={() => setDetail(null)}
 				/>
 			)}

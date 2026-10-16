@@ -2,6 +2,11 @@ import { shiftDate } from "./format.ts";
 import { isHistoricalMovement, isPendingMovement, type Plan } from "./model.ts";
 import type { Projection } from "./result.ts";
 import { horizonDate } from "./result.ts";
+import {
+	compareTransactionDates,
+	DEFAULT_TRANSACTION_ORDER,
+	type TransactionOrder,
+} from "./transactionSort.ts";
 
 export interface AccountTransaction {
 	id: string;
@@ -27,7 +32,7 @@ export interface ActivityFilters {
 	source: "all" | "historical" | "projected";
 	direction: "all" | "in" | "out" | "transfer";
 	period: "all" | "30-days" | "12-months";
-	order: "oldest" | "newest";
+	order: TransactionOrder;
 }
 
 export const defaultActivityFilters: ActivityFilters = {
@@ -35,7 +40,7 @@ export const defaultActivityFilters: ActivityFilters = {
 	source: "all",
 	direction: "all",
 	period: "all",
-	order: "oldest",
+	order: DEFAULT_TRANSACTION_ORDER,
 };
 
 // Account dialog default: recorded facts only. Projected occurrences stay
@@ -229,9 +234,13 @@ export function filterTransactions({
 					.includes(query)
 			);
 		})
-		.sort(
-			(a, b) =>
-				(filters.order === "oldest" ? 1 : -1) * a.date.localeCompare(b.date) ||
-				a.id.localeCompare(b.id),
+		.sort((a, b) =>
+			compareTransactionDates({
+				aDate: a.date,
+				bDate: b.date,
+				aId: a.id,
+				bId: b.id,
+				order: filters.order,
+			}),
 		);
 }
