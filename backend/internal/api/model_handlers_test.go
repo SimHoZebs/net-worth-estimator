@@ -286,6 +286,46 @@ func TestRowWriteIgnoresEchoedSourceField(t *testing.T) {
 	}
 }
 
+func TestRowDeleteAccountWithDependentsIsRejected(t *testing.T) {
+	database := openAPIStore(t)
+	if _, _, err := database.ImportCSV(
+		filepath.Join(apiProjectRoot(t), "public", "configs"),
+		filepath.Join(apiProjectRoot(t), "public", "data", "income"),
+	); err != nil {
+		t.Fatalf("seed store: %v", err)
+	}
+	handler := New(database, Config{})
+
+	deleted := httptest.NewRecorder()
+	handler.ServeHTTP(deleted, httptest.NewRequest(http.MethodDelete, "/v1/accounts/checking", nil))
+	if deleted.Code != http.StatusOK {
+		t.Fatalf("DELETE status = %d, body %s", deleted.Code, deleted.Body.String())
+	}
+	var payload struct {
+		Issues    []types.ModelValidationIssue `json:"issues"`
+		Persisted bool                         `json:"persisted"`
+	}
+	if err := json.Unmarshal(deleted.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode DELETE response: %v", err)
+	}
+	if payload.Persisted || len(payload.Issues) == 0 {
+		t.Fatalf("dangling delete response = %+v", payload)
+	}
+	loaded, err := database.LoadDocument()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	found := false
+	for _, account := range loaded.Accounts {
+		if account.ID == "checking" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("referenced account was deleted")
+	}
+}
+
 func TestDeterministicResponseIncludesMovementEvents(t *testing.T) {
 	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "checkpoints.json")
 	fixtureBytes, err := os.ReadFile(fixturePath)
