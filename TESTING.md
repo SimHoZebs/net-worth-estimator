@@ -298,7 +298,6 @@ For local fixture verification, set exact dry-run and fixture mode:
 
 ```bash
 export NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK=1
-export NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS=mock-checking=checking,mock-prime=prime_card
 export NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS=prime_card
 export NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1
 unset NET_WORTH_ESTIMATOR_AUTH_TOKEN
@@ -311,7 +310,7 @@ With writable, unauthenticated access, trigger and inspect counts:
 curl -fsS -X POST "$BASE_URL/v1/sync/simplefin" | jq .
 ```
 
-The response must report `dryRun: true`. Reload the model and confirm no `simplefin` rows were committed. A second successful trigger inside 20 hours returns 429; the interval guard stamps successful runs only.
+The response must report `dryRun: true` with `accountsProvisioned: 2` (mock accounts auto-provision on first sync). Reload the model and confirm no rows were committed. Link a mock bridge account to a model account through `PUT /v1/sync/simplefin/accounts/{bridgeAccountId}` and list links with `GET` on the same path. Restart the server (clears the in-memory trigger stamp), trigger again, and confirm checkpoints resolve to the linked accounts. A second successful trigger inside 20 hours returns 429; the interval guard stamps successful runs only.
 
 A guard test belongs in Go and runs with:
 

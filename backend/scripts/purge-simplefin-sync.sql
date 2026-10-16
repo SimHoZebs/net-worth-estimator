@@ -14,7 +14,7 @@
 --   4. Run the two DELETEs, e.g.:
 --        sqlite3 "$NET_WORTH_ESTIMATOR_DB" < backend/scripts/purge-simplefin-sync.sql
 --   5. Unset NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK, set the real access URL +
---      account map, restart, then POST /v1/sync/simplefin (dry-run first).
+--      Access URL, restart, then POST /v1/sync/simplefin (dry-run first).
 --
 -- Note: this script was tested through equivalent sqlite execution, not the
 -- sqlite3 CLI itself; run step 4 verbatim once on a machine with sqlite3

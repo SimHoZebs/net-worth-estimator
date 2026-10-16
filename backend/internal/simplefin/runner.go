@@ -81,30 +81,18 @@ func (r *Runner) Sync(ctx context.Context) (*Summary, error) {
 	for _, link := range links {
 		resolved[link.BridgeAccountID] = link.ModelAccountID
 	}
-	// Env entries bootstrap manual links; they win over nothing stored
-	// because stored links already populate resolved above.
-	for bridgeID, modelID := range r.config.AccountMap {
-		if _, ok := resolved[bridgeID]; !ok {
-			resolved[bridgeID] = modelID
-		}
-	}
 	plan, err := Map(set, r.config, resolved, now)
 	if err != nil {
 		return nil, err
 	}
 	provisions := make([]store.SyncProvision, 0, len(set.Accounts))
 	for _, account := range set.Accounts {
-		item := store.SyncProvision{
+		provisions = append(provisions, store.SyncProvision{
 			BridgeID: account.ID,
 			Name:     account.Name,
 			Currency: account.Currency,
 			Kind:     types.AccountKind(provisionKind(account)),
-		}
-		// Env entries bootstrap manual links for known bridge IDs.
-		if modelID, ok := r.config.AccountMap[account.ID]; ok {
-			item.ModelAccountID = modelID
-		}
-		provisions = append(provisions, item)
+		})
 	}
 	resolved, provisioned, stale, err := r.store.ProvisionSyncAccounts(provisions, r.config.DryRun)
 	if err != nil {

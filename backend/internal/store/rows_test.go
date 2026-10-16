@@ -261,8 +261,12 @@ func TestProvisionSyncAccounts(t *testing.T) {
 	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking"}); err != nil {
 		t.Fatalf("create account: %v", err)
 	}
+	if _, err := store.SaveAccountLink(AccountLink{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", BridgeName: "Old"}); err != nil {
+		t.Fatalf("save link: %v", err)
+	}
+	// Dry run resolves and counts without committing.
 	resolved, provisioned, stale, err := store.ProvisionSyncAccounts([]SyncProvision{
-		{BridgeID: "bridge-checking", ModelAccountID: "checking", Name: "College", Currency: "USD"},
+		{BridgeID: "bridge-checking", Name: "College", Currency: "USD", Kind: types.AccountKind("cash")},
 		{BridgeID: "bridge-new", Name: "New Card", Currency: "USD", Kind: types.AccountKind("debt")},
 	}, true)
 	if err != nil {
@@ -271,11 +275,11 @@ func TestProvisionSyncAccounts(t *testing.T) {
 	if provisioned != 1 || resolved["bridge-checking"] != "checking" || resolved["bridge-new"] == "" {
 		t.Fatalf("dry-run resolved = %v provisioned = %d", resolved, provisioned)
 	}
-	if links, err := store.ListAccountLinks(); err != nil || len(links) != 0 {
-		t.Fatalf("dry run wrote links: %+v, err %v", links, err)
+	if links, err := store.ListAccountLinks(); err != nil || len(links) != 1 {
+		t.Fatalf("dry run changed links: %+v, err %v", links, err)
 	}
 	resolved, provisioned, stale, err = store.ProvisionSyncAccounts([]SyncProvision{
-		{BridgeID: "bridge-checking", ModelAccountID: "checking", Name: "College", Currency: "USD"},
+		{BridgeID: "bridge-checking", Name: "College", Currency: "USD", Kind: types.AccountKind("cash")},
 		{BridgeID: "bridge-new", Name: "New Card", Currency: "USD", Kind: types.AccountKind("debt")},
 	}, false)
 	if err != nil {
@@ -320,11 +324,6 @@ func TestProvisionSyncAccounts(t *testing.T) {
 	}
 	if len(stale) != 0 {
 		t.Fatalf("stale links = %v, want none", stale)
-	}
-	if _, _, _, err := store.ProvisionSyncAccounts([]SyncProvision{
-		{BridgeID: "bridge-ghost", ModelAccountID: "ghost", Name: "Ghost"},
-	}, false); !IsAccountMissing(err) {
-		t.Fatalf("bootstrap missing account err = %v, want account-missing", err)
 	}
 }
 

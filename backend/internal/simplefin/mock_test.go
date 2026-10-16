@@ -13,7 +13,6 @@ import (
 
 func mockTestConfig(dryRun bool) Config {
 	return Config{
-		AccountMap:   map[string]string{"mock-checking": "checking", "mock-prime": "prime_card"},
 		CardAccounts: map[string]struct{}{"prime_card": {}},
 		DryRun:       dryRun,
 	}

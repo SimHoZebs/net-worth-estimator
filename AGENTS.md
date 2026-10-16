@@ -58,7 +58,6 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 | `NET_WORTH_ESTIMATOR_READ_ONLY` | writable | `1`, `true`, or `yes` rejects guarded writes with 403 |
 | `NET_WORTH_ESTIMATOR_AUTH_TOKEN` | empty | bearer token for guarded writes |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` | empty | Bridge Access URL secret; enables real sync |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS` | empty | `bridge-id=model-account-id,...` mapping |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` | empty | model account IDs eligible for pending-charge seeds |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN` | empty | exact value `1` plans counts without committing writes |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK` | empty | exact value `1` enables fixture mode |

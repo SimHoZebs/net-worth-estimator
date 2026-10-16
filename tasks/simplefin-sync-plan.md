@@ -37,7 +37,6 @@ Rows outside scope are counted by reason. Amounts and descriptions are omitted f
 | Variable | Required | Meaning |
 | --- | --- | --- |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` | real mode | Bridge Access URL secret; an empty value disables the runner |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS` | bootstrap only | comma-separated `bridge-account-id=model-account-id` entries, imported as manual links on first sync; links then live in `account_links` and survive env removal |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` | for pending seeds | comma-separated model account IDs treated as cards |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN` | optional | exact value `1` enables dry-run; all other values disable it |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK` | fixture mode only | exact value `1` enables deterministic fixture responses |
@@ -45,7 +44,6 @@ Rows outside scope are counted by reason. Amounts and descriptions are omitted f
 
 Startup rules:
 
-- an unparseable account map is fatal;
 - fixture mode and a real Access URL are mutually exclusive;
 - a fixture file without fixture mode is fatal;
 - an empty Access URL without fixture mode disables synchronization and makes the trigger return 503;
@@ -80,7 +78,7 @@ Posting behavior:
 
 - incoming `sfin-` IDs are dropped;
 - stored sync pending postings are re-merged;
-- removing a mapped account from the seed does not garbage-collect sync rows, because sync persistence is independent of the current account map.
+- removing an account from the seed does not garbage-collect sync rows or links, because sync persistence is independent of linking.
 
 Any future ownership migration must preserve this collision contract and add a package test before runtime rollout. Migrations are forward-only, transactional, data-preserving, and applied by `store.Open`.
 
@@ -206,11 +204,10 @@ This makes cutover an explicit database purge rather than a code branch.
 ### Prerequisites
 
 1. Obtain the Bridge Access URL through the secret store.
-2. Obtain stable Bridge account IDs and build the account map.
-3. Decide which mapped model accounts are cards.
-4. Confirm the persistent database path and create a verified SQLite backup.
-5. Confirm the service has one instance.
-6. Start with dry-run enabled.
+2. Decide which model accounts are cards.
+3. Confirm the persistent database path and create a verified SQLite backup.
+4. Confirm the service has one instance.
+5. Start with dry-run enabled.
 
 ### From fixture to real source
 
@@ -219,7 +216,7 @@ This makes cutover an explicit database purge rather than a code branch.
 3. Confirm the preview lists the expected sync-owned postings and checkpoints.
 4. Execute the two `DELETE` statements in that script. It removes all `simplefin` rows; owner rows remain.
 5. Unset `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK` and `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE`.
-6. Set the real Access URL, account map, and card list as secrets or runtime variables.
+6. Set the real Access URL and card list as secrets or runtime variables. The first sync auto-provisions model accounts and links; review and relink through the links endpoint.
 7. Keep `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1` and restart the service.
 8. Trigger once through `POST /v1/sync/simplefin` with the required bearer token.
 9. Inspect checkpoint insert/update/skip counts, pending delete/insert counts, skip reasons, and `dryRun: true`.
@@ -255,14 +252,13 @@ backend/scripts/verify.sh ./cmd/server
 
 Required coverage:
 
-- account-map parsing and startup failure;
 - redacted protocol fixture mapping;
 - positive, posted, non-USD, invalid, and unmapped skip reasons;
 - deterministic pending IDs and row shape;
 - checkpoint insert/update/owner-skip behavior;
 - pending snapshot replacement and owner-posting preservation;
 - dry-run rollback;
-- model-save strip-and-merge behavior;
+- row-write guards (reserved IDs, sync ownership, dangling references);
 - forged reserved IDs being dropped;
 - exact owner checkpoint collision precedence;
 - trigger 401/403/409/429 behavior;
