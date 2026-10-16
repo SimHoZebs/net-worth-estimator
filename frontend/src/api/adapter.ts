@@ -873,7 +873,7 @@ export function displayPlanToBackendDocument(
 			sameFloorValue(storedExtras.minBalance, account.minBalance)
 				? storedExtras.minBalance
 				: storedAccount &&
-						sameFloorValue(storedAccount.minBalance, account.minBalance)
+					  sameFloorValue(storedAccount.minBalance, account.minBalance)
 					? storedAccount.minBalance
 					: account.minBalance;
 		const maxBalance =
@@ -881,7 +881,7 @@ export function displayPlanToBackendDocument(
 			sameCeilingValue(storedExtras.maxBalance, account.maxBalance)
 				? storedExtras.maxBalance
 				: storedAccount &&
-						sameCeilingValue(storedAccount.maxBalance, account.maxBalance)
+					  sameCeilingValue(storedAccount.maxBalance, account.maxBalance)
 					? storedAccount.maxBalance
 					: account.maxBalance;
 		const accountId = account.id;
@@ -911,9 +911,9 @@ export function displayPlanToBackendDocument(
 		}
 		const sameCheckpoint = Boolean(
 			storedAccount &&
-				sourceCheckpoint &&
-				sourceCheckpoint.Date === account.observedOn &&
-				sameNumber(sourceCheckpoint.Balance, account.balance),
+			sourceCheckpoint &&
+			sourceCheckpoint.Date === account.observedOn &&
+			sameNumber(sourceCheckpoint.Balance, account.balance),
 		);
 		if (
 			sameCheckpoint ||
@@ -980,7 +980,7 @@ export function displayPlanToBackendDocument(
 			`accounts.${index}`,
 		);
 		return {
-			...(storedAccount ?? {}),
+			...storedAccount,
 			id: account.id,
 			name: account.name,
 			kind: account.kind,
@@ -1129,7 +1129,7 @@ export function displayPlanToBackendDocument(
 		if (movement.frequency === "once") {
 			const source = storedExtras?.source ?? storedPosting?.source;
 			postings.push({
-				...(storedPosting ?? {}),
+				...storedPosting,
 				id: movement.id,
 				name: movement.name,
 				sourceAccountId: movement.fromId,
@@ -1172,7 +1172,7 @@ export function displayPlanToBackendDocument(
 		const annualRate = storedExtras?.annualRate ?? storedRule?.annualRate ?? 0;
 		const volatility = storedExtras?.volatility ?? storedRule?.volatility ?? 0;
 		recurrenceRules.push({
-			...(storedRule ?? {}),
+			...storedRule,
 			id: movement.id,
 			name: movement.name,
 			sourceAccountId: movement.fromId,
@@ -1237,12 +1237,12 @@ export function displayPlanToBackendDocument(
 				? objectValue(storedEvaluation.config)
 				: null;
 			return {
-				...(storedEvaluation ?? {}),
+				...storedEvaluation,
 				instanceId: evaluation.id,
 				name: evaluation.name,
 				enabled: evaluation.enabled,
 				config: {
-					...(storedConfig ?? {}),
+					...storedConfig,
 					target: evaluation.target,
 				} satisfies JsonObject,
 			};
@@ -1257,12 +1257,12 @@ export function displayPlanToBackendDocument(
 				? objectValue(storedEvaluation.config)
 				: null;
 			return {
-				...(storedEvaluation ?? {}),
+				...storedEvaluation,
 				instanceId: evaluation.id,
 				name: evaluation.name,
 				enabled: evaluation.enabled,
 				config: {
-					...(storedConfig ?? {}),
+					...storedConfig,
 					accountId: evaluation.accountId,
 					target: evaluation.target,
 				} satisfies JsonObject,
@@ -1385,7 +1385,7 @@ export function displayPlanToBackendDocument(
 		(account) => checkpointByAccount.get(account.id) ?? [],
 	);
 	const evaluations: EvaluationTables = {
-		...(sourceEvaluations ?? {}),
+		...sourceEvaluations,
 		financialIndependence: [...financialIndependence],
 		netWorthThreshold,
 		accountBalance,
@@ -1394,7 +1394,7 @@ export function displayPlanToBackendDocument(
 	};
 	return {
 		document: {
-			...(sourceDocument ?? {}),
+			...sourceDocument,
 			sourcePath,
 			accounts,
 			checkpoints,

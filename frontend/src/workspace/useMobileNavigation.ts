@@ -6,6 +6,9 @@ export function useMobileNavigation() {
 	const mobile = useMediaQuery("(max-width: 800px)");
 	const sidebarRef = useRef<HTMLElement>(null);
 	useEffect(() => {
+		// Viewport reset: closing the drawer when leaving mobile widths is the
+		// intended sync, not a render cascade.
+		// oxlint-disable-next-line react/set-state-in-effect
 		if (!mobile) setOpen(false);
 	}, [mobile]);
 	useEffect(() => {

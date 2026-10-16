@@ -16,33 +16,37 @@ export function WorkspaceLayout({
 	overlays: ReactNode;
 	notification: ReactNode;
 }) {
-	const mobile = useMobileNavigation();
+	const {
+		open,
+		mobile: isMobile,
+		sidebarRef,
+		close,
+		show,
+	} = useMobileNavigation();
 	return (
 		<div className="app-shell">
 			<a className="skip-link" href="#main-content">
 				Skip to main content
 			</a>
-			{mobile.open && (
+			{open && (
 				<button
 					type="button"
 					className="nav-backdrop"
 					aria-label="Close navigation"
-					onClick={mobile.close}
+					onClick={close}
 				/>
 			)}
 			<aside
-				ref={mobile.sidebarRef}
-				className={`sidebar ${mobile.open ? "sidebar-open" : ""}`}
-				inert={mobile.mobile && !mobile.open}
-				{...(mobile.open
-					? { role: "dialog", "aria-modal": true as const }
-					: {})}
+				ref={sidebarRef}
+				className={`sidebar ${open ? "sidebar-open" : ""}`}
+				inert={isMobile && !open}
+				{...(open ? { role: "dialog", "aria-modal": true as const } : {})}
 				aria-label="Workspace navigation"
 			>
-				{navigation(mobile.close)}
+				{navigation(close)}
 			</aside>
-			<div className="workspace" inert={mobile.open}>
-				{header(mobile.show)}
+			<div className="workspace" inert={open}>
+				{header(show)}
 				<main id="main-content" className="main-content">
 					{children}
 				</main>
