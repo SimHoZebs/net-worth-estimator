@@ -36,7 +36,6 @@ export function ServerWorkspaceRecovery() {
 			readOnly,
 			hasDraft: false,
 			loading: false,
-			revision: null,
 		},
 		recover: importServerDocument,
 		reload: retry,

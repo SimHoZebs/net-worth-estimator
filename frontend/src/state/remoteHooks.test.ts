@@ -3,9 +3,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook as renderHookRTL } from "@testing-library/react";
 import { createElement, Fragment, type ReactNode, StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { RowWriteResponse } from "../api/index.ts";
 import {
 	ApiHttpError,
 	ApiNetworkError,
+	type BackendAccount,
+	type BackendCheckpoint,
+	type BackendPosting,
+	type BackendRecurrenceRule,
+	type EvaluationInstance,
 	type FinancialModelDocument,
 	type FinancialModelResponse,
 	type IncomeDataSnapshot,
@@ -14,6 +20,11 @@ import {
 	type StochasticProjectionResult,
 } from "../api/index.ts";
 import type { Plan } from "../domain/model.ts";
+
+type ResolveRowWrite = (
+	value: Error | RowWriteResponse<BackendRecurrenceRule>,
+) => void;
+
 import {
 	loadRemoteState,
 	persistRemoteState,
@@ -320,10 +331,52 @@ function stochasticFixture(): StochasticProjectionResult {
 	};
 }
 
-function clientFixture(
-	put: (document: FinancialModelDocument) => Error | FinancialModelResponse,
-) {
-	const model = modelFixture();
+type PutCallback = (
+	document: FinancialModelDocument,
+) => Error | FinancialModelResponse;
+
+function clientFixture(put?: PutCallback) {
+	const current = structuredClone(modelFixture());
+	// The optional put callback overrides row-write outcomes (error
+	// injection, warning issues) against the mutated server document.
+	const viaPut = <T>(row: T): Error | RowWriteResponse<T> => {
+		if (!put)
+			return { row, issues: [], persisted: true, revision: '"sha256-test"' };
+		const response = put(structuredClone(current));
+		if (response instanceof Error) return response;
+		const errors = (response.issues ?? []).filter(
+			(issue) => issue.severity === "error",
+		);
+		return {
+			row,
+			issues: response.issues ?? [],
+			persisted: errors.length === 0,
+			revision: response.revision ?? '"sha256-test"',
+		};
+	};
+	const moveIn =
+		<T extends { id?: string; instanceId?: string }>(rows: T[]) =>
+		(id: string, beforeId: string | null) => {
+			const key = (row: T) => row.id ?? row.instanceId ?? "";
+			const kept = rows.filter((row) => key(row) !== id);
+			const moved = rows.find((row) => key(row) === id);
+			if (!moved) return;
+			if (!beforeId) {
+				kept.push(moved);
+			} else {
+				const at = kept.findIndex((row) => key(row) === beforeId);
+				kept.splice(at < 0 ? kept.length : at, 0, moved);
+			}
+			rows.length = 0;
+			rows.push(...kept);
+		};
+	const evalRows = (evaluationType: string) => {
+		const tables = current.evaluations as unknown as Record<
+			string,
+			{ instanceId: string }[]
+		>;
+		return tables[evaluationType] ?? [];
+	};
 	const client = {
 		getStatus: vi.fn(
 			async (): Promise<ServerStatus> => ({
@@ -333,7 +386,7 @@ function clientFixture(
 		),
 		getModel: vi.fn(
 			async (): Promise<FinancialModelResponse> => ({
-				document: model,
+				document: structuredClone(current),
 				issues: [],
 				revision: '"sha256-test"',
 			}),
@@ -344,9 +397,124 @@ function clientFixture(
 				taxProfiles: [],
 			}),
 		),
-		putModel: vi.fn(async (document: FinancialModelDocument) => put(document)),
+		createAccount: vi.fn(async (row: BackendAccount) => {
+			current.accounts.push(structuredClone(row));
+			return viaPut(row);
+		}),
+		updateAccount: vi.fn(async (id: string, row: BackendAccount) => {
+			current.accounts = current.accounts.map((item) =>
+				item.id === id ? structuredClone(row) : item,
+			);
+			return viaPut(row);
+		}),
+		deleteAccount: vi.fn(async (id: string) => {
+			current.accounts = current.accounts.filter((item) => item.id !== id);
+			return viaPut({});
+		}),
+		moveAccount: vi.fn(async (id: string, beforeId: string | null) => {
+			moveIn(current.accounts)(id, beforeId || null);
+			return viaPut({});
+		}),
+		createPosting: vi.fn(async (row: BackendPosting) => {
+			current.postings.push(structuredClone(row));
+			return viaPut(row);
+		}),
+		updatePosting: vi.fn(async (id: string, row: BackendPosting) => {
+			current.postings = current.postings.map((item) =>
+				item.id === id ? structuredClone(row) : item,
+			);
+			return viaPut(row);
+		}),
+		deletePosting: vi.fn(async (id: string) => {
+			current.postings = current.postings.filter((item) => item.id !== id);
+			return viaPut({});
+		}),
+		movePosting: vi.fn(async (id: string, beforeId: string | null) => {
+			moveIn(current.postings)(id, beforeId || null);
+			return viaPut({});
+		}),
+		createRule: vi.fn(async (row: BackendRecurrenceRule) => {
+			current.recurrenceRules.push(structuredClone(row));
+			return viaPut(row);
+		}),
+		updateRule: vi.fn(async (id: string, row: BackendRecurrenceRule) => {
+			current.recurrenceRules = current.recurrenceRules.map((item) =>
+				item.id === id ? structuredClone(row) : item,
+			);
+			return viaPut(row);
+		}),
+		deleteRule: vi.fn(async (id: string) => {
+			current.recurrenceRules = current.recurrenceRules.filter(
+				(item) => item.id !== id,
+			);
+			return viaPut({});
+		}),
+		moveRule: vi.fn(async (id: string, beforeId: string | null) => {
+			moveIn(current.recurrenceRules)(id, beforeId || null);
+			return viaPut({});
+		}),
+		saveCheckpoint: vi.fn(async (row: BackendCheckpoint) => {
+			const checkpoint = structuredClone(row);
+			current.checkpoints = [
+				...current.checkpoints.filter(
+					(item) =>
+						!(
+							item.AccountId === checkpoint.AccountId &&
+							item.Date === checkpoint.Date
+						),
+				),
+				checkpoint,
+			];
+			return viaPut(row);
+		}),
+		deleteCheckpoint: vi.fn(async (accountId: string, date: string) => {
+			current.checkpoints = current.checkpoints.filter(
+				(item) => !(item.AccountId === accountId && item.Date === date),
+			);
+			return viaPut({});
+		}),
+		createEvaluation: vi.fn(
+			async (row: EvaluationInstance, evaluationType: string) => {
+				evalRows(evaluationType).push(structuredClone(row));
+				return viaPut(row);
+			},
+		),
+		updateEvaluation: vi.fn(
+			async (
+				instanceId: string,
+				row: EvaluationInstance,
+				evaluationType: string,
+			) => {
+				const rows = evalRows(evaluationType);
+				const at = rows.findIndex((item) => item.instanceId === instanceId);
+				if (at >= 0) rows[at] = structuredClone(row);
+				return viaPut(row);
+			},
+		),
+		deleteEvaluation: vi.fn(async (instanceId: string) => {
+			for (const table of Object.values(
+				current.evaluations as unknown as Record<
+					string,
+					{ instanceId: string }[]
+				>,
+			)) {
+				const at = table.findIndex((item) => item.instanceId === instanceId);
+				if (at >= 0) table.splice(at, 1);
+			}
+			return viaPut({});
+		}),
+		moveEvaluation: vi.fn(
+			async (
+				evaluationType: string,
+				instanceId: string,
+				beforeId: string | null,
+			) => {
+				moveIn(evalRows(evaluationType))(instanceId, beforeId || null);
+				return viaPut({});
+			},
+		),
 	};
-	return { client, model };
+	return { client, model: modelFixture() };
 }
 
 afterEach(() => {
@@ -480,7 +648,7 @@ describe("remote workspace state", () => {
 				.updatePlan(withMovementAmount(rendered.result().plan!, 150)),
 		).toBe(false);
 		expect(rendered.result().discard()).toBe(false);
-		expect(changedClient.putModel).not.toHaveBeenCalled();
+		expect(changedClient.updateRule).not.toHaveBeenCalled();
 
 		expect(await rendered.result().retry()).toBeUndefined();
 		await rendered.settle();
@@ -518,11 +686,11 @@ describe("remote workspace state", () => {
 		expect(rendered.result().draftStale).toBe(true);
 		expect(rendered.result().error).not.toBeNull();
 		expect(await rendered.result().save()).toBe(false);
-		expect(client.putModel).not.toHaveBeenCalled();
+		expect(client.updateRule).not.toHaveBeenCalled();
 		rendered.unmount();
 	});
 
-	it("blocks editing when the server omits a model revision", async () => {
+	it("edits and saves without a server revision", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const { client } = clientFixture(() => ({
@@ -536,10 +704,10 @@ describe("remote workspace state", () => {
 			rendered
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
-		).toBe(false);
+		).toBe(true);
 		await rendered.settle();
-		expect(rendered.result().error).not.toBeNull();
-		expect(client.putModel).not.toHaveBeenCalled();
+		expect(await rendered.result().save()).toBe(true);
+		expect(client.updateRule).toHaveBeenCalledOnce();
 		rendered.unmount();
 	});
 
@@ -615,12 +783,14 @@ describe("remote workspace state", () => {
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
-		let resolvePut!: (value: Error | FinancialModelResponse) => void;
-		client.putModel.mockImplementation(
+		let resolvePut!: ResolveRowWrite;
+		client.updateRule.mockImplementation(
 			() =>
-				new Promise((resolve) => {
-					resolvePut = resolve;
-				}),
+				new Promise<Error | RowWriteResponse<BackendRecurrenceRule>>(
+					(resolve) => {
+						resolvePut = resolve;
+					},
+				),
 		);
 		const savePromise = rendered.result().save();
 		client.getStatus.mockResolvedValue(
@@ -639,7 +809,6 @@ describe("remote workspace state", () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		let current = structuredClone(modelFixture());
-		let revision = '"sha256-initial"';
 		const { client } = clientFixture(() => ({
 			document: modelFixture(),
 			issues: [],
@@ -647,22 +816,29 @@ describe("remote workspace state", () => {
 		client.getModel.mockImplementation(async () => ({
 			document: structuredClone(current),
 			issues: [],
-			revision,
+			revision: '"sha256-test"',
 		}));
 		let resolvePut!: () => void;
-		client.putModel.mockImplementation(
-			(document) =>
-				new Promise((resolve) => {
-					resolvePut = () => {
-						current = structuredClone(document);
-						revision = '"sha256-next"';
-						resolve({
-							document: structuredClone(current),
-							issues: [],
-							revision,
-						});
-					};
-				}),
+		client.updateRule.mockImplementation(
+			(_id: string, row: BackendRecurrenceRule) =>
+				new Promise<Error | RowWriteResponse<BackendRecurrenceRule>>(
+					(resolve) => {
+						resolvePut = () => {
+							current = {
+								...structuredClone(current),
+								recurrenceRules: structuredClone(current).recurrenceRules.map(
+									(rule) => (rule.id === _id ? structuredClone(row) : rule),
+								),
+							};
+							resolve({
+								row,
+								issues: [],
+								persisted: true,
+								revision: '"sha256-next"',
+							});
+						};
+					},
+				),
 		);
 		const rendered = renderHook(() => useRemoteWorkspace({ client }));
 		await rendered.settle();
@@ -699,18 +875,19 @@ describe("remote workspace state", () => {
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
-		let resolvePut!: (value: FinancialModelResponse) => void;
-		client.putModel.mockImplementation(
+		let resolvePut!: ResolveRowWrite;
+		client.updateRule.mockImplementation(
 			() =>
-				new Promise((resolve) => {
-					resolvePut = resolve;
-				}),
+				new Promise<Error | RowWriteResponse<BackendRecurrenceRule>>(
+					(resolve) => {
+						resolvePut = resolve;
+					},
+				),
 		);
 		const savePromise = rendered.result().save();
 		const retryPromise = rendered.result().retry();
 		resolvePut({
-			document: modelFixture(),
-			revision: '"sha256-test"',
+			row: modelFixture().recurrenceRules[0] as BackendRecurrenceRule,
 			issues: [
 				{
 					severity: "error",
@@ -719,6 +896,8 @@ describe("remote workspace state", () => {
 					path: [],
 				},
 			],
+			persisted: false,
+			revision: '"sha256-test"',
 		});
 		expect(await savePromise).toBe(false);
 		await rendered.settle();
@@ -744,7 +923,7 @@ describe("remote workspace state", () => {
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
-		client.putModel.mockImplementation(() => new Promise(() => {}));
+		client.updateRule.mockImplementation(() => new Promise(() => {}));
 
 		const savePromise = rendered.result().save();
 		await rendered.result().retry();
@@ -769,20 +948,23 @@ describe("remote workspace state", () => {
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
-		let resolvePut!: (value: Error | FinancialModelResponse) => void;
-		client.putModel.mockImplementation(
+		let resolvePut!: ResolveRowWrite;
+		client.updateRule.mockImplementation(
 			() =>
-				new Promise((resolve) => {
-					resolvePut = resolve;
-				}),
+				new Promise<Error | RowWriteResponse<BackendRecurrenceRule>>(
+					(resolve) => {
+						resolvePut = resolve;
+					},
+				),
 		);
 		const savePromise = rendered.result().save();
 		expect(rendered.result().discard()).toBe(false);
 		await rendered.settle();
 		expect(rendered.result().error).not.toBeNull();
 		resolvePut({
-			document: modelFixture(),
+			row: modelFixture().recurrenceRules[0] as BackendRecurrenceRule,
 			issues: [],
+			persisted: true,
 			revision: '"sha256-test"',
 		});
 		await savePromise;
@@ -806,13 +988,14 @@ describe("remote workspace state", () => {
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
-		const resolvers: Array<(value: Error | FinancialModelResponse) => void> =
-			[];
-		client.putModel.mockImplementation(
+		const resolvers: Array<ResolveRowWrite> = [];
+		client.updateRule.mockImplementation(
 			() =>
-				new Promise((resolve) => {
-					resolvers.push(resolve);
-				}),
+				new Promise<Error | RowWriteResponse<BackendRecurrenceRule>>(
+					(resolve) => {
+						resolvers.push(resolve);
+					},
+				),
 		);
 		const firstSave = rendered.result().save();
 		await rendered.result().retry();
@@ -835,11 +1018,11 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("preserves a failed import hydration error after a 412", async () => {
+	it("preserves a failed import hydration error after a conflict", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const { client } = clientFixture(
-			() => new ApiHttpError({ message: "already exists", status: 412 }),
+			() => new ApiHttpError({ message: "already exists", status: 409 }),
 		);
 		client.getModel
 			.mockResolvedValueOnce({ document: null, issues: [] })
@@ -854,7 +1037,7 @@ describe("remote workspace state", () => {
 		expect(await rendered.result().importServerDocument(modelFixture())).toBe(
 			false,
 		);
-		expect(client.putModel).toHaveBeenCalledTimes(2);
+		expect(client.createAccount).toHaveBeenCalledTimes(2);
 		rendered.unmount();
 	});
 
@@ -977,17 +1160,13 @@ describe("remote workspace state", () => {
 
 		expect(await rendered.result().save()).toBe(true);
 		await rendered.settle();
-		expect(client.putModel).toHaveBeenCalledWith(
+		expect(client.updateRule).toHaveBeenCalledWith(
+			expect.any(String),
 			expect.objectContaining({
-				sourcePath: "/configs/household.json",
-				recurrenceRules: [
-					expect.objectContaining({
-						amount: expect.objectContaining({
-							resolver: "expression",
-							config: expect.objectContaining({ expression: "125" }),
-						}),
-					}),
-				],
+				amount: expect.objectContaining({
+					resolver: "expression",
+					config: expect.objectContaining({ expression: "125" }),
+				}),
 			}),
 			expect.objectContaining({ authToken: "write-token" }),
 		);
@@ -997,41 +1176,13 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("sends the server revision when saving a remote draft", async () => {
+	it("applies movement edits as rule updates", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		let current = structuredClone(modelFixture());
-		let revision = '"sha256-initial"';
-		const client = {
-			getStatus: vi.fn(
-				async (): Promise<ServerStatus> => ({
-					readOnly: false,
-					authEnabled: false,
-				}),
-			),
-			getModel: vi.fn(
-				async (): Promise<FinancialModelResponse> => ({
-					document: structuredClone(current),
-					issues: [],
-					revision,
-				}),
-			),
-			getIncomeData: vi.fn(
-				async (): Promise<IncomeDataSnapshot> => ({
-					incomeSources: [],
-					taxProfiles: [],
-				}),
-			),
-			putModel: vi.fn(
-				async (
-					document: FinancialModelDocument,
-				): Promise<FinancialModelResponse> => {
-					current = structuredClone(document);
-					revision = '"sha256-next"';
-					return { document: structuredClone(current), issues: [], revision };
-				},
-			),
-		};
+		const { client } = clientFixture(() => ({
+			document: modelFixture(),
+			issues: [],
+		}));
 		const rendered = renderHook(() => useRemoteWorkspace({ client }));
 		await rendered.settle();
 		expect(
@@ -1040,58 +1191,74 @@ describe("remote workspace state", () => {
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 		expect(await rendered.result().save()).toBe(true);
-		expect(client.putModel).toHaveBeenCalledWith(
+		expect(client.updateRule).toHaveBeenCalledOnce();
+		expect(client.updateRule).toHaveBeenCalledWith(
+			expect.any(String),
+			expect.objectContaining({
+				amount: expect.objectContaining({
+					config: expect.objectContaining({ expression: "125" }),
+				}),
+			}),
 			expect.anything(),
-			expect.objectContaining({ ifMatch: '"sha256-initial"' }),
 		);
 		rendered.unmount();
 	});
 
-	it("uses an If-Match wildcard when importing into an empty server", async () => {
+	it("creates rows when importing into an empty server", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
+		const { client } = clientFixture(() => ({
+			document: modelFixture(),
+			issues: [],
+		}));
 		let stored: FinancialModelDocument | null = null;
-		const client = {
-			getStatus: vi.fn(
-				async (): Promise<ServerStatus> => ({
-					readOnly: false,
-					authEnabled: false,
-				}),
-			),
-			getModel: vi.fn(
-				async (): Promise<FinancialModelResponse> => ({
-					document: stored,
-					issues: [],
-				}),
-			),
-			getIncomeData: vi.fn(
-				async (): Promise<IncomeDataSnapshot> => ({
-					incomeSources: [],
-					taxProfiles: [],
-				}),
-			),
-			putModel: vi.fn(
-				async (
-					document: FinancialModelDocument,
-				): Promise<FinancialModelResponse> => {
-					stored = structuredClone(document);
-					return {
-						document: structuredClone(document),
-						issues: [],
-						revision: '"sha256-imported"',
-					};
+		const storedDoc = (): FinancialModelDocument =>
+			(stored ??= {
+				sourcePath: "",
+				accounts: [],
+				checkpoints: [],
+				evaluations: {
+					financialIndependence: [],
+					netWorthThreshold: [],
+					accountBalance: [],
+					postingFulfillment: [],
+					cycleFulfillment: [],
 				},
-			),
-		};
+				postings: [],
+				recurrenceRules: [],
+			});
+		const storedOk = <T>(row: T): RowWriteResponse<T> => ({
+			row,
+			issues: [],
+			persisted: true,
+			revision: '"sha256-test"',
+		});
+		client.getModel.mockImplementation(async () => ({
+			document: stored ? structuredClone(stored) : null,
+			issues: [],
+		}));
+		client.createAccount.mockImplementation(async (row) => {
+			storedDoc().accounts.push(structuredClone(row));
+			return storedOk(row);
+		});
+		client.createPosting.mockImplementation(async (row) => {
+			storedDoc().postings.push(structuredClone(row));
+			return storedOk(row);
+		});
+		client.createRule.mockImplementation(async (row) => {
+			storedDoc().recurrenceRules.push(structuredClone(row));
+			return storedOk(row);
+		});
+		client.saveCheckpoint.mockImplementation(async (row) => {
+			storedDoc().checkpoints.push(structuredClone(row));
+			return storedOk(row);
+		});
 		const rendered = renderHook(() => useRemoteWorkspace({ client }));
 		await rendered.settle();
 		expect(await rendered.result().importServerDocument(modelFixture())).toBe(
 			true,
 		);
-		expect(client.putModel).toHaveBeenCalledWith(
-			expect.anything(),
-			expect.objectContaining({ ifMatch: "*" }),
-		);
+		expect(client.createAccount).toHaveBeenCalled();
 		rendered.unmount();
 	});
 
@@ -1251,7 +1418,7 @@ describe("remote workspace state", () => {
 			volatility: 0,
 		});
 		expect(rendered.result().error).not.toBeNull();
-		expect(client.putModel).not.toHaveBeenCalled();
+		expect(client.updateRule).not.toHaveBeenCalled();
 		rendered.unmount();
 	});
 
@@ -1353,16 +1520,13 @@ describe("remote workspace state", () => {
 		expect(rendered.result().error).toBeNull();
 
 		expect(await rendered.result().save()).toBe(true);
-		expect(client.putModel).toHaveBeenCalledWith(
+		expect(client.updateRule).toHaveBeenCalledWith(
+			expect.any(String),
 			expect.objectContaining({
-				recurrenceRules: [
-					expect.objectContaining({
-						amount: expect.objectContaining({
-							resolver: "expression",
-							config: expect.objectContaining({ expression: "125" }),
-						}),
-					}),
-				],
+				amount: expect.objectContaining({
+					resolver: "expression",
+					config: expect.objectContaining({ expression: "125" }),
+				}),
 			}),
 			expect.anything(),
 		);
@@ -1399,7 +1563,7 @@ describe("remote workspace state", () => {
 		expect(rendered.result().workspace?.draft).toEqual(lossyPlan);
 		expect(await rendered.result().save()).toBe(false);
 		await rendered.settle();
-		expect(client.putModel).not.toHaveBeenCalled();
+		expect(client.updateRule).not.toHaveBeenCalled();
 		expect(rendered.result().workspace?.draft).toEqual(lossyPlan);
 		expect(rendered.result().error).not.toBeNull();
 		rendered.unmount();

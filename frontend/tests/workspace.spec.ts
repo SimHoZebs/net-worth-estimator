@@ -147,8 +147,8 @@ test("failed saves retain the intended plan", async ({ page }) => {
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await page.getByRole("button", { name: "Review & save" }).click();
 	// The server rejects the write, so the unsaved changes must survive.
-	await page.route("**/v1/financial-model", async (route) => {
-		if (route.request().method() === "PUT")
+	await page.route("**/v1/postings/*", async (route) => {
+		if (route.request().method() === "PATCH")
 			return route.fulfill({
 				status: 500,
 				contentType: "application/json",

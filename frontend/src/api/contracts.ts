@@ -475,11 +475,36 @@ export interface SimpleFINSummary extends HumaMetadata {
 	checkpointsSkipped: number;
 	pendingDeleted: number;
 	pendingInserted: number;
+	accountsProvisioned: number;
 	skipped: Record<string, number>;
 	dryRun: boolean;
 }
 
 export type SimpleFinSummary = SimpleFINSummary;
+
+export interface RowWriteResponse<TRow> extends HumaMetadata {
+	row: TRow;
+	issues: ModelValidationIssue[];
+	persisted: boolean;
+	revision: string;
+}
+
+export interface RowDeleteResponse extends HumaMetadata {
+	revision: string;
+}
+
+export interface AccountLink extends HumaMetadata {
+	bridgeAccountId: string;
+	modelAccountId: string;
+	bridgeName: string;
+	currency: string;
+	origin: string;
+	lastSeenAt: string;
+}
+
+export interface AccountLinkListResponse {
+	links: AccountLink[];
+}
 
 export interface ProgressSSEData {
 	progress: StochasticProgress;
