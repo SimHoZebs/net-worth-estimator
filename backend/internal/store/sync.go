@@ -192,49 +192,61 @@ type SyncProvision struct {
 // account in one transaction: existing links get a snapshot touch,
 // manual entries are bootstrapped after validating the model account,
 // and unknown accounts get a provisioned account plus an auto link.
-// dryRun rolls everything back and still returns the resolved map.
-func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision, dryRun bool) (map[string]string, int, error) {
+// A link whose model account no longer exists resolves to nothing and
+// is reported stale: no checkpoints are written for it, nothing is
+// auto-recreated, and the link stays for relinking. dryRun rolls
+// everything back and still returns the resolved map.
+func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision, dryRun bool) (map[string]string, int, []string, error) {
 	resolved := map[string]string{}
+	var stale []string
 	provisioned := 0
 	tx, err := s.db.Begin()
 	if err != nil {
-		return nil, 0, fmt.Errorf("provision begin: %w", err)
+		return nil, 0, nil, fmt.Errorf("provision begin: %w", err)
 	}
 	defer tx.Rollback()
 	for _, item := range items {
 		var modelAccountID string
 		if err := tx.QueryRow(`SELECT model_account_id FROM account_links WHERE bridge_account_id = ?`, item.BridgeID).Scan(&modelAccountID); err == nil {
+			exists, err := accountExists(tx, modelAccountID)
+			if err != nil {
+				return nil, 0, nil, err
+			}
+			if !exists {
+				stale = append(stale, item.BridgeID)
+				continue
+			}
 			if err := TouchAccountLink(tx, item.BridgeID, item.Name, item.Currency); err != nil {
-				return nil, 0, err
+				return nil, 0, nil, err
 			}
 			resolved[item.BridgeID] = modelAccountID
 			continue
 		} else if err != sql.ErrNoRows {
-			return nil, 0, fmt.Errorf("read account link %s: %w", item.BridgeID, err)
+			return nil, 0, nil, fmt.Errorf("read account link %s: %w", item.BridgeID, err)
 		}
 		if item.ModelAccountID != "" {
 			exists, err := accountExists(tx, item.ModelAccountID)
 			if err != nil {
-				return nil, 0, err
+				return nil, 0, nil, err
 			}
 			if !exists {
-				return nil, 0, &rowError{code: "account-missing", id: item.ModelAccountID}
+				return nil, 0, nil, &rowError{code: "account-missing", id: item.ModelAccountID}
 			}
 			if _, err := tx.Exec(
 				`INSERT INTO account_links (bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at) VALUES (?,?,?,?,?,?)`,
 				item.BridgeID, item.ModelAccountID, item.Name, item.Currency, LinkOriginManual, utcToday(),
 			); err != nil {
 				if isUniqueViolation(err) {
-					return nil, 0, &rowError{code: "id-conflict", id: item.ModelAccountID}
+					return nil, 0, nil, &rowError{code: "id-conflict", id: item.ModelAccountID}
 				}
-				return nil, 0, fmt.Errorf("bootstrap account link %s: %w", item.BridgeID, err)
+				return nil, 0, nil, fmt.Errorf("bootstrap account link %s: %w", item.BridgeID, err)
 			}
 			resolved[item.BridgeID] = item.ModelAccountID
 			continue
 		}
 		modelAccountID, created, err := EnsureLinkedAccount(tx, item.BridgeID, item.Name, item.Currency, item.Kind)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, nil, err
 		}
 		if created {
 			provisioned++
@@ -242,12 +254,12 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision, dryRun bool) 
 		resolved[item.BridgeID] = modelAccountID
 	}
 	if dryRun {
-		return resolved, provisioned, nil
+		return resolved, provisioned, stale, nil
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, 0, fmt.Errorf("provision commit: %w", err)
+		return nil, 0, nil, fmt.Errorf("provision commit: %w", err)
 	}
-	return resolved, provisioned, nil
+	return resolved, provisioned, stale, nil
 }
 
 // ApplySyncPlan upserts sync checkpoints and refreshes pending seed postings

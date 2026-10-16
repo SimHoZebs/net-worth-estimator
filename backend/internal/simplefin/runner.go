@@ -92,42 +92,42 @@ func (r *Runner) Sync(ctx context.Context) (*Summary, error) {
 	if err != nil {
 		return nil, err
 	}
-	provisions := make([]store.SyncProvision, 0, len(plan.Provisions)+len(r.config.AccountMap))
-	byBridge := map[string]Account{}
+	provisions := make([]store.SyncProvision, 0, len(set.Accounts))
 	for _, account := range set.Accounts {
-		byBridge[account.ID] = account
+		item := store.SyncProvision{
+			BridgeID: account.ID,
+			Name:     account.Name,
+			Currency: account.Currency,
+			Kind:     types.AccountKind(provisionKind(account)),
+		}
+		// Env entries bootstrap manual links for known bridge IDs.
+		if modelID, ok := r.config.AccountMap[account.ID]; ok {
+			item.ModelAccountID = modelID
+		}
+		provisions = append(provisions, item)
 	}
-	for bridgeID, modelID := range r.config.AccountMap {
-		account := byBridge[bridgeID]
-		provisions = append(provisions, store.SyncProvision{
-			BridgeID: bridgeID, ModelAccountID: modelID,
-			Name: account.Name, Currency: account.Currency,
-		})
-	}
-	for _, provision := range plan.Provisions {
-		provisions = append(provisions, store.SyncProvision{
-			BridgeID: provision.BridgeID, Name: provision.Name,
-			Currency: provision.Currency, Kind: types.AccountKind(provision.Kind),
-		})
-	}
-	resolved, provisioned, err := r.store.ProvisionSyncAccounts(provisions, r.config.DryRun)
+	resolved, provisioned, stale, err := r.store.ProvisionSyncAccounts(provisions, r.config.DryRun)
 	if err != nil {
 		return nil, err
 	}
-	for i := range plan.Checkpoints {
-		if plan.Checkpoints[i].AccountID == "" {
-			modelID, ok := resolved[plan.Checkpoints[i].BridgeID]
-			if !ok {
-				continue
-			}
-			plan.Checkpoints[i].AccountID = modelID
-		}
+	if len(stale) > 0 {
+		plan.Skipped[SkipStaleLink] += len(stale)
 	}
-	checkpoints := make([]store.SyncCheckpoint, 0, len(plan.Checkpoints))
+	// Re-resolve every checkpoint against post-provisioning truth. A
+	// stale link (model account deleted) resolves to nothing and its
+	// checkpoint is dropped: counted, never written.
+	kept := plan.Checkpoints[:0]
 	for _, checkpoint := range plan.Checkpoints {
-		if checkpoint.AccountID == "" {
+		modelID, ok := resolved[checkpoint.BridgeID]
+		if !ok {
 			continue
 		}
+		checkpoint.AccountID = modelID
+		kept = append(kept, checkpoint)
+	}
+	plan.Checkpoints = kept
+	checkpoints := make([]store.SyncCheckpoint, 0, len(plan.Checkpoints))
+	for _, checkpoint := range plan.Checkpoints {
 		checkpoints = append(checkpoints, store.SyncCheckpoint{
 			AccountID: checkpoint.AccountID,
 			Date:      checkpoint.Date,

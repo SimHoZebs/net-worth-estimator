@@ -383,10 +383,11 @@ func (s *sqliteStore) UpdateAccount(account types.Account) (types.Account, error
 	return account, nil
 }
 
-// DeleteAccount removes one account, its registry entry, and its
-// bridge links. A deleted account has no link to keep: if the bridge
-// still reports the account, the next sync provisions it afresh.
-// Dependent rows are validated at the API layer before this runs.
+// DeleteAccount removes one account and its registry entry. Bridge
+// links are kept: the link is the memory of the mapping, so recreating
+// the account restores sync flow, and the links endpoint keeps showing
+// the last-seen snapshot. Dependent rows are validated at the API layer
+// before this runs.
 func (s *sqliteStore) DeleteAccount(id string) error {
 	return withRowTx(s.db, func(tx *sql.Tx) error {
 		result, err := tx.Exec(`DELETE FROM accounts WHERE id = ?`, id)
@@ -399,9 +400,6 @@ func (s *sqliteStore) DeleteAccount(id string) error {
 		}
 		if affected == 0 {
 			return &rowError{code: "not-found", id: id}
-		}
-		if _, err := tx.Exec(`DELETE FROM account_links WHERE model_account_id = ?`, id); err != nil {
-			return fmt.Errorf("delete account links %s: %w", id, err)
 		}
 		return releaseRowID(tx, id)
 	})

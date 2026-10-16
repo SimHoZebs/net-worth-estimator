@@ -165,10 +165,16 @@ func TestDeleteAccountLeavesSyncRows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list links: %v", err)
 	}
+	// The link survives the account delete: it is the memory of the
+	// mapping, and recreating the account resumes sync flow.
+	foundLink := false
 	for _, link := range links {
-		if link.ModelAccountID == "checking" {
-			t.Fatalf("deleted account kept its link: %+v", link)
+		if link.BridgeAccountID == "bridge-checking" && link.ModelAccountID == "checking" {
+			foundLink = true
 		}
+	}
+	if !foundLink {
+		t.Fatalf("link was garbage-collected with its account: %+v", links)
 	}
 }
 
