@@ -648,9 +648,7 @@ export function TimingPreview({
 				{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
 			</p>
 			<div className="spend-answer">
-				<span>
-					{allowance >= 0 ? "You can spend" : "Over budget"}
-				</span>
+				<span>{allowance >= 0 ? "You can spend" : "Over budget"}</span>
 				<strong>{money(Math.abs(allowance))}</strong>
 				<span>
 					{allowance >= 0

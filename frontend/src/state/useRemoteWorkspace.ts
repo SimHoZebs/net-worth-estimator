@@ -27,6 +27,9 @@ export function useRemoteWorkspace({
 }: UseRemoteWorkspaceOptions = {}): RemoteWorkspaceState {
 	const api = useMemo(() => {
 		if (client) return client;
+		// Lazily-created module singleton: idempotent, so the shared client is
+		// stable across hook instances without an extra provider.
+		// oxlint-disable-next-line react/globals
 		if (!defaultClient) defaultClient = createApiClient();
 		return defaultClient;
 	}, [client]);

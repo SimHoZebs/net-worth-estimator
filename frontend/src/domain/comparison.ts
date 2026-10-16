@@ -132,9 +132,9 @@ function display(value: FieldValue | undefined, key: string) {
 				? "Yes"
 				: "No"
 			: typeof value === "number" &&
-					["amount", "balance", "minBalance", "maxBalance", "target"].includes(
+				  ["amount", "balance", "minBalance", "maxBalance", "target"].includes(
 						key,
-					)
+				  )
 				? money(value)
 				: String(value);
 }

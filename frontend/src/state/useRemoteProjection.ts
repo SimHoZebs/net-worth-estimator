@@ -792,9 +792,12 @@ export function useRemoteProjection({
 	const incomeDataKey = incomeData ? JSON.stringify(incomeData) : "null";
 	// Refs give the streaming effect latest values without keying it on
 	// object identity (callers may rebuild equivalent documents per render).
+	// Render-time sync keeps them fresh regardless of effect order.
 	const activeDocumentRef = useRef(activeDocument);
 	const incomeDataRef = useRef(incomeData ?? null);
+	// oxlint-disable-next-line react/refs
 	activeDocumentRef.current = activeDocument;
+	// oxlint-disable-next-line react/refs
 	incomeDataRef.current = incomeData ?? null;
 	const hasDocument = activeDocument !== null;
 	const deterministic = useQuery({

@@ -63,7 +63,6 @@ export function WorkspaceSidebar({
 				</ul>
 			</nav>
 			<div className="sidebar-bottom">
-				{/* biome-ignore lint/a11y/useValidAnchor: The hash navigates to a workspace page; onClick only closes the mobile drawer. */}
 				<a
 					className={`nav-link ${page === "sources" ? "active" : ""}`}
 					href="#sources"
