@@ -17,7 +17,9 @@ export interface BarSegment {
 	tone: SegmentTone;
 }
 
-/** A stacked bar splitting one pool of money into labeled segments. */
+/** A stacked bar splitting one pool of money into labeled segments.
+ * Only positive shares are drawn: a negative remainder is not a share of
+ * the pool, so callers omit it and state it in the caption instead. */
 export function SegmentedBar({
 	caption,
 	segments,
@@ -27,21 +29,18 @@ export function SegmentedBar({
 	segments: BarSegment[];
 	ariaLabel: string;
 }) {
-	const total = segments.reduce(
-		(sum, segment) => sum + Math.abs(segment.amount),
-		0,
-	);
+	const total = segments.reduce((sum, segment) => sum + segment.amount, 0);
 	return (
 		<div>
 			<p className="section-note">{caption}</p>
 			<div className="seg-bar" role="img" aria-label={ariaLabel}>
 				{segments.map((segment) =>
-					segment.amount !== 0 ? (
+					segment.amount > 0 ? (
 						<span
 							key={segment.label}
 							className={`seg seg-${segment.tone} pat-${segment.pattern}`}
 							style={{
-								width: `${(Math.abs(segment.amount) / Math.max(total, 1)) * 100}%`,
+								width: `${(segment.amount / Math.max(total, 1)) * 100}%`,
 							}}
 						/>
 					) : null,

@@ -59,24 +59,28 @@ describe("native API client", () => {
 		}
 	});
 
-	it("sends the model content identity on conditional writes", async () => {
-		const fetcher = vi.fn<FetchLike>(async (_input, init) => {
-			expect(new Headers(init?.headers).get("if-match")).toBe(
-				'"sha256-revision"',
-			);
+	it("posts row writes without a content identity header", async () => {
+		const fetcher = vi.fn<FetchLike>(async (input, init) => {
+			expect(String(input)).toContain("/v1/accounts");
+			expect(init?.method).toBe("POST");
+			expect(new Headers(init?.headers).get("if-match")).toBeNull();
 			return response(
-				JSON.stringify({ document: {}, issues: [], revision: '"sha256-next"' }),
+				JSON.stringify({
+					row: { id: "a" },
+					issues: [],
+					persisted: true,
+					revision: "r1",
+				}),
 				{ status: 200, headers: { "content-type": "application/json" } },
 			);
 		});
 		const client = new ApiClient({ fetch: fetcher });
-		const result = await client.putModel({} as never, {
-			ifMatch: '"sha256-revision"',
-		});
+		const result = await client.createAccount({} as never);
 		expect(result).toEqual({
-			document: {},
+			row: { id: "a" },
 			issues: [],
-			revision: '"sha256-next"',
+			persisted: true,
+			revision: "r1",
 		});
 	});
 
@@ -95,7 +99,7 @@ describe("native API client", () => {
 					},
 				),
 		});
-		const result = await client.putModel({} as never);
+		const result = await client.createAccount({} as never);
 
 		expect(result).toBeInstanceOf(ApiHttpError);
 		if (!(result instanceof ApiHttpError)) return;

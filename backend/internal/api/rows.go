@@ -295,6 +295,9 @@ type postingBody struct {
 	Claim           *types.PostingClaim           `json:"claim,omitempty"`
 	Priority        int                           `json:"priority"`
 	Enabled         bool                          `json:"enabled"`
+	// Source is accepted and ignored: ownership is server-computed,
+	// mirroring the retired whole-document PUT contract.
+	Source *string `json:"source,omitempty"`
 }
 
 func (b postingBody) toPosting(id string) types.Posting {
@@ -336,6 +339,9 @@ func (s *Server) createPosting(_ context.Context, input *postingInput) (*posting
 	if revErr != nil {
 		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
+	if persisted {
+		row.Source = store.SourceModel
+	}
 	return &postingOutput{Body: rowResultBody[types.Posting]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
 }
 
@@ -355,6 +361,9 @@ func (s *Server) updatePosting(_ context.Context, input *struct {
 	revision, revErr := currentRevision(s)
 	if revErr != nil {
 		return nil, huma.Error500InternalServerError(revErr.Error())
+	}
+	if persisted {
+		row.Source = store.SourceModel
 	}
 	return &postingOutput{Body: rowResultBody[types.Posting]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
 }

@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { type ApiClient, createApiClient } from "../api/client.ts";
 import type { FinancialModelDocument } from "../api/contracts.ts";
+import type { RowWriter } from "../api/rowSync.ts";
 import {
 	importServerModel,
 	type ServerModelImportOptions,
 } from "../api/serverModelImport.ts";
 import { useUiStore } from "./uiStore.ts";
 
-let defaultImportClient: Pick<ApiClient, "putModel"> | null = null;
+type ImportClient = Pick<ApiClient, "getModel"> & RowWriter;
 
-function defaultClient(): Pick<ApiClient, "putModel"> {
+let defaultImportClient: ImportClient | null = null;
+
+function defaultClient(): ImportClient {
 	if (!defaultImportClient) defaultImportClient = createApiClient();
 	return defaultImportClient;
 }

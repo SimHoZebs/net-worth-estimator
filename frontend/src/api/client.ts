@@ -1,12 +1,20 @@
 import * as errore from "errore";
 import type {
+	AccountLink,
+	AccountLinkListResponse,
+	BackendAccount,
+	BackendCheckpoint,
+	BackendPosting,
+	BackendRecurrenceRule,
 	DeterministicProjectionRequest,
 	DeterministicProjectionResponse,
 	ErrorSSEData,
-	FinancialModelDocument,
+	EvaluationInstance,
 	FinancialModelResponse,
 	IncomeDataSnapshot,
 	ProblemDetails,
+	RowDeleteResponse,
+	RowWriteResponse,
 	ServerStatus,
 	SimpleFINSummary,
 	StochasticProjectionRequest,
@@ -33,7 +41,6 @@ export interface ApiRequestOptions {
 	authToken?: string;
 	bearerToken?: string;
 	token?: string;
-	ifMatch?: string;
 	headers?: HeadersInit;
 }
 
@@ -234,7 +241,6 @@ function requestHeaders({
 	authToken,
 	bearerToken,
 	token,
-	ifMatch,
 	headers,
 	accept,
 }: {
@@ -242,7 +248,6 @@ function requestHeaders({
 	authToken?: string;
 	bearerToken?: string;
 	token?: string;
-	ifMatch?: string;
 	headers?: HeadersInit;
 	accept: string;
 }): Headers | ApiRequestError {
@@ -254,7 +259,6 @@ function requestHeaders({
 			if (!result.has("accept")) result.set("accept", accept);
 			const suppliedToken = authToken ?? bearerToken ?? token;
 			if (suppliedToken) result.set("authorization", `Bearer ${suppliedToken}`);
-			if (ifMatch) result.set("if-match", ifMatch);
 			return result;
 		},
 		catch: (cause) => new ApiRequestError(cause),
@@ -280,7 +284,6 @@ function requestInit(
 		authToken: options.authToken,
 		bearerToken: options.bearerToken,
 		token: options.token,
-		ifMatch: options.ifMatch,
 		headers: options.headers,
 		accept,
 	});
@@ -332,16 +335,6 @@ export class ApiClient {
 		);
 	}
 
-	putModel(
-		document: FinancialModelDocument,
-		options: ApiRequestOptions = {},
-	): Promise<Error | FinancialModelResponse> {
-		return this.requestJson<FinancialModelResponse>(
-			"financial-model",
-			requestInit("PUT", document, options),
-		);
-	}
-
 	projectDeterministic(
 		request: DeterministicProjectionRequest,
 		options: ApiRequestOptions = {},
@@ -373,6 +366,232 @@ export class ApiClient {
 		return this.requestJson<SimpleFINSummary>(
 			"sync/simplefin",
 			requestInit("POST", undefined, options),
+		);
+	}
+
+	createAccount(
+		account: BackendAccount,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowWriteResponse<BackendAccount>> {
+		return this.requestJson<RowWriteResponse<BackendAccount>>(
+			"accounts",
+			requestInit("POST", account, options),
+		);
+	}
+
+	updateAccount(
+		id: string,
+		account: BackendAccount,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowWriteResponse<BackendAccount>> {
+		return this.requestJson<RowWriteResponse<BackendAccount>>(
+			`accounts/${encodeURIComponent(id)}`,
+			requestInit("PATCH", account, options),
+		);
+	}
+
+	deleteAccount(
+		id: string,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowDeleteResponse> {
+		return this.requestJson<RowDeleteResponse>(
+			`accounts/${encodeURIComponent(id)}`,
+			requestInit("DELETE", undefined, options),
+		);
+	}
+
+	moveAccount(
+		id: string,
+		beforeId: string | null,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowDeleteResponse> {
+		return this.requestJson<RowDeleteResponse>(
+			"accounts/reorder",
+			requestInit("POST", { id, beforeId: beforeId ?? "" }, options),
+		);
+	}
+
+	createPosting(
+		posting: BackendPosting,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowWriteResponse<BackendPosting>> {
+		return this.requestJson<RowWriteResponse<BackendPosting>>(
+			"postings",
+			requestInit("POST", posting, options),
+		);
+	}
+
+	updatePosting(
+		id: string,
+		posting: BackendPosting,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowWriteResponse<BackendPosting>> {
+		return this.requestJson<RowWriteResponse<BackendPosting>>(
+			`postings/${encodeURIComponent(id)}`,
+			requestInit("PATCH", posting, options),
+		);
+	}
+
+	deletePosting(
+		id: string,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowDeleteResponse> {
+		return this.requestJson<RowDeleteResponse>(
+			`postings/${encodeURIComponent(id)}`,
+			requestInit("DELETE", undefined, options),
+		);
+	}
+
+	movePosting(
+		id: string,
+		beforeId: string | null,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowDeleteResponse> {
+		return this.requestJson<RowDeleteResponse>(
+			"postings/reorder",
+			requestInit("POST", { id, beforeId: beforeId ?? "" }, options),
+		);
+	}
+
+	createRule(
+		rule: BackendRecurrenceRule,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowWriteResponse<BackendRecurrenceRule>> {
+		return this.requestJson<RowWriteResponse<BackendRecurrenceRule>>(
+			"recurrence-rules",
+			requestInit("POST", rule, options),
+		);
+	}
+
+	updateRule(
+		id: string,
+		rule: BackendRecurrenceRule,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowWriteResponse<BackendRecurrenceRule>> {
+		return this.requestJson<RowWriteResponse<BackendRecurrenceRule>>(
+			`recurrence-rules/${encodeURIComponent(id)}`,
+			requestInit("PATCH", rule, options),
+		);
+	}
+
+	deleteRule(
+		id: string,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowDeleteResponse> {
+		return this.requestJson<RowDeleteResponse>(
+			`recurrence-rules/${encodeURIComponent(id)}`,
+			requestInit("DELETE", undefined, options),
+		);
+	}
+
+	moveRule(
+		id: string,
+		beforeId: string | null,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowDeleteResponse> {
+		return this.requestJson<RowDeleteResponse>(
+			"recurrence-rules/reorder",
+			requestInit("POST", { id, beforeId: beforeId ?? "" }, options),
+		);
+	}
+
+	saveCheckpoint(
+		checkpoint: BackendCheckpoint,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowWriteResponse<BackendCheckpoint>> {
+		return this.requestJson<RowWriteResponse<BackendCheckpoint>>(
+			"checkpoints",
+			requestInit("POST", checkpoint, options),
+		);
+	}
+
+	deleteCheckpoint(
+		accountId: string,
+		date: string,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowDeleteResponse> {
+		return this.requestJson<RowDeleteResponse>(
+			`checkpoints?accountId=${encodeURIComponent(accountId)}&date=${encodeURIComponent(date)}`,
+			requestInit("DELETE", undefined, options),
+		);
+	}
+
+	createEvaluation(
+		item: EvaluationInstance,
+		evaluationType: string,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowWriteResponse<EvaluationInstance>> {
+		return this.requestJson<RowWriteResponse<EvaluationInstance>>(
+			"evaluations",
+			requestInit("POST", { ...item, type: evaluationType }, options),
+		);
+	}
+
+	updateEvaluation(
+		instanceId: string,
+		item: EvaluationInstance,
+		evaluationType: string,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowWriteResponse<EvaluationInstance>> {
+		return this.requestJson<RowWriteResponse<EvaluationInstance>>(
+			`evaluations/${encodeURIComponent(instanceId)}`,
+			requestInit("PATCH", { ...item, type: evaluationType }, options),
+		);
+	}
+
+	deleteEvaluation(
+		instanceId: string,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowDeleteResponse> {
+		return this.requestJson<RowDeleteResponse>(
+			`evaluations/${encodeURIComponent(instanceId)}`,
+			requestInit("DELETE", undefined, options),
+		);
+	}
+
+	moveEvaluation(
+		evaluationType: string,
+		instanceId: string,
+		beforeId: string | null,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowDeleteResponse> {
+		return this.requestJson<RowDeleteResponse>(
+			"evaluations/reorder",
+			requestInit(
+				"POST",
+				{ type: evaluationType, instanceId, beforeId: beforeId ?? "" },
+				options,
+			),
+		);
+	}
+
+	listAccountLinks(
+		options: ApiRequestOptions = {},
+	): Promise<Error | AccountLinkListResponse> {
+		return this.requestJson<AccountLinkListResponse>(
+			"sync/simplefin/accounts",
+			requestInit("GET", undefined, options),
+		);
+	}
+
+	saveAccountLink(
+		bridgeAccountId: string,
+		modelAccountId: string,
+		options: ApiRequestOptions = {},
+	): Promise<Error | { link: AccountLink; revision: string }> {
+		return this.requestJson<{ link: AccountLink; revision: string }>(
+			`sync/simplefin/accounts/${encodeURIComponent(bridgeAccountId)}`,
+			requestInit("PUT", { modelAccountId }, options),
+		);
+	}
+
+	deleteAccountLink(
+		bridgeAccountId: string,
+		options: ApiRequestOptions = {},
+	): Promise<Error | RowDeleteResponse> {
+		return this.requestJson<RowDeleteResponse>(
+			`sync/simplefin/accounts/${encodeURIComponent(bridgeAccountId)}`,
+			requestInit("DELETE", undefined, options),
 		);
 	}
 

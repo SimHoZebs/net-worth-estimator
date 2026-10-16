@@ -52,20 +52,29 @@ export interface PaycheckDecomposition {
 function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 	const isShort = parts.short > 0 || parts.cushion < 0;
 	const shortAmount = parts.short > 0 ? parts.short : -parts.cushion;
-	const segments: BarSegment[] = [
-		{
-			label: "Bills due",
-			amount: parts.bills,
-			pattern: "stripes",
-			tone: "sage",
-		},
-		{
-			label: "Left to spend",
-			amount: isShort ? -shortAmount : parts.cushion,
-			pattern: isShort ? "hatch" : "solid",
-			tone: isShort ? "amber" : "sage",
-		},
-	];
+	const segments: BarSegment[] = isShort
+		? [
+				{
+					label: "Bills due",
+					amount: parts.bills,
+					pattern: "stripes",
+					tone: "sage",
+				},
+			]
+		: [
+				{
+					label: "Bills due",
+					amount: parts.bills,
+					pattern: "stripes",
+					tone: "sage",
+				},
+				{
+					label: "Left to spend",
+					amount: parts.cushion,
+					pattern: "solid",
+					tone: "sage",
+				},
+			];
 	const paidNote =
 		parts.spentSinceStart > 0
 			? ` · ${money(parts.spentSinceStart)} paid since ${dateLabel(parts.since, true)}`
@@ -91,7 +100,9 @@ function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 	);
 }
 
-/** Bucket two: where the next paycheck goes. */
+/** Bucket two: where the next paycheck goes. A negative allowance buys
+ * nothing, so the bar draws only the claims on the paycheck; the overage
+ * lives in the caption as a negative number. */
 function PaycheckBar({ parts }: { parts: PaycheckDecomposition }) {
 	const segments: BarSegment[] = [
 		{ label: "Bills", amount: parts.fixed, pattern: "stripes", tone: "sage" },
@@ -102,12 +113,16 @@ function PaycheckBar({ parts }: { parts: PaycheckDecomposition }) {
 			tone: "pale",
 		},
 		{ label: "Spent", amount: parts.spent, pattern: "solid", tone: "dark" },
-		{
-			label: parts.allowance >= 0 ? "Left" : "Over",
-			amount: parts.allowance >= 0 ? parts.allowance : -parts.allowance,
-			pattern: parts.allowance >= 0 ? "solid" : "hatch",
-			tone: parts.allowance >= 0 ? "pale" : "amber",
-		},
+		...(parts.allowance >= 0
+			? [
+					{
+						label: "Left",
+						amount: parts.allowance,
+						pattern: "solid",
+						tone: "pale",
+					} as BarSegment,
+				]
+			: []),
 	];
 	return (
 		<SegmentedBar

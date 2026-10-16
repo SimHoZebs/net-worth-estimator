@@ -247,6 +247,45 @@ func TestRowWriteNotFoundAndConflict(t *testing.T) {
 	}
 }
 
+func TestRowWriteIgnoresEchoedSourceField(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+
+	account := httptest.NewRecorder()
+	accountRequest := httptest.NewRequest(http.MethodPost, "/v1/accounts", bytes.NewReader([]byte(
+		`{"id":"checking","name":"Checking","kind":"cash","enabled":true}`,
+	)))
+	accountRequest.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(account, accountRequest)
+	if account.Code != http.StatusOK {
+		t.Fatalf("account status = %d, body %s", account.Code, account.Body.String())
+	}
+
+	// Frontend drafts echo stored rows verbatim, including the
+	// server-computed source flag. Writes must accept and ignore it.
+	post := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/postings", bytes.NewReader([]byte(
+		`{"id":"echo","name":"Echo","destinations":["checking"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"date":"2026-08-01","priority":1,"enabled":true,"source":"model","claim":null}`,
+	)))
+	request.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(post, request)
+	if post.Code != http.StatusOK {
+		t.Fatalf("POST status = %d, body %s", post.Code, post.Body.String())
+	}
+	var created struct {
+		Row struct {
+			Source string `json:"source"`
+		} `json:"row"`
+		Persisted bool `json:"persisted"`
+	}
+	if err := json.Unmarshal(post.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode POST response: %v", err)
+	}
+	if !created.Persisted || created.Row.Source != "model" {
+		t.Fatalf("echoed source response = %+v", created)
+	}
+}
+
 func TestDeterministicResponseIncludesMovementEvents(t *testing.T) {
 	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "checkpoints.json")
 	fixtureBytes, err := os.ReadFile(fixturePath)

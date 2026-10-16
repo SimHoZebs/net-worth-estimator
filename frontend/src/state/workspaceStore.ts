@@ -13,6 +13,11 @@ import {
 	READ_ONLY_IMPORT_MESSAGE,
 	type ServerStatus,
 } from "../api/index.ts";
+import {
+	applyRowOperations,
+	diffFinancialModelDocuments,
+	type RowWriter,
+} from "../api/rowSync.ts";
 import { changesBetween, type Plan, validatePlan } from "../domain/model.ts";
 import {
 	loadRemoteState,
@@ -23,7 +28,7 @@ import {
 } from "./remoteStorage.ts";
 import type { Snapshot, StorageError } from "./storage.ts";
 
-export interface RemoteApiClient {
+export interface RemoteApiClient extends RowWriter {
 	getStatus(options?: ApiRequestOptions): Promise<Error | ServerStatus>;
 	getModel(
 		options?: ApiRequestOptions,
@@ -31,10 +36,6 @@ export interface RemoteApiClient {
 	getIncomeData(
 		options?: ApiRequestOptions,
 	): Promise<Error | IncomeDataSnapshot>;
-	putModel(
-		document: FinancialModelDocument,
-		options?: ApiRequestOptions,
-	): Promise<Error | FinancialModelResponse>;
 }
 
 export interface RemoteWorkspace {
@@ -660,13 +661,6 @@ export const useWorkspaceStore = create<
 			});
 			return false;
 		}
-		if (!get().serverRevision) {
-			set({
-				error:
-					"The server did not provide a model content identity. Editing and saving are blocked until the current model supports revisions.",
-			});
-			return false;
-		}
 		const current = get().workspace;
 		if (!current) {
 			set({ error: "Load the server workspace before editing it." });
@@ -745,10 +739,10 @@ export const useWorkspaceStore = create<
 			set({ error: staleDraftMessage });
 			return false;
 		}
-		if (!current.baseRevision || !get().serverRevision) {
+		if (!get().serverDocument && !get().serverRevision) {
 			set({
 				error:
-					"The server did not provide a model content identity. Saving is blocked until the current server model is reloaded with revision support.",
+					"The server model has not loaded yet. Wait for the current server load to finish before saving.",
 			});
 			return false;
 		}
@@ -793,10 +787,13 @@ export const useWorkspaceStore = create<
 		set({ loading: true, error: null });
 		try {
 			const document = conversion.document;
-			const putResult = await api.putModel(document, {
+			const operations = diffFinancialModelDocuments(
+				get().serverDocument,
+				document,
+			);
+			const applyResult = await applyRowOperations(api, operations, {
 				authToken,
 				signal: controller.signal,
-				ifMatch: current.baseRevision ?? undefined,
 			});
 			if (
 				!get().engine.mounted ||
@@ -804,31 +801,18 @@ export const useWorkspaceStore = create<
 				get().engine.workspaceEpoch !== operationEpoch
 			)
 				return false;
-			if (putResult instanceof Error) {
-				if (statusFor(putResult) === 412) {
-					const conflicted = { ...current, draftStale: true };
-					set({ workspace: conflicted });
-					get().writeLocalState(
-						localStateFor(conflicted, get().draftPresentation),
-						localStateFor(current, get().draftPresentation),
-					);
-					const message =
-						"The server model changed after this draft was created. The draft remains available locally, but saving is blocked until it is discarded or reloaded.";
-					set({ error: message });
-					get().preserveQueuedError(message);
-					return false;
-				}
+			if (applyResult instanceof Error) {
 				const message = markApiFailure(
 					(value) => set({ error: value }),
 					(value) => set({ authRequiredState: value }),
 					(value) => set({ writeBlocked: value }),
-					putResult,
+					applyResult,
 					"The temporary plan could not be saved to the server. It remains available locally.",
 				);
 				get().preserveQueuedError(message);
 				return false;
 			}
-			const validationErrors = putResult.issues.filter(
+			const validationErrors = applyResult.issues.filter(
 				(issue) => issue.severity === "error",
 			);
 			if (validationErrors.length) {
@@ -1009,22 +993,13 @@ export const useWorkspaceStore = create<
 		engine.saveController = controller;
 		set({ loading: true, error: null });
 		try {
-			const result = await api.putModel(document, {
+			const operations = diffFinancialModelDocuments(null, document);
+			const result = await applyRowOperations(api, operations, {
 				authToken,
 				signal: controller.signal,
-				ifMatch: "*",
 			});
 			if (!get().engine.mounted || controller.signal.aborted) return false;
 			if (result instanceof Error) {
-				if (statusFor(result) === 412) {
-					await get().hydrate({ deferDuringSave: false });
-					if (!get().workspace) return false;
-					const message =
-						"A server model was created while this import was being reviewed. The latest server model has been loaded; review it before importing again.";
-					set({ error: message });
-					get().preserveQueuedError(message);
-					return false;
-				}
 				const message = markApiFailure(
 					(value) => set({ error: value }),
 					(value) => set({ authRequiredState: value }),
@@ -1032,6 +1007,17 @@ export const useWorkspaceStore = create<
 					result,
 					"The selected model could not be imported. The server has no active model.",
 				);
+				get().preserveQueuedError(message);
+				return false;
+			}
+			if (!result.ok) {
+				const details = result.issues
+					.filter((issue) => issue.severity === "error")
+					.map((issue) => issue.message)
+					.filter(Boolean)
+					.join(" ");
+				const message = `The selected model could not be imported${details ? `: ${details}` : "."}`;
+				set({ error: message });
 				get().preserveQueuedError(message);
 				return false;
 			}
