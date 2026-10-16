@@ -133,6 +133,9 @@ func TestDeleteAccountLeavesSyncRows(t *testing.T) {
 	store := openTestStore(t)
 	seedOwnerDocument(t, store)
 	seedSyncState(t, store)
+	if _, err := store.SaveAccountLink(AccountLink{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", BridgeName: "College"}); err != nil {
+		t.Fatalf("seed link: %v", err)
+	}
 	if err := store.DeleteAccount("checking"); err != nil {
 		t.Fatalf("delete sync-referenced account: %v", err)
 	}
@@ -157,6 +160,15 @@ func TestDeleteAccountLeavesSyncRows(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("sync pending posting was garbage-collected: %v", ids)
+	}
+	links, err := store.ListAccountLinks()
+	if err != nil {
+		t.Fatalf("list links: %v", err)
+	}
+	for _, link := range links {
+		if link.ModelAccountID == "checking" {
+			t.Fatalf("deleted account kept its link: %+v", link)
+		}
 	}
 }
 

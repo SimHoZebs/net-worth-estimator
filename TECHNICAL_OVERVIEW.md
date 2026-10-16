@@ -225,7 +225,7 @@ Each row write runs one transaction: validate the resulting document, then inser
 2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
 3. Incoming `source` values are ignored and recomputed. Incoming IDs in the reserved `sfin-` namespace are rejected. Stored sync rows therefore cannot be forged through row writes; sync-owned postings also refuse owner updates and deletes.
 4. Owner checkpoints win key collisions; a later synchronization skips the owner-owned key until owner data is removed.
-5. Deleting an account never garbage-collects sync rows or links; relinking restores sync flow.
+5. Deleting an account removes its bridge links with it; sync rows stay (the API refuses deletes that would orphan references). If the bridge still reports the account, the next sync provisions it afresh.
 
 ### Artifact durability
 
