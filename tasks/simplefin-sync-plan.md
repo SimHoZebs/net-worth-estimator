@@ -28,7 +28,7 @@ Rows outside scope are counted by reason. Amounts and descriptions are omitted f
 - The secret is read from the environment or platform secret store and is absent from status, model, and successful sync-summary payloads.
 - Protocol errors disclose only the Bridge host and status. HTTP transport errors can wrap the full request URL; failed trigger responses and scheduler logs are therefore sensitive until error redaction is implemented.
 - Derived checkpoints and pending labels are visible through `GET /v1/financial-model`; protect that route according to the separate access-control plan if the resulting balances are sensitive.
-- `POST /v1/sync/simplefin` uses the same read-only and bearer policy as canonical model saves.
+- `POST /v1/sync/simplefin` uses the same read-only and bearer policy as row writes.
 - Dry-run mode must not commit source rows, even when the fetch and mapping succeed.
 - One service instance owns the scheduler and SQLite writer. Multiple scheduler replicas are outside this plan.
 
@@ -37,7 +37,7 @@ Rows outside scope are counted by reason. Amounts and descriptions are omitted f
 | Variable | Required | Meaning |
 | --- | --- | --- |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` | real mode | Bridge Access URL secret; an empty value disables the runner |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS` | when mappings exist | comma-separated `bridge-account-id=model-account-id` entries |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS` | bootstrap only | comma-separated `bridge-account-id=model-account-id` entries, imported as manual links on first sync; links then live in `account_links` and survive env removal |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` | for pending seeds | comma-separated model account IDs treated as cards |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN` | optional | exact value `1` enables dry-run; all other values disable it |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK` | fixture mode only | exact value `1` enables deterministic fixture responses |
@@ -49,33 +49,38 @@ Startup rules:
 - fixture mode and a real Access URL are mutually exclusive;
 - a fixture file without fixture mode is fatal;
 - an empty Access URL without fixture mode disables synchronization and makes the trigger return 503;
+- env bootstrap entries pointing at missing model accounts fail the sync loudly instead of writing ghost checkpoints;
 - changing a secret requires a service restart.
 
-## Row Ownership and Migration
+## Row Ownership, Links, and Migration
 
-Schema version 3 adds `source TEXT NOT NULL DEFAULT 'model'` to checkpoints and postings. Existing rows are owner rows.
+Schema version 3 adds `source TEXT NOT NULL DEFAULT 'model'` to checkpoints and postings. Existing rows are owner rows. Schema version 8 adds `entity_ids` (shared ID registry) and `account_links` (bridge-to-model bindings with snapshot, origin, and last-seen date).
 
 The reserved `store.SyncPostingPrefix` is `sfin-`. Pending posting IDs use `sfin-pending-<model-account>-<sanitized-transaction-id>`.
 
-### Model-save coexistence
+### Linking and provisioning
 
-`store.SaveDocument` snapshots stored sync rows, strips owner payload IDs in the reserved namespace, replaces owner rows, and re-merges stored sync rows in one transaction.
+Each sync resolves bridge accounts through `account_links` plus env bootstrap, then provisions unknown USD accounts as model accounts (investment with holdings, else cash) with `auto` links. `GET /v1/sync/simplefin/accounts` lists links and snapshots with zero Bridge quota; `PUT`/`DELETE` manage bindings. A vanished bridge account keeps its link, rows, and data.
+
+### Owner-write coexistence
+
+Row writes replace the retired whole-document save. Incoming `source` values are ignored and sync-namespace IDs are rejected, so stored sync rows cannot be forged, edited, or deleted through row writes. Owner checkpoints win key collisions; later synchronization skips the owner-owned key until owner data is removed. Deleting an account never garbage-collects sync rows or links.
+
+### Seed and import coexistence
+
+`replaceDocument` (seed/import path) snapshots stored sync rows, drops forged `sfin-` IDs from the incoming document, replaces owner rows, and re-merges stored sync rows in one transaction.
 
 Checkpoint behavior:
 
-- stored sync rows survive a model save;
-- an incoming owner checkpoint with the same account/date and same balance preserves sync ownership;
-- an incoming owner checkpoint with the same account/date and a different balance becomes the owner row;
-- the colliding sync checkpoint is omitted;
-- later synchronization skips that account/date while the owner row exists;
-- the owner row is restored to sync ownership only when the model no longer supplies that exact checkpoint.
+- stored sync rows survive a seed;
+- an incoming owner checkpoint with the same key wins and becomes the owner row;
+- a later synchronization skips the owner-owned key until owner data is removed.
 
 Posting behavior:
 
 - incoming `sfin-` IDs are dropped;
 - stored sync pending postings are re-merged;
-- an owner model cannot edit or delete a sync pending posting through a model save;
-- removing a mapped account from the canonical document does not garbage-collect sync rows, because sync persistence is independent of the current account map.
+- removing a mapped account from the seed does not garbage-collect sync rows, because sync persistence is independent of the current account map.
 
 Any future ownership migration must preserve this collision contract and add a package test before runtime rollout. Migrations are forward-only, transactional, data-preserving, and applied by `store.Open`.
 
@@ -83,7 +88,7 @@ Any future ownership migration must preserve this collision contract and add a p
 
 ### Balance checkpoints
 
-For each mapped Bridge account:
+For each resolved Bridge account (linked, env-bootstrapped, or auto-provisioned):
 
 - accept an empty currency or `USD`; skip other currencies;
 - parse the balance as a numeric decimal;
@@ -282,7 +287,7 @@ Required coverage:
 - The Access URL is stored in server-side secret configuration and omitted from successful payloads; transport-error redaction is a production requirement.
 - Dry-run is verified before the first committed run.
 - Scheduler and manual-trigger behavior remain single-process and guarded.
-- Sync-owned rows survive model saves and cannot be forged by model payloads.
+- Sync-owned rows survive owner writes and cannot be forged by row payloads.
 - Owner checkpoint precedence is covered by package and operator checks.
 - Fixture-to-real cutover uses the versioned purge script and a verified backup.
 - All listed production-package verification gates pass before fixture removal and before production cutover.

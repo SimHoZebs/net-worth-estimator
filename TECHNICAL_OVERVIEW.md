@@ -43,14 +43,16 @@ The container boundary is split. `backend/Dockerfile` produces an API-only image
 }
 ```
 
-Each issue contains `severity`, `code`, `message`, and `path`. Stored model and income rows are loaded in one read transaction. The response always includes a non-null issue array; `document` is null when the store has no canonical model. `revision` and the `ETag` response header identify the canonical content used by conditional writes.
+Each issue contains `severity`, `code`, `message`, and `path`. Stored model and income rows are loaded in one read transaction. The response always includes a non-null issue array; `document` is null when the store has no canonical model. `revision` and the `ETag` response header identify canonical content for reads and caching.
 
-`PUT /v1/financial-model` accepts one `FinancialModelDocument` and requires an `If-Match` header containing the revision returned by the preceding read. It validates the incoming document against the stored income snapshot and returns the same `{document, issues, revision}` shape. A missing `If-Match` value returns 428; a stale value returns 412 without changing stored state.
+Row writes replace the retired whole-document PUT. Each `POST`, `PATCH`, `PUT`, or `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, and `/v1/sync/simplefin/accounts` applies one change: it validates the resulting document against the stored income snapshot and returns `{row, issues, persisted, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions.
 
 - Any error-severity issue prevents persistence.
-- Warning-only documents are persisted.
-- A rejected request does not replace stored state.
+- Warning-only writes are persisted.
+- A rejected request changes nothing.
 - The `source` field on checkpoint and posting inputs is not trusted. The store recomputes ownership.
+- Omitted row IDs are server-generated UUIDv7, unique across accounts, postings, rules, and evaluations via the `entity_ids` registry (duplicate IDs return 409).
+- Positions are server-managed: creates append, `POST .../reorder` moves one row before another (or to the end).
 
 ### Status and income
 
@@ -153,14 +155,14 @@ An unseeded run does not use the shared registry or artifact cache. Its context 
 
 ### Origin and write policy
 
-`ParseAllowedOrigins` accepts comma-separated exact HTTP/S origins. It rejects non-root paths, queries, fragments, credentials, invalid ports, empty entries, and wildcard values. CORS permits only `GET`, `POST`, `PUT`, and `OPTIONS`, and only `Content-Type`, `Authorization`, and `If-Match` request headers. Same-origin requests are accepted automatically; configured origins are checked exactly. A TLS-terminating proxy must forward exactly one valid `X-Forwarded-Proto` and `X-Forwarded-Host` value, or have its public HTTPS origin listed in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`.
+`ParseAllowedOrigins` accepts comma-separated exact HTTP/S origins. It rejects non-root paths, queries, fragments, credentials, invalid ports, empty entries, and wildcard values. CORS permits `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, and `OPTIONS`, and only `Content-Type` and `Authorization` request headers. Same-origin requests are accepted automatically; configured origins are checked exactly. A TLS-terminating proxy must forward exactly one valid `X-Forwarded-Proto` and `X-Forwarded-Host` value, or have its public HTTPS origin listed in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`.
 
 A request without an `Origin` header passes. Origin filtering does not grant write access.
 
-`writeAuthMiddleware` guards exactly:
+`writeAuthMiddleware` guards row writes and sync endpoints:
 
-- `PUT /v1/financial-model`;
-- `POST /v1/sync/simplefin`.
+- `POST`, `PATCH`, `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`;
+- `POST /v1/sync/simplefin` and link writes under `/v1/sync/simplefin/accounts`.
 
 Read-only mode rejects those routes first with 403. Otherwise, a configured token requires the exact `Bearer <token>` value and is compared in constant time. Reads and projection computation remain unguarded.
 
@@ -170,15 +172,17 @@ Read-only mode rejects those routes first with 403. Otherwise, a configured toke
 
 `store.Store` is the persistence boundary. Its methods cover:
 
-- canonical document load/save, including conditional save by content identity;
+- canonical document load (writes go through row create/update/delete/move);
+- row writes with server-generated UUIDv7 IDs and a shared cross-table ID registry;
+- bridge-to-model account links;
 - income snapshot load/save;
 - one consistent document-and-income load;
 - CSV replacement import;
 - artifact get/put;
-- transactional SimpleFIN application;
+- transactional SimpleFIN application with provisioning;
 - test/import clear and close.
 
-`store.Open` returns the interface, not the SQLite implementation. `RunConformance` exercises that interface for canonical round trips, income effective dating, import rollback, row ownership, sync behavior, dry-run rollback, and artifact first-write behavior.
+`store.Open` returns the interface, not the SQLite implementation. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, income effective dating, import rollback, dry-run rollback, and artifact first-write behavior.
 
 ### SQLite setup
 
@@ -201,6 +205,8 @@ The current schema stores:
 | `checkpoints` | ordered balance observations, unique by account/date, with owner |
 | `postings` | ordered posting definitions with owner |
 | `evaluations` | type, globally keyed instance ID, order, label, enablement, and JSON config |
+| `entity_ids` | shared ID registry across accounts, postings, rules, and evaluations |
+| `account_links` | bridge-to-model bindings with snapshot, origin, and last-seen date |
 | `income_sources` | effective-dated income rows sharing an ID |
 | `tax_profiles` | ordered deductions, brackets, and source URL |
 | `projection_artifacts` | versioned content identity, kind, creation time, and JSON payload |
@@ -211,24 +217,15 @@ The current schema stores:
 
 `cmd/importcsv` deliberately invokes the same import path for operator-controlled replacement of an existing database.
 
-### Canonical replacement and ownership
+### Row writes and ownership
 
-`SaveDocument` runs one transaction. `SaveDocumentIfUnchanged` first reads the current canonical content identity inside that transaction and rejects a mismatched ETag before replacing rows.
+Each row write runs one transaction: validate the resulting document, then insert, replace, delete, or reorder one row. There is no whole-document replace at runtime; `replaceDocument` survives only as the private seed/import path.
 
-1. Snapshot stored sync-owned checkpoints and postings.
-2. Delete current canonical model rows.
-3. Insert incoming owner rows.
-4. Re-merge stored sync-owned rows.
-5. Persist source metadata.
-
-Incoming `source` values are ignored. Incoming posting IDs in the reserved `sfin-` namespace are dropped. Stored sync rows therefore cannot be forged, edited, or deleted through a model save.
-
-Checkpoint collision rules are explicit:
-
-- an incoming owner checkpoint with the same key and balance preserves the stored sync row;
-- an incoming owner checkpoint with the same key and a different balance wins;
-- a sync checkpoint with the same key is omitted after an owner override;
-- a later synchronization skips the owner-owned key until owner data is removed.
+1. Creates claim the row ID in `entity_ids` (server-generated UUIDv7 when omitted); duplicates return 409.
+2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
+3. Incoming `source` values are ignored and recomputed. Incoming IDs in the reserved `sfin-` namespace are rejected. Stored sync rows therefore cannot be forged through row writes; sync-owned postings also refuse owner updates and deletes.
+4. Owner checkpoints win key collisions; a later synchronization skips the owner-owned key until owner data is removed.
+5. Deleting an account never garbage-collects sync rows or links; relinking restores sync flow.
 
 ### Artifact durability
 
@@ -472,14 +469,16 @@ The seed controls the state sequence. Run-count normalization and seed-null beha
 `internal/simplefin` is configured once in `cmd/server`:
 
 - `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` enables a real Bridge runner.
-- `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS` maps Bridge IDs to model account IDs.
+- `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS` bootstraps Bridge-to-model links on first sync; links then live in the `account_links` table and survive env removal.
 - `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` selects model accounts eligible for pending-charge seeds.
+- Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them.
+- A bridge account that vanishes keeps its link, rows, and data (stale, never deleted by sync).
 - `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1` plans without committing.
 - `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK=1` enables fixture mode; an optional fixture file is reloaded for each fetch.
 - Fixture mode and a real Access URL are mutually exclusive.
 - An invalid account map is fatal at startup.
 
-`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. `Map` emits one balance checkpoint per mapped account/date and only pending negative card charges as disabled postings. Posted, positive, non-USD, invalid-amount, and unmapped rows are counted by reason without logging descriptions or amounts.
+`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through links plus env bootstrap, provisions unmapped USD accounts, then `Map` emits one balance checkpoint per resolved account/date and only pending negative card charges as disabled postings. Posted, positive, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
 
 `Store.ApplySyncPlan` applies checkpoints and the pending snapshot in one transaction. Owner checkpoints win key collisions. Pending deletion is constrained by owner, account, and the escaped reserved prefix. Dry-run returns before commit, so the transaction rolls back.
 
@@ -496,12 +495,14 @@ The scheduler calls `Runner.Sync` daily at a random minute from 03:00 through 03
 | `backend/internal/api/auth.go` | read-only and bearer policy |
 | `backend/internal/api/cors.go` | origin parsing and preflight enforcement |
 | `backend/internal/api/model_handlers.go` | model, status, and income handlers |
+| `backend/internal/api/rows.go` | row create/update/delete/move and link handlers |
 | `backend/internal/api/projection_handlers.go` | deterministic resolution, execution, and cache |
 | `backend/internal/api/stochastic_sse.go` | shared seeded runs and event serialization |
 | `backend/internal/api/artifacts.go` | content identity and cache helpers |
 | `backend/internal/store/store.go` | `Store`, `store.Open`, migrations |
-| `backend/internal/store/model.go` | canonical transaction and ordered reload |
-| `backend/internal/store/sync.go` | ownership merge and sync application |
+| `backend/internal/store/model.go` | seed/import replacement and ordered reload |
+| `backend/internal/store/rows.go` | row CRUD, ID registry, links, provisioning |
+| `backend/internal/store/sync.go` | sync application and pending snapshot |
 | `backend/internal/store/artifacts.go` | bounded artifact storage |
 | `backend/internal/csvio/import.go` | model and income CSV parsing |
 | `backend/internal/domain/validation.go` | authoritative model validation |
