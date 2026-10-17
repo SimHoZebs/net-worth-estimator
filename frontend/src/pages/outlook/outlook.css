@@ -453,6 +453,42 @@
 		height: 16px;
 		accent-color: var(--track-fill);
 	}
+	.account-toggles {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+	.account-toggle {
+		border: 1px solid var(--line-strong);
+		background: var(--surface);
+		border-radius: 10px;
+		padding: 6px 12px 6px 6px;
+		cursor: pointer;
+		text-align: left;
+		/* Same text metrics as the accounts table so the shared
+		   icon-plus-name row renders identically. */
+		font-size: 11px;
+		transition:
+			border-color 0.15s,
+			background 0.15s;
+	}
+	.account-toggle:hover {
+		background: var(--hover);
+	}
+	.account-toggle:focus-visible {
+		outline: 2px solid var(--track-fill);
+		outline-offset: 2px;
+	}
+	.account-toggle[aria-pressed="true"] {
+		border-color: var(--track-fill);
+		background: var(--accent-green-bg);
+	}
+	.account-toggle[aria-pressed="false"] > .account-icon {
+		opacity: 0.55;
+	}
+	.account-toggle[aria-pressed="false"] > span {
+		color: var(--muted);
+	}
 	.cycle-breakdown {
 		margin-top: 14px;
 		border-top: 1px solid var(--line);

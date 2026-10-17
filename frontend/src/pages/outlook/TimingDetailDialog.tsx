@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
 import { TransactionRow } from "../../components/activity/TransactionRow.tsx";
+import { AccountLabel } from "../../components/AccountIcon.tsx";
 import {
 	type BarSegment,
 	SegmentedBar,
@@ -254,6 +255,27 @@ export interface TimingConfigHints {
 	trackedSpendingIds: string[];
 }
 
+function AccountToggle({
+	account,
+	checked,
+	onToggle,
+}: {
+	account: Pick<Plan["accounts"][number], "id" | "kind" | "color" | "name">;
+	checked: boolean;
+	onToggle: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			className="account-toggle table-name"
+			aria-pressed={checked}
+			onClick={onToggle}
+		>
+			<AccountLabel account={account} />
+		</button>
+	);
+}
+
 export function TimingDetailDialog({
 	eyebrow,
 	today,
@@ -329,6 +351,10 @@ export function TimingDetailDialog({
 	const movements = useMemo(
 		() => new Map(plan.movements.map((movement) => [movement.id, movement])),
 		[plan.movements],
+	);
+	const accountsById = useMemo(
+		() => new Map(plan.accounts.map((account) => [account.id, account])),
+		[plan.accounts],
 	);
 	return (
 		<Modal
@@ -634,19 +660,23 @@ export function TimingDetailDialog({
 						)}
 						<fieldset className="cycle-accounts">
 							<legend>Accounts in available balance</legend>
-							{config.spendingAccounts.map((account) => {
-								const checked = config.trackedSpendingIds.includes(account.id);
-								return (
-									<label key={account.id} className="cycle-account-option">
-										<input
-											type="checkbox"
+							<div className="account-toggles">
+								{config.spendingAccounts.map((account) => {
+									const full = accountsById.get(account.id);
+									const checked = config.trackedSpendingIds.includes(
+										account.id,
+									);
+									if (!full) return null;
+									return (
+										<AccountToggle
+											key={account.id}
+											account={full}
 											checked={checked}
-											onChange={() => onToggleSpendingAccount(account.id)}
+											onToggle={() => onToggleSpendingAccount(account.id)}
 										/>
-										<span>{account.name}</span>
-									</label>
-								);
-							})}
+									);
+								})}
+							</div>
 						</fieldset>
 						<label className="field">
 							<span>
@@ -681,19 +711,21 @@ export function TimingDetailDialog({
 						)}
 						<fieldset className="cycle-accounts">
 							<legend>Cards in cycle total</legend>
-							{config.cards.map((card) => {
-								const checked = config.trackedIds.includes(card.id);
-								return (
-									<label key={card.id} className="cycle-account-option">
-										<input
-											type="checkbox"
+							<div className="account-toggles">
+								{config.cards.map((card) => {
+									const full = accountsById.get(card.id);
+									const checked = config.trackedIds.includes(card.id);
+									if (!full) return null;
+									return (
+										<AccountToggle
+											key={card.id}
+											account={full}
 											checked={checked}
-											onChange={() => onToggleAccount(card.id)}
+											onToggle={() => onToggleAccount(card.id)}
 										/>
-										<span>{card.name}</span>
-									</label>
-								);
-							})}
+									);
+								})}
+							</div>
 						</fieldset>
 						<fieldset className="cycle-accounts">
 							<legend>Recurring payments in this total</legend>
