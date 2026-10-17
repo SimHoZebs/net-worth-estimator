@@ -113,6 +113,33 @@ export function projectionChartModel({
 }
 
 export type ChartModel = NonNullable<ReturnType<typeof projectionChartModel>>;
+
+/**
+ * Index of the plotted point at or nearest `today` (a YYYY-MM-DD date).
+ * The result is always a valid index: today before the first point yields 0
+ * and today after the last point yields the last index. Ties prefer the
+ * earlier point so the default never jumps into the future on a coin flip.
+ */
+export function nearestPointIndex(
+	points: ReadonlyArray<{ date: string }>,
+	today: string,
+): number {
+	let best = 0;
+	let bestDistance = Number.POSITIVE_INFINITY;
+	const target = Date.parse(today);
+	for (const [index, point] of points.entries()) {
+		const time = Date.parse(point.date.slice(0, 10));
+		const distance =
+			Number.isNaN(time) || Number.isNaN(target)
+				? Number.POSITIVE_INFINITY
+				: Math.abs(time - target);
+		if (distance < bestDistance) {
+			best = index;
+			bestDistance = distance;
+		}
+	}
+	return best;
+}
 export function projectionCsv(rows: ChartModel["rows"]) {
 	return [
 		"Date,Base case,10th percentile,Median,90th percentile",

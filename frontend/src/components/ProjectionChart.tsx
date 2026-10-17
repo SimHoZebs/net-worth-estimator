@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from "react";
-import { projectionChartModel } from "../domain/chart.ts";
-import { dateLabel, money } from "../domain/format.ts";
+import { nearestPointIndex, projectionChartModel } from "../domain/chart.ts";
+import { dateLabel, money, todayIso } from "../domain/format.ts";
 import { type Plan, visibleAccounts } from "../domain/model.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { useMediaQuery } from "../state/useMediaQuery.ts";
@@ -48,8 +48,12 @@ export function ProjectionChart({
 				: null,
 		[projection, range, narrow],
 	);
+	const defaultIndex = useMemo(
+		() => (model ? nearestPointIndex(model.points, todayIso()) : 0),
+		[model],
+	);
 	const selectedIndex = model
-		? Math.min(inspected ?? model.points.length - 1, model.points.length - 1)
+		? Math.min(inspected ?? defaultIndex, model.points.length - 1)
 		: 0;
 	const point = model?.points[selectedIndex] ?? model?.last;
 	const selectedRange = model ? range?.points[selectedIndex] : undefined;
