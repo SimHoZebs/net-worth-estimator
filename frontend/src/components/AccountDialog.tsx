@@ -71,6 +71,7 @@ export function AccountDialog({
 				onChange={setView}
 				label="Account view"
 				className="account-view-tabs"
+				panelClassName="account-activity-panel"
 			>
 				{view === "transactions" ? (
 					<Transactions
