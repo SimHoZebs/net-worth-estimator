@@ -8,7 +8,11 @@ import "./SegmentedBar.css";
  */
 export type SegmentPattern = "solid" | "stripes" | "dots" | "hatch";
 
-export type SegmentTone = "sage" | "pale" | "dark" | "amber";
+/** One green only: sage is the single green selectable for bar segments,
+ * so consumers cannot place similar greens side by side. The pale and dark
+ * fills stay in CSS/tokens for the snapshot SVG, which addresses them
+ * directly — they are not valid SegmentTone values. */
+export type SegmentTone = "sage" | "amber" | "blue" | "plum";
 
 export interface BarSegment {
 	label: string;

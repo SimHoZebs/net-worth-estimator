@@ -41,6 +41,8 @@
 	--chart-median: #8fa07e;
 	--track: #2a352c;
 	--track-fill: #9dbd7d;
+	--seg-blue: #9cc0dd;
+	--seg-plum: #c9b8e0;
 }
 
 /* Dark mirrors of accessibility remediation (unlayered, must win). */
