@@ -84,6 +84,23 @@
 		font-size: 11px;
 		color: var(--muted);
 	}
+	.details-heading {
+		grid-column: 1 / -1;
+		font-size: 12px;
+		font-weight: 650;
+		color: var(--ink);
+		margin: 10px 0 0;
+		padding-top: 14px;
+		border-top: 1px solid var(--line);
+	}
+	.details-heading:first-child {
+		margin-top: 0;
+		padding-top: 0;
+		border-top: 0;
+	}
+	.account-source-row > div {
+		display: flex;
+	}
 	.balance-range {
 		border: 0;
 		padding: 0;
@@ -99,10 +116,11 @@
 	}
 	.balance-range-track {
 		position: relative;
-		height: 8px;
+		height: 10px;
 		border-radius: 20px;
 		background: var(--surface-3);
-		overflow: hidden;
+		border: 1px solid var(--line);
+		overflow: visible;
 	}
 	.balance-range-fill {
 		position: absolute;
@@ -113,10 +131,22 @@
 	}
 	.balance-range-marker {
 		position: absolute;
-		top: -2px;
-		bottom: -2px;
+		top: -3px;
+		bottom: -3px;
 		width: 2px;
 		background: var(--ink);
+		transform: translateX(-1px);
+	}
+	.balance-range-thumb {
+		position: absolute;
+		top: 50%;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--input-bg);
+		border: 2px solid var(--track-fill);
+		transform: translate(-50%, -50%);
+		box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
 	}
 	.balance-range-inputs {
 		display: grid;
@@ -167,6 +197,7 @@
 		min-width: 0;
 		font-size: 12px;
 		padding: 9px 3px;
+		text-overflow: ellipsis;
 	}
 	.transaction-order {
 		white-space: nowrap;
@@ -552,6 +583,13 @@
 		.balance-range-ceiling-toggle {
 			grid-column: 1 / -1;
 			padding-bottom: 0;
+		}
+		.account-details-form .form-grid {
+			grid-template-columns: 1fr;
+		}
+		.details-heading {
+			margin-top: 6px;
+			padding-top: 12px;
 		}
 	}
 }
