@@ -89,7 +89,7 @@ export function WorkspaceDialogs({
 					<p>
 						Your {changeCount} unsaved{" "}
 						{changeCount === 1 ? "change will" : "changes will"} be removed.
-						Your saved plan and captured comparison measures stay intact.
+						Your saved plan stays intact.
 					</p>
 				</ConfirmDialog>
 			)}

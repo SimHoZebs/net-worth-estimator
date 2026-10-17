@@ -86,14 +86,6 @@
 		background: var(--track-fill);
 		margin-left: auto;
 	}
-	.nav-count {
-		border-radius: 4px;
-		background: var(--accent-amber-bg);
-		min-width: 19px;
-		text-align: center;
-		font-size: 10px;
-		margin-left: auto;
-	}
 	.sidebar-bottom {
 		margin-top: auto;
 		padding-top: 50px;

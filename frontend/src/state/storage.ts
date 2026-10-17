@@ -1,5 +1,4 @@
 import * as errore from "errore";
-import { z } from "zod";
 import { type Plan, planSchema } from "../domain/model.ts";
 
 export class StorageError extends errore.createTaggedError({
@@ -12,37 +11,6 @@ export class ImportError extends errore.createTaggedError({
 	message: "$detail Choose a valid Waypoint plan JSON file.",
 }) {}
 
-function migrateLegacySnapshot(value: unknown): unknown {
-	if (typeof value !== "object" || value === null || Array.isArray(value))
-		return value;
-	const record = value as Record<string, unknown>;
-	if (
-		record.evaluationDate === undefined &&
-		typeof record.goalDate !== "undefined"
-	)
-		return { ...record, evaluationDate: record.goalDate };
-	return value;
-}
-
-export const snapshotSchema = z.preprocess(
-	migrateLegacySnapshot,
-	z.object({
-		capturedAt: z.string(),
-		name: z.string(),
-		years: z.number(),
-		startDate: z.string(),
-		revision: z.number(),
-		assumptions: z.string(),
-		// Legacy derived metrics. Old captures stored these; new captures omit
-		// them and derive previous/current at render via comparisonMetrics.
-		final: z.number().optional(),
-		current: z.number().optional(),
-		evaluationDate: z.string().nullable().optional(),
-		shortfallDate: z.string().nullable().optional(),
-		changes: z.number().optional(),
-	}),
-);
-export type Snapshot = z.infer<typeof snapshotSchema>;
 // Workspace persistence lives in remoteStorage.ts (REMOTE_STORAGE_KEY).
 // Do not add another workspace schema here.
 export function parsePlan(text: string): Plan | ImportError {

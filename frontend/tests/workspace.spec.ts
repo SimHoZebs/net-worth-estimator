@@ -57,7 +57,7 @@ test("outlook renders real calculations, scenario ranges and evidence", async ({
 	expect(errors).toEqual([]);
 });
 
-test("edits remain temporary, persist across reload, compare, and save deliberately", async ({
+test("edits remain temporary, persist across reload, and save deliberately", async ({
 	page,
 }) => {
 	await page.goto("/");
@@ -71,15 +71,10 @@ test("edits remain temporary, persist across reload, compare, and save deliberat
 	await expect(
 		page.getByText("1 unsaved change · saved plan unchanged"),
 	).toBeVisible();
-	await page.getByRole("button", { name: "Review & save" }).click();
+	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect(
-		page.getByRole("heading", { name: "Your changes" }),
-	).toBeVisible();
-	await page.getByText("Monthly investing", { exact: true }).click();
-	await expect(page.getByText("$600", { exact: true })).toBeVisible();
-	await expect(page.getByText("$900", { exact: true })).toBeVisible();
-	await page.getByRole("button", { name: "Save this plan" }).click();
-	await expect(page.getByText("No unsaved changes.")).toBeVisible();
+		page.getByText("1 unsaved change · saved plan unchanged"),
+	).not.toBeVisible();
 	await page.reload();
 	// The save reached the server, and the unsaved changes are gone.
 	const saved = await readSavedServerPlan();
@@ -143,7 +138,6 @@ test("failed saves retain the intended plan", async ({ page }) => {
 	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await page.getByRole("button", { name: "Review & save" }).click();
 	// The server rejects the write, so the unsaved changes must survive.
 	await page.route("**/v1/postings/*", async (route) => {
 		if (route.request().method() === "PATCH")
@@ -154,7 +148,7 @@ test("failed saves retain the intended plan", async ({ page }) => {
 			});
 		return route.continue();
 	});
-	await page.getByRole("button", { name: "Save this plan" }).click();
+	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect(
 		page.getByRole("alert").filter({ hasText: "HTTP 500" }),
 	).toBeVisible();
@@ -201,7 +195,6 @@ test("desktop pages and edit dialogs meet automated accessibility checks", async
 		"/#accounts",
 		"/#transactions",
 		"/#evaluations",
-		"/#compare",
 		"/#sources",
 	]) {
 		await page.goto(path);
@@ -323,32 +316,9 @@ test("read-only plans can be explored but not saved", async ({ page }) => {
 	await expect(
 		page.getByText("1 unsaved change · saved plan unchanged"),
 	).toBeVisible();
-	await page.getByRole("button", { name: "Review & save" }).click();
 	await expect(
-		page.getByRole("button", { name: "Save this plan" }),
+		page.getByRole("button", { name: "Save changes" }),
 	).toBeDisabled();
-});
-
-test("comparison snapshots contain measures and export remains portable", async ({
-	page,
-}) => {
-	await page.goto("/#compare");
-	await page.getByRole("button", { name: "Capture snapshot" }).click();
-	await expect(
-		page.getByText("Captured snapshot", { exact: true }),
-	).toBeVisible();
-	// The snapshot lives in this browser and carries measures, not a plan.
-	const snapshot = await page.evaluate(
-		(key) => JSON.parse(window.localStorage.getItem(key)!).snapshot,
-		REMOTE_STORAGE_KEY,
-	);
-	expect(snapshot).not.toHaveProperty("accounts");
-	expect(snapshot).not.toHaveProperty("movements");
-	expect(snapshot).toHaveProperty("final");
-	await page.getByRole("link", { name: "Configs", exact: true }).click();
-	const file = page.waitForEvent("download");
-	await page.getByRole("button", { name: "Export model" }).click();
-	expect((await file).suggestedFilename()).toBe("waypoint-model.json");
 });
 
 test("a second tab cannot overwrite newer financial work", async ({
@@ -417,7 +387,6 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 			"accounts",
 			"transactions",
 			"evaluations",
-			"compare",
 			"sources",
 		]) {
 			await page.goto(`/#${route}`);

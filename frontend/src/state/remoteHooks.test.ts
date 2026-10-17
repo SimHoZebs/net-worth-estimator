@@ -1508,15 +1508,14 @@ describe("remote workspace state", () => {
 			deriveDraftDocument(
 				rendered.result().workspace?.draft ?? null,
 				rendered.result().serverDocument,
-				rendered.result().draftPresentation ?? rendered.result().savedPresentation,
+				rendered.result().draftPresentation ??
+					rendered.result().savedPresentation,
 			)?.recurrenceRules[0]?.amount,
-		).toEqual(
-			{
-				resolver: "expression",
-				config: { expression: "125" },
-				inputs: {},
-			},
-		);
+		).toEqual({
+			resolver: "expression",
+			config: { expression: "125" },
+			inputs: {},
+		});
 		expect(rendered.result().error).toBeNull();
 
 		expect(await rendered.result().save()).toBe(true);
@@ -1553,7 +1552,6 @@ describe("remote workspace state", () => {
 				draftPresentation: first.result().savedPresentation,
 				baseFingerprint: serverDocumentFingerprint(modelFixture()),
 				baseRevision: '"sha256-test"',
-				snapshot: null,
 			}),
 		).toBeNull();
 		first.unmount();
@@ -2304,7 +2302,6 @@ describe("remote draft storage", () => {
 			version: 1 as const,
 			draft: null,
 			draftPresentation: null,
-			snapshot: null,
 		};
 		expect(persistRemoteState(state)).toBeNull();
 		expect(loadRemoteState()).toEqual(state);

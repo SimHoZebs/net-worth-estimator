@@ -18,9 +18,9 @@ export type {
 
 let defaultClient: RemoteApiClient | null = null;
 
-/// The engine lives in the workspace store; this hook binds options,
-/// boots the sync on mount, and subscribes to the snapshot. Return shape is
-/// unchanged: components and tests consume state and actions exactly as before.
+/// The engine lives in the workspace store; this hook binds options and boots
+/// the sync on mount. Return shape is unchanged: components and tests consume
+/// state and actions exactly as before.
 export function useRemoteWorkspace({
 	client,
 	authToken,
@@ -74,7 +74,6 @@ export function useRemoteWorkspace({
 	const discard = useWorkspaceStore((state) => state.discard);
 	const reloadDraft = useWorkspaceStore((state) => state.reloadDraft);
 	const replace = useWorkspaceStore((state) => state.replace);
-	const capture = useWorkspaceStore((state) => state.capture);
 	const importServerDocument = useWorkspaceStore(
 		(state) => state.importServerDocument,
 	);
@@ -97,7 +96,9 @@ export function useRemoteWorkspace({
 		volatile,
 		stale: Boolean(workspace?.draftStale),
 		draftStale: Boolean(workspace?.draftStale),
-		storageConflict: Boolean(error?.includes("changed in another tab") ?? false),
+		storageConflict: Boolean(
+			error?.includes("changed in another tab") ?? false,
+		),
 		readOnly: Boolean(status?.readOnly || writeBlocked),
 		authRequired: authRequiredState,
 		updatePlan,
@@ -105,7 +106,6 @@ export function useRemoteWorkspace({
 		discard,
 		reloadDraft,
 		replace,
-		capture,
 		importServerDocument,
 		retry,
 		dismissNotice,

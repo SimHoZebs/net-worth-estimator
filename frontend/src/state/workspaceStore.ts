@@ -26,7 +26,7 @@ import {
 	readRemoteStateRaw,
 	serverDocumentFingerprint,
 } from "./remoteStorage.ts";
-import type { Snapshot, StorageError } from "./storage.ts";
+import type { StorageError } from "./storage.ts";
 
 export interface RemoteApiClient extends RowWriter {
 	getStatus(options?: ApiRequestOptions): Promise<Error | ServerStatus>;
@@ -45,7 +45,6 @@ export interface RemoteWorkspace {
 	baseFingerprint: string | null;
 	baseRevision: string | null;
 	draftStale: boolean;
-	snapshot: Snapshot | null;
 }
 
 export interface UseRemoteWorkspaceOptions {
@@ -78,7 +77,6 @@ export interface RemoteWorkspaceState {
 	discard: () => boolean;
 	reloadDraft: () => Promise<boolean>;
 	replace: (next: Plan) => boolean;
-	capture: (snapshot: Snapshot) => void;
 	importServerDocument: (document: FinancialModelDocument) => Promise<boolean>;
 	retry: () => Promise<void>;
 	dismissNotice: () => void;
@@ -189,7 +187,6 @@ function localStateFor(
 		draftPresentation: workspace.draft ? draftPresentation : null,
 		baseFingerprint: workspace.draft ? workspace.baseFingerprint : null,
 		baseRevision: workspace.draft ? workspace.baseRevision : null,
-		snapshot: workspace.snapshot,
 	};
 }
 
@@ -334,7 +331,6 @@ interface WorkspaceActions {
 	discard: () => boolean;
 	reloadDraft: () => Promise<boolean>;
 	replace: (next: Plan) => boolean;
-	capture: (snapshot: Snapshot) => void;
 	retry: () => Promise<void>;
 	dismissNotice: () => void;
 }
@@ -615,7 +611,6 @@ export const useWorkspaceStore = create<
 			baseFingerprint,
 			baseRevision,
 			draftStale,
-			snapshot: localState?.snapshot ?? null,
 		};
 		set({
 			recoveryDraft: null,
@@ -893,7 +888,6 @@ export const useWorkspaceStore = create<
 				baseFingerprint: null,
 				baseRevision: null,
 				draftStale: false,
-				snapshot: current.snapshot,
 			};
 			const nextLocal: RemoteLocalState = {
 				version: 1,
@@ -901,7 +895,6 @@ export const useWorkspaceStore = create<
 				draftPresentation: null,
 				baseFingerprint: null,
 				baseRevision: null,
-				snapshot: current.snapshot,
 			};
 			const fallbackLocal = localStateFor(
 				current,
@@ -1187,7 +1180,6 @@ export const useWorkspaceStore = create<
 			baseFingerprint: get().engine.serverFingerprint,
 			baseRevision: get().serverRevision,
 			draftStale: false,
-			snapshot: null,
 		};
 		const draftPresentation = draftPresentationFor(
 			savedPresentationFor(validated, get().savedPresentation),
@@ -1201,25 +1193,6 @@ export const useWorkspaceStore = create<
 		set({ notice: "Imported plan is ready for review and save." });
 		if (persisted) set({ error: null });
 		return true;
-	},
-
-	capture: (snapshot: Snapshot) => {
-		const { engine } = get();
-		if (engine.hydrating || engine.saving) {
-			set({
-				error:
-					"Wait for the current server operation to finish before capturing a comparison.",
-			});
-			return;
-		}
-		const current = get().workspace;
-		if (!current) return;
-		const nextWorkspace = { ...current, snapshot };
-		set({ workspace: nextWorkspace });
-		const nextLocal = localStateFor(nextWorkspace, get().draftPresentation);
-		const persisted = get().writeLocalState(nextLocal, nextLocal);
-		set({ notice: "Comparison snapshot captured." });
-		if (persisted) set({ error: null });
 	},
 
 	retry: async () => {
