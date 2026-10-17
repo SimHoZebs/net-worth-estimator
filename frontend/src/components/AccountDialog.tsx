@@ -6,6 +6,7 @@ import type { EditorTarget } from "../domain/planEdits.ts";
 import type { Projection } from "../domain/result.ts";
 import { AccountIcon } from "./AccountIcon.tsx";
 import { AccountDetails } from "./activity/AccountDetails.tsx";
+import { RecurringRules } from "./activity/RecurringRules.tsx";
 import { Transactions } from "./activity/Transactions.tsx";
 import { Tabs } from "./Tabs.tsx";
 import { Modal } from "./ui.tsx";
@@ -26,10 +27,21 @@ export function AccountDialog({
 	onClose: () => void;
 	onEdit: (target: EditorTarget) => void;
 }) {
-	const [view, setView] = useState<"transactions" | "details">("transactions");
+	const [view, setView] = useState<"transactions" | "details" | "recurring">(
+		"transactions",
+	);
 	const transactions = useMemo(
 		() => accountTransactions({ accountId: account.id, plan, projection }),
 		[account.id, plan, projection],
+	);
+	const recurring = useMemo(
+		() =>
+			plan.movements.filter(
+				(movement) =>
+					movement.frequency !== "once" &&
+					(movement.fromId === account.id || movement.toId === account.id),
+			),
+		[plan.movements, account.id],
 	);
 	const starting =
 		projection.points.find((point) => point.date === plan.startDate) ??
@@ -65,6 +77,7 @@ export function AccountDialog({
 						label: "Transactions",
 						count: transactions.length,
 					},
+					{ id: "recurring", label: "Recurring", count: recurring.length },
 					{ id: "details", label: "Account details" },
 				]}
 				value={view}
@@ -80,6 +93,8 @@ export function AccountDialog({
 						horizon={last?.date ?? plan.startDate}
 						onEdit={onEdit}
 					/>
+				) : view === "recurring" ? (
+					<RecurringRules account={account} plan={plan} onEdit={onEdit} />
 				) : (
 					<AccountDetails
 						account={account}
