@@ -1,6 +1,6 @@
 import { LockKeyhole } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
-import { money } from "../../domain/format.ts";
+import { dateLabel, money } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { type Account, type Plan, validatePlan } from "../../domain/model.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
@@ -33,7 +33,6 @@ export function AccountDetails({
 		toAmountInput(account.maxBalance),
 	);
 	const [noCeiling, setNoCeiling] = useState(account.maxBalance === null);
-	const [observedOn, setObservedOn] = useState(account.observedOn);
 	const [error, setError] = useState<string | null>(null);
 
 	const readOnly = account.readOnly;
@@ -70,8 +69,7 @@ export function AccountDetails({
 		balance !== String(account.balance) ||
 		minBalance !== String(account.minBalance) ||
 		toAmountInput(account.maxBalance) !== (noCeiling ? "" : maxBalance) ||
-		noCeiling !== (account.maxBalance === null) ||
-		observedOn !== account.observedOn;
+		noCeiling !== (account.maxBalance === null);
 
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
@@ -92,7 +90,10 @@ export function AccountDetails({
 			balance: balanceValue,
 			minBalance: minValue,
 			maxBalance: maxValue,
-			observedOn,
+			// The observation date is system-owned (projection start or the
+			// latest checkpoint). It is never edited here; the stored value
+			// is preserved so the balance keeps its observation date.
+			observedOn: account.observedOn,
 			// Source is display provenance only. It is never edited here; the
 			// stored value is preserved so edits cannot change it.
 			source: account.source,
@@ -148,14 +149,15 @@ export function AccountDetails({
 					<option value="property">Property</option>
 					<option value="debt">Debt</option>
 				</SelectField>
-				<InputField
-					label="As of date"
-					type="date"
-					required
-					max={plan.startDate}
-					value={observedOn}
-					onChange={(event) => setObservedOn(event.target.value)}
-				/>
+				<div className="field">
+					<span id="account-observed-label">As of date</span>
+					<div
+						className="readonly-value"
+						aria-labelledby="account-observed-label"
+					>
+						{dateLabel(account.observedOn, true)}
+					</div>
+				</div>
 				<label className="checkbox-field">
 					<input
 						type="checkbox"

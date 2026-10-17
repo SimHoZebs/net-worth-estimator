@@ -1,4 +1,5 @@
 import type { Account } from "../../domain/model.ts";
+import { dateLabel } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { InputField, SelectField } from "../Field.tsx";
@@ -39,7 +40,11 @@ export function AccountEditor({
 						? numberValue(data, "maxBalance")
 						: null,
 					color: item?.color ?? null,
-					observedOn: textValue(data, "observedOn"),
+					// The observation date is system-owned (projection start
+					// or the latest checkpoint). It is never read from the
+					// form; the stored value is preserved so the balance
+					// keeps its observation date.
+					observedOn: item?.observedOn ?? plan.startDate,
 					balanceCheck: item?.balanceCheck ?? true,
 					// Source is display provenance only (e.g. "Manual entry",
 					// "Backend checkpoint"). It is never read from the form;
@@ -110,14 +115,15 @@ export function AccountEditor({
 				defaultValue={item?.maxBalance ?? ""}
 				placeholder="No ceiling"
 			/>
-			<InputField
-				label="As of date"
-				name="observedOn"
-				type="date"
-				required
-				max={plan.startDate}
-				defaultValue={item?.observedOn ?? plan.startDate}
-			/>
+			<div className="field">
+				<span id="account-observed-label">As of date</span>
+				<div
+					className="readonly-value"
+					aria-labelledby="account-observed-label"
+				>
+					{dateLabel(item?.observedOn ?? plan.startDate, true)}
+				</div>
+			</div>
 			<div className="field field-wide">
 				<span id="account-source-label">Source</span>
 				<div aria-labelledby="account-source-label">
