@@ -2,6 +2,7 @@ import type { Account } from "../../domain/model.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { InputField, SelectField } from "../Field.tsx";
+import { Badge } from "../ui.tsx";
 import {
 	EditorForm,
 	type EditorProps,
@@ -40,7 +41,10 @@ export function AccountEditor({
 					color: item?.color ?? null,
 					observedOn: textValue(data, "observedOn"),
 					balanceCheck: item?.balanceCheck ?? true,
-					source: textValue(data, "source"),
+					// Source is display provenance only (e.g. "Manual entry",
+					// "Backend checkpoint"). It is never read from the form;
+					// the stored value is preserved so user edits cannot change it.
+					source: item?.source ?? "Manual entry",
 					readOnly: false,
 				};
 				return {
@@ -114,13 +118,12 @@ export function AccountEditor({
 				max={plan.startDate}
 				defaultValue={item?.observedOn ?? plan.startDate}
 			/>
-			<InputField
-				label="Source"
-				name="source"
-				required
-				maxLength={100}
-				defaultValue={item?.source ?? "Manual entry"}
-			/>
+			<div className="field field-wide">
+				<span id="account-source-label">Source</span>
+				<div aria-labelledby="account-source-label">
+					<Badge tone="outline">{item?.source ?? "Manual entry"}</Badge>
+				</div>
+			</div>
 		</EditorForm>
 	);
 }
