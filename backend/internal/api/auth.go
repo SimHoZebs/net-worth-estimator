@@ -12,6 +12,8 @@ import (
 // otherwise a missing or wrong bearer token is 401. When no token is
 // configured (dev default) guarded routes stay open. Reads and compute
 // endpoints always pass through.
+// New write routes must add a prefix here: the guard is a string table,
+// not derived from route registration, so an unlisted route stays open.
 func writeAuthMiddleware(readOnly bool, token string) func(http.Handler) http.Handler {
 	guardedPrefixes := []string{
 		http.MethodPost + " /v1/accounts",

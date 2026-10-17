@@ -12,6 +12,9 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
+// deterministicResultCacheVersion covers the deterministic payload shape.
+// See artifactCacheVersion in artifacts.go: bump both together so old
+// payloads never read as hits.
 const deterministicResultCacheVersion = 2
 
 // domainValidate avoids importing the domain package in multiple files.
