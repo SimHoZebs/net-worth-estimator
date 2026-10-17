@@ -32,8 +32,10 @@ export function EvidenceDialog({
 	onClose: () => void;
 	onEdit: (target: EditorTarget) => void;
 }) {
+	// The editor replaces the evidence in the URL overlay slot, so the
+	// evidence unmounts on navigation: no separate close is needed, and the
+	// back button returns to this evidence.
 	const edit = (next: EditorTarget) => {
-		onClose();
 		onEdit(next);
 	};
 	switch (target.kind) {

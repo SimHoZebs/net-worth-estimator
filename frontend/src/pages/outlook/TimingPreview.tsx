@@ -52,11 +52,17 @@ export function TimingPreview({
 	projection,
 	onEdit,
 	pending = false,
+	detail,
+	onDetail,
+	onTabChange,
 }: {
 	plan: Plan;
 	projection: Projection | null;
 	onEdit: (target: EditorTarget) => void;
 	pending?: boolean;
+	detail: TimingDetailTab | null;
+	onDetail: (tab: TimingDetailTab | null) => void;
+	onTabChange: (tab: TimingDetailTab) => void;
 }) {
 	const movements = projection?.movements ?? EMPTY_MOVEMENTS;
 	const cards = useMemo(
@@ -68,7 +74,6 @@ export function TimingPreview({
 	);
 	const settingsState = useTimingSettings();
 	const { updateSettings, resetConfig, ...settings } = settingsState;
-	const [detail, setDetail] = useState<TimingDetailTab | null>(null);
 	const [transactionOrder, setTransactionOrder] = useState<TransactionOrder>(
 		DEFAULT_TRANSACTION_ORDER,
 	);
@@ -537,7 +542,7 @@ export function TimingPreview({
 			<button
 				type="button"
 				className="timing-open"
-				onClick={() => setDetail("mandatory")}
+				onClick={() => onDetail("mandatory")}
 			>
 				<span className="sr-only">Open timing details</span>
 			</button>
@@ -583,7 +588,7 @@ export function TimingPreview({
 					className="text-button"
 					onClick={(event) => {
 						event.stopPropagation();
-						setDetail("mandatory");
+						onDetail("mandatory");
 					}}
 				>
 					Bills
@@ -593,7 +598,7 @@ export function TimingPreview({
 					className="text-button"
 					onClick={(event) => {
 						event.stopPropagation();
-						setDetail("cycle");
+						onDetail("cycle");
 					}}
 				>
 					Charges
@@ -655,10 +660,11 @@ export function TimingPreview({
 					onToggleSpendingAccount={toggleSpendingAccount}
 					onUpdateConfig={updateSettings}
 					onResetConfig={resetConfig}
-					initialTab={detail}
+					tab={detail}
+					onTabChange={onTabChange}
 					transactionOrder={transactionOrder}
 					onTransactionOrderChange={setTransactionOrder}
-					onClose={() => setDetail(null)}
+					onClose={() => onDetail(null)}
 				/>
 			)}
 		</section>

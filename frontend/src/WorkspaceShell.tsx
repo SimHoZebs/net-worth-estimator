@@ -1,5 +1,6 @@
 import { useBeforeUnload } from "./state/useBeforeUnload.ts";
 import { DraftBar } from "./workspace/DraftBar.tsx";
+import type { TimingDetailTab } from "./pages/outlook/TimingDetailDialog.tsx";
 import "./workspace/workspace.css";
 import { useWorkspaceStore } from "./state/workspaceStore.ts";
 import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation.ts";
@@ -26,8 +27,17 @@ export function WorkspaceShell() {
 	const navigation = useWorkspaceNavigation();
 	const volatile = useWorkspaceStore((state) => state.volatile);
 	const discard = useWorkspaceStore((state) => state.discard);
-	const overlays = useWorkspaceOverlays({ discard });
+	const overlays = useWorkspaceOverlays({
+		discard,
+		route: navigation.route,
+		pushHash: navigation.pushHash,
+		replaceHash: navigation.replaceHash,
+	});
 	useBeforeUnload(volatile);
+	const timingDetail = (tab: TimingDetailTab | null) => {
+		if (tab) overlays.openTimingDetail(tab);
+		else overlays.closeTimingDetail();
+	};
 	return (
 		<WorkspaceLayout
 			navigation={(close) => (
@@ -54,6 +64,9 @@ export function WorkspaceShell() {
 				onEvidence={overlays.openEvidence}
 				onDiscard={overlays.openDiscard}
 				onNavigate={navigation.navigate}
+				timingDetail={overlays.timingDetail}
+				onTimingDetail={timingDetail}
+				onTimingTab={overlays.switchTimingTab}
 			/>
 			<WorkspaceEvidence overlays={overlays} />
 		</WorkspaceLayout>
