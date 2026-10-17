@@ -1,12 +1,15 @@
+import { useEffect } from "react";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
 import type { Plan } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/planEdits.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
+import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { EvaluationPreview } from "./outlook/EvaluationPreview.tsx";
+import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
 import { FundingInsight } from "./outlook/FundingInsight.tsx";
 import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
 import type { TimingDetailTab } from "./outlook/TimingDetailDialog.tsx";
@@ -43,6 +46,11 @@ export function Outlook({
 	const ranges = useUiStore((state) => state.ranges);
 	const setRanges = useUiStore((state) => state.setRanges);
 	const projection = useRemoteProjection();
+	const pinnedIds = usePinnedEvaluationsStore((state) => state.ids);
+	const refreshPins = usePinnedEvaluationsStore((state) => state.refresh);
+	useEffect(() => {
+		void refreshPins();
+	}, [refreshPins]);
 	if (!plan) return null;
 	const baseLoadError =
 		projection.base instanceof Error && !projection.loading
@@ -78,6 +86,7 @@ export function Outlook({
 				plan={plan}
 				projection={base}
 				pending={base === null}
+				pinnedIds={pinnedIds}
 				range={projection.range}
 				ranges={ranges}
 				setRanges={setRanges}
@@ -103,9 +112,7 @@ function OutlookContent({
 	plan,
 	projection,
 	pending,
-	timingDetail,
-	onTimingDetail,
-	onTimingTab,
+	pinnedIds,
 	range,
 	ranges,
 	setRanges,
@@ -119,13 +126,14 @@ function OutlookContent({
 	onEvaluations,
 	onEvaluation,
 	onEdit,
+	timingDetail,
+	onTimingDetail,
+	onTimingTab,
 }: {
 	plan: Plan;
 	projection: Projection | null;
 	pending: boolean;
-	timingDetail: TimingDetailTab | null;
-	onTimingDetail: (tab: TimingDetailTab | null) => void;
-	onTimingTab: (tab: TimingDetailTab) => void;
+	pinnedIds: string[] | null;
 	range: RangeResult | null;
 	ranges: boolean;
 	setRanges: (value: boolean) => void;
@@ -139,6 +147,9 @@ function OutlookContent({
 	onEvaluations: () => void;
 	onEvaluation: (id: string) => void;
 	onEdit: (target: EditorTarget) => void;
+	timingDetail: TimingDetailTab | null;
+	onTimingDetail: (tab: TimingDetailTab | null) => void;
+	onTimingTab: (tab: TimingDetailTab) => void;
 }) {
 	if (projection === null && !pending) return null;
 	const evaluation =
@@ -184,6 +195,12 @@ function OutlookContent({
 					/>
 				</div>
 			</div>
+			<PinnedEvaluations
+				projection={projection}
+				pinnedIds={pinnedIds}
+				pending={pending}
+				onEvaluation={onEvaluation}
+			/>
 			<div className="outlook-secondary" aria-busy={pending}>
 				<EvaluationPreview
 					result={evaluation ?? null}

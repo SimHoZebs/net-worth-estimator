@@ -48,6 +48,9 @@ func deleteDocumentRows(tx *sql.Tx) error {
 	if _, err := tx.Exec(`DELETE FROM payment_terms`); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM pinned_evaluations`); err != nil {
+		return err
+	}
 	return nil
 }
 

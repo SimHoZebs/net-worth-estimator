@@ -30,6 +30,7 @@ func writeAuthMiddleware(readOnly bool, token string) func(http.Handler) http.Ha
 		http.MethodPost + " /v1/evaluations",
 		http.MethodPatch + " /v1/evaluations/",
 		http.MethodDelete + " /v1/evaluations/",
+		http.MethodPut + " /v1/pinned-evaluations",
 		http.MethodPost + " /v1/payment-terms",
 		http.MethodDelete + " /v1/payment-terms/",
 		http.MethodPost + " /v1/sync/simplefin",

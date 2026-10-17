@@ -1,5 +1,11 @@
-import { ArrowUpRight, Check, Flag, Pencil, Trash2 } from "lucide-react";
-import { Badge, IconButton, Progress, Skeleton, Toggle } from "../../components/ui.tsx";
+import { ArrowUpRight, Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
+import {
+	Badge,
+	IconButton,
+	Progress,
+	Skeleton,
+	Toggle,
+} from "../../components/ui.tsx";
 import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { Evaluation } from "../../domain/model.ts";
 import type { EvaluationResult } from "../../domain/result.ts";
@@ -13,6 +19,9 @@ export function EvaluationCard({
 	onEnabledChange,
 	onEvidence,
 	pending = false,
+	pinned = false,
+	onPinChange = null,
+	pinDisabled = false,
 }: {
 	evaluation: Evaluation;
 	result: Pick<EvaluationResult, "current" | "firstDate"> | undefined;
@@ -22,6 +31,9 @@ export function EvaluationCard({
 	onEnabledChange: (enabled: boolean) => void;
 	onEvidence: () => void;
 	pending?: boolean;
+	pinned?: boolean;
+	onPinChange?: (() => void) | null;
+	pinDisabled?: boolean;
 }) {
 	const met = result && result.current >= evaluation.target;
 	// Outcome slots await the projection; everything else is plan data and
@@ -36,6 +48,19 @@ export function EvaluationCard({
 					{met ? <Check size={23} /> : <Flag size={23} />}
 				</span>
 				<div className="table-actions">
+					{onPinChange && (
+						<IconButton
+							icon={Pin}
+							label={
+								pinned
+									? `Unpin ${evaluation.name} from Outlook`
+									: `Pin ${evaluation.name} to Outlook`
+							}
+							onClick={onPinChange}
+							disabled={pinDisabled}
+							aria-pressed={pinned}
+						/>
+					)}
 					<IconButton
 						icon={Pencil}
 						label={`Edit ${evaluation.name}`}

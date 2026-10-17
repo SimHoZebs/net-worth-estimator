@@ -505,6 +505,14 @@ export interface AccountLinkListResponse {
 	links: AccountLink[];
 }
 
+export interface PinnedEvaluationsResponse extends HumaMetadata {
+	instanceIds: string[];
+}
+
+export interface PinnedEvaluationsRequest extends HumaMetadata {
+	instanceIds: string[];
+}
+
 export interface ProgressSSEData {
 	progress: StochasticProgress;
 }

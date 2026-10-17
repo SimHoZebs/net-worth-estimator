@@ -210,6 +210,11 @@ func New(store store.Store, serverConfig Config) http.Handler {
 			huma.Register(api, huma.Operation{OperationID: "list-account-links", Method: "GET", Path: "/v1/sync/simplefin/accounts", Summary: "List bridge-to-model account links"}, server.listAccountLinks)
 		},
 		func() {
+			huma.Register(api, huma.Operation{OperationID: "get-pinned-evaluations", Method: "GET", Path: "/v1/pinned-evaluations", Summary: "List pinned evaluation instance IDs"}, server.getPinnedEvaluations)
+		},
+		func() {
+			huma.Register(api, huma.Operation{OperationID: "set-pinned-evaluations", Method: "PUT", Path: "/v1/pinned-evaluations", Summary: "Replace pinned evaluation instance IDs"}, server.setPinnedEvaluations)
+		}, func() {
 			huma.Register(api, huma.Operation{OperationID: "save-account-link", Method: "PUT", Path: "/v1/sync/simplefin/accounts/{bridgeAccountId}", Summary: "Link one bridge account"}, server.saveAccountLink)
 		},
 		func() {
