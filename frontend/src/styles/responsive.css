@@ -204,6 +204,9 @@
 		   so per-frame inline transforms are not re-smoothed. */
 		box-shadow: 10px 0 60px #19332920;
 		overflow-y: auto;
+		/* Vertical scroll stays with the browser; horizontal swipes are left
+		   to the swipe gesture in useMobileNavigation. */
+		touch-action: pan-y;
 	}
 	.sidebar.sidebar-open {
 		transform: translateX(0);
