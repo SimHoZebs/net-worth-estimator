@@ -134,7 +134,7 @@ A `partial` result is a cumulative snapshot. A slow attached stream may skip int
 | `miss` | this request owns a new seeded run, or an unseeded request-bound run |
 | `attach` | this request attached to an identical seeded run already in progress |
 
-An attached seeded request receives the latest cumulative snapshot, if one exists, and then remaining events. A stream disconnect detaches only that stream. The shared seeded computation continues. Completed seeded runs remain in the in-process registry for 60 seconds and in SQLite afterward.
+An attached seeded request receives the latest cumulative snapshot, if one exists, and then remaining events. A stream disconnect detaches only that stream. The shared seeded computation continues. Completed seeded runs are evicted from the in-process registry at completion; later reconnects use the SQLite artifact cache.
 
 Walk-away rule: seeded runs are walk-away safe. Start on your phone, lose Wi-Fi or background the browser, repeat the same body later to attach or read the saved result. Unseeded runs are quick checks only and cancel on disconnect.
 
