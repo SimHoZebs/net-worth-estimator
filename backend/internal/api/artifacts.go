@@ -15,6 +15,11 @@ import (
 // Server-side artifact cache: content-addressed reuse of completed
 // projections across requests and reloads. artifactKey defines the identity;
 // identity is Go-owned, so hashes are not cross-implementation compatible.
+// artifactCacheVersion covers the key envelope; deterministicResultCacheVersion
+// (projection_handlers.go) covers the deterministic payload shape. Bump both
+// together when either changes so old payloads never read as hits. Eviction
+// is global (maxArtifacts in store/artifacts.go): stochastic floods can evict
+// deterministic. Keep a per-kind floor only with product sign-off.
 
 const artifactCacheVersion = 1
 

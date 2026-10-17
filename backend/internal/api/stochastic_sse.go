@@ -33,10 +33,6 @@ import (
 const (
 	sseRetryMs           = 3000
 	sseHeartbeatInterval = 15 * time.Second
-	// sharedRunGracePeriod keeps a finished run in memory so clients racing
-	// completion read the final result without touching the DB. Later
-	// reconnects use the DB artifact cache.
-	sharedRunGracePeriod = 60 * time.Second
 	// sharedRunSubscriberBuffer bounds per-stream lag: progress/partial
 	// events are cumulative snapshots, so a slow stream may drop
 	// intermediate ones without losing correctness.
@@ -66,10 +62,6 @@ var sharedStochasticRegistry = struct {
 	sync.Mutex
 	byKey map[string]*sharedStochasticRun
 }{byKey: map[string]*sharedStochasticRun{}}
-
-// sharedRunGracePeriodVar allows tests to shorten eviction without touching
-// production timing.
-var sharedRunGracePeriodVar = sharedRunGracePeriod
 
 // getOrStartSharedRun returns the run for key, starting it when absent. The
 // second return reports ownership: only the owner drives the computation.
@@ -143,8 +135,9 @@ func (run *sharedStochasticRun) publish(event stochasticStreamEvent) {
 	}
 }
 
-// finish records the outcome, wakes every attached stream, persists
-// completed results for post-grace reconnects, and schedules eviction.
+// finish records the outcome, wakes every attached stream, persists the
+// completed result, and evicts the run: post-completion reconnects are
+// served from the artifact cache.
 func (run *sharedStochasticRun) finish(key string, persist func(*types.StochasticProjectionResult), result *types.StochasticProjectionResult, runErr error) {
 	run.mu.Lock()
 	run.result = result
@@ -154,7 +147,7 @@ func (run *sharedStochasticRun) finish(key string, persist func(*types.Stochasti
 	if runErr == nil && result != nil && persist != nil {
 		persist(result)
 	}
-	time.AfterFunc(sharedRunGracePeriodVar, func() { removeSharedRun(key, run) })
+	removeSharedRun(key, run)
 }
 
 // outcome returns the finished run's result or error. Call only after done
@@ -163,6 +156,20 @@ func (run *sharedStochasticRun) outcome() (*types.StochasticProjectionResult, er
 	run.mu.Lock()
 	defer run.mu.Unlock()
 	return run.result, run.runErr
+}
+
+// writeSSEPreamble emits shared SSE headers plus the reconnect hint. Both
+// seeded (shared) and unseeded (inline) streams use this so proxy behavior
+// and retry timing stay identical. Callers set X-Cache before calling.
+func writeSSEPreamble(w http.ResponseWriter, flusher http.Flusher) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+	if _, err := fmt.Fprintf(w, "retry: %d\n\n", sseRetryMs); err == nil {
+		flusher.Flush()
+	}
 }
 
 // ---- Shared SSE stream helpers ----
@@ -306,19 +313,7 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Cache", "attach")
 	}
 
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Connection", "keep-alive")
-	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
-
-	// Reconnect hint: a caller that drops the stream waits this long before
-	// re-issuing the POST, which attaches to the still-running computation.
-	// Heartbeats below keep idle proxies/NAT from killing long batches between
-	// progress flushes.
-	if _, err := fmt.Fprintf(w, "retry: %d\n\n", sseRetryMs); err == nil {
-		flusher.Flush()
-	}
+	writeSSEPreamble(w, flusher)
 
 	// All writes to this stream share one mutex: the heartbeat goroutine
 	// and the event loop below run on different goroutines and their bytes
@@ -421,15 +416,7 @@ func (s *Server) serveStochasticInline(
 		return
 	}
 	w.Header().Set("X-Cache", "miss")
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Connection", "keep-alive")
-	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
-
-	if _, err := fmt.Fprintf(w, "retry: %d\n\n", sseRetryMs); err == nil {
-		flusher.Flush()
-	}
+	writeSSEPreamble(w, flusher)
 
 	var writeMu sync.Mutex
 	heartbeatDone := make(chan struct{})

@@ -169,8 +169,8 @@ func corsOriginParts(value string) (string, string, string, bool) {
 	if (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
 		return "", "", "", false
 	}
-	host := strings.ToLower(parsed.Hostname())
-	if host == "" {
+	host, ok := normalizeCORSOriginHost(parsed.Hostname())
+	if !ok {
 		return "", "", "", false
 	}
 	port := parsed.Port()
@@ -200,8 +200,8 @@ func corsRequestHostParts(value string) (string, string, bool) {
 	if parsed.Path != "" || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
 		return "", "", false
 	}
-	host := strings.ToLower(parsed.Hostname())
-	if host == "" {
+	host, ok := normalizeCORSOriginHost(parsed.Hostname())
+	if !ok {
 		return "", "", false
 	}
 	port := parsed.Port()
@@ -211,11 +211,11 @@ func corsRequestHostParts(value string) (string, string, bool) {
 		}
 		return host, "", true
 	}
-	port, ok := normalizeCORSOriginPort(port)
-	if !ok {
+	normalizedPort, portOK := normalizeCORSOriginPort(port)
+	if !portOK {
 		return "", "", false
 	}
-	return host, port, true
+	return host, normalizedPort, true
 }
 
 func normalizeCORSOriginPort(value string) (string, bool) {
@@ -224,6 +224,30 @@ func normalizeCORSOriginPort(value string) (string, bool) {
 		return "", false
 	}
 	return strconv.Itoa(port), true
+}
+
+func normalizeCORSOriginHost(host string) (string, bool) {
+	normalized := strings.ToLower(host)
+	if normalized == "" {
+		return "", false
+	}
+	return normalized, true
+}
+
+// formatCORSOrigin joins a normalized host and port. When stripDefault is
+// true, default ports (80/443) are omitted for allow-list storage; otherwise
+// the port is always filled for same-origin comparison.
+func formatCORSOrigin(host, port, scheme string, stripDefault bool) (string, string) {
+	if stripDefault && ((scheme == "http" && port == "80") || (scheme == "https" && port == "443")) {
+		port = ""
+	}
+	if port != "" {
+		return net.JoinHostPort(host, port), port
+	}
+	if strings.Contains(host, ":") {
+		return "[" + host + "]", port
+	}
+	return host, port
 }
 
 func corsHeadersAllowed(value string) bool {
@@ -267,27 +291,20 @@ func ParseAllowedOrigins(value string) ([]string, error) {
 			return nil, fmt.Errorf("origin %q cannot contain a path, query, or fragment", candidate)
 		}
 
-		host := strings.ToLower(parsed.Hostname())
-		if host == "" {
+		host, ok := normalizeCORSOriginHost(parsed.Hostname())
+		if !ok {
 			return nil, fmt.Errorf("origin %q must contain a host", candidate)
 		}
 		port := parsed.Port()
 		if port != "" {
-			parsedPort, err := strconv.Atoi(port)
-			if err != nil || parsedPort < 1 || parsedPort > 65535 {
+			normalized, ok := normalizeCORSOriginPort(port)
+			if !ok {
 				return nil, fmt.Errorf("origin %q contains an invalid port", candidate)
 			}
-			port = strconv.Itoa(parsedPort)
+			port = normalized
 		}
-		if (scheme == "http" && port == "80") || (scheme == "https" && port == "443") {
-			port = ""
-		}
-		if port != "" {
-			host = net.JoinHostPort(host, port)
-		} else if strings.Contains(host, ":") {
-			host = "[" + host + "]"
-		}
-		origin := scheme + "://" + host
+		joined, _ := formatCORSOrigin(host, port, scheme, true)
+		origin := scheme + "://" + joined
 		if _, exists := seen[origin]; exists {
 			continue
 		}
