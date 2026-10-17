@@ -1,4 +1,5 @@
 import * as errore from "errore";
+import { isRecord } from "../domain/guards.ts";
 import type { FinancialModelDocument } from "./index.ts";
 
 export class ModelImportError extends errore.createTaggedError({
@@ -7,10 +8,6 @@ export class ModelImportError extends errore.createTaggedError({
 }) {}
 
 export const MAX_IMPORT_BYTES = 2_000_000;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function isEvaluationTables(value: unknown): boolean {
 	return (

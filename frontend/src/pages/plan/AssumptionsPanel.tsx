@@ -1,4 +1,5 @@
 import type { FocusEvent, KeyboardEvent } from "react";
+import { parseDisplayNumber } from "../../components/editors/formValues.ts";
 import { InputField } from "../../components/Field.tsx";
 import type { Plan } from "../../domain/model.ts";
 import "./plan.css";
@@ -13,8 +14,8 @@ export function AssumptionsPanel({
 	onUpdate: (plan: Plan) => boolean;
 }) {
 	const commit = (field: AssumptionField, input: HTMLInputElement) => {
-		const value = Number(input.value);
-		if (!Number.isFinite(value)) {
+		const value = parseDisplayNumber(input.value);
+		if (value === null) {
 			input.value = String(plan.assumptions[field]);
 			return;
 		}

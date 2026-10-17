@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { type Evaluation, visibleAccounts } from "../../domain/model.ts";
+import { parseUnion } from "../../domain/guards.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { InputField, SelectField } from "../Field.tsx";
 import { AccountOptions } from "./AccountOptions.tsx";
@@ -48,7 +49,13 @@ export function EvaluationEditor({
 				label="Measure"
 				name="kind"
 				value={kind}
-				onChange={(event) => setKind(event.target.value as Evaluation["kind"])}
+				onChange={(event) => {
+				const next = parseUnion(event.target.value, [
+					"net-worth",
+					"reserve",
+				] as const);
+				if (next) setKind(next);
+			}}
 			>
 				<option value="net-worth">Household net worth</option>
 				<option value="reserve">An account balance</option>

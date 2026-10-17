@@ -1,4 +1,5 @@
 import * as errore from "errore";
+import { isRecord } from "../domain/guards.ts";
 import type {
 	AccountLink,
 	AccountLinkListResponse,
@@ -38,8 +39,11 @@ export interface ApiClientOptions {
 
 export interface ApiRequestOptions {
 	signal?: AbortSignal;
+	/** Canonical token key. */
 	authToken?: string;
+	/** Deprecated alias for authToken. */
 	bearerToken?: string;
+	/** Deprecated alias for authToken. */
 	token?: string;
 	headers?: HeadersInit;
 }
@@ -125,10 +129,6 @@ type ParsedBody =
 	| { kind: "text"; value: string }
 	| { kind: "empty" }
 	| Error;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function isJsonContentType(contentType: string | null): boolean {
 	if (!contentType) return false;
@@ -257,6 +257,11 @@ function requestHeaders({
 			if (body && !result.has("content-type"))
 				result.set("content-type", "application/json");
 			if (!result.has("accept")) result.set("accept", accept);
+			if (authToken == null && (bearerToken ?? token)) {
+				console.warn(
+					"API client uses deprecated bearerToken/token; use authToken.",
+				);
+			}
 			const suppliedToken = authToken ?? bearerToken ?? token;
 			if (suppliedToken) result.set("authorization", `Bearer ${suppliedToken}`);
 			return result;

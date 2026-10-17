@@ -1,13 +1,10 @@
 import { z } from "zod";
 import type { FinancialModelDocument, PlanPresentation } from "../api/index.ts";
+import { isRecord } from "../domain/guards.ts";
 import { type Plan, planSchema } from "../domain/model.ts";
 import { type Snapshot, StorageError, snapshotSchema } from "./storage.ts";
 
 export const REMOTE_STORAGE_KEY = "waypoint.remote-workspace.v1";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function isPlanPresentation(value: unknown): value is PlanPresentation {
 	return (

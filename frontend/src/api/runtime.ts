@@ -2,8 +2,11 @@ export const RUNTIME_CONFIG_KEY = "__WAYPOINT_CONFIG__";
 export const DEFAULT_RUNTIME_API_BASE_URL = "";
 
 export interface WaypointRuntimeConfig {
+	/** Canonical key. Use this for new config. */
 	apiBaseUrl?: string;
+	/** Deprecated alias for apiBaseUrl. Kept for old embeds. */
 	apiBase?: string;
+	/** Deprecated alias for apiBaseUrl. Kept for old embeds. */
 	baseUrl?: string;
 }
 
@@ -27,6 +30,11 @@ function buildApiBaseUrl(): string | null {
 function configuredBaseUrl(
 	config: WaypointRuntimeConfig | null | undefined,
 ): string | null {
+	if (config && config.apiBaseUrl == null && (config.apiBase ?? config.baseUrl)) {
+		console.warn(
+			"Waypoint config uses deprecated apiBase/baseUrl; use apiBaseUrl.",
+		);
+	}
 	return (
 		normalizeBaseUrl(
 			config?.apiBaseUrl ?? config?.apiBase ?? config?.baseUrl,

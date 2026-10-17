@@ -1,6 +1,11 @@
 import { Search } from "lucide-react";
 import type { ActivityFilters } from "../../domain/accountActivity.ts";
+import { parseUnion } from "../../domain/guards.ts";
 import { TransactionSortButton } from "./TransactionSortButton.tsx";
+
+const sources = ["all", "historical", "projected"] as const;
+const directions = ["all", "in", "out", "transfer"] as const;
+const periods = ["all", "30-days", "12-months"] as const;
 
 export function TransactionFilters({
 	filters,
@@ -37,11 +42,10 @@ export function TransactionFilters({
 					<select
 						aria-label="Transaction source"
 						value={filters.source}
-						onChange={(event) =>
-							onChange({
-								source: event.target.value as ActivityFilters["source"],
-							})
-						}
+						onChange={(event) => {
+							const source = parseUnion(event.target.value, sources);
+							if (source) onChange({ source });
+						}}
 					>
 						<option value="all">All transactions</option>
 						<option value="historical">Historical ({recordedCount})</option>
@@ -55,11 +59,10 @@ export function TransactionFilters({
 					<select
 						aria-label="Transaction direction"
 						value={filters.direction}
-						onChange={(event) =>
-							onChange({
-								direction: event.target.value as ActivityFilters["direction"],
-							})
-						}
+						onChange={(event) => {
+							const direction = parseUnion(event.target.value, directions);
+							if (direction) onChange({ direction });
+						}}
 					>
 						<option value="all">All types</option>
 						<option value="in">Money in</option>
@@ -72,11 +75,10 @@ export function TransactionFilters({
 					<select
 						aria-label="Transaction dates"
 						value={filters.period}
-						onChange={(event) =>
-							onChange({
-								period: event.target.value as ActivityFilters["period"],
-							})
-						}
+						onChange={(event) => {
+							const period = parseUnion(event.target.value, periods);
+							if (period) onChange({ period });
+						}}
 					>
 						<option value="all">All dates</option>
 						<option value="30-days">Next 30 days</option>

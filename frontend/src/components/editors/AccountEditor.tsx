@@ -1,4 +1,5 @@
 import type { Account } from "../../domain/model.ts";
+import { parseUnion } from "../../domain/guards.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { InputField, SelectField } from "../Field.tsx";
 import {
@@ -22,7 +23,13 @@ export function AccountEditor({
 				const account: Account = {
 					id: item?.id ?? crypto.randomUUID(),
 					name: textValue(data, "name"),
-					kind: textValue(data, "kind") as Account["kind"],
+					kind:
+					parseUnion(textValue(data, "kind"), [
+						"cash",
+						"investment",
+						"property",
+						"debt",
+					] as const) ?? "cash",
 					enabled: textValue(data, "enabled") === "on",
 					archived: item?.archived ?? false,
 					balance: numberValue(data, "balance"),

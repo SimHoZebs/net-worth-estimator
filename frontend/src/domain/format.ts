@@ -34,3 +34,31 @@ export function shiftDate({ date, days }: { date: string; days: number }) {
 	value.setUTCDate(value.getUTCDate() + days);
 	return isoDate(value);
 }
+
+/** Single browser date owner. All YYYY-MM-DD parsing goes through here. */
+export function utcDate(iso: string): Date {
+	return new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+}
+
+export function isIsoDate(value: string): boolean {
+	return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(utcDate(value).getTime());
+}
+
+export function daysBetweenInclusive(startIso: string, endIso: string): number {
+	const start = utcDate(startIso).getTime();
+	const end = utcDate(endIso).getTime();
+	return Math.round((end - start) / 86_400_000) + 1;
+}
+
+export function clampMonth({
+	year,
+	month,
+	day,
+}: {
+	year: number;
+	month: number;
+	day: number;
+}): string {
+	const maxDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+	return isoDate(new Date(Date.UTC(year, month, Math.min(day, maxDay), 12, 0, 0)));
+}
