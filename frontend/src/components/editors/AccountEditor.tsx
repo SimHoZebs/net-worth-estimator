@@ -1,5 +1,4 @@
 import type { Account } from "../../domain/model.ts";
-import { dateLabel } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { InputField, SelectField } from "../Field.tsx";
@@ -115,15 +114,6 @@ export function AccountEditor({
 				defaultValue={item?.maxBalance ?? ""}
 				placeholder="No ceiling"
 			/>
-			<div className="field">
-				<span id="account-observed-label">As of date</span>
-				<div
-					className="readonly-value"
-					aria-labelledby="account-observed-label"
-				>
-					{dateLabel(item?.observedOn ?? plan.startDate, true)}
-				</div>
-			</div>
 			<div className="field field-wide">
 				<span id="account-source-label">Source</span>
 				<div aria-labelledby="account-source-label">
