@@ -5,6 +5,7 @@ import {
 	type LucideIcon,
 	X,
 } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import {
 	type ComponentProps,
 	type ReactNode,
@@ -69,6 +70,7 @@ export function Modal({
 	const ref = useRef<HTMLDialogElement>(null);
 	const [closing, setClosing] = useState(false);
 	const closeRequested = useRef(false);
+	const reduceMotion = useReducedMotion();
 	const id = useId();
 	useEffect(() => {
 		const dialog = ref.current;
@@ -85,10 +87,21 @@ export function Modal({
 		closeRequested.current = true;
 		setClosing(true);
 	};
+	// Drawer variants slide in from the right; centered dialogs scale/fade.
+	// The native <dialog> stays static so showModal top-layer, focus, and
+	// backdrop behavior are unchanged — motion owns only the inner panel.
+	const drawer = className.includes("modal-drawer");
+	const enter = drawer ? { opacity: 1, x: 0 } : { opacity: 1, scale: 1, y: 0 };
+	const initial = drawer
+		? { opacity: 0, x: 48 }
+		: { opacity: 0, scale: 0.97, y: 8 };
+	const exit = drawer
+		? { opacity: 0, x: 48 }
+		: { opacity: 0, scale: 0.98, y: 8 };
 	return (
 		<dialog
 			ref={ref}
-			className={`modal ${wide ? "modal-wide" : ""} ${className} ${closing ? "is-closing" : ""}`}
+			className={`modal ${wide ? "modal-wide" : ""} ${className}`}
 			aria-labelledby={id}
 			onCancel={(event) => {
 				event.preventDefault();
@@ -97,23 +110,27 @@ export function Modal({
 			onClick={(event) => {
 				if (event.target === event.currentTarget) requestClose();
 			}}
-			onAnimationEnd={(event) => {
-				if (
-					closing &&
-					(event.animationName === "dialog-out" ||
-						event.animationName === "drawer-out")
-				)
-					onClose();
-			}}
 		>
-			<div className="modal-header">
-				<div>
-					{eyebrow && <p className="eyebrow">{eyebrow}</p>}
-					<h2 id={id}>{title}</h2>
+			<motion.div
+				initial={initial}
+				animate={closing ? exit : enter}
+				transition={{
+					duration: reduceMotion ? 0 : closing ? 0.12 : drawer ? 0.18 : 0.15,
+					ease: "easeOut",
+				}}
+				onAnimationComplete={() => {
+					if (closing) onClose();
+				}}
+			>
+				<div className="modal-header">
+					<div>
+						{eyebrow && <p className="eyebrow">{eyebrow}</p>}
+						<h2 id={id}>{title}</h2>
+					</div>
+					<IconButton icon={X} label="Close dialog" onClick={requestClose} />
 				</div>
-				<IconButton icon={X} label="Close dialog" onClick={requestClose} />
-			</div>
-			<div className="modal-body">{children}</div>
+				<div className="modal-body">{children}</div>
+			</motion.div>
 		</dialog>
 	);
 }
