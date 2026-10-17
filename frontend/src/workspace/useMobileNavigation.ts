@@ -5,6 +5,10 @@ export function useMobileNavigation() {
 	const [open, setOpen] = useState(false);
 	const mobile = useMediaQuery("(max-width: 800px)");
 	const sidebarRef = useRef<HTMLElement>(null);
+	const openRef = useRef(open);
+	useEffect(() => {
+		openRef.current = open;
+	}, [open]);
 	useEffect(() => {
 		// Viewport reset: closing the drawer when leaving mobile widths is the
 		// intended sync, not a render cascade.
@@ -16,6 +20,65 @@ export function useMobileNavigation() {
 		window.addEventListener("hashchange", close);
 		return () => window.removeEventListener("hashchange", close);
 	}, []);
+	useEffect(() => {
+		// Touch gestures: a mostly-horizontal rightward swipe anywhere on
+		// screen opens the drawer; a leftward swipe starting over the drawer
+		// or its backdrop closes it. Listeners are passive and act only on
+		// touchend, so vertical scrolling is never intercepted.
+		if (!mobile) return;
+		const MIN_DISTANCE = 64;
+		// Horizontal travel must dominate vertical travel so diagonal
+		// scrolling is not hijacked.
+		const DIRECTION_RATIO = 1.5;
+		let startX = 0;
+		let startY = 0;
+		let tracking = false;
+		let startTarget: EventTarget | null = null;
+		const onTouchStart = (event: TouchEvent) => {
+			if (event.touches.length !== 1) {
+				tracking = false;
+				return;
+			}
+			const touch = event.touches[0];
+			if (!touch) {
+				tracking = false;
+				return;
+			}
+			startX = touch.clientX;
+			startY = touch.clientY;
+			startTarget = event.target;
+			tracking = true;
+		};
+		const onTouchEnd = (event: TouchEvent) => {
+			if (!tracking) return;
+			tracking = false;
+			if (event.changedTouches.length !== 1) return;
+			const touch = event.changedTouches[0];
+			if (!touch) return;
+			const dx = touch.clientX - startX;
+			const dy = touch.clientY - startY;
+			if (Math.abs(dx) < MIN_DISTANCE) return;
+			if (Math.abs(dx) < Math.abs(dy) * DIRECTION_RATIO) return;
+			if (openRef.current) {
+				if (dx >= 0) return;
+				const origin = startTarget;
+				const overSidebar =
+					origin instanceof Node &&
+					(sidebarRef.current?.contains(origin) ||
+						(origin instanceof Element &&
+							origin.classList.contains("nav-backdrop")));
+				if (overSidebar) setOpen(false);
+				return;
+			}
+			if (dx > 0) setOpen(true);
+		};
+		window.addEventListener("touchstart", onTouchStart, { passive: true });
+		window.addEventListener("touchend", onTouchEnd, { passive: true });
+		return () => {
+			window.removeEventListener("touchstart", onTouchStart);
+			window.removeEventListener("touchend", onTouchEnd);
+		};
+	}, [mobile]);
 	useEffect(() => {
 		if (!open) return;
 		const previous = document.activeElement;
