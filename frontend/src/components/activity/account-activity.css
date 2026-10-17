@@ -282,6 +282,65 @@
 		line-height: 1.8;
 		color: var(--muted);
 	}
+	.recurring-toolbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 15px;
+	}
+	.recurring-toolbar .transaction-context {
+		padding: 0;
+	}
+	.recurring-list {
+		display: flex;
+		flex-direction: column;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		border-top: 1px solid var(--line);
+	}
+	.recurring-row {
+		display: flex;
+		align-items: center;
+		gap: 11px;
+		padding: 12px;
+		border-bottom: 1px solid var(--line);
+		background: none;
+	}
+	.recurring-row-button {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		gap: 11px;
+		border: 0;
+		background: none;
+		border-radius: 5px;
+		padding: 3px 0;
+		text-align: left;
+	}
+	.recurring-order {
+		white-space: nowrap;
+		font-size: 10px;
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
+		min-width: 2ch;
+		text-align: right;
+	}
+	.recurring-drag {
+		display: flex;
+		color: var(--muted);
+		cursor: grab;
+	}
+	.recurring-edit-controls {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		margin-left: auto;
+	}
+	.recurring-edit-controls .text-button {
+		font-size: 11px;
+	}
 }
 
 @layer responsive {
@@ -394,6 +453,13 @@
 		}
 		.transaction-chevron {
 			display: none;
+		}
+		.recurring-row {
+			padding: 13px 8px;
+			gap: 8px;
+		}
+		.recurring-edit-controls {
+			gap: 2px;
 		}
 	}
 }
