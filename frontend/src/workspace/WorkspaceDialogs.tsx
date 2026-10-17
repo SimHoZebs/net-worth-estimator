@@ -1,10 +1,17 @@
+import { Suspense, lazy } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
-import { EvidenceDialog } from "../components/EvidenceDialog.tsx";
 import { PlanEditor } from "../components/PlanEditor.tsx";
+import { Skeleton } from "../components/ui.tsx";
 import { changesBetween } from "../domain/model.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import type { WorkspaceOverlays } from "./useWorkspaceOverlays.ts";
+
+const EvidenceDialog = lazy(() =>
+	import("../components/EvidenceDialog.tsx").then((module) => ({
+		default: module.EvidenceDialog,
+	})),
+);
 
 export function WorkspaceEvidence({
 	overlays,
@@ -31,7 +38,8 @@ function WorkspaceEvidenceLoaded({
 			: projection.base;
 	if (!overlays.evidence || !plan || !base) return null;
 	return (
-		<EvidenceDialog
+		<Suspense fallback={<Skeleton width="100%" height={120} />}>
+			<EvidenceDialog
 			target={overlays.evidence}
 			plan={plan}
 			projection={base}
@@ -39,7 +47,8 @@ function WorkspaceEvidenceLoaded({
 			temporary={Boolean(workspace?.draft)}
 			onClose={overlays.closeEvidence}
 			onEdit={overlays.editFromEvidence}
-		/>
+			/>
+		</Suspense>
 	);
 }
 

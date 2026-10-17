@@ -1,5 +1,5 @@
 import { Camera, GitCompareArrows, TriangleAlert } from "lucide-react";
-import { Badge } from "../../components/ui.tsx";
+import { Badge, Skeleton } from "../../components/ui.tsx";
 import type { ComparisonMetrics } from "../../domain/comparison.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Snapshot } from "../../state/storage.ts";
@@ -88,20 +88,12 @@ export function ComparisonSummary({
 				<div className="comparison-grid">
 					<span>Current net worth</span>
 					{prev === null ? (
-						<span
-							className="skeleton"
-							style={{ width: 90, height: 16 }}
-							aria-hidden="true"
-						/>
+						<Skeleton width={90} height={16} />
 					) : (
 						<strong>{money(prev.current)}</strong>
 					)}
 					{curr === null ? (
-						<span
-							className="skeleton"
-							style={{ width: 90, height: 16 }}
-							aria-hidden="true"
-						/>
+						<Skeleton width={90} height={16} />
 					) : (
 						<strong>{money(curr.current)}</strong>
 					)}
@@ -111,20 +103,12 @@ export function ComparisonSummary({
 						Projected net worth<small>Base case</small>
 					</span>
 					{prev === null ? (
-						<span
-							className="skeleton"
-							style={{ width: 90, height: 16 }}
-							aria-hidden="true"
-						/>
+						<Skeleton width={90} height={16} />
 					) : (
 						<strong>{money(prev.final)}</strong>
 					)}
 					{curr === null ? (
-						<span
-							className="skeleton"
-							style={{ width: 90, height: 16 }}
-							aria-hidden="true"
-						/>
+						<Skeleton width={90} height={16} />
 					) : (
 						<div>
 							<strong>{money(curr.final)}</strong>
@@ -140,11 +124,7 @@ export function ComparisonSummary({
 				<div className="comparison-grid">
 					<span>First net-worth evaluation reached</span>
 					{prev === null ? (
-						<span
-							className="skeleton"
-							style={{ width: 90, height: 16 }}
-							aria-hidden="true"
-						/>
+						<Skeleton width={90} height={16} />
 					) : (
 						<strong>
 							{prev.evaluationDate
@@ -153,11 +133,7 @@ export function ComparisonSummary({
 						</strong>
 					)}
 					{curr === null ? (
-						<span
-							className="skeleton"
-							style={{ width: 90, height: 16 }}
-							aria-hidden="true"
-						/>
+						<Skeleton width={90} height={16} />
 					) : (
 						<strong>
 							{curr.evaluationDate
@@ -169,11 +145,7 @@ export function ComparisonSummary({
 				<div className="comparison-grid">
 					<span>First underfunded transaction</span>
 					{prev === null ? (
-						<span
-							className="skeleton"
-							style={{ width: 90, height: 16 }}
-							aria-hidden="true"
-						/>
+						<Skeleton width={90} height={16} />
 					) : (
 						<strong>
 							{prev.shortfallDate
@@ -182,11 +154,7 @@ export function ComparisonSummary({
 						</strong>
 					)}
 					{curr === null ? (
-						<span
-							className="skeleton"
-							style={{ width: 90, height: 16 }}
-							aria-hidden="true"
-						/>
+						<Skeleton width={90} height={16} />
 					) : (
 						<strong>
 							{curr.shortfallDate

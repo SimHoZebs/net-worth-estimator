@@ -1,4 +1,5 @@
 import type { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
+import { Skeleton } from "../components/ui.tsx";
 import {
 	WorkspaceHeading,
 	WorkspaceTopbar,
@@ -37,26 +38,10 @@ export function ServerLoadingShell({
 				aria-busy="true"
 				aria-label="Loading workspace"
 			>
-				<span
-					className="skeleton"
-					style={{ width: 240, height: 22 }}
-					aria-hidden="true"
-				/>
-				<span
-					className="skeleton"
-					style={{ width: "100%", height: 12 }}
-					aria-hidden="true"
-				/>
-				<span
-					className="skeleton"
-					style={{ width: "82%", height: 12 }}
-					aria-hidden="true"
-				/>
-				<span
-					className="skeleton"
-					style={{ width: "100%", height: 220 }}
-					aria-hidden="true"
-				/>
+				<Skeleton width={240} height={22} />
+				<Skeleton width={"100%"} height={12} />
+				<Skeleton width={"82%"} height={12} />
+				<Skeleton width={"100%"} height={220} />
 				<p className="sr-only" role="status">
 					Loading the saved model, status, and income snapshot.
 				</p>

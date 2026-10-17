@@ -1,4 +1,6 @@
-/* Base typography: document defaults and unclassed element styling. */
+/* Base typography: document defaults and unclassed element styling.
+   :focus-visible here is the single global focus owner; do not add
+   per-component focus rings. */
 @layer base {
 	body {
 		min-width: 320px;

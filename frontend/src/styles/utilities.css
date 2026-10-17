@@ -1,4 +1,6 @@
-/* Shared utilities: single-purpose helpers any component may use. */
+/* Shared utilities: single-purpose helpers any component may use.
+   .eyebrow is the single presentational owner for eyebrow type; per-surface
+   files may only override the color token (dark theme) or touch size. */
 @layer base {
 	.muted {
 		color: var(--muted);

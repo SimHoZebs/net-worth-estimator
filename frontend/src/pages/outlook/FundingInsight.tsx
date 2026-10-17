@@ -1,5 +1,5 @@
 import { ArrowUpRight, ShieldCheck, TriangleAlert } from "lucide-react";
-import { Progress } from "../../components/ui.tsx";
+import { Progress, Skeleton } from "../../components/ui.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { MovementResult } from "../../domain/result.ts";
 
@@ -21,22 +21,10 @@ export function FundingInsight({
 		return (
 			<article className="insight-card" aria-busy="true">
 				<div className="eyebrow">
-					<span
-						className="skeleton"
-						style={{ width: 150, height: 14 }}
-						aria-hidden="true"
-					/>
+					<Skeleton width={150} height={14} />
 				</div>
-				<span
-					className="skeleton"
-					style={{ width: 110, height: 30 }}
-					aria-hidden="true"
-				/>
-				<span
-					className="skeleton"
-					style={{ width: "100%", height: 44 }}
-					aria-hidden="true"
-				/>
+				<Skeleton width={110} height={30} />
+				<Skeleton width={"100%"} height={44} />
 			</article>
 		);
 	const action = failure ? onFailure : onPlan;

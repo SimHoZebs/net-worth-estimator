@@ -228,3 +228,32 @@ export function Progress({
 		</div>
 	);
 }
+
+export function Skeleton({
+	width,
+	height,
+	label = "Loading",
+}: {
+	width?: number | string;
+	height?: number | string;
+	label?: string;
+}) {
+	return (
+		<span
+			className="skeleton"
+			role="status"
+			aria-label={label}
+			aria-busy="true"
+			style={{
+				...(width !== undefined
+					? { width: typeof width === "number" ? `${width}px` : width }
+					: {}),
+				...(height !== undefined
+					? {
+							height: typeof height === "number" ? `${height}px` : height,
+						}
+					: {}),
+			}}
+		/>
+	);
+}

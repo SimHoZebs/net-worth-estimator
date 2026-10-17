@@ -1,7 +1,7 @@
 import { LockKeyhole, PanelLeftClose, Settings } from "lucide-react";
 import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
-import { IconButton } from "../components/ui.tsx";
+import { IconButton, Skeleton } from "../components/ui.tsx";
 import { changesBetween } from "../domain/model.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { type Page, pages } from "./navigation.ts";
@@ -76,11 +76,7 @@ export function WorkspaceSidebar({
 				<div className="sidebar-status">
 					<span className="status-dot" />
 					{pending ? (
-						<span
-							className="skeleton"
-							style={{ width: 80, height: 10 }}
-							aria-hidden="true"
-						/>
+						<Skeleton width={80} height={10} />
 					) : (
 						<>
 							{statusLabel} <LockKeyhole size={12} />

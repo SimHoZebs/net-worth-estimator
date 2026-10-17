@@ -46,9 +46,7 @@ export function TimingEvidence({
 			wide
 		>
 			<p className="form-intro">These amounts are scheduled.</p>
-			<div
-				style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}
-			>
+			<div className="table-toolbar">
 				<TransactionSortButton order={order} onChange={setOrder} />
 			</div>
 			<div className="table-scroll">
