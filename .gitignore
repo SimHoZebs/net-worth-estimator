@@ -2,3 +2,4 @@ private-data/
 core
 core.*
 uploads/
+tmp/
