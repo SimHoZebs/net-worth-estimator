@@ -46,9 +46,7 @@ test("outlook renders real calculations, scenario ranges and evidence", async ({
 		timeout: 30_000,
 	});
 	await page.getByRole("button", { name: "Inspect this expense" }).click();
-	await expect(page.getByRole("dialog")).toContainText(
-		"Protected account balance",
-	);
+	await expect(page.getByRole("dialog")).toContainText("Shortfall $2,650");
 	await expect(page.getByRole("dialog")).toContainText("Mar 6, 2026");
 	await page.keyboard.press("Escape");
 	await expect(

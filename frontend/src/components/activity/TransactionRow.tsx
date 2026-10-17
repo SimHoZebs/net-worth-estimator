@@ -5,6 +5,7 @@ import {
 	TriangleAlert,
 } from "lucide-react";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
+import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, exactMoney } from "../../domain/format.ts";
 import type { Movement } from "../../domain/model.ts";
 import { Badge } from "../ui.tsx";
@@ -13,10 +14,16 @@ export function TransactionRow({
 	transaction,
 	movement,
 	onEdit,
+	shortfallLabel,
+	hideExternalCounterparty = false,
 }: {
 	transaction: AccountTransaction;
 	movement: Movement | null;
 	onEdit: (movement: Movement) => void;
+	shortfallLabel?: string;
+	/** Hide counterparties that only restate the direction ("External
+	 * spending" just means spent). Real accounts still show. */
+	hideExternalCounterparty?: boolean;
 }) {
 	const DirectionIcon =
 		transaction.category === "transfer"
@@ -25,6 +32,9 @@ export function TransactionRow({
 				? ArrowDownLeft
 				: ArrowUpRight;
 	const action = movement?.readOnly ? "Inspect" : "Edit";
+	const external =
+		transaction.counterparty === externalCounterpartyName("in") ||
+		transaction.counterparty === externalCounterpartyName("out");
 	return (
 		<tr className="transaction-row">
 			<td className="transaction-date-column">
@@ -49,10 +59,12 @@ export function TransactionRow({
 					</span>
 					<span className="transaction-name">
 						<strong>{transaction.name}</strong>
-						<span>
-							{transaction.direction === "in" ? "From" : "To"}{" "}
-							{transaction.counterparty}
-						</span>
+						{(!hideExternalCounterparty || !external) && (
+							<span>
+								{transaction.direction === "in" ? "From" : "To"}{" "}
+								{transaction.counterparty}
+							</span>
+						)}
 						<time
 							className="transaction-mobile-date"
 							dateTime={transaction.date}
@@ -73,7 +85,7 @@ export function TransactionRow({
 								{transaction.shortfall > 0.01 && (
 									<Badge tone="amber">
 										<TriangleAlert size={10} />
-										Shortfall
+										{shortfallLabel ?? "Shortfall"}
 									</Badge>
 								)}
 							</span>

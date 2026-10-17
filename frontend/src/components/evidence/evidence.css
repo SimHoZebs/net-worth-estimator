@@ -89,4 +89,18 @@
 	.failure-comparison > svg {
 		color: var(--subtle);
 	}
+	.snapshot {
+		margin: 12px 0 2px;
+	}
+	.snapshot-also {
+		font-size: 12px;
+		font-weight: 650;
+		color: var(--ink);
+		margin: 0 0 10px;
+	}
+	.snapshot-more {
+		font-size: 10px;
+		color: var(--muted);
+		margin: 8px 0 0;
+	}
 }
