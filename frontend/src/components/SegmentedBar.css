@@ -16,6 +16,9 @@
 		height: 100%;
 		min-width: 3px;
 	}
+	.seg-bar > span + span {
+		border-left: 2px solid var(--surface);
+	}
 	.seg-sage {
 		background-color: var(--seg-sage);
 	}

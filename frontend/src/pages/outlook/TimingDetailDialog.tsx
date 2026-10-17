@@ -78,7 +78,7 @@ function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
 					label: "Left to spend",
 					amount: parts.cushion,
 					pattern: "solid",
-					tone: "sage",
+					tone: "pale",
 				},
 			];
 	const paidNote =
@@ -125,7 +125,7 @@ function PaycheckBar({ parts }: { parts: PaycheckDecomposition }) {
 						label: "Left",
 						amount: parts.allowance,
 						pattern: "solid",
-						tone: "pale",
+						tone: "amber",
 					} as BarSegment,
 				]
 			: []),
@@ -444,7 +444,7 @@ export function TimingDetailDialog({
 								label: `${card.name} · ${money(card.amount)}`,
 								amount: card.amount,
 								pattern: index % 2 === 0 ? "solid" : "stripes",
-								tone: index % 2 === 0 ? "dark" : "sage",
+								tone: index % 2 === 0 ? "dark" : "pale",
 							}))}
 							ariaLabel={`Card charges ${money(heroes.committedTotal)}: ${heroes.committedByCard.map((card) => `${card.name} ${money(card.amount)}`).join(", ")}`}
 						/>
