@@ -20,7 +20,16 @@ export default defineConfig({
 	timeout: 45_000,
 	expect: { timeout: 10_000 },
 	reporter: "list",
-	use: { baseURL, trace: "retain-on-failure", screenshot: "only-on-failure" },
+	use: {
+		baseURL,
+		trace: "retain-on-failure",
+		screenshot: "only-on-failure",
+		// Reduced motion makes the modal/drawer enter animations resolve
+		// instantly, so axe and layout assertions never sample a mid-fade
+		// frame (which reads as a contrast failure). The app honors this
+		// via useReducedMotion; end states are unchanged.
+		reducedMotion: "reduce",
+	},
 	projects: [
 		{
 			name: "chromium",
