@@ -62,7 +62,10 @@ func (r *PostingFulfillmentPathResult) ToJSON() types.JsonValue {
 	}
 }
 
-func roundAmount(value float64) float64 { return math.Round(value) }
+// roundAmount is kept as an alias so fulfillment and cycle results use one
+// currency rounding owner with path.go. mathRound stays separate: it rounds
+// halves toward +Infinity for percentile buffers and differs on negative .5.
+func roundAmount(value float64) float64 { return roundCurrency(value) }
 
 func reportableUnfulfilled(event *types.MovementEvent) float64 {
 	amount := math.Max(0, event.RequestedAmount-event.RealizedAmount)

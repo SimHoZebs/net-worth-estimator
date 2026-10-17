@@ -338,12 +338,7 @@ func applyBranchPostingEvents(events []branchEventGroup, baseRealizedByDateAndPo
 	for _, group := range events {
 		sorted := make([]DatedPostingOccurrence, len(group.occurrences))
 		copy(sorted, group.occurrences)
-		sort.SliceStable(sorted, func(i, j int) bool {
-			if sorted[i].Posting.Priority != sorted[j].Posting.Priority {
-				return sorted[i].Posting.Priority < sorted[j].Posting.Priority
-			}
-			return sorted[i].Index < sorted[j].Index
-		})
+		sortOccurrences(sorted)
 		for _, occurrence := range sorted {
 			posting := occurrence.Posting
 			disposition, ok := dispositions[posting.ID]
