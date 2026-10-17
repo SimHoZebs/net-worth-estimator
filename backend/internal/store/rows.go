@@ -728,7 +728,8 @@ func (s *sqliteStore) UpdateEvaluation(item EvaluationUpdate) (EvaluationUpdate,
 	return item, nil
 }
 
-// DeleteEvaluation removes one evaluation instance.
+// DeleteEvaluation removes one evaluation instance. Its pin, if any,
+// is dropped in the same transaction so pins never dangle.
 func (s *sqliteStore) DeleteEvaluation(instanceID string) error {
 	return withRowTx(s.db, func(tx *sql.Tx) error {
 		result, err := tx.Exec(`DELETE FROM evaluations WHERE instance_id = ?`, instanceID)
@@ -741,6 +742,9 @@ func (s *sqliteStore) DeleteEvaluation(instanceID string) error {
 		}
 		if affected == 0 {
 			return &rowError{code: "not-found", id: instanceID}
+		}
+		if _, err := tx.Exec(`DELETE FROM pinned_evaluations WHERE instance_id = ?`, instanceID); err != nil {
+			return fmt.Errorf("unpin evaluation %s: %w", instanceID, err)
 		}
 		return releaseRowID(tx, instanceID)
 	})

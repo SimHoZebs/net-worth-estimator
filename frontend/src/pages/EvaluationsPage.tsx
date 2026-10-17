@@ -1,8 +1,10 @@
-import { Check, Flag, Plus } from "lucide-react";
+import { Check, Flag, Pin, Plus } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import {
 	Badge,
 	EmptyState,
 	ErrorNotice,
+	IconButton,
 	Progress,
 	ProjectionUpdating,
 } from "../components/ui.tsx";
@@ -15,12 +17,23 @@ import type {
 	Projection,
 	RangeResult,
 } from "../domain/result.ts";
+import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { EvaluationCard } from "./evaluations/EvaluationCard.tsx";
 
-function OtherEvaluationCard({ item }: { item: OtherEvaluation }) {
+function OtherEvaluationCard({
+	item,
+	pinned,
+	onPinChange,
+	pinDisabled,
+}: {
+	item: OtherEvaluation;
+	pinned: boolean;
+	onPinChange: (() => void) | null;
+	pinDisabled: boolean;
+}) {
 	const satisfied = item.enabled && item.status === "satisfied";
 	const tone =
 		!item.enabled || item.status === "indeterminate"
@@ -36,6 +49,21 @@ function OtherEvaluationCard({ item }: { item: OtherEvaluation }) {
 				<span className="evaluation-icon">
 					{satisfied ? <Check size={23} /> : <Flag size={23} />}
 				</span>
+				{onPinChange && (
+					<div className="table-actions">
+						<IconButton
+							icon={Pin}
+							label={
+								pinned
+									? `Unpin ${item.name} from Outlook`
+									: `Pin ${item.name} to Outlook`
+							}
+							onClick={onPinChange}
+							disabled={pinDisabled}
+							aria-pressed={pinned}
+						/>
+					</div>
+				)}
 			</div>
 			<h2>{item.name}</h2>
 			{item.goal && item.goal !== item.name && <p>{item.goal}</p>}
@@ -149,6 +177,30 @@ function EvaluationsContent({
 	// Other evaluation kinds are configured server-side, so their count is
 	// unknowable until the projection lands; they join the grid on arrival.
 	const others = projection?.otherEvaluations ?? [];
+	const serverDocument = useWorkspaceStore((state) => state.serverDocument);
+	const status = useWorkspaceStore((state) => state.status);
+	const pinnedIds = usePinnedEvaluationsStore((state) => state.ids);
+	const pinnedError = usePinnedEvaluationsStore((state) => state.error);
+	const refreshPins = usePinnedEvaluationsStore((state) => state.refresh);
+	const togglePin = usePinnedEvaluationsStore((state) => state.toggle);
+	useEffect(() => {
+		void refreshPins();
+	}, [refreshPins]);
+	// Pins name persisted server instances: draft-only evaluations have no
+	// server row yet, so their pin control stays disabled until saved.
+	const savedEvaluationIds = useMemo(() => {
+		const ids = new Set<string>();
+		const tables = serverDocument?.evaluations;
+		if (!tables) return ids;
+		for (const row of tables.financialIndependence) ids.add(row.instanceId);
+		for (const row of tables.netWorthThreshold) ids.add(row.instanceId);
+		for (const row of tables.accountBalance) ids.add(row.instanceId);
+		for (const row of tables.postingFulfillment) ids.add(row.instanceId);
+		for (const row of tables.cycleFulfillment ?? []) ids.add(row.instanceId);
+		return ids;
+	}, [serverDocument]);
+	const pinsBlocked = (status?.readOnly ?? false) || pending;
+	const pinnedSet = new Set(pinnedIds ?? []);
 	const archivedIds = new Set(
 		plan.accounts.filter((a) => a.archived).map((a) => a.id),
 	);
@@ -168,6 +220,13 @@ function EvaluationsContent({
 					Add evaluation
 				</button>
 			</div>
+			{pinnedError && (
+				<ErrorNotice
+					message={pinnedError}
+					action="Reload pins"
+					onAction={() => refreshPins()}
+				/>
+			)}
 			{!pending && !evaluations.length && !others.length && (
 				<EmptyState icon={Flag} title="What are you working toward?" />
 			)}
@@ -190,6 +249,11 @@ function EvaluationsContent({
 								: null
 						}
 						pending={pending}
+						pinned={pinnedSet.has(evaluation.id)}
+						onPinChange={() => {
+							void togglePin(evaluation.id);
+						}}
+						pinDisabled={pinsBlocked || !savedEvaluationIds.has(evaluation.id)}
 						onEdit={() => onEdit(evaluation)}
 						onRemove={() =>
 							onUpdate(removeEvaluation({ plan, id: evaluation.id }))
@@ -203,7 +267,15 @@ function EvaluationsContent({
 					/>
 				))}
 				{others.map((item) => (
-					<OtherEvaluationCard key={item.id} item={item} />
+					<OtherEvaluationCard
+						key={item.id}
+						item={item}
+						pinned={pinnedSet.has(item.id)}
+						onPinChange={() => {
+							void togglePin(item.id);
+						}}
+						pinDisabled={pinsBlocked || !savedEvaluationIds.has(item.id)}
+					/>
 				))}
 			</div>
 		</>

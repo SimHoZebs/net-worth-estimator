@@ -13,6 +13,7 @@ import type {
 	EvaluationInstance,
 	FinancialModelResponse,
 	IncomeDataSnapshot,
+	PinnedEvaluationsResponse,
 	ProblemDetails,
 	RowDeleteResponse,
 	RowWriteResponse,
@@ -576,6 +577,25 @@ export class ApiClient {
 		return this.requestJson<AccountLinkListResponse>(
 			"sync/simplefin/accounts",
 			requestInit("GET", undefined, options),
+		);
+	}
+
+	getPinnedEvaluations(
+		options: ApiRequestOptions = {},
+	): Promise<Error | PinnedEvaluationsResponse> {
+		return this.requestJson<PinnedEvaluationsResponse>(
+			"pinned-evaluations",
+			requestInit("GET", undefined, options),
+		);
+	}
+
+	setPinnedEvaluations(
+		instanceIds: string[],
+		options: ApiRequestOptions = {},
+	): Promise<Error | PinnedEvaluationsResponse> {
+		return this.requestJson<PinnedEvaluationsResponse>(
+			"pinned-evaluations",
+			requestInit("PUT", { instanceIds }, options),
 		);
 	}
 
