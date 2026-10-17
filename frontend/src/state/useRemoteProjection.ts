@@ -17,6 +17,7 @@ import {
 	type StochasticProjectionResult,
 } from "../api/index.ts";
 import { dateLabel, money, percent, todayIso } from "../domain/format.ts";
+import { finite, isRecord, stringValue } from "../domain/guards.ts";
 import type {
 	OtherEvaluationProgress,
 	Projection,
@@ -28,7 +29,7 @@ import {
 	stochasticQueryKey,
 } from "./serverQuery.ts";
 import { useUiStore } from "./uiStore.ts";
-import { useWorkspaceStore } from "./workspaceStore.ts";
+import { deriveDraftDocument, useWorkspaceStore } from "./workspaceStore.ts";
 
 export interface RemoteProjectionClient {
 	projectDeterministic(
@@ -94,18 +95,6 @@ async function runDeterministic(
 					"The deterministic projection could not be mapped for display.",
 				);
 	}
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function finite(value: unknown): number | null {
-	return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function stringValue(value: unknown): string | null {
-	return typeof value === "string" && value.length ? value : null;
 }
 
 function valueRecord(
@@ -772,14 +761,34 @@ export function useRemoteProjection({
 	// components subscribe where the query is declared instead of receiving
 	// fetched data as props. Null stays explicit: it means "none", not
 	// "fall back".
-	const storeDraftDocument = useWorkspaceStore((state) => state.draftDocument);
+	const storeDraft = useWorkspaceStore((state) => state.workspace?.draft ?? null);
 	const storeDocument = useWorkspaceStore((state) => state.serverDocument);
+	const storeDraftPresentation = useWorkspaceStore(
+		(state) => state.draftPresentation,
+	);
+	const storeSavedPresentation = useWorkspaceStore(
+		(state) => state.savedPresentation,
+	);
+	// The draft document derives on demand from the stored draft plan: the
+	// reverse conversion already runs on every edit for the loss check, so a
+	// stored copy only duplicated that result. Memoized on reference, so this
+	// re-converts only when the draft, server document, or presentation
+	// actually changes.
+	const derivedDraftDocument = useMemo(
+		() =>
+			deriveDraftDocument(
+				storeDraft,
+				storeDocument,
+				storeDraftPresentation ?? storeSavedPresentation,
+			),
+		[storeDraft, storeDocument, storeDraftPresentation, storeSavedPresentation],
+	);
+	const draftDocument =
+		draftOverride !== undefined ? draftOverride : derivedDraftDocument;
 	const storeIncomeData = useWorkspaceStore((state) => state.incomeData);
 	const storeYears = useUiStore((state) => state.years);
 	const storeRanges = useUiStore((state) => state.ranges);
 	const storeToken = useUiStore((state) => state.authToken);
-	const draftDocument =
-		draftOverride !== undefined ? draftOverride : storeDraftDocument;
 	const document =
 		documentOverride !== undefined ? documentOverride : storeDocument;
 	const years = yearsOverride ?? storeYears;
@@ -788,8 +797,16 @@ export function useRemoteProjection({
 	const incomeData =
 		incomeOverride !== undefined ? incomeOverride : storeIncomeData;
 	const activeDocument = draftDocument ?? document ?? null;
-	const documentKey = activeDocument ? JSON.stringify(activeDocument) : "null";
-	const incomeDataKey = incomeData ? JSON.stringify(incomeData) : "null";
+	// Memoized on reference: callers rebuild equivalent documents per render,
+	// so this only re-stringifies when the store reference actually changes.
+	const documentKey = useMemo(
+		() => (activeDocument ? JSON.stringify(activeDocument) : "null"),
+		[activeDocument],
+	);
+	const incomeDataKey = useMemo(
+		() => (incomeData ? JSON.stringify(incomeData) : "null"),
+		[incomeData],
+	);
 	// Refs give the streaming effect latest values without keying it on
 	// object identity (callers may rebuild equivalent documents per render).
 	// Render-time sync keeps them fresh regardless of effect order.

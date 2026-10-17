@@ -1,6 +1,17 @@
-import { isoDate } from "./format.ts";
+import { isoDate, utcDate } from "./format.ts";
 import type { Plan } from "./model.ts";
 import type { MovementResult } from "./result.ts";
+
+// Server ownership: every amount summed here originates server-side.
+// `movements` are adapted `ProjectionResult.movementEvents` (requested and
+// realized per event); `spendingBalance` reads saved Plan balances surfaced
+// as `ProjectionAccountSummary.startingBalance`. The Gap check
+// (`requested - realized`) is the same gap the posting-fulfillment Goal
+// check aggregates; the paycheck filter mirrors
+// `MovementEvent.income.netCashRealized`. Only the windows stay client-side:
+// they follow user-selected accounts, bills, statement day, and overrides,
+// which have no server contract (see PRODUCT_INTENT open decisions on
+// household timing). Do not add new windowed sums here; derive from these.
 
 export const DEFAULT_CYCLE_STATEMENT_DAY = 20;
 export const DEFAULT_PROTECTED_RESERVE = 725;
@@ -10,10 +21,6 @@ export const DEFAULT_PROTECTED_RESERVE = 725;
  * alongside external inflows.
  */
 export const VIRTUAL_PAY_ACCOUNT_ID = "gross_pay";
-
-function utcDate(iso: string): Date {
-	return new Date(`${iso.slice(0, 10)}T12:00:00Z`);
-}
 
 /** Last calendar day of the month containing `todayIso`. */
 export function monthEndIso(todayIso: string): string {
@@ -49,15 +56,6 @@ export function checkingAccountId(plan: Plan): string | null {
 	if (cash) return cash.id;
 	const anyCash = visible.find((account) => account.kind === "cash");
 	return anyCash?.id ?? null;
-}
-
-export function checkingBalance(plan: Plan): number | null {
-	const id = checkingAccountId(plan);
-	if (!id) return null;
-	return (
-		plan.accounts.find((account) => account.id === id && !account.archived)
-			?.balance ?? null
-	);
 }
 
 /**
@@ -152,9 +150,11 @@ export function nextPaycheck({
 			movement.requested > 0,
 	);
 	if (!upcoming.length) return null;
+	const first = upcoming[0];
+	if (!first) return null;
 	const earliest = upcoming.reduce(
-		(first, movement) => (movement.date < first ? movement.date : first),
-		upcoming[0]!.date,
+		(firstDate, movement) => (movement.date < firstDate ? movement.date : firstDate),
+		first.date,
 	);
 	const amount = upcoming
 		.filter((movement) => movement.date === earliest)
@@ -178,19 +178,6 @@ export function cashCushion({
 	remainingObligations: number;
 }): number {
 	return checking - spentSinceStart - remainingObligations;
-}
-
-/** Amount set aside for the card cycle before spending. */
-export function cycleBudget({
-	paycheck,
-	fixedObligations,
-	reserve,
-}: {
-	paycheck: number;
-	fixedObligations: number;
-	reserve: number;
-}): number {
-	return paycheck - fixedObligations - reserve;
 }
 
 /**

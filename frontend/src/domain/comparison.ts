@@ -65,7 +65,7 @@ export function comparisonContext({
 	years: number;
 }) {
 	const current = comparisonMetrics(projection);
-	const previous = snapshot ?? comparisonMetrics(savedProjection);
+	const previous = comparisonMetrics(savedProjection);
 	return {
 		changes: changesBetween({ saved, current: plan }),
 		current,
@@ -78,15 +78,11 @@ export function captureComparison({
 	plan,
 	revision,
 	years,
-	changes,
-	current,
 	capturedAt,
 }: {
 	plan: Plan;
 	revision: number;
 	years: number;
-	changes: number;
-	current: ComparisonMetrics;
 	capturedAt: string;
 }): Snapshot {
 	return {
@@ -95,9 +91,7 @@ export function captureComparison({
 		years,
 		startDate: plan.startDate,
 		revision,
-		changes,
 		assumptions: assumptionKey(plan),
-		...current,
 	};
 }
 

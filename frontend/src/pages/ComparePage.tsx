@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
 import {
 	captureComparison,
@@ -32,13 +32,16 @@ export function ComparePage({ onDiscard }: { onDiscard: () => void }) {
 	const capture = useWorkspaceStore((state) => state.capture);
 	const save = useWorkspaceStore((state) => state.save);
 	const projection = useRemoteProjection();
-	// The saved side always subscribes: without a draft its inputs match the
-	// active query exactly, so the shared cache serves both from one fetch.
-	// With a draft the keys diverge and each side computes independently.
+	// The saved side disables itself without a draft: with no draft its
+	// inputs would match the active query exactly, so the active fetch covers
+	// it. With a draft the keys diverge and each side computes independently.
+	// Server still content-addresses seeded runs, so this only removes the
+	// client duplicate subscription.
 	const saved = useRemoteProjection({
 		document: serverDocument,
 		draftDocument: null,
 		ranges: false,
+		enabled: hasDraft,
 	});
 	if (!workspace || !plan) return null;
 	const readOnly = statusReadOnly || writeBlocked || plan.readOnly;
@@ -97,10 +100,23 @@ function CompareContent({
 		savedProjection.base instanceof Error || savedProjection.base === null
 			? null
 			: savedProjection.base;
-	const changes = changesBetween({ saved, current: plan });
-	const current = base ? comparisonMetrics(base) : null;
-	const previous =
-		snapshot ?? (savedBase ? comparisonMetrics(savedBase) : null);
+	const changes = useMemo(
+		() => changesBetween({ saved, current: plan }),
+		[saved, plan],
+	);
+	const current = useMemo(
+		() => (base ? comparisonMetrics(base) : null),
+		[base],
+	);
+	const previous = useMemo(
+		() =>
+			savedBase
+				? comparisonMetrics(savedBase)
+				: !hasDraft
+					? current
+					: null,
+		[savedBase, hasDraft, current],
+	);
 	const comparable = comparisonComparable({ snapshot, plan, years });
 	const save = async () => {
 		if (saving || readOnly) return;
@@ -153,8 +169,6 @@ function CompareContent({
 							plan,
 							revision: saved.revision,
 							years,
-							changes: changes.length,
-							current,
 							capturedAt: new Date().toISOString(),
 						}),
 					);

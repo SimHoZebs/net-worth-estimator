@@ -31,23 +31,20 @@ export const snapshotSchema = z.preprocess(
 		name: z.string(),
 		years: z.number(),
 		startDate: z.string(),
-		final: z.number(),
-		current: z.number(),
-		evaluationDate: z.string().nullable(),
-		shortfallDate: z.string().nullable(),
 		revision: z.number(),
-		changes: z.number(),
 		assumptions: z.string(),
+		// Legacy derived metrics. Old captures stored these; new captures omit
+		// them and derive previous/current at render via comparisonMetrics.
+		final: z.number().optional(),
+		current: z.number().optional(),
+		evaluationDate: z.string().nullable().optional(),
+		shortfallDate: z.string().nullable().optional(),
+		changes: z.number().optional(),
 	}),
 );
 export type Snapshot = z.infer<typeof snapshotSchema>;
-const workspaceSchema = z.object({
-	version: z.literal(1),
-	saved: planSchema,
-	draft: planSchema.nullable(),
-	snapshot: snapshotSchema.nullable(),
-});
-export type Workspace = z.infer<typeof workspaceSchema>;
+// Workspace persistence lives in remoteStorage.ts (REMOTE_STORAGE_KEY).
+// Do not add another workspace schema here.
 export function parsePlan(text: string): Plan | ImportError {
 	const value = errore.try({
 		try: () => JSON.parse(text) as object,

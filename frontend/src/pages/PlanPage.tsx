@@ -251,10 +251,14 @@ function TransactionsView({
 			projection ? resolveMovementAmounts(projection.movements) : new Map(),
 		[projection],
 	);
-	const visible = visibleMovements({
-		movements: plan.movements,
-		accounts: plan.accounts,
-	});
+	const visible = useMemo(
+		() =>
+			visibleMovements({
+				movements: plan.movements,
+				accounts: plan.accounts,
+			}),
+		[plan.movements, plan.accounts],
+	);
 	const recurringCount = visible.filter(
 		(movement) => movement.frequency !== "once",
 	).length;

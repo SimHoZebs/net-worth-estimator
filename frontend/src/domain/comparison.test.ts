@@ -32,8 +32,6 @@ const snapshot = captureComparison({
 	plan: examplePlan,
 	revision: 7,
 	years: 10,
-	changes: 2,
-	current: comparisonMetrics(projection),
 	capturedAt: "2026-09-26T12:00:00.000Z",
 });
 
@@ -99,7 +97,9 @@ describe("comparison measures and snapshots", () => {
 			comparable: true,
 			changes: [],
 		});
-		expect(comparisonContext({ ...input, snapshot }).previous).toBe(snapshot);
+		expect(comparisonContext({ ...input, snapshot }).previous).toMatchObject({
+			current: 100,
+		});
 		expect(comparisonContext({ ...input, snapshot }).comparable).toBe(true);
 	});
 	it("retains the persisted capture shape and assumption JSON field order", () => {
@@ -109,7 +109,6 @@ describe("comparison measures and snapshots", () => {
 			years: 10,
 			startDate: examplePlan.startDate,
 			revision: 7,
-			changes: 2,
 			assumptions: JSON.stringify({
 				...examplePlan.assumptions,
 				rates: examplePlan.accounts.map((account) => ({
@@ -121,10 +120,6 @@ describe("comparison measures and snapshots", () => {
 					source: account.source,
 				})),
 			}),
-			current: 120,
-			final: 450,
-			evaluationDate: null,
-			shortfallDate: null,
 		});
 	});
 	it.each<[string, (plan: Plan) => void]>([
