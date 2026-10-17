@@ -2,7 +2,6 @@ import { LockKeyhole, PanelLeftClose, Settings } from "lucide-react";
 import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { IconButton, Skeleton } from "../components/ui.tsx";
-import { changesBetween } from "../domain/model.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { type Page, pages } from "./navigation.ts";
 import { workspaceStatusLabel } from "./WorkspaceNotices.tsx";
@@ -24,10 +23,6 @@ export function WorkspaceSidebar({
 	);
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
 	const readOnly = statusReadOnly || writeBlocked || (plan?.readOnly ?? true);
-	const changeCount =
-		workspace && plan
-			? changesBetween({ saved: workspace.saved, current: plan }).length
-			: 0;
 	const statusLabel = workspaceStatusLabel({ readOnly });
 	return (
 		<>
@@ -54,9 +49,6 @@ export function WorkspaceSidebar({
 								>
 									<item.icon size={19} strokeWidth={1.7} />
 									<span>{item.label}</span>
-									{item.id === "compare" && changeCount > 0 && (
-										<span className="nav-count">{changeCount}</span>
-									)}
 								</a>
 							</li>
 						))}

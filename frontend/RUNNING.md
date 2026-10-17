@@ -66,7 +66,7 @@ sh ../scripts/smoke-compose.sh
 TEST_PRODUCTION=1 npm run test:browser
 ```
 
-Browser tests cover plan editing, persistent drafts, deliberate save and discard, import validation, read-only sources, corrupt storage, storage failures, cross-tab protection, comparison snapshots, export, scenario failures, keyboard navigation, responsive layouts, and automated WCAG accessibility checks. Screenshots are written under `test-results/`.
+Browser tests cover plan editing, persistent drafts, deliberate save and discard, import validation, read-only sources, corrupt storage, storage failures, cross-tab protection, export, scenario failures, keyboard navigation, responsive layouts, and automated WCAG accessibility checks. Screenshots are written under `test-results/`.
 
 ## Workspace and data
 
@@ -77,8 +77,7 @@ Browser tests cover plan editing, persistent drafts, deliberate save and discard
 - A server draft is also protected by the model content identity returned by the API. A concurrent server change blocks the save and preserves the draft for explicit recovery.
 - Read-only plans allow experimentation and export. Saving back to the read-only source is disabled. Source-owned read-only records cannot be edited or removed.
 - Imports accept a version 1 Waypoint plan JSON file, validate its structure and account references, and show a preview before replacement. Export the example plan to obtain a complete format reference.
-- Plan exports can be imported. Full workspace backups also contain the saved state, temporary version, and comparison measures; their individual `saved` or `draft` plan can be extracted for import.
-- Comparison snapshots store descriptive measures and their context. They do not contain another plan or offer plan restoration.
+- Plan exports can be imported. Full workspace backups also contain the saved state and the temporary version; their individual `saved` or `draft` plan can be extracted for import.
 
 ## Account transactions
 
@@ -108,7 +107,7 @@ Income evidence uses recorded, enabled one-time external inflows. Similar amount
 - `src/api/`: backend contracts, same-origin client, SSE parsing and display/document adapters.
 - `src/state/`: browser persistence, remote hydration, conditional saves and projection state.
 - `src/components/`: accessible controls, evidence dialogs, editing forms and visualization.
-- `src/pages/`: outlook, accounts, transactions, evaluations, comparison and configs (sources).
+- `src/pages/`: outlook, accounts, transactions, evaluations and configs (sources).
 - `tests/`: browser workflows and accessibility checks.
 
 The frontend is part of the repository and always uses the Go API.

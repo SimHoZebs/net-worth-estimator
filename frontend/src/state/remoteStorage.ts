@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { FinancialModelDocument, PlanPresentation } from "../api/index.ts";
 import { isRecord } from "../domain/guards.ts";
 import { type Plan, planSchema } from "../domain/model.ts";
-import { type Snapshot, StorageError, snapshotSchema } from "./storage.ts";
+import { StorageError } from "./storage.ts";
 
 export const REMOTE_STORAGE_KEY = "waypoint.remote-workspace.v1";
 
@@ -21,7 +21,6 @@ const remoteStateSchema = z.object({
 	draftPresentation: planPresentationSchema.nullable(),
 	baseFingerprint: z.string().min(1).nullable().optional(),
 	baseRevision: z.string().min(1).nullable().optional(),
-	snapshot: snapshotSchema.nullable(),
 });
 
 export interface RemoteLocalState {
@@ -30,7 +29,6 @@ export interface RemoteLocalState {
 	draftPresentation: PlanPresentation | null;
 	baseFingerprint?: string | null;
 	baseRevision?: string | null;
-	snapshot: Snapshot | null;
 }
 
 function canonicalJson(value: unknown): string {

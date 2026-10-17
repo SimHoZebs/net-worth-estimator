@@ -1,6 +1,5 @@
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
-import { ComparePage } from "../pages/ComparePage.tsx";
 import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
 import type { TimingDetailTab } from "../pages/outlook/TimingDetailDialog.tsx";
@@ -15,7 +14,6 @@ export function WorkspacePage({
 	page,
 	onEdit,
 	onEvidence,
-	onDiscard,
 	onNavigate,
 	timingDetail,
 	onTimingDetail,
@@ -24,7 +22,6 @@ export function WorkspacePage({
 	page: Page;
 	onEdit: (target: EditorTarget) => void;
 	onEvidence: (target: EvidenceTarget) => void;
-	onDiscard: () => void;
 	onNavigate: (page: Page) => void;
 	timingDetail: TimingDetailTab | null;
 	onTimingDetail: (tab: TimingDetailTab | null) => void;
@@ -70,8 +67,6 @@ export function WorkspacePage({
 					onEvidence={(id) => onEvidence({ kind: "evaluation", id })}
 				/>
 			);
-		case "compare":
-			return <ComparePage onDiscard={onDiscard} />;
 		case "sources":
 			return <SourcesPage />;
 	}

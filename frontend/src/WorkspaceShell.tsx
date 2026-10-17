@@ -38,18 +38,15 @@ export function WorkspaceShell() {
 		if (tab) overlays.openTimingDetail(tab);
 		else overlays.closeTimingDetail();
 	};
+	// DraftBar runs its own save against the store; only the discard overlay
+	// stays a prop.
 	return (
 		<WorkspaceLayout
 			navigation={(close) => (
 				<WorkspaceSidebar page={navigation.page} onClose={close} />
 			)}
 			header={(open) => <WorkspaceTopbar onOpenNavigation={open} />}
-			draftBar={
-				<DraftBar
-					onDiscard={overlays.openDiscard}
-					onReview={() => navigation.navigate("compare")}
-				/>
-			}
+			draftBar={<DraftBar onDiscard={overlays.openDiscard} />}
 			overlays={<WorkspaceDialogs overlays={overlays} />}
 			notification={<WorkspaceNotification />}
 		>
@@ -62,7 +59,6 @@ export function WorkspaceShell() {
 				page={navigation.page}
 				onEdit={overlays.openEditor}
 				onEvidence={overlays.openEvidence}
-				onDiscard={overlays.openDiscard}
 				onNavigate={navigation.navigate}
 				timingDetail={overlays.timingDetail}
 				onTimingDetail={timingDetail}

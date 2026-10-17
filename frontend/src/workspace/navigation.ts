@@ -2,7 +2,6 @@ import {
 	ArrowRightLeft,
 	type Compass,
 	Flag,
-	GitCompareArrows,
 	LayoutDashboard,
 	Settings,
 	Wallet,
@@ -13,7 +12,6 @@ export type Page =
 	| "accounts"
 	| "transactions"
 	| "evaluations"
-	| "compare"
 	| "sources";
 export type PageDefinition = {
 	id: Page;
@@ -46,12 +44,6 @@ export const pages: PageDefinition[] = [
 		label: "Evaluations",
 		icon: Flag,
 		title: "Check what the plan supports",
-	},
-	{
-		id: "compare",
-		label: "Compare",
-		icon: GitCompareArrows,
-		title: "Small changes. Clearer choices.",
 	},
 	{
 		id: "sources",
