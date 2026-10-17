@@ -12,7 +12,22 @@
 		<title>Waypoint · Your financial outlook</title>
 		<script>
 			try {
-				var stored = localStorage.getItem("waypoint-theme") || "system";
+				var raw = localStorage.getItem("waypoint-theme") || "system";
+				var stored = raw;
+				try {
+					var parsed = JSON.parse(raw);
+					if (
+						parsed &&
+						parsed.state &&
+						typeof parsed.state.preference === "string"
+					) {
+						stored = parsed.state.preference;
+					} else if (typeof parsed === "string") {
+						stored = parsed;
+					}
+				} catch (e) {
+					// Legacy plain-string format: use raw as-is.
+				}
 				var dark =
 					stored === "dark" ||
 					(stored === "system" &&

@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { appJsonStorage, UI_PREFS_STORAGE_KEY } from "./persisted.ts";
 
 /**
  * Local interface state: projection horizon, scenario bands, and the bearer
@@ -17,16 +19,48 @@ interface UiState {
 	setImporting: (importing: boolean) => void;
 }
 
-export const useUiStore = create<UiState>()((set) => ({
-	years: 20,
-	ranges: true,
-	authToken: "",
-	importing: false,
-	setYears: (years) => set({ years }),
-	setRanges: (ranges) => set({ ranges }),
-	setAuthToken: (authToken) => set({ authToken }),
-	setImporting: (importing) => set({ importing }),
-}));
+type UiPrefs = Pick<UiState, "years" | "ranges">;
+
+const UI_DEFAULTS: UiPrefs = { years: 20, ranges: true };
+
+function sanitizeUiPrefs(value: unknown): UiPrefs {
+	if (typeof value !== "object" || value === null) return { ...UI_DEFAULTS };
+	const record = value as Record<string, unknown>;
+	const years =
+		typeof record.years === "number" &&
+		Number.isFinite(record.years) &&
+		record.years > 0
+			? Math.min(100, Math.floor(record.years))
+			: UI_DEFAULTS.years;
+	const ranges =
+		typeof record.ranges === "boolean" ? record.ranges : UI_DEFAULTS.ranges;
+	return { years, ranges };
+}
+
+export const useUiStore = create<UiState>()(
+	persist(
+		(set) => ({
+			...UI_DEFAULTS,
+			authToken: "",
+			importing: false,
+			setYears: (years) => set({ years }),
+			setRanges: (ranges) => set({ ranges }),
+			setAuthToken: (authToken) => set({ authToken }),
+			setImporting: (importing) => set({ importing }),
+		}),
+		{
+			name: UI_PREFS_STORAGE_KEY,
+			version: 1,
+			storage: appJsonStorage<UiPrefs>(),
+			partialize: (state) => ({ years: state.years, ranges: state.ranges }),
+			migrate: (persisted) => sanitizeUiPrefs(persisted),
+			merge: (persisted, current) => ({
+				...current,
+				...sanitizeUiPrefs(persisted),
+			}),
+		},
+	),
+);
 
 /** Test hook: restores default interface state between cases. */
 export function resetUiStore(): void {
