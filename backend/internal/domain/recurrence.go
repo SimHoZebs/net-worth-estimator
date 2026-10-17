@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"sort"
+
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -18,6 +20,18 @@ type DatedPostingOccurrence struct {
 	Index   int
 	Rule    *types.RecurrenceRule
 	DocPath []any
+}
+
+// sortOccurrences orders same-date postings by ascending priority and
+// declaration sequence. Simulate, history replay, and the financial
+// independence branch share this order so one edit changes all three.
+func sortOccurrences(occurrences []DatedPostingOccurrence) {
+	sort.SliceStable(occurrences, func(i, j int) bool {
+		if occurrences[i].Posting.Priority != occurrences[j].Posting.Priority {
+			return occurrences[i].Posting.Priority < occurrences[j].Posting.Priority
+		}
+		return occurrences[i].Index < occurrences[j].Index
+	})
 }
 
 // FrequencyDivisor converts annual rates to per-occurrence rates.

@@ -47,12 +47,7 @@ func Simulate(request types.SimulationRequest) (types.SimulationRun, error) {
 		occurrences := eventDates[date]
 		sorted := make([]DatedPostingOccurrence, len(occurrences))
 		copy(sorted, occurrences)
-		sort.SliceStable(sorted, func(i, j int) bool {
-			if sorted[i].Posting.Priority != sorted[j].Posting.Priority {
-				return sorted[i].Posting.Priority < sorted[j].Posting.Priority
-			}
-			return sorted[i].Index < sorted[j].Index
-		})
+		sortOccurrences(sorted)
 		for _, occurrence := range sorted {
 			transition, err := transitions.ExecutePosting(occurrence, date)
 			if err != nil {

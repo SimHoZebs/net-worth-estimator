@@ -124,12 +124,7 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 	for _, date := range historicalDates {
 		occurrences := make([]DatedPostingOccurrence, len(occurrencesByDate[date]))
 		copy(occurrences, occurrencesByDate[date])
-		sort.SliceStable(occurrences, func(i, j int) bool {
-			if occurrences[i].Posting.Priority != occurrences[j].Posting.Priority {
-				return occurrences[i].Posting.Priority < occurrences[j].Posting.Priority
-			}
-			return occurrences[i].Index < occurrences[j].Index
-		})
+		sortOccurrences(occurrences)
 		for _, occurrence := range occurrences {
 			if _, err := transitions.ExecutePosting(occurrence, date); err != nil {
 				message := err.Error()
