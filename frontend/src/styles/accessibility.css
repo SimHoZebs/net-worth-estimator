@@ -1,6 +1,7 @@
 /* Global contrast / touch-target remediation. Imported by the styles/index.css
    manifest. Intentionally unlayered (see responsive.css): remediation must win
-   regardless of bundler stylesheet order. */
+   regardless of bundler stylesheet order. Hex values below are intentional
+   contrast bumps over tokens.css and must stay darker than the base tokens. */
 .mobile-only {
 	display: none;
 }

@@ -372,13 +372,7 @@ export function TimingDetailDialog({
 						>
 							{null}
 						</Tabs>
-						<div
-							style={{
-								display: "flex",
-								justifyContent: "flex-end",
-								margin: "8px 0",
-							}}
-						>
+						<div className="table-toolbar">
 							<TransactionSortButton
 								order={transactionOrder}
 								onChange={onTransactionOrderChange}

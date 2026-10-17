@@ -4,6 +4,17 @@ import { defineConfig } from "vite";
 export default defineConfig({
 	plugins: [react()],
 	publicDir: "public",
+	build: {
+		rollupOptions: {
+			output: {
+				manualChunks: {
+					react: ["react", "react-dom"],
+					query: ["@tanstack/react-query"],
+					form: ["zod", "errore"],
+				},
+			},
+		},
+	},
 	server: {
 		port: 5178,
 		strictPort: true,

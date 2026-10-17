@@ -1,5 +1,5 @@
 import { CircleHelp, TrendingUp } from "lucide-react";
-import { IconButton } from "../../components/ui.tsx";
+import { IconButton, Skeleton } from "../../components/ui.tsx";
 import { compactMoney, dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import { currentNetWorth, type Projection } from "../../domain/result.ts";
@@ -35,11 +35,7 @@ export function OutlookMetrics({
 							disabled
 						/>
 					</div>
-					<span
-						className="skeleton"
-						style={{ width: 120, height: 28 }}
-						aria-hidden="true"
-					/>
+					<Skeleton width={120} height={28} />
 					<div className="metric-context">
 						<span className="status-dot" />
 						As of {dateLabel(plan.startDate, true)}
@@ -50,11 +46,7 @@ export function OutlookMetrics({
 						<span>Base case in {finalYear}</span>
 						<TrendingUp size={19} />
 					</div>
-					<span
-						className="skeleton"
-						style={{ width: 140, height: 28 }}
-						aria-hidden="true"
-					/>
+					<Skeleton width={140} height={28} />
 					<div className="metric-context">{years}-year projection</div>
 				</section>
 			</div>

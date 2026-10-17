@@ -17,16 +17,16 @@
 		min-width: 3px;
 	}
 	.seg-sage {
-		background-color: #7a8f5e;
+		background-color: var(--seg-sage);
 	}
 	.seg-pale {
-		background-color: #c9d3b8;
+		background-color: var(--seg-pale);
 	}
 	.seg-dark {
 		background-color: var(--track-fill);
 	}
 	.seg-amber {
-		background-color: #d97706;
+		background-color: var(--seg-amber);
 	}
 	.pat-stripes {
 		background-image: repeating-linear-gradient(

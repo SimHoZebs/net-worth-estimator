@@ -6,7 +6,7 @@ import type { Projection, RangeResult } from "../domain/result.ts";
 import { useMediaQuery } from "../state/useMediaQuery.ts";
 import { AccountDot } from "./AccountIcon.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
-import { Toggle } from "./ui.tsx";
+import { Skeleton, Toggle } from "./ui.tsx";
 import "./chart/ProjectionChart.css";
 
 export function ProjectionChart({
@@ -114,11 +114,7 @@ export function ProjectionChart({
 					<Toggle label="Show range" checked={ranges} onChange={setRanges} />
 				</div>
 				<div aria-busy="true">
-					<span
-						className="skeleton"
-						style={{ width: "100%", height: 220 }}
-						aria-hidden="true"
-					/>
+					<Skeleton width={"100%"} height={220} />
 				</div>
 			</section>
 		);

@@ -1,5 +1,5 @@
 import { ArrowRight, ArrowUpRight, Flag } from "lucide-react";
-import { Progress } from "../../components/ui.tsx";
+import { Progress, Skeleton } from "../../components/ui.tsx";
 import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { EvaluationResult, RangeResult } from "../../domain/result.ts";
 
@@ -27,21 +27,9 @@ export function EvaluationPreview({
 						All evaluations <ArrowUpRight size={16} />
 					</button>
 				</div>
-				<span
-					className="skeleton"
-					style={{ width: 170, height: 18 }}
-					aria-hidden="true"
-				/>
-				<span
-					className="skeleton"
-					style={{ width: 120, height: 30 }}
-					aria-hidden="true"
-				/>
-				<span
-					className="skeleton"
-					style={{ width: "100%", height: 44 }}
-					aria-hidden="true"
-				/>
+				<Skeleton width={170} height={18} />
+				<Skeleton width={120} height={30} />
+				<Skeleton width={"100%"} height={44} />
 			</section>
 		);
 	return (

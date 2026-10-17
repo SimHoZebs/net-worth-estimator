@@ -1,5 +1,5 @@
 import { ArrowUpRight, Check, Flag, Pencil, Trash2 } from "lucide-react";
-import { Badge, IconButton, Progress, Toggle } from "../../components/ui.tsx";
+import { Badge, IconButton, Progress, Skeleton, Toggle } from "../../components/ui.tsx";
 import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { Evaluation } from "../../domain/model.ts";
 import type { EvaluationResult } from "../../domain/result.ts";
@@ -53,11 +53,7 @@ export function EvaluationCard({
 				{!evaluation.enabled ? (
 					"Paused"
 				) : outcomePending ? (
-					<span
-						className="skeleton"
-						style={{ width: 140, height: 16 }}
-						aria-hidden="true"
-					/>
+					<Skeleton width={140} height={16} />
 				) : met ? (
 					"Already reached"
 				) : result?.firstDate ? (
@@ -67,11 +63,7 @@ export function EvaluationCard({
 				)}
 			</div>
 			{outcomePending ? (
-				<span
-					className="skeleton"
-					style={{ width: 110, height: 20 }}
-					aria-hidden="true"
-				/>
+				<Skeleton width={110} height={20} />
 			) : (
 				<Badge tone={met ? "green" : "neutral"}>
 					{!evaluation.enabled
@@ -84,11 +76,7 @@ export function EvaluationCard({
 				</Badge>
 			)}
 			{outcomePending ? (
-				<span
-					className="skeleton"
-					style={{ width: "100%", height: 44 }}
-					aria-hidden="true"
-				/>
+				<Skeleton width={"100%"} height={44} />
 			) : (
 				<div className="evaluation-card-progress">
 					<div className="progress-label">

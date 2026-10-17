@@ -38,6 +38,7 @@
 		--danger-bg: #fbefe7;
 		--danger-text: #9b493a;
 		--danger-border: #edd4c8;
+		--danger-solid: #a34536;
 		--chart-grid: #e5e8e0;
 		--chart-line: #315f47;
 		--chart-band: #dde6c7;
@@ -45,6 +46,9 @@
 		--chart-median: #8c997c;
 		--track: #e9eddf;
 		--track-fill: #7f965c;
+		--seg-sage: #7a8f5e;
+		--seg-pale: #c9d3b8;
+		--seg-amber: #d97706;
 		--serif: "Newsreader Variable", Georgia, serif;
 		--sidebar: 224px;
 	}
