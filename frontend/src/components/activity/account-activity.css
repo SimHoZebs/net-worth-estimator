@@ -64,6 +64,91 @@
 	.account-activity-panel .modal-actions {
 		margin-top: 0;
 	}
+	.account-details-form {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.account-details-form .form-grid {
+		margin: 0;
+		border: 0;
+		padding: 0;
+	}
+	.account-details-form .detail-list {
+		margin: 0;
+	}
+	.account-details-form .checkbox-field {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-size: 11px;
+		color: var(--muted);
+	}
+	.balance-range {
+		border: 0;
+		padding: 0;
+		margin: 0;
+		min-width: 0;
+	}
+	.balance-range > legend {
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--muted);
+		padding: 0;
+		margin-bottom: 7px;
+	}
+	.balance-range-track {
+		position: relative;
+		height: 8px;
+		border-radius: 20px;
+		background: var(--surface-3);
+		overflow: hidden;
+	}
+	.balance-range-fill {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		background: var(--track-fill);
+		border-radius: 20px;
+	}
+	.balance-range-marker {
+		position: absolute;
+		top: -2px;
+		bottom: -2px;
+		width: 2px;
+		background: var(--ink);
+	}
+	.balance-range-inputs {
+		display: grid;
+		grid-template-columns: 1fr 1fr auto;
+		gap: 12px;
+		align-items: end;
+		margin-top: 10px;
+	}
+	.balance-range-inputs > label {
+		display: flex;
+		flex-direction: column;
+		gap: 7px;
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--muted);
+	}
+	.balance-range-inputs input[type="number"] {
+		width: 100%;
+		border: 1px solid var(--field-border);
+		border-radius: 6px;
+		padding: 10px 11px;
+		height: 41px;
+		background: var(--input-bg);
+		font-size: 12px;
+		color: var(--field-text);
+	}
+	.balance-range-ceiling-toggle {
+		flex-direction: row !important;
+		align-items: center;
+		padding-bottom: 12px;
+		white-space: nowrap;
+	}
 	.account-view-tabs button > span {
 		color: var(--accent-green-text);
 	}
@@ -460,6 +545,13 @@
 		}
 		.recurring-edit-controls {
 			gap: 2px;
+		}
+		.balance-range-inputs {
+			grid-template-columns: 1fr 1fr;
+		}
+		.balance-range-ceiling-toggle {
+			grid-column: 1 / -1;
+			padding-bottom: 0;
 		}
 	}
 }

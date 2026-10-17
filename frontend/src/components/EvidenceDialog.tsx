@@ -23,6 +23,7 @@ export function EvidenceDialog({
 	temporary = false,
 	onClose,
 	onEdit,
+	onApply,
 }: {
 	target: EvidenceTarget;
 	plan: Plan;
@@ -31,6 +32,7 @@ export function EvidenceDialog({
 	temporary?: boolean;
 	onClose: () => void;
 	onEdit: (target: EditorTarget) => void;
+	onApply: (plan: Plan) => boolean;
 }) {
 	// The editor replaces the evidence in the URL overlay slot, so the
 	// evidence unmounts on navigation: no separate close is needed, and the
@@ -74,6 +76,7 @@ export function EvidenceDialog({
 					temporary={temporary}
 					onClose={onClose}
 					onEdit={edit}
+					onApply={onApply}
 				/>
 			) : null;
 		}

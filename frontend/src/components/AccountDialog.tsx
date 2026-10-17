@@ -19,6 +19,7 @@ export function AccountDialog({
 	temporary,
 	onClose,
 	onEdit,
+	onApply,
 }: {
 	account: Account;
 	plan: Plan;
@@ -26,6 +27,7 @@ export function AccountDialog({
 	temporary: boolean;
 	onClose: () => void;
 	onEdit: (target: EditorTarget) => void;
+	onApply: (plan: Plan) => boolean;
 }) {
 	const [view, setView] = useState<"transactions" | "details" | "recurring">(
 		"transactions",
@@ -97,9 +99,11 @@ export function AccountDialog({
 					<RecurringRules account={account} plan={plan} onEdit={onEdit} />
 				) : (
 					<AccountDetails
+						key={account.id}
 						account={account}
+						plan={plan}
 						endingBalance={last?.balances[account.id] ?? 0}
-						onEdit={() => onEdit({ kind: "account", item: account })}
+						onApply={onApply}
 					/>
 				)}
 			</Tabs>

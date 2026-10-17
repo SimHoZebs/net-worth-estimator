@@ -31,6 +31,7 @@ function WorkspaceEvidenceLoaded({
 }) {
 	const workspace = useWorkspaceStore((state) => state.workspace);
 	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	const projection = useRemoteProjection();
 	const base =
 		projection.base instanceof Error || projection.base === null
@@ -40,13 +41,14 @@ function WorkspaceEvidenceLoaded({
 	return (
 		<Suspense fallback={<Skeleton width="100%" height={120} />}>
 			<EvidenceDialog
-			target={overlays.evidence}
-			plan={plan}
-			projection={base}
-			range={projection.range}
-			temporary={Boolean(workspace?.draft)}
-			onClose={overlays.closeEvidence}
-			onEdit={overlays.editFromEvidence}
+				target={overlays.evidence}
+				plan={plan}
+				projection={base}
+				range={projection.range}
+				temporary={Boolean(workspace?.draft)}
+				onClose={overlays.closeEvidence}
+				onEdit={overlays.editFromEvidence}
+				onApply={updatePlan}
 			/>
 		</Suspense>
 	);
