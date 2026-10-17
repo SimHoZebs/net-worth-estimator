@@ -1,6 +1,6 @@
 import { LockKeyhole } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
-import { dateLabel, money } from "../../domain/format.ts";
+import { money } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { type Account, type Plan, validatePlan } from "../../domain/model.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
@@ -149,15 +149,6 @@ export function AccountDetails({
 					<option value="property">Property</option>
 					<option value="debt">Debt</option>
 				</SelectField>
-				<div className="field">
-					<span id="account-observed-label">As of date</span>
-					<div
-						className="readonly-value"
-						aria-labelledby="account-observed-label"
-					>
-						{dateLabel(account.observedOn, true)}
-					</div>
-				</div>
 				<label className="checkbox-field">
 					<input
 						type="checkbox"
