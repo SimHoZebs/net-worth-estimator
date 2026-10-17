@@ -59,7 +59,6 @@ export interface RemoteWorkspaceState {
 	status: ServerStatus | null;
 	serverDocument: FinancialModelDocument | null;
 	serverRevision: string | null;
-	draftDocument: FinancialModelDocument | null;
 	recoveryDraft: Plan | null;
 	incomeData: IncomeDataSnapshot | null;
 	adapterReport: AdapterReport | null;
@@ -136,6 +135,32 @@ function conversionOrError(
 				"The display plan could not be converted to a server model.",
 			),
 		);
+	}
+}
+
+/**
+ * Derive the server document for a draft on demand instead of storing it.
+ * The conversion already runs on every edit (updatePlan loss-check) and save,
+ * so the stored copy duplicated that work per write while adding a third plan
+ * shape to keep in sync. Derivation runs at most once per draft, server
+ * document, or presentation reference change via useMemo at the call site.
+ * Mirrors the previously stored values: the converted document when the
+ * reverse conversion succeeds (even lossy, as hydrate stored it), null when
+ * the conversion throws.
+ */
+export function deriveDraftDocument(
+	draft: Plan | null,
+	sourceDocument: FinancialModelDocument | null,
+	presentation: PlanPresentation | null,
+): FinancialModelDocument | null {
+	if (!draft) return null;
+	try {
+		return displayPlanToBackendDocument(draft, {
+			sourceDocument,
+			presentation,
+		}).document;
+	} catch {
+		return null;
 	}
 }
 
@@ -223,6 +248,9 @@ interface WorkspaceEngine {
 	expectedRaw: string | null | undefined;
 	serverFingerprint: string | null;
 	volatileState: RemoteLocalState | null;
+	// Save/hydrate epoch only. Guards save/hydrate races; deterministic and
+	// stochastic queries cancel via their own AbortController/signal and
+	// TanStack query keys, never via this epoch.
 	workspaceEpoch: number;
 	pendingHydrate: boolean;
 	activeSaveToken: symbol | null;
@@ -256,7 +284,6 @@ interface WorkspaceData {
 	status: ServerStatus | null;
 	serverDocument: FinancialModelDocument | null;
 	serverRevision: string | null;
-	draftDocument: FinancialModelDocument | null;
 	recoveryDraft: Plan | null;
 	incomeData: IncomeDataSnapshot | null;
 	adapterReport: AdapterReport | null;
@@ -276,7 +303,6 @@ function initialData(): WorkspaceData {
 		status: null,
 		serverDocument: null,
 		serverRevision: null,
-		draftDocument: null,
 		recoveryDraft: null,
 		incomeData: null,
 		adapterReport: null,
@@ -582,10 +608,6 @@ export const useWorkspaceStore = create<
 		const convertedDraft = storedDraft
 			? conversionOrError(storedDraft, model, draftPresentation)
 			: null;
-		const convertedDraftDocument =
-			convertedDraft instanceof Error || convertedDraft === null
-				? null
-				: convertedDraft.document;
 		const nextWorkspace: RemoteWorkspace = {
 			version: 1,
 			saved: savedPlan,
@@ -600,7 +622,6 @@ export const useWorkspaceStore = create<
 			workspace: nextWorkspace,
 			status: statusResult,
 			serverDocument: model,
-			draftDocument: convertedDraftDocument,
 			adapterReport: conversion.report,
 			savedPresentation: conversion.presentation,
 			draftPresentation,
@@ -699,7 +720,6 @@ export const useWorkspaceStore = create<
 		const nextDraftPresentation = draft
 			? draftPresentationFor(conversionPresentation)
 			: null;
-		const document = conversion?.document ?? null;
 		const nextWorkspace = {
 			...current,
 			draft,
@@ -714,7 +734,6 @@ export const useWorkspaceStore = create<
 		set({
 			workspace: nextWorkspace,
 			draftPresentation: nextDraftPresentation,
-			draftDocument: document,
 		});
 		const nextLocal = localStateFor(nextWorkspace, nextDraftPresentation);
 		const persisted = get().writeLocalState(nextLocal, nextLocal);
@@ -892,7 +911,6 @@ export const useWorkspaceStore = create<
 			const retainedPresentation = persisted
 				? null
 				: fallbackLocal.draftPresentation;
-			const retainedDocument = persisted ? null : get().draftDocument;
 			const retainedWorkspace = persisted
 				? nextWorkspace
 				: {
@@ -912,7 +930,6 @@ export const useWorkspaceStore = create<
 				workspace: retainedWorkspace,
 				savedPresentation: authoritativeConversion.presentation,
 				draftPresentation: retainedPresentation,
-				draftDocument: retainedDocument,
 				serverDocument: authoritative.document,
 				serverRevision: authoritative.revision ?? null,
 				adapterReport: authoritativeConversion.report,
@@ -1078,7 +1095,6 @@ export const useWorkspaceStore = create<
 		set({
 			workspace: nextWorkspace,
 			draftPresentation: null,
-			draftDocument: null,
 			notice: "Unsaved changes discarded. Saved server plan restored.",
 			error: null,
 		});
@@ -1109,7 +1125,6 @@ export const useWorkspaceStore = create<
 		if (!persisted) return false;
 		set({
 			workspace: nextWorkspace,
-			draftDocument: null,
 			draftPresentation: null,
 			error: null,
 			notice: "Stale draft discarded. Loading the latest server model.",
@@ -1180,7 +1195,6 @@ export const useWorkspaceStore = create<
 		set({
 			workspace: nextWorkspace,
 			draftPresentation,
-			draftDocument: conversion.document,
 		});
 		const nextLocal = localStateFor(nextWorkspace, draftPresentation);
 		const persisted = get().writeLocalState(nextLocal, nextLocal);

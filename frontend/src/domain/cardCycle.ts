@@ -1,5 +1,5 @@
 import type { AccountTransaction } from "./accountActivity.ts";
-import { isoDate } from "./format.ts";
+import { clampMonth, daysBetweenInclusive, isoDate, utcDate } from "./format.ts";
 
 export interface StatementCycle {
 	cycleStart: string;
@@ -9,35 +9,12 @@ export interface StatementCycle {
 	daysLeft: number;
 }
 
-export interface CycleSpendGroup {
-	key: string;
-	name: string;
-	counterparty: string;
-	total: number;
-	count: number;
-}
-
-function utcDate(iso: string): Date {
-	return new Date(`${iso.slice(0, 10)}T12:00:00Z`);
-}
-
-function daysBetweenInclusive(startIso: string, endIso: string): number {
-	const start = utcDate(startIso).getTime();
-	const end = utcDate(endIso).getTime();
-	return Math.round((end - start) / 86_400_000) + 1;
-}
-
-function monthLength(year: number, monthIndex: number): number {
-	return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
-}
-
 function cycleDateFor(
 	year: number,
 	monthIndex: number,
 	statementDay: number,
 ): string {
-	const day = Math.min(statementDay, monthLength(year, monthIndex));
-	return isoDate(new Date(Date.UTC(year, monthIndex, day, 12, 0, 0)));
+	return clampMonth({ year, month: monthIndex, day: statementDay });
 }
 
 /**
@@ -115,72 +92,4 @@ export function cycleSpentSoFar({
 				transaction.date <= today,
 		)
 		.reduce((sum, transaction) => sum + transaction.amount, 0);
-}
-
-/** Scheduled but not yet incurred in (todayIso, cycleEnd]. */
-export function cycleScheduledRest({
-	transactions,
-	cycleEnd,
-	todayIso,
-}: {
-	transactions: AccountTransaction[];
-	cycleEnd: string;
-	todayIso: string;
-}): number {
-	const today = todayIso.slice(0, 10);
-	return transactions
-		.filter(
-			(transaction) =>
-				isCycleOutflow(transaction) &&
-				transaction.date > today &&
-				transaction.date <= cycleEnd,
-		)
-		.reduce((sum, transaction) => sum + transaction.amount, 0);
-}
-
-export function groupCycleSpending({
-	transactions,
-	cycleStart,
-	todayIso,
-}: {
-	transactions: AccountTransaction[];
-	cycleStart: string;
-	todayIso: string;
-}): CycleSpendGroup[] {
-	const today = todayIso.slice(0, 10);
-	const groups = new Map<string, CycleSpendGroup>();
-	for (const transaction of transactions) {
-		if (!isCycleOutflow(transaction)) continue;
-		if (transaction.date < cycleStart || transaction.date > today) continue;
-		const key = `${transaction.name}‖${transaction.counterparty}`;
-		const existing = groups.get(key);
-		if (existing) {
-			existing.total += transaction.amount;
-			existing.count += 1;
-		} else {
-			groups.set(key, {
-				key,
-				name: transaction.name,
-				counterparty: transaction.counterparty,
-				total: transaction.amount,
-				count: 1,
-			});
-		}
-	}
-	return [...groups.values()].sort(
-		(a, b) => b.total - a.total || a.key.localeCompare(b.key),
-	);
-}
-
-export function dailyAllowance({
-	budget,
-	spent,
-	daysLeft,
-}: {
-	budget: number;
-	spent: number;
-	daysLeft: number;
-}): number {
-	if (daysLeft <= 0) return budget - spent;
-	return (budget - spent) / daysLeft;
 }

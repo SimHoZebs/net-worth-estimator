@@ -15,6 +15,7 @@ export function SourcesPage() {
 	);
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
 	const onUpdatePlan = useWorkspaceStore((state) => state.updatePlan);
+	const incomeData = useWorkspaceStore((state) => state.incomeData);
 	if (!workspace || !plan) return null;
 	const readOnly = statusReadOnly || writeBlocked || workspace.saved.readOnly;
 	const sourceAccess = readOnly ? "Read-only" : "Writable";
@@ -25,7 +26,7 @@ export function SourcesPage() {
 				serverDocument={serverDocument}
 			/>
 			<RemoteAuthControl />
-			<IncomeEvidence plan={plan} />
+			<IncomeEvidence incomeData={incomeData} />
 			<AssumptionsPanel plan={plan} onUpdate={onUpdatePlan} />
 		</>
 	);

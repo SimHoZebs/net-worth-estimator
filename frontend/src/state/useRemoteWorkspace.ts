@@ -45,40 +45,70 @@ export function useRemoteWorkspace({
 		bootWorkspace();
 		return () => shutdownWorkspace();
 	}, [bindEngine, bootWorkspace, shutdownWorkspace, api, resolvedToken]);
-	const snapshot = useWorkspaceStore();
-	const workspace = snapshot.workspace;
+	// Narrow selectors: subscribe per field so a toast, notice, or volatile
+	// write does not re-render every consumer of the whole store. Add new
+	// fields as individual selectors, never by spreading the store.
+	const workspace = useWorkspaceStore((state) => state.workspace);
+	const status = useWorkspaceStore((state) => state.status);
+	const serverDocument = useWorkspaceStore((state) => state.serverDocument);
+	const serverRevision = useWorkspaceStore((state) => state.serverRevision);
+	const recoveryDraft = useWorkspaceStore((state) => state.recoveryDraft);
+	const incomeData = useWorkspaceStore((state) => state.incomeData);
+	const adapterReport = useWorkspaceStore((state) => state.adapterReport);
+	const savedPresentation = useWorkspaceStore(
+		(state) => state.savedPresentation,
+	);
+	const draftPresentation = useWorkspaceStore(
+		(state) => state.draftPresentation,
+	);
+	const loading = useWorkspaceStore((state) => state.loading);
+	const error = useWorkspaceStore((state) => state.error);
+	const notice = useWorkspaceStore((state) => state.notice);
+	const volatile = useWorkspaceStore((state) => state.volatile);
+	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
+	const authRequiredState = useWorkspaceStore(
+		(state) => state.authRequiredState,
+	);
+	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
+	const save = useWorkspaceStore((state) => state.save);
+	const discard = useWorkspaceStore((state) => state.discard);
+	const reloadDraft = useWorkspaceStore((state) => state.reloadDraft);
+	const replace = useWorkspaceStore((state) => state.replace);
+	const capture = useWorkspaceStore((state) => state.capture);
+	const importServerDocument = useWorkspaceStore(
+		(state) => state.importServerDocument,
+	);
+	const retry = useWorkspaceStore((state) => state.retry);
+	const dismissNotice = useWorkspaceStore((state) => state.dismissNotice);
 	return {
 		workspace,
 		plan: workspace?.draft ?? workspace?.saved ?? null,
-		status: snapshot.status,
-		serverDocument: snapshot.serverDocument,
-		serverRevision: snapshot.serverRevision,
-		draftDocument: snapshot.draftDocument,
-		recoveryDraft: snapshot.recoveryDraft,
-		incomeData: snapshot.incomeData,
-		adapterReport: snapshot.adapterReport,
-		savedPresentation: snapshot.savedPresentation,
-		draftPresentation: snapshot.draftPresentation,
-		loading: snapshot.loading,
-		error: snapshot.error,
-		notice: snapshot.notice,
-		volatile: snapshot.volatile,
+		status,
+		serverDocument,
+		serverRevision,
+		recoveryDraft,
+		incomeData,
+		adapterReport,
+		savedPresentation,
+		draftPresentation,
+		loading,
+		error,
+		notice,
+		volatile,
 		stale: Boolean(workspace?.draftStale),
 		draftStale: Boolean(workspace?.draftStale),
-		storageConflict: Boolean(
-			snapshot.error?.includes("changed in another tab") ?? false,
-		),
-		readOnly: Boolean(snapshot.status?.readOnly || snapshot.writeBlocked),
-		authRequired: snapshot.authRequiredState,
-		updatePlan: snapshot.updatePlan,
-		save: snapshot.save,
-		discard: snapshot.discard,
-		reloadDraft: snapshot.reloadDraft,
-		replace: snapshot.replace,
-		capture: snapshot.capture,
-		importServerDocument: snapshot.importServerDocument,
-		retry: snapshot.retry,
-		dismissNotice: snapshot.dismissNotice,
+		storageConflict: Boolean(error?.includes("changed in another tab") ?? false),
+		readOnly: Boolean(status?.readOnly || writeBlocked),
+		authRequired: authRequiredState,
+		updatePlan,
+		save,
+		discard,
+		reloadDraft,
+		replace,
+		capture,
+		importServerDocument,
+		retry,
+		dismissNotice,
 	};
 }
 

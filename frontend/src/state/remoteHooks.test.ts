@@ -39,7 +39,7 @@ import {
 	useRemoteProjection,
 } from "./useRemoteProjection.ts";
 import { useRemoteWorkspace } from "./useRemoteWorkspace.ts";
-import { resetWorkspaceStore } from "./workspaceStore.ts";
+import { deriveDraftDocument, resetWorkspaceStore } from "./workspaceStore.ts";
 
 interface Rendered<T> {
 	result: () => T;
@@ -1504,7 +1504,13 @@ describe("remote workspace state", () => {
 		expect(rendered.result().updatePlan(edited)).toBe(true);
 		await rendered.settle();
 		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
-		expect(rendered.result().draftDocument?.recurrenceRules[0]?.amount).toEqual(
+		expect(
+			deriveDraftDocument(
+				rendered.result().workspace?.draft ?? null,
+				rendered.result().serverDocument,
+				rendered.result().draftPresentation ?? rendered.result().savedPresentation,
+			)?.recurrenceRules[0]?.amount,
+		).toEqual(
 			{
 				resolver: "expression",
 				config: { expression: "125" },

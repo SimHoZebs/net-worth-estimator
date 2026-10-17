@@ -6,7 +6,6 @@ import {
 	checkingAccountId,
 	checkingShortfall,
 	cycleAllowance,
-	cycleBudget,
 	filterMovementsById,
 	groupMandatorySpending,
 	monthEndIso,
@@ -213,20 +212,15 @@ describe("cycleAllowance", () => {
 		).toBe(654);
 	});
 
-	it("matches budget minus spent", () => {
-		const budget = cycleBudget({
-			paycheck: 7579,
-			fixedObligations: 5000,
-			reserve: 725,
-		});
-		expect(budget - 1200).toBe(
+	it("matches allowance plus spent", () => {
+		expect(
 			cycleAllowance({
 				paycheck: 7579,
 				fixedObligations: 5000,
 				spent: 1200,
 				reserve: 725,
 			}),
-		);
+		).toBe(7579 - 5000 - 1200 - 725);
 	});
 });
 
