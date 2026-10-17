@@ -151,6 +151,10 @@ type accountBody struct {
 	MaxBalance *float64          `json:"maxBalance,omitempty"`
 	Color      *string           `json:"color,omitempty"`
 	Enabled    bool              `json:"enabled"`
+	// Source is accepted and ignored: accounts carry no ownership flag.
+	// Row ownership lives in checkpoints/postings ("model" | "simplefin")
+	// plus account_links, mirroring the retired whole-document PUT contract.
+	Source *string `json:"source,omitempty"`
 }
 
 func (b accountBody) toAccount(id string) types.Account {
