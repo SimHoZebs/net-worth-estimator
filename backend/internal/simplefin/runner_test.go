@@ -182,3 +182,158 @@ func TestTriggerRefusesConcurrentRun(t *testing.T) {
 		t.Fatalf("first trigger: %v", err)
 	}
 }
+
+func TestParsePositiveDuration(t *testing.T) {
+	if got, err := ParsePositiveDuration("", MinTriggerInterval); err != nil || got != MinTriggerInterval {
+		t.Fatalf("empty = %v, %v, want fallback", got, err)
+	}
+	if got, err := ParsePositiveDuration("90m", MinTriggerInterval); err != nil || got != 90*time.Minute {
+		t.Fatalf("90m = %v, %v, want 90m", got, err)
+	}
+	for _, value := range []string{"banana", "0", "-1h", "0s"} {
+		if _, err := ParsePositiveDuration(value, MinTriggerInterval); err == nil {
+			t.Fatalf("ParsePositiveDuration(%q) succeeded, want error", value)
+		}
+	}
+}
+
+func TestTriggerHonorsConfiguredInterval(t *testing.T) {
+	database := openRunnerStore(t)
+	calls := 0
+	runner := NewRunner(database, Config{
+		DryRun:             true,
+		MinTriggerInterval: time.Hour,
+	}, nil)
+	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
+		calls++
+		return &AccountSet{}, nil
+	}
+	if _, err := runner.Trigger(context.Background()); err != nil {
+		t.Fatalf("first trigger: %v", err)
+	}
+	start := time.Now()
+	runner.now = func() time.Time { return start }
+	// Re-stamp lastTrigger against the controlled clock so the interval math
+	// is deterministic.
+	runner.mu.Lock()
+	runner.lastTrigger = start
+	runner.mu.Unlock()
+	if _, err := runner.Trigger(context.Background()); err == nil {
+		t.Fatal("expected configured interval to refuse second trigger")
+	} else {
+		var tooSoon *TooSoonError
+		if !errors.As(err, &tooSoon) {
+			t.Fatalf("second trigger error = %T, want TooSoonError", err)
+		}
+		if tooSoon.RetryAfter <= 59*time.Minute || tooSoon.RetryAfter > time.Hour {
+			t.Fatalf("retry after = %v, want ~1h", tooSoon.RetryAfter)
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("fetch calls = %d, want 1", calls)
+	}
+}
+
+func TestTriggerBacksOffAfterBridgeRateLimit(t *testing.T) {
+	database := openRunnerStore(t)
+	calls := 0
+	runner := NewRunner(database, Config{
+		DryRun:             true,
+		MinTriggerInterval: time.Millisecond,
+		RateLimitCooldown:  200 * time.Millisecond,
+	}, nil)
+	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
+		calls++
+		if calls == 1 {
+			return nil, &RateLimitedError{Message: "too many requests"}
+		}
+		return &AccountSet{}, nil
+	}
+	if _, err := runner.Trigger(context.Background()); err == nil {
+		t.Fatal("expected rate-limited trigger to fail")
+	} else {
+		var tooSoon *TooSoonError
+		if !errors.As(err, &tooSoon) {
+			t.Fatalf("rate-limited error = %T, want TooSoonError", err)
+		}
+	}
+	if _, err := runner.Trigger(context.Background()); err == nil {
+		t.Fatal("expected blackout to refuse second trigger without a fetch")
+	} else if _, ok := err.(*TooSoonError); !ok {
+		// errors.As unwraps huma-style wrappers; direct type assert keeps
+		// this unit test independent of the API mapping.
+		var tooSoon *TooSoonError
+		if !errors.As(err, &tooSoon) {
+			t.Fatalf("blackout error = %T, want TooSoonError", err)
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("fetch calls = %d, want 1 during blackout", calls)
+	}
+	time.Sleep(250 * time.Millisecond)
+	if _, err := runner.Trigger(context.Background()); err != nil {
+		t.Fatalf("trigger after cooldown: %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("fetch calls = %d, want 2 after cooldown", calls)
+	}
+}
+
+func TestSyncSharesSingleflightWithTrigger(t *testing.T) {
+	database := openRunnerStore(t)
+	release := make(chan struct{})
+	entered := make(chan struct{})
+	runner := NewRunner(database, Config{DryRun: true}, nil)
+	runner.fetch = func(ctx context.Context, start, end time.Time) (*AccountSet, error) {
+		close(entered)
+		select {
+		case <-release:
+			return &AccountSet{}, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := runner.Trigger(context.Background())
+		firstDone <- err
+	}()
+	<-entered
+	if _, err := runner.Sync(context.Background()); err == nil {
+		t.Fatal("expected scheduler Sync during manual Trigger to be refused")
+	} else if _, ok := err.(*InProgressError); !ok {
+		t.Fatalf("concurrent Sync error = %T, want InProgressError", err)
+	}
+	close(release)
+	if err := <-firstDone; err != nil {
+		t.Fatalf("first trigger: %v", err)
+	}
+}
+
+func TestSyncHonorsRateLimitBlackout(t *testing.T) {
+	database := openRunnerStore(t)
+	calls := 0
+	runner := NewRunner(database, Config{
+		DryRun:             true,
+		MinTriggerInterval: time.Millisecond,
+		RateLimitCooldown:  time.Hour,
+	}, nil)
+	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
+		calls++
+		return nil, &RateLimitedError{Message: "too many requests"}
+	}
+	if _, err := runner.Trigger(context.Background()); err == nil {
+		t.Fatal("expected rate-limited trigger to fail")
+	}
+	if _, err := runner.Sync(context.Background()); err == nil {
+		t.Fatal("expected scheduler Sync during blackout to be refused")
+	} else {
+		var tooSoon *TooSoonError
+		if !errors.As(err, &tooSoon) {
+			t.Fatalf("blackout Sync error = %T, want TooSoonError", err)
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("fetch calls = %d, want 1", calls)
+	}
+}

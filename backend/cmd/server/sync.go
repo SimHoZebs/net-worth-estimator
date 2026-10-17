@@ -21,7 +21,28 @@ import (
 // env map. Mock and real sources are mutually exclusive: mock rows are
 // intentionally identical to real sync rows, so cutover is a documented
 // DB purge (backend/scripts/purge-simplefin-sync.sql), never a code branch.
+//
+// Throttling matches the Bridge daily-update quota (24 requests or fewer
+// per day, replenished throughout the day): successful manual triggers are
+// spaced by MIN_TRIGGER_INTERVAL (default 20h), concurrent scheduler and
+// trigger runs share one singleflight guard, and an upstream 429 arms a
+// RATE_LIMIT_COOLDOWN blackout (default 1h) so frontend bursts degrade to
+// local 429s with Retry-After instead of further Bridge hits.
 func configureSync(database store.Store) (*simplefin.Runner, func()) {
+	triggerInterval, err := simplefin.ParsePositiveDuration(
+		os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_MIN_TRIGGER_INTERVAL"),
+		simplefin.MinTriggerInterval,
+	)
+	if err != nil {
+		log.Fatalf("invalid simplefin trigger interval: %v", err)
+	}
+	rateLimitCooldown, err := simplefin.ParsePositiveDuration(
+		os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_RATE_LIMIT_COOLDOWN"),
+		simplefin.DefaultRateLimitCooldown,
+	)
+	if err != nil {
+		log.Fatalf("invalid simplefin rate-limit cooldown: %v", err)
+	}
 	mockMode := simplefin.ParseMockMode(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK"))
 	mockFile := strings.TrimSpace(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE"))
 	accessURL := os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL")
@@ -33,8 +54,10 @@ func configureSync(database store.Store) (*simplefin.Runner, func()) {
 	}
 	if mockMode {
 		config := simplefin.Config{
-			CardAccounts: simplefin.ParseCardAccounts(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS")),
-			DryRun:       simplefin.ParseDryRun(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN")),
+			CardAccounts:       simplefin.ParseCardAccounts(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS")),
+			DryRun:             simplefin.ParseDryRun(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN")),
+			MinTriggerInterval: triggerInterval,
+			RateLimitCooldown:  rateLimitCooldown,
 		}
 		var runner *simplefin.Runner
 		if mockFile != "" {
@@ -53,9 +76,11 @@ func configureSync(database store.Store) (*simplefin.Runner, func()) {
 		return nil, func() {}
 	}
 	config := simplefin.Config{
-		AccessURL:    accessURL,
-		CardAccounts: simplefin.ParseCardAccounts(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS")),
-		DryRun:       simplefin.ParseDryRun(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN")),
+		AccessURL:          accessURL,
+		CardAccounts:       simplefin.ParseCardAccounts(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS")),
+		DryRun:             simplefin.ParseDryRun(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN")),
+		MinTriggerInterval: triggerInterval,
+		RateLimitCooldown:  rateLimitCooldown,
 	}
 	runner := simplefin.NewRunner(database, config, &simplefin.Client{AccessURL: accessURL})
 	stop := startSyncScheduler(runner)

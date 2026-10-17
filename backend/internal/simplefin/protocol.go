@@ -40,9 +40,22 @@ type Account struct {
 	Transactions     []Transaction `json:"transactions"`
 }
 
-// AccountSet mirrors the top-level GET /accounts response.
+// AccountSet mirrors the top-level GET /accounts response. errlist holds
+// structured protocol errors and errors holds the deprecated string list;
+// both are inspected for Bridge rate-limit signals before accounts are
+// trusted.
 type AccountSet struct {
-	Accounts []Account `json:"accounts"`
+	ErrList  []ProtocolError `json:"errlist"`
+	Errors   []string        `json:"errors"`
+	Accounts []Account       `json:"accounts"`
+}
+
+// ProtocolError mirrors one entry of the SimpleFIN errlist array.
+type ProtocolError struct {
+	Code      string `json:"code"`
+	Msg       string `json:"msg"`
+	ConnID    string `json:"conn_id"`
+	AccountID string `json:"account_id"`
 }
 
 // IsPending reports whether the transaction has not yet posted.
@@ -74,6 +87,76 @@ func (t Transaction) ParseAmount() (float64, error) {
 		return 0, fmt.Errorf("transaction amount %q: %w", t.Amount, err)
 	}
 	return amount, nil
+}
+
+// RateLimitedError reports that the Bridge refused a fetch for quota
+// reasons: HTTP 429, or a 200/4xx body carrying a rate-limit message in
+// errors/errlist. Callers must back off instead of retrying immediately so
+// one frontend burst cannot cost the Access Token.
+type RateLimitedError struct {
+	RetryAfter time.Duration
+	Message    string
+}
+
+func (e *RateLimitedError) Error() string {
+	if e == nil {
+		return "simplefin rate limited"
+	}
+	if e.Message != "" {
+		return e.Message
+	}
+	return "simplefin bridge rate limited"
+}
+
+func isRateLimitMessage(value string) bool {
+	lowered := strings.ToLower(value)
+	return strings.Contains(lowered, "too many requests") ||
+		strings.Contains(lowered, "rate limit") ||
+		strings.Contains(lowered, "rate-limit")
+}
+
+// rateLimitMessage returns the first Bridge rate-limit message found in the
+// deprecated errors list or the structured errlist, or "" when absent.
+func (s *AccountSet) rateLimitMessage() string {
+	if s == nil {
+		return ""
+	}
+	for _, message := range s.Errors {
+		if isRateLimitMessage(message) {
+			return message
+		}
+	}
+	for _, entry := range s.ErrList {
+		if isRateLimitMessage(entry.Msg) || isRateLimitMessage(entry.Code) {
+			if entry.Msg != "" {
+				return entry.Msg
+			}
+			return entry.Code
+		}
+	}
+	return ""
+}
+
+// parseRetryAfter converts a Retry-After header to a wait duration: integer
+// seconds per RFC 7231, falling back to an HTTP date. Missing or invalid
+// headers yield 0 so callers apply their configured cooldown.
+func parseRetryAfter(header http.Header, now time.Time) time.Duration {
+	value := strings.TrimSpace(header.Get("Retry-After"))
+	if value == "" {
+		return 0
+	}
+	if seconds, err := strconv.Atoi(value); err == nil {
+		if seconds < 0 {
+			return 0
+		}
+		return time.Duration(seconds) * time.Second
+	}
+	if when, err := time.Parse(http.TimeFormat, value); err == nil {
+		if wait := when.Sub(now); wait > 0 {
+			return wait
+		}
+	}
+	return 0
 }
 
 // Client fetches SimpleFIN account sets. The access URL is a secret. Protocol
@@ -114,12 +197,30 @@ func (c *Client) Fetch(ctx context.Context, start, end time.Time) (*AccountSet, 
 	if err != nil {
 		return nil, fmt.Errorf("simplefin read from %s: %w", endpoint.Host, err)
 	}
+	if response.StatusCode == http.StatusTooManyRequests {
+		retryAfter := parseRetryAfter(response.Header, time.Now())
+		return nil, &RateLimitedError{
+			RetryAfter: retryAfter,
+			Message:    fmt.Sprintf("simplefin bridge rate limited (status 429 from %s)", endpoint.Host),
+		}
+	}
 	if response.StatusCode != http.StatusOK {
+		if isRateLimitMessage(string(body)) {
+			return nil, &RateLimitedError{
+				RetryAfter: parseRetryAfter(response.Header, time.Now()),
+				Message:    fmt.Sprintf("simplefin bridge rate limited (status %d from %s)", response.StatusCode, endpoint.Host),
+			}
+		}
 		return nil, fmt.Errorf("simplefin fetch from %s: status %d", endpoint.Host, response.StatusCode)
 	}
 	var set AccountSet
 	if err := json.Unmarshal(body, &set); err != nil {
 		return nil, fmt.Errorf("simplefin decode from %s: %w", endpoint.Host, err)
+	}
+	if message := set.rateLimitMessage(); message != "" {
+		return nil, &RateLimitedError{
+			Message: fmt.Sprintf("simplefin bridge rate limited from %s: %s", endpoint.Host, message),
+		}
 	}
 	return &set, nil
 }
