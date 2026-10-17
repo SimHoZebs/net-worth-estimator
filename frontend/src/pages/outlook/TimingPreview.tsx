@@ -1,5 +1,5 @@
 import { CalendarDays } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { accountTransactions } from "../../domain/accountActivity.ts";
 import {
 	DEFAULT_TRANSACTION_ORDER,
@@ -18,13 +18,12 @@ import {
 	sum,
 	todayIso,
 } from "../../domain/format.ts";
+import { Skeleton } from "../../components/ui.tsx";
 import {
 	cashCushion,
 	checkingAccountId,
 	checkingShortfall,
 	cycleAllowance,
-	DEFAULT_CYCLE_STATEMENT_DAY,
-	DEFAULT_PROTECTED_RESERVE,
 	filterMovementsById,
 	groupMandatorySpending,
 	nextMonthObligations,
@@ -41,122 +40,11 @@ import {
 	TimingDetailDialog,
 	type TimingDetailTab,
 } from "./TimingDetailDialog.tsx";
-
-const STORAGE_KEY = "nwe.card-cycle.v4";
-const LEGACY_STORAGE_KEYS = ["nwe.card-cycle.v3", "nwe.card-cycle.v2"];
+import { useTimingSettings } from "../../state/useTimingSettings.ts";
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
 const EMPTY_MOVEMENTS: Projection["movements"] = [];
-
-interface TotalCycleSettings {
-	statementDay: number;
-	reserve: number;
-	spentOverride: number | null;
-	paycheckOverride: number | null;
-	fixedOverride: number | null;
-	checkingOverride: number | null;
-	remainingOverride: number | null;
-	/** Null means every debt account counts toward the total. */
-	accountIds: string[] | null;
-	/** Null means the detected checking account alone counts as spendable. */
-	spendingAccountIds: string[] | null;
-	/** Null means every recurring outflow counts as a bill. */
-	movementIds: string[] | null;
-	/** Which window the drawer bills tab uses. Card figures stay calendar. */
-	mandatoryFrame: "calendar" | "cycle";
-	/** True once the statement day is explicitly chosen. Untouched legacy 1st falls back to the household 20th. */
-	statementDaySet: boolean;
-}
-
-const defaultSettings = (): TotalCycleSettings => ({
-	statementDay: DEFAULT_CYCLE_STATEMENT_DAY,
-	reserve: DEFAULT_PROTECTED_RESERVE,
-	spentOverride: null,
-	paycheckOverride: null,
-	fixedOverride: null,
-	checkingOverride: null,
-	remainingOverride: null,
-	accountIds: null,
-	spendingAccountIds: null,
-	movementIds: null,
-	mandatoryFrame: "calendar",
-	statementDaySet: false,
-});
-
-function optionalMoney(value: unknown): number | null {
-	if (value === null || value === undefined || value === "") return null;
-	const parsed = Number(value);
-	if (!Number.isFinite(parsed) || parsed < 0) return null;
-	return parsed;
-}
-
-function loadPersisted(): TotalCycleSettings {
-	if (typeof window === "undefined" || !window.localStorage)
-		return defaultSettings();
-	try {
-		const raw =
-			window.localStorage.getItem(STORAGE_KEY) ??
-			LEGACY_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find(
-				(value) => value !== null && value !== undefined,
-			) ??
-			null;
-		if (!raw) return defaultSettings();
-		const parsed = JSON.parse(raw) as Partial<TotalCycleSettings> & {
-			budget?: unknown;
-		};
-		if (typeof parsed !== "object" || parsed === null) return defaultSettings();
-		const accountIds = Array.isArray(parsed.accountIds)
-			? parsed.accountIds.filter(
-					(id): id is string => typeof id === "string" && id !== "",
-				)
-			: null;
-		const movementIds = Array.isArray(parsed.movementIds)
-			? parsed.movementIds.filter(
-					(id): id is string => typeof id === "string" && id !== "",
-				)
-			: null;
-		const spendingAccountIds = Array.isArray(parsed.spendingAccountIds)
-			? parsed.spendingAccountIds.filter(
-					(id): id is string => typeof id === "string" && id !== "",
-				)
-			: null;
-		const statementDaySet = parsed.statementDaySet === true;
-		const storedDay = Math.min(
-			28,
-			Math.max(
-				1,
-				Math.floor(Number(parsed.statementDay) || DEFAULT_CYCLE_STATEMENT_DAY),
-			),
-		);
-		return {
-			statementDay:
-				!statementDaySet && storedDay === 1
-					? DEFAULT_CYCLE_STATEMENT_DAY
-					: storedDay,
-			statementDaySet,
-			reserve: Math.max(
-				0,
-				Number.isFinite(Number(parsed.reserve))
-					? Number(parsed.reserve)
-					: DEFAULT_PROTECTED_RESERVE,
-			),
-			spentOverride: optionalMoney(parsed.spentOverride),
-			paycheckOverride: optionalMoney(parsed.paycheckOverride),
-			fixedOverride: optionalMoney(parsed.fixedOverride),
-			checkingOverride: optionalMoney(parsed.checkingOverride),
-			remainingOverride: optionalMoney(parsed.remainingOverride),
-			accountIds: accountIds?.length ? accountIds : null,
-			spendingAccountIds: spendingAccountIds?.length
-				? spendingAccountIds
-				: null,
-			movementIds: movementIds?.length ? movementIds : null,
-			mandatoryFrame: parsed.mandatoryFrame === "cycle" ? "cycle" : "calendar",
-		};
-	} catch {
-		return defaultSettings();
-	}
-}
 
 export function TimingPreview({
 	plan,
@@ -177,7 +65,8 @@ export function TimingPreview({
 			),
 		[plan.accounts],
 	);
-	const [settings, setSettings] = useState<TotalCycleSettings>(loadPersisted);
+	const settingsState = useTimingSettings();
+	const { updateSettings, resetConfig, ...settings } = settingsState;
 	const [detail, setDetail] = useState<TimingDetailTab | null>(null);
 	const [transactionOrder, setTransactionOrder] = useState<TransactionOrder>(
 		DEFAULT_TRANSACTION_ORDER,
@@ -192,15 +81,6 @@ export function TimingPreview({
 		return today >= start ? today : start;
 	});
 	const staleData = displayToday > plan.startDate.slice(0, 10);
-
-	useEffect(() => {
-		if (typeof window === "undefined" || !window.localStorage) return;
-		try {
-			window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-		} catch {
-			// Storage is best-effort; the tracker still works for this session.
-		}
-	}, [settings]);
 
 	const trackedIds = useMemo(() => {
 		const known = new Set(cards.map((card) => card.id));
@@ -488,51 +368,6 @@ export function TimingPreview({
 		reserveAmount: settings.reserve,
 	};
 
-	const updateSettings = (next: Partial<TotalCycleSettings>) => {
-		setSettings((previous) => ({
-			statementDay: next.statementDay ?? previous.statementDay,
-			statementDaySet: next.statementDaySet ?? previous.statementDaySet,
-			reserve: next.reserve ?? previous.reserve,
-			spentOverride:
-				next.spentOverride !== undefined
-					? next.spentOverride
-					: previous.spentOverride,
-			paycheckOverride:
-				next.paycheckOverride !== undefined
-					? next.paycheckOverride
-					: previous.paycheckOverride,
-			fixedOverride:
-				next.fixedOverride !== undefined
-					? next.fixedOverride
-					: previous.fixedOverride,
-			checkingOverride:
-				next.checkingOverride !== undefined
-					? next.checkingOverride
-					: previous.checkingOverride,
-			remainingOverride:
-				next.remainingOverride !== undefined
-					? next.remainingOverride
-					: previous.remainingOverride,
-			accountIds:
-				next.accountIds !== undefined ? next.accountIds : previous.accountIds,
-			spendingAccountIds:
-				next.spendingAccountIds !== undefined
-					? next.spendingAccountIds
-					: previous.spendingAccountIds,
-			movementIds:
-				next.movementIds !== undefined
-					? next.movementIds
-					: previous.movementIds,
-			mandatoryFrame: next.mandatoryFrame ?? previous.mandatoryFrame,
-		}));
-	};
-
-	const resetConfig = (
-		key: "paycheck" | "fixed" | "spent" | "checking" | "remaining",
-	) => {
-		updateSettings({ [`${key}Override`]: null } as Partial<TotalCycleSettings>);
-	};
-
 	const toggleAccount = (accountId: string) => {
 		const cardLike = cards
 			.map((card) => card.id)
@@ -625,11 +460,7 @@ export function TimingPreview({
 					{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
 				</p>
 				<div aria-busy="true">
-					<span
-						className="skeleton"
-						style={{ width: "100%", height: 120 }}
-						aria-hidden="true"
-					/>
+					<Skeleton width={"100%"} height={120} />
 				</div>
 			</section>
 		);
