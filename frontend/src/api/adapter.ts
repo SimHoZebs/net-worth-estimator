@@ -1,4 +1,5 @@
 import { todayIso } from "../domain/format.ts";
+import { finite, isRecord } from "../domain/guards.ts";
 import type { Account, Movement, Plan } from "../domain/model.ts";
 import {
 	type BackendAccount,
@@ -148,16 +149,8 @@ function provisional(target: AdapterReport, field: string): void {
 		target.provisionalFields.push(field);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function finite(value: unknown): number | null {
-	return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
 function objectValue(value: JsonValue | undefined): JsonObject | null {
-	return isRecord(value) ? (value as JsonObject) : null;
+	return isRecord(value) ? (value as unknown as JsonObject) : null;
 }
 
 function sameNumber(left: number, right: number): boolean {
@@ -218,6 +211,11 @@ function boundValue(
 	return Number.isFinite(value) ? value : null;
 }
 
+const sentinelMap = {
+	floor: NO_FLOOR_SENTINEL,
+	ceiling: NO_CEILING_SENTINEL,
+} as const;
+
 function checkpointDate(
 	checkpoint: BackendCheckpoint | null,
 	fallback: IsoDate,
@@ -273,15 +271,19 @@ function postingAmountValue(
 function displayFrequency(
 	frequency: RecurrenceFrequency,
 ): Movement["frequency"] {
-	if (frequency === "annual") return "yearly";
-	if (frequency === "monthly") return frequency;
-	return "monthly";
+	return frequency === "annual" ? "yearly" : "monthly";
 }
+
+const frequencyMap = {
+	yearly: "annual",
+	monthly: "monthly",
+	once: "monthly",
+} as const;
 
 function backendFrequency(
 	frequency: Movement["frequency"],
 ): RecurrenceFrequency {
-	return frequency === "yearly" ? "annual" : "monthly";
+	return frequencyMap[frequency] ?? "monthly";
 }
 
 function targetFromEvaluation(config: JsonValue | undefined): number {
@@ -316,8 +318,8 @@ function accountDisplay(
 	syncCheckpoint: boolean,
 	archived: boolean,
 ): Account {
-	const minBalance = boundValue(account.minBalance, NO_FLOOR_SENTINEL);
-	const maxBalance = boundValue(account.maxBalance, NO_CEILING_SENTINEL);
+	const minBalance = boundValue(account.minBalance, sentinelMap.floor);
+	const maxBalance = boundValue(account.maxBalance, sentinelMap.ceiling);
 	return {
 		id: account.id,
 		name: account.name || account.id,
@@ -341,13 +343,23 @@ function accountDisplay(
 	};
 }
 
+/**
+ * Single destination policy: forward collapses to first, reverse preserves
+ * the stored list when the display destination is unchanged. Both directions
+ * share firstDestinationOf so a multi-destination change touches one place.
+ */
+function firstDestinationOf(
+	destinations: string[] | null | undefined,
+): string | null {
+	return destinations?.[0] ?? null;
+}
+
 function movementDisplayFromRule(
 	rule: BackendRecurrenceRule,
 	amount: number | null,
 	previous?: MovementPresentation,
 ): Movement {
-	const destinations = rule.destinations ?? [];
-	const firstDestination = destinations[0] ?? null;
+	const firstDestination = firstDestinationOf(rule.destinations);
 	return {
 		id: rule.id,
 		name: rule.name || rule.id,
@@ -372,8 +384,7 @@ function movementDisplayFromPosting(
 	amount: number | null,
 	previous?: MovementPresentation,
 ): Movement {
-	const destinations = posting.destinations ?? [];
-	const firstDestination = destinations[0] ?? null;
+	const firstDestination = firstDestinationOf(posting.destinations);
 	return {
 		id: posting.id,
 		name: posting.name || posting.id,

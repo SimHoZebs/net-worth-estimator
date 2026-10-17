@@ -1,4 +1,4 @@
-import { isoDate } from "./format.ts";
+import { clampMonth } from "./format.ts";
 import type { Evaluation } from "./model.ts";
 
 export interface Point {
@@ -89,8 +89,7 @@ function monthDate({
 	month: number;
 	day: number;
 }) {
-	const maxDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-	return isoDate(new Date(Date.UTC(year, month, Math.min(day, maxDay))));
+	return clampMonth({ year, month, day });
 }
 
 // The horizon end date, clamped to month end. The backend resolves its own end
@@ -108,23 +107,6 @@ export function horizonDate({
 		month: value.getUTCMonth(),
 		day: value.getUTCDate(),
 	});
-}
-
-// Linear-interpolation percentile over an unsorted sample.
-export function quantile({
-	values,
-	fraction,
-}: {
-	values: number[];
-	fraction: number;
-}) {
-	if (!values.length) return 0;
-	const sorted = [...values].sort((left, right) => left - right);
-	const position = (sorted.length - 1) * fraction;
-	const lower = Math.floor(position);
-	const upper = Math.ceil(position);
-	const weight = position - lower;
-	return sorted[lower]! * (1 - weight) + sorted[upper]! * weight;
 }
 
 // The engine owns this value. The previous plan-balance fallback existed only

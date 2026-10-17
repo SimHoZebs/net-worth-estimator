@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { type Movement, visibleAccounts } from "../../domain/model.ts";
+import { parseUnion } from "../../domain/guards.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { InputField, SelectField } from "../Field.tsx";
 import { AccountOptions } from "./AccountOptions.tsx";
@@ -43,7 +44,12 @@ export function MovementEditor({
 					amountKnown: true,
 					fromId: textValue(data, "fromId") || null,
 					toId: textValue(data, "toId") || null,
-					frequency: textValue(data, "frequency") as Movement["frequency"],
+					frequency:
+						parseUnion(textValue(data, "frequency"), [
+							"monthly",
+							"yearly",
+							"once",
+						] as const) ?? "monthly",
 					startDate: textValue(data, "startDate"),
 					endDate:
 						textValue(data, "noEndDate") === "on"
@@ -84,9 +90,14 @@ export function MovementEditor({
 				label="Frequency"
 				name="frequency"
 				defaultValue={item?.frequency ?? "monthly"}
-				onChange={(event) =>
-					setFrequency(event.target.value as Movement["frequency"])
-				}
+				onChange={(event) => {
+					const next = parseUnion(event.target.value, [
+						"monthly",
+						"yearly",
+						"once",
+					] as const);
+					if (next) setFrequency(next);
+				}}
 			>
 				<option value="monthly">Monthly</option>
 				<option value="yearly">Yearly</option>

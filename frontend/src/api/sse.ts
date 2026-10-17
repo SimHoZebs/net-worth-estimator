@@ -1,3 +1,4 @@
+import { isRecord } from "../domain/guards.ts";
 import type {
 	ErrorSSEData,
 	PartialSSEData,
@@ -46,10 +47,6 @@ type StreamSource =
 	| ReadableStream<Uint8Array>
 	| AsyncIterable<Uint8Array | string>;
 export type SSEInput = Response | StreamSource | string;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function eventPayload<T>(value: unknown): T {
 	return value as T;
