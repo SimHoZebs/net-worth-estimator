@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
 import { TransactionRow } from "../../components/activity/TransactionRow.tsx";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
@@ -281,7 +281,8 @@ export function TimingDetailDialog({
 	onToggleSpendingAccount,
 	onUpdateConfig,
 	onResetConfig,
-	initialTab,
+	tab,
+	onTabChange,
 	transactionOrder,
 	onTransactionOrderChange,
 	onClose,
@@ -324,12 +325,12 @@ export function TimingDetailDialog({
 	onResetConfig: (
 		key: "paycheck" | "fixed" | "spent" | "checking" | "remaining",
 	) => void;
-	initialTab: TimingDetailTab;
+	tab: TimingDetailTab;
+	onTabChange: (tab: TimingDetailTab) => void;
 	transactionOrder: TransactionOrder;
 	onTransactionOrderChange: (order: TransactionOrder) => void;
 	onClose: () => void;
 }) {
-	const [tab, setTab] = useState<TimingDetailTab>(initialTab);
 	const movements = useMemo(
 		() => new Map(plan.movements.map((movement) => [movement.id, movement])),
 		[plan.movements],
@@ -356,7 +357,7 @@ export function TimingDetailDialog({
 					{ id: "configure", label: "Configure" },
 				]}
 				value={tab}
-				onChange={setTab}
+				onChange={onTabChange}
 				label="Timing detail view"
 				className="account-view-tabs"
 			>

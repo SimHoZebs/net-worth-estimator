@@ -3,6 +3,7 @@ import type { EditorTarget } from "../components/PlanEditor.tsx";
 import { ComparePage } from "../pages/ComparePage.tsx";
 import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
+import type { TimingDetailTab } from "../pages/outlook/TimingDetailDialog.tsx";
 import { PlanPage } from "../pages/PlanPage.tsx";
 import { SourcesPage } from "../pages/SourcesPage.tsx";
 import type { Page } from "./navigation.ts";
@@ -16,12 +17,18 @@ export function WorkspacePage({
 	onEvidence,
 	onDiscard,
 	onNavigate,
+	timingDetail,
+	onTimingDetail,
+	onTimingTab,
 }: {
 	page: Page;
 	onEdit: (target: EditorTarget) => void;
 	onEvidence: (target: EvidenceTarget) => void;
 	onDiscard: () => void;
 	onNavigate: (page: Page) => void;
+	timingDetail: TimingDetailTab | null;
+	onTimingDetail: (tab: TimingDetailTab | null) => void;
+	onTimingTab: (tab: TimingDetailTab) => void;
 }) {
 	switch (page) {
 		case "outlook":
@@ -33,6 +40,9 @@ export function WorkspacePage({
 					onEvaluations={() => onNavigate("evaluations")}
 					onEvaluation={(id) => onEvidence({ kind: "evaluation", id })}
 					onEdit={onEdit}
+					timingDetail={timingDetail}
+					onTimingDetail={onTimingDetail}
+					onTimingTab={onTimingTab}
 				/>
 			);
 		case "accounts":

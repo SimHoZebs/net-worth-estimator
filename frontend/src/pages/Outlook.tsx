@@ -9,6 +9,7 @@ import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { EvaluationPreview } from "./outlook/EvaluationPreview.tsx";
 import { FundingInsight } from "./outlook/FundingInsight.tsx";
 import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
+import type { TimingDetailTab } from "./outlook/TimingDetailDialog.tsx";
 import { TimingPreview } from "./outlook/TimingPreview.tsx";
 import "./outlook/outlook.css";
 
@@ -19,6 +20,9 @@ export function Outlook({
 	onEvaluations,
 	onEvaluation,
 	onEdit,
+	timingDetail,
+	onTimingDetail,
+	onTimingTab,
 }: {
 	onEvidence: () => void;
 	onFailure: () => void;
@@ -26,6 +30,9 @@ export function Outlook({
 	onEvaluations: () => void;
 	onEvaluation: (id: string) => void;
 	onEdit: (target: EditorTarget) => void;
+	timingDetail: TimingDetailTab | null;
+	onTimingDetail: (tab: TimingDetailTab | null) => void;
+	onTimingTab: (tab: TimingDetailTab) => void;
 }) {
 	// Every data input subscribes where the query is declared; only UI
 	// callbacks arrive as props.
@@ -84,6 +91,9 @@ export function Outlook({
 				onEvaluations={onEvaluations}
 				onEvaluation={onEvaluation}
 				onEdit={onEdit}
+				timingDetail={timingDetail}
+				onTimingDetail={onTimingDetail}
+				onTimingTab={onTimingTab}
 			/>
 		</>
 	);
@@ -93,6 +103,9 @@ function OutlookContent({
 	plan,
 	projection,
 	pending,
+	timingDetail,
+	onTimingDetail,
+	onTimingTab,
 	range,
 	ranges,
 	setRanges,
@@ -110,6 +123,9 @@ function OutlookContent({
 	plan: Plan;
 	projection: Projection | null;
 	pending: boolean;
+	timingDetail: TimingDetailTab | null;
+	onTimingDetail: (tab: TimingDetailTab | null) => void;
+	onTimingTab: (tab: TimingDetailTab) => void;
 	range: RangeResult | null;
 	ranges: boolean;
 	setRanges: (value: boolean) => void;
@@ -181,6 +197,9 @@ function OutlookContent({
 					projection={projection}
 					onEdit={onEdit}
 					pending={pending}
+					detail={timingDetail}
+					onDetail={onTimingDetail}
+					onTabChange={onTimingTab}
 				/>
 			</div>
 		</>
