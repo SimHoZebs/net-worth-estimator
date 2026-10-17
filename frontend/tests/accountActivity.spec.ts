@@ -237,13 +237,40 @@ test("growth-only accounts have an honest empty state and retain account details
 	await expect(
 		dialog.getByRole("tab", { name: "Account details" }),
 	).toBeFocused();
-	await expect(dialog).toContainText("No maxBalance");
-	await expect(dialog).toContainText("$340,000");
-	await dialog
-		.getByRole("button", { name: "Edit account", exact: true })
-		.click();
-	await page.getByRole("button", { name: "Cancel", exact: true }).click();
-	await expect(page.getByRole("dialog", { name: "Home value" })).toBeVisible();
+	await dialog.getByRole("tab", { name: "Account details" }).click();
+	// Details edit inline: no second modal, source is display-only, and
+	// the protected/ceiling pair shares one range visual.
+	await expect(dialog.getByLabel("Account name")).toHaveValue("Home value");
+	await expect(dialog.getByText("Source")).toBeVisible();
+	await expect(dialog.getByRole("textbox", { name: "Source" })).toHaveCount(0);
+	await expect(dialog.getByLabel("Protected balance in USD")).toHaveValue("0");
+	await expect(dialog.getByLabel("Maximum balance in USD")).toBeDisabled();
+	await expect(
+		dialog.getByRole("checkbox", { name: "No ceiling" }),
+	).toBeChecked();
+	await expect(dialog.locator(".balance-range-track")).toBeVisible();
+	await expect(
+		dialog.getByRole("button", { name: "Apply unsaved changes" }),
+	).toBeDisabled();
+	await expect(
+		dialog.getByRole("button", { name: "Edit account", exact: true }),
+	).toHaveCount(0);
+	// Editing applies to the draft without opening another dialog.
+	await dialog.getByLabel("Protected balance in USD").fill("5000");
+	await expect(
+		dialog.getByRole("button", { name: "Apply unsaved changes" }),
+	).toBeEnabled();
+	await dialog.getByRole("button", { name: "Apply unsaved changes" }).click();
+	await expect(dialog).toContainText("Account activity · Changes");
+	await expect(dialog.getByLabel("Protected balance in USD")).toHaveValue(
+		"5000",
+	);
+	// The inline edit changed the draft only; the saved plan is untouched.
+	const draft = await readTemporaryVersion(page);
+	const home = (
+		draft as { accounts: { id: string; minBalance: number }[] }
+	).accounts.find((account) => account.id === "home");
+	expect(home?.minBalance).toBe(5000);
 });
 
 test("account transactions and editor evidence are accessible on desktop and mobile", async ({
