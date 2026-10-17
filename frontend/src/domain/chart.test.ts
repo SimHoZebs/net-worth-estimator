@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { projectionFixture } from "../test/projection.ts";
-import { projectionChartModel, projectionCsv } from "./chart.ts";
+import {
+	nearestPointIndex,
+	projectionChartModel,
+	projectionCsv,
+} from "./chart.ts";
 
 const projection = projectionFixture();
 const options = {
@@ -88,4 +92,30 @@ describe("chart presentation data", () => {
 			}
 		},
 	);
+	describe("nearestPointIndex", () => {
+		const points = [
+			{ date: "2026-01-01" },
+			{ date: "2026-07-01" },
+			{ date: "2027-01-01" },
+		];
+		it("returns the exact match when today is a plotted date", () => {
+			expect(nearestPointIndex(points, "2026-07-01")).toBe(1);
+		});
+		it("returns the nearest point when today falls between dates", () => {
+			expect(nearestPointIndex(points, "2026-08-15")).toBe(1);
+			expect(nearestPointIndex(points, "2026-11-15")).toBe(2);
+		});
+		it("prefers the earlier point on a tie", () => {
+			const even = [{ date: "2026-01-01" }, { date: "2026-01-03" }];
+			expect(nearestPointIndex(even, "2026-01-02")).toBe(0);
+		});
+		it("clamps today outside the projection to the nearest end", () => {
+			expect(nearestPointIndex(points, "2020-05-05")).toBe(0);
+			expect(nearestPointIndex(points, "2035-05-05")).toBe(2);
+		});
+		it("handles a single point and an empty list", () => {
+			expect(nearestPointIndex([{ date: "2026-01-01" }], "2030-01-01")).toBe(0);
+			expect(nearestPointIndex([], "2026-01-01")).toBe(0);
+		});
+	});
 });
