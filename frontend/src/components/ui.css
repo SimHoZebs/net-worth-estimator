@@ -547,7 +547,7 @@
 	.field-wide {
 		grid-column: 1 / -1;
 	}
-	.field input,
+	.field input:not([type="checkbox"]):not([type="radio"]),
 	.field select {
 		width: 100%;
 		border: 1px solid var(--field-border);
@@ -565,6 +565,18 @@
 	.field select:focus {
 		outline: 2px solid var(--track-fill);
 		outline-offset: 2px;
+	}
+	input[type="checkbox"] {
+		width: 18px;
+		height: 18px;
+		flex: none;
+		margin: 0;
+		accent-color: var(--track-fill);
+		cursor: pointer;
+	}
+	input[type="checkbox"]:disabled {
+		cursor: not-allowed;
+		opacity: 0.6;
 	}
 	.field small,
 	.field-hint {

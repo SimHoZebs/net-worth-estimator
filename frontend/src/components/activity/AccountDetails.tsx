@@ -1,6 +1,6 @@
 import { LockKeyhole } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
-import { dateLabel, money } from "../../domain/format.ts";
+import { money } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { type Account, type Plan, validatePlan } from "../../domain/model.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
@@ -119,6 +119,7 @@ export function AccountDetails({
 				</div>
 			)}
 			<fieldset disabled={readOnly} className="form-grid">
+				<h3 className="details-heading">Account</h3>
 				<InputField
 					label="Account name"
 					wide
@@ -163,6 +164,7 @@ export function AccountDetails({
 					/>
 					Include in net worth and projections
 				</label>
+				<h3 className="details-heading">Balance & limits</h3>
 				<InputField
 					label="Balance (USD)"
 					type="number"
@@ -187,6 +189,20 @@ export function AccountDetails({
 								width: `${Math.max(0, rangeEnd - rangeStart)}%`,
 							}}
 						/>
+						<div
+							className="balance-range-thumb"
+							aria-hidden="true"
+							style={{ left: `${rangeStart}%` }}
+							title={`Protected ${money(numbers.minValue)}`}
+						/>
+						{numbers.maxValue !== null && (
+							<div
+								className="balance-range-thumb"
+								aria-hidden="true"
+								style={{ left: `${rangeEnd}%` }}
+								title={`Ceiling ${money(numbers.maxValue)}`}
+							/>
+						)}
 						<div
 							className="balance-range-marker"
 							style={{ left: `${toPercent(numbers.balanceValue)}%` }}
@@ -235,7 +251,7 @@ export function AccountDetails({
 						</label>
 					</div>
 				</fieldset>
-				<div className="field field-wide">
+				<div className="field field-wide account-source-row">
 					<span id="account-source-label">Source</span>
 					<div aria-labelledby="account-source-label">
 						<Badge tone="outline">{account.source}</Badge>
@@ -247,20 +263,6 @@ export function AccountDetails({
 				<div>
 					<dt>Base case at horizon</dt>
 					<dd>{money(endingBalance)}</dd>
-				</div>
-				<div>
-					<dt>Balance date</dt>
-					<dd>{dateLabel(account.observedOn, true)}</dd>
-				</div>
-				<div>
-					<dt>Record access</dt>
-					<dd>
-						{!account.enabled
-							? "Excluded from net worth and projections"
-							: account.readOnly
-								? "Read-only source record"
-								: "Editable in unsaved changes"}
-					</dd>
 				</div>
 			</dl>
 			{!readOnly && (
