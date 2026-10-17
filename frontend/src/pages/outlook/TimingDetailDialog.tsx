@@ -116,14 +116,14 @@ function PaycheckBar({ parts }: { parts: PaycheckDecomposition }) {
 			pattern: "dots",
 			tone: "pale",
 		},
-		{ label: "Spent", amount: parts.spent, pattern: "solid", tone: "dark" },
+		{ label: "Spent", amount: parts.spent, pattern: "solid", tone: "amber" },
 		...(parts.allowance >= 0
 			? [
 					{
 						label: "Left",
 						amount: parts.allowance,
 						pattern: "solid",
-						tone: "amber",
+						tone: "dark",
 					} as BarSegment,
 				]
 			: []),
