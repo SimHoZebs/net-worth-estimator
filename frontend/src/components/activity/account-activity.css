@@ -53,6 +53,17 @@
 		margin-top: 17px;
 		margin-bottom: 17px;
 	}
+	.account-activity-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	.account-activity-panel .detail-list {
+		margin: 0;
+	}
+	.account-activity-panel .modal-actions {
+		margin-top: 0;
+	}
 	.account-view-tabs button > span {
 		color: var(--accent-green-text);
 	}
@@ -80,7 +91,7 @@
 		display: grid;
 		grid-template-columns: 1.2fr 1fr 1fr;
 		gap: 12px;
-		margin-top: 12px;
+		margin: 0;
 	}
 	.account-activity-filters label {
 		display: flex;
