@@ -34,4 +34,63 @@
 		background: var(--accent-green-bg);
 		color: var(--accent-green-text);
 	}
+	.account-entries {
+		list-style: none;
+		padding: 0;
+		margin: 14px 0 8px;
+		display: grid;
+		gap: 4px;
+	}
+	.account-entry {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		min-width: 0;
+	}
+	.account-entry > .account-icon {
+		width: 30px;
+		height: 31px;
+		border-radius: 7px;
+	}
+	.account-entry-external {
+		display: grid;
+		place-items: center;
+		width: 30px;
+		height: 30px;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+	.account-entry-in {
+		background: var(--accent-green-bg);
+		color: var(--accent-green-text);
+	}
+	.account-entry-out {
+		background: var(--accent-amber-bg);
+		color: var(--accent-amber-text);
+	}
+	.account-entry-name {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		flex: 1;
+		min-width: 0;
+	}
+	.account-entry-name strong {
+		font-size: 12px;
+		font-weight: 650;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.account-entry-name small {
+		font-size: 9px;
+		color: var(--muted);
+	}
+	.account-entry-value {
+		font-size: 14px;
+		font-weight: 650;
+		letter-spacing: -0.3px;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
 }
