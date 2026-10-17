@@ -49,6 +49,7 @@ export function EvidenceDialog({
 			return (
 				<FailureEvidence
 					plan={plan}
+					projection={projection}
 					failure={projection.firstFailure}
 					onClose={onClose}
 					onEdit={edit}

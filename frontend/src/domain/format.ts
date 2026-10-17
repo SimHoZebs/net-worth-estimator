@@ -24,6 +24,12 @@ export const dateLabel = (value: string, full = false) =>
 		year: "numeric",
 		timeZone: "UTC",
 	}).format(new Date(`${value.slice(0, 10)}T12:00:00Z`));
+export const monthDay = (value: string) =>
+	new Intl.DateTimeFormat("en-US", {
+		month: "short",
+		day: "numeric",
+		timeZone: "UTC",
+	}).format(utcDate(value));
 export const percent = (value: number) => `${Math.round(value * 100)}%`;
 export const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
 export const isoDate = (value: Date) => value.toISOString().slice(0, 10);
@@ -41,7 +47,9 @@ export function utcDate(iso: string): Date {
 }
 
 export function isIsoDate(value: string): boolean {
-	return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(utcDate(value).getTime());
+	return (
+		/^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(utcDate(value).getTime())
+	);
 }
 
 export function daysBetweenInclusive(startIso: string, endIso: string): number {
@@ -60,5 +68,7 @@ export function clampMonth({
 	day: number;
 }): string {
 	const maxDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-	return isoDate(new Date(Date.UTC(year, month, Math.min(day, maxDay), 12, 0, 0)));
+	return isoDate(
+		new Date(Date.UTC(year, month, Math.min(day, maxDay), 12, 0, 0)),
+	);
 }
