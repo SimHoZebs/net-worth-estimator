@@ -26,6 +26,7 @@ import {
 	cycleAllowance,
 	filterMovementsById,
 	groupMandatorySpending,
+	mandatoryTransactions,
 	nextMonthObligations,
 	nextPaycheck,
 	realizedCheckingOutflows,
@@ -297,6 +298,68 @@ export function TimingPreview({
 			end: nextCycle.cycleEnd,
 		});
 	}, [obligationMovements, spendingIds, nextCycle]);
+	const thisMonthTransactions = useMemo(() => {
+		if (!spendingIds.length) return [];
+		const range =
+			settings.mandatoryFrame === "calendar"
+				? {
+						start: shiftDate({ date: displayToday, days: 1 }),
+						end: remainingDerived.monthEnd,
+					}
+				: {
+						start: shiftDate({ date: displayToday, days: 1 }),
+						end: cycle.cycleEnd,
+					};
+		return sortTransactionsByDate({
+			items: mandatoryTransactions({
+				movements: obligationMovements,
+				checkingIds: spendingIds,
+				start: range.start,
+				end: range.end,
+				plan,
+			}),
+			getDate: (transaction) => transaction.date,
+			getId: (transaction) => transaction.id,
+			order: transactionOrder,
+		});
+	}, [
+		obligationMovements,
+		spendingIds,
+		plan,
+		settings.mandatoryFrame,
+		displayToday,
+		remainingDerived.monthEnd,
+		cycle.cycleEnd,
+		transactionOrder,
+	]);
+	const nextMonthTransactions = useMemo(() => {
+		if (!spendingIds.length) return [];
+		const range =
+			settings.mandatoryFrame === "calendar"
+				? { start: fixedDerived.start, end: fixedDerived.end }
+				: { start: nextCycle.cycleStart, end: nextCycle.cycleEnd };
+		return sortTransactionsByDate({
+			items: mandatoryTransactions({
+				movements: obligationMovements,
+				checkingIds: spendingIds,
+				start: range.start,
+				end: range.end,
+				plan,
+			}),
+			getDate: (transaction) => transaction.date,
+			getId: (transaction) => transaction.id,
+			order: transactionOrder,
+		});
+	}, [
+		obligationMovements,
+		spendingIds,
+		plan,
+		settings.mandatoryFrame,
+		fixedDerived.start,
+		fixedDerived.end,
+		nextCycle,
+		transactionOrder,
+	]);
 
 	if (!cards.length) {
 		return (
@@ -421,12 +484,14 @@ export function TimingPreview({
 					subtitle: `${dateLabel(displayToday, true)} to ${dateLabel(remainingDerived.monthEnd, true)}`,
 					total: remainingObligations,
 					groups: mandatoryThisMonth,
+					transactions: thisMonthTransactions,
 				}
 			: {
 					title: "Due before cycle end",
 					subtitle: `${dateLabel(displayToday, true)} to ${dateLabel(cycle.cycleEnd, true)}`,
 					total: sum(cycleThisGroups.map((group) => group.total)),
 					groups: cycleThisGroups,
+					transactions: thisMonthTransactions,
 				};
 	const activeNextMonth =
 		settings.mandatoryFrame === "calendar"
@@ -435,12 +500,14 @@ export function TimingPreview({
 					subtitle: `${dateLabel(fixedDerived.start, true)} to ${dateLabel(fixedDerived.end, true)}${billsFiltered ? ` · ${trackedBillIds.length} of ${billCandidates.length} bills` : ""}`,
 					total: fixedObligations,
 					groups: mandatoryNextMonth,
+					transactions: nextMonthTransactions,
 				}
 			: {
 					title: "Next cycle fixed",
 					subtitle: `${dateLabel(nextCycle.cycleStart, true)} to ${dateLabel(nextCycle.cycleEnd, true)}${billsFiltered ? ` · ${trackedBillIds.length} of ${billCandidates.length} bills` : ""}`,
 					total: sum(cycleNextGroups.map((group) => group.total)),
 					groups: cycleNextGroups,
+					transactions: nextMonthTransactions,
 				};
 
 	// Plan-derived frame (header, cycle dates) renders regardless; only the
@@ -535,7 +602,6 @@ export function TimingPreview({
 			{detail && (
 				<TimingDetailDialog
 					eyebrow={`${dateLabel(cycle.cycleStart, true)} to ${dateLabel(cycle.cycleEnd, true)}${accountLabel ? ` · ${accountLabel}` : ""}`}
-					today={displayToday}
 					heroes={heroes}
 					cashNow={{
 						checking,
