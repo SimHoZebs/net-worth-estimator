@@ -161,6 +161,7 @@ function OutlookContent({
 					/>
 					<FundingInsight
 						failure={projection?.firstFailure ?? null}
+						plan={plan}
 						onFailure={onFailure}
 						onPlan={onTransactions}
 						pending={pending}

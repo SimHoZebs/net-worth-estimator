@@ -178,6 +178,9 @@
 		color: var(--ink);
 		font-weight: 600;
 	}
+	.insight-card .account-entry-name small {
+		color: var(--accent-amber-text);
+	}
 	.progress-track {
 		height: 5px;
 		background: var(--track);
