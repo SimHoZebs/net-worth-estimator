@@ -7,8 +7,8 @@ import {
 	GripVertical,
 	Repeat,
 } from "lucide-react";
-import { Reorder } from "motion/react";
-import { useMemo, useState } from "react";
+import { Reorder, useDragControls } from "motion/react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { money } from "../../domain/format.ts";
 import type { Account, Movement, Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
@@ -51,6 +51,50 @@ function frequencyLabel(frequency: string): string {
 		default:
 			return frequency;
 	}
+}
+
+// One draggable row. The drag starts only from the grip handle
+// (dragListener={false} + drag controls) so the up/down buttons and the
+// Edit button inside the row keep working, and touch drags get
+// touch-action: none on the handle instead of scrolling the list.
+function SortableRow({
+	id,
+	label,
+	onDragStart,
+	onDrop,
+	controls,
+	children,
+}: {
+	id: string;
+	label: string;
+	onDragStart: () => void;
+	onDrop: () => void;
+	controls: ReactNode;
+	children: ReactNode;
+}) {
+	const dragControls = useDragControls();
+	return (
+		<Reorder.Item
+			value={id}
+			dragListener={false}
+			dragControls={dragControls}
+			onDragStart={onDragStart}
+			onDragEnd={onDrop}
+			className="recurring-row"
+			aria-label={label}
+		>
+			<span
+				className="recurring-drag"
+				aria-hidden="true"
+				style={{ touchAction: "none", cursor: "grab" }}
+				onPointerDown={(event) => dragControls.start(event)}
+			>
+				<GripVertical size={16} />
+			</span>
+			{children}
+			{controls}
+		</Reorder.Item>
+	);
 }
 
 export function RecurringRules({
@@ -123,8 +167,46 @@ export function RecurringRules({
 		updatePlan({ ...plan, movements });
 	};
 
+	// Local drag order. Reorder fires onReorder continuously mid-drag, so
+	// writing straight to the store re-renders and resets motion's internal
+	// order before siblings can displace. Instead the drag plays out in
+	// local state (siblings push/pull freely) and persists once on drop.
+	const [localIds, setLocalIds] = useState<string[]>([]);
+	const localIdsRef = useRef<string[]>([]);
+	const draggingRef = useRef(false);
+	const ids = rules.map((movement) => movement.id);
+	useEffect(() => {
+		if (!draggingRef.current) {
+			setLocalIds(ids);
+			localIdsRef.current = ids;
+		}
+		// oxlint-disable-next-line react/exhaustive-deps
+	}, [rules, editing]);
 	const handleReorder = (orderedIds: string[]) => {
-		persistOrder(orderedIds);
+		localIdsRef.current = orderedIds;
+		setLocalIds(orderedIds);
+	};
+	const orderedRules = useMemo(() => {
+		const byId = new Map(rules.map((movement) => [movement.id, movement]));
+		const ordered = localIds
+			.map((id) => byId.get(id))
+			.filter((item): item is Movement => item !== undefined);
+		for (const movement of rules) {
+			if (!ordered.includes(movement)) ordered.push(movement);
+		}
+		return ordered;
+	}, [rules, localIds]);
+
+	const handleDrop = () => {
+		draggingRef.current = false;
+		const current = rules.map((movement) => movement.id);
+		const next = localIdsRef.current;
+		if (
+			current.length !== next.length ||
+			current.some((id, index) => id !== next[index])
+		) {
+			persistOrder(next);
+		}
 	};
 
 	const moveBy = (id: string, delta: -1 | 1) => {
@@ -150,7 +232,6 @@ export function RecurringRules({
 				onAction={() => onEdit({ kind: "movement", item: null })}
 			/>
 		);
-	const ids = rules.map((movement) => movement.id);
 
 	const rowContent = (
 		movement: Movement,
@@ -218,45 +299,47 @@ export function RecurringRules({
 			{editing ? (
 				<Reorder.Group
 					axis="y"
-					values={ids}
+					values={localIds}
 					onReorder={handleReorder}
 					className="recurring-list"
 					aria-label={`Reorder recurring transactions for ${account.name}`}
 				>
-					{rules.map((movement, index) => (
-						<Reorder.Item
+					{orderedRules.map((movement, index) => (
+						<SortableRow
 							key={movement.id}
-							value={movement.id}
-							className="recurring-row"
-							aria-label={`${index + 1} of ${rules.length}: ${movement.name}`}
+							id={movement.id}
+							label={`${index + 1} of ${orderedRules.length}: ${movement.name}`}
+							onDragStart={() => {
+								draggingRef.current = true;
+							}}
+							onDrop={handleDrop}
+							controls={
+								<span className="recurring-edit-controls">
+									<IconButton
+										icon={ChevronUp}
+										label={`Move ${movement.name} up`}
+										disabled={index === 0}
+										onClick={() => moveBy(movement.id, -1)}
+									/>
+									<IconButton
+										icon={ChevronDown}
+										label={`Move ${movement.name} down`}
+										disabled={index === orderedRules.length - 1}
+										onClick={() => moveBy(movement.id, 1)}
+									/>
+									<button
+										type="button"
+										className="text-button"
+										aria-label={`Edit ${movement.name}`}
+										onClick={() => onEdit({ kind: "movement", item: movement })}
+									>
+										Edit
+									</button>
+								</span>
+							}
 						>
-							<span className="recurring-drag" aria-hidden="true">
-								<GripVertical size={16} />
-							</span>
 							{rowContent(movement, index + 1, true)}
-							<span className="recurring-edit-controls">
-								<IconButton
-									icon={ChevronUp}
-									label={`Move ${movement.name} up`}
-									disabled={index === 0}
-									onClick={() => moveBy(movement.id, -1)}
-								/>
-								<IconButton
-									icon={ChevronDown}
-									label={`Move ${movement.name} down`}
-									disabled={index === rules.length - 1}
-									onClick={() => moveBy(movement.id, 1)}
-								/>
-								<button
-									type="button"
-									className="text-button"
-									aria-label={`Edit ${movement.name}`}
-									onClick={() => onEdit({ kind: "movement", item: movement })}
-								>
-									Edit
-								</button>
-							</span>
-						</Reorder.Item>
+						</SortableRow>
 					))}
 				</Reorder.Group>
 			) : (
