@@ -1,5 +1,5 @@
 import { FileCheck2, LockKeyhole, Pencil, Trash2, Wallet } from "lucide-react";
-import { AccountIcon } from "../../components/AccountIcon.tsx";
+import { AccountLabel } from "../../components/AccountIcon.tsx";
 import { EmptyState, IconButton } from "../../components/ui.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Account } from "../../domain/model.ts";
@@ -42,14 +42,10 @@ export function AccountsPanel({
 									aria-label={`Open ${account.name} transactions`}
 									onClick={() => onAccount(account.id)}
 								>
-									<AccountIcon account={account} />
-									<span>
-										<strong>{account.name}</strong>
-										<small>
-											{account.kind}
-											{!account.enabled ? " · excluded" : ""}
-										</small>
-									</span>
+									<AccountLabel
+									account={account}
+									suffix={!account.enabled ? " · excluded" : undefined}
+								/>
 									{account.readOnly && (
 										<LockKeyhole size={14} aria-label="Read-only record" />
 									)}

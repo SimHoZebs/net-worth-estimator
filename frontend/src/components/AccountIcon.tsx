@@ -46,3 +46,28 @@ export function AccountDot({ color }: { color: Account["color"] }) {
 		/>
 	);
 }
+
+// Shared icon-plus-name row used by the accounts table and the safe-card
+// configure toggles. Render inside a `.table-name` parent, which owns the
+// flex layout, gap, and text stack; the wrappers stay separate because one
+// navigates while the other toggles a pressed state.
+export function AccountLabel({
+	account,
+	suffix,
+}: {
+	account: Pick<Account, "id" | "kind" | "color" | "name">;
+	suffix?: string;
+}) {
+	return (
+		<>
+			<AccountIcon account={account} />
+			<span>
+				<strong>{account.name}</strong>
+				<small>
+					{account.kind}
+					{suffix}
+				</small>
+			</span>
+		</>
+	);
+}
