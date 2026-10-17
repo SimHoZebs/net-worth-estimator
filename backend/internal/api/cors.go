@@ -13,7 +13,7 @@ import (
 const (
 	corsAllowedHeaders = "Content-Type, Authorization"
 	corsAllowedMethods = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-	corsExposedHeaders = "ETag, X-Cache, Link"
+	corsExposedHeaders = "ETag, X-Cache, Link, Retry-After"
 )
 
 var allowedCORSMethods = map[string]struct{}{

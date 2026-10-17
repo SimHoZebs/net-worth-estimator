@@ -2,6 +2,7 @@ package simplefin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -9,6 +10,15 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
+
+// rateLimitedCause unwraps err to a Bridge RateLimitedError, if any.
+func rateLimitedCause(err error) *RateLimitedError {
+	var rateLimited *RateLimitedError
+	if err == nil || !errors.As(err, &rateLimited) {
+		return nil
+	}
+	return rateLimited
+}
 
 // Summary describes one sync run for logs and the trigger endpoint.
 type Summary struct {
@@ -22,8 +32,16 @@ type Summary struct {
 	DryRun              bool           `json:"dryRun"`
 }
 
-// MinTriggerInterval spaces manual trigger runs.
+// MinTriggerInterval is the default spacing for successful manual trigger
+// runs. The Bridge expects 24 requests or fewer per day with quotas
+// replenished throughout the day; one nightly scheduler run plus one manual
+// run per 20 hours stays well under that quota while keeping balances
+// daily-fresh. Override per runner with Config.MinTriggerInterval.
 const MinTriggerInterval = 20 * time.Hour
+
+// DefaultRateLimitCooldown is the default Bridge-fetch blackout after the
+// Bridge reports quota exhaustion. Override with Config.RateLimitCooldown.
+const DefaultRateLimitCooldown = time.Hour
 
 // ErrTooSoon reports a trigger refused by the interval guard.
 type TooSoonError struct {
@@ -49,9 +67,43 @@ type Runner struct {
 	fetch  func(ctx context.Context, start, end time.Time) (*AccountSet, error)
 	now    func() time.Time
 
-	mu          sync.Mutex
+	mu sync.Mutex
+	// lastTrigger stamps the last successful manual trigger; scheduler runs
+	// do not stamp it so one nightly run plus one manual run per interval
+	// stays under the Bridge 24/day quota.
 	lastTrigger time.Time
-	inFlight    bool
+	// limitedUntil blocks Bridge fetches after the Bridge reports quota
+	// exhaustion, so a frontend burst degrades to local 429s instead of
+	// further Bridge hits.
+	limitedUntil time.Time
+	inFlight     bool
+}
+
+// effectiveTriggerInterval returns the configured manual-trigger spacing,
+// defaulting to MinTriggerInterval.
+func (r *Runner) effectiveTriggerInterval() time.Duration {
+	if r.config.MinTriggerInterval > 0 {
+		return r.config.MinTriggerInterval
+	}
+	return MinTriggerInterval
+}
+
+// effectiveRateLimitCooldown returns the configured post-429 blackout,
+// defaulting to DefaultRateLimitCooldown.
+func (r *Runner) effectiveRateLimitCooldown() time.Duration {
+	if r.config.RateLimitCooldown > 0 {
+		return r.config.RateLimitCooldown
+	}
+	return DefaultRateLimitCooldown
+}
+
+// rateLimitWait resolves how long to black out Bridge fetches: the Bridge
+// Retry-After when present, otherwise the configured cooldown.
+func (r *Runner) rateLimitWait(rateLimited *RateLimitedError) time.Duration {
+	if rateLimited != nil && rateLimited.RetryAfter > 0 {
+		return rateLimited.RetryAfter
+	}
+	return r.effectiveRateLimitCooldown()
 }
 
 // NewRunner builds a runner. client may be nil only when Fetch is stubbed.
@@ -64,8 +116,41 @@ func NewRunner(database store.Store, config Config, client *Client) *Runner {
 
 // Sync runs fetch, link resolution, provisioning, map, and apply.
 // Scheduler and first-live-run flows call it directly; manual triggers go
-// through Trigger for interval guarding.
+// through Trigger for interval guarding. Sync shares the singleflight guard
+// with Trigger so a scheduled run and a manual trigger never hit the Bridge
+// concurrently, and it honors the post-429 blackout without touching the
+// Bridge.
 func (r *Runner) Sync(ctx context.Context) (*Summary, error) {
+	r.mu.Lock()
+	if r.inFlight {
+		r.mu.Unlock()
+		return nil, &InProgressError{}
+	}
+	if now := r.now(); now.Before(r.limitedUntil) {
+		retryAfter := r.limitedUntil.Sub(now)
+		r.mu.Unlock()
+		return nil, &TooSoonError{RetryAfter: retryAfter}
+	}
+	r.inFlight = true
+	r.mu.Unlock()
+
+	summary, err := r.fetchAndApply(ctx)
+
+	r.mu.Lock()
+	r.inFlight = false
+	if rateLimited := rateLimitedCause(err); rateLimited != nil {
+		wait := r.rateLimitWait(rateLimited)
+		r.limitedUntil = r.now().Add(wait)
+		r.mu.Unlock()
+		return nil, &TooSoonError{RetryAfter: wait}
+	}
+	r.mu.Unlock()
+	return summary, err
+}
+
+// fetchAndApply runs one Bridge fetch through map and apply with no guard
+// checks. Callers own singleflight and blackout handling.
+func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	now := r.now()
 	end := now.Add(24 * time.Hour)
 	start := now.Add(-90 * 24 * time.Hour)
@@ -146,31 +231,47 @@ func (r *Runner) Sync(ctx context.Context) (*Summary, error) {
 	}, nil
 }
 
-// Trigger runs Sync unless a sync is in flight or a trigger ran within
-// MinTriggerInterval. The guard stamps only successful runs so a failed
-// attempt stays retryable.
+// Trigger runs fetchAndApply unless a sync is in flight, a trigger ran
+// within the configured interval, or the Bridge rate-limit blackout is
+// active. The success guard stamps only successful runs so a generic failed
+// attempt stays retryable; upstream 429s instead arm the blackout and return
+// TooSoon so the frontend backs off without another Bridge hit.
 func (r *Runner) Trigger(ctx context.Context) (*Summary, error) {
 	r.mu.Lock()
 	if r.inFlight {
 		r.mu.Unlock()
 		return nil, &InProgressError{}
 	}
-	if !r.lastTrigger.IsZero() && r.now().Sub(r.lastTrigger) < MinTriggerInterval {
-		retryAfter := MinTriggerInterval - r.now().Sub(r.lastTrigger)
+	now := r.now()
+	if now.Before(r.limitedUntil) {
+		retryAfter := r.limitedUntil.Sub(now)
+		r.mu.Unlock()
+		return nil, &TooSoonError{RetryAfter: retryAfter}
+	}
+	interval := r.effectiveTriggerInterval()
+	if !r.lastTrigger.IsZero() && now.Sub(r.lastTrigger) < interval {
+		retryAfter := interval - now.Sub(r.lastTrigger)
 		r.mu.Unlock()
 		return nil, &TooSoonError{RetryAfter: retryAfter}
 	}
 	r.inFlight = true
 	r.mu.Unlock()
-	summary, err := r.Sync(ctx)
+
+	summary, err := r.fetchAndApply(ctx)
+
 	r.mu.Lock()
 	r.inFlight = false
 	if err == nil {
 		r.lastTrigger = r.now()
+		r.mu.Unlock()
+		return summary, nil
+	}
+	if rateLimited := rateLimitedCause(err); rateLimited != nil {
+		wait := r.rateLimitWait(rateLimited)
+		r.limitedUntil = r.now().Add(wait)
+		r.mu.Unlock()
+		return nil, &TooSoonError{RetryAfter: wait}
 	}
 	r.mu.Unlock()
-	if err != nil {
-		return nil, err
-	}
-	return summary, nil
+	return nil, err
 }

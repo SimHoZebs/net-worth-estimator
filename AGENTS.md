@@ -62,6 +62,8 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN` | empty | exact value `1` plans counts without committing writes |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK` | empty | exact value `1` enables fixture mode |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE` | empty | optional fixture file, valid only with mock mode |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MIN_TRIGGER_INTERVAL` | `20h` | Go duration spacing successful manual sync triggers; Bridge expects 24 requests or fewer per day |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_RATE_LIMIT_COOLDOWN` | `1h` | Go duration Bridge-fetch blackout after an upstream 429; excess triggers return local 429 with `Retry-After` |
 
 ## API and Persistence Flow
 
