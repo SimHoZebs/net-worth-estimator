@@ -1,5 +1,9 @@
+import {
+	externalCounterpartyName,
+	type AccountTransaction,
+} from "./accountActivity.ts";
 import { isoDate, utcDate } from "./format.ts";
-import type { Plan } from "./model.ts";
+import { isPendingMovement, type Plan } from "./model.ts";
 import type { MovementResult } from "./result.ts";
 
 // Server ownership: every amount summed here originates server-side.
@@ -335,4 +339,57 @@ export function groupMandatorySpending({
 	return [...groups.values()].sort(
 		(a, b) => b.total - a.total || a.name.localeCompare(b.name),
 	);
+}
+
+/**
+ * Per-occurrence bill rows for a mandatory window: the same occurrences
+ * backing groupMandatorySpending, shaped as AccountTransactions so the
+ * bills tab renders the shared TransactionRow. Requested amounts sum to
+ * the group totals; partially paid occurrences surface as shortfalls.
+ */
+export function mandatoryTransactions({
+	movements,
+	checkingIds,
+	start,
+	end,
+	plan,
+}: {
+	movements: MovementResult[];
+	checkingIds: string[];
+	start: string;
+	end: string;
+	plan: Plan;
+}): AccountTransaction[] {
+	const sources = new Set(checkingIds);
+	const names = new Map(plan.accounts.map((account) => [account.id, account.name]));
+	const rows: AccountTransaction[] = [];
+	let index = 0;
+	for (const movement of movements) {
+		if (movement.fromId === null || !sources.has(movement.fromId)) continue;
+		if (movement.requested <= 0) continue;
+		if (movement.date < start || movement.date > end) continue;
+		const counterparty = movement.toId
+			? (names.get(movement.toId) ?? "Unknown account")
+			: externalCounterpartyName("out");
+		const amount = Math.max(0, movement.realized);
+		rows.push({
+			id: `mandatory-${movement.movementId}-${movement.date}-${index++}`,
+			movementId: movement.movementId,
+			date: movement.date,
+			name: movement.name || movement.movementId,
+			source: "projected",
+			direction: "out",
+			category: movement.toId ? "transfer" : "expense",
+			counterparty,
+			from: names.get(movement.fromId) ?? "Unknown account",
+			to: counterparty,
+			amount,
+			requested: movement.requested,
+			shortfall: Math.max(0, movement.requested - amount),
+			constraint: movement.constraint,
+			excluded: false,
+			pending: isPendingMovement(movement.movementId),
+		});
+	}
+	return rows;
 }

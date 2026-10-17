@@ -13,10 +13,7 @@ import { dateLabel, money } from "../../domain/format.ts";
 import type { MandatorySpendingGroup } from "../../domain/householdTiming.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
-import {
-	compareTransactionDates,
-	type TransactionOrder,
-} from "../../domain/transactionSort.ts";
+import type { TransactionOrder } from "../../domain/transactionSort.ts";
 
 export type TimingDetailTab = "mandatory" | "cycle" | "configure";
 
@@ -27,6 +24,7 @@ export interface TimingMandatorySection {
 	subtitle: string;
 	total: number;
 	groups: MandatorySpendingGroup[];
+	transactions: AccountTransaction[];
 }
 export interface CashNowDecomposition {
 	checking: number;
@@ -147,72 +145,58 @@ function PaycheckBar({ parts }: { parts: PaycheckDecomposition }) {
 	);
 }
 
-function daysUntil(date: string, today: string): number {
-	return Math.round(
-		(new Date(`${date}T12:00:00Z`).getTime() -
-			new Date(`${today}T12:00:00Z`).getTime()) /
-			86_400_000,
-	);
-}
-
-function dueLabel(date: string, today: string): string {
-	const days = daysUntil(date, today);
-	if (days <= 0) return dateLabel(date, true);
-	if (days === 1) return `${dateLabel(date, true)} · tomorrow`;
-	return `${dateLabel(date, true)} · in ${days} days`;
-}
-
 function MandatorySectionView({
 	section,
-	today,
+	movements,
+	onEdit,
 	order,
 }: {
 	section: TimingMandatorySection;
-	today: string;
+	movements: Map<string, Plan["movements"][number]>;
+	onEdit: (movement: Plan["movements"][number]) => void;
 	order: TransactionOrder;
 }) {
-	if (!section.groups.length) {
+	if (!section.transactions.length) {
 		return (
 			<div className="cycle-breakdown">
 				<p>No bills due in this period.</p>
 			</div>
 		);
 	}
-	const ordered = [...section.groups].sort(
-		(a, b) =>
-			compareTransactionDates({
-				aDate: a.dates[0] ?? "",
-				bDate: b.dates[0] ?? "",
-				aId: a.movementId,
-				bId: b.movementId,
-				order,
-			}) || b.total - a.total,
-	);
 	return (
 		<div>
 			<p className="section-note">
 				{section.subtitle} · <strong>{money(section.total)}</strong>
 			</p>
-			<ul className="mandatory-list">
-				{ordered.map((group) => {
-					const first = group.dates[0] ?? today;
-					const when =
-						group.dates.length === 1
-							? dueLabel(first, today)
-							: `${dueLabel(first, today)} · ${group.count} charges`;
-					return (
-						<li key={group.movementId}>
-							<div className="mandatory-row">
-								<span>
-									<strong>{group.name}</strong>
-									<small>{when}</small>
-								</span>
-								<strong>{money(group.total)}</strong>
-							</div>
-						</li>
-					);
-				})}
-			</ul>
+			<div className="table-scroll">
+				<table className="account-activity-table">
+					<caption className="sr-only">
+						{section.title},{" "}
+						{order === "oldest" ? "oldest first" : "newest first"}
+					</caption>
+					<thead>
+						<tr>
+							<th scope="col" className="transaction-date-column">
+								Date
+							</th>
+							<th scope="col">Transaction</th>
+							<th scope="col" className="transaction-amount-column">
+								Amount
+							</th>
+						</tr>
+					</thead>
+					<tbody>
+						{section.transactions.map((transaction) => (
+							<TransactionRow
+								key={transaction.id}
+								transaction={transaction}
+								movement={movements.get(transaction.movementId) ?? null}
+								onEdit={onEdit}
+							/>
+						))}
+					</tbody>
+				</table>
+			</div>
 		</div>
 	);
 }
@@ -278,7 +262,6 @@ function AccountToggle({
 
 export function TimingDetailDialog({
 	eyebrow,
-	today,
 	heroes,
 	cashNow,
 	paycheck,
@@ -304,7 +287,6 @@ export function TimingDetailDialog({
 	onClose,
 }: {
 	eyebrow: string;
-	today: string;
 	heroes: TimingHeroes;
 	cashNow: CashNowDecomposition;
 	paycheck: PaycheckDecomposition;
@@ -407,13 +389,15 @@ export function TimingDetailDialog({
 						<h3>{thisMonth.title}</h3>
 						<MandatorySectionView
 							section={thisMonth}
-							today={today}
+							movements={movements}
+							onEdit={(item) => onEdit({ kind: "movement", item })}
 							order={transactionOrder}
 						/>
 						<h3>{nextMonth.title}</h3>
 						<MandatorySectionView
 							section={nextMonth}
-							today={today}
+							movements={movements}
+							onEdit={(item) => onEdit({ kind: "movement", item })}
 							order={transactionOrder}
 						/>
 						<p className="section-note">
