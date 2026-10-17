@@ -81,6 +81,26 @@ func serveFrontendFile(root *os.Root, name string, writer http.ResponseWriter, r
 	return true, true
 }
 
+// serveFrontendMissingPage serves the bundled 404 page with a 404 status.
+// Unknown page routes show that page (which redirects back to the app)
+// instead of silently serving the index. Missing assets keep the plain
+// 404 below so bad asset URLs never return HTML.
+func serveFrontendMissingPage(root *os.Root, writer http.ResponseWriter, request *http.Request) bool {
+	file, err := root.Open("404.html")
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil || info.IsDir() || !info.Mode().IsRegular() {
+		return false
+	}
+	writer.WriteHeader(http.StatusNotFound)
+	http.ServeContent(writer, request, "404.html", info.ModTime(), file)
+	return true
+}
+
 func frontendHandler(frontendDir string) http.HandlerFunc {
 	frontendDir = filepath.Clean(frontendDir)
 	return func(writer http.ResponseWriter, request *http.Request) {
@@ -114,7 +134,7 @@ func frontendHandler(frontendDir string) http.HandlerFunc {
 			return
 		}
 		if path.Ext(requestPath) == "" && !strings.HasPrefix(requestPath, "/assets/") {
-			if served, _ := serveFrontendFile(root, "index.html", writer, request); served {
+			if serveFrontendMissingPage(root, writer, request) {
 				return
 			}
 		}
