@@ -104,7 +104,7 @@ SimpleFIN is optional and narrow:
 - pending seeds use the reserved `sfin-pending-` namespace and snapshot replacement per card account;
 - the Access URL stays server-side and is absent from successful payloads; transport failures can wrap the request URL, so failed trigger responses and scheduler logs must be treated as sensitive;
 - `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1` returns planned counts and rolls back all writes;
-- a scheduler runs daily shortly after 03:00 local time with a random minute offset;
+- a scheduler runs every 6 hours with a random minute offset;
 - the guarded trigger endpoint permits one in-flight run and spaces successful manual runs by 20 hours;
 - fixture mode is for local verification only and follows the same mapping, ownership, and persistence path as a real run.
 
