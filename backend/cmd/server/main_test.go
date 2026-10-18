@@ -33,16 +33,23 @@ func TestParseReadOnlyDefaultsToWritable(t *testing.T) {
 	}
 }
 
-func TestNextSyncDelayTargetsMorning(t *testing.T) {
+func TestNextSyncDelayTargetsSixHourBoundaries(t *testing.T) {
 	morning := time.Date(2026, 8, 5, 1, 0, 0, 0, time.UTC)
 	delay := nextSyncDelay(morning, 15)
-	if delay != 2*time.Hour+15*time.Minute {
-		t.Fatalf("delay = %v, want 2h15m", delay)
+	if delay != 5*time.Hour+15*time.Minute {
+		t.Fatalf("delay = %v, want 5h15m", delay)
 	}
-	afternoon := time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC)
-	overnight := nextSyncDelay(afternoon, 0)
-	if overnight != 15*time.Hour {
-		t.Fatalf("delay = %v, want 15h", overnight)
+	onBoundary := time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC)
+	if delay := nextSyncDelay(onBoundary, 0); delay != 0 {
+		t.Fatalf("delay = %v, want 0", delay)
+	}
+	afternoon := time.Date(2026, 8, 5, 13, 0, 0, 0, time.UTC)
+	if delay := nextSyncDelay(afternoon, 0); delay != 5*time.Hour {
+		t.Fatalf("delay = %v, want 5h", delay)
+	}
+	lateNight := time.Date(2026, 8, 5, 23, 30, 0, 0, time.UTC)
+	if delay := nextSyncDelay(lateNight, 10); delay != 40*time.Minute {
+		t.Fatalf("delay = %v, want 40m", delay)
 	}
 }
 

@@ -23,8 +23,9 @@ import (
 // DB purge (backend/scripts/purge-simplefin-sync.sql), never a code branch.
 //
 // Throttling matches the Bridge daily-update quota (24 requests or fewer
-// per day, replenished throughout the day): successful manual triggers are
-// spaced by MIN_TRIGGER_INTERVAL (default 20h), concurrent scheduler and
+// per day, replenished throughout the day): the scheduler runs every 6
+// hours (four runs per day), successful manual triggers are spaced by
+// MIN_TRIGGER_INTERVAL (default 20h), concurrent scheduler and
 // trigger runs share one singleflight guard, and an upstream 429 arms a
 // RATE_LIMIT_COOLDOWN blackout (default 1h) so frontend bursts degrade to
 // local 429s with Retry-After instead of further Bridge hits.
@@ -90,14 +91,23 @@ func configureSync(database store.Store) (*simplefin.Runner, func()) {
 	return runner, stop
 }
 
-// nextSyncDelay returns the wait until the next 3am local time plus a random
-// sub-hour offset, spreading Bridge load off the top of the hour.
+// syncInterval is the fixed scheduler cadence: four Bridge hits per day,
+// well under the Bridge daily-update quota (24 requests or fewer per day).
+const syncInterval = 6 * time.Hour
+
+// nextSyncDelay returns the wait until the next 6-hour boundary (00, 06,
+// 12, 18 local) plus a random sub-hour offset, spreading Bridge load off
+// the top of the hour.
 func nextSyncDelay(now time.Time, randMinute int) time.Duration {
-	next := time.Date(now.Year(), now.Month(), now.Day(), 3, 0, 0, 0, now.Location())
-	if !now.Before(next) {
-		next = next.Add(24 * time.Hour)
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	for _, hour := range []int{0, 6, 12, 18, 24} {
+		candidate := midnight.Add(time.Duration(hour) * time.Hour)
+		if now.After(candidate) {
+			continue
+		}
+		return candidate.Sub(now) + time.Duration(randMinute)*time.Minute
 	}
-	return next.Sub(now) + time.Duration(randMinute)*time.Minute
+	return syncInterval + time.Duration(randMinute)*time.Minute
 }
 
 func startSyncScheduler(runner *simplefin.Runner) func() {
@@ -116,7 +126,7 @@ func startSyncScheduler(runner *simplefin.Runner) func() {
 				} else {
 					log.Printf("simplefin scheduled sync: %+v", summary)
 				}
-				timer.Reset(24 * time.Hour)
+				timer.Reset(syncInterval)
 			}
 		}
 	}()

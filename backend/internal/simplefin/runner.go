@@ -34,9 +34,9 @@ type Summary struct {
 
 // MinTriggerInterval is the default spacing for successful manual trigger
 // runs. The Bridge expects 24 requests or fewer per day with quotas
-// replenished throughout the day; one nightly scheduler run plus one manual
-// run per 20 hours stays well under that quota while keeping balances
-// daily-fresh. Override per runner with Config.MinTriggerInterval.
+// replenished throughout the day; scheduled runs every 6 hours plus one
+// manual run per 20 hours stay well under that quota while keeping balances
+// fresh. Override per runner with Config.MinTriggerInterval.
 const MinTriggerInterval = 20 * time.Hour
 
 // DefaultRateLimitCooldown is the default Bridge-fetch blackout after the
@@ -69,7 +69,7 @@ type Runner struct {
 
 	mu sync.Mutex
 	// lastTrigger stamps the last successful manual trigger; scheduler runs
-	// do not stamp it so one nightly run plus one manual run per interval
+	// do not stamp it so scheduled runs plus one manual run per interval
 	// stays under the Bridge 24/day quota.
 	lastTrigger time.Time
 	// limitedUntil blocks Bridge fetches after the Bridge reports quota
