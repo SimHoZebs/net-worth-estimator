@@ -50,9 +50,19 @@ type AmountReferenceContext struct {
 }
 
 type providerDefinition struct {
+	// Name is the provider key used in AmountInputBinding.Provider.
+	// Registered once via RegisterAmountProvider; duplicates panic.
+	name string
+	// Description is human-readable help surfaced by the discovery endpoint.
+	description         string
 	resolve             func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error)
 	validateReferences  func(args map[string]types.JsonValue, refs *AmountReferenceContext) error
 	postingDependencies func(args map[string]types.JsonValue) []string
+	// volatileParams reports stochastic sampling parameters when the
+	// provider carries rate behavior. Nil means never volatile.
+	// occurrence-rate is the only built-in volatile provider; custom
+	// plugins opt in by setting this hook.
+	volatileParams func(args map[string]types.JsonValue) (annualRate, volatility float64, volatile bool)
 }
 
 func argString(args map[string]types.JsonValue, key string) (string, bool) {
@@ -104,6 +114,48 @@ func validateRateArgs(args map[string]types.JsonValue) (float64, float64, error)
 		return 0, 0, amtErrf("Amount provider argument 'volatility' must be at or above zero.")
 	}
 	return annualRate, volatility, nil
+}
+
+// RegisterAmountProvider adds a named amount provider. It panics on empty
+// names, nil resolve funcs, or duplicate registration so miswiring fails
+// fast at init time instead of surfacing as a mid-simulation unknown.
+func RegisterAmountProvider(name, description string, def providerDefinition) {
+	if name == "" {
+		panic("RegisterAmountProvider: empty provider name")
+	}
+	if def.resolve == nil {
+		panic("RegisterAmountProvider: nil resolve for '" + name + "'")
+	}
+	if _, exists := amountProviders[name]; exists {
+		panic("RegisterAmountProvider: duplicate provider '" + name + "'")
+	}
+	def.name = name
+	def.description = description
+	amountProviders[name] = def
+}
+
+// LookupAmountProvider returns the provider and true when registered.
+func LookupAmountProvider(name string) (providerDefinition, bool) {
+	def, ok := amountProviders[name]
+	return def, ok
+}
+
+// ListAmountProviders returns registered provider names in sorted order.
+// The order is part of no contract; VolatileRateInputOf sorts input names
+// instead so seeded sampling stays stable.
+func ListAmountProviders() []AmountProviderInfo {
+	out := make([]AmountProviderInfo, 0, len(amountProviders))
+	for name, def := range amountProviders {
+		out = append(out, AmountProviderInfo{Name: name, Description: def.description})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// AmountProviderInfo describes one registered provider for discovery.
+type AmountProviderInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // Design: accounts stay dumb, movements carry behavior. Accounts expose
@@ -185,6 +237,13 @@ var amountProviders = map[string]providerDefinition{
 		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
 			_, _, err := validateRateArgs(args)
 			return err
+		},
+		volatileParams: func(args map[string]types.JsonValue) (float64, float64, bool) {
+			annualRate, volatility, err := validateRateArgs(args)
+			if err != nil || volatility <= 0 {
+				return 0, 0, false
+			}
+			return annualRate, volatility, true
 		},
 	},
 	// growth-factor resolves the compounding factor for a movement's
@@ -358,19 +417,20 @@ func termsMinimum(terms types.PaymentTerms, balance float64) float64 {
 }
 
 // VolatileRateParams is one movement's stochastic sampling configuration:
-// the annual rate and volatility of its single volatile occurrence-rate
+// the annual rate and volatility reported by its single volatile provider
 // input. Movements carry at most one volatile input; every volatile input
-// in a movement shares the movement's one pre-sampled annual rate, exactly
-// like the former one-rate-per-rule columns.
+// in a movement shares the movement's one pre-sampled annual rate.
 type VolatileRateParams struct {
 	AnnualRate float64
 	Volatility float64
+	// Provider names the volatile provider that reported the parameters.
+	Provider string
 }
 
-// VolatileRateInputOf scans an amount descriptor for occurrence-rate inputs
-// in sorted input-name order and returns the sampling parameters. Movements
-// without a volatile input report found=false. Malformed arguments also
-// report found=false here; ValidateAmountDescriptor reports them.
+// VolatileRateInputOf scans an amount descriptor for volatile provider
+// inputs in sorted input-name order and returns the sampling parameters.
+// Providers opt in via volatileParams; malformed arguments report
+// found=false here while ValidateAmountDescriptor reports them.
 func VolatileRateInputOf(amount types.PostingAmountResolution) (params VolatileRateParams, found bool) {
 	names := make([]string, 0, len(amount.Inputs))
 	for name := range amount.Inputs {
@@ -379,14 +439,15 @@ func VolatileRateInputOf(amount types.PostingAmountResolution) (params VolatileR
 	sort.Strings(names)
 	for _, name := range names {
 		binding := amount.Inputs[name]
-		if binding.Source != "provider" || binding.Provider != "occurrence-rate" {
+		if binding.Source != "provider" {
 			continue
 		}
-		annualRate, volatility, err := validateRateArgs(binding.Arguments)
-		if err != nil {
+		def, ok := amountProviders[binding.Provider]
+		if !ok || def.volatileParams == nil {
 			continue
 		}
-		if volatility <= 0 {
+		annualRate, volatility, volatile := def.volatileParams(binding.Arguments)
+		if !volatile {
 			continue
 		}
 		if found {
@@ -394,26 +455,26 @@ func VolatileRateInputOf(amount types.PostingAmountResolution) (params VolatileR
 			// keeps the first in sorted order for a stable error path.
 			continue
 		}
-		params = VolatileRateParams{AnnualRate: annualRate, Volatility: volatility}
+		params = VolatileRateParams{AnnualRate: annualRate, Volatility: volatility, Provider: binding.Provider}
 		found = true
 	}
 	return params, found
 }
 
-// CountVolatileRateInputs reports how many occurrence-rate inputs in an
-// amount descriptor carry volatility above zero. Validation rejects more
-// than one: one movement shares one pre-sampled annual rate.
+// CountVolatileRateInputs reports how many provider inputs in an amount
+// descriptor carry volatility. Validation rejects more than one: one
+// movement shares one pre-sampled annual rate.
 func CountVolatileRateInputs(amount types.PostingAmountResolution) int {
 	count := 0
 	for _, binding := range amount.Inputs {
-		if binding.Source != "provider" || binding.Provider != "occurrence-rate" {
+		if binding.Source != "provider" {
 			continue
 		}
-		_, volatility, err := validateRateArgs(binding.Arguments)
-		if err != nil {
+		def, ok := amountProviders[binding.Provider]
+		if !ok || def.volatileParams == nil {
 			continue
 		}
-		if volatility > 0 {
+		if _, _, volatile := def.volatileParams(binding.Arguments); volatile {
 			count++
 		}
 	}
@@ -421,12 +482,17 @@ func CountVolatileRateInputs(amount types.PostingAmountResolution) int {
 }
 
 type resolverDefinition struct {
+	name string
+	// Description is human-readable help surfaced by the discovery endpoint.
+	description    string
 	requiredInputs func(config map[string]types.JsonValue) ([]string, error)
 	resolve        func(config map[string]types.JsonValue, inputs map[string]float64) (float64, error)
 }
 
 var amountResolvers = map[string]resolverDefinition{
 	"expression": {
+		name:        "expression",
+		description: "Arithmetic expression over named inputs (identifiers, rate, abs, + - * /).",
 		requiredInputs: func(config map[string]types.JsonValue) ([]string, error) {
 			expression, _ := config["expression"].(string)
 			reqs, err := ArithmeticRequirements(expression)
@@ -440,6 +506,64 @@ var amountResolvers = map[string]resolverDefinition{
 			return EvaluateArithmetic(expression, inputs)
 		},
 	},
+}
+
+// RegisterAmountResolver adds a named amount resolver. It panics on empty
+// names, nil funcs, or duplicate registration so miswiring fails fast.
+func RegisterAmountResolver(name, description string, def resolverDefinition) {
+	if name == "" {
+		panic("RegisterAmountResolver: empty resolver name")
+	}
+	if def.requiredInputs == nil || def.resolve == nil {
+		panic("RegisterAmountResolver: nil funcs for '" + name + "'")
+	}
+	if _, exists := amountResolvers[name]; exists {
+		panic("RegisterAmountResolver: duplicate resolver '" + name + "'")
+	}
+	def.name = name
+	def.description = description
+	amountResolvers[name] = def
+}
+
+// LookupAmountResolver returns the resolver and true when registered.
+func LookupAmountResolver(name string) (resolverDefinition, bool) {
+	def, ok := amountResolvers[name]
+	return def, ok
+}
+
+// AmountResolverInfo describes one registered resolver for discovery.
+type AmountResolverInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// ListAmountResolvers returns registered resolvers in sorted name order.
+func ListAmountResolvers() []AmountResolverInfo {
+	out := make([]AmountResolverInfo, 0, len(amountResolvers)+1)
+	for _, def := range amountResolvers {
+		out = append(out, AmountResolverInfo{Name: def.name, Description: def.description})
+	}
+	// income is a built-in descriptor handled outside the generic registry;
+	// surface it so discovery stays complete.
+	out = append(out, AmountResolverInfo{Name: "income", Description: "Income-pipeline amount resolved by the income transition."})
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+func init() {
+	describe := func(name, description string) {
+		if def, ok := amountProviders[name]; ok {
+			def.description = description
+			amountProviders[name] = def
+		}
+	}
+	describe("model-value", "Latest realized posting amount, falling back to account balance.")
+	describe("account-balance", "Live balance of one account.")
+	describe("occurrence-rate", "Per-occurrence rate from annualRate/frequency with optional stochastic volatility.")
+	describe("growth-factor", "Compounding factor for annualGrowthRate over rule start to occurrence date.")
+	describe("terms-minimum", "Payment-terms minimum for one account.")
+	describe("late-fee", "Flat fee when a payment posting fell short of its terms minimum this month.")
+	describe("balance-fee", "Flat fee when an account balance sits below a threshold.")
 }
 
 func validateExactKeys(actual map[string]types.AmountInputBinding, required []string) error {
@@ -478,7 +602,9 @@ func validateExactKeys(actual map[string]types.AmountInputBinding, required []st
 }
 
 // ValidateAmountDescriptor validates an amount descriptor and returns posting
-// dependencies for cycle detection.
+// dependencies for cycle detection. Resolvers and providers come from the
+// registry; RegisterAmountResolver/RegisterAmountProvider extend it without
+// touching this function.
 func ValidateAmountDescriptor(amount types.PostingAmountResolution, references *AmountReferenceContext) ([]string, error) {
 	if amount.Resolver == "income" {
 		if len(amount.Inputs) > 0 {
@@ -492,7 +618,7 @@ func ValidateAmountDescriptor(amount types.PostingAmountResolution, references *
 		}
 		return []string{}, nil
 	}
-	resolver, ok := amountResolvers[amount.Resolver]
+	resolver, ok := LookupAmountResolver(amount.Resolver)
 	if !ok {
 		return nil, amtErrf("Unknown amount resolver '%s'.", amount.Resolver)
 	}
@@ -518,7 +644,7 @@ func ValidateAmountDescriptor(amount types.PostingAmountResolution, references *
 			}
 			continue
 		}
-		provider, ok := amountProviders[binding.Provider]
+		provider, ok := LookupAmountProvider(binding.Provider)
 		if !ok {
 			return nil, amtErrf("Unknown amount provider '%s' for input '%s'.", binding.Provider, name)
 		}
@@ -539,11 +665,12 @@ func ValidateAmountDescriptor(amount types.PostingAmountResolution, references *
 }
 
 // ResolvePostingAmountDescriptor resolves a non-income posting amount.
+// Resolver and provider implementations come from the registry.
 func ResolvePostingAmountDescriptor(amount types.PostingAmountResolution, ctx *AmountProviderContext) (float64, error) {
 	if amount.Resolver == "income" {
 		return 0, amtErrf("Income amounts must be resolved by the income transition.")
 	}
-	resolver, ok := amountResolvers[amount.Resolver]
+	resolver, ok := LookupAmountResolver(amount.Resolver)
 	if !ok {
 		return 0, amtErrf("Unknown amount resolver '%s'.", amount.Resolver)
 	}
@@ -564,7 +691,7 @@ func ResolvePostingAmountDescriptor(amount types.PostingAmountResolution, ctx *A
 			}
 			value = literal
 		} else {
-			provider, ok := amountProviders[binding.Provider]
+			provider, ok := LookupAmountProvider(binding.Provider)
 			if !ok {
 				return 0, amtErrf("Unknown amount provider '%s'.", binding.Provider)
 			}

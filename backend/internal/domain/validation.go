@@ -285,7 +285,7 @@ func validateMovementAmounts(issues *[]types.ModelValidationIssue, document *typ
 		validateAmount(posting.ID, posting.Amount, []any{"postings", index})
 		if CountVolatileRateInputs(posting.Amount) > 1 {
 			addIssue(issues, types.SeverityError, "posting.amount.multiple_volatile_rates",
-				"Amounts carry at most one volatile occurrence-rate input: one movement shares one pre-sampled annual rate.",
+				"Amounts carry at most one volatile provider input: one movement shares one pre-sampled annual rate.",
 				pathWithField([]any{"postings", index}, "amount")...)
 		}
 	}
@@ -294,7 +294,7 @@ func validateMovementAmounts(issues *[]types.ModelValidationIssue, document *typ
 		validateAmount(rule.ID, rule.Amount, []any{"recurrenceRules", index})
 		if CountVolatileRateInputs(rule.Amount) > 1 {
 			addIssue(issues, types.SeverityError, "posting.amount.multiple_volatile_rates",
-				"Amounts carry at most one volatile occurrence-rate input: one movement shares one pre-sampled annual rate.",
+				"Amounts carry at most one volatile provider input: one movement shares one pre-sampled annual rate.",
 				pathWithField([]any{"recurrenceRules", index}, "amount")...)
 		}
 	}

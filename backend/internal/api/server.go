@@ -266,6 +266,13 @@ func New(store store.Store, serverConfig Config) http.Handler {
 	}, server.getIncomeData)
 
 	huma.Register(api, huma.Operation{
+		OperationID: "get-amount-resolvers",
+		Method:      "GET",
+		Path:        "/v1/amount-resolvers",
+		Summary:     "List registered amount resolvers and providers",
+	}, server.getAmountResolvers)
+
+	huma.Register(api, huma.Operation{
 		OperationID: "project-deterministic",
 		Method:      "POST",
 		Path:        "/v1/projections/deterministic",
