@@ -56,6 +56,9 @@ func RunConformance(t *testing.T, newStore func(*testing.T) Store) {
 	t.Run("SyncStateDefaultsEmptyAndRoundTrips", func(t *testing.T) {
 		testSyncStateDefaultsEmptyAndRoundTrips(t, newStore)
 	})
+	t.Run("AmountPresetsRoundTripAndReorder", func(t *testing.T) {
+		testAmountPresetConformanceRoundTrip(t, newStore)
+	})
 }
 
 // TestStoreConformance runs the suite against the embedded SQLite backend.

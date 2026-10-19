@@ -21,6 +21,7 @@ const (
 	RowPosting    RowKind = "posting"
 	RowRule       RowKind = "rule"
 	RowEvaluation RowKind = "evaluation"
+	RowPreset     RowKind = "preset"
 )
 
 // Row errors map to API statuses: NotFound→404, IDConflict→409,
@@ -194,6 +195,8 @@ func orderedIDs(tx *sql.Tx, kind RowKind, evaluationType string) ([]string, erro
 	case RowEvaluation:
 		query = `SELECT instance_id FROM evaluations WHERE type = ? ORDER BY position`
 		args = append(args, evaluationType)
+	case RowPreset:
+		query = `SELECT id FROM amount_presets ORDER BY position`
 	default:
 		return nil, fmt.Errorf("move unsupported for %q", kind)
 	}
@@ -233,6 +236,9 @@ func rewritePositions(tx *sql.Tx, kind RowKind, evaluationType string, ids []str
 		case RowEvaluation:
 			query = `UPDATE evaluations SET position = ? WHERE type = ? AND instance_id = ?`
 			args = []any{position, evaluationType, id}
+		case RowPreset:
+			query = `UPDATE amount_presets SET position = ? WHERE id = ?`
+			args = []any{position, id}
 		default:
 			return fmt.Errorf("move unsupported for %q", kind)
 		}
@@ -320,17 +326,9 @@ func (s *sqliteStore) CreateAccount(account types.Account) (types.Account, error
 		if err != nil {
 			return err
 		}
-		var minBalance, maxBalance any = types.NoFloor, types.NoCeiling
-		if account.MinBalance != nil {
-			minBalance = *account.MinBalance
-		}
-		if account.MaxBalance != nil {
-			maxBalance = *account.MaxBalance
-		}
-		var color any
-		if account.Color != nil {
-			color = *account.Color
-		}
+		minBalance := valueOr(account.MinBalance, types.NoFloor)
+		maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
+		color := nullable(account.Color)
 		if _, err := tx.Exec(
 			`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled) VALUES (?,?,?,?,?,?,?,?)`,
 			account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled),
@@ -358,17 +356,9 @@ func (s *sqliteStore) UpdateAccount(account types.Account) (types.Account, error
 			}
 			return fmt.Errorf("read account %s: %w", account.ID, err)
 		}
-		var minBalance, maxBalance any = types.NoFloor, types.NoCeiling
-		if account.MinBalance != nil {
-			minBalance = *account.MinBalance
-		}
-		if account.MaxBalance != nil {
-			maxBalance = *account.MaxBalance
-		}
-		var color any
-		if account.Color != nil {
-			color = *account.Color
-		}
+		minBalance := valueOr(account.MinBalance, types.NoFloor)
+		maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
+		color := nullable(account.Color)
 		if _, err := tx.Exec(
 			`UPDATE accounts SET name = ?, kind = ?, min_balance = ?, max_balance = ?, color = ?, enabled = ? WHERE id = ?`,
 			account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled), account.ID,
@@ -767,13 +757,8 @@ func (s *sqliteStore) SavePaymentTerms(terms types.PaymentTerms) (types.PaymentT
 		if err != nil {
 			return err
 		}
-		var minimumPercent, statementDay any
-		if terms.MinimumPercent != nil {
-			minimumPercent = *terms.MinimumPercent
-		}
-		if terms.StatementDay != nil {
-			statementDay = *terms.StatementDay
-		}
+		minimumPercent := nullable(terms.MinimumPercent)
+		statementDay := nullable(terms.StatementDay)
 		if _, err := tx.Exec(
 			`INSERT INTO payment_terms (account_id, position, minimum_fixed, minimum_percent, due_day, statement_day) VALUES (?,?,?,?,?,?)
 			 ON CONFLICT(account_id) DO UPDATE SET minimum_fixed = excluded.minimum_fixed, minimum_percent = excluded.minimum_percent,

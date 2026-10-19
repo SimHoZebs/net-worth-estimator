@@ -55,6 +55,11 @@ type Store interface {
 	MoveEvaluation(evalType, instanceID, beforeID string) error
 	SavePaymentTerms(terms types.PaymentTerms) (types.PaymentTerms, error)
 	DeletePaymentTerms(accountID string) error
+	ListAmountPresets() ([]types.AmountPreset, error)
+	CreateAmountPreset(preset types.AmountPreset) (types.AmountPreset, error)
+	UpdateAmountPreset(preset types.AmountPreset) (types.AmountPreset, error)
+	DeleteAmountPreset(id string) error
+	MoveAmountPreset(id, beforeID string) error
 	ListPinnedEvaluations() ([]string, error)
 	SetPinnedEvaluations(ids []string) ([]string, error)
 	ListAccountLinks() ([]AccountLink, error)
@@ -80,7 +85,7 @@ type sqliteStore struct {
 	db *sql.DB
 }
 
-const latestSchemaVersion = 13
+const latestSchemaVersion = 14
 
 // ruleMigrationBackupSuffix marks the pre-V7 database copy. V7 splits the
 // postings table into dated postings plus recurrence rules; the copy lets an
@@ -272,6 +277,12 @@ func (s *sqliteStore) migrate() error {
 			return err
 		}
 		version = 13
+	}
+	if version < 14 {
+		if err := migrateV14(tx); err != nil {
+			return err
+		}
+		version = 14
 	}
 	if version != initialVersion {
 		if _, err := tx.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, version)); err != nil {

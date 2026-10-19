@@ -153,9 +153,13 @@ func ListAmountProviders() []AmountProviderInfo {
 }
 
 // AmountProviderInfo describes one registered provider for discovery.
+// Only wiring: name, technical description, volatility behavior, and
+// required argument keys. Human words live in the frontend.
 type AmountProviderInfo struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Volatile    bool              `json:"volatile,omitempty"`
+	ArgFields   []AmountFieldSpec `json:"argFields,omitempty"`
 }
 
 // Design: accounts stay dumb, movements carry behavior. Accounts expose
@@ -532,9 +536,12 @@ func LookupAmountResolver(name string) (resolverDefinition, bool) {
 }
 
 // AmountResolverInfo describes one registered resolver for discovery.
+// Only wiring: name, technical description, and required config keys.
+// Human words live in the frontend.
 type AmountResolverInfo struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	Name         string            `json:"name"`
+	Description  string            `json:"description"`
+	ConfigFields []AmountFieldSpec `json:"configFields,omitempty"`
 }
 
 // ListAmountResolvers returns registered resolvers in sorted name order.
