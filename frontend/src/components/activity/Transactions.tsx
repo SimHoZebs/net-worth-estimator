@@ -1,9 +1,4 @@
-import {
-	ArrowRightLeft,
-	ChevronLeft,
-	ChevronRight,
-	ListFilter,
-} from "lucide-react";
+import { ArrowRightLeft, ListFilter } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import {
 	type AccountTransaction,
@@ -13,19 +8,23 @@ import {
 } from "../../domain/accountActivity.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
-import { EmptyState, IconButton } from "../ui.tsx";
+import { TablePagination } from "../DataTable.tsx";
+import { EmptyState } from "../ui.tsx";
 import { TransactionFilters } from "./TransactionFilters.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";
+import { TransactionTable } from "./TransactionTable.tsx";
 
 const PAGE_SIZE = 10;
 export function Transactions({
 	transactions,
 	plan,
+	showHeaders = false,
 	onEdit,
 }: {
 	transactions: AccountTransaction[];
 	plan: Plan;
 	horizon: string;
+	showHeaders?: boolean;
 	onEdit: (target: EditorTarget) => void;
 }) {
 	const [filters, setFilters] = useState<ActivityFilters>(
@@ -80,59 +79,27 @@ export function Transactions({
 			/>
 			{filtered.length ? (
 				<>
-					<div className="table-scroll" id={`${id}-table`}>
-						<table className="account-activity-table">
-							<caption className="sr-only">
-								Transactions involving this account, separated into recorded
-								facts and projected movements.
-							</caption>
-							<thead>
-								<tr>
-									<th scope="col" className="transaction-date-column">
-										Date
-									</th>
-									<th scope="col">Transaction</th>
-									<th scope="col" className="transaction-amount-column">
-										Amount
-									</th>
-								</tr>
-							</thead>
-							<tbody>
-								{rows.map((transaction) => (
-									<TransactionRow
-										key={transaction.id}
-										transaction={transaction}
-										movement={movements.get(transaction.movementId) ?? null}
-										onEdit={(item) => onEdit({ kind: "movement", item })}
-									/>
-								))}
-							</tbody>
-						</table>
-					</div>
-					<div className="transaction-pagination">
-						<span role="status">
-							Showing {currentPage * PAGE_SIZE + 1}–
-							{Math.min((currentPage + 1) * PAGE_SIZE, filtered.length)} of{" "}
-							{filtered.length} transactions
-						</span>
-						<div>
-							<IconButton
-								icon={ChevronLeft}
-								label="Previous transaction page"
-								disabled={currentPage === 0}
-								onClick={() => turnPage(currentPage - 1)}
+					<TransactionTable
+						caption="Transactions involving this account, separated into recorded facts and projected movements."
+						showHeaders={showHeaders}
+						scrollId={`${id}-table`}
+					>
+						{rows.map((transaction) => (
+							<TransactionRow
+								key={transaction.id}
+								transaction={transaction}
+								movement={movements.get(transaction.movementId) ?? null}
+								onEdit={(item) => onEdit({ kind: "movement", item })}
 							/>
-							<span>
-								{currentPage + 1} / {pageCount}
-							</span>
-							<IconButton
-								icon={ChevronRight}
-								label="Next transaction page"
-								disabled={currentPage === pageCount - 1}
-								onClick={() => turnPage(currentPage + 1)}
-							/>
-						</div>
-					</div>
+						))}
+					</TransactionTable>
+					<TablePagination
+						page={currentPage}
+						pageCount={pageCount}
+						total={filtered.length}
+						pageSize={PAGE_SIZE}
+						onPage={turnPage}
+					/>
 				</>
 			) : (
 				<EmptyState
