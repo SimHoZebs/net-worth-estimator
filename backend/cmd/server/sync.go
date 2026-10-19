@@ -25,7 +25,7 @@ import (
 // Throttling matches the Bridge daily-update quota (24 requests or fewer
 // per day, replenished throughout the day): the scheduler runs every 6
 // hours (four runs per day), successful manual triggers are spaced by
-// MIN_TRIGGER_INTERVAL (default 20h), concurrent scheduler and
+// MIN_TRIGGER_INTERVAL (default 6h), concurrent scheduler and
 // trigger runs share one singleflight guard, and an upstream 429 arms a
 // RATE_LIMIT_COOLDOWN blackout (default 1h) so frontend bursts degrade to
 // local 429s with Retry-After instead of further Bridge hits.
