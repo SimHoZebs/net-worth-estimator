@@ -345,6 +345,7 @@ export function TimingDetailDialog({
 			eyebrow={eyebrow}
 			onClose={onClose}
 			className="modal-drawer"
+			coverage="full"
 		>
 			<Tabs
 				items={[

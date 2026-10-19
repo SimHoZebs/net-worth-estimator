@@ -497,8 +497,8 @@
 		border-bottom: 0;
 	}
 	.modal::backdrop {
-		background: #172d2b66;
-		backdrop-filter: blur(3px);
+		background: var(--backdrop-film);
+		backdrop-filter: blur(var(--backdrop-blur));
 	}
 	.modal-header {
 		display: flex;

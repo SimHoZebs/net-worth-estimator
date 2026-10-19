@@ -55,6 +55,7 @@ export function AccountDialog({
 			eyebrow={`Account activity · ${temporary ? "Changes" : "Saved plan"}`}
 			onClose={onClose}
 			className="modal-drawer"
+			coverage="full"
 		>
 			<div className="account-dialog-summary">
 				<AccountIcon account={account} />
