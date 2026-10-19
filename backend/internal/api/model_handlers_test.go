@@ -307,7 +307,7 @@ func TestRowWriteIgnoresEchoedSourceField(t *testing.T) {
 	// server-computed source flag. Writes must accept and ignore it.
 	post := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/postings", bytes.NewReader([]byte(
-		`{"id":"echo","name":"Echo","destinations":["checking"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"date":"2026-08-01","priority":1,"enabled":true,"source":"model","claim":null}`,
+		`{"id":"echo","name":"Echo","destinations":["checking"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true,"source":"model","claim":null}`,
 	)))
 	request.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(post, request)

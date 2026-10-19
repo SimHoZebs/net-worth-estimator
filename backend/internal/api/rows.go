@@ -295,9 +295,9 @@ type postingBody struct {
 	SourceAccountID *string                       `json:"sourceAccountId,omitempty"`
 	Destinations    []string                      `json:"destinations,omitempty"`
 	Amount          types.PostingAmountResolution `json:"amount"`
-	Date            types.IsoDate                 `json:"date"`
+	PostedTime      int64                         `json:"postedTime"`
+	TransactionTime int64                         `json:"transactionTime"`
 	Claim           *types.PostingClaim           `json:"claim,omitempty"`
-	Priority        int                           `json:"priority"`
 	Enabled         bool                          `json:"enabled"`
 	// Source is accepted and ignored: ownership is server-computed,
 	// mirroring the retired whole-document PUT contract.
@@ -307,8 +307,9 @@ type postingBody struct {
 func (b postingBody) toPosting(id string) types.Posting {
 	out := types.Posting{
 		Name: b.Name, SourceAccountID: b.SourceAccountID,
-		Destinations: b.Destinations, Amount: b.Amount, Date: b.Date,
-		Claim: b.Claim, Priority: b.Priority, Enabled: b.Enabled,
+		Destinations: b.Destinations, Amount: b.Amount,
+		PostedTime: b.PostedTime, TransactionTime: b.TransactionTime,
+		Claim: b.Claim, Enabled: b.Enabled,
 	}
 	if b.ID != nil {
 		out.ID = *b.ID
@@ -413,28 +414,24 @@ func (s *Server) movePosting(_ context.Context, input *reorderInput) (*reorderOu
 }
 
 type ruleBody struct {
-	ID               *string                       `json:"id,omitempty"`
-	Name             string                        `json:"name"`
-	SourceAccountID  *string                       `json:"sourceAccountId,omitempty"`
-	Destinations     []string                      `json:"destinations,omitempty"`
-	Amount           types.PostingAmountResolution `json:"amount"`
-	Frequency        types.RecurrenceFrequency     `json:"frequency"`
-	AnnualRate       float64                       `json:"annualRate"`
-	AnnualGrowthRate float64                       `json:"annualGrowthRate"`
-	Volatility       float64                       `json:"volatility"`
-	StartDate        types.IsoDate                 `json:"startDate"`
-	EndDate          *types.IsoDate                `json:"endDate,omitempty"`
-	AnnualCap        *float64                      `json:"annualCap,omitempty"`
-	Priority         int                           `json:"priority"`
-	Enabled          bool                          `json:"enabled"`
+	ID              *string                       `json:"id,omitempty"`
+	Name            string                        `json:"name"`
+	SourceAccountID *string                       `json:"sourceAccountId,omitempty"`
+	Destinations    []string                      `json:"destinations,omitempty"`
+	Amount          types.PostingAmountResolution `json:"amount"`
+	Frequency       types.RecurrenceFrequency     `json:"frequency"`
+	StartDate       types.IsoDate                 `json:"startDate"`
+	EndDate         *types.IsoDate                `json:"endDate,omitempty"`
+	AnnualCap       *float64                      `json:"annualCap,omitempty"`
+	Priority        int                           `json:"priority"`
+	Enabled         bool                          `json:"enabled"`
 }
 
 func (b ruleBody) toRule(id string) types.RecurrenceRule {
 	out := types.RecurrenceRule{
 		Name: b.Name, SourceAccountID: b.SourceAccountID,
 		Destinations: b.Destinations, Amount: b.Amount, Frequency: b.Frequency,
-		AnnualRate: b.AnnualRate, AnnualGrowthRate: b.AnnualGrowthRate,
-		Volatility: b.Volatility, StartDate: b.StartDate, EndDate: b.EndDate,
+		StartDate: b.StartDate, EndDate: b.EndDate,
 		AnnualCap: b.AnnualCap, Priority: b.Priority, Enabled: b.Enabled,
 	}
 	if b.ID != nil {

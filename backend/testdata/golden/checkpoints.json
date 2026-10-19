@@ -61,10 +61,10 @@
           },
           "inputs": {}
         },
-        "priority": 1,
         "enabled": true,
         "id": "historical_checking",
-        "date": "2026-01-31"
+        "postedTime": 1769817600,
+        "transactionTime": 1769817600
       },
       {
         "name": "historical_brokerage",
@@ -79,10 +79,10 @@
           },
           "inputs": {}
         },
-        "priority": 1,
         "enabled": true,
         "id": "historical_brokerage",
-        "date": "2026-01-31"
+        "postedTime": 1769817600,
+        "transactionTime": 1769817600
       },
       {
         "name": "historical_loan",
@@ -95,10 +95,10 @@
           },
           "inputs": {}
         },
-        "priority": 1,
         "enabled": true,
         "id": "historical_loan",
-        "date": "2026-01-31"
+        "postedTime": 1769817600,
+        "transactionTime": 1769817600
       }
     ],
     "recurrenceRules": [
@@ -116,9 +116,6 @@
           "inputs": {}
         },
         "frequency": "monthly",
-        "annualRate": 0,
-        "annualGrowthRate": 0,
-        "volatility": 0,
         "startDate": "2026-02-05",
         "endDate": "2026-02-05",
         "annualCap": null,
@@ -138,9 +135,6 @@
           "inputs": {}
         },
         "frequency": "monthly",
-        "annualRate": 0,
-        "annualGrowthRate": 0,
-        "volatility": 0,
         "startDate": "2026-02-06",
         "endDate": "2026-02-06",
         "annualCap": null,
@@ -162,9 +156,6 @@
           "inputs": {}
         },
         "frequency": "monthly",
-        "annualRate": 0,
-        "annualGrowthRate": 0,
-        "volatility": 0,
         "startDate": "2026-02-10",
         "endDate": "2026-02-10",
         "annualCap": null,
@@ -194,9 +185,6 @@
           }
         },
         "frequency": "monthly",
-        "annualRate": 0,
-        "annualGrowthRate": 0,
-        "volatility": 0,
         "startDate": "2026-02-20",
         "endDate": "2026-02-20",
         "annualCap": null,
@@ -567,9 +555,6 @@
             "inputs": {}
           },
           "frequency": "once",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-01-31",
           "endDate": null,
           "annualCap": null,
@@ -591,9 +576,6 @@
             "inputs": {}
           },
           "frequency": "once",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-01-31",
           "endDate": null,
           "annualCap": null,
@@ -613,9 +595,6 @@
             "inputs": {}
           },
           "frequency": "once",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-01-31",
           "endDate": null,
           "annualCap": null,
@@ -637,9 +616,6 @@
             "inputs": {}
           },
           "frequency": "monthly",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-02-05",
           "endDate": "2026-02-05",
           "annualCap": null,
@@ -659,9 +635,6 @@
             "inputs": {}
           },
           "frequency": "monthly",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-02-06",
           "endDate": "2026-02-06",
           "annualCap": null,
@@ -683,9 +656,6 @@
             "inputs": {}
           },
           "frequency": "monthly",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-02-10",
           "endDate": "2026-02-10",
           "annualCap": null,
@@ -715,9 +685,6 @@
             }
           },
           "frequency": "monthly",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-02-20",
           "endDate": "2026-02-20",
           "annualCap": null,

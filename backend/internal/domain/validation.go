@@ -283,14 +283,18 @@ func validateMovementAmounts(issues *[]types.ModelValidationIssue, document *typ
 	for index := range document.Postings {
 		posting := &document.Postings[index]
 		validateAmount(posting.ID, posting.Amount, []any{"postings", index})
+		if CountVolatileRateInputs(posting.Amount) > 1 {
+			addIssue(issues, types.SeverityError, "posting.amount.multiple_volatile_rates",
+				"Amounts carry at most one volatile occurrence-rate input: one movement shares one pre-sampled annual rate.",
+				pathWithField([]any{"postings", index}, "amount")...)
+		}
 	}
 	for index := range document.RecurrenceRules {
 		rule := &document.RecurrenceRules[index]
 		validateAmount(rule.ID, rule.Amount, []any{"recurrenceRules", index})
-		if rule.Amount.Resolver != "expression" &&
-			(rule.AnnualRate != 0 || rule.AnnualGrowthRate != 0 || rule.Volatility != 0) {
-			addIssue(issues, types.SeverityError, "posting.amount.non_expression_rates",
-				"Non-expression amount resolvers require annualRate, annualGrowthRate, and volatility to be zero.",
+		if CountVolatileRateInputs(rule.Amount) > 1 {
+			addIssue(issues, types.SeverityError, "posting.amount.multiple_volatile_rates",
+				"Amounts carry at most one volatile occurrence-rate input: one movement shares one pre-sampled annual rate.",
 				pathWithField([]any{"recurrenceRules", index}, "amount")...)
 		}
 	}
@@ -386,10 +390,15 @@ func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []type
 				"Posting sourceAccountId must not appear in destinations.",
 				[]any{"postings", index}...)
 		}
-		if !IsValidIsoDate(posting.Date) {
-			addIssue(issues, types.SeverityError, "posting.date.format",
-				fmt.Sprintf("Posting '%s' date must be a YYYY-MM-DD calendar date.", posting.ID),
-				pathWithField([]any{"postings", index}, "date")...)
+		if posting.PostedTime <= 0 {
+			addIssue(issues, types.SeverityError, "posting.postedTime.invalid",
+				fmt.Sprintf("Posting '%s' posted time must be positive Unix seconds.", posting.ID),
+				pathWithField([]any{"postings", index}, "postedTime")...)
+		}
+		if posting.TransactionTime <= 0 {
+			addIssue(issues, types.SeverityError, "posting.transactionTime.invalid",
+				fmt.Sprintf("Posting '%s' transaction time must be positive Unix seconds.", posting.ID),
+				pathWithField([]any{"postings", index}, "transactionTime")...)
 		}
 	}
 }

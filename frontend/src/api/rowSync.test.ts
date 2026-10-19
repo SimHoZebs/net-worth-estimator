@@ -41,8 +41,8 @@ const posting = (id: string, name = id): BackendPosting => ({
 	sourceAccountId: null,
 	destinations: null,
 	amount: { resolver: "expression", config: { expression: "10" }, inputs: {} },
-	date: "2026-08-01",
-	priority: 1,
+	postedTime: 1785542400,
+	transactionTime: 1785542400,
 	enabled: true,
 });
 

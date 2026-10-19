@@ -2,6 +2,7 @@ import { todayIso } from "../domain/format.ts";
 import { finite, isRecord } from "../domain/guards.ts";
 import type { Account, Movement, Plan } from "../domain/model.ts";
 import {
+	type AmountInputBinding,
 	type BackendAccount,
 	type BackendCheckpoint,
 	type BackendPosting,
@@ -54,11 +55,10 @@ export interface MovementPresentation {
 	amountValue?: number;
 	destinations?: string[] | null;
 	frequency?: RecurrenceFrequency;
-	annualRate?: number;
-	annualGrowthRate?: number;
-	volatility?: number;
 	annualCap?: number | null;
 	priority?: number;
+	postedTime?: number;
+	transactionTime?: number;
 
 	readOnly: boolean;
 	displayFrequency?: Movement["frequency"];
@@ -237,7 +237,12 @@ function fallbackStartDate(
 		projection?.milestones.projectionStartDate ??
 		latestDate(document.checkpoints.map((checkpoint) => checkpoint.Date)) ??
 		(document.recurrenceRules ?? [])[0]?.startDate ??
-		document.postings[0]?.date ??
+		(document.postings[0]
+			? dayFromTimes(
+					document.postings[0].transactionTime,
+					document.postings[0].postedTime,
+				)
+			: undefined) ??
 		todayIso()
 	);
 }
@@ -247,6 +252,124 @@ function numericExpression(value: string | undefined): number | null {
 	const trimmed = value.trim();
 	if (!/^-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i.test(trimmed)) return null;
 	return finite(Number(trimmed));
+}
+
+/**
+ * Growth helpers: a movement's annual increase lives in its amount inputs
+ * as a growth-factor provider, the same descriptor one-time postings use.
+ * These mirror the backend migration so the display plan reads and writes
+ * growth without dedicated rule columns.
+ */
+function growthInputOf(
+	amount: PostingAmountResolution | undefined | null,
+): { name: string; rate: number } | null {
+	const inputs = amount?.inputs ?? {};
+	const names = Object.keys(inputs).sort();
+	for (const name of names) {
+		const binding = inputs[name];
+		if (
+			binding?.source !== "provider" ||
+			binding.provider !== "growth-factor"
+		) {
+			continue;
+		}
+		const rate = finite(binding.arguments?.annualGrowthRate);
+		if (rate === null) continue;
+		return { name, rate };
+	}
+	return null;
+}
+
+function growthRateOfAmount(
+	amount: PostingAmountResolution | undefined | null,
+): number | null {
+	return growthInputOf(amount)?.rate ?? null;
+}
+
+function withGrowthRate(
+	amount: PostingAmountResolution,
+	rate: number,
+): PostingAmountResolution {
+	const inputs: Record<string, AmountInputBinding> = {};
+	for (const [key, value] of Object.entries(
+		(objectValue(amount.inputs as JsonValue) ?? {}) as Record<string, JsonValue>,
+	)) {
+		inputs[key] = value as unknown as AmountInputBinding;
+	}
+	const existing = growthInputOf({ ...amount, inputs });
+	if (rate === 0) {
+		if (!existing) return amount;
+		const reference = new RegExp(`\\b${existing.name}\\b`).test(
+			expressionOf(amount),
+		);
+		if (!reference) {
+			delete inputs[existing.name];
+			return { ...amount, inputs };
+		}
+		const stripped = stripGrowthReference(
+			expressionOf(amount),
+			existing.name,
+		);
+		if (stripped !== null) {
+			delete inputs[existing.name];
+			return {
+				...amount,
+				config: { ...objectValue(amount.config), expression: stripped },
+				inputs,
+			};
+		}
+		inputs[existing.name] = {
+			...inputs[existing.name]!,
+			arguments: { ...inputs[existing.name]?.arguments, annualGrowthRate: 0 },
+		};
+		return { ...amount, inputs };
+	}
+	const name = existing?.name ?? uniqueInputName(inputs, "growth");
+	inputs[name] = {
+		source: "provider",
+		provider: "growth-factor",
+		arguments: { annualGrowthRate: rate },
+	};
+	if (new RegExp(`\\b${name}\\b`).test(expressionOf(amount))) {
+		return { ...amount, inputs };
+	}
+	return {
+		...amount,
+		config: {
+			...objectValue(amount.config),
+			expression: `(${expressionOf(amount)}) * ${name}`,
+		},
+		inputs,
+	};
+}
+
+function expressionOf(amount: PostingAmountResolution): string {
+	const config = objectValue(amount.config);
+	return typeof config?.expression === "string" ? config.expression : "";
+}
+
+function uniqueInputName(
+	inputs: Record<string, AmountInputBinding>,
+	base: string,
+): string {
+	if (!Object.hasOwn(inputs, base)) return base;
+	let index = 2;
+	while (Object.hasOwn(inputs, `${base}_${index}`)) index += 1;
+	return `${base}_${index}`;
+}
+
+function stripGrowthReference(
+	expression: string,
+	name: string,
+): string | null {
+	const suffix = ` * ${name}`;
+	if (!expression.endsWith(suffix)) return null;
+	let core = expression.slice(0, -suffix.length);
+	if (core.startsWith("(") && core.endsWith(")") && core.length >= 2) {
+		core = core.slice(1, -1);
+	}
+	if (new RegExp(`\\b${name}\\b`).test(core)) return null;
+	return core;
 }
 
 function postingAmountValue(
@@ -354,6 +477,16 @@ function firstDestinationOf(
 	return destinations?.[0] ?? null;
 }
 
+function dayFromTimes(transactionTime: number, postedTime: number): IsoDate {
+	const stamp =
+		transactionTime > 0 ? transactionTime : postedTime > 0 ? postedTime : 0;
+	return new Date(stamp * 1000).toISOString().slice(0, 10) as IsoDate;
+}
+
+function midnightOf(day: IsoDate): number {
+	return Math.floor(new Date(`${day}T00:00:00Z`).getTime() / 1000);
+}
+
 function movementDisplayFromRule(
 	rule: BackendRecurrenceRule,
 	amount: number | null,
@@ -371,7 +504,8 @@ function movementDisplayFromRule(
 		startDate: rule.startDate,
 		endDate: rule.endDate,
 		annualIncrease:
-			previous?.displayAnnualIncrease ?? rule.annualGrowthRate * 100,
+			previous?.displayAnnualIncrease ??
+			(growthRateOfAmount(rule.amount) ?? 0) * 100,
 		enabled: rule.enabled,
 		readOnly: previous?.readOnly ?? amount === null,
 		claimRuleId: null,
@@ -393,7 +527,7 @@ function movementDisplayFromPosting(
 		fromId: posting.sourceAccountId,
 		toId: firstDestination,
 		frequency: "once",
-		startDate: posting.date,
+		startDate: dayFromTimes(posting.transactionTime, posting.postedTime),
 		endDate: null,
 		annualIncrease: previous?.displayAnnualIncrease ?? 0,
 		enabled: posting.enabled,
@@ -492,15 +626,11 @@ function addForwardRuleWarnings(
 		);
 		provisional(target, `${path}.toId`);
 	}
-	if (
-		rule.annualRate !== 0 ||
-		rule.volatility !== 0 ||
-		rule.annualCap !== null
-	) {
+	if (rule.annualCap !== null) {
 		warn(
 			target,
 			"posting-metadata",
-			"Backend annual rate, volatility, and annual cap are preserved as presentation state.",
+			"Backend annual cap is preserved as presentation state.",
 			path,
 		);
 		provisional(target, `${path}.metadata`);
@@ -589,9 +719,6 @@ function buildPresentationRule(
 			: (amount ?? previous?.amountValue),
 		destinations: presentationDestinations,
 		frequency: previous?.frequency ?? rule.frequency,
-		annualRate: previous?.annualRate ?? rule.annualRate,
-		annualGrowthRate: previous?.annualGrowthRate ?? rule.annualGrowthRate,
-		volatility: previous?.volatility ?? rule.volatility,
 		annualCap: previous?.annualCap ?? rule.annualCap,
 		priority: previous?.priority ?? rule.priority,
 		readOnly: previous?.readOnly ?? amount === null,
@@ -599,7 +726,8 @@ function buildPresentationRule(
 			previous?.displayFrequency ?? displayFrequency(rule.frequency),
 		displayToId: previous?.displayToId ?? rule.destinations?.[0] ?? null,
 		displayAnnualIncrease:
-			previous?.displayAnnualIncrease ?? rule.annualGrowthRate * 100,
+			previous?.displayAnnualIncrease ??
+			(growthRateOfAmount(rule.amount) ?? 0) * 100,
 	};
 }
 
@@ -628,7 +756,8 @@ function buildPresentationPosting(
 			? (previous?.amountValue ?? amount)
 			: (amount ?? previous?.amountValue),
 		destinations: presentationDestinations,
-		priority: previous?.priority ?? posting.priority,
+		postedTime: previous?.postedTime ?? posting.postedTime,
+		transactionTime: previous?.transactionTime ?? posting.transactionTime,
 		readOnly:
 			previous?.readOnly ?? (amount === null || posting.source === "simplefin"),
 		displayToId: previous?.displayToId ?? posting.destinations?.[0] ?? null,
@@ -1038,6 +1167,16 @@ export function displayPlanToBackendDocument(
 
 	const postings: BackendPosting[] = [];
 	const recurrenceRules: BackendRecurrenceRule[] = [];
+	let rulePosition = 0;
+	const sourceRuleOrder = (sourceDocument?.recurrenceRules ?? []).map(
+		(rule) => rule.id,
+	);
+	const planRuleOrder = plan.movements
+		.filter((movement) => movement.frequency !== "once")
+		.map((movement) => movement.id);
+	const ruleOrderKept =
+		sourceRuleOrder.length === planRuleOrder.length &&
+		sourceRuleOrder.every((id, position) => planRuleOrder[position] === id);
 	plan.movements.forEach((movement, index) => {
 		const storedExtras = movementPresentations[movement.id];
 		const storedPosting = sourcePostings.get(movement.id);
@@ -1132,13 +1271,25 @@ export function displayPlanToBackendDocument(
 			"Transaction read-only state stays local and is not imported.",
 			`movements.${index}`,
 		);
-		const priority =
-			storedExtras?.priority ??
-			storedPosting?.priority ??
-			storedRule?.priority ??
-			index + 1;
 		if (movement.frequency === "once") {
 			const source = storedExtras?.source ?? storedPosting?.source;
+			const storedPostedTime =
+				storedExtras?.postedTime ?? storedPosting?.postedTime ?? null;
+			const storedTransactionTime =
+				storedExtras?.transactionTime ?? storedPosting?.transactionTime ?? null;
+			const storedDay =
+				storedPostedTime !== null && storedTransactionTime !== null
+					? dayFromTimes(storedTransactionTime, storedPostedTime)
+					: null;
+			const midnight = midnightOf(movement.startDate);
+			const postedTime =
+				storedDay === movement.startDate && storedPostedTime !== null
+					? storedPostedTime
+					: midnight;
+			const transactionTime =
+				storedDay === movement.startDate && storedTransactionTime !== null
+					? storedTransactionTime
+					: midnight;
 			postings.push({
 				...storedPosting,
 				id: movement.id,
@@ -1146,7 +1297,8 @@ export function displayPlanToBackendDocument(
 				sourceAccountId: movement.fromId,
 				destinations,
 				amount,
-				date: movement.startDate,
+				postedTime,
+				transactionTime,
 				claim:
 					movement.claimRuleId && movement.claimOccurrenceDate
 						? {
@@ -1154,12 +1306,12 @@ export function displayPlanToBackendDocument(
 								occurrenceDate: movement.claimOccurrenceDate,
 							}
 						: null,
-				priority,
 				enabled: movement.enabled,
 				...(source === undefined ? {} : { source }),
 			});
 			return;
 		}
+		rulePosition += 1;
 		const previousDisplayFrequency =
 			storedExtras?.displayFrequency ??
 			(storedRule ? displayFrequency(storedRule.frequency) : undefined);
@@ -1169,34 +1321,32 @@ export function displayPlanToBackendDocument(
 				storedRule?.frequency ??
 				backendFrequency(movement.frequency))
 			: backendFrequency(movement.frequency);
-		const previousDisplayAnnualIncrease =
-			storedExtras?.displayAnnualIncrease ??
-			(storedRule ? storedRule.annualGrowthRate * 100 : undefined);
-		const sameGrowth =
-			previousDisplayAnnualIncrease !== undefined &&
-			sameNumber(previousDisplayAnnualIncrease, movement.annualIncrease);
-		const annualGrowthRate = sameGrowth
-			? (storedExtras?.annualGrowthRate ??
-				storedRule?.annualGrowthRate ??
-				movement.annualIncrease / 100)
+		const storedGrowth = growthRateOfAmount(preservedAmount) ?? 0;
+		const sameGrowth = sameNumber(
+			storedGrowth * 100,
+			movement.annualIncrease,
+		);
+		const effectiveGrowth = sameGrowth
+			? storedGrowth
 			: movement.annualIncrease / 100;
-		const annualRate = storedExtras?.annualRate ?? storedRule?.annualRate ?? 0;
-		const volatility = storedExtras?.volatility ?? storedRule?.volatility ?? 0;
+		const grownAmount =
+			effectiveGrowth !== 0 || growthRateOfAmount(amount) !== null
+				? withGrowthRate(amount, effectiveGrowth)
+				: amount;
 		recurrenceRules.push({
 			...storedRule,
 			id: movement.id,
 			name: movement.name,
 			sourceAccountId: movement.fromId,
 			destinations,
-			amount,
+			amount: grownAmount,
 			frequency,
-			annualRate,
-			annualGrowthRate,
-			volatility,
 			startDate: movement.startDate,
 			endDate: movement.endDate,
 			annualCap: storedExtras?.annualCap ?? storedRule?.annualCap ?? null,
-			priority,
+			priority: ruleOrderKept
+				? (storedExtras?.priority ?? storedRule?.priority ?? rulePosition)
+				: rulePosition,
 			enabled: movement.enabled,
 		});
 	});

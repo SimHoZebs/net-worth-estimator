@@ -12,7 +12,7 @@ export type SegmentPattern = "solid" | "stripes" | "dots" | "hatch";
  * so consumers cannot place similar greens side by side. The pale and dark
  * fills stay in CSS/tokens for the snapshot SVG, which addresses them
  * directly — they are not valid SegmentTone values. */
-export type SegmentTone = "sage" | "amber" | "blue" | "plum";
+export type SegmentTone = "sage" | "tan" | "blue" | "plum";
 
 export interface BarSegment {
 	label: string;

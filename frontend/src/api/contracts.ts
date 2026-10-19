@@ -104,9 +104,9 @@ export interface BackendPosting extends HumaMetadata {
 	sourceAccountId: string | null;
 	destinations: string[] | null;
 	amount: PostingAmountResolution;
-	date: IsoDate;
+	postedTime: number;
+	transactionTime: number;
 	claim?: PostingClaim | null;
-	priority: number;
 	enabled: boolean;
 	source?: string;
 }
@@ -119,9 +119,6 @@ export interface BackendRecurrenceRule extends HumaMetadata {
 	destinations: string[] | null;
 	amount: PostingAmountResolution;
 	frequency: RecurrenceFrequency;
-	annualRate: number;
-	annualGrowthRate: number;
-	volatility: number;
 	startDate: IsoDate;
 	endDate: IsoDate | null;
 	annualCap: number | null;

@@ -42,13 +42,14 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 	if _, ok := checkpointsByDate[projectionStartDate]; ok {
 		hasStartDateCheckpoint = true
 	}
-	// History merges manual postings dated at or before the start with the
-	// rule occurrences needed for checkpoint replay. A manual posting
-	// dated exactly on the start replays only when a start checkpoint
-	// exists; claimed rule occurrences never replay because the claiming
-	// actual stands in for them. Same-date order is rules first in rule
-	// order, then manuals in document order (matching Simulate), via one
-	// shared resolution sequence.
+	// History merges manual postings with transaction day at or before the
+	// start with the rule occurrences needed for checkpoint replay. A manual
+	// posting with transaction day exactly on the start replays only when a
+	// start checkpoint exists; claimed rule occurrences never replay because
+	// the claiming actual stands in for them. Same-day order is one-time
+	// postings first by transaction time, posted time, then ID, followed by
+	// rule instances by priority (matching Simulate), via one shared
+	// resolution sequence.
 	occurrencesByDate := map[string][]DatedPostingOccurrence{}
 
 	earliestCheckpointDate := ""
@@ -70,10 +71,14 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 
 	for index := range document.Postings {
 		posting := &document.Postings[index]
-		isBeforeStart := CompareIsoDates(posting.Date, projectionStartDate) < 0
-		isStartWithCheckpoint := hasStartDateCheckpoint && posting.Date == projectionStartDate
+		day := postingDay(posting)
+		if day == "" {
+			continue
+		}
+		isBeforeStart := CompareIsoDates(day, projectionStartDate) < 0
+		isStartWithCheckpoint := hasStartDateCheckpoint && day == projectionStartDate
 		if posting.Enabled && (isBeforeStart || isStartWithCheckpoint) {
-			occurrencesByDate[posting.Date] = append(occurrencesByDate[posting.Date], DatedPostingOccurrence{Posting: posting, Index: manualIndexBase + index, Rule: nil, DocPath: []any{"postings", index}})
+			occurrencesByDate[day] = append(occurrencesByDate[day], DatedPostingOccurrence{Posting: posting, Index: manualIndexBase + index, Rule: nil, DocPath: []any{"postings", index}})
 		}
 	}
 

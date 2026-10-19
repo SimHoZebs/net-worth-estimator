@@ -74,7 +74,7 @@ func testExpressionPosting(id string, source *string, destinations []string, ena
 			Resolver: "expression",
 			Config:   map[string]any{"expression": "100"},
 		},
-		Date: "2026-01-15", Priority: 1, Enabled: enabled,
+		PostedTime: 1768435200, TransactionTime: 1768435200, Enabled: enabled,
 	}
 }
 

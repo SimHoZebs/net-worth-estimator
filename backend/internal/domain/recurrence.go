@@ -2,12 +2,13 @@ package domain
 
 import (
 	"sort"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 // Rule expansion and claim suppression. Rules own repetition; postings own
-// dated movements. Expansion is virtual: rule occurrences are synthesized at
+// timed movements. Expansion is virtual: rule occurrences are synthesized at
 // projection time and never stored. A synthesized instance carries the rule's
 // ID, so all downstream ledgers (realized amounts, annual caps, movement
 // origins, evaluation references) key on one stable identity per rule.
@@ -22,16 +23,56 @@ type DatedPostingOccurrence struct {
 	DocPath []any
 }
 
-// sortOccurrences orders same-date postings by ascending priority and
-// declaration sequence. Simulate, history replay, and the financial
-// independence branch share this order so one edit changes all three.
+// sortOccurrences orders same-day occurrences with one-time postings
+// first, then scheduled rule instances. Within one-time postings it orders
+// by transaction time, then posted time, then ID. Within rule instances it
+// orders by rule priority, then declaration sequence. Simulate, history
+// replay, and the financial independence branch share this order so one
+// edit changes all three.
 func sortOccurrences(occurrences []DatedPostingOccurrence) {
 	sort.SliceStable(occurrences, func(i, j int) bool {
-		if occurrences[i].Posting.Priority != occurrences[j].Posting.Priority {
-			return occurrences[i].Posting.Priority < occurrences[j].Posting.Priority
+		leftRule := occurrences[i].Rule != nil
+		rightRule := occurrences[j].Rule != nil
+		if leftRule != rightRule {
+			return !leftRule && rightRule
+		}
+		if !leftRule {
+			leftPosting := occurrences[i].Posting
+			rightPosting := occurrences[j].Posting
+			if leftPosting.TransactionTime != rightPosting.TransactionTime {
+				return leftPosting.TransactionTime < rightPosting.TransactionTime
+			}
+			if leftPosting.PostedTime != rightPosting.PostedTime {
+				return leftPosting.PostedTime < rightPosting.PostedTime
+			}
+			if leftPosting.ID != rightPosting.ID {
+				return leftPosting.ID < rightPosting.ID
+			}
+			return occurrences[i].Index < occurrences[j].Index
+		}
+		if occurrences[i].Rule.Priority != occurrences[j].Rule.Priority {
+			return occurrences[i].Rule.Priority < occurrences[j].Rule.Priority
 		}
 		return occurrences[i].Index < occurrences[j].Index
 	})
+}
+
+// postingDay returns the UTC calendar day for a posting, derived from
+// transaction time with posted time as fallback.
+func postingDay(posting *types.Posting) string {
+	stamp := posting.TransactionTime
+	if stamp <= 0 {
+		stamp = posting.PostedTime
+	}
+	if stamp <= 0 {
+		return ""
+	}
+	return FormatIsoDate(time.Unix(stamp, 0).UTC())
+}
+
+// midnightUnix returns Unix seconds for UTC midnight of a calendar day.
+func midnightUnix(date string) int64 {
+	return MustParseIsoDate(date).Unix()
 }
 
 // FrequencyDivisor converts annual rates to per-occurrence rates.
@@ -185,14 +226,15 @@ func ResolveOccurrences(rules []types.RecurrenceRule, postings []types.Posting, 
 	sequence := 0
 	for _, spec := range specs {
 		rule := &rules[spec.ruleIndex]
+		midnight := midnightUnix(spec.date)
 		resolved.Instances = append(resolved.Instances, types.Posting{
 			ID:              rule.ID,
 			Name:            rule.Name,
 			SourceAccountID: rule.SourceAccountID,
 			Destinations:    rule.Destinations,
 			Amount:          rule.Amount,
-			Date:            spec.date,
-			Priority:        rule.Priority,
+			PostedTime:      midnight,
+			TransactionTime: midnight,
 			Enabled:         true,
 		})
 		instance := &resolved.Instances[len(resolved.Instances)-1]
@@ -209,10 +251,11 @@ func ResolveOccurrences(rules []types.RecurrenceRule, postings []types.Posting, 
 		if !posting.Enabled {
 			continue
 		}
-		if !inWindow(posting.Date) {
+		day := postingDay(posting)
+		if day == "" || !inWindow(day) {
 			continue
 		}
-		resolved.ByDate[posting.Date] = append(resolved.ByDate[posting.Date], DatedPostingOccurrence{
+		resolved.ByDate[day] = append(resolved.ByDate[day], DatedPostingOccurrence{
 			Posting: posting,
 			Index:   sequence,
 			Rule:    nil,
@@ -235,10 +278,10 @@ func incomeDivisor(occurrence DatedPostingOccurrence) int {
 
 // ResolvedMovementPostings returns every movement identity in a document
 // as postings: manual postings in stored order, then one synthesized entry
-// per rule carrying the rule's template (ID, name, routes, amount,
-// priority). Evaluation lookups keyed by origin ID work over this list
-// without caring which side an ID came from. Caps are not carried: they
-// live on rules and resolve through RuleCapsByID.
+// per rule carrying the rule's template (ID, name, routes, amount).
+// Evaluation lookups keyed by origin ID work over this list without caring
+// which side an ID came from. Caps are not carried: they live on rules and
+// resolve through RuleCapsByID.
 func ResolvedMovementPostings(document *types.FinancialModelDocument) []types.Posting {
 	out := make([]types.Posting, 0, len(document.Postings)+len(document.RecurrenceRules))
 	out = append(out, document.Postings...)
@@ -250,7 +293,6 @@ func ResolvedMovementPostings(document *types.FinancialModelDocument) []types.Po
 			SourceAccountID: rule.SourceAccountID,
 			Destinations:    rule.Destinations,
 			Amount:          rule.Amount,
-			Priority:        rule.Priority,
 			Enabled:         rule.Enabled,
 			Claim:           nil,
 		})

@@ -71,9 +71,6 @@
           "inputs": {}
         },
         "frequency": "monthly",
-        "annualRate": 0,
-        "annualGrowthRate": 0,
-        "volatility": 0,
         "startDate": "2026-02-05",
         "endDate": null,
         "annualCap": null,
@@ -92,9 +89,6 @@
           "inputs": {}
         },
         "frequency": "monthly",
-        "annualRate": 0,
-        "annualGrowthRate": 0,
-        "volatility": 0,
         "startDate": "2026-02-06",
         "endDate": "2026-02-06",
         "annualCap": null,
@@ -229,7 +223,6 @@
                     "name": "checking"
                   }
                 ],
-                "priority": 1,
                 "annualCap": null,
                 "requestedAmount": 0,
                 "realizedAmount": 0,
@@ -245,7 +238,6 @@
                 "sourceAccountId": "checking",
                 "sourceAccountLabel": "checking",
                 "destinations": null,
-                "priority": 1,
                 "annualCap": null,
                 "requestedAmount": 0,
                 "realizedAmount": 0,

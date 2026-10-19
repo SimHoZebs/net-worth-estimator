@@ -110,10 +110,19 @@ function latestDate(values: string[]): string | null {
 }
 
 export function projectionStartDate(document: FinancialModelDocument): string {
+	const posting = document.postings[0];
 	return (
 		latestDate(document.checkpoints.map((checkpoint) => checkpoint.Date)) ??
 		(document.recurrenceRules ?? [])[0]?.startDate ??
-		document.postings[0]?.date ??
+		(posting
+			? new Date(
+					(posting.transactionTime > 0
+						? posting.transactionTime
+						: posting.postedTime) * 1000,
+				)
+					.toISOString()
+					.slice(0, 10)
+			: undefined) ??
 		todayIso()
 	);
 }

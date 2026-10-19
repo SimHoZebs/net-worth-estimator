@@ -11,9 +11,6 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// PendingPriority matches the sibling charge tier in the seed postings.
-const PendingPriority = 6
-
 // SkipReason counts rows the mapper deliberately drops.
 type SkipReason string
 
@@ -190,6 +187,14 @@ func Map(set *AccountSet, config Config, resolved map[string]string, now time.Ti
 				continue
 			}
 			source := modelAccountID
+			postedTime := transaction.Posted
+			if postedTime <= 0 {
+				postedTime = now.Unix()
+			}
+			transactionTime := postedTime
+			if transaction.TransactedAt != nil && *transaction.TransactedAt > 0 {
+				transactionTime = *transaction.TransactedAt
+			}
 			plan.Pending = append(plan.Pending, types.Posting{
 				ID:              PendingPostingID(modelAccountID, transaction.ID),
 				Name:            truncateLabel(transaction.Description),
@@ -199,9 +204,9 @@ func Map(set *AccountSet, config Config, resolved map[string]string, now time.Ti
 					Config:   map[string]any{"expression": abs},
 					Inputs:   map[string]types.AmountInputBinding{},
 				},
-				Date:     types.IsoDate(transaction.PostedDay(now)),
-				Priority: PendingPriority,
-				Enabled:  false,
+				PostedTime:      postedTime,
+				TransactionTime: transactionTime,
+				Enabled:         false,
 			})
 		}
 	}

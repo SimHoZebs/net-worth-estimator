@@ -28,8 +28,8 @@
 	.seg-dark {
 		background-color: var(--track-fill);
 	}
-	.seg-amber {
-		background-color: var(--seg-amber);
+	.seg-tan {
+		background-color: var(--seg-tan);
 	}
 	.seg-blue {
 		background-color: var(--seg-blue);

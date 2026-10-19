@@ -214,10 +214,10 @@ func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source stri
 		claimOccurrenceDate = posting.Claim.OccurrenceDate
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, date, claim_rule_id, claim_occurrence_date, priority, enabled, source)
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, posted_time, transaction_time, claim_rule_id, claim_occurrence_date, enabled, source)
 		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
 		posting.ID, position, posting.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
-		posting.Date, claimRuleID, claimOccurrenceDate, posting.Priority, boolToInt(posting.Enabled), source,
+		posting.PostedTime, posting.TransactionTime, claimRuleID, claimOccurrenceDate, boolToInt(posting.Enabled), source,
 	); err != nil {
 		return fmt.Errorf("insert posting %s: %w", posting.ID, err)
 	}
@@ -248,10 +248,10 @@ func insertRule(tx *sql.Tx, position int, rule *types.RecurrenceRule) error {
 		annualCap = *rule.AnnualCap
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO recurrence_rules (id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`INSERT INTO recurrence_rules (id, position, name, source_account_id, destinations, amount_json, frequency, start_date, end_date, annual_cap, priority, enabled)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
 		rule.ID, position, rule.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
-		string(rule.Frequency), rule.AnnualRate, rule.AnnualGrowthRate, rule.Volatility,
+		string(rule.Frequency),
 		rule.StartDate, endDate, annualCap, rule.Priority, boolToInt(rule.Enabled),
 	); err != nil {
 		return fmt.Errorf("insert recurrence rule %s: %w", rule.ID, err)
@@ -292,7 +292,7 @@ func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 	var destinationsJSON, amountJSON string
 	var enabled int64
 	var source sql.NullString
-	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &posting.Date, &claimRuleID, &claimOccurrenceDate, &posting.Priority, &enabled, &source); err != nil {
+	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &posting.PostedTime, &posting.TransactionTime, &claimRuleID, &claimOccurrenceDate, &enabled, &source); err != nil {
 		return types.Posting{}, err
 	}
 	if sourceAccountID.Valid {
@@ -326,7 +326,7 @@ func scanRuleRow(rows *sql.Rows) (types.RecurrenceRule, error) {
 	var frequency string
 	var enabled int64
 	var capNull sql.NullFloat64
-	if err := rows.Scan(&rule.ID, &rule.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &frequency, &rule.AnnualRate, &rule.AnnualGrowthRate, &rule.Volatility, &rule.StartDate, &endDate, &capNull, &rule.Priority, &enabled); err != nil {
+	if err := rows.Scan(&rule.ID, &rule.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &frequency, &rule.StartDate, &endDate, &capNull, &rule.Priority, &enabled); err != nil {
 		return types.RecurrenceRule{}, err
 	}
 	if sourceAccountID.Valid {
@@ -485,7 +485,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close checkpoints: %w", err)
 	}
 
-	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_json, date, claim_rule_id, claim_occurrence_date, priority, enabled, source FROM postings ORDER BY position`)
+	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_json, posted_time, transaction_time, claim_rule_id, claim_occurrence_date, enabled, source FROM postings ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -505,7 +505,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close postings: %w", err)
 	}
 
-	ruleRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules ORDER BY position`)
+	ruleRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
