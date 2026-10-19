@@ -24,11 +24,10 @@ import { resolveMovementAmounts } from "../domain/resolvedMovementAmounts.ts";
 import type { Projection } from "../domain/result.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
-import { AccountsPanel, BalanceChecksPanel } from "./plan/AccountsPanel.tsx";
+import { AccountsPanel } from "./plan/AccountsPanel.tsx";
 import { MovementsPanel } from "./plan/MovementsPanel.tsx";
 
 export type PlanView = "accounts" | "transactions";
-type AccountsSection = "accounts" | "checks";
 
 type ScheduleFilter = "all" | "recurring";
 
@@ -158,34 +157,15 @@ function AccountsView({
 	onUpdate: (plan: Plan) => boolean;
 	onAccount: (id: string) => void;
 }) {
-	const [tab, setTab] = useState<AccountsSection>("accounts");
 	const [query, setQuery] = useState("");
 	const { requestRemoval, dialog } = usePlanRemoval({ plan, onUpdate });
 	const visible = visibleAccounts(plan.accounts);
-	const tabs: TabItem<AccountsSection>[] = [
-		{ id: "accounts", label: "Accounts", count: visible.length },
-		{
-			id: "checks",
-			label: "Starting balances",
-			count: visible.filter((account) => account.balanceCheck).length,
-		},
-	];
 	const accounts = visible.filter((account) =>
 		account.name.toLowerCase().includes(query.toLowerCase()),
 	);
 	return (
 		<>
-			<Tabs
-				items={tabs}
-				value={tab}
-				onChange={(next) => {
-					setTab(next);
-					setQuery("");
-				}}
-				label="Accounts sections"
-				panelAs="section"
-				panelClassName="panel plan-panel"
-			>
+			<section className="panel plan-panel">
 				<div className="plan-toolbar">
 					<label className="search-field">
 						<Search size={17} />
@@ -205,23 +185,15 @@ function AccountsView({
 						Add account
 					</button>
 				</div>
-				{tab === "accounts" && (
-					<AccountsPanel
-						accounts={accounts}
-						onAccount={onAccount}
-						onEdit={(item) => onEdit({ kind: "account", item })}
-						onRemove={(item) =>
-							requestRemoval({ kind: "accounts", id: item.id, name: item.name })
-						}
-					/>
-				)}
-				{tab === "checks" && (
-					<BalanceChecksPanel
-						accounts={accounts}
-						onEdit={(item) => onEdit({ kind: "account", item })}
-					/>
-				)}
-			</Tabs>
+				<AccountsPanel
+					accounts={accounts}
+					onAccount={onAccount}
+					onEdit={(item) => onEdit({ kind: "account", item })}
+					onRemove={(item) =>
+						requestRemoval({ kind: "accounts", id: item.id, name: item.name })
+					}
+				/>
+			</section>
 			{dialog}
 		</>
 	);

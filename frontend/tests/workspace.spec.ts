@@ -358,16 +358,14 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 	await page.goto("/#accounts");
 	await expect(
 		page.locator('.page-tabs[role="tablist"] > button[role="tab"]'),
-	).toHaveCount(2);
-	await page.getByRole("tab", { name: /Accounts/ }).focus();
-	await page.keyboard.press("ArrowRight");
-	await expect(
-		page.getByRole("tab", { name: /Starting balances/ }),
-	).toBeFocused();
+	).toHaveCount(0);
 	await page.goto("/#transactions");
 	await expect(
 		page.locator('.page-tabs[role="tablist"] > button[role="tab"]'),
 	).toHaveCount(2);
+	await page.getByRole("tab", { name: /All transactions/ }).focus();
+	await page.keyboard.press("ArrowRight");
+	await expect(page.getByRole("tab", { name: /Recurring/ })).toBeFocused();
 	await page.getByRole("tab", { name: /Recurring/ }).click();
 	await expect(page.getByRole("tab", { name: /Recurring/ })).toHaveAttribute(
 		"aria-selected",
