@@ -146,6 +146,26 @@ function PaycheckBar({ parts }: { parts: PaycheckDecomposition }) {
 	);
 }
 
+function TimingSectionHeader({
+	title,
+	subtitle,
+	total,
+}: {
+	title: string;
+	subtitle: string;
+	total: number;
+}) {
+	return (
+		<div className="section-top">
+			<div className="timing-section-title">
+				<h3>{title}</h3>
+				<p className="section-note">{subtitle}</p>
+			</div>
+			<strong className="timing-total">{money(total)}</strong>
+		</div>
+	);
+}
+
 function TransactionSectionView({
 	transactions,
 	caption,
@@ -397,13 +417,11 @@ export function TimingDetailDialog({
 								onChange={onTransactionOrderChange}
 							/>
 						</div>
-						<div className="section-top">
-							<div className="timing-section-title">
-								<h3>{thisMonth.title}</h3>
-								<p className="section-note">{thisMonth.subtitle}</p>
-							</div>
-							<strong className="timing-total">{money(thisMonth.total)}</strong>
-						</div>
+						<TimingSectionHeader
+							title={thisMonth.title}
+							subtitle={thisMonth.subtitle}
+							total={thisMonth.total}
+						/>
 						<TransactionSectionView
 							transactions={thisMonth.transactions}
 							caption={thisMonth.title}
@@ -442,23 +460,14 @@ export function TimingDetailDialog({
 					</div>
 				) : tab === "cycle" ? (
 					<div className="timing-mandatory">
-						<div className="section-top">
-							<div className="timing-section-title">
-								<h3>Card charges in this cycle</h3>
-								<p className="section-note">
-									{dateLabel(heroes.cycleStart, true)} to{" "}
-									{dateLabel(heroes.cycleEnd, true)}
-								</p>
-							</div>
-							<strong className="timing-total">
-								{money(
-									cycleTransactions.reduce(
-										(total, transaction) => total + transaction.amount,
-										0,
-									),
-								)}
-							</strong>
-						</div>
+						<TimingSectionHeader
+							title="Card charges in this cycle"
+							subtitle={`${dateLabel(heroes.cycleStart, true)} to ${dateLabel(heroes.cycleEnd, true)}`}
+							total={cycleTransactions.reduce(
+								(total, transaction) => total + transaction.amount,
+								0,
+							)}
+						/>
 						<div className="table-toolbar">
 							<TransactionSortButton
 								order={transactionOrder}
