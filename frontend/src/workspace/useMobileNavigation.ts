@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useDrawerSwipe } from "../components/drawer.ts";
+import { useHorizontalSwipe } from "../components/drawer.ts";
 import { useMediaQuery } from "../state/useMediaQuery.ts";
 
 export function useMobileNavigation() {
@@ -21,18 +21,24 @@ export function useMobileNavigation() {
 		window.addEventListener("hashchange", close);
 		return () => window.removeEventListener("hashchange", close);
 	}, []);
-	// Touch gestures share the drawer swipe primitive: a mostly-horizontal
-	// rightward swipe opens the drawer; a leftward swipe starting over the
-	// drawer or its backdrop closes it. Listeners are passive and act only
-	// on touchend, so vertical scrolling is never intercepted.
-	useDrawerSwipe({
+	// Touch gestures: a mostly-horizontal rightward swipe opens the drawer;
+	// a leftward swipe starting over the drawer or its backdrop closes it.
+	// Listeners are passive and act only on touchend, so vertical scrolling
+	// is never intercepted.
+	useHorizontalSwipe({
 		enabled: mobile,
-		side: "left",
-		panelRef: sidebarRef,
-		openRef,
-		backdropClass: "nav-backdrop",
-		onOpen: () => setOpen(true),
-		onClose: () => setOpen(false),
+		onSwipeRight: () => {
+			if (!openRef.current) setOpen(true);
+		},
+		onSwipeLeft: (_dx, origin) => {
+			if (!openRef.current) return;
+			const overSidebar =
+				origin instanceof Node &&
+				(sidebarRef.current?.contains(origin) ||
+					(origin instanceof Element &&
+						origin.classList.contains("nav-backdrop")));
+			if (overSidebar) setOpen(false);
+		},
 	});
 	useEffect(() => {
 		if (!open) return;

@@ -18,8 +18,8 @@ import { useMediaQuery } from "../state/useMediaQuery.ts";
 import "./ui.css";
 import {
 	drawerHiddenX,
-	useDrawerSwipe,
 	useDrawerTransition,
+	useHorizontalSwipe,
 } from "./drawer.ts";
 
 export function IconButton({
@@ -77,7 +77,6 @@ export function Modal({
 	const panelRef = useRef<HTMLDivElement>(null);
 	const [closing, setClosing] = useState(false);
 	const closeRequested = useRef(false);
-	const drawerOpenRef = useRef(true);
 	const reduceMotion = useReducedMotion();
 	const id = useId();
 	useEffect(() => {
@@ -102,12 +101,15 @@ export function Modal({
 	const fullScreenDrawer = useMediaQuery("(max-width: 600px)");
 	const full = drawer && fullScreenDrawer;
 	const drawerTransition = useDrawerTransition(closing);
-	useDrawerSwipe({
+	// A rightward swipe starting over the panel closes the drawer. The
+	// gesture owns no drawer state; an unmounted drawer simply has no listener.
+	useHorizontalSwipe({
 		enabled: full && !closing,
-		side: "right",
-		panelRef,
-		openRef: drawerOpenRef,
-		onClose: requestClose,
+		onSwipeRight: (_dx, origin) => {
+			if (origin instanceof Node && panelRef.current?.contains(origin)) {
+				requestClose();
+			}
+		},
 	});
 	const drawerClosedX = drawerHiddenX("right", full);
 	// The native <dialog> stays static so showModal top-layer, focus, and

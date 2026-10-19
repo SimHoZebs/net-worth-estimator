@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef } from "react";
 import { useReducedMotion } from "motion/react";
 
 // Shared slide primitives for the left navigation drawer (WorkspaceLayout)
@@ -6,6 +6,10 @@ import { useReducedMotion } from "motion/react";
 // off-canvas width on mobile with the same timing; the right drawer keeps a
 // subtle offset plus fade on larger viewports where it docks as a side panel
 // instead of covering the viewport.
+//
+// Swipe detection is drawer-agnostic: useHorizontalSwipe reports qualified
+// horizontal swipes and knows nothing about drawers; each call site maps a
+// direction to its own open/close meaning with its own hit-test.
 
 export const DRAWER_EASE = "easeOut" as const;
 export const DRAWER_OPEN_DURATION = 0.2;
@@ -50,26 +54,18 @@ export function useDrawerBackdropTransition(): {
 	};
 }
 
-export function useDrawerSwipe<T extends Element>({
+export function useHorizontalSwipe({
 	enabled,
-	side,
-	panelRef,
-	openRef,
-	backdropClass,
-	onOpen,
-	onClose,
+	onSwipeLeft,
+	onSwipeRight,
 }: {
 	enabled: boolean;
-	side: DrawerSide;
-	panelRef: RefObject<T | null>;
-	openRef: RefObject<boolean>;
-	backdropClass?: string;
-	onOpen?: () => void;
-	onClose: () => void;
+	onSwipeLeft?: (dx: number, origin: EventTarget | null) => void;
+	onSwipeRight?: (dx: number, origin: EventTarget | null) => void;
 }) {
-	const callbacks = useRef({ onOpen, onClose });
+	const callbacks = useRef({ onSwipeLeft, onSwipeRight });
 	useEffect(() => {
-		callbacks.current = { onOpen, onClose };
+		callbacks.current = { onSwipeLeft, onSwipeRight };
 	});
 	useEffect(() => {
 		if (!enabled) return;
@@ -135,27 +131,11 @@ export function useDrawerSwipe<T extends Element>({
 			if (Math.abs(dx) < MIN_DISTANCE) return;
 			if (Math.abs(dx) < Math.abs(dy) * DIRECTION_RATIO) return;
 			// Lowest priority: a scroller that can move further in the swipe
-			// direction consumes the gesture instead of the drawer.
+			// direction consumes the gesture instead of the swipe handler.
 			const scroller = nearestHorizontalScroller(startTarget);
 			if (scroller && scrollerConsumes(scroller, dx)) return;
-			if (openRef.current) {
-				// Closing swipes travel toward the docked edge: leftward for
-				// the left drawer, rightward for the right drawer.
-				if (side === "left" ? dx >= 0 : dx <= 0) return;
-				const origin = startTarget;
-				const overPanel =
-					origin instanceof Node &&
-					(panelRef.current?.contains(origin) ||
-						(backdropClass !== undefined &&
-							origin instanceof Element &&
-							origin.classList.contains(backdropClass)));
-				if (overPanel) callbacks.current.onClose();
-				return;
-			}
-			// Opening swipes travel away from the docked edge. Only the left
-			// drawer opens by gesture; the right drawer opens from its trigger.
-			if (side === "left" ? dx <= 0 : dx >= 0) return;
-			callbacks.current.onOpen?.();
+			if (dx < 0) callbacks.current.onSwipeLeft?.(dx, startTarget);
+			else callbacks.current.onSwipeRight?.(dx, startTarget);
 		};
 		window.addEventListener("touchstart", onTouchStart, { passive: true });
 		window.addEventListener("touchend", onTouchEnd, { passive: true });
@@ -163,5 +143,5 @@ export function useDrawerSwipe<T extends Element>({
 			window.removeEventListener("touchstart", onTouchStart);
 			window.removeEventListener("touchend", onTouchEnd);
 		};
-	}, [enabled, side, panelRef, openRef, backdropClass]);
+	}, [enabled]);
 }
