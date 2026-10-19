@@ -3,6 +3,16 @@
    Responsive and accessibility overrides are unlayered and always win.
    Keep selectors inside @layer components. */
 @layer components {
+	.seg-stack {
+		display: grid;
+		gap: 8px;
+	}
+	.seg-stack .seg-bar {
+		margin: 0;
+	}
+	.seg-stack .seg-legend {
+		margin: 0;
+	}
 	.seg-bar {
 		display: flex;
 		height: 14px;

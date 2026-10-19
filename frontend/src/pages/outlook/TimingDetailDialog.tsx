@@ -167,24 +167,19 @@ function MandatorySectionView({
 		);
 	}
 	return (
-		<div>
-			<p className="section-note">
-				{section.subtitle} · <strong>{money(section.total)}</strong>
-			</p>
-			<TransactionTable
-				caption={`${section.title}, ${order === "oldest" ? "oldest first" : "newest first"}`}
-				showHeaders={showHeaders}
-			>
-				{section.transactions.map((transaction) => (
-					<TransactionRow
-						key={transaction.id}
-						transaction={transaction}
-						movement={movements.get(transaction.movementId) ?? null}
-						onEdit={onEdit}
-					/>
-				))}
-			</TransactionTable>
-		</div>
+		<TransactionTable
+			caption={`${section.title}, ${order === "oldest" ? "oldest first" : "newest first"}`}
+			showHeaders={showHeaders}
+		>
+			{section.transactions.map((transaction) => (
+				<TransactionRow
+					key={transaction.id}
+					transaction={transaction}
+					movement={movements.get(transaction.movementId) ?? null}
+					onEdit={onEdit}
+				/>
+			))}
+		</TransactionTable>
 	);
 }
 
@@ -255,12 +250,10 @@ export function TimingDetailDialog({
 	frame,
 	onFrameChange,
 	thisMonth,
-	nextMonth,
 	plan,
 	onEdit,
 	cycleTransactions,
 	config,
-	billsFiltered,
 	billCandidates,
 	trackedBillIds,
 	onToggleBill,
@@ -282,12 +275,10 @@ export function TimingDetailDialog({
 	frame: MandatoryFrame;
 	onFrameChange: (frame: MandatoryFrame) => void;
 	thisMonth: TimingMandatorySection;
-	nextMonth: TimingMandatorySection;
 	plan: Plan;
 	onEdit: (target: EditorTarget) => void;
 	cycleTransactions: AccountTransaction[];
 	config: TimingConfigHints;
-	billsFiltered: boolean;
 	billCandidates: {
 		id: string;
 		name: string;
@@ -353,31 +344,51 @@ export function TimingDetailDialog({
 			>
 				{tab === "mandatory" ? (
 					<div className="timing-mandatory">
-						<h3>Available balance</h3>
-						<p className="section-note">
-							{heroes.checkingObservedOn
-								? `As of ${dateLabel(heroes.checkingObservedOn, true)}`
-								: ""}
-						</p>
+						<div className="section-top">
+							<div className="timing-section-title">
+								<h3>Available balance</h3>
+								{heroes.checkingObservedOn ? (
+									<p className="section-note">
+										As of {dateLabel(heroes.checkingObservedOn, true)}
+									</p>
+								) : null}
+							</div>
+						</div>
 						<CashNowBar parts={cashNow} />
-						<Tabs
-							items={[
-								{ id: "calendar", label: "Calendar month" },
-								{ id: "cycle", label: "Card cycle" },
-							]}
-							value={frame}
-							onChange={onFrameChange}
-							label="Bills window"
-						>
-							{null}
-						</Tabs>
-						<div className="table-toolbar">
+						<div className="timing-controls">
+							<div
+								className="segmented"
+								role="toolbar"
+								aria-label="Bills window"
+							>
+								{(
+									[
+										{ id: "calendar", label: "Calendar month" },
+										{ id: "cycle", label: "Card cycle" },
+									] as const
+								).map((option) => (
+									<button
+										type="button"
+										key={option.id}
+										aria-pressed={frame === option.id}
+										onClick={() => onFrameChange(option.id)}
+									>
+										{option.label}
+									</button>
+								))}
+							</div>
 							<TransactionSortButton
 								order={transactionOrder}
 								onChange={onTransactionOrderChange}
 							/>
 						</div>
-						<h3>{thisMonth.title}</h3>
+						<div className="section-top">
+							<div className="timing-section-title">
+								<h3>{thisMonth.title}</h3>
+								<p className="section-note">{thisMonth.subtitle}</p>
+							</div>
+							<strong className="timing-total">{money(thisMonth.total)}</strong>
+						</div>
 						<MandatorySectionView
 							section={thisMonth}
 							movements={movements}
@@ -385,20 +396,6 @@ export function TimingDetailDialog({
 							order={transactionOrder}
 							showHeaders={showHeaders}
 						/>
-						<h3>{nextMonth.title}</h3>
-						<MandatorySectionView
-							section={nextMonth}
-							movements={movements}
-							onEdit={(item) => onEdit({ kind: "movement", item })}
-							order={transactionOrder}
-							showHeaders={showHeaders}
-						/>
-						<p className="section-note">
-							{billsFiltered
-								? "Filtered to your selected bills — change the set in Configure."
-								: "Counting every recurring bill. "}
-							Card charges are not bills; they come out of your next paycheck.
-						</p>
 						<h3>Safe card room</h3>
 						<PaycheckBar parts={paycheck} />
 						<div className="timing-figures">
@@ -428,14 +425,8 @@ export function TimingDetailDialog({
 					</div>
 				) : tab === "cycle" ? (
 					cycleTransactions.length ? (
-						<div>
-							<div
-								style={{
-									display: "flex",
-									justifyContent: "flex-end",
-									marginBottom: 8,
-								}}
-							>
+						<div className="timing-cycle">
+							<div className="table-toolbar">
 								<TransactionSortButton
 									order={transactionOrder}
 									onChange={onTransactionOrderChange}

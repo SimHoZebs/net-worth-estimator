@@ -268,23 +268,6 @@ export function TimingPreview({
 		displayToday,
 		remainingDerived.monthEnd,
 	]);
-	const mandatoryNextMonth = useMemo(() => {
-		if (!spendingIds.length) return [];
-		return groupMandatorySpending({
-			movements: obligationMovements,
-			checkingIds: spendingIds,
-			start: fixedDerived.start,
-			end: fixedDerived.end,
-		});
-	}, [obligationMovements, spendingIds, fixedDerived.start, fixedDerived.end]);
-	const nextCycle = useMemo(
-		() =>
-			resolveStatementCycle({
-				todayIso: shiftDate({ date: cycle.cycleEnd, days: 1 }),
-				statementDay: settings.statementDay,
-			}),
-		[cycle.cycleEnd, settings.statementDay],
-	);
 	const cycleThisGroups = useMemo(() => {
 		if (!spendingIds.length) return [];
 		return groupMandatorySpending({
@@ -294,15 +277,6 @@ export function TimingPreview({
 			end: cycle.cycleEnd,
 		});
 	}, [obligationMovements, spendingIds, displayToday, cycle.cycleEnd]);
-	const cycleNextGroups = useMemo(() => {
-		if (!spendingIds.length) return [];
-		return groupMandatorySpending({
-			movements: obligationMovements,
-			checkingIds: spendingIds,
-			start: nextCycle.cycleStart,
-			end: nextCycle.cycleEnd,
-		});
-	}, [obligationMovements, spendingIds, nextCycle]);
 	const thisMonthTransactions = useMemo(() => {
 		if (!spendingIds.length) return [];
 		const range =
@@ -337,35 +311,6 @@ export function TimingPreview({
 		cycle.cycleEnd,
 		transactionOrder,
 	]);
-	const nextMonthTransactions = useMemo(() => {
-		if (!spendingIds.length) return [];
-		const range =
-			settings.mandatoryFrame === "calendar"
-				? { start: fixedDerived.start, end: fixedDerived.end }
-				: { start: nextCycle.cycleStart, end: nextCycle.cycleEnd };
-		return sortTransactionsByDate({
-			items: mandatoryTransactions({
-				movements: obligationMovements,
-				checkingIds: spendingIds,
-				start: range.start,
-				end: range.end,
-				plan,
-			}),
-			getDate: (transaction) => transaction.date,
-			getId: (transaction) => transaction.id,
-			order: transactionOrder,
-		});
-	}, [
-		obligationMovements,
-		spendingIds,
-		plan,
-		settings.mandatoryFrame,
-		fixedDerived.start,
-		fixedDerived.end,
-		nextCycle,
-		transactionOrder,
-	]);
-
 	if (!cards.length) {
 		return (
 			<section className="timing-preview" aria-label="Safe card spending">
@@ -448,10 +393,6 @@ export function TimingPreview({
 		updateSettings({ accountIds: next.length ? next : null });
 	};
 
-	const billsFiltered =
-		settings.movementIds !== null &&
-		settings.movementIds.length !== billCandidates.length;
-
 	const toggleBill = (movementId: string) => {
 		const explicit =
 			settings.movementIds ?? billCandidates.map((bill) => bill.id);
@@ -498,23 +439,6 @@ export function TimingPreview({
 					groups: cycleThisGroups,
 					transactions: thisMonthTransactions,
 				};
-	const activeNextMonth =
-		settings.mandatoryFrame === "calendar"
-			? {
-					title: "Next month fixed",
-					subtitle: `${dateLabel(fixedDerived.start, true)} to ${dateLabel(fixedDerived.end, true)}${billsFiltered ? ` · ${trackedBillIds.length} of ${billCandidates.length} bills` : ""}`,
-					total: fixedObligations,
-					groups: mandatoryNextMonth,
-					transactions: nextMonthTransactions,
-				}
-			: {
-					title: "Next cycle fixed",
-					subtitle: `${dateLabel(nextCycle.cycleStart, true)} to ${dateLabel(nextCycle.cycleEnd, true)}${billsFiltered ? ` · ${trackedBillIds.length} of ${billCandidates.length} bills` : ""}`,
-					total: sum(cycleNextGroups.map((group) => group.total)),
-					groups: cycleNextGroups,
-					transactions: nextMonthTransactions,
-				};
-
 	// Plan-derived frame (header, cycle dates) renders regardless; only the
 	// computed timing body skeletonizes while the projection is absent.
 	if (pending)
@@ -625,10 +549,8 @@ export function TimingPreview({
 						allowance,
 					}}
 					thisMonth={activeThisMonth}
-					nextMonth={activeNextMonth}
 					frame={settings.mandatoryFrame}
 					onFrameChange={(frame) => updateSettings({ mandatoryFrame: frame })}
-					billsFiltered={billsFiltered}
 					billCandidates={billCandidates}
 					trackedBillIds={trackedBillIds}
 					onToggleBill={toggleBill}

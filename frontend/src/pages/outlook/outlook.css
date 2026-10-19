@@ -373,11 +373,12 @@
 	.timing-figures {
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
-		padding: 29px 0 24px;
+		padding: 0;
 	}
 	.timing-figures > div {
 		display: flex;
 		flex-direction: column;
+		gap: 4px;
 	}
 	.timing-figures > div + div {
 		border-left: 1px solid var(--line);
@@ -386,7 +387,7 @@
 	.timing-figures span {
 		color: var(--muted);
 		font-size: 9px;
-		margin-bottom: 7px;
+		margin: 0;
 	}
 	.timing-figures strong {
 		font-size: 25px;
@@ -472,11 +473,7 @@
 	.cycle-config {
 		display: grid;
 		gap: 12px;
-		background: var(--surface-2);
-		border: 1px solid var(--line);
-		border-radius: 8px;
-		padding: 16px;
-		margin-top: 14px;
+		align-content: start;
 	}
 	.cycle-accounts {
 		display: grid;
@@ -487,7 +484,7 @@
 		font-weight: 600;
 		color: var(--muted);
 		padding: 0;
-		margin-bottom: 4px;
+		margin: 0;
 	}
 	.cycle-account-option {
 		display: flex;
@@ -539,7 +536,6 @@
 		color: var(--muted);
 	}
 	.cycle-breakdown {
-		margin-top: 14px;
 		border-top: 1px solid var(--line);
 		padding-top: 12px;
 	}
@@ -571,13 +567,53 @@
 		color: var(--muted);
 		font-size: 9px;
 	}
+	.timing-mandatory {
+		display: grid;
+		gap: 16px;
+		align-content: start;
+	}
 	.timing-mandatory h3 {
 		font-size: 12px;
 		font-weight: 650;
 		color: var(--ink);
-		margin: 20px 0 8px;
+		margin: 0;
 	}
-	.timing-mandatory h3:first-child {
-		margin-top: 4px;
+	.timing-cycle {
+		display: grid;
+		gap: 8px;
+	}
+	.timing-mandatory .section-top {
+		flex-wrap: wrap;
+		gap: 4px 12px;
+	}
+	.timing-section-title {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 4px 8px;
+	}
+	.timing-total {
+		font-size: 13px;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+	}
+	.modal-body .timing-mandatory .section-note,
+	.modal-body .seg-stack .section-note,
+	.modal-body .cycle-config .section-note {
+		padding: 0;
+	}
+	.timing-mandatory .table-toolbar,
+	.timing-cycle .table-toolbar {
+		margin: 0;
+	}
+	.timing-mandatory .account-activity-table,
+	.timing-cycle .account-activity-table {
+		border-top: 0;
+	}
+	.timing-controls {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
 	}
 }
