@@ -379,14 +379,6 @@ func TestV8MigrationBackfillsRegistryAndLinks(t *testing.T) {
 		}
 	}
 	for _, statement := range []string{
-		`CREATE TABLE schema_version (version INTEGER NOT NULL)`,
-		`INSERT INTO schema_version (version) VALUES (1)`,
-		`INSERT INTO schema_version (version) VALUES (2)`,
-		`INSERT INTO schema_version (version) VALUES (3)`,
-		`INSERT INTO schema_version (version) VALUES (4)`,
-		`INSERT INTO schema_version (version) VALUES (5)`,
-		`INSERT INTO schema_version (version) VALUES (6)`,
-		`INSERT INTO schema_version (version) VALUES (7)`,
 		`INSERT INTO accounts (id, position, name, kind, enabled) VALUES ('checking', 0, 'Checking', 'cash', 1)`,
 		`INSERT INTO postings (id, position, name, amount_json, date, priority, enabled, source) VALUES ('rent', 0, 'Rent', '{}', '2026-08-01', 1, 1, 'model')`,
 		`INSERT INTO evaluations (type, instance_id, position, name, enabled, config_json) VALUES ('netWorthThreshold', 'eval-1', 0, 'Target', 1, '{}')`,
@@ -398,6 +390,9 @@ func TestV8MigrationBackfillsRegistryAndLinks(t *testing.T) {
 	}
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("commit: %v", err)
+	}
+	if _, err := raw.Exec(`PRAGMA user_version = 7`); err != nil {
+		t.Fatalf("set v7 version: %v", err)
 	}
 	if err := raw.Close(); err != nil {
 		t.Fatalf("close raw: %v", err)

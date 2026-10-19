@@ -214,7 +214,7 @@ func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source stri
 		claimOccurrenceDate = posting.Claim.OccurrenceDate
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, posted_time, transaction_time, claim_rule_id, claim_occurrence_date, enabled, source)
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source)
 		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
 		posting.ID, position, posting.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
 		posting.PostedTime, posting.TransactionTime, claimRuleID, claimOccurrenceDate, boolToInt(posting.Enabled), source,
@@ -248,7 +248,7 @@ func insertRule(tx *sql.Tx, position int, rule *types.RecurrenceRule) error {
 		annualCap = *rule.AnnualCap
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO recurrence_rules (id, position, name, source_account_id, destinations, amount_json, frequency, start_date, end_date, annual_cap, priority, enabled)
+		`INSERT INTO recurrence_rules (id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled)
 		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
 		rule.ID, position, rule.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
 		string(rule.Frequency),
@@ -485,7 +485,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close checkpoints: %w", err)
 	}
 
-	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_json, posted_time, transaction_time, claim_rule_id, claim_occurrence_date, enabled, source FROM postings ORDER BY position`)
+	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source FROM postings ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -505,7 +505,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close postings: %w", err)
 	}
 
-	ruleRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules ORDER BY position`)
+	ruleRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}

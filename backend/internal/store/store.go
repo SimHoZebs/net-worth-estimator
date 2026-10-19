@@ -80,7 +80,7 @@ type sqliteStore struct {
 	db *sql.DB
 }
 
-const latestSchemaVersion = 12
+const latestSchemaVersion = 13
 
 // ruleMigrationBackupSuffix marks the pre-V7 database copy. V7 splits the
 // postings table into dated postings plus recurrence rules; the copy lets an
@@ -149,6 +149,15 @@ func readSchemaVersionReadOnly(path string) (int, error) {
 	}
 	defer db.Close()
 	var version int
+	if err := db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		return 0, err
+	}
+	if version != 0 {
+		return version, nil
+	}
+	// Bridge read for pre-change files: user_version is still 0 and the
+	// ledger table holds the version. A missing table reports an error so
+	// the caller skips the backup, matching the old probe behavior.
 	if err := db.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_version`).Scan(&version); err != nil {
 		return 0, err
 	}
@@ -164,12 +173,24 @@ func (s *sqliteStore) migrate() error {
 		return fmt.Errorf("begin migration: %w", err)
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(`CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)`); err != nil {
-		return fmt.Errorf("create schema version: %w", err)
-	}
 	var version int
-	if err := tx.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_version`).Scan(&version); err != nil {
+	if err := tx.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return fmt.Errorf("read schema version: %w", err)
+	}
+	initialVersion := version
+	if version == 0 {
+		var hasTable int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'`).Scan(&hasTable); err != nil {
+			return fmt.Errorf("probe schema version table: %w", err)
+		}
+		if hasTable > 0 {
+			if err := tx.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_version`).Scan(&version); err != nil {
+				return fmt.Errorf("read schema version: %w", err)
+			}
+			if _, err := tx.Exec(`DROP TABLE schema_version`); err != nil {
+				return fmt.Errorf("drop schema version table: %w", err)
+			}
+		}
 	}
 	if version > latestSchemaVersion {
 		return fmt.Errorf("database schema version %d is newer than supported version %d", version, latestSchemaVersion)
@@ -178,17 +199,11 @@ func (s *sqliteStore) migrate() error {
 		if err := migrateV1(tx); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (1)`); err != nil {
-			return fmt.Errorf("record schema version 1: %w", err)
-		}
 		version = 1
 	}
 	if version < 2 {
 		if err := migrateV2(tx); err != nil {
 			return err
-		}
-		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (2)`); err != nil {
-			return fmt.Errorf("record schema version 2: %w", err)
 		}
 		version = 2
 	}
@@ -196,17 +211,11 @@ func (s *sqliteStore) migrate() error {
 		if err := migrateV3(tx); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (3)`); err != nil {
-			return fmt.Errorf("record schema version 3: %w", err)
-		}
 		version = 3
 	}
 	if version < 4 {
 		if err := migrateV4(tx); err != nil {
 			return err
-		}
-		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (4)`); err != nil {
-			return fmt.Errorf("record schema version 4: %w", err)
 		}
 		version = 4
 	}
@@ -214,17 +223,11 @@ func (s *sqliteStore) migrate() error {
 		if err := migrateV5(tx); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (5)`); err != nil {
-			return fmt.Errorf("record schema version 5: %w", err)
-		}
 		version = 5
 	}
 	if version < 6 {
 		if err := migrateV6(tx); err != nil {
 			return err
-		}
-		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (6)`); err != nil {
-			return fmt.Errorf("record schema version 6: %w", err)
 		}
 		version = 6
 	}
@@ -232,16 +235,11 @@ func (s *sqliteStore) migrate() error {
 		if err := migrateV7(tx); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (7)`); err != nil {
-			return fmt.Errorf("record schema version 7: %w", err)
-		}
+		version = 7
 	}
 	if version < 8 {
 		if err := migrateV8(tx); err != nil {
 			return err
-		}
-		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (8)`); err != nil {
-			return fmt.Errorf("record schema version 8: %w", err)
 		}
 		version = 8
 	}
@@ -249,17 +247,11 @@ func (s *sqliteStore) migrate() error {
 		if err := migrateV9(tx); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (9)`); err != nil {
-			return fmt.Errorf("record schema version 9: %w", err)
-		}
 		version = 9
 	}
 	if version < 10 {
 		if err := migrateV10(tx); err != nil {
 			return err
-		}
-		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (10)`); err != nil {
-			return fmt.Errorf("record schema version 10: %w", err)
 		}
 		version = 10
 	}
@@ -267,20 +259,46 @@ func (s *sqliteStore) migrate() error {
 		if err := migrateV11(tx); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (11)`); err != nil {
-			return fmt.Errorf("record schema version 11: %w", err)
-		}
+		version = 11
 	}
 	if version < 12 {
 		if err := migrateV12(tx); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (12)`); err != nil {
-			return fmt.Errorf("record schema version 12: %w", err)
+		version = 12
+	}
+	if version < 13 {
+		if err := migrateV13(tx); err != nil {
+			return err
+		}
+		version = 13
+	}
+	if version != initialVersion {
+		if _, err := tx.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, version)); err != nil {
+			return fmt.Errorf("record schema version %d: %w", version, err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit migration: %w", err)
+	}
+	return nil
+}
+
+// migrateV13 renames stored amount and claim columns to self-describing
+// names. The values are untouched: amount_json never held an amount (it
+// holds a marshaled PostingAmountResolution), and claim_* columns record
+// the scheduled occurrence a posting fulfills.
+func migrateV13(tx *sql.Tx) error {
+	statements := []string{
+		`ALTER TABLE postings RENAME COLUMN amount_json TO amount_resolution_json`,
+		`ALTER TABLE postings RENAME COLUMN claim_rule_id TO fulfills_rule_id`,
+		`ALTER TABLE postings RENAME COLUMN claim_occurrence_date TO fulfills_occurrence_date`,
+		`ALTER TABLE recurrence_rules RENAME COLUMN amount_json TO amount_resolution_json`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("migrate schema version 13: %w", err)
+		}
 	}
 	return nil
 }

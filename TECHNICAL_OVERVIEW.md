@@ -199,7 +199,7 @@ The current schema stores:
 
 | Table | Purpose |
 | --- | --- |
-| `schema_version` | applied migration versions |
+| `PRAGMA user_version` | applied migration version |
 | `model_metadata` | source path and document-present flag |
 | `accounts` | ordered account definitions |
 | `checkpoints` | ordered balance observations, unique by account/date, with owner |
