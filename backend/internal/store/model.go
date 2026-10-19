@@ -133,17 +133,9 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 
 	position := 0
 	for _, account := range accounts {
-		var minBalance, maxBalance any = types.NoFloor, types.NoCeiling
-		if account.MinBalance != nil {
-			minBalance = *account.MinBalance
-		}
-		if account.MaxBalance != nil {
-			maxBalance = *account.MaxBalance
-		}
-		var color any
-		if account.Color != nil {
-			color = *account.Color
-		}
+		minBalance := valueOr(account.MinBalance, types.NoFloor)
+		maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
+		color := nullable(account.Color)
 		if _, err := tx.Exec(
 			`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled) VALUES (?,?,?,?,?,?,?,?)`,
 			account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled),
@@ -206,9 +198,7 @@ func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source stri
 		return fmt.Errorf("marshal amount %s: %w", posting.ID, err)
 	}
 	var sourceAccountID, claimRuleID, claimOccurrenceDate any
-	if posting.SourceAccountID != nil {
-		sourceAccountID = *posting.SourceAccountID
-	}
+	sourceAccountID = nullable(posting.SourceAccountID)
 	if posting.Claim != nil {
 		claimRuleID = posting.Claim.RuleID
 		claimOccurrenceDate = posting.Claim.OccurrenceDate
@@ -237,16 +227,9 @@ func insertRule(tx *sql.Tx, position int, rule *types.RecurrenceRule) error {
 	if err != nil {
 		return fmt.Errorf("marshal rule amount %s: %w", rule.ID, err)
 	}
-	var sourceAccountID, endDate, annualCap any
-	if rule.SourceAccountID != nil {
-		sourceAccountID = *rule.SourceAccountID
-	}
-	if rule.EndDate != nil {
-		endDate = *rule.EndDate
-	}
-	if rule.AnnualCap != nil {
-		annualCap = *rule.AnnualCap
-	}
+	sourceAccountID := nullable(rule.SourceAccountID)
+	endDate := nullable(rule.EndDate)
+	annualCap := nullable(rule.AnnualCap)
 	if _, err := tx.Exec(
 		`INSERT INTO recurrence_rules (id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled)
 		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -261,13 +244,8 @@ func insertRule(tx *sql.Tx, position int, rule *types.RecurrenceRule) error {
 
 func savePaymentTerms(tx *sql.Tx, terms []types.PaymentTerms) error {
 	for position, term := range terms {
-		var minimumPercent, statementDay any
-		if term.MinimumPercent != nil {
-			minimumPercent = *term.MinimumPercent
-		}
-		if term.StatementDay != nil {
-			statementDay = *term.StatementDay
-		}
+		minimumPercent := nullable(term.MinimumPercent)
+		statementDay := nullable(term.StatementDay)
 		if _, err := tx.Exec(
 			`INSERT INTO payment_terms (account_id, position, minimum_fixed, minimum_percent, due_day, statement_day) VALUES (?,?,?,?,?,?)`,
 			term.AccountID, position, term.MinimumFixed, minimumPercent, term.DueDay, statementDay,
@@ -672,10 +650,7 @@ func replaceIncomeData(tx *sql.Tx, snapshot *types.IncomeDataSnapshot) error {
 		return err
 	}
 	for position, source := range snapshot.IncomeSources {
-		var effectiveTo any
-		if source.EffectiveTo != nil {
-			effectiveTo = *source.EffectiveTo
-		}
+		effectiveTo := nullable(source.EffectiveTo)
 		if _, err := tx.Exec(
 			`INSERT INTO income_sources (id, position, name, effective_from, effective_to, annual_gross_income) VALUES (?,?,?,?,?,?)`,
 			source.ID, position, source.Name, source.EffectiveFrom, effectiveTo, source.AnnualGrossIncome,
@@ -688,10 +663,7 @@ func replaceIncomeData(tx *sql.Tx, snapshot *types.IncomeDataSnapshot) error {
 		if err != nil {
 			return err
 		}
-		var sourceURL any
-		if profile.SourceURL != nil {
-			sourceURL = *profile.SourceURL
-		}
+		sourceURL := nullable(profile.SourceURL)
 		if _, err := tx.Exec(
 			`INSERT INTO tax_profiles (id, position, name, deduction, brackets_json, source_url) VALUES (?,?,?,?,?,?)`,
 			profile.ID, position, profile.Name, profile.Deduction, string(bracketsJSON), sourceURL,
@@ -805,4 +777,21 @@ func boolToInt(value bool) int {
 		return 1
 	}
 	return 0
+}
+
+// nullable maps a pointer to a SQL nullable argument: nil becomes NULL.
+func nullable[T any](ptr *T) any {
+	if ptr == nil {
+		return nil
+	}
+	return *ptr
+}
+
+// valueOr returns the pointed-to value or the fallback (for sentinel columns
+// that never store NULL, such as account bounds).
+func valueOr[T any](ptr *T, fallback T) T {
+	if ptr == nil {
+		return fallback
+	}
+	return *ptr
 }

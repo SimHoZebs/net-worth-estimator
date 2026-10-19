@@ -94,6 +94,23 @@ func applyRowChange[T any](s *Server, mutate func(document *types.FinancialModel
 	return row, issues, true, nil
 }
 
+// runRowWrite validates, persists, and loads the post-write revision in one
+// call. Handlers return early on err and wrap row/issues/persisted/revision
+// in their output shape.
+func runRowWrite[T any](s *Server, mutate func(document *types.FinancialModelDocument), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
+	row, issues, persisted, err := applyRowChange(s, mutate, persist)
+	if err != nil {
+		var zero T
+		return zero, issues, persisted, "", err
+	}
+	revision, revErr := currentRevision(s)
+	if revErr != nil {
+		var zero T
+		return zero, nil, false, "", huma.Error500InternalServerError(revErr.Error())
+	}
+	return row, issues, persisted, revision, nil
+}
+
 func replaceByID[T any](rows []T, id string, getID func(T) string, value T) []T {
 	for i, row := range rows {
 		if getID(row) == id {
@@ -184,17 +201,13 @@ func accountID(account types.Account) string { return account.ID }
 
 func (s *Server) createAccount(_ context.Context, input *accountInput) (*accountOutput, error) {
 	account := input.Body.toAccount("")
-	row, issues, persisted, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Accounts = replaceByID(document.Accounts, account.ID, accountID, account)
 	}, func() (types.Account, error) {
 		return s.store.CreateAccount(account)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &accountOutput{Body: rowResultBody[types.Account]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
 }
@@ -204,17 +217,13 @@ func (s *Server) updateAccount(_ context.Context, input *struct {
 	Body accountBody `json:"body"`
 }) (*accountOutput, error) {
 	account := input.Body.toAccount(input.ID)
-	row, issues, persisted, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Accounts = replaceByID(document.Accounts, account.ID, accountID, account)
 	}, func() (types.Account, error) {
 		return s.store.UpdateAccount(account)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &accountOutput{Body: rowResultBody[types.Account]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
 }
@@ -230,17 +239,13 @@ func (s *Server) deleteAccount(_ context.Context, input *struct {
 	} `json:"body"`
 }, error) {
 	id := input.ID
-	_, issues, persisted, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	_, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Accounts = removeByID(document.Accounts, id, accountID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.DeleteAccount(id)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	output := &struct {
 		Body struct {
@@ -272,17 +277,13 @@ type reorderOutput struct {
 
 func (s *Server) moveAccount(_ context.Context, input *reorderInput) (*reorderOutput, error) {
 	id, beforeID := input.Body.ID, input.Body.BeforeID
-	_, _, _, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Accounts = moveBeforeID(document.Accounts, id, beforeID, accountID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.MoveAccount(id, beforeID)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &reorderOutput{Body: struct {
 		Revision string `json:"revision"`
@@ -332,17 +333,13 @@ func postingID(posting types.Posting) string { return posting.ID }
 
 func (s *Server) createPosting(_ context.Context, input *postingInput) (*postingOutput, error) {
 	posting := input.Body.toPosting("")
-	row, issues, persisted, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Postings = replaceByID(document.Postings, posting.ID, postingID, posting)
 	}, func() (types.Posting, error) {
 		return s.store.CreatePosting(posting)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	if persisted {
 		row.Source = store.SourceModel
@@ -355,17 +352,13 @@ func (s *Server) updatePosting(_ context.Context, input *struct {
 	Body postingBody `json:"body"`
 }) (*postingOutput, error) {
 	posting := input.Body.toPosting(input.ID)
-	row, issues, persisted, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Postings = replaceByID(document.Postings, posting.ID, postingID, posting)
 	}, func() (types.Posting, error) {
 		return s.store.UpdatePosting(posting)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	if persisted {
 		row.Source = store.SourceModel
@@ -377,17 +370,13 @@ func (s *Server) deletePosting(_ context.Context, input *struct {
 	ID string `path:"id"`
 }) (*reorderOutput, error) {
 	id := input.ID
-	_, _, _, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Postings = removeByID(document.Postings, id, postingID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.DeletePosting(id)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &reorderOutput{Body: struct {
 		Revision string `json:"revision"`
@@ -396,17 +385,13 @@ func (s *Server) deletePosting(_ context.Context, input *struct {
 
 func (s *Server) movePosting(_ context.Context, input *reorderInput) (*reorderOutput, error) {
 	id, beforeID := input.Body.ID, input.Body.BeforeID
-	_, _, _, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Postings = moveBeforeID(document.Postings, id, beforeID, postingID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.MovePosting(id, beforeID)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &reorderOutput{Body: struct {
 		Revision string `json:"revision"`
@@ -455,17 +440,13 @@ func ruleID(rule types.RecurrenceRule) string { return rule.ID }
 
 func (s *Server) createRule(_ context.Context, input *ruleInput) (*ruleOutput, error) {
 	rule := input.Body.toRule("")
-	row, issues, persisted, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.RecurrenceRules = replaceByID(document.RecurrenceRules, rule.ID, ruleID, rule)
 	}, func() (types.RecurrenceRule, error) {
 		return s.store.CreateRule(rule)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &ruleOutput{Body: rowResultBody[types.RecurrenceRule]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
 }
@@ -475,17 +456,13 @@ func (s *Server) updateRule(_ context.Context, input *struct {
 	Body ruleBody `json:"body"`
 }) (*ruleOutput, error) {
 	rule := input.Body.toRule(input.ID)
-	row, issues, persisted, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.RecurrenceRules = replaceByID(document.RecurrenceRules, rule.ID, ruleID, rule)
 	}, func() (types.RecurrenceRule, error) {
 		return s.store.UpdateRule(rule)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &ruleOutput{Body: rowResultBody[types.RecurrenceRule]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
 }
@@ -494,17 +471,13 @@ func (s *Server) deleteRule(_ context.Context, input *struct {
 	ID string `path:"id"`
 }) (*reorderOutput, error) {
 	id := input.ID
-	_, _, _, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.RecurrenceRules = removeByID(document.RecurrenceRules, id, ruleID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.DeleteRule(id)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &reorderOutput{Body: struct {
 		Revision string `json:"revision"`
@@ -513,17 +486,13 @@ func (s *Server) deleteRule(_ context.Context, input *struct {
 
 func (s *Server) moveRule(_ context.Context, input *reorderInput) (*reorderOutput, error) {
 	id, beforeID := input.Body.ID, input.Body.BeforeID
-	_, _, _, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.RecurrenceRules = moveBeforeID(document.RecurrenceRules, id, beforeID, ruleID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.MoveRule(id, beforeID)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &reorderOutput{Body: struct {
 		Revision string `json:"revision"`
@@ -544,17 +513,13 @@ func checkpointKey(checkpoint types.Checkpoint) string {
 
 func (s *Server) saveCheckpoint(_ context.Context, input *checkpointInput) (*checkpointOutput, error) {
 	checkpoint := input.Body
-	row, issues, persisted, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Checkpoints = replaceByID(document.Checkpoints, checkpointKey(checkpoint), checkpointKey, checkpoint)
 	}, func() (types.Checkpoint, error) {
 		return s.store.SaveCheckpoint(checkpoint)
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &checkpointOutput{Body: rowResultBody[types.Checkpoint]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
 }
@@ -564,7 +529,7 @@ func (s *Server) deleteCheckpoint(_ context.Context, input *struct {
 	Date      string `query:"date"`
 }) (*reorderOutput, error) {
 	accountID, date := input.AccountID, input.Date
-	_, _, _, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		kept := document.Checkpoints[:0]
 		for _, checkpoint := range document.Checkpoints {
 			if checkpoint.AccountID != accountID || string(checkpoint.Date) != date {
@@ -577,10 +542,6 @@ func (s *Server) deleteCheckpoint(_ context.Context, input *struct {
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &reorderOutput{Body: struct {
 		Revision string `json:"revision"`
@@ -622,7 +583,7 @@ func instanceIDOf(instance types.EvaluationInstance[types.JsonValue]) string {
 
 func (s *Server) createEvaluation(_ context.Context, input *evaluationInput) (*evaluationOutput, error) {
 	item := input.Body
-	row, issues, persisted, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		if slice := evalSlice(document, item.Type); slice != nil {
 			*slice = replaceByID(*slice, item.InstanceID, instanceIDOf, evalToInstance(item))
 		}
@@ -631,10 +592,6 @@ func (s *Server) createEvaluation(_ context.Context, input *evaluationInput) (*e
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &evaluationOutput{Body: rowResultBody[store.EvaluationUpdate]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
 }
@@ -645,7 +602,7 @@ func (s *Server) updateEvaluation(_ context.Context, input *struct {
 }) (*evaluationOutput, error) {
 	item := input.Body
 	item.InstanceID = input.InstanceID
-	row, issues, persisted, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		if slice := evalSlice(document, item.Type); slice != nil {
 			*slice = replaceByID(*slice, item.InstanceID, instanceIDOf, evalToInstance(item))
 		}
@@ -655,10 +612,6 @@ func (s *Server) updateEvaluation(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
-	}
 	return &evaluationOutput{Body: rowResultBody[store.EvaluationUpdate]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
 }
 
@@ -666,7 +619,7 @@ func (s *Server) deleteEvaluation(_ context.Context, input *struct {
 	InstanceID string `path:"instanceId"`
 }) (*reorderOutput, error) {
 	instanceID := input.InstanceID
-	_, _, _, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		for _, evalType := range types.EvaluationTypeOrder {
 			if slice := evalSlice(document, evalType); slice != nil {
 				*slice = removeByID(*slice, instanceID, instanceIDOf)
@@ -677,10 +630,6 @@ func (s *Server) deleteEvaluation(_ context.Context, input *struct {
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &reorderOutput{Body: struct {
 		Revision string `json:"revision"`
@@ -695,7 +644,7 @@ func (s *Server) moveEvaluation(_ context.Context, input *struct {
 	} `json:"body"`
 }) (*reorderOutput, error) {
 	evalType, instanceID, beforeID := input.Body.Type, input.Body.InstanceID, input.Body.BeforeID
-	_, _, _, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		if slice := evalSlice(document, evalType); slice != nil {
 			*slice = moveBeforeID(*slice, instanceID, beforeID, instanceIDOf)
 		}
@@ -704,10 +653,6 @@ func (s *Server) moveEvaluation(_ context.Context, input *struct {
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &reorderOutput{Body: struct {
 		Revision string `json:"revision"`
@@ -739,7 +684,7 @@ type paymentTermsOutput struct {
 
 func (s *Server) savePaymentTerms(_ context.Context, input *paymentTermsInput) (*paymentTermsOutput, error) {
 	terms := input.Body.toTerms()
-	row, issues, persisted, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		replaced := false
 		for i, existing := range document.PaymentTerms {
 			if existing.AccountID == terms.AccountID {
@@ -756,10 +701,6 @@ func (s *Server) savePaymentTerms(_ context.Context, input *paymentTermsInput) (
 	if err != nil {
 		return nil, err
 	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
-	}
 	return &paymentTermsOutput{Body: rowResultBody[types.PaymentTerms]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
 }
 
@@ -767,7 +708,7 @@ func (s *Server) deletePaymentTerms(_ context.Context, input *struct {
 	AccountID string `path:"accountId"`
 }) (*reorderOutput, error) {
 	accountID := input.AccountID
-	_, _, _, err := applyRowChange(s, func(document *types.FinancialModelDocument) {
+	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		kept := document.PaymentTerms[:0]
 		for _, terms := range document.PaymentTerms {
 			if terms.AccountID != accountID {
@@ -780,10 +721,6 @@ func (s *Server) deletePaymentTerms(_ context.Context, input *struct {
 	})
 	if err != nil {
 		return nil, err
-	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		return nil, huma.Error500InternalServerError(revErr.Error())
 	}
 	return &reorderOutput{Body: struct {
 		Revision string `json:"revision"`
