@@ -65,6 +65,7 @@ export function Modal({
 	onClose,
 	wide = false,
 	className = "",
+	coverage = "sheet",
 }: {
 	title: string;
 	eyebrow?: string;
@@ -72,6 +73,8 @@ export function Modal({
 	onClose: () => void;
 	wide?: boolean;
 	className?: string;
+	/** Drawer width on mobile viewports: edge-to-edge sheet or full screen. */
+	coverage?: "sheet" | "full";
 }) {
 	const ref = useRef<HTMLDialogElement>(null);
 	const panelRef = useRef<HTMLDivElement>(null);
@@ -95,23 +98,24 @@ export function Modal({
 		setClosing(true);
 	};
 	// Drawer variants share the drawer slide primitive with the left
-	// navigation: full off-canvas travel on mobile where the drawer covers
-	// the viewport, subtle offset where it docks as a side panel.
+	// navigation: full off-canvas travel on mobile, subtle offset where it
+	// docks as a side panel. Mobile width is configurable: sheet by default,
+	// full screen with coverage="full".
 	const drawer = className.includes("modal-drawer");
 	const fullScreenDrawer = useMediaQuery("(max-width: 600px)");
-	const full = drawer && fullScreenDrawer;
+	const offCanvas = drawer && fullScreenDrawer;
 	const drawerTransition = useDrawerTransition(closing);
 	// A rightward swipe starting over the panel closes the drawer. The
 	// gesture owns no drawer state; an unmounted drawer simply has no listener.
 	useHorizontalSwipe({
-		enabled: full && !closing,
+		enabled: offCanvas && !closing,
 		onSwipeRight: (_dx, origin) => {
 			if (origin instanceof Node && panelRef.current?.contains(origin)) {
 				requestClose();
 			}
 		},
 	});
-	const drawerClosedX = drawerHiddenX("right", full);
+	const drawerClosedX = drawerHiddenX("right", offCanvas);
 	// The native <dialog> stays static so showModal top-layer, focus, and
 	// backdrop behavior are unchanged — motion owns only the inner panel.
 	const enter = drawer ? { opacity: 1, x: 0 } : { opacity: 1, scale: 1, y: 0 };
@@ -124,7 +128,7 @@ export function Modal({
 	return (
 		<dialog
 			ref={ref}
-			className={`modal ${wide ? "modal-wide" : ""} ${className}`}
+			className={`modal ${wide ? "modal-wide" : ""} ${className} ${drawer && coverage === "full" ? "modal-drawer-full" : ""}`}
 			aria-labelledby={id}
 			onCancel={(event) => {
 				event.preventDefault();

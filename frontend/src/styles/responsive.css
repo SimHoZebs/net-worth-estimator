@@ -222,9 +222,9 @@
 		position: fixed;
 		inset: 0;
 		z-index: 29;
-		background: #1f392c66;
+		background: var(--backdrop-film);
 		border: 0;
-		backdrop-filter: blur(2px);
+		backdrop-filter: blur(var(--backdrop-blur));
 	}
 	.mobile-only {
 		display: inline-grid !important;
@@ -661,19 +661,32 @@
 		border-radius: 11px;
 	}
 	.modal-drawer {
-		width: 100%;
-		max-width: 100%;
+		/* Right sheet mirroring the left navigation sheet: docked to the
+		   viewport edge with the dimmed page behind, not a fullscreen
+		   takeover, so the slide reads as coming from the right. */
+		width: min(420px, calc(100vw - 56px));
 		height: 100dvh;
 		max-height: 100dvh;
-		margin: 0;
-		inset: 0;
+		margin: 0 0 0 auto;
+		inset: 0 0 0 auto;
 		border: 0;
+		border-left: 1px solid var(--line-strong);
 		border-radius: 0;
+		/* Mirror of the sidebar sheet shadow, cast toward the page. */
+		box-shadow: -10px 0 60px #19332920;
 		/* Slide is owned by motion (Modal drawer variant); no CSS transition
 		   here so per-frame inline transforms are not re-smoothed. */
 		/* Vertical scroll stays with the browser; horizontal swipes are left
 		   to the swipe gesture in the drawer primitive. */
 		touch-action: pan-y;
+	}
+	/* Full-coverage opt-in (Modal coverage="full"): edge-to-edge content
+	   with no sheet chrome. */
+	.modal-drawer.modal-drawer-full {
+		width: 100%;
+		max-width: 100%;
+		border-left: 0;
+		box-shadow: none;
 	}
 	.modal-header {
 		padding: 22px 20px 19px;

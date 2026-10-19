@@ -51,6 +51,8 @@
 		--seg-tan: #bda074;
 		--seg-blue: #9fbdd4;
 		--seg-plum: #bcabd2;
+		--backdrop-film: #172d2b66;
+		--backdrop-blur: 3px;
 		--serif: "Newsreader Variable", Georgia, serif;
 		--sidebar: 224px;
 	}
