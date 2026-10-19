@@ -1,8 +1,8 @@
-import { FileCheck2, LockKeyhole, Pencil, Trash2, Wallet } from "lucide-react";
+import { LockKeyhole, Pencil, Trash2, Wallet } from "lucide-react";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
 import { DataTable } from "../../components/DataTable.tsx";
 import { EmptyState, IconButton } from "../../components/ui.tsx";
-import { dateLabel, money } from "../../domain/format.ts";
+import { money } from "../../domain/format.ts";
 import type { Account } from "../../domain/model.ts";
 import "./plan.css";
 
@@ -74,36 +74,3 @@ export function AccountsPanel({
 	);
 }
 
-export function BalanceChecksPanel({
-	accounts,
-	onEdit,
-}: {
-	accounts: Account[];
-	onEdit: (account: Account) => void;
-}) {
-	return (
-		<div className="movement-list">
-			{accounts
-				.filter((account) => account.balanceCheck)
-				.map((account) => (
-					<div className="movement-row" key={account.id}>
-						<span className="movement-icon inflow">
-							<FileCheck2 size={19} />
-						</span>
-						<div className="movement-name">
-							<strong>{account.name}</strong>
-							<span>
-								{dateLabel(account.observedOn, true)} · {account.source}
-							</span>
-						</div>
-						<strong>{money(account.balance)}</strong>
-						<IconButton
-							icon={Pencil}
-							label={`Edit starting balance for ${account.name}`}
-							onClick={() => onEdit(account)}
-						/>
-					</div>
-				))}
-		</div>
-	);
-}
