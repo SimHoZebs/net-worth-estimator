@@ -15,6 +15,7 @@ test.beforeEach(async () => {
 async function openInvestingMovementEditor(page: Page) {
 	await page.getByRole("link", { name: "Transactions", exact: true }).click();
 	await page.getByRole("button", { name: "Monthly investing" }).click();
+	await page.getByLabel("Amount (USD)").click();
 }
 
 const issues = (
@@ -72,9 +73,12 @@ test("edits remain temporary, persist across reload, and save deliberately", asy
 		page.getByText("1 unsaved change · saved plan unchanged"),
 	).toBeVisible();
 	await page.getByRole("button", { name: "Save changes" }).click();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).not.toBeVisible();
+	// Synchronize on save completion, not on the banner flipping to its
+	// loading text: the "unsaved change" copy disappears the moment the
+	// save starts, while the draft is only cleared after the server
+	// roundtrips finish. Reloading on the loading text races the save and
+	// restores a stale draft.
+	await expect(page.getByText("Plan saved on the server.")).toBeVisible();
 	await page.reload();
 	// The save reached the server, and the unsaved changes are gone.
 	const saved = await readSavedServerPlan();

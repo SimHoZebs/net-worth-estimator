@@ -36,7 +36,6 @@ export function WorkspacePage({
 					onTransactions={() => onNavigate("transactions")}
 					onEvaluations={() => onNavigate("evaluations")}
 					onEvaluation={(id) => onEvidence({ kind: "evaluation", id })}
-					onEdit={onEdit}
 					timingDetail={timingDetail}
 					onTimingDetail={onTimingDetail}
 					onTimingTab={onTimingTab}

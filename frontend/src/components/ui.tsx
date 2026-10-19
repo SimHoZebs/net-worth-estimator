@@ -14,13 +14,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { useMediaQuery } from "../state/useMediaQuery.ts";
 import "./ui.css";
-import {
-	drawerHiddenX,
-	useDrawerTransition,
-	useHorizontalSwipe,
-} from "./drawer.ts";
 
 export function IconButton({
 	icon: Icon,
@@ -65,19 +59,21 @@ export function Modal({
 	onClose,
 	wide = false,
 	className = "",
-	coverage = "sheet",
+	titleSize = "display",
+	actions,
 }: {
-	title: string;
+	title: ReactNode;
 	eyebrow?: string;
 	children: ReactNode;
 	onClose: () => void;
 	wide?: boolean;
 	className?: string;
-	/** Drawer width on mobile viewports: edge-to-edge sheet or full screen. */
-	coverage?: "sheet" | "full";
+	/** Plain titles name the subject without competing with the content. */
+	titleSize?: "display" | "plain";
+	/** Extra icon buttons beside the corner close button. */
+	actions?: ReactNode;
 }) {
 	const ref = useRef<HTMLDialogElement>(null);
-	const panelRef = useRef<HTMLDivElement>(null);
 	const [closing, setClosing] = useState(false);
 	const closeRequested = useRef(false);
 	const reduceMotion = useReducedMotion();
@@ -97,38 +93,17 @@ export function Modal({
 		closeRequested.current = true;
 		setClosing(true);
 	};
-	// Drawer variants share the drawer slide primitive with the left
-	// navigation: full off-canvas travel on mobile, subtle offset where it
-	// docks as a side panel. Mobile width is configurable: sheet by default,
-	// full screen with coverage="full".
-	const drawer = className.includes("modal-drawer");
-	const fullScreenDrawer = useMediaQuery("(max-width: 600px)");
-	const offCanvas = drawer && fullScreenDrawer;
-	const drawerTransition = useDrawerTransition(closing);
-	// A rightward swipe starting over the panel closes the drawer. The
-	// gesture owns no drawer state; an unmounted drawer simply has no listener.
-	useHorizontalSwipe({
-		enabled: offCanvas && !closing,
-		onSwipeRight: (_dx, origin) => {
-			if (origin instanceof Node && panelRef.current?.contains(origin)) {
-				requestClose();
-			}
-		},
-	});
-	const drawerClosedX = drawerHiddenX("right", offCanvas);
-	// The native <dialog> stays static so showModal top-layer, focus, and
-	// backdrop behavior are unchanged — motion owns only the inner panel.
-	const enter = drawer ? { opacity: 1, x: 0 } : { opacity: 1, scale: 1, y: 0 };
-	const initial = drawer
-		? { opacity: 0, x: drawerClosedX }
-		: { opacity: 0, scale: 0.97, y: 8 };
-	const exit = drawer
-		? { opacity: 0, x: drawerClosedX }
-		: { opacity: 0, scale: 0.98, y: 8 };
+	// Centered dialogs scale/fade. Drawer sheets are the shared Drawer
+	// component; the native <dialog> stays static so showModal top-layer,
+	// focus, and backdrop behavior are unchanged — motion owns only the
+	// inner panel.
+	const enter = { opacity: 1, scale: 1, y: 0 };
+	const initial = { opacity: 0, scale: 0.97, y: 8 };
+	const exit = { opacity: 0, scale: 0.98, y: 8 };
 	return (
 		<dialog
 			ref={ref}
-			className={`modal ${wide ? "modal-wide" : ""} ${className} ${drawer && coverage === "full" ? "modal-drawer-full" : ""}`}
+			className={`modal ${wide ? "modal-wide" : ""} ${className}`}
 			aria-labelledby={id}
 			onCancel={(event) => {
 				event.preventDefault();
@@ -139,17 +114,12 @@ export function Modal({
 			}}
 		>
 			<motion.div
-				ref={panelRef}
 				initial={initial}
 				animate={closing ? exit : enter}
-				transition={
-					drawer
-						? drawerTransition
-						: {
-								duration: reduceMotion ? 0 : closing ? 0.12 : 0.15,
-								ease: "easeOut",
-							}
-				}
+				transition={{
+					duration: reduceMotion ? 0 : closing ? 0.12 : 0.15,
+					ease: "easeOut",
+				}}
 				onAnimationComplete={() => {
 					if (closing) onClose();
 				}}
@@ -157,9 +127,19 @@ export function Modal({
 				<div className="modal-header">
 					<div>
 						{eyebrow && <p className="eyebrow">{eyebrow}</p>}
-						<h2 id={id}>{title}</h2>
+						<h2
+							id={id}
+							className={
+								titleSize === "plain" ? "modal-title-plain" : undefined
+							}
+						>
+							{title}
+						</h2>
 					</div>
-					<IconButton icon={X} label="Close dialog" onClick={requestClose} />
+					<div className="modal-header-actions">
+						{actions}
+						<IconButton icon={X} label="Close dialog" onClick={requestClose} />
+					</div>
 				</div>
 				<div className="modal-body">{children}</div>
 			</motion.div>

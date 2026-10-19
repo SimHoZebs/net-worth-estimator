@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { money } from "../../domain/format.ts";
+import type { Account, Plan } from "../../domain/model.ts";
+import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import type { FailureLedger } from "../../domain/constraintSnapshot.ts";
-import type { EditorTarget } from "../../domain/planEdits.ts";
+import type { Movement } from "../../domain/model.ts";
 import type { MovementResult } from "../../domain/result.ts";
 import { AccountEntry } from "../AccountEntry.tsx";
+import { TransactionDetail } from "../activity/TransactionDetail.tsx";
 import { TransactionRow } from "../activity/TransactionRow.tsx";
 import { TransactionTable } from "../activity/TransactionTable.tsx";
 
@@ -12,15 +16,22 @@ import { TransactionTable } from "../activity/TransactionTable.tsx";
 export function ConstraintSnapshot({
 	ledger,
 	failure,
+	accounts,
+	plan,
 	showHeaders = false,
-	onEdit,
 }: {
 	ledger: FailureLedger;
 	failure: MovementResult;
+	accounts: Pick<Account, "id" | "kind" | "color" | "name">[];
+	plan: Plan;
 	showHeaders?: boolean;
-	onEdit: (target: EditorTarget) => void;
 }) {
 	const gap = failure.requested - failure.realized;
+	const [selected, setSelected] = useState<{
+		transaction: AccountTransaction;
+		movement: Movement;
+		failing: boolean;
+	} | null>(null);
 	return (
 		<figure className="snapshot">
 			{ledger.accountIcon ? (
@@ -40,13 +51,27 @@ export function ConstraintSnapshot({
 						key={transaction.id}
 						transaction={transaction}
 						movement={movement}
-						onEdit={(item) => onEdit({ kind: "movement", item })}
+						onEdit={(item) =>
+							setSelected({ transaction, movement: item, failing })
+						}
 						shortfallLabel={failing ? `Shortfall ${money(gap)}` : undefined}
 					/>
 				))}
 			</TransactionTable>
 			{ledger.overflow > 0 && (
 				<p className="snapshot-more">+{ledger.overflow} more</p>
+			)}
+			{selected && (
+				<TransactionDetail
+					transaction={selected.transaction}
+					movement={selected.movement}
+					accounts={accounts}
+					plan={plan}
+					shortfallLabel={
+						selected.failing ? `Shortfall ${money(gap)}` : undefined
+					}
+					onClose={() => setSelected(null)}
+				/>
 			)}
 		</figure>
 	);

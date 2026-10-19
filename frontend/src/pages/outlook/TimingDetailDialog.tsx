@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
+import { TransactionDetail } from "../../components/activity/TransactionDetail.tsx";
 import { TransactionRow } from "../../components/activity/TransactionRow.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
@@ -8,12 +9,11 @@ import {
 	SegmentedBar,
 } from "../../components/SegmentedBar.tsx";
 import { Tabs } from "../../components/Tabs.tsx";
-import { Modal } from "../../components/ui.tsx";
+import { Drawer } from "../../components/Drawer.tsx";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { MandatorySpendingGroup } from "../../domain/householdTiming.ts";
 import type { Plan } from "../../domain/model.ts";
-import type { EditorTarget } from "../../domain/planEdits.ts";
 import type { TransactionOrder } from "../../domain/transactionSort.ts";
 
 export type TimingDetailTab = "mandatory" | "cycle" | "configure";
@@ -146,37 +146,44 @@ function PaycheckBar({ parts }: { parts: PaycheckDecomposition }) {
 	);
 }
 
-function MandatorySectionView({
-	section,
+function TransactionSectionView({
+	transactions,
+	caption,
+	emptyMessage,
 	movements,
-	onEdit,
+	onInspect,
 	order,
 	showHeaders = false,
 }: {
-	section: TimingMandatorySection;
+	transactions: AccountTransaction[];
+	caption: string;
+	emptyMessage: string;
 	movements: Map<string, Plan["movements"][number]>;
-	onEdit: (movement: Plan["movements"][number]) => void;
+	onInspect: (
+		transaction: AccountTransaction,
+		movement: Plan["movements"][number],
+	) => void;
 	order: TransactionOrder;
 	showHeaders?: boolean;
 }) {
-	if (!section.transactions.length) {
+	if (!transactions.length) {
 		return (
 			<div className="cycle-breakdown">
-				<p>No bills due in this period.</p>
+				<p>{emptyMessage}</p>
 			</div>
 		);
 	}
 	return (
 		<TransactionTable
-			caption={`${section.title}, ${order === "oldest" ? "oldest first" : "newest first"}`}
+			caption={`${caption}, ${order === "oldest" ? "oldest first" : "newest first"}`}
 			showHeaders={showHeaders}
 		>
-			{section.transactions.map((transaction) => (
+			{transactions.map((transaction) => (
 				<TransactionRow
 					key={transaction.id}
 					transaction={transaction}
 					movement={movements.get(transaction.movementId) ?? null}
-					onEdit={onEdit}
+					onEdit={(movement) => onInspect(transaction, movement)}
 				/>
 			))}
 		</TransactionTable>
@@ -251,7 +258,6 @@ export function TimingDetailDialog({
 	onFrameChange,
 	thisMonth,
 	plan,
-	onEdit,
 	cycleTransactions,
 	config,
 	billCandidates,
@@ -276,7 +282,6 @@ export function TimingDetailDialog({
 	onFrameChange: (frame: MandatoryFrame) => void;
 	thisMonth: TimingMandatorySection;
 	plan: Plan;
-	onEdit: (target: EditorTarget) => void;
 	cycleTransactions: AccountTransaction[];
 	config: TimingConfigHints;
 	billCandidates: {
@@ -319,12 +324,22 @@ export function TimingDetailDialog({
 		() => new Map(plan.accounts.map((account) => [account.id, account])),
 		[plan.accounts],
 	);
+	const [selected, setSelected] = useState<{
+		transaction: AccountTransaction;
+		movement: Plan["movements"][number];
+	} | null>(null);
+	const inspect = (
+		transaction: AccountTransaction,
+		movement: Plan["movements"][number],
+	) => setSelected({ transaction, movement });
 	return (
-		<Modal
+		<Drawer
+			side="right"
+			open
+			onClose={onClose}
+			label="Timing detail"
 			title="Timing detail"
 			eyebrow={eyebrow}
-			onClose={onClose}
-			className="modal-drawer"
 			coverage="full"
 		>
 			<Tabs
@@ -389,10 +404,12 @@ export function TimingDetailDialog({
 							</div>
 							<strong className="timing-total">{money(thisMonth.total)}</strong>
 						</div>
-						<MandatorySectionView
-							section={thisMonth}
+						<TransactionSectionView
+							transactions={thisMonth.transactions}
+							caption={thisMonth.title}
+							emptyMessage="No bills due in this period."
 							movements={movements}
-							onEdit={(item) => onEdit({ kind: "movement", item })}
+							onInspect={inspect}
 							order={transactionOrder}
 							showHeaders={showHeaders}
 						/>
@@ -424,31 +441,40 @@ export function TimingDetailDialog({
 						/>
 					</div>
 				) : tab === "cycle" ? (
-					cycleTransactions.length ? (
-						<div className="timing-cycle">
-							<div className="table-toolbar">
-								<TransactionSortButton
-									order={transactionOrder}
-									onChange={onTransactionOrderChange}
-								/>
+					<div className="timing-mandatory">
+						<div className="section-top">
+							<div className="timing-section-title">
+								<h3>Card charges in this cycle</h3>
+								<p className="section-note">
+									{dateLabel(heroes.cycleStart, true)} to{" "}
+									{dateLabel(heroes.cycleEnd, true)}
+								</p>
 							</div>
-							<TransactionTable
-								caption={`Card charges in this cycle, ${transactionOrder === "oldest" ? "oldest first" : "newest first"}`}
-								showHeaders={showHeaders}
-							>
-								{cycleTransactions.map((transaction) => (
-									<TransactionRow
-										key={transaction.id}
-										transaction={transaction}
-										movement={movements.get(transaction.movementId) ?? null}
-										onEdit={(item) => onEdit({ kind: "movement", item })}
-									/>
-								))}
-							</TransactionTable>
+							<strong className="timing-total">
+								{money(
+									cycleTransactions.reduce(
+										(total, transaction) => total + transaction.amount,
+										0,
+									),
+								)}
+							</strong>
 						</div>
-					) : (
-						<p>No charges in this cycle yet.</p>
-					)
+						<div className="table-toolbar">
+							<TransactionSortButton
+								order={transactionOrder}
+								onChange={onTransactionOrderChange}
+							/>
+						</div>
+						<TransactionSectionView
+							transactions={cycleTransactions}
+							caption="Card charges in this cycle"
+							emptyMessage="No charges in this cycle yet."
+							movements={movements}
+							onInspect={inspect}
+							order={transactionOrder}
+							showHeaders={showHeaders}
+						/>
+					</div>
 				) : (
 					<div className="cycle-config">
 						<label className="field">
@@ -704,6 +730,22 @@ export function TimingDetailDialog({
 					</div>
 				)}
 			</Tabs>
-		</Modal>
+			{selected && (
+				<TransactionDetail
+					transaction={selected.transaction}
+					movement={selected.movement}
+					accounts={plan.accounts}
+					plan={plan}
+					claimRuleName={
+						selected.movement.claimRuleId
+							? (plan.movements.find(
+									(item) => item.id === selected.movement.claimRuleId,
+								)?.name ?? null)
+							: null
+					}
+					onClose={() => setSelected(null)}
+				/>
+			)}
+		</Drawer>
 	);
 }

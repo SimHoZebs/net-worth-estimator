@@ -1,15 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useReducedMotion } from "motion/react";
 
-// Shared slide primitives for the left navigation drawer (WorkspaceLayout)
-// and the right context drawer (Modal `modal-drawer`). Both slide the full
-// off-canvas width on mobile with the same timing; the right drawer keeps a
-// subtle offset plus fade on larger viewports where it docks as a side panel
-// instead of covering the viewport.
-//
-// Swipe detection is drawer-agnostic: useHorizontalSwipe reports qualified
-// horizontal swipes and knows nothing about drawers; each call site maps a
-// direction to its own open/close meaning with its own hit-test.
+// Shared slide primitives for the single Drawer component: the left
+// navigation sheet and the right context sheet slide the full off-canvas
+// width on mobile with the same timing; the right sheet keeps its docked
+// width on larger viewports. Swipe detection is drawer-agnostic: each call
+// site maps a direction to its own meaning with its own hit-test.
 
 export const DRAWER_EASE = "easeOut" as const;
 export const DRAWER_OPEN_DURATION = 0.2;

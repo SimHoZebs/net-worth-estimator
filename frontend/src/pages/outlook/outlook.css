@@ -578,10 +578,6 @@
 		color: var(--ink);
 		margin: 0;
 	}
-	.timing-cycle {
-		display: grid;
-		gap: 8px;
-	}
 	.timing-mandatory .section-top {
 		flex-wrap: wrap;
 		gap: 4px 12px;
@@ -602,12 +598,10 @@
 	.modal-body .cycle-config .section-note {
 		padding: 0;
 	}
-	.timing-mandatory .table-toolbar,
-	.timing-cycle .table-toolbar {
+	.timing-mandatory .table-toolbar {
 		margin: 0;
 	}
-	.timing-mandatory .account-activity-table,
-	.timing-cycle .account-activity-table {
+	.timing-mandatory .account-activity-table {
 		border-top: 0;
 	}
 	.timing-controls {

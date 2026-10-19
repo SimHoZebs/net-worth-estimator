@@ -338,8 +338,8 @@ function TransactionsView({
 				<MovementsPanel
 					movements={pagedMovements}
 					accounts={visibleAccounts(plan.accounts)}
+					plan={plan}
 					resolvedAmounts={resolvedAmounts}
-					onEdit={(item) => onEdit({ kind: "movement", item })}
 				/>
 			</div>
 			{pageCount > 1 && (

@@ -28,11 +28,11 @@ test("clicking an account opens its recorded history and projected transactions"
 	// The fixture records two payroll deposits and one take-home deposit before
 	// the projection starts.
 	await expect(
-		dialog.getByRole("button", { name: /Edit Household payroll/ }),
+		dialog.getByRole("button", { name: /View Household payroll/ }),
 	).toHaveCount(2);
 	await expect(
 		dialog.getByRole("button", {
-			name: "Edit Household take-home pay on Jan 28, 2026",
+			name: "View Household take-home pay on Jan 28, 2026",
 		}),
 	).toBeVisible();
 	await dialog.getByLabel("Transaction source").selectOption("historical");
@@ -58,7 +58,7 @@ test("clicking an account opens its recorded history and projected transactions"
 		"Jan 29, 2026",
 	);
 	await dialog
-		.getByRole("button", { name: "Edit Household payroll on Jan 15, 2026" })
+		.getByRole("button", { name: "View Household payroll on Jan 15, 2026" })
 		.click();
 	await expect(
 		page.getByRole("dialog", { name: "Household payroll" }),
@@ -93,19 +93,28 @@ test("account names in the plan open incoming transfers with the correct other a
 	await expect(dialog.getByText("+$400.00", { exact: true })).toBeVisible();
 	await dialog
 		.getByRole("button", {
-			name: "Edit Retirement contribution on Feb 12, 2026",
+			name: "View Retirement contribution on Feb 12, 2026",
 		})
 		.click();
 	await expect(
 		page.getByRole("dialog", { name: "Retirement contribution" }),
 	).toBeVisible();
+	await page.getByLabel("Amount (USD)").click();
+	await expect(
+		page.getByRole("dialog", { name: "Retirement contribution" }),
+	).toBeVisible();
+	await expect(page.getByLabel("Amount (USD)")).toBeFocused();
+	// The route chips are always present and show the right accounts.
 	await expect(page.getByLabel("From", { exact: true })).toContainText(
 		"Everyday checking",
 	);
 	await expect(page.getByLabel("To", { exact: true })).toContainText(
 		"Investment portfolio",
 	);
-	await page.getByRole("button", { name: "Cancel", exact: true }).click();
+	await page
+		.getByRole("dialog", { name: "Retirement contribution" })
+		.getByRole("button", { name: "Close dialog" })
+		.click();
 	await expect(
 		page.getByRole("dialog", { name: "Investment portfolio" }),
 	).toBeVisible();
@@ -124,6 +133,61 @@ test("account names in the plan open incoming transfers with the correct other a
 	).toBeEnabled();
 });
 
+test("transaction values edit in place with save and discard", async ({
+	page,
+}) => {
+	await page.goto("/#accounts");
+	await page
+		.getByRole("button", { name: "Open Investment portfolio transactions" })
+		.click();
+	const dialog = page.getByRole("dialog", { name: "Investment portfolio" });
+	await dialog.getByLabel("Transaction source").selectOption("all");
+	await dialog.getByLabel("Transaction dates").selectOption("30-days");
+	await dialog
+		.getByRole("button", {
+			name: "View Retirement contribution on Feb 12, 2026",
+		})
+		.click();
+	const detail = page.getByRole("dialog", { name: "Retirement contribution" });
+	await expect(detail).toBeVisible();
+	// No edit toggle: the values are live controls. Nothing happens until
+	// a value actually changes; the first change reveals Save/Discard.
+	await page.getByLabel("Amount (USD)").click();
+	await expect(page.getByLabel("Amount (USD)")).toBeFocused();
+	await expect(
+		page.getByRole("button", { name: "Apply unsaved changes" }),
+	).toHaveCount(0);
+	// Discard restores the read view with the original value.
+	await page.getByLabel("Amount (USD)").fill("999");
+	await expect(
+		page.getByRole("button", { name: "Apply unsaved changes" }),
+	).toBeVisible();
+	await page.getByRole("button", { name: "Discard changes" }).click();
+	await expect(
+		page.getByRole("button", { name: "Apply unsaved changes" }),
+	).toHaveCount(0);
+	await expect(dialog.getByText("+$400.00", { exact: true })).toBeVisible();
+	// Changing the source chip summons Save; Discard restores the route.
+	await page.getByLabel("From", { exact: true }).focus();
+	await expect(page.getByLabel("From", { exact: true })).toBeFocused();
+	await page.getByLabel("From", { exact: true }).selectOption("brokerage");
+	await expect(
+		page.getByRole("button", { name: "Apply unsaved changes" }),
+	).toBeVisible();
+	await page.getByRole("button", { name: "Discard changes" }).click();
+	await expect(page.getByLabel("From", { exact: true })).toContainText(
+		"Everyday checking",
+	);
+	await page.getByLabel("Transaction name").click();
+	await expect(page.getByLabel("Transaction name")).toBeFocused();
+	// Switching values keeps the open edit: amount becomes the control.
+	await page.getByLabel("Amount (USD)").click();
+	await expect(page.getByLabel("Amount (USD)")).toBeFocused();
+	await page.getByLabel("Amount (USD)").fill("450");
+	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
+	await expect(dialog.getByText("+$450.00", { exact: true })).toBeVisible();
+});
+
 test("a shortfall can be inspected and edited while preserving account context and the saved plan", async ({
 	page,
 }) => {
@@ -138,11 +202,12 @@ test("a shortfall can be inspected and edited while preserving account context a
 	);
 	await expect(dialog.getByText("Shortfall", { exact: true })).toBeVisible();
 	await dialog
-		.getByRole("button", { name: "Edit Home renovation on Mar 6, 2026" })
+		.getByRole("button", { name: "View Home renovation on Mar 6, 2026" })
 		.click();
 	await expect(
 		page.getByRole("dialog", { name: "Home renovation" }),
 	).toBeVisible();
+	await page.getByLabel("Amount (USD)").click();
 	await page.getByLabel("Amount (USD)").fill("3000");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	dialog = page.getByRole("dialog", { name: "Everyday checking" });
@@ -156,13 +221,18 @@ test("a shortfall can be inspected and edited while preserving account context a
 	await expect(dialog.getByText("−$3,000.00", { exact: true })).toBeVisible();
 	await expect(dialog.getByText("Shortfall", { exact: true })).toHaveCount(0);
 	// The saved plan is untouched: only the unsaved changes changed.
+	// Posting CSV ids are replaced with server UUIDs on import, so the
+	// renovation is located by name on both sides.
 	const draft = await readTemporaryVersion(page);
-	const renovation = (plan: { movements: { id: string; amount: number }[] }) =>
-		plan.movements.find((movement) => movement.id === "renovation")?.amount;
+	const renovation = (plan: {
+		movements: { name: string; amount: number }[];
+	}) =>
+		plan.movements.find((movement) => movement.name === "Home renovation")
+			?.amount;
 	expect(renovation(draft)).toBe(3000);
 	const saved = await readSavedServerPlan();
 	const savedExpression = saved.postings.find(
-		(posting) => posting.id === "renovation",
+		(posting) => posting.name === "Home renovation",
 	)?.amount.config.expression;
 	expect(savedExpression).toBe("9000");
 });
@@ -186,7 +256,7 @@ test("filters reset pagination and keep projected transfers distinct from record
 	);
 	// Historical income is not a transfer, so the filter must exclude it.
 	await expect(
-		dialog.getByRole("button", { name: /Edit Household payroll/ }),
+		dialog.getByRole("button", { name: /View Household payroll/ }),
 	).toHaveCount(0);
 	await dialog
 		.getByRole("searchbox", { name: "Search account transactions" })
@@ -195,7 +265,7 @@ test("filters reset pagination and keep projected transfers distinct from record
 		"Showing 1–1 of 1 transactions",
 	);
 	await expect(
-		dialog.getByRole("button", { name: /Edit Retirement contribution/ }),
+		dialog.getByRole("button", { name: /View Retirement contribution/ }),
 	).toBeVisible();
 	await expect(dialog.getByText("−$400.00", { exact: true })).toBeVisible();
 });
@@ -284,10 +354,10 @@ test("account transactions and editor evidence are accessible on desktop and mob
 			.getByRole("searchbox", { name: "Search account transactions" })
 			.fill("renovation");
 		await dialog
-			.getByRole("button", { name: "Edit Home renovation on Mar 6, 2026" })
+			.getByRole("button", { name: "View Home renovation on Mar 6, 2026" })
 			.click();
-		const editor = page.getByRole("dialog", { name: "Home renovation" });
-		await expect(editor).toBeVisible();
+		const detail = page.getByRole("dialog", { name: "Home renovation" });
+		await expect(detail).toBeVisible();
 		const results = await new AxeBuilder({ page })
 			.withTags(["wcag2a", "wcag2aa", "wcag21aa"])
 			.analyze();
@@ -302,7 +372,7 @@ test("account transactions and editor evidence are accessible on desktop and mob
 			`${width}px`,
 		).toEqual([]);
 		expect(
-			await editor.evaluate(
+			await detail.evaluate(
 				(element) => element.scrollWidth <= element.clientWidth,
 			),
 			`Dialog fits ${width}px`,

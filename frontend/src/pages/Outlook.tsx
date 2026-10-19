@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
 import type { Plan } from "../domain/model.ts";
-import type { EditorTarget } from "../domain/planEdits.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
@@ -22,7 +21,6 @@ export function Outlook({
 	onTransactions,
 	onEvaluations,
 	onEvaluation,
-	onEdit,
 	timingDetail,
 	onTimingDetail,
 	onTimingTab,
@@ -32,7 +30,6 @@ export function Outlook({
 	onTransactions: () => void;
 	onEvaluations: () => void;
 	onEvaluation: (id: string) => void;
-	onEdit: (target: EditorTarget) => void;
 	timingDetail: TimingDetailTab | null;
 	onTimingDetail: (tab: TimingDetailTab | null) => void;
 	onTimingTab: (tab: TimingDetailTab) => void;
@@ -99,7 +96,6 @@ export function Outlook({
 				onTransactions={onTransactions}
 				onEvaluations={onEvaluations}
 				onEvaluation={onEvaluation}
-				onEdit={onEdit}
 				timingDetail={timingDetail}
 				onTimingDetail={onTimingDetail}
 				onTimingTab={onTimingTab}
@@ -125,7 +121,6 @@ function OutlookContent({
 	onTransactions,
 	onEvaluations,
 	onEvaluation,
-	onEdit,
 	timingDetail,
 	onTimingDetail,
 	onTimingTab,
@@ -146,7 +141,6 @@ function OutlookContent({
 	onTransactions: () => void;
 	onEvaluations: () => void;
 	onEvaluation: (id: string) => void;
-	onEdit: (target: EditorTarget) => void;
 	timingDetail: TimingDetailTab | null;
 	onTimingDetail: (tab: TimingDetailTab | null) => void;
 	onTimingTab: (tab: TimingDetailTab) => void;
@@ -212,7 +206,6 @@ function OutlookContent({
 				<TimingPreview
 					plan={plan}
 					projection={projection}
-					onEdit={onEdit}
 					pending={pending}
 					detail={timingDetail}
 					onDetail={onTimingDetail}

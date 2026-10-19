@@ -1,10 +1,5 @@
 import type { ReactNode } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import {
-	drawerHiddenX,
-	useDrawerBackdropTransition,
-	useDrawerTransition,
-} from "../components/drawer.ts";
+import { Drawer } from "../components/Drawer.tsx";
 import { useMobileNavigation } from "./useMobileNavigation.ts";
 
 export function WorkspaceLayout({
@@ -22,47 +17,24 @@ export function WorkspaceLayout({
 	overlays: ReactNode;
 	notification: ReactNode;
 }) {
-	const {
-		open,
-		mobile: isMobile,
-		sidebarRef,
-		close,
-		show,
-	} = useMobileNavigation();
-	const drawerTransition = useDrawerTransition(false);
-	const backdropTransition = useDrawerBackdropTransition();
+	const { open, mobile, close, show } = useMobileNavigation();
 	return (
 		<div className="app-shell">
 			<a className="skip-link" href="#main-content">
 				Skip to main content
 			</a>
-			<AnimatePresence>
-				{open && (
-					<motion.button
-						key="nav-backdrop"
-						type="button"
-						className="nav-backdrop"
-						aria-label="Close navigation"
-						onClick={close}
-						initial={{ opacity: 0 }}
-						animate={{ opacity: 1 }}
-						exit={{ opacity: 0 }}
-						transition={backdropTransition}
-					/>
-				)}
-			</AnimatePresence>
-			<motion.aside
-				ref={sidebarRef}
-				className={`sidebar ${open ? "sidebar-open" : ""}`}
-				inert={isMobile && !open}
-				{...(open ? { role: "dialog", "aria-modal": true as const } : {})}
-				aria-label="Workspace navigation"
-				initial={false}
-				animate={{ x: open || !isMobile ? "0%" : drawerHiddenX("left", true) }}
-				transition={drawerTransition}
+			<Drawer
+				side="left"
+				open={open || !mobile}
+				onClose={close}
+				label="Workspace navigation"
+				full={mobile}
+				backdrop={mobile}
+				modal={mobile}
+				swipeClose={mobile}
 			>
 				{navigation(close)}
-			</motion.aside>
+			</Drawer>
 			<div className="workspace" inert={open}>
 				{header(show)}
 				<main id="main-content" className="main-content">
