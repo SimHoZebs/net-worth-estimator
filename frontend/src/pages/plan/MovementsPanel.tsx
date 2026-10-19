@@ -2,7 +2,6 @@ import { ArrowDownLeft, ArrowRight, ArrowUpRight } from "lucide-react";
 import { Badge, EmptyState } from "../../components/ui.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
 import "../../components/activity/account-activity.css";
-import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import {
 	isPendingMovement,
@@ -35,6 +34,12 @@ export function MovementsPanel({
 		>
 			{movements.map((movement) => {
 				const pending = isPendingMovement(movement);
+				// External endpoints only restate the direction, so the route
+				// names real accounts only. The date lives in its own column.
+				const route = [movement.fromId, movement.toId]
+					.map((id) => (id ? names.get(id) : null))
+					.filter((name): name is string => Boolean(name))
+					.join(" → ");
 				return (
 					<tr
 						key={movement.id}
@@ -73,22 +78,7 @@ export function MovementsPanel({
 								</span>
 								<span className="transaction-name">
 									<strong>{movement.name}</strong>
-									<span>
-										{movement.frequency === "once"
-											? dateLabel(movement.startDate, true)
-											: movement.frequency === "monthly"
-												? "Monthly"
-												: "Yearly"}{" "}
-										·{" "}
-										{movement.fromId
-											? names.get(movement.fromId)
-											: externalCounterpartyName("in")}
-										{movement.toId
-											? ` → ${names.get(movement.toId) ?? ""}`
-											: movement.fromId
-												? ` → ${externalCounterpartyName("out")}`
-												: null}
-									</span>
+									{route && <span>{route}</span>}
 									<span className="transaction-mobile-date">
 										{movement.frequency === "once"
 											? dateLabel(movement.startDate, true)
@@ -111,15 +101,17 @@ export function MovementsPanel({
 							</button>
 						</th>
 						<td className="transaction-amount-column">
-							<MovementAmount
-								movement={movement}
-								resolved={resolvedAmounts?.get(movement.id)}
-							/>
-							{movement.claimRuleId && (
-								<Badge tone="neutral">
-									Records {movement.claimOccurrenceDate}
-								</Badge>
-							)}
+							<span className="transaction-amount">
+								<MovementAmount
+									movement={movement}
+									resolved={resolvedAmounts?.get(movement.id)}
+								/>
+								{movement.claimRuleId && (
+									<Badge tone="neutral">
+										Records {movement.claimOccurrenceDate}
+									</Badge>
+								)}
+							</span>
 						</td>
 					</tr>
 				);

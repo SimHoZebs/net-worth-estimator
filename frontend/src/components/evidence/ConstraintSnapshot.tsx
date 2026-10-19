@@ -42,7 +42,6 @@ export function ConstraintSnapshot({
 						movement={movement}
 						onEdit={(item) => onEdit({ kind: "movement", item })}
 						shortfallLabel={failing ? `Shortfall ${money(gap)}` : undefined}
-						hideExternalCounterparty
 					/>
 				))}
 			</TransactionTable>

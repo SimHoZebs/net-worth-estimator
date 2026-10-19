@@ -267,7 +267,6 @@
 		border: 0;
 		background: none;
 		border-radius: 5px;
-		padding: 3px 0;
 		text-align: left;
 	}
 	.transaction-name {
@@ -275,6 +274,9 @@
 		flex-direction: column;
 		gap: 4px;
 		min-width: 0;
+	}
+	.transaction-name > * {
+		margin: 0;
 	}
 	.transaction-name > strong {
 		font-size: 12px;
@@ -314,15 +316,23 @@
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
-	.transaction-amount-column > strong {
+	.transaction-amount {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 2px;
+	}
+	.transaction-amount > * {
+		margin: 0;
+	}
+	.transaction-amount > strong {
 		font-size: 13px;
 		font-weight: 650;
 	}
-	.transaction-amount-column > small {
+	.transaction-amount > small {
 		display: block;
 		color: var(--accent-amber-text);
 		font-size: 9px;
-		margin-top: 5px;
 	}
 	.transaction-mobile-date {
 		display: none;
@@ -335,6 +345,16 @@
 		border: 1px solid var(--line-strong);
 		border-radius: 7px;
 		padding: 18px;
+		display: flex;
+		flex-direction: column;
+		gap: 13px;
+	}
+	.transaction-details > * {
+		margin: 0;
+	}
+	.transaction-details > .text-button {
+		align-self: flex-start;
+		font-size: 11px;
 	}
 	.transaction-details dl {
 		display: grid;
@@ -344,7 +364,6 @@
 	.transaction-details dt {
 		font-size: 10px;
 		color: var(--muted);
-		margin-bottom: 4px;
 	}
 	.transaction-details dd {
 		font-size: 11px;
@@ -354,12 +373,7 @@
 	.transaction-details > p {
 		color: var(--muted);
 		font-size: 10px;
-		margin-top: 16px;
 		line-height: 1.8;
-	}
-	.transaction-details > .text-button {
-		margin-top: 13px;
-		font-size: 11px;
 	}
 	.transaction-pagination {
 		display: flex;
@@ -432,7 +446,6 @@
 		border: 0;
 		background: none;
 		border-radius: 5px;
-		padding: 3px 0;
 		text-align: left;
 	}
 	.recurring-order {
@@ -539,10 +552,10 @@
 		.transaction-badges .badge {
 			font-size: 8px;
 		}
-		.transaction-amount-column > strong {
+		.transaction-amount > strong {
 			font-size: 12px;
 		}
-		.transaction-amount-column > small {
+		.transaction-amount > small {
 			font-size: 8px;
 		}
 		.transaction-details {
