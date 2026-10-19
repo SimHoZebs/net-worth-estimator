@@ -4,8 +4,10 @@ import { IconButton } from "../components/ui.tsx";
 import type { PageDefinition } from "./navigation.ts";
 
 export function WorkspaceTopbar({
+	page,
 	onOpenNavigation,
 }: {
+	page: PageDefinition;
 	onOpenNavigation: () => void;
 }) {
 	return (
@@ -16,6 +18,7 @@ export function WorkspaceTopbar({
 				className="mobile-only"
 				onClick={onOpenNavigation}
 			/>
+			<span className="topbar-title">{page.label}</span>
 		</header>
 	);
 }

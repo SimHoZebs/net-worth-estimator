@@ -45,7 +45,12 @@ export function WorkspaceShell() {
 			navigation={(close) => (
 				<WorkspaceSidebar page={navigation.page} onClose={close} />
 			)}
-			header={(open) => <WorkspaceTopbar onOpenNavigation={open} />}
+			header={(open) => (
+				<WorkspaceTopbar
+					page={navigation.currentPage}
+					onOpenNavigation={open}
+				/>
+			)}
 			draftBar={<DraftBar onDiscard={overlays.openDiscard} />}
 			overlays={<WorkspaceDialogs overlays={overlays} />}
 			notification={<WorkspaceNotification />}

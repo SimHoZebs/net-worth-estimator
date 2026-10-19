@@ -24,7 +24,12 @@ export function ServerLoadingShell({
 			navigation={(close) => (
 				<WorkspaceSidebar page={navigation.page} onClose={close} pending />
 			)}
-			header={(open) => <WorkspaceTopbar onOpenNavigation={open} />}
+			header={(open) => (
+				<WorkspaceTopbar
+					page={navigation.currentPage}
+					onOpenNavigation={open}
+				/>
+			)}
 			draftBar={null}
 			overlays={null}
 			notification={null}
