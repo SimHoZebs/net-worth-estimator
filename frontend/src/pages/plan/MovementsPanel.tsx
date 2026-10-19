@@ -1,5 +1,6 @@
 import { ArrowDownLeft, ArrowRight, ArrowUpRight } from "lucide-react";
 import { Badge, EmptyState } from "../../components/ui.tsx";
+import { TransactionItemRow } from "../../components/activity/TransactionItem.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
 import "../../components/activity/account-activity.css";
 import { dateLabel, money } from "../../domain/format.ts";
@@ -40,68 +41,56 @@ export function MovementsPanel({
 					.map((id) => (id ? names.get(id) : null))
 					.filter((name): name is string => Boolean(name))
 					.join(" → ");
+				const tone = movement.fromId
+					? movement.toId
+						? ("transfer" as const)
+						: ("outflow" as const)
+					: ("inflow" as const);
+				const dateText =
+					movement.frequency === "once"
+						? dateLabel(movement.startDate, true)
+						: movement.frequency === "monthly"
+							? "Monthly"
+							: "Yearly";
 				return (
-					<tr
+					<TransactionItemRow
 						key={movement.id}
-						className={`transaction-row ${movement.enabled || pending ? "" : "is-excluded"}`}
-					>
-						<td className="transaction-date-column">
-							{movement.frequency === "once" ? (
-								<time dateTime={movement.startDate}>
-									{dateLabel(movement.startDate, true)}
-								</time>
-							) : movement.frequency === "monthly" ? (
-								"Monthly"
+						dimmed={!movement.enabled && !pending}
+						date={
+							movement.frequency === "once" ? (
+								<time dateTime={movement.startDate}>{dateText}</time>
 							) : (
-								"Yearly"
-							)}
-						</td>
-						<th scope="row">
-							<button
-								type="button"
-								className="transaction-row-button"
-								aria-label={`${movement.name} on ${movement.frequency === "once" ? dateLabel(movement.startDate, true) : movement.frequency}`}
-								onClick={() => onEdit(movement)}
-							>
-								<span
-									className={`movement-icon ${movement.fromId ? (movement.toId ? "transfer" : "outflow") : "inflow"}`}
-								>
-									{movement.fromId ? (
-										movement.toId ? (
-											<ArrowRight size={16} aria-hidden="true" />
-										) : (
-											<ArrowUpRight size={16} aria-hidden="true" />
-										)
+								dateText
+							)
+						}
+						icon={
+							movement.fromId ? (
+								movement.toId ? (
+									<ArrowRight size={16} aria-hidden="true" />
+								) : (
+									<ArrowUpRight size={16} aria-hidden="true" />
+								)
+							) : (
+								<ArrowDownLeft size={16} aria-hidden="true" />
+							)
+						}
+						tone={tone}
+						title={movement.name}
+						subtitle={route ? <span>{route}</span> : undefined}
+						mobile={<span className="transaction-mobile-date">{dateText}</span>}
+						badges={
+							(pending || !movement.enabled) && (
+								<span className="transaction-badges">
+									{pending ? (
+										<Badge tone="neutral">Pending</Badge>
 									) : (
-										<ArrowDownLeft size={16} aria-hidden="true" />
+										!movement.enabled && <Badge tone="amber">Excluded</Badge>
 									)}
 								</span>
-								<span className="transaction-name">
-									<strong>{movement.name}</strong>
-									{route && <span>{route}</span>}
-									<span className="transaction-mobile-date">
-										{movement.frequency === "once"
-											? dateLabel(movement.startDate, true)
-											: movement.frequency === "monthly"
-												? "Monthly"
-												: "Yearly"}
-									</span>
-									{(pending || !movement.enabled) && (
-										<span className="transaction-badges">
-											{pending ? (
-												<Badge tone="neutral">Pending</Badge>
-											) : (
-												!movement.enabled && (
-													<Badge tone="amber">Excluded</Badge>
-												)
-											)}
-										</span>
-									)}
-								</span>
-							</button>
-						</th>
-						<td className="transaction-amount-column">
-							<span className="transaction-amount">
+							)
+						}
+						amount={
+							<>
 								<MovementAmount
 									movement={movement}
 									resolved={resolvedAmounts?.get(movement.id)}
@@ -111,9 +100,11 @@ export function MovementsPanel({
 										Records {movement.claimOccurrenceDate}
 									</Badge>
 								)}
-							</span>
-						</td>
-					</tr>
+							</>
+						}
+						actionLabel={`${movement.name} on ${movement.frequency === "once" ? dateText : movement.frequency}`}
+						onSelect={() => onEdit(movement)}
+					/>
 				);
 			})}
 		</TransactionTable>
