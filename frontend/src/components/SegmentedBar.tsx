@@ -35,7 +35,7 @@ export function SegmentedBar({
 }) {
 	const total = segments.reduce((sum, segment) => sum + segment.amount, 0);
 	return (
-		<div>
+		<div className="seg-stack">
 			<p className="section-note">{caption}</p>
 			<div className="seg-bar" role="img" aria-label={ariaLabel}>
 				{segments.map((segment) =>
