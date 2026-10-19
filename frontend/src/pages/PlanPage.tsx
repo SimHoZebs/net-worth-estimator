@@ -165,7 +165,7 @@ function AccountsView({
 	);
 	return (
 		<>
-			<section className="panel plan-panel">
+			<section className="plan-transactions">
 				<div className="plan-toolbar">
 					<label className="search-field">
 						<Search size={17} />
