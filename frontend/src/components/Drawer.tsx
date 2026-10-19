@@ -69,6 +69,14 @@ export function Drawer({
 	const drawerTransition = useDrawerTransition(closing);
 	const backdropTransition = useDrawerBackdropTransition();
 	const hiddenX = drawerHiddenX(side, isFull);
+	// The drawer stays mounted across open cycles (only its portal content
+	// unmounts), so a completed animated close must reset. Otherwise the
+	// next open renders already in the exit position and immediately
+	// re-triggers onClose, making the drawer impossible to reopen.
+	useEffect(() => {
+		// oxlint-disable-next-line react/set-state-in-effect
+		if (!open) setClosing(false);
+	}, [open]);
 	const requestClose = () => {
 		setClosing(true);
 	};
