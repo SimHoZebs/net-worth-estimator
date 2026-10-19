@@ -23,7 +23,7 @@ The Vite server runs on `http://localhost:5178` and proxies `/v1` to `127.0.0.1:
 
 ## Deployment
 
-`backend/Dockerfile` builds the API image. `frontend/Dockerfile` builds a static Nginx image that serves the SPA and proxies `/v1` to the backend named by `BACKEND_URL`. `docker compose up --build` runs the split stack with a persistent `net-worth-estimator-data` volume. The root `Dockerfile` is a legacy combined image retained for the existing Northflank build.
+`backend/Dockerfile` builds the API image. `frontend/Dockerfile` builds a static Nginx image that serves the SPA and proxies `/v1` to the backend named by `BACKEND_URL`. `docker compose up --build` runs the split stack with a persistent `net-worth-estimator-data` volume. The root `Dockerfile` is a legacy combined image.
 
 The frontend image is environment-independent. Vercel deployments set `VITE_API_BASE_URL` to the public backend origin, and the backend must allow that exact frontend origin through `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`. An unset `NET_WORTH_ESTIMATOR_AUTH_TOKEN` leaves guarded writes unauthenticated, and an unset `NET_WORTH_ESTIMATOR_READ_ONLY` leaves the backend writable.
 
@@ -40,7 +40,7 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 | `backend/internal/csvio/` | canonical model and income CSV import |
 | `backend/internal/simplefin/` | Bridge client, mapping, scheduler-safe runner, dry-run, mock fixture mode |
 | `backend/scripts/` | verification and benchmark entry points |
-| `scripts/` | backend smoke, container smoke, and Northflank operator inspection |
+| `scripts/` | backend smoke and container smoke |
 | `backend/Dockerfile` | API-only container image |
 | `frontend/Dockerfile` | static frontend image and runtime API proxy |
 | `docker-compose.yml` | split local/full-stack deployment |
@@ -77,7 +77,7 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 - `store.Store` is the persistence boundary. Row create/update/delete/move methods write one row per transaction with server-generated UUIDv7 IDs and a shared ID registry. Checkpoints and postings carry `source: "model" | "simplefin"`; sync-owned checkpoint collisions yield to owner rows.
 - Completed deterministic and seeded stochastic results are best-effort cached in `projection_artifacts`. The cache is bounded to 256 rows across both kinds. Partial results are not persisted. Unseeded stochastic runs are neither shared nor cached.
 - `backend/Dockerfile` runs as UID/GID `10001`, listens on `0.0.0.0:8787`, and stores SQLite at `/data/net-worth-estimator.db`. Compose supplies the persistent volume; production durability requires `/data` on persistent storage and one backend instance.
-- The root `Dockerfile` is the legacy combined image retained for the existing Northflank build. `frontend/Dockerfile` and `docker compose` are the split deployment path.
+- The root `Dockerfile` is the legacy combined image. `frontend/Dockerfile` and `docker compose` are the split deployment path.
 
 ## Simulation Rules
 
