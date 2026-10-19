@@ -1,0 +1,352 @@
+import { useMemo, useState } from "react";
+import type {
+	AmountTemplate,
+	PostingAmountResolution,
+} from "../../api/contracts.ts";
+import {
+	FALLBACK_TEMPLATES,
+	plainLanguageForAmount,
+} from "../../domain/amountCatalog.ts";
+import { InputField, SelectField } from "../Field.tsx";
+
+function numberOr(fallback: number, value: string): number {
+	const parsed = Number(value);
+	return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+type Option = { id: string; name: string };
+
+function optionsFor(list: Option[], placeholder: string) {
+	return (
+		<>
+			<option value="">{placeholder}</option>
+			{list.map((item) => (
+				<option key={item.id} value={item.id}>
+					{item.name}
+				</option>
+			))}
+		</>
+	);
+}
+
+export function buildTemplateAmount(
+	templateId: string,
+	fields: Record<string, string>,
+	accounts: { id: string }[],
+): PostingAmountResolution {
+	const firstAccount = accounts[0]?.id ?? "checking";
+	const get = (key: string, fallback: string) => fields[key] || fallback;
+	switch (templateId) {
+		case "growth":
+			return {
+				resolver: "expression",
+				config: { expression: "(base) * growth" },
+				inputs: {
+					base: { source: "literal", value: numberOr(500, get("base", "500")) },
+					growth: {
+						source: "provider",
+						provider: "growth-factor",
+						arguments: {
+							annualGrowthRate: numberOr(0.03, get("annualGrowthRate", "0.03")),
+						},
+					},
+				},
+			};
+		case "account-percent":
+			return {
+				resolver: "expression",
+				config: { expression: "balance * pct" },
+				inputs: {
+					balance: {
+						source: "provider",
+						provider: "account-balance",
+						arguments: { id: get("accountId", firstAccount) },
+					},
+					pct: { source: "literal", value: numberOr(0.04, get("pct", "0.04")) },
+				},
+			};
+		case "investment-growth":
+			return {
+				resolver: "expression",
+				config: { expression: "ref * rate" },
+				inputs: {
+					ref: {
+						source: "provider",
+						provider: "model-value",
+						arguments: { id: get("refId", firstAccount) },
+					},
+					rate: {
+						source: "provider",
+						provider: "occurrence-rate",
+						arguments: {
+							annualRate: numberOr(0.07, get("annualRate", "0.07")),
+							volatility: numberOr(0.12, get("volatility", "0.12")),
+						},
+					},
+				},
+			};
+		case "debt-minimum":
+			return {
+				resolver: "expression",
+				config: { expression: "minimum" },
+				inputs: {
+					minimum: {
+						source: "provider",
+						provider: "terms-minimum",
+						arguments: { id: get("accountId", firstAccount) },
+					},
+				},
+			};
+		case "late-fee":
+			return {
+				resolver: "expression",
+				config: { expression: "fee" },
+				inputs: {
+					fee: {
+						source: "provider",
+						provider: "late-fee",
+						arguments: {
+							payment: get("paymentId", "card_payment"),
+							account: get("accountId", firstAccount),
+							fee: numberOr(30, get("fee", "30")),
+						},
+					},
+				},
+			};
+		case "low-balance-fee":
+			return {
+				resolver: "expression",
+				config: { expression: "fee" },
+				inputs: {
+					fee: {
+						source: "provider",
+						provider: "balance-fee",
+						arguments: {
+							account: get("accountId", firstAccount),
+							threshold: numberOr(1500, get("threshold", "1500")),
+							fee: numberOr(12, get("fee", "12")),
+						},
+					},
+				},
+			};
+		case "paycheck":
+			return {
+				resolver: "income",
+				config: {
+					incomeSourceId: get("incomeSourceId", "salary"),
+					resolvers: [
+						{
+							resolver: "percentage",
+							config: {
+								rate: numberOr(0.1, get("rate", "0.10")),
+								annualCap: numberOr(23500, get("annualCap", "23500")),
+							},
+							destinationAccountId: get("destinationAccountId", "401k") || null,
+						},
+						{
+							resolver: "progressive-bracket",
+							config: { profileId: get("profileId", "federal") },
+						},
+					],
+				},
+				inputs: {},
+			};
+		case "fixed":
+		default:
+			return {
+				resolver: "expression",
+				config: { expression: String(numberOr(500, get("amount", "500"))) },
+				inputs: {},
+			};
+	}
+}
+
+function TemplateFields({
+	templateId,
+	accounts,
+	postings,
+	incomeSources,
+	taxProfiles,
+	fields,
+	onField,
+}: {
+	templateId: string;
+	accounts: Option[];
+	postings: Option[];
+	incomeSources: Option[];
+	taxProfiles: Option[];
+	fields: Record<string, string>;
+	onField: (key: string, value: string) => void;
+}) {
+	const set = (key: string) => ({
+		value: fields[key] ?? "",
+		onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+			onField(key, event.target.value),
+	});
+	const accountOptions = (placeholder: string) => optionsFor(accounts, placeholder);
+	switch (templateId) {
+		case "fixed":
+			return (
+				<InputField label="Dollars each time" name="amount" type="number" step="0.01" placeholder="e.g. 500" {...set("amount")} />
+			);
+		case "growth":
+			return (
+				<>
+					<InputField label="Starting dollars" name="base" type="number" step="0.01" placeholder="e.g. 500" {...set("base")} />
+					<InputField label="Yearly growth (0.03 = 3%)" name="annualGrowthRate" type="number" step="0.001" placeholder="e.g. 0.03" {...set("annualGrowthRate")} />
+				</>
+			);
+		case "account-percent":
+			return (
+				<>
+					<SelectField label="Account" name="accountId" {...set("accountId")}>{accountOptions("Pick an account")}</SelectField>
+					<InputField label="Percent (0.04 = 4%)" name="pct" type="number" step="0.001" placeholder="e.g. 0.04" {...set("pct")} />
+				</>
+			);
+		case "investment-growth":
+			return (
+				<>
+					<SelectField label="Balance to grow" name="refId" {...set("refId")}>{accountOptions("Pick an account")}</SelectField>
+					<InputField label="Yearly rate (0.07 = 7%)" name="annualRate" type="number" step="0.001" placeholder="e.g. 0.07" {...set("annualRate")} />
+					<InputField label="Wobble (0 = exact, 0.12 = bumpy)" name="volatility" type="number" step="0.01" placeholder="e.g. 0.12" {...set("volatility")} />
+				</>
+			);
+		case "debt-minimum":
+			return <SelectField label="Card account" name="accountId" {...set("accountId")}>{accountOptions("Pick an account")}</SelectField>;
+		case "late-fee":
+			return (
+				<>
+					<SelectField label="Payment to check" name="paymentId" {...set("paymentId")}>{optionsFor(postings, "Pick a movement")}</SelectField>
+					<SelectField label="Card account" name="accountId" {...set("accountId")}>{accountOptions("Pick an account")}</SelectField>
+					<InputField label="Fee dollars" name="fee" type="number" step="0.01" placeholder="e.g. 30" {...set("fee")} />
+				</>
+			);
+		case "low-balance-fee":
+			return (
+				<>
+					<SelectField label="Account" name="accountId" {...set("accountId")}>{accountOptions("Pick an account")}</SelectField>
+					<InputField label="Balance limit" name="threshold" type="number" step="0.01" placeholder="e.g. 1500" {...set("threshold")} />
+					<InputField label="Fee dollars" name="fee" type="number" step="0.01" placeholder="e.g. 12" {...set("fee")} />
+				</>
+			);
+		case "paycheck":
+			return (
+				<>
+					<SelectField label="Salary" name="incomeSourceId" {...set("incomeSourceId")}>{optionsFor(incomeSources, "Pick a salary")}</SelectField>
+					<InputField label="Savings percent (0.10 = 10%)" name="rate" type="number" step="0.001" placeholder="e.g. 0.10" {...set("rate")} />
+					<InputField label="Yearly savings limit" name="annualCap" type="number" step="1" placeholder="e.g. 23500" {...set("annualCap")} />
+					<SelectField label="Savings go to" name="destinationAccountId" {...set("destinationAccountId")}>{accountOptions("Pick an account")}</SelectField>
+					<SelectField label="Tax table" name="profileId" {...set("profileId")}>{optionsFor(taxProfiles, "Pick a tax table")}</SelectField>
+				</>
+			);
+		default:
+			return null;
+	}
+}
+
+export function AmountBuilder({
+	accounts,
+	postings,
+	incomeSources,
+	taxProfiles,
+	templates,
+	initialTemplateId,
+	hidePicker,
+	fixedAmount,
+	onChange,
+}: {
+	accounts: Option[];
+	postings: Option[];
+	incomeSources: Option[];
+	taxProfiles: Option[];
+	templates?: AmountTemplate[];
+	initialTemplateId?: string;
+	hidePicker?: boolean;
+	fixedAmount?: PostingAmountResolution;
+	onChange?: (amount: PostingAmountResolution) => void;
+}) {
+	const list = templates?.length ? templates : FALLBACK_TEMPLATES;
+	const [templateId, setTemplateId] = useState(initialTemplateId ?? "fixed");
+	const [fields, setFields] = useState<Record<string, string>>({});
+	const [copied, setCopied] = useState(false);
+	const template = list.find((item) => item.id === templateId) ?? list[0]!;
+	const amount = useMemo(
+		() => fixedAmount ?? buildTemplateAmount(template.id, fields, accounts),
+		[fixedAmount, template.id, fields, accounts],
+	);
+	const plain = plainLanguageForAmount(amount);
+	const wire = JSON.stringify(amount, null, 2);
+	return (
+		<div className="amount-builder">
+			{!hidePicker && (
+				<>
+					<div className="form-grid">
+						<SelectField
+							label="What kind of amount?"
+							name="amountTemplate"
+							value={template.id}
+							onChange={(event) => {
+								setTemplateId(event.target.value);
+								setFields({});
+								setCopied(false);
+							}}
+						>
+							{list.map((item) => (
+								<option key={item.id} value={item.id}>
+									{item.label}
+								</option>
+							))}
+						</SelectField>
+					</div>
+					<p className="muted">
+						<strong>{template.label}.</strong> {template.summary}{" "}
+						{template.whenToUse && <span>Use when: {template.whenToUse}</span>}
+					</p>
+				</>
+			)}
+			{!fixedAmount && (
+				<div className="form-grid">
+					<TemplateFields
+						templateId={template.id}
+						accounts={accounts}
+						postings={postings}
+						incomeSources={incomeSources}
+						taxProfiles={taxProfiles}
+						fields={fields}
+						onField={(key, value) =>
+							setFields((previous) => ({ ...previous, [key]: value }))
+						}
+					/>
+				</div>
+			)}
+			<p className="muted">{plain}</p>
+			<details>
+				<summary>Show saved data (JSON)</summary>
+				<pre className="code-block">{wire}</pre>
+			</details>
+			<div className="modal-actions">
+				<button
+					type="button"
+					className="button secondary"
+					onClick={() => {
+						void navigator.clipboard?.writeText(wire).then(
+							() => setCopied(true),
+							() => setCopied(false),
+						);
+					}}
+				>
+					{copied ? "Copied!" : "Copy JSON"}
+				</button>
+				{onChange && (
+					<button
+						type="button"
+						className="button primary"
+						onClick={() => onChange(amount)}
+					>
+						Use this amount
+					</button>
+				)}
+			</div>
+		</div>
+	);
+}

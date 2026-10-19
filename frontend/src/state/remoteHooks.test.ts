@@ -7,6 +7,7 @@ import type { RowWriteResponse } from "../api/index.ts";
 import {
 	ApiHttpError,
 	ApiNetworkError,
+	type AmountPreset,
 	type BackendAccount,
 	type BackendCheckpoint,
 	type BackendPosting,
@@ -387,6 +388,21 @@ function clientFixture(put?: PutCallback) {
 		getIncomeData: vi.fn(async (): Promise<IncomeDataSnapshot> => ({
 			incomeSources: [],
 			taxProfiles: [],
+		})),
+		listAmountPresets: vi.fn(async () => ({ presets: [] })),
+		createAmountPreset: vi.fn(async (row: AmountPreset) => ({
+			row: { ...row, id: row.id || "preset-1" },
+			issues: [],
+			persisted: true,
+		})),
+		updateAmountPreset: vi.fn(async (_id: string, row: AmountPreset) => ({
+			row,
+			issues: [],
+			persisted: true,
+		})),
+		deleteAmountPreset: vi.fn(async (id: string) => ({ deletedId: id })),
+		moveAmountPreset: vi.fn(async (id: string, _beforeId: string | null) => ({
+			movedId: id,
 		})),
 		createAccount: vi.fn(async (row: BackendAccount) => {
 			current.accounts.push(structuredClone(row));

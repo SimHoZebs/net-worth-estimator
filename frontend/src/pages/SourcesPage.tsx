@@ -1,4 +1,5 @@
 import { RemoteAuthControl } from "../app/RemoteAuthControl.tsx";
+import { AmountCatalog } from "../components/editors/AmountCatalog.tsx";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
 import { IncomeEvidence } from "./sources/IncomeEvidence.tsx";
@@ -27,6 +28,30 @@ export function SourcesPage() {
 			/>
 			<RemoteAuthControl />
 			<IncomeEvidence incomeData={incomeData} />
+			<AmountCatalog
+				accounts={plan.accounts.map((account) => ({
+					id: account.id,
+					name: account.name,
+				}))}
+				postings={[
+					...(serverDocument?.recurrenceRules ?? []).map((rule) => ({
+						id: rule.id,
+						name: rule.name,
+					})),
+					...(serverDocument?.postings ?? []).map((posting) => ({
+						id: posting.id,
+						name: posting.name,
+					})),
+				]}
+				incomeSources={(incomeData?.incomeSources ?? []).map((source) => ({
+					id: source.id,
+					name: source.name,
+				}))}
+				taxProfiles={(incomeData?.taxProfiles ?? []).map((profile) => ({
+					id: profile.id,
+					name: profile.name,
+				}))}
+			/>
 			<AssumptionsPanel plan={plan} onUpdate={onUpdatePlan} />
 		</>
 	);

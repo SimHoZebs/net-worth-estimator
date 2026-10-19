@@ -3,6 +3,12 @@ import { isRecord } from "../domain/guards.ts";
 import type {
 	AccountLink,
 	AccountLinkListResponse,
+	AmountCatalogResponse,
+	AmountPreset,
+	AmountPresetDeleteResponse,
+	AmountPresetListResponse,
+	AmountPresetMoveResponse,
+	AmountPresetWriteResponse,
 	BackendAccount,
 	BackendCheckpoint,
 	BackendPosting,
@@ -338,6 +344,66 @@ export class ApiClient {
 		return this.requestJson<IncomeDataSnapshot>(
 			"income-data",
 			requestInit("GET", undefined, options),
+		);
+	}
+
+	getAmountCatalog(
+		options: ApiRequestOptions = {},
+	): Promise<Error | AmountCatalogResponse> {
+		return this.requestJson<AmountCatalogResponse>(
+			"amount-resolvers",
+			requestInit("GET", undefined, options),
+		);
+	}
+
+	listAmountPresets(
+		options: ApiRequestOptions = {},
+	): Promise<Error | AmountPresetListResponse> {
+		return this.requestJson<AmountPresetListResponse>(
+			"amount-presets",
+			requestInit("GET", undefined, options),
+		);
+	}
+
+	createAmountPreset(
+		preset: AmountPreset,
+		options: ApiRequestOptions = {},
+	): Promise<Error | AmountPresetWriteResponse> {
+		return this.requestJson<AmountPresetWriteResponse>(
+			"amount-presets",
+			requestInit("POST", preset, options),
+		);
+	}
+
+	updateAmountPreset(
+		id: string,
+		preset: AmountPreset,
+		options: ApiRequestOptions = {},
+	): Promise<Error | AmountPresetWriteResponse> {
+		return this.requestJson<AmountPresetWriteResponse>(
+			`amount-presets/${encodeURIComponent(id)}`,
+			requestInit("PATCH", preset, options),
+		);
+	}
+
+	deleteAmountPreset(
+		id: string,
+		options: ApiRequestOptions = {},
+	): Promise<Error | AmountPresetDeleteResponse> {
+		return this.requestJson<AmountPresetDeleteResponse>(
+			`amount-presets/${encodeURIComponent(id)}`,
+			requestInit("DELETE", undefined, options),
+		);
+	}
+
+	moveAmountPreset(
+		id: string,
+		beforeId: string | null,
+		options: ApiRequestOptions = {},
+	): Promise<Error | AmountPresetMoveResponse> {
+		return this.requestJson<AmountPresetMoveResponse>(
+			"amount-presets/reorder",
+			requestInit("POST", { id, beforeId: beforeId ?? "" }, options),
 		);
 	}
 

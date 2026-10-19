@@ -1,7 +1,16 @@
 import { useState } from "react";
-import { type Movement, visibleAccounts } from "../../domain/model.ts";
+import {
+	type Movement,
+	type Plan,
+	visibleAccounts,
+} from "../../domain/model.ts";
+import {
+	FALLBACK_TEMPLATES,
+	presetToTemplate,
+} from "../../domain/amountCatalog.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
+import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { InputField, SelectField } from "../Field.tsx";
 import { AccountOptions } from "./AccountOptions.tsx";
 import {
@@ -11,62 +20,83 @@ import {
 } from "./EditorForm.tsx";
 import { numberValue, textValue } from "./formValues.ts";
 
-export function MovementEditor({
+/** Pure plan builder shared by the overlay editor and inline detail edits. */
+export function buildMovementPlan({
+	plan,
+	item,
+	data,
+}: {
+	plan: Plan;
+	item: Movement | null;
+	data: FormData;
+}): Plan {
+	const claimRuleId = textValue(data, "claimRuleId") || null;
+	const claimOccurrenceDate = textValue(data, "claimOccurrenceDate") || null;
+	const amountKind = textValue(data, "amountKind") || "fixed";
+	const advanced = amountKind !== "fixed" && amountKind !== "growth";
+	const movement: Movement = {
+		id: item?.id ?? crypto.randomUUID(),
+		name: textValue(data, "name"),
+		amount: advanced ? 0 : numberValue(data, "amount"),
+		amountKnown: !advanced,
+		fromId: textValue(data, "fromId") || null,
+		toId: textValue(data, "toId") || null,
+		frequency:
+			parseUnion(textValue(data, "frequency"), [
+				"monthly",
+				"yearly",
+				"once",
+			] as const) ?? "monthly",
+		startDate: textValue(data, "startDate"),
+		endDate:
+			textValue(data, "noEndDate") === "on"
+				? null
+				: textValue(data, "endDate") || null,
+		annualIncrease: advanced ? 0 : numberValue(data, "annualIncrease"),
+		enabled: textValue(data, "enabled") === "on",
+		readOnly: false,
+		claimRuleId,
+		claimOccurrenceDate,
+	};
+	return {
+		...plan,
+		movements: upsertItem({ items: plan.movements, item: movement }),
+	};
+}
+
+/** The movement fields without a form shell. State is keyed by field name so
+ *  any owning form can read it through FormData on submit. */
+export function MovementFormFields({
 	item,
 	plan,
-	...props
-}: EditorProps & { item: Movement | null }) {
-	const readOnlyReason =
-		item?.amountKnown === false
-			? "This amount is calculated each occurrence. See the transaction list and Outlook for the resolved amounts."
-			: item?.readOnly
-				? sourceReadOnlyReason
-				: undefined;
+}: {
+	item: Movement | null;
+	plan: Plan;
+}) {
 	const [noEndDate, setNoEndDate] = useState(item?.endDate == null);
 	const [frequency, setFrequency] = useState(item?.frequency ?? "monthly");
 	const isOnce = frequency === "once";
 	const claimRules = plan.movements.filter(
 		(movement) => movement.frequency !== "once" && movement.id !== item?.id,
 	);
+	const initialKind =
+		item?.amountKnown === false
+			? "advanced"
+			: (item?.annualIncrease ?? 0) !== 0
+				? "growth"
+				: "fixed";
+	const [amountKind, setAmountKind] = useState(initialKind);
+	const serverPresets = useWorkspaceStore((state) => state.serverPresets);
+	const templates =
+		serverPresets === null
+			? FALLBACK_TEMPLATES
+			: serverPresets.map(presetToTemplate);
+	const advanced = amountKind !== "fixed" && amountKind !== "growth";
+	const templateForKind =
+		templates.find((template) => template.id === amountKind) ??
+		templates.find((template) => template.id === "fixed")!;
 	return (
-		<EditorForm
-			{...props}
-			title={item ? item.name : "Add planned transaction"}
-			readOnlyReason={readOnlyReason}
-			buildPlan={(data) => {
-				const claimRuleId = textValue(data, "claimRuleId") || null;
-				const claimOccurrenceDate =
-					textValue(data, "claimOccurrenceDate") || null;
-				const movement: Movement = {
-					id: item?.id ?? crypto.randomUUID(),
-					name: textValue(data, "name"),
-					amount: numberValue(data, "amount"),
-					amountKnown: true,
-					fromId: textValue(data, "fromId") || null,
-					toId: textValue(data, "toId") || null,
-					frequency:
-						parseUnion(textValue(data, "frequency"), [
-							"monthly",
-							"yearly",
-							"once",
-						] as const) ?? "monthly",
-					startDate: textValue(data, "startDate"),
-					endDate:
-						textValue(data, "noEndDate") === "on"
-							? null
-							: textValue(data, "endDate") || null,
-					annualIncrease: numberValue(data, "annualIncrease"),
-					enabled: textValue(data, "enabled") === "on",
-					readOnly: false,
-					claimRuleId,
-					claimOccurrenceDate,
-				};
-				return {
-					...plan,
-					movements: upsertItem({ items: plan.movements, item: movement }),
-				};
-			}}
-		>
+		<>
 			<InputField
 				label="Transaction name"
 				wide
@@ -76,16 +106,86 @@ export function MovementEditor({
 				defaultValue={item?.name ?? ""}
 				placeholder="e.g. Monthly investing"
 			/>
-			<InputField
-				label="Amount (USD)"
-				name="amount"
-				type="number"
-				required
-				min="0.01"
-				max="10000000000"
-				step="0.01"
-				defaultValue={item?.amountKnown === false ? "" : (item?.amount ?? 500)}
-			/>
+			<SelectField
+				label="How is the amount calculated?"
+				name="amountKind"
+				value={amountKind}
+				onChange={(event) => setAmountKind(event.target.value)}
+			>
+				<option value="fixed">Fixed amount</option>
+				<option value="growth">Grows yearly by %</option>
+				{templates.filter(
+					(template) => template.id !== "fixed" && template.id !== "growth",
+				).map((template) => (
+					<option key={template.id} value={template.id}>
+						{template.label}
+					</option>
+				))}
+				{item?.amountKnown === false && (
+					<option value="advanced">Current calculated amount (keep)</option>
+				)}
+			</SelectField>
+			{!advanced && (
+				<p className="muted small" style={{ gridColumn: "1 / -1" }}>
+					{templateForKind.summary}{" "}
+					{templateForKind.whenToUse && (
+						<span>Use when: {templateForKind.whenToUse}</span>
+					)}
+				</p>
+			)}
+			{!advanced ? (
+				<>
+					<InputField
+						label="Amount (USD)"
+						name="amount"
+						type="number"
+						required
+						min="0.01"
+						max="10000000000"
+						step="0.01"
+						defaultValue={item?.amountKnown === false ? "" : (item?.amount ?? 500)}
+					/>
+					{amountKind === "growth" && (
+						<InputField
+							label="Annual amount increase (%)"
+							name="annualIncrease"
+							type="number"
+							required
+							min="-50"
+							max="50"
+							step="0.1"
+							defaultValue={item?.annualIncrease ?? 3}
+						/>
+					)}
+					{amountKind === "fixed" && (
+						<input type="hidden" name="annualIncrease" value="0" />
+					)}
+				</>
+			) : (
+				<>
+					<input type="hidden" name="amount" value="0" />
+					<input type="hidden" name="annualIncrease" value="0" />
+					<div className="inline-notice" style={{ gridColumn: "1 / -1" }}>
+						<span>
+							{templates.some(
+								(template) => template.id === amountKind,
+							) ? (
+								<>
+									<strong>{templateForKind.label}.</strong>{" "}
+									{templateForKind.summary} Builds exact values in
+									Configs → How amounts are calculated. This entry
+									stays as Varies.
+								</>
+							) : (
+								<>
+									This movement already uses a calculated amount. It
+									stays as Varies and keeps its saved recipe.
+								</>
+							)}
+						</span>
+					</div>
+				</>
+			)}
 			<SelectField
 				label="Frequency"
 				name="frequency"
@@ -163,16 +263,6 @@ export function MovementEditor({
 					</label>
 				</>
 			)}
-			<InputField
-				label="Annual amount increase (%)"
-				name="annualIncrease"
-				type="number"
-				required
-				min="-50"
-				max="50"
-				step="0.1"
-				defaultValue={item?.annualIncrease ?? 0}
-			/>
 			<label className="checkbox-field">
 				<input
 					name="enabled"
@@ -181,6 +271,29 @@ export function MovementEditor({
 				/>
 				Include in projections
 			</label>
+		</>
+	);
+}
+
+export function MovementEditor({
+	item,
+	plan,
+	...props
+}: EditorProps & { item: Movement | null }) {
+	const readOnlyReason =
+		item?.amountKnown === false
+			? "This amount is calculated each occurrence. See the transaction list and Outlook for the resolved amounts."
+			: item?.readOnly
+				? sourceReadOnlyReason
+				: undefined;
+	return (
+		<EditorForm
+			{...props}
+			title={item ? item.name : "Add planned transaction"}
+			readOnlyReason={readOnlyReason}
+			buildPlan={(data) => buildMovementPlan({ plan, item, data })}
+		>
+			<MovementFormFields item={item} plan={plan} />
 		</EditorForm>
 	);
 }
