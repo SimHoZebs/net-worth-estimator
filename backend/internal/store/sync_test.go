@@ -65,7 +65,7 @@ func seedSyncRows(t *testing.T, store *sqliteStore) {
 		`INSERT INTO accounts (id, position, name, enabled) VALUES ('prime_card', 1, 'Prime', 1)`,
 		`INSERT INTO entity_ids (id, kind) VALUES ('prime_card', 'account')`,
 		`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (10, '2026-08-01', 'checking', 111, 'simplefin')`,
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, posted_time, transaction_time, enabled, source)
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source)
 		 VALUES ('sfin-pending-prime_card-tx1', 10, 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 0, 'simplefin')`,
 		`INSERT INTO entity_ids (id, kind) VALUES ('sfin-pending-prime_card-tx1', 'posting')`,
 	})
@@ -327,9 +327,6 @@ func TestOpenMigratesVersionTwoSourceColumns(t *testing.T) {
 		t.Fatalf("create version two schema: %v", err)
 	}
 	for _, statement := range []string{
-		`CREATE TABLE schema_version (version INTEGER NOT NULL)`,
-		`INSERT INTO schema_version (version) VALUES (1)`,
-		`INSERT INTO schema_version (version) VALUES (2)`,
 		`INSERT INTO accounts (id, position, label, enabled) VALUES ('checking', 0, 'Checking', 1)`,
 		`INSERT INTO checkpoints (position, date, account_id, balance) VALUES (0, '2026-04-30', 'checking', 200)`,
 		`UPDATE model_metadata SET document_present = 1 WHERE id = 1`,
@@ -340,6 +337,9 @@ func TestOpenMigratesVersionTwoSourceColumns(t *testing.T) {
 	}
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("commit version two database: %v", err)
+	}
+	if _, err := db.Exec(`PRAGMA user_version = 2`); err != nil {
+		t.Fatalf("set version two: %v", err)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatalf("close version two database: %v", err)
@@ -359,7 +359,7 @@ func TestOpenMigratesVersionTwoSourceColumns(t *testing.T) {
 		t.Fatalf("migrated checkpoint = %+v, want balance 200 source model", checkpoint)
 	}
 	var version int
-	if err := store.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != latestSchemaVersion {
+	if err := store.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != latestSchemaVersion {
 		t.Fatalf("migrated schema version = %d, err %v", version, err)
 	}
 }
@@ -380,13 +380,6 @@ func TestOpenMigratesVersionSixPostingsIntoRules(t *testing.T) {
 		}
 	}
 	for _, statement := range []string{
-		`CREATE TABLE schema_version (version INTEGER NOT NULL)`,
-		`INSERT INTO schema_version (version) VALUES (1)`,
-		`INSERT INTO schema_version (version) VALUES (2)`,
-		`INSERT INTO schema_version (version) VALUES (3)`,
-		`INSERT INTO schema_version (version) VALUES (4)`,
-		`INSERT INTO schema_version (version) VALUES (5)`,
-		`INSERT INTO schema_version (version) VALUES (6)`,
 		`INSERT INTO accounts (id, position, name, kind, enabled) VALUES ('checking', 0, 'Checking', 'cash', 1)`,
 		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled, source)
 		 VALUES ('once-actual', 0, 'Actual', NULL, '["checking"]', '{}', 'once', 0, 0, 0, '2026-08-02', NULL, NULL, 1, 1, 'model')`,
@@ -400,6 +393,9 @@ func TestOpenMigratesVersionSixPostingsIntoRules(t *testing.T) {
 	}
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("commit version six database: %v", err)
+	}
+	if _, err := db.Exec(`PRAGMA user_version = 6`); err != nil {
+		t.Fatalf("set version six: %v", err)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatalf("close version six database: %v", err)
@@ -635,7 +631,7 @@ func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
 	// so only raw SQL can set up this coexistence case.
 	store := openSQLiteStore(t)
 	execSyncSetup(t, store, []string{
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_json, posted_time, transaction_time, enabled, source)
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source)
 		 VALUES ('sfin-pending-prime_card-manual', 0, 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 1, 'model')`,
 	})
 	summary, err := store.ApplySyncPlan(nil, []types.Posting{
