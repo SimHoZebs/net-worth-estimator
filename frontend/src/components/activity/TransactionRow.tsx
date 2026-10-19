@@ -15,15 +15,11 @@ export function TransactionRow({
 	movement,
 	onEdit,
 	shortfallLabel,
-	hideExternalCounterparty = false,
 }: {
 	transaction: AccountTransaction;
 	movement: Movement | null;
 	onEdit: (movement: Movement) => void;
 	shortfallLabel?: string;
-	/** Hide counterparties that only restate the direction ("External
-	 * spending" just means spent). Real accounts still show. */
-	hideExternalCounterparty?: boolean;
 }) {
 	const DirectionIcon =
 		transaction.category === "transfer"
@@ -32,9 +28,14 @@ export function TransactionRow({
 				? ArrowDownLeft
 				: ArrowUpRight;
 	const action = movement?.readOnly ? "Inspect" : "Edit";
-	const external =
+	// Counterparties that only restate the direction ("External
+	// income/spending" just means in/out) carry no information the icon
+	// does not already show. Real accounts still show.
+	const counterparty =
 		transaction.counterparty === externalCounterpartyName("in") ||
-		transaction.counterparty === externalCounterpartyName("out");
+		transaction.counterparty === externalCounterpartyName("out")
+			? null
+			: transaction.counterparty;
 	return (
 		<tr className="transaction-row">
 			<td className="transaction-date-column">
@@ -46,7 +47,7 @@ export function TransactionRow({
 				<button
 					type="button"
 					className="transaction-row-button"
-					aria-label={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}; ${transaction.direction === "in" ? "money in from" : "money out to"} ${transaction.counterparty}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.pending ? "; pending" : transaction.excluded ? "; excluded from plan" : ""}`}
+					aria-label={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${counterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${counterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.pending ? "; pending" : transaction.excluded ? "; excluded from plan" : ""}`}
 					onClick={() => {
 						if (movement) onEdit(movement);
 					}}
@@ -59,10 +60,9 @@ export function TransactionRow({
 					</span>
 					<span className="transaction-name">
 						<strong>{transaction.name}</strong>
-						{(!hideExternalCounterparty || !external) && (
+						{counterparty && (
 							<span>
-								{transaction.direction === "in" ? "From" : "To"}{" "}
-								{transaction.counterparty}
+								{transaction.direction === "in" ? "From" : "To"} {counterparty}
 							</span>
 						)}
 						<time
@@ -94,14 +94,16 @@ export function TransactionRow({
 				</button>
 			</th>
 			<td className="transaction-amount-column">
-				<strong className={transaction.direction === "in" ? "positive" : ""}>
-					{transaction.amount === 0
-						? exactMoney(0)
-						: `${transaction.direction === "in" ? "+" : "−"}${exactMoney(transaction.amount)}`}
-				</strong>
-				{transaction.shortfall > 0.01 && (
-					<small>{exactMoney(transaction.requested)} planned</small>
-				)}
+				<span className="transaction-amount">
+					<strong className={transaction.direction === "in" ? "positive" : ""}>
+						{transaction.amount === 0
+							? exactMoney(0)
+							: `${transaction.direction === "in" ? "+" : "−"}${exactMoney(transaction.amount)}`}
+					</strong>
+					{transaction.shortfall > 0.01 && (
+						<small>{exactMoney(transaction.requested)} planned</small>
+					)}
+				</span>
 			</td>
 		</tr>
 	);
