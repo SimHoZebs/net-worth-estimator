@@ -14,7 +14,13 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { useMediaQuery } from "../state/useMediaQuery.ts";
 import "./ui.css";
+import {
+	drawerHiddenX,
+	useDrawerSwipe,
+	useDrawerTransition,
+} from "./drawer.ts";
 
 export function IconButton({
 	icon: Icon,
@@ -68,8 +74,10 @@ export function Modal({
 	className?: string;
 }) {
 	const ref = useRef<HTMLDialogElement>(null);
+	const panelRef = useRef<HTMLDivElement>(null);
 	const [closing, setClosing] = useState(false);
 	const closeRequested = useRef(false);
+	const drawerOpenRef = useRef(true);
 	const reduceMotion = useReducedMotion();
 	const id = useId();
 	useEffect(() => {
@@ -87,16 +95,29 @@ export function Modal({
 		closeRequested.current = true;
 		setClosing(true);
 	};
-	// Drawer variants slide in from the right; centered dialogs scale/fade.
+	// Drawer variants share the drawer slide primitive with the left
+	// navigation: full off-canvas travel on mobile where the drawer covers
+	// the viewport, subtle offset where it docks as a side panel.
+	const drawer = className.includes("modal-drawer");
+	const fullScreenDrawer = useMediaQuery("(max-width: 600px)");
+	const full = drawer && fullScreenDrawer;
+	const drawerTransition = useDrawerTransition(closing);
+	useDrawerSwipe({
+		enabled: full && !closing,
+		side: "right",
+		panelRef,
+		openRef: drawerOpenRef,
+		onClose: requestClose,
+	});
+	const drawerClosedX = drawerHiddenX("right", full);
 	// The native <dialog> stays static so showModal top-layer, focus, and
 	// backdrop behavior are unchanged — motion owns only the inner panel.
-	const drawer = className.includes("modal-drawer");
 	const enter = drawer ? { opacity: 1, x: 0 } : { opacity: 1, scale: 1, y: 0 };
 	const initial = drawer
-		? { opacity: 0, x: 48 }
+		? { opacity: 0, x: drawerClosedX }
 		: { opacity: 0, scale: 0.97, y: 8 };
 	const exit = drawer
-		? { opacity: 0, x: 48 }
+		? { opacity: 0, x: drawerClosedX }
 		: { opacity: 0, scale: 0.98, y: 8 };
 	return (
 		<dialog
@@ -112,12 +133,17 @@ export function Modal({
 			}}
 		>
 			<motion.div
+				ref={panelRef}
 				initial={initial}
 				animate={closing ? exit : enter}
-				transition={{
-					duration: reduceMotion ? 0 : closing ? 0.12 : drawer ? 0.18 : 0.15,
-					ease: "easeOut",
-				}}
+				transition={
+					drawer
+						? drawerTransition
+						: {
+								duration: reduceMotion ? 0 : closing ? 0.12 : 0.15,
+								ease: "easeOut",
+							}
+				}
 				onAnimationComplete={() => {
 					if (closing) onClose();
 				}}

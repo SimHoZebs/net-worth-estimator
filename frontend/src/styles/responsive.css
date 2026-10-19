@@ -669,6 +669,11 @@
 		inset: 0;
 		border: 0;
 		border-radius: 0;
+		/* Slide is owned by motion (Modal drawer variant); no CSS transition
+		   here so per-frame inline transforms are not re-smoothed. */
+		/* Vertical scroll stays with the browser; horizontal swipes are left
+		   to the swipe gesture in the drawer primitive. */
+		touch-action: pan-y;
 	}
 	.modal-header {
 		padding: 22px 20px 19px;
