@@ -42,7 +42,7 @@ func ParseDryRun(value string) bool {
 	return strings.TrimSpace(value) == "1"
 }
 
-// ParsePositiveDuration parses a Go duration string (e.g. "20h", "90m") for
+// ParsePositiveDuration parses a Go duration string (e.g. "6h", "90m") for
 // sync throttling. Empty means fallback; invalid or non-positive values are
 // an error so operators notice a typo instead of silently hammering the
 // Bridge.
