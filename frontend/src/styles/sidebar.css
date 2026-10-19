@@ -122,10 +122,15 @@
 		align-items: center;
 		gap: 7px;
 		border-top: 1px solid var(--line);
-		padding: 19px 8px;
+		padding: 19px 8px 4px;
 		font-size: 9px;
 		color: var(--muted);
 		margin-top: 17px;
+	}
+	.sidebar-sync {
+		padding: 0 8px 19px;
+		font-size: 9px;
+		color: var(--muted);
 	}
 	.sidebar-status > svg {
 		margin-left: auto;

@@ -67,7 +67,7 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 
 ## API and Persistence Flow
 
-- `api.New(store.Store, api.Config)` builds the router. `GET /healthz`, `GET /v1/financial-model`, row endpoints under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, link endpoints under `/v1/sync/simplefin/accounts`, `GET /v1/status`, `GET /v1/income-data`, `POST /v1/projections/deterministic`, `POST /v1/projections/stochastic`, and `POST /v1/sync/simplefin` are the current routes.
+- `api.New(store.Store, api.Config)` builds the router. `GET /healthz`, `GET /v1/financial-model`, row endpoints under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, link endpoints under `/v1/sync/simplefin/accounts`, `GET /v1/status` (read-only/auth/sync state), `GET /v1/income-data`, `POST /v1/projections/deterministic`, `POST /v1/projections/stochastic`, and `POST /v1/sync/simplefin` are the current routes.
 - `GET /v1/financial-model` returns an `ETag` and revision for reads and caching. Row writes are last-write-wins: each `POST`/`PATCH`/`DELETE` validates one change against stored state plus income and persists only when no error-severity issue exists.
 - Row writes validate against the stored income snapshot. Error diagnostics return issues without persisting; warning-only writes are persisted.
 - `api.Config.FrontendDir` optionally serves the built Waypoint frontend with same-origin static assets and SPA fallback for binary-only runs; the split container path leaves it empty.

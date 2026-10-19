@@ -60,6 +60,12 @@ type Store interface {
 	SaveAccountLink(link AccountLink) (AccountLink, error)
 	DeleteAccountLink(bridgeAccountID string) error
 	ProvisionSyncAccounts(items []SyncProvision, dryRun bool) (map[string]string, int, []string, error)
+	// GetLastSyncTime reports the completion time of the last successful
+	// SimpleFIN sync as RFC3339 UTC, or "" when no sync has completed yet.
+	GetLastSyncTime() (string, error)
+	// SetLastSyncTime records a successful sync completion time. Callers
+	// pass RFC3339 UTC; dry runs and failed runs must not record.
+	SetLastSyncTime(completedAt string) error
 	GetArtifact(identity string) (string, bool, error)
 	PutArtifact(identity, kind, payload string) error
 	ApplySyncPlan(checkpoints []SyncCheckpoint, pending []types.Posting, cardAccounts []string, dryRun bool) (SyncApplySummary, error)
@@ -73,7 +79,7 @@ type sqliteStore struct {
 	db *sql.DB
 }
 
-const latestSchemaVersion = 9
+const latestSchemaVersion = 10
 
 // ruleMigrationBackupSuffix marks the pre-V7 database copy. V7 splits the
 // postings table into dated postings plus recurrence rules; the copy lets an
@@ -244,6 +250,15 @@ func (s *sqliteStore) migrate() error {
 		}
 		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (9)`); err != nil {
 			return fmt.Errorf("record schema version 9: %w", err)
+		}
+		version = 9
+	}
+	if version < 10 {
+		if err := migrateV10(tx); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (10)`); err != nil {
+			return fmt.Errorf("record schema version 10: %w", err)
 		}
 	}
 	if err := tx.Commit(); err != nil {

@@ -53,6 +53,9 @@ func RunConformance(t *testing.T, newStore func(*testing.T) Store) {
 	t.Run("ArtifactsRoundTripAndKeepFirstWrite", func(t *testing.T) {
 		testArtifactsRoundTripAndKeepFirstWrite(t, newStore)
 	})
+	t.Run("SyncStateDefaultsEmptyAndRoundTrips", func(t *testing.T) {
+		testSyncStateDefaultsEmptyAndRoundTrips(t, newStore)
+	})
 }
 
 // TestStoreConformance runs the suite against the embedded SQLite backend.

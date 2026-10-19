@@ -138,7 +138,8 @@ thead {
 	font-size: 10px;
 }
 .local-card p,
-.sidebar-status {
+.sidebar-status,
+.sidebar-sync {
 	font-size: 10px;
 }
 .timing-replenishment strong {

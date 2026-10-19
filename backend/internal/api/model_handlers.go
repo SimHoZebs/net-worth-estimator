@@ -45,8 +45,12 @@ func (s *Server) getModel(_ context.Context, _ *struct{}) (*getModelOutput, erro
 
 type statusOutput struct {
 	Body struct {
-		ReadOnly    bool `json:"readOnly"`
-		AuthEnabled bool `json:"authEnabled"`
+		ReadOnly       bool `json:"readOnly"`
+		AuthEnabled    bool `json:"authEnabled"`
+		SyncConfigured bool `json:"syncConfigured"`
+		// LastSyncAt is the last successful sync completion time (RFC3339
+		// UTC), omitted when no sync has completed yet.
+		LastSyncAt string `json:"lastSyncAt,omitempty"`
 	}
 }
 
@@ -54,6 +58,12 @@ func (s *Server) getStatus(_ context.Context, _ *struct{}) (*statusOutput, error
 	output := &statusOutput{}
 	output.Body.ReadOnly = s.ReadOnly
 	output.Body.AuthEnabled = s.AuthEnabled
+	output.Body.SyncConfigured = s.SyncRunner != nil
+	lastSync, err := s.store.GetLastSyncTime()
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	output.Body.LastSyncAt = lastSync
 	return output, nil
 }
 
