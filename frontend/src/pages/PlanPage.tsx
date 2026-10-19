@@ -1,13 +1,10 @@
-import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { TransactionSortButton } from "../components/activity/TransactionSortButton.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
+import { TablePagination } from "../components/DataTable.tsx";
 import { type TabItem, Tabs } from "../components/Tabs.tsx";
-import {
-	ErrorNotice,
-	IconButton,
-	ProjectionUpdating,
-} from "../components/ui.tsx";
+import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
 import {
 	DEFAULT_TRANSACTION_ORDER,
 	sortTransactionsByDate,
@@ -346,33 +343,13 @@ function TransactionsView({
 				/>
 			</div>
 			{pageCount > 1 && (
-				<div className="transaction-pagination">
-					<span role="status">
-						Showing {currentPage * TRANSACTIONS_PAGE_SIZE + 1}–
-						{Math.min(
-							(currentPage + 1) * TRANSACTIONS_PAGE_SIZE,
-							movements.length,
-						)}{" "}
-						of {movements.length} transactions
-					</span>
-					<div>
-						<IconButton
-							icon={ChevronLeft}
-							label="Previous transaction page"
-							disabled={currentPage === 0}
-							onClick={() => turnPage(currentPage - 1)}
-						/>
-						<span>
-							{currentPage + 1} / {pageCount}
-						</span>
-						<IconButton
-							icon={ChevronRight}
-							label="Next transaction page"
-							disabled={currentPage === pageCount - 1}
-							onClick={() => turnPage(currentPage + 1)}
-						/>
-					</div>
-				</div>
+				<TablePagination
+					page={currentPage}
+					pageCount={pageCount}
+					total={movements.length}
+					pageSize={TRANSACTIONS_PAGE_SIZE}
+					onPage={turnPage}
+				/>
 			)}
 		</Tabs>
 	);
