@@ -50,7 +50,7 @@ Or run the complete split stack with Compose:
 docker compose up --build
 ```
 
-Compose publishes the frontend at `http://localhost:8080` and the API at `http://localhost:8787`. The frontend container proxies `/v1` to `BACKEND_URL` and preserves long-running stochastic SSE responses. The root `Dockerfile` is a legacy combined image for the existing Northflank deployment.
+Compose publishes the frontend at `http://localhost:8080` and the API at `http://localhost:8787`. The frontend container proxies `/v1` to `BACKEND_URL` and preserves long-running stochastic SSE responses.
 
 Navigation uses URL fragments, so a static host does not need SPA route rewrites. Fonts and the scenario worker are served with the application. There are no external font, analytics, or bank requests.
 

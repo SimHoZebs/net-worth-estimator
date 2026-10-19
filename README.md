@@ -146,13 +146,13 @@ docker compose up --build
 
 The frontend is available at `http://localhost:8080` and the API at `http://localhost:8787`. Stop the stack with `docker compose down`; use `docker compose down -v` only when you intend to delete the SQLite volume.
 
-The root `Dockerfile` remains a legacy combined image for the existing Northflank build. The split images do not embed or build one another, and the legacy image and Compose stack must not run against the same volume or port at the same time.
+The root `Dockerfile` remains a legacy combined image. The split images do not embed or build one another, and the legacy image and Compose stack must not run against the same volume or port at the same time.
 
 For Vercel, set `VITE_API_BASE_URL` to the public backend origin. Add that exact frontend origin to `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`; Vercel preview origins require an explicit allowlist entry. A proxy or Nginx cut during a seeded stochastic run detaches the client without an error event, and the client can recover by repeating the same request.
 
 `NET_WORTH_ESTIMATOR_AUTH_TOKEN` is empty when unset, which leaves guarded writes unauthenticated. `NET_WORTH_ESTIMATOR_READ_ONLY` is writable when unset. Set both explicitly for any shared environment.
 
-Configure a Northflank backend service with this durable contract:
+Configure a backend service with this durable contract:
 
 | Setting | Value |
 | --- | --- |
@@ -184,7 +184,6 @@ Operator checks:
 
 ```bash
 BASE_URL=http://127.0.0.1:8787 scripts/smoke-backend.sh
-scripts/nf-status.sh --help
 ```
 
 The smoke script expects health, model, and sync endpoints to return 200. Run it against a writable, unauthenticated instance with SimpleFIN configured; otherwise exercise the guarded routes directly as described in `TESTING.md`.
