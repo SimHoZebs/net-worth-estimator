@@ -64,6 +64,9 @@ func clearDocument(tx *sql.Tx) error {
 	if _, err := tx.Exec(`DELETE FROM account_links`); err != nil {
 		return fmt.Errorf("clear account links: %w", err)
 	}
+	if _, err := tx.Exec(`DELETE FROM sync_state`); err != nil {
+		return fmt.Errorf("clear sync state: %w", err)
+	}
 	if _, err := tx.Exec(`UPDATE model_metadata SET source_path = '', document_present = 0 WHERE id = 1`); err != nil {
 		return fmt.Errorf("clear model metadata: %w", err)
 	}

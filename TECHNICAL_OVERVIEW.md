@@ -481,7 +481,7 @@ The seed controls the state sequence. Run-count normalization and seed-null beha
 
 `Store.ApplySyncPlan` applies checkpoints and the pending snapshot in one transaction. Owner checkpoints win key collisions. Pending deletion is constrained by owner, account, and the escaped reserved prefix. Dry-run returns before commit, so the transaction rolls back.
 
-The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00, 06, 12, 18 local) plus a random minute offset. Manual triggers use `Runner.Trigger`, which rejects concurrent and too-recent successful runs.
+The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00, 06, 12, 18 local) plus a random minute offset. Manual triggers use `Runner.Trigger`, which rejects concurrent and too-recent successful runs. Successful non-dry runs persist their completion time; `GET /v1/status` exposes it as `lastSyncAt` alongside `syncConfigured`.
 
 ## 12. Backend Key Files
 

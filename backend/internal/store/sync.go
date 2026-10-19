@@ -153,6 +153,46 @@ func loadSyncedPostings(tx *sql.Tx) ([]types.Posting, error) {
 	return postings, rows.Close()
 }
 
+// migrateV10 adds the singleton sync-state row tracking the last
+// successful SimpleFIN sync. Empty means no sync has completed yet.
+func migrateV10(tx *sql.Tx) error {
+	statements := []string{
+		`CREATE TABLE sync_state (
+			id INTEGER PRIMARY KEY CHECK (id = 1),
+			last_sync_at TEXT NOT NULL DEFAULT ''
+		)`,
+		`INSERT INTO sync_state (id, last_sync_at) VALUES (1, '')`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("migrate schema version 10: %w", err)
+		}
+	}
+	return nil
+}
+
+// GetLastSyncTime reports the last successful sync completion time, or ""
+// when no sync has completed (fresh, migrated, or cleared database).
+func (s *sqliteStore) GetLastSyncTime() (string, error) {
+	var value string
+	if err := s.db.QueryRow(`SELECT last_sync_at FROM sync_state WHERE id = 1`).Scan(&value); err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", fmt.Errorf("read last sync time: %w", err)
+	}
+	return value, nil
+}
+
+// SetLastSyncTime records a successful sync completion time.
+func (s *sqliteStore) SetLastSyncTime(completedAt string) error {
+	if _, err := s.db.Exec(`INSERT INTO sync_state (id, last_sync_at) VALUES (1, ?)
+		ON CONFLICT(id) DO UPDATE SET last_sync_at = excluded.last_sync_at`, completedAt); err != nil {
+		return fmt.Errorf("record last sync time: %w", err)
+	}
+	return nil
+}
+
 // SyncCheckpoint is a balance observation applied by the sync.
 type SyncCheckpoint struct {
 	AccountID string

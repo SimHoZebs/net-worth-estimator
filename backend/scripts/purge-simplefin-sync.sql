@@ -30,3 +30,6 @@ DELETE FROM checkpoints WHERE source = 'simplefin';
 -- Owner rows can never hold sfin- IDs (row writes reject them), so this
 -- cannot release an owner row.
 DELETE FROM entity_ids WHERE id LIKE 'sfin-%';
+-- Reset the last-sync timestamp so the sidebar does not report a stale
+-- time against an empty sync state. The next successful sync re-stamps it.
+DELETE FROM sync_state;

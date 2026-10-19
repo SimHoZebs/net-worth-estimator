@@ -16,6 +16,9 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	store := openSQLiteStore(t)
 	seedOwnerDocument(t, store)
 	seedSyncRows(t, store)
+	if err := store.SetLastSyncTime("2026-10-18T14:30:00Z"); err != nil {
+		t.Fatalf("record last sync: %v", err)
+	}
 	if got := countRows(t, store, "postings", "source = 'simplefin'"); got != 1 {
 		t.Fatalf("sync postings before purge = %d, want 1", got)
 	}
@@ -34,8 +37,8 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 			statements = append(statements, strings.TrimSuffix(trimmed, ";"))
 		}
 	}
-	if len(statements) != 3 {
-		t.Fatalf("purge script DELETEs = %d, want 3 (postings + checkpoints + entity ids)", len(statements))
+	if len(statements) != 4 {
+		t.Fatalf("purge script DELETEs = %d, want 4 (postings + checkpoints + entity ids + sync state)", len(statements))
 	}
 	for _, statement := range statements {
 		if _, err := store.db.Exec(statement); err != nil {
@@ -60,5 +63,8 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	}
 	if got := countRows(t, store, "checkpoints", "source = 'model'"); got != 1 {
 		t.Fatalf("owner checkpoints = %d, want 1", got)
+	}
+	if got, err := store.GetLastSyncTime(); err != nil || got != "" {
+		t.Fatalf("last sync after purge = %q, err %v, want empty", got, err)
 	}
 }

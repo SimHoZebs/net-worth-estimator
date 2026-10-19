@@ -215,6 +215,13 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Stamp successful non-dry runs so /v1/status can report the last
+	// sync time. Failed runs return above unstamped and stay retryable.
+	if !r.config.DryRun {
+		if err := r.store.SetLastSyncTime(r.now().UTC().Format(time.RFC3339)); err != nil {
+			return nil, fmt.Errorf("record sync time: %w", err)
+		}
+	}
 	skipped := map[string]int{}
 	for reason, count := range plan.Skipped {
 		skipped[string(reason)] = count

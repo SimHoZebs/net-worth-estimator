@@ -3,6 +3,7 @@ import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { IconButton, Skeleton } from "../components/ui.tsx";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { lastSyncLabel } from "./lastSync.ts";
 import { type Page, pages } from "./navigation.ts";
 import { workspaceStatusLabel } from "./WorkspaceNotices.tsx";
 
@@ -24,6 +25,7 @@ export function WorkspaceSidebar({
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
 	const readOnly = statusReadOnly || writeBlocked || (plan?.readOnly ?? true);
 	const statusLabel = workspaceStatusLabel({ readOnly });
+	const status = useWorkspaceStore((state) => state.status);
 	return (
 		<>
 			<div className="brand-row">
@@ -73,6 +75,13 @@ export function WorkspaceSidebar({
 						<>
 							{statusLabel} <LockKeyhole size={12} />
 						</>
+					)}
+				</div>
+				<div className="sidebar-sync">
+					{pending ? (
+						<Skeleton width={110} height={10} />
+					) : (
+						<span>{lastSyncLabel(status)}</span>
 					)}
 				</div>
 			</div>

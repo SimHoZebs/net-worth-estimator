@@ -12,6 +12,26 @@ import (
 
 const syncTestAmountJSON = `{"resolver":"expression","config":{"expression":"50"},"inputs":{}}`
 
+func testSyncStateDefaultsEmptyAndRoundTrips(t *testing.T, newStore func(*testing.T) Store) {
+	t.Helper()
+	database := newStore(t)
+	if got, err := database.GetLastSyncTime(); err != nil || got != "" {
+		t.Fatalf("fresh last sync = %q, err %v, want empty", got, err)
+	}
+	if err := database.SetLastSyncTime("2026-10-18T14:30:00Z"); err != nil {
+		t.Fatalf("record last sync: %v", err)
+	}
+	if got, err := database.GetLastSyncTime(); err != nil || got != "2026-10-18T14:30:00Z" {
+		t.Fatalf("last sync = %q, err %v, want recorded time", got, err)
+	}
+	if err := database.Clear(); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	if got, err := database.GetLastSyncTime(); err != nil || got != "" {
+		t.Fatalf("cleared last sync = %q, err %v, want empty", got, err)
+	}
+}
+
 func withSourceModel(checkpoints []types.Checkpoint) []types.Checkpoint {
 	out := make([]types.Checkpoint, len(checkpoints))
 	for i, checkpoint := range checkpoints {

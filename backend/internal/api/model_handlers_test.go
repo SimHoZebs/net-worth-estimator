@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -66,6 +67,47 @@ func TestStatusReflectsReadOnlyFlag(t *testing.T) {
 		if payload.ReadOnly != readOnly || payload.AuthEnabled {
 			t.Fatalf("readOnly=%v status = %+v", readOnly, payload)
 		}
+	}
+}
+
+func TestStatusReportsSyncConfigurationAndLastSync(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body %s", response.Code, response.Body.String())
+	}
+	var unconfigured map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &unconfigured); err != nil {
+		t.Fatalf("decode status: %v", err)
+	}
+	if unconfigured["syncConfigured"] != false {
+		t.Fatalf("status = %v, want syncConfigured false", unconfigured)
+	}
+	if _, present := unconfigured["lastSyncAt"]; present {
+		t.Fatalf("status = %v, want no lastSyncAt before any sync", unconfigured)
+	}
+
+	runner := simplefin.NewRunner(database, simplefin.Config{DryRun: true}, nil)
+	configured := New(database, Config{SyncRunner: runner})
+	if err := database.SetLastSyncTime("2026-10-18T14:30:00Z"); err != nil {
+		t.Fatalf("record last sync: %v", err)
+	}
+	after := httptest.NewRecorder()
+	configured.ServeHTTP(after, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
+	if after.Code != http.StatusOK {
+		t.Fatalf("status = %d, body %s", after.Code, after.Body.String())
+	}
+	var payload struct {
+		SyncConfigured bool   `json:"syncConfigured"`
+		LastSyncAt     string `json:"lastSyncAt"`
+	}
+	if err := json.Unmarshal(after.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode status: %v", err)
+	}
+	if !payload.SyncConfigured || payload.LastSyncAt != "2026-10-18T14:30:00Z" {
+		t.Fatalf("status = %+v, want configured sync with recorded time", payload)
 	}
 }
 

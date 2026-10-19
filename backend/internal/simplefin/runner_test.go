@@ -183,6 +183,50 @@ func TestTriggerRefusesConcurrentRun(t *testing.T) {
 	}
 }
 
+func TestSyncRecordsLastSyncTime(t *testing.T) {
+	database := openRunnerStore(t)
+	runner := NewRunner(database, Config{}, nil)
+	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
+		return &AccountSet{}, nil
+	}
+	if _, err := runner.Sync(context.Background()); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	stamped, err := database.GetLastSyncTime()
+	if err != nil || stamped == "" {
+		t.Fatalf("last sync = %q, err %v, want recorded time", stamped, err)
+	}
+	if _, err := time.Parse(time.RFC3339, stamped); err != nil {
+		t.Fatalf("last sync %q is not RFC3339: %v", stamped, err)
+	}
+}
+
+func TestDryRunAndFailedSyncsDoNotRecordSyncTime(t *testing.T) {
+	dryRunStore := openRunnerStore(t)
+	dryRunner := NewRunner(dryRunStore, Config{DryRun: true}, nil)
+	dryRunner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
+		return &AccountSet{}, nil
+	}
+	if _, err := dryRunner.Sync(context.Background()); err != nil {
+		t.Fatalf("dry-run sync: %v", err)
+	}
+	if got, err := dryRunStore.GetLastSyncTime(); err != nil || got != "" {
+		t.Fatalf("dry-run last sync = %q, err %v, want empty", got, err)
+	}
+
+	failedStore := openRunnerStore(t)
+	failedRunner := NewRunner(failedStore, Config{}, nil)
+	failedRunner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
+		return nil, errBridgeDown
+	}
+	if _, err := failedRunner.Sync(context.Background()); err == nil {
+		t.Fatal("expected failed sync to fail")
+	}
+	if got, err := failedStore.GetLastSyncTime(); err != nil || got != "" {
+		t.Fatalf("failed last sync = %q, err %v, want empty", got, err)
+	}
+}
+
 func TestParsePositiveDuration(t *testing.T) {
 	if got, err := ParsePositiveDuration("", MinTriggerInterval); err != nil || got != MinTriggerInterval {
 		t.Fatalf("empty = %v, %v, want fallback", got, err)
