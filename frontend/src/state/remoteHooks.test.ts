@@ -2218,7 +2218,10 @@ describe("remote projection mapping and SSE", () => {
 			})),
 			projectStochastic: vi.fn(async () => {
 				calls += 1;
-				if (calls === 1) throw aborted;
+				// The client contract returns errors instead of throwing, so
+				// the first call returns the abortion for the hook to
+				// recognize rather than throwing it.
+				if (calls === 1) return aborted;
 				return new Response(stream, {
 					status: 200,
 					headers: { "content-type": "text/event-stream" },

@@ -905,7 +905,11 @@ export function useRemoteProjection({
 				authToken,
 				signal: controller.signal,
 			});
-			if (response instanceof Error) throw new Error(response.message);
+			// Rethrow intact: the client disguises aborts as ApiNetworkError
+			// with the AbortError as cause, and the remount redrive below
+			// recognizes only the original chain. Wrapping the message in a
+			// fresh Error would report every remount abort as a failed range.
+			if (response instanceof Error) throw response;
 			let finalRange: RangeResult | null = null;
 			let streamError: string | null = null;
 			const parseResult = await parseSSE(
