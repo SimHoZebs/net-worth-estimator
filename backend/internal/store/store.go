@@ -24,8 +24,8 @@ import (
 //   - Readers always see the latest committed state (no stale replicas).
 //   - SQL must stay portable: plain DDL/DML plus ON CONFLICT only. No
 //     SQLite pragmas, extensions, or file assumptions outside Open.
-//   - An empty backend reports DocumentExists() == false so the server
-//     seeds from CSVs on first boot; Open applies migrations itself.
+//   - An empty backend reports DocumentExists() == false; the server
+//     boots empty and Open applies migrations itself.
 //   - Clear resets all persisted state; the conformance suite relies on it.
 type Store interface {
 	LoadDocument() (*types.FinancialModelDocument, error)

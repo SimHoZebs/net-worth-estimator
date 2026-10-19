@@ -213,7 +213,7 @@ The current schema stores:
 
 ### First boot and import
 
-`cmd/server` calls `DocumentExists`. When false, `ImportCSV(modelPath, incomePath)` parses both seed directories and replaces model and income state in one transaction. Later server starts read the database and do not rescan seed directories.
+`cmd/server` calls `DocumentExists` and logs a notice when no model is stored; onboarding is an explicit import through Configs or `cmd/importcsv`. `ImportCSV` (offline tool, fixture seeding, tests) parses both CSV directories and replaces model and income state in one transaction.
 
 `cmd/importcsv` deliberately invokes the same import path for operator-controlled replacement of an existing database.
 

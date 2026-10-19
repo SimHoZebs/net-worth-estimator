@@ -71,7 +71,7 @@ public/data/income/
 └── tax-profiles.csv
 ```
 
-Set `NET_WORTH_ESTIMATOR_MODEL_PATH` and `NET_WORTH_ESTIMATOR_INCOME_PATH` to use other seed directories. CSV files seed an empty database and support the explicit offline `cmd/importcsv` replacement tool. They do not resynchronize a populated database on server restart.
+The CSV directories back the explicit offline `cmd/importcsv` replacement tool and `cmd/fixtureapi` browser-test seeding. The server never reads them: an empty database stays empty until a model is imported through Configs or `cmd/importcsv`.
 
 Offline replacement from `backend/`:
 
@@ -116,9 +116,10 @@ Run the API and frontend as separate processes from the repository root:
 
 ```bash
 # terminal 1
+# Local state comes from a database backup, never the shipped CSVs: copy a
+# backup to the dev database path while the server is stopped.
+cp <backup>.db /tmp/net-worth-estimator.db
 NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
-NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs" \
-NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income" \
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
@@ -134,7 +135,7 @@ The Vite server runs on `http://localhost:5178` and proxies `/v1` to `127.0.0.1:
 
 The split deployment has two images:
 
-- `backend/Dockerfile` builds the Go API and includes the seed CSV directories.
+- `backend/Dockerfile` builds the Go API. Local state comes from a database backup restored to the volume, never from files baked into the image.
 - `frontend/Dockerfile` builds the Waypoint bundle and serves it from Nginx. The image proxies `/v1` to the backend named by `BACKEND_URL` and keeps stochastic SSE streaming unbuffered.
 
 Run both services with the persistent local volume:

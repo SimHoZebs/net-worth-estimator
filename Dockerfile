@@ -34,14 +34,10 @@ WORKDIR /app
 
 COPY --from=build --chown=app:app /out/server /app/server
 COPY --from=frontend-build --chown=app:app /build/frontend/dist /app/frontend
-COPY --chown=app:app public/configs /app/public/configs
-COPY --chown=app:app public/data/income /app/public/data/income
 
 ENV HOST=0.0.0.0 \
     PORT=8787 \
     NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db \
-    NET_WORTH_ESTIMATOR_MODEL_PATH=/app/public/configs \
-    NET_WORTH_ESTIMATOR_INCOME_PATH=/app/public/data/income \
     NET_WORTH_ESTIMATOR_FRONTEND_PATH=/app/frontend
 
 EXPOSE 8787

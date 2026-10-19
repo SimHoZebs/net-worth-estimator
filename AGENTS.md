@@ -6,9 +6,10 @@ Run the API and frontend as separate processes from the repository root:
 
 ```bash
 # terminal 1
+# Local state comes from a database backup, never the shipped CSVs: copy a
+# backup to the dev database path while the server is stopped.
+cp <backup>.db /tmp/net-worth-estimator.db
 NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
-NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs" \
-NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income" \
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
@@ -51,8 +52,8 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 | `HOST` | `127.0.0.1`; container `0.0.0.0` | listen address |
 | `PORT` | `8787` | listen port |
 | `NET_WORTH_ESTIMATOR_DB` | per-user SQLite path; container `/data/net-worth-estimator.db` | canonical data and artifacts |
-| `NET_WORTH_ESTIMATOR_MODEL_PATH` | `public/configs` | first-boot model seed directory |
-| `NET_WORTH_ESTIMATOR_INCOME_PATH` | `public/data/income` | first-boot income seed directory |
+| `NET_WORTH_ESTIMATOR_MODEL_PATH` | `public/configs` | CSV directory for `cmd/fixtureapi` browser-test seeding; the server never reads it |
+| `NET_WORTH_ESTIMATOR_INCOME_PATH` | `public/data/income` | CSV directory for `cmd/fixtureapi` browser-test seeding; the server never reads it |
 | `NET_WORTH_ESTIMATOR_FRONTEND_PATH` | empty | optional built frontend directory for binary-only same-origin static serving |
 | `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` | empty | comma-separated exact HTTP/S origins for direct cross-origin API access |
 | `NET_WORTH_ESTIMATOR_READ_ONLY` | writable | `1`, `true`, or `yes` rejects guarded writes with 403 |
@@ -72,7 +73,7 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 - Row writes validate against the stored income snapshot. Error diagnostics return issues without persisting; warning-only writes are persisted.
 - `api.Config.FrontendDir` optionally serves the built Waypoint frontend with same-origin static assets and SPA fallback for binary-only runs; the split container path leaves it empty.
 - The read-only guard runs before bearer validation on model saves and sync triggers. A missing or wrong bearer returns 401 when a token is configured. Reads and projection computation remain unguarded.
-- `store.Open` applies schema migrations and enables SQLite WAL, foreign keys, a 5-second busy timeout, and one connection. An empty database is seeded once from CSV by `cmd/server`; later CSV edits do not replace stored data. V7 splits postings into dated postings plus recurrence rules; `Open` copies a `.pre-v7-backup` beside the database before migrating.
+- `store.Open` applies schema migrations and enables SQLite WAL, foreign keys, a 5-second busy timeout, and one connection. An empty database stays empty until a model is imported through Configs or `cmd/importcsv`; later CSV edits do not replace stored data. V7 splits postings into dated postings plus recurrence rules; `Open` copies a `.pre-v7-backup` beside the database before migrating.
 - `store.Store` is the persistence boundary. Row create/update/delete/move methods write one row per transaction with server-generated UUIDv7 IDs and a shared ID registry. Checkpoints and postings carry `source: "model" | "simplefin"`; sync-owned checkpoint collisions yield to owner rows.
 - Completed deterministic and seeded stochastic results are best-effort cached in `projection_artifacts`. The cache is bounded to 256 rows across both kinds. Partial results are not persisted. Unseeded stochastic runs are neither shared nor cached.
 - `backend/Dockerfile` runs as UID/GID `10001`, listens on `0.0.0.0:8787`, and stores SQLite at `/data/net-worth-estimator.db`. Compose supplies the persistent volume; production durability requires `/data` on persistent storage and one backend instance.

@@ -7,9 +7,10 @@ A household financial planning frontend backed by the Go API.
 Use Node.js 24 or newer. The frontend runs in local development against the Go API at `127.0.0.1:8787`. From the repository root, start the backend:
 
 ```sh
+# Local state comes from a database backup, never the shipped CSVs: copy a
+# backup to the dev database path while the server is stopped.
+cp <backup>.db /tmp/net-worth-estimator.db
 NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
-NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs" \
-NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income" \
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
