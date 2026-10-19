@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import {
 	type AdapterReport,
+	type AmountPreset,
+	type AmountPresetWriteResponse,
 	ApiHttpError,
 	type ApiRequestOptions,
 	backendToDisplayPlan,
@@ -36,6 +38,27 @@ export interface RemoteApiClient extends RowWriter {
 	getIncomeData(
 		options?: ApiRequestOptions,
 	): Promise<Error | IncomeDataSnapshot>;
+	listAmountPresets(
+		options?: ApiRequestOptions,
+	): Promise<Error | { presets: AmountPreset[] }>;
+	createAmountPreset(
+		preset: AmountPreset,
+		options?: ApiRequestOptions,
+	): Promise<Error | AmountPresetWriteResponse>;
+	updateAmountPreset(
+		id: string,
+		preset: AmountPreset,
+		options?: ApiRequestOptions,
+	): Promise<Error | AmountPresetWriteResponse>;
+	deleteAmountPreset(
+		id: string,
+		options?: ApiRequestOptions,
+	): Promise<Error | { deletedId: string }>;
+	moveAmountPreset(
+		id: string,
+		beforeId: string | null,
+		options?: ApiRequestOptions,
+	): Promise<Error | { movedId: string }>;
 }
 
 export interface RemoteWorkspace {
@@ -60,6 +83,8 @@ export interface RemoteWorkspaceState {
 	serverRevision: string | null;
 	recoveryDraft: Plan | null;
 	incomeData: IncomeDataSnapshot | null;
+	serverPresets: AmountPreset[] | null;
+	presetError: string | null;
 	adapterReport: AdapterReport | null;
 	savedPresentation: PlanPresentation | null;
 	draftPresentation: PlanPresentation | null;
@@ -80,6 +105,11 @@ export interface RemoteWorkspaceState {
 	importServerDocument: (document: FinancialModelDocument) => Promise<boolean>;
 	retry: () => Promise<void>;
 	dismissNotice: () => void;
+	refreshPresets: () => Promise<void>;
+	createPreset: (preset: AmountPreset) => Promise<boolean>;
+	updatePreset: (preset: AmountPreset) => Promise<boolean>;
+	deletePreset: (id: string) => Promise<boolean>;
+	movePreset: (id: string, beforeId: string | null) => Promise<boolean>;
 }
 
 function messageFor(error: unknown, fallback: string): string {
@@ -283,6 +313,8 @@ interface WorkspaceData {
 	serverRevision: string | null;
 	recoveryDraft: Plan | null;
 	incomeData: IncomeDataSnapshot | null;
+	serverPresets: AmountPreset[] | null;
+	presetError: string | null;
 	adapterReport: AdapterReport | null;
 	savedPresentation: PlanPresentation | null;
 	draftPresentation: PlanPresentation | null;
@@ -302,6 +334,8 @@ function initialData(): WorkspaceData {
 		serverRevision: null,
 		recoveryDraft: null,
 		incomeData: null,
+		serverPresets: null,
+		presetError: null,
 		adapterReport: null,
 		savedPresentation: null,
 		draftPresentation: null,
@@ -325,6 +359,7 @@ interface WorkspaceActions {
 		fallback?: RemoteLocalState,
 	) => boolean;
 	hydrate: (options?: { deferDuringSave?: boolean }) => Promise<void>;
+	refreshStatus: () => Promise<void>;
 	updatePlan: (next: Plan) => boolean;
 	save: () => Promise<boolean>;
 	importServerDocument: (document: FinancialModelDocument) => Promise<boolean>;
@@ -333,6 +368,11 @@ interface WorkspaceActions {
 	replace: (next: Plan) => boolean;
 	retry: () => Promise<void>;
 	dismissNotice: () => void;
+	refreshPresets: () => Promise<void>;
+	createPreset: (preset: AmountPreset) => Promise<boolean>;
+	updatePreset: (preset: AmountPreset) => Promise<boolean>;
+	deletePreset: (id: string) => Promise<boolean>;
+	movePreset: (id: string, beforeId: string | null) => Promise<boolean>;
 }
 
 export const useWorkspaceStore = create<
@@ -445,6 +485,8 @@ export const useWorkspaceStore = create<
 				workspace: null,
 				serverDocument: null,
 				serverRevision: null,
+				serverPresets: null,
+				presetError: null,
 				status: null,
 			});
 		};
@@ -453,17 +495,20 @@ export const useWorkspaceStore = create<
 			Error | ServerStatus,
 			Error | FinancialModelResponse,
 			Error | IncomeDataSnapshot,
+			Error | { presets: AmountPreset[] },
 		];
 		try {
 			const responsePromise = Promise.all([
 				api.getStatus({ signal: controller.signal }),
 				api.getModel({ signal: controller.signal }),
 				api.getIncomeData({ signal: controller.signal }),
+				api.listAmountPresets({ signal: controller.signal }),
 			]);
 			responses = (await Promise.race([responsePromise, timeoutPromise])) as [
 				Error | ServerStatus,
 				Error | FinancialModelResponse,
 				Error | IncomeDataSnapshot,
+				Error | { presets: AmountPreset[] },
 			];
 		} catch (cause) {
 			if (get().engine.mounted && (!controller.signal.aborted || timedOut)) {
@@ -482,7 +527,7 @@ export const useWorkspaceStore = create<
 			finishHydration();
 			return;
 		}
-		const [statusResult, modelResult, incomeResult] = responses;
+		const [statusResult, modelResult, incomeResult, presetResult] = responses;
 		if (
 			!get().engine.mounted ||
 			controller.signal.aborted ||
@@ -528,6 +573,17 @@ export const useWorkspaceStore = create<
 			set({ incomeData: null, error: incomeError });
 		} else {
 			set({ incomeData: incomeResult });
+		}
+		if (presetResult instanceof Error) {
+			set({
+				serverPresets: null,
+				presetError: messageFor(
+					presetResult,
+					"Saved amount recipes could not be loaded.",
+				),
+			});
+		} else {
+			set({ serverPresets: presetResult.presets, presetError: null });
 		}
 		set({
 			status: statusResult,
@@ -1221,6 +1277,125 @@ export const useWorkspaceStore = create<
 	},
 
 	dismissNotice: () => set({ notice: "" }),
+
+	/** Re-reads /v1/status without touching the loaded model. Failures
+	 * surface through the shared error state, mirroring hydrate. */
+	refreshStatus: async (): Promise<void> => {
+		const { engine } = get();
+		const api = engine.client;
+		if (!api) return;
+		const result = await api.getStatus();
+		if (result instanceof Error) {
+			markApiFailure(
+				(value) => set({ error: value }),
+				(value) => set({ authRequiredState: value }),
+				(value) => set({ writeBlocked: value }),
+				result,
+				"The server status could not be refreshed. Retry the connection.",
+			);
+			return;
+		}
+		set({
+			status: result,
+			authRequiredState: result.authEnabled,
+			writeBlocked: false,
+		});
+	},
+
+	refreshPresets: async (): Promise<void> => {
+		const { engine } = get();
+		const api = engine.client;
+		if (!api) return;
+		const result = await api.listAmountPresets({ authToken: engine.authToken });
+		if (result instanceof Error) {
+			set({
+				serverPresets: null,
+				presetError: messageFor(result, "Saved amount recipes could not be loaded."),
+			});
+			return;
+		}
+		set({ serverPresets: result.presets, presetError: null });
+	},
+
+	createPreset: async (preset: AmountPreset): Promise<boolean> => {
+		const { engine } = get();
+		const api = engine.client;
+		if (!api) return false;
+		const result = await api.createAmountPreset(preset, { authToken: engine.authToken });
+		if (result instanceof Error) {
+			set({ presetError: messageFor(result, "The recipe could not be saved.") });
+			return false;
+		}
+		if (!result.persisted) {
+			const details = result.issues
+				.map((issue) => issue.message)
+				.filter(Boolean)
+				.join(" ");
+			set({
+				presetError: `The recipe was rejected${details ? `: ${details}` : "."}`,
+			});
+			return false;
+		}
+		set({ serverPresets: [...(get().serverPresets ?? []), result.row], presetError: null });
+		return true;
+	},
+
+	updatePreset: async (preset: AmountPreset): Promise<boolean> => {
+		const { engine } = get();
+		const api = engine.client;
+		if (!api || !preset.id) return false;
+		const result = await api.updateAmountPreset(preset.id, preset, { authToken: engine.authToken });
+		if (result instanceof Error) {
+			set({ presetError: messageFor(result, "The recipe could not be saved.") });
+			return false;
+		}
+		if (!result.persisted) {
+			const details = result.issues
+				.map((issue) => issue.message)
+				.filter(Boolean)
+				.join(" ");
+			set({
+				presetError: `The recipe was rejected${details ? `: ${details}` : "."}`,
+			});
+			return false;
+		}
+		set({
+			serverPresets: (get().serverPresets ?? []).map((item) =>
+				item.id === result.row.id ? result.row : item,
+			),
+			presetError: null,
+		});
+		return true;
+	},
+
+	deletePreset: async (id: string): Promise<boolean> => {
+		const { engine } = get();
+		const api = engine.client;
+		if (!api) return false;
+		const result = await api.deleteAmountPreset(id, { authToken: engine.authToken });
+		if (result instanceof Error) {
+			set({ presetError: messageFor(result, "The recipe could not be deleted.") });
+			return false;
+		}
+		set({
+			serverPresets: (get().serverPresets ?? []).filter((item) => item.id !== id),
+			presetError: null,
+		});
+		return true;
+	},
+
+	movePreset: async (id: string, beforeId: string | null): Promise<boolean> => {
+		const { engine } = get();
+		const api = engine.client;
+		if (!api) return false;
+		const result = await api.moveAmountPreset(id, beforeId, { authToken: engine.authToken });
+		if (result instanceof Error) {
+			set({ presetError: messageFor(result, "The recipe could not be moved.") });
+			return false;
+		}
+		await get().refreshPresets();
+		return true;
+	},
 }));
 
 /** Test hook: restores a pristine engine and data between cases. */
