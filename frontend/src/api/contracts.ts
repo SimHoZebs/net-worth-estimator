@@ -86,6 +86,68 @@ export type PostingAmountResolution =
 	| OtherPostingAmountResolution;
 export type AmountResolution = PostingAmountResolution;
 
+export interface AmountFieldSpec extends HumaMetadata {
+	key: string;
+	kind: string;
+	required: boolean;
+}
+
+export interface AmountResolverSpec extends HumaMetadata {
+	name: string;
+	description?: string;
+	configFields?: AmountFieldSpec[];
+}
+
+export interface AmountProviderSpec extends HumaMetadata {
+	name: string;
+	description?: string;
+	volatile?: boolean;
+	argFields?: AmountFieldSpec[];
+}
+
+export interface AmountTemplate extends HumaMetadata {
+	id: string;
+	label: string;
+	summary?: string;
+	resolver?: string;
+	whenToUse?: string;
+	amount?: PostingAmountResolution;
+}
+
+export interface AmountPreset extends HumaMetadata {
+	id: string;
+	name: string;
+	label: string;
+	summary?: string | null;
+	whenUse?: string | null;
+	amount: PostingAmountResolution;
+	enabled: boolean;
+}
+
+export interface AmountPresetListResponse extends HumaMetadata {
+	presets: AmountPreset[];
+}
+
+export interface AmountPresetWriteResponse extends HumaMetadata {
+	row: AmountPreset;
+	issues: ModelValidationIssue[];
+	persisted: boolean;
+}
+
+export interface AmountPresetDeleteResponse extends HumaMetadata {
+	deletedId: string;
+}
+
+export interface AmountPresetMoveResponse extends HumaMetadata {
+	movedId: string;
+}
+
+export interface AmountCatalogResponse extends HumaMetadata {
+	resolvers: AmountResolverSpec[];
+	providers: AmountProviderSpec[];
+	incomeSteps: AmountResolverSpec[];
+}
+
 export type RecurrenceFrequency =
 	| "daily"
 	| "weekly"

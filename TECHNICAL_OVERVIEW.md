@@ -1,6 +1,6 @@
 # Technical Overview: Net Worth Estimator Backend
 
-The backend is the authoritative implementation for model validation, persistence, deterministic simulation, stochastic simulation, and configured evaluations. It exposes one HTTP/SSE contract and stores canonical data, income data, sync-owned rows, and completed projection artifacts in SQLite.
+The backend is the authoritative implementation for model validation, persistence, deterministic simulation, stochastic simulation, and configured evaluations. It exposes one HTTP/SSE contract and stores canonical data, income data, sync-owned rows, completed projection artifacts, and saved amount presets in SQLite.
 
 `PRODUCT_INTENT.md` defines the product experience. This document defines only the current Go contracts and domain behavior.
 
@@ -150,7 +150,7 @@ An unseeded run does not use the shared registry or artifact cache. Its context 
 | token configured and missing/wrong | 401 |
 | sync unconfigured | 503 |
 | another run is active | 409 |
-| successful manual run was less than 20 hours ago | 429 |
+| successful manual run was less than 6 hours ago | 429 |
 | success | 200 |
 
 ### Origin and write policy
@@ -210,6 +210,7 @@ The current schema stores:
 | `income_sources` | effective-dated income rows sharing an ID |
 | `tax_profiles` | ordered deductions, brackets, and source URL |
 | `projection_artifacts` | versioned content identity, kind, creation time, and JSON payload |
+| `amount_presets` | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
 
 ### First boot and import
 
@@ -226,6 +227,10 @@ Each row write runs one transaction: validate the resulting document, then inser
 3. Incoming `source` values are ignored and recomputed. Incoming IDs in the reserved `sfin-` namespace are rejected. Stored sync rows therefore cannot be forged through row writes; sync-owned postings also refuse owner updates and deletes.
 4. Owner checkpoints win key collisions; a later synchronization skips the owner-owned key until owner data is removed.
 5. Deleting an account keeps its bridge links; the link is the memory of the mapping, so recreating the account resumes sync flow. A link whose model account is gone resolves to nothing and is counted as `linked-account-missing` until relinked.
+
+### Amount presets
+
+Amount presets are saved amount recipes managed through `GET /v1/amount-presets`, `POST`/`PATCH`/`DELETE /v1/amount-presets`, and `POST /v1/amount-presets/reorder`. Each write runs one transaction without touching the canonical document: creates generate UUIDv7 IDs when omitted and reject the reserved `sfin-` namespace; names are unique (duplicates return 409) and immutable; deletes and moves return the affected ID. Validation is shape-only (non-empty name and label, `ValidateAmountDescriptor` with no references so placeholder IDs pass); failures return issues with `persisted: false`. The table seeds 8 factory presets at migration time and survives `Clear` and CSV import: presets are user configuration, not model data.
 
 ### Artifact durability
 
@@ -317,6 +322,8 @@ Current general resolvers:
 `expression` amounts carry rate behavior in their inputs: the `occurrence-rate` provider resolves the annual rate (sampled per projection year when volatile) divided by the frequency divisor, and the `growth-factor` provider resolves the compounding factor from the rule start date. One-time and recurring movements resolve through the same path. Posting references (`model-value`) may name posting or rule IDs; a rule reference resolves to its latest realized occurrence.
 
 The `income` resolver is an ordered pipeline like any other resolver. It reads the effective income source for the occurrence date, executes configured resolver steps, routes configured outputs, and deposits the remaining net cash into rule or posting destinations. Income rules and postings validate alike: a source account contradicts the inflow shape, at least one destination is required, and rule annual caps bound net cash deposited per calendar year while step splits carry their own resolver-level caps. Rule instances divide annual figures by their rule's frequency; manual postings resolve the whole annual figure at once.
+
+Layman discovery: `GET /v1/amount-resolvers` returns `resolvers`, `providers`, and `incomeSteps` as wiring only (entry names, technical descriptions, field keys, field kinds, required flags, and provider volatility). All human words live in the frontend. Reusable recipes persist as rows: `GET /v1/amount-presets` lists them, `POST`/`PATCH`/`DELETE /v1/amount-presets` and `POST /v1/amount-presets/reorder` manage them. A preset is an authoring macro only — applying it copies its amount descriptor into a posting or rule, so simulation never reads presets and they never affect artifact identity. The wire shape is unchanged; presets only author it.
 
 ### Constraints and movement records
 

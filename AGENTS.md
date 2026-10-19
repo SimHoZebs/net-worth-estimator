@@ -63,12 +63,12 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN` | empty | exact value `1` plans counts without committing writes |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK` | empty | exact value `1` enables fixture mode |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE` | empty | optional fixture file, valid only with mock mode |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MIN_TRIGGER_INTERVAL` | `20h` | Go duration spacing successful manual sync triggers; Bridge expects 24 requests or fewer per day |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MIN_TRIGGER_INTERVAL` | `6h` | Go duration spacing successful manual sync triggers; Bridge expects 24 requests or fewer per day |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_RATE_LIMIT_COOLDOWN` | `1h` | Go duration Bridge-fetch blackout after an upstream 429; excess triggers return local 429 with `Retry-After` |
 
 ## API and Persistence Flow
 
-- `api.New(store.Store, api.Config)` builds the router. `GET /healthz`, `GET /v1/financial-model`, row endpoints under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, link endpoints under `/v1/sync/simplefin/accounts`, `GET /v1/status` (read-only/auth/sync state), `GET /v1/income-data`, `POST /v1/projections/deterministic`, `POST /v1/projections/stochastic`, and `POST /v1/sync/simplefin` are the current routes.
+- `api.New(store.Store, api.Config)` builds the router. `GET /healthz`, `GET /v1/financial-model`, row endpoints under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, preset endpoints under `/v1/amount-presets` (list/create/replace/delete/reorder; shape-only validation, names unique and immutable, never touch the canonical document), link endpoints under `/v1/sync/simplefin/accounts`, `GET /v1/status` (read-only/auth/sync state), `GET /v1/income-data`, `POST /v1/projections/deterministic`, `POST /v1/projections/stochastic`, and `POST /v1/sync/simplefin` are the current routes.
 - `GET /v1/financial-model` returns an `ETag` and revision for reads and caching. Row writes are last-write-wins: each `POST`/`PATCH`/`DELETE` validates one change against stored state plus income and persists only when no error-severity issue exists.
 - Row writes validate against the stored income snapshot. Error diagnostics return issues without persisting; warning-only writes are persisted.
 - `api.Config.FrontendDir` optionally serves the built Waypoint frontend with same-origin static assets and SPA fallback for binary-only runs; the split container path leaves it empty.

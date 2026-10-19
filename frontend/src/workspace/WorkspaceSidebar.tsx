@@ -5,6 +5,7 @@ import { IconButton, Skeleton } from "../components/ui.tsx";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { lastSyncLabel } from "./lastSync.ts";
 import { type Page, pages } from "./navigation.ts";
+import { useSyncNow } from "./useSyncNow.ts";
 import { workspaceStatusLabel } from "./WorkspaceNotices.tsx";
 
 export function WorkspaceSidebar({
@@ -26,6 +27,9 @@ export function WorkspaceSidebar({
 	const readOnly = statusReadOnly || writeBlocked || (plan?.readOnly ?? true);
 	const statusLabel = workspaceStatusLabel({ readOnly });
 	const status = useWorkspaceStore((state) => state.status);
+	const { syncing, error: syncError, syncNow } = useSyncNow();
+	const syncAvailable =
+		!pending && status !== null && status.syncConfigured !== false;
 	return (
 		<>
 			<div className="brand-row">
@@ -81,7 +85,24 @@ export function WorkspaceSidebar({
 					{pending ? (
 						<Skeleton width={110} height={10} />
 					) : (
-						<span>{lastSyncLabel(status)}</span>
+						<>
+							<span>{lastSyncLabel(status)}</span>
+							{syncAvailable && (
+								<button
+									type="button"
+									className="text-button sync-now"
+									onClick={() => void syncNow()}
+									disabled={syncing}
+								>
+									{syncing ? "Syncing…" : "Sync now"}
+								</button>
+							)}
+							{syncError && (
+								<span className="sidebar-sync-error" role="alert">
+									{syncError}
+								</span>
+							)}
+						</>
 					)}
 				</div>
 			</div>

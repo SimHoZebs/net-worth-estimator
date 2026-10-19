@@ -105,7 +105,7 @@ SimpleFIN is optional and narrow:
 - the Access URL stays server-side and is absent from successful payloads; transport failures can wrap the request URL, so failed trigger responses and scheduler logs must be treated as sensitive;
 - `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1` returns planned counts and rolls back all writes;
 - a scheduler runs every 6 hours with a random minute offset, and `GET /v1/status` reports the last successful sync time for the sidebar;
-- the guarded trigger endpoint permits one in-flight run and spaces successful manual runs by 20 hours;
+- the guarded trigger endpoint permits one in-flight run and spaces successful manual runs by 6 hours;
 - fixture mode is for local verification only and follows the same mapping, ownership, and persistence path as a real run.
 
 A model save that removes an account referenced by sync-owned rows preserves that account so observations and postings cannot become orphaned. Sync rows are not garbage-collected; operators must keep mappings valid or purge affected source rows deliberately.

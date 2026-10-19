@@ -1,16 +1,7 @@
-/* Sidebar chrome: brand, nav, and status regions. */
+/* Sidebar chrome: brand, nav, and status regions. Panel positioning,
+   border, and shadow live in components/drawer.css, the single owner for
+   every drawer sheet. */
 @layer layout {
-	.sidebar {
-		width: var(--sidebar);
-		background: var(--sidebar-bg);
-		border-right: 1px solid var(--line);
-		position: fixed;
-		inset: 0 auto 0 0;
-		display: flex;
-		flex-direction: column;
-		padding: 31px 19px 0;
-		z-index: 30;
-	}
 	.brand-row {
 		display: flex;
 		justify-content: space-between;
@@ -128,9 +119,25 @@
 		margin-top: 17px;
 	}
 	.sidebar-sync {
+		display: grid;
+		gap: 4px;
+		justify-items: start;
 		padding: 0 8px 19px;
 		font-size: 9px;
 		color: var(--muted);
+	}
+	.sync-now {
+		font-size: 9px;
+		padding: 0;
+	}
+	.sync-now:disabled {
+		color: var(--muted);
+		text-decoration: none;
+		cursor: default;
+	}
+	.sidebar-sync-error {
+		color: var(--danger-text);
+		line-height: 1.5;
 	}
 	.sidebar-status > svg {
 		margin-left: auto;
