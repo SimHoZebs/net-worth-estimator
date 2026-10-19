@@ -15,6 +15,7 @@ import type { EditorTarget } from "../../domain/planEdits.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { Badge, EmptyState, IconButton } from "../ui.tsx";
 import "./account-activity.css";
+import { MovementDetail } from "./TransactionDetail.tsx";
 
 type Direction = "in" | "out" | "transfer";
 
@@ -116,6 +117,7 @@ export function RecurringRules({
 		(state) => state.savedPresentation,
 	);
 	const [editing, setEditing] = useState(false);
+	const [selectedId, setSelectedId] = useState<string | null>(null);
 
 	const presentation = draftPresentation ?? savedPresentation;
 	const serverRules = useMemo(
@@ -147,7 +149,9 @@ export function RecurringRules({
 	};
 
 	const persistOrder = (orderedIds: string[]) => {
-		const byId = new Map(plan.movements.map((movement) => [movement.id, movement]));
+		const byId = new Map(
+			plan.movements.map((movement) => [movement.id, movement]),
+		);
 		const queue = orderedIds
 			.map((id) => byId.get(id))
 			.filter((item): item is Movement => item !== undefined);
@@ -229,11 +233,7 @@ export function RecurringRules({
 			/>
 		);
 
-	const rowContent = (
-		movement: Movement,
-		order: number,
-		compact: boolean,
-	) => {
+	const rowContent = (movement: Movement, order: number, compact: boolean) => {
 		const direction = directionFor(movement, account.id);
 		const { backendFrequency } = detailFor(movement);
 		const DirectionIcon =
@@ -244,7 +244,10 @@ export function RecurringRules({
 					: ArrowUpRight;
 		return (
 			<>
-				<span className="recurring-order" aria-hidden={compact ? undefined : true}>
+				<span
+					className="recurring-order"
+					aria-hidden={compact ? undefined : true}
+				>
 					{order}
 				</span>
 				<span
@@ -326,7 +329,10 @@ export function RecurringRules({
 										type="button"
 										className="text-button"
 										aria-label={`Edit ${movement.name}`}
-										onClick={() => onEdit({ kind: "movement", item: movement })}
+										onClick={() => {
+											setEditing(false);
+											setSelectedId(movement.id);
+										}}
 									>
 										Edit
 									</button>
@@ -347,8 +353,8 @@ export function RecurringRules({
 							<button
 								type="button"
 								className="recurring-row-button"
-								aria-label={`Edit ${movement.name}, ${directionLabel(directionFor(movement, account.id)).toLowerCase()} ${frequencyLabel(detailFor(movement).backendFrequency).toLowerCase()}, position ${index + 1} of ${rules.length}`}
-								onClick={() => onEdit({ kind: "movement", item: movement })}
+								aria-label={`View ${movement.name}, ${directionLabel(directionFor(movement, account.id)).toLowerCase()} ${frequencyLabel(detailFor(movement).backendFrequency).toLowerCase()}, position ${index + 1} of ${rules.length}`}
+								onClick={() => setSelectedId(movement.id)}
 							>
 								{rowContent(movement, index + 1, false)}
 							</button>
@@ -356,6 +362,19 @@ export function RecurringRules({
 					))}
 				</ul>
 			)}
+			{selectedId &&
+				(() => {
+					const movement = rules.find((item) => item.id === selectedId);
+					if (!movement) return null;
+					return (
+						<MovementDetail
+							movement={movement}
+							accounts={plan.accounts}
+							plan={plan}
+							onClose={() => setSelectedId(null)}
+						/>
+					);
+				})()}
 		</>
 	);
 }

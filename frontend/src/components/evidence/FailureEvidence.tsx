@@ -2,7 +2,6 @@ import { TriangleAlert } from "lucide-react";
 import { dateLabel } from "../../domain/format.ts";
 import { failureLedger } from "../../domain/constraintSnapshot.ts";
 import type { Plan } from "../../domain/model.ts";
-import type { EditorTarget } from "../../domain/planEdits.ts";
 import type { MovementResult, Projection } from "../../domain/result.ts";
 import { Modal } from "../ui.tsx";
 import { ConstraintSnapshot } from "./ConstraintSnapshot.tsx";
@@ -12,13 +11,11 @@ export function FailureEvidence({
 	projection,
 	failure,
 	onClose,
-	onEdit,
 }: {
 	plan: Plan;
 	projection: Projection;
 	failure: MovementResult | null;
 	onClose: () => void;
-	onEdit: (target: EditorTarget) => void;
 }) {
 	if (!failure)
 		return (
@@ -38,7 +35,12 @@ export function FailureEvidence({
 				</div>
 			)}
 			{ledger && (
-				<ConstraintSnapshot ledger={ledger} failure={failure} onEdit={onEdit} />
+				<ConstraintSnapshot
+					ledger={ledger}
+					failure={failure}
+					accounts={plan.accounts}
+					plan={plan}
+				/>
 			)}
 		</Modal>
 	);

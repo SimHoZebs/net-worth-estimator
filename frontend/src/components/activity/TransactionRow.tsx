@@ -34,7 +34,7 @@ export function TransactionRow({
 			: transaction.direction === "in"
 				? ("inflow" as const)
 				: ("outflow" as const);
-	const action = movement?.readOnly ? "Inspect" : "Edit";
+	const action = "View";
 	// Counterparties that only restate the direction ("External
 	// income/spending" just means in/out) carry no information the icon
 	// does not already show. Real accounts still show.

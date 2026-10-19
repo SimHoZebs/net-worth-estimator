@@ -1,0 +1,91 @@
+/* Single visual owner for every drawer sheet: the left navigation drawer
+   and the right context drawer are the same component with mirrored sides.
+   Cascade order is set by the @layer declaration in styles/index.css; keep
+   selectors inside @layer components. */
+@layer components {
+	.drawer-backdrop {
+		position: fixed;
+		inset: 0;
+		background: var(--backdrop-film);
+		border: 0;
+		backdrop-filter: blur(var(--backdrop-blur));
+	}
+	.drawer-backdrop-left {
+		z-index: 29;
+	}
+	.drawer-backdrop-right {
+		z-index: 40;
+	}
+	.drawer {
+		position: fixed;
+		top: 0;
+		bottom: 0;
+		display: flex;
+		flex-direction: column;
+		background: var(--surface);
+		color: var(--ink);
+		overflow-y: auto;
+		/* Slide is owned by motion (Drawer); no CSS transition here so
+		   per-frame inline transforms are not re-smoothed. */
+		/* Vertical scroll stays with the browser; horizontal swipes are left
+		   to the swipe gesture in the drawer primitive. */
+		touch-action: pan-y;
+	}
+	.drawer-left {
+		left: 0;
+		z-index: 30;
+		width: var(--sidebar);
+		padding: 31px 19px 0;
+		border-right: 1px solid var(--line);
+	}
+	.drawer-right {
+		right: 0;
+		z-index: 41;
+		width: min(760px, calc(100vw - 64px));
+		max-width: 760px;
+		border-left: 1px solid var(--line);
+	}
+}
+
+@media (max-width: 1250px) {
+	.drawer-left {
+		padding-left: 13px;
+		padding-right: 13px;
+	}
+}
+
+@media (max-width: 1050px) {
+	.drawer-left {
+		padding-left: 11px;
+		padding-right: 11px;
+	}
+}
+
+@media (max-width: 800px) {
+	.drawer-left {
+		width: 230px;
+		padding: 25px 18px 0;
+		/* Mirror of the right sheet shadow, cast toward the page. */
+		box-shadow: 10px 0 60px #19332920;
+	}
+}
+
+@media (max-width: 600px) {
+	.drawer-right {
+		/* Right sheet mirroring the left navigation sheet: docked to the
+		   viewport edge with the dimmed page behind, so the slide reads as
+		   coming from the right. */
+		width: min(420px, calc(100vw - 56px));
+		border-radius: 0;
+		/* Mirror of the left sheet shadow, cast toward the page. */
+		box-shadow: -10px 0 60px #19332920;
+	}
+	/* Full-coverage opt-in (Drawer coverage="full"): edge-to-edge content
+	   with no sheet chrome. */
+	.drawer-right.drawer-full {
+		width: 100%;
+		max-width: 100%;
+		border-left: 0;
+		box-shadow: none;
+	}
+}

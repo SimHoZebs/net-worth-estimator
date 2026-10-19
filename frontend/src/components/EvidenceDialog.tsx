@@ -56,7 +56,6 @@ export function EvidenceDialog({
 					projection={projection}
 					failure={projection.firstFailure}
 					onClose={onClose}
-					onEdit={edit}
 				/>
 			);
 		case "timing":

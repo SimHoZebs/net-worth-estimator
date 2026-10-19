@@ -35,7 +35,6 @@ import {
 } from "../../domain/householdTiming.ts";
 import type { Plan } from "../../domain/model.ts";
 import { visibleAccounts } from "../../domain/model.ts";
-import type { EditorTarget } from "../../domain/planEdits.ts";
 import type { Projection } from "../../domain/result.ts";
 import {
 	TimingDetailDialog,
@@ -50,7 +49,6 @@ const EMPTY_MOVEMENTS: Projection["movements"] = [];
 export function TimingPreview({
 	plan,
 	projection,
-	onEdit,
 	pending = false,
 	detail,
 	onDetail,
@@ -58,7 +56,6 @@ export function TimingPreview({
 }: {
 	plan: Plan;
 	projection: Projection | null;
-	onEdit: (target: EditorTarget) => void;
 	pending?: boolean;
 	detail: TimingDetailTab | null;
 	onDetail: (tab: TimingDetailTab | null) => void;
@@ -555,7 +552,6 @@ export function TimingPreview({
 					trackedBillIds={trackedBillIds}
 					onToggleBill={toggleBill}
 					plan={plan}
-					onEdit={onEdit}
 					cycleTransactions={cycleTransactions}
 					config={{
 						statementDay: settings.statementDay,

@@ -44,6 +44,7 @@ export async function readSavedServerPlan() {
 		const body = await response.json();
 		type movement = {
 			id: string;
+			name: string;
 			amount: { config: { expression?: string } };
 		};
 		return {

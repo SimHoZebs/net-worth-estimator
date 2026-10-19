@@ -8,8 +8,8 @@ import { AccountIcon } from "./AccountIcon.tsx";
 import { AccountDetails } from "./activity/AccountDetails.tsx";
 import { RecurringRules } from "./activity/RecurringRules.tsx";
 import { Transactions } from "./activity/Transactions.tsx";
+import { Drawer } from "./Drawer.tsx";
 import { Tabs } from "./Tabs.tsx";
-import { Modal } from "./ui.tsx";
 import "./activity/account-activity.css";
 
 export function AccountDialog({
@@ -50,11 +50,13 @@ export function AccountDialog({
 		projection.points[0];
 	const last = projection.points.at(-1);
 	return (
-		<Modal
+		<Drawer
+			side="right"
+			open
+			onClose={onClose}
+			label={account.name}
 			title={account.name}
 			eyebrow={`Account activity · ${temporary ? "Changes" : "Saved plan"}`}
-			onClose={onClose}
-			className="modal-drawer"
 			coverage="full"
 		>
 			<div className="account-dialog-summary">
@@ -108,6 +110,6 @@ export function AccountDialog({
 					/>
 				)}
 			</Tabs>
-		</Modal>
+		</Drawer>
 	);
 }

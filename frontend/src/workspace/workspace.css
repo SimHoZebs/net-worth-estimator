@@ -89,7 +89,4 @@
 	.toast .icon-button:hover {
 		background: rgba(0, 0, 0, 0.15);
 	}
-	.nav-backdrop {
-		display: none;
-	}
 }

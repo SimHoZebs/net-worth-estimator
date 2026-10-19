@@ -484,18 +484,6 @@
 	.modal-wide {
 		width: min(780px, calc(100% - 32px));
 	}
-	.modal-drawer {
-		width: min(760px, calc(100vw - 64px));
-		max-width: 760px;
-		height: 100dvh;
-		max-height: 100dvh;
-		margin: 0 0 0 auto;
-		inset: 0 0 0 auto;
-		border-radius: 0;
-		border-top: 0;
-		border-right: 0;
-		border-bottom: 0;
-	}
 	.modal::backdrop {
 		background: var(--backdrop-film);
 		backdrop-filter: blur(var(--backdrop-blur));
@@ -518,6 +506,21 @@
 	.modal-header .eyebrow {
 		margin-bottom: 9px;
 		font-size: 9px;
+	}
+	.modal-header-actions {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		flex: none;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+	}
+	.modal-header .modal-title-plain {
+		font-family: inherit;
+		font-size: 13px;
+		font-weight: 650;
+		letter-spacing: 0;
+		line-height: 1.4;
 	}
 	.modal-body {
 		padding: 24px 27px 27px;
