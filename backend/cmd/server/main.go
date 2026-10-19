@@ -68,8 +68,6 @@ func main() {
 			log.Fatalf("create database directory %s: %v", dir, err)
 		}
 	}
-	modelPath := envOr("NET_WORTH_ESTIMATOR_MODEL_PATH", "public/configs")
-	incomePath := envOr("NET_WORTH_ESTIMATOR_INCOME_PATH", "public/data/income")
 	frontendPath := envOr("NET_WORTH_ESTIMATOR_FRONTEND_PATH", "")
 	allowedOrigins, err := parseAllowedOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
 	if err != nil {
@@ -91,10 +89,7 @@ func main() {
 		log.Fatalf("check store: %v", err)
 	}
 	if !exists {
-		if _, _, err := database.ImportCSV(modelPath, incomePath); err != nil {
-			log.Fatalf("seed from CSV: %v", err)
-		}
-		fmt.Printf("seeded database from %s and %s\n", modelPath, incomePath)
+		fmt.Println("no financial model stored: import one through Configs or cmd/importcsv")
 	}
 
 	syncRunner, syncStop := configureSync(database)

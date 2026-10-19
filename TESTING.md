@@ -107,20 +107,19 @@ The actual benchmark run uses the checked-in fixture and the Go toolchain.
 
 ## Real-Data Server
 
-Use a disposable database. From the repository root, start the server with absolute seed paths:
+Use a disposable database restored from a backup. From the repository root, copy a backup to a scratch path while no server is running, then start the server:
 
 ```bash
 export BASE_URL=http://127.0.0.1:8787
 export NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator-test.db
-export NET_WORTH_ESTIMATOR_MODEL_PATH="$PWD/public/configs"
-export NET_WORTH_ESTIMATOR_INCOME_PATH="$PWD/public/data/income"
 unset NET_WORTH_ESTIMATOR_READ_ONLY
 unset NET_WORTH_ESTIMATOR_AUTH_TOKEN
 
+cp <backup>.db /tmp/net-worth-estimator-test.db
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-The first start imports the real seed directories. A later start reads SQLite and does not rescan those directories. To start from a clean seed snapshot, remove only the disposable database and its `-shm`/`-wal` companions while the server is stopped.
+The server reads the restored database; it never scans the CSV directories. To start from a clean snapshot, stop the server and restore the backup again (removing the `-shm`/`-wal` companions if present).
 
 The defaults bind to `127.0.0.1:8787`. Set `HOST=0.0.0.0` only when another process must reach the listener.
 
