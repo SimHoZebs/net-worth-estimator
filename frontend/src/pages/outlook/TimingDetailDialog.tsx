@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
 import { TransactionRow } from "../../components/activity/TransactionRow.tsx";
+import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
 import {
 	type BarSegment,
@@ -150,11 +151,13 @@ function MandatorySectionView({
 	movements,
 	onEdit,
 	order,
+	showHeaders = false,
 }: {
 	section: TimingMandatorySection;
 	movements: Map<string, Plan["movements"][number]>;
 	onEdit: (movement: Plan["movements"][number]) => void;
 	order: TransactionOrder;
+	showHeaders?: boolean;
 }) {
 	if (!section.transactions.length) {
 		return (
@@ -168,35 +171,19 @@ function MandatorySectionView({
 			<p className="section-note">
 				{section.subtitle} · <strong>{money(section.total)}</strong>
 			</p>
-			<div className="table-scroll">
-				<table className="account-activity-table">
-					<caption className="sr-only">
-						{section.title},{" "}
-						{order === "oldest" ? "oldest first" : "newest first"}
-					</caption>
-					<thead>
-						<tr>
-							<th scope="col" className="transaction-date-column">
-								Date
-							</th>
-							<th scope="col">Transaction</th>
-							<th scope="col" className="transaction-amount-column">
-								Amount
-							</th>
-						</tr>
-					</thead>
-					<tbody>
-						{section.transactions.map((transaction) => (
-							<TransactionRow
-								key={transaction.id}
-								transaction={transaction}
-								movement={movements.get(transaction.movementId) ?? null}
-								onEdit={onEdit}
-							/>
-						))}
-					</tbody>
-				</table>
-			</div>
+			<TransactionTable
+				caption={`${section.title}, ${order === "oldest" ? "oldest first" : "newest first"}`}
+				showHeaders={showHeaders}
+			>
+				{section.transactions.map((transaction) => (
+					<TransactionRow
+						key={transaction.id}
+						transaction={transaction}
+						movement={movements.get(transaction.movementId) ?? null}
+						onEdit={onEdit}
+					/>
+				))}
+			</TransactionTable>
 		</div>
 	);
 }
@@ -285,6 +272,7 @@ export function TimingDetailDialog({
 	onTabChange,
 	transactionOrder,
 	onTransactionOrderChange,
+	showHeaders = false,
 	onClose,
 }: {
 	eyebrow: string;
@@ -329,6 +317,7 @@ export function TimingDetailDialog({
 	onTabChange: (tab: TimingDetailTab) => void;
 	transactionOrder: TransactionOrder;
 	onTransactionOrderChange: (order: TransactionOrder) => void;
+	showHeaders?: boolean;
 	onClose: () => void;
 }) {
 	const movements = useMemo(
@@ -394,6 +383,7 @@ export function TimingDetailDialog({
 							movements={movements}
 							onEdit={(item) => onEdit({ kind: "movement", item })}
 							order={transactionOrder}
+							showHeaders={showHeaders}
 						/>
 						<h3>{nextMonth.title}</h3>
 						<MandatorySectionView
@@ -401,6 +391,7 @@ export function TimingDetailDialog({
 							movements={movements}
 							onEdit={(item) => onEdit({ kind: "movement", item })}
 							order={transactionOrder}
+							showHeaders={showHeaders}
 						/>
 						<p className="section-note">
 							{billsFiltered
@@ -450,37 +441,19 @@ export function TimingDetailDialog({
 									onChange={onTransactionOrderChange}
 								/>
 							</div>
-							<div className="table-scroll">
-								<table className="account-activity-table">
-									<caption className="sr-only">
-										Card charges in this cycle,{" "}
-										{transactionOrder === "oldest"
-											? "oldest first"
-											: "newest first"}
-									</caption>
-									<thead>
-										<tr>
-											<th scope="col" className="transaction-date-column">
-												Date
-											</th>
-											<th scope="col">Transaction</th>
-											<th scope="col" className="transaction-amount-column">
-												Amount
-											</th>
-										</tr>
-									</thead>
-									<tbody>
-										{cycleTransactions.map((transaction) => (
-											<TransactionRow
-												key={transaction.id}
-												transaction={transaction}
-												movement={movements.get(transaction.movementId) ?? null}
-												onEdit={(item) => onEdit({ kind: "movement", item })}
-											/>
-										))}
-									</tbody>
-								</table>
-							</div>
+							<TransactionTable
+								caption={`Card charges in this cycle, ${transactionOrder === "oldest" ? "oldest first" : "newest first"}`}
+								showHeaders={showHeaders}
+							>
+								{cycleTransactions.map((transaction) => (
+									<TransactionRow
+										key={transaction.id}
+										transaction={transaction}
+										movement={movements.get(transaction.movementId) ?? null}
+										onEdit={(item) => onEdit({ kind: "movement", item })}
+									/>
+								))}
+							</TransactionTable>
 						</div>
 					) : (
 						<p>No charges in this cycle yet.</p>
