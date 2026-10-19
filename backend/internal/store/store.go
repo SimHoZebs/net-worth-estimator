@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -79,7 +80,7 @@ type sqliteStore struct {
 	db *sql.DB
 }
 
-const latestSchemaVersion = 10
+const latestSchemaVersion = 12
 
 // ruleMigrationBackupSuffix marks the pre-V7 database copy. V7 splits the
 // postings table into dated postings plus recurrence rules; the copy lets an
@@ -259,6 +260,23 @@ func (s *sqliteStore) migrate() error {
 		}
 		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (10)`); err != nil {
 			return fmt.Errorf("record schema version 10: %w", err)
+		}
+		version = 10
+	}
+	if version < 11 {
+		if err := migrateV11(tx); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (11)`); err != nil {
+			return fmt.Errorf("record schema version 11: %w", err)
+		}
+	}
+	if version < 12 {
+		if err := migrateV12(tx); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO schema_version (version) VALUES (12)`); err != nil {
+			return fmt.Errorf("record schema version 12: %w", err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -510,6 +528,201 @@ func migrateV7(tx *sql.Tx) error {
 		}
 	}
 	return nil
+}
+
+// migrateV11 replaces the posting day string and priority with posted and
+// transaction Unix seconds. Existing days convert to UTC midnight for both
+// times; same-day order then falls back to ID order until entries carry
+// distinct times. IDs are preserved: custom names convert to UUIDs at
+// import and creation time, not by rewriting stored rows.
+func migrateV11(tx *sql.Tx) error {
+	statements := []string{
+		`CREATE TABLE postings_v11 (
+			id TEXT PRIMARY KEY,
+			position INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			source_account_id TEXT,
+			destinations TEXT,
+			amount_json TEXT NOT NULL,
+			posted_time INTEGER NOT NULL,
+			transaction_time INTEGER NOT NULL,
+			claim_rule_id TEXT,
+			claim_occurrence_date TEXT,
+			enabled INTEGER NOT NULL,
+			source TEXT NOT NULL DEFAULT 'model'
+		)`,
+		`INSERT INTO postings_v11 (id, position, name, source_account_id, destinations, amount_json, posted_time, transaction_time, claim_rule_id, claim_occurrence_date, enabled, source)
+		 SELECT id, position, name, source_account_id, destinations, amount_json,
+			COALESCE(CAST(strftime('%s', date) AS INTEGER), 0),
+			COALESCE(CAST(strftime('%s', date) AS INTEGER), 0),
+			claim_rule_id, claim_occurrence_date, enabled, source
+		 FROM postings ORDER BY position`,
+		`DROP TABLE postings`,
+		`ALTER TABLE postings_v11 RENAME TO postings`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("migrate schema version 11: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateV12 removes the rate side columns from recurrence rules. Rate
+// behavior (annual rate, growth, volatility) lives in the amount inputs
+// (occurrence-rate and growth-factor providers), the same descriptors
+// one-time postings use. Column values fold into amount_json:
+// occurrence-rate inputs gain their annualRate/volatility arguments, and a
+// non-zero growth rate becomes an explicit growth-factor input multiplied
+// in the expression. Rates without an occurrence-rate consumer were inert
+// and are dropped.
+func migrateV12(tx *sql.Tx) error {
+	type ruleRow struct {
+		id               string
+		position         int
+		name             string
+		sourceAccountID  any
+		destinations     string
+		amountJSON       string
+		frequency        string
+		annualRate       float64
+		annualGrowthRate float64
+		volatility       float64
+		startDate        string
+		endDate          any
+		annualCap        any
+		priority         int
+		enabled          int
+	}
+	rows, err := tx.Query(`SELECT id, position, name, source_account_id, destinations, amount_json, frequency, annual_rate, annual_growth_rate, volatility, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules ORDER BY position`)
+	if err != nil {
+		return fmt.Errorf("migrate schema version 12 read rules: %w", err)
+	}
+	migrated := []ruleRow{}
+	for rows.Next() {
+		var row ruleRow
+		var sourceAccountID, endDate sql.NullString
+		var annualCap sql.NullFloat64
+		if err := rows.Scan(&row.id, &row.position, &row.name, &sourceAccountID, &row.destinations, &row.amountJSON, &row.frequency, &row.annualRate, &row.annualGrowthRate, &row.volatility, &row.startDate, &endDate, &annualCap, &row.priority, &row.enabled); err != nil {
+			rows.Close()
+			return fmt.Errorf("migrate schema version 12 scan rule: %w", err)
+		}
+		if sourceAccountID.Valid {
+			row.sourceAccountID = sourceAccountID.String
+		}
+		if endDate.Valid {
+			row.endDate = endDate.String
+		}
+		if annualCap.Valid {
+			row.annualCap = annualCap.Float64
+		}
+		rewritten, err := migrateV12Amount(row.amountJSON, row.annualRate, row.annualGrowthRate, row.volatility)
+		if err != nil {
+			rows.Close()
+			return fmt.Errorf("migrate schema version 12 rewrite rule %s: %w", row.id, err)
+		}
+		row.amountJSON = rewritten
+		migrated = append(migrated, row)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("migrate schema version 12 iterate rules: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("migrate schema version 12 close rules: %w", err)
+	}
+	statements := []string{
+		`CREATE TABLE recurrence_rules_v12 (
+			id TEXT PRIMARY KEY,
+			position INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			source_account_id TEXT,
+			destinations TEXT,
+			amount_json TEXT NOT NULL,
+			frequency TEXT NOT NULL,
+			start_date TEXT NOT NULL,
+			end_date TEXT,
+			annual_cap REAL,
+			priority INTEGER NOT NULL,
+			enabled INTEGER NOT NULL
+		)`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("migrate schema version 12: %w", err)
+		}
+	}
+	for _, row := range migrated {
+		if _, err := tx.Exec(
+			`INSERT INTO recurrence_rules_v12 (id, position, name, source_account_id, destinations, amount_json, frequency, start_date, end_date, annual_cap, priority, enabled)
+			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+			row.id, row.position, row.name, row.sourceAccountID, row.destinations, row.amountJSON,
+			row.frequency, row.startDate, row.endDate, row.annualCap, row.priority, row.enabled,
+		); err != nil {
+			return fmt.Errorf("migrate schema version 12 insert rule %s: %w", row.id, err)
+		}
+	}
+	for _, statement := range []string{
+		`DROP TABLE recurrence_rules`,
+		`ALTER TABLE recurrence_rules_v12 RENAME TO recurrence_rules`,
+	} {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("migrate schema version 12: %w", err)
+		}
+	}
+	return nil
+}
+
+// migrateV12Amount folds one rule's column rates into its amount descriptor.
+func migrateV12Amount(amountJSON string, annualRate, annualGrowthRate, volatility float64) (string, error) {
+	var amount types.PostingAmountResolution
+	if err := json.Unmarshal([]byte(amountJSON), &amount); err != nil {
+		return "", err
+	}
+	if amount.Inputs == nil {
+		amount.Inputs = map[string]types.AmountInputBinding{}
+	}
+	for name, binding := range amount.Inputs {
+		if binding.Source != "provider" || binding.Provider != "occurrence-rate" {
+			continue
+		}
+		if binding.Arguments == nil {
+			binding.Arguments = map[string]any{}
+		}
+		if _, ok := binding.Arguments["annualRate"]; !ok {
+			binding.Arguments["annualRate"] = annualRate
+		}
+		if _, ok := binding.Arguments["volatility"]; !ok {
+			binding.Arguments["volatility"] = volatility
+		}
+		amount.Inputs[name] = binding
+	}
+	if annualGrowthRate != 0 && amount.Resolver == "expression" {
+		expression, ok := amount.Config["expression"].(string)
+		if ok {
+			name := "growth"
+			for index := 2; ; index++ {
+				if _, taken := amount.Inputs[name]; !taken {
+					break
+				}
+				name = fmt.Sprintf("growth_%d", index)
+			}
+			amount.Inputs[name] = types.AmountInputBinding{
+				Source:    "provider",
+				Provider:  "growth-factor",
+				Arguments: map[string]any{"annualGrowthRate": annualGrowthRate},
+			}
+			if amount.Config == nil {
+				amount.Config = map[string]any{}
+			}
+			amount.Config["expression"] = "(" + expression + ") * " + name
+		}
+	}
+	rewritten, err := json.Marshal(amount)
+	if err != nil {
+		return "", err
+	}
+	return string(rewritten), nil
 }
 
 // migrateV6 adds the payment-terms table. Terms are owner config keyed by

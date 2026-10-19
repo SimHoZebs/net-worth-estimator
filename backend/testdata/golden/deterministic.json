@@ -50,10 +50,10 @@
           },
           "inputs": {}
         },
-        "priority": 1,
         "enabled": true,
         "id": "historical_checking",
-        "date": "2026-01-31"
+        "postedTime": 1769817600,
+        "transactionTime": 1769817600
       },
       {
         "name": "historical_brokerage",
@@ -68,10 +68,10 @@
           },
           "inputs": {}
         },
-        "priority": 1,
         "enabled": true,
         "id": "historical_brokerage",
-        "date": "2026-01-31"
+        "postedTime": 1769817600,
+        "transactionTime": 1769817600
       },
       {
         "name": "historical_loan",
@@ -84,10 +84,10 @@
           },
           "inputs": {}
         },
-        "priority": 1,
         "enabled": true,
         "id": "historical_loan",
-        "date": "2026-01-31"
+        "postedTime": 1769817600,
+        "transactionTime": 1769817600
       }
     ],
     "recurrenceRules": [
@@ -105,9 +105,6 @@
           "inputs": {}
         },
         "frequency": "monthly",
-        "annualRate": 0,
-        "annualGrowthRate": 0,
-        "volatility": 0,
         "startDate": "2026-02-05",
         "endDate": "2026-02-05",
         "annualCap": null,
@@ -127,9 +124,6 @@
           "inputs": {}
         },
         "frequency": "monthly",
-        "annualRate": 0,
-        "annualGrowthRate": 0,
-        "volatility": 0,
         "startDate": "2026-02-06",
         "endDate": "2026-02-06",
         "annualCap": null,
@@ -151,9 +145,6 @@
           "inputs": {}
         },
         "frequency": "monthly",
-        "annualRate": 0,
-        "annualGrowthRate": 0,
-        "volatility": 0,
         "startDate": "2026-02-10",
         "endDate": "2026-02-10",
         "annualCap": null,
@@ -183,9 +174,6 @@
           }
         },
         "frequency": "monthly",
-        "annualRate": 0,
-        "annualGrowthRate": 0,
-        "volatility": 0,
         "startDate": "2026-02-20",
         "endDate": "2026-02-20",
         "annualCap": null,
@@ -532,9 +520,6 @@
             "inputs": {}
           },
           "frequency": "once",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-01-31",
           "endDate": null,
           "annualCap": null,
@@ -556,9 +541,6 @@
             "inputs": {}
           },
           "frequency": "once",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-01-31",
           "endDate": null,
           "annualCap": null,
@@ -578,9 +560,6 @@
             "inputs": {}
           },
           "frequency": "once",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-01-31",
           "endDate": null,
           "annualCap": null,
@@ -602,9 +581,6 @@
             "inputs": {}
           },
           "frequency": "monthly",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-02-05",
           "endDate": "2026-02-05",
           "annualCap": null,
@@ -624,9 +600,6 @@
             "inputs": {}
           },
           "frequency": "monthly",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-02-06",
           "endDate": "2026-02-06",
           "annualCap": null,
@@ -648,9 +621,6 @@
             "inputs": {}
           },
           "frequency": "monthly",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-02-10",
           "endDate": "2026-02-10",
           "annualCap": null,
@@ -680,9 +650,6 @@
             }
           },
           "frequency": "monthly",
-          "annualRate": 0,
-          "annualGrowthRate": 0,
-          "volatility": 0,
           "startDate": "2026-02-20",
           "endDate": "2026-02-20",
           "annualCap": null,
@@ -1061,7 +1028,6 @@
                     "name": "checking"
                   }
                 ],
-                "priority": 1,
                 "annualCap": null,
                 "requestedAmount": 0,
                 "realizedAmount": 0,
@@ -1082,7 +1048,6 @@
                     "name": "brokerage"
                   }
                 ],
-                "priority": 1,
                 "annualCap": null,
                 "requestedAmount": 0,
                 "realizedAmount": 0,
@@ -1098,7 +1063,6 @@
                 "sourceAccountId": "loan",
                 "sourceAccountLabel": "loan",
                 "destinations": null,
-                "priority": 1,
                 "annualCap": null,
                 "requestedAmount": 0,
                 "realizedAmount": 0,
@@ -1119,7 +1083,6 @@
                     "name": "checking"
                   }
                 ],
-                "priority": 1,
                 "annualCap": null,
                 "requestedAmount": 1000,
                 "realizedAmount": 1000,
@@ -1135,7 +1098,6 @@
                 "sourceAccountId": "checking",
                 "sourceAccountLabel": "checking",
                 "destinations": null,
-                "priority": 1,
                 "annualCap": null,
                 "requestedAmount": 200,
                 "realizedAmount": 200,
@@ -1156,7 +1118,6 @@
                     "name": "brokerage"
                   }
                 ],
-                "priority": 1,
                 "annualCap": null,
                 "requestedAmount": 900,
                 "realizedAmount": 900,
@@ -1177,7 +1138,6 @@
                     "name": "loan"
                   }
                 ],
-                "priority": 2,
                 "annualCap": null,
                 "requestedAmount": 250,
                 "realizedAmount": 250,

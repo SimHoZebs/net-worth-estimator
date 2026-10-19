@@ -78,8 +78,8 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if pending.ID != "sfin-pending-prime_card-pend1" {
 		t.Fatalf("pending id = %q", pending.ID)
 	}
-	if pending.Date != "2026-08-02" {
-		t.Fatalf("pending date = %q, want injected now", pending.Date)
+	if pending.PostedTime != 1785628800 || pending.TransactionTime != 1785628800 {
+		t.Fatalf("pending time = %d/%d, want injected now", pending.PostedTime, pending.TransactionTime)
 	}
 	if pending.Enabled {
 		t.Fatal("pending seed must be disabled")
@@ -104,7 +104,7 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if value, err := strconv.ParseFloat(strings.TrimSpace(expression), 64); err != nil || value != 42.10 {
 		t.Fatalf("pending amount = %+v, want 42.10", pending.Amount)
 	}
-	if pending.Claim != nil || pending.Priority != PendingPriority {
+	if pending.Claim != nil {
 		t.Fatalf("pending shape = %+v", pending)
 	}
 	if plan.Skipped[SkipPosted] != 2 || plan.Skipped[SkipNonCharge] != 1 || plan.Skipped[SkipBadAmount] != 1 {

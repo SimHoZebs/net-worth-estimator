@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -113,6 +115,82 @@ func parseOptionalString(value string) *string {
 	return &text
 }
 
+func isUUID(value string) bool {
+	_, err := uuid.Parse(value)
+	return err == nil
+}
+
+func newUUIDv7() string {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return uuid.NewString()
+	}
+	return id.String()
+}
+
+// parseUnixTime parses required Unix seconds. A legacy YYYY-MM-DD day
+// converts to UTC midnight to ease migration.
+func parseUnixTime(value, fallbackDate string) (int64, error) {
+	if value != "" {
+		parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+		if err != nil || parsed <= 0 {
+			return 0, fmt.Errorf("invalid Unix time %q", value)
+		}
+		return parsed, nil
+	}
+	if fallbackDate != "" {
+		parsed, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(fallbackDate), time.UTC)
+		if err != nil {
+			return 0, fmt.Errorf("invalid date %q", fallbackDate)
+		}
+		stamp := parsed.Unix()
+		if stamp <= 0 {
+			return 0, fmt.Errorf("invalid date %q", fallbackDate)
+		}
+		return stamp, nil
+	}
+	return 0, fmt.Errorf("missing time")
+}
+
+func rewriteAmountInputs(amount *types.PostingAmountResolution, idMap map[string]string) {
+	if amount == nil || len(idMap) == 0 {
+		return
+	}
+	for key, binding := range amount.Inputs {
+		if binding.Arguments == nil {
+			continue
+		}
+		if raw, ok := binding.Arguments["id"].(string); ok {
+			if next, ok := idMap[raw]; ok {
+				binding.Arguments["id"] = next
+				amount.Inputs[key] = binding
+			}
+		}
+	}
+}
+
+func rewriteJSONValue(value any, idMap map[string]string) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, item := range typed {
+			typed[key] = rewriteJSONValue(item, idMap)
+		}
+		return typed
+	case []any:
+		for index, item := range typed {
+			typed[index] = rewriteJSONValue(item, idMap)
+		}
+		return typed
+	case string:
+		if next, ok := idMap[typed]; ok {
+			return next
+		}
+		return typed
+	default:
+		return value
+	}
+}
+
 // ParseNumberValue converts a JSON-decoded number to float64.
 func ParseNumberValue(value any) float64 {
 	number, _ := value.(float64)
@@ -181,32 +259,59 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 	}
 	index = headerIndex(records[0])
 	if _, legacy := index["frequency"]; legacy {
-		return nil, fmt.Errorf("postings.csv uses the legacy frequency column: move repeating rows to recurrence-rules.csv with a date column for one-time rows")
+		return nil, fmt.Errorf("postings.csv uses the legacy frequency column: move repeating rows to recurrence-rules.csv with time columns for one-time rows")
 	}
+	idMap := map[string]string{}
 	for _, record := range records[1:] {
 		if len(strings.Join(record, "")) == 0 {
 			continue
 		}
+		rawID := field(record, index, "id")
+		storedID := rawID
+		if !isUUID(rawID) {
+			storedID = newUUIDv7()
+			if rawID != "" {
+				idMap[rawID] = storedID
+			}
+		}
+		postedTime, err := parseUnixTime(field(record, index, "postedTime"), field(record, index, "date"))
+		if err != nil {
+			return nil, fmt.Errorf("posting %s: %w", rawID, err)
+		}
+		transactionRaw := field(record, index, "transactionTime")
+		var transactionTime int64
+		if transactionRaw != "" {
+			transactionTime, err = parseUnixTime(transactionRaw, "")
+			if err != nil {
+				return nil, fmt.Errorf("posting %s: %w", rawID, err)
+			}
+		} else {
+			transactionTime = postedTime
+		}
 		posting := types.Posting{
-			ID:              field(record, index, "id"),
+			ID:              storedID,
 			Name:            field(record, index, "name"),
 			SourceAccountID: parseOptionalString(field(record, index, "sourceAccountId")),
 			Destinations:    parseDestinations(field(record, index, "destinations")),
-			Date:            field(record, index, "date"),
-			Priority:        int(parseNumberOr(field(record, index, "priority"), 1)),
+			PostedTime:      postedTime,
+			TransactionTime: transactionTime,
 			Enabled:         parseBool(field(record, index, "enabled")),
 		}
 		var amount types.PostingAmountResolution
 		amountRaw := field(record, index, "amount")
 		if err := strictUnmarshal([]byte(amountRaw), &amount); err != nil {
-			return nil, fmt.Errorf("posting %s amount: %w", posting.ID, err)
+			return nil, fmt.Errorf("posting %s amount: %w", rawID, err)
 		}
+		rewriteAmountInputs(&amount, idMap)
 		posting.Amount = amount
 		if ruleID := field(record, index, "ruleId"); ruleID != "" {
 			occurrenceDate := field(record, index, "occurrenceDate")
 			posting.Claim = &types.PostingClaim{RuleID: ruleID, OccurrenceDate: occurrenceDate}
 		}
 		document.Postings = append(document.Postings, posting)
+	}
+	for index := range document.Postings {
+		rewriteAmountInputs(&document.Postings[index].Amount, idMap)
 	}
 
 	records, err = readCSV(filepath.Join(csvPath, RulesFile))
@@ -219,7 +324,6 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 	}
 	if len(records) > 0 {
 		index = headerIndex(records[0])
-		annualRateIndex := index["annualRate"]
 		for _, record := range records[1:] {
 			if len(strings.Join(record, "")) == 0 {
 				continue
@@ -241,11 +345,6 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 				return nil, fmt.Errorf("rule %s amount: %w", rule.ID, err)
 			}
 			rule.Amount = amount
-			if annualRateIndex >= 0 && annualRateIndex < len(record) {
-				rule.AnnualRate = parseNumberOr(record[annualRateIndex], 0)
-			}
-			rule.AnnualGrowthRate = parseNumberOr(field(record, index, "annualGrowthRate"), 0)
-			rule.Volatility = parseNumberOr(field(record, index, "volatility"), 0)
 			rule.AnnualCap = parseOptionalFloat(field(record, index, "annualCap"))
 			document.RecurrenceRules = append(document.RecurrenceRules, rule)
 		}
@@ -262,6 +361,17 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 	}
 	if err := importFulfillmentEvaluations(csvPath, document); err != nil {
 		return nil, err
+	}
+	for index := range document.RecurrenceRules {
+		rewriteAmountInputs(&document.RecurrenceRules[index].Amount, idMap)
+	}
+	if len(idMap) > 0 {
+		for index := range document.Evaluations.FinancialIndependence {
+			document.Evaluations.FinancialIndependence[index].Config = rewriteJSONValue(document.Evaluations.FinancialIndependence[index].Config, idMap)
+		}
+		for index := range document.Evaluations.PostingFulfillment {
+			document.Evaluations.PostingFulfillment[index].Config = rewriteJSONValue(document.Evaluations.PostingFulfillment[index].Config, idMap)
+		}
 	}
 	return document, nil
 }

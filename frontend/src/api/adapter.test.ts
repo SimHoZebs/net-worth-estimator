@@ -63,13 +63,16 @@ function documentFixture(): FinancialModelDocument {
 				destinations: ["cash"],
 				amount: {
 					resolver: "expression",
-					config: { expression: "250" },
-					inputs: {},
+					config: { expression: "(250) * growth" },
+					inputs: {
+						growth: {
+							source: "provider",
+							provider: "growth-factor",
+							arguments: { annualGrowthRate: 0.02 },
+						},
+					},
 				},
 				frequency: "monthly",
-				annualRate: 0,
-				annualGrowthRate: 0.02,
-				volatility: 0.1,
 				startDate: "2026-02-05",
 				endDate: null,
 				annualCap: null,
@@ -105,13 +108,29 @@ function projectionFixture(): ProjectionResult {
 	};
 }
 
+function projectionWithSalaryEvent(requestedAmount: number): ProjectionResult {
+	return {
+		...projectionFixture(),
+		movementEvents: [
+			{
+				date: "2026-02-05",
+				sequence: 0,
+				origin: { type: "posting", postingId: "salary" },
+				requestedAmount,
+				realizedAmount: requestedAmount,
+				accountDeltas: null,
+			},
+		],
+	};
+}
+
 describe("backend and display plan adapter", () => {
 	it("uses the latest checkpoint at or before projection start and maps bounds, postings, and evaluations", () => {
 		const document = documentFixture();
 		const conversion = backendToDisplayPlan({
 			document,
 			status: { readOnly: false, authEnabled: true },
-			projection: projectionFixture(),
+			projection: projectionWithSalaryEvent(250),
 		});
 
 		expect(conversion.plan.startDate).toBe("2026-02-01");
@@ -139,9 +158,6 @@ describe("backend and display plan adapter", () => {
 		]);
 		expect(conversion.report.provisionalFields).toContain(
 			"accounts.0.minBalance",
-		);
-		expect(conversion.report.provisionalFields).toContain(
-			"movements.0.metadata",
 		);
 	});
 
@@ -182,9 +198,9 @@ describe("backend and display plan adapter", () => {
 					config: { expression: "250" },
 					inputs: {},
 				},
-				date: "2026-01-01",
+				postedTime: 1767225600,
+				transactionTime: 1767225600,
 				claim: null,
-				priority: 3,
 				enabled: true,
 			},
 		];
@@ -206,7 +222,8 @@ describe("backend and display plan adapter", () => {
 			{
 				...past.postings[0]!,
 				id: "future-bonus",
-				date: "2026-06-01",
+				postedTime: 1780272000,
+				transactionTime: 1780272000,
 			},
 		];
 		const futureConversion = backendToDisplayPlan({
@@ -257,7 +274,7 @@ describe("backend and display plan adapter", () => {
 		const conversion = backendToDisplayPlan({
 			document,
 			status: { readOnly: false, authEnabled: false },
-			projection: projectionFixture(),
+			projection: projectionWithSalaryEvent(250),
 			startDate: "2026-02-01",
 		});
 		const reverse = displayPlanToBackendDocument(conversion.plan, {
@@ -279,13 +296,20 @@ describe("backend and display plan adapter", () => {
 		expect(amountEdit.report.losses).toEqual([]);
 		expect(amountEdit.document.recurrenceRules[0]?.amount).toEqual({
 			resolver: "expression",
-			config: { expression: "300" },
-			inputs: {},
+			config: { expression: "(300) * growth" },
+			inputs: {
+				growth: {
+					source: "provider",
+					provider: "growth-factor",
+					arguments: { annualGrowthRate: 0.02 },
+				},
+			},
 		});
 		const reloaded = backendToDisplayPlan({
 			document: amountEdit.document,
 			status: { readOnly: false, authEnabled: false },
 			presentation: conversion.presentation,
+			projection: projectionWithSalaryEvent(300),
 		});
 		expect(reloaded.presentation.movements.salary?.amountValue).toBe(300);
 	});
@@ -303,9 +327,9 @@ describe("backend and display plan adapter", () => {
 					config: { expression: "950" },
 					inputs: {},
 				},
-				date: "2026-02-05",
+				postedTime: 1770249600,
+				transactionTime: 1770249600,
 				claim: { ruleId: "salary", occurrenceDate: "2026-02-05" },
-				priority: 1,
 				enabled: true,
 			},
 		];

@@ -329,7 +329,6 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 				"sourceAccountId":          posting.SourceAccountID,
 				"sourceAccountLabel":       sourceLabel,
 				"destinations":             destinations,
-				"priority":                 posting.Priority,
 				"annualCap":                annualCap,
 				"requestedAmount":          roundAmount(totals.requestedAmount),
 				"realizedAmount":           roundAmount(totals.realizedAmount),

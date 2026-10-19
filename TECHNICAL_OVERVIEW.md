@@ -272,11 +272,13 @@ Accounts are ordered rows with a unique ID, label, bounds, optional color, and e
 
 ### Posting and recurrence-rule structure
 
-Postings are pure dated movements: one record of money moved on one `date`.
-Repetition is owned by recurrence rules, which expand into occurrences at
-projection time. A posting with a `claim` (`ruleId` plus `occurrenceDate`,
-both set manually) records the actual for one scheduled occurrence; history
-replays the actual and skips the generated occurrence.
+Postings are single timed movements: one record of money moved, carrying
+posted time (when the bank posts it) and transaction time (when the money
+moves), both Unix seconds. Repetition is owned by recurrence rules, which
+expand into occurrences at projection time. A posting with a `claim`
+(`ruleId` plus `occurrenceDate`, both set manually) records the actual for
+one scheduled occurrence; history replays the actual and skips the generated
+occurrence.
 
 Posting and rule behavior is selected only by source and destination presence:
 
@@ -286,7 +288,12 @@ Posting and rule behavior is selected only by source and destination presence:
 | present | absent | external outflow |
 | present | present | account-to-account transfer |
 
-`enabled` controls participation. `priority` controls same-date order. A resolution sequence breaks priority ties.
+`enabled` controls participation. One-time postings carry posted and
+transaction Unix times and always execute before scheduled rule
+occurrences on the same day, ordered by transaction time, then posted
+time, then ID. Rules carry `priority`, which orders rule occurrences
+after all one-time postings on the same day; declaration sequence breaks
+priority ties.
 
 A rule occurrence executes exactly on its scheduled date. Schedules use 365-day years, 52-week years, and clamped calendar-month/year addition.
 
@@ -307,7 +314,7 @@ Current general resolvers:
 
 - `expression`.
 
-`expression` can use rule annual rate, annual growth, and sampled annual volatility. Posting references (`model-value`) may name posting or rule IDs; a rule reference resolves to its latest realized occurrence.
+`expression` amounts carry rate behavior in their inputs: the `occurrence-rate` provider resolves the annual rate (sampled per projection year when volatile) divided by the frequency divisor, and the `growth-factor` provider resolves the compounding factor from the rule start date. One-time and recurring movements resolve through the same path. Posting references (`model-value`) may name posting or rule IDs; a rule reference resolves to its latest realized occurrence.
 
 The `income` resolver is an ordered pipeline like any other resolver. It reads the effective income source for the occurrence date, executes configured resolver steps, routes configured outputs, and deposits the remaining net cash into rule or posting destinations. Income rules and postings validate alike: a source account contradicts the inflow shape, at least one destination is required, and rule annual caps bound net cash deposited per calendar year while step splits carry their own resolver-level caps. Rule instances divide annual figures by their rule's frequency; manual postings resolve the whole annual figure at once.
 
@@ -359,7 +366,7 @@ Historical preparation uses the same `TransitionRuntime` as projection execution
 - Without a start-date checkpoint, projection includes start-date occurrences.
 - With a start-date checkpoint, projection excludes start-date occurrences.
 - Historical dates execute in ascending calendar order.
-- Same-date movements execute by ascending priority, then resolution sequence.
+- Same-date movements execute one-time postings first (by transaction time, posted time, then ID), then rule occurrences by ascending priority and resolution sequence.
 - Checkpoints execute after same-date postings and overwrite only their account balance.
 
 Each historical correction records observed balance, modeled balance, and adjustment. Historical rows carry no projected movement totals. Replay still updates balances, latest realized posting amounts, and annual-cap state for later projection and amount providers.
@@ -451,7 +458,7 @@ A residual below 0.5 is not reportable. Deterministic output includes first unde
 
 1. prepares and runs the deterministic baseline;
 2. evaluates deterministic baseline evaluations in summary mode;
-3. counts required annual rates per rule from enabled occurrences and horizon;
+3. counts required annual rates per volatile amount from enabled occurrences and horizon;
 4. creates annual-rate samples for each run;
 5. simulates sample paths on a worker pool sized to available CPUs;
 6. consumes completed paths in submission order;

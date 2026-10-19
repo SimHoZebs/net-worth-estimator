@@ -29,10 +29,10 @@ func claimTestDocument() *types.FinancialModelDocument {
 					Resolver: "expression",
 					Config:   map[string]any{"expression": "950"},
 				},
-				Date:     "2026-02-05",
-				Claim:    &types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-02-01"},
-				Priority: 1,
-				Enabled:  true,
+				PostedTime: 1770249600, TransactionTime: 1770249600,
+				Claim: &types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-02-01"},
+
+				Enabled: true,
 			},
 		},
 		RecurrenceRules: []types.RecurrenceRule{

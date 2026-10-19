@@ -153,13 +153,11 @@ func (t *TransitionRuntime) applyAndCollectDeltas(result AccountMovementResult, 
 func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, date string) (PostingExecutionTransition, error) {
 	posting := occurrence.Posting
 	// Rate behavior (volatility sampling, annual caps) belongs to rules.
-	// Manual postings execute literally; only rule instances sample and
-	// only rules carry caps.
+	// Manual postings execute literally unless their amount carries a
+	// volatile occurrence-rate input; only rules carry caps.
 	var ruleAnnualCap *float64
-	volatility := 0.0
 	if occurrence.Rule != nil {
 		ruleAnnualCap = occurrence.Rule.AnnualCap
-		volatility = occurrence.Rule.Volatility
 	}
 	if posting.Amount.Resolver == "income" {
 		config, err := t.incomeConfig(posting)
@@ -193,7 +191,11 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 	}
 	yearIndex := ProjectionYearIndex(t.projectionStart, date)
 	var sampledRate *float64
-	if volatility > 0 && t.monteCarloSample != nil {
+	// Sampling is coordinator-owned: volatile amounts look up their
+	// movement's pre-sampled annual rate for this projection year.
+	// Providers never draw RNG; a missing entry for a volatile movement
+	// is a preparation defect, not a fresh draw.
+	if _, volatile := VolatileRateInputOf(posting.Amount); volatile && t.monteCarloSample != nil {
 		rates, ok := t.monteCarloSample.AnnualRatesByPostingID[posting.ID]
 		if !ok || yearIndex >= len(rates) {
 			return PostingExecutionTransition{}, fmt.Errorf(

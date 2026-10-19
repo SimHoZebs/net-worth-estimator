@@ -190,24 +190,26 @@ type PostingClaim struct {
 	// manually, never inferred.
 	RuleID string `json:"ruleId"`
 	// OccurrenceDate is the scheduled occurrence this posting replaces.
-	// It is independent of Date, so an early or late actual can still
-	// claim its occurrence.
+	// It is independent of posted and transaction times, so an early or
+	// late actual can still claim its occurrence.
 	OccurrenceDate IsoDate `json:"occurrenceDate"`
 }
 
-// Posting is a pure dated movement: a single record of money moved on one
-// date. Postings never repeat; repetition is owned by RecurrenceRule, which
-// expands into occurrences at projection time. A posting with a Claim is an
-// actual recorded against one scheduled occurrence of its rule.
+// Posting is a single movement with two times: posted time is when the
+// bank posts it, transaction time is when the money moves. Both are Unix
+// seconds. The UTC day of transaction time groups the movement. Postings
+// never repeat; repetition is owned by RecurrenceRule, which expands into
+// occurrences at projection time. A posting with a Claim is an actual
+// recorded against one scheduled occurrence of its rule.
 type Posting struct {
 	ID              string                  `json:"id"`
 	Name            string                  `json:"name"`
 	SourceAccountID *string                 `json:"sourceAccountId"`
 	Destinations    []string                `json:"destinations"`
 	Amount          PostingAmountResolution `json:"amount"`
-	Date            IsoDate                 `json:"date"`
+	PostedTime      int64                   `json:"postedTime"`
+	TransactionTime int64                   `json:"transactionTime"`
 	Claim           *PostingClaim           `json:"claim,omitempty"`
-	Priority        int                     `json:"priority"`
 	Enabled         bool                    `json:"enabled"`
 	// Source names the row owner: "model" (owner/seed) or "simplefin".
 	// Read-only on GET; PUT ignores it (server recomputes ownership).
@@ -217,22 +219,22 @@ type Posting struct {
 // RecurrenceRule owns repetition. Its movement fields are the template
 // expanded into one occurrence per scheduled date; its schedule fields say
 // when. Rules never move money themselves; expansion at projection time
-// produces occurrences that execute exactly like postings.
+// produces occurrences that execute exactly like postings. Rate behavior
+// (occurrence-rate, growth-factor, volatility) lives in the amount inputs,
+// the same descriptors one-time postings use; the rule contributes only
+// schedule context (frequency divisor, start date).
 type RecurrenceRule struct {
-	ID               string                  `json:"id"`
-	Name             string                  `json:"name"`
-	SourceAccountID  *string                 `json:"sourceAccountId"`
-	Destinations     []string                `json:"destinations"`
-	Amount           PostingAmountResolution `json:"amount"`
-	Frequency        RecurrenceFrequency     `json:"frequency"`
-	AnnualRate       float64                 `json:"annualRate"`
-	AnnualGrowthRate float64                 `json:"annualGrowthRate"`
-	Volatility       float64                 `json:"volatility"`
-	StartDate        IsoDate                 `json:"startDate"`
-	EndDate          *IsoDate                `json:"endDate"`
-	AnnualCap        *float64                `json:"annualCap"`
-	Priority         int                     `json:"priority"`
-	Enabled          bool                    `json:"enabled"`
+	ID              string                  `json:"id"`
+	Name            string                  `json:"name"`
+	SourceAccountID *string                 `json:"sourceAccountId"`
+	Destinations    []string                `json:"destinations"`
+	Amount          PostingAmountResolution `json:"amount"`
+	Frequency       RecurrenceFrequency     `json:"frequency"`
+	StartDate       IsoDate                 `json:"startDate"`
+	EndDate         *IsoDate                `json:"endDate"`
+	AnnualCap       *float64                `json:"annualCap"`
+	Priority        int                     `json:"priority"`
+	Enabled         bool                    `json:"enabled"`
 }
 
 type FinancialModelDocument struct {

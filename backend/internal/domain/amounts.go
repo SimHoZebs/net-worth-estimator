@@ -28,7 +28,17 @@ type AmountProviderContext struct {
 	RealizedPostingAmountsByYear map[string]map[string]float64
 	PaymentTerms                 map[string]types.PaymentTerms
 	Date                         string
-	OccurrenceRate               float64
+	// FrequencyDivisor converts an annual rate to a per-occurrence rate.
+	// Rules carry their frequency divisor; manual postings use 1.
+	FrequencyDivisor int
+	// RuleStartDate is the owning rule's start date, or "" for manual
+	// postings. It anchors the growth-factor provider.
+	RuleStartDate string
+	// SampledAnnualRate is the pre-sampled annual rate for this movement
+	// in this projection year, or nil when the movement is not sampled
+	// (deterministic runs and non-volatile amounts). Sampling stays
+	// coordinator-owned; providers only look the value up.
+	SampledAnnualRate *float64
 }
 
 // AmountReferenceContext validates ID references during validation.
@@ -62,16 +72,51 @@ func validateIDArgument(args map[string]types.JsonValue) (string, error) {
 	return id, nil
 }
 
+// argFloat reads a finite-number argument. Required arguments must be
+// present; optional ones fall back to fallback when absent.
+func argFloat(args map[string]types.JsonValue, key string, required bool, fallback float64) (float64, error) {
+	raw, ok := args[key]
+	if !ok {
+		if required {
+			return 0, amtErrf("Amount provider argument '%s' must be a finite number.", key)
+		}
+		return fallback, nil
+	}
+	value, ok := raw.(float64)
+	if !ok || math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, amtErrf("Amount provider argument '%s' must be a finite number.", key)
+	}
+	return value, nil
+}
+
+// validateRateArgs checks the shared occurrence-rate argument shape:
+// a finite annualRate plus a finite volatility at or above zero.
+func validateRateArgs(args map[string]types.JsonValue) (float64, float64, error) {
+	annualRate, err := argFloat(args, "annualRate", true, 0)
+	if err != nil {
+		return 0, 0, err
+	}
+	volatility, err := argFloat(args, "volatility", false, 0)
+	if err != nil {
+		return 0, 0, err
+	}
+	if volatility < 0 {
+		return 0, 0, amtErrf("Amount provider argument 'volatility' must be at or above zero.")
+	}
+	return annualRate, volatility, nil
+}
+
 // Design: accounts stay dumb, movements carry behavior. Accounts expose
 // only floor/ceiling/withdrawable/headroom (see accounts.go). Fees and
 // minimums live in PaymentTerms plus the providers below, and a posting or
 // rule reads them to move money. Terms declare what is owed; an enabled
 // movement behind them moves it.
 //
-// Live plan uses: model-value, account-balance, occurrence-rate with the
-// expression resolver. Debt feature (tested, unused in seed CSVs): terms-minimum,
-// late-fee, balance-fee. Income pipeline in income.go has its own
-// percentage/progressive-bracket steps; there are no other generic resolvers.
+// Live plan uses: model-value, account-balance, occurrence-rate and
+// growth-factor with the expression resolver. Debt feature (tested, unused
+// in seed CSVs): terms-minimum, late-fee, balance-fee. Income pipeline in
+// income.go has its own percentage/progressive-bracket steps; there are no
+// other generic resolvers.
 var amountProviders = map[string]providerDefinition{
 	"model-value": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
@@ -117,8 +162,54 @@ var amountProviders = map[string]providerDefinition{
 		},
 	},
 	"occurrence-rate": {
-		resolve: func(_ map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
-			return ctx.OccurrenceRate, nil
+		// occurrence-rate carries a movement's rate behavior: the annual
+		// rate plus the volatility sampled per projection year. The
+		// divisor comes from context (rule frequency, 1 for manuals) and
+		// the sampled annual rate arrives pre-sampled from the stochastic
+		// coordinator; providers never draw RNG themselves.
+		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
+			annualRate, volatility, err := validateRateArgs(args)
+			if err != nil {
+				return 0, err
+			}
+			effective := annualRate
+			if volatility > 0 && ctx.SampledAnnualRate != nil {
+				effective = *ctx.SampledAnnualRate
+			}
+			divisor := ctx.FrequencyDivisor
+			if divisor <= 0 {
+				divisor = 1
+			}
+			return effective / float64(divisor), nil
+		},
+		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
+			_, _, err := validateRateArgs(args)
+			return err
+		},
+	},
+	// growth-factor resolves the compounding factor for a movement's
+	// annual growth rate over the days from the rule start date to the
+	// occurrence date. Expressions multiply it explicitly, so one-time
+	// and recurring movements resolve through the same path. Manual
+	// postings have no start date and resolve 1.
+	"growth-factor": {
+		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
+			annualGrowthRate, err := argFloat(args, "annualGrowthRate", true, 0)
+			if err != nil {
+				return 0, err
+			}
+			if annualGrowthRate == 0 || ctx.RuleStartDate == "" || ctx.Date == "" {
+				return 1, nil
+			}
+			daysElapsed := DaysBetween(ctx.RuleStartDate, ctx.Date)
+			if daysElapsed <= 0 {
+				return 1, nil
+			}
+			return math.Pow(1+annualGrowthRate, float64(daysElapsed)/365), nil
+		},
+		validateReferences: func(args map[string]types.JsonValue, refs *AmountReferenceContext) error {
+			_, err := argFloat(args, "annualGrowthRate", true, 0)
+			return err
 		},
 	},
 	// terms-minimum resolves a payment-terms minimum for one account: the
@@ -264,6 +355,69 @@ func termsMinimum(terms types.PaymentTerms, balance float64) float64 {
 		minimum = math.Max(minimum, percent*math.Abs(balance))
 	}
 	return minimum
+}
+
+// VolatileRateParams is one movement's stochastic sampling configuration:
+// the annual rate and volatility of its single volatile occurrence-rate
+// input. Movements carry at most one volatile input; every volatile input
+// in a movement shares the movement's one pre-sampled annual rate, exactly
+// like the former one-rate-per-rule columns.
+type VolatileRateParams struct {
+	AnnualRate float64
+	Volatility float64
+}
+
+// VolatileRateInputOf scans an amount descriptor for occurrence-rate inputs
+// in sorted input-name order and returns the sampling parameters. Movements
+// without a volatile input report found=false. Malformed arguments also
+// report found=false here; ValidateAmountDescriptor reports them.
+func VolatileRateInputOf(amount types.PostingAmountResolution) (params VolatileRateParams, found bool) {
+	names := make([]string, 0, len(amount.Inputs))
+	for name := range amount.Inputs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		binding := amount.Inputs[name]
+		if binding.Source != "provider" || binding.Provider != "occurrence-rate" {
+			continue
+		}
+		annualRate, volatility, err := validateRateArgs(binding.Arguments)
+		if err != nil {
+			continue
+		}
+		if volatility <= 0 {
+			continue
+		}
+		if found {
+			// Multiple volatile inputs: validation reports it; discovery
+			// keeps the first in sorted order for a stable error path.
+			continue
+		}
+		params = VolatileRateParams{AnnualRate: annualRate, Volatility: volatility}
+		found = true
+	}
+	return params, found
+}
+
+// CountVolatileRateInputs reports how many occurrence-rate inputs in an
+// amount descriptor carry volatility above zero. Validation rejects more
+// than one: one movement shares one pre-sampled annual rate.
+func CountVolatileRateInputs(amount types.PostingAmountResolution) int {
+	count := 0
+	for _, binding := range amount.Inputs {
+		if binding.Source != "provider" || binding.Provider != "occurrence-rate" {
+			continue
+		}
+		_, volatility, err := validateRateArgs(binding.Arguments)
+		if err != nil {
+			continue
+		}
+		if volatility > 0 {
+			count++
+		}
+	}
+	return count
 }
 
 type resolverDefinition struct {

@@ -143,11 +143,7 @@ export function RecurringRules({
 		const server = serverRules.get(movement.id);
 		const backendFrequency =
 			stored?.frequency ?? server?.frequency ?? movement.frequency;
-		const priority =
-			stored?.priority ??
-			server?.priority ??
-			globalRecurring.findIndex((item) => item.id === movement.id) + 1;
-		return { backendFrequency, priority };
+		return { backendFrequency };
 	};
 
 	const persistOrder = (orderedIds: string[]) => {
@@ -239,7 +235,7 @@ export function RecurringRules({
 		compact: boolean,
 	) => {
 		const direction = directionFor(movement, account.id);
-		const { backendFrequency, priority } = detailFor(movement);
+		const { backendFrequency } = detailFor(movement);
 		const DirectionIcon =
 			direction === "transfer"
 				? ArrowRightLeft
@@ -260,8 +256,7 @@ export function RecurringRules({
 					<strong>{movement.name}</strong>
 					<span>
 						{directionLabel(direction)} · {frequencyLabel(backendFrequency)} ·{" "}
-						{movement.amountKnown ? money(movement.amount) : "Varies"} ·
-						Priority {priority}
+						{movement.amountKnown ? money(movement.amount) : "Varies"}
 					</span>
 					{!movement.enabled && (
 						<span className="transaction-badges">

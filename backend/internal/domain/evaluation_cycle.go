@@ -132,14 +132,18 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 		if !ok || !accountSet[sourceAccount] {
 			continue
 		}
-		if CompareIsoDates(posting.Date, cycleStart) < 0 || CompareIsoDates(posting.Date, projectionStart) > 0 {
+		day := postingDay(posting)
+		if day == "" {
 			continue
 		}
-		if posting.Date == projectionStart && startDateEvents[posting.ID] {
+		if CompareIsoDates(day, cycleStart) < 0 || CompareIsoDates(day, projectionStart) > 0 {
+			continue
+		}
+		if day == projectionStart && startDateEvents[posting.ID] {
 			continue
 		}
 		if byYear, ok := path.ProjectionStartPostingState.RealizedPostingAmountsByYear[posting.ID]; ok {
-			recorded += maxFloat(0, byYear[posting.Date[:4]])
+			recorded += maxFloat(0, byYear[day[:4]])
 		}
 	}
 	scheduled := 0.0

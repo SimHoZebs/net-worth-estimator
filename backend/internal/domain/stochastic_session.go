@@ -53,42 +53,90 @@ type stochasticSession struct {
 	onProgress              StochasticProgressCallback
 }
 
-func buildSampleCountsByPostingId(rules []types.RecurrenceRule, horizonYears int, startDate, endDate string, includeStartDateEvents bool) map[string]int {
+func buildSampleCountsByPostingId(rules []types.RecurrenceRule, postings []types.Posting, horizonYears int, startDate, endDate string, includeStartDateEvents bool) map[string]int {
 	sampleCounts := map[string]int{}
+	// Rules first in stored order, then manual postings: the LCG is
+	// order-sensitive, so discovery order is part of the seeded contract.
+	// Existing models carry volatility on rules only; manuals without a
+	// volatile occurrence-rate input change nothing.
 	for _, rule := range rules {
-		if rule.Enabled && rule.Volatility > 0 {
+		if params, ok := VolatileRateInputOf(rule.Amount); ok && rule.Enabled && params.Volatility > 0 {
+			_ = params
 			sampleCounts[rule.ID] = horizonYears
 		}
 	}
-	// Manual postings never sample: volatility lives on rules.
-	resolved := ResolveOccurrences(rules, nil, startDate, endDate, includeStartDateEvents)
+	for _, posting := range postings {
+		if params, ok := VolatileRateInputOf(posting.Amount); ok && posting.Enabled && params.Volatility > 0 {
+			_ = params
+			if _, exists := sampleCounts[posting.ID]; !exists {
+				sampleCounts[posting.ID] = horizonYears
+			}
+		}
+	}
+	// Occurrence dates extend short horizons: a movement executing in
+	// projection year N needs at least N+1 samples.
+	resolved := ResolveOccurrences(rules, postings, startDate, endDate, includeStartDateEvents)
 	for date, occurrences := range resolved.ByDate {
 		requiredCount := ProjectionYearIndex(startDate, date) + 1
 		for _, occurrence := range occurrences {
-			if occurrence.Rule == nil || occurrence.Rule.Volatility <= 0 {
+			if _, ok := VolatileRateInputOf(occurrence.Posting.Amount); !ok {
 				continue
 			}
-			if current, ok := sampleCounts[occurrence.Rule.ID]; !ok || requiredCount > current {
-				sampleCounts[occurrence.Rule.ID] = requiredCount
+			if current, ok := sampleCounts[occurrence.Posting.ID]; !ok || requiredCount > current {
+				sampleCounts[occurrence.Posting.ID] = requiredCount
 			}
 		}
 	}
 	return sampleCounts
 }
 
-func buildStochasticRates(rules []types.RecurrenceRule, sampleCounts map[string]int, sampler StochasticSampler) map[string][]float64 {
-	rates := map[string][]float64{}
+// samplingParamsByID indexes volatile sampling parameters by movement ID:
+// rules in stored order, then manual postings. The sampler draws in this
+// order, so iteration order is part of the seeded contract.
+func samplingParamsByID(rules []types.RecurrenceRule, postings []types.Posting) []struct {
+	id     string
+	params VolatileRateParams
+} {
+	var ordered []struct {
+		id     string
+		params VolatileRateParams
+	}
 	for index := range rules {
 		rule := &rules[index]
-		if rule.Volatility <= 0 || !rule.Enabled {
+		if !rule.Enabled {
 			continue
 		}
-		count := sampleCounts[rule.ID]
+		if params, ok := VolatileRateInputOf(rule.Amount); ok {
+			ordered = append(ordered, struct {
+				id     string
+				params VolatileRateParams
+			}{id: rule.ID, params: params})
+		}
+	}
+	for index := range postings {
+		posting := &postings[index]
+		if !posting.Enabled {
+			continue
+		}
+		if params, ok := VolatileRateInputOf(posting.Amount); ok {
+			ordered = append(ordered, struct {
+				id     string
+				params VolatileRateParams
+			}{id: posting.ID, params: params})
+		}
+	}
+	return ordered
+}
+
+func buildStochasticRates(rules []types.RecurrenceRule, postings []types.Posting, sampleCounts map[string]int, sampler StochasticSampler) map[string][]float64 {
+	rates := map[string][]float64{}
+	for _, entry := range samplingParamsByID(rules, postings) {
+		count := sampleCounts[entry.id]
 		samples := make([]float64, count)
 		for i := 0; i < count; i++ {
-			samples[i] = sampler(rule.AnnualRate, rule.Volatility)
+			samples[i] = sampler(entry.params.AnnualRate, entry.params.Volatility)
 		}
-		rates[rule.ID] = samples
+		rates[entry.id] = samples
 	}
 	return rates
 }
@@ -126,6 +174,7 @@ func newStochasticSession(document *types.FinancialModelDocument, settings *type
 
 	session.sampleCountsByPostingID = buildSampleCountsByPostingId(
 		prepared.Request.Model.RecurrenceRules,
+		prepared.Request.Model.Postings,
 		settings.HorizonYears,
 		prepared.Request.StartDate,
 		prepared.Request.EndDate,
@@ -160,7 +209,7 @@ func newStochasticSession(document *types.FinancialModelDocument, settings *type
 
 func (s *stochasticSession) createSample() *types.MonteCarloSample {
 	return &types.MonteCarloSample{
-		AnnualRatesByPostingID: buildStochasticRates(s.prepared.Request.Model.RecurrenceRules, s.sampleCountsByPostingID, s.sampler),
+		AnnualRatesByPostingID: buildStochasticRates(s.prepared.Request.Model.RecurrenceRules, s.prepared.Request.Model.Postings, s.sampleCountsByPostingID, s.sampler),
 	}
 }
 

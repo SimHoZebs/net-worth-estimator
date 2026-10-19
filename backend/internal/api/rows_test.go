@@ -69,7 +69,7 @@ func TestRowWriteValidationRejectsDanglingReference(t *testing.T) {
 	handler := New(database, Config{})
 
 	response := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
-		`{"name":"Ghost","sourceAccountId":"ghost","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"date":"2026-08-01","priority":1,"enabled":true}`)
+		`{"name":"Ghost","sourceAccountId":"ghost","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true}`)
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, body %s", response.Code, response.Body.String())
 	}

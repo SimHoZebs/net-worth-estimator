@@ -16,9 +16,8 @@ func testPostingFixture(id string) types.Posting {
 		Name:            "Posting " + id,
 		SourceAccountID: &source,
 		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
-		Date:            "2026-07-02",
-		Priority:        3,
-		Enabled:         true,
+		PostedTime:      1782950400, TransactionTime: 1782950400,
+		Enabled: true,
 	}
 }
 
@@ -29,7 +28,6 @@ func testRuleFixture(id string) types.RecurrenceRule {
 		Frequency: types.FrequencyMonthly,
 		Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		StartDate: "2026-01-01",
-		Priority:  3,
 		Enabled:   true,
 	}
 }

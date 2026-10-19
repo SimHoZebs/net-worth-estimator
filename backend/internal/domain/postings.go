@@ -23,37 +23,23 @@ type AccountMovementResult struct {
 	RealizedAmount  float64
 }
 
-// ApplyAnnualGrowth compounds an amount over elapsed days at an annual rate.
-func ApplyAnnualGrowth(amount, annualGrowthRate float64, daysElapsed int) float64 {
-	if amount == 0 || annualGrowthRate == 0 || daysElapsed <= 0 {
-		return amount
-	}
-	return amount * math.Pow(1+annualGrowthRate, float64(daysElapsed)/365)
-}
-
 // ComputeRequestedAmount resolves the raw posting amount for one occurrence.
-// Rule-generated instances compound the rule's schedule: the per-occurrence
-// rate derives from the rule's annual rate and frequency, and expression
-// amounts grow from the rule's start date. Manual postings carry no rates,
-// so their resolved amount stands as authored.
+// One-time and rule-generated movements resolve through the same amount
+// descriptor path: rate, growth, and volatility live in the amount inputs
+// (occurrence-rate and growth-factor providers), never in side columns.
+// Rule schedule context (frequency divisor, start date, pre-sampled rate)
+// arrives through AmountProviderContext; manual postings use divisor 1,
+// no start date, and no sample.
 func ComputeRequestedAmount(occurrence DatedPostingOccurrence, currentDate string, latestRealized map[string]float64, realizedDates map[string]string, realizedByYear map[string]map[string]float64, balances map[string]float64, paymentTerms map[string]types.PaymentTerms, stochasticRate *float64) (float64, error) {
 	posting := occurrence.Posting
-	daysElapsed := 0
-	annualGrowthRate := 0.0
-	ratePerOccurrence := 0.0
+	divisor := 1
+	startDate := ""
 	if occurrence.Rule != nil {
-		daysElapsed = DaysBetween(occurrence.Rule.StartDate, currentDate)
-		effectiveAnnualRate := occurrence.Rule.AnnualRate
-		if stochasticRate != nil {
-			effectiveAnnualRate = *stochasticRate
-		}
-		if occurrence.Rule.AnnualRate != 0 {
-			ratePerOccurrence = effectiveAnnualRate / float64(FrequencyDivisor(occurrence.Rule.Frequency))
-		}
-		annualGrowthRate = occurrence.Rule.AnnualGrowthRate
+		divisor = FrequencyDivisor(occurrence.Rule.Frequency)
+		startDate = occurrence.Rule.StartDate
 	}
-	// Manual postings carry no rates: stochastic sampling only produces
-	// rates for volatile rules, so a nil rule always resolves literally.
+	// Manual postings carry no schedule: stochastic sampling only produces
+	// rates for volatile amounts, so a nil sample always resolves literally.
 	rawAmount, err := ResolvePostingAmountDescriptor(posting.Amount, &AmountProviderContext{
 		Balances:                     balances,
 		LatestRealizedPostingAmounts: latestRealized,
@@ -61,13 +47,12 @@ func ComputeRequestedAmount(occurrence DatedPostingOccurrence, currentDate strin
 		RealizedPostingAmountsByYear: realizedByYear,
 		PaymentTerms:                 paymentTerms,
 		Date:                         currentDate,
-		OccurrenceRate:               ratePerOccurrence,
+		FrequencyDivisor:             divisor,
+		RuleStartDate:                startDate,
+		SampledAnnualRate:            stochasticRate,
 	})
 	if err != nil {
 		return 0, err
-	}
-	if posting.Amount.Resolver == "expression" {
-		rawAmount = ApplyAnnualGrowth(rawAmount, annualGrowthRate, daysElapsed)
 	}
 	return rawAmount, nil
 }

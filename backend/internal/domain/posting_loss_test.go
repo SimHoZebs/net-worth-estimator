@@ -33,15 +33,13 @@ func lossTestModel(minBalance *float64) types.FinancialModel {
 					Config:   map[string]any{"expression": "bal * rate"},
 					Inputs: map[string]types.AmountInputBinding{
 						"bal":  {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "growth"}},
-						"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{}},
+						"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 0.12, "volatility": 0.3}},
 					},
 				},
-				Frequency:  types.FrequencyMonthly,
-				AnnualRate: 0.12,
-				Volatility: 0.3,
-				StartDate:  "2026-02-01",
-				Priority:   1,
-				Enabled:    true,
+				Frequency: types.FrequencyMonthly,
+				StartDate: "2026-02-01",
+				Priority:  1,
+				Enabled:   true,
 			},
 		},
 	}
@@ -139,9 +137,9 @@ func TestNegativeSourcedOutflowStillClampsToZero(t *testing.T) {
 					Config:   map[string]any{"expression": "0 - 50"},
 					Inputs:   map[string]types.AmountInputBinding{},
 				},
-				Date:     "2026-02-01",
-				Priority: 1,
-				Enabled:  true,
+				PostedTime: 1769904000, TransactionTime: 1769904000,
+
+				Enabled: true,
 			},
 		},
 	}
@@ -181,15 +179,14 @@ func TestLossDoesNotInflateAnnualCapHeadroom(t *testing.T) {
 					Config:   map[string]any{"expression": "bal * rate"},
 					Inputs: map[string]types.AmountInputBinding{
 						"bal":  {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "vault"}},
-						"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{}},
+						"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": -6.0}},
 					},
 				},
-				Frequency:  types.FrequencyMonthly,
-				AnnualRate: -6.0,
-				StartDate:  "2026-02-01",
-				AnnualCap:  lossFloatPtr(1000),
-				Priority:   1,
-				Enabled:    true,
+				Frequency: types.FrequencyMonthly,
+				StartDate: "2026-02-01",
+				AnnualCap: lossFloatPtr(1000),
+				Priority:  1,
+				Enabled:   true,
 			},
 		},
 	}
@@ -205,7 +202,7 @@ func TestLossDoesNotInflateAnnualCapHeadroom(t *testing.T) {
 	// A later gain in the same year requests 6000 * (12 / 12) = 6000 but
 	// must see only 1000 of cap headroom. If the loss had accrued to the
 	// ledger, headroom would be 7000 and the gain would realize in full.
-	model.RecurrenceRules[0].AnnualRate = 12.0
+	model.RecurrenceRules[0].Amount.Inputs["rate"] = types.AmountInputBinding{Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 12.0}}
 	gainTransition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "capgrowth", "2026-03-01"), "2026-03-01")
 	if err != nil {
 		t.Fatalf("execute gain posting: %v", err)
