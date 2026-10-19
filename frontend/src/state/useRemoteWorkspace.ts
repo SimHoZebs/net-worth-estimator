@@ -54,6 +54,8 @@ export function useRemoteWorkspace({
 	const serverRevision = useWorkspaceStore((state) => state.serverRevision);
 	const recoveryDraft = useWorkspaceStore((state) => state.recoveryDraft);
 	const incomeData = useWorkspaceStore((state) => state.incomeData);
+	const serverPresets = useWorkspaceStore((state) => state.serverPresets);
+	const presetError = useWorkspaceStore((state) => state.presetError);
 	const adapterReport = useWorkspaceStore((state) => state.adapterReport);
 	const savedPresentation = useWorkspaceStore(
 		(state) => state.savedPresentation,
@@ -79,6 +81,11 @@ export function useRemoteWorkspace({
 	);
 	const retry = useWorkspaceStore((state) => state.retry);
 	const dismissNotice = useWorkspaceStore((state) => state.dismissNotice);
+	const refreshPresets = useWorkspaceStore((state) => state.refreshPresets);
+	const createPreset = useWorkspaceStore((state) => state.createPreset);
+	const updatePreset = useWorkspaceStore((state) => state.updatePreset);
+	const deletePreset = useWorkspaceStore((state) => state.deletePreset);
+	const movePreset = useWorkspaceStore((state) => state.movePreset);
 	return {
 		workspace,
 		plan: workspace?.draft ?? workspace?.saved ?? null,
@@ -87,6 +94,8 @@ export function useRemoteWorkspace({
 		serverRevision,
 		recoveryDraft,
 		incomeData,
+		serverPresets,
+		presetError,
 		adapterReport,
 		savedPresentation,
 		draftPresentation,
@@ -109,6 +118,11 @@ export function useRemoteWorkspace({
 		importServerDocument,
 		retry,
 		dismissNotice,
+		refreshPresets,
+		createPreset,
+		updatePreset,
+		deletePreset,
+		movePreset,
 	};
 }
 
