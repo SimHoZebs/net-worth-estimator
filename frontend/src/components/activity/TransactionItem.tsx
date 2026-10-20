@@ -2,6 +2,12 @@ import type { ReactNode } from "react";
 
 export type TransactionTone = "transfer" | "inflow" | "outflow";
 
+export type TransactionItemSlots = {
+	subtitle?: ReactNode;
+	mobile?: ReactNode;
+	badges?: ReactNode;
+};
+
 /**
  * Single visual transaction row. Domain mapping stays with the callers
  * (plan definitions vs projected occurrences); this owns only the shared
@@ -12,27 +18,23 @@ export function TransactionItemRow({
 	icon,
 	tone,
 	title,
-	subtitle,
-	mobile,
-	badges,
 	amount,
 	actionLabel,
 	onSelect,
 	selectDisabled = false,
 	dimmed = false,
+	slots,
 }: {
 	date: ReactNode;
 	icon: ReactNode;
 	tone: TransactionTone;
 	title: string;
-	subtitle?: ReactNode;
-	mobile?: ReactNode;
-	badges?: ReactNode;
 	amount: ReactNode;
 	actionLabel: string;
 	onSelect: () => void;
 	selectDisabled?: boolean;
 	dimmed?: boolean;
+	slots?: TransactionItemSlots;
 }) {
 	return (
 		<tr className={`transaction-row${dimmed ? " is-excluded" : ""}`}>
@@ -48,9 +50,9 @@ export function TransactionItemRow({
 					<span className={`movement-icon ${tone}`}>{icon}</span>
 					<span className="transaction-name">
 						<strong>{title}</strong>
-						{subtitle}
-						{mobile}
-						{badges}
+						{slots?.subtitle}
+						{slots?.mobile}
+						{slots?.badges}
 					</span>
 				</button>
 			</th>
