@@ -75,16 +75,16 @@ Both produce a result. Neither reads or writes the other's inputs.
 
 ## Verbs
 
-| Action | Use | Do not use |
-| --- | --- | --- |
-| compute the single path | project (code, docs), calculate (copy) | simulate, run, execute |
-| compute the sampled band | calculate (copy) | sample, Monte Carlo |
-| send edits to the server | save | persist, commit, apply, write |
-| throw away unsaved edits | discard | revert, clear, reset |
-| fetch the model | load (copy), read (code) | fetch, pull, retrieve |
-| import CSV into SQLite | import | ingest, ingestion |
-| sync a bank | sync | — |
-| report model problems | validate (code), fix (copy) | diagnose, check |
+| Action                   | Use                                    | Do not use                    |
+| ------------------------ | -------------------------------------- | ----------------------------- |
+| compute the single path  | project (code, docs), calculate (copy) | simulate, run, execute        |
+| compute the sampled band | calculate (copy)                       | sample, Monte Carlo           |
+| send edits to the server | save                                   | persist, commit, apply, write |
+| throw away unsaved edits | discard                                | revert, clear, reset          |
+| fetch the model          | load (copy), read (code)               | fetch, pull, retrieve         |
+| import CSV into SQLite   | import                                 | ingest, ingestion             |
+| sync a bank              | sync                                   | —                             |
+| report model problems    | validate (code), fix (copy)            | diagnose, check               |
 
 ## Keeping the names
 
