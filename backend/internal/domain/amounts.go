@@ -43,10 +43,8 @@ type AmountProviderContext struct {
 
 // AmountReferenceContext validates ID references during validation.
 type AmountReferenceContext struct {
-	AccountIDs      map[string]bool
-	PostingIDs      map[string]bool
-	IncomeSourceIDs map[string]bool // nil = skip check
-	TaxProfileIDs   map[string]bool // nil = skip check
+	AccountIDs map[string]bool
+	PostingIDs map[string]bool
 }
 
 type providerDefinition struct {
@@ -546,13 +544,10 @@ type AmountResolverInfo struct {
 
 // ListAmountResolvers returns registered resolvers in sorted name order.
 func ListAmountResolvers() []AmountResolverInfo {
-	out := make([]AmountResolverInfo, 0, len(amountResolvers)+1)
+	out := make([]AmountResolverInfo, 0, len(amountResolvers))
 	for _, def := range amountResolvers {
 		out = append(out, AmountResolverInfo{Name: def.name, Description: def.description})
 	}
-	// income is a built-in descriptor handled outside the generic registry;
-	// surface it so discovery stays complete.
-	out = append(out, AmountResolverInfo{Name: "income", Description: "Income-pipeline amount resolved by the income transition."})
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
@@ -613,18 +608,6 @@ func validateExactKeys(actual map[string]types.AmountInputBinding, required []st
 // registry; RegisterAmountResolver/RegisterAmountProvider extend it without
 // touching this function.
 func ValidateAmountDescriptor(amount types.PostingAmountResolution, references *AmountReferenceContext) ([]string, error) {
-	if amount.Resolver == "income" {
-		if len(amount.Inputs) > 0 {
-			return nil, amtErrf("Income amount descriptors cannot define generic inputs.")
-		}
-		if err := ValidateIncomeAmountConfig(amount.Config, references); err != nil {
-			if resErr, ok := err.(*IncomeResolutionError); ok {
-				return nil, amtErrf("%s", resErr.Message)
-			}
-			return nil, amtErrf("%s", err.Error())
-		}
-		return []string{}, nil
-	}
 	resolver, ok := LookupAmountResolver(amount.Resolver)
 	if !ok {
 		return nil, amtErrf("Unknown amount resolver '%s'.", amount.Resolver)
@@ -671,12 +654,9 @@ func ValidateAmountDescriptor(amount types.PostingAmountResolution, references *
 	return dependencies, nil
 }
 
-// ResolvePostingAmountDescriptor resolves a non-income posting amount.
+// ResolvePostingAmountDescriptor resolves a posting amount.
 // Resolver and provider implementations come from the registry.
 func ResolvePostingAmountDescriptor(amount types.PostingAmountResolution, ctx *AmountProviderContext) (float64, error) {
-	if amount.Resolver == "income" {
-		return 0, amtErrf("Income amounts must be resolved by the income transition.")
-	}
 	resolver, ok := LookupAmountResolver(amount.Resolver)
 	if !ok {
 		return 0, amtErrf("Unknown amount resolver '%s'.", amount.Resolver)

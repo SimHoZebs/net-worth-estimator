@@ -33,7 +33,7 @@ func validateUniqueIDs(issues *[]types.ModelValidationIssue, ids []string, codeP
 
 // ValidateFinancialModel runs all cross-field checks and returns issues in
 // stable validation order.
-func ValidateFinancialModel(document *types.FinancialModelDocument, incomeData *types.IncomeDataSnapshot) []types.ModelValidationIssue {
+func ValidateFinancialModel(document *types.FinancialModelDocument) []types.ModelValidationIssue {
 	issues := []types.ModelValidationIssue{}
 	accountIDs := make(map[string]bool, len(document.Accounts))
 	for _, account := range document.Accounts {
@@ -118,7 +118,7 @@ func ValidateFinancialModel(document *types.FinancialModelDocument, incomeData *
 		checkpointKeys[key] = true
 	}
 
-	dependencies := validateMovementAmounts(&issues, document, accountIDs, incomeData)
+	dependencies := validateMovementAmounts(&issues, document, accountIDs)
 	validatePostingDependencies(&issues, document, dependencies)
 	validatePostingRoutes(&issues, document.Postings, accountIDs)
 	validateRuleSchedules(&issues, document, accountIDs)
@@ -244,26 +244,13 @@ func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, d
 // validateMovementAmounts validates amount descriptors for manual postings
 // and rule templates together. References may name posting or rule IDs, so
 // the dependency graph spans both.
-func validateMovementAmounts(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, accountIDs map[string]bool, incomeData *types.IncomeDataSnapshot) map[string][]string {
+func validateMovementAmounts(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, accountIDs map[string]bool) map[string][]string {
 	movementIDsSet := MovementIDs(document)
-	var incomeSourceIDs, taxProfileIDs map[string]bool
-	if incomeData != nil {
-		incomeSourceIDs = make(map[string]bool, len(incomeData.IncomeSources))
-		for _, source := range incomeData.IncomeSources {
-			incomeSourceIDs[source.ID] = true
-		}
-		taxProfileIDs = make(map[string]bool, len(incomeData.TaxProfiles))
-		for _, profile := range incomeData.TaxProfiles {
-			taxProfileIDs[profile.ID] = true
-		}
-	}
 	dependencies := map[string][]string{}
 	validateAmount := func(id string, amount types.PostingAmountResolution, path []any) {
 		deps, err := ValidateAmountDescriptor(amount, &AmountReferenceContext{
-			AccountIDs:      accountIDs,
-			PostingIDs:      movementIDsSet,
-			IncomeSourceIDs: incomeSourceIDs,
-			TaxProfileIDs:   taxProfileIDs,
+			AccountIDs: accountIDs,
+			PostingIDs: movementIDsSet,
 		})
 		if err != nil {
 			message := err.Error()
@@ -352,13 +339,6 @@ func validatePostingDependencies(issues *[]types.ModelValidationIssue, document 
 func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []types.Posting, accountIDs map[string]bool) {
 	for index := range postings {
 		posting := &postings[index]
-		if posting.Amount.Resolver == "income" {
-			if posting.SourceAccountID != nil {
-				addIssue(issues, types.SeverityError, "posting.income.source.invalid",
-					"Income postings cannot withdraw from an account.",
-					pathWithField([]any{"postings", index}, "sourceAccountId")...)
-			}
-		}
 		if posting.SourceAccountID != nil && !accountIDs[*posting.SourceAccountID] {
 			addIssue(issues, types.SeverityError, "posting.source.missing",
 				fmt.Sprintf("Posting source account '%s' does not exist.", *posting.SourceAccountID),
@@ -408,13 +388,6 @@ func validateRuleSchedules(issues *[]types.ModelValidationIssue, document *types
 	for index := range document.RecurrenceRules {
 		rule := &document.RecurrenceRules[index]
 		base := []any{"recurrenceRules", index}
-		if rule.Amount.Resolver == "income" {
-			if rule.SourceAccountID != nil {
-				addIssue(issues, types.SeverityError, "posting.income.source.invalid",
-					"Income rules cannot withdraw from an account.",
-					pathWithField(base, "sourceAccountId")...)
-			}
-		}
 		if rule.SourceAccountID != nil && !accountIDs[*rule.SourceAccountID] {
 			addIssue(issues, types.SeverityError, "posting.source.missing",
 				fmt.Sprintf("Rule source account '%s' does not exist.", *rule.SourceAccountID),

@@ -23,9 +23,8 @@ func StochasticProjection(
 	overrides types.ModelOverrides,
 	config types.StochasticConfig,
 	onProgress StochasticProgressCallback,
-	incomeData *types.IncomeDataSnapshot,
 ) (*types.StochasticProjectionResult, error) {
-	session, err := newStochasticSession(document, settings, overrides, config, onProgress, incomeData)
+	session, err := newStochasticSession(document, settings, overrides, config, onProgress)
 	if err != nil {
 		return nil, err
 	}

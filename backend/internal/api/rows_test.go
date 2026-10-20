@@ -173,7 +173,7 @@ func TestWriteGuardCoversRowPrefixes(t *testing.T) {
 	}{
 		{http.MethodGet, "/v1/financial-model"},
 		{http.MethodGet, "/v1/sync/simplefin/accounts"},
-		{http.MethodGet, "/v1/income-data"},
+		{http.MethodGet, "/v1/amount-resolvers"},
 	}
 	for _, read := range reads {
 		response := doRowRequest(t, handler, read.method, read.path, "")

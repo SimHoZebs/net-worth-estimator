@@ -28,16 +28,13 @@ func TestListAmountSpecsAreMinimalWiring(t *testing.T) {
 	if !ok || !field.Required || field.Kind != "expression" {
 		t.Fatalf("expression resolver wiring = %+v, want required expression field", expression.ConfigFields)
 	}
-	income, ok := byName["income"]
+	bracket, ok := byName["progressive-bracket"]
 	if !ok {
-		t.Fatalf("missing resolver spec income")
+		t.Fatalf("missing resolver spec progressive-bracket")
 	}
-	incomeFields := fieldKeys(income.ConfigFields)
-	if field, ok := incomeFields["incomeSourceId"]; !ok || !field.Required {
-		t.Fatalf("income resolver wiring = %+v, want required incomeSourceId", income.ConfigFields)
-	}
-	if _, ok := incomeFields["resolvers"]; !ok {
-		t.Fatalf("income resolver wiring = %+v, want resolvers field", income.ConfigFields)
+	bracketFields := fieldKeys(bracket.ConfigFields)
+	if _, ok := bracketFields["brackets"]; !ok {
+		t.Fatalf("progressive-bracket resolver wiring = %+v, want brackets field", bracket.ConfigFields)
 	}
 
 	providers := ListAmountProviderSpecs()
@@ -72,12 +69,4 @@ func TestListAmountSpecsAreMinimalWiring(t *testing.T) {
 		}
 	}
 
-	steps := ListIncomeStepSpecs()
-	if len(steps) != 2 {
-		t.Fatalf("income steps = %d, want 2", len(steps))
-	}
-	stepFields := fieldKeys(steps[0].ConfigFields)
-	if _, ok := stepFields["rate"]; !ok {
-		t.Fatalf("first income step wiring = %+v, want rate", steps[0].ConfigFields)
-	}
 }

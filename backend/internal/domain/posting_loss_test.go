@@ -51,7 +51,7 @@ func lossTestRuntime(t *testing.T, model types.FinancialModel, balances map[stri
 		Balances:                     balances,
 		LatestRealizedPostingAmounts: map[string]float64{},
 		RealizedPostingAmountsByYear: map[string]map[string]float64{},
-	}, "2026-01-15", sample, nil)
+	}, "2026-01-15", sample)
 	if err != nil {
 		t.Fatalf("create runtime: %v", err)
 	}

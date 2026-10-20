@@ -380,9 +380,16 @@ describe("backend and display plan adapter", () => {
 	it("marks provider-backed amounts as provisional and read-only", () => {
 		const document = documentFixture();
 		document.recurrenceRules[0]!.amount = {
-			resolver: "income",
-			config: { incomeSourceId: "salary", resolvers: [] },
-			inputs: {},
+			resolver: "progressive-bracket",
+			config: { deduction: 1000, brackets: [{ upTo: 5000, rate: 0.1 }] },
+			inputs: {
+				gross: {
+					source: "provider",
+					provider: "model-value",
+					arguments: { id: "gross-rule" },
+				},
+				pretax: { source: "literal", value: 0 },
+			},
 		};
 		const conversion = backendToDisplayPlan({
 			document,

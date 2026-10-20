@@ -40,9 +40,8 @@ func TestRowWriteAuthMatrix(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			database := openAPIStore(t)
 			root := apiProjectRoot(t)
-			if _, _, err := database.ImportCSV(
+			if _, err := database.ImportCSV(
 				filepath.Join(root, "public", "configs"),
-				filepath.Join(root, "public", "data", "income"),
 			); err != nil {
 				t.Fatalf("seed store: %v", err)
 			}

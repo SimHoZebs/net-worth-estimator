@@ -97,7 +97,7 @@ func TestValidateFinancialModelFlagsDanglingCycleFulfillmentEvaluation(t *testin
 			}},
 		},
 	}
-	issues := ValidateFinancialModel(document, nil)
+	issues := ValidateFinancialModel(document)
 	found := false
 	for _, issue := range issues {
 		if issue.Code == "evaluation.cycleFulfillment.accountId.invalid" {
@@ -128,7 +128,7 @@ func TestValidateFinancialModelAcceptsLiveCycleFulfillmentEvaluation(t *testing.
 			}},
 		},
 	}
-	for _, issue := range ValidateFinancialModel(document, nil) {
+	for _, issue := range ValidateFinancialModel(document) {
 		if issue.Code == "evaluation.cycleFulfillment.accountId.invalid" || issue.Code == "evaluation.config.invalid" {
 			t.Fatalf("unexpected cycle issue: %+v", issue)
 		}

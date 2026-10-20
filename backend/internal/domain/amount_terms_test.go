@@ -176,7 +176,7 @@ func executeTermsOccurrence(t *testing.T, model types.FinancialModel, balances m
 		Balances:                     balances,
 		LatestRealizedPostingAmounts: map[string]float64{},
 		RealizedPostingAmountsByYear: map[string]map[string]float64{},
-	}, "2026-09-01", nil, nil)
+	}, "2026-09-01", nil)
 	if err != nil {
 		t.Fatalf("create runtime: %v", err)
 	}
@@ -239,7 +239,7 @@ func TestLateFeePostingAssessesShortfall(t *testing.T) {
 		Balances:                     map[string]float64{"checking": 50, "prime_card": -2000},
 		LatestRealizedPostingAmounts: map[string]float64{},
 		RealizedPostingAmountsByYear: map[string]map[string]float64{},
-	}, "2026-09-01", nil, nil)
+	}, "2026-09-01", nil)
 	if err != nil {
 		t.Fatalf("create runtime: %v", err)
 	}
@@ -343,7 +343,7 @@ func TestBalanceFeePostingDebitsChecking(t *testing.T) {
 		Balances:                     map[string]float64{checking: 1400},
 		LatestRealizedPostingAmounts: map[string]float64{},
 		RealizedPostingAmountsByYear: map[string]map[string]float64{},
-	}, "2026-09-01", nil, nil)
+	}, "2026-09-01", nil)
 	if err != nil {
 		t.Fatalf("create runtime: %v", err)
 	}

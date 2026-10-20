@@ -211,13 +211,6 @@ func New(store store.Store, serverConfig Config) http.Handler {
 	}, server.triggerSync)
 
 	huma.Register(api, huma.Operation{
-		OperationID: "get-income-data",
-		Method:      "GET",
-		Path:        "/v1/income-data",
-		Summary:     "Load the income data snapshot",
-	}, server.getIncomeData)
-
-	huma.Register(api, huma.Operation{
 		OperationID: "get-amount-resolvers",
 		Method:      "GET",
 		Path:        "/v1/amount-resolvers",

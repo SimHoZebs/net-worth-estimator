@@ -7,7 +7,6 @@ import {
 	type DeterministicProjectionResponse,
 	type EvaluationResultEnvelope,
 	type FinancialModelDocument,
-	type IncomeDataSnapshot,
 	type JsonValue,
 	type MovementEvent,
 	type ProjectionAccountSummary,
@@ -49,7 +48,6 @@ export interface UseRemoteProjectionOptions {
 	years?: number;
 	ranges?: boolean;
 	authToken?: string;
-	incomeData?: IncomeDataSnapshot | null;
 	// When false the hook issues no requests. The saved-plan projection is
 	// identical to the active one whenever there is no draft, so running it
 	// separately would compute the same projection twice.
@@ -70,11 +68,10 @@ async function runDeterministic(
 	api: RemoteProjectionClient,
 	document: FinancialModelDocument,
 	years: number,
-	incomeData: IncomeDataSnapshot | null,
 	authToken: string | undefined,
 	signal: AbortSignal,
 ): Promise<Projection> {
-	const request = projectionRequest(document, years, incomeData);
+	const request = projectionRequest(document, years);
 	const response = await api.projectDeterministic(request, {
 		authToken,
 		signal,
@@ -130,7 +127,6 @@ export function projectionStartDate(document: FinancialModelDocument): string {
 export function projectionRequest(
 	document: FinancialModelDocument,
 	years: number,
-	incomeData?: IncomeDataSnapshot | null,
 ): DeterministicProjectionRequest {
 	const horizonYears = Number.isFinite(years)
 		? Math.max(1, Math.trunc(years))
@@ -142,7 +138,6 @@ export function projectionRequest(
 			horizonYears,
 			evaluations: document.evaluations,
 		},
-		...(incomeData ? { incomeData } : {}),
 	};
 }
 
@@ -762,7 +757,6 @@ export function useRemoteProjection({
 	years: yearsOverride,
 	ranges: rangesOverride,
 	authToken: tokenOverride,
-	incomeData: incomeOverride,
 	enabled = true,
 }: UseRemoteProjectionOptions = {}) {
 	const api = useMemo(() => client ?? defaultApiClient(), [client]);
@@ -796,7 +790,6 @@ export function useRemoteProjection({
 	);
 	const draftDocument =
 		draftOverride !== undefined ? draftOverride : derivedDraftDocument;
-	const storeIncomeData = useWorkspaceStore((state) => state.incomeData);
 	const storeYears = useUiStore((state) => state.years);
 	const storeRanges = useUiStore((state) => state.ranges);
 	const storeToken = useUiStore((state) => state.authToken);
@@ -805,8 +798,6 @@ export function useRemoteProjection({
 	const years = yearsOverride ?? storeYears;
 	const ranges = rangesOverride ?? storeRanges;
 	const authToken = tokenOverride ?? storeToken;
-	const incomeData =
-		incomeOverride !== undefined ? incomeOverride : storeIncomeData;
 	const activeDocument = draftDocument ?? document ?? null;
 	// Memoized on reference: callers rebuild equivalent documents per render,
 	// so this only re-stringifies when the store reference actually changes.
@@ -814,33 +805,19 @@ export function useRemoteProjection({
 		() => (activeDocument ? JSON.stringify(activeDocument) : "null"),
 		[activeDocument],
 	);
-	const incomeDataKey = useMemo(
-		() => (incomeData ? JSON.stringify(incomeData) : "null"),
-		[incomeData],
-	);
 	// Refs give the streaming effect latest values without keying it on
 	// object identity (callers may rebuild equivalent documents per render).
 	// Render-time sync keeps them fresh regardless of effect order.
 	const activeDocumentRef = useRef(activeDocument);
-	const incomeDataRef = useRef(incomeData ?? null);
 	// oxlint-disable-next-line react/refs
 	activeDocumentRef.current = activeDocument;
-	// oxlint-disable-next-line react/refs
-	incomeDataRef.current = incomeData ?? null;
 	const hasDocument = activeDocument !== null;
 	const deterministic = useQuery({
-		queryKey: deterministicQueryKey(documentKey, incomeDataKey, years),
+		queryKey: deterministicQueryKey(documentKey, years),
 		queryFn: ({ signal }) => {
 			const current = activeDocument;
 			if (!current) throw new Error(MISSING_DOCUMENT_MESSAGE);
-			return runDeterministic(
-				api,
-				current,
-				years,
-				incomeData,
-				authToken,
-				signal,
-			);
+			return runDeterministic(api, current, years, authToken, signal);
 		},
 		enabled: enabled && hasDocument,
 		placeholderData: keepPreviousData,
@@ -894,7 +871,7 @@ export function useRemoteProjection({
 		const runCount = randomRunCount();
 		const seed = 42;
 		const request: StochasticProjectionRequest = {
-			...projectionRequest(current, years, incomeDataRef.current),
+			...projectionRequest(current, years),
 			config: { runCount, seed },
 		};
 		// The stream runs through the shared query cache: identical
@@ -954,7 +931,6 @@ export function useRemoteProjection({
 				.fetchQuery({
 					queryKey: stochasticQueryKey(
 						documentKey,
-						incomeDataKey,
 						years,
 						runCount,
 						seed,
@@ -989,16 +965,7 @@ export function useRemoteProjection({
 		};
 		runStream();
 		return () => controller.abort();
-	}, [
-		api,
-		authToken,
-		documentKey,
-		enabled,
-		incomeDataKey,
-		rangeAttempt,
-		ranges,
-		years,
-	]);
+	}, [api, authToken, documentKey, enabled, rangeAttempt, ranges, years]);
 
 	const abort = useCallback(() => {
 		// Deterministic cancellation is Query-managed; only the streaming

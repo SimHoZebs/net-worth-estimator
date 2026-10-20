@@ -119,7 +119,7 @@ func TestMultipleVolatileInputsRejected(t *testing.T) {
 			Frequency: types.FrequencyMonthly, StartDate: "2026-02-01", Enabled: true,
 		}},
 	}
-	issues := ValidateFinancialModel(document, nil)
+	issues := ValidateFinancialModel(document)
 	found := false
 	for _, issue := range issues {
 		if issue.Code == "posting.amount.multiple_volatile_rates" {

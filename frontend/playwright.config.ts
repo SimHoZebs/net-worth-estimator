@@ -54,7 +54,6 @@ export default defineConfig({
 				// A purpose-built fixture keeps assertions stable and keeps a
 				// real household's details out of the suite.
 				NET_WORTH_ESTIMATOR_MODEL_PATH: "../frontend/tests/fixtures/model",
-				NET_WORTH_ESTIMATOR_INCOME_PATH: "../frontend/tests/fixtures/income",
 			},
 			url: `${apiOrigin}/healthz`,
 			reuseExistingServer: !process.env.CI,

@@ -30,8 +30,8 @@ func TestGetAmountResolversListsRegistry(t *testing.T) {
 	for _, r := range payload.Resolvers {
 		names[r.Name] = true
 	}
-	if !names["expression"] || !names["income"] {
-		t.Fatalf("resolvers = %+v, want expression and income", payload.Resolvers)
+	if !names["expression"] || !names["progressive-bracket"] {
+		t.Fatalf("resolvers = %+v, want expression and progressive-bracket", payload.Resolvers)
 	}
 	providers := map[string]bool{}
 	for _, p := range payload.Providers {

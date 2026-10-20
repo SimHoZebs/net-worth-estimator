@@ -19,7 +19,46 @@ type AppliedMovementTransition struct {
 type PostingExecutionTransition struct {
 	AppliedMovementTransition
 	PostingID string
-	Income    *types.IncomeEvent
+}
+
+// AccountDeltaEntry is one account balance change.
+type AccountDeltaEntry struct {
+	AccountID string
+	Delta     float64
+}
+
+// collectDeltasInOrder emits changed accounts in model declaration order,
+// with any extras appended sorted.
+func collectDeltasInOrder(before, after map[string]float64, order []string) []AccountDeltaEntry {
+	seen := map[string]bool{}
+	deltas := []AccountDeltaEntry{}
+	emit := func(id string) {
+		if seen[id] {
+			return
+		}
+		seen[id] = true
+		was := before[id]
+		delta := after[id] - was
+		if delta != 0 {
+			deltas = append(deltas, AccountDeltaEntry{AccountID: id, Delta: delta})
+		}
+	}
+	for _, id := range order {
+		if _, ok := after[id]; ok {
+			emit(id)
+		}
+	}
+	extraIDs := make([]string, 0, len(after))
+	for id := range after {
+		if !seen[id] {
+			extraIDs = append(extraIDs, id)
+		}
+	}
+	sortStrings(extraIDs)
+	for _, id := range extraIDs {
+		emit(id)
+	}
+	return deltas
 }
 
 // SimulationState is the backend state type with owned maps.
@@ -58,24 +97,10 @@ type TransitionRuntime struct {
 	paymentTerms     map[string]types.PaymentTerms
 	projectionStart  string
 	monteCarloSample *types.MonteCarloSample
-	incomeIndex      *incomeRuntimeIndex
-	// incomeConfigs caches the parsed+validated income config per posting
-	// ID. Income postings execute on every occurrence date, but their
-	// config never changes within a run; parsing once preserves exact
-	// error behavior (the first execution still surfaces the error).
-	incomeConfigs map[string]*cachedIncomeConfig
-}
-
-type cachedIncomeConfig struct {
-	config types.IncomeAmountConfig
-	err    error
 }
 
 // CreateTransitionRuntime clones initialState and binds model context.
-func CreateTransitionRuntime(model types.FinancialModel, initialState SimulationState, projectionStartDate string, monteCarloSample *types.MonteCarloSample, incomeData *types.IncomeDataSnapshot) (*TransitionRuntime, error) {
-	if incomeData == nil {
-		incomeData = types.EmptyIncomeData()
-	}
+func CreateTransitionRuntime(model types.FinancialModel, initialState SimulationState, projectionStartDate string, monteCarloSample *types.MonteCarloSample) (*TransitionRuntime, error) {
 	accountByID := make(map[string]types.Account, len(model.Accounts))
 	accountOrder := make([]string, 0, len(model.Accounts))
 	seenAccounts := map[string]bool{}
@@ -94,27 +119,7 @@ func CreateTransitionRuntime(model types.FinancialModel, initialState Simulation
 		paymentTerms:     paymentTermsByAccount(model.PaymentTerms),
 		projectionStart:  projectionStartDate,
 		monteCarloSample: monteCarloSample,
-		incomeIndex:      newIncomeRuntimeIndex(incomeData, accountByID),
-		incomeConfigs:    map[string]*cachedIncomeConfig{},
 	}, nil
-}
-
-// incomeConfig parses and validates an income posting's amount config once
-// per runtime; later occurrences reuse the cached outcome.
-func (t *TransitionRuntime) incomeConfig(posting *types.Posting) (types.IncomeAmountConfig, error) {
-	if cached, ok := t.incomeConfigs[posting.ID]; ok {
-		return cached.config, cached.err
-	}
-	config, err := ParseIncomeAmountConfig(posting.Amount.Config)
-	if err == nil {
-		err = validateParsedIncomeAmountConfig(config, &AmountReferenceContext{
-			AccountIDs:      t.incomeIndex.accountIDs,
-			IncomeSourceIDs: t.incomeIndex.incomeSourceIDs,
-			TaxProfileIDs:   t.incomeIndex.taxProfileIDs,
-		})
-	}
-	t.incomeConfigs[posting.ID] = &cachedIncomeConfig{config: config, err: err}
-	return config, err
 }
 
 func (t *TransitionRuntime) observePosting(postingID string, realizedAmount float64, date string) {
@@ -158,36 +163,6 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 	var ruleAnnualCap *float64
 	if occurrence.Rule != nil {
 		ruleAnnualCap = occurrence.Rule.AnnualCap
-	}
-	if posting.Amount.Resolver == "income" {
-		config, err := t.incomeConfig(posting)
-		if err != nil {
-			return PostingExecutionTransition{}, err
-		}
-		// Rule-level caps limit net cash deposited per calendar year,
-		// mirroring ordinary postings. Step splits carry their own
-		// resolver-level caps. Accrual runs through observePosting below.
-		annualCapRemaining := inf()
-		if ruleAnnualCap != nil {
-			annualCapRemaining = maxFloat(0, *ruleAnnualCap-t.State.RealizedPostingAmountsByYear[posting.ID][date[:4]])
-		}
-		execution, err := executeIncomePosting(posting, config, date, annualCapRemaining, t.incomeIndex, t.State.Balances, t.accountByID, t.accountOrder, incomeDivisor(occurrence))
-		if err != nil {
-			return PostingExecutionTransition{}, err
-		}
-		result := AccountMovementResult{
-			RequestedAmount: execution.RequestedAmount,
-			RealizedAmount:  execution.RealizedAmount,
-		}
-		t.observePosting(posting.ID, result.RealizedAmount, date)
-		return PostingExecutionTransition{
-			AppliedMovementTransition: AppliedMovementTransition{
-				Result:        result,
-				AccountDeltas: execution.AccountDeltas,
-			},
-			PostingID: posting.ID,
-			Income:    &execution.Income,
-		}, nil
 	}
 	yearIndex := ProjectionYearIndex(t.projectionStart, date)
 	var sampledRate *float64

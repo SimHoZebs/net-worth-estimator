@@ -73,22 +73,6 @@ func decodeOverrides(t *testing.T, raw any) types.ModelOverrides {
 	return overrides
 }
 
-func decodeIncomeData(t *testing.T, raw any) *types.IncomeDataSnapshot {
-	t.Helper()
-	if raw == nil {
-		return nil
-	}
-	data, err := json.Marshal(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var snapshot types.IncomeDataSnapshot
-	if err := json.Unmarshal(data, &snapshot); err != nil {
-		t.Fatalf("decode income data: %v", err)
-	}
-	return &snapshot
-}
-
 func toAny(t *testing.T, value any) any {
 	t.Helper()
 	data, err := json.Marshal(value)
@@ -206,7 +190,7 @@ func TestGoldenDeterministic(t *testing.T) {
 	overrides := decodeOverrides(t, payload["overrides"])
 	expectedResult := payload["result"].(map[string]any)
 
-	result, err := ProjectFinancialModelDocument(document, settings, overrides, nil, nil)
+	result, err := ProjectFinancialModelDocument(document, settings, overrides, nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
@@ -219,7 +203,7 @@ func TestGoldenCheckpoints(t *testing.T) {
 	settings := decodeSettings(t, payload["settings"])
 	overrides := decodeOverrides(t, payload["overrides"])
 
-	path, result, err := ProjectRawFinancialModelDocument(document, settings, overrides, nil, nil)
+	path, result, err := ProjectRawFinancialModelDocument(document, settings, overrides, nil)
 	if err != nil {
 		t.Fatalf("project raw: %v", err)
 	}
@@ -236,9 +220,7 @@ func TestGoldenIncome(t *testing.T) {
 	document := decodeDocument(t, payload["document"])
 	settings := decodeSettings(t, payload["settings"])
 	overrides := decodeOverrides(t, payload["overrides"])
-	incomeData := decodeIncomeData(t, payload["incomeData"])
-
-	result, err := ProjectFinancialModelDocument(document, settings, overrides, nil, incomeData)
+	result, err := ProjectFinancialModelDocument(document, settings, overrides, nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
@@ -254,7 +236,7 @@ func TestGoldenStochasticSeeded(t *testing.T) {
 	seed := int64(configRaw["seed"].(float64))
 	config := types.StochasticConfig{RunCount: int(configRaw["runCount"].(float64)), Seed: &seed}
 
-	result, err := StochasticProjection(context.Background(), document, settings, overrides, config, nil, nil)
+	result, err := StochasticProjection(context.Background(), document, settings, overrides, config, nil)
 	if err != nil {
 		t.Fatalf("stochastic: %v", err)
 	}

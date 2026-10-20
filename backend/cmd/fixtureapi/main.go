@@ -38,7 +38,6 @@ func main() {
 	}
 	dbPath := envOr("NET_WORTH_ESTIMATOR_DB", filepath.Join(os.TempDir(), "waypoint-fixture.db"))
 	modelPath := envOr("NET_WORTH_ESTIMATOR_MODEL_PATH", "public/configs")
-	incomePath := envOr("NET_WORTH_ESTIMATOR_INCOME_PATH", "public/data/income")
 	authToken := os.Getenv("NET_WORTH_ESTIMATOR_AUTH_TOKEN")
 	allowedOrigins := splitOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
 
@@ -59,7 +58,7 @@ func main() {
 		if err := database.Clear(); err != nil {
 			return fmt.Errorf("clear store: %w", err)
 		}
-		if _, _, err := database.ImportCSV(modelPath, incomePath); err != nil {
+		if _, err := database.ImportCSV(modelPath); err != nil {
 			return fmt.Errorf("import fixture: %w", err)
 		}
 		readOnly = nextReadOnly
@@ -99,9 +98,8 @@ func main() {
 		}
 		writer.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(writer).Encode(map[string]any{
-			"reset":  true,
-			"model":  modelPath,
-			"income": incomePath,
+			"reset": true,
+			"model": modelPath,
 		})
 	}))
 	mux.Handle("/", live)

@@ -20,14 +20,14 @@ type getModelOutput struct {
 }
 
 func (s *Server) loadStoredDocument() (*types.FinancialModelDocument, []types.ModelValidationIssue, error) {
-	document, incomeData, err := s.store.LoadDocumentAndIncomeData()
+	document, err := s.store.LoadDocument()
 	if err != nil {
 		return nil, nil, err
 	}
 	if document == nil {
 		return nil, []types.ModelValidationIssue{}, nil
 	}
-	issues := domainValidate(document, incomeData)
+	issues := domainValidate(document)
 	return document, issues, nil
 }
 
@@ -65,16 +65,4 @@ func (s *Server) getStatus(_ context.Context, _ *struct{}) (*statusOutput, error
 	}
 	output.Body.LastSyncAt = lastSync
 	return output, nil
-}
-
-type incomeDataOutput struct {
-	Body types.IncomeDataSnapshot
-}
-
-func (s *Server) getIncomeData(_ context.Context, _ *struct{}) (*incomeDataOutput, error) {
-	snapshot, err := s.store.LoadIncomeData()
-	if err != nil {
-		return nil, huma.Error500InternalServerError(err.Error())
-	}
-	return &incomeDataOutput{Body: *snapshot}, nil
 }

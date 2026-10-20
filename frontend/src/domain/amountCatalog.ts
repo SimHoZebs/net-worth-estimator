@@ -21,25 +21,10 @@ export const FALLBACK_RESOLVERS: CopyEntry[] = [
 			"You write a simple formula like 500 or (1000) * growth. Each name in the formula needs a value below.",
 	},
 	{
-		name: "income",
-		label: "Paycheck (take-home pay)",
-		summary:
-			"Starts from yearly salary, then takes off savings, taxes, and other steps in order. What is left is deposited as take-home pay.",
-	},
-];
-
-export const FALLBACK_INCOME_STEPS: CopyEntry[] = [
-	{
-		name: "percentage",
-		label: "Take a percent off",
-		summary:
-			"Takes a slice like 10% for savings. Stops at the yearly limit when set.",
-	},
-	{
 		name: "progressive-bracket",
-		label: "Tax table",
+		label: "Tax owed",
 		summary:
-			"Looks up tax in a table (for example federal tax) after subtracting the standard deduction.",
+			"Progressive tax on one paycheck: gross pay minus the pre-tax slice, minus the deduction, through the bracket table.",
 	},
 ];
 
@@ -227,26 +212,33 @@ export const FALLBACK_TEMPLATES: AmountTemplate[] = [
 		},
 	},
 	{
-		id: "paycheck",
-		label: "Paycheck take-home",
+		id: "federal-tax",
+		label: "Federal tax owed",
 		summary:
-			"Yearly salary minus 401k percent and tax table, in order. Remainder lands as take-home pay.",
-		whenToUse: "Any salary with pre-tax savings and taxes.",
-		resolver: "income",
+			"Progressive tax on one paycheck: gross pay minus the 401(k) slice, minus the deduction, through the bracket table.",
+		whenToUse: "Tax withholding rules that read gross and 401(k) rules.",
+		resolver: "progressive-bracket",
 		amount: {
-			resolver: "income",
+			resolver: "progressive-bracket",
 			config: {
-				incomeSourceId: "salary",
-				resolvers: [
-					{
-						resolver: "percentage",
-						config: { rate: 0.1, annualCap: 23500 },
-						destinationAccountId: "401k",
-					},
-					{ resolver: "progressive-bracket", config: { profileId: "federal" } },
+				deduction: 1341.67,
+				brackets: [
+					{ upTo: 2066.67, rate: 0.1 },
+					{ upTo: null, rate: 0.12 },
 				],
 			},
-			inputs: {},
+			inputs: {
+				gross: {
+					source: "provider",
+					provider: "model-value",
+					arguments: { id: "salary" },
+				},
+				pretax: {
+					source: "provider",
+					provider: "model-value",
+					arguments: { id: "salary_401k" },
+				},
+			},
 		},
 	},
 ];
@@ -255,14 +247,8 @@ export function plainLanguageForAmount(
 	amount: PostingAmountResolution | null | undefined,
 ): string {
 	if (!amount) return "No amount set.";
-	if (amount.resolver === "income") {
-		const steps =
-			(
-				(amount.config as Record<string, unknown> | null)?.resolvers as
-					| Array<{ resolver?: string }>
-					| undefined
-			)?.length ?? 0;
-		return `Take-home pay: salary minus ${steps} step${steps === 1 ? "" : "s"} in order. Remainder is deposited.`;
+	if (amount.resolver === "progressive-bracket") {
+		return "Tax owed: progressive brackets on gross pay minus the pre-tax slice and deduction.";
 	}
 	const expression =
 		(amount.config as Record<string, unknown> | null)?.expression ?? "";

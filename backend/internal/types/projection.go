@@ -13,26 +13,6 @@ type MovementOrigin struct {
 	PostingID string `json:"postingId"`
 }
 
-type IncomeResolverEvent struct {
-	Resolver                    string  `json:"resolver"`
-	RequestedAmount             float64 `json:"requestedAmount"`
-	RealizedAmount              float64 `json:"realizedAmount"`
-	DestinationAccountID        *string `json:"destinationAccountId"`
-	TaxableAmountAfter          float64 `json:"taxableAmountAfter"`
-	EmployerMatchAmount         float64 `json:"employerMatchAmount"`
-	EmployerMatchRealizedAmount float64 `json:"employerMatchRealizedAmount"`
-}
-
-type IncomeEvent struct {
-	AnnualGrossIncome      float64               `json:"annualGrossIncome"`
-	GrossAmount            float64               `json:"grossAmount"`
-	Resolvers              []IncomeResolverEvent `json:"resolvers"`
-	NetCashRequested       float64               `json:"netCashRequested"`
-	NetCashRealized        float64               `json:"netCashRealized"`
-	EmployerMatchRequested float64               `json:"employerMatchRequested"`
-	EmployerMatchRealized  float64               `json:"employerMatchRealized"`
-}
-
 type MovementEvent struct {
 	Date            IsoDate        `json:"date"`
 	Sequence        int            `json:"sequence"`
@@ -43,9 +23,8 @@ type MovementEvent struct {
 		AccountID string  `json:"accountId"`
 		Delta     float64 `json:"delta"`
 	} `json:"accountDeltas"`
-	BindingConstraints []JsonValue  `json:"bindingConstraints,omitempty"`
-	AvailableAmount    *float64     `json:"availableAmount,omitempty"`
-	Income             *IncomeEvent `json:"income,omitempty"`
+	BindingConstraints []JsonValue `json:"bindingConstraints,omitempty"`
+	AvailableAmount    *float64    `json:"availableAmount,omitempty"`
 }
 
 type AccountSnapshot struct {
@@ -122,7 +101,6 @@ type ProjectionPath struct {
 	Rows                        []ProjectionRow        `json:"rows"`
 	MovementEvents              []MovementEvent        `json:"movementEvents"`
 	EffectiveDocument           FinancialModelDocument `json:"effectiveDocument"`
-	IncomeData                  *IncomeDataSnapshot    `json:"incomeData,omitempty"`
 	ProjectionStartPostingState struct {
 		LatestRealizedPostingAmounts map[string]float64            `json:"latestRealizedPostingAmounts"`
 		LatestRealizedPostingDates   map[string]string             `json:"latestRealizedPostingDates,omitempty"`

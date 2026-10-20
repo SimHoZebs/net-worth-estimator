@@ -3,7 +3,6 @@ import { ApiClient } from "../../api/client.ts";
 import type { PostingAmountResolution } from "../../api/contracts.ts";
 import {
 	BUILT_IN_TEMPLATE_IDS,
-	FALLBACK_INCOME_STEPS,
 	FALLBACK_PROVIDERS,
 	FALLBACK_RESOLVERS,
 	FALLBACK_TEMPLATES,
@@ -20,7 +19,6 @@ function useRemoteNames() {
 	const [remote, setRemote] = useState<{
 		resolvers: { name: string; description?: string }[];
 		providers: { name: string; description?: string }[];
-		incomeSteps: { name: string; description?: string }[];
 	} | null>(null);
 	useEffect(() => {
 		let cancelled = false;
@@ -31,7 +29,6 @@ function useRemoteNames() {
 				setRemote({
 					resolvers: result.resolvers ?? [],
 					providers: result.providers ?? [],
-					incomeSteps: result.incomeSteps ?? [],
 				});
 			})
 			.catch(() => {});
@@ -100,13 +97,9 @@ function slugify(value: string): string {
 export function AmountCatalog({
 	accounts,
 	postings,
-	incomeSources,
-	taxProfiles,
 }: {
 	accounts: { id: string; name: string }[];
 	postings: { id: string; name: string }[];
-	incomeSources: { id: string; name: string }[];
-	taxProfiles: { id: string; name: string }[];
 }) {
 	const remote = useRemoteNames();
 	const serverPresets = useWorkspaceStore((state) => state.serverPresets);
@@ -147,7 +140,6 @@ export function AmountCatalog({
 		useState<PostingAmountResolution | null>(null);
 
 	const recipes = mergeCopy(FALLBACK_RESOLVERS, remote?.resolvers ?? []);
-	const steps = mergeCopy(FALLBACK_INCOME_STEPS, remote?.incomeSteps ?? []);
 	const values = mergeCopy(FALLBACK_PROVIDERS, remote?.providers ?? []);
 
 	const index =
@@ -319,8 +311,6 @@ export function AmountCatalog({
 					<AmountBuilder
 						accounts={accounts}
 						postings={postings}
-						incomeSources={incomeSources}
-						taxProfiles={taxProfiles}
 						templates={templates}
 						initialTemplateId="fixed"
 						onChange={setStagedAmount}
@@ -383,8 +373,6 @@ export function AmountCatalog({
 						<AmountBuilder
 							accounts={accounts}
 							postings={postings}
-							incomeSources={incomeSources}
-							taxProfiles={taxProfiles}
 							templates={templates}
 							initialTemplateId={
 								BUILT_IN_TEMPLATE_IDS.has(selectedPreset.name)
@@ -435,8 +423,6 @@ export function AmountCatalog({
 					key={selected.id}
 					accounts={accounts}
 					postings={postings}
-					incomeSources={incomeSources}
-					taxProfiles={taxProfiles}
 					templates={templates}
 					initialTemplateId={selected.id}
 					hidePicker
@@ -445,13 +431,10 @@ export function AmountCatalog({
 			)}
 			<details>
 				<summary>
-					All recipes and values (
-					{recipes.length + steps.length + values.length})
+					All recipes and values ({recipes.length + values.length})
 				</summary>
 				<h4>Recipes</h4>
 				<CompactList items={recipes} />
-				<h4>Paycheck steps</h4>
-				<CompactList items={steps} />
 				<h4>Named values</h4>
 				<CompactList items={values} />
 			</details>

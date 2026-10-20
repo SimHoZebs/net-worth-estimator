@@ -18,7 +18,6 @@ import type {
 	ErrorSSEData,
 	EvaluationInstance,
 	FinancialModelResponse,
-	IncomeDataSnapshot,
 	PinnedEvaluationsResponse,
 	ProblemDetails,
 	RowDeleteResponse,
@@ -334,15 +333,6 @@ export class ApiClient {
 	): Promise<Error | FinancialModelResponse> {
 		return this.requestJson<FinancialModelResponse>(
 			"financial-model",
-			requestInit("GET", undefined, options),
-		);
-	}
-
-	getIncomeData(
-		options: ApiRequestOptions = {},
-	): Promise<Error | IncomeDataSnapshot> {
-		return this.requestJson<IncomeDataSnapshot>(
-			"income-data",
 			requestInit("GET", undefined, options),
 		);
 	}

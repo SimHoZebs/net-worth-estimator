@@ -69,35 +69,6 @@ type movementAccountDelta = struct {
 	Delta     float64 `json:"delta"`
 }
 
-func cloneIncomeEvent(income *types.IncomeEvent) *types.IncomeEvent {
-	if income == nil {
-		return nil
-	}
-	cloned := *income
-	cloned.AnnualGrossIncome = roundCurrency(income.AnnualGrossIncome)
-	cloned.GrossAmount = roundCurrency(income.GrossAmount)
-	cloned.NetCashRequested = roundCurrency(income.NetCashRequested)
-	cloned.NetCashRealized = roundCurrency(income.NetCashRealized)
-	cloned.EmployerMatchRequested = roundCurrency(income.EmployerMatchRequested)
-	cloned.EmployerMatchRealized = roundCurrency(income.EmployerMatchRealized)
-	if income.Resolvers != nil {
-		cloned.Resolvers = make([]types.IncomeResolverEvent, len(income.Resolvers))
-		for index, resolver := range income.Resolvers {
-			resolver.RequestedAmount = roundCurrency(resolver.RequestedAmount)
-			resolver.RealizedAmount = roundCurrency(resolver.RealizedAmount)
-			resolver.TaxableAmountAfter = roundCurrency(resolver.TaxableAmountAfter)
-			resolver.EmployerMatchAmount = roundCurrency(resolver.EmployerMatchAmount)
-			resolver.EmployerMatchRealizedAmount = roundCurrency(resolver.EmployerMatchRealizedAmount)
-			if resolver.DestinationAccountID != nil {
-				destinationID := *resolver.DestinationAccountID
-				resolver.DestinationAccountID = &destinationID
-			}
-			cloned.Resolvers[index] = resolver
-		}
-	}
-	return &cloned
-}
-
 func cloneMovementEvent(event types.MovementEvent) types.MovementEvent {
 	cloned := event
 	cloned.RequestedAmount = roundCurrency(event.RequestedAmount)
@@ -117,7 +88,6 @@ func cloneMovementEvent(event types.MovementEvent) types.MovementEvent {
 		available := roundCurrency(*event.AvailableAmount)
 		cloned.AvailableAmount = &available
 	}
-	cloned.Income = cloneIncomeEvent(event.Income)
 	return cloned
 }
 
@@ -230,16 +200,6 @@ func classifyAttempts(attempts []*types.MovementEvent, postingsByID map[string]*
 				Delta:     delta.Delta,
 			})
 		}
-		if attempt.Income != nil {
-			resolverSum := 0.0
-			for _, resolver := range attempt.Income.Resolvers {
-				if resolver.DestinationAccountID != nil {
-					resolverSum += resolver.RealizedAmount
-				}
-			}
-			result.externalInflowAmount += attempt.Income.NetCashRealized + resolverSum + attempt.Income.EmployerMatchRealized
-			continue
-		}
 		switch {
 		case IsExternalInflow(posting):
 			// Inflow totals are net of investment losses: a negative
@@ -313,7 +273,6 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 		Rows:                rows,
 		MovementEvents:      run.MovementAttempts,
 		EffectiveDocument:   effectiveDocument,
-		IncomeData:          run.Request.IncomeData,
 		ProjectionStartDate: run.Request.StartDate,
 		ProjectionEndDate:   run.Request.EndDate,
 	}
@@ -400,8 +359,8 @@ func AdaptSimulationRun(prepared *types.PreparedProjection, run *types.Simulatio
 }
 
 // ProjectRawFinancialModelDocument prepares and simulates without evaluations.
-func ProjectRawFinancialModelDocument(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample, incomeData *types.IncomeDataSnapshot) (*types.ProjectionPath, *types.ProjectionResult, error) {
-	prepared, err := PrepareSimulationRequest(document, settings, overrides, monteCarloSample, incomeData)
+func ProjectRawFinancialModelDocument(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.ProjectionPath, *types.ProjectionResult, error) {
+	prepared, err := PrepareSimulationRequest(document, settings, overrides, monteCarloSample)
 	if err != nil {
 		return nil, nil, err
 	}

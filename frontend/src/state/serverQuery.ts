@@ -13,29 +13,19 @@ import { QueryClient } from "@tanstack/react-query";
 
 export function deterministicQueryKey(
 	documentKey: string,
-	incomeDataKey: string,
 	years: number,
 ): readonly unknown[] {
-	return ["deterministic-projection", documentKey, incomeDataKey, years];
+	return ["deterministic-projection", documentKey, years];
 }
 
 export function stochasticQueryKey(
 	documentKey: string,
-	incomeDataKey: string,
 	years: number,
 	runCount: number,
 	seed: number,
 	attempt: number,
 ): readonly unknown[] {
-	return [
-		"stochastic-projection",
-		documentKey,
-		incomeDataKey,
-		years,
-		runCount,
-		seed,
-		attempt,
-	];
+	return ["stochastic-projection", documentKey, years, runCount, seed, attempt];
 }
 
 let shared: QueryClient | null = null;

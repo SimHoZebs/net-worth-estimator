@@ -266,16 +266,6 @@ func ResolveOccurrences(rules []types.RecurrenceRule, postings []types.Posting, 
 	return resolved
 }
 
-// incomeDivisor converts an occurrence into its annual-income divisor:
-// rule instances divide by their rule's frequency, manual postings resolve
-// the whole annual figure at once.
-func incomeDivisor(occurrence DatedPostingOccurrence) int {
-	if occurrence.Rule != nil {
-		return FrequencyDivisor(occurrence.Rule.Frequency)
-	}
-	return 1
-}
-
 // ResolvedMovementPostings returns every movement identity in a document
 // as postings: manual postings in stored order, then one synthesized entry
 // per rule carrying the rule's template (ID, name, routes, amount).

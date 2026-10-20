@@ -111,11 +111,11 @@ Use a disposable database restored from a backup. From the repository root, copy
 
 ```bash
 export BASE_URL=http://127.0.0.1:8787
-export NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator-test.db
+export NET_WORTH_ESTIMATOR_DB=$PWD/tmp/net-worth-estimator-test.db
 unset NET_WORTH_ESTIMATOR_READ_ONLY
 unset NET_WORTH_ESTIMATOR_AUTH_TOKEN
 
-cp <backup>.db /tmp/net-worth-estimator-test.db
+cp <backup>.db tmp/net-worth-estimator-test.db
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
@@ -134,15 +134,13 @@ printf '\n'
 curl -fsS "$BASE_URL/v1/status" | jq .
 curl -fsS "$BASE_URL/v1/financial-model" \
   | jq '{accounts: (.document.accounts | length), postings: (.document.postings | length), checkpoints: (.document.checkpoints | length), issues}'
-curl -fsS "$BASE_URL/v1/income-data" \
-  | jq '{incomeSources: (.incomeSources | length), taxProfiles: (.taxProfiles | length)}'
 ```
 
 Expected baseline:
 
 - `/healthz` returns `ok`;
 - `/v1/status` reports the process configuration;
-- the model and income responses return 200;
+- the model response returns 200;
 - `issues` is an array;
 - warning-severity model issues may be present, but a projection must not run with error-severity issues.
 

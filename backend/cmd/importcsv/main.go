@@ -12,7 +12,6 @@ import (
 func main() {
 	dbPath := flag.String("db", "net-worth-estimator.db", "SQLite database path")
 	modelPath := flag.String("model", "public/configs", "directory containing model CSV files")
-	incomePath := flag.String("income", "public/data/income", "directory containing income CSV files")
 	flag.Parse()
 
 	database, err := store.Open(*dbPath)
@@ -20,8 +19,8 @@ func main() {
 		log.Fatalf("open store: %v", err)
 	}
 	defer database.Close()
-	if _, _, err := database.ImportCSV(*modelPath, *incomePath); err != nil {
+	if _, err := database.ImportCSV(*modelPath); err != nil {
 		log.Fatalf("import: %v", err)
 	}
-	fmt.Printf("imported %s and %s into %s\n", *modelPath, *incomePath, *dbPath)
+	fmt.Printf("imported %s into %s\n", *modelPath, *dbPath)
 }

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type {
 	AmountTemplate,
+	JsonValue,
 	PostingAmountResolution,
 } from "../../api/contracts.ts";
 import {
@@ -12,6 +13,24 @@ import { InputField, SelectField } from "../Field.tsx";
 function numberOr(fallback: number, value: string): number {
 	const parsed = Number(value);
 	return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+const DEFAULT_BRACKETS_JSON = JSON.stringify(
+	[
+		{ upTo: 2066.67, rate: 0.1 },
+		{ upTo: null, rate: 0.12 },
+	],
+	null,
+	1,
+);
+
+function parseBrackets(value: string): JsonValue[] {
+	try {
+		const parsed: unknown = JSON.parse(value || "[]");
+		return Array.isArray(parsed) ? (parsed as JsonValue[]) : [];
+	} catch {
+		return [];
+	}
 }
 
 type Option = { id: string; name: string };
@@ -129,27 +148,25 @@ export function buildTemplateAmount(
 					},
 				},
 			};
-		case "paycheck":
+		case "federal-tax":
 			return {
-				resolver: "income",
+				resolver: "progressive-bracket",
 				config: {
-					incomeSourceId: get("incomeSourceId", "salary"),
-					resolvers: [
-						{
-							resolver: "percentage",
-							config: {
-								rate: numberOr(0.1, get("rate", "0.10")),
-								annualCap: numberOr(23500, get("annualCap", "23500")),
-							},
-							destinationAccountId: get("destinationAccountId", "401k") || null,
-						},
-						{
-							resolver: "progressive-bracket",
-							config: { profileId: get("profileId", "federal") },
-						},
-					],
+					deduction: numberOr(1341.67, get("deduction", "1341.67")),
+					brackets: parseBrackets(get("brackets", DEFAULT_BRACKETS_JSON)),
 				},
-				inputs: {},
+				inputs: {
+					gross: {
+						source: "provider",
+						provider: "model-value",
+						arguments: { id: get("grossId", "salary") },
+					},
+					pretax: {
+						source: "provider",
+						provider: "model-value",
+						arguments: { id: get("pretaxId", "salary_401k") },
+					},
+				},
 			};
 		case "fixed":
 		default:
@@ -165,16 +182,12 @@ function TemplateFields({
 	templateId,
 	accounts,
 	postings,
-	incomeSources,
-	taxProfiles,
 	fields,
 	onField,
 }: {
 	templateId: string;
 	accounts: Option[];
 	postings: Option[];
-	incomeSources: Option[];
-	taxProfiles: Option[];
 	fields: Record<string, string>;
 	onField: (key: string, value: string) => void;
 }) {
@@ -320,42 +333,40 @@ function TemplateFields({
 					/>
 				</>
 			);
-		case "paycheck":
+		case "federal-tax":
 			return (
 				<>
 					<SelectField
-						label="Salary"
-						name="incomeSourceId"
-						{...set("incomeSourceId")}
+						label="Gross pay movement"
+						name="grossId"
+						{...set("grossId")}
 					>
-						{optionsFor(incomeSources, "Pick a salary")}
+						{optionsFor(postings, "Pick gross pay")}
 					</SelectField>
-					<InputField
-						label="Savings percent (0.10 = 10%)"
-						name="rate"
-						type="number"
-						step="0.001"
-						placeholder="e.g. 0.10"
-						{...set("rate")}
-					/>
-					<InputField
-						label="Yearly savings limit"
-						name="annualCap"
-						type="number"
-						step="1"
-						placeholder="e.g. 23500"
-						{...set("annualCap")}
-					/>
 					<SelectField
-						label="Savings go to"
-						name="destinationAccountId"
-						{...set("destinationAccountId")}
+						label="Pre-tax slice movement"
+						name="pretaxId"
+						{...set("pretaxId")}
 					>
-						{accountOptions("Pick an account")}
+						{optionsFor(postings, "Pick pre-tax slice")}
 					</SelectField>
-					<SelectField label="Tax table" name="profileId" {...set("profileId")}>
-						{optionsFor(taxProfiles, "Pick a tax table")}
-					</SelectField>
+					<InputField
+						label="Deduction per paycheck"
+						name="deduction"
+						type="number"
+						step="0.01"
+						placeholder="e.g. 1341.67"
+						{...set("deduction")}
+					/>
+					<label className="field">
+						<span>Brackets (JSON: upTo per paycheck, rate 0–1)</span>
+						<textarea
+							name="brackets"
+							rows={4}
+							defaultValue={fields["brackets"] ?? DEFAULT_BRACKETS_JSON}
+							onChange={(event) => onField("brackets", event.target.value)}
+						/>
+					</label>
 				</>
 			);
 		default:
@@ -366,8 +377,6 @@ function TemplateFields({
 export function AmountBuilder({
 	accounts,
 	postings,
-	incomeSources,
-	taxProfiles,
 	templates,
 	initialTemplateId,
 	hidePicker,
@@ -376,8 +385,6 @@ export function AmountBuilder({
 }: {
 	accounts: Option[];
 	postings: Option[];
-	incomeSources: Option[];
-	taxProfiles: Option[];
 	templates?: AmountTemplate[];
 	initialTemplateId?: string;
 	hidePicker?: boolean;
@@ -429,8 +436,6 @@ export function AmountBuilder({
 						templateId={template.id}
 						accounts={accounts}
 						postings={postings}
-						incomeSources={incomeSources}
-						taxProfiles={taxProfiles}
 						fields={fields}
 						onField={(key, value) =>
 							setFields((previous) => ({ ...previous, [key]: value }))

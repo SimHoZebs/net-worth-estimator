@@ -7,9 +7,10 @@ Run the API and frontend as separate processes from the repository root:
 ```bash
 # terminal 1
 # Local state comes from a database backup, never the shipped CSVs: copy a
-# backup to the dev database path while the server is stopped.
-cp <backup>.db /tmp/net-worth-estimator.db
-NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
+# backup to the dev database path while the server is stopped. tmp/ is
+# gitignored and survives reboot, unlike /tmp.
+cp <backup>.db tmp/net-worth-estimator.db
+NET_WORTH_ESTIMATOR_DB=$PWD/tmp/net-worth-estimator.db \
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
@@ -34,10 +35,10 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 | `backend/cmd/server/`         | configuration, startup, graceful shutdown, SimpleFIN scheduler                                                  |
 | `backend/cmd/importcsv/`      | offline CSV replacement into an existing SQLite database                                                        |
 | `backend/internal/api/`       | HTTP routes, CORS, bearer guard, deterministic API, stochastic SSE, artifact identity                           |
-| `backend/internal/types/`     | persisted model (postings, recurrence rules, claims), income, request, result, evaluation, and validation types |
-| `backend/internal/store/`     | `Store`, SQLite migrations, model/income persistence, sync ownership, bounded artifacts                         |
+| `backend/internal/types/`     | persisted model (postings, recurrence rules, claims), request, result, evaluation, and validation types |
+| `backend/internal/store/`     | `Store`, SQLite schema, model persistence, sync ownership, bounded artifacts                                        |
 | `backend/internal/domain/`    | validation, request preparation, shared transitions, simulation, evaluations, stochastic kernels                |
-| `backend/internal/csvio/`     | canonical model and income CSV import                                                                           |
+| `backend/internal/csvio/`     | canonical model CSV import                                                                                      |
 | `backend/internal/simplefin/` | Bridge client, mapping, scheduler-safe runner, dry-run, mock fixture mode                                       |
 | `backend/scripts/`            | verification and benchmark entry points                                                                         |
 | `scripts/`                    | backend smoke and container smoke                                                                               |
@@ -53,7 +54,6 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 | `PORT`                                               | `8787`                                                         | listen port                                                                                                  |
 | `NET_WORTH_ESTIMATOR_DB`                             | per-user SQLite path; container `/data/net-worth-estimator.db` | canonical data and artifacts                                                                                 |
 | `NET_WORTH_ESTIMATOR_MODEL_PATH`                     | `public/configs`                                               | CSV directory for `cmd/fixtureapi` browser-test seeding; the server never reads it                           |
-| `NET_WORTH_ESTIMATOR_INCOME_PATH`                    | `public/data/income`                                           | CSV directory for `cmd/fixtureapi` browser-test seeding; the server never reads it                           |
 | `NET_WORTH_ESTIMATOR_FRONTEND_PATH`                  | empty                                                          | optional built frontend directory for binary-only same-origin static serving                                 |
 | `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`                | empty                                                          | comma-separated exact HTTP/S origins for direct cross-origin API access                                      |
 | `NET_WORTH_ESTIMATOR_READ_ONLY`                      | writable                                                       | `1`, `true`, or `yes` rejects guarded writes with 403                                                        |
@@ -68,15 +68,15 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 
 ## API and Persistence Flow
 
-- `api.New(store.Store, api.Config)` builds the router. Current routes: `GET /healthz`, `GET /v1/financial-model`, row endpoints under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, amount presets under `/v1/amount-presets`, pinned evaluations under `/v1/pinned-evaluations`, link endpoints under `/v1/sync/simplefin/accounts`, `GET /v1/status`, `GET /v1/income-data`, `GET /v1/amount-resolvers`, `POST /v1/projections/deterministic`, `POST /v1/projections/stochastic`, and `POST /v1/sync/simplefin`.
+- `api.New(store.Store, api.Config)` builds the router. Current routes: `GET /healthz`, `GET /v1/financial-model`, row endpoints under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, amount presets under `/v1/amount-presets`, pinned evaluations under `/v1/pinned-evaluations`, link endpoints under `/v1/sync/simplefin/accounts`, `GET /v1/status`, `GET /v1/amount-resolvers`, `POST /v1/projections/deterministic`, `POST /v1/projections/stochastic`, and `POST /v1/sync/simplefin`.
 
 ## Core Go APIs
 
 | Symbol                                                                 | Contract                                                           |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `store.Open`, `store.Store`                                            | migrated persistence and synchronization boundary                  |
+| `store.Open`, `store.Store`                                            | SQLite persistence and synchronization boundary                      |
 | `api.New`, `api.Server`, `api.Config`                                  | HTTP wiring and access policy                                      |
-| `domain.ValidateFinancialModel`                                        | model and income cross-validation                                  |
+| `domain.ValidateFinancialModel`                                        | model cross-validation                                             |
 | `domain.PrepareSimulationRequest`                                      | overrides, history, dates, state, and request preparation          |
 | `domain.Simulate`                                                      | deterministic movement kernel                                      |
 | `domain.AdaptSimulationRun`, `domain.ProjectRawFinancialModelDocument` | path and public-result adaptation                                  |
