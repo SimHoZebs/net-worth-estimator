@@ -1,6 +1,6 @@
 import { useBeforeUnload } from "./state/useBeforeUnload.ts";
 import { DraftBar } from "./workspace/DraftBar.tsx";
-import type { TimingDetailTab } from "./pages/outlook/TimingDetailDialog.tsx";
+import type { TimingDetailTab } from "./pages/outlook/timing/timingDetailModel.ts";
 import "./workspace/workspace.css";
 import { useWorkspaceStore } from "./state/workspaceStore.ts";
 import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation.ts";

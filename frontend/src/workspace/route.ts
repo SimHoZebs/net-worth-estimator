@@ -1,7 +1,7 @@
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { Account, Evaluation, Movement } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/planEdits.ts";
-import type { TimingDetailTab } from "../pages/outlook/TimingDetailDialog.tsx";
+import type { TimingDetailTab } from "../pages/outlook/timing/timingDetailModel.ts";
 import { pages, type Page } from "./navigation.ts";
 
 // URL-driven overlays. The hash carries the page plus at most one overlay:

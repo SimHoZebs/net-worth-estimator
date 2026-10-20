@@ -2,7 +2,7 @@ import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
 import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
-import type { TimingDetailTab } from "../pages/outlook/TimingDetailDialog.tsx";
+import type { TimingDetailTab } from "../pages/outlook/timing/timingDetailModel.ts";
 import { PlanPage } from "../pages/PlanPage.tsx";
 import { SourcesPage } from "../pages/SourcesPage.tsx";
 import type { Page } from "./navigation.ts";

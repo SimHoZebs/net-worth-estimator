@@ -11,8 +11,8 @@ import { EvaluationPreview } from "./outlook/EvaluationPreview.tsx";
 import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
 import { FundingInsight } from "./outlook/FundingInsight.tsx";
 import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
-import type { TimingDetailTab } from "./outlook/TimingDetailDialog.tsx";
-import { TimingPreview } from "./outlook/TimingPreview.tsx";
+import type { TimingDetailTab } from "./outlook/timing/timingDetailModel.ts";
+import { TimingPreview } from "./outlook/timing/TimingPreview.tsx";
 import "./outlook/outlook.css";
 
 export function Outlook({
