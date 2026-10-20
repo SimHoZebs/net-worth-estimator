@@ -41,9 +41,7 @@
       {
         "name": "seed_checking",
         "sourceAccountId": null,
-        "destinations": [
-          "checking"
-        ],
+        "destinations": ["checking"],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -81,9 +79,7 @@
       {
         "name": "growth",
         "sourceAccountId": "checking",
-        "destinations": [
-          "brokerage"
-        ],
+        "destinations": ["brokerage"],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -125,9 +121,7 @@
                 "included": true
               }
             ],
-            "continuingPostingIds": [
-              "growth"
-            ],
+            "continuingPostingIds": ["growth"],
             "principalPolicy": "preserve-real-principal"
           }
         }

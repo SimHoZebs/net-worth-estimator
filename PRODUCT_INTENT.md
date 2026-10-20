@@ -62,40 +62,40 @@ The product should preserve room for a less technical household user. It should 
 
 The product must help the user complete these jobs:
 
-| User question | Required response |
-| --- | --- |
-| Where are we now? | Current net worth, account balances, recorded-versus-modeled status, and data freshness. |
-| What happens if nothing changes? | A base-case projection from the current plan through the selected horizon. |
-| How uncertain is that outcome? | A median and an interpretable range across modeled scenarios when ranges are enabled. |
-| Can we reach our goals? | Goal outcomes, dates, status, and uncertainty where available. |
-| What fails first? | The first underfulfilled movement or goal, with its date, amount, and limiting constraint. |
-| Why does it fail? | The relevant account, movement, limit, funding source, or other plan constraint. |
-| What is happening soon? | Cash available, upcoming commitments, replenishment cadence, and a conservative near-term spending assessment when supported by the plan. |
-| What is the plan made of? | Accounts, contributions, transfers, planned income, recurring rules, one-time movements, balance checks, and goal definitions. |
-| What happens if I change this? | A temporary version whose outcomes can be compared descriptively with the saved or previously captured state. |
-| Can I trust this? | Clear separation of recorded facts, assumptions, planned movements, projections, ranges, goal outcomes, and inferred evidence. |
-| How do I fix or verify it? | A precise path to the relevant record or assumption, followed by an explicit save or discard decision. |
+| User question                    | Required response                                                                                                                         |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Where are we now?                | Current net worth, account balances, recorded-versus-modeled status, and data freshness.                                                  |
+| What happens if nothing changes? | A base-case projection from the current plan through the selected horizon.                                                                |
+| How uncertain is that outcome?   | A median and an interpretable range across modeled scenarios when ranges are enabled.                                                     |
+| Can we reach our goals?          | Goal outcomes, dates, status, and uncertainty where available.                                                                            |
+| What fails first?                | The first underfulfilled movement or goal, with its date, amount, and limiting constraint.                                                |
+| Why does it fail?                | The relevant account, movement, limit, funding source, or other plan constraint.                                                          |
+| What is happening soon?          | Cash available, upcoming commitments, replenishment cadence, and a conservative near-term spending assessment when supported by the plan. |
+| What is the plan made of?        | Accounts, contributions, transfers, planned income, recurring rules, one-time movements, balance checks, and goal definitions.            |
+| What happens if I change this?   | A temporary version whose outcomes can be compared descriptively with the saved or previously captured state.                             |
+| Can I trust this?                | Clear separation of recorded facts, assumptions, planned movements, projections, ranges, goal outcomes, and inferred evidence.            |
+| How do I fix or verify it?       | A precise path to the relevant record or assumption, followed by an explicit save or discard decision.                                    |
 
 ## 4. Core concepts
 
 The product must make these concepts understandable without specialist documentation.
 
-| Concept | Meaning |
-| --- | --- |
-| **Recorded** | A balance or movement explicitly supplied by a source or recorded as a balance check. It is evidence of a point-in-time state, not a promise about the future. |
-| **Balance check** | A recorded end-of-day account balance used to correct modeled history and establish what was known to be true at that date. |
-| **Planned movement** | An expected movement into, out of, or between accounts. |
-| **Account rule** | A recurring or constrained movement associated with an account. |
-| **Plan** | The saved collection of accounts, movements, balance checks, assumptions, source information, and goal definitions. |
-| **Temporary version** | An edited plan used for evaluation without changing the saved plan. |
-| **Projection** | A calculated future path from the current plan and chosen horizon. |
-| **Base case** | The projection using central assumptions without scenario variation. It is a calculation, not a prediction of what must happen. |
-| **Range** | A percentile band across modeled scenarios. Its meaning must remain clear without requiring specialist terminology. |
-| **Goal check** | A named question applied to a projection, such as whether a goal is reached, spending is sustainable, or planned movements are fulfilled. |
-| **Financial independence** | A configurable goal check combining a minimum-net-worth gate, configured annual-expense coverage, selected funding sources, a withdrawal policy, explicitly selected continuing movements, a principal policy, and required confidence. Continuing movements are user-selected and never inferred from labels, categories, identity, or rates. |
-| **Evidence analysis** | An independent inference from posting-derived external inflows, such as an estimate of posting-derived net pay. It does not independently verify bank provenance. |
-| **Comparison** | A descriptive snapshot of selected measures. It does not store or restore another plan. |
-| **Household safe spending** | Optional near-term context about cash, commitments, replenishment, and conservative room to spend. It is separate from longer-term structural constraints unless an explicit product rule combines them. |
+| Concept                     | Meaning                                                                                                                                                                                                                                                                                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recorded**                | A balance or movement explicitly supplied by a source or recorded as a balance check. It is evidence of a point-in-time state, not a promise about the future.                                                                                                                                                                                 |
+| **Balance check**           | A recorded end-of-day account balance used to correct modeled history and establish what was known to be true at that date.                                                                                                                                                                                                                    |
+| **Planned movement**        | An expected movement into, out of, or between accounts.                                                                                                                                                                                                                                                                                        |
+| **Account rule**            | A recurring or constrained movement associated with an account.                                                                                                                                                                                                                                                                                |
+| **Plan**                    | The saved collection of accounts, movements, balance checks, assumptions, source information, and goal definitions.                                                                                                                                                                                                                            |
+| **Temporary version**       | An edited plan used for evaluation without changing the saved plan.                                                                                                                                                                                                                                                                            |
+| **Projection**              | A calculated future path from the current plan and chosen horizon.                                                                                                                                                                                                                                                                             |
+| **Base case**               | The projection using central assumptions without scenario variation. It is a calculation, not a prediction of what must happen.                                                                                                                                                                                                                |
+| **Range**                   | A percentile band across modeled scenarios. Its meaning must remain clear without requiring specialist terminology.                                                                                                                                                                                                                            |
+| **Goal check**              | A named question applied to a projection, such as whether a goal is reached, spending is sustainable, or planned movements are fulfilled.                                                                                                                                                                                                      |
+| **Financial independence**  | A configurable goal check combining a minimum-net-worth gate, configured annual-expense coverage, selected funding sources, a withdrawal policy, explicitly selected continuing movements, a principal policy, and required confidence. Continuing movements are user-selected and never inferred from labels, categories, identity, or rates. |
+| **Evidence analysis**       | An independent inference from posting-derived external inflows, such as an estimate of posting-derived net pay. It does not independently verify bank provenance.                                                                                                                                                                              |
+| **Comparison**              | A descriptive snapshot of selected measures. It does not store or restore another plan.                                                                                                                                                                                                                                                        |
+| **Household safe spending** | Optional near-term context about cash, commitments, replenishment, and conservative room to spend. It is separate from longer-term structural constraints unless an explicit product rule combines them.                                                                                                                                       |
 
 ## 5. Required product knowledge
 

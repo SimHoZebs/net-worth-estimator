@@ -30,21 +30,21 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 
 ## Backend Map
 
-| Path                          | Responsibility                                                                                                  |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `backend/cmd/server/`         | configuration, startup, graceful shutdown, SimpleFIN scheduler                                                  |
-| `backend/cmd/importcsv/`      | offline CSV replacement into an existing SQLite database                                                        |
-| `backend/internal/api/`       | HTTP routes, CORS, bearer guard, deterministic API, stochastic SSE, artifact identity                           |
+| Path                          | Responsibility                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `backend/cmd/server/`         | configuration, startup, graceful shutdown, SimpleFIN scheduler                                          |
+| `backend/cmd/importcsv/`      | offline CSV replacement into an existing SQLite database                                                |
+| `backend/internal/api/`       | HTTP routes, CORS, bearer guard, deterministic API, stochastic SSE, artifact identity                   |
 | `backend/internal/types/`     | persisted model (postings, recurrence rules, claims), request, result, evaluation, and validation types |
-| `backend/internal/store/`     | `Store`, SQLite schema, model persistence, sync ownership, bounded artifacts                                        |
-| `backend/internal/domain/`    | validation, request preparation, shared transitions, simulation, evaluations, stochastic kernels                |
-| `backend/internal/csvio/`     | canonical model CSV import                                                                                      |
-| `backend/internal/simplefin/` | Bridge client, mapping, scheduler-safe runner, dry-run, mock fixture mode                                       |
-| `backend/scripts/`            | verification and benchmark entry points                                                                         |
-| `scripts/`                    | backend smoke and container smoke                                                                               |
-| `backend/Dockerfile`          | API-only container image                                                                                        |
-| `frontend/Dockerfile`         | static frontend image and runtime API proxy                                                                     |
-| `docker-compose.yml`          | split local/full-stack deployment                                                                               |
+| `backend/internal/store/`     | `Store`, SQLite schema, model persistence, sync ownership, bounded artifacts                            |
+| `backend/internal/domain/`    | validation, request preparation, shared transitions, simulation, evaluations, stochastic kernels        |
+| `backend/internal/csvio/`     | canonical model CSV import                                                                              |
+| `backend/internal/simplefin/` | Bridge client, mapping, scheduler-safe runner, dry-run, mock fixture mode                               |
+| `backend/scripts/`            | verification and benchmark entry points                                                                 |
+| `scripts/`                    | backend smoke and container smoke                                                                       |
+| `backend/Dockerfile`          | API-only container image                                                                                |
+| `frontend/Dockerfile`         | static frontend image and runtime API proxy                                                             |
+| `docker-compose.yml`          | split local/full-stack deployment                                                                       |
 
 ## Runtime Configuration
 
@@ -74,7 +74,7 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 
 | Symbol                                                                 | Contract                                                           |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `store.Open`, `store.Store`                                            | SQLite persistence and synchronization boundary                      |
+| `store.Open`, `store.Store`                                            | SQLite persistence and synchronization boundary                    |
 | `api.New`, `api.Server`, `api.Config`                                  | HTTP wiring and access policy                                      |
 | `domain.ValidateFinancialModel`                                        | model cross-validation                                             |
 | `domain.PrepareSimulationRequest`                                      | overrides, history, dates, state, and request preparation          |

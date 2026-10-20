@@ -40,9 +40,7 @@
       {
         "name": "historical_checking",
         "sourceAccountId": null,
-        "destinations": [
-          "checking"
-        ],
+        "destinations": ["checking"],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -58,9 +56,7 @@
       {
         "name": "historical_brokerage",
         "sourceAccountId": null,
-        "destinations": [
-          "brokerage"
-        ],
+        "destinations": ["brokerage"],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -94,9 +90,7 @@
       {
         "name": "salary",
         "sourceAccountId": null,
-        "destinations": [
-          "checking"
-        ],
+        "destinations": ["checking"],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -134,9 +128,7 @@
       {
         "name": "invest",
         "sourceAccountId": "checking",
-        "destinations": [
-          "brokerage"
-        ],
+        "destinations": ["brokerage"],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -155,9 +147,7 @@
       {
         "name": "paydown",
         "sourceAccountId": "checking",
-        "destinations": [
-          "loan"
-        ],
+        "destinations": ["loan"],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -509,9 +499,7 @@
         {
           "name": "historical_checking",
           "sourceAccountId": null,
-          "destinations": [
-            "checking"
-          ],
+          "destinations": ["checking"],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -530,9 +518,7 @@
         {
           "name": "historical_brokerage",
           "sourceAccountId": null,
-          "destinations": [
-            "brokerage"
-          ],
+          "destinations": ["brokerage"],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -570,9 +556,7 @@
         {
           "name": "salary",
           "sourceAccountId": null,
-          "destinations": [
-            "checking"
-          ],
+          "destinations": ["checking"],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -610,9 +594,7 @@
         {
           "name": "invest",
           "sourceAccountId": "checking",
-          "destinations": [
-            "brokerage"
-          ],
+          "destinations": ["brokerage"],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -631,9 +613,7 @@
         {
           "name": "paydown",
           "sourceAccountId": "checking",
-          "destinations": [
-            "loan"
-          ],
+          "destinations": ["loan"],
           "amount": {
             "resolver": "expression",
             "config": {
