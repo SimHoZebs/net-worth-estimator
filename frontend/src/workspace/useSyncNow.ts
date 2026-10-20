@@ -22,9 +22,7 @@ export function useSyncNow({ client }: { client?: SyncTriggerClient } = {}) {
 		setSyncing(true);
 		setError(null);
 		try {
-			const result = await api.triggerSimpleFIN(
-				authToken ? { authToken } : {},
-			);
+			const result = await api.triggerSimpleFIN(authToken ? { authToken } : {});
 			if (result instanceof Error) {
 				setError(result.message);
 				return false;

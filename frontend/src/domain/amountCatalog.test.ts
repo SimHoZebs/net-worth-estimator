@@ -23,7 +23,9 @@ describe("amount catalog", () => {
 		const accounts = [{ id: "checking" }, { id: "brokerage" }];
 		for (const template of FALLBACK_TEMPLATES) {
 			const amount = buildTemplateAmount(template.id, {}, accounts);
-			expect(amount.resolver).toBe(template.resolver ?? template.amount?.resolver);
+			expect(amount.resolver).toBe(
+				template.resolver ?? template.amount?.resolver,
+			);
 			expect(plainLanguageForAmount(amount)).toBeTruthy();
 		}
 	});

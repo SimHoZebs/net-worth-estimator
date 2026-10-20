@@ -42,7 +42,12 @@ function useRemoteNames() {
 	return remote;
 }
 
-type CopyEntry = { name: string; label?: string | null; summary?: string | null; description?: string | null };
+type CopyEntry = {
+	name: string;
+	label?: string | null;
+	summary?: string | null;
+	description?: string | null;
+};
 
 // Frontend owns all human words. Backend names unknown here get a generic
 // entry from the backend technical description.
@@ -68,7 +73,11 @@ function mergeCopy(
 	return items;
 }
 
-function CompactList({ items }: { items: { key: string; title: string; text: string }[] }) {
+function CompactList({
+	items,
+}: {
+	items: { key: string; title: string; text: string }[];
+}) {
 	return (
 		<ul className="catalog-list">
 			{items.map((item) => (
@@ -111,7 +120,9 @@ export function AmountCatalog({
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
 	const workspace = useWorkspaceStore((state) => state.workspace);
 	const readOnly =
-		(status?.readOnly ?? false) || writeBlocked || (workspace?.saved.readOnly ?? false);
+		(status?.readOnly ?? false) ||
+		writeBlocked ||
+		(workspace?.saved.readOnly ?? false);
 
 	// Server presets are the source of truth; the local list only covers
 	// the offline gap before the first load.
@@ -132,7 +143,8 @@ export function AmountCatalog({
 	const [creating, setCreating] = useState(false);
 	const [editing, setEditing] = useState(false);
 	const [deleting, setDeleting] = useState(false);
-	const [stagedAmount, setStagedAmount] = useState<PostingAmountResolution | null>(null);
+	const [stagedAmount, setStagedAmount] =
+		useState<PostingAmountResolution | null>(null);
 
 	const recipes = mergeCopy(FALLBACK_RESOLVERS, remote?.resolvers ?? []);
 	const steps = mergeCopy(FALLBACK_INCOME_STEPS, remote?.incomeSteps ?? []);
@@ -313,9 +325,7 @@ export function AmountCatalog({
 						initialTemplateId="fixed"
 						onChange={setStagedAmount}
 					/>
-					{stagedAmount && (
-						<p className="muted">Amount ready to save.</p>
-					)}
+					{stagedAmount && <p className="muted">Amount ready to save.</p>}
 					<div className="modal-actions">
 						<button
 							type="button"
@@ -376,7 +386,11 @@ export function AmountCatalog({
 							incomeSources={incomeSources}
 							taxProfiles={taxProfiles}
 							templates={templates}
-							initialTemplateId={BUILT_IN_TEMPLATE_IDS.has(selectedPreset.name) ? selectedPreset.name : "fixed"}
+							initialTemplateId={
+								BUILT_IN_TEMPLATE_IDS.has(selectedPreset.name)
+									? selectedPreset.name
+									: "fixed"
+							}
 							onChange={setStagedAmount}
 						/>
 					</details>
@@ -410,8 +424,8 @@ export function AmountCatalog({
 					}}
 				>
 					<p>
-						The recipe stops appearing as a starting point. Movements
-						already using its amounts are unaffected.
+						The recipe stops appearing as a starting point. Movements already
+						using its amounts are unaffected.
 					</p>
 				</ConfirmDialog>
 			)}
@@ -431,7 +445,8 @@ export function AmountCatalog({
 			)}
 			<details>
 				<summary>
-					All recipes and values ({recipes.length + steps.length + values.length})
+					All recipes and values (
+					{recipes.length + steps.length + values.length})
 				</summary>
 				<h4>Recipes</h4>
 				<CompactList items={recipes} />

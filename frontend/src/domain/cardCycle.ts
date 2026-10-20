@@ -1,5 +1,10 @@
 import type { AccountTransaction } from "./accountActivity.ts";
-import { clampMonth, daysBetweenInclusive, isoDate, utcDate } from "./format.ts";
+import {
+	clampMonth,
+	daysBetweenInclusive,
+	isoDate,
+	utcDate,
+} from "./format.ts";
 
 export interface StatementCycle {
 	cycleStart: string;

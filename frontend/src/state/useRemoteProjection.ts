@@ -770,7 +770,9 @@ export function useRemoteProjection({
 	// components subscribe where the query is declared instead of receiving
 	// fetched data as props. Null stays explicit: it means "none", not
 	// "fall back".
-	const storeDraft = useWorkspaceStore((state) => state.workspace?.draft ?? null);
+	const storeDraft = useWorkspaceStore(
+		(state) => state.workspace?.draft ?? null,
+	);
 	const storeDocument = useWorkspaceStore((state) => state.serverDocument);
 	const storeDraftPresentation = useWorkspaceStore(
 		(state) => state.draftPresentation,
