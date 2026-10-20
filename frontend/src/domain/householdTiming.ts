@@ -157,7 +157,8 @@ export function nextPaycheck({
 	const first = upcoming[0];
 	if (!first) return null;
 	const earliest = upcoming.reduce(
-		(firstDate, movement) => (movement.date < firstDate ? movement.date : firstDate),
+		(firstDate, movement) =>
+			movement.date < firstDate ? movement.date : firstDate,
 		first.date,
 	);
 	const amount = upcoming
@@ -361,7 +362,9 @@ export function mandatoryTransactions({
 	plan: Plan;
 }): AccountTransaction[] {
 	const sources = new Set(checkingIds);
-	const names = new Map(plan.accounts.map((account) => [account.id, account.name]));
+	const names = new Map(
+		plan.accounts.map((account) => [account.id, account.name]),
+	);
 	const rows: AccountTransaction[] = [];
 	let index = 0;
 	for (const movement of movements) {

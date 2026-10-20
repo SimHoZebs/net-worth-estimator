@@ -53,7 +53,8 @@ export const FALLBACK_PROVIDERS: CopyEntry[] = [
 	{
 		name: "account-balance",
 		label: "Account balance",
-		summary: "The live balance of one account on that date. Moves with the projection.",
+		summary:
+			"The live balance of one account on that date. Moves with the projection.",
 	},
 	{
 		name: "occurrence-rate",
@@ -107,7 +108,8 @@ export const FALLBACK_TEMPLATES: AmountTemplate[] = [
 	{
 		id: "growth",
 		label: "Grows yearly by %",
-		summary: "Starts at a base amount, then grows by a yearly percent from the start date.",
+		summary:
+			"Starts at a base amount, then grows by a yearly percent from the start date.",
 		whenToUse: "Salary that rises 3% a year, rent that climbs.",
 		resolver: "expression",
 		amount: {
@@ -145,7 +147,8 @@ export const FALLBACK_TEMPLATES: AmountTemplate[] = [
 	{
 		id: "investment-growth",
 		label: "Investment growth",
-		summary: "Balance times a yearly rate, split across paychecks. Add wobble to model uncertainty ranges.",
+		summary:
+			"Balance times a yearly rate, split across paychecks. Add wobble to model uncertainty ranges.",
 		whenToUse: "Brokerage or savings growth with optional volatility.",
 		resolver: "expression",
 		amount: {
@@ -196,7 +199,11 @@ export const FALLBACK_TEMPLATES: AmountTemplate[] = [
 				fee: {
 					source: "provider",
 					provider: "late-fee",
-					arguments: { payment: "card_payment", account: "prime_card", fee: 30 },
+					arguments: {
+						payment: "card_payment",
+						account: "prime_card",
+						fee: 30,
+					},
 				},
 			},
 		},
@@ -222,7 +229,8 @@ export const FALLBACK_TEMPLATES: AmountTemplate[] = [
 	{
 		id: "paycheck",
 		label: "Paycheck take-home",
-		summary: "Yearly salary minus 401k percent and tax table, in order. Remainder lands as take-home pay.",
+		summary:
+			"Yearly salary minus 401k percent and tax table, in order. Remainder lands as take-home pay.",
 		whenToUse: "Any salary with pre-tax savings and taxes.",
 		resolver: "income",
 		amount: {
@@ -248,11 +256,12 @@ export function plainLanguageForAmount(
 ): string {
 	if (!amount) return "No amount set.";
 	if (amount.resolver === "income") {
-		const steps = (
-			(amount.config as Record<string, unknown> | null)?.resolvers as
-				| Array<{ resolver?: string }>
-				| undefined
-		)?.length ?? 0;
+		const steps =
+			(
+				(amount.config as Record<string, unknown> | null)?.resolvers as
+					| Array<{ resolver?: string }>
+					| undefined
+			)?.length ?? 0;
 		return `Take-home pay: salary minus ${steps} step${steps === 1 ? "" : "s"} in order. Remainder is deposited.`;
 	}
 	const expression =

@@ -180,63 +180,182 @@ function TemplateFields({
 }) {
 	const set = (key: string) => ({
 		value: fields[key] ?? "",
-		onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-			onField(key, event.target.value),
+		onChange: (
+			event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+		) => onField(key, event.target.value),
 	});
-	const accountOptions = (placeholder: string) => optionsFor(accounts, placeholder);
+	const accountOptions = (placeholder: string) =>
+		optionsFor(accounts, placeholder);
 	switch (templateId) {
 		case "fixed":
 			return (
-				<InputField label="Dollars each time" name="amount" type="number" step="0.01" placeholder="e.g. 500" {...set("amount")} />
+				<InputField
+					label="Dollars each time"
+					name="amount"
+					type="number"
+					step="0.01"
+					placeholder="e.g. 500"
+					{...set("amount")}
+				/>
 			);
 		case "growth":
 			return (
 				<>
-					<InputField label="Starting dollars" name="base" type="number" step="0.01" placeholder="e.g. 500" {...set("base")} />
-					<InputField label="Yearly growth (0.03 = 3%)" name="annualGrowthRate" type="number" step="0.001" placeholder="e.g. 0.03" {...set("annualGrowthRate")} />
+					<InputField
+						label="Starting dollars"
+						name="base"
+						type="number"
+						step="0.01"
+						placeholder="e.g. 500"
+						{...set("base")}
+					/>
+					<InputField
+						label="Yearly growth (0.03 = 3%)"
+						name="annualGrowthRate"
+						type="number"
+						step="0.001"
+						placeholder="e.g. 0.03"
+						{...set("annualGrowthRate")}
+					/>
 				</>
 			);
 		case "account-percent":
 			return (
 				<>
-					<SelectField label="Account" name="accountId" {...set("accountId")}>{accountOptions("Pick an account")}</SelectField>
-					<InputField label="Percent (0.04 = 4%)" name="pct" type="number" step="0.001" placeholder="e.g. 0.04" {...set("pct")} />
+					<SelectField label="Account" name="accountId" {...set("accountId")}>
+						{accountOptions("Pick an account")}
+					</SelectField>
+					<InputField
+						label="Percent (0.04 = 4%)"
+						name="pct"
+						type="number"
+						step="0.001"
+						placeholder="e.g. 0.04"
+						{...set("pct")}
+					/>
 				</>
 			);
 		case "investment-growth":
 			return (
 				<>
-					<SelectField label="Balance to grow" name="refId" {...set("refId")}>{accountOptions("Pick an account")}</SelectField>
-					<InputField label="Yearly rate (0.07 = 7%)" name="annualRate" type="number" step="0.001" placeholder="e.g. 0.07" {...set("annualRate")} />
-					<InputField label="Wobble (0 = exact, 0.12 = bumpy)" name="volatility" type="number" step="0.01" placeholder="e.g. 0.12" {...set("volatility")} />
+					<SelectField label="Balance to grow" name="refId" {...set("refId")}>
+						{accountOptions("Pick an account")}
+					</SelectField>
+					<InputField
+						label="Yearly rate (0.07 = 7%)"
+						name="annualRate"
+						type="number"
+						step="0.001"
+						placeholder="e.g. 0.07"
+						{...set("annualRate")}
+					/>
+					<InputField
+						label="Wobble (0 = exact, 0.12 = bumpy)"
+						name="volatility"
+						type="number"
+						step="0.01"
+						placeholder="e.g. 0.12"
+						{...set("volatility")}
+					/>
 				</>
 			);
 		case "debt-minimum":
-			return <SelectField label="Card account" name="accountId" {...set("accountId")}>{accountOptions("Pick an account")}</SelectField>;
+			return (
+				<SelectField
+					label="Card account"
+					name="accountId"
+					{...set("accountId")}
+				>
+					{accountOptions("Pick an account")}
+				</SelectField>
+			);
 		case "late-fee":
 			return (
 				<>
-					<SelectField label="Payment to check" name="paymentId" {...set("paymentId")}>{optionsFor(postings, "Pick a movement")}</SelectField>
-					<SelectField label="Card account" name="accountId" {...set("accountId")}>{accountOptions("Pick an account")}</SelectField>
-					<InputField label="Fee dollars" name="fee" type="number" step="0.01" placeholder="e.g. 30" {...set("fee")} />
+					<SelectField
+						label="Payment to check"
+						name="paymentId"
+						{...set("paymentId")}
+					>
+						{optionsFor(postings, "Pick a movement")}
+					</SelectField>
+					<SelectField
+						label="Card account"
+						name="accountId"
+						{...set("accountId")}
+					>
+						{accountOptions("Pick an account")}
+					</SelectField>
+					<InputField
+						label="Fee dollars"
+						name="fee"
+						type="number"
+						step="0.01"
+						placeholder="e.g. 30"
+						{...set("fee")}
+					/>
 				</>
 			);
 		case "low-balance-fee":
 			return (
 				<>
-					<SelectField label="Account" name="accountId" {...set("accountId")}>{accountOptions("Pick an account")}</SelectField>
-					<InputField label="Balance limit" name="threshold" type="number" step="0.01" placeholder="e.g. 1500" {...set("threshold")} />
-					<InputField label="Fee dollars" name="fee" type="number" step="0.01" placeholder="e.g. 12" {...set("fee")} />
+					<SelectField label="Account" name="accountId" {...set("accountId")}>
+						{accountOptions("Pick an account")}
+					</SelectField>
+					<InputField
+						label="Balance limit"
+						name="threshold"
+						type="number"
+						step="0.01"
+						placeholder="e.g. 1500"
+						{...set("threshold")}
+					/>
+					<InputField
+						label="Fee dollars"
+						name="fee"
+						type="number"
+						step="0.01"
+						placeholder="e.g. 12"
+						{...set("fee")}
+					/>
 				</>
 			);
 		case "paycheck":
 			return (
 				<>
-					<SelectField label="Salary" name="incomeSourceId" {...set("incomeSourceId")}>{optionsFor(incomeSources, "Pick a salary")}</SelectField>
-					<InputField label="Savings percent (0.10 = 10%)" name="rate" type="number" step="0.001" placeholder="e.g. 0.10" {...set("rate")} />
-					<InputField label="Yearly savings limit" name="annualCap" type="number" step="1" placeholder="e.g. 23500" {...set("annualCap")} />
-					<SelectField label="Savings go to" name="destinationAccountId" {...set("destinationAccountId")}>{accountOptions("Pick an account")}</SelectField>
-					<SelectField label="Tax table" name="profileId" {...set("profileId")}>{optionsFor(taxProfiles, "Pick a tax table")}</SelectField>
+					<SelectField
+						label="Salary"
+						name="incomeSourceId"
+						{...set("incomeSourceId")}
+					>
+						{optionsFor(incomeSources, "Pick a salary")}
+					</SelectField>
+					<InputField
+						label="Savings percent (0.10 = 10%)"
+						name="rate"
+						type="number"
+						step="0.001"
+						placeholder="e.g. 0.10"
+						{...set("rate")}
+					/>
+					<InputField
+						label="Yearly savings limit"
+						name="annualCap"
+						type="number"
+						step="1"
+						placeholder="e.g. 23500"
+						{...set("annualCap")}
+					/>
+					<SelectField
+						label="Savings go to"
+						name="destinationAccountId"
+						{...set("destinationAccountId")}
+					>
+						{accountOptions("Pick an account")}
+					</SelectField>
+					<SelectField label="Tax table" name="profileId" {...set("profileId")}>
+						{optionsFor(taxProfiles, "Pick a tax table")}
+					</SelectField>
 				</>
 			);
 		default:
