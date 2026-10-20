@@ -57,6 +57,7 @@ export function buildMovementPlan({
 		readOnly: false,
 		claimRuleId,
 		claimOccurrenceDate,
+		postedDate: (textValue(data, "postedDate") || item?.postedDate) ?? null,
 	};
 	return {
 		...plan,
@@ -114,13 +115,15 @@ export function MovementFormFields({
 			>
 				<option value="fixed">Fixed amount</option>
 				<option value="growth">Grows yearly by %</option>
-				{templates.filter(
-					(template) => template.id !== "fixed" && template.id !== "growth",
-				).map((template) => (
-					<option key={template.id} value={template.id}>
-						{template.label}
-					</option>
-				))}
+				{templates
+					.filter(
+						(template) => template.id !== "fixed" && template.id !== "growth",
+					)
+					.map((template) => (
+						<option key={template.id} value={template.id}>
+							{template.label}
+						</option>
+					))}
 				{item?.amountKnown === false && (
 					<option value="advanced">Current calculated amount (keep)</option>
 				)}
@@ -143,7 +146,9 @@ export function MovementFormFields({
 						min="0.01"
 						max="10000000000"
 						step="0.01"
-						defaultValue={item?.amountKnown === false ? "" : (item?.amount ?? 500)}
+						defaultValue={
+							item?.amountKnown === false ? "" : (item?.amount ?? 500)
+						}
 					/>
 					{amountKind === "growth" && (
 						<InputField
@@ -167,19 +172,16 @@ export function MovementFormFields({
 					<input type="hidden" name="annualIncrease" value="0" />
 					<div className="inline-notice" style={{ gridColumn: "1 / -1" }}>
 						<span>
-							{templates.some(
-								(template) => template.id === amountKind,
-							) ? (
+							{templates.some((template) => template.id === amountKind) ? (
 								<>
 									<strong>{templateForKind.label}.</strong>{" "}
-									{templateForKind.summary} Builds exact values in
-									Configs → How amounts are calculated. This entry
-									stays as Varies.
+									{templateForKind.summary} Builds exact values in Configs → How
+									amounts are calculated. This entry stays as Varies.
 								</>
 							) : (
 								<>
-									This movement already uses a calculated amount. It
-									stays as Varies and keeps its saved recipe.
+									This movement already uses a calculated amount. It stays as
+									Varies and keeps its saved recipe.
 								</>
 							)}
 						</span>

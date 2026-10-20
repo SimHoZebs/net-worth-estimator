@@ -151,6 +151,7 @@ describe("account-scoped transactions", () => {
 			readOnly: true,
 			claimRuleId: null,
 			claimOccurrenceDate: null,
+			postedDate: null,
 		});
 		const rows = accountTransactions({
 			accountId: "checking",

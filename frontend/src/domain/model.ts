@@ -44,6 +44,11 @@ export const movementSchema = z.object({
 	// one-time movements; the server validates the named occurrence.
 	claimRuleId: id.nullable().default(null),
 	claimOccurrenceDate: date.nullable().default(null),
+	// Display-only day the one-time posting settled, when it differs from
+	// the transaction day (startDate). Recurring rules never carry one, and
+	// reverse conversion ignores it: the server times round-trip through
+	// stored extras instead.
+	postedDate: date.nullable().default(null),
 });
 
 /**

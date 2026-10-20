@@ -207,6 +207,9 @@ test("a shortfall can be inspected and edited while preserving account context a
 	await expect(
 		page.getByRole("dialog", { name: "Home renovation" }),
 	).toBeVisible();
+	// Both settlement dates show: transacted inline, posted beneath it.
+	await expect(page.getByLabel("Date posted")).toHaveValue("2026-03-08");
+	await page.getByLabel("Date posted").fill("2026-03-10");
 	await page.getByLabel("Amount (USD)").click();
 	await page.getByLabel("Amount (USD)").fill("3000");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
@@ -225,11 +228,10 @@ test("a shortfall can be inspected and edited while preserving account context a
 	// renovation is located by name on both sides.
 	const draft = await readTemporaryVersion(page);
 	const renovation = (plan: {
-		movements: { name: string; amount: number }[];
-	}) =>
-		plan.movements.find((movement) => movement.name === "Home renovation")
-			?.amount;
-	expect(renovation(draft)).toBe(3000);
+		movements: { name: string; amount: number; postedDate: string | null }[];
+	}) => plan.movements.find((movement) => movement.name === "Home renovation");
+	expect(renovation(draft)?.amount).toBe(3000);
+	expect(renovation(draft)?.postedDate).toBe("2026-03-10");
 	const saved = await readSavedServerPlan();
 	const savedExpression = saved.postings.find(
 		(posting) => posting.name === "Home renovation",
