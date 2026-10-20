@@ -14,7 +14,7 @@ import (
 const syncTriggerFixture = `{
   "accounts": [
     {
-      "id": "sfin-checking",
+      "id": "bridge-checking",
       "name": "Checking",
       "currency": "USD",
       "balance": "1523.10",
@@ -22,7 +22,7 @@ const syncTriggerFixture = `{
       "transactions": []
     },
     {
-      "id": "sfin-prime",
+      "id": "bridge-prime",
       "name": "Prime Card",
       "currency": "USD",
       "balance": "-412.55",
@@ -75,7 +75,7 @@ func TestSyncTriggerRunsDryRunAndGuardsInterval(t *testing.T) {
 			t.Fatalf("seed account: %v", err)
 		}
 	}
-	for _, link := range [][2]string{{"sfin-checking", "checking"}, {"sfin-prime", "prime_card"}} {
+	for _, link := range [][2]string{{"bridge-checking", "checking"}, {"bridge-prime", "prime_card"}} {
 		if _, err := database.SaveAccountLink(store.AccountLink{BridgeAccountID: link[0], ModelAccountID: link[1], Origin: store.LinkOriginManual}); err != nil {
 			t.Fatalf("seed link: %v", err)
 		}

@@ -78,7 +78,7 @@ func clearDocument(tx *sql.Tx) error {
 func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 	// Invariant: bank lines survive your saves. Sync-owned rows are managed
 	// only by the sync, never by seed payloads: snapshot them, drop
-	// forged sfin- rows from the incoming document, then re-merge. Incoming
+	// forged sync-namespace rows from the incoming document, then re-merge. Incoming
 	// owner checkpoints win key collisions, so owners always keep an override
 	// path. Accounts referenced only by sync rows are preserved so history
 	// never orphans.

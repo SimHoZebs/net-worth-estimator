@@ -253,9 +253,9 @@ describe("backend and display plan adapter", () => {
 		).toBe(false);
 
 		// Backend sync-owned rows carry a non-"model" owner; the exact sync
-		// name is a backend contract, so the fixture uses its real value.
+		// name is a backend contract, so the fixture uses a stand-in.
 		const syncedDocument = structuredClone(past);
-		syncedDocument.postings[0]!.source = "simplefin";
+		syncedDocument.postings[0]!.source = "bank-sync";
 		const syncedConversion = backendToDisplayPlan({
 			document: syncedDocument,
 			status: { readOnly: false, authEnabled: false },
@@ -407,7 +407,7 @@ describe("backend and display plan adapter", () => {
 
 	it("blocks removal of an account with a synced checkpoint", () => {
 		const document = documentFixture();
-		document.checkpoints[0]!.source = "simplefin";
+		document.checkpoints[0]!.source = "bank-sync";
 		const conversion = backendToDisplayPlan({
 			document,
 			status: { readOnly: false, authEnabled: false },

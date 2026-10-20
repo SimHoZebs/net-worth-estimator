@@ -65,17 +65,36 @@ export function isHistoricalMovement(
 }
 
 /**
- * Sync-owned pending card charges use the reserved `sfin-pending-` namespace.
- * They are stored disabled (excluded from projections) until they post, so
- * callers use this to show a Pending tag instead of an Excluded tag.
+ * Sync-owned pending card charges use the reserved `sync-pending-`
+ * namespace. They are stored disabled (excluded from projections) until they
+ * post, so callers use this to show a Pending tag instead of an Excluded
+ * tag. `sfin-pending-` is the pre-rename legacy namespace; databases keep
+ * rows under it until their next sync refreshes them.
  */
-export const PENDING_MOVEMENT_PREFIX = "sfin-pending-";
+export const PENDING_MOVEMENT_PREFIX = "sync-pending-";
+
+const LEGACY_PENDING_MOVEMENT_PREFIX = "sfin-pending-";
+
+/** Reserved sync-output ID namespace, plus the pre-rename legacy one. */
+const SYNC_RESERVED_PREFIX = "sync-";
+const LEGACY_SYNC_RESERVED_PREFIX = "sfin-";
+
+/** Backend-reserved sync-output IDs, including the legacy namespace. */
+export function isSyncReservedId(id: string): boolean {
+	return (
+		id.startsWith(SYNC_RESERVED_PREFIX) ||
+		id.startsWith(LEGACY_SYNC_RESERVED_PREFIX)
+	);
+}
 
 export function isPendingMovement(
 	movement: Pick<Movement, "id"> | string,
 ): boolean {
 	const id = typeof movement === "string" ? movement : movement.id;
-	return id.startsWith(PENDING_MOVEMENT_PREFIX);
+	return (
+		id.startsWith(PENDING_MOVEMENT_PREFIX) ||
+		id.startsWith(LEGACY_PENDING_MOVEMENT_PREFIX)
+	);
 }
 
 export const evaluationSchema = z.object({

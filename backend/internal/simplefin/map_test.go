@@ -13,7 +13,7 @@ import (
 const fixtureAccountSet = `{
   "accounts": [
     {
-      "id": "sfin-checking",
+      "id": "bridge-checking",
       "name": "Checking",
       "currency": "USD",
       "balance": "1523.10",
@@ -21,7 +21,7 @@ const fixtureAccountSet = `{
       "transactions": []
     },
     {
-      "id": "sfin-prime",
+      "id": "bridge-prime",
       "name": "Prime Card",
       "currency": "USD",
       "balance": "-412.55",
@@ -35,7 +35,7 @@ const fixtureAccountSet = `{
       ]
     },
     {
-      "id": "sfin-other",
+      "id": "bridge-other",
       "name": "Unknown",
       "currency": "USD",
       "balance": "1.00",
@@ -56,7 +56,7 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if err := json.Unmarshal([]byte(fixtureAccountSet), &set); err != nil {
 		t.Fatalf("decode fixture: %v", err)
 	}
-	plan, err := Map(&set, fixtureConfig(), map[string]string{"sfin-checking": "checking", "sfin-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
+	plan, err := Map(&set, fixtureConfig(), map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
 	if err != nil {
 		t.Fatalf("map: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 		t.Fatalf("pending = %+v", plan.Pending)
 	}
 	pending := plan.Pending[0]
-	if pending.ID != "sfin-pending-prime_card-pend1" {
+	if pending.ID != "sync-pending-prime_card-pend1" {
 		t.Fatalf("pending id = %q", pending.ID)
 	}
 	if pending.PostedTime != 1785628800 || pending.TransactionTime != 1785628800 {
@@ -87,11 +87,11 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if pending.SourceAccountID == nil || *pending.SourceAccountID != "prime_card" {
 		t.Fatalf("pending source = %+v", pending.SourceAccountID)
 	}
-	if len(plan.Provisions) != 1 || plan.Provisions[0].BridgeID != "sfin-other" || plan.Provisions[0].Kind != "cash" {
-		t.Fatalf("provisions = %+v, want sfin-other cash", plan.Provisions)
+	if len(plan.Provisions) != 1 || plan.Provisions[0].BridgeID != "bridge-other" || plan.Provisions[0].Kind != "cash" {
+		t.Fatalf("provisions = %+v, want bridge-other cash", plan.Provisions)
 	}
 	unmapped := plan.Checkpoints[2]
-	if unmapped.AccountID != "" || unmapped.BridgeID != "sfin-other" || unmapped.Balance != 1.00 {
+	if unmapped.AccountID != "" || unmapped.BridgeID != "bridge-other" || unmapped.Balance != 1.00 {
 		t.Fatalf("unmapped checkpoint = %+v, want bridge-keyed", unmapped)
 	}
 	if plan.Skipped[SkipUnmappedAccount] != 2 {
@@ -117,7 +117,7 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 
 func TestPendingPostingIDSanitizes(t *testing.T) {
 	id := PendingPostingID("prime_card", "a/b c.d")
-	if id != "sfin-pending-prime_card-a_b_c_d" {
+	if id != "sync-pending-prime_card-a_b_c_d" {
 		t.Fatalf("id = %q", id)
 	}
 }
