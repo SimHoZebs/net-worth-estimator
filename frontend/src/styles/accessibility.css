@@ -20,8 +20,8 @@
 .range-disclaimer,
 .evaluation-preview-content p,
 .progress-label,
-.timing-figures span,
-.timing-replenishment span > span,
+.safe-spending-figures span,
+.safe-spending-replenishment span > span,
 .account-summary,
 .account-label > span,
 .page-footer,
@@ -114,7 +114,7 @@ thead {
 }
 .insight-card > p,
 .evaluation-preview-content p,
-.timing-figures span {
+.safe-spending-figures span {
 	font-size: 11px;
 }
 .insight-card .eyebrow,
@@ -143,10 +143,10 @@ thead {
 .sidebar-sync-error {
 	font-size: 10px;
 }
-.timing-replenishment strong {
+.safe-spending-replenishment strong {
 	font-size: 11px;
 }
-.timing-replenishment span > span {
+.safe-spending-replenishment span > span {
 	font-size: 10px;
 }
 .field input,

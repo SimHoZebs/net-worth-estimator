@@ -15,7 +15,7 @@ import type { MovementResult } from "./result.ts";
 // `MovementEvent.income.netCashRealized`. Only the windows stay client-side:
 // they follow user-selected accounts, bills, statement day, and overrides,
 // which have no server contract (see PRODUCT_INTENT open decisions on
-// household timing). Do not add new windowed sums here; derive from these.
+// household safe spending). Do not add new windowed sums here; derive from these.
 
 export const DEFAULT_CYCLE_STATEMENT_DAY = 20;
 export const DEFAULT_PROTECTED_RESERVE = 725;
