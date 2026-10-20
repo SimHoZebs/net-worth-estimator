@@ -9,8 +9,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// Store is the persistence seam behind the canonical model, income data,
-// projection artifacts, and SimpleFIN sync state. The server, API handlers,
+// Store is the persistence seam behind the canonical model, projection
+// artifacts, and SimpleFIN sync state. The server, API handlers,
 // and sync runner depend only on this interface; the SQLite file backend
 // below is one implementation. Table definitions live in schema.go; this file owns the contract, the handle, and its
 // lifecycle. A replacement backend (Turso, Postgres, …)

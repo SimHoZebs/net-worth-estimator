@@ -42,9 +42,7 @@
         "id": "salary-gross",
         "name": "Salary",
         "sourceAccountId": null,
-        "destinations": [
-          "checking"
-        ],
+        "destinations": ["checking"],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -63,9 +61,7 @@
         "id": "salary-401k",
         "name": "401(k) Contribution",
         "sourceAccountId": "checking",
-        "destinations": [
-          "brokerage"
-        ],
+        "destinations": ["brokerage"],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -92,9 +88,7 @@
         "id": "salary-401k-match",
         "name": "401(k) Match",
         "sourceAccountId": null,
-        "destinations": [
-          "brokerage"
-        ],
+        "destinations": ["brokerage"],
         "amount": {
           "resolver": "expression",
           "config": {

@@ -712,26 +712,26 @@ func TestDeterministicMovementEvidenceReportsDestinationHeadroom(t *testing.T) {
 	t.Fatal("paydown movement was not returned")
 }
 
-func TestDeterministicMovementEvidenceRoundsIncomeFields(t *testing.T) {
-	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "income.json")
+func TestDeterministicMovementEvidenceRoundsPayrollFields(t *testing.T) {
+	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "payroll.json")
 	fixtureBytes, err := os.ReadFile(fixturePath)
 	if err != nil {
-		t.Fatalf("read income projection fixture: %v", err)
+		t.Fatalf("read payroll projection fixture: %v", err)
 	}
 	var fixture struct {
 		Document *types.FinancialModelDocument   `json:"document"`
 		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
-		t.Fatalf("decode income projection fixture: %v", err)
+		t.Fatalf("decode payroll projection fixture: %v", err)
 	}
 	if fixture.Document == nil {
-		t.Fatal("income projection fixture is incomplete")
+		t.Fatal("payroll projection fixture is incomplete")
 	}
 	fixture.Settings.HorizonYears = 1
 	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings})
 	if err != nil {
-		t.Fatalf("encode income projection request: %v", err)
+		t.Fatalf("encode payroll projection request: %v", err)
 	}
 	database := openAPIStore(t)
 	handler := New(database, Config{})
@@ -740,16 +740,16 @@ func TestDeterministicMovementEvidenceRoundsIncomeFields(t *testing.T) {
 	request.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
-		t.Fatalf("income projection status = %d, body %s", response.Code, response.Body.String())
+		t.Fatalf("payroll projection status = %d, body %s", response.Code, response.Body.String())
 	}
 	var payload struct {
 		Result *types.ProjectionResult `json:"result"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode income projection response: %v", err)
+		t.Fatalf("decode payroll projection response: %v", err)
 	}
 	if payload.Result == nil || len(payload.Result.MovementEvents) == 0 {
-		t.Fatalf("income movement events = %+v", payload.Result)
+		t.Fatalf("payroll movement events = %+v", payload.Result)
 	}
 	for _, event := range payload.Result.MovementEvents {
 		for _, delta := range event.AccountDeltas {

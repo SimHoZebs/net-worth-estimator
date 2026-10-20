@@ -9,7 +9,7 @@ import (
 )
 
 // Row writes replace the retired whole-document PUT. Each handler loads
-// the stored document plus income, applies one change in memory, runs the
+// the stored document, applies one change in memory, runs the
 // authoritative validator, and persists only when no error-severity issue
 // exists. Last write wins: concurrent row edits overwrite each other,
 // which is correct for a single writer and revisable later.

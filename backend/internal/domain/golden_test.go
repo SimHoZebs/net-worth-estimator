@@ -215,8 +215,8 @@ func TestGoldenCheckpoints(t *testing.T) {
 	compareValues(t, "path.rows", expectedPath["rows"], toAny(t, path.Rows))
 }
 
-func TestGoldenIncome(t *testing.T) {
-	payload := loadGolden(t, "income.json")
+func TestGoldenPayroll(t *testing.T) {
+	payload := loadGolden(t, "payroll.json")
 	document := decodeDocument(t, payload["document"])
 	settings := decodeSettings(t, payload["settings"])
 	overrides := decodeOverrides(t, payload["overrides"])
