@@ -53,20 +53,18 @@ export function TransactionRow({
 			icon={<DirectionIcon size={16} aria-hidden="true" />}
 			tone={tone}
 			title={transaction.name}
-			subtitle={
-				counterparty && (
+			slots={{
+				subtitle: counterparty && (
 					<span>
 						{transaction.direction === "in" ? "From" : "To"} {counterparty}
 					</span>
-				)
-			}
-			mobile={
-				<time className="transaction-mobile-date" dateTime={transaction.date}>
-					{dateLabel(transaction.date, true)}
-				</time>
-			}
-			badges={
-				(transaction.pending ||
+				),
+				mobile: (
+					<time className="transaction-mobile-date" dateTime={transaction.date}>
+						{dateLabel(transaction.date, true)}
+					</time>
+				),
+				badges: (transaction.pending ||
 					transaction.excluded ||
 					transaction.shortfall > 0.01) && (
 					<span className="transaction-badges">
@@ -84,8 +82,8 @@ export function TransactionRow({
 							</Badge>
 						)}
 					</span>
-				)
-			}
+				),
+			}}
 			amount={
 				<>
 					<strong className={transaction.direction === "in" ? "positive" : ""}>

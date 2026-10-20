@@ -91,12 +91,12 @@ export function MovementsPanel({
 							}
 							tone={tone}
 							title={movement.name}
-							subtitle={route ? <span>{route}</span> : undefined}
-							mobile={
-								<span className="transaction-mobile-date">{dateText}</span>
-							}
-							badges={
-								(pending || !movement.enabled) && (
+							slots={{
+								subtitle: route ? <span>{route}</span> : undefined,
+								mobile: (
+									<span className="transaction-mobile-date">{dateText}</span>
+								),
+								badges: (pending || !movement.enabled) && (
 									<span className="transaction-badges">
 										{pending ? (
 											<Badge tone="neutral">Pending</Badge>
@@ -104,8 +104,8 @@ export function MovementsPanel({
 											!movement.enabled && <Badge tone="amber">Excluded</Badge>
 										)}
 									</span>
-								)
-							}
+								),
+							}}
 							amount={
 								<>
 									<MovementAmount
