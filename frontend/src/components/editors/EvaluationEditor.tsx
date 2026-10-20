@@ -50,12 +50,12 @@ export function EvaluationEditor({
 				name="kind"
 				value={kind}
 				onChange={(event) => {
-				const next = parseUnion(event.target.value, [
-					"net-worth",
-					"reserve",
-				] as const);
-				if (next) setKind(next);
-			}}
+					const next = parseUnion(event.target.value, [
+						"net-worth",
+						"reserve",
+					] as const);
+					if (next) setKind(next);
+				}}
 			>
 				<option value="net-worth">Household net worth</option>
 				<option value="reserve">An account balance</option>

@@ -30,7 +30,11 @@ function buildApiBaseUrl(): string | null {
 function configuredBaseUrl(
 	config: WaypointRuntimeConfig | null | undefined,
 ): string | null {
-	if (config && config.apiBaseUrl == null && (config.apiBase ?? config.baseUrl)) {
+	if (
+		config &&
+		config.apiBaseUrl == null &&
+		(config.apiBase ?? config.baseUrl)
+	) {
 		console.warn(
 			"Waypoint config uses deprecated apiBase/baseUrl; use apiBaseUrl.",
 		);

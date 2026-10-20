@@ -48,7 +48,7 @@ npm --prefix frontend run test:browser
 
 For a backend change, it is the Go gate below.
 
-The pre-commit hook verifies the backend packages containing staged Go files. The pre-push hook verifies `./internal/...` and `./cmd/...`. No hook runs the frontend gates; they run only when invoked directly.
+The pre-commit hook verifies the backend packages containing staged Go files, plus `oxlint` and `oxfmt --check` on staged frontend files. The pre-push hook verifies `./internal/...` and `./cmd/...`, plus whole-project `oxlint`. Remaining frontend gates (`typecheck`, `test`, `build`, `test:browser`) run only when invoked directly.
 
 ---
 

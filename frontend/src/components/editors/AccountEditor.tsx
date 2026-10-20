@@ -25,12 +25,12 @@ export function AccountEditor({
 					id: item?.id ?? crypto.randomUUID(),
 					name: textValue(data, "name"),
 					kind:
-					parseUnion(textValue(data, "kind"), [
-						"cash",
-						"investment",
-						"property",
-						"debt",
-					] as const) ?? "cash",
+						parseUnion(textValue(data, "kind"), [
+							"cash",
+							"investment",
+							"property",
+							"debt",
+						] as const) ?? "cash",
 					enabled: textValue(data, "enabled") === "on",
 					archived: item?.archived ?? false,
 					balance: numberValue(data, "balance"),
