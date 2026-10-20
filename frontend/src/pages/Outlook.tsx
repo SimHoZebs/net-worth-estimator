@@ -1,6 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
+import { FundingGapsCard } from "../components/funding/FundingGapsCard.tsx";
+import { deriveFundingGaps } from "../domain/fundingGaps.ts";
 import type { Projection } from "../domain/result.ts";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
@@ -8,7 +10,6 @@ import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { EvaluationPreview } from "./outlook/EvaluationPreview.tsx";
 import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
-import { FundingInsight } from "./outlook/FundingInsight.tsx";
 import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
 import type { SafeSpendingDetailTab } from "./outlook/safe-spending/safeSpendingDetailModel.ts";
 import { SafeSpendingPreview } from "./outlook/safe-spending/SafeSpendingPreview.tsx";
@@ -53,8 +54,6 @@ export function Outlook({
 
 function OutlookContent({
 	onEvidence,
-	onFailure,
-	onTransactions,
 	onEvaluations,
 	onEvaluation,
 	safeSpendingDetail,
@@ -75,7 +74,6 @@ function OutlookContent({
 	useEffect(() => {
 		void refreshPins();
 	}, [refreshPins]);
-	if (!plan) return null;
 	const baseLoadError =
 		projection.base instanceof Error && !projection.loading
 			? projection.base
@@ -83,6 +81,11 @@ function OutlookContent({
 	const base: Projection | null =
 		projection.base instanceof Error ? null : projection.base;
 	const pending = base === null;
+	const gaps = useMemo(
+		() => (plan && base ? deriveFundingGaps({ plan, projection: base }) : []),
+		[plan, base],
+	);
+	if (!plan) return null;
 	if (base === null && !pending) {
 		return (
 			<>
@@ -167,13 +170,7 @@ function OutlookContent({
 						onEvidence={onEvidence}
 						pending={pending}
 					/>
-					<FundingInsight
-						failure={base?.firstFailure ?? null}
-						plan={plan}
-						onFailure={onFailure}
-						onPlan={onTransactions}
-						pending={pending}
-					/>
+					<FundingGapsCard gaps={gaps} pending={pending} />
 				</div>
 			</div>
 			<PinnedEvaluations
