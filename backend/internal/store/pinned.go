@@ -15,21 +15,6 @@ import (
 // Referential rule: a pin names an existing evaluation instance. Unknown
 // IDs are rejected (not-found), and deleting an evaluation drops its pin
 // in the same transaction, so pins never dangle.
-func migrateV9(tx *sql.Tx) error {
-	statements := []string{
-		`CREATE TABLE pinned_evaluations (
-			instance_id TEXT PRIMARY KEY,
-			position INTEGER NOT NULL
-		)`,
-	}
-	for _, statement := range statements {
-		if _, err := tx.Exec(statement); err != nil {
-			return fmt.Errorf("migrate schema version 9: %w", err)
-		}
-	}
-	return nil
-}
-
 // ListPinnedEvaluations returns pinned evaluation instance IDs in pin order.
 func (s *sqliteStore) ListPinnedEvaluations() ([]string, error) {
 	rows, err := s.db.Query(`SELECT instance_id FROM pinned_evaluations ORDER BY position`)

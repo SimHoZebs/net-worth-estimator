@@ -13,7 +13,7 @@ import (
 //		store.RunConformance(t, openTursoTestStore)
 //	}
 //
-// SQLite-only concerns (schema migrations, raw scripts, file layout) stay
+// SQLite-only concerns (schema shape, raw scripts, file layout) stay
 // in TestOpen* and TestPurge* alongside this file.
 func RunConformance(t *testing.T, newStore func(*testing.T) Store) {
 	t.Helper()

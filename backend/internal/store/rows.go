@@ -98,36 +98,6 @@ const (
 	LinkOriginAuto   = "auto"
 )
 
-// migrateV8 adds the shared ID registry and the account link table.
-// entity_ids enforces cross-table ID uniqueness in SQL; account_links
-// stores bridge-to-model bindings outside owner-editable account rows.
-func migrateV8(tx *sql.Tx) error {
-	statements := []string{
-		`CREATE TABLE entity_ids (
-			id TEXT PRIMARY KEY,
-			kind TEXT NOT NULL
-		)`,
-		`INSERT INTO entity_ids (id, kind) SELECT id, 'account' FROM accounts`,
-		`INSERT INTO entity_ids (id, kind) SELECT id, 'posting' FROM postings`,
-		`INSERT INTO entity_ids (id, kind) SELECT id, 'rule' FROM recurrence_rules`,
-		`INSERT INTO entity_ids (id, kind) SELECT instance_id, 'evaluation' FROM evaluations`,
-		`CREATE TABLE account_links (
-			bridge_account_id TEXT PRIMARY KEY,
-			model_account_id TEXT NOT NULL UNIQUE,
-			bridge_name TEXT NOT NULL DEFAULT '',
-			currency TEXT NOT NULL DEFAULT '',
-			origin TEXT NOT NULL DEFAULT 'manual',
-			last_seen_at TEXT NOT NULL DEFAULT ''
-		)`,
-	}
-	for _, statement := range statements {
-		if _, err := tx.Exec(statement); err != nil {
-			return fmt.Errorf("migrate schema version 8: %w", err)
-		}
-	}
-	return nil
-}
-
 // newRowID generates a time-ordered unique row ID.
 func newRowID() (string, error) {
 	id, err := uuid.NewV7()

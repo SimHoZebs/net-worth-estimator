@@ -1,8 +1,6 @@
 package store
 
 import (
-	"database/sql"
-	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -360,56 +358,5 @@ func TestProvisionReportsStaleLinks(t *testing.T) {
 	}, false)
 	if err != nil || resolved["bridge-checking"] != "checking" || len(stale) != 0 {
 		t.Fatalf("relink resolved = %v stale = %v err %v", resolved, stale, err)
-	}
-}
-
-func TestV8MigrationBackfillsRegistryAndLinks(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "v7.db")
-	raw, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatalf("open raw: %v", err)
-	}
-	tx, err := raw.Begin()
-	if err != nil {
-		t.Fatalf("begin: %v", err)
-	}
-	for _, migrate := range []func(*sql.Tx) error{migrateV1, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7} {
-		if err := migrate(tx); err != nil {
-			t.Fatalf("migrate: %v", err)
-		}
-	}
-	for _, statement := range []string{
-		`INSERT INTO accounts (id, position, name, kind, enabled) VALUES ('checking', 0, 'Checking', 'cash', 1)`,
-		`INSERT INTO postings (id, position, name, amount_json, date, priority, enabled, source) VALUES ('rent', 0, 'Rent', '{}', '2026-08-01', 1, 1, 'model')`,
-		`INSERT INTO evaluations (type, instance_id, position, name, enabled, config_json) VALUES ('netWorthThreshold', 'eval-1', 0, 'Target', 1, '{}')`,
-		`UPDATE model_metadata SET document_present = 1 WHERE id = 1`,
-	} {
-		if _, err := tx.Exec(statement); err != nil {
-			t.Fatalf("seed v7 %q: %v", statement, err)
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
-	if _, err := raw.Exec(`PRAGMA user_version = 7`); err != nil {
-		t.Fatalf("set v7 version: %v", err)
-	}
-	if err := raw.Close(); err != nil {
-		t.Fatalf("close raw: %v", err)
-	}
-	opened, err := Open(path)
-	if err != nil {
-		t.Fatalf("open migrates to v8: %v", err)
-	}
-	t.Cleanup(func() { _ = opened.Close() })
-	if _, err := opened.CreatePosting(testPostingFixture("rent")); !IsIDConflict(err) {
-		t.Fatalf("posting over migrated id err = %v, want id-conflict", err)
-	}
-	if _, err := opened.CreateAccount(types.Account{ID: "eval-1", Name: "Clash"}); !IsIDConflict(err) {
-		t.Fatalf("account over migrated eval id err = %v, want id-conflict", err)
-	}
-	links, err := opened.ListAccountLinks()
-	if err != nil || len(links) != 0 {
-		t.Fatalf("links = %+v, err %v", links, err)
 	}
 }
