@@ -124,6 +124,17 @@
 	color: var(--accent-amber-text);
 }
 
+/* Dark muted already passes on the dark amber card; reset the light-only
+   funding-card remediation above. */
+[data-theme="dark"] .funding-gaps-card .section-note,
+[data-theme="dark"] .funding-gaps-card .funding-gaps-name,
+[data-theme="dark"] .funding-gaps-card .funding-gaps-required > span,
+[data-theme="dark"] .funding-gaps-card .funding-gaps-next small,
+[data-theme="dark"] .funding-gaps-card .funding-gaps-more,
+[data-theme="dark"] .funding-gaps-card .seg-legend li {
+	color: var(--muted);
+}
+
 [data-theme="dark"] .inline-notice {
 	color: var(--accent-green-text);
 }

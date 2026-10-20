@@ -130,14 +130,14 @@ export function deriveFundingGaps({
 		const account = plan.accounts.find((item) => item.id === accountId);
 		const accountName = account?.name ?? "Unknown account";
 		const windowStart = monthStart(failure.date);
+		// Opening is the balance before the window opens: the latest point
+		// strictly before the window month. Points snapshot end-of-day
+		// balances, so a same-month point already includes that month's
+		// movements and reusing it would double-count the ledger below.
 		const priorPoint = [...projection.points]
 			.reverse()
-			.find((point) => point.date <= windowStart);
-		const opening =
-			priorPoint?.balances[accountId] ??
-			projection.points[0]?.balances[accountId] ??
-			account?.balance ??
-			0;
+			.find((point) => point.date < windowStart);
+		const opening = priorPoint?.balances[accountId] ?? account?.balance ?? 0;
 		// Only successfully executed movements affecting this account before
 		// the failed payment, in execution order. Exclude the failed payment
 		// itself and any later deposits.
