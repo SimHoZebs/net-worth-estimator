@@ -700,24 +700,23 @@
 		}
 	}
 
-		.transaction-detail-hero .transaction-amount-edit {
-			font-size: 24px;
-		}
-		.transaction-detail-hero .transaction-amount-input {
-			font-size: 24px;
-		}
-		.transaction-detail-hero > .movement-icon {
-			flex: none;
-		}
-		.transaction-detail-hero > div {
-			flex: 1 1 auto;
-			min-width: 0;
-			max-width: calc(100% - 60px);
-		}
-		.transaction-detail-hero .transaction-detail-date {
-			flex: none;
-			margin-left: 0;
-		}
+	.transaction-detail-hero .transaction-amount-edit {
+		font-size: 24px;
+	}
+	.transaction-detail-hero .transaction-amount-input {
+		font-size: 24px;
+	}
+	.transaction-detail-hero > .movement-icon {
+		flex: none;
+	}
+	.transaction-detail-hero > div {
+		flex: 1 1 auto;
+		min-width: 0;
+		max-width: calc(100% - 60px);
+	}
+	.transaction-detail-hero .transaction-detail-date {
+		flex: none;
+		margin-left: 0;
 	}
 	.transaction-detail-hero .transaction-amount-edit.positive {
 		color: var(--accent-green-text);

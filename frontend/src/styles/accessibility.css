@@ -75,6 +75,16 @@ thead {
 .evidence-date {
 	color: #756039;
 }
+/* Muted text on the amber funding card sits on a darker background than
+   paper, so it needs a darker tone than the global remediation above. */
+.funding-gaps-card .section-note,
+.funding-gaps-card .funding-gaps-name,
+.funding-gaps-card .funding-gaps-required > span,
+.funding-gaps-card .funding-gaps-next small,
+.funding-gaps-card .funding-gaps-more,
+.funding-gaps-card .seg-legend li {
+	color: #5d6859;
+}
 .inline-notice {
 	color: #566844;
 }

@@ -46,12 +46,12 @@ test("outlook renders real calculations, scenario ranges and evidence", async ({
 	await expect(page.getByText(/80% of (400 )?scenarios/)).toBeVisible({
 		timeout: 30_000,
 	});
-	await page.getByRole("button", { name: "Inspect this expense" }).click();
-	await expect(page.getByRole("dialog")).toContainText("Shortfall $2,650");
+	await page.getByRole("button", { name: "Inspect cash flow" }).click();
+	await expect(page.getByRole("dialog")).toContainText("$2,650 short");
 	await expect(page.getByRole("dialog")).toContainText("Mar 6, 2026");
 	await page.keyboard.press("Escape");
 	await expect(
-		page.getByRole("button", { name: "Inspect this expense" }),
+		page.getByRole("button", { name: "Inspect cash flow" }),
 	).toBeFocused();
 	await page.getByRole("button", { name: "10 years", exact: true }).click();
 	await expect(page.getByText("Base case in 2036")).toBeVisible();
@@ -407,9 +407,9 @@ test("evidence dialogs and the mobile navigation preserve accessible semantics",
 	await page.goto("/");
 	for (const action of [
 		"Inspect current net worth evidence",
-		"Inspect this expense",
+		"Inspect cash flow",
 	]) {
-		await page.getByRole("button", { name: action, exact: true }).click();
+		await page.getByRole("button", { name: action }).click();
 		await expect(page.getByRole("dialog")).toBeVisible();
 		const result = await new AxeBuilder({ page })
 			.withTags(["wcag2a", "wcag2aa", "wcag21aa"])
