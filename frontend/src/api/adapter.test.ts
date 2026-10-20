@@ -252,21 +252,23 @@ describe("backend and display plan adapter", () => {
 			isHistoricalMovement(recurringConversion.plan.movements[0]!, startDate),
 		).toBe(false);
 
-		const simplefinDocument = structuredClone(past);
-		simplefinDocument.postings[0]!.source = "simplefin";
-		const simplefinConversion = backendToDisplayPlan({
-			document: simplefinDocument,
+		// Backend sync-owned rows carry a non-"model" owner; the exact sync
+		// name is a backend contract, so the fixture uses its real value.
+		const syncedDocument = structuredClone(past);
+		syncedDocument.postings[0]!.source = "simplefin";
+		const syncedConversion = backendToDisplayPlan({
+			document: syncedDocument,
 			status: { readOnly: false, authEnabled: false },
 			projection: projectionFixture(),
 			startDate,
 		});
-		const simplefinMovement = simplefinConversion.plan.movements.find(
+		const syncedMovement = syncedConversion.plan.movements.find(
 			(movement) => movement.id === "bonus",
 		)!;
-		expect(simplefinMovement).toMatchObject({
+		expect(syncedMovement).toMatchObject({
 			readOnly: true,
 		});
-		expect(isHistoricalMovement(simplefinMovement, startDate)).toBe(true);
+		expect(isHistoricalMovement(syncedMovement, startDate)).toBe(true);
 	});
 
 	it("preserves unchanged backend rows and allows expression-backed amount edits", () => {
@@ -403,7 +405,7 @@ describe("backend and display plan adapter", () => {
 		});
 	});
 
-	it("blocks removal of an account with a SimpleFIN-owned checkpoint", () => {
+	it("blocks removal of an account with a synced checkpoint", () => {
 		const document = documentFixture();
 		document.checkpoints[0]!.source = "simplefin";
 		const conversion = backendToDisplayPlan({
