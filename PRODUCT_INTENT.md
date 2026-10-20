@@ -35,7 +35,7 @@ The planner needs to:
 - understand when a goal may be reached;
 - evaluate planned spending, debt payments, income, and withdrawals;
 - identify the first important constraint before it becomes a crisis;
-- separate near-term cash timing from longer-term plan constraints when the evidence supports it;
+- separate near-term safe spending from longer-term plan constraints when the evidence supports it;
 - test assumptions without committing them;
 - understand the consequence of a change before deciding whether to keep it; and
 - retain confidence that displayed values reflect the intended source data.
@@ -70,7 +70,7 @@ The product must help the user complete these jobs:
 | Can we reach our goals? | Goal outcomes, dates, status, and uncertainty where available. |
 | What fails first? | The first underfulfilled movement or goal, with its date, amount, and limiting constraint. |
 | Why does it fail? | The relevant account, movement, limit, funding source, or other plan constraint. |
-| What is happening soon? | Cash available, upcoming commitments, replenishment timing, and a conservative near-term spending assessment when supported by the plan. |
+| What is happening soon? | Cash available, upcoming commitments, replenishment cadence, and a conservative near-term spending assessment when supported by the plan. |
 | What is the plan made of? | Accounts, contributions, transfers, planned income, recurring rules, one-time movements, balance checks, and goal definitions. |
 | What happens if I change this? | A temporary version whose outcomes can be compared descriptively with the saved or previously captured state. |
 | Can I trust this? | Clear separation of recorded facts, assumptions, planned movements, projections, ranges, goal outcomes, and inferred evidence. |
@@ -95,7 +95,7 @@ The product must make these concepts understandable without specialist documenta
 | **Financial independence** | A configurable goal check combining a minimum-net-worth gate, configured annual-expense coverage, selected funding sources, a withdrawal policy, explicitly selected continuing movements, a principal policy, and required confidence. Continuing movements are user-selected and never inferred from labels, categories, identity, or rates. |
 | **Evidence analysis** | An independent inference from posting-derived external inflows, such as an estimate of posting-derived net pay. It does not independently verify bank provenance. |
 | **Comparison** | A descriptive snapshot of selected measures. It does not store or restore another plan. |
-| **Household timing** | Optional near-term context about cash, commitments, replenishment, and conservative room to spend. It is separate from longer-term structural constraints unless an explicit product rule combines them. |
+| **Household safe spending** | Optional near-term context about cash, commitments, replenishment, and conservative room to spend. It is separate from longer-term structural constraints unless an explicit product rule combines them. |
 
 ## 5. Required product knowledge
 
@@ -164,7 +164,7 @@ The product must identify the earliest meaningful underfulfilled movement or goa
 - the downstream consequence; and
 - a specific way to inspect or repair the relevant plan element.
 
-Near-term timing failures and longer-term structural constraints must remain distinguishable unless the product defines an explicit rule for combining them.
+Near-term safe spending failures and longer-term structural constraints must remain distinguishable unless the product defines an explicit rule for combining them.
 
 ### 5.6 Causal evidence
 
@@ -385,7 +385,7 @@ The product is aligned with this intent when a user can:
 - understand whether an outcome is saved, temporary, provisional, stale, or incomplete;
 - trace a material conclusion to supporting records;
 - test a change safely and compare the consequence under a known context;
-- distinguish near-term timing from longer-term structural constraints;
+- distinguish near-term safe spending from longer-term structural constraints;
 - recover from invalid data or failed calculation with a specific next step;
 - inspect the evidence and limitations behind posting-derived inference; and
 - complete the primary decisions with assistive technology and at different display sizes.
@@ -399,10 +399,10 @@ The product does not settle the following questions:
 - Is this primarily a personal planning tool, or should it support a less technical self-service audience?
 - Should plan and source onboarding be part of the product experience?
 - Which goal check or diagnosis should receive primary emphasis when several are configured?
-- What rule, if any, should combine near-term timing constraints and longer-term structural constraints?
+- What rule, if any, should combine near-term safe spending constraints and longer-term structural constraints?
 - How much record-level evidence should be available for posting-derived inference?
 - Should temporary versions and comparisons remain temporary, or should any become durable planning records?
-- Should household timing become a reusable household concept or remain a personal extension?
+- Should household safe spending become a reusable household concept or remain a personal extension?
 - How should recorded and modeled balances be distinguished when both describe the same account?
 - Which approximation labels are acceptable for debt payoff and other derived dates?
 - What level of scenario detail is useful without overwhelming the user?

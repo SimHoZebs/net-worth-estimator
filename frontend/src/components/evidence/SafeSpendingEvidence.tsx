@@ -79,8 +79,8 @@ export function SafeSpendingEvidence({
 				<Info size={18} />
 				<span>
 					Cash above protected balances is not a safe-to-spend recommendation.
-					Account timing, future commitments and unmodeled expenses can still
-					limit spending.
+					Account safe spending, future commitments and unmodeled expenses can
+					still limit spending.
 				</span>
 			</div>
 		</Modal>

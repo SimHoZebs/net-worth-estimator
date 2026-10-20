@@ -156,13 +156,13 @@
 	.safe-spending-preview .section-top h2 {
 		font-size: 11px;
 	}
-	.timing-figures > div + div {
+	.safe-spending-figures > div + div {
 		padding-left: 15px;
 	}
 	.evaluation-preview .section-top .text-button {
 		font-size: 9px;
 	}
-	.timing-figures strong {
+	.safe-spending-figures strong {
 		font-size: 24px;
 	}
 	.evaluations-grid {
@@ -383,10 +383,10 @@
 	.evaluation-preview .section-top .text-button {
 		font-size: 10px;
 	}
-	.timing-figures {
+	.safe-spending-figures {
 		padding: 0;
 	}
-	.timing-figures strong {
+	.safe-spending-figures strong {
 		font-size: 27px;
 	}
 	.page-footer {

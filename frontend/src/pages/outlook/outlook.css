@@ -370,38 +370,38 @@
 		margin-top: 0;
 		flex-shrink: 0;
 	}
-	.timing-figures {
+	.safe-spending-figures {
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 		padding: 0;
 	}
-	.timing-figures > div {
+	.safe-spending-figures > div {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
 	}
-	.timing-figures > div + div {
+	.safe-spending-figures > div + div {
 		border-left: 1px solid var(--line);
 		padding-left: 24px;
 	}
-	.timing-figures span {
+	.safe-spending-figures span {
 		color: var(--muted);
 		font-size: 9px;
 		margin: 0;
 	}
-	.timing-figures strong {
+	.safe-spending-figures strong {
 		font-size: 25px;
 		font-weight: 550;
 		letter-spacing: -1px;
 	}
-	.timing-replenishment {
+	.safe-spending-replenishment {
 		display: flex;
 		align-items: center;
 		gap: 11px;
 		border-top: 1px solid var(--line);
 		padding-top: 17px;
 	}
-	.timing-check {
+	.safe-spending-check {
 		width: 29px;
 		height: 29px;
 		border-radius: 50%;
@@ -410,20 +410,20 @@
 		display: grid;
 		place-items: center;
 	}
-	.timing-replenishment > span:nth-child(2) {
+	.safe-spending-replenishment > span:nth-child(2) {
 		display: flex;
 		flex-direction: column;
 	}
-	.timing-replenishment strong {
+	.safe-spending-replenishment strong {
 		font-size: 10px;
 		font-weight: 600;
 	}
-	.timing-replenishment span > span {
+	.safe-spending-replenishment span > span {
 		color: var(--muted);
 		font-size: 9px;
 		margin-top: 2px;
 	}
-	.timing-replenishment > button {
+	.safe-spending-replenishment > button {
 		margin-left: auto;
 	}
 	.cycle-dates {
@@ -604,7 +604,7 @@
 	.safe-spending-mandatory .account-activity-table {
 		border-top: 0;
 	}
-	.timing-controls {
+	.safe-spending-controls {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;

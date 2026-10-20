@@ -3,7 +3,7 @@ import { useReducedMotion } from "motion/react";
 
 // Shared slide primitives for the single Drawer component: the left
 // navigation sheet and the right context sheet slide the full off-canvas
-// width on mobile with the same timing; the right sheet keeps its docked
+// width on mobile with the same motion; the right sheet keeps its docked
 // width on larger viewports. Swipe detection is drawer-agnostic: each call
 // site maps a direction to its own meaning with its own hit-test.
 
