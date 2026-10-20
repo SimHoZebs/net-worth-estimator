@@ -21,19 +21,21 @@ import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
-import { EvaluationCard } from "./evaluations/EvaluationCard.tsx";
+import {
+	EvaluationCard,
+	type EvaluationPin,
+} from "./evaluations/EvaluationCard.tsx";
 
 function OtherEvaluationCard({
 	item,
-	pinned,
-	onPinChange,
-	pinDisabled,
+	pin = null,
 }: {
 	item: OtherEvaluation;
-	pinned: boolean;
-	onPinChange: (() => void) | null;
-	pinDisabled: boolean;
+	pin?: EvaluationPin | null;
 }) {
+	const pinned = pin?.pinned ?? false;
+	const onPinChange = pin?.onPinChange ?? null;
+	const pinDisabled = pin?.disabled ?? false;
 	const satisfied = item.enabled && item.status === "satisfied";
 	const tone =
 		!item.enabled || item.status === "indeterminate"
@@ -249,11 +251,13 @@ function EvaluationsContent({
 								: null
 						}
 						pending={pending}
-						pinned={pinnedSet.has(evaluation.id)}
-						onPinChange={() => {
-							void togglePin(evaluation.id);
+						pin={{
+							pinned: pinnedSet.has(evaluation.id),
+							onPinChange: () => {
+								void togglePin(evaluation.id);
+							},
+							disabled: pinsBlocked || !savedEvaluationIds.has(evaluation.id),
 						}}
-						pinDisabled={pinsBlocked || !savedEvaluationIds.has(evaluation.id)}
 						onEdit={() => onEdit(evaluation)}
 						onRemove={() =>
 							onUpdate(removeEvaluation({ plan, id: evaluation.id }))
@@ -270,11 +274,13 @@ function EvaluationsContent({
 					<OtherEvaluationCard
 						key={item.id}
 						item={item}
-						pinned={pinnedSet.has(item.id)}
-						onPinChange={() => {
-							void togglePin(item.id);
+						pin={{
+							pinned: pinnedSet.has(item.id),
+							onPinChange: () => {
+								void togglePin(item.id);
+							},
+							disabled: pinsBlocked || !savedEvaluationIds.has(item.id),
 						}}
-						pinDisabled={pinsBlocked || !savedEvaluationIds.has(item.id)}
 					/>
 				))}
 			</div>

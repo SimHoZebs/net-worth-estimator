@@ -10,6 +10,12 @@ import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { Evaluation } from "../../domain/model.ts";
 import type { EvaluationResult } from "../../domain/result.ts";
 
+export type EvaluationPin = {
+	pinned: boolean;
+	onPinChange: (() => void) | null;
+	disabled?: boolean;
+};
+
 export function EvaluationCard({
 	evaluation,
 	result,
@@ -19,9 +25,7 @@ export function EvaluationCard({
 	onEnabledChange,
 	onEvidence,
 	pending = false,
-	pinned = false,
-	onPinChange = null,
-	pinDisabled = false,
+	pin = null,
 }: {
 	evaluation: Evaluation;
 	result: Pick<EvaluationResult, "current" | "firstDate"> | undefined;
@@ -31,10 +35,11 @@ export function EvaluationCard({
 	onEnabledChange: (enabled: boolean) => void;
 	onEvidence: () => void;
 	pending?: boolean;
-	pinned?: boolean;
-	onPinChange?: (() => void) | null;
-	pinDisabled?: boolean;
+	pin?: EvaluationPin | null;
 }) {
+	const pinned = pin?.pinned ?? false;
+	const onPinChange = pin?.onPinChange ?? null;
+	const pinDisabled = pin?.disabled ?? false;
 	const met = result && result.current >= evaluation.target;
 	// Outcome slots await the projection; everything else is plan data and
 	// stays live. Pending never fabricates zeros for not-yet-computed values.
