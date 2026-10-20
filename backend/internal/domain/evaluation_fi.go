@@ -348,31 +348,6 @@ func applyBranchPostingEvents(events []branchEventGroup, baseRealizedByDateAndPo
 			if disposition == dispositionObserveBasePath {
 				key := fmt.Sprintf("%s:%s", group.date, posting.ID)
 				realizedAmount := baseRealizedByDateAndPosting[key]
-				baseEvent := baseEventsByDateAndPosting[key]
-				if baseEvent != nil && baseEvent.Income != nil {
-					for _, resolver := range baseEvent.Income.Resolvers {
-						if resolver.DestinationAccountID == nil {
-							continue
-						}
-						destinations := []string{*resolver.DestinationAccountID}
-						if _, err := transitions.ExecuteGeneratedMovement(AccountMovementAction{
-							SourceAccountID: nil,
-							Destinations:    destinations,
-							RequestedAmount: resolver.RealizedAmount,
-						}); err != nil {
-							return 0, fmt.Errorf("replay posting %q on %s: %w", posting.ID, group.date, err)
-						}
-						if resolver.EmployerMatchRealizedAmount > 0 {
-							if _, err := transitions.ExecuteGeneratedMovement(AccountMovementAction{
-								SourceAccountID: nil,
-								Destinations:    destinations,
-								RequestedAmount: resolver.EmployerMatchRealizedAmount,
-							}); err != nil {
-								return 0, fmt.Errorf("replay posting %q on %s: %w", posting.ID, group.date, err)
-							}
-						}
-					}
-				}
 				transitions.ObservePosting(posting.ID, realizedAmount, group.date)
 				observedDirectIncome += realizedAmount
 				continue
@@ -523,7 +498,7 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 		Postings:        branchPostings,
 		RecurrenceRules: branchRules,
 		PaymentTerms:    path.EffectiveDocument.PaymentTerms,
-	}, initializeBranchSimulationState(candidateBalances, path.MovementEvents, candidate.Date, path), path.ProjectionStartDate, monteCarloSample, path.IncomeData)
+	}, initializeBranchSimulationState(candidateBalances, path.MovementEvents, candidate.Date, path), path.ProjectionStartDate, monteCarloSample)
 	if err != nil {
 		return nil, err
 	}

@@ -117,7 +117,7 @@ describe("native API client", () => {
 					headers: { "content-type": "text/plain" },
 				}),
 		});
-		const textResult = await textClient.getIncomeData();
+		const textResult = await textClient.getModel();
 		expect(textResult).toBeInstanceOf(ApiHttpError);
 		if (!(textResult instanceof ApiHttpError))
 			throw new Error("Expected ApiHttpError for plain-text error");

@@ -78,7 +78,7 @@ func historicalBalance(t *testing.T, path *types.ProjectionPath, date, accountID
 }
 
 func TestClaimSuppressesGeneratedOccurrence(t *testing.T) {
-	path, _, err := ProjectRawFinancialModelDocument(claimTestDocument(), claimTestSettings(), types.EmptyModelOverrides(), nil, nil)
+	path, _, err := ProjectRawFinancialModelDocument(claimTestDocument(), claimTestSettings(), types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestClaimSuppressesGeneratedOccurrence(t *testing.T) {
 func TestUnclaimedOccurrenceReplaysNormally(t *testing.T) {
 	document := claimTestDocument()
 	document.Postings[0].Claim = nil
-	path, _, err := ProjectRawFinancialModelDocument(document, claimTestSettings(), types.EmptyModelOverrides(), nil, nil)
+	path, _, err := ProjectRawFinancialModelDocument(document, claimTestSettings(), types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestUnclaimedOccurrenceReplaysNormally(t *testing.T) {
 }
 
 func TestClaimLeavesFutureOccurrencesAlone(t *testing.T) {
-	path, _, err := ProjectRawFinancialModelDocument(claimTestDocument(), claimTestSettings(), types.EmptyModelOverrides(), nil, nil)
+	path, _, err := ProjectRawFinancialModelDocument(claimTestDocument(), claimTestSettings(), types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
@@ -144,13 +144,13 @@ func TestClaimValidation(t *testing.T) {
 			document := claimTestDocument()
 			document.Postings[0].Claim = testCase.claim
 			found := false
-			for _, issue := range ValidateFinancialModel(document, nil) {
+			for _, issue := range ValidateFinancialModel(document) {
 				if issue.Code == testCase.code {
 					found = true
 				}
 			}
 			if !found {
-				t.Fatalf("expected %q, got %+v", testCase.code, ValidateFinancialModel(document, nil))
+				t.Fatalf("expected %q, got %+v", testCase.code, ValidateFinancialModel(document))
 			}
 		})
 	}
@@ -162,13 +162,13 @@ func TestDuplicateClaimRejected(t *testing.T) {
 	duplicate.ID = "rent-feb-actual-2"
 	document.Postings = append(document.Postings, duplicate)
 	found := false
-	for _, issue := range ValidateFinancialModel(document, nil) {
+	for _, issue := range ValidateFinancialModel(document) {
 		if issue.Code == "posting.claim.duplicate" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("expected posting.claim.duplicate, got %+v", ValidateFinancialModel(document, nil))
+		t.Fatalf("expected posting.claim.duplicate, got %+v", ValidateFinancialModel(document))
 	}
 }
 

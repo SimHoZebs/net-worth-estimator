@@ -29,10 +29,7 @@ import (
 type Store interface {
 	LoadDocument() (*types.FinancialModelDocument, error)
 	DocumentExists() (bool, error)
-	LoadIncomeData() (*types.IncomeDataSnapshot, error)
-	SaveIncomeData(snapshot *types.IncomeDataSnapshot) error
-	LoadDocumentAndIncomeData() (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error)
-	ImportCSV(modelPath, incomePath string) (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error)
+	ImportCSV(modelPath string) (*types.FinancialModelDocument, error)
 	CreateAccount(account types.Account) (types.Account, error)
 	UpdateAccount(account types.Account) (types.Account, error)
 	DeleteAccount(id string) error

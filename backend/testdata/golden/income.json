@@ -39,34 +39,16 @@
     "postings": [],
     "recurrenceRules": [
       {
-        "id": "salary",
+        "id": "salary-gross",
         "name": "Salary",
         "sourceAccountId": null,
         "destinations": [
           "checking"
         ],
         "amount": {
-          "resolver": "income",
+          "resolver": "expression",
           "config": {
-            "incomeSourceId": "salary",
-            "resolvers": [
-              {
-                "resolver": "percentage",
-                "config": {
-                  "rate": 0.04,
-                  "annualCap": 23000
-                },
-                "destinationAccountId": "brokerage",
-                "employerMatchRate": 0.5
-              },
-              {
-                "resolver": "progressive-bracket",
-                "config": {
-                  "profileId": "simple"
-                },
-                "destinationAccountId": null
-              }
-            ]
+            "expression": "10000"
           },
           "inputs": {}
         },
@@ -75,6 +57,108 @@
         "endDate": null,
         "annualCap": null,
         "priority": 1,
+        "enabled": true
+      },
+      {
+        "id": "salary-401k",
+        "name": "401(k) Contribution",
+        "sourceAccountId": "checking",
+        "destinations": [
+          "brokerage"
+        ],
+        "amount": {
+          "resolver": "expression",
+          "config": {
+            "expression": "gross * 0.04"
+          },
+          "inputs": {
+            "gross": {
+              "source": "provider",
+              "provider": "model-value",
+              "arguments": {
+                "id": "salary-gross"
+              }
+            }
+          }
+        },
+        "frequency": "monthly",
+        "startDate": "2026-02-05",
+        "endDate": null,
+        "annualCap": 23000,
+        "priority": 2,
+        "enabled": true
+      },
+      {
+        "id": "salary-401k-match",
+        "name": "401(k) Match",
+        "sourceAccountId": null,
+        "destinations": [
+          "brokerage"
+        ],
+        "amount": {
+          "resolver": "expression",
+          "config": {
+            "expression": "contrib * 0.5"
+          },
+          "inputs": {
+            "contrib": {
+              "source": "provider",
+              "provider": "model-value",
+              "arguments": {
+                "id": "salary-401k"
+              }
+            }
+          }
+        },
+        "frequency": "monthly",
+        "startDate": "2026-02-05",
+        "endDate": null,
+        "annualCap": null,
+        "priority": 3,
+        "enabled": true
+      },
+      {
+        "id": "salary-tax",
+        "name": "Federal Tax",
+        "sourceAccountId": "checking",
+        "destinations": null,
+        "amount": {
+          "resolver": "progressive-bracket",
+          "config": {
+            "deduction": 1341.6666666666667,
+            "brackets": [
+              {
+                "upTo": 2066.6666666666665,
+                "rate": 0.1
+              },
+              {
+                "upTo": null,
+                "rate": 0.12
+              }
+            ]
+          },
+          "inputs": {
+            "gross": {
+              "source": "provider",
+              "provider": "model-value",
+              "arguments": {
+                "id": "salary-gross"
+              }
+            },
+            "pretax": {
+              "source": "provider",
+              "provider": "model-value",
+              "arguments": {
+                "id": "salary-401k"
+              }
+            }
+          }
+        },
+        "frequency": "monthly",
+        "startDate": "2026-02-05",
+        "endDate": null,
+        "annualCap": null,
+        "priority": 4,
         "enabled": true
       },
       {
@@ -122,35 +206,6 @@
     "disabledAccountIds": [],
     "disabledPostingIds": []
   },
-  "incomeData": {
-    "incomeSources": [
-      {
-        "id": "salary",
-        "name": "Salary",
-        "effectiveFrom": "2026-01-01",
-        "effectiveTo": null,
-        "annualGrossIncome": 120000
-      }
-    ],
-    "taxProfiles": [
-      {
-        "id": "simple",
-        "name": "Simple",
-        "deduction": 16100,
-        "brackets": [
-          {
-            "upTo": 24800,
-            "rate": 0.1
-          },
-          {
-            "upTo": null,
-            "rate": 0.12
-          }
-        ],
-        "sourceUrl": null
-      }
-    ]
-  },
   "result": {
     "timeline": {
       "rows": []
@@ -158,27 +213,27 @@
     "accountSummaries": [
       {
         "accountId": "checking",
-        "name": "checking",
         "color": null,
         "enabled": true,
-        "startingBalance": 0,
-        "endingBalance": 0
+        "endingBalance": 0,
+        "name": "checking",
+        "startingBalance": 0
       },
       {
         "accountId": "brokerage",
-        "name": "brokerage",
         "color": null,
         "enabled": true,
-        "startingBalance": 0,
-        "endingBalance": 0
+        "endingBalance": 0,
+        "name": "brokerage",
+        "startingBalance": 0
       },
       {
         "accountId": "loan",
-        "name": "loan",
         "color": null,
         "enabled": true,
-        "startingBalance": 0,
-        "endingBalance": 0
+        "endingBalance": 0,
+        "name": "loan",
+        "startingBalance": 0
       }
     ],
     "totals": {
@@ -195,62 +250,119 @@
       "finalNetWorth": 0
     },
     "evaluations": {
+      "accountBalance": [],
+      "cycleFulfillment": [],
       "financialIndependence": [],
       "netWorthThreshold": [],
       "postingFulfillment": [
         {
-          "instanceId": "pf-all",
-          "name": "Posting fulfillment",
-          "status": "satisfied",
           "deterministic": {
-            "requestedAmount": 0,
-            "realizedAmount": 0,
-            "destinationLimitedAmount": 0,
-            "unfulfilledAmount": 0,
             "completionRate": 1,
-            "firstUnderfulfilledDate": null,
-            "events": [],
             "dates": [],
+            "destinationLimitedAmount": 0,
+            "events": [],
+            "firstUnderfulfilledDate": null,
             "postings": [
               {
-                "postingId": "salary",
-                "name": "Salary",
-                "sourceAccountId": null,
-                "sourceAccountLabel": null,
+                "annualCap": null,
+                "completionRate": 1,
+                "destinationLimitedAmount": 0,
                 "destinations": [
                   {
                     "accountId": "checking",
                     "name": "checking"
                   }
                 ],
-                "annualCap": null,
-                "requestedAmount": 0,
-                "realizedAmount": 0,
-                "destinationLimitedAmount": 0,
-                "utilizationRate": 0,
-                "completionRate": 1,
                 "firstUnderfulfilledDate": null,
-                "unfulfilledAmount": 0
+                "name": "Salary",
+                "postingId": "salary-gross",
+                "realizedAmount": 0,
+                "requestedAmount": 0,
+                "sourceAccountId": null,
+                "sourceAccountLabel": null,
+                "unfulfilledAmount": 0,
+                "utilizationRate": 0
               },
               {
-                "postingId": "spend",
-                "name": "spend",
+                "annualCap": 23000,
+                "completionRate": 1,
+                "destinationLimitedAmount": 0,
+                "destinations": [
+                  {
+                    "accountId": "brokerage",
+                    "name": "brokerage"
+                  }
+                ],
+                "firstUnderfulfilledDate": null,
+                "name": "401(k) Contribution",
+                "postingId": "salary-401k",
+                "realizedAmount": 0,
+                "requestedAmount": 0,
                 "sourceAccountId": "checking",
                 "sourceAccountLabel": "checking",
-                "destinations": null,
+                "unfulfilledAmount": 0,
+                "utilizationRate": 0
+              },
+              {
                 "annualCap": null,
-                "requestedAmount": 0,
-                "realizedAmount": 0,
-                "destinationLimitedAmount": 0,
-                "utilizationRate": 0,
                 "completionRate": 1,
+                "destinationLimitedAmount": 0,
+                "destinations": [
+                  {
+                    "accountId": "brokerage",
+                    "name": "brokerage"
+                  }
+                ],
                 "firstUnderfulfilledDate": null,
-                "unfulfilledAmount": 0
+                "name": "401(k) Match",
+                "postingId": "salary-401k-match",
+                "realizedAmount": 0,
+                "requestedAmount": 0,
+                "sourceAccountId": null,
+                "sourceAccountLabel": null,
+                "unfulfilledAmount": 0,
+                "utilizationRate": 0
+              },
+              {
+                "annualCap": null,
+                "completionRate": 1,
+                "destinationLimitedAmount": 0,
+                "destinations": null,
+                "firstUnderfulfilledDate": null,
+                "name": "Federal Tax",
+                "postingId": "salary-tax",
+                "realizedAmount": 0,
+                "requestedAmount": 0,
+                "sourceAccountId": "checking",
+                "sourceAccountLabel": "checking",
+                "unfulfilledAmount": 0,
+                "utilizationRate": 0
+              },
+              {
+                "annualCap": null,
+                "completionRate": 1,
+                "destinationLimitedAmount": 0,
+                "destinations": null,
+                "firstUnderfulfilledDate": null,
+                "name": "spend",
+                "postingId": "spend",
+                "realizedAmount": 0,
+                "requestedAmount": 0,
+                "sourceAccountId": "checking",
+                "sourceAccountLabel": "checking",
+                "unfulfilledAmount": 0,
+                "utilizationRate": 0
               }
-            ]
+            ],
+            "realizedAmount": 0,
+            "requestedAmount": 0,
+            "unfulfilledAmount": 0
           },
+          "diagnostics": [],
+          "instanceId": "pf-all",
+          "name": "Posting fulfillment",
           "probabilistic": null,
-          "diagnostics": []
+          "status": "satisfied"
         }
       ]
     }

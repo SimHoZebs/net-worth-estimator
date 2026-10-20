@@ -58,19 +58,15 @@ func currentRevision(s *Server) (string, error) {
 // persist when clean. It returns the issues and post-write revision.
 func applyRowChange[T any](s *Server, mutate func(document *types.FinancialModelDocument), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, error) {
 	var zero T
-	document, incomeData, err := s.store.LoadDocumentAndIncomeData()
+	document, err := s.store.LoadDocument()
 	if err != nil {
 		return zero, nil, false, huma.Error500InternalServerError(err.Error())
 	}
 	if document == nil {
-		empty := &types.FinancialModelDocument{Evaluations: types.EmptyEvaluationTables()}
-		document = empty
-		if incomeData == nil {
-			incomeData = &types.IncomeDataSnapshot{}
-		}
+		document = &types.FinancialModelDocument{Evaluations: types.EmptyEvaluationTables()}
 	}
 	mutate(document)
-	issues := domainValidate(document, incomeData)
+	issues := domainValidate(document)
 	if issues == nil {
 		issues = []types.ModelValidationIssue{}
 	}
@@ -83,11 +79,11 @@ func applyRowChange[T any](s *Server, mutate func(document *types.FinancialModel
 	}
 	// Re-read warnings against the persisted document so the response
 	// reflects stored state, not the request echo.
-	document, incomeData, err = s.store.LoadDocumentAndIncomeData()
+	document, err = s.store.LoadDocument()
 	if err != nil {
 		return zero, nil, false, huma.Error500InternalServerError(err.Error())
 	}
-	issues = domainValidate(document, incomeData)
+	issues = domainValidate(document)
 	if issues == nil {
 		issues = []types.ModelValidationIssue{}
 	}

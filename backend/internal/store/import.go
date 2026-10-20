@@ -7,28 +7,24 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// ImportCSV seeds the database from CSV directories, replacing content.
-func (s *sqliteStore) ImportCSV(modelPath, incomePath string) (*types.FinancialModelDocument, *types.IncomeDataSnapshot, error) {
+// ImportCSV seeds the database from a CSV directory, replacing content.
+func (s *sqliteStore) ImportCSV(modelPath string) (*types.FinancialModelDocument, error) {
 	document, err := csvio.ImportModel(modelPath)
 	if err != nil {
-		return nil, nil, err
-	}
-	incomeData, err := csvio.ImportIncomeData(incomePath)
-	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
-		return nil, nil, fmt.Errorf("import begin: %w", err)
+		return nil, fmt.Errorf("import begin: %w", err)
 	}
 	defer tx.Rollback()
 	if err := replaceDocument(tx, document); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	// Rebuild the ID registry from the seed; account links survive a
 	// reseed so bridge bindings are not lost.
 	if _, err := tx.Exec(`DELETE FROM entity_ids`); err != nil {
-		return nil, nil, fmt.Errorf("import clear entity ids: %w", err)
+		return nil, fmt.Errorf("import clear entity ids: %w", err)
 	}
 	for _, seed := range []struct {
 		kind  string
@@ -40,22 +36,15 @@ func (s *sqliteStore) ImportCSV(modelPath, incomePath string) (*types.FinancialM
 		{"evaluation", `INSERT INTO entity_ids (id, kind) SELECT instance_id, 'evaluation' FROM evaluations`},
 	} {
 		if _, err := tx.Exec(seed.query); err != nil {
-			return nil, nil, fmt.Errorf("import seed entity ids %s: %w", seed.kind, err)
+			return nil, fmt.Errorf("import seed entity ids %s: %w", seed.kind, err)
 		}
-	}
-	if err := replaceIncomeData(tx, incomeData); err != nil {
-		return nil, nil, err
 	}
 	storedDocument, err := loadDocument(tx)
 	if err != nil {
-		return nil, nil, err
-	}
-	storedIncomeData, err := loadIncomeData(tx)
-	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, nil, fmt.Errorf("import commit: %w", err)
+		return nil, fmt.Errorf("import commit: %w", err)
 	}
-	return storedDocument, storedIncomeData, nil
+	return storedDocument, nil
 }

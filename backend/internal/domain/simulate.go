@@ -25,7 +25,6 @@ func Simulate(request types.SimulationRequest) (types.SimulationRun, error) {
 		request.InitialState,
 		request.StartDate,
 		request.MonteCarloSample,
-		request.IncomeData,
 	)
 	if err != nil {
 		return types.SimulationRun{}, err
@@ -59,7 +58,6 @@ func Simulate(request types.SimulationRequest) (types.SimulationRun, error) {
 				Origin:          types.MovementOrigin{Type: "posting", PostingID: transition.PostingID},
 				RequestedAmount: transition.Result.RequestedAmount,
 				RealizedAmount:  transition.Result.RealizedAmount,
-				Income:          transition.Income,
 			}
 			for _, delta := range transition.AccountDeltas {
 				event.AccountDeltas = append(event.AccountDeltas, struct {
@@ -79,7 +77,6 @@ func Simulate(request types.SimulationRequest) (types.SimulationRun, error) {
 	run.Request.StartDate = request.StartDate
 	run.Request.EndDate = request.EndDate
 	run.Request.IncludeStartDateEvents = request.IncludeStartDateEvents
-	run.Request.IncomeData = request.IncomeData
 	run.InitialState = CloneSimulationState(request.InitialState)
 	run.FinalState = CloneSimulationState(transitions.State)
 	run.Snapshots = snapshots

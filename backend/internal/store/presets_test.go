@@ -36,7 +36,7 @@ func TestAmountPresetsSeedDefaults(t *testing.T) {
 		}
 		names[preset.Name] = true
 	}
-	for _, want := range []string{"fixed", "growth", "paycheck"} {
+	for _, want := range []string{"fixed", "growth", "federal-tax"} {
 		if !names[want] {
 			t.Fatalf("seed presets missing %s", want)
 		}

@@ -22,7 +22,7 @@ func (e *SimulationPreparationError) Error() string {
 	return message
 }
 
-func replayHistoricalState(document *types.FinancialModelDocument, projectionStartDate string, incomeData *types.IncomeDataSnapshot) (*SimulationState, []types.HistoricalObservationSnapshot, bool, error) {
+func replayHistoricalState(document *types.FinancialModelDocument, projectionStartDate string) (*SimulationState, []types.HistoricalObservationSnapshot, bool, error) {
 	for _, checkpoint := range document.Checkpoints {
 		if CompareIsoDates(checkpoint.Date, projectionStartDate) > 0 {
 			return nil, nil, false, &SimulationPreparationError{Issues: []types.ModelValidationIssue{{
@@ -107,7 +107,7 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 		Balances:                     InitAccountBalances(document.Accounts),
 		LatestRealizedPostingAmounts: map[string]float64{},
 		RealizedPostingAmountsByYear: map[string]map[string]float64{},
-	}, projectionStartDate, nil, incomeData)
+	}, projectionStartDate, nil)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -135,8 +135,6 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 				message := err.Error()
 				switch typed := err.(type) {
 				case *AmountResolutionError:
-					message = typed.Message
-				case *IncomeResolutionError:
 					message = typed.Message
 				case *EvalError:
 					message = typed.Message
@@ -178,32 +176,9 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 }
 
 // PrepareSimulationRequest resolves overrides, validation, history, and dates.
-func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample, incomeData *types.IncomeDataSnapshot) (*types.PreparedProjection, error) {
+func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.PreparedProjection, error) {
 	effectiveDocument := types.ApplyModelOverrides(*document, overrides)
-	hasEnabledIncome := false
-	for _, posting := range effectiveDocument.Postings {
-		if posting.Enabled && posting.Amount.Resolver == "income" {
-			hasEnabledIncome = true
-			break
-		}
-	}
-	if !hasEnabledIncome {
-		for _, rule := range effectiveDocument.RecurrenceRules {
-			if rule.Enabled && rule.Amount.Resolver == "income" {
-				hasEnabledIncome = true
-				break
-			}
-		}
-	}
-	if hasEnabledIncome && incomeData == nil {
-		return nil, &SimulationPreparationError{Issues: []types.ModelValidationIssue{{
-			Severity: types.SeverityError,
-			Code:     "income-data.missing",
-			Message:  "Income data is required to project an income posting.",
-			Path:     []any{},
-		}}}
-	}
-	issues := ValidateFinancialModel(&effectiveDocument, incomeData)
+	issues := ValidateFinancialModel(&effectiveDocument)
 	validationErrors := []types.ModelValidationIssue{}
 	for _, issue := range issues {
 		if issue.Severity == types.SeverityError {
@@ -223,7 +198,7 @@ func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *
 			Path:     []any{"fallbackProjectionStartDate"},
 		}}}
 	}
-	state, historicalSnapshots, includeStartDateEvents, err := replayHistoricalState(&effectiveDocument, startDate, incomeData)
+	state, historicalSnapshots, includeStartDateEvents, err := replayHistoricalState(&effectiveDocument, startDate)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +218,6 @@ func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *
 			EndDate:                AddYearsClamped(startDate, settings.HorizonYears),
 			IncludeStartDateEvents: includeStartDateEvents,
 			MonteCarloSample:       monteCarloSample,
-			IncomeData:             incomeData,
 		},
 	}
 	return prepared, nil

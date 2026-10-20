@@ -34,8 +34,8 @@ func EvaluateProjectionPath(path *types.ProjectionPath, evaluations *types.Evalu
 }
 
 // ProjectFinancialModelDocument produces the full public projection result.
-func ProjectFinancialModelDocument(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample, incomeData *types.IncomeDataSnapshot) (*types.ProjectionResult, error) {
-	path, result, err := ProjectRawFinancialModelDocument(document, settings, overrides, monteCarloSample, incomeData)
+func ProjectFinancialModelDocument(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.ProjectionResult, error) {
+	path, result, err := ProjectRawFinancialModelDocument(document, settings, overrides, monteCarloSample)
 	if err != nil {
 		return nil, err
 	}

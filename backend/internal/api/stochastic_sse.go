@@ -250,17 +250,16 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		Document   *types.FinancialModelDocument   `json:"document,omitempty"`
-		Overrides  types.ModelOverrides            `json:"overrides,omitempty"`
-		Settings   types.ProjectionRuntimeSettings `json:"settings"`
-		Config     types.StochasticConfig          `json:"config"`
-		IncomeData *types.IncomeDataSnapshot       `json:"incomeData,omitempty"`
+		Document  *types.FinancialModelDocument   `json:"document,omitempty"`
+		Overrides types.ModelOverrides            `json:"overrides,omitempty"`
+		Settings  types.ProjectionRuntimeSettings `json:"settings"`
+		Config    types.StochasticConfig          `json:"config"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	document, incomeData, err := s.resolveDocument(body.Document, body.IncomeData)
+	document, err := s.resolveDocument(body.Document)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -273,10 +272,9 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 	var cacheKey string
 	if cacheEligible {
 		cacheKey = artifactKey("stochastic", map[string]any{
-			"document":   document,
-			"overrides":  body.Overrides,
-			"settings":   projectionSettingsDescriptor(body.Settings),
-			"incomeData": incomeData,
+			"document":  document,
+			"overrides": body.Overrides,
+			"settings":  projectionSettingsDescriptor(body.Settings),
 			"config": map[string]any{
 				"runCount": body.Config.RunCount,
 				"seed":     body.Config.Seed,
@@ -298,7 +296,7 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		s.serveStochasticInline(w, r, document, incomeData, body.Settings, body.Overrides, body.Config)
+		s.serveStochasticInline(w, r, document, body.Settings, body.Overrides, body.Config)
 		return
 	}
 	w.Header().Set("X-Cache", "miss")
@@ -339,7 +337,7 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 			progressCallback := func(progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
 				run.publish(stochasticStreamEvent{progress: progress, partial: partial})
 			}
-			result, runErr := domain.StochasticProjection(computeCtx, document, &body.Settings, body.Overrides, body.Config, progressCallback, incomeData)
+			result, runErr := domain.StochasticProjection(computeCtx, document, &body.Settings, body.Overrides, body.Config, progressCallback)
 			run.finish(cacheKey, func(result *types.StochasticProjectionResult) {
 				putArtifact(s.store, cacheKey, "stochastic", result)
 			}, result, runErr)
@@ -405,7 +403,6 @@ func (s *Server) serveStochasticInline(
 	w http.ResponseWriter,
 	r *http.Request,
 	document *types.FinancialModelDocument,
-	incomeData *types.IncomeDataSnapshot,
 	settings types.ProjectionRuntimeSettings,
 	overrides types.ModelOverrides,
 	config types.StochasticConfig,
@@ -430,7 +427,7 @@ func (s *Server) serveStochasticInline(
 	}
 
 	ctx := r.Context()
-	result, runErr := domain.StochasticProjection(ctx, document, &settings, overrides, config, progressCallback, incomeData)
+	result, runErr := domain.StochasticProjection(ctx, document, &settings, overrides, config, progressCallback)
 	if runErr != nil {
 		if err := writeEvent("error", "error", map[string]any{"error": runErr.Error()}); err != nil {
 			log.Printf("stochastic sse: error write failed: %v", err)

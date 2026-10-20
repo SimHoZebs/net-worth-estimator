@@ -53,7 +53,6 @@ export function useRemoteWorkspace({
 	const serverDocument = useWorkspaceStore((state) => state.serverDocument);
 	const serverRevision = useWorkspaceStore((state) => state.serverRevision);
 	const recoveryDraft = useWorkspaceStore((state) => state.recoveryDraft);
-	const incomeData = useWorkspaceStore((state) => state.incomeData);
 	const serverPresets = useWorkspaceStore((state) => state.serverPresets);
 	const presetError = useWorkspaceStore((state) => state.presetError);
 	const adapterReport = useWorkspaceStore((state) => state.adapterReport);
@@ -93,7 +92,6 @@ export function useRemoteWorkspace({
 		serverDocument,
 		serverRevision,
 		recoveryDraft,
-		incomeData,
 		serverPresets,
 		presetError,
 		adapterReport,

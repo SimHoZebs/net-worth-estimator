@@ -145,7 +145,6 @@ export interface AmountPresetMoveResponse extends HumaMetadata {
 export interface AmountCatalogResponse extends HumaMetadata {
 	resolvers: AmountResolverSpec[];
 	providers: AmountProviderSpec[];
-	incomeSteps: AmountResolverSpec[];
 }
 
 export type RecurrenceFrequency =
@@ -250,32 +249,6 @@ export interface ProjectionRuntimeSettings extends HumaMetadata {
 	evaluations: EvaluationTables;
 }
 
-export interface IncomeSourceDefinition extends HumaMetadata {
-	id: string;
-	name: string;
-	effectiveFrom: IsoDate;
-	effectiveTo: IsoDate | null;
-	annualGrossIncome: number;
-}
-
-export interface IncomeTaxBracket extends HumaMetadata {
-	upTo: number | null;
-	rate: number;
-}
-
-export interface IncomeTaxProfile extends HumaMetadata {
-	id: string;
-	name: string;
-	deduction: number;
-	brackets: IncomeTaxBracket[];
-	sourceUrl: string | null;
-}
-
-export interface IncomeDataSnapshot extends HumaMetadata {
-	incomeSources: IncomeSourceDefinition[];
-	taxProfiles: IncomeTaxProfile[];
-}
-
 export interface ModelValidationIssue extends HumaMetadata {
 	severity: "error" | "warning" | string;
 	code: string;
@@ -332,26 +305,6 @@ export interface MovementAccountDelta {
 	delta: number;
 }
 
-export interface IncomeResolverEvent {
-	resolver: string;
-	requestedAmount: number;
-	realizedAmount: number;
-	destinationAccountId: string | null;
-	taxableAmountAfter: number;
-	employerMatchAmount: number;
-	employerMatchRealizedAmount: number;
-}
-
-export interface IncomeEvent {
-	annualGrossIncome: number;
-	grossAmount: number;
-	resolvers: IncomeResolverEvent[];
-	netCashRequested: number;
-	netCashRealized: number;
-	employerMatchRequested: number;
-	employerMatchRealized: number;
-}
-
 export interface MovementEvent {
 	date: IsoDate;
 	sequence: number;
@@ -359,7 +312,6 @@ export interface MovementEvent {
 	requestedAmount: number;
 	realizedAmount: number;
 	accountDeltas: MovementAccountDelta[] | null;
-	income?: IncomeEvent;
 }
 
 export interface ProjectionTimeline {
@@ -429,7 +381,6 @@ export interface DeterministicProjectionRequest extends HumaMetadata {
 	document?: FinancialModelDocument | null;
 	overrides?: ModelOverrides;
 	settings: ProjectionRuntimeSettings;
-	incomeData?: IncomeDataSnapshot | null;
 }
 
 export interface DeterministicProjectionResponse extends HumaMetadata {

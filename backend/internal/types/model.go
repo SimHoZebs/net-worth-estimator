@@ -172,18 +172,6 @@ type PostingAmountResolution struct {
 	Inputs   map[string]AmountInputBinding `json:"inputs"`
 }
 
-type IncomeResolverStep struct {
-	Resolver             string         `json:"resolver"`
-	Config               map[string]any `json:"config"`
-	DestinationAccountID *string        `json:"destinationAccountId"`
-	EmployerMatchRate    *float64       `json:"employerMatchRate,omitempty"`
-}
-
-type IncomeAmountConfig struct {
-	IncomeSourceID string               `json:"incomeSourceId"`
-	Resolvers      []IncomeResolverStep `json:"resolvers"`
-}
-
 type PostingClaim struct {
 	// RuleID names the recurrence rule whose scheduled occurrence this
 	// posting records. Always paired with OccurrenceDate; both are set

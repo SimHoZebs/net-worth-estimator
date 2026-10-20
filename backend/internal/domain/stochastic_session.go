@@ -141,7 +141,7 @@ func buildStochasticRates(rules []types.RecurrenceRule, postings []types.Posting
 	return rates
 }
 
-func newStochasticSession(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, config types.StochasticConfig, onProgress StochasticProgressCallback, incomeData *types.IncomeDataSnapshot) (*stochasticSession, error) {
+func newStochasticSession(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, config types.StochasticConfig, onProgress StochasticProgressCallback) (*stochasticSession, error) {
 	session := &stochasticSession{
 		config:              NormalizeStochasticConfig(config),
 		onProgress:          onProgress,
@@ -160,7 +160,7 @@ func newStochasticSession(document *types.FinancialModelDocument, settings *type
 		}, nil)
 	}
 	session.sampler = NewStochasticSampler(session.config.Seed)
-	prepared, err := PrepareSimulationRequest(document, settings, overrides, nil, incomeData)
+	prepared, err := PrepareSimulationRequest(document, settings, overrides, nil)
 	if err != nil {
 		return nil, err
 	}

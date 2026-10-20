@@ -135,9 +135,8 @@ func TestReadOnlyRejectsWritesButServesReads(t *testing.T) {
 func TestReadOnlyRejectsRowWrites(t *testing.T) {
 	database := openAPIStore(t)
 	root := apiProjectRoot(t)
-	if _, _, err := database.ImportCSV(
+	if _, err := database.ImportCSV(
 		filepath.Join(root, "public", "configs"),
-		filepath.Join(root, "public", "data", "income"),
 	); err != nil {
 		t.Fatalf("seed store: %v", err)
 	}
@@ -175,9 +174,8 @@ func TestReadOnlyRejectsRowWrites(t *testing.T) {
 
 func TestRowWriteReturnsRevision(t *testing.T) {
 	database := openAPIStore(t)
-	if _, _, err := database.ImportCSV(
+	if _, err := database.ImportCSV(
 		filepath.Join(apiProjectRoot(t), "public", "configs"),
-		filepath.Join(apiProjectRoot(t), "public", "data", "income"),
 	); err != nil {
 		t.Fatalf("seed store: %v", err)
 	}
@@ -212,9 +210,8 @@ func TestRowWriteReturnsRevision(t *testing.T) {
 
 func TestRowWriteRejectsInvalidRow(t *testing.T) {
 	database := openAPIStore(t)
-	if _, _, err := database.ImportCSV(
+	if _, err := database.ImportCSV(
 		filepath.Join(apiProjectRoot(t), "public", "configs"),
-		filepath.Join(apiProjectRoot(t), "public", "data", "income"),
 	); err != nil {
 		t.Fatalf("seed store: %v", err)
 	}
@@ -330,9 +327,8 @@ func TestRowWriteIgnoresEchoedSourceField(t *testing.T) {
 
 func TestRowDeleteAccountWithDependentsIsRejected(t *testing.T) {
 	database := openAPIStore(t)
-	if _, _, err := database.ImportCSV(
+	if _, err := database.ImportCSV(
 		filepath.Join(apiProjectRoot(t), "public", "configs"),
-		filepath.Join(apiProjectRoot(t), "public", "data", "income"),
 	); err != nil {
 		t.Fatalf("seed store: %v", err)
 	}
@@ -723,18 +719,17 @@ func TestDeterministicMovementEvidenceRoundsIncomeFields(t *testing.T) {
 		t.Fatalf("read income projection fixture: %v", err)
 	}
 	var fixture struct {
-		Document   *types.FinancialModelDocument   `json:"document"`
-		Settings   types.ProjectionRuntimeSettings `json:"settings"`
-		IncomeData *types.IncomeDataSnapshot       `json:"incomeData"`
+		Document *types.FinancialModelDocument   `json:"document"`
+		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
 		t.Fatalf("decode income projection fixture: %v", err)
 	}
-	if fixture.Document == nil || fixture.IncomeData == nil {
+	if fixture.Document == nil {
 		t.Fatal("income projection fixture is incomplete")
 	}
 	fixture.Settings.HorizonYears = 1
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, IncomeData: fixture.IncomeData})
+	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings})
 	if err != nil {
 		t.Fatalf("encode income projection request: %v", err)
 	}
@@ -756,28 +751,17 @@ func TestDeterministicMovementEvidenceRoundsIncomeFields(t *testing.T) {
 	if payload.Result == nil || len(payload.Result.MovementEvents) == 0 {
 		t.Fatalf("income movement events = %+v", payload.Result)
 	}
-	assertRounded := func(value float64) {
-		t.Helper()
-		if value != math.Trunc(value) {
-			t.Fatalf("public movement amount is not rounded: %v", value)
-		}
-	}
 	for _, event := range payload.Result.MovementEvents {
-		if event.Income == nil {
-			continue
+		for _, delta := range event.AccountDeltas {
+			if delta.Delta != math.Trunc(delta.Delta) {
+				t.Fatalf("public movement amount is not rounded: %v", delta.Delta)
+			}
 		}
-		assertRounded(event.Income.AnnualGrossIncome)
-		assertRounded(event.Income.GrossAmount)
-		assertRounded(event.Income.NetCashRequested)
-		assertRounded(event.Income.NetCashRealized)
-		assertRounded(event.Income.EmployerMatchRequested)
-		assertRounded(event.Income.EmployerMatchRealized)
-		for _, resolver := range event.Income.Resolvers {
-			assertRounded(resolver.RequestedAmount)
-			assertRounded(resolver.RealizedAmount)
-			assertRounded(resolver.TaxableAmountAfter)
-			assertRounded(resolver.EmployerMatchAmount)
-			assertRounded(resolver.EmployerMatchRealizedAmount)
+		if event.RequestedAmount != math.Trunc(event.RequestedAmount) {
+			t.Fatalf("public requested amount is not rounded: %v", event.RequestedAmount)
+		}
+		if event.RealizedAmount != math.Trunc(event.RealizedAmount) {
+			t.Fatalf("public realized amount is not rounded: %v", event.RealizedAmount)
 		}
 	}
 }

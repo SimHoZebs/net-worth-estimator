@@ -16,15 +16,14 @@ import (
 
 // Field kinds tell a client which control to render for a key:
 // expression, money, percent, rate, volatility, account, posting,
-// posting-or-account, income-source, tax-profile, income-steps.
+// posting-or-account, brackets.
 type AmountFieldSpec struct {
 	Key      string `json:"key"`
 	Kind     string `json:"kind"`
 	Required bool   `json:"required"`
 }
 
-// ResolverSpecs returns wiring for every resolver including the
-// special-cased income pipeline.
+// ResolverSpecs returns wiring for every registered resolver.
 func ListAmountResolverSpecs() []AmountResolverInfo {
 	base := ListAmountResolvers()
 	specs := map[string]AmountResolverInfo{
@@ -35,12 +34,12 @@ func ListAmountResolverSpecs() []AmountResolverInfo {
 				{Key: "expression", Kind: "expression", Required: true},
 			},
 		},
-		"income": {
-			Name:        "income",
-			Description: "Income-pipeline amount resolved by the income transition.",
+		"progressive-bracket": {
+			Name:        "progressive-bracket",
+			Description: "Progressive tax liability on (gross - pretax - deduction).",
 			ConfigFields: []AmountFieldSpec{
-				{Key: "incomeSourceId", Kind: "income-source", Required: true},
-				{Key: "resolvers", Kind: "income-steps", Required: false},
+				{Key: "deduction", Kind: "money", Required: false},
+				{Key: "brackets", Kind: "brackets", Required: true},
 			},
 		},
 	}
@@ -128,29 +127,4 @@ func ListAmountProviderSpecs() []AmountProviderInfo {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
-}
-
-// IncomeStepSpecs returns wiring for the ordered steps inside an income
-// resolver.
-func ListIncomeStepSpecs() []AmountResolverInfo {
-	return []AmountResolverInfo{
-		{
-			Name:        "percentage",
-			Description: "Takes a percent slice (for example 401k) with an optional yearly limit.",
-			ConfigFields: []AmountFieldSpec{
-				{Key: "rate", Kind: "percent", Required: true},
-				{Key: "annualCap", Kind: "money", Required: false},
-				{Key: "destinationAccountId", Kind: "account", Required: false},
-				{Key: "employerMatchRate", Kind: "percent", Required: false},
-			},
-		},
-		{
-			Name:        "progressive-bracket",
-			Description: "Computes tax from a bracket table after a deduction.",
-			ConfigFields: []AmountFieldSpec{
-				{Key: "profileId", Kind: "tax-profile", Required: true},
-				{Key: "destinationAccountId", Kind: "account", Required: false},
-			},
-		},
-	}
 }

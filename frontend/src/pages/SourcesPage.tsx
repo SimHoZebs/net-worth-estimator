@@ -2,7 +2,6 @@ import { RemoteAuthControl } from "../app/RemoteAuthControl.tsx";
 import { AmountCatalog } from "../components/editors/AmountCatalog.tsx";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
-import { IncomeEvidence } from "./sources/IncomeEvidence.tsx";
 import { SourceBanner } from "./sources/SourceHealth.tsx";
 import "./sources/sources.css";
 
@@ -16,7 +15,6 @@ export function SourcesPage() {
 	);
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
 	const onUpdatePlan = useWorkspaceStore((state) => state.updatePlan);
-	const incomeData = useWorkspaceStore((state) => state.incomeData);
 	if (!workspace || !plan) return null;
 	const readOnly = statusReadOnly || writeBlocked || workspace.saved.readOnly;
 	const sourceAccess = readOnly ? "Read-only" : "Writable";
@@ -27,7 +25,6 @@ export function SourcesPage() {
 				serverDocument={serverDocument}
 			/>
 			<RemoteAuthControl />
-			<IncomeEvidence incomeData={incomeData} />
 			<AmountCatalog
 				accounts={plan.accounts.map((account) => ({
 					id: account.id,
@@ -43,14 +40,6 @@ export function SourcesPage() {
 						name: posting.name,
 					})),
 				]}
-				incomeSources={(incomeData?.incomeSources ?? []).map((source) => ({
-					id: source.id,
-					name: source.name,
-				}))}
-				taxProfiles={(incomeData?.taxProfiles ?? []).map((profile) => ({
-					id: profile.id,
-					name: profile.name,
-				}))}
 			/>
 			<AssumptionsPanel plan={plan} onUpdate={onUpdatePlan} />
 		</>

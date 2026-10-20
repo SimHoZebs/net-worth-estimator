@@ -11,8 +11,9 @@ import type { MovementResult } from "./result.ts";
 // realized per event); `spendingBalance` reads saved Plan balances surfaced
 // as `ProjectionAccountSummary.startingBalance`. The Gap check
 // (`requested - realized`) is the same gap the posting-fulfillment Goal
-// check aggregates; the paycheck filter mirrors
-// `MovementEvent.income.netCashRealized`. Only the windows stay client-side:
+// check aggregates; the paycheck filter counts take-home sweep transfers
+// from the gross-pay staging account alongside external inflows.
+// Only the windows stay client-side:
 // they follow user-selected accounts, bills, statement day, and overrides,
 // which have no server contract (see PRODUCT_INTENT open decisions on
 // household safe spending). Do not add new windowed sums here; derive from these.

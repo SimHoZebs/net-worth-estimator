@@ -55,7 +55,7 @@ func BenchmarkSim(b *testing.B) {
 	document, settings, overrides := loadBenchFixture(b)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := ProjectFinancialModelDocument(document, settings, overrides, nil, nil); err != nil {
+		if _, err := ProjectFinancialModelDocument(document, settings, overrides, nil); err != nil {
 			b.Fatal(err)
 		}
 	}

@@ -120,23 +120,6 @@ func schemaStatements() []string {
 			config_json TEXT NOT NULL,
 			PRIMARY KEY (type, instance_id)
 		)`,
-		`CREATE TABLE IF NOT EXISTS income_sources (
-			id TEXT NOT NULL,
-			position INTEGER NOT NULL,
-			name TEXT NOT NULL,
-			effective_from TEXT NOT NULL,
-			effective_to TEXT,
-			annual_gross_income REAL NOT NULL,
-			PRIMARY KEY (id, effective_from)
-		)`,
-		`CREATE TABLE IF NOT EXISTS tax_profiles (
-			id TEXT PRIMARY KEY,
-			position INTEGER NOT NULL,
-			name TEXT NOT NULL,
-			deduction REAL NOT NULL,
-			brackets_json TEXT NOT NULL,
-			source_url TEXT
-		)`,
 		`CREATE TABLE IF NOT EXISTS projection_artifacts (
 			identity TEXT PRIMARY KEY,
 			kind TEXT NOT NULL,
@@ -282,19 +265,22 @@ func seedAmountPresets() []types.AmountPreset {
 			},
 		},
 		{
-			Name: "paycheck", Label: "Paycheck take-home", Enabled: true,
-			Summary: "Yearly salary minus 401k percent and tax table, in order. Remainder lands as take-home pay.",
-			WhenUse: "Any salary with pre-tax savings and taxes.",
+			Name: "federal-tax", Label: "Federal tax owed", Enabled: true,
+			Summary: "Progressive tax on gross pay minus pre-tax slices, per occurrence.",
+			WhenUse: "Tax withholding rules that read gross and 401(k) rules.",
 			Amount: types.PostingAmountResolution{
-				Resolver: "income",
+				Resolver: "progressive-bracket",
 				Config: map[string]any{
-					"incomeSourceId": "salary",
-					"resolvers": []any{
-						map[string]any{"resolver": "percentage", "config": map[string]any{"rate": 0.10, "annualCap": 23500.0}, "destinationAccountId": "401k"},
-						map[string]any{"resolver": "progressive-bracket", "config": map[string]any{"profileId": "federal"}},
+					"deduction": 1341.67,
+					"brackets": []any{
+						map[string]any{"upTo": 2066.67, "rate": 0.10},
+						map[string]any{"upTo": nil, "rate": 0.12},
 					},
 				},
-				Inputs: map[string]types.AmountInputBinding{},
+				Inputs: map[string]types.AmountInputBinding{
+					"gross":  {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "salary"}},
+					"pretax": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "salary_401k"}},
+				},
 			},
 		},
 	}
@@ -309,8 +295,6 @@ func expectedSchemaTables() []string {
 		"postings",
 		"recurrence_rules",
 		"evaluations",
-		"income_sources",
-		"tax_profiles",
 		"projection_artifacts",
 		"model_metadata",
 		"payment_terms",

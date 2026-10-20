@@ -21,13 +21,12 @@ type MonteCarloSample struct {
 }
 
 type SimulationRequest struct {
-	Model                  FinancialModel      `json:"model"`
-	IncomeData             *IncomeDataSnapshot `json:"incomeData,omitempty"`
-	InitialState           SimulationState     `json:"initialState"`
-	StartDate              IsoDate             `json:"startDate"`
-	EndDate                IsoDate             `json:"endDate"`
-	IncludeStartDateEvents bool                `json:"includeStartDateEvents"`
-	MonteCarloSample       *MonteCarloSample   `json:"monteCarloSample,omitempty"`
+	Model                  FinancialModel    `json:"model"`
+	InitialState           SimulationState   `json:"initialState"`
+	StartDate              IsoDate           `json:"startDate"`
+	EndDate                IsoDate           `json:"endDate"`
+	IncludeStartDateEvents bool              `json:"includeStartDateEvents"`
+	MonteCarloSample       *MonteCarloSample `json:"monteCarloSample,omitempty"`
 }
 
 type SimulationSnapshot struct {
@@ -37,11 +36,10 @@ type SimulationSnapshot struct {
 
 type SimulationRun struct {
 	Request struct {
-		Model                  FinancialModel      `json:"model"`
-		StartDate              IsoDate             `json:"startDate"`
-		EndDate                IsoDate             `json:"endDate"`
-		IncludeStartDateEvents bool                `json:"includeStartDateEvents"`
-		IncomeData             *IncomeDataSnapshot `json:"incomeData,omitempty"`
+		Model                  FinancialModel `json:"model"`
+		StartDate              IsoDate        `json:"startDate"`
+		EndDate                IsoDate        `json:"endDate"`
+		IncludeStartDateEvents bool           `json:"includeStartDateEvents"`
 	} `json:"request"`
 	InitialState     SimulationState      `json:"initialState"`
 	FinalState       SimulationState      `json:"finalState"`

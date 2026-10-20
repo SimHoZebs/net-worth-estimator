@@ -26,8 +26,6 @@ const (
 	ThresholdFile      = "behavior/net-worth-threshold.csv"
 	AccountBalanceFile = "behavior/account-balance.csv"
 	FulfillmentFile    = "behavior/posting-fulfillment.csv"
-	IncomeSourcesFile  = "income-sources.csv"
-	TaxProfilesFile    = "tax-profiles.csv"
 )
 
 func readCSV(path string) ([][]string, error) {
@@ -529,51 +527,6 @@ func parseNumberOr(raw string, fallback float64) float64 {
 		return fallback
 	}
 	return parsed
-}
-
-// ImportIncomeData reads income CSVs from a directory.
-func ImportIncomeData(incomePath string) (*types.IncomeDataSnapshot, error) {
-	snapshot := &types.IncomeDataSnapshot{}
-	records, err := readCSV(filepath.Join(incomePath, IncomeSourcesFile))
-	if err != nil {
-		return nil, fmt.Errorf("read income sources: %w", err)
-	}
-	index := headerIndex(records[0])
-	for _, record := range records[1:] {
-		if len(strings.Join(record, "")) == 0 {
-			continue
-		}
-		gross := parseNumberOr(field(record, index, "annualGrossIncome"), 0)
-		snapshot.IncomeSources = append(snapshot.IncomeSources, types.IncomeSourceDefinition{
-			ID:                field(record, index, "id"),
-			Name:              field(record, index, "name"),
-			EffectiveFrom:     field(record, index, "effectiveFrom"),
-			EffectiveTo:       parseOptionalDate(field(record, index, "effectiveTo")),
-			AnnualGrossIncome: gross,
-		})
-	}
-	profileRecords, err := readCSV(filepath.Join(incomePath, TaxProfilesFile))
-	if err != nil {
-		return nil, fmt.Errorf("read tax profiles: %w", err)
-	}
-	profileIndex := headerIndex(profileRecords[0])
-	for _, record := range profileRecords[1:] {
-		if len(strings.Join(record, "")) == 0 {
-			continue
-		}
-		var brackets []types.IncomeTaxBracket
-		if err := strictUnmarshal([]byte(field(record, profileIndex, "brackets")), &brackets); err != nil {
-			return nil, fmt.Errorf("tax profile brackets: %w", err)
-		}
-		snapshot.TaxProfiles = append(snapshot.TaxProfiles, types.IncomeTaxProfile{
-			ID:        field(record, profileIndex, "id"),
-			Name:      field(record, profileIndex, "name"),
-			Deduction: parseNumberOr(field(record, profileIndex, "deduction"), 0),
-			Brackets:  brackets,
-			SourceURL: parseOptionalString(field(record, profileIndex, "sourceUrl")),
-		})
-	}
-	return snapshot, nil
 }
 
 var _ io.Reader = (*strings.Reader)(nil)

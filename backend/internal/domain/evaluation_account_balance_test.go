@@ -174,7 +174,7 @@ func TestValidateFinancialModelFlagsDanglingAccountBalanceEvaluation(t *testing.
 			}},
 		},
 	}
-	issues := ValidateFinancialModel(document, nil)
+	issues := ValidateFinancialModel(document)
 	found := false
 	for _, issue := range issues {
 		if issue.Code == "evaluation.accountBalance.accountId.invalid" {

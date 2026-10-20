@@ -15,7 +15,6 @@ import {
 	type EvaluationInstance,
 	type FinancialModelDocument,
 	type FinancialModelResponse,
-	type IncomeDataSnapshot,
 	type ProjectionResult,
 	type ServerStatus,
 	type StochasticProjectionResult,
@@ -385,10 +384,6 @@ function clientFixture(put?: PutCallback) {
 			issues: [],
 			revision: '"sha256-test"',
 		})),
-		getIncomeData: vi.fn(async (): Promise<IncomeDataSnapshot> => ({
-			incomeSources: [],
-			taxProfiles: [],
-		})),
 		listAmountPresets: vi.fn(async () => ({ presets: [] })),
 		createAmountPreset: vi.fn(async (row: AmountPreset) => ({
 			row: { ...row, id: row.id || "preset-1" },
@@ -574,10 +569,6 @@ describe("remote workspace state", () => {
 		expect(
 			rendered.result().plan?.accounts.map((account) => account.id),
 		).toEqual(["cash", "loan"]);
-		expect(rendered.result().incomeData).toEqual({
-			incomeSources: [],
-			taxProfiles: [],
-		});
 		expect(rendered.result().adapterReport?.warnings.length).toBeGreaterThan(0);
 
 		const edited = withMovementAmount(rendered.result().plan!, 125);

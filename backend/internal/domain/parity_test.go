@@ -106,7 +106,7 @@ func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 		Checkpoints: []types.Checkpoint{{AccountID: "checking", Date: "2026-13-40", Balance: 100}},
 	}
 
-	issues := ValidateFinancialModel(document, nil)
+	issues := ValidateFinancialModel(document)
 
 	found := map[string]bool{}
 	for _, issue := range issues {
@@ -129,7 +129,7 @@ func TestPrepareSimulationRejectsMalformedProjectionStart(t *testing.T) {
 		FallbackProjectionStartDate: "01/02/2026",
 		HorizonYears:                1,
 	}
-	_, err := PrepareSimulationRequest(document, settings, types.EmptyModelOverrides(), nil, nil)
+	_, err := PrepareSimulationRequest(document, settings, types.EmptyModelOverrides(), nil)
 	preparationError, ok := err.(*SimulationPreparationError)
 	if !ok {
 		t.Fatalf("expected SimulationPreparationError, got %v", err)

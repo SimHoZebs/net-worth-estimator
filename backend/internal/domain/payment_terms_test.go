@@ -46,7 +46,7 @@ func TestValidatePaymentTermsAcceptsCardRow(t *testing.T) {
 			Config:   map[string]any{"expression": "25"},
 		},
 	}}
-	for _, issue := range ValidateFinancialModel(document, nil) {
+	for _, issue := range ValidateFinancialModel(document) {
 		if len(issue.Code) >= 6 && issue.Code[:6] == "terms." && issue.Severity == types.SeverityError {
 			t.Fatalf("unexpected terms error: %+v", issue)
 		}
@@ -77,8 +77,8 @@ func TestValidatePaymentTermsRejectsBadRows(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			document := termsDocument()
 			document.PaymentTerms = testCase.terms
-			if !termsCodes(ValidateFinancialModel(document, nil))[testCase.code] {
-				t.Fatalf("expected %q, got %+v", testCase.code, ValidateFinancialModel(document, nil))
+			if !termsCodes(ValidateFinancialModel(document))[testCase.code] {
+				t.Fatalf("expected %q, got %+v", testCase.code, ValidateFinancialModel(document))
 			}
 		})
 	}
@@ -105,7 +105,7 @@ func TestValidatePaymentTermsCoverageWarnsWithoutPaymentShell(t *testing.T) {
 		{AccountID: "prime_card", MinimumFixed: 25, DueDay: 10},
 	}
 	found := false
-	for _, issue := range ValidateFinancialModel(document, nil) {
+	for _, issue := range ValidateFinancialModel(document) {
 		if issue.Code == "terms.payment.missing" {
 			found = true
 			if issue.Severity != types.SeverityWarning {
@@ -127,7 +127,7 @@ func TestValidatePaymentTermsCoverageWarnsWithoutPaymentShell(t *testing.T) {
 			Config:   map[string]any{"expression": "25"},
 		},
 	}}
-	for _, issue := range ValidateFinancialModel(document, nil) {
+	for _, issue := range ValidateFinancialModel(document) {
 		if issue.Code == "terms.payment.missing" {
 			t.Fatalf("payment shell should satisfy coverage: %+v", issue)
 		}
