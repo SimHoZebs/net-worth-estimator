@@ -200,15 +200,15 @@ A small seeded run should terminate with one `result` event. It may include `pro
 
 Exercise each row against a disposable database and record the status and whether stored state changed.
 
-| Mode | Authorization | row writes (`POST /v1/accounts`, …) | `POST /v1/sync/simplefin` |
-| --- | --- | --- | --- |
-| writable, no token configured | absent | normal handling | 503 when sync is unconfigured |
-| writable, token configured | absent | 401 | 401 |
-| writable, token configured | wrong bearer | 401 | 401 |
-| writable, token configured | correct bearer | normal handling | normal handling or sync-specific error |
-| read-only, no token | absent | 403 | 403 |
-| read-only, token configured | correct bearer | 403 | 403 |
-| either mode | any | `GET` remains 200 | reads and projections remain 200 |
+| Mode                          | Authorization  | row writes (`POST /v1/accounts`, …) | `POST /v1/sync/simplefin`              |
+| ----------------------------- | -------------- | ----------------------------------- | -------------------------------------- |
+| writable, no token configured | absent         | normal handling                     | 503 when sync is unconfigured          |
+| writable, token configured    | absent         | 401                                 | 401                                    |
+| writable, token configured    | wrong bearer   | 401                                 | 401                                    |
+| writable, token configured    | correct bearer | normal handling                     | normal handling or sync-specific error |
+| read-only, no token           | absent         | 403                                 | 403                                    |
+| read-only, token configured   | correct bearer | 403                                 | 403                                    |
+| either mode                   | any            | `GET` remains 200                   | reads and projections remain 200       |
 
 Read-only server:
 
@@ -309,7 +309,7 @@ With writable, unauthenticated access, trigger and inspect counts:
 curl -fsS -X POST "$BASE_URL/v1/sync/simplefin" | jq .
 ```
 
-The response must report `dryRun: true` with `accountsProvisioned: 2` (mock accounts auto-provision on first sync). Reload the model and confirm no rows were committed. Link a mock bridge account to a model account through `PUT /v1/sync/simplefin/accounts/{bridgeAccountId}` and list links with `GET` on the same path. Restart the server (clears the in-memory trigger stamp), trigger again, and confirm checkpoints resolve to the linked accounts. A second successful trigger inside 20 hours returns 429; the interval guard stamps successful runs only.
+The response must report `dryRun: true` with `accountsProvisioned: 2` (mock accounts auto-provision on first sync). Reload the model and confirm no rows were committed. Link a mock bridge account to a model account through `PUT /v1/sync/simplefin/accounts/{bridgeAccountId}` and list links with `GET` on the same path. Restart the server (clears the in-memory trigger stamp), trigger again, and confirm checkpoints resolve to the linked accounts. A second successful trigger inside the configured interval (default 6 hours) returns 429; the interval guard stamps successful runs only.
 
 A guard test belongs in Go and runs with:
 

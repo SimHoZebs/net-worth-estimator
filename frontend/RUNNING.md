@@ -23,10 +23,6 @@ npm --prefix frontend run dev
 
 The development server uses port `5178` and proxies `/v1` to the backend named by `NET_WORTH_ESTIMATOR_BACKEND` (default `http://127.0.0.1:8787`).
 
-```sh
-
-```
-
 ## Production build and containers
 
 Build static assets with a build-time API origin when the frontend is hosted separately:
@@ -54,21 +50,6 @@ Compose publishes the frontend at `http://localhost:8080` and the API at `http:/
 
 Navigation uses URL fragments, so a static host does not need SPA route rewrites. Fonts and the scenario worker are served with the application. There are no external font, analytics, or bank requests.
 
-## Verification
-
-```sh
-npm run lint
-npm run typecheck
-npm test
-npx playwright install chromium
-npm run build
-npm run test:browser
-sh ../scripts/smoke-compose.sh
-TEST_PRODUCTION=1 npm run test:browser
-```
-
-Browser tests cover plan editing, persistent drafts, deliberate save and discard, import validation, read-only sources, corrupt storage, storage failures, cross-tab protection, export, scenario failures, keyboard navigation, responsive layouts, and automated WCAG accessibility checks. Screenshots are written under `test-results/`.
-
 ## Workspace and data
 
 - Browser tests run against the fixtureapi harness, which serves the real API from a recorded CSV fixture.
@@ -90,17 +71,7 @@ The list contains the records available in the plan; it does not establish compl
 
 ## Calculation boundaries
 
-The canonical model and income snapshot go to the Go backend for deterministic and stochastic projections; the frontend maps those results for display and keeps local edits as a temporary review layer.
-
-The base case compounds account rates between dated movements. Monthly and yearly schedules preserve their intended day, clamped to month end where needed. Amount increases apply on schedule anniversaries. Protected balances limit withdrawals, account ceilings limit incoming movements, and debt payments stop at zero.
-
-Starting balances establish the projection boundary. Older balance checks are carried forward unchanged. Historical recorded movements are evidence only; replaying them would count money already included in starting balances twice.
-
-The optional range uses 400 repeatable scenarios. Each calendar year shares one normally sampled market shock across investment accounts. Investment rates are capped between −50% and +50%; cash, property, and debt rates are fixed. The displayed band is the 10th to 90th percentile, with a separately calculated median. Inflation is used only for the optional today's-dollars chart; each movement has its own nominal annual increase.
-
-Evaluations check the first crossing of a net-worth or account-balance target. Threshold evaluations do not implement financial-independence or retirement-sustainability evaluations; those server evaluations are listed alongside them as read-only outcomes. Taxes, fees, withdrawal eligibility, legal limits and unplanned events require additional model support or explicit plan movements. Cash timing is not a safe-to-spend recommendation. An underfunded movement is neither borrowed nor rescheduled automatically.
-
-Income evidence uses recorded, enabled one-time external inflows. Similar amounts and a monthly cadence can support a provisional annualized estimate. It does not independently establish a payer, payroll status, gross salary or bank provenance, and it never changes planned income.
+The canonical model and income snapshot go to the Go backend for projections; the frontend maps results for display and keeps local edits as a temporary review layer.
 
 ## Structure
 

@@ -45,7 +45,7 @@ The container boundary is split. `backend/Dockerfile` produces an API-only image
 
 Each issue contains `severity`, `code`, `message`, and `path`. Stored model and income rows are loaded in one read transaction. The response always includes a non-null issue array; `document` is null when the store has no canonical model. `revision` and the `ETag` response header identify canonical content for reads and caching.
 
-Row writes replace the retired whole-document PUT. Each `POST`, `PATCH`, `PUT`, or `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, and `/v1/sync/simplefin/accounts` applies one change: it validates the resulting document against the stored income snapshot and returns `{row, issues, persisted, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions.
+Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, and `/v1/sync/simplefin/accounts` validates the resulting document against the stored income snapshot and returns `{row, issues, persisted, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions.
 
 - Any error-severity issue prevents persistence.
 - Warning-only writes are persisted.
@@ -56,14 +56,7 @@ Row writes replace the retired whole-document PUT. Each `POST`, `PATCH`, `PUT`, 
 
 ### Status and income
 
-`GET /v1/status` returns:
-
-```json
-{
-  "readOnly": false,
-  "authEnabled": true
-}
-```
+`GET /v1/status` returns `readOnly`, `authEnabled`, `syncConfigured`, and `lastSyncAt` (omitted when no sync completed).
 
 `GET /v1/income-data` returns `types.IncomeDataSnapshot`, containing effective-dated `incomeSources` and ordered `taxProfiles`.
 
@@ -117,26 +110,24 @@ A `domain.SimulationPreparationError`, including model validation failure, retur
 
 The response is `text/event-stream` with `Cache-Control: no-store`. It writes `retry: 3000` and heartbeat comments every 15 seconds.
 
-| Event | Data |
-| --- | --- |
-| `progress` | `{ "progress": StochasticProgress }` |
-| `partial` | `{ "progress": StochasticProgress, "partial": StochasticProjectionResult }` |
-| `result` | `{ "result": StochasticProjectionResult }` |
-| `error` | `{ "error": string }` |
+| Event      | Data                                                                        |
+| ---------- | --------------------------------------------------------------------------- |
+| `progress` | `{ "progress": StochasticProgress }`                                        |
+| `partial`  | `{ "progress": StochasticProgress, "partial": StochasticProjectionResult }` |
+| `result`   | `{ "result": StochasticProjectionResult }`                                  |
+| `error`    | `{ "error": string }`                                                       |
 
 A `partial` result is a cumulative snapshot. A slow attached stream may skip intermediate snapshots because the next one supersedes them.
 
 `X-Cache` semantics:
 
-| Value | Meaning |
-| --- | --- |
-| `hit` | completed seeded result loaded from SQLite; stream contains one `result` event |
-| `miss` | this request owns a new seeded run, or an unseeded request-bound run |
-| `attach` | this request attached to an identical seeded run already in progress |
+| Value    | Meaning                                                                        |
+| -------- | ------------------------------------------------------------------------------ |
+| `hit`    | completed seeded result loaded from SQLite; stream contains one `result` event |
+| `miss`   | this request owns a new seeded run, or an unseeded request-bound run           |
+| `attach` | this request attached to an identical seeded run already in progress           |
 
 An attached seeded request receives the latest cumulative snapshot, if one exists, and then remaining events. A stream disconnect detaches only that stream. The shared seeded computation continues. Completed seeded runs are evicted from the in-process registry at completion; later reconnects use the SQLite artifact cache.
-
-Walk-away rule: seeded runs are walk-away safe. Start on your phone, lose Wi-Fi or background the browser, repeat the same body later to attach or read the saved result. Unseeded runs are quick checks only and cancel on disconnect.
 
 An unseeded run does not use the shared registry or artifact cache. Its context follows the request, so disconnect cancels computation and no result is persisted.
 
@@ -144,14 +135,14 @@ An unseeded run does not use the shared registry or artifact cache. Its context 
 
 `POST /v1/sync/simplefin` calls `simplefin.Runner.Trigger` and returns `simplefin.Summary` counts.
 
-| Condition | Status |
-| --- | --- |
-| read-only mode | 403, before bearer validation |
-| token configured and missing/wrong | 401 |
-| sync unconfigured | 503 |
-| another run is active | 409 |
-| successful manual run was less than 6 hours ago | 429 |
-| success | 200 |
+| Condition                                       | Status                        |
+| ----------------------------------------------- | ----------------------------- |
+| read-only mode                                  | 403, before bearer validation |
+| token configured and missing/wrong              | 401                           |
+| sync unconfigured                               | 503                           |
+| another run is active                           | 409                           |
+| successful manual run was less than 6 hours ago | 429                           |
+| success                                         | 200                           |
 
 ### Origin and write policy
 
@@ -197,20 +188,20 @@ Migrations are transactional and forward-only. A database newer than the support
 
 The current schema stores:
 
-| Table | Purpose |
-| --- | --- |
-| `PRAGMA user_version` | applied migration version |
-| `model_metadata` | source path and document-present flag |
-| `accounts` | ordered account definitions |
-| `checkpoints` | ordered balance observations, unique by account/date, with owner |
-| `postings` | ordered posting definitions with owner |
-| `evaluations` | type, globally keyed instance ID, order, label, enablement, and JSON config |
-| `entity_ids` | shared ID registry across accounts, postings, rules, and evaluations |
-| `account_links` | bridge-to-model bindings with snapshot, origin, and last-seen date |
-| `income_sources` | effective-dated income rows sharing an ID |
-| `tax_profiles` | ordered deductions, brackets, and source URL |
-| `projection_artifacts` | versioned content identity, kind, creation time, and JSON payload |
-| `amount_presets` | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
+| Table                  | Purpose                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `PRAGMA user_version`  | applied migration version                                                                                     |
+| `model_metadata`       | source path and document-present flag                                                                         |
+| `accounts`             | ordered account definitions                                                                                   |
+| `checkpoints`          | ordered balance observations, unique by account/date, with owner                                              |
+| `postings`             | ordered posting definitions with owner                                                                        |
+| `evaluations`          | type, globally keyed instance ID, order, label, enablement, and JSON config                                   |
+| `entity_ids`           | shared ID registry across accounts, postings, rules, and evaluations                                          |
+| `account_links`        | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
+| `income_sources`       | effective-dated income rows sharing an ID                                                                     |
+| `tax_profiles`         | ordered deductions, brackets, and source URL                                                                  |
+| `projection_artifacts` | versioned content identity, kind, creation time, and JSON payload                                             |
+| `amount_presets`       | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
 
 ### First boot and import
 
@@ -287,11 +278,11 @@ occurrence.
 
 Posting and rule behavior is selected only by source and destination presence:
 
-| Source | Destinations | Behavior |
-| --- | --- | --- |
-| absent | present | external inflow |
-| present | absent | external outflow |
-| present | present | account-to-account transfer |
+| Source  | Destinations | Behavior                    |
+| ------- | ------------ | --------------------------- |
+| absent  | present      | external inflow             |
+| present | absent       | external outflow            |
+| present | present      | account-to-account transfer |
 
 `enabled` controls participation. One-time postings carry posted and
 transaction Unix times and always execute before scheduled rule
@@ -406,15 +397,15 @@ The kernel:
 
 ## 9. Evaluation Runtime
 
-`EvaluationRegistry` contains three process-wide definitions:
+`EvaluationRegistry` contains five process-wide definitions:
 
-| Go definition | Type |
-| --- | --- |
+| Go definition                     | Type                    |
+| --------------------------------- | ----------------------- |
 | `financialIndependenceDefinition` | `financialIndependence` |
-| `netWorthThresholdDefinition` | `netWorthThreshold` |
-| `accountBalanceDefinition` | `accountBalance` |
-| `postingFulfillmentDefinition` | `postingFulfillment` |
-| `cycleFulfillmentDefinition` | `cycleFulfillment` |
+| `netWorthThresholdDefinition`     | `netWorthThreshold`     |
+| `accountBalanceDefinition`        | `accountBalance`        |
+| `postingFulfillmentDefinition`    | `postingFulfillment`    |
+| `cycleFulfillmentDefinition`      | `cycleFulfillment`      |
 
 `types.EvaluationTypeOrder` fixes table order. Each table preserves stored order. Instance IDs are globally unique across all tables.
 
@@ -483,7 +474,7 @@ The seed controls the state sequence. Run-count normalization and seed-null beha
 `internal/simplefin` is configured once in `cmd/server`:
 
 - `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` enables a real Bridge runner.
-- `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCOUNTS` bootstraps Bridge-to-model links on first sync; links then live in the `account_links` table and survive env removal.
+- Account links live in the `account_links` table.
 - `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` selects model accounts eligible for pending-charge seeds.
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.
 - A bridge account that vanishes keeps its link, rows, and data (stale, never deleted by sync).
@@ -499,36 +490,36 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 
 ## 12. Backend Key Files
 
-| File | Responsibility |
-| --- | --- |
-| `backend/cmd/server/main.go` | environment, first-boot seed, HTTP lifecycle |
-| `backend/cmd/server/sync.go` | SimpleFIN configuration and 6-hour scheduler |
-| `backend/cmd/importcsv/main.go` | offline seed replacement |
-| `backend/internal/api/server.go` | router and operation registration |
-| `backend/internal/api/auth.go` | read-only and bearer policy |
-| `backend/internal/api/cors.go` | origin parsing and preflight enforcement |
-| `backend/internal/api/model_handlers.go` | model, status, and income handlers |
-| `backend/internal/api/rows.go` | row create/update/delete/move and link handlers |
-| `backend/internal/api/projection_handlers.go` | deterministic resolution, execution, and cache |
-| `backend/internal/api/stochastic_sse.go` | shared seeded runs and event serialization |
-| `backend/internal/api/artifacts.go` | content identity and cache helpers |
-| `backend/internal/store/store.go` | `Store`, `store.Open`, migrations |
-| `backend/internal/store/model.go` | seed/import replacement and ordered reload |
-| `backend/internal/store/rows.go` | row CRUD, ID registry, links, provisioning |
-| `backend/internal/store/sync.go` | sync application and pending snapshot |
-| `backend/internal/store/artifacts.go` | bounded artifact storage |
-| `backend/internal/csvio/import.go` | model and income CSV parsing |
-| `backend/internal/domain/validation.go` | authoritative model validation |
-| `backend/internal/domain/prepare.go` | overrides, history, dates, initial state |
-| `backend/internal/domain/transitions.go` | shared movement and income execution |
-| `backend/internal/domain/simulate.go` | deterministic kernel |
-| `backend/internal/domain/path.go` | path and public-result adaptation |
-| `backend/internal/domain/evaluation_runtime.go` | registry and evaluator lifecycle |
-| `backend/internal/domain/evaluation_fi.go` | financial-independence branch evaluation |
-| `backend/internal/domain/evaluation_threshold.go` | net-worth threshold evaluation |
-| `backend/internal/domain/evaluation_fulfillment.go` | posting fulfillment evaluation |
-| `backend/internal/domain/stochastic.go` | worker execution and progress |
-| `backend/internal/domain/stochastic_session.go` | baseline, samples, percentiles, accumulators |
-| `backend/internal/domain/sampler.go` | seeded sampling and percentile helpers |
-| `backend/internal/simplefin/runner.go` | fetch/map/apply orchestration and trigger guards |
-| `backend/internal/simplefin/map.go` | checkpoint and pending-charge mapping |
+| File                                                | Responsibility                                   |
+| --------------------------------------------------- | ------------------------------------------------ |
+| `backend/cmd/server/main.go`                        | environment, first-boot seed, HTTP lifecycle     |
+| `backend/cmd/server/sync.go`                        | SimpleFIN configuration and 6-hour scheduler     |
+| `backend/cmd/importcsv/main.go`                     | offline seed replacement                         |
+| `backend/internal/api/server.go`                    | router and operation registration                |
+| `backend/internal/api/auth.go`                      | read-only and bearer policy                      |
+| `backend/internal/api/cors.go`                      | origin parsing and preflight enforcement         |
+| `backend/internal/api/model_handlers.go`            | model, status, and income handlers               |
+| `backend/internal/api/rows.go`                      | row create/update/delete/move and link handlers  |
+| `backend/internal/api/projection_handlers.go`       | deterministic resolution, execution, and cache   |
+| `backend/internal/api/stochastic_sse.go`            | shared seeded runs and event serialization       |
+| `backend/internal/api/artifacts.go`                 | content identity and cache helpers               |
+| `backend/internal/store/store.go`                   | `Store`, `store.Open`, migrations                |
+| `backend/internal/store/model.go`                   | seed/import replacement and ordered reload       |
+| `backend/internal/store/rows.go`                    | row CRUD, ID registry, links, provisioning       |
+| `backend/internal/store/sync.go`                    | sync application and pending snapshot            |
+| `backend/internal/store/artifacts.go`               | bounded artifact storage                         |
+| `backend/internal/csvio/import.go`                  | model and income CSV parsing                     |
+| `backend/internal/domain/validation.go`             | authoritative model validation                   |
+| `backend/internal/domain/prepare.go`                | overrides, history, dates, initial state         |
+| `backend/internal/domain/transitions.go`            | shared movement and income execution             |
+| `backend/internal/domain/simulate.go`               | deterministic kernel                             |
+| `backend/internal/domain/path.go`                   | path and public-result adaptation                |
+| `backend/internal/domain/evaluation_runtime.go`     | registry and evaluator lifecycle                 |
+| `backend/internal/domain/evaluation_fi.go`          | financial-independence branch evaluation         |
+| `backend/internal/domain/evaluation_threshold.go`   | net-worth threshold evaluation                   |
+| `backend/internal/domain/evaluation_fulfillment.go` | posting fulfillment evaluation                   |
+| `backend/internal/domain/stochastic.go`             | worker execution and progress                    |
+| `backend/internal/domain/stochastic_session.go`     | baseline, samples, percentiles, accumulators     |
+| `backend/internal/domain/sampler.go`                | seeded sampling and percentile helpers           |
+| `backend/internal/simplefin/runner.go`              | fetch/map/apply orchestration and trigger guards |
+| `backend/internal/simplefin/map.go`                 | checkpoint and pending-charge mapping            |
