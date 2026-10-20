@@ -1,6 +1,7 @@
 import { Plus, Search } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { TransactionSortButton } from "../components/activity/TransactionSortButton.tsx";
+import { AccountCardGrid } from "../components/cards/AccountCardGrid.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { TablePagination } from "../components/DataTable.tsx";
 import { type TabItem, Tabs } from "../components/Tabs.tsx";
@@ -102,6 +103,21 @@ function TransactionsWithProjection({
 	);
 }
 
+function AccountsWithProjection({
+	plan,
+	query,
+}: {
+	plan: Plan;
+	query: string;
+}) {
+	const projection = useRemoteProjection({ ranges: false });
+	const base =
+		projection.base instanceof Error || projection.base === null
+			? null
+			: projection.base;
+	return <AccountCardGrid plan={plan} projection={base} query={query} />;
+}
+
 function usePlanRemoval({
 	plan,
 	onUpdate,
@@ -165,6 +181,7 @@ function AccountsView({
 	);
 	return (
 		<>
+			<AccountsWithProjection plan={plan} query={query} />
 			<section className="plan-transactions">
 				<div className="plan-toolbar">
 					<label className="search-field">
