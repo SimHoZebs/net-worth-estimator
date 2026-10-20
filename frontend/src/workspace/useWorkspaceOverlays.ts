@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
-import type { TimingDetailTab } from "../pages/outlook/TimingDetailDialog.tsx";
+import type { TimingDetailTab } from "../pages/outlook/timing/timingDetailModel.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import {
 	discardHash,

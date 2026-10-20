@@ -1,24 +1,24 @@
 import { CalendarDays } from "lucide-react";
 import { useMemo, useState } from "react";
-import { accountTransactions } from "../../domain/accountActivity.ts";
+import { accountTransactions } from "../../../domain/accountActivity.ts";
 import {
 	DEFAULT_TRANSACTION_ORDER,
 	sortTransactionsByDate,
 	type TransactionOrder,
-} from "../../domain/transactionSort.ts";
+} from "../../../domain/transactionSort.ts";
 import {
 	cycleSpentSoFar,
 	isCycleOutflow,
 	resolveStatementCycle,
-} from "../../domain/cardCycle.ts";
+} from "../../../domain/cardCycle.ts";
 import {
 	dateLabel,
 	money,
 	shiftDate,
 	sum,
 	todayIso,
-} from "../../domain/format.ts";
-import { Skeleton } from "../../components/ui.tsx";
+} from "../../../domain/format.ts";
+import { Skeleton } from "../../../components/ui.tsx";
 import {
 	cashCushion,
 	checkingAccountId,
@@ -32,15 +32,16 @@ import {
 	realizedCheckingOutflows,
 	remainingMonthlyObligations,
 	spendingBalance,
-} from "../../domain/householdTiming.ts";
-import type { Plan } from "../../domain/model.ts";
-import { visibleAccounts } from "../../domain/model.ts";
-import type { Projection } from "../../domain/result.ts";
-import {
-	TimingDetailDialog,
-	type TimingDetailTab,
-} from "./TimingDetailDialog.tsx";
-import { useTimingSettings } from "../../state/useTimingSettings.ts";
+} from "../../../domain/householdTiming.ts";
+import type { Plan } from "../../../domain/model.ts";
+import { visibleAccounts } from "../../../domain/model.ts";
+import type { Projection } from "../../../domain/result.ts";
+import { TimingBillsPanel } from "./TimingBillsPanel.tsx";
+import { TimingConfigurePanel } from "./TimingConfigurePanel.tsx";
+import { TimingCyclePanel } from "./TimingCyclePanel.tsx";
+import { TimingDetailShell } from "./TimingDetailShell.tsx";
+import type { TimingDetailTab } from "./timingDetailModel.ts";
+import { useTimingSettings } from "../../../state/useTimingSettings.ts";
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
@@ -516,63 +517,85 @@ export function TimingPreview({
 				</button>
 			</div>
 			{detail && (
-				<TimingDetailDialog
-					heroes={heroes}
-					cashNow={{
-						checking,
-						spentSinceStart,
-						bills: remainingObligations,
-						cushion,
-						since: plan.startDate.slice(0, 10),
-						short: shortWindow.total,
-						firstShort: shortWindow.firstDate,
-					}}
-					paycheck={{
-						paycheck,
-						fixed: fixedObligations,
-						reserve: settings.reserve,
-						spent,
-						allowance,
-					}}
-					thisMonth={activeThisMonth}
-					frame={settings.mandatoryFrame}
-					onFrameChange={(frame) => updateSettings({ mandatoryFrame: frame })}
-					billCandidates={billCandidates}
-					trackedBillIds={trackedBillIds}
-					onToggleBill={toggleBill}
-					plan={plan}
-					cycleTransactions={cycleTransactions}
-					config={{
-						statementDay: settings.statementDay,
-						reserve: settings.reserve,
-						spentOverride: settings.spentOverride,
-						paycheckOverride: settings.paycheckOverride,
-						fixedOverride: settings.fixedOverride,
-						checkingOverride: settings.checkingOverride,
-						remainingOverride: settings.remainingOverride,
-						paycheckHint: paycheckDerived,
-						fixedHint: fixedDerived,
-						checkingHint: spendingDerived,
-						remainingHint: remainingDerived,
-						spentHint: derivedSpent,
-						cards: cards.map((card) => ({ id: card.id, name: card.name })),
-						trackedIds,
-						spendingAccounts: spendableAccounts.map((account) => ({
-							id: account.id,
-							name: account.name,
-						})),
-						trackedSpendingIds: spendingIds,
-					}}
-					onToggleAccount={toggleAccount}
-					onToggleSpendingAccount={toggleSpendingAccount}
-					onUpdateConfig={updateSettings}
-					onResetConfig={resetConfig}
+				<TimingDetailShell
 					tab={detail}
 					onTabChange={onTabChange}
-					transactionOrder={transactionOrder}
-					onTransactionOrderChange={setTransactionOrder}
+					cycleCount={cycleTransactions.length}
 					onClose={() => onDetail(null)}
-				/>
+				>
+					{detail === "mandatory" && (
+						<TimingBillsPanel
+							heroes={heroes}
+							cashNow={{
+								checking,
+								spentSinceStart,
+								bills: remainingObligations,
+								cushion,
+								since: plan.startDate.slice(0, 10),
+								short: shortWindow.total,
+								firstShort: shortWindow.firstDate,
+							}}
+							paycheck={{
+								paycheck,
+								fixed: fixedObligations,
+								reserve: settings.reserve,
+								spent,
+								allowance,
+							}}
+							section={activeThisMonth}
+							frame={settings.mandatoryFrame}
+							onFrameChange={(frame) =>
+								updateSettings({ mandatoryFrame: frame })
+							}
+							plan={plan}
+							transactionOrder={transactionOrder}
+							onTransactionOrderChange={setTransactionOrder}
+						/>
+					)}
+					{detail === "cycle" && (
+						<TimingCyclePanel
+							cycleStart={cycle.cycleStart}
+							cycleEnd={cycle.cycleEnd}
+							transactions={cycleTransactions}
+							plan={plan}
+							transactionOrder={transactionOrder}
+							onTransactionOrderChange={setTransactionOrder}
+						/>
+					)}
+					{detail === "configure" && (
+						<TimingConfigurePanel
+							config={{
+								statementDay: settings.statementDay,
+								reserve: settings.reserve,
+								spentOverride: settings.spentOverride,
+								paycheckOverride: settings.paycheckOverride,
+								fixedOverride: settings.fixedOverride,
+								checkingOverride: settings.checkingOverride,
+								remainingOverride: settings.remainingOverride,
+								paycheckHint: paycheckDerived,
+								fixedHint: fixedDerived,
+								checkingHint: spendingDerived,
+								remainingHint: remainingDerived,
+								spentHint: derivedSpent,
+								cards: cards.map((card) => ({ id: card.id, name: card.name })),
+								trackedIds,
+								spendingAccounts: spendableAccounts.map((account) => ({
+									id: account.id,
+									name: account.name,
+								})),
+								trackedSpendingIds: spendingIds,
+							}}
+							billCandidates={billCandidates}
+							trackedBillIds={trackedBillIds}
+							accounts={plan.accounts}
+							onToggleBill={toggleBill}
+							onToggleAccount={toggleAccount}
+							onToggleSpendingAccount={toggleSpendingAccount}
+							onUpdateConfig={updateSettings}
+							onResetConfig={resetConfig}
+						/>
+					)}
+				</TimingDetailShell>
 			)}
 		</section>
 	);
