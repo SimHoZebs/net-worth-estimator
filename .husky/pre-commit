@@ -18,16 +18,21 @@ else
   done
 fi
 
-staged_frontend=$(git diff --cached --name-only --diff-filter=ACM | grep '^frontend/' | grep -v '^frontend/node_modules/' | grep -E '\.(ts|tsx|css|json)$' || true)
-if [ -z "$staged_frontend" ]; then
+staged_lint=$(git diff --cached --name-only --diff-filter=ACM | grep '^frontend/' | grep -v '^frontend/node_modules/' | grep -E '\.(ts|tsx)$' || true)
+staged_format=$(git diff --cached --name-only --diff-filter=ACM | grep '^frontend/' | grep -v '^frontend/node_modules/' | grep -E '\.(ts|tsx|css|json|html)$' || true)
+if [ -z "$staged_lint" ] && [ -z "$staged_format" ]; then
   echo "pre-commit: no staged frontend files, skipping frontend checks."
 else
   echo "pre-commit: frontend lint and format check"
-  # Unquoted on purpose: one repo-relative path per line, no spaces in tree.
-  # shellcheck disable=SC2086
-  npm --prefix frontend exec -- oxlint $staged_frontend
-  # shellcheck disable=SC2086
-  npm --prefix frontend exec -- oxfmt --check $staged_frontend
+  if [ -n "$staged_lint" ]; then
+    # Unquoted on purpose: one repo-relative path per line, no spaces in tree.
+    # shellcheck disable=SC2086
+    npm --prefix frontend exec -- oxlint $staged_lint
+  fi
+  if [ -n "$staged_format" ]; then
+    # shellcheck disable=SC2086
+    npm --prefix frontend exec -- oxfmt --check $staged_format
+  fi
 fi
 
 end=$(date +%s)
