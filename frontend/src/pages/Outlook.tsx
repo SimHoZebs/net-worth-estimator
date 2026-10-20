@@ -11,8 +11,8 @@ import { EvaluationPreview } from "./outlook/EvaluationPreview.tsx";
 import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
 import { FundingInsight } from "./outlook/FundingInsight.tsx";
 import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
-import type { TimingDetailTab } from "./outlook/timing/timingDetailModel.ts";
-import { TimingPreview } from "./outlook/timing/TimingPreview.tsx";
+import type { SafeSpendingDetailTab } from "./outlook/safe-spending/safeSpendingDetailModel.ts";
+import { SafeSpendingPreview } from "./outlook/safe-spending/SafeSpendingPreview.tsx";
 import "./outlook/outlook.css";
 
 export function Outlook({
@@ -21,18 +21,18 @@ export function Outlook({
 	onTransactions,
 	onEvaluations,
 	onEvaluation,
-	timingDetail,
-	onTimingDetail,
-	onTimingTab,
+	safeSpendingDetail,
+	onSafeSpendingDetail,
+	onSafeSpendingTab,
 }: {
 	onEvidence: () => void;
 	onFailure: () => void;
 	onTransactions: () => void;
 	onEvaluations: () => void;
 	onEvaluation: (id: string) => void;
-	timingDetail: TimingDetailTab | null;
-	onTimingDetail: (tab: TimingDetailTab | null) => void;
-	onTimingTab: (tab: TimingDetailTab) => void;
+	safeSpendingDetail: SafeSpendingDetailTab | null;
+	onSafeSpendingDetail: (tab: SafeSpendingDetailTab | null) => void;
+	onSafeSpendingTab: (tab: SafeSpendingDetailTab) => void;
 }) {
 	// Every data input subscribes where the query is declared; only UI
 	// callbacks arrive as props.
@@ -96,9 +96,9 @@ export function Outlook({
 				onTransactions={onTransactions}
 				onEvaluations={onEvaluations}
 				onEvaluation={onEvaluation}
-				timingDetail={timingDetail}
-				onTimingDetail={onTimingDetail}
-				onTimingTab={onTimingTab}
+				safeSpendingDetail={safeSpendingDetail}
+				onSafeSpendingDetail={onSafeSpendingDetail}
+				onSafeSpendingTab={onSafeSpendingTab}
 			/>
 		</>
 	);
@@ -121,9 +121,9 @@ function OutlookContent({
 	onTransactions,
 	onEvaluations,
 	onEvaluation,
-	timingDetail,
-	onTimingDetail,
-	onTimingTab,
+	safeSpendingDetail,
+	onSafeSpendingDetail,
+	onSafeSpendingTab,
 }: {
 	plan: Plan;
 	projection: Projection | null;
@@ -141,9 +141,9 @@ function OutlookContent({
 	onTransactions: () => void;
 	onEvaluations: () => void;
 	onEvaluation: (id: string) => void;
-	timingDetail: TimingDetailTab | null;
-	onTimingDetail: (tab: TimingDetailTab | null) => void;
-	onTimingTab: (tab: TimingDetailTab) => void;
+	safeSpendingDetail: SafeSpendingDetailTab | null;
+	onSafeSpendingDetail: (tab: SafeSpendingDetailTab | null) => void;
+	onSafeSpendingTab: (tab: SafeSpendingDetailTab) => void;
 }) {
 	if (projection === null && !pending) return null;
 	const evaluation =
@@ -203,13 +203,13 @@ function OutlookContent({
 					onEvaluation={onEvaluation}
 					pending={pending}
 				/>
-				<TimingPreview
+				<SafeSpendingPreview
 					plan={plan}
 					projection={projection}
 					pending={pending}
-					detail={timingDetail}
-					onDetail={onTimingDetail}
-					onTabChange={onTimingTab}
+					detail={safeSpendingDetail}
+					onDetail={onSafeSpendingDetail}
+					onTabChange={onSafeSpendingTab}
 				/>
 			</div>
 		</>

@@ -5,7 +5,7 @@ import { money } from "../../../domain/format.ts";
 import type { Movement } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 
-export function TimingSectionHeader({
+export function SafeSpendingSectionHeader({
 	title,
 	subtitle,
 	total,
@@ -16,11 +16,11 @@ export function TimingSectionHeader({
 }) {
 	return (
 		<div className="section-top">
-			<div className="timing-section-title">
+			<div className="safe-spending-section-title">
 				<h3>{title}</h3>
 				<p className="section-note">{subtitle}</p>
 			</div>
-			<strong className="timing-total">{money(total)}</strong>
+			<strong className="safe-spending-total">{money(total)}</strong>
 		</div>
 	);
 }

@@ -1,11 +1,11 @@
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
-import type { MandatorySpendingGroup } from "../../../domain/householdTiming.ts";
+import type { MandatorySpendingGroup } from "../../../domain/safeSpending.ts";
 
-export type TimingDetailTab = "mandatory" | "cycle" | "configure";
+export type SafeSpendingDetailTab = "mandatory" | "cycle" | "configure";
 
 export type MandatoryFrame = "calendar" | "cycle";
 
-export interface TimingMandatorySection {
+export interface SafeSpendingMandatorySection {
 	title: string;
 	subtitle: string;
 	total: number;
@@ -33,7 +33,7 @@ export interface PaycheckDecomposition {
 	allowance: number;
 }
 
-export interface TimingHeroes {
+export interface SafeSpendingHeroes {
 	cushion: number;
 	cushionProvisional: boolean;
 	checkingAmount: number;
@@ -52,7 +52,7 @@ export interface TimingHeroes {
 	reserveAmount: number;
 }
 
-export interface TimingConfigHints {
+export interface SafeSpendingConfigHints {
 	statementDay: number;
 	reserve: number;
 	spentOverride: number | null;

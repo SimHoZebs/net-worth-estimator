@@ -1,6 +1,6 @@
 import { useBeforeUnload } from "./state/useBeforeUnload.ts";
 import { DraftBar } from "./workspace/DraftBar.tsx";
-import type { TimingDetailTab } from "./pages/outlook/timing/timingDetailModel.ts";
+import type { SafeSpendingDetailTab } from "./pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import "./workspace/workspace.css";
 import { useWorkspaceStore } from "./state/workspaceStore.ts";
 import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation.ts";
@@ -34,9 +34,9 @@ export function WorkspaceShell() {
 		replaceHash: navigation.replaceHash,
 	});
 	useBeforeUnload(volatile);
-	const timingDetail = (tab: TimingDetailTab | null) => {
-		if (tab) overlays.openTimingDetail(tab);
-		else overlays.closeTimingDetail();
+	const safeSpendingDetail = (tab: SafeSpendingDetailTab | null) => {
+		if (tab) overlays.openSafeSpendingDetail(tab);
+		else overlays.closeSafeSpendingDetail();
 	};
 	// DraftBar runs its own save against the store; only the discard overlay
 	// stays a prop.
@@ -65,9 +65,9 @@ export function WorkspaceShell() {
 				onEdit={overlays.openEditor}
 				onEvidence={overlays.openEvidence}
 				onNavigate={navigation.navigate}
-				timingDetail={overlays.timingDetail}
-				onTimingDetail={timingDetail}
-				onTimingTab={overlays.switchTimingTab}
+				safeSpendingDetail={overlays.safeSpendingDetail}
+				onSafeSpendingDetail={safeSpendingDetail}
+				onSafeSpendingTab={overlays.switchSafeSpendingTab}
 			/>
 			<WorkspaceEvidence overlays={overlays} />
 		</WorkspaceLayout>

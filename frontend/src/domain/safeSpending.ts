@@ -214,7 +214,7 @@ export interface MandatorySpendingGroup {
 
 /**
  * Narrow projection movements to a selected bill set. Null keeps every
- * movement, so the timing card counts all spendable-account outflows by
+ * movement, so the safe spending card counts all spendable-account outflows by
  * default.
  */
 export function filterMovementsById(

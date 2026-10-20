@@ -231,14 +231,14 @@
 		gap: 6px;
 	}
 	.evaluation-preview,
-	.timing-preview {
+	.safe-spending-preview {
 		background: var(--surface);
 		border: 1px solid var(--line);
 		border-radius: 10px;
 		padding: 22px 23px 18px;
 		position: relative;
 	}
-	.timing-open {
+	.safe-spending-open {
 		position: absolute;
 		inset: 0;
 		border-radius: 10px;
@@ -247,16 +247,16 @@
 		padding: 0;
 		cursor: pointer;
 	}
-	.timing-open:focus-visible {
+	.safe-spending-open:focus-visible {
 		outline: 2px solid var(--track-fill);
 		outline-offset: 2px;
 	}
-	.timing-preview .cycle-actions {
+	.safe-spending-preview .cycle-actions {
 		position: relative;
 		z-index: 1;
 	}
 	.evaluation-preview .section-top h2,
-	.timing-preview .section-top h2 {
+	.safe-spending-preview .section-top h2 {
 		font-size: 13px;
 	}
 	.spend-answer {
@@ -567,41 +567,41 @@
 		color: var(--muted);
 		font-size: 9px;
 	}
-	.timing-mandatory {
+	.safe-spending-mandatory {
 		display: grid;
 		gap: 16px;
 		align-content: start;
 	}
-	.timing-mandatory h3 {
+	.safe-spending-mandatory h3 {
 		font-size: 12px;
 		font-weight: 650;
 		color: var(--ink);
 		margin: 0;
 	}
-	.timing-mandatory .section-top {
+	.safe-spending-mandatory .section-top {
 		flex-wrap: wrap;
 		gap: 4px 12px;
 	}
-	.timing-section-title {
+	.safe-spending-section-title {
 		display: flex;
 		align-items: center;
 		flex-wrap: wrap;
 		gap: 4px 8px;
 	}
-	.timing-total {
+	.safe-spending-total {
 		font-size: 13px;
 		font-weight: 700;
 		font-variant-numeric: tabular-nums;
 	}
-	.modal-body .timing-mandatory .section-note,
+	.modal-body .safe-spending-mandatory .section-note,
 	.modal-body .seg-stack .section-note,
 	.modal-body .cycle-config .section-note {
 		padding: 0;
 	}
-	.timing-mandatory .table-toolbar {
+	.safe-spending-mandatory .table-toolbar {
 		margin: 0;
 	}
-	.timing-mandatory .account-activity-table {
+	.safe-spending-mandatory .account-activity-table {
 		border-top: 0;
 	}
 	.timing-controls {
@@ -750,7 +750,7 @@
 	.household-paycheck-cols {
 		padding: 5px 0;
 	}
-	.household-timing-controls {
+	.household-safe-spending-controls {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -761,16 +761,16 @@
 		font-size: 14px;
 		color: var(--ink);
 	}
-	/* Timing detail tabs sit where the drawer header divider sat: no double
+	/* Safe spending detail tabs sit where the drawer header divider sat: no double
 	   border, no body gap. The tab row's own border becomes the divider. */
-	.drawer-right:has(.timing-detail-tabs) .modal-header {
+	.drawer-right:has(.safe-spending-detail-tabs) .modal-header {
 		border-bottom: 0;
 		padding-bottom: 8px;
 	}
-	.drawer-right:has(.timing-detail-tabs) .modal-body {
+	.drawer-right:has(.safe-spending-detail-tabs) .modal-body {
 		padding-top: 0;
 	}
-	.timing-detail-tabs.page-tabs {
+	.safe-spending-detail-tabs.page-tabs {
 		margin-bottom: 16px;
 	}
 }

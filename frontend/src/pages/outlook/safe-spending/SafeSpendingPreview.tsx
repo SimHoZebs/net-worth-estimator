@@ -32,22 +32,22 @@ import {
 	realizedCheckingOutflows,
 	remainingMonthlyObligations,
 	spendingBalance,
-} from "../../../domain/householdTiming.ts";
+} from "../../../domain/safeSpending.ts";
 import type { Plan } from "../../../domain/model.ts";
 import { visibleAccounts } from "../../../domain/model.ts";
 import type { Projection } from "../../../domain/result.ts";
-import { TimingBillsPanel } from "./TimingBillsPanel.tsx";
-import { TimingConfigurePanel } from "./TimingConfigurePanel.tsx";
-import { TimingCyclePanel } from "./TimingCyclePanel.tsx";
-import { TimingDetailShell } from "./TimingDetailShell.tsx";
-import type { TimingDetailTab } from "./timingDetailModel.ts";
-import { useTimingSettings } from "../../../state/useTimingSettings.ts";
+import { SafeSpendingBillsPanel } from "./SafeSpendingBillsPanel.tsx";
+import { SafeSpendingConfigurePanel } from "./SafeSpendingConfigurePanel.tsx";
+import { SafeSpendingCyclePanel } from "./SafeSpendingCyclePanel.tsx";
+import { SafeSpendingDetailShell } from "./SafeSpendingDetailShell.tsx";
+import type { SafeSpendingDetailTab } from "./safeSpendingDetailModel.ts";
+import { useSafeSpendingSettings } from "../../../state/useSafeSpendingSettings.ts";
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
 const EMPTY_MOVEMENTS: Projection["movements"] = [];
 
-export function TimingPreview({
+export function SafeSpendingPreview({
 	plan,
 	projection,
 	pending = false,
@@ -58,9 +58,9 @@ export function TimingPreview({
 	plan: Plan;
 	projection: Projection | null;
 	pending?: boolean;
-	detail: TimingDetailTab | null;
-	onDetail: (tab: TimingDetailTab | null) => void;
-	onTabChange: (tab: TimingDetailTab) => void;
+	detail: SafeSpendingDetailTab | null;
+	onDetail: (tab: SafeSpendingDetailTab | null) => void;
+	onTabChange: (tab: SafeSpendingDetailTab) => void;
 }) {
 	const movements = projection?.movements ?? EMPTY_MOVEMENTS;
 	const cards = useMemo(
@@ -70,13 +70,13 @@ export function TimingPreview({
 			),
 		[plan.accounts],
 	);
-	const settingsState = useTimingSettings();
+	const settingsState = useSafeSpendingSettings();
 	const { updateSettings, resetConfig, ...settings } = settingsState;
 	const [transactionOrder, setTransactionOrder] = useState<TransactionOrder>(
 		DEFAULT_TRANSACTION_ORDER,
 	);
 
-	// Display timing follows the real calendar day so due dates read
+	// Safe spending display follows the real calendar day so due dates read
 	// correctly, while the projection math stays on plan.startDate (the
 	// latest balance checkpoint). Never before the projection start.
 	const [displayToday] = useState(() => {
@@ -306,7 +306,10 @@ export function TimingPreview({
 	]);
 	if (!cards.length) {
 		return (
-			<section className="timing-preview" aria-label="Safe card spending">
+			<section
+				className="safe-spending-preview"
+				aria-label="Safe card spending"
+			>
 				<div className="section-top">
 					<h2>
 						<CalendarDays size={18} />
@@ -428,10 +431,13 @@ export function TimingPreview({
 					transactions: thisMonthTransactions,
 				};
 	// Plan-derived frame (header, cycle dates) renders regardless; only the
-	// computed timing body skeletonizes while the projection is absent.
+	// computed safe spending body skeletonizes while the projection is absent.
 	if (pending)
 		return (
-			<section className="timing-preview" aria-label="Safe card spending">
+			<section
+				className="safe-spending-preview"
+				aria-label="Safe card spending"
+			>
 				<div className="section-top">
 					<h2>
 						<CalendarDays size={18} />
@@ -450,13 +456,13 @@ export function TimingPreview({
 		);
 
 	return (
-		<section className="timing-preview" aria-label="Safe card spending">
+		<section className="safe-spending-preview" aria-label="Safe card spending">
 			<button
 				type="button"
-				className="timing-open"
+				className="safe-spending-open"
 				onClick={() => onDetail("mandatory")}
 			>
-				<span className="sr-only">Open timing details</span>
+				<span className="sr-only">Open safe spending details</span>
 			</button>
 			<div className="section-top">
 				<h2>
@@ -517,14 +523,14 @@ export function TimingPreview({
 				</button>
 			</div>
 			{detail && (
-				<TimingDetailShell
+				<SafeSpendingDetailShell
 					tab={detail}
 					onTabChange={onTabChange}
 					cycleCount={cycleTransactions.length}
 					onClose={() => onDetail(null)}
 				>
 					{detail === "mandatory" && (
-						<TimingBillsPanel
+						<SafeSpendingBillsPanel
 							heroes={heroes}
 							cashNow={{
 								checking,
@@ -553,7 +559,7 @@ export function TimingPreview({
 						/>
 					)}
 					{detail === "cycle" && (
-						<TimingCyclePanel
+						<SafeSpendingCyclePanel
 							cycleStart={cycle.cycleStart}
 							cycleEnd={cycle.cycleEnd}
 							transactions={cycleTransactions}
@@ -563,7 +569,7 @@ export function TimingPreview({
 						/>
 					)}
 					{detail === "configure" && (
-						<TimingConfigurePanel
+						<SafeSpendingConfigurePanel
 							config={{
 								statementDay: settings.statementDay,
 								reserve: settings.reserve,
@@ -595,7 +601,7 @@ export function TimingPreview({
 							onResetConfig={resetConfig}
 						/>
 					)}
-				</TimingDetailShell>
+				</SafeSpendingDetailShell>
 			)}
 		</section>
 	);

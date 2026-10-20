@@ -4,12 +4,12 @@ import { parseDisplayNumber } from "../components/editors/formValues.ts";
 import {
 	DEFAULT_CYCLE_STATEMENT_DAY,
 	DEFAULT_PROTECTED_RESERVE,
-} from "../domain/householdTiming.ts";
+} from "../domain/safeSpending.ts";
 import {
 	appJsonStorage,
 	appLocalStorage,
-	TIMING_LEGACY_KEYS,
-	TIMING_STORAGE_KEY,
+	SAFE_SPENDING_LEGACY_KEYS,
+	SAFE_SPENDING_STORAGE_KEY,
 } from "./persisted.ts";
 
 export interface TotalCycleSettings {
@@ -32,7 +32,7 @@ export interface TotalCycleSettings {
 	statementDaySet: boolean;
 }
 
-export const defaultTimingSettings = (): TotalCycleSettings => ({
+export const defaultSafeSpendingSettings = (): TotalCycleSettings => ({
 	statementDay: DEFAULT_CYCLE_STATEMENT_DAY,
 	reserve: DEFAULT_PROTECTED_RESERVE,
 	spentOverride: null,
@@ -62,8 +62,10 @@ function stringIds(value: unknown): string[] | null {
 	return ids.length ? ids : null;
 }
 
-export function sanitizeTimingSettings(value: unknown): TotalCycleSettings {
-	const fallback = defaultTimingSettings();
+export function sanitizeSafeSpendingSettings(
+	value: unknown,
+): TotalCycleSettings {
+	const fallback = defaultSafeSpendingSettings();
 	if (typeof value !== "object" || value === null) return fallback;
 	const parsed = (value as Record<string, unknown>).state ?? value;
 	if (typeof parsed !== "object" || parsed === null) return fallback;
@@ -117,7 +119,7 @@ function looksLikeSettings(value: unknown): boolean {
  * (`{"statementDay":20,...}`) and legacy keys v3/v2. Writes always target
  * the primary key in envelope form.
  */
-function timingStorage(): PersistStorage<TotalCycleSettings> | undefined {
+function safeSpendingStorage(): PersistStorage<TotalCycleSettings> | undefined {
 	const fallback = appJsonStorage<TotalCycleSettings>();
 	const readRawSettings = (raw: string | null): TotalCycleSettings | null => {
 		if (raw === null) return null;
@@ -130,9 +132,10 @@ function timingStorage(): PersistStorage<TotalCycleSettings> | undefined {
 					record.state !== null &&
 					looksLikeSettings(record.state)
 				) {
-					return sanitizeTimingSettings(record.state);
+					return sanitizeSafeSpendingSettings(record.state);
 				}
-				if (looksLikeSettings(parsed)) return sanitizeTimingSettings(parsed);
+				if (looksLikeSettings(parsed))
+					return sanitizeSafeSpendingSettings(parsed);
 			}
 		} catch {
 			return null;
@@ -151,7 +154,7 @@ function timingStorage(): PersistStorage<TotalCycleSettings> | undefined {
 				})(),
 			);
 			if (primary !== null) return { state: primary, version: 4 };
-			for (const key of TIMING_LEGACY_KEYS) {
+			for (const key of SAFE_SPENDING_LEGACY_KEYS) {
 				try {
 					const legacy = readRawSettings(
 						appLocalStorage.getItem(key) as string | null,
@@ -186,22 +189,22 @@ function timingStorage(): PersistStorage<TotalCycleSettings> | undefined {
 	};
 }
 
-export type TimingResetKey =
+export type SafeSpendingResetKey =
 	| "paycheck"
 	| "fixed"
 	| "spent"
 	| "checking"
 	| "remaining";
 
-interface TimingSettingsState extends TotalCycleSettings {
+interface SafeSpendingSettingsState extends TotalCycleSettings {
 	updateSettings: (next: Partial<TotalCycleSettings>) => void;
-	resetConfig: (key: TimingResetKey) => void;
+	resetConfig: (key: SafeSpendingResetKey) => void;
 }
 
-export const useTimingSettings = create<TimingSettingsState>()(
+export const useSafeSpendingSettings = create<SafeSpendingSettingsState>()(
 	persist(
 		(set) => ({
-			...defaultTimingSettings(),
+			...defaultSafeSpendingSettings(),
 			updateSettings: (next) =>
 				set((previous) => ({
 					statementDay: next.statementDay ?? previous.statementDay,
@@ -248,9 +251,9 @@ export const useTimingSettings = create<TimingSettingsState>()(
 				})),
 		}),
 		{
-			name: TIMING_STORAGE_KEY,
+			name: SAFE_SPENDING_STORAGE_KEY,
 			version: 4,
-			storage: timingStorage(),
+			storage: safeSpendingStorage(),
 			partialize: (state) => ({
 				statementDay: state.statementDay,
 				reserve: state.reserve,
@@ -265,16 +268,16 @@ export const useTimingSettings = create<TimingSettingsState>()(
 				mandatoryFrame: state.mandatoryFrame,
 				statementDaySet: state.statementDaySet,
 			}),
-			migrate: (persisted) => sanitizeTimingSettings(persisted),
+			migrate: (persisted) => sanitizeSafeSpendingSettings(persisted),
 			merge: (persisted, current) => ({
 				...current,
-				...sanitizeTimingSettings(persisted),
+				...sanitizeSafeSpendingSettings(persisted),
 			}),
 		},
 	),
 );
 
-/** Test hook: restores timing defaults between cases. */
-export function resetTimingSettings(): void {
-	useTimingSettings.setState({ ...defaultTimingSettings() });
+/** Test hook: restores safe spending defaults between cases. */
+export function resetSafeSpendingSettings(): void {
+	useSafeSpendingSettings.setState({ ...defaultSafeSpendingSettings() });
 }

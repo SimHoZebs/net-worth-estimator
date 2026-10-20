@@ -5,12 +5,12 @@ import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import { useMemo, useState } from "react";
 import {
 	TransactionSectionView,
-	TimingSectionHeader,
+	SafeSpendingSectionHeader,
 } from "./TransactionSectionView.tsx";
 import { TransactionSortButton } from "../../../components/activity/TransactionSortButton.tsx";
 import { dateLabel } from "../../../domain/format.ts";
 
-export function TimingCyclePanel({
+export function SafeSpendingCyclePanel({
 	cycleStart,
 	cycleEnd,
 	transactions,
@@ -38,8 +38,8 @@ export function TimingCyclePanel({
 	const inspect = (transaction: AccountTransaction, movement: Movement) =>
 		setSelected({ transaction, movement });
 	return (
-		<div className="timing-mandatory">
-			<TimingSectionHeader
+		<div className="safe-spending-mandatory">
+			<SafeSpendingSectionHeader
 				title="Card charges in this cycle"
 				subtitle={`${dateLabel(cycleStart, true)} to ${dateLabel(cycleEnd, true)}`}
 				total={transactions.reduce(

@@ -15,7 +15,7 @@ import {
 	realizedCheckingOutflows,
 	remainingMonthlyObligations,
 	spendingBalance,
-} from "./householdTiming.ts";
+} from "./safeSpending.ts";
 
 describe("month helpers", () => {
 	it("finds the end of the current month", () => {
@@ -224,7 +224,7 @@ describe("cycleAllowance", () => {
 	});
 });
 
-describe("projection-derived timing", () => {
+describe("projection-derived safe spending", () => {
 	const movements = [
 		movementFixture({
 			date: "2026-10-10",
