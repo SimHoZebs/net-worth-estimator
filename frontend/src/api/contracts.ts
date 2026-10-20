@@ -466,10 +466,6 @@ export type StochasticResponse = StochasticProjectionResponse;
 export interface ServerStatus extends HumaMetadata {
 	readOnly: boolean;
 	authEnabled: boolean;
-	/** False when the server has no sync runner configured. Absent from older backends. */
-	syncConfigured?: boolean;
-	/** Last successful sync completion time (RFC3339 UTC). Omitted when no sync has completed yet. */
-	lastSyncAt?: string;
 }
 
 export type StatusResponse = ServerStatus;
@@ -482,19 +478,6 @@ export interface FinancialModelResponse extends HumaMetadata {
 
 export type ModelResponse = FinancialModelResponse;
 
-export interface SimpleFINSummary extends HumaMetadata {
-	checkpointsInserted: number;
-	checkpointsUpdated: number;
-	checkpointsSkipped: number;
-	pendingDeleted: number;
-	pendingInserted: number;
-	accountsProvisioned: number;
-	skipped: Record<string, number>;
-	dryRun: boolean;
-}
-
-export type SimpleFinSummary = SimpleFINSummary;
-
 export interface RowWriteResponse<TRow> extends HumaMetadata {
 	row: TRow;
 	issues: ModelValidationIssue[];
@@ -504,19 +487,6 @@ export interface RowWriteResponse<TRow> extends HumaMetadata {
 
 export interface RowDeleteResponse extends HumaMetadata {
 	revision: string;
-}
-
-export interface AccountLink extends HumaMetadata {
-	bridgeAccountId: string;
-	modelAccountId: string;
-	bridgeName: string;
-	currency: string;
-	origin: string;
-	lastSeenAt: string;
-}
-
-export interface AccountLinkListResponse {
-	links: AccountLink[];
 }
 
 export interface PinnedEvaluationsResponse extends HumaMetadata {

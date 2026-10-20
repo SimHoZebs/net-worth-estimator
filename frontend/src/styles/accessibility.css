@@ -138,9 +138,7 @@ thead {
 	font-size: 10px;
 }
 .local-card p,
-.sidebar-status,
-.sidebar-sync,
-.sidebar-sync-error {
+.sidebar-status {
 	font-size: 10px;
 }
 .safe-spending-replenishment strong {

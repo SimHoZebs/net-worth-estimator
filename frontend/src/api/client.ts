@@ -1,8 +1,6 @@
 import * as errore from "errore";
 import { isRecord } from "../domain/guards.ts";
 import type {
-	AccountLink,
-	AccountLinkListResponse,
 	AmountCatalogResponse,
 	AmountPreset,
 	AmountPresetDeleteResponse,
@@ -23,7 +21,6 @@ import type {
 	RowDeleteResponse,
 	RowWriteResponse,
 	ServerStatus,
-	SimpleFINSummary,
 	StochasticProjectionRequest,
 	StochasticProjectionResult,
 } from "./contracts.ts";
@@ -422,15 +419,6 @@ export class ApiClient {
 		return response;
 	}
 
-	triggerSimpleFIN(
-		options: ApiRequestOptions = {},
-	): Promise<Error | SimpleFINSummary> {
-		return this.requestJson<SimpleFINSummary>(
-			"sync/simplefin",
-			requestInit("POST", undefined, options),
-		);
-	}
-
 	createAccount(
 		account: BackendAccount,
 		options: ApiRequestOptions = {},
@@ -627,15 +615,6 @@ export class ApiClient {
 		);
 	}
 
-	listAccountLinks(
-		options: ApiRequestOptions = {},
-	): Promise<Error | AccountLinkListResponse> {
-		return this.requestJson<AccountLinkListResponse>(
-			"sync/simplefin/accounts",
-			requestInit("GET", undefined, options),
-		);
-	}
-
 	getPinnedEvaluations(
 		options: ApiRequestOptions = {},
 	): Promise<Error | PinnedEvaluationsResponse> {
@@ -652,27 +631,6 @@ export class ApiClient {
 		return this.requestJson<PinnedEvaluationsResponse>(
 			"pinned-evaluations",
 			requestInit("PUT", { instanceIds }, options),
-		);
-	}
-
-	saveAccountLink(
-		bridgeAccountId: string,
-		modelAccountId: string,
-		options: ApiRequestOptions = {},
-	): Promise<Error | { link: AccountLink; revision: string }> {
-		return this.requestJson<{ link: AccountLink; revision: string }>(
-			`sync/simplefin/accounts/${encodeURIComponent(bridgeAccountId)}`,
-			requestInit("PUT", { modelAccountId }, options),
-		);
-	}
-
-	deleteAccountLink(
-		bridgeAccountId: string,
-		options: ApiRequestOptions = {},
-	): Promise<Error | RowDeleteResponse> {
-		return this.requestJson<RowDeleteResponse>(
-			`sync/simplefin/accounts/${encodeURIComponent(bridgeAccountId)}`,
-			requestInit("DELETE", undefined, options),
 		);
 	}
 

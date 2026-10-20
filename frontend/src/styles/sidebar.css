@@ -118,27 +118,6 @@
 		color: var(--muted);
 		margin-top: 17px;
 	}
-	.sidebar-sync {
-		display: grid;
-		gap: 4px;
-		justify-items: start;
-		padding: 0 8px 19px;
-		font-size: 9px;
-		color: var(--muted);
-	}
-	.sync-now {
-		font-size: 9px;
-		padding: 0;
-	}
-	.sync-now:disabled {
-		color: var(--muted);
-		text-decoration: none;
-		cursor: default;
-	}
-	.sidebar-sync-error {
-		color: var(--danger-text);
-		line-height: 1.5;
-	}
 	.sidebar-status > svg {
 		margin-left: auto;
 	}

@@ -211,6 +211,26 @@ function boundValue(
 	return Number.isFinite(value) ? value : null;
 }
 
+/**
+ * Backend row ownership is "model" (owner/seed) or a sync-owned name set by
+ * the server. Any non-model owner is system-owned sync output: read-only in
+ * the workspace and protected from removal. The exact sync name is a
+ * backend contract, so match by exclusion rather than by name.
+ */
+function isSyncOwned(source: string | undefined | null): boolean {
+	return source != null && source !== "model";
+}
+
+function checkpointSourceLabel(
+	checkpoint: {
+		source?: string | null;
+	} | null,
+): string {
+	if (checkpoint && isSyncOwned(checkpoint.source ?? null))
+		return "Synced checkpoint";
+	return checkpoint ? "Backend checkpoint" : "Backend account";
+}
+
 const sentinelMap = {
 	floor: NO_FLOOR_SENTINEL,
 	ceiling: NO_CEILING_SENTINEL,
@@ -452,13 +472,7 @@ function accountDisplay(
 		color: account.color ?? null,
 		observedOn,
 		balanceCheck: previous?.balanceCheck ?? Boolean(checkpoint),
-		source:
-			previous?.source ??
-			(checkpoint?.source === "simplefin"
-				? "SimpleFIN checkpoint"
-				: checkpoint
-					? "Backend checkpoint"
-					: "Backend account"),
+		source: previous?.source ?? checkpointSourceLabel(checkpoint),
 		readOnly: previous?.readOnly || syncCheckpoint || status.readOnly,
 	};
 }
@@ -535,7 +549,7 @@ function movementDisplayFromPosting(
 		annualIncrease: previous?.displayAnnualIncrease ?? 0,
 		enabled: posting.enabled,
 		readOnly:
-			previous?.readOnly ?? (amount === null || posting.source === "simplefin"),
+			previous?.readOnly ?? (amount === null || isSyncOwned(posting.source)),
 		claimRuleId: posting.claim?.ruleId ?? null,
 		claimOccurrenceDate: posting.claim?.occurrenceDate ?? null,
 		postedDate: settledDay(posting.postedTime),
@@ -685,13 +699,7 @@ function buildPresentationAccount(
 ): AccountPresentation {
 	return {
 		balanceCheck: previous?.balanceCheck ?? Boolean(checkpoint),
-		source:
-			previous?.source ??
-			(checkpoint?.source === "simplefin"
-				? "SimpleFIN checkpoint"
-				: checkpoint
-					? "Backend checkpoint"
-					: "Backend account"),
+		source: previous?.source ?? checkpointSourceLabel(checkpoint),
 		readOnly: previous?.readOnly ?? status.readOnly,
 		enabled: account.enabled,
 		minBalance: account.minBalance,
@@ -763,7 +771,7 @@ function buildPresentationPosting(
 		postedTime: previous?.postedTime ?? posting.postedTime,
 		transactionTime: previous?.transactionTime ?? posting.transactionTime,
 		readOnly:
-			previous?.readOnly ?? (amount === null || posting.source === "simplefin"),
+			previous?.readOnly ?? (amount === null || isSyncOwned(posting.source)),
 		displayToId: previous?.displayToId ?? posting.destinations?.[0] ?? null,
 		displayAnnualIncrease: previous?.displayAnnualIncrease ?? 0,
 	};
@@ -791,7 +799,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		const observedOn = checkpointDate(checkpoint, projectionStartDate);
 		const previous = previousPresentation?.accounts[account.id];
 		const syncCheckpoint = document.checkpoints.some(
-			(item) => item.AccountId === account.id && item.source === "simplefin",
+			(item) => item.AccountId === account.id && isSyncOwned(item.source),
 		);
 		const archived = isArchivedDebt(account, document, projectionStartDate);
 		const display = accountDisplay(
@@ -1142,13 +1150,12 @@ export function displayPlanToBackendDocument(
 		const hasSyncCheckpoint =
 			sourceDocument?.checkpoints.some(
 				(checkpoint) =>
-					checkpoint.AccountId === accountId &&
-					checkpoint.source === "simplefin",
+					checkpoint.AccountId === accountId && isSyncOwned(checkpoint.source),
 			) ?? false;
 		const hasSyncPosting =
 			sourceDocument?.postings.some(
 				(posting) =>
-					posting.source === "simplefin" &&
+					isSyncOwned(posting.source) &&
 					(posting.sourceAccountId === accountId ||
 						posting.destinations?.includes(accountId)),
 			) ?? false;
@@ -1156,7 +1163,7 @@ export function displayPlanToBackendDocument(
 			lose(
 				conversionReport,
 				`accounts.${accountId}`,
-				"An account with a SimpleFIN-owned checkpoint or posting cannot be removed through the display plan.",
+				"An account with a synced checkpoint or posting cannot be removed through the display plan.",
 				`accounts.${accountId}`,
 			);
 		} else {
@@ -1186,19 +1193,20 @@ export function displayPlanToBackendDocument(
 		const storedPosting = sourcePostings.get(movement.id);
 		const storedRule = sourceRules.get(movement.id);
 		const storedAmount = storedPosting ?? storedRule;
+		// Reserved sync-output posting IDs use the backend `sfin-` namespace.
 		if (movement.id.startsWith("sfin-")) {
 			lose(
 				conversionReport,
 				`movements.${movement.id}`,
-				"Reserved SimpleFIN posting IDs cannot be created by the display plan.",
+				"Reserved sync posting IDs cannot be created by the display plan.",
 				`movements.${index}.id`,
 			);
 		}
-		if (storedPosting?.source === "simplefin" && movement.readOnly !== true) {
+		if (isSyncOwned(storedPosting?.source) && movement.readOnly !== true) {
 			lose(
 				conversionReport,
 				`movements.${movement.id}.readOnly`,
-				"SimpleFIN-owned postings cannot be edited through the display plan.",
+				"Synced postings cannot be edited through the display plan.",
 				`movements.${index}.readOnly`,
 			);
 		}
@@ -1260,7 +1268,7 @@ export function displayPlanToBackendDocument(
 			);
 		}
 		const previousReadOnly =
-			storedExtras?.readOnly ?? storedPosting?.source === "simplefin";
+			storedExtras?.readOnly ?? isSyncOwned(storedPosting?.source);
 		if (movement.readOnly !== previousReadOnly)
 			lose(
 				conversionReport,
@@ -1367,11 +1375,11 @@ export function displayPlanToBackendDocument(
 		(sourceDocument?.postings ?? []).map((posting) => posting.id),
 	)) {
 		const storedPosting = sourcePostings.get(postingId);
-		if (storedPosting?.source === "simplefin") {
+		if (isSyncOwned(storedPosting?.source)) {
 			lose(
 				conversionReport,
 				`movements.${postingId}`,
-				"SimpleFIN-owned postings cannot be removed through the display plan.",
+				"Synced postings cannot be removed through the display plan.",
 				`movements.${postingId}`,
 			);
 		} else {
