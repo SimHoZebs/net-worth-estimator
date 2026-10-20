@@ -1,8 +1,7 @@
 import { useEffect } from "react";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
-import type { Plan } from "../domain/model.ts";
-import type { Projection, RangeResult } from "../domain/result.ts";
+import type { Projection } from "../domain/result.ts";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
@@ -15,6 +14,17 @@ import type { SafeSpendingDetailTab } from "./outlook/safe-spending/safeSpending
 import { SafeSpendingPreview } from "./outlook/safe-spending/SafeSpendingPreview.tsx";
 import "./outlook/outlook.css";
 
+type OutlookProps = {
+	onEvidence: () => void;
+	onFailure: () => void;
+	onTransactions: () => void;
+	onEvaluations: () => void;
+	onEvaluation: (id: string) => void;
+	safeSpendingDetail: SafeSpendingDetailTab | null;
+	onSafeSpendingDetail: (tab: SafeSpendingDetailTab | null) => void;
+	onSafeSpendingTab: (tab: SafeSpendingDetailTab) => void;
+};
+
 export function Outlook({
 	onEvidence,
 	onFailure,
@@ -24,16 +34,33 @@ export function Outlook({
 	safeSpendingDetail,
 	onSafeSpendingDetail,
 	onSafeSpendingTab,
-}: {
-	onEvidence: () => void;
-	onFailure: () => void;
-	onTransactions: () => void;
-	onEvaluations: () => void;
-	onEvaluation: (id: string) => void;
-	safeSpendingDetail: SafeSpendingDetailTab | null;
-	onSafeSpendingDetail: (tab: SafeSpendingDetailTab | null) => void;
-	onSafeSpendingTab: (tab: SafeSpendingDetailTab) => void;
-}) {
+}: OutlookProps) {
+	// Only UI callbacks arrive as props; data subscriptions live in
+	// OutlookContent where the queries are declared.
+	return (
+		<OutlookContent
+			onEvidence={onEvidence}
+			onFailure={onFailure}
+			onTransactions={onTransactions}
+			onEvaluations={onEvaluations}
+			onEvaluation={onEvaluation}
+			safeSpendingDetail={safeSpendingDetail}
+			onSafeSpendingDetail={onSafeSpendingDetail}
+			onSafeSpendingTab={onSafeSpendingTab}
+		/>
+	);
+}
+
+function OutlookContent({
+	onEvidence,
+	onFailure,
+	onTransactions,
+	onEvaluations,
+	onEvaluation,
+	safeSpendingDetail,
+	onSafeSpendingDetail,
+	onSafeSpendingTab,
+}: OutlookProps) {
 	// Every data input subscribes where the query is declared; only UI
 	// callbacks arrive as props.
 	const workspace = useWorkspaceStore((state) => state.workspace);
@@ -55,6 +82,41 @@ export function Outlook({
 			: null;
 	const base: Projection | null =
 		projection.base instanceof Error ? null : projection.base;
+	const pending = base === null;
+	if (base === null && !pending) {
+		return (
+			<>
+				{baseLoadError && (
+					<ErrorNotice
+						message={baseLoadError.message}
+						action="Retry calculation"
+						onAction={projection.retryProjection}
+					/>
+				)}
+				{projection.baseError && base && (
+					<ErrorNotice
+						message={projection.baseError}
+						action="Retry calculation"
+						onAction={projection.retryProjection}
+					/>
+				)}
+				{projection.rangeError && ranges && (
+					<ErrorNotice
+						message={projection.rangeError}
+						action="Retry scenario calculation"
+						onAction={projection.retryRange}
+					/>
+				)}
+				{projection.loading && base && <ProjectionUpdating />}
+			</>
+		);
+	}
+	const evaluation =
+		base?.evaluations.find(
+			(result) => result.current < result.evaluation.target,
+		) ??
+		base?.evaluations[0] ??
+		null;
 	return (
 		<>
 			{baseLoadError && (
@@ -79,81 +141,6 @@ export function Outlook({
 				/>
 			)}
 			{projection.loading && base && <ProjectionUpdating />}
-			<OutlookContent
-				plan={plan}
-				projection={base}
-				pending={base === null}
-				pinnedIds={pinnedIds}
-				range={projection.range}
-				ranges={ranges}
-				setRanges={setRanges}
-				years={years}
-				setYears={setYears}
-				progress={projection.progress}
-				rangeError={projection.rangeError}
-				onEvidence={onEvidence}
-				onFailure={onFailure}
-				onTransactions={onTransactions}
-				onEvaluations={onEvaluations}
-				onEvaluation={onEvaluation}
-				safeSpendingDetail={safeSpendingDetail}
-				onSafeSpendingDetail={onSafeSpendingDetail}
-				onSafeSpendingTab={onSafeSpendingTab}
-			/>
-		</>
-	);
-}
-
-function OutlookContent({
-	plan,
-	projection,
-	pending,
-	pinnedIds,
-	range,
-	ranges,
-	setRanges,
-	years,
-	setYears,
-	progress,
-	rangeError,
-	onEvidence,
-	onFailure,
-	onTransactions,
-	onEvaluations,
-	onEvaluation,
-	safeSpendingDetail,
-	onSafeSpendingDetail,
-	onSafeSpendingTab,
-}: {
-	plan: Plan;
-	projection: Projection | null;
-	pending: boolean;
-	pinnedIds: string[] | null;
-	range: RangeResult | null;
-	ranges: boolean;
-	setRanges: (value: boolean) => void;
-	years: number;
-	setYears: (value: number) => void;
-	progress: number;
-	rangeError: string | null;
-	onEvidence: () => void;
-	onFailure: () => void;
-	onTransactions: () => void;
-	onEvaluations: () => void;
-	onEvaluation: (id: string) => void;
-	safeSpendingDetail: SafeSpendingDetailTab | null;
-	onSafeSpendingDetail: (tab: SafeSpendingDetailTab | null) => void;
-	onSafeSpendingTab: (tab: SafeSpendingDetailTab) => void;
-}) {
-	if (projection === null && !pending) return null;
-	const evaluation =
-		projection?.evaluations.find(
-			(result) => result.current < result.evaluation.target,
-		) ??
-		projection?.evaluations[0] ??
-		null;
-	return (
-		<>
 			{pending && (
 				<p className="sr-only" role="status">
 					Loading the projection.
@@ -162,26 +149,26 @@ function OutlookContent({
 			<div className="outlook-top" aria-busy={pending}>
 				<ProjectionChart
 					plan={plan}
-					projection={projection}
-					range={range}
+					projection={base}
+					range={projection.range}
 					ranges={ranges}
 					setRanges={setRanges}
 					years={years}
 					setYears={setYears}
-					progress={progress}
-					rangeError={rangeError}
+					progress={projection.progress}
+					rangeError={projection.rangeError}
 					pending={pending}
 				/>
 				<div className="outlook-rail">
 					<OutlookMetrics
 						plan={plan}
-						projection={projection}
+						projection={base}
 						years={years}
 						onEvidence={onEvidence}
 						pending={pending}
 					/>
 					<FundingInsight
-						failure={projection?.firstFailure ?? null}
+						failure={base?.firstFailure ?? null}
 						plan={plan}
 						onFailure={onFailure}
 						onPlan={onTransactions}
@@ -190,7 +177,7 @@ function OutlookContent({
 				</div>
 			</div>
 			<PinnedEvaluations
-				projection={projection}
+				projection={base}
 				pinnedIds={pinnedIds}
 				pending={pending}
 				onEvaluation={onEvaluation}
@@ -198,14 +185,14 @@ function OutlookContent({
 			<div className="outlook-secondary" aria-busy={pending}>
 				<EvaluationPreview
 					result={evaluation ?? null}
-					range={range}
+					range={projection.range}
 					onEvaluations={onEvaluations}
 					onEvaluation={onEvaluation}
 					pending={pending}
 				/>
 				<SafeSpendingPreview
 					plan={plan}
-					projection={projection}
+					projection={base}
 					pending={pending}
 					detail={safeSpendingDetail}
 					onDetail={onSafeSpendingDetail}
