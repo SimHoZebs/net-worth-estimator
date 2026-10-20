@@ -1,6 +1,6 @@
 # Technical Overview: Net Worth Estimator Backend
 
-The backend is the authoritative implementation for model validation, persistence, deterministic simulation, stochastic simulation, and configured evaluations. It exposes one HTTP/SSE contract and stores canonical data, income data, sync-owned rows, completed projection artifacts, and saved amount presets in SQLite.
+The backend is the authoritative implementation for model validation, persistence, deterministic simulation, stochastic simulation, and configured evaluations. It exposes one HTTP/SSE contract and stores canonical data, sync-owned rows, completed projection artifacts, and saved amount presets in SQLite.
 
 `PRODUCT_INTENT.md` defines the product experience. This document defines only the current Go contracts and domain behavior.
 
@@ -23,7 +23,7 @@ Store interface backed by SQLite
 - `internal/store` owns transactions, ordering, schema migration, row ownership, and artifact eviction.
 - `internal/types` defines the JSON and domain values shared across those layers.
 
-The model aggregate is `types.FinancialModelDocument`. Income is stored separately as `types.IncomeDataSnapshot` and is passed into validation and income resolution at request time.
+The model aggregate is `types.FinancialModelDocument`. Payroll is modeled as ordinary recurrence rules chained by priority and model-value references: gross pay, pre-tax contributions, employer match, and progressive-bracket tax are separate rules, not a separate income pipeline.
 
 ## 2. HTTP Contracts
 
@@ -43,9 +43,9 @@ The container boundary is split. `backend/Dockerfile` produces an API-only image
 }
 ```
 
-Each issue contains `severity`, `code`, `message`, and `path`. Stored model and income rows are loaded in one read transaction. The response always includes a non-null issue array; `document` is null when the store has no canonical model. `revision` and the `ETag` response header identify canonical content for reads and caching.
+Each issue contains `severity`, `code`, `message`, and `path`. The stored model is loaded in one read transaction. The response always includes a non-null issue array; `document` is null when the store has no canonical model. `revision` and the `ETag` response header identify canonical content for reads and caching.
 
-Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, and `/v1/sync/simplefin/accounts` validates the resulting document against the stored income snapshot and returns `{row, issues, persisted, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions.
+Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, and `/v1/sync/simplefin/accounts` validates the resulting document and returns `{row, issues, persisted, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions.
 
 - Any error-severity issue prevents persistence.
 - Warning-only writes are persisted.
@@ -54,11 +54,9 @@ Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under
 - Omitted row IDs are server-generated UUIDv7, unique across accounts, postings, rules, and evaluations via the `entity_ids` registry (duplicate IDs return 409).
 - Positions are server-managed: creates append, `POST .../reorder` moves one row before another (or to the end).
 
-### Status and income
+### Status
 
 `GET /v1/status` returns `readOnly`, `authEnabled`, `syncConfigured`, and `lastSyncAt` (omitted when no sync completed).
-
-`GET /v1/income-data` returns `types.IncomeDataSnapshot`, containing effective-dated `incomeSources` and ordered `taxProfiles`.
 
 ### Deterministic projection
 
@@ -70,23 +68,23 @@ Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under
   "overrides": {
     "addedAccounts": [],
     "addedPostings": [],
+    "addedRules": [],
     "disabledAccountIds": [],
-    "disabledPostingIds": []
+    "disabledPostingIds": [],
+    "disabledRuleIds": []
   },
   "settings": {
     "fallbackProjectionStartDate": "YYYY-MM-DD",
     "horizonYears": 1,
     "evaluations": {}
-  },
-  "incomeData": "optional IncomeDataSnapshot"
+  }
 }
 ```
 
 Resolution rules:
 
-- If both `document` and `incomeData` are omitted, one stored snapshot supplies both.
-- If only one is supplied, the other comes from storage.
-- A supplied document or income snapshot affects only that request.
+- If `document` is omitted, the stored model supplies it.
+- A supplied document affects only that request.
 - `overrides` are applied by `types.ApplyModelOverrides` to a new document value; stored state is unchanged.
 
 A successful response has `result` and `X-Cache: hit|miss`.
@@ -166,14 +164,12 @@ Read-only mode rejects those routes first with 403. Otherwise, a configured toke
 - canonical document load (writes go through row create/update/delete/move);
 - row writes with server-generated UUIDv7 IDs and a shared cross-table ID registry;
 - bridge-to-model account links;
-- income snapshot load/save;
-- one consistent document-and-income load;
 - CSV replacement import;
 - artifact get/put;
 - transactional SimpleFIN application with provisioning;
 - test/import clear and close.
 
-`store.Open` returns the interface, not the SQLite implementation. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, income effective dating, import rollback, dry-run rollback, and artifact first-write behavior.
+`store.Open` returns the interface, not the SQLite implementation. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, import rollback, dry-run rollback, and artifact first-write behavior.
 
 ### SQLite setup
 
@@ -195,17 +191,19 @@ The current schema stores:
 | `accounts`             | ordered account definitions                                                                                   |
 | `checkpoints`          | ordered balance observations, unique by account/date, with owner                                              |
 | `postings`             | ordered posting definitions with owner                                                                        |
+| `recurrence_rules`     | ordered repetition templates with schedule, priority, and optional annual cap                                 |
+| `payment_terms`        | mechanism config for debt-account minimums, due anchors, and statement anchors                                |
 | `evaluations`          | type, globally keyed instance ID, order, label, enablement, and JSON config                                   |
 | `entity_ids`           | shared ID registry across accounts, postings, rules, and evaluations                                          |
 | `account_links`        | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
-| `income_sources`       | effective-dated income rows sharing an ID                                                                     |
-| `tax_profiles`         | ordered deductions, brackets, and source URL                                                                  |
+| `pinned_evaluations`   | ordered pinned evaluation instance IDs                                                                        |
+| `sync_state`           | last successful sync completion time                                                                          |
 | `projection_artifacts` | versioned content identity, kind, creation time, and JSON payload                                             |
 | `amount_presets`       | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
 
 ### First boot and import
 
-`cmd/server` calls `DocumentExists` and logs a notice when no model is stored; onboarding is an explicit import through Configs or `cmd/importcsv`. `ImportCSV` (offline tool, fixture seeding, tests) parses both CSV directories and replaces model and income state in one transaction.
+`cmd/server` calls `DocumentExists` and logs a notice when no model is stored; onboarding is an explicit import through Configs or `cmd/importcsv`. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces model state in one transaction.
 
 `cmd/importcsv` deliberately invokes the same import path for operator-controlled replacement of an existing database.
 
@@ -240,14 +238,13 @@ Deterministic identity includes:
 - the resolved model document;
 - request overrides;
 - fallback projection start date and horizon;
-- every enabled evaluation instance ID and config, excluding evaluation labels;
-- the resolved income snapshot.
+- every enabled evaluation instance ID and config, excluding evaluation labels.
 
 Seeded stochastic identity adds the requested run count and the exact seed.
 
 Consequences:
 
-- omitting model and income bodies still tracks saved model and income changes because the handler hashes the resolved stored snapshot;
+- omitting the model body still tracks saved model changes because the handler hashes the resolved stored snapshot;
 - disabled evaluation configs do not affect computation identity;
 - evaluation label-only changes do not invalidate a result;
 - a seed is part of stochastic identity;
@@ -302,19 +299,19 @@ Current providers:
 - `model-value`;
 - `account-balance`;
 - `occurrence-rate`;
+- `growth-factor`;
 - `terms-minimum`;
 - `late-fee`;
 - `balance-fee`.
 
 Current general resolvers:
 
-- `expression`.
+- `expression`;
+- `progressive-bracket` (progressive tax liability on gross minus pre-tax contributions minus deduction).
 
-`expression` amounts carry rate behavior in their inputs: the `occurrence-rate` provider resolves the annual rate (sampled per projection year when volatile) divided by the frequency divisor, and the `growth-factor` provider resolves the compounding factor from the rule start date. One-time and recurring movements resolve through the same path. Posting references (`model-value`) may name posting or rule IDs; a rule reference resolves to its latest realized occurrence.
+`expression` amounts carry rate behavior in their inputs: the `occurrence-rate` provider resolves the annual rate (sampled per projection year when volatile) divided by the frequency divisor, and the `growth-factor` provider resolves the compounding factor from the rule start date. One-time and recurring movements resolve through the same path. Posting references (`model-value`) may name posting or rule IDs; a rule reference resolves to its latest realized occurrence. Payroll chains rules by priority and `model-value`: gross pay, pre-tax contributions, employer match, and a `progressive-bracket` tax rule compose take-home pay from ordinary movements.
 
-The `income` resolver is an ordered pipeline like any other resolver. It reads the effective income source for the occurrence date, executes configured resolver steps, routes configured outputs, and deposits the remaining net cash into rule or posting destinations. Income rules and postings validate alike: a source account contradicts the inflow shape, at least one destination is required, and rule annual caps bound net cash deposited per calendar year while step splits carry their own resolver-level caps. Rule instances divide annual figures by their rule's frequency; manual postings resolve the whole annual figure at once.
-
-Layman discovery: `GET /v1/amount-resolvers` returns `resolvers`, `providers`, and `incomeSteps` as wiring only (entry names, technical descriptions, field keys, field kinds, required flags, and provider volatility). All human words live in the frontend. Reusable recipes persist as rows: `GET /v1/amount-presets` lists them, `POST`/`PATCH`/`DELETE /v1/amount-presets` and `POST /v1/amount-presets/reorder` manage them. A preset is an authoring macro only — applying it copies its amount descriptor into a posting or rule, so simulation never reads presets and they never affect artifact identity. The wire shape is unchanged; presets only author it.
+Layman discovery: `GET /v1/amount-resolvers` returns `resolvers` and `providers` as wiring only (entry names, technical descriptions, field keys, field kinds, required flags, and provider volatility). All human words live in the frontend. Reusable recipes persist as rows: `GET /v1/amount-presets` lists them, `POST`/`PATCH`/`DELETE /v1/amount-presets` and `POST /v1/amount-presets/reorder` manage them. A preset is an authoring macro only — applying it copies its amount descriptor into a posting or rule, so simulation never reads presets and they never affect artifact identity. The wire shape is unchanged; presets only author it.
 
 ### Constraints and movement records
 
@@ -338,20 +335,18 @@ Annual-cap usage is observed from realized amounts by movement ID (posting or ru
 - amount resolver config, exact required inputs, provider references, and movement dependency cycles spanning postings and rules;
 - posting and rule source/destination references, duplicate destinations, same-account routing, rule schedules, and claim validity (named rule exists, date is a real scheduled occurrence, no double claims);
 - account bounds;
-- evaluation instance IDs and config;
-- income references when income data is supplied.
+- evaluation instance IDs and config.
 
 Warnings and errors share the ordered `ModelValidationIssue` shape. `SeverityError` blocks persistence and simulation. `SeverityWarning` does not.
 
 `PrepareSimulationRequest`:
 
 1. applies request overrides without mutating the input document;
-2. requires income data when an enabled income rule or posting exists;
-3. validates the effective model;
-4. validates `fallbackProjectionStartDate`;
-5. replays historical state;
-6. computes the clamped projection end date;
-7. creates one `types.SimulationRequest`.
+2. validates the effective model;
+3. validates `fallbackProjectionStartDate`;
+4. replays historical state;
+5. computes the clamped projection end date;
+6. creates one `types.SimulationRequest`.
 
 ## 7. Historical Replay and Checkpoints
 
@@ -377,7 +372,7 @@ Each historical correction records observed balance, modeled balance, and adjust
 
 The kernel:
 
-1. creates a `TransitionRuntime` from the prepared model, state, date, income snapshot, and optional sampled rates;
+1. creates a `TransitionRuntime` from the prepared model, state, date, and optional sampled rates;
 2. expands enabled occurrences through the projection window;
 3. sorts dates and same-date occurrences;
 4. executes each occurrence through the shared transition path;
@@ -498,7 +493,7 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/api/server.go`                    | router and operation registration                |
 | `backend/internal/api/auth.go`                      | read-only and bearer policy                      |
 | `backend/internal/api/cors.go`                      | origin parsing and preflight enforcement         |
-| `backend/internal/api/model_handlers.go`            | model, status, and income handlers               |
+| `backend/internal/api/model_handlers.go`            | model and status handlers                        |
 | `backend/internal/api/rows.go`                      | row create/update/delete/move and link handlers  |
 | `backend/internal/api/projection_handlers.go`       | deterministic resolution, execution, and cache   |
 | `backend/internal/api/stochastic_sse.go`            | shared seeded runs and event serialization       |
@@ -508,10 +503,10 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/store/rows.go`                    | row CRUD, ID registry, links, provisioning       |
 | `backend/internal/store/sync.go`                    | sync application and pending snapshot            |
 | `backend/internal/store/artifacts.go`               | bounded artifact storage                         |
-| `backend/internal/csvio/import.go`                  | model and income CSV parsing                     |
+| `backend/internal/csvio/import.go`                  | canonical model CSV parsing                      |
 | `backend/internal/domain/validation.go`             | authoritative model validation                   |
 | `backend/internal/domain/prepare.go`                | overrides, history, dates, initial state         |
-| `backend/internal/domain/transitions.go`            | shared movement and income execution             |
+| `backend/internal/domain/transitions.go`            | shared movement execution                        |
 | `backend/internal/domain/simulate.go`               | deterministic kernel                             |
 | `backend/internal/domain/path.go`                   | path and public-result adaptation                |
 | `backend/internal/domain/evaluation_runtime.go`     | registry and evaluator lifecycle                 |

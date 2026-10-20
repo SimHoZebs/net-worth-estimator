@@ -7,11 +7,11 @@ package types
 // rule, so simulation never reads presets and they never affect artifact
 // identity, validation, or the canonical model revision.
 //
-// The amount descriptor may reference placeholder account, posting, income
-// source, or tax profile IDs. Placeholders are resolved at authoring time
-// (the UI substitutes real IDs), so preset validation checks shape only:
-// known resolver, exact required inputs, known providers, finite literals.
-// It never checks references against stored data.
+// The amount descriptor may reference placeholder account or posting IDs.
+// Placeholders are resolved at authoring time (the UI substitutes real
+// IDs), so preset validation checks shape only: known resolver, exact
+// required inputs, known providers, finite literals. It never checks
+// references against stored data.
 type AmountPreset struct {
 	ID      string                  `json:"id"`
 	Name    string                  `json:"name"`

@@ -9,7 +9,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Amount resolution for posting and income configurations.
+// Amount resolution for posting and rule configurations.
 
 // AmountResolutionError reports amount-resolution failures.
 type AmountResolutionError struct{ Message string }
@@ -167,10 +167,10 @@ type AmountProviderInfo struct {
 // movement behind them moves it.
 //
 // Live plan uses: model-value, account-balance, occurrence-rate and
-// growth-factor with the expression resolver. Debt feature (tested, unused
-// in seed CSVs): terms-minimum, late-fee, balance-fee. Income pipeline in
-// income.go has its own percentage/progressive-bracket steps; there are no
-// other generic resolvers.
+// growth-factor with the expression resolver. Payroll modeling (tested,
+// seeded): chained expression rules with the progressive-bracket resolver
+// for tax. Debt feature (tested, unused in seed CSVs): terms-minimum,
+// late-fee, balance-fee. There are no other generic resolvers.
 var amountProviders = map[string]providerDefinition{
 	"model-value": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
