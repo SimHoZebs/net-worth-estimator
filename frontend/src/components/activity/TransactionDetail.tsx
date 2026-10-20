@@ -27,6 +27,7 @@ import {
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
+import { markAsSubscription } from "../../domain/subscriptions.ts";
 import {
 	validatePlan,
 	visibleAccounts,
@@ -593,6 +594,45 @@ function useMovementEdit({
 	};
 }
 
+function MarkAsSubscriptionAction({
+	movement,
+	plan,
+	locked,
+	onDone,
+}: {
+	movement: Movement;
+	plan: Plan;
+	locked: boolean;
+	onDone: () => void;
+}) {
+	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
+	const [error, setError] = useState<string | null>(null);
+	if (movement.frequency !== "once" || movement.claimRuleId || locked)
+		return null;
+	const mark = () => {
+		const next = markAsSubscription(plan, movement.id);
+		if (next instanceof Error) {
+			setError(next.message);
+			return;
+		}
+		if (updatePlan(next)) onDone();
+		else setError("That change could not be applied to the plan.");
+	};
+	return (
+		<div className="inline-notice">
+			<Repeat size={18} aria-hidden="true" />
+			<span>
+				Pay this every month? Marking it as a subscription creates a monthly
+				rule and links this transaction to its first occurrence.
+			</span>
+			<button type="button" className="button small" onClick={mark}>
+				Mark as subscription
+			</button>
+			{error && <ErrorNotice message={error} />}
+		</div>
+	);
+}
+
 function DiscardConfirm({
 	onContinue,
 	onDiscard,
@@ -886,6 +926,12 @@ export function TransactionDetail({
 						locked={!canEdit}
 						scheduleControlId={`${edit.formId}-schedule`}
 					/>
+					<MarkAsSubscriptionAction
+						movement={movement}
+						plan={plan}
+						locked={!canEdit}
+						onDone={onClose}
+					/>
 					<MoreOptions
 						movement={movement}
 						plan={plan}
@@ -1147,6 +1193,12 @@ export function MovementDetail({
 						editing={edit.activeField === "schedule"}
 						locked={!canEdit}
 						scheduleControlId={`${edit.formId}-schedule`}
+					/>
+					<MarkAsSubscriptionAction
+						movement={movement}
+						plan={plan}
+						locked={!canEdit}
+						onDone={onClose}
 					/>
 					<MoreOptions
 						movement={movement}
