@@ -1,10 +1,14 @@
 import {
+	ArrowDown,
 	ArrowDownLeft,
-	ArrowRight,
 	ArrowRightLeft,
 	ArrowUpRight,
 	Banknote,
+	CalendarCheck2,
+	CalendarDays,
+	Check,
 	ChevronDown,
+	Clock3,
 	Link2,
 	LockKeyhole,
 	Repeat,
@@ -16,6 +20,7 @@ import { createPortal } from "react-dom";
 import {
 	useId,
 	useState,
+	type ComponentType,
 	type FormEvent,
 	type ReactNode,
 } from "react";
@@ -60,14 +65,20 @@ function frequencyLabel(frequency: Movement["frequency"]): string {
 	}
 }
 
-function DirectionIcon({ kind }: { kind: "in" | "out" | "transfer" }) {
+function DirectionIcon({
+	kind,
+	size = 16,
+}: {
+	kind: "in" | "out" | "transfer";
+	size?: number;
+}) {
 	const Icon =
 		kind === "transfer"
 			? ArrowRightLeft
 			: kind === "in"
 				? ArrowDownLeft
 				: ArrowUpRight;
-	return <Icon size={16} aria-hidden="true" />;
+	return <Icon size={size} aria-hidden="true" />;
 }
 
 function directionKindFor(movement: Movement): "in" | "out" | "transfer" {
@@ -84,69 +95,35 @@ function accountFor(
 	return accounts.find((account) => account.id === id) ?? null;
 }
 
-/** Money path as a picture: source chip → destination chip. */
-function FlowStrip({ from, to }: { from: ReactNode; to: ReactNode }) {
+/** Aligned metadata row: quiet icon label on the left, value on the right.
+ * A wrapping label associates the text with the control inside, so no
+ * aria-labels are needed on row controls. */
+function MetaRow({
+	icon: Icon,
+	label,
+	children,
+}: {
+	icon: ComponentType<{ size?: number; className?: string }>;
+	label: string;
+	children: ReactNode;
+}) {
 	return (
-		<div className="transaction-flow">
-			{from}
-			<ArrowRight
-				size={16}
-				aria-hidden="true"
-				className="transaction-flow-arrow"
-			/>
-			{to}
-		</div>
+		<label className="transaction-meta-row">
+			<span className="transaction-meta-label">
+				<Icon size={15} aria-hidden="true" />
+				{label}
+			</span>
+			{children}
+		</label>
 	);
 }
 
-/** The money-route chip, always a select. Read mode is an attribute flip:
- * armed selects look static; locked selects are disabled. Any change flows
- * through onChange, which also marks the edit active. */
-function FlowSelect({
-	account,
-	value,
-	onChange,
-	label,
-	name,
-	id,
-	emptyLabel,
-	options,
-	locked,
-	active,
-}: {
-	account: AccountRef | null;
-	value: string;
-	onChange: (value: string) => void;
-	label: string;
-	name: string;
-	id: string;
-	emptyLabel: string;
-	options: Account[];
-	locked: boolean;
-	active: boolean;
-}) {
-	return (
-		<label
-			className={`transaction-flow-chip${account ? "" : " external"}${active ? " editing" : ""}`}
-		>
-			{account ? (
-				<AccountIcon account={account} />
-			) : (
-				<Banknote size={15} aria-hidden="true" />
-			)}
-			<select
-				id={id}
-				aria-label={label}
-				name={name}
-				value={value}
-				disabled={locked}
-				onChange={(event) => onChange(event.target.value)}
-			>
-				<option value="">{emptyLabel}</option>
-				<AccountOptions accounts={options} />
-			</select>
-		</label>
-	);
+function categoryLabel(kind: "in" | "out" | "transfer"): string {
+	return kind === "transfer"
+		? "Transfer"
+		: kind === "in"
+			? "Income"
+			: "Expense";
 }
 
 function FrequencyOptions() {
@@ -356,10 +333,18 @@ function ScheduleCapsule({
 			? null
 			: ` · ${annualIncrease > 0 ? "+" : ""}${annualIncrease}% yearly`;
 	return (
-		<p className="transaction-schedule">
-			<Repeat size={15} aria-hidden="true" />
-			<span>
-				{frequencyLabel(frequency)} ·{" "}
+		<div className="transaction-inset">
+			<div className="transaction-inset-head">
+				<Repeat size={16} aria-hidden="true" />
+				<div>
+					<strong>Recurring transaction</strong>
+					<span>
+						{frequencyLabel(frequency)}
+						{growth}
+					</span>
+				</div>
+			</div>
+			<div className="transaction-schedule-dates">
 				<input
 					id={scheduleControlId}
 					aria-label="First occurrence"
@@ -368,7 +353,9 @@ function ScheduleCapsule({
 					required
 					readOnly={locked}
 					value={draft.startDate}
-					onChange={(event) => updateDraft({ startDate: event.target.value }, "schedule")}
+					onChange={(event) =>
+						updateDraft({ startDate: event.target.value }, "schedule")
+					}
 				/>{" "}
 				→{" "}
 				{draft.noEndDate && !editing ? (
@@ -381,7 +368,9 @@ function ScheduleCapsule({
 						disabled={draft.noEndDate || locked}
 						readOnly={locked}
 						value={draft.endDate}
-						onChange={(event) => updateDraft({ endDate: event.target.value }, "schedule")}
+						onChange={(event) =>
+							updateDraft({ endDate: event.target.value }, "schedule")
+						}
 					/>
 				)}{" "}
 				{editing && (
@@ -391,14 +380,15 @@ function ScheduleCapsule({
 							name="noEndDate"
 							disabled={locked}
 							checked={draft.noEndDate}
-							onChange={(event) => updateDraft({ noEndDate: event.target.checked }, "schedule")}
+							onChange={(event) =>
+								updateDraft({ noEndDate: event.target.checked }, "schedule")
+							}
 						/>
 						No end date
 					</label>
 				)}
-				{growth}
-			</span>
-		</p>
+			</div>
+		</div>
 	);
 }
 
@@ -431,35 +421,6 @@ function readOnlyReasonFor(movement: Movement): string | undefined {
 			: undefined;
 }
 
-function StatusBadges({
-	transaction,
-	movement,
-	shortfallLabel,
-}: {
-	transaction: AccountTransaction;
-	movement: Movement;
-	shortfallLabel?: string;
-}) {
-	const showShortfall = transaction.shortfall > 0.01;
-	const showExcluded = transaction.excluded && !transaction.pending;
-	if (!transaction.pending && !showExcluded && !showShortfall) return null;
-	return (
-		<span className="transaction-badges">
-			{transaction.pending && <Badge tone="neutral">Pending</Badge>}
-			{showExcluded && <Badge tone="amber">Excluded from plan</Badge>}
-			{showShortfall && (
-				<Badge tone="amber">
-					<TriangleAlert size={10} />
-					{shortfallLabel ?? "Shortfall"}
-				</Badge>
-			)}
-			{!movement.enabled && !transaction.pending && !showExcluded && (
-				<Badge tone="amber">Excluded</Badge>
-			)}
-		</span>
-	);
-}
-
 /**
  * In-place edit state for the detail dialog. There is no edit mode toggle:
  * clicking a value makes only that value editable and reveals Save/Discard
@@ -467,7 +428,7 @@ function StatusBadges({
  * The dialog shell never unmounts, and closing with unsaved changes asks
  * for confirmation instead of navigating away.
  */
-type EditField = "name" | "amount" | "from" | "to" | "schedule";
+type EditField = "name" | "amount" | "from" | "to" | "schedule" | "posted";
 
 type MovementDraft = {
 	name: string;
@@ -482,6 +443,7 @@ type MovementDraft = {
 	enabled: boolean;
 	claimRuleId: string;
 	claimOccurrenceDate: string;
+	postedDate: string;
 };
 
 function draftFromMovement(movement: Movement): MovementDraft {
@@ -498,6 +460,7 @@ function draftFromMovement(movement: Movement): MovementDraft {
 		enabled: movement.enabled,
 		claimRuleId: movement.claimRuleId ?? "",
 		claimOccurrenceDate: movement.claimOccurrenceDate ?? "",
+		postedDate: movement.postedDate ?? "",
 	};
 }
 function useMovementEdit({
@@ -578,6 +541,7 @@ function useMovementEdit({
 		if (draft.enabled) data.append("enabled", "on");
 		data.append("claimRuleId", draft.claimRuleId);
 		data.append("claimOccurrenceDate", draft.claimOccurrenceDate);
+		data.append("postedDate", draft.postedDate);
 		const validated = validatePlan(
 			buildMovementPlan({
 				plan,
@@ -684,111 +648,236 @@ export function TransactionDetail({
 	const edit = useMovementEdit({ movement, plan, onClose });
 	const once = movement.frequency === "once";
 	const canEdit = !edit.readOnlyReason;
-	const editTitle = (
+	const showShortfall = transaction.shortfall > 0.01;
+	const showExcluded = transaction.excluded && !transaction.pending;
+	const postedDiffers =
+		movement.postedDate !== null &&
+		movement.postedDate !== edit.draft.startDate;
+	const fromAccount = accountFor(accounts, edit.draft.fromId || null);
+	const toAccount = accountFor(accounts, edit.draft.toId || null);
+	const hasStatusPill =
+		transaction.pending ||
+		transaction.source === "historical" ||
+		showExcluded ||
+		showShortfall ||
+		(!movement.enabled && !transaction.pending && !showExcluded);
+	const editHeading = (
 		<>
 			<span className="sr-only">{edit.draft.name}</span>
-			<input
-				id={`${edit.formId}-name`}
-				aria-label="Transaction name"
-				name="name"
-				required
-				maxLength={100}
-				value={edit.draft.name}
-				onChange={(event) => edit.updateDraft({ name: event.target.value }, "name")}
-				readOnly={!canEdit}
-				form={edit.formId}
-				className="transaction-title-input"
-			/>
+			<span className="transaction-detail-heading">
+				<span
+					className={`movement-icon square ${kind === "transfer" ? "transfer" : kind === "in" ? "inflow" : "outflow"}`}
+				>
+					<DirectionIcon kind={kind} size={22} />
+				</span>
+				<span className="transaction-detail-eyebrow">Transaction details</span>
+			</span>
 		</>
 	);
 	return (
 		<DetailPortal>
 			<Modal
-				title={editTitle}
+				title={editHeading}
 				titleSize="plain"
 				className="transaction-detail-modal"
 				actions={edit.actions}
 				onClose={edit.close}
+				focusPanelOnOpen
 			>
 				<form id={edit.formId} onSubmit={edit.submit}>
+					<div className="transaction-name-row">
+						<input
+							id={`${edit.formId}-name`}
+							aria-label="Transaction name"
+							name="name"
+							required
+							maxLength={100}
+							value={edit.draft.name}
+							onChange={(event) =>
+								edit.updateDraft({ name: event.target.value }, "name")
+							}
+							readOnly={!canEdit}
+							form={edit.formId}
+							className="transaction-name-input"
+						/>
+						{movement.frequency !== "once" && (
+							<span
+								title="Recurring transaction"
+								aria-label="Recurring transaction"
+								role="img"
+								className="transaction-repeat-badge"
+							>
+								<Repeat size={16} aria-hidden="true" />
+							</span>
+						)}
+					</div>
 					<div className="transaction-detail-hero">
-						<span
-							className={`movement-icon ${kind === "transfer" ? "transfer" : kind === "in" ? "inflow" : "outflow"}`}
-						>
-							<DirectionIcon kind={kind} />
-						</span>
 						<div>
-								<span className={`transaction-amount-edit${transaction.direction === "in" ? " positive" : ""}`}>
-									<span aria-hidden="true">{transaction.amount === 0 ? "$" : `${transaction.direction === "in" ? "+" : "−"}$`}</span>
-									<input
-										id={`${edit.formId}-amount`}
-										aria-label="Amount (USD)"
-										name="amount"
-										type="number"
-										required
-										min="0.01"
-										max="10000000000"
-										step="0.01"
-										value={edit.draft.amount}
-										onChange={(event) =>
-											edit.updateDraft({ amount: event.target.value }, "amount")
-										}
-										readOnly={!canEdit}
-										className={`transaction-amount-input${transaction.direction === "in" ? " positive" : ""}`}
-									/>
+							<span
+								className={`transaction-amount-edit${transaction.direction === "in" ? " positive" : ""}`}
+							>
+								<span aria-hidden="true">
+									{transaction.amount === 0
+										? "$"
+										: `${transaction.direction === "in" ? "+" : "−"}$`}
 								</span>
-						</div>
-						{once &&
 								<input
-									id={`${edit.formId}-date`}
-									aria-label="Date"
-									type="date"
-									name="startDate"
+									id={`${edit.formId}-amount`}
+									aria-label="Amount (USD)"
+									name="amount"
+									type="number"
 									required
-									value={edit.draft.startDate}
+									min="0.01"
+									max="10000000000"
+									step="0.01"
+									value={edit.draft.amount}
 									onChange={(event) =>
-										edit.updateDraft({ startDate: event.target.value }, "schedule")
+										edit.updateDraft({ amount: event.target.value }, "amount")
 									}
 									readOnly={!canEdit}
-									className="transaction-detail-date transaction-inline-date"
+									className={`transaction-amount-input${transaction.direction === "in" ? " positive" : ""}`}
 								/>
-						}
+							</span>
+						</div>
 					</div>
-					<StatusBadges
-						transaction={transaction}
-						movement={movement}
-						shortfallLabel={shortfallLabel}
-					/>
-					<FlowStrip
-						from={
-							<FlowSelect
-								account={accountFor(accounts, edit.draft.fromId || null)}
-								value={edit.draft.fromId}
-								onChange={(value) => edit.updateDraft({ fromId: value }, "from")}
-								label="From"
-								name="fromId"
-								id={`${edit.formId}-from`}
-								emptyLabel="External income"
-								options={fromAccountOptions(plan)}
-								locked={!canEdit}
-								active={edit.activeField === "from"}
-							/>
-						}
-						to={
-							<FlowSelect
-								account={accountFor(accounts, edit.draft.toId || null)}
-								value={edit.draft.toId}
-								onChange={(value) => edit.updateDraft({ toId: value }, "to")}
-								label="To"
-								name="toId"
-								id={`${edit.formId}-to`}
-								emptyLabel="External spending"
-								options={visibleAccounts(plan.accounts)}
-								locked={!canEdit}
-								active={edit.activeField === "to"}
-							/>
-						}
-					/>
+					<div className="transaction-status">
+						{transaction.pending ? (
+							<Badge tone="amber">
+								<Clock3 size={10} aria-hidden="true" />
+								Pending
+							</Badge>
+						) : transaction.source === "historical" ? (
+							<Badge tone="green">
+								<Check size={10} aria-hidden="true" />
+								Posted
+							</Badge>
+						) : null}
+						{showExcluded && <Badge tone="amber">Excluded from plan</Badge>}
+						{showShortfall && (
+							<Badge tone="amber">
+								<TriangleAlert size={10} aria-hidden="true" />
+								{shortfallLabel ?? "Shortfall"}
+							</Badge>
+						)}
+						{!movement.enabled && !transaction.pending && !showExcluded && (
+							<Badge tone="amber">Excluded</Badge>
+						)}
+						{hasStatusPill && <span aria-hidden="true">·</span>}
+						<span className="transaction-category">{categoryLabel(kind)}</span>
+					</div>
+					{(once || transaction.pending || postedDiffers) && (
+						<div className="transaction-meta">
+							{once && (
+								<MetaRow icon={CalendarDays} label="Transaction date">
+									<input
+										id={`${edit.formId}-date`}
+										type="date"
+										name="startDate"
+										required
+										value={edit.draft.startDate}
+										onChange={(event) =>
+											edit.updateDraft(
+												{ startDate: event.target.value },
+												"schedule",
+											)
+										}
+										readOnly={!canEdit}
+									/>
+								</MetaRow>
+							)}
+							{(transaction.pending || postedDiffers) && (
+								<MetaRow icon={CalendarCheck2} label="Date posted">
+									{transaction.pending ? (
+										<span className="transaction-muted">Not yet posted</span>
+									) : (
+										<input
+											id={`${edit.formId}-posted`}
+											type="date"
+											name="postedDate"
+											required
+											value={edit.draft.postedDate}
+											onChange={(event) =>
+												edit.updateDraft(
+													{ postedDate: event.target.value },
+													"posted",
+												)
+											}
+											readOnly={!canEdit}
+										/>
+									)}
+								</MetaRow>
+							)}
+						</div>
+					)}
+					{kind === "transfer" && (
+						<div className="transaction-transfer">
+							<h3>Transfer details</h3>
+							<div className="transaction-transfer-box">
+								<div className="transaction-transfer-row">
+									{fromAccount ? (
+										<AccountIcon account={fromAccount} />
+									) : (
+										<span className="transaction-transfer-icon">
+											<Banknote size={15} aria-hidden="true" />
+										</span>
+									)}
+									<div>
+										<span aria-hidden="true">FROM ACCOUNT</span>
+										<select
+											id={`${edit.formId}-from`}
+											aria-label="From"
+											name="fromId"
+											value={edit.draft.fromId}
+											onChange={(event) =>
+												edit.updateDraft({ fromId: event.target.value }, "from")
+											}
+											disabled={!canEdit}
+											className={
+												edit.activeField === "from" ? "editing" : undefined
+											}
+										>
+											<option value="">External income</option>
+											<AccountOptions accounts={fromAccountOptions(plan)} />
+										</select>
+									</div>
+								</div>
+								<div className="transaction-transfer-mid" aria-hidden="true">
+									<ArrowDown size={16} />
+									<span />
+								</div>
+								<div className="transaction-transfer-row">
+									{toAccount ? (
+										<AccountIcon account={toAccount} />
+									) : (
+										<span className="transaction-transfer-icon">
+											<Banknote size={15} aria-hidden="true" />
+										</span>
+									)}
+									<div>
+										<span aria-hidden="true">TO ACCOUNT</span>
+										<select
+											id={`${edit.formId}-to`}
+											aria-label="To"
+											name="toId"
+											value={edit.draft.toId}
+											onChange={(event) =>
+												edit.updateDraft({ toId: event.target.value }, "to")
+											}
+											disabled={!canEdit}
+											className={
+												edit.activeField === "to" ? "editing" : undefined
+											}
+										>
+											<option value="">External spending</option>
+											<AccountOptions
+												accounts={visibleAccounts(plan.accounts)}
+											/>
+										</select>
+									</div>
+								</div>
+							</div>
+						</div>
+					)}
 					<ScheduleCapsule
 						draft={edit.draft}
 						updateDraft={edit.updateDraft}
@@ -846,39 +935,62 @@ export function MovementDetail({
 	const edit = useMovementEdit({ movement, plan, onClose });
 	const once = movement.frequency === "once";
 	const canEdit = !edit.readOnlyReason;
-	const editTitle = (
+	const postedDiffers =
+		movement.postedDate !== null &&
+		movement.postedDate !== edit.draft.startDate;
+	const fromAccount = accountFor(accounts, edit.draft.fromId || null);
+	const toAccount = accountFor(accounts, edit.draft.toId || null);
+	const editHeading = (
 		<>
 			<span className="sr-only">{edit.draft.name}</span>
-			<input
-				id={`${edit.formId}-name`}
-				aria-label="Transaction name"
-				name="name"
-				required
-				maxLength={100}
-				value={edit.draft.name}
-				onChange={(event) => edit.updateDraft({ name: event.target.value }, "name")}
-				readOnly={!canEdit}
-				form={edit.formId}
-				className="transaction-title-input"
-			/>
+			<span className="transaction-detail-heading">
+				<span
+					className={`movement-icon square ${kind === "transfer" ? "transfer" : kind === "in" ? "inflow" : "outflow"}`}
+				>
+					<DirectionIcon kind={kind} size={22} />
+				</span>
+				<span className="transaction-detail-eyebrow">Transaction details</span>
+			</span>
 		</>
 	);
 	return (
 		<DetailPortal>
 			<Modal
-				title={editTitle}
+				title={editHeading}
 				titleSize="plain"
 				className="transaction-detail-modal"
 				actions={edit.actions}
 				onClose={edit.close}
-				>
+				focusPanelOnOpen
+			>
 				<form id={edit.formId} onSubmit={edit.submit}>
+					<div className="transaction-name-row">
+						<input
+							id={`${edit.formId}-name`}
+							aria-label="Transaction name"
+							name="name"
+							required
+							maxLength={100}
+							value={edit.draft.name}
+							onChange={(event) =>
+								edit.updateDraft({ name: event.target.value }, "name")
+							}
+							readOnly={!canEdit}
+							form={edit.formId}
+							className="transaction-name-input"
+						/>
+						{movement.frequency !== "once" && (
+							<span
+								title="Recurring transaction"
+								aria-label="Recurring transaction"
+								role="img"
+								className="transaction-repeat-badge"
+							>
+								<Repeat size={16} aria-hidden="true" />
+							</span>
+						)}
+					</div>
 					<div className="transaction-detail-hero">
-						<span
-							className={`movement-icon ${kind === "transfer" ? "transfer" : kind === "in" ? "inflow" : "outflow"}`}
-						>
-							<DirectionIcon kind={kind} />
-						</span>
 						<div>
 							<span className="transaction-amount-edit">
 								<span aria-hidden="true">$</span>
@@ -904,66 +1016,130 @@ export function MovementDetail({
 									? "Per occurrence"
 									: resolvedAmount !== undefined && resolvedDate
 										? `Calculated · ${money(resolvedAmount)} on ${dateLabel(resolvedDate, true)}`
-									: "Calculated each occurrence"}
+										: "Calculated each occurrence"}
 							</span>
 						</div>
-						{once &&
-						<input
-							id={`${edit.formId}-date`}
-							aria-label="Date"
-							type="date"
-							name="startDate"
-							required
-							value={edit.draft.startDate}
-							onChange={(event) =>
-								edit.updateDraft({ startDate: event.target.value }, "schedule")
-							}
-							readOnly={!canEdit}
-							className="transaction-detail-date transaction-inline-date"
-						/>
-						}
+						{(once || postedDiffers) && (
+							<div className="transaction-meta">
+								{once && (
+									<MetaRow icon={CalendarDays} label="Transaction date">
+										<input
+											id={`${edit.formId}-date`}
+											type="date"
+											name="startDate"
+											required
+											value={edit.draft.startDate}
+											onChange={(event) =>
+												edit.updateDraft(
+													{ startDate: event.target.value },
+													"schedule",
+												)
+											}
+											readOnly={!canEdit}
+										/>
+									</MetaRow>
+								)}
+								{postedDiffers && (
+									<MetaRow icon={CalendarCheck2} label="Date posted">
+										<input
+											id={`${edit.formId}-posted`}
+											type="date"
+											name="postedDate"
+											required
+											value={edit.draft.postedDate}
+											onChange={(event) =>
+												edit.updateDraft(
+													{ postedDate: event.target.value },
+													"posted",
+												)
+											}
+											readOnly={!canEdit}
+										/>
+									</MetaRow>
+								)}
+							</div>
+						)}
 					</div>
-					{(movement.readOnly ||
-						movement.amountKnown === false ||
-						!movement.enabled) && (
-						<span className="transaction-badges">
-							{movement.readOnly && <Badge tone="neutral">Synced</Badge>}
-							{movement.amountKnown === false && (
-								<Badge tone="neutral">Varies</Badge>
-							)}
-							{!movement.enabled && <Badge tone="amber">Excluded</Badge>}
-						</span>
+					<div className="transaction-status">
+						{movement.readOnly && <Badge tone="neutral">Synced</Badge>}
+						{movement.amountKnown === false && (
+							<Badge tone="neutral">Varies</Badge>
+						)}
+						{!movement.enabled && <Badge tone="amber">Excluded</Badge>}
+						{(movement.readOnly ||
+							movement.amountKnown === false ||
+							!movement.enabled) && <span aria-hidden="true">·</span>}
+						<span className="transaction-category">{categoryLabel(kind)}</span>
+					</div>
+					{kind === "transfer" && (
+						<div className="transaction-transfer">
+							<h3>Transfer details</h3>
+							<div className="transaction-transfer-box">
+								<div className="transaction-transfer-row">
+									{fromAccount ? (
+										<AccountIcon account={fromAccount} />
+									) : (
+										<span className="transaction-transfer-icon">
+											<Banknote size={15} aria-hidden="true" />
+										</span>
+									)}
+									<div>
+										<span aria-hidden="true">FROM ACCOUNT</span>
+										<select
+											id={`${edit.formId}-from`}
+											aria-label="From"
+											name="fromId"
+											value={edit.draft.fromId}
+											onChange={(event) =>
+												edit.updateDraft({ fromId: event.target.value }, "from")
+											}
+											disabled={!canEdit}
+											className={
+												edit.activeField === "from" ? "editing" : undefined
+											}
+										>
+											<option value="">External income</option>
+											<AccountOptions accounts={fromAccountOptions(plan)} />
+										</select>
+									</div>
+								</div>
+								<div className="transaction-transfer-mid" aria-hidden="true">
+									<ArrowDown size={16} />
+									<span />
+								</div>
+								<div className="transaction-transfer-row">
+									{toAccount ? (
+										<AccountIcon account={toAccount} />
+									) : (
+										<span className="transaction-transfer-icon">
+											<Banknote size={15} aria-hidden="true" />
+										</span>
+									)}
+									<div>
+										<span aria-hidden="true">TO ACCOUNT</span>
+										<select
+											id={`${edit.formId}-to`}
+											aria-label="To"
+											name="toId"
+											value={edit.draft.toId}
+											onChange={(event) =>
+												edit.updateDraft({ toId: event.target.value }, "to")
+											}
+											disabled={!canEdit}
+											className={
+												edit.activeField === "to" ? "editing" : undefined
+											}
+										>
+											<option value="">External spending</option>
+											<AccountOptions
+												accounts={visibleAccounts(plan.accounts)}
+											/>
+										</select>
+									</div>
+								</div>
+							</div>
+						</div>
 					)}
-					<FlowStrip
-						from={
-							<FlowSelect
-								account={accountFor(accounts, edit.draft.fromId || null)}
-								value={edit.draft.fromId}
-								onChange={(value) => edit.updateDraft({ fromId: value }, "from")}
-								label="From"
-								name="fromId"
-								id={`${edit.formId}-from`}
-								emptyLabel="External income"
-								options={fromAccountOptions(plan)}
-								locked={!canEdit}
-								active={edit.activeField === "from"}
-							/>
-						}
-						to={
-							<FlowSelect
-								account={accountFor(accounts, edit.draft.toId || null)}
-								value={edit.draft.toId}
-								onChange={(value) => edit.updateDraft({ toId: value }, "to")}
-								label="To"
-								name="toId"
-								id={`${edit.formId}-to`}
-								emptyLabel="External spending"
-								options={visibleAccounts(plan.accounts)}
-								locked={!canEdit}
-								active={edit.activeField === "to"}
-							/>
-						}
-					/>
 					<ScheduleCapsule
 						draft={edit.draft}
 						updateDraft={edit.updateDraft}

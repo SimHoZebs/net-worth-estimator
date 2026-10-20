@@ -61,6 +61,7 @@ export function Modal({
 	className = "",
 	titleSize = "display",
 	actions,
+	focusPanelOnOpen = false,
 }: {
 	title: ReactNode;
 	eyebrow?: string;
@@ -72,8 +73,15 @@ export function Modal({
 	titleSize?: "display" | "plain";
 	/** Extra icon buttons beside the corner close button. */
 	actions?: ReactNode;
+	/**
+	 * Focus the panel itself on open instead of the browser default (first
+	 * focusable control). For dialogs whose first control is a value that
+	 * looks like text, an initial focus ring reads as a rendering bug.
+	 */
+	focusPanelOnOpen?: boolean;
 }) {
 	const ref = useRef<HTMLDialogElement>(null);
+	const panelRef = useRef<HTMLDivElement>(null);
 	const [closing, setClosing] = useState(false);
 	const closeRequested = useRef(false);
 	const reduceMotion = useReducedMotion();
@@ -82,11 +90,13 @@ export function Modal({
 		const dialog = ref.current;
 		const previous = document.activeElement;
 		dialog?.showModal();
+		if (focusPanelOnOpen) panelRef.current?.focus();
 		return () => {
 			dialog?.close();
 			if (previous instanceof HTMLElement && previous.isConnected)
 				previous.focus();
 		};
+		// oxlint-disable-next-line react/exhaustive-deps
 	}, []);
 	const requestClose = () => {
 		if (closeRequested.current) return;
@@ -114,6 +124,9 @@ export function Modal({
 			}}
 		>
 			<motion.div
+				ref={panelRef}
+				tabIndex={focusPanelOnOpen ? -1 : undefined}
+				className="modal-panel"
 				initial={initial}
 				animate={closing ? exit : enter}
 				transition={{

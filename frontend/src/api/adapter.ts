@@ -292,7 +292,10 @@ function withGrowthRate(
 ): PostingAmountResolution {
 	const inputs: Record<string, AmountInputBinding> = {};
 	for (const [key, value] of Object.entries(
-		(objectValue(amount.inputs as JsonValue) ?? {}) as Record<string, JsonValue>,
+		(objectValue(amount.inputs as JsonValue) ?? {}) as Record<
+			string,
+			JsonValue
+		>,
 	)) {
 		inputs[key] = value as unknown as AmountInputBinding;
 	}
@@ -306,10 +309,7 @@ function withGrowthRate(
 			delete inputs[existing.name];
 			return { ...amount, inputs };
 		}
-		const stripped = stripGrowthReference(
-			expressionOf(amount),
-			existing.name,
-		);
+		const stripped = stripGrowthReference(expressionOf(amount), existing.name);
 		if (stripped !== null) {
 			delete inputs[existing.name];
 			return {
@@ -358,10 +358,7 @@ function uniqueInputName(
 	return `${base}_${index}`;
 }
 
-function stripGrowthReference(
-	expression: string,
-	name: string,
-): string | null {
+function stripGrowthReference(expression: string, name: string): string | null {
 	const suffix = ` * ${name}`;
 	if (!expression.endsWith(suffix)) return null;
 	let core = expression.slice(0, -suffix.length);
@@ -483,6 +480,11 @@ function dayFromTimes(transactionTime: number, postedTime: number): IsoDate {
 	return new Date(stamp * 1000).toISOString().slice(0, 10) as IsoDate;
 }
 
+function settledDay(postedTime: number | undefined): IsoDate | null {
+	if (postedTime === undefined || postedTime <= 0) return null;
+	return new Date(postedTime * 1000).toISOString().slice(0, 10) as IsoDate;
+}
+
 function midnightOf(day: IsoDate): number {
 	return Math.floor(new Date(`${day}T00:00:00Z`).getTime() / 1000);
 }
@@ -510,6 +512,7 @@ function movementDisplayFromRule(
 		readOnly: previous?.readOnly ?? amount === null,
 		claimRuleId: null,
 		claimOccurrenceDate: null,
+		postedDate: null,
 	};
 }
 
@@ -535,6 +538,7 @@ function movementDisplayFromPosting(
 			previous?.readOnly ?? (amount === null || posting.source === "simplefin"),
 		claimRuleId: posting.claim?.ruleId ?? null,
 		claimOccurrenceDate: posting.claim?.occurrenceDate ?? null,
+		postedDate: settledDay(posting.postedTime),
 	};
 }
 
@@ -1282,10 +1286,19 @@ export function displayPlanToBackendDocument(
 					? dayFromTimes(storedTransactionTime, storedPostedTime)
 					: null;
 			const midnight = midnightOf(movement.startDate);
+			// An explicitly set settlement day wins; a matching stored day
+			// keeps its exact time so edits never drop intraday precision.
+			const postedDay = movement.postedDate ?? null;
 			const postedTime =
-				storedDay === movement.startDate && storedPostedTime !== null
+				postedDay !== null &&
+				storedPostedTime !== null &&
+				settledDay(storedPostedTime) === postedDay
 					? storedPostedTime
-					: midnight;
+					: postedDay !== null
+						? midnightOf(postedDay)
+						: storedDay === movement.startDate && storedPostedTime !== null
+							? storedPostedTime
+							: midnight;
 			const transactionTime =
 				storedDay === movement.startDate && storedTransactionTime !== null
 					? storedTransactionTime
@@ -1322,10 +1335,7 @@ export function displayPlanToBackendDocument(
 				backendFrequency(movement.frequency))
 			: backendFrequency(movement.frequency);
 		const storedGrowth = growthRateOfAmount(preservedAmount) ?? 0;
-		const sameGrowth = sameNumber(
-			storedGrowth * 100,
-			movement.annualIncrease,
-		);
+		const sameGrowth = sameNumber(storedGrowth * 100, movement.annualIncrease);
 		const effectiveGrowth = sameGrowth
 			? storedGrowth
 			: movement.annualIncrease / 100;

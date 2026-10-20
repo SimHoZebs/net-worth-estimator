@@ -488,6 +488,9 @@
 		background: var(--backdrop-film);
 		backdrop-filter: blur(var(--backdrop-blur));
 	}
+	.modal-panel:focus {
+		outline: none;
+	}
 	.modal-header {
 		display: flex;
 		align-items: flex-start;
