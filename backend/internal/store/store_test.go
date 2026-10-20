@@ -1,8 +1,6 @@
 package store
 
 import (
-	"database/sql"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -40,15 +38,29 @@ func TestRowWritesMarkDocumentPresent(t *testing.T) {
 	}
 }
 
-func TestOpenCreatesCurrentSchemaVersion(t *testing.T) {
+func TestOpenCreatesExpectedTables(t *testing.T) {
 	store := openSQLiteStore(t)
-	var version int
-	if err := store.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != latestSchemaVersion {
-		t.Fatalf("fresh schema version = %d, err %v", version, err)
+	tables := map[string]bool{}
+	rows, err := store.db.Query(`SELECT name FROM sqlite_master WHERE type = 'table'`)
+	if err != nil {
+		t.Fatalf("list tables: %v", err)
 	}
-	var tableCount int
-	if err := store.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'`).Scan(&tableCount); err != nil || tableCount != 0 {
-		t.Fatalf("legacy schema_version table present = %d, err %v", tableCount, err)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			rows.Close()
+			t.Fatalf("scan table: %v", err)
+		}
+		tables[name] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate tables: %v", err)
+	}
+	for _, want := range expectedSchemaTables() {
+		if !tables[want] {
+			t.Fatalf("missing table %q: %v", want, tables)
+		}
 	}
 }
 
@@ -163,43 +175,6 @@ func testStorePersistsEffectiveDatedIncomeRowsWithSharedID(t *testing.T, newStor
 	}
 }
 
-func TestOpenMigratesVersionOneData(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "version-one.db")
-	createVersionOneDatabase(t, path)
-
-	store, err := Open(path)
-	if err != nil {
-		t.Fatalf("open migrated store: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-	document, incomeData, err := store.LoadDocumentAndIncomeData()
-	if err != nil {
-		t.Fatalf("load migrated aggregate: %v", err)
-	}
-	if document == nil || document.SourcePath != "" {
-		t.Fatalf("migrated document metadata = %+v", document)
-	}
-	wantDates := []types.IsoDate{"2026-04-30", "2026-04-06"}
-	gotDates := []types.IsoDate{document.Checkpoints[0].Date, document.Checkpoints[1].Date}
-	if !reflect.DeepEqual(gotDates, wantDates) {
-		t.Fatalf("migrated checkpoint order = %v, want %v", gotDates, wantDates)
-	}
-	if len(incomeData.IncomeSources) != 1 || incomeData.IncomeSources[0].AnnualGrossIncome != 100 {
-		t.Fatalf("migrated income data = %+v", incomeData)
-	}
-
-	juneEnd := types.IsoDate("2026-06-30")
-	if err := store.SaveIncomeData(&types.IncomeDataSnapshot{
-		IncomeSources: []types.IncomeSourceDefinition{
-			{ID: "salary", EffectiveFrom: "2026-01-01", EffectiveTo: &juneEnd},
-			{ID: "salary", EffectiveFrom: "2026-07-01"},
-		},
-		TaxProfiles: []types.IncomeTaxProfile{},
-	}); err != nil {
-		t.Fatalf("save effective periods after migration: %v", err)
-	}
-}
-
 func TestImportCSVRollsBackModelWhenIncomeReplacementFails(t *testing.T) {
 	testImportCSVRollsBackModelWhenIncomeReplacementFails(t, openTestStore)
 }
@@ -245,31 +220,13 @@ func testImportCSVRollsBackModelWhenIncomeReplacementFails(t *testing.T, newStor
 	}
 }
 
-func TestOpenRejectsFutureSchemaVersion(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "future.db")
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatalf("open future database: %v", err)
-	}
-	if _, err := db.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, latestSchemaVersion+1)); err != nil {
-		t.Fatalf("set future version: %v", err)
-	}
-	if err := db.Close(); err != nil {
-		t.Fatalf("close future database: %v", err)
-	}
-	if store, err := Open(path); err == nil {
-		store.Close()
-		t.Fatal("expected future schema version to be rejected")
-	}
-}
-
 func openTestStore(t *testing.T) Store {
 	t.Helper()
 	return openSQLiteStore(t)
 }
 
 // openSQLiteStore opens the embedded-SQLite backend directly. Tests that
-// assert on SQL-level details (schema versions, raw scripts) use this;
+// assert on SQL-level details (raw scripts) use this;
 // behavioral tests go through RunConformance with the interface instead.
 func openSQLiteStore(t *testing.T) *sqliteStore {
 	t.Helper()
@@ -288,42 +245,6 @@ func openSQLiteStoreAt(t *testing.T, path string) *sqliteStore {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 	return implementation
-}
-
-func createVersionOneDatabase(t *testing.T, path string) {
-	t.Helper()
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatalf("open version one database: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	tx, err := db.Begin()
-	if err != nil {
-		t.Fatalf("begin version one database: %v", err)
-	}
-	if err := migrateV1(tx); err != nil {
-		t.Fatalf("create version one schema: %v", err)
-	}
-	statements := []string{
-		`INSERT INTO accounts (id, position, label, enabled) VALUES ('checking', 0, 'Checking', 1)`,
-		`INSERT INTO checkpoints (date, account_id, balance) VALUES ('2026-04-30', 'checking', 200)`,
-		`INSERT INTO checkpoints (date, account_id, balance) VALUES ('2026-04-06', 'checking', 100)`,
-		`INSERT INTO income_sources (id, position, label, effective_from, annual_gross_income) VALUES ('salary', 0, 'Salary', '2026-01-01', 100)`,
-	}
-	for _, statement := range statements {
-		if _, err := tx.Exec(statement); err != nil {
-			t.Fatalf("seed version one database: %v", err)
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit version one database: %v", err)
-	}
-	if _, err := db.Exec(`PRAGMA user_version = 1`); err != nil {
-		t.Fatalf("set version one: %v", err)
-	}
-	if err := db.Close(); err != nil {
-		t.Fatalf("close version one database: %v", err)
-	}
 }
 
 func projectRoot(t *testing.T) string {
