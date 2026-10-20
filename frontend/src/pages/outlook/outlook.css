@@ -610,4 +610,167 @@
 		justify-content: space-between;
 		gap: 12px;
 	}
+	.household-panel-heading,
+	.household-amount-line,
+	.household-two-col,
+	.household-card-breakdown > div,
+	.household-metric-label {
+		display: flex;
+		align-items: center;
+	}
+	.household-panel-heading,
+	.household-amount-line,
+	.household-two-col {
+		justify-content: space-between;
+	}
+	.household-panel {
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-radius: 15px;
+		padding: 16px;
+		display: flex;
+		flex-direction: column;
+		gap: 13px;
+		min-width: 0;
+	}
+	.household-metric-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 10px;
+	}
+	.household-metric-card {
+		gap: 7px;
+		min-height: 112px;
+	}
+	.household-metric-label {
+		gap: 6px;
+	}
+	.household-metric-value {
+		font-size: clamp(26px, 6vw, 34px);
+		font-weight: 750;
+		letter-spacing: -1.2px;
+		font-variant-numeric: tabular-nums;
+		color: var(--ink);
+	}
+	.household-big-number {
+		font-size: 30px;
+		font-weight: 750;
+		letter-spacing: -0.9px;
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+	}
+	.household-medium-number {
+		font-size: 20px;
+		font-weight: 730;
+		letter-spacing: -0.5px;
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+	}
+	.household-muted {
+		color: var(--muted);
+	}
+	.household-tiny {
+		font-size: 11px;
+	}
+	.household-positive {
+		color: var(--accent-green-text);
+	}
+	.household-negative {
+		color: var(--danger-text);
+	}
+	.household-align-right {
+		text-align: right;
+	}
+	.household-two-col > div {
+		min-width: 0;
+	}
+	.household-divider {
+		height: 1px;
+		background: var(--line);
+		width: 100%;
+	}
+	.household-card-breakdown > div {
+		gap: 9px;
+	}
+	.household-card-breakdown > div > div {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+	}
+	.household-card-breakdown strong {
+		font-size: 13px;
+		color: var(--ink);
+	}
+	.household-amount-line {
+		font-size: 13px;
+		gap: 12px;
+		color: var(--ink);
+	}
+	.household-amount-line > span:first-child {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+	}
+	.household-bill-grid {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 10px 4px;
+	}
+	.household-bill-chip {
+		display: flex;
+		align-items: center;
+		flex-direction: column;
+		text-align: center;
+		gap: 4px;
+		min-width: 0;
+	}
+	.household-bill-chip .household-bill-name {
+		white-space: nowrap;
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.household-bill-chip strong {
+		font-size: 12px;
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+	}
+	.household-bill-status.posted {
+		color: var(--accent-green-text);
+	}
+	.household-bill-status.unpaid {
+		color: var(--accent-amber-text);
+	}
+	.household-bill-status.pending {
+		color: var(--accent-amber-text);
+	}
+	.household-bill-status.assumed-funded {
+		color: var(--subtle);
+	}
+	.household-paycheck-cols {
+		padding: 5px 0;
+	}
+	.household-timing-controls {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		flex-wrap: wrap;
+	}
+	.household-panel-heading strong {
+		font-size: 14px;
+		color: var(--ink);
+	}
+	/* Timing detail tabs sit where the drawer header divider sat: no double
+	   border, no body gap. The tab row's own border becomes the divider. */
+	.drawer-right:has(.timing-detail-tabs) .modal-header {
+		border-bottom: 0;
+		padding-bottom: 8px;
+	}
+	.drawer-right:has(.timing-detail-tabs) .modal-body {
+		padding-top: 0;
+	}
+	.timing-detail-tabs.page-tabs {
+		margin-bottom: 16px;
+	}
 }

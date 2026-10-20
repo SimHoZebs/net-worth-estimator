@@ -98,11 +98,6 @@ export function TimingPreview({
 		return selected.length ? selected : fallback.filter((id) => known.has(id));
 	}, [settings.accountIds, cards]);
 
-	const trackedCards = useMemo(() => {
-		const selected = new Set(trackedIds);
-		return cards.filter((card) => selected.has(card.id));
-	}, [trackedIds, cards]);
-
 	const cycle = useMemo(
 		() =>
 			resolveStatementCycle({
@@ -415,11 +410,6 @@ export function TimingPreview({
 		updateSettings({ spendingAccountIds: next.length ? next : null });
 	};
 
-	const narrowedAccounts = trackedIds.length !== cards.length;
-	const accountLabel = narrowedAccounts
-		? trackedCards.map((card) => card.name).join(", ")
-		: null;
-
 	const activeThisMonth =
 		settings.mandatoryFrame === "calendar"
 			? {
@@ -527,7 +517,6 @@ export function TimingPreview({
 			</div>
 			{detail && (
 				<TimingDetailDialog
-					eyebrow={`${dateLabel(cycle.cycleStart, true)} to ${dateLabel(cycle.cycleEnd, true)}${accountLabel ? ` · ${accountLabel}` : ""}`}
 					heroes={heroes}
 					cashNow={{
 						checking,

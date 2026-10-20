@@ -1,3 +1,13 @@
+import {
+	AlertCircle,
+	CheckCircle2,
+	Clock3,
+	CreditCard,
+	Landmark,
+	ShieldCheck,
+	ShoppingBag,
+	Wallet,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
 import { TransactionDetail } from "../../components/activity/TransactionDetail.tsx";
@@ -11,7 +21,7 @@ import {
 import { Tabs } from "../../components/Tabs.tsx";
 import { Drawer } from "../../components/Drawer.tsx";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
-import { dateLabel, money } from "../../domain/format.ts";
+import { dateLabel, exactMoney, money, monthDay } from "../../domain/format.ts";
 import type { MandatorySpendingGroup } from "../../domain/householdTiming.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { TransactionOrder } from "../../domain/transactionSort.ts";
@@ -48,104 +58,6 @@ export interface PaycheckDecomposition {
 	allowance: number;
 }
 
-/** Bucket one: what checking covers right now. Short comes from the
- * simulated unpaid bills (the fulfillment signal), not the cushion: with a
- * floor the simulation pays partially and reports the gap. The cushion only
- * stands in when the plan permits invisible overdraft (no gaps to report).
- * The walk-forward adjustment stays in the math but only appears in the bar
- * when nonzero. */
-function CashNowBar({ parts }: { parts: CashNowDecomposition }) {
-	const isShort = parts.short > 0 || parts.cushion < 0;
-	const shortAmount = parts.short > 0 ? parts.short : -parts.cushion;
-	const segments: BarSegment[] = isShort
-		? [
-				{
-					label: "Bills due",
-					amount: parts.bills,
-					pattern: "stripes",
-					tone: "sage",
-				},
-			]
-		: [
-				{
-					label: "Bills due",
-					amount: parts.bills,
-					pattern: "stripes",
-					tone: "sage",
-				},
-				{
-					label: "Left to spend",
-					amount: parts.cushion,
-					pattern: "solid",
-					tone: "plum",
-				},
-			];
-	const paidNote =
-		parts.spentSinceStart > 0
-			? ` · ${money(parts.spentSinceStart)} paid since ${dateLabel(parts.since, true)}`
-			: "";
-	const shortNote =
-		isShort && parts.short > 0 && parts.firstShort
-			? ` from ${dateLabel(parts.firstShort, true)}`
-			: "";
-	return (
-		<SegmentedBar
-			caption={
-				isShort
-					? `${money(parts.checking)} total${paidNote} · ${money(-shortAmount)} left to spend${shortNote}`
-					: `${money(parts.checking)} total${paidNote} · ${money(parts.cushion)} left to spend`
-			}
-			segments={segments}
-			ariaLabel={
-				isShort
-					? `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, left to spend ${money(-shortAmount)}${shortNote}${paidNote}`
-					: `Available balance ${money(parts.checking)}: bills due ${money(parts.bills)}, left to spend ${money(parts.cushion)}${paidNote}`
-			}
-		/>
-	);
-}
-
-/** Bucket two: where the next paycheck goes. A negative allowance buys
- * nothing, so the bar draws only the claims on the paycheck; the overage
- * lives in the caption as a negative number. */
-function PaycheckBar({ parts }: { parts: PaycheckDecomposition }) {
-	const segments: BarSegment[] = [
-		{ label: "Bills", amount: parts.fixed, pattern: "stripes", tone: "sage" },
-		{
-			label: "Reserve",
-			amount: parts.reserve,
-			pattern: "dots",
-			tone: "blue",
-		},
-		{ label: "Spent", amount: parts.spent, pattern: "solid", tone: "tan" },
-		...(parts.allowance >= 0
-			? [
-					{
-						label: "Left",
-						amount: parts.allowance,
-						pattern: "solid",
-						tone: "plum",
-					} as BarSegment,
-				]
-			: []),
-	];
-	return (
-		<SegmentedBar
-			caption={
-				parts.allowance >= 0
-					? `${money(parts.paycheck)} paycheck · ${money(parts.allowance)} left`
-					: `${money(parts.paycheck)} paycheck · over by ${money(-parts.allowance)}`
-			}
-			segments={segments}
-			ariaLabel={
-				parts.allowance >= 0
-					? `Paycheck ${money(parts.paycheck)}: bills ${money(parts.fixed)}, reserve ${money(parts.reserve)}, spent ${money(parts.spent)}, left ${money(parts.allowance)}`
-					: `Paycheck ${money(parts.paycheck)}: bills ${money(parts.fixed)}, reserve ${money(parts.reserve)}, spent ${money(parts.spent)}, over by ${money(-parts.allowance)}`
-			}
-		/>
-	);
-}
-
 function TimingSectionHeader({
 	title,
 	subtitle,
@@ -164,6 +76,103 @@ function TimingSectionHeader({
 			<strong className="timing-total">{money(total)}</strong>
 		</div>
 	);
+}
+
+type HouseholdBillStatus = "posted" | "pending" | "assumed-funded" | "unpaid";
+
+function HouseholdPanel({
+	children,
+	className = "",
+}: {
+	children: React.ReactNode;
+	className?: string;
+}) {
+	return (
+		<section className={`household-panel ${className}`}>{children}</section>
+	);
+}
+
+function HouseholdMetricCard({
+	label,
+	value,
+	icon,
+	foot,
+	tone = "normal",
+}: {
+	label: string;
+	value: string;
+	icon: React.ReactNode;
+	foot?: string;
+	tone?: "normal" | "positive" | "negative";
+}) {
+	return (
+		<HouseholdPanel className="household-metric-card">
+			<div className="household-muted household-tiny household-metric-label">
+				{icon}
+				{label}
+			</div>
+			<div
+				className={`household-metric-value ${tone === "positive" ? "household-positive" : tone === "negative" ? "household-negative" : ""}`}
+			>
+				{value}
+			</div>
+			{foot && <div className="household-muted household-tiny">{foot}</div>}
+		</HouseholdPanel>
+	);
+}
+
+function HouseholdBillChip({
+	name,
+	amount,
+	status,
+	note,
+}: {
+	name: string;
+	amount: number;
+	status: HouseholdBillStatus;
+	note?: string;
+}) {
+	return (
+		<div className="household-bill-chip" title={note ?? `${name}: ${status}`}>
+			<span className={`household-bill-status ${status}`} aria-label={status}>
+				{status === "posted" ? (
+					<CheckCircle2 size={19} />
+				) : status === "unpaid" ? (
+					<Clock3 size={19} />
+				) : status === "pending" ? (
+					<Clock3 size={19} />
+				) : (
+					<AlertCircle size={19} />
+				)}
+			</span>
+			<span className="household-tiny household-muted household-bill-name">
+				{name}
+			</span>
+			<strong>{money(amount)}</strong>
+		</div>
+	);
+}
+
+function billStatusForGroup({
+	group,
+	transactions,
+}: {
+	group: MandatorySpendingGroup;
+	transactions: AccountTransaction[];
+}): { status: HouseholdBillStatus; note?: string } {
+	const rows = transactions.filter(
+		(transaction) => transaction.movementId === group.movementId,
+	);
+	if (rows.some((row) => row.pending))
+		return { status: "pending", note: `${group.name}: pending` };
+	if (rows.some((row) => row.shortfall > 0.01))
+		return { status: "unpaid", note: `${group.name}: unpaid` };
+	if (rows.length > 0 && rows.every((row) => row.category === "transfer"))
+		return {
+			status: "assumed-funded",
+			note: `${group.name}: assumed funded via household transfer`,
+		};
+	return { status: "posted", note: `${group.name}: posted` };
 }
 
 function TransactionSectionView({
@@ -270,7 +279,6 @@ function AccountToggle({
 }
 
 export function TimingDetailDialog({
-	eyebrow,
 	heroes,
 	cashNow,
 	paycheck,
@@ -294,7 +302,6 @@ export function TimingDetailDialog({
 	showHeaders = false,
 	onClose,
 }: {
-	eyebrow: string;
 	heroes: TimingHeroes;
 	cashNow: CashNowDecomposition;
 	paycheck: PaycheckDecomposition;
@@ -352,14 +359,19 @@ export function TimingDetailDialog({
 		transaction: AccountTransaction,
 		movement: Plan["movements"][number],
 	) => setSelected({ transaction, movement });
+	const title =
+		tab === "mandatory"
+			? "Bills"
+			: tab === "cycle"
+				? "Where the cycle went"
+				: "Configure";
 	return (
 		<Drawer
 			side="right"
 			open
 			onClose={onClose}
-			label="Timing detail"
-			title="Timing detail"
-			eyebrow={eyebrow}
+			label={title}
+			title={title}
 			coverage="full"
 		>
 			<Tabs
@@ -375,88 +387,287 @@ export function TimingDetailDialog({
 				value={tab}
 				onChange={onTabChange}
 				label="Timing detail view"
-				className="account-view-tabs"
+				className="account-view-tabs timing-detail-tabs"
 			>
 				{tab === "mandatory" ? (
 					<div className="timing-mandatory">
-						<div className="section-top">
-							<div className="timing-section-title">
-								<h3>Available balance</h3>
-								{heroes.checkingObservedOn ? (
-									<p className="section-note">
-										As of {dateLabel(heroes.checkingObservedOn, true)}
-									</p>
-								) : null}
-							</div>
-						</div>
-						<CashNowBar parts={cashNow} />
-						<div className="timing-controls">
-							<div
-								className="segmented"
-								role="toolbar"
-								aria-label="Bills window"
-							>
-								{(
-									[
-										{ id: "calendar", label: "Calendar month" },
-										{ id: "cycle", label: "Card cycle" },
-									] as const
-								).map((option) => (
-									<button
-										type="button"
-										key={option.id}
-										aria-pressed={frame === option.id}
-										onClick={() => onFrameChange(option.id)}
-									>
-										{option.label}
-									</button>
-								))}
-							</div>
-							<TransactionSortButton
-								order={transactionOrder}
-								onChange={onTransactionOrderChange}
+						<div className="household-metric-grid">
+							<HouseholdMetricCard
+								label="Cash cushion"
+								icon={<Landmark size={16} aria-hidden="true" />}
+								value={money(cashNow.cushion)}
+								foot={
+									heroes.checkingObservedOn
+										? "Verified balance"
+										: "Estimated · balance age unknown"
+								}
+							/>
+							<HouseholdMetricCard
+								label="Conservative room"
+								icon={<CreditCard size={16} aria-hidden="true" />}
+								value={money(paycheck.allowance)}
+								tone={paycheck.allowance < 0 ? "normal" : "positive"}
+								foot={`Through ${monthDay(heroes.cycleEnd)}`}
 							/>
 						</div>
-						<TimingSectionHeader
-							title={thisMonth.title}
-							subtitle={thisMonth.subtitle}
-							total={thisMonth.total}
-						/>
-						<TransactionSectionView
-							transactions={thisMonth.transactions}
-							caption={thisMonth.title}
-							emptyMessage="No bills due in this period."
-							movements={movements}
-							onInspect={inspect}
-							order={transactionOrder}
-							showHeaders={showHeaders}
-						/>
-						<h3>Safe card room</h3>
-						<PaycheckBar parts={paycheck} />
-						<div className="timing-figures">
-							<div>
-								<span>Theoretical room</span>
-								<strong>{money(heroes.theoretical)}</strong>
+						<HouseholdPanel>
+							<div className="household-panel-heading">
+								<strong>Card cycle</strong>
+								<span className="household-muted household-tiny">
+									{monthDay(heroes.cycleStart)} – {monthDay(heroes.cycleEnd)}
+								</span>
 							</div>
-							<div>
-								<span>Daily safe · {heroes.fullDaysLeft} days</span>
-								<strong>{money(Math.max(0, heroes.dailySafe))}</strong>
+							<div className="household-two-col">
+								<div>
+									<div className="household-muted household-tiny">
+										Committed
+									</div>
+									<div className="household-big-number">
+										{money(heroes.committedTotal)}
+									</div>
+								</div>
+								<div className="household-align-right">
+									<div className="household-muted household-tiny">
+										Theoretical room
+									</div>
+									<div className="household-medium-number">
+										{money(heroes.theoretical)}
+									</div>
+								</div>
 							</div>
-							<div>
-								<span>Daily theoretical</span>
-								<strong>{money(Math.max(0, heroes.dailyTheoretical))}</strong>
+							<SegmentedBar
+								caption={`Card cycle ${money(heroes.committedTotal)} committed · ${money(Math.max(0, paycheck.allowance))} safe · ${money(paycheck.reserve)} reserve`}
+								segments={[
+									{
+										label: "Committed",
+										amount: heroes.committedTotal,
+										pattern: "solid",
+										tone: "tan",
+									} as BarSegment,
+									...(paycheck.allowance > 0
+										? [
+												{
+													label: "Safe",
+													amount: paycheck.allowance,
+													pattern: "solid",
+													tone: "plum",
+												} as BarSegment,
+											]
+										: []),
+									{
+										label: "Reserve",
+										amount: paycheck.reserve,
+										pattern: "dots",
+										tone: "blue",
+									} as BarSegment,
+								]}
+								ariaLabel={`Card cycle: committed ${money(heroes.committedTotal)}, safe ${money(Math.max(0, paycheck.allowance))}, reserve ${money(paycheck.reserve)}`}
+							/>
+							<div className="household-divider" />
+							<div className="household-two-col household-card-breakdown">
+								{heroes.committedByCard.map((card, index) => {
+									const Icon =
+										index === 0
+											? CreditCard
+											: index === 1
+												? ShoppingBag
+												: Wallet;
+									return (
+										<div key={card.id}>
+											<Icon size={20} aria-hidden="true" />
+											<div>
+												<span className="household-muted household-tiny">
+													{card.name}
+												</span>
+												<strong>{money(card.amount)}</strong>
+											</div>
+										</div>
+									);
+								})}
 							</div>
-						</div>
-						<SegmentedBar
-							caption={`Card charges ${money(heroes.committedTotal)} — payments toward prior balances excluded`}
-							segments={heroes.committedByCard.map((card, index) => ({
-								label: `${card.name} · ${money(card.amount)}`,
-								amount: card.amount,
-								pattern: index % 2 === 0 ? "solid" : "stripes",
-								tone: index % 2 === 0 ? "blue" : "plum",
-							}))}
-							ariaLabel={`Card charges ${money(heroes.committedTotal)}: ${heroes.committedByCard.map((card) => `${card.name} ${money(card.amount)}`).join(", ")}`}
-						/>
+						</HouseholdPanel>
+						<HouseholdPanel>
+							<div className="household-panel-heading">
+								<strong>Cash flow</strong>
+								<ShieldCheck
+									size={19}
+									className="household-positive"
+									aria-hidden="true"
+								/>
+							</div>
+							<div className="household-amount-line">
+								<span className="household-muted">Checking snapshot</span>
+								<strong>{exactMoney(cashNow.checking)}</strong>
+							</div>
+							<SegmentedBar
+								caption={`${exactMoney(cashNow.checking)} checking · ${exactMoney(Math.max(0, cashNow.bills))} unpaid bills · ${exactMoney(Math.max(0, cashNow.cushion))} cushion${cashNow.spentSinceStart > 0 ? ` · ${exactMoney(cashNow.spentSinceStart)} paid since ${monthDay(cashNow.since)}` : ""}`}
+								segments={[
+									{
+										label: "Unpaid bills",
+										amount: Math.min(
+											cashNow.checking,
+											Math.max(0, cashNow.bills),
+										),
+										pattern: "stripes",
+										tone: "sage",
+									} as BarSegment,
+									...(cashNow.cushion > 0
+										? [
+												{
+													label: "Cushion",
+													amount: cashNow.cushion,
+													pattern: "solid",
+													tone: "plum",
+												} as BarSegment,
+											]
+										: []),
+								]}
+								ariaLabel={`Checking ${exactMoney(cashNow.checking)}: unpaid bills ${exactMoney(Math.max(0, cashNow.bills))}, cushion ${exactMoney(Math.max(0, cashNow.cushion))}`}
+							/>
+							<div className="household-amount-line">
+								<span>
+									<Clock3 size={16} aria-hidden="true" /> Unpaid cash bills
+								</span>
+								<strong>−{exactMoney(cashNow.bills)}</strong>
+							</div>
+							{cashNow.spentSinceStart > 0 ? (
+								<div className="household-amount-line">
+									<span className="household-muted">
+										Paid since {monthDay(cashNow.since)}
+									</span>
+									<strong>{exactMoney(cashNow.spentSinceStart)}</strong>
+								</div>
+							) : null}
+							<div className="household-divider" />
+							{thisMonth.groups.length ? (
+								<div className="household-bill-grid">
+									{thisMonth.groups.map((group) => {
+										const { status, note } = billStatusForGroup({
+											group,
+											transactions: thisMonth.transactions,
+										});
+										return (
+											<HouseholdBillChip
+												key={group.movementId}
+												name={group.name}
+												amount={group.total}
+												status={status}
+												note={note}
+											/>
+										);
+									})}
+								</div>
+							) : (
+								<p className="household-muted household-tiny">
+									No bills due in this period.
+								</p>
+							)}
+							<div className="household-timing-controls">
+								<div
+									className="segmented"
+									role="toolbar"
+									aria-label="Bills window"
+								>
+									{(
+										[
+											{ id: "calendar", label: "Calendar month" },
+											{ id: "cycle", label: "Card cycle" },
+										] as const
+									).map((option) => (
+										<button
+											type="button"
+											key={option.id}
+											aria-pressed={frame === option.id}
+											onClick={() => onFrameChange(option.id)}
+										>
+											{option.label}
+										</button>
+									))}
+								</div>
+								<TransactionSortButton
+									order={transactionOrder}
+									onChange={onTransactionOrderChange}
+								/>
+							</div>
+							<TimingSectionHeader
+								title={thisMonth.title}
+								subtitle={thisMonth.subtitle}
+								total={thisMonth.total}
+							/>
+							<TransactionSectionView
+								transactions={thisMonth.transactions}
+								caption={thisMonth.title}
+								emptyMessage="No bills due in this period."
+								movements={movements}
+								onInspect={inspect}
+								order={transactionOrder}
+								showHeaders={showHeaders}
+							/>
+						</HouseholdPanel>
+						<HouseholdPanel>
+							<div className="household-panel-heading">
+								<strong>Next paycheck</strong>
+								<span className="household-medium-number">
+									{money(paycheck.paycheck)}
+								</span>
+							</div>
+							<div className="household-two-col household-paycheck-cols">
+								<div>
+									<div className="household-muted household-tiny">
+										Fixed bills
+									</div>
+									<div className="household-medium-number">
+										{money(paycheck.fixed)}
+									</div>
+								</div>
+								<div className="household-align-right">
+									<div className="household-muted household-tiny">
+										Card spending
+									</div>
+									<div className="household-medium-number">
+										{money(heroes.committedTotal)}
+									</div>
+								</div>
+							</div>
+							<div className="household-divider" />
+							<div className="household-amount-line">
+								<span className="household-muted">Protected reserve</span>
+								<strong>{money(paycheck.reserve)}</strong>
+							</div>
+							<div className="household-amount-line">
+								<span className="household-muted">Safe remainder</span>
+								<strong
+									className={
+										paycheck.allowance < 0
+											? "household-negative"
+											: "household-positive"
+									}
+								>
+									{money(paycheck.allowance)}
+								</strong>
+							</div>
+							<div className="household-divider" />
+							<div className="household-amount-line">
+								<span className="household-muted">
+									Daily · {heroes.fullDaysLeft} full{" "}
+									{heroes.fullDaysLeft === 1 ? "day" : "days"}
+								</span>
+								<strong>
+									{heroes.fullDaysLeft > 0
+										? money(Math.max(0, heroes.dailySafe))
+										: "N/A"}{" "}
+									<span className="household-muted household-tiny">safe</span>
+								</strong>
+							</div>
+							<div className="household-amount-line">
+								<span className="household-muted">Daily theoretical</span>
+								<strong>
+									{heroes.fullDaysLeft > 0
+										? money(Math.max(0, heroes.dailyTheoretical))
+										: "N/A"}
+								</strong>
+							</div>
+						</HouseholdPanel>
 					</div>
 				) : tab === "cycle" ? (
 					<div className="timing-mandatory">
