@@ -22,30 +22,36 @@ export function Drawer({
 	open,
 	onClose,
 	label,
-	title,
-	eyebrow,
-	coverage = "sheet",
-	full,
-	fullBreakpoint = "(max-width: 600px)",
-	modal = true,
-	backdrop = true,
-	swipeClose = true,
+	appearance,
+	behavior,
 	children,
 }: {
 	side: DrawerSide;
 	open: boolean;
 	onClose: () => void;
 	label: string;
-	title?: string;
-	eyebrow?: string;
-	coverage?: "sheet" | "full";
-	full?: boolean;
-	fullBreakpoint?: string;
-	modal?: boolean;
-	backdrop?: boolean;
-	swipeClose?: boolean;
+	appearance?: {
+		title?: string;
+		eyebrow?: string;
+		coverage?: "sheet" | "full";
+		full?: boolean;
+		fullBreakpoint?: string;
+	};
+	behavior?: {
+		modal?: boolean;
+		backdrop?: boolean;
+		swipeClose?: boolean;
+	};
 	children: ReactNode;
 }) {
+	const {
+		title,
+		eyebrow,
+		coverage = "sheet",
+		full,
+		fullBreakpoint = "(max-width: 600px)",
+	} = appearance ?? {};
+	const { modal = true, backdrop = true, swipeClose = true } = behavior ?? {};
 	const panelEl = useRef<Element | null>(null);
 	const titleId = useId();
 	// The element that held focus when the drawer opened. Captured once per

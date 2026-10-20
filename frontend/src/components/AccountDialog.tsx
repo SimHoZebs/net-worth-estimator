@@ -55,9 +55,11 @@ export function AccountDialog({
 			open
 			onClose={onClose}
 			label={account.name}
-			title={account.name}
-			eyebrow={`Account activity · ${temporary ? "Changes" : "Saved plan"}`}
-			coverage="full"
+			appearance={{
+				title: account.name,
+				eyebrow: `Account activity · ${temporary ? "Changes" : "Saved plan"}`,
+				coverage: "full",
+			}}
 		>
 			<div className="account-dialog-summary">
 				<AccountIcon account={account} />

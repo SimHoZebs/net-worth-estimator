@@ -28,10 +28,8 @@ export function WorkspaceLayout({
 				open={open || !mobile}
 				onClose={close}
 				label="Workspace navigation"
-				full={mobile}
-				backdrop={mobile}
-				modal={mobile}
-				swipeClose={mobile}
+				appearance={{ full: mobile }}
+				behavior={{ backdrop: mobile, modal: mobile, swipeClose: mobile }}
 			>
 				{navigation(close)}
 			</Drawer>

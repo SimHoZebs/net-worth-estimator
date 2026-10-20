@@ -28,8 +28,7 @@ export function SafeSpendingDetailShell({
 			open
 			onClose={onClose}
 			label={title}
-			title={title}
-			coverage="full"
+			appearance={{ title, coverage: "full" }}
 		>
 			<Tabs
 				items={[
