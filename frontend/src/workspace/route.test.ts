@@ -9,7 +9,7 @@ import {
 	parseHash,
 	resolveOverlayRoute,
 	slugifyAccount,
-	timingDetailHash,
+	safeSpendingDetailHash,
 } from "./route.ts";
 
 function account(id: string, name: string, archived = false): Account {
@@ -158,7 +158,7 @@ describe("parseHash", () => {
 		});
 	});
 
-	test("outlook evidence and timing detail parse", () => {
+	test("outlook evidence and safe spending detail parse", () => {
 		expect(parseHash("#outlook/position")).toEqual({
 			page: "outlook",
 			overlay: { type: "position" },
@@ -167,43 +167,45 @@ describe("parseHash", () => {
 			page: "outlook",
 			overlay: { type: "shortfall" },
 		});
-		expect(parseHash("#outlook/timing")).toEqual({
+		expect(parseHash("#outlook/safe-spending")).toEqual({
 			page: "outlook",
-			overlay: { type: "timing" },
+			overlay: { type: "safe-spending" },
 		});
-		expect(parseHash("#outlook/timing-detail")).toEqual({
+		expect(parseHash("#outlook/safe-spending-detail")).toEqual({
 			page: "outlook",
-			overlay: { type: "timingDetail", tab: "mandatory" },
+			overlay: { type: "safeSpendingDetail", tab: "mandatory" },
 		});
-		expect(parseHash("#outlook/timing-detail/cycle")).toEqual({
+		expect(parseHash("#outlook/safe-spending-detail/cycle")).toEqual({
 			page: "outlook",
-			overlay: { type: "timingDetail", tab: "cycle" },
+			overlay: { type: "safeSpendingDetail", tab: "cycle" },
 		});
 		expect(
-			parseHash("#outlook/timing-detail/cycle/edit-movement/invest"),
+			parseHash("#outlook/safe-spending-detail/cycle/edit-movement/invest"),
 		).toEqual({
 			page: "outlook",
 			overlay: {
-				type: "timingDetail",
+				type: "safeSpendingDetail",
 				tab: "cycle",
 				editMovement: "invest",
 			},
 		});
-		expect(parseHash("#outlook/timing-detail/edit-movement/invest")).toEqual({
+		expect(
+			parseHash("#outlook/safe-spending-detail/edit-movement/invest"),
+		).toEqual({
 			page: "outlook",
 			overlay: {
-				type: "timingDetail",
+				type: "safeSpendingDetail",
 				tab: "mandatory",
 				editMovement: "invest",
 			},
 		});
-		expect(parseHash("#outlook/timing-detail/bogus")).toEqual({
+		expect(parseHash("#outlook/safe-spending-detail/bogus")).toEqual({
 			page: "outlook",
 			overlay: { type: "invalid" },
 		});
-		expect(parseHash("#accounts/timing-detail")).toEqual({
+		expect(parseHash("#accounts/safe-spending-detail")).toEqual({
 			page: "accounts",
-			overlay: { type: "timingDetail", tab: "mandatory" },
+			overlay: { type: "safeSpendingDetail", tab: "mandatory" },
 		});
 	});
 
@@ -393,24 +395,24 @@ describe("resolveOverlayRoute", () => {
 		).toEqual({ state: "unknown" });
 	});
 
-	test("timing detail resolves with and without a stacked editor", () => {
+	test("safe spending detail resolves with and without a stacked editor", () => {
 		expect(
 			resolveOverlayRoute(
 				{
 					page: "outlook",
-					overlay: { type: "timingDetail", tab: "cycle" },
+					overlay: { type: "safeSpendingDetail", tab: "cycle" },
 				},
 				plan,
 			),
 		).toEqual({
 			state: "ready",
-			overlay: { kind: "timingDetail", tab: "cycle", edit: null },
+			overlay: { kind: "safeSpendingDetail", tab: "cycle", edit: null },
 		});
 		const stacked = resolveOverlayRoute(
 			{
 				page: "outlook",
 				overlay: {
-					type: "timingDetail",
+					type: "safeSpendingDetail",
 					tab: "cycle",
 					editMovement: "invest",
 				},
@@ -420,7 +422,7 @@ describe("resolveOverlayRoute", () => {
 		expect(stacked).toEqual({
 			state: "ready",
 			overlay: {
-				kind: "timingDetail",
+				kind: "safeSpendingDetail",
 				tab: "cycle",
 				edit: { kind: "movement", item: investMovement },
 			},
@@ -430,7 +432,7 @@ describe("resolveOverlayRoute", () => {
 				{
 					page: "outlook",
 					overlay: {
-						type: "timingDetail",
+						type: "safeSpendingDetail",
 						tab: "cycle",
 						editMovement: "missing",
 					},
@@ -513,18 +515,20 @@ describe("hash builders round-trip through the parser", () => {
 		).toBe("#outlook/evaluation/goal-1");
 	});
 
-	test("timing detail and discard round-trip", () => {
-		expect(timingDetailHash("outlook", "cycle")).toBe(
-			"#outlook/timing-detail/cycle",
+	test("safe spending detail and discard round-trip", () => {
+		expect(safeSpendingDetailHash("outlook", "cycle")).toBe(
+			"#outlook/safe-spending-detail/cycle",
 		);
-		expect(timingDetailHash("outlook", "cycle", "invest")).toBe(
-			"#outlook/timing-detail/cycle/edit-movement/invest",
+		expect(safeSpendingDetailHash("outlook", "cycle", "invest")).toBe(
+			"#outlook/safe-spending-detail/cycle/edit-movement/invest",
 		);
 		expect(discardHash("sources")).toBe("#sources/discard");
-		expect(parseHash(timingDetailHash("outlook", "cycle", "invest"))).toEqual({
+		expect(
+			parseHash(safeSpendingDetailHash("outlook", "cycle", "invest")),
+		).toEqual({
 			page: "outlook",
 			overlay: {
-				type: "timingDetail",
+				type: "safeSpendingDetail",
 				tab: "cycle",
 				editMovement: "invest",
 			},

@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { Projection } from "../../domain/result.ts";
-import { upcomingMovements } from "../../domain/timing.ts";
+import { upcomingMovements } from "../../domain/upcoming.ts";
 import {
 	DEFAULT_TRANSACTION_ORDER,
 	sortTransactionsByDate,
@@ -12,7 +12,7 @@ import {
 import { TransactionSortButton } from "../activity/TransactionSortButton.tsx";
 import { Badge, Modal } from "../ui.tsx";
 
-export function TimingEvidence({
+export function SafeSpendingEvidence({
 	plan,
 	projection,
 	onClose,

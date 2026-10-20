@@ -17,20 +17,20 @@ import {
 } from "../../../components/SegmentedBar.tsx";
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
 import { exactMoney, money, monthDay } from "../../../domain/format.ts";
-import type { MandatorySpendingGroup } from "../../../domain/householdTiming.ts";
+import type { MandatorySpendingGroup } from "../../../domain/safeSpending.ts";
 import type { Movement, Plan } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import {
 	TransactionSectionView,
-	TimingSectionHeader,
+	SafeSpendingSectionHeader,
 } from "./TransactionSectionView.tsx";
 import type {
 	CashNowDecomposition,
 	MandatoryFrame,
 	PaycheckDecomposition,
-	TimingHeroes,
-	TimingMandatorySection,
-} from "./timingDetailModel.ts";
+	SafeSpendingHeroes,
+	SafeSpendingMandatorySection,
+} from "./safeSpendingDetailModel.ts";
 
 function HouseholdPanel({
 	children,
@@ -129,7 +129,7 @@ function billStatusForGroup({
 	return { status: "posted", note: `${group.name}: posted` };
 }
 
-export function TimingBillsPanel({
+export function SafeSpendingBillsPanel({
 	heroes,
 	cashNow,
 	paycheck,
@@ -141,10 +141,10 @@ export function TimingBillsPanel({
 	onTransactionOrderChange,
 	showHeaders = false,
 }: {
-	heroes: TimingHeroes;
+	heroes: SafeSpendingHeroes;
 	cashNow: CashNowDecomposition;
 	paycheck: PaycheckDecomposition;
-	section: TimingMandatorySection;
+	section: SafeSpendingMandatorySection;
 	frame: MandatoryFrame;
 	onFrameChange: (frame: MandatoryFrame) => void;
 	plan: Plan;
@@ -163,7 +163,7 @@ export function TimingBillsPanel({
 	const inspect = (transaction: AccountTransaction, movement: Movement) =>
 		setSelected({ transaction, movement });
 	return (
-		<div className="timing-mandatory">
+		<div className="safe-spending-mandatory">
 			<div className="household-metric-grid">
 				<HouseholdMetricCard
 					label="Cash cushion"
@@ -326,7 +326,7 @@ export function TimingBillsPanel({
 						No bills due in this period.
 					</p>
 				)}
-				<div className="household-timing-controls">
+				<div className="household-safe-spending-controls">
 					<div className="segmented" role="toolbar" aria-label="Bills window">
 						{(
 							[
@@ -349,7 +349,7 @@ export function TimingBillsPanel({
 						onChange={onTransactionOrderChange}
 					/>
 				</div>
-				<TimingSectionHeader
+				<SafeSpendingSectionHeader
 					title={section.title}
 					subtitle={section.subtitle}
 					total={section.total}

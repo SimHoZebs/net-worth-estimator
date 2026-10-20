@@ -1,7 +1,7 @@
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { Account, Evaluation, Movement } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/planEdits.ts";
-import type { TimingDetailTab } from "../pages/outlook/timing/timingDetailModel.ts";
+import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import { pages, type Page } from "./navigation.ts";
 
 // URL-driven overlays. The hash carries the page plus at most one overlay:
@@ -11,7 +11,7 @@ import { pages, type Page } from "./navigation.ts";
 // bookmarks, and direct loads all resolve through the same parser. Page-only
 // hashes are unchanged: every overlay form appends segments to them.
 
-export const TIMING_TABS: readonly TimingDetailTab[] = [
+export const SAFE_SPENDING_TABS: readonly SafeSpendingDetailTab[] = [
 	"mandatory",
 	"cycle",
 	"configure",
@@ -29,8 +29,12 @@ export type OverlayRoute =
 	| { type: "outlookItem"; key: string }
 	| { type: "position" }
 	| { type: "shortfall" }
-	| { type: "timing" }
-	| { type: "timingDetail"; tab: TimingDetailTab; editMovement?: string }
+	| { type: "safe-spending" }
+	| {
+			type: "safeSpendingDetail";
+			tab: SafeSpendingDetailTab;
+			editMovement?: string;
+	  }
 	| { type: "discard" }
 	// Well-formed page, unparseable overlay segments. Resolves to unknown so
 	// the URL normalizes back to the page instead of sticking.
@@ -52,7 +56,11 @@ export type PlanLike = {
 export type ResolvedOverlay =
 	| { kind: "evidence"; target: EvidenceTarget }
 	| { kind: "editor"; target: EditorTarget }
-	| { kind: "timingDetail"; tab: TimingDetailTab; edit: EditorTarget | null }
+	| {
+			kind: "safeSpendingDetail";
+			tab: SafeSpendingDetailTab;
+			edit: EditorTarget | null;
+	  }
 	| { kind: "discard" };
 
 export type OverlayResolution =
@@ -74,8 +82,8 @@ const RESERVED_SLUGS = new Set([
 	"discard",
 	"position",
 	"shortfall",
-	"timing",
-	"timing-detail",
+	"safe-spending",
+	"safe-spending-detail",
 	"account",
 	"evaluation",
 	"evaluations",
@@ -142,24 +150,31 @@ function scopedEditor(page: Page, key: string): OverlayRoute | null {
 	}
 }
 
-function parseTimingDetail(parts: string[]): OverlayRoute {
+function parseSafeSpendingDetail(parts: string[]): OverlayRoute {
 	const [tabOrEdit, maybeEdit, key, ...extra] = parts;
 	if (extra.length > 0) return { type: "invalid" };
 	if (tabOrEdit === "edit-movement") {
-		// `#outlook/timing-detail/edit-movement/<id>`
+		// `#outlook/safe-spending-detail/edit-movement/<id>`
 		return maybeEdit
-			? { type: "timingDetail", tab: "mandatory", editMovement: maybeEdit }
+			? {
+					type: "safeSpendingDetail",
+					tab: "mandatory",
+					editMovement: maybeEdit,
+				}
 			: { type: "invalid" };
 	}
-	if (!isTimingTab(tabOrEdit)) return { type: "invalid" };
-	if (maybeEdit === undefined) return { type: "timingDetail", tab: tabOrEdit };
-	// `#outlook/timing-detail/<tab>/edit-movement/<id>`
+	if (!isSafeSpendingTab(tabOrEdit)) return { type: "invalid" };
+	if (maybeEdit === undefined)
+		return { type: "safeSpendingDetail", tab: tabOrEdit };
+	// `#outlook/safe-spending-detail/<tab>/edit-movement/<id>`
 	return maybeEdit === "edit-movement" && key
-		? { type: "timingDetail", tab: tabOrEdit, editMovement: key }
+		? { type: "safeSpendingDetail", tab: tabOrEdit, editMovement: key }
 		: { type: "invalid" };
 }
 
-function isTimingTab(value: string | undefined): value is TimingDetailTab {
+function isSafeSpendingTab(
+	value: string | undefined,
+): value is SafeSpendingDetailTab {
 	return value === "mandatory" || value === "cycle" || value === "configure";
 }
 
@@ -169,10 +184,11 @@ function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
 	// Length is checked, so the head always exists; this only satisfies the
 	// type checker for indexed access.
 	if (first === undefined) return null;
-	if (first === "timing-detail") {
+	if (first === "safe-spending-detail") {
 		if (rest.length > 4) return { type: "invalid" };
-		if (second === undefined) return { type: "timingDetail", tab: "mandatory" };
-		return parseTimingDetail(rest.slice(1));
+		if (second === undefined)
+			return { type: "safeSpendingDetail", tab: "mandatory" };
+		return parseSafeSpendingDetail(rest.slice(1));
 	}
 	if (rest.length > 2) return { type: "invalid" };
 	if (rest.length === 1) {
@@ -183,10 +199,10 @@ function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
 				return { type: "position" };
 			case "shortfall":
 				return { type: "shortfall" };
-			case "timing":
-				return { type: "timing" };
-			case "timing-detail":
-				return { type: "timingDetail", tab: "mandatory" };
+			case "safe-spending":
+				return { type: "safe-spending" };
+			case "safe-spending-detail":
+				return { type: "safeSpendingDetail", tab: "mandatory" };
 			case "new":
 				return homeEditor(page);
 			default:
@@ -269,8 +285,8 @@ export function resolveOverlayRoute(
 			return ready({ kind: "evidence", target: { kind: "position" } });
 		case "shortfall":
 			return ready({ kind: "evidence", target: { kind: "failure" } });
-		case "timing":
-			return ready({ kind: "evidence", target: { kind: "timing" } });
+		case "safe-spending":
+			return ready({ kind: "evidence", target: { kind: "safe-spending" } });
 		case "discard":
 			return ready({ kind: "discard" });
 		case "account": {
@@ -351,12 +367,16 @@ export function resolveOverlayRoute(
 					})
 				: unknown();
 		}
-		case "timingDetail": {
+		case "safeSpendingDetail": {
 			if (overlay.editMovement === undefined)
-				return ready({ kind: "timingDetail", tab: overlay.tab, edit: null });
+				return ready({
+					kind: "safeSpendingDetail",
+					tab: overlay.tab,
+					edit: null,
+				});
 			if (overlay.editMovement === "new")
 				return ready({
-					kind: "timingDetail",
+					kind: "safeSpendingDetail",
 					tab: overlay.tab,
 					edit: { kind: "movement", item: null },
 				});
@@ -365,7 +385,7 @@ export function resolveOverlayRoute(
 			);
 			return movement
 				? ready({
-						kind: "timingDetail",
+						kind: "safeSpendingDetail",
 						tab: overlay.tab,
 						edit: { kind: "movement", item: movement },
 					})
@@ -395,8 +415,8 @@ export function evidenceHash(
 			return `#${page}/position`;
 		case "failure":
 			return `#${page}/shortfall`;
-		case "timing":
-			return `#${page}/timing`;
+		case "safe-spending":
+			return `#${page}/safe-spending`;
 		case "account": {
 			const account = plan ? findAccount(plan, target.id) : undefined;
 			const slug = account ? accountSlug(account) : null;
@@ -442,12 +462,12 @@ export function editorHash(page: Page, target: EditorTarget): string {
 	}
 }
 
-export function timingDetailHash(
+export function safeSpendingDetailHash(
 	page: Page,
-	tab: TimingDetailTab,
+	tab: SafeSpendingDetailTab,
 	editKey?: string,
 ): string {
-	const base = `#${page}/timing-detail/${tab}`;
+	const base = `#${page}/safe-spending-detail/${tab}`;
 	return editKey ? `${base}/edit-movement/${encode(editKey)}` : base;
 }
 

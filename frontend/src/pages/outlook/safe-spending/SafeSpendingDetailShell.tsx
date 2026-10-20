@@ -1,22 +1,22 @@
 import { Drawer } from "../../../components/Drawer.tsx";
 import { Tabs } from "../../../components/Tabs.tsx";
-import type { TimingDetailTab } from "./timingDetailModel.ts";
+import type { SafeSpendingDetailTab } from "./safeSpendingDetailModel.ts";
 
-const TITLES: Record<TimingDetailTab, string> = {
+const TITLES: Record<SafeSpendingDetailTab, string> = {
 	mandatory: "Bills",
 	cycle: "Where the cycle went",
 	configure: "Configure",
 };
 
-export function TimingDetailShell({
+export function SafeSpendingDetailShell({
 	tab,
 	onTabChange,
 	cycleCount,
 	onClose,
 	children,
 }: {
-	tab: TimingDetailTab;
-	onTabChange: (tab: TimingDetailTab) => void;
+	tab: SafeSpendingDetailTab;
+	onTabChange: (tab: SafeSpendingDetailTab) => void;
 	cycleCount: number;
 	onClose: () => void;
 	children: React.ReactNode;
@@ -43,8 +43,8 @@ export function TimingDetailShell({
 				]}
 				value={tab}
 				onChange={onTabChange}
-				label="Timing detail view"
-				className="account-view-tabs timing-detail-tabs"
+				label="SafeSpending detail view"
+				className="account-view-tabs safe-spending-detail-tabs"
 			>
 				{children}
 			</Tabs>

@@ -1,17 +1,17 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testPlan } from "../../../test/plan.ts";
-import { TimingBillsPanel } from "./TimingBillsPanel.tsx";
-import { TimingConfigurePanel } from "./TimingConfigurePanel.tsx";
-import { TimingCyclePanel } from "./TimingCyclePanel.tsx";
-import { TimingDetailShell } from "./TimingDetailShell.tsx";
+import { SafeSpendingBillsPanel } from "./SafeSpendingBillsPanel.tsx";
+import { SafeSpendingConfigurePanel } from "./SafeSpendingConfigurePanel.tsx";
+import { SafeSpendingCyclePanel } from "./SafeSpendingCyclePanel.tsx";
+import { SafeSpendingDetailShell } from "./SafeSpendingDetailShell.tsx";
 import type {
 	CashNowDecomposition,
 	PaycheckDecomposition,
-	TimingConfigHints,
-	TimingHeroes,
-	TimingMandatorySection,
-} from "./timingDetailModel.ts";
+	SafeSpendingConfigHints,
+	SafeSpendingHeroes,
+	SafeSpendingMandatorySection,
+} from "./safeSpendingDetailModel.ts";
 
 beforeEach(() => {
 	vi.stubGlobal("matchMedia", (query: string) => ({
@@ -30,7 +30,7 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-const heroes: TimingHeroes = {
+const heroes: SafeSpendingHeroes = {
 	cushion: 1200,
 	cushionProvisional: false,
 	checkingAmount: 5000,
@@ -67,7 +67,7 @@ const paycheck: PaycheckDecomposition = {
 	allowance: 300,
 };
 
-const section: TimingMandatorySection = {
+const section: SafeSpendingMandatorySection = {
 	title: "Due before month-end",
 	subtitle: "Sep 24 to Sep 30",
 	total: 1000,
@@ -75,7 +75,7 @@ const section: TimingMandatorySection = {
 	transactions: [],
 };
 
-const config: TimingConfigHints = {
+const config: SafeSpendingConfigHints = {
 	statementDay: 20,
 	reserve: 200,
 	spentOverride: null,
@@ -96,17 +96,17 @@ const config: TimingConfigHints = {
 
 const noop = () => {};
 
-describe("TimingDetailShell", () => {
+describe("SafeSpendingDetailShell", () => {
 	it("switches tabs through the shell", () => {
 		const onTabChange = vi.fn();
 		render(
-			<TimingDetailShell
+			<SafeSpendingDetailShell
 				tab="mandatory"
 				onTabChange={onTabChange}
 				cycleCount={3}
 				onClose={noop}
 			>
-				<TimingBillsPanel
+				<SafeSpendingBillsPanel
 					heroes={heroes}
 					cashNow={cashNow}
 					paycheck={paycheck}
@@ -117,7 +117,7 @@ describe("TimingDetailShell", () => {
 					transactionOrder="newest"
 					onTransactionOrderChange={noop}
 				/>
-			</TimingDetailShell>,
+			</SafeSpendingDetailShell>,
 		);
 		expect(screen.getByText("Cash cushion")).toBeTruthy();
 		// Empty groups render both the bill-grid note and the section note.
@@ -127,10 +127,10 @@ describe("TimingDetailShell", () => {
 	});
 });
 
-describe("TimingCyclePanel", () => {
+describe("SafeSpendingCyclePanel", () => {
 	it("renders the empty cycle state", () => {
 		render(
-			<TimingCyclePanel
+			<SafeSpendingCyclePanel
 				cycleStart="2026-09-20"
 				cycleEnd="2026-10-19"
 				transactions={[]}
@@ -144,10 +144,10 @@ describe("TimingCyclePanel", () => {
 	});
 });
 
-describe("TimingConfigurePanel", () => {
+describe("SafeSpendingConfigurePanel", () => {
 	it("renders statement, reserve, and empty account states", () => {
 		render(
-			<TimingConfigurePanel
+			<SafeSpendingConfigurePanel
 				config={config}
 				billCandidates={[]}
 				trackedBillIds={[]}

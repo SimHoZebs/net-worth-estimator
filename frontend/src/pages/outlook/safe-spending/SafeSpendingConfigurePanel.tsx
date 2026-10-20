@@ -3,10 +3,13 @@ import { AccountLabel } from "../../../components/AccountIcon.tsx";
 import { dateLabel, money } from "../../../domain/format.ts";
 import type { Plan } from "../../../domain/model.ts";
 import type {
-	TimingResetKey,
+	SafeSpendingResetKey,
 	TotalCycleSettings,
-} from "../../../state/useTimingSettings.ts";
-import type { BillCandidate, TimingConfigHints } from "./timingDetailModel.ts";
+} from "../../../state/useSafeSpendingSettings.ts";
+import type {
+	BillCandidate,
+	SafeSpendingConfigHints,
+} from "./safeSpendingDetailModel.ts";
 
 function AccountToggle({
 	account,
@@ -29,7 +32,7 @@ function AccountToggle({
 	);
 }
 
-export function TimingConfigurePanel({
+export function SafeSpendingConfigurePanel({
 	config,
 	billCandidates,
 	trackedBillIds,
@@ -40,7 +43,7 @@ export function TimingConfigurePanel({
 	onUpdateConfig,
 	onResetConfig,
 }: {
-	config: TimingConfigHints;
+	config: SafeSpendingConfigHints;
 	billCandidates: BillCandidate[];
 	trackedBillIds: string[];
 	accounts: Plan["accounts"];
@@ -48,7 +51,7 @@ export function TimingConfigurePanel({
 	onToggleAccount: (accountId: string) => void;
 	onToggleSpendingAccount: (accountId: string) => void;
 	onUpdateConfig: (next: Partial<TotalCycleSettings>) => void;
-	onResetConfig: (key: TimingResetKey) => void;
+	onResetConfig: (key: SafeSpendingResetKey) => void;
 }) {
 	const accountsById = useMemo(
 		() => new Map(accounts.map((account) => [account.id, account])),

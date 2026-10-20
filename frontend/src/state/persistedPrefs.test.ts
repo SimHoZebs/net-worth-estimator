@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	THEME_STORAGE_KEY,
-	TIMING_STORAGE_KEY,
+	SAFE_SPENDING_STORAGE_KEY,
 	UI_PREFS_STORAGE_KEY,
 } from "./persisted.ts";
 import { resetUiStore, useUiStore } from "./uiStore.ts";
 import { useThemeStore } from "./useTheme.ts";
 import {
-	resetTimingSettings,
-	sanitizeTimingSettings,
-	useTimingSettings,
-} from "./useTimingSettings.ts";
+	resetSafeSpendingSettings,
+	sanitizeSafeSpendingSettings,
+	useSafeSpendingSettings,
+} from "./useSafeSpendingSettings.ts";
 
 function memoryStorage(): Storage {
 	const values = new Map<string, string>();
@@ -52,7 +52,7 @@ beforeEach(() => {
 	});
 	resetUiStore();
 	useThemeStore.setState({ preference: "system" });
-	resetTimingSettings();
+	resetSafeSpendingSettings();
 	try {
 		window.localStorage.clear();
 	} catch {
@@ -93,29 +93,33 @@ describe("unified persisted prefs", () => {
 		expect(useThemeStore.getState().preference).toBe("light");
 	});
 
-	it("migrates legacy raw timing settings", async () => {
+	it("migrates legacy raw safe spending settings", async () => {
 		window.localStorage.setItem(
-			TIMING_STORAGE_KEY,
+			SAFE_SPENDING_STORAGE_KEY,
 			JSON.stringify({
 				statementDay: 5,
 				reserve: 100,
 				mandatoryFrame: "cycle",
 			}),
 		);
-		await useTimingSettings.persist.rehydrate();
-		const state = useTimingSettings.getState();
+		await useSafeSpendingSettings.persist.rehydrate();
+		const state = useSafeSpendingSettings.getState();
 		expect(state.statementDay).toBe(5);
 		expect(state.reserve).toBe(100);
 		expect(state.mandatoryFrame).toBe("cycle");
 	});
 
-	it("sanitizes timing settings with legacy 1st-day fallback", () => {
+	it("sanitizes safe spending settings with legacy 1st-day fallback", () => {
 		expect(
-			sanitizeTimingSettings({ statementDay: 1, reserve: -5 }).statementDay,
+			sanitizeSafeSpendingSettings({ statementDay: 1, reserve: -5 })
+				.statementDay,
 		).toBe(20);
 		expect(
-			sanitizeTimingSettings({ statementDay: 99, reserve: 50 }).statementDay,
+			sanitizeSafeSpendingSettings({ statementDay: 99, reserve: 50 })
+				.statementDay,
 		).toBe(28);
-		expect(sanitizeTimingSettings(null).reserve).toBeGreaterThanOrEqual(0);
+		expect(sanitizeSafeSpendingSettings(null).reserve).toBeGreaterThanOrEqual(
+			0,
+		);
 	});
 });

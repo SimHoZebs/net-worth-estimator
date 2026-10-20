@@ -2,7 +2,7 @@ import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
 import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
-import type { TimingDetailTab } from "../pages/outlook/timing/timingDetailModel.ts";
+import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import { PlanPage } from "../pages/PlanPage.tsx";
 import { SourcesPage } from "../pages/SourcesPage.tsx";
 import type { Page } from "./navigation.ts";
@@ -15,17 +15,17 @@ export function WorkspacePage({
 	onEdit,
 	onEvidence,
 	onNavigate,
-	timingDetail,
-	onTimingDetail,
-	onTimingTab,
+	safeSpendingDetail,
+	onSafeSpendingDetail,
+	onSafeSpendingTab,
 }: {
 	page: Page;
 	onEdit: (target: EditorTarget) => void;
 	onEvidence: (target: EvidenceTarget) => void;
 	onNavigate: (page: Page) => void;
-	timingDetail: TimingDetailTab | null;
-	onTimingDetail: (tab: TimingDetailTab | null) => void;
-	onTimingTab: (tab: TimingDetailTab) => void;
+	safeSpendingDetail: SafeSpendingDetailTab | null;
+	onSafeSpendingDetail: (tab: SafeSpendingDetailTab | null) => void;
+	onSafeSpendingTab: (tab: SafeSpendingDetailTab) => void;
 }) {
 	switch (page) {
 		case "outlook":
@@ -36,9 +36,9 @@ export function WorkspacePage({
 					onTransactions={() => onNavigate("transactions")}
 					onEvaluations={() => onNavigate("evaluations")}
 					onEvaluation={(id) => onEvidence({ kind: "evaluation", id })}
-					timingDetail={timingDetail}
-					onTimingDetail={onTimingDetail}
-					onTimingTab={onTimingTab}
+					safeSpendingDetail={safeSpendingDetail}
+					onSafeSpendingDetail={onSafeSpendingDetail}
+					onSafeSpendingTab={onSafeSpendingTab}
 				/>
 			);
 		case "accounts":

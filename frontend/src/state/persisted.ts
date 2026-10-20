@@ -6,8 +6,12 @@ import {
 
 export const THEME_STORAGE_KEY = "waypoint-theme";
 export const UI_PREFS_STORAGE_KEY = "waypoint.ui-prefs.v1";
-export const TIMING_STORAGE_KEY = "nwe.card-cycle.v4";
-export const TIMING_LEGACY_KEYS = ["nwe.card-cycle.v3", "nwe.card-cycle.v2"];
+export const SAFE_SPENDING_STORAGE_KEY = "nwe.safe-spending.v1";
+export const SAFE_SPENDING_LEGACY_KEYS = [
+	"nwe.card-cycle.v4",
+	"nwe.card-cycle.v3",
+	"nwe.card-cycle.v2",
+];
 
 const memory = new Map<string, string>();
 

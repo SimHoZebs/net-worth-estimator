@@ -149,11 +149,11 @@
 		gap: 15px;
 	}
 	.evaluation-preview,
-	.timing-preview {
+	.safe-spending-preview {
 		padding: 20px 18px;
 	}
 	.evaluation-preview .section-top h2,
-	.timing-preview .section-top h2 {
+	.safe-spending-preview .section-top h2 {
 		font-size: 11px;
 	}
 	.timing-figures > div + div {
@@ -370,11 +370,11 @@
 		margin-top: 20px;
 	}
 	.evaluation-preview,
-	.timing-preview {
+	.safe-spending-preview {
 		padding: 21px;
 	}
 	.evaluation-preview .section-top h2,
-	.timing-preview .section-top h2 {
+	.safe-spending-preview .section-top h2 {
 		font-size: 13px;
 	}
 	.evaluation-preview-content {
@@ -744,7 +744,7 @@
 	.panel,
 	.chart-card,
 	.evaluation-preview,
-	.timing-preview {
+	.safe-spending-preview {
 		break-inside: avoid;
 	}
 	body {

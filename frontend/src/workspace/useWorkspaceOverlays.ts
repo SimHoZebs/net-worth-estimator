@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
-import type { TimingDetailTab } from "../pages/outlook/timing/timingDetailModel.ts";
+import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import {
 	discardHash,
@@ -9,7 +9,7 @@ import {
 	evidenceHash,
 	pageHash,
 	resolveOverlayRoute,
-	timingDetailHash,
+	safeSpendingDetailHash,
 	type PlanLike,
 	type WorkspaceRoute,
 } from "./route.ts";
@@ -47,9 +47,12 @@ export function useWorkspaceOverlays({
 
 	const ready = resolution.state === "ready" ? resolution.overlay : null;
 	const evidence = ready?.kind === "evidence" ? ready.target : null;
-	const timingDetail = ready?.kind === "timingDetail" ? ready.tab : null;
-	const timingEdit = ready?.kind === "timingDetail" ? ready.edit : null;
-	const editor = ready?.kind === "editor" ? ready.target : (timingEdit ?? null);
+	const safeSpendingDetail =
+		ready?.kind === "safeSpendingDetail" ? ready.tab : null;
+	const safeSpendingEdit =
+		ready?.kind === "safeSpendingDetail" ? ready.edit : null;
+	const editor =
+		ready?.kind === "editor" ? ready.target : (safeSpendingEdit ?? null);
 	const discardOpen = ready?.kind === "discard";
 
 	const openEvidence = (target: EvidenceTarget) => {
@@ -59,11 +62,14 @@ export function useWorkspaceOverlays({
 	};
 	const openEditor = (target: EditorTarget) => {
 		if (!plan) return;
-		// An editor opened from the timing detail stacks onto it, preserving
+		// An editor opened from the safe spending detail stacks onto it, preserving
 		// the detail underneath; anywhere else it replaces the overlay.
-		if (target.kind === "movement" && route.overlay?.type === "timingDetail") {
+		if (
+			target.kind === "movement" &&
+			route.overlay?.type === "safeSpendingDetail"
+		) {
 			pushHash(
-				timingDetailHash(
+				safeSpendingDetailHash(
 					page,
 					route.overlay.tab,
 					target.item ? target.item.id : "new",
@@ -84,10 +90,10 @@ export function useWorkspaceOverlays({
 	const closeEditor = () => {
 		if (!plan) return;
 		if (
-			route.overlay?.type === "timingDetail" &&
+			route.overlay?.type === "safeSpendingDetail" &&
 			route.overlay.editMovement !== undefined
 		) {
-			pushHash(timingDetailHash(page, route.overlay.tab));
+			pushHash(safeSpendingDetailHash(page, route.overlay.tab));
 			return;
 		}
 		if (returnTo) {
@@ -100,14 +106,14 @@ export function useWorkspaceOverlays({
 	const closeEvidence = () => {
 		pushHash(pageHash(page));
 	};
-	const openTimingDetail = (tab: TimingDetailTab) => {
-		pushHash(timingDetailHash(page, tab));
+	const openSafeSpendingDetail = (tab: SafeSpendingDetailTab) => {
+		pushHash(safeSpendingDetailHash(page, tab));
 	};
-	const switchTimingTab = (tab: TimingDetailTab) => {
-		if (route.overlay?.type !== "timingDetail") return;
-		replaceHash(timingDetailHash(page, tab, route.overlay.editMovement));
+	const switchSafeSpendingTab = (tab: SafeSpendingDetailTab) => {
+		if (route.overlay?.type !== "safeSpendingDetail") return;
+		replaceHash(safeSpendingDetailHash(page, tab, route.overlay.editMovement));
 	};
-	const closeTimingDetail = () => {
+	const closeSafeSpendingDetail = () => {
 		pushHash(pageHash(page));
 	};
 	const openDiscard = () => {
@@ -128,7 +134,7 @@ export function useWorkspaceOverlays({
 	return {
 		editor,
 		evidence,
-		timingDetail,
+		safeSpendingDetail,
 		discardOpen,
 		discarding,
 		openEditor,
@@ -136,9 +142,9 @@ export function useWorkspaceOverlays({
 		editFromEvidence,
 		closeEditor,
 		closeEvidence,
-		openTimingDetail,
-		switchTimingTab,
-		closeTimingDetail,
+		openSafeSpendingDetail,
+		switchSafeSpendingTab,
+		closeSafeSpendingDetail,
 		openDiscard,
 		closeDiscard,
 		confirmDiscard,

@@ -5,7 +5,7 @@ import { AccountDialog } from "./AccountDialog.tsx";
 import { EvaluationEvidence } from "./evidence/EvaluationEvidence.tsx";
 import { FailureEvidence } from "./evidence/FailureEvidence.tsx";
 import { PositionEvidence } from "./evidence/PositionEvidence.tsx";
-import { TimingEvidence } from "./evidence/TimingEvidence.tsx";
+import { SafeSpendingEvidence } from "./evidence/SafeSpendingEvidence.tsx";
 import "./evidence/evidence.css";
 
 export type EvidenceTarget =
@@ -13,7 +13,7 @@ export type EvidenceTarget =
 	| { kind: "account"; id: string }
 	| { kind: "failure" }
 	| { kind: "evaluation"; id: string }
-	| { kind: "timing" };
+	| { kind: "safe-spending" };
 
 export function EvidenceDialog({
 	target,
@@ -58,9 +58,13 @@ export function EvidenceDialog({
 					onClose={onClose}
 				/>
 			);
-		case "timing":
+		case "safe-spending":
 			return (
-				<TimingEvidence plan={plan} projection={projection} onClose={onClose} />
+				<SafeSpendingEvidence
+					plan={plan}
+					projection={projection}
+					onClose={onClose}
+				/>
 			);
 		case "account": {
 			const account = plan.accounts.find(
