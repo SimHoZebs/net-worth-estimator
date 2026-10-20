@@ -1,34 +1,31 @@
 # Backend Access-Control Plan
 
+Status: superseded. Current contracts live in `backend/internal/api/auth.go`, `backend/internal/api/cors.go`, `TECHNICAL_OVERVIEW.md` §2, and `docs/backend-migration/ASSUMPTIONS.md` A19. This file records rollout history only.
+
 ## Objective
 
 Protect canonical model writes and direct SimpleFIN triggers while preserving unauthenticated health checks, canonical reads, and projection computation. Keep access policy explicit at the server boundary and reversible through runtime configuration.
 
 ## Current Control Contract
 
-| Control | Contract |
-| --- | --- |
-| read-only | `NET_WORTH_ESTIMATOR_READ_ONLY=1`, `true`, or `yes` rejects guarded writes with 403; unset or unrecognized values leave the server writable |
-| bearer token | when `NET_WORTH_ESTIMATOR_AUTH_TOKEN` is non-empty, guarded writes require the exact `Authorization: Bearer <token>` value |
-| comparison | bearer values are compared with `crypto/subtle.ConstantTimeCompare` |
-| precedence | read-only rejection occurs before bearer validation |
-| status | `GET /v1/status` reports `readOnly` and `authEnabled` without exposing the token |
-| origins | `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` accepts comma-separated exact HTTP/S origins |
-| preflight | allowed methods are `GET`, `POST`, `PUT`, and `OPTIONS`; allowed request headers are `Content-Type` and `Authorization` |
-| originless requests | requests without an `Origin` header are not rejected by the origin policy |
+| Control             | Contract                                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| read-only           | `NET_WORTH_ESTIMATOR_READ_ONLY=1`, `true`, or `yes` rejects guarded writes with 403; unset or unrecognized values leave the server writable |
+| bearer token        | when `NET_WORTH_ESTIMATOR_AUTH_TOKEN` is non-empty, guarded writes require the exact `Authorization: Bearer <token>` value                  |
+| comparison          | bearer values are compared with `crypto/subtle.ConstantTimeCompare`                                                                         |
+| precedence          | read-only rejection occurs before bearer validation                                                                                         |
+| status              | `GET /v1/status` reports `readOnly` and `authEnabled` without exposing the token                                                            |
+| origins             | `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS` accepts comma-separated exact HTTP/S origins                                                          |
+| preflight           | allowed methods are `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, and `OPTIONS`; allowed request headers are `Content-Type` and `Authorization`  |
+| originless requests | requests without an `Origin` header are not rejected by the origin policy                                                                   |
 
-Guarded routes are exactly:
-
-- `PUT /v1/financial-model`;
-- `POST /v1/sync/simplefin`.
-
-`GET /healthz`, `GET /v1/financial-model`, `GET /v1/status`, `GET /v1/income-data`, `POST /v1/projections/deterministic`, and `POST /v1/projections/stochastic` pass the write guard.
+Guarded routes are row writes and sync triggers defined in `writeAuthMiddleware`. `GET /healthz`, canonical reads, and projections pass the write guard.
 
 ## Security Boundaries
 
 ### Canonical writes
 
-`store.SaveDocument` atomically replaces owner model rows. A successful request can therefore change the canonical plan and its evaluation configuration.
+Historical note: this plan assumed a whole-document save; current code uses one-row create/replace/delete/move writes. A successful write can change the canonical plan and its evaluation configuration.
 
 Incoming checkpoint and posting `source` values are ignored. The store recomputes ownership, drops the reserved `sfin-` posting namespace, preserves stored `simplefin` rows, and lets owner checkpoints win account/date collisions. Access control protects the model-save boundary; it does not give model payloads control over sync-owned rows.
 
@@ -121,14 +118,14 @@ Verify:
 
 With a configured SimpleFIN runner, verify the same access matrix for `POST /v1/sync/simplefin`:
 
-| Policy | Expected result |
-| --- | --- |
-| read-only | 403 |
-| writable, token configured, missing/wrong bearer | 401 |
-| writable, no token configured | normal runner result, including 503 when unconfigured |
-| writable, correct bearer | normal runner result |
-| active run | 409 |
-| successful manual run under 20 hours old | 429 |
+| Policy                                           | Expected result                                       |
+| ------------------------------------------------ | ----------------------------------------------------- |
+| read-only                                        | 403                                                   |
+| writable, token configured, missing/wrong bearer | 401                                                   |
+| writable, no token configured                    | normal runner result, including 503 when unconfigured |
+| writable, correct bearer                         | normal runner result                                  |
+| active run                                       | 409                                                   |
+| successful manual run under 20 hours old         | 429                                                   |
 
 Keep dry-run enabled for the first policy check. Confirm the response counts are marked `dryRun: true` and no source row is committed.
 
@@ -161,13 +158,13 @@ Clearing the token while the service remains writable disables authentication. R
 
 ## Rollback
 
-| Failure | Rollback action |
-| --- | --- |
-| valid operator cannot save | verify exact bearer format and token source; keep read-only while repairing configuration |
-| token suspected exposed | enable read-only, rotate or revoke, verify 403, then decide whether writes should be restored |
-| allowed origin rejected | correct the exact origin value; do not disable the entire HTTP policy |
-| origin policy is not protecting direct callers | rely on bearer enforcement; add an appropriate trusted network boundary |
-| persistence unhealthy | keep read-only, stop writers, restore or inspect the SQLite backup, run package verification, then cut back only after data checks pass |
+| Failure                                        | Rollback action                                                                                                                         |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| valid operator cannot save                     | verify exact bearer format and token source; keep read-only while repairing configuration                                               |
+| token suspected exposed                        | enable read-only, rotate or revoke, verify 403, then decide whether writes should be restored                                           |
+| allowed origin rejected                        | correct the exact origin value; do not disable the entire HTTP policy                                                                   |
+| origin policy is not protecting direct callers | rely on bearer enforcement; add an appropriate trusted network boundary                                                                 |
+| persistence unhealthy                          | keep read-only, stop writers, restore or inspect the SQLite backup, run package verification, then cut back only after data checks pass |
 
 ## Completion Criteria
 

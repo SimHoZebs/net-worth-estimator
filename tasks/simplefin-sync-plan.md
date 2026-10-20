@@ -1,5 +1,7 @@
 # SimpleFIN Synchronization Plan
 
+Status: implemented. Current contracts live in `backend/cmd/server/sync.go`, `backend/internal/simplefin/`, `TECHNICAL_OVERVIEW.md` §11, and `docs/backend-migration/ASSUMPTIONS.md` A5/A18. This file records planning history; intervals below are stale where they disagree with code (scheduler is every 6 hours, manual-trigger spacing defaults to 6 hours).
+
 ## Objective
 
 Synchronize the narrow set of source data that the financial model cannot infer safely: current mapped account balances and pending negative card charges. Keep the source secret, make row ownership explicit, make dry-run the first live operator step, and preserve a recoverable cutover path.
@@ -34,13 +36,13 @@ Rows outside scope are counted by reason. Amounts and descriptions are omitted f
 
 ## Configuration
 
-| Variable | Required | Meaning |
-| --- | --- | --- |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` | real mode | Bridge Access URL secret; an empty value disables the runner |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` | for pending seeds | comma-separated model account IDs treated as cards |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN` | optional | exact value `1` enables dry-run; all other values disable it |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK` | fixture mode only | exact value `1` enables deterministic fixture responses |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE` | optional | Bridge-shaped JSON file, valid only when fixture mode is enabled |
+| Variable                                   | Required          | Meaning                                                          |
+| ------------------------------------------ | ----------------- | ---------------------------------------------------------------- |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` | real mode         | Bridge Access URL secret; an empty value disables the runner     |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS`      | for pending seeds | comma-separated model account IDs treated as cards               |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN`    | optional          | exact value `1` enables dry-run; all other values disable it     |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK`       | fixture mode only | exact value `1` enables deterministic fixture responses          |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE`  | optional          | Bridge-shaped JSON file, valid only when fixture mode is enabled |
 
 Startup rules:
 
@@ -158,13 +160,13 @@ Dry-run performs the same count work and returns before commit. The deferred rol
 - accepts only HTTP 200;
 - aborts on the supplied context.
 
-A failed fetch, malformed payload, or apply error does not update the successful-trigger timestamp. A later manual trigger can retry. The scheduler runs once per local day; no same-run retry policy is part of this plan.
+A failed fetch, malformed payload, or apply error does not update the successful-trigger timestamp. A later manual trigger can retry. Historical note: this plan assumed a daily scheduler; current code runs every 6 hours.
 
 ## Scheduler and Manual Trigger
 
 ### Scheduler
 
-`cmd/server` starts one scheduler when a runner is configured. It selects a random minute from 00 through 59 after 03:00 local time, then repeats every 24 hours. The scheduler calls `Runner.Sync` directly, so it does not use the 20-hour manual-trigger guard.
+Historical note: this plan assumed a daily 03:00 scheduler and a 20-hour manual-trigger guard; current code uses a 6-hour scheduler and a 6-hour default trigger interval. `cmd/server` starts one scheduler when a runner is configured. The scheduler calls `Runner.Sync` directly.
 
 Operational constraints:
 
@@ -177,13 +179,13 @@ Operational constraints:
 
 `Runner.Trigger` wraps `Runner.Sync` with process-local guards:
 
-| State | Result |
-| --- | --- |
-| no active run and no recent success | execute |
-| active run | `InProgressError` → HTTP 409 |
-| successful run less than 20 hours old | `TooSoonError` → HTTP 429 |
-| prior attempt failed | remain eligible for retry |
-| runner unconfigured | HTTP 503 before runner execution |
+| State                                 | Result                           |
+| ------------------------------------- | -------------------------------- |
+| no active run and no recent success   | execute                          |
+| active run                            | `InProgressError` → HTTP 409     |
+| successful run less than 20 hours old | `TooSoonError` → HTTP 429        |
+| prior attempt failed                  | remain eligible for retry        |
+| runner unconfigured                   | HTTP 503 before runner execution |
 
 The interval stamp is in memory and clears on process restart.
 
