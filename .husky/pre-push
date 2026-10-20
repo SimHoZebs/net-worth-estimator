@@ -5,5 +5,8 @@ start=$(date +%s)
 backend/scripts/verify.sh ./internal/...
 backend/scripts/verify.sh ./cmd/...
 
+echo "pre-push: frontend lint"
+npm --prefix frontend run lint
+
 end=$(date +%s)
 echo "pre-push: done in $((end - start))s"

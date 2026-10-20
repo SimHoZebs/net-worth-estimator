@@ -18,5 +18,17 @@ else
   done
 fi
 
+staged_frontend=$(git diff --cached --name-only --diff-filter=ACM | grep '^frontend/' | grep -v '^frontend/node_modules/' | grep -E '\.(ts|tsx|css|json)$' || true)
+if [ -z "$staged_frontend" ]; then
+  echo "pre-commit: no staged frontend files, skipping frontend checks."
+else
+  echo "pre-commit: frontend lint and format check"
+  # Unquoted on purpose: one repo-relative path per line, no spaces in tree.
+  # shellcheck disable=SC2086
+  npm --prefix frontend exec -- oxlint $staged_frontend
+  # shellcheck disable=SC2086
+  npm --prefix frontend exec -- oxfmt --check $staged_frontend
+fi
+
 end=$(date +%s)
 echo "pre-commit: done in $((end - start))s"
