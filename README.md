@@ -48,9 +48,10 @@ Run the API and frontend as separate processes from the repository root:
 ```bash
 # terminal 1
 # Local state comes from a database backup, never the shipped CSVs: copy a
-# backup to the dev database path while the server is stopped.
-cp <backup>.db /tmp/net-worth-estimator.db
-NET_WORTH_ESTIMATOR_DB=/tmp/net-worth-estimator.db \
+# backup to the dev database path while the server is stopped. tmp/ is
+# gitignored and survives reboot, unlike /tmp.
+cp <backup>.db tmp/net-worth-estimator.db
+NET_WORTH_ESTIMATOR_DB=$PWD/tmp/net-worth-estimator.db \
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
