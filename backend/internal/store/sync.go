@@ -8,21 +8,35 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Row ownership for SimpleFIN sync coexistence. "model" rows are
-// owner/seed content; "simplefin" rows are system-owned sync output managed
-// only by the sync (PUT payloads cannot create, edit, or delete them).
+// Row ownership for bank-data sync coexistence. "model" rows are
+// owner/seed content; any other source value is system-owned sync output
+// managed only by the sync (PUT payloads cannot create, edit, or delete
+// them). The exact sync source name is a backend contract; row ownership
+// checks match by exclusion (not "model"), never by provider name.
 const (
-	SourceModel     = "model"
+	SourceModel = "model"
+	// SourceSimpleFIN is the sync source written by the current SimpleFIN
+	// bank-data provider. A future provider (Plaid, MX, CSV import) writes
+	// its own source name; all non-"model" sources share the sync-owned
+	// lifecycle below.
 	SourceSimpleFIN = "simplefin"
 )
 
 // SyncPostingPrefix reserves posting IDs for sync-owned rows. Owner payloads
 // carrying it are dropped on save; validation never sees them.
-const SyncPostingPrefix = "sfin-"
+const SyncPostingPrefix = "sync-"
 
-// IsSyncPostingID reports whether an ID belongs to the sync namespace.
+// LegacySyncPostingPrefix is the pre-rename sync namespace. Existing
+// databases hold rows under it until their next sync refreshes them, so
+// reservation checks and pending cleanup accept both prefixes. New sync
+// output always uses SyncPostingPrefix.
+const LegacySyncPostingPrefix = "sfin-"
+
+// IsSyncPostingID reports whether an ID belongs to the sync namespace,
+// including the legacy prefix (see LegacySyncPostingPrefix).
 func IsSyncPostingID(id string) bool {
-	return strings.HasPrefix(id, SyncPostingPrefix)
+	return strings.HasPrefix(id, SyncPostingPrefix) ||
+		strings.HasPrefix(id, LegacySyncPostingPrefix)
 }
 
 // syncCheckpointKey identifies an owner/sync checkpoint row for re-merge.
@@ -82,7 +96,7 @@ func remergeCheckpoints(tx *sql.Tx, incoming []types.Checkpoint, synced []types.
 		}
 		if _, err := tx.Exec(
 			`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (?,?,?,?,?)`,
-			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceSimpleFIN,
+			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, syncedSource(checkpoint.Source),
 		); err != nil {
 			return 0, fmt.Errorf("re-merge synced checkpoint: %w", err)
 		}
@@ -105,7 +119,7 @@ func remergePostings(tx *sql.Tx, incoming []types.Posting, synced []types.Postin
 		position++
 	}
 	for i := range synced {
-		if err := insertPosting(tx, position, &synced[i], SourceSimpleFIN); err != nil {
+		if err := insertPosting(tx, position, &synced[i], syncedSource(synced[i].Source)); err != nil {
 			return 0, fmt.Errorf("re-merge synced posting: %w", err)
 		}
 		position++
@@ -114,7 +128,10 @@ func remergePostings(tx *sql.Tx, incoming []types.Posting, synced []types.Postin
 }
 
 func loadSyncedCheckpoints(tx *sql.Tx) ([]types.Checkpoint, error) {
-	rows, err := tx.Query(`SELECT date, account_id, balance, source FROM checkpoints WHERE source = ? ORDER BY position`, SourceSimpleFIN)
+	// Any non-model source is sync-owned. Sources stay per-provider
+	// (simplefin, plaid, ...) so metrics and debugging can tell bank-data
+	// origins apart; the lifecycle treats them uniformly.
+	rows, err := tx.Query(`SELECT date, account_id, balance, source FROM checkpoints WHERE source != ? ORDER BY position`, SourceModel)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +151,7 @@ func loadSyncedCheckpoints(tx *sql.Tx) ([]types.Checkpoint, error) {
 }
 
 func loadSyncedPostings(tx *sql.Tx) ([]types.Posting, error) {
-	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source FROM postings WHERE source = ? ORDER BY position`, SourceSimpleFIN)
+	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source FROM postings WHERE source != ? ORDER BY position`, SourceModel)
 	if err != nil {
 		return nil, err
 	}
@@ -151,6 +168,15 @@ func loadSyncedPostings(tx *sql.Tx) ([]types.Posting, error) {
 		return nil, err
 	}
 	return postings, rows.Close()
+}
+
+// syncedSource preserves a sync row's provider source on re-merge,
+// defaulting blank sources to the current provider.
+func syncedSource(source string) string {
+	if source == "" {
+		return SourceSimpleFIN
+	}
+	return source
 }
 
 // GetLastSyncTime reports the last successful sync completion time, or ""
@@ -319,40 +345,48 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []type
 		summary.CheckpointsUpdated++
 	}
 
-	pendingPrefix := SyncPostingPrefix + "pending-"
 	for _, accountID := range cardAccounts {
-		pattern := pendingPrefix + escapeLike(accountID) + `-%`
-		rows, err := tx.Query(
-			`SELECT id FROM postings WHERE source = ? AND source_account_id = ? AND id LIKE ? ESCAPE '\'`,
-			SourceSimpleFIN, accountID, pattern,
-		)
-		if err != nil {
-			return summary, fmt.Errorf("sync read pending: %w", err)
+		// Clean both the current and legacy pending namespaces so a
+		// pre-rename database cannot orphan sfin-pending-* rows.
+		patterns := []string{
+			SyncPostingPrefix + "pending-" + escapeLike(accountID) + `-%`,
+			LegacySyncPostingPrefix + "pending-" + escapeLike(accountID) + `-%`,
 		}
 		var stale []string
-		for rows.Next() {
-			var id string
-			if err := rows.Scan(&id); err != nil {
-				rows.Close()
-				return summary, err
+		var deleted int64
+		for _, pattern := range patterns {
+			rows, err := tx.Query(
+				`SELECT id FROM postings WHERE source = ? AND source_account_id = ? AND id LIKE ? ESCAPE '\'`,
+				SourceSimpleFIN, accountID, pattern,
+			)
+			if err != nil {
+				return summary, fmt.Errorf("sync read pending: %w", err)
 			}
-			stale = append(stale, id)
-		}
-		if err := rows.Err(); err != nil {
+			for rows.Next() {
+				var id string
+				if err := rows.Scan(&id); err != nil {
+					rows.Close()
+					return summary, err
+				}
+				stale = append(stale, id)
+			}
+			if err := rows.Err(); err != nil {
+				rows.Close()
+				return summary, fmt.Errorf("sync read pending rows: %w", err)
+			}
 			rows.Close()
-			return summary, fmt.Errorf("sync read pending rows: %w", err)
-		}
-		rows.Close()
-		result, err := tx.Exec(
-			`DELETE FROM postings WHERE source = ? AND source_account_id = ? AND id LIKE ? ESCAPE '\'`,
-			SourceSimpleFIN, accountID, pattern,
-		)
-		if err != nil {
-			return summary, fmt.Errorf("sync clear pending: %w", err)
-		}
-		deleted, err := result.RowsAffected()
-		if err != nil {
-			return summary, fmt.Errorf("sync pending rows: %w", err)
+			result, err := tx.Exec(
+				`DELETE FROM postings WHERE source = ? AND source_account_id = ? AND id LIKE ? ESCAPE '\'`,
+				SourceSimpleFIN, accountID, pattern,
+			)
+			if err != nil {
+				return summary, fmt.Errorf("sync clear pending: %w", err)
+			}
+			count, err := result.RowsAffected()
+			if err != nil {
+				return summary, fmt.Errorf("sync pending rows: %w", err)
+			}
+			deleted += count
 		}
 		summary.PendingDeleted += int(deleted)
 		for _, id := range stale {
@@ -366,8 +400,9 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []type
 		return summary, err
 	}
 	for i := range pending {
-		// Sync-owned IDs live in the sfin- namespace, which owner writes
-		// cannot claim, so idempotent re-claim is safe here.
+		// Sync-owned IDs live in the sync- namespace (plus the legacy sfin-
+		// namespace), which owner writes cannot claim, so idempotent
+		// re-claim is safe here.
 		if _, err := tx.Exec(`INSERT OR IGNORE INTO entity_ids (id, kind) VALUES (?, 'posting')`, pending[i].ID); err != nil {
 			return summary, fmt.Errorf("sync claim pending id: %w", err)
 		}

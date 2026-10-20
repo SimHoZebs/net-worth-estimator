@@ -137,6 +137,38 @@ describe("account-scoped transactions", () => {
 	it("flags sync pending charges instead of reporting them as user-excluded", () => {
 		const plan = structuredClone(examplePlan);
 		plan.movements.push({
+			id: "sync-pending-checking-mock-pend1",
+			name: "Mock Corner Store",
+			amount: 42.1,
+			amountKnown: true,
+			fromId: "checking",
+			toId: null,
+			frequency: "once",
+			startDate: plan.startDate,
+			endDate: null,
+			annualIncrease: 0,
+			enabled: false,
+			readOnly: true,
+			claimRuleId: null,
+			claimOccurrenceDate: null,
+			postedDate: null,
+		});
+		const rows = accountTransactions({
+			accountId: "checking",
+			plan,
+			projection: activityProjection(plan),
+		});
+		expect(
+			rows.find((row) => row.movementId === "sync-pending-checking-mock-pend1"),
+		).toMatchObject({
+			pending: true,
+			excluded: true,
+		});
+	});
+
+	it("still flags legacy pre-rename pending charges", () => {
+		const plan = structuredClone(examplePlan);
+		plan.movements.push({
 			id: "sfin-pending-checking-mock-pend1",
 			name: "Mock Corner Store",
 			amount: 42.1,

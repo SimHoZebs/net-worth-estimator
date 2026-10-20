@@ -16,6 +16,11 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	store := openSQLiteStore(t)
 	seedOwnerDocument(t, store)
 	seedSyncRows(t, store)
+	// Pre-rename databases hold legacy sfin- registry rows; the purge must
+	// release those too.
+	execSyncSetup(t, store, []string{
+		`INSERT INTO entity_ids (id, kind) VALUES ('sfin-pending-prime_card-legacy', 'posting')`,
+	})
 	if err := store.SetLastSyncTime("2026-10-18T14:30:00Z"); err != nil {
 		t.Fatalf("record last sync: %v", err)
 	}
@@ -52,7 +57,7 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	if got := countRows(t, store, "checkpoints", "source = 'simplefin'"); got != 0 {
 		t.Fatalf("sync checkpoints after purge = %d, want 0", got)
 	}
-	if got := countRows(t, store, "entity_ids", "id LIKE 'sfin-%'"); got != 0 {
+	if got := countRows(t, store, "entity_ids", "id LIKE 'sync-%' OR id LIKE 'sfin-%'"); got != 0 {
 		t.Fatalf("sync registry rows after purge = %d, want 0", got)
 	}
 	if got := countRows(t, store, "entity_ids", "id = 'owner-charge'"); got != 1 {

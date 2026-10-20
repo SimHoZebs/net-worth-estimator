@@ -3,7 +3,7 @@
 // This file is temporary scaffolding for the mock interlude: it fabricates
 // bridge-shaped AccountSets so the sync can be exercised without Bridge
 // credentials. Mock rows are intentionally identical to real sync rows
-// (source "simplefin", sfin-pending-* IDs) and flow through the same
+// (source "simplefin", sync-pending-* IDs) and flow through the same
 // Map/ApplySyncPlan path, so no store or mapper logic branches on mock vs
 // real. Cutover is a documented DB purge, not code:
 // backend/scripts/purge-simplefin-sync.sql.

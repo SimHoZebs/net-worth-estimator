@@ -42,7 +42,7 @@ func TestMockAccountSetMapsLikeBridge(t *testing.T) {
 		t.Fatalf("pending = %+v, want the one mock charge", plan.Pending)
 	}
 	pending := plan.Pending[0]
-	if pending.ID != "sfin-pending-prime_card-mock-pend1" {
+	if pending.ID != "sync-pending-prime_card-mock-pend1" {
 		t.Fatalf("pending id = %q, want sync namespace", pending.ID)
 	}
 	if pending.Enabled {

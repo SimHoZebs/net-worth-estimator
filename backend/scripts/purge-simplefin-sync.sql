@@ -1,7 +1,8 @@
 -- SimpleFIN sync cutover purge (mock interlude).
 --
 -- Intent: mock and real sync rows are intentionally identical
--- (source 'simplefin', sfin-pending-* IDs), so selective mock-only deletion
+-- (source 'simplefin', sync-pending-* IDs; pre-rename databases may still
+-- hold legacy sfin-pending-* IDs), so selective mock-only deletion
 -- is impossible by design. This script removes ALL sync-owned rows; the
 -- first real sync re-inserts fresh checkpoints and the pending snapshot.
 -- Owner rows (source 'model') are untouched: model saves already protect
@@ -27,9 +28,10 @@
 DELETE FROM postings WHERE source = 'simplefin';
 DELETE FROM checkpoints WHERE source = 'simplefin';
 -- Release sync-namespace IDs so the first real sync can re-claim them.
--- Owner rows can never hold sfin- IDs (row writes reject them), so this
--- cannot release an owner row.
-DELETE FROM entity_ids WHERE id LIKE 'sfin-%';
+-- Owner rows can never hold sync- IDs (row writes reject them), so this
+-- cannot release an owner row. The second pattern covers pre-rename
+-- databases that still hold legacy sfin- rows.
+DELETE FROM entity_ids WHERE id LIKE 'sync-%' OR id LIKE 'sfin-%';
 -- Reset the last-sync timestamp so the sidebar does not report a stale
 -- time against an empty sync state. The next successful sync re-stamps it.
 DELETE FROM sync_state;

@@ -1,6 +1,11 @@
 import { todayIso } from "../domain/format.ts";
 import { finite, isRecord } from "../domain/guards.ts";
-import type { Account, Movement, Plan } from "../domain/model.ts";
+import {
+	isSyncReservedId,
+	type Account,
+	type Movement,
+	type Plan,
+} from "../domain/model.ts";
 import {
 	type AmountInputBinding,
 	type BackendAccount,
@@ -1193,8 +1198,9 @@ export function displayPlanToBackendDocument(
 		const storedPosting = sourcePostings.get(movement.id);
 		const storedRule = sourceRules.get(movement.id);
 		const storedAmount = storedPosting ?? storedRule;
-		// Reserved sync-output posting IDs use the backend `sfin-` namespace.
-		if (movement.id.startsWith("sfin-")) {
+		// Reserved sync-output posting IDs use a backend namespace the
+		// workspace never invents; the backend drops forged rows on save.
+		if (isSyncReservedId(movement.id)) {
 			lose(
 				conversionReport,
 				`movements.${movement.id}`,
