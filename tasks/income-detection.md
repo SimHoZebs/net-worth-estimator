@@ -2,7 +2,7 @@
 
 Status: planned. Payroll is modeled as decomposed rules (gross, 401k,
 match, tax) with generic resolvers; no income pipeline remains. This tracks
-rebuilding income *detection* on top of that.
+rebuilding income _detection_ on top of that.
 
 ## Next slice: detect candidate paycheck deposits
 
@@ -13,6 +13,7 @@ Agreed scope: gross deposits only. The 401k/match/tax split events are out
 of scope — detection must not need them.
 
 Design (agreed):
+
 - Candidates are sourceless external inflows landing in spendable (bank)
   accounts. Splits exclude themselves by shape: 401k/tax carry a source
   account, match lands in 401k rather than a bank account.
@@ -22,6 +23,7 @@ Design (agreed):
   pattern, annualized figure, provenance stay distinct (see TERMS.md §F).
 
 Acceptance:
+
 - Domain function + unit tests over synthetic movement events: monthly
   gross detected, 401k transfer / tax outflow / match ignored, one-time
   transfer between own accounts ignored.

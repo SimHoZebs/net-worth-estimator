@@ -4,8 +4,5 @@
   "buildCommand": "npm --prefix frontend run build",
   "outputDirectory": "frontend/dist",
   "devCommand": "npm --prefix frontend run dev -- --host 0.0.0.0",
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/404.html", "status": 404 }
-  ]
+  "routes": [{ "handle": "filesystem" }, { "src": "/(.*)", "dest": "/404.html", "status": 404 }]
 }
