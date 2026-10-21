@@ -26,8 +26,6 @@ export interface TotalCycleSettings {
 	spendingAccountIds: string[] | null;
 	/** Null means every recurring outflow counts as a bill. */
 	movementIds: string[] | null;
-	/** Which window the drawer bills tab uses. Card figures stay calendar. */
-	mandatoryFrame: "calendar" | "cycle";
 	/** True once the statement day is explicitly chosen. Untouched legacy 1st falls back to the household 20th. */
 	statementDaySet: boolean;
 }
@@ -43,7 +41,6 @@ export const defaultSafeSpendingSettings = (): TotalCycleSettings => ({
 	accountIds: null,
 	spendingAccountIds: null,
 	movementIds: null,
-	mandatoryFrame: "calendar",
 	statementDaySet: false,
 });
 
@@ -98,7 +95,6 @@ export function sanitizeSafeSpendingSettings(
 		accountIds: stringIds(record.accountIds),
 		spendingAccountIds: stringIds(record.spendingAccountIds),
 		movementIds: stringIds(record.movementIds),
-		mandatoryFrame: record.mandatoryFrame === "cycle" ? "cycle" : "calendar",
 	};
 }
 
@@ -242,7 +238,6 @@ export const useSafeSpendingSettings = create<SafeSpendingSettingsState>()(
 						next.movementIds !== undefined
 							? next.movementIds
 							: previous.movementIds,
-					mandatoryFrame: next.mandatoryFrame ?? previous.mandatoryFrame,
 				})),
 			resetConfig: (key) =>
 				set((previous) => ({
@@ -265,7 +260,6 @@ export const useSafeSpendingSettings = create<SafeSpendingSettingsState>()(
 				accountIds: state.accountIds,
 				spendingAccountIds: state.spendingAccountIds,
 				movementIds: state.movementIds,
-				mandatoryFrame: state.mandatoryFrame,
 				statementDaySet: state.statementDaySet,
 			}),
 			migrate: (persisted) => sanitizeSafeSpendingSettings(persisted),

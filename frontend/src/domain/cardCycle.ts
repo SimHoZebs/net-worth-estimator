@@ -78,8 +78,8 @@ export function isCycleOutflow(transaction: AccountTransaction): boolean {
 	return transaction.direction === "out" && !transaction.excluded;
 }
 
-/** Spend already incurred in [cycleStart, todayIso]. */
-export function cycleSpentSoFar({
+/** Included card outflows in the inclusive [cycleStart, todayIso] window. */
+export function cycleOutflowTransactions({
 	transactions,
 	cycleStart,
 	todayIso,
@@ -87,14 +87,24 @@ export function cycleSpentSoFar({
 	transactions: AccountTransaction[];
 	cycleStart: string;
 	todayIso: string;
-}): number {
+}): AccountTransaction[] {
 	const today = todayIso.slice(0, 10);
-	return transactions
-		.filter(
-			(transaction) =>
-				isCycleOutflow(transaction) &&
-				transaction.date >= cycleStart &&
-				transaction.date <= today,
-		)
-		.reduce((sum, transaction) => sum + transaction.amount, 0);
+	return transactions.filter(
+		(transaction) =>
+			isCycleOutflow(transaction) &&
+			transaction.date >= cycleStart &&
+			transaction.date <= today,
+	);
+}
+
+/** Spend already incurred in [cycleStart, todayIso]. */
+export function cycleSpentSoFar(input: {
+	transactions: AccountTransaction[];
+	cycleStart: string;
+	todayIso: string;
+}): number {
+	return cycleOutflowTransactions(input).reduce(
+		(sum, transaction) => sum + transaction.amount,
+		0,
+	);
 }

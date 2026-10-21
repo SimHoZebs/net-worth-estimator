@@ -29,15 +29,17 @@ export function SegmentedBar({
 	caption,
 	segments,
 	ariaLabel,
+	showDetails = true,
 }: {
 	caption: string;
 	segments: BarSegment[];
 	ariaLabel: string;
+	showDetails?: boolean;
 }) {
 	const total = segments.reduce((sum, segment) => sum + segment.amount, 0);
 	return (
 		<div className="seg-stack">
-			<p className="section-note">{caption}</p>
+			{showDetails && <p className="section-note">{caption}</p>}
 			<div className="seg-bar" role="img" aria-label={ariaLabel}>
 				{segments.map((segment) =>
 					segment.amount > 0 ? (
@@ -51,17 +53,19 @@ export function SegmentedBar({
 					) : null,
 				)}
 			</div>
-			<ul className="seg-legend">
-				{segments.map((segment) => (
-					<li key={segment.label}>
-						<span
-							className={`seg-swatch seg-${segment.tone} pat-${segment.pattern}`}
-							aria-hidden="true"
-						/>
-						{segment.label} · {money(segment.amount)}
-					</li>
-				))}
-			</ul>
+			{showDetails && (
+				<ul className="seg-legend">
+					{segments.map((segment) => (
+						<li key={segment.label}>
+							<span
+								className={`seg-swatch seg-${segment.tone} pat-${segment.pattern}`}
+								aria-hidden="true"
+							/>
+							{segment.label} · {money(segment.amount)}
+						</li>
+					))}
+				</ul>
+			)}
 		</div>
 	);
 }
