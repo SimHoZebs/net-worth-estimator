@@ -295,11 +295,9 @@ func rawInstances(tables *types.EvaluationTables) []rawInstance {
 			})
 		}
 	}
-	appendTable(types.EvaluationTypeFinancialIndependence, tables.FinancialIndependence)
-	appendTable(types.EvaluationTypeNetWorthThreshold, tables.NetWorthThreshold)
-	appendTable(types.EvaluationTypeAccountBalance, tables.AccountBalance)
-	appendTable(types.EvaluationTypePostingFulfillment, tables.PostingFulfillment)
-	appendTable(types.EvaluationTypeCycleFulfillment, tables.CycleFulfillment)
+	for _, table := range tables.Tables() {
+		appendTable(table.Type, *table.Rows)
+	}
 	return instances
 }
 
@@ -425,18 +423,11 @@ func (s *EvaluationRuntimeSet) Result() types.EvaluationResultCollection {
 			CycleFulfillment:      []types.EvaluationResultEnvelope{},
 		},
 	}
-	for _, runtimeInstance := range s.runtimes {
-		switch runtimeInstance.evaluationType {
-		case types.EvaluationTypeFinancialIndependence:
-			collection.Evaluations.FinancialIndependence = append(collection.Evaluations.FinancialIndependence, runtimeInstance.envelope())
-		case types.EvaluationTypeNetWorthThreshold:
-			collection.Evaluations.NetWorthThreshold = append(collection.Evaluations.NetWorthThreshold, runtimeInstance.envelope())
-		case types.EvaluationTypeAccountBalance:
-			collection.Evaluations.AccountBalance = append(collection.Evaluations.AccountBalance, runtimeInstance.envelope())
-		case types.EvaluationTypePostingFulfillment:
-			collection.Evaluations.PostingFulfillment = append(collection.Evaluations.PostingFulfillment, runtimeInstance.envelope())
-		case types.EvaluationTypeCycleFulfillment:
-			collection.Evaluations.CycleFulfillment = append(collection.Evaluations.CycleFulfillment, runtimeInstance.envelope())
+	for _, table := range collection.Evaluations.Tables() {
+		for _, runtimeInstance := range s.runtimes {
+			if runtimeInstance.evaluationType == table.Type {
+				*table.Rows = append(*table.Rows, runtimeInstance.envelope())
+			}
 		}
 	}
 	return collection

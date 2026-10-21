@@ -83,11 +83,12 @@ type (
 )
 
 type EvaluationTables struct {
-	FinancialIndependence []FIEvaluation          `json:"financialIndependence"`
-	NetWorthThreshold     []ThresholdEvaluation   `json:"netWorthThreshold"`
-	AccountBalance        []BalanceEvaluation     `json:"accountBalance"`
-	PostingFulfillment    []FulfillmentEvaluation `json:"postingFulfillment"`
-	CycleFulfillment      []CycleEvaluation       `json:"cycleFulfillment"`
+	FinancialIndependence []FIEvaluation                  `json:"financialIndependence"`
+	NetWorthThreshold     []ThresholdEvaluation           `json:"netWorthThreshold"`
+	AccountBalance        []BalanceEvaluation             `json:"accountBalance"`
+	PostingFulfillment    []FulfillmentEvaluation         `json:"postingFulfillment"`
+	CycleFulfillment      []CycleEvaluation               `json:"cycleFulfillment"`
+	PlannedPurchases      []EvaluationInstance[JsonValue] `json:"plannedPurchases,omitempty"`
 }
 
 func EmptyEvaluationTables() EvaluationTables {

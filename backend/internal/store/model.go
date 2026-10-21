@@ -157,20 +157,10 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 		}
 		position++
 	}
-	if err := saveEvaluationTable(tx, string(types.EvaluationTypeFinancialIndependence), evaluationRowsOf(document.Evaluations.FinancialIndependence)); err != nil {
-		return err
-	}
-	if err := saveEvaluationTable(tx, string(types.EvaluationTypeNetWorthThreshold), evaluationRowsOf(document.Evaluations.NetWorthThreshold)); err != nil {
-		return err
-	}
-	if err := saveEvaluationTable(tx, string(types.EvaluationTypeAccountBalance), evaluationRowsOf(document.Evaluations.AccountBalance)); err != nil {
-		return err
-	}
-	if err := saveEvaluationTable(tx, string(types.EvaluationTypePostingFulfillment), evaluationRowsOf(document.Evaluations.PostingFulfillment)); err != nil {
-		return err
-	}
-	if err := saveEvaluationTable(tx, string(types.EvaluationTypeCycleFulfillment), evaluationRowsOf(document.Evaluations.CycleFulfillment)); err != nil {
-		return err
+	for _, table := range document.Evaluations.Tables() {
+		if err := saveEvaluationTable(tx, table.Type, evaluationRowsOf(*table.Rows)); err != nil {
+			return err
+		}
 	}
 	if err := savePaymentTerms(tx, document.PaymentTerms); err != nil {
 		return err
@@ -211,7 +201,7 @@ func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source stri
 	); err != nil {
 		return fmt.Errorf("insert posting %s: %w", posting.ID, err)
 	}
-	return nil
+	return insertPurchasePolicy(tx, posting)
 }
 
 func insertRule(tx *sql.Tx, position int, rule *types.RecurrenceRule) error {
@@ -482,6 +472,9 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 	if err := postingRows.Close(); err != nil {
 		return nil, fmt.Errorf("close postings: %w", err)
 	}
+	if err := loadPurchasePolicies(q, document.Postings); err != nil {
+		return nil, err
+	}
 
 	ruleRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules ORDER BY position`)
 	if err != nil {
@@ -514,45 +507,12 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		if err := evaluationRows.Scan(&evaluationType, &instanceID, &name, &enabled, &configJSON); err != nil {
 			return nil, err
 		}
-		switch types.EvaluationType(evaluationType) {
-		case types.EvaluationTypeFinancialIndependence:
+		if rows := document.Evaluations.ByType(evaluationType); rows != nil {
 			config := map[string]any{}
 			if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
-				return nil, fmt.Errorf("parse FI config %s: %w", instanceID, err)
+				return nil, fmt.Errorf("parse %s config %s: %w", evaluationType, instanceID, err)
 			}
-			document.Evaluations.FinancialIndependence = append(document.Evaluations.FinancialIndependence, types.FIEvaluation{
-				InstanceID: instanceID, Name: name, Enabled: enabled != 0, Config: config,
-			})
-		case types.EvaluationTypeNetWorthThreshold:
-			config := map[string]any{}
-			if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
-				return nil, fmt.Errorf("parse threshold config %s: %w", instanceID, err)
-			}
-			document.Evaluations.NetWorthThreshold = append(document.Evaluations.NetWorthThreshold, types.ThresholdEvaluation{
-				InstanceID: instanceID, Name: name, Enabled: enabled != 0, Config: config,
-			})
-		case types.EvaluationTypeAccountBalance:
-			config := map[string]any{}
-			if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
-				return nil, fmt.Errorf("parse account balance config %s: %w", instanceID, err)
-			}
-			document.Evaluations.AccountBalance = append(document.Evaluations.AccountBalance, types.BalanceEvaluation{
-				InstanceID: instanceID, Name: name, Enabled: enabled != 0, Config: config,
-			})
-		case types.EvaluationTypePostingFulfillment:
-			config := map[string]any{}
-			if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
-				return nil, fmt.Errorf("parse fulfillment config %s: %w", instanceID, err)
-			}
-			document.Evaluations.PostingFulfillment = append(document.Evaluations.PostingFulfillment, types.FulfillmentEvaluation{
-				InstanceID: instanceID, Name: name, Enabled: enabled != 0, Config: config,
-			})
-		case types.EvaluationTypeCycleFulfillment:
-			config := map[string]any{}
-			if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
-				return nil, fmt.Errorf("parse cycle fulfillment config %s: %w", instanceID, err)
-			}
-			document.Evaluations.CycleFulfillment = append(document.Evaluations.CycleFulfillment, types.CycleEvaluation{
+			*rows = append(*rows, types.EvaluationInstance[types.JsonValue]{
 				InstanceID: instanceID, Name: name, Enabled: enabled != 0, Config: config,
 			})
 		}

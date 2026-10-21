@@ -16,20 +16,7 @@ type evaluationOutput struct {
 }
 
 func evalSlice(document *types.FinancialModelDocument, evalType string) *[]types.EvaluationInstance[types.JsonValue] {
-	switch types.EvaluationType(evalType) {
-	case types.EvaluationTypeFinancialIndependence:
-		return (*[]types.EvaluationInstance[types.JsonValue])(&document.Evaluations.FinancialIndependence)
-	case types.EvaluationTypeNetWorthThreshold:
-		return (*[]types.EvaluationInstance[types.JsonValue])(&document.Evaluations.NetWorthThreshold)
-	case types.EvaluationTypeAccountBalance:
-		return (*[]types.EvaluationInstance[types.JsonValue])(&document.Evaluations.AccountBalance)
-	case types.EvaluationTypePostingFulfillment:
-		return (*[]types.EvaluationInstance[types.JsonValue])(&document.Evaluations.PostingFulfillment)
-	case types.EvaluationTypeCycleFulfillment:
-		return (*[]types.EvaluationInstance[types.JsonValue])(&document.Evaluations.CycleFulfillment)
-	default:
-		return nil
-	}
+	return document.Evaluations.ByType(evalType)
 }
 
 func evalToInstance(item store.EvaluationUpdate) types.EvaluationInstance[types.JsonValue] {

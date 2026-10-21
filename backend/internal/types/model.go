@@ -16,6 +16,7 @@ const (
 	EvaluationTypeAccountBalance        = "accountBalance"
 	EvaluationTypePostingFulfillment    = "postingFulfillment"
 	EvaluationTypeCycleFulfillment      = "cycleFulfillment"
+	EvaluationTypePlannedPurchases      = "plannedPurchases"
 )
 
 // EvaluationTypeOrder controls evaluation type ordering; table arrays
@@ -26,6 +27,7 @@ var EvaluationTypeOrder = []string{
 	EvaluationTypeAccountBalance,
 	EvaluationTypePostingFulfillment,
 	EvaluationTypeCycleFulfillment,
+	EvaluationTypePlannedPurchases,
 }
 
 // JsonValue represents arbitrary JSON values in wire payloads.
@@ -198,6 +200,7 @@ type Posting struct {
 	PostedTime      int64                   `json:"postedTime"`
 	TransactionTime int64                   `json:"transactionTime"`
 	Claim           *PostingClaim           `json:"claim,omitempty"`
+	Purchase        *PurchasePolicy         `json:"purchase,omitempty"`
 	Enabled         bool                    `json:"enabled"`
 	// Source names the row owner: "model" (owner/seed) or "simplefin".
 	// Read-only on GET; PUT ignores it (server recomputes ownership).

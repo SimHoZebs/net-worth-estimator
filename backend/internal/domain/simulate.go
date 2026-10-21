@@ -20,6 +20,12 @@ func inf() float64 { return math.Inf(1) }
 
 // Simulate runs the pure kernel over a prepared request.
 func Simulate(request types.SimulationRequest) (types.SimulationRun, error) {
+	return simulateScheduled(request, nil, nil)
+}
+
+// simulateScheduled executes established payments and accepted purchases.
+// Only the purchase evaluation supplies purchases and candidate dates.
+func simulateScheduled(request types.SimulationRequest, purchases []scheduledPurchase, candidateDates []string) (types.SimulationRun, error) {
 	transitions, err := CreateTransitionRuntime(
 		request.Model,
 		request.InitialState,
@@ -35,6 +41,12 @@ func Simulate(request types.SimulationRequest) (types.SimulationRun, error) {
 
 	resolved := ResolveOccurrences(request.Model.RecurrenceRules, request.Model.Postings, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
 	eventDates := resolved.ByDate
+	for _, date := range candidateDates {
+		if _, exists := eventDates[date]; !exists {
+			eventDates[date] = nil
+		}
+	}
+	appendScheduledPurchases(eventDates, purchases)
 
 	dates := make([]string, 0, len(eventDates))
 	for date := range eventDates {

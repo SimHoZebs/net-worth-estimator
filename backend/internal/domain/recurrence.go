@@ -26,11 +26,23 @@ type DatedPostingOccurrence struct {
 // sortOccurrences orders same-day occurrences with one-time postings
 // first, then scheduled rule instances. Within one-time postings it orders
 // by transaction time, then posted time, then ID. Within rule instances it
-// orders by rule priority, then declaration sequence. Simulate, history
-// replay, and the financial independence branch share this order so one
-// edit changes all three.
+// orders by rule priority, then declaration sequence. Accepted purchases
+// follow both, ordered by purchase priority then sequence. Simulate, history
+// replay, and the financial independence branch share this order so one edit
+// changes all three.
 func sortOccurrences(occurrences []DatedPostingOccurrence) {
 	sort.SliceStable(occurrences, func(i, j int) bool {
+		leftPurchase := occurrences[i].Posting.Purchase
+		rightPurchase := occurrences[j].Posting.Purchase
+		if (leftPurchase != nil) != (rightPurchase != nil) {
+			return leftPurchase == nil
+		}
+		if leftPurchase != nil {
+			if leftPurchase.Priority != rightPurchase.Priority {
+				return leftPurchase.Priority < rightPurchase.Priority
+			}
+			return occurrences[i].Index < occurrences[j].Index
+		}
 		leftRule := occurrences[i].Rule != nil
 		rightRule := occurrences[j].Rule != nil
 		if leftRule != rightRule {
@@ -163,7 +175,7 @@ func claimsByRule(postings []types.Posting) map[string]map[string]bool {
 	claims := map[string]map[string]bool{}
 	for index := range postings {
 		posting := &postings[index]
-		if !posting.Enabled || posting.Claim == nil {
+		if !posting.Enabled || posting.Purchase != nil || posting.Claim == nil {
 			continue
 		}
 		dates, ok := claims[posting.Claim.RuleID]
@@ -248,7 +260,7 @@ func ResolveOccurrences(rules []types.RecurrenceRule, postings []types.Posting, 
 	}
 	for postingIndex := range postings {
 		posting := &postings[postingIndex]
-		if !posting.Enabled {
+		if !posting.Enabled || posting.Purchase != nil {
 			continue
 		}
 		day := postingDay(posting)

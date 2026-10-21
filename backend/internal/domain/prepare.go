@@ -71,6 +71,9 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 
 	for index := range document.Postings {
 		posting := &document.Postings[index]
+		if posting.Purchase != nil {
+			continue // Planned purchases are evaluation inputs, never historical actuals.
+		}
 		day := postingDay(posting)
 		if day == "" {
 			continue
