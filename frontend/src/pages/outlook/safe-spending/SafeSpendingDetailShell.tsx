@@ -1,45 +1,50 @@
 import { Drawer } from "../../../components/Drawer.tsx";
 import { Tabs } from "../../../components/Tabs.tsx";
-import type { SafeSpendingDetailTab } from "./safeSpendingDetailModel.ts";
-
-const TITLES: Record<SafeSpendingDetailTab, string> = {
-	mandatory: "Bills",
-	cycle: "Where the cycle went",
-	configure: "Configure",
-};
+import { dateLabel } from "../../../domain/format.ts";
+import {
+	SAFE_SPENDING_DETAIL_TABS,
+	type SafeSpendingDetailTab,
+	type SafeSpendingCycleTab,
+} from "./safeSpendingDetailModel.ts";
 
 export function SafeSpendingDetailShell({
 	tab,
 	onTabChange,
-	cycleCount,
+	cycleCounts,
+	range,
 	onClose,
 	children,
 }: {
 	tab: SafeSpendingDetailTab;
 	onTabChange: (tab: SafeSpendingDetailTab) => void;
-	cycleCount: number;
+	cycleCounts: Partial<Record<SafeSpendingCycleTab, number>>;
+	range?: { start: string; end: string };
 	onClose: () => void;
 	children: React.ReactNode;
 }) {
-	const title = TITLES[tab];
+	const title =
+		SAFE_SPENDING_DETAIL_TABS.find((item) => item.id === tab)?.label ??
+		"This cycle";
+	const counts: Partial<Record<SafeSpendingDetailTab, number>> = cycleCounts;
 	return (
 		<Drawer
 			side="right"
 			open
 			onClose={onClose}
 			label={title}
-			appearance={{ title, coverage: "full" }}
+			appearance={{
+				title,
+				eyebrow: range
+					? `${dateLabel(range.start, true)} – ${dateLabel(range.end, true)}`
+					: undefined,
+				coverage: "full",
+			}}
 		>
 			<Tabs
-				items={[
-					{ id: "mandatory", label: "Bills" },
-					{
-						id: "cycle",
-						label: "Where the cycle went",
-						count: cycleCount,
-					},
-					{ id: "configure", label: "Configure" },
-				]}
+				items={SAFE_SPENDING_DETAIL_TABS.map((item) => ({
+					...item,
+					count: counts[item.id],
+				}))}
 				value={tab}
 				onChange={onTabChange}
 				label="SafeSpending detail view"
