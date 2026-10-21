@@ -49,6 +49,7 @@ export const movementSchema = z.object({
 	// reverse conversion ignores it: the server times round-trip through
 	// stored extras instead.
 	postedDate: date.nullable().default(null),
+	purchasePriority: z.number().int().nonnegative().nullable().optional(),
 });
 
 /**
@@ -60,7 +61,9 @@ export function isHistoricalMovement(
 	projectionStartDate: string,
 ): boolean {
 	return (
-		movement.frequency === "once" && movement.startDate <= projectionStartDate
+		movement.purchasePriority == null &&
+		movement.frequency === "once" &&
+		movement.startDate <= projectionStartDate
 	);
 }
 
@@ -171,6 +174,19 @@ export const planSchema = z.preprocess(
 				if (movementIds.has(movement.id))
 					issue(["movements", index, "id"], "Transaction IDs must be unique.");
 				movementIds.add(movement.id);
+				if (
+					movement.purchasePriority != null &&
+					(movement.frequency !== "once" ||
+						!movement.fromId ||
+						movement.toId ||
+						movement.amount <= 0 ||
+						!movement.amountKnown ||
+						movement.claimRuleId)
+				)
+					issue(
+						["movements", index],
+						"Planned purchases need a fixed positive cost, a funding account, and no recurrence or claim.",
+					);
 				if (!movement.fromId && !movement.toId)
 					issue(
 						["movements", index],

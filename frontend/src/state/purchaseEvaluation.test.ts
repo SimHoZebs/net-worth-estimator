@@ -1,0 +1,219 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { displayPlanToBackendDocument } from "../api/adapter.ts";
+import type {
+	DeterministicProjectionRequest,
+	EvaluationResultTables,
+	ProjectionResult,
+} from "../api/contracts.ts";
+import { testPlan } from "../test/plan.ts";
+import {
+	PURCHASE_EVALUATIONS,
+	PURCHASE_EVALUATION_ID,
+	purchaseEvaluationResult,
+	purchaseSchedule,
+} from "./purchaseEvaluation.ts";
+import {
+	projectionStartDate,
+	useRemoteProjection,
+} from "./useRemoteProjection.ts";
+
+afterEach(cleanup);
+
+function resultFixture(evaluations: EvaluationResultTables): ProjectionResult {
+	return {
+		timeline: { rows: [] },
+		accountSummaries: [],
+		totals: {
+			externalInflowAmount: 0,
+			externalOutflowAmount: 0,
+			internalTransferAmount: 0,
+		},
+		milestones: {
+			latestHistoricalDate: null,
+			projectionStartDate: "2026-01-31",
+		},
+		summary: { currentNetWorth: 0, finalNetWorth: 0 },
+		evaluations,
+	};
+}
+
+describe("isolated purchase evaluation", () => {
+	it("never derives a baseline start date from a planned purchase", () => {
+		const document = displayPlanToBackendDocument(testPlan).document;
+		document.checkpoints = [];
+		document.recurrenceRules = [];
+		const posting = {
+			id: "real",
+			name: "Real",
+			sourceAccountId: "checking",
+			destinations: null,
+			amount: { resolver: "expression", config: { expression: "50" } },
+			enabled: true,
+			postedTime: 1769904000,
+			transactionTime: 1769904000,
+		};
+		document.postings = [
+			{
+				...posting,
+				id: "purchase",
+				postedTime: 1577836800,
+				transactionTime: 1577836800,
+				purchase: { priority: 0 },
+			},
+			posting,
+		];
+		expect(projectionStartDate(document)).toBe("2026-02-01");
+	});
+	it("maps only the evaluation schedule, including explicitly unfunded items", () => {
+		expect(
+			purchaseSchedule({
+				purchases: [
+					{ postingId: "laptop", date: "2027-02-05", amount: 500 },
+					{ postingId: "chair", date: null, amount: 150 },
+				],
+			}),
+		).toEqual({
+			purchases: [
+				{ postingId: "laptop", date: "2027-02-05", amount: 500 },
+				{ postingId: "chair", date: null, amount: 150 },
+			],
+		});
+		expect(
+			purchaseSchedule({ purchases: [{ postingId: "laptop", amount: 500 }] }),
+		).toBeNull();
+	});
+
+	it("reports missing or failed evaluation evidence instead of labeling purchases unfunded", () => {
+		const tables: EvaluationResultTables = {
+			financialIndependence: [],
+			netWorthThreshold: [],
+			accountBalance: [],
+			postingFulfillment: [],
+		};
+		expect(() =>
+			purchaseEvaluationResult(tables, PURCHASE_EVALUATIONS),
+		).toThrow("returned no schedule");
+		tables.plannedPurchases = [
+			{
+				instanceId: PURCHASE_EVALUATION_ID,
+				name: "Purchases",
+				status: "warning",
+				deterministic: null,
+				probabilistic: null,
+				diagnostics: [
+					{ code: "error", severity: "error", message: "Trial failed" },
+				],
+			},
+		];
+		expect(() =>
+			purchaseEvaluationResult(tables, PURCHASE_EVALUATIONS),
+		).toThrow("Trial failed");
+		expect(purchaseEvaluationResult(tables, undefined)).toBeNull();
+	});
+
+	it("separates baseline and evaluation cache entries and recalculates on priority changes", async () => {
+		const queryClient = new QueryClient({
+			defaultOptions: { queries: { retry: false } },
+		});
+		const wrapper = ({ children }: { children: ReactNode }) =>
+			createElement(QueryClientProvider, { client: queryClient }, children);
+		const document = displayPlanToBackendDocument(testPlan).document;
+		document.postings.push({
+			id: "laptop",
+			name: "Laptop",
+			sourceAccountId: "checking",
+			destinations: null,
+			amount: { resolver: "expression", config: { expression: "500" } },
+			enabled: true,
+			postedTime: 1769904000,
+			transactionTime: 1769904000,
+			purchase: { priority: 0 },
+		});
+		const before = JSON.stringify(document);
+		const client = {
+			projectDeterministic: vi.fn(
+				async (request: DeterministicProjectionRequest) => {
+					const evaluations: EvaluationResultTables = {
+						financialIndependence: [],
+						netWorthThreshold: [],
+						accountBalance: [],
+						postingFulfillment: [],
+					};
+					if (request.settings.evaluations.plannedPurchases?.length)
+						evaluations.plannedPurchases = [
+							{
+								instanceId: PURCHASE_EVALUATION_ID,
+								name: "Purchases",
+								status: "satisfied",
+								probabilistic: null,
+								diagnostics: [],
+								deterministic: {
+									purchases: [
+										{
+											postingId: "laptop",
+											date:
+												request.document?.postings.find(
+													(item) => item.id === "laptop",
+												)?.purchase?.priority === 0
+													? "2026-02-01"
+													: "2026-03-01",
+											amount: 500,
+										},
+									],
+								},
+							},
+						];
+					return { result: resultFixture(evaluations), issues: [] };
+				},
+			),
+			projectStochastic: vi.fn(async () => new Error("not requested")),
+		};
+		const rendered = renderHook(
+			({ active }) => ({
+				baseline: useRemoteProjection({
+					client,
+					document: active,
+					draftDocument: null,
+					years: 1,
+					ranges: false,
+				}),
+				purchases: useRemoteProjection({
+					client,
+					document: active,
+					draftDocument: null,
+					years: 1,
+					ranges: false,
+					evaluations: PURCHASE_EVALUATIONS,
+				}),
+			}),
+			{ wrapper, initialProps: { active: document } },
+		);
+		await waitFor(() =>
+			expect(client.projectDeterministic).toHaveBeenCalledTimes(2),
+		);
+		await waitFor(() =>
+			expect(rendered.result.current.purchases.base).toMatchObject({
+				plannedPurchases: { purchases: [{ date: "2026-02-01" }] },
+			}),
+		);
+		expect(rendered.result.current.baseline.base).toMatchObject({
+			plannedPurchases: null,
+		});
+		expect(JSON.stringify(document)).toBe(before);
+		const changed = structuredClone(document);
+		changed.postings.find((item) => item.id === "laptop")!.purchase!.priority =
+			1;
+		rendered.rerender({ active: changed });
+		await waitFor(() =>
+			expect(rendered.result.current.purchases.base).toMatchObject({
+				plannedPurchases: { purchases: [{ date: "2026-03-01" }] },
+			}),
+		);
+		expect(client.projectStochastic).not.toHaveBeenCalled();
+		rendered.unmount();
+		queryClient.clear();
+	});
+});
