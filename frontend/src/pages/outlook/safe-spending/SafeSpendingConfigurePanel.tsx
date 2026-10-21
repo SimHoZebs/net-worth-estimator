@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { AccountLabel } from "../../../components/AccountIcon.tsx";
-import { dateLabel, money } from "../../../domain/format.ts";
+import { InputField } from "../../../components/Field.tsx";
+import { dateLabel, exactMoney, money } from "../../../domain/format.ts";
 import type { Plan } from "../../../domain/model.ts";
 import type {
 	SafeSpendingResetKey,
@@ -10,6 +11,7 @@ import type {
 	BillCandidate,
 	SafeSpendingConfigHints,
 } from "./safeSpendingDetailModel.ts";
+import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 function AccountToggle({
 	account,
@@ -57,163 +59,128 @@ export function SafeSpendingConfigurePanel({
 		() => new Map(accounts.map((account) => [account.id, account])),
 		[accounts],
 	);
+	const overrideFields = [
+		{
+			key: "checking",
+			label: labels.cashBalance,
+			automatic: config.checkingHint ?? 0,
+			source: `${exactMoney(config.checkingHint ?? 0)} from selected cash accounts`,
+			effect: `Changes ${labels.cashBalance} and ${labels.cashAfterBills}. ${labels.allowance} stays unchanged.`,
+		},
+		{
+			key: "remaining",
+			label: labels.remainingBills,
+			automatic: config.remainingHint.total,
+			source: `${exactMoney(config.remainingHint.total)} through ${dateLabel(config.remainingHint.monthEnd, true)}`,
+			effect: `Changes ${labels.remainingBills} and ${labels.cashAfterBills}. The ${labels.scheduledBills} list stays unchanged.`,
+		},
+		{
+			key: "paycheck",
+			label: labels.nextPaycheck,
+			automatic: config.paycheckHint?.amount ?? 0,
+			source: config.paycheckHint
+				? `${exactMoney(config.paycheckHint.amount)} on ${dateLabel(config.paycheckHint.date, true)}`
+				: "$0.00. No upcoming paycheck in the projection",
+			effect: `Changes ${labels.allowance} in This cycle and ${labels.unallocated} in Last cycle.`,
+		},
+		{
+			key: "fixed",
+			label: labels.fixedBills,
+			automatic: config.fixedHint.total,
+			source: `${exactMoney(config.fixedHint.total)} for ${dateLabel(config.fixedHint.start, true)} to ${dateLabel(config.fixedHint.end, true)}`,
+			effect: `Reduces ${labels.allowance} in This cycle and ${labels.unallocated} in Last cycle.`,
+		},
+		{
+			key: "spent",
+			label: labels.cardSpending,
+			automatic: config.spentHint,
+			source: `${exactMoney(config.spentHint)} from this cycle's recorded card charges`,
+			effect: `Changes ${labels.cardSpending} and ${labels.allowance} in This cycle. ${labels.recordedCharges} and ${labels.closedCards} stay unchanged.`,
+		},
+	] satisfies {
+		key: SafeSpendingResetKey;
+		label: string;
+		automatic: number;
+		source: string;
+		effect: string;
+	}[];
 	return (
 		<div className="cycle-config">
-			<label className="field">
-				<span>Statement starts on day (1–28)</span>
-				<input
-					type="number"
-					min={1}
-					max={28}
-					value={config.statementDay}
-					onChange={(event) =>
-						onUpdateConfig({
-							statementDay: Math.min(
-								28,
-								Math.max(1, Math.floor(Number(event.target.value) || 20)),
-							),
-							statementDaySet: true,
-						})
-					}
-				/>
-			</label>
-			<label className="field">
-				<span>
-					Expected next paycheck ($) —{" "}
-					{config.paycheckHint
-						? `${money(config.paycheckHint.amount)} on ${dateLabel(config.paycheckHint.date, true)}`
-						: "no upcoming inflow in projection"}
-				</span>
-				<input
-					type="number"
-					min={0}
-					step="10"
-					placeholder={String(Math.round(config.paycheckHint?.amount ?? 0))}
-					value={config.paycheckOverride ?? ""}
-					onChange={(event) =>
-						onUpdateConfig({
-							paycheckOverride:
-								event.target.value === ""
-									? null
-									: Math.max(0, Number(event.target.value) || 0),
-						})
-					}
-				/>
-			</label>
-			{config.paycheckOverride !== null && (
-				<button
-					type="button"
-					className="text-button"
-					onClick={() => onResetConfig("paycheck")}
-				>
-					Use projected {money(config.paycheckHint?.amount ?? 0)} instead
-				</button>
-			)}
-			<label className="field">
-				<span>
-					Next month fixed obligations ($) — {money(config.fixedHint.total)} for{" "}
-					{dateLabel(config.fixedHint.start, true)} to{" "}
-					{dateLabel(config.fixedHint.end, true)}
-				</span>
-				<input
-					type="number"
-					min={0}
-					step="10"
-					placeholder={String(Math.round(config.fixedHint.total))}
-					value={config.fixedOverride ?? ""}
-					onChange={(event) =>
-						onUpdateConfig({
-							fixedOverride:
-								event.target.value === ""
-									? null
-									: Math.max(0, Number(event.target.value) || 0),
-						})
-					}
-				/>
-			</label>
-			{config.fixedOverride !== null && (
-				<button
-					type="button"
-					className="text-button"
-					onClick={() => onResetConfig("fixed")}
-				>
-					Use projected {money(config.fixedHint.total)} instead
-				</button>
-			)}
-			<label className="field">
-				<span>Protected reserve ($)</span>
-				<input
-					type="number"
-					min={0}
-					step="5"
-					value={config.reserve}
-					onChange={(event) =>
-						onUpdateConfig({
-							reserve: Math.max(0, Number(event.target.value) || 0),
-						})
-					}
-				/>
-			</label>
-			<label className="field">
-				<span>
-					Actual spent ($) — empty uses {money(config.spentHint)} tracked
-				</span>
-				<input
-					type="number"
-					min={0}
-					step="1"
-					placeholder={String(Math.round(config.spentHint))}
-					value={config.spentOverride ?? ""}
-					onChange={(event) =>
-						onUpdateConfig({
-							spentOverride:
-								event.target.value === ""
-									? null
-									: Math.max(0, Number(event.target.value) || 0),
-						})
-					}
-				/>
-			</label>
-			{config.spentOverride !== null && (
-				<button
-					type="button"
-					className="text-button"
-					onClick={() => onResetConfig("spent")}
-				>
-					Use tracked {money(config.spentHint)} instead
-				</button>
-			)}
-			<label className="field">
-				<span>
-					Available balance ($) — {money(config.checkingHint ?? 0)} in plan
-				</span>
-				<input
-					type="number"
-					min={0}
-					step="10"
-					placeholder={String(Math.round(config.checkingHint ?? 0))}
-					value={config.checkingOverride ?? ""}
-					onChange={(event) =>
-						onUpdateConfig({
-							checkingOverride:
-								event.target.value === ""
-									? null
-									: Math.max(0, Number(event.target.value) || 0),
-						})
-					}
-				/>
-			</label>
-			{config.checkingOverride !== null && (
-				<button
-					type="button"
-					className="text-button"
-					onClick={() => onResetConfig("checking")}
-				>
-					Use plan {money(config.checkingHint ?? 0)} instead
-				</button>
-			)}
+			<p className="section-note">
+				Budget settings stay in this browser. Your saved plan and bank records
+				stay unchanged.
+			</p>
+			<InputField
+				label={`${labels.cycleStart} (1–28)`}
+				hint={`Sets both cycle date ranges and the closing-balance date. Also changes ${labels.scheduledBills}, days left, and ${labels.dailyAllowance}.`}
+				type="number"
+				min={1}
+				max={28}
+				value={config.statementDay}
+				onChange={(event) =>
+					onUpdateConfig({
+						statementDay: Math.min(
+							28,
+							Math.max(1, Math.floor(Number(event.target.value) || 20)),
+						),
+						statementDaySet: true,
+					})
+				}
+			/>
+			<InputField
+				label={`${labels.reserve} ($)`}
+				hint={`Reduces ${labels.allowance} in This cycle and ${labels.unallocated} in Last cycle.`}
+				type="number"
+				min={0}
+				step="0.01"
+				value={config.reserve}
+				onChange={(event) =>
+					onUpdateConfig({
+						reserve: Math.max(0, Number(event.target.value) || 0),
+					})
+				}
+			/>
+			{overrideFields.map((field) => {
+				const setting = `${field.key}Override` as const;
+				const value = config[setting];
+				return (
+					<div key={field.key}>
+						<InputField
+							label={`${field.label} ($)`}
+							hint={`${value === null ? "Automatic value active." : "Override active."} Automatic: ${field.source}. ${field.effect} Leave empty to use the automatic value.`}
+							type="number"
+							min={0}
+							step="0.01"
+							placeholder={String(field.automatic)}
+							value={value ?? ""}
+							onChange={(event) =>
+								onUpdateConfig({
+									[setting]:
+										event.target.value === ""
+											? null
+											: Math.max(0, Number(event.target.value) || 0),
+								})
+							}
+						/>
+						{value !== null && (
+							<button
+								type="button"
+								className="text-button"
+								onClick={() => onResetConfig(field.key)}
+							>
+								Use automatic {field.label}
+							</button>
+						)}
+					</div>
+				);
+			})}
 			<fieldset className="cycle-accounts">
-				<legend>Accounts in available balance</legend>
+				<legend>{labels.cashAccounts}</legend>
+				<p className="section-note">
+					Feeds automatic {labels.cashBalance}, {labels.nextPaycheck},{" "}
+					{labels.remainingBills}, {labels.fixedBills}, and{" "}
+					{labels.cashPayments}. Overrides keep their entered values.
+				</p>
 				<div className="account-toggles">
 					{config.spendingAccounts.map((account) => {
 						const full = accountsById.get(account.id);
@@ -230,38 +197,17 @@ export function SafeSpendingConfigurePanel({
 					})}
 				</div>
 			</fieldset>
-			<label className="field">
-				<span>
-					Remaining bills this month ($) — {money(config.remainingHint.total)}{" "}
-					through {dateLabel(config.remainingHint.monthEnd, true)}
-				</span>
-				<input
-					type="number"
-					min={0}
-					step="10"
-					placeholder={String(Math.round(config.remainingHint.total))}
-					value={config.remainingOverride ?? ""}
-					onChange={(event) =>
-						onUpdateConfig({
-							remainingOverride:
-								event.target.value === ""
-									? null
-									: Math.max(0, Number(event.target.value) || 0),
-						})
-					}
-				/>
-			</label>
-			{config.remainingOverride !== null && (
-				<button
-					type="button"
-					className="text-button"
-					onClick={() => onResetConfig("remaining")}
-				>
-					Use projected {money(config.remainingHint.total)} instead
-				</button>
-			)}
 			<fieldset className="cycle-accounts">
-				<legend>Cards in cycle total</legend>
+				<legend>Tracked cards</legend>
+				<p className="section-note">
+					Feeds {labels.closedCards} in Last cycle and automatic{" "}
+					{labels.cardSpending} in This cycle. Changes both{" "}
+					{labels.recordedCharges} lists. Overrides keep their entered totals.
+				</p>
+				<p className="section-note">
+					{labels.closedCards} uses each selected card's latest saved balance at
+					or before the last cycle ends.
+				</p>
 				<div className="account-toggles">
 					{config.cards.map((card) => {
 						const full = accountsById.get(card.id);
@@ -279,7 +225,12 @@ export function SafeSpendingConfigurePanel({
 				</div>
 			</fieldset>
 			<fieldset className="cycle-accounts">
-				<legend>Recurring payments in this total</legend>
+				<legend>Included bills</legend>
+				<p className="section-note">
+					Feeds automatic {labels.remainingBills}, {labels.fixedBills}, and{" "}
+					{labels.cashPayments}. Also changes {labels.scheduledBills}. Overrides
+					keep their entered totals.
+				</p>
 				{billCandidates.length ? (
 					billCandidates.map((bill) => {
 						const checked = trackedBillIds.includes(bill.id);
@@ -298,7 +249,7 @@ export function SafeSpendingConfigurePanel({
 					})
 				) : (
 					<p className="section-note">
-						No recurring checking outflows found in the plan.
+						No recurring bills found for the selected cash accounts.
 					</p>
 				)}
 			</fieldset>

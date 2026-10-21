@@ -1,0 +1,30 @@
+export const SAFE_SPENDING_LABELS = {
+	cashBalance: "Cash balance",
+	cashAccounts: "Cash accounts",
+	cashAfterBills: "Cash after bills",
+	remainingBills: "Bills before month-end",
+	cashPayments: "Cash payments since balance",
+	billShortfall: "Projected bill shortfall",
+	nextPaycheck: "Next paycheck",
+	fixedBills: "Next month's bills",
+	cardSpending: "Card spending",
+	allowance: "Card spending allowance",
+	dailyAllowance: "Daily card allowance",
+	reserve: "Protected reserve",
+	closedCards: "Closed card balance",
+	closedCardBalances: "Closed card balances",
+	recordedCharges: "Recorded card charges",
+	paycheckBeforeReserve: "Paycheck before reserve",
+	unallocated: "Unallocated paycheck",
+	paycheckAllocation: "Paycheck allocation",
+	cycleStart: "Cycle start day",
+	scheduledBills: "Upcoming bills this cycle",
+} as const;
+
+const labels = SAFE_SPENDING_LABELS;
+
+export const SAFE_SPENDING_FORMULAS = {
+	cashAfterBills: `${labels.cashAfterBills} = ${labels.cashBalance} − ${labels.cashPayments} − ${labels.remainingBills}.`,
+	allowance: `${labels.allowance} = ${labels.nextPaycheck} − ${labels.fixedBills} − ${labels.cardSpending} − ${labels.reserve}.`,
+	unallocated: `${labels.unallocated} = ${labels.nextPaycheck} − ${labels.fixedBills} − ${labels.closedCards} − ${labels.reserve}.`,
+} as const;

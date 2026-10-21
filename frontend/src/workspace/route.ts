@@ -1,7 +1,10 @@
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { Account, Evaluation, Movement } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/planEdits.ts";
-import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
+import {
+	SAFE_SPENDING_DETAIL_TABS,
+	type SafeSpendingDetailTab,
+} from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import { pages, type Page } from "./navigation.ts";
 
 // URL-driven overlays. The hash carries the page plus at most one overlay:
@@ -11,11 +14,9 @@ import { pages, type Page } from "./navigation.ts";
 // bookmarks, and direct loads all resolve through the same parser. Page-only
 // hashes are unchanged: every overlay form appends segments to them.
 
-export const SAFE_SPENDING_TABS: readonly SafeSpendingDetailTab[] = [
-	"mandatory",
-	"cycle",
-	"configure",
-];
+export const SAFE_SPENDING_TABS = SAFE_SPENDING_DETAIL_TABS.map(
+	(tab) => tab.id,
+);
 
 export type OverlayRoute =
 	| { type: "account"; key: string }
@@ -146,14 +147,15 @@ function scopedEditor(page: Page, key: string): OverlayRoute | null {
 }
 
 function parseSafeSpendingDetail(parts: string[]): OverlayRoute {
-	const [tabOrEdit, maybeEdit, key, ...extra] = parts;
+	const [requestedTab, maybeEdit, key, ...extra] = parts;
+	const tabOrEdit = requestedTab === "mandatory" ? "cycle" : requestedTab;
 	if (extra.length > 0) return { type: "invalid" };
 	if (tabOrEdit === "edit-movement") {
 		// `#outlook/safe-spending-detail/edit-movement/<id>`
 		return maybeEdit
 			? {
 					type: "safeSpendingDetail",
-					tab: "mandatory",
+					tab: "cycle",
 					editMovement: maybeEdit,
 				}
 			: { type: "invalid" };
@@ -170,7 +172,7 @@ function parseSafeSpendingDetail(parts: string[]): OverlayRoute {
 function isSafeSpendingTab(
 	value: string | undefined,
 ): value is SafeSpendingDetailTab {
-	return value === "mandatory" || value === "cycle" || value === "configure";
+	return SAFE_SPENDING_TABS.some((tab) => tab === value);
 }
 
 function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
@@ -182,7 +184,7 @@ function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
 	if (first === "safe-spending-detail") {
 		if (rest.length > 4) return { type: "invalid" };
 		if (second === undefined)
-			return { type: "safeSpendingDetail", tab: "mandatory" };
+			return { type: "safeSpendingDetail", tab: "cycle" };
 		return parseSafeSpendingDetail(rest.slice(1));
 	}
 	if (rest.length > 2) return { type: "invalid" };
@@ -197,7 +199,7 @@ function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
 			case "safe-spending":
 				return { type: "safe-spending" };
 			case "safe-spending-detail":
-				return { type: "safeSpendingDetail", tab: "mandatory" };
+				return { type: "safeSpendingDetail", tab: "cycle" };
 			case "new":
 				return homeEditor(page);
 			default:
