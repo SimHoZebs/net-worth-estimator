@@ -23,6 +23,7 @@
 	}
 	.seg-bar > span {
 		display: block;
+		width: var(--segment-width);
 		height: 100%;
 		min-width: 3px;
 	}

@@ -227,8 +227,39 @@
 			transform: rotate(360deg);
 		}
 	}
+	.progress-track {
+		height: 5px;
+		background: var(--track);
+		border-radius: 4px;
+		overflow: hidden;
+	}
+	.progress-track > span {
+		display: block;
+		width: var(--progress-width);
+		height: 100%;
+		background: var(--track-fill);
+		border-radius: inherit;
+		transition: width 0.35s;
+	}
+	.progress-amber {
+		background: var(--accent-amber-bg);
+	}
+	.progress-amber > span {
+		background: var(--accent-amber-text);
+	}
+	.progress-label {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		color: var(--muted);
+		font-size: 9px;
+		margin-bottom: 8px;
+	}
 	.skeleton {
 		display: block;
+		width: var(--skeleton-width, auto);
+		height: var(--skeleton-height, auto);
 		border-radius: 6px;
 		background: var(--line-strong);
 		opacity: 0.55;

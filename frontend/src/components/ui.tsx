@@ -14,6 +14,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { cssVariables } from "./cssVariables.ts";
 import "./ui.css";
 
 export function IconButton({
@@ -266,7 +267,11 @@ export function Progress({
 			aria-valuemin={0}
 			aria-valuemax={100}
 		>
-			<span style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+			<span
+				style={cssVariables({
+					"--progress-width": `${Math.min(100, Math.max(0, value))}%`,
+				})}
+			/>
 		</div>
 	);
 }
@@ -286,16 +291,11 @@ export function Skeleton({
 			role="status"
 			aria-label={label}
 			aria-busy="true"
-			style={{
-				...(width !== undefined
-					? { width: typeof width === "number" ? `${width}px` : width }
-					: {}),
-				...(height !== undefined
-					? {
-							height: typeof height === "number" ? `${height}px` : height,
-						}
-					: {}),
-			}}
+			style={cssVariables({
+				"--skeleton-width": typeof width === "number" ? `${width}px` : width,
+				"--skeleton-height":
+					typeof height === "number" ? `${height}px` : height,
+			})}
 		/>
 	);
 }

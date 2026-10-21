@@ -6,6 +6,7 @@ import { type Account, type Plan, validatePlan } from "../../domain/model.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { parseDisplayNumber } from "../editors/formValues.ts";
 import { InputField, SelectField } from "../Field.tsx";
+import { cssVariables } from "../cssVariables.ts";
 import { Badge, ErrorNotice } from "../ui.tsx";
 import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
 
@@ -177,28 +178,30 @@ export function AccountDetails({
 					>
 						<div
 							className="balance-range-fill"
-							style={{
-								left: `${rangeStart}%`,
-								width: `${Math.max(0, rangeEnd - rangeStart)}%`,
-							}}
+							style={cssVariables({
+								"--balance-start": `${rangeStart}%`,
+								"--balance-width": `${Math.max(0, rangeEnd - rangeStart)}%`,
+							})}
 						/>
 						<div
 							className="balance-range-thumb"
 							aria-hidden="true"
-							style={{ left: `${rangeStart}%` }}
+							style={cssVariables({ "--balance-position": `${rangeStart}%` })}
 							title={`Protected ${money(numbers.minValue)}`}
 						/>
 						{numbers.maxValue !== null && (
 							<div
 								className="balance-range-thumb"
 								aria-hidden="true"
-								style={{ left: `${rangeEnd}%` }}
+								style={cssVariables({ "--balance-position": `${rangeEnd}%` })}
 								title={`Ceiling ${money(numbers.maxValue)}`}
 							/>
 						)}
 						<div
 							className="balance-range-marker"
-							style={{ left: `${toPercent(numbers.balanceValue)}%` }}
+							style={cssVariables({
+								"--balance-position": `${toPercent(numbers.balanceValue)}%`,
+							})}
 							title={`Current balance ${money(numbers.balanceValue)}`}
 						/>
 					</div>

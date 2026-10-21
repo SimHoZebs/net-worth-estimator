@@ -1,4 +1,5 @@
 import { money } from "../domain/format.ts";
+import { cssVariables } from "./cssVariables.ts";
 import "./SegmentedBar.css";
 
 /**
@@ -43,9 +44,9 @@ export function SegmentedBar({
 						<span
 							key={segment.label}
 							className={`seg seg-${segment.tone} pat-${segment.pattern}`}
-							style={{
-								width: `${(segment.amount / Math.max(total, 1)) * 100}%`,
-							}}
+							style={cssVariables({
+								"--segment-width": `${(segment.amount / Math.max(total, 1)) * 100}%`,
+							})}
 						/>
 					) : null,
 				)}
