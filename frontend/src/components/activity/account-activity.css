@@ -124,6 +124,8 @@
 	}
 	.balance-range-fill {
 		position: absolute;
+		left: var(--balance-start);
+		width: var(--balance-width);
 		top: 0;
 		bottom: 0;
 		background: var(--track-fill);
@@ -131,6 +133,7 @@
 	}
 	.balance-range-marker {
 		position: absolute;
+		left: var(--balance-position);
 		top: -3px;
 		bottom: -3px;
 		width: 2px;
@@ -139,6 +142,7 @@
 	}
 	.balance-range-thumb {
 		position: absolute;
+		left: var(--balance-position);
 		top: 50%;
 		width: 16px;
 		height: 16px;

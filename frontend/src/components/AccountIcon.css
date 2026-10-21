@@ -18,7 +18,7 @@
 		width: 8px;
 		height: 8px;
 		border-radius: 50%;
-		background: var(--subtle);
+		background: var(--account-color, var(--subtle));
 		display: inline-block;
 		flex-shrink: 0;
 	}
@@ -33,6 +33,15 @@
 	.account-investment {
 		background: var(--accent-green-bg);
 		color: var(--accent-green-text);
+	}
+	.account-custom-color {
+		background-color: color-mix(
+			in srgb,
+			var(--account-color) 22%,
+			var(--surface)
+		);
+		border-color: color-mix(in srgb, var(--account-color) 42%, var(--line));
+		color: var(--account-color);
 	}
 	.account-entries {
 		list-style: none;
