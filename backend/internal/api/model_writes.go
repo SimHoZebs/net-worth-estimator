@@ -52,13 +52,14 @@ func currentRevision(s *Server) (string, error) {
 	return store.DocumentETag(document)
 }
 
-// applyRowChange validates one in-memory mutation and persists it with
-// persist when clean. It returns the issues and post-write revision.
-func applyRowChange[T any](s *Server, mutate func(document *types.FinancialModelDocument), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, error) {
+// runRowWrite validates and persists one plan-entry change, then computes
+// its revision from the stored snapshot used for response warnings.
+// Handlers wrap row/issues/persisted/revision in their output shape.
+func runRowWrite[T any](s *Server, mutate func(document *types.FinancialModelDocument), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
 	var zero T
 	document, err := s.store.LoadDocument()
 	if err != nil {
-		return zero, nil, false, huma.Error500InternalServerError(err.Error())
+		return zero, nil, false, "", huma.Error500InternalServerError(err.Error())
 	}
 	if document == nil {
 		document = &types.FinancialModelDocument{Evaluations: types.EmptyEvaluationTables()}
@@ -69,40 +70,32 @@ func applyRowChange[T any](s *Server, mutate func(document *types.FinancialModel
 		issues = []types.ModelValidationIssue{}
 	}
 	if hasErrorIssues(issues) {
-		return zero, issues, false, nil
+		// The invalid candidate differs from stored state. Reload its identity.
+		revision, err := currentRevision(s)
+		if err != nil {
+			return zero, nil, false, "", huma.Error500InternalServerError(err.Error())
+		}
+		return zero, issues, false, revision, nil
 	}
 	row, err := persist()
 	if err != nil {
-		return zero, nil, false, rowWriteError(err)
+		return zero, nil, false, "", rowWriteError(err)
 	}
 	// Re-read warnings against the persisted document so the response
 	// reflects stored state, not the request echo.
 	document, err = s.store.LoadDocument()
 	if err != nil {
-		return zero, nil, false, huma.Error500InternalServerError(err.Error())
+		return zero, nil, false, "", huma.Error500InternalServerError(err.Error())
 	}
 	issues = domainValidate(document)
 	if issues == nil {
 		issues = []types.ModelValidationIssue{}
 	}
-	return row, issues, true, nil
-}
-
-// runRowWrite validates, persists, and loads the post-write revision in one
-// call. Handlers return early on err and wrap row/issues/persisted/revision
-// in their output shape.
-func runRowWrite[T any](s *Server, mutate func(document *types.FinancialModelDocument), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
-	row, issues, persisted, err := applyRowChange(s, mutate, persist)
+	revision, err := store.DocumentETag(document)
 	if err != nil {
-		var zero T
-		return zero, issues, persisted, "", err
+		return zero, nil, false, "", huma.Error500InternalServerError(err.Error())
 	}
-	revision, revErr := currentRevision(s)
-	if revErr != nil {
-		var zero T
-		return zero, nil, false, "", huma.Error500InternalServerError(revErr.Error())
-	}
-	return row, issues, persisted, revision, nil
+	return row, issues, true, revision, nil
 }
 
 func replaceByID[T any](rows []T, id string, getID func(T) string, value T) []T {
