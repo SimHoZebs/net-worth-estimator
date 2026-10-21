@@ -16,6 +16,8 @@ npm --prefix frontend run build
 
 `typecheck` covers `frontend/tsconfig.json` and, separately, `frontend/tests/tsconfig.json`.
 
+Font roles follow `frontend/src/styles/README.md`. `npm --prefix frontend run lint:typography` warns about font choices outside the shared owner without failing the command. The normal lint gate also runs it. Unit tests cover the lint rule's detection logic, not exact fonts, role classes, or rendered sizes.
+
 ## Frontend Browser Tests
 
 The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness on port 8799, seeded from `frontend/tests/fixtures/`, and the Vite dev server on 5178 pointed at it. No running backend of your own is needed, and none of your data is touched.
