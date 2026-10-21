@@ -186,11 +186,15 @@ describe("parseHash", () => {
 		});
 		expect(parseHash("#outlook/safe-spending-detail")).toEqual({
 			page: "outlook",
-			overlay: { type: "safeSpendingDetail", tab: "mandatory" },
+			overlay: { type: "safeSpendingDetail", tab: "cycle" },
 		});
 		expect(parseHash("#outlook/safe-spending-detail/cycle")).toEqual({
 			page: "outlook",
 			overlay: { type: "safeSpendingDetail", tab: "cycle" },
+		});
+		expect(parseHash("#outlook/safe-spending-detail/last-cycle")).toEqual({
+			page: "outlook",
+			overlay: { type: "safeSpendingDetail", tab: "last-cycle" },
 		});
 		expect(
 			parseHash("#outlook/safe-spending-detail/cycle/edit-movement/invest"),
@@ -208,7 +212,7 @@ describe("parseHash", () => {
 			page: "outlook",
 			overlay: {
 				type: "safeSpendingDetail",
-				tab: "mandatory",
+				tab: "cycle",
 				editMovement: "invest",
 			},
 		});
@@ -218,7 +222,7 @@ describe("parseHash", () => {
 		});
 		expect(parseHash("#accounts/safe-spending-detail")).toEqual({
 			page: "accounts",
-			overlay: { type: "safeSpendingDetail", tab: "mandatory" },
+			overlay: { type: "safeSpendingDetail", tab: "cycle" },
 		});
 	});
 
@@ -499,6 +503,16 @@ describe("hash builders round-trip through the parser", () => {
 	});
 
 	test("safe spending detail and discard round-trip", () => {
+		expect(
+			parseHash(safeSpendingDetailHash("outlook", "last-cycle", "invest")),
+		).toEqual({
+			page: "outlook",
+			overlay: {
+				type: "safeSpendingDetail",
+				tab: "last-cycle",
+				editMovement: "invest",
+			},
+		});
 		expect(safeSpendingDetailHash("outlook", "cycle")).toBe(
 			"#outlook/safe-spending-detail/cycle",
 		);

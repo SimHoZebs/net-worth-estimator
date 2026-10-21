@@ -1,7 +1,7 @@
 import { TransactionRow } from "../../../components/activity/TransactionRow.tsx";
 import { TransactionTable } from "../../../components/activity/TransactionTable.tsx";
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
-import { money } from "../../../domain/format.ts";
+import { exactMoney } from "../../../domain/format.ts";
 import type { Movement } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 
@@ -11,16 +11,18 @@ export function SafeSpendingSectionHeader({
 	total,
 }: {
 	title: string;
-	subtitle: string;
-	total: number;
+	subtitle?: string;
+	total?: number;
 }) {
 	return (
 		<div className="section-top">
 			<div className="safe-spending-section-title">
 				<h3>{title}</h3>
-				<p className="section-note">{subtitle}</p>
+				{subtitle && <p className="section-note">{subtitle}</p>}
 			</div>
-			<strong className="safe-spending-total">{money(total)}</strong>
+			{total !== undefined && (
+				<strong className="safe-spending-total">{exactMoney(total)}</strong>
+			)}
 		</div>
 	);
 }
