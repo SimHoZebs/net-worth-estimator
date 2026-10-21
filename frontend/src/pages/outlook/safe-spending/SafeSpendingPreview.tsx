@@ -1,16 +1,11 @@
 import { CalendarDays } from "lucide-react";
 import { useMemo, useState } from "react";
-import { accountTransactions } from "../../../domain/accountActivity.ts";
+import type { BackendCheckpoint } from "../../../api/contracts.ts";
 import {
 	DEFAULT_TRANSACTION_ORDER,
 	sortTransactionsByDate,
 	type TransactionOrder,
 } from "../../../domain/transactionSort.ts";
-import {
-	cycleSpentSoFar,
-	isCycleOutflow,
-	resolveStatementCycle,
-} from "../../../domain/cardCycle.ts";
 import {
 	dateLabel,
 	money,
@@ -25,7 +20,6 @@ import {
 	checkingShortfall,
 	cycleAllowance,
 	filterMovementsById,
-	groupMandatorySpending,
 	mandatoryTransactions,
 	nextMonthObligations,
 	nextPaycheck,
@@ -40,8 +34,14 @@ import { SafeSpendingBillsPanel } from "./SafeSpendingBillsPanel.tsx";
 import { SafeSpendingConfigurePanel } from "./SafeSpendingConfigurePanel.tsx";
 import { SafeSpendingCyclePanel } from "./SafeSpendingCyclePanel.tsx";
 import { SafeSpendingDetailShell } from "./SafeSpendingDetailShell.tsx";
-import type { SafeSpendingDetailTab } from "./safeSpendingDetailModel.ts";
+import {
+	isSafeSpendingCycleTab,
+	type SafeSpendingDetailTab,
+} from "./safeSpendingDetailModel.ts";
 import { useSafeSpendingSettings } from "../../../state/useSafeSpendingSettings.ts";
+import { useCardCycleActivity } from "./useCardCycleActivity.ts";
+import { HouseholdBudgetSummary } from "./HouseholdBudgetSummary.tsx";
+import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
@@ -49,6 +49,7 @@ const EMPTY_MOVEMENTS: Projection["movements"] = [];
 
 export function SafeSpendingPreview({
 	plan,
+	checkpoints,
 	projection,
 	pending = false,
 	detail,
@@ -56,6 +57,7 @@ export function SafeSpendingPreview({
 	onTabChange,
 }: {
 	plan: Plan;
+	checkpoints: BackendCheckpoint[];
 	projection: Projection | null;
 	pending?: boolean;
 	detail: SafeSpendingDetailTab | null;
@@ -99,54 +101,17 @@ export function SafeSpendingPreview({
 		return selected.length ? selected : fallback.filter((id) => known.has(id));
 	}, [settings.accountIds, cards]);
 
-	const cycle = useMemo(
-		() =>
-			resolveStatementCycle({
-				todayIso: displayToday,
-				statementDay: settings.statementDay,
-			}),
-		[displayToday, settings.statementDay],
-	);
-
-	const perAccount = useMemo(
-		() =>
-			!projection
-				? []
-				: trackedIds.map((accountId) => {
-						const transactions = accountTransactions({
-							accountId,
-							plan,
-							projection,
-						});
-						const name =
-							cards.find((card) => card.id === accountId)?.name ?? accountId;
-						return {
-							accountId,
-							name,
-							derived: cycleSpentSoFar({
-								transactions,
-								cycleStart: cycle.cycleStart,
-								todayIso: displayToday,
-							}),
-							inCycle: transactions.filter(
-								(transaction) =>
-									isCycleOutflow(transaction) &&
-									transaction.date >= cycle.cycleStart &&
-									transaction.date <= displayToday,
-							),
-						};
-					}),
-		[trackedIds, cards, plan, projection, cycle, displayToday],
-	);
-	const cycleTransactions = useMemo(
-		() =>
-			sortTransactionsByDate({
-				items: perAccount.flatMap((item) => item.inCycle),
-				getDate: (transaction) => transaction.date,
-				getId: (transaction) => transaction.id,
-				order: transactionOrder,
-			}),
-		[perAccount, transactionOrder],
+	const { cycle, closedCycle, perAccount, chargeCycles } = useCardCycleActivity(
+		{
+			plan,
+			checkpoints,
+			projection,
+			cards,
+			trackedIds,
+			statementDay: settings.statementDay,
+			displayToday,
+			transactionOrder,
+		},
 	);
 
 	const spendableAccounts = useMemo(
@@ -247,47 +212,14 @@ export function SafeSpendingPreview({
 		return selected.length ? selected : billCandidates.map((bill) => bill.id);
 	}, [settings.movementIds, billCandidates]);
 
-	const mandatoryThisMonth = useMemo(() => {
+	const billTransactions = useMemo(() => {
 		if (!spendingIds.length) return [];
-		return groupMandatorySpending({
-			movements: obligationMovements,
-			checkingIds: spendingIds,
-			start: shiftDate({ date: displayToday, days: 1 }),
-			end: remainingDerived.monthEnd,
-		});
-	}, [
-		obligationMovements,
-		spendingIds,
-		displayToday,
-		remainingDerived.monthEnd,
-	]);
-	const cycleThisGroups = useMemo(() => {
-		if (!spendingIds.length) return [];
-		return groupMandatorySpending({
-			movements: obligationMovements,
-			checkingIds: spendingIds,
-			start: shiftDate({ date: displayToday, days: 1 }),
-			end: cycle.cycleEnd,
-		});
-	}, [obligationMovements, spendingIds, displayToday, cycle.cycleEnd]);
-	const thisMonthTransactions = useMemo(() => {
-		if (!spendingIds.length) return [];
-		const range =
-			settings.mandatoryFrame === "calendar"
-				? {
-						start: shiftDate({ date: displayToday, days: 1 }),
-						end: remainingDerived.monthEnd,
-					}
-				: {
-						start: shiftDate({ date: displayToday, days: 1 }),
-						end: cycle.cycleEnd,
-					};
 		return sortTransactionsByDate({
 			items: mandatoryTransactions({
 				movements: obligationMovements,
 				checkingIds: spendingIds,
-				start: range.start,
-				end: range.end,
+				start: shiftDate({ date: displayToday, days: 1 }),
+				end: cycle.cycleEnd,
 				plan,
 			}),
 			getDate: (transaction) => transaction.date,
@@ -298,9 +230,7 @@ export function SafeSpendingPreview({
 		obligationMovements,
 		spendingIds,
 		plan,
-		settings.mandatoryFrame,
 		displayToday,
-		remainingDerived.monthEnd,
 		cycle.cycleEnd,
 		transactionOrder,
 	]);
@@ -366,15 +296,25 @@ export function SafeSpendingPreview({
 		fullDaysLeft,
 		cycleStart: cycle.cycleStart,
 		cycleEnd: cycle.cycleEnd,
+		closedCycle,
 		committedTotal: spent,
+		recordedTotal: derivedSpent,
 		committedByCard: perAccount.map((item) => ({
 			id: item.accountId,
 			name: item.name,
 			amount: item.derived,
 		})),
 		paycheckAmount: paycheck,
+		paycheckDate: paycheckDerived?.date ?? null,
 		fixedAmount: fixedObligations,
 		reserveAmount: settings.reserve,
+	};
+	const paycheckDetails = {
+		paycheck,
+		fixed: fixedObligations,
+		reserve: settings.reserve,
+		spent,
+		allowance,
 	};
 
 	const toggleAccount = (accountId: string) => {
@@ -414,22 +354,12 @@ export function SafeSpendingPreview({
 		updateSettings({ spendingAccountIds: next.length ? next : null });
 	};
 
-	const activeThisMonth =
-		settings.mandatoryFrame === "calendar"
-			? {
-					title: "Due before month-end",
-					subtitle: `${dateLabel(displayToday, true)} to ${dateLabel(remainingDerived.monthEnd, true)}`,
-					total: remainingObligations,
-					groups: mandatoryThisMonth,
-					transactions: thisMonthTransactions,
-				}
-			: {
-					title: "Due before cycle end",
-					subtitle: `${dateLabel(displayToday, true)} to ${dateLabel(cycle.cycleEnd, true)}`,
-					total: sum(cycleThisGroups.map((group) => group.total)),
-					groups: cycleThisGroups,
-					transactions: thisMonthTransactions,
-				};
+	const billsSection = {
+		title: labels.scheduledBills,
+		subtitle: "Scheduled amounts",
+		total: sum(billTransactions.map((transaction) => transaction.requested)),
+		transactions: billTransactions,
+	};
 	// Plan-derived frame (header, cycle dates) renders regardless; only the
 	// computed safe spending body skeletonizes while the projection is absent.
 	if (pending)
@@ -460,7 +390,7 @@ export function SafeSpendingPreview({
 			<button
 				type="button"
 				className="safe-spending-open"
-				onClick={() => onDetail("mandatory")}
+				onClick={() => onDetail("cycle")}
 			>
 				<span className="sr-only">Open safe spending details</span>
 			</button>
@@ -476,8 +406,8 @@ export function SafeSpendingPreview({
 				{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
 			</p>
 			<div className="spend-answer">
-				<span>{allowance >= 0 ? "You can spend" : "Over budget"}</span>
-				<strong className="type-value">{money(Math.abs(allowance))}</strong>
+				<span>{labels.allowance}</span>
+				<strong className="type-value">{money(allowance)}</strong>
 				<span>
 					{allowance >= 0
 						? `${money(dailySafe)} a day`
@@ -486,15 +416,19 @@ export function SafeSpendingPreview({
 			</div>
 			<div className="cycle-remaining">
 				<div>
-					<span>Balance</span>
+					<span>{labels.cashBalance}</span>
 					<strong>{money(checking)}</strong>
 				</div>
 				<div>
-					<span>Bills due</span>
+					<span>{labels.remainingBills}</span>
 					<strong>{money(remainingObligations)}</strong>
 				</div>
 				<div>
-					<span>Left to spend</span>
+					<span>
+						{shortWindow.total > 0
+							? labels.billShortfall
+							: labels.cashAfterBills}
+					</span>
 					<strong>
 						{money(shortWindow.total > 0 ? -shortWindow.total : cushion)}
 					</strong>
@@ -506,67 +440,71 @@ export function SafeSpendingPreview({
 					className="text-button"
 					onClick={(event) => {
 						event.stopPropagation();
-						onDetail("mandatory");
+						onDetail("cycle");
 					}}
 				>
-					Bills
+					This cycle
 				</button>
 				<button
 					type="button"
 					className="text-button"
 					onClick={(event) => {
 						event.stopPropagation();
-						onDetail("cycle");
+						onDetail("last-cycle");
 					}}
 				>
-					Charges
+					Last cycle
 				</button>
 			</div>
 			{detail && (
 				<SafeSpendingDetailShell
 					tab={detail}
 					onTabChange={onTabChange}
-					cycleCount={cycleTransactions.length}
+					cycleCounts={Object.fromEntries(
+						Object.entries(chargeCycles).map(([id, entry]) => [
+							id,
+							entry.transactions.length,
+						]),
+					)}
+					range={
+						isSafeSpendingCycleTab(detail) ? chargeCycles[detail] : undefined
+					}
 					onClose={() => onDetail(null)}
 				>
-					{detail === "mandatory" && (
-						<SafeSpendingBillsPanel
-							heroes={heroes}
-							cashNow={{
-								checking,
-								spentSinceStart,
-								bills: remainingObligations,
-								cushion,
-								since: plan.startDate.slice(0, 10),
-								short: shortWindow.total,
-								firstShort: shortWindow.firstDate,
-							}}
-							paycheck={{
-								paycheck,
-								fixed: fixedObligations,
-								reserve: settings.reserve,
-								spent,
-								allowance,
-							}}
-							section={activeThisMonth}
-							frame={settings.mandatoryFrame}
-							onFrameChange={(frame) =>
-								updateSettings({ mandatoryFrame: frame })
-							}
-							plan={plan}
-							transactionOrder={transactionOrder}
-							onTransactionOrderChange={setTransactionOrder}
-						/>
-					)}
-					{detail === "cycle" && (
-						<SafeSpendingCyclePanel
-							cycleStart={cycle.cycleStart}
-							cycleEnd={cycle.cycleEnd}
-							transactions={cycleTransactions}
-							plan={plan}
-							transactionOrder={transactionOrder}
-							onTransactionOrderChange={setTransactionOrder}
-						/>
+					{isSafeSpendingCycleTab(detail) && (
+						<div className="safe-spending-mandatory">
+							{detail === "cycle" ? (
+								<SafeSpendingBillsPanel
+									heroes={heroes}
+									cashNow={{
+										checking,
+										spentSinceStart,
+										bills: remainingObligations,
+										cushion,
+										since: plan.startDate.slice(0, 10),
+										short: shortWindow.total,
+										firstShort: shortWindow.firstDate,
+									}}
+									paycheck={paycheckDetails}
+									section={billsSection}
+									plan={plan}
+									transactionOrder={transactionOrder}
+									onTransactionOrderChange={setTransactionOrder}
+								/>
+							) : (
+								<HouseholdBudgetSummary
+									heroes={heroes}
+									paycheck={paycheckDetails}
+								/>
+							)}
+							<SafeSpendingCyclePanel
+								key={detail}
+								cycle={chargeCycles[detail]}
+								plan={plan}
+								transactionOrder={transactionOrder}
+								onTransactionOrderChange={setTransactionOrder}
+							/>
+						</div>
 					)}
 					{detail === "configure" && (
 						<SafeSpendingConfigurePanel

@@ -8,20 +8,16 @@ import {
 	SafeSpendingSectionHeader,
 } from "./TransactionSectionView.tsx";
 import { TransactionSortButton } from "../../../components/activity/TransactionSortButton.tsx";
-import { dateLabel } from "../../../domain/format.ts";
+import type { SafeSpendingChargeCycle } from "./safeSpendingDetailModel.ts";
 
 export function SafeSpendingCyclePanel({
-	cycleStart,
-	cycleEnd,
-	transactions,
+	cycle,
 	plan,
 	transactionOrder,
 	onTransactionOrderChange,
 	showHeaders = false,
 }: {
-	cycleStart: string;
-	cycleEnd: string;
-	transactions: AccountTransaction[];
+	cycle: SafeSpendingChargeCycle;
 	plan: Plan;
 	transactionOrder: TransactionOrder;
 	onTransactionOrderChange: (order: TransactionOrder) => void;
@@ -40,13 +36,17 @@ export function SafeSpendingCyclePanel({
 	return (
 		<div className="safe-spending-mandatory">
 			<SafeSpendingSectionHeader
-				title="Card charges in this cycle"
-				subtitle={`${dateLabel(cycleStart, true)} to ${dateLabel(cycleEnd, true)}`}
-				total={transactions.reduce(
-					(total, transaction) => total + transaction.amount,
-					0,
-				)}
+				title={cycle.title}
+				total={
+					cycle.showTotal
+						? cycle.transactions.reduce(
+								(total, transaction) => total + transaction.amount,
+								0,
+							)
+						: undefined
+				}
 			/>
+			{cycle.note && <p className="section-note">{cycle.note}</p>}
 			<div className="table-toolbar">
 				<TransactionSortButton
 					order={transactionOrder}
@@ -54,9 +54,9 @@ export function SafeSpendingCyclePanel({
 				/>
 			</div>
 			<TransactionSectionView
-				transactions={transactions}
-				caption="Card charges in this cycle"
-				emptyMessage="No charges in this cycle yet."
+				transactions={cycle.transactions}
+				caption={cycle.title}
+				emptyMessage={cycle.emptyMessage}
 				movements={movements}
 				onInspect={inspect}
 				order={transactionOrder}

@@ -1,15 +1,45 @@
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
-import type { MandatorySpendingGroup } from "../../../domain/safeSpending.ts";
+import type { ClosedCardBalances } from "../../../domain/closedCardBalances.ts";
 
-export type SafeSpendingDetailTab = "mandatory" | "cycle" | "configure";
+export const SAFE_SPENDING_DETAIL_TABS = [
+	{ id: "cycle", label: "This cycle", view: "charges" },
+	{ id: "last-cycle", label: "Last cycle", view: "charges" },
+	{ id: "configure", label: "Configure", view: "configure" },
+] as const;
 
-export type MandatoryFrame = "calendar" | "cycle";
+export type SafeSpendingDetailTab =
+	(typeof SAFE_SPENDING_DETAIL_TABS)[number]["id"];
+export type SafeSpendingCycleTab = Extract<
+	(typeof SAFE_SPENDING_DETAIL_TABS)[number],
+	{ view: "charges" }
+>["id"];
+
+export function isSafeSpendingCycleTab(
+	tab: SafeSpendingDetailTab,
+): tab is SafeSpendingCycleTab {
+	return SAFE_SPENDING_DETAIL_TABS.some(
+		(item) => item.id === tab && item.view === "charges",
+	);
+}
+export type SafeSpendingClosedCycle = ClosedCardBalances & {
+	start: string;
+	end: string;
+};
+
+export interface SafeSpendingChargeCycle {
+	start: string;
+	end: string;
+	title: string;
+	emptyMessage: string;
+	transactions: AccountTransaction[];
+	note?: string;
+	showTotal?: boolean;
+}
 
 export interface SafeSpendingMandatorySection {
 	title: string;
 	subtitle: string;
 	total: number;
-	groups: MandatorySpendingGroup[];
 	transactions: AccountTransaction[];
 }
 export interface CashNowDecomposition {
@@ -45,9 +75,12 @@ export interface SafeSpendingHeroes {
 	fullDaysLeft: number;
 	cycleStart: string;
 	cycleEnd: string;
+	closedCycle: SafeSpendingClosedCycle;
 	committedTotal: number;
+	recordedTotal: number;
 	committedByCard: { id: string; name: string; amount: number }[];
 	paycheckAmount: number;
+	paycheckDate: string | null;
 	fixedAmount: number;
 	reserveAmount: number;
 }

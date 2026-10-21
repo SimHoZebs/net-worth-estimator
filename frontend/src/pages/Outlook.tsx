@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import type { BackendCheckpoint } from "../api/contracts.ts";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
 import type { Projection } from "../domain/result.ts";
@@ -11,6 +12,8 @@ import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
 import type { SafeSpendingDetailTab } from "./outlook/safe-spending/safeSpendingDetailModel.ts";
 import { SafeSpendingPreview } from "./outlook/safe-spending/SafeSpendingPreview.tsx";
 import "./outlook/outlook.css";
+
+const EMPTY_CHECKPOINTS: BackendCheckpoint[] = [];
 
 type OutlookProps = {
 	onEvidence: () => void;
@@ -56,6 +59,9 @@ function OutlookContent({
 	// Every data input subscribes where the query is declared; only UI
 	// callbacks arrive as props.
 	const workspace = useWorkspaceStore((state) => state.workspace);
+	const checkpoints = useWorkspaceStore(
+		(state) => state.serverDocument?.checkpoints ?? EMPTY_CHECKPOINTS,
+	);
 	const plan = workspace?.draft ?? workspace?.saved ?? null;
 	const years = useUiStore((state) => state.years);
 	const setYears = useUiStore((state) => state.setYears);
@@ -183,6 +189,7 @@ function OutlookContent({
 			<div className="outlook-secondary" aria-busy={pending}>
 				<SafeSpendingPreview
 					plan={plan}
+					checkpoints={checkpoints}
 					projection={base}
 					pending={pending}
 					detail={safeSpendingDetail}
