@@ -18,6 +18,11 @@
 		color: var(--accent-green-text);
 		background: var(--accent-green-bg);
 	}
+	.evaluation-card .icon-button[aria-pressed="true"] {
+		background: var(--accent-green-bg);
+		color: var(--accent-green-text);
+		border-color: var(--accent-green-border);
+	}
 	.evaluation-card h2 {
 		margin-top: 20px;
 		font-size: 19px;

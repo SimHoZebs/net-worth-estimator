@@ -1,107 +1,20 @@
-import { Check, Flag, Pin, Plus } from "lucide-react";
+import { Flag, Plus } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import {
-	Badge,
 	EmptyState,
 	ErrorNotice,
-	IconButton,
-	Progress,
 	ProjectionUpdating,
 } from "../components/ui.tsx";
 import "./evaluations/evaluations.css";
-import { dateLabel } from "../domain/format.ts";
 import type { Evaluation, Plan } from "../domain/model.ts";
 import { removeEvaluation, setEvaluationEnabled } from "../domain/planEdits.ts";
-import type {
-	OtherEvaluation,
-	Projection,
-	RangeResult,
-} from "../domain/result.ts";
+import type { Projection, RangeResult } from "../domain/result.ts";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
-import {
-	EvaluationCard,
-	type EvaluationPin,
-} from "./evaluations/EvaluationCard.tsx";
-
-function OtherEvaluationCard({
-	item,
-	pin = null,
-}: {
-	item: OtherEvaluation;
-	pin?: EvaluationPin | null;
-}) {
-	const pinned = pin?.pinned ?? false;
-	const onPinChange = pin?.onPinChange ?? null;
-	const pinDisabled = pin?.disabled ?? false;
-	const satisfied = item.enabled && item.status === "satisfied";
-	const tone =
-		!item.enabled || item.status === "indeterminate"
-			? "neutral"
-			: item.status === "satisfied"
-				? "green"
-				: item.status === "warning"
-					? "amber"
-					: "neutral";
-	return (
-		<section className={`evaluation-card ${item.enabled ? "" : "is-excluded"}`}>
-			<div className="section-top">
-				<span className="evaluation-icon">
-					{satisfied ? <Check size={23} /> : <Flag size={23} />}
-				</span>
-				{onPinChange && (
-					<div className="table-actions">
-						<IconButton
-							icon={Pin}
-							label={
-								pinned
-									? `Unpin ${item.name} from Outlook`
-									: `Pin ${item.name} to Outlook`
-							}
-							onClick={onPinChange}
-							disabled={pinDisabled}
-							aria-pressed={pinned}
-						/>
-					</div>
-				)}
-			</div>
-			<h2>{item.name}</h2>
-			{item.goal && item.goal !== item.name && <p>{item.goal}</p>}
-			<div className="evaluation-card-outcome type-value">
-				{!item.enabled
-					? "Paused"
-					: item.outcomeDate
-						? dateLabel(item.outcomeDate)
-						: item.outcomeText}
-			</div>
-			{item.enabled && item.qualifier && (
-				<p className="section-note">{item.qualifier}</p>
-			)}
-			<Badge tone={tone}>
-				{!item.enabled
-					? "Excluded from evaluation"
-					: item.status === "satisfied"
-						? "Satisfied"
-						: item.status === "not-satisfied"
-							? "Not satisfied"
-							: item.status === "warning"
-								? "Needs attention"
-								: "Indeterminate"}
-			</Badge>
-			{item.enabled && item.progress && (
-				<div className="evaluation-card-progress">
-					<div className="progress-label">
-						<span>{item.progress.current}</span>
-						{item.progress.share && <span>{item.progress.share}</span>}
-					</div>
-					<Progress value={item.progress.fraction * 100} label={item.name} />
-				</div>
-			)}
-		</section>
-	);
-}
+import { EvaluationCard } from "./evaluations/EvaluationCard.tsx";
+import { OtherEvaluationCard } from "./evaluations/OtherEvaluationCard.tsx";
 
 export function EvaluationsPage({
 	onEdit,
@@ -274,6 +187,8 @@ function EvaluationsContent({
 					<OtherEvaluationCard
 						key={item.id}
 						item={item}
+						plan={plan}
+						projection={projection}
 						pin={{
 							pinned: pinnedSet.has(item.id),
 							onPinChange: () => {

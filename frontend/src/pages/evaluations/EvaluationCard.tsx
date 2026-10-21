@@ -1,4 +1,5 @@
 import { ArrowUpRight, Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
+import type { EvaluationPin } from "../../components/evaluationCard.ts";
 import {
 	Badge,
 	IconButton,
@@ -9,12 +10,9 @@ import {
 import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { Evaluation } from "../../domain/model.ts";
 import type { EvaluationResult } from "../../domain/result.ts";
+import "./evaluations.css";
 
-export type EvaluationPin = {
-	pinned: boolean;
-	onPinChange: (() => void) | null;
-	disabled?: boolean;
-};
+export type { EvaluationPin } from "../../components/evaluationCard.ts";
 
 export function EvaluationCard({
 	evaluation,
@@ -30,9 +28,9 @@ export function EvaluationCard({
 	evaluation: Evaluation;
 	result: Pick<EvaluationResult, "current" | "firstDate"> | undefined;
 	probability: number | null;
-	onEdit: () => void;
-	onRemove: () => void;
-	onEnabledChange: (enabled: boolean) => void;
+	onEdit?: () => void;
+	onRemove?: () => void;
+	onEnabledChange?: (enabled: boolean) => void;
 	onEvidence: () => void;
 	pending?: boolean;
 	pin?: EvaluationPin | null;
@@ -66,16 +64,20 @@ export function EvaluationCard({
 							aria-pressed={pinned}
 						/>
 					)}
-					<IconButton
-						icon={Pencil}
-						label={`Edit ${evaluation.name}`}
-						onClick={onEdit}
-					/>
-					<IconButton
-						icon={Trash2}
-						label={`Remove ${evaluation.name}`}
-						onClick={onRemove}
-					/>
+					{onEdit && (
+						<IconButton
+							icon={Pencil}
+							label={`Edit ${evaluation.name}`}
+							onClick={onEdit}
+						/>
+					)}
+					{onRemove && (
+						<IconButton
+							icon={Trash2}
+							label={`Remove ${evaluation.name}`}
+							onClick={onRemove}
+						/>
+					)}
 				</div>
 			</div>
 			<h2>{evaluation.name}</h2>
@@ -132,11 +134,13 @@ export function EvaluationCard({
 				</p>
 			)}
 			<div className="evaluation-card-footer">
-				<Toggle
-					label="Enabled"
-					checked={evaluation.enabled}
-					onChange={onEnabledChange}
-				/>
+				{onEnabledChange && (
+					<Toggle
+						label="Enabled"
+						checked={evaluation.enabled}
+						onChange={onEnabledChange}
+					/>
+				)}
 				<button
 					type="button"
 					className="text-button"

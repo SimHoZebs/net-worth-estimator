@@ -52,6 +52,8 @@ Use **evaluation**. The three roles below are distinct and stay distinct:
 - **constraint** — the binding limit that stopped a transaction
 - **shortfall** — the gap between what a transaction requested and what funded it
 
+Use **Funding gaps** for the default transaction-funding evaluation and its outlook summary. Use **Funding gap** for one inspector item and **No projected funding gaps** for a clear result. Keep custom evaluation names. `postingFulfillment` remains the engine's storage and API identifier; the stored default name "Posting fulfillment" displays as "Funding gaps" without a data rewrite.
+
 `EvaluationTypeOrder` in `backend/internal/types/model.go` fixes the display order of the five evaluation tables: financial independence, net-worth threshold, account balance, posting fulfillment, cycle fulfillment. `EvaluationRegistry` in `backend/internal/domain/evaluation_runtime.go` owns the registered definitions; the cycle fulfillment definition lands with its runtime.
 
 - Retired from prose: goal check, evaluation blocker.

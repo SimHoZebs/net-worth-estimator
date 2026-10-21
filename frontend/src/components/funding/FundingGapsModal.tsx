@@ -7,8 +7,9 @@ import {
 	summarizeFundingGap,
 	type FundingGap,
 } from "../../domain/fundingGaps.ts";
+import { fundingLabels } from "../../domain/fundingTerminology.ts";
 import { BalancePathChart } from "./BalancePathChart.tsx";
-import { FundingMovementIcon } from "./FundingGapsCard.tsx";
+import { FundingMovementIcon } from "./FundingMovementIcon.tsx";
 import "./funding-gaps.css";
 
 export function FundingGapsModal({
@@ -29,15 +30,15 @@ export function FundingGapsModal({
 	const index = sorted.findIndex((item) => item.id === gap.id);
 	return (
 		<Modal
-			title="Funding failure"
-			eyebrow={`Failure ${index + 1} of ${sorted.length} · ${dateLabel(gap.date, true)}`}
+			title={fundingLabels.detail}
+			eyebrow={`Gap ${index + 1} of ${sorted.length} · ${dateLabel(gap.date, true)}`}
 			wide
 			onClose={onClose}
 		>
 			<div
 				className="segmented funding-date-tabs"
 				role="group"
-				aria-label="Choose projected failure"
+				aria-label="Choose projected funding gap"
 			>
 				{sorted.map((item) => (
 					<button
