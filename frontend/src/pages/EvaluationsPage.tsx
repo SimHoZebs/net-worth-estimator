@@ -18,10 +18,8 @@ import { OtherEvaluationCard } from "./evaluations/OtherEvaluationCard.tsx";
 
 export function EvaluationsPage({
 	onEdit,
-	onEvidence,
 }: {
 	onEdit: (evaluation: Evaluation | null) => void;
-	onEvidence: (id: string) => void;
 }) {
 	// Plan, actions, and projection subscribe where the query is declared;
 	// only UI callbacks arrive as props.
@@ -67,7 +65,6 @@ export function EvaluationsPage({
 				range={projection.range}
 				onEdit={onEdit}
 				onUpdate={onUpdate}
-				onEvidence={onEvidence}
 			/>
 		</>
 	);
@@ -79,14 +76,12 @@ function EvaluationsContent({
 	range,
 	onEdit,
 	onUpdate,
-	onEvidence,
 }: {
 	plan: Plan;
 	projection: Projection | null;
 	range: RangeResult | null;
 	onEdit: (evaluation: Evaluation | null) => void;
 	onUpdate: (plan: Plan) => boolean;
-	onEvidence: (id: string) => void;
 }) {
 	const pending = projection === null;
 	// Other evaluation kinds are configured server-side, so their count is
@@ -175,7 +170,6 @@ function EvaluationsContent({
 						onRemove={() =>
 							onUpdate(removeEvaluation({ plan, id: evaluation.id }))
 						}
-						onEvidence={() => onEvidence(evaluation.id)}
 					/>
 				))}
 				{others.map((item) => (

@@ -149,20 +149,25 @@ describe("parseHash", () => {
 			page: "outlook",
 			overlay: { type: "accountEdit", key: "new" },
 		});
+		expect(parseHash("#evaluations/goal-1/edit")).toEqual({
+			page: "evaluations",
+			overlay: { type: "evaluationEdit", key: "goal-1" },
+		});
+		expect(parseHash("#outlook/edit-evaluation/goal-1")).toEqual({
+			page: "outlook",
+			overlay: { type: "evaluationEdit", key: "goal-1" },
+		});
 	});
 
-	test("evaluation evidence prefers the scoped form on its page", () => {
-		expect(parseHash("#evaluations/goal-1")).toEqual({
-			page: "evaluations",
-			overlay: { type: "evaluation", key: "goal-1" },
-		});
-		expect(parseHash("#outlook/evaluation/goal-1")).toEqual({
-			page: "outlook",
-			overlay: { type: "evaluation", key: "goal-1" },
-		});
-		expect(parseHash("#outlook/evaluations")).toEqual({
-			page: "outlook",
-			overlay: { type: "outlookItem", key: "evaluations" },
+	test.each([
+		"#evaluations/goal-1",
+		"#goals/goal-1",
+		"#outlook/evaluation/goal-1",
+		"#accounts/evaluation/goal-1",
+		"#outlook/goal-1",
+	])("retired evaluation evidence URL %s resolves to unknown", (hash) => {
+		expect(resolveOverlayRoute(parseHash(hash), plan)).toEqual({
+			state: "unknown",
 		});
 	});
 
@@ -367,27 +372,9 @@ describe("resolveOverlayRoute", () => {
 		});
 	});
 
-	test("outlook single segments prefer evaluations, then accounts", () => {
+	test("outlook single segments resolve account evidence", () => {
 		expect(
-			resolveOverlayRoute(
-				{ page: "outlook", overlay: { type: "outlookItem", key: "goal-1" } },
-				plan,
-			),
-		).toEqual({
-			state: "ready",
-			overlay: {
-				kind: "evidence",
-				target: { kind: "evaluation", id: "goal-1" },
-			},
-		});
-		expect(
-			resolveOverlayRoute(
-				{
-					page: "outlook",
-					overlay: { type: "outlookItem", key: "everyday-checking" },
-				},
-				plan,
-			),
+			resolveOverlayRoute(parseHash("#outlook/everyday-checking"), plan),
 		).toEqual({
 			state: "ready",
 			overlay: {
@@ -395,12 +382,9 @@ describe("resolveOverlayRoute", () => {
 				target: { kind: "account", id: "checking" },
 			},
 		});
-		expect(
-			resolveOverlayRoute(
-				{ page: "outlook", overlay: { type: "outlookItem", key: "nope" } },
-				plan,
-			),
-		).toEqual({ state: "unknown" });
+		expect(resolveOverlayRoute(parseHash("#outlook/nope"), plan)).toEqual({
+			state: "unknown",
+		});
 	});
 
 	test("safe spending detail resolves with and without a stacked editor", () => {
@@ -512,15 +496,6 @@ describe("hash builders round-trip through the parser", () => {
 			page: "outlook",
 			overlay: { type: "movementEdit", key: "invest" },
 		});
-	});
-
-	test("evaluation evidence round-trips on every page", () => {
-		expect(
-			evidenceHash("evaluations", { kind: "evaluation", id: "goal-1" }, plan),
-		).toBe("#evaluations/goal-1");
-		expect(
-			evidenceHash("outlook", { kind: "evaluation", id: "goal-1" }, plan),
-		).toBe("#outlook/evaluation/goal-1");
 	});
 
 	test("safe spending detail and discard round-trip", () => {

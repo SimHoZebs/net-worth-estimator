@@ -8,6 +8,11 @@ test.beforeEach(async () => {
 test("account modals have URLs, restore on back, and deep-link", async ({
 	page,
 }) => {
+	const scenarioRequests: string[] = [];
+	page.on("request", (request) => {
+		if (request.url().endsWith("/v1/projections/stochastic"))
+			scenarioRequests.push(request.url());
+	});
 	await page.goto("/#accounts");
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
@@ -26,6 +31,7 @@ test("account modals have URLs, restore on back, and deep-link", async ({
 	await expect(
 		page.getByRole("heading", { name: "Accounts and starting balances" }),
 	).toBeVisible();
+	expect(scenarioRequests).toEqual([]);
 });
 
 test("unknown account slugs normalize back to the page", async ({ page }) => {
@@ -50,12 +56,38 @@ test("editors have URLs and unknown editor ids normalize", async ({ page }) => {
 	await expect(page.getByRole("dialog")).not.toBeVisible();
 });
 
-test("evaluation evidence deep-links onto its page", async ({ page }) => {
-	await page.goto("/#evaluations/net-worth-750k");
-	await expect(page.getByRole("dialog")).toContainText(
+test("target cards retain editing without an evidence dialog", async ({
+	page,
+}) => {
+	await page.goto("/#evaluations");
+	const target = page.getByRole("region", { name: "Reach $750,000 net worth" });
+	await expect(target.getByRole("progressbar")).toBeVisible();
+	await expect(target.getByRole("button", { name: /Evidence/ })).toHaveCount(0);
+	await target
+		.getByRole("button", { name: "Edit Reach $750,000 net worth" })
+		.click();
+	await expect(page).toHaveURL(/#evaluations\/net-worth-750k\/edit$/);
+	await expect(
+		page.getByRole("dialog", { name: "Edit evaluation" }),
+	).toBeVisible();
+	await expect(page.getByLabel("Evaluation name")).toHaveValue(
 		"Reach $750,000 net worth",
 	);
-	await expect(
-		page.getByRole("heading", { name: "Check what the plan supports" }),
-	).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(page).toHaveURL(/#evaluations$/);
+	await expect(page.getByRole("dialog")).not.toBeVisible();
 });
+
+for (const [path, pageHash] of [
+	["evaluations/net-worth-750k", "evaluations"],
+	["outlook/evaluation/net-worth-750k", "outlook"],
+	["outlook/net-worth-750k", "outlook"],
+]) {
+	test(`retired evaluation evidence URL ${path} returns to its page`, async ({
+		page,
+	}) => {
+		await page.goto(`/#${path}`);
+		await expect(page).toHaveURL(new RegExp(`#${pageHash}$`));
+		await expect(page.getByRole("dialog")).not.toBeVisible();
+	});
+}
