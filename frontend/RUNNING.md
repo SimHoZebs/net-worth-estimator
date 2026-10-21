@@ -51,6 +51,10 @@ Compose publishes the frontend at `http://localhost:8080` and the API at `http:/
 
 Navigation uses URL fragments, so a static host does not need SPA route rewrites. Fonts and the scenario worker are served with the application. There are no external font, analytics, or bank requests.
 
+## Typography
+
+Follow the [typography roles and ownership guidance](src/styles/README.md) for frontend changes. Newsreader serves display titles, Manrope serves UI and financial data, and system monospace serves code and editable JSON. `npm run lint` warns about font choices outside the shared owner. Font names and role assignments are not pinned by tests.
+
 ## Workspace and data
 
 - Browser tests run against the fixtureapi harness, which serves the real API from a recorded CSV fixture.

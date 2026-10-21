@@ -34,3 +34,16 @@ section heading already inherit the UI role. For a new JSON editor, apply
 
 The standalone static `public/404.html` page uses system fonts by design. It does
 not load the application bundle or participate in the application font contract.
+
+## Development guidance
+
+Shared defaults and role classes keep components consistent. Font names, sizes,
+and role assignments remain design choices, rather than test contracts.
+
+Run `npm run lint:typography` from `frontend/` for ownership warnings. The normal
+lint command, pre-push hook, and CI also run it. Warnings do not fail the command.
+
+`scripts/lint-typography.ts` flags local font-family choices, family-token
+overrides, family-changing `font` shorthands, and inline font properties. Its unit
+tests cover detection logic with isolated examples, not application fonts or
+markup. Change shared fonts or add a role without updating typography assertions.
