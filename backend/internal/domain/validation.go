@@ -119,6 +119,7 @@ func ValidateFinancialModel(document *types.FinancialModelDocument) []types.Mode
 	}
 
 	dependencies := validateMovementAmounts(&issues, document, accountIDs)
+	validatePurchases(&issues, document, dependencies)
 	validatePostingDependencies(&issues, document, dependencies)
 	validatePostingRoutes(&issues, document.Postings, accountIDs)
 	validateRuleSchedules(&issues, document, accountIDs)
@@ -162,25 +163,8 @@ type instanceRef struct {
 
 func evaluationInstances(document *types.FinancialModelDocument, evaluationType string) []instanceRef {
 	refs := []instanceRef{}
-	switch evaluationType {
-	case types.EvaluationTypeFinancialIndependence:
-		for _, item := range document.Evaluations.FinancialIndependence {
-			refs = append(refs, instanceRef{evaluationType, item.InstanceID, item.Enabled, item.Config})
-		}
-	case types.EvaluationTypeNetWorthThreshold:
-		for _, item := range document.Evaluations.NetWorthThreshold {
-			refs = append(refs, instanceRef{evaluationType, item.InstanceID, item.Enabled, item.Config})
-		}
-	case types.EvaluationTypeAccountBalance:
-		for _, item := range document.Evaluations.AccountBalance {
-			refs = append(refs, instanceRef{evaluationType, item.InstanceID, item.Enabled, item.Config})
-		}
-	case types.EvaluationTypePostingFulfillment:
-		for _, item := range document.Evaluations.PostingFulfillment {
-			refs = append(refs, instanceRef{evaluationType, item.InstanceID, item.Enabled, item.Config})
-		}
-	case types.EvaluationTypeCycleFulfillment:
-		for _, item := range document.Evaluations.CycleFulfillment {
+	if rows := document.Evaluations.ByType(evaluationType); rows != nil {
+		for _, item := range *rows {
 			refs = append(refs, instanceRef{evaluationType, item.InstanceID, item.Enabled, item.Config})
 		}
 	}
@@ -190,20 +174,11 @@ func evaluationInstances(document *types.FinancialModelDocument, evaluationType 
 func validateEvaluationConfigs(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument) {
 	for _, evaluationType := range types.EvaluationTypeOrder {
 		for index, instance := range evaluationInstances(document, evaluationType) {
-			var err error
-			switch evaluationType {
-			case types.EvaluationTypeFinancialIndependence:
-				err = ValidateFIPlanConfig(instance.Config)
-			case types.EvaluationTypeNetWorthThreshold:
-				err = ValidateThresholdConfig(instance.Config)
-			case types.EvaluationTypeAccountBalance:
-				err = ValidateAccountBalanceConfig(instance.Config)
-			case types.EvaluationTypePostingFulfillment:
-				err = ValidateFulfillmentConfig(instance.Config)
-			case types.EvaluationTypeCycleFulfillment:
-				err = ValidateCycleFulfillmentConfig(instance.Config)
+			definition, ok := evaluationRegistryInstance.Get(evaluationType)
+			if !ok {
+				continue
 			}
-			if err != nil {
+			if err := definition.ValidateConfig(instance.Config); err != nil {
 				path := []any{"evaluations", evaluationType, index}
 				addIssue(issues, types.SeverityError, "evaluation.config.invalid", err.Error(), path...)
 			}

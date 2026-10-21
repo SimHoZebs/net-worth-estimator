@@ -9,8 +9,6 @@ import (
 
 // Posting fulfillment evaluation.
 
-const minReportableUnfulfilledAmount = 0.5
-
 type fulfillmentEventJSON struct {
 	Date                     IsoDate           `json:"date"`
 	Sequence                 int               `json:"sequence"`
@@ -66,125 +64,6 @@ func (r *PostingFulfillmentPathResult) ToJSON() types.JsonValue {
 // currency rounding owner with path.go. mathRound stays separate: it rounds
 // halves toward +Infinity for percentile buffers and differs on negative .5.
 func roundAmount(value float64) float64 { return roundCurrency(value) }
-
-func reportableUnfulfilled(event *types.MovementEvent) float64 {
-	amount := math.Max(0, event.RequestedAmount-event.RealizedAmount)
-	if amount >= minReportableUnfulfilledAmount {
-		return amount
-	}
-	return 0
-}
-
-type evaluatedMovementEvent struct {
-	event              *types.MovementEvent
-	bindingConstraints []accountMovementConstraint
-	destinationLimited float64
-	unfulfilled        float64
-}
-
-func (evaluated evaluatedMovementEvent) fulfillment() types.MovementFulfillment {
-	return types.MovementFulfillment{
-		UnfulfilledAmount:        roundAmount(evaluated.unfulfilled),
-		DestinationLimitedAmount: roundAmount(evaluated.destinationLimited),
-	}
-}
-
-func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent {
-	balancesBeforeBySequence := ReconstructBalancesBeforeEvents(path)
-	accountsByID := map[string]types.Account{}
-	for _, account := range path.EffectiveDocument.Accounts {
-		accountsByID[account.ID] = account
-	}
-	postingsByID := map[string]*types.Posting{}
-	movements := ResolvedMovementPostings(&path.EffectiveDocument)
-	for index := range movements {
-		posting := &movements[index]
-		postingsByID[posting.ID] = posting
-	}
-	capsByID := RuleCapsByID(&path.EffectiveDocument)
-	realizedByPostingAndYear := map[string]float64{}
-	for postingID, byYear := range path.ProjectionStartPostingState.RealizedPostingAmountsByYear {
-		for year, amount := range byYear {
-			realizedByPostingAndYear[postingID+":"+year] = amount
-		}
-	}
-
-	sorted := make([]*types.MovementEvent, len(path.MovementEvents))
-	for index := range path.MovementEvents {
-		sorted[index] = &path.MovementEvents[index]
-	}
-	sort.SliceStable(sorted, func(i, j int) bool {
-		if sorted[i].Date != sorted[j].Date {
-			return sorted[i].Date < sorted[j].Date
-		}
-		return sorted[i].Sequence < sorted[j].Sequence
-	})
-
-	out := make([]evaluatedMovementEvent, 0, len(sorted))
-	for _, event := range sorted {
-		posting := postingsByID[event.Origin.PostingID]
-		capKey := event.Origin.PostingID + ":" + event.Date[:4]
-		realizedBefore := realizedByPostingAndYear[capKey]
-		var bindingConstraints []accountMovementConstraint
-		if cap, capped := capsByID[event.Origin.PostingID]; capped {
-			limitRemaining := math.Max(0, cap-realizedBefore)
-			beforeBalances := balancesBeforeBySequence[event.Sequence]
-			if beforeBalances == nil {
-				beforeBalances = map[string]float64{}
-			}
-			bindingConstraints = ClassifyMovementConstraints(movementConstraintInput{
-				SourceAccountID: posting.SourceAccountID,
-				Destinations:    posting.Destinations,
-				RequestedAmount: event.RequestedAmount,
-				RealizedAmount:  event.RealizedAmount,
-				BalancesBefore:  beforeBalances,
-				AccountsByID:    accountsByID,
-				LimitRemaining:  &limitRemaining,
-			})
-		} else if posting != nil {
-			beforeBalances := balancesBeforeBySequence[event.Sequence]
-			if beforeBalances == nil {
-				beforeBalances = map[string]float64{}
-			}
-			bindingConstraints = ClassifyMovementConstraints(movementConstraintInput{
-				SourceAccountID: posting.SourceAccountID,
-				Destinations:    posting.Destinations,
-				RequestedAmount: event.RequestedAmount,
-				RealizedAmount:  event.RealizedAmount,
-				BalancesBefore:  beforeBalances,
-				AccountsByID:    accountsByID,
-				LimitRemaining:  nil,
-			})
-		} else {
-			bindingConstraints = []accountMovementConstraint{}
-		}
-		residual := reportableUnfulfilled(event)
-		destinationLimited := false
-		for _, constraint := range bindingConstraints {
-			if constraint.Type == "destination-ceiling" {
-				destinationLimited = true
-				break
-			}
-		}
-		destinationLimitedAmount := 0.0
-		unfulfilledAmount := 0.0
-		if destinationLimited {
-			destinationLimitedAmount = residual
-		} else {
-			unfulfilledAmount = residual
-		}
-		// Losses are balance adjustments, not cap consumption: only
-		// non-negative realizations accrue against the annual cap.
-		realizedByPostingAndYear[capKey] = realizedBefore + maxFloat(0, event.RealizedAmount)
-		out = append(out, evaluatedMovementEvent{
-			event:              event,
-			bindingConstraints: bindingConstraints,
-			destinationLimited: destinationLimitedAmount,
-			unfulfilled:        unfulfilledAmount,
-		})
-	}
-	return out
-}
 
 func toFulfillmentEvent(evaluated evaluatedMovementEvent) fulfillmentEventJSON {
 	event := evaluated.event
@@ -292,6 +171,9 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 		detailCaps := RuleCapsByID(&path.EffectiveDocument)
 		for index := range detailMovements {
 			posting := &detailMovements[index]
+			if posting.Purchase != nil {
+				continue // Evaluation inputs are not established payment evidence.
+			}
 			if selectedIDs != nil && !selectedIDs[posting.ID] {
 				continue
 			}

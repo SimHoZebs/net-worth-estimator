@@ -21,7 +21,7 @@ import (
 // is global (maxArtifacts in store/artifacts.go): stochastic floods can evict
 // deterministic. Keep a per-kind floor only with product sign-off.
 
-const artifactCacheVersion = 4
+const artifactCacheVersion = 5
 
 func mustCanonical(payload any) string {
 	encoded, err := json.Marshal(payload)
@@ -112,13 +112,11 @@ func projectionSettingsDescriptor(settings types.ProjectionRuntimeSettings) map[
 }
 
 func evaluationDescriptor(tables *types.EvaluationTables) map[string]any {
-	return map[string]any{
-		"financialIndependence": enabledEvaluationConfigs(tables.FinancialIndependence),
-		"netWorthThreshold":     enabledEvaluationConfigs(tables.NetWorthThreshold),
-		"accountBalance":        enabledEvaluationConfigs(tables.AccountBalance),
-		"postingFulfillment":    enabledEvaluationConfigs(tables.PostingFulfillment),
-		"cycleFulfillment":      enabledEvaluationConfigs(tables.CycleFulfillment),
+	out := map[string]any{}
+	for _, table := range tables.Tables() {
+		out[table.Type] = enabledEvaluationConfigs(*table.Rows)
 	}
+	return out
 }
 
 // enabledEvaluationConfigs strips name-only fields from evaluation tables

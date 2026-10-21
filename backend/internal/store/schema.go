@@ -97,6 +97,10 @@ func schemaStatements() []string {
 			enabled INTEGER NOT NULL,
 			source TEXT NOT NULL DEFAULT 'model'
 		)`,
+		`CREATE TABLE IF NOT EXISTS purchase_policies (
+			posting_id TEXT PRIMARY KEY REFERENCES postings(id) ON DELETE CASCADE,
+			priority INTEGER NOT NULL CHECK (priority >= 0)
+		)`,
 		`CREATE TABLE IF NOT EXISTS recurrence_rules (
 			id TEXT PRIMARY KEY,
 			position INTEGER NOT NULL,
@@ -293,6 +297,7 @@ func expectedSchemaTables() []string {
 		"accounts",
 		"checkpoints",
 		"postings",
+		"purchase_policies",
 		"recurrence_rules",
 		"evaluations",
 		"projection_artifacts",

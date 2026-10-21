@@ -35,6 +35,7 @@ type EvaluationResultTables struct {
 	AccountBalance        []EvaluationResultEnvelope `json:"accountBalance"`
 	PostingFulfillment    []EvaluationResultEnvelope `json:"postingFulfillment"`
 	CycleFulfillment      []EvaluationResultEnvelope `json:"cycleFulfillment"`
+	PlannedPurchases      []EvaluationResultEnvelope `json:"plannedPurchases,omitempty"`
 }
 
 type EvaluationResultCollection struct {
