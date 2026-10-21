@@ -100,9 +100,7 @@ describe("AccountDetails", () => {
 		// jsdom does not cascade fieldset[disabled] to the disabled IDL, so
 		// assert the attribute on the group itself: real browsers lock all
 		// descendants behind it.
-		expect(
-			container.querySelector("fieldset.form-grid[disabled]"),
-		).toBeTruthy();
+		expect(container.querySelector("fieldset[disabled]")).toBeTruthy();
 		expect(
 			screen.queryByRole("button", { name: "Apply unsaved changes" }),
 		).toBeNull();

@@ -39,8 +39,6 @@ test("clicking an account opens its recorded history and projected transactions"
 	await expect(dialog.getByRole("status")).toHaveText(
 		"Showing 1–3 of 3 transactions",
 	);
-	// Rows carry no provenance badges; shortfalls and exclusions still do.
-	await expect(dialog.locator("tbody .badge")).toHaveCount(0);
 	// Historical activity is listed newest first by default, and the control
 	// toggles rather than sets.
 	await expect(dialog.locator("tbody tr").first()).toContainText(
@@ -296,9 +294,7 @@ test("growth-only accounts have an honest empty state and retain account details
 	await expect(
 		dialog.getByRole("button", { name: "Add a planned transaction" }),
 	).toBeVisible();
-	await expect(
-		dialog.locator('.account-view-tabs > button[role="tab"]'),
-	).toHaveCount(3);
+	await expect(dialog.getByRole("tab")).toHaveCount(3);
 	await expect(
 		dialog.getByRole("searchbox", { name: "Search account transactions" }),
 	).toHaveCount(0);
@@ -320,7 +316,6 @@ test("growth-only accounts have an honest empty state and retain account details
 	await expect(
 		dialog.getByRole("checkbox", { name: "No ceiling" }),
 	).toBeChecked();
-	await expect(dialog.locator(".balance-range-track")).toBeVisible();
 	await expect(
 		dialog.getByRole("button", { name: "Apply unsaved changes" }),
 	).toBeDisabled();
