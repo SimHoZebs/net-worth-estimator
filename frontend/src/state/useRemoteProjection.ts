@@ -6,6 +6,7 @@ import {
 	type DeterministicProjectionRequest,
 	type DeterministicProjectionResponse,
 	type EvaluationResultEnvelope,
+	type EvaluationTables,
 	type FinancialModelDocument,
 	type JsonValue,
 	type ProjectionAccountSummary,
@@ -33,6 +34,7 @@ import {
 } from "./serverQuery.ts";
 import { useUiStore } from "./uiStore.ts";
 import { deriveDraftDocument, useWorkspaceStore } from "./workspaceStore.ts";
+import { purchaseEvaluationResult } from "./purchaseEvaluation.ts";
 
 export interface RemoteProjectionClient {
 	projectDeterministic(
@@ -52,6 +54,8 @@ export interface UseRemoteProjectionOptions {
 	years?: number;
 	ranges?: boolean;
 	authToken?: string;
+	// Request-local evaluation scope. It participates in document/cache identity.
+	evaluations?: EvaluationTables;
 	// When false the hook issues no requests. The saved-plan projection is
 	// identical to the active one whenever there is no draft, so running it
 	// separately would compute the same projection twice.
@@ -111,7 +115,7 @@ function latestDate(values: string[]): string | null {
 }
 
 export function projectionStartDate(document: FinancialModelDocument): string {
-	const posting = document.postings[0];
+	const posting = document.postings.find((item) => !item.purchase);
 	return (
 		latestDate(document.checkpoints.map((checkpoint) => checkpoint.Date)) ??
 		(document.recurrenceRules ?? [])[0]?.startDate ??
@@ -544,6 +548,10 @@ export function projectionResultToLocal(
 		outflows: result.totals.externalOutflowAmount,
 		transfers: result.totals.internalTransferAmount,
 		startDateHasCheckpoint: startCheckpoint,
+		plannedPurchases: purchaseEvaluationResult(
+			result.evaluations,
+			document?.evaluations,
+		),
 	};
 }
 
@@ -641,6 +649,7 @@ export function useRemoteProjection({
 	years: yearsOverride,
 	ranges: rangesOverride,
 	authToken: tokenOverride,
+	evaluations: evaluationsOverride,
 	enabled = true,
 }: UseRemoteProjectionOptions = {}) {
 	const api = useMemo(() => client ?? defaultApiClient(), [client]);
@@ -682,7 +691,14 @@ export function useRemoteProjection({
 	const years = yearsOverride ?? storeYears;
 	const ranges = rangesOverride ?? storeRanges;
 	const authToken = tokenOverride ?? storeToken;
-	const activeDocument = draftDocument ?? document ?? null;
+	const sourceDocument = draftDocument ?? document ?? null;
+	const activeDocument = useMemo(
+		() =>
+			sourceDocument && evaluationsOverride
+				? { ...sourceDocument, evaluations: evaluationsOverride }
+				: sourceDocument,
+		[sourceDocument, evaluationsOverride],
+	);
 	// Memoized on reference: callers rebuild equivalent documents per render,
 	// so this only re-stringifies when the store reference actually changes.
 	const documentKey = useMemo(

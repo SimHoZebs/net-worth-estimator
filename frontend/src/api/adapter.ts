@@ -258,15 +258,13 @@ function fallbackStartDate(
 	document: FinancialModelDocument,
 	projection: ProjectionResult | null | undefined,
 ): IsoDate {
+	const posting = document.postings.find((item) => !item.purchase);
 	return (
 		projection?.milestones.projectionStartDate ??
 		latestDate(document.checkpoints.map((checkpoint) => checkpoint.Date)) ??
 		(document.recurrenceRules ?? [])[0]?.startDate ??
-		(document.postings[0]
-			? dayFromTimes(
-					document.postings[0].transactionTime,
-					document.postings[0].postedTime,
-				)
+		(posting
+			? dayFromTimes(posting.transactionTime, posting.postedTime)
 			: undefined) ??
 		todayIso()
 	);
@@ -556,6 +554,9 @@ function movementDisplayFromPosting(
 		readOnly:
 			previous?.readOnly ?? (amount === null || isSyncOwned(posting.source)),
 		claimRuleId: posting.claim?.ruleId ?? null,
+		...(posting.purchase
+			? { purchasePriority: posting.purchase.priority }
+			: {}),
 		claimOccurrenceDate: posting.claim?.occurrenceDate ?? null,
 		postedDate: settledDay(posting.postedTime),
 	};
@@ -1326,6 +1327,11 @@ export function displayPlanToBackendDocument(
 				amount,
 				postedTime,
 				transactionTime,
+				...(movement.purchasePriority != null
+					? { purchase: { priority: movement.purchasePriority } }
+					: storedPosting?.purchase
+						? { purchase: null }
+						: {}),
 				claim:
 					movement.claimRuleId && movement.claimOccurrenceDate
 						? {
@@ -1576,6 +1582,9 @@ export function displayPlanToBackendDocument(
 		accountBalance,
 		postingFulfillment: [...postingFulfillment],
 		cycleFulfillment: [...cycleFulfillment],
+		...(sourceEvaluations?.plannedPurchases
+			? { plannedPurchases: [...sourceEvaluations.plannedPurchases] }
+			: {}),
 	};
 	return {
 		document: {

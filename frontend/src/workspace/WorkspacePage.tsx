@@ -4,6 +4,7 @@ import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import { PlanPage } from "../pages/PlanPage.tsx";
+import { PurchasesPage } from "../pages/PurchasesPage.tsx";
 import { SourcesPage } from "../pages/SourcesPage.tsx";
 import type { Page } from "./navigation.ts";
 
@@ -58,6 +59,8 @@ export function WorkspacePage({
 					onAccount={(id) => onEvidence({ kind: "account", id })}
 				/>
 			);
+		case "purchases":
+			return <PurchasesPage />;
 		case "evaluations":
 			return (
 				<EvaluationsPage

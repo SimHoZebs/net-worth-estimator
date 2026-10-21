@@ -94,6 +94,14 @@ describe("parseHash", () => {
 		});
 	});
 
+	test("planned purchases has a direct page route", () => {
+		expect(parseHash("#purchases")).toEqual({
+			page: "purchases",
+			overlay: null,
+		});
+		expect(pageHash("purchases")).toBe("#purchases");
+	});
+
 	test("unknown pages fall back to outlook with an invalid overlay", () => {
 		expect(parseHash("#nope")).toEqual({
 			page: "outlook",

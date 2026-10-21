@@ -1,11 +1,11 @@
 import { Plus, Search } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { TransactionSortButton } from "../components/activity/TransactionSortButton.tsx";
+import { BaseProjectionView } from "../components/BaseProjectionView.tsx";
 import { AccountCardGrid } from "../components/cards/AccountCardGrid.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { TablePagination } from "../components/DataTable.tsx";
 import { type TabItem, Tabs } from "../components/Tabs.tsx";
-import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
 import {
 	DEFAULT_TRANSACTION_ORDER,
 	sortTransactionsByDate,
@@ -59,47 +59,12 @@ export function PlanPage({
 			/>
 		);
 	}
-	return <TransactionsWithProjection plan={plan} onEdit={onEdit} />;
-}
-
-// The transaction list resolves realized amounts from the projection, so it
-// subscribes with scenarios disabled: the range stream would only duplicate
-// the page that actually charts it.
-function TransactionsWithProjection({
-	plan,
-	onEdit,
-}: {
-	plan: Plan;
-	onEdit: (target: EditorTarget) => void;
-}) {
-	const projection = useRemoteProjection({ ranges: false });
-	const baseLoadError =
-		projection.base instanceof Error && !projection.loading
-			? projection.base
-			: null;
-	const base =
-		projection.base instanceof Error || projection.base === null
-			? null
-			: projection.base;
 	return (
-		<>
-			{baseLoadError && (
-				<ErrorNotice
-					message={baseLoadError.message}
-					action="Retry calculation"
-					onAction={projection.retryProjection}
-				/>
+		<BaseProjectionView>
+			{({ base }) => (
+				<TransactionsView plan={plan} projection={base} onEdit={onEdit} />
 			)}
-			{projection.baseError && base && (
-				<ErrorNotice
-					message={projection.baseError}
-					action="Retry calculation"
-					onAction={projection.retryProjection}
-				/>
-			)}
-			{projection.loading && base && <ProjectionUpdating />}
-			<TransactionsView plan={plan} projection={base} onEdit={onEdit} />
-		</>
+		</BaseProjectionView>
 	);
 }
 
@@ -249,7 +214,12 @@ function TransactionsView({
 		(movement) => movement.frequency !== "once",
 	).length;
 	const tabs: TabItem<ScheduleFilter>[] = [
-		{ id: "all", label: "All transactions", count: visible.length },
+		{
+			id: "all",
+			label: "All transactions",
+			count: visible.filter((movement) => movement.purchasePriority == null)
+				.length,
+		},
 		{ id: "recurring", label: "Recurring", count: recurringCount },
 	];
 	const movements = useMemo(
@@ -257,6 +227,7 @@ function TransactionsView({
 			sortTransactionsByDate({
 				items: visible.filter(
 					(movement) =>
+						movement.purchasePriority == null &&
 						movement.name.toLowerCase().includes(query.toLowerCase()) &&
 						(schedule === "all" || movement.frequency !== "once"),
 				),

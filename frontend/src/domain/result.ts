@@ -70,6 +70,11 @@ export interface Projection {
 	outflows: number;
 	transfers: number;
 	startDateHasCheckpoint?: boolean;
+	plannedPurchases?: PurchaseSchedule | null;
+}
+
+export interface PurchaseSchedule {
+	purchases: { postingId: string; date: string | null; amount: number }[];
 }
 export interface RangePoint {
 	date: string;

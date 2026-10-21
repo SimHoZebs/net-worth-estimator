@@ -168,6 +168,7 @@ export interface BackendPosting extends HumaMetadata {
 	postedTime: number;
 	transactionTime: number;
 	claim?: PostingClaim | null;
+	purchase?: { priority: number } | null;
 	enabled: boolean;
 	source?: string;
 }
@@ -223,6 +224,7 @@ export interface EvaluationTables extends HumaMetadata {
 	accountBalance: AccountBalanceEvaluation[];
 	postingFulfillment: PostingFulfillmentEvaluation[];
 	cycleFulfillment?: CycleFulfillmentEvaluation[];
+	plannedPurchases?: EvaluationInstance[];
 }
 
 export interface FinancialModelDocument extends HumaMetadata {
@@ -373,6 +375,7 @@ export interface EvaluationResultTables extends HumaMetadata {
 	accountBalance: EvaluationResultEnvelope[];
 	postingFulfillment: EvaluationResultEnvelope[];
 	cycleFulfillment?: EvaluationResultEnvelope[];
+	plannedPurchases?: EvaluationResultEnvelope[];
 }
 
 export interface ProjectionResult extends HumaMetadata {

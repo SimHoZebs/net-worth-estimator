@@ -247,6 +247,7 @@ test("desktop pages and edit dialogs meet automated accessibility checks", async
 		"/",
 		"/#accounts",
 		"/#transactions",
+		"/#purchases",
 		"/#evaluations",
 		"/#sources",
 	]) {
@@ -272,6 +273,7 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 	for (const { route, label } of [
 		{ route: "accounts", label: "Accounts" },
 		{ route: "transactions", label: "Transactions" },
+		{ route: "purchases", label: "Planned purchases" },
 		{ route: "sources", label: "Configs" },
 	]) {
 		await page.goto(`/#${route}`);
@@ -414,6 +416,10 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 		"aria-selected",
 		"true",
 	);
+	await page.keyboard.press("ArrowRight");
+	await expect(
+		page.getByRole("tab", { name: /All transactions/ }),
+	).toBeFocused();
 	await expect(
 		page.getByRole("heading", { name: "The inputs behind the outlook" }),
 	).not.toBeVisible();
@@ -431,6 +437,7 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 			"outlook",
 			"accounts",
 			"transactions",
+			"purchases",
 			"evaluations",
 			"sources",
 		]) {

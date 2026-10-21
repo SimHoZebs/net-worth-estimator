@@ -4,6 +4,7 @@ import {
 	Flag,
 	LayoutDashboard,
 	Settings,
+	ShoppingBag,
 	Wallet,
 } from "lucide-react";
 
@@ -11,6 +12,7 @@ export type Page =
 	| "outlook"
 	| "accounts"
 	| "transactions"
+	| "purchases"
 	| "evaluations"
 	| "sources";
 export type PageDefinition = {
@@ -38,6 +40,12 @@ export const pages: PageDefinition[] = [
 		label: "Transactions",
 		icon: ArrowRightLeft,
 		title: "Planned transactions",
+	},
+	{
+		id: "purchases",
+		label: "Planned purchases",
+		icon: ShoppingBag,
+		title: "Plan your purchases",
 	},
 	{
 		id: "evaluations",
