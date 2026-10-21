@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OtherEvaluation } from "../../domain/result.ts";
 import { testPlan } from "../../test/plan.ts";
-import { projectionFixture } from "../../test/projection.ts";
+import { evaluationFixture, projectionFixture } from "../../test/projection.ts";
 import { PinnedEvaluations } from "./PinnedEvaluations.tsx";
 
 afterEach(cleanup);
@@ -63,4 +63,34 @@ describe("pinned evaluation cards", () => {
 		fireEvent.click(button);
 		expect(input.onPinChange).not.toHaveBeenCalled();
 	});
+
+	it.each(testPlan.evaluations)(
+		"pins and inspects the configured $kind target",
+		(evaluation) => {
+			const result = evaluationFixture({ evaluation });
+			const input = {
+				...props(),
+				projection: projectionFixture({ evaluations: [result] }),
+				pinnedIds: [evaluation.id],
+			};
+			const view = render(<PinnedEvaluations {...input} />);
+			const card = within(view.getByRole("region", { name: evaluation.name }));
+			const progress = card.getByRole("progressbar", { name: evaluation.name });
+			expect(Number(progress.getAttribute("aria-valuenow"))).toBe(
+				Math.round(
+					Math.min(
+						100,
+						Math.max(0, (result.current / evaluation.target) * 100),
+					),
+				),
+			);
+			const [pin, evidence] = card.getAllByRole("button");
+			fireEvent.click(evidence!);
+			expect(input.onEvaluation).toHaveBeenCalledWith(evaluation.id);
+			fireEvent.click(pin!);
+			expect(input.onPinChange).toHaveBeenCalledWith(evaluation.id);
+			view.rerender(<PinnedEvaluations {...input} pinnedIds={[]} />);
+			expect(view.container.childElementCount).toBe(0);
+		},
+	);
 });

@@ -210,7 +210,6 @@
 		align-items: center;
 		gap: 6px;
 	}
-	.evaluation-preview,
 	.safe-spending-preview {
 		background: var(--surface);
 		border: 1px solid var(--line);
@@ -235,7 +234,6 @@
 		position: relative;
 		z-index: 1;
 	}
-	.evaluation-preview .section-top h2,
 	.safe-spending-preview .section-top h2 {
 		font-size: 13px;
 	}
@@ -259,41 +257,6 @@
 	}
 	.spend-answer strong + span {
 		margin-top: 6px;
-	}
-	.evaluation-preview-content {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 19px 0 17px;
-	}
-	.evaluation-preview-content p {
-		font-size: 10px;
-		color: var(--muted);
-	}
-	.evaluation-date {
-		font-size: 29px;
-		font-weight: 550;
-		letter-spacing: -0.5px;
-		margin: 4px 0;
-		line-height: 1.3;
-	}
-	.evaluation-preview-content .muted {
-		font-size: 9px;
-	}
-	.evaluation-glyph {
-		background: var(--accent-green-bg);
-		border: 1px solid var(--accent-green-border);
-		color: var(--accent-green-text);
-		border-radius: 50%;
-		height: 59px;
-		width: 59px;
-		display: grid;
-		place-items: center;
-		margin-right: 3px;
-	}
-	.evaluation-evidence-link {
-		margin-top: 14px;
-		font-size: 9px;
 	}
 	.pinned-evaluations {
 		margin-top: 25px;

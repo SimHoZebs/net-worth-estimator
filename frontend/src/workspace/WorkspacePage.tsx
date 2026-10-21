@@ -34,7 +34,6 @@ export function WorkspacePage({
 					onEvidence={() => onEvidence({ kind: "position" })}
 					onFailure={() => onEvidence({ kind: "failure" })}
 					onTransactions={() => onNavigate("transactions")}
-					onEvaluations={() => onNavigate("evaluations")}
 					onEvaluation={(id) => onEvidence({ kind: "evaluation", id })}
 					safeSpendingDetail={safeSpendingDetail}
 					onSafeSpendingDetail={onSafeSpendingDetail}

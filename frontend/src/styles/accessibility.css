@@ -18,7 +18,6 @@
 .chart-legend,
 .chart-inspection span,
 .range-disclaimer,
-.evaluation-preview-content p,
 .progress-label,
 .safe-spending-figures span,
 .safe-spending-replenishment span > span,
@@ -123,7 +122,6 @@ thead {
 	font-size: 10px;
 }
 .insight-card > p,
-.evaluation-preview-content p,
 .safe-spending-figures span {
 	font-size: 11px;
 }
@@ -132,9 +130,7 @@ thead {
 .insight-caption {
 	font-size: 10px;
 }
-.progress-label,
-.evaluation-preview-content .muted,
-.evaluation-evidence-link {
+.progress-label {
 	font-size: 10px;
 }
 .account-label strong {
