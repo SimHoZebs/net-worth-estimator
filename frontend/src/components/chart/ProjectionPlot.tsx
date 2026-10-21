@@ -1,5 +1,6 @@
 import type { ChartModel } from "../../domain/chart.ts";
 import { compactMoney, dateLabel, money } from "../../domain/format.ts";
+import "./plot-colors.css";
 
 export function ProjectionPlot({
 	model,
@@ -56,16 +57,8 @@ export function ProjectionPlot({
 			</desc>
 			<defs>
 				<linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
-					<stop
-						offset="0%"
-						style={{ stopColor: "var(--chart-band)" }}
-						stopOpacity=".55"
-					/>
-					<stop
-						offset="100%"
-						style={{ stopColor: "var(--chart-band)" }}
-						stopOpacity=".1"
-					/>
+					<stop offset="0%" className="plot-band-stop" stopOpacity=".55" />
+					<stop offset="100%" className="plot-band-stop" stopOpacity=".1" />
 				</linearGradient>
 			</defs>
 			{Array.from(
@@ -78,7 +71,7 @@ export function ProjectionPlot({
 						x2={width - right}
 						y1={y(value)}
 						y2={y(value)}
-						style={{ stroke: "var(--chart-grid)" }}
+						className="plot-grid"
 						strokeDasharray="3 5"
 					/>
 					<text
@@ -92,7 +85,7 @@ export function ProjectionPlot({
 				</g>
 			))}
 			{ranges && model.hasRange ? (
-				<path d={area} style={{ fill: "var(--chart-band)" }} fillOpacity=".7" />
+				<path d={area} className="plot-band" fillOpacity=".7" />
 			) : (
 				<path d={filledBasePath} fill={`url(#${id}-fill)`} />
 			)}
@@ -100,7 +93,7 @@ export function ProjectionPlot({
 				<path
 					d={medianPath}
 					fill="none"
-					style={{ stroke: "var(--chart-median)" }}
+					className="plot-median"
 					strokeWidth="1.5"
 					strokeDasharray="4 5"
 				/>
@@ -108,7 +101,7 @@ export function ProjectionPlot({
 			<path
 				d={basePath}
 				fill="none"
-				style={{ stroke: "var(--chart-line)" }}
+				className="plot-line"
 				strokeWidth="3"
 				strokeLinejoin="round"
 				strokeLinecap="round"
@@ -119,7 +112,7 @@ export function ProjectionPlot({
 					x2={width - right}
 					y1={y(0)}
 					y2={y(0)}
-					style={{ stroke: "var(--muted)" }}
+					className="plot-reference"
 					strokeWidth="1.5"
 				/>
 				<text
@@ -151,7 +144,7 @@ export function ProjectionPlot({
 				cx={x(points.length - 1)}
 				cy={y(values.at(-1) ?? 0)}
 				r="5"
-				style={{ fill: "var(--chart-line)", stroke: "var(--surface)" }}
+				className="plot-endpoint"
 				strokeWidth="3"
 			/>
 			{inspected !== null && (
@@ -161,14 +154,14 @@ export function ProjectionPlot({
 						x2={x(selectedIndex)}
 						y1={top}
 						y2={height - bottom}
-						style={{ stroke: "var(--muted)" }}
+						className="plot-reference"
 						strokeDasharray="4 4"
 					/>
 					<circle
 						cx={x(selectedIndex)}
 						cy={y(values[selectedIndex] ?? 0)}
 						r="5"
-						style={{ fill: "var(--forest)", stroke: "var(--surface)" }}
+						className="plot-inspection-point"
 						strokeWidth="2"
 					/>
 				</g>

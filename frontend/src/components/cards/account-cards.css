@@ -86,4 +86,35 @@
 		flex-wrap: wrap;
 		margin-bottom: 12px;
 	}
+	.account-card-summary {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.account-details-summary {
+		display: flex;
+		gap: 12px;
+		align-items: center;
+	}
+	.account-details-balance {
+		font-size: 1.25rem;
+	}
+	.account-utilization {
+		margin-top: 14px;
+	}
+	.modal-body .section-note.account-utilization-note {
+		padding: 6px 0;
+	}
+	.account-transactions-heading {
+		margin-top: 8px;
+	}
+	.account-transactions-heading h2 {
+		font-size: 0.8125rem;
+	}
+	.account-search-row .search-field {
+		flex: 1;
+	}
+	.account-posting-filter button {
+		text-transform: capitalize;
+	}
 }

@@ -1,0 +1,38 @@
+/* Shared paint roles for projection and account-balance plots. */
+@layer components {
+	.plot-band-stop {
+		stop-color: var(--chart-band);
+	}
+	.plot-band {
+		fill: var(--chart-band);
+	}
+	.plot-grid {
+		stroke: var(--chart-grid);
+	}
+	.plot-median {
+		stroke: var(--chart-median);
+	}
+	.plot-line {
+		stroke: var(--chart-line);
+	}
+	.plot-reference {
+		stroke: var(--muted);
+	}
+	.plot-danger {
+		stroke: var(--danger-solid);
+	}
+	.plot-endpoint,
+	.plot-danger-endpoint,
+	.plot-inspection-point {
+		stroke: var(--surface);
+	}
+	.plot-endpoint {
+		fill: var(--chart-line);
+	}
+	.plot-danger-endpoint {
+		fill: var(--danger-solid);
+	}
+	.plot-inspection-point {
+		fill: var(--forest);
+	}
+}

@@ -135,6 +135,33 @@
 	.funding-date-tabs {
 		margin: 4px 0 16px;
 	}
+	.funding-gap-heading {
+		font-size: 1.25rem;
+	}
+	.modal-body .section-note.funding-gap-summary {
+		padding: 4px 0;
+	}
+	.funding-ledger-heading {
+		font-size: 0.8125rem;
+		margin: 14px 0 4px;
+	}
+	.funding-gap-date-icon {
+		margin-right: 8px;
+	}
+	.funding-failed-summary {
+		display: flex;
+		gap: 10px;
+		align-items: center;
+	}
+	.funding-failed-name {
+		font-size: 0.75rem;
+	}
+	.funding-failed-amount {
+		text-align: right;
+	}
+	.modal-body .section-note.funding-window-note {
+		padding: 12px 0 0;
+	}
 	.funding-metrics {
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -664,4 +664,7 @@
 	.modal-body .section-note {
 		padding: 8px 0;
 	}
+	.section-note.section-note-flush {
+		padding: 0;
+	}
 }

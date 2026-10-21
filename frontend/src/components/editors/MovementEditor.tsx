@@ -129,7 +129,7 @@ export function MovementFormFields({
 				)}
 			</SelectField>
 			{!advanced && (
-				<p className="muted small" style={{ gridColumn: "1 / -1" }}>
+				<p className="muted small field-wide">
 					{templateForKind.summary}{" "}
 					{templateForKind.whenToUse && (
 						<span>Use when: {templateForKind.whenToUse}</span>
@@ -170,7 +170,7 @@ export function MovementFormFields({
 				<>
 					<input type="hidden" name="amount" value="0" />
 					<input type="hidden" name="annualIncrease" value="0" />
-					<div className="inline-notice" style={{ gridColumn: "1 / -1" }}>
+					<div className="inline-notice field-wide">
 						<span>
 							{templates.some((template) => template.id === amountKind) ? (
 								<>

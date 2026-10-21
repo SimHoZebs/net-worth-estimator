@@ -46,15 +46,7 @@ export function AccountCard({
 				))}
 			</span>
 			<span className="account-card-foot">
-				<span
-					style={{
-						whiteSpace: "nowrap",
-						overflow: "hidden",
-						textOverflow: "ellipsis",
-					}}
-				>
-					{card.summary}
-				</span>
+				<span className="account-card-summary">{card.summary}</span>
 				<span aria-hidden="true">›</span>
 			</span>
 		</button>

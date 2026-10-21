@@ -933,6 +933,7 @@
 	}
 	.recurring-drag {
 		display: flex;
+		touch-action: none;
 		color: var(--muted);
 		cursor: grab;
 	}

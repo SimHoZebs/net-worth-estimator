@@ -87,7 +87,6 @@ function SortableRow({
 			<span
 				className="recurring-drag"
 				aria-hidden="true"
-				style={{ touchAction: "none", cursor: "grab" }}
 				onPointerDown={(event) => dragControls.start(event)}
 			>
 				<GripVertical size={16} />
