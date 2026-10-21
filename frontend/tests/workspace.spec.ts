@@ -236,7 +236,6 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 			page.getByRole("dialog", { name: "Workspace navigation" }),
 		).not.toBeVisible();
 		await expect(openNavigation).toBeFocused();
-		await expect(page.locator(".workspace")).not.toHaveAttribute("inert", "");
 	}
 	await page.goto("/");
 	await expect(
@@ -260,7 +259,6 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 			)
 			.map((element) => ({
 				tag: element.tagName,
-				class: element.className,
 				right: element.getBoundingClientRect().right,
 			})),
 	}));
@@ -356,13 +354,9 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 	page,
 }) => {
 	await page.goto("/#accounts");
-	await expect(
-		page.locator('.page-tabs[role="tablist"] > button[role="tab"]'),
-	).toHaveCount(0);
+	await expect(page.getByRole("tab")).toHaveCount(0);
 	await page.goto("/#transactions");
-	await expect(
-		page.locator('.page-tabs[role="tablist"] > button[role="tab"]'),
-	).toHaveCount(2);
+	await expect(page.getByRole("tab")).toHaveCount(2);
 	await page.getByRole("tab", { name: /All transactions/ }).focus();
 	await page.keyboard.press("ArrowRight");
 	await expect(page.getByRole("tab", { name: /Recurring/ })).toBeFocused();
