@@ -1,4 +1,4 @@
-import { ArrowUpRight, Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
+import { Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
 import { useId } from "react";
 import type { EvaluationPin } from "../../components/evaluationCard.ts";
 import { IconButton, Progress, Skeleton } from "../../components/ui.tsx";
@@ -15,7 +15,6 @@ export function EvaluationCard({
 	probability,
 	onEdit,
 	onRemove,
-	onEvidence,
 	pending = false,
 	pin = null,
 }: {
@@ -24,7 +23,6 @@ export function EvaluationCard({
 	probability: number | null;
 	onEdit?: () => void;
 	onRemove?: () => void;
-	onEvidence: () => void;
 	pending?: boolean;
 	pin?: EvaluationPin | null;
 }) {
@@ -129,16 +127,6 @@ export function EvaluationCard({
 					scenarios.
 				</p>
 			)}
-			<div className="evaluation-card-footer">
-				<button
-					type="button"
-					className="text-button"
-					disabled={!evaluation.enabled || outcomePending}
-					onClick={onEvidence}
-				>
-					Evidence <ArrowUpRight size={15} />
-				</button>
-			</div>
 		</section>
 	);
 }
