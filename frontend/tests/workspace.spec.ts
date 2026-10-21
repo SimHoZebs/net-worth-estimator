@@ -8,7 +8,7 @@ import {
 } from "./fixture.ts";
 
 test.beforeEach(async () => {
-	await resetFixture();
+	await resetFixture({ pinnedEvaluationIds: ["posting-fulfillment"] });
 });
 
 /** Open the movement editor for the fixture's investing transfer. */

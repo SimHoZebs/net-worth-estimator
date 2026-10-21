@@ -8,7 +8,7 @@ export const FIXTURE_API =
 export const REMOTE_STORAGE_KEY = "waypoint.remote-workspace.v1";
 
 export async function resetFixture(
-	options: { readOnly?: boolean } = {},
+	options: { readOnly?: boolean; pinnedEvaluationIds?: string[] } = {},
 ): Promise<void> {
 	const api = await request.newContext();
 	try {
@@ -19,6 +19,12 @@ export async function resetFixture(
 			throw new Error(
 				`fixture reset failed: ${response.status()} ${await response.text()}`,
 			);
+		if (options.pinnedEvaluationIds) {
+			const pins = await api.put(`${FIXTURE_API}/v1/pinned-evaluations`, {
+				data: { instanceIds: options.pinnedEvaluationIds },
+			});
+			if (!pins.ok()) throw new Error(`fixture pins failed: ${pins.status()}`);
+		}
 	} finally {
 		await api.dispose();
 	}

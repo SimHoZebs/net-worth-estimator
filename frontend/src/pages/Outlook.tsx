@@ -1,8 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
-import { FundingGapsCard } from "../components/funding/FundingGapsCard.tsx";
-import { deriveFundingGaps } from "../domain/fundingGaps.ts";
 import type { Projection } from "../domain/result.ts";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
@@ -71,6 +69,10 @@ function OutlookContent({
 	const projection = useRemoteProjection();
 	const pinnedIds = usePinnedEvaluationsStore((state) => state.ids);
 	const refreshPins = usePinnedEvaluationsStore((state) => state.refresh);
+	const togglePin = usePinnedEvaluationsStore((state) => state.toggle);
+	const pinsLoading = usePinnedEvaluationsStore((state) => state.loading);
+	const pinnedError = usePinnedEvaluationsStore((state) => state.error);
+	const status = useWorkspaceStore((state) => state.status);
 	useEffect(() => {
 		void refreshPins();
 	}, [refreshPins]);
@@ -81,10 +83,6 @@ function OutlookContent({
 	const base: Projection | null =
 		projection.base instanceof Error ? null : projection.base;
 	const pending = base === null;
-	const gaps = useMemo(
-		() => (plan && base ? deriveFundingGaps({ plan, projection: base }) : []),
-		[plan, base],
-	);
 	if (!plan) return null;
 	if (base === null && !pending) {
 		return (
@@ -170,13 +168,27 @@ function OutlookContent({
 						onEvidence={onEvidence}
 						pending={pending}
 					/>
-					<FundingGapsCard gaps={gaps} pending={pending} />
 				</div>
 			</div>
+			{pinnedError && (
+				<ErrorNotice
+					message={pinnedError}
+					action="Reload pins"
+					onAction={() => {
+						void refreshPins();
+					}}
+				/>
+			)}
 			<PinnedEvaluations
+				plan={plan}
 				projection={base}
+				range={projection.range}
 				pinnedIds={pinnedIds}
 				pending={pending}
+				pinsDisabled={pinsLoading || (status?.readOnly ?? false)}
+				onPinChange={(id) => {
+					void togglePin(id);
+				}}
 				onEvaluation={onEvaluation}
 			/>
 			<div className="outlook-secondary" aria-busy={pending}>

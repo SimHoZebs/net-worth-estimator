@@ -296,10 +296,6 @@
 		font-size: 9px;
 	}
 	.pinned-evaluations {
-		background: var(--surface);
-		border: 1px solid var(--line);
-		border-radius: 10px;
-		padding: 22px 23px 18px;
 		margin-top: 25px;
 	}
 	.pinned-heading {
@@ -309,37 +305,14 @@
 		font-size: 13px;
 		font-weight: 600;
 	}
-	.pinned-evaluations ul {
+	.pinned-evaluations > ul {
 		list-style: none;
 		padding: 0;
 		margin: 12px 0 0;
+	}
+	.pinned-evaluations > ul > li {
 		display: grid;
-	}
-	.pinned-evaluations li {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-		padding: 10px 0;
-		border-top: 1px solid var(--line);
-	}
-	.pinned-evaluations li > div {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		min-width: 0;
-	}
-	.pinned-evaluations li strong {
-		font-size: 12px;
-		font-weight: 600;
-	}
-	.pinned-evaluations li .muted {
-		font-size: 10px;
-		color: var(--muted);
-	}
-	.pinned-evaluations li .evaluation-evidence-link {
-		margin-top: 0;
-		flex-shrink: 0;
+		min-inline-size: 0;
 	}
 	.safe-spending-figures {
 		display: grid;
