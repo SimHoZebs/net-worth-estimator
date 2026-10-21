@@ -2014,6 +2014,7 @@ describe("remote projection mapping and SSE", () => {
 		expect(
 			local.otherEvaluations.find((entry) => entry.id === "fulfillment"),
 		).toMatchObject({
+			name: document.evaluations.postingFulfillment[0]!.name,
 			outcomeDate: "2026-05-01",
 			qualifier: null,
 			progress: { fraction: 0.87 },
@@ -2028,7 +2029,7 @@ describe("remote projection mapping and SSE", () => {
 				postingFulfillment: [
 					{
 						instanceId: "fulfillment",
-						name: "Planned movements",
+						name: "Posting fulfillment",
 						enabled: true,
 						config: { postingIds: null },
 					},
@@ -2055,6 +2056,8 @@ describe("remote projection mapping and SSE", () => {
 		expect(
 			local.otherEvaluations.find((entry) => entry.id === "fulfillment"),
 		).toMatchObject({
+			status: "satisfied",
+			postingIds: null,
 			outcomeDate: null,
 			progress: null,
 		});

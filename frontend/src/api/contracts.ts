@@ -305,6 +305,11 @@ export interface MovementAccountDelta {
 	delta: number;
 }
 
+export interface MovementFulfillment {
+	unfulfilledAmount: number;
+	destinationLimitedAmount: number;
+}
+
 export interface MovementEvent {
 	date: IsoDate;
 	sequence: number;
@@ -312,6 +317,9 @@ export interface MovementEvent {
 	requestedAmount: number;
 	realizedAmount: number;
 	accountDeltas: MovementAccountDelta[] | null;
+	bindingConstraints?: JsonValue[];
+	availableAmount?: number;
+	fulfillment?: MovementFulfillment;
 }
 
 export interface ProjectionTimeline {

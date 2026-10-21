@@ -13,6 +13,14 @@ type MovementOrigin struct {
 	PostingID string `json:"postingId"`
 }
 
+// MovementFulfillment is the per-event assessment shared by public evidence
+// and configured posting-fulfillment evaluations. Destination limits do not
+// count as unfulfilled funding.
+type MovementFulfillment struct {
+	UnfulfilledAmount        float64 `json:"unfulfilledAmount"`
+	DestinationLimitedAmount float64 `json:"destinationLimitedAmount"`
+}
+
 type MovementEvent struct {
 	Date            IsoDate        `json:"date"`
 	Sequence        int            `json:"sequence"`
@@ -23,8 +31,9 @@ type MovementEvent struct {
 		AccountID string  `json:"accountId"`
 		Delta     float64 `json:"delta"`
 	} `json:"accountDeltas"`
-	BindingConstraints []JsonValue `json:"bindingConstraints,omitempty"`
-	AvailableAmount    *float64    `json:"availableAmount,omitempty"`
+	BindingConstraints []JsonValue          `json:"bindingConstraints,omitempty"`
+	AvailableAmount    *float64             `json:"availableAmount,omitempty"`
+	Fulfillment        *MovementFulfillment `json:"fulfillment,omitempty"`
 }
 
 type AccountSnapshot struct {

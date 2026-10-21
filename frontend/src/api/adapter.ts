@@ -914,7 +914,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		warn(
 			conversionReport,
 			"server-evaluations",
-			"Financial-independence, posting-fulfillment, and cycle-fulfillment evaluations are listed with the editable evaluations and are read-only in this workspace.",
+			"Financial independence, funding gaps, and cycle fulfillment evaluations are listed with the editable evaluations and are read-only in this workspace.",
 			"evaluations",
 		);
 		provisional(conversionReport, "evaluations");

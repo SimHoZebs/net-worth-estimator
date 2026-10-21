@@ -37,6 +37,8 @@ export interface FundingGap {
 	fundingAccount: FundingGapAccount;
 	openingBalance: number;
 	requiredAmount: number;
+	availableAmount: number;
+	unfulfilledAmount: number;
 	windowStartDate: string;
 	/** Execution order, same-day order significant. Never re-sort. */
 	movements: FundingGapMovement[];
@@ -68,10 +70,10 @@ export function summarizeFundingGap(gap: FundingGap): FundingGapSummary {
 		else moneyOut -= movement.amount;
 		return { ...movement, balanceAfter: balance };
 	});
-	const shortfall = Math.max(0, gap.requiredAmount - balance);
-	const coveredAmount = Math.min(gap.requiredAmount, Math.max(0, balance));
+	const shortfall = gap.unfulfilledAmount;
+	const coveredAmount = Math.max(0, gap.requiredAmount - shortfall);
 	return {
-		available: balance,
+		available: gap.availableAmount,
 		shortfall,
 		coveredAmount,
 		coveragePercent:
@@ -108,21 +110,25 @@ function monthStart(date: string): string {
 }
 
 /**
- * Derive inspectable funding gaps from base-case movements. The simulation
- * owns fundability: only movements with realized < requested (a funding
- * constraint) become gaps. The UI recomputes display totals only.
+ * Present the backend's per-event fulfillment assessment with account-history
+ * evidence. The ledger explains the result; it never decides fundability.
  */
 export function deriveFundingGaps({
 	plan,
 	projection,
+	postingIds = null,
 }: {
 	plan: Plan;
 	projection: Projection | null;
+	postingIds?: readonly string[] | null;
 }): FundingGap[] {
 	if (!projection) return [];
+	const selectedIds = postingIds === null ? null : new Set(postingIds);
 	// Execution order is projection.movements order (date, sequence).
 	const failures = projection.movements.filter(
-		(movement) => movement.requested - movement.realized > 0.5,
+		(movement) =>
+			(movement.fulfillment?.unfulfilledAmount ?? 0) > 0 &&
+			(selectedIds === null || selectedIds.has(movement.movementId)),
 	);
 	return failures.flatMap((failure: MovementResult): FundingGap[] => {
 		const accountId = failure.fromId ?? failure.toId;
@@ -184,10 +190,6 @@ export function deriveFundingGaps({
 			}),
 		);
 		const required = failure.requested;
-		const available =
-			failure.available ??
-			opening + movements.reduce((sum, item) => sum + item.amount, 0);
-		if (Math.max(0, required - available) <= 0.5) return [];
 		return [
 			{
 				id: `${failure.movementId}-${failure.date}`,
@@ -196,6 +198,8 @@ export function deriveFundingGaps({
 				fundingAccount: { id: accountId, name: accountName },
 				openingBalance: opening,
 				requiredAmount: required,
+				availableAmount: failure.available ?? failure.realized,
+				unfulfilledAmount: failure.fulfillment!.unfulfilledAmount,
 				windowStartDate: windowStart,
 				movements,
 			},

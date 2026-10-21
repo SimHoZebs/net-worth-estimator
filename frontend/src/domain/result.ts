@@ -1,3 +1,4 @@
+import type { MovementFulfillment } from "../api/contracts.ts";
 import { clampMonth } from "./format.ts";
 import type { Evaluation } from "./model.ts";
 
@@ -27,6 +28,7 @@ export interface MovementResult {
 	constraint: string | null;
 	accountDeltas: MovementAccountDelta[];
 	constraintTypes?: string[];
+	fulfillment?: MovementFulfillment;
 }
 export interface EvaluationResult {
 	evaluation: Evaluation;
@@ -54,6 +56,8 @@ export interface OtherEvaluation {
 	outcomeText: string;
 	qualifier: string | null;
 	progress: OtherEvaluationProgress | null;
+	/** Configured transaction scope for posting-fulfillment evidence. Null means all. */
+	postingIds?: string[] | null;
 }
 export interface Projection {
 	points: Point[];

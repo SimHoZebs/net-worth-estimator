@@ -95,9 +95,9 @@ func publicMovementEvents(path *types.ProjectionPath) []types.MovementEvent {
 	if path.MovementEvents == nil {
 		return nil
 	}
-	evaluatedBySequence := make(map[int][]accountMovementConstraint)
+	evaluatedBySequence := make(map[int]evaluatedMovementEvent)
 	for _, evaluated := range evaluateMovementEvents(path) {
-		evaluatedBySequence[evaluated.event.Sequence] = evaluated.bindingConstraints
+		evaluatedBySequence[evaluated.event.Sequence] = evaluated
 	}
 	balancesBeforeBySequence := ReconstructBalancesBeforeEvents(path)
 	accountsByID := make(map[string]types.Account, len(path.EffectiveDocument.Accounts))
@@ -146,7 +146,10 @@ func publicMovementEvents(path *types.ProjectionPath) []types.MovementEvent {
 		event := cloneMovementEvent(source)
 		event.BindingConstraints = nil
 		event.AvailableAmount = nil
-		constraints := evaluatedBySequence[source.Sequence]
+		evaluated := evaluatedBySequence[source.Sequence]
+		fulfillment := evaluated.fulfillment()
+		event.Fulfillment = &fulfillment
+		constraints := evaluated.bindingConstraints
 		if len(constraints) > 0 {
 			event.BindingConstraints = make([]types.JsonValue, len(constraints))
 			for constraintIndex, constraint := range constraints {
