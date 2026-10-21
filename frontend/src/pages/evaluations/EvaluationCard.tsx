@@ -79,7 +79,7 @@ export function EvaluationCard({
 				</div>
 			</div>
 			<h2>{evaluation.name}</h2>
-			<div className="evaluation-card-outcome">
+			<div className="evaluation-card-outcome type-value">
 				{!evaluation.enabled ? (
 					"Paused"
 				) : outcomePending ? (

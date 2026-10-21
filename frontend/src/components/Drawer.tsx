@@ -230,7 +230,9 @@ export function Drawer({
 								<div className="modal-header">
 									<div>
 										{eyebrow && <p className="eyebrow">{eyebrow}</p>}
-										<h2 id={titleId}>{title}</h2>
+										<h2 id={titleId} className="type-display">
+											{title}
+										</h2>
 									</div>
 									<IconButton
 										icon={X}

@@ -24,7 +24,7 @@ export function EvaluationEvidence({
 			eyebrow="Evaluation evidence"
 			onClose={onClose}
 		>
-			<div className="evidence-amount">
+			<div className="evidence-amount type-value">
 				{result.firstDate
 					? result.current >= result.evaluation.target
 						? "Already reached"

@@ -80,7 +80,9 @@ export function AccountDetailsModal({
 				<div style={{ display: "flex", gap: 12, alignItems: "center" }}>
 					<AccountIcon account={card.account} />
 					<div>
-						<strong style={{ fontSize: 20 }}>{exactMoney(card.balance)}</strong>
+						<strong className="type-value" style={{ fontSize: 20 }}>
+							{exactMoney(card.balance)}
+						</strong>
 						<div className="section-note" style={{ padding: 0 }}>
 							{card.balanceLabel} · {card.summary}
 						</div>

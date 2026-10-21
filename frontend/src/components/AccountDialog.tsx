@@ -65,7 +65,7 @@ export function AccountDialog({
 				<AccountIcon account={account} />
 				<div>
 					<span>Starting balance</span>
-					<strong>
+					<strong className="type-value">
 						{money(
 							!account.enabled
 								? 0

@@ -44,7 +44,7 @@ export function EvaluationPreview({
 					<div className="evaluation-preview-content">
 						<div>
 							<p>{evaluation.evaluation.name}</p>
-							<div className="evaluation-date">
+							<div className="evaluation-date type-value">
 								{evaluation.current >= evaluation.evaluation.target
 									? "Already there"
 									: evaluation.firstDate

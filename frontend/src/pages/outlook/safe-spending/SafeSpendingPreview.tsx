@@ -477,7 +477,7 @@ export function SafeSpendingPreview({
 			</p>
 			<div className="spend-answer">
 				<span>{allowance >= 0 ? "You can spend" : "Over budget"}</span>
-				<strong>{money(Math.abs(allowance))}</strong>
+				<strong className="type-value">{money(Math.abs(allowance))}</strong>
 				<span>
 					{allowance >= 0
 						? `${money(dailySafe)} a day`

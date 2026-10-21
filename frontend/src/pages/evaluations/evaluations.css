@@ -28,8 +28,9 @@
 		margin: 8px 0;
 	}
 	.evaluation-card-outcome {
-		font-family: var(--serif);
 		font-size: 36px;
+		font-weight: 550;
+		line-height: 1.2;
 		letter-spacing: -1px;
 		margin: 22px 0 4px;
 	}

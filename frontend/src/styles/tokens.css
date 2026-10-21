@@ -5,10 +5,12 @@
 @layer base {
 	:root {
 		color-scheme: light;
-		font-family: "Manrope Variable", sans-serif;
 		color: var(--ink);
 		background: var(--paper);
 		font-synthesis: none;
+		--font-ui: "Manrope Variable", sans-serif;
+		--font-display: "Newsreader Variable", Georgia, serif;
+		--font-code: ui-monospace, monospace;
 		--forest: #254d3d;
 		--forest-hover: #193d2d;
 		--on-forest: #fafcf5;
@@ -53,7 +55,6 @@
 		--seg-plum: #bcabd2;
 		--backdrop-film: #172d2b66;
 		--backdrop-blur: 3px;
-		--serif: "Newsreader Variable", Georgia, serif;
 		--sidebar: 224px;
 	}
 }

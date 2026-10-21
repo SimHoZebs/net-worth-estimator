@@ -32,7 +32,9 @@ export function AccountCard({
 				</span>
 			</span>
 			<span>
-				<span className="account-card-balance">{money(card.balance)}</span>
+				<span className="account-card-balance type-value">
+					{money(card.balance)}
+				</span>
 				<br />
 				<span className="account-card-label">{card.balanceLabel}</span>
 			</span>

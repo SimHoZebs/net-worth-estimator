@@ -139,7 +139,6 @@
 		place-items: center;
 	}
 	.insight-card h2 {
-		font-family: var(--serif);
 		font-size: 24px;
 		font-weight: 450;
 		line-height: 1.15;
@@ -291,8 +290,8 @@
 		color: var(--muted);
 	}
 	.evaluation-date {
-		font-family: var(--serif);
 		font-size: 29px;
+		font-weight: 550;
 		letter-spacing: -0.5px;
 		margin: 4px 0;
 		line-height: 1.3;
