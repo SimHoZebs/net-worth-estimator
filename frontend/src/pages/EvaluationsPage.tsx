@@ -69,7 +69,7 @@ function OtherEvaluationCard({
 			</div>
 			<h2>{item.name}</h2>
 			{item.goal && item.goal !== item.name && <p>{item.goal}</p>}
-			<div className="evaluation-card-outcome">
+			<div className="evaluation-card-outcome type-value">
 				{!item.enabled
 					? "Paused"
 					: item.outcomeDate

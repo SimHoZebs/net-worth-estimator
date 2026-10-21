@@ -66,7 +66,7 @@ export function OutlookMetrics({
 						onClick={onEvidence}
 					/>
 				</div>
-				<div className="metric-value">{money(current)}</div>
+				<div className="metric-value type-value">{money(current)}</div>
 				<div className="metric-context">
 					<span className="status-dot" />
 					As of {dateLabel(plan.startDate, true)}
@@ -77,7 +77,7 @@ export function OutlookMetrics({
 					<span>Base case in {final.date.slice(0, 4)}</span>
 					<TrendingUp size={19} />
 				</div>
-				<div className="metric-value" title={money(final.total)}>
+				<div className="metric-value type-value" title={money(final.total)}>
 					{compactMoney(final.total)}
 					<span className="growth-pill">
 						{final.total >= current ? "+" : ""}

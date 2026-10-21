@@ -143,7 +143,7 @@ export function Modal({
 						<h2
 							id={id}
 							className={
-								titleSize === "plain" ? "modal-title-plain" : undefined
+								titleSize === "plain" ? "modal-title-plain" : "type-display"
 							}
 						>
 							{title}

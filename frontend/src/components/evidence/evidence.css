@@ -52,8 +52,8 @@
 		color: var(--accent-green-text);
 	}
 	.evidence-amount {
-		font-family: var(--serif);
 		font-size: 41px;
+		font-weight: 550;
 		line-height: 1.2;
 		letter-spacing: -1px;
 		margin-bottom: 9px;

@@ -69,7 +69,6 @@
 	.axis-label {
 		fill: var(--chart-axis);
 		font-size: 10px;
-		font-family: "Manrope Variable", sans-serif;
 	}
 	.chart-keyboard {
 		width: calc(100% - 80px);

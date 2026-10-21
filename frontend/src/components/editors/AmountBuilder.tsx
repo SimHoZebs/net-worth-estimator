@@ -361,6 +361,7 @@ function TemplateFields({
 					<label className="field">
 						<span>Brackets (JSON: upTo per paycheck, rate 0–1)</span>
 						<textarea
+							className="type-code"
 							name="brackets"
 							rows={4}
 							defaultValue={fields["brackets"] ?? DEFAULT_BRACKETS_JSON}

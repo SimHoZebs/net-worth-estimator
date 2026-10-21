@@ -103,7 +103,7 @@ export function FundingGapsCard({
 					</span>
 					<span className="funding-gaps-hero">
 						<span>
-							<span className="funding-gaps-short">
+							<span className="funding-gaps-short type-value">
 								{money(summary.shortfall)} short
 							</span>
 							<span className="funding-gaps-name">

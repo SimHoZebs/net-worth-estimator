@@ -21,7 +21,7 @@ export function PositionEvidence({
 			eyebrow="Current position"
 			onClose={onClose}
 		>
-			<div className="evidence-amount">
+			<div className="evidence-amount type-value">
 				{money(currentNetWorth(projection))}
 			</div>
 			<p className="muted">

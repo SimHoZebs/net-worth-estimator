@@ -1,10 +1,38 @@
-/* Base typography: document defaults and unclassed element styling.
-   :focus-visible here is the single global focus owner; do not add
-   per-component focus rings. */
+/* Single font-family owner. Roles and extension rules: ./README.md.
+   Component styles own size, weight, and layout, never family selection.
+    :focus-visible here is the single global focus owner; do not add
+    per-component focus rings. */
 @layer base {
+	:root,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6,
+	button,
+	input,
+	select,
+	textarea,
+	.type-value {
+		font-family: var(--font-ui);
+	}
+	h1,
+	.type-display {
+		font-family: var(--font-display);
+	}
+	pre,
+	code,
+	kbd,
+	samp,
+	.type-code {
+		font-family: var(--font-code);
+	}
+	.type-value {
+		font-variant-numeric: tabular-nums;
+	}
 	body {
 		min-width: 320px;
-		font-size: 13px;
+		font-size: 0.8125rem;
 		line-height: 1.6;
 	}
 	::selection {
@@ -17,8 +45,7 @@
 		border-radius: 4px;
 	}
 	h1 {
-		font-family: var(--serif);
-		font-size: clamp(30px, 3.2vw, 43px);
+		font-size: clamp(1.875rem, 1rem + 2vw, 2.6875rem);
 		font-weight: 450;
 		letter-spacing: -1.15px;
 		line-height: 1.15;

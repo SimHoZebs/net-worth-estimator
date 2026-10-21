@@ -49,9 +49,8 @@
 	}
 	.funding-gaps-short {
 		display: block;
-		font-family: var(--serif);
 		font-size: 30px;
-		font-weight: 450;
+		font-weight: 550;
 		letter-spacing: -0.8px;
 		line-height: 1.1;
 		color: var(--danger-text);
