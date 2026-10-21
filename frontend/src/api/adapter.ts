@@ -1,5 +1,6 @@
 import { todayIso } from "../domain/format.ts";
 import { finite, isRecord } from "../domain/guards.ts";
+import { latestCheckpoint } from "./checkpoints.ts";
 import {
 	isSyncReservedId,
 	type Account,
@@ -186,26 +187,6 @@ function sameCeilingValue(
 	if (backendValue === null || backendValue === NO_CEILING_SENTINEL)
 		return displayValue === null;
 	return sameNullableNumber(backendValue, displayValue);
-}
-
-function latestCheckpoint(
-	document: FinancialModelDocument,
-	accountId: string,
-	projectionStartDate: IsoDate,
-): BackendCheckpoint | null {
-	const candidates = document.checkpoints
-		.map((checkpoint, index) => ({ checkpoint, index }))
-		.filter(
-			({ checkpoint }) =>
-				checkpoint.AccountId === accountId &&
-				checkpoint.Date <= projectionStartDate,
-		)
-		.sort(
-			(left, right) =>
-				right.checkpoint.Date.localeCompare(left.checkpoint.Date) ||
-				left.index - right.index,
-		);
-	return candidates[0]?.checkpoint ?? null;
 }
 
 function boundValue(
@@ -797,7 +778,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 	const accounts = document.accounts.map((account, index) => {
 		const path = `accounts.${index}`;
 		const checkpoint = latestCheckpoint(
-			document,
+			document.checkpoints,
 			account.id,
 			projectionStartDate,
 		);
@@ -1020,7 +1001,7 @@ export function displayPlanToBackendDocument(
 		const storedExtras = accountPresentations[account.id];
 		const sourceCheckpoint = storedAccount
 			? latestCheckpoint(
-					sourceDocument as FinancialModelDocument,
+					(sourceDocument as FinancialModelDocument).checkpoints,
 					account.id,
 					plan.startDate,
 				)
