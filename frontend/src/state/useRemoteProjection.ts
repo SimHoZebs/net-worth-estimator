@@ -8,14 +8,18 @@ import {
 	type EvaluationResultEnvelope,
 	type FinancialModelDocument,
 	type JsonValue,
-	type MovementEvent,
 	type ProjectionAccountSummary,
 	type ProjectionResult,
 	parseSSE,
 	type StochasticProjectionRequest,
 	type StochasticProjectionResult,
 } from "../api/index.ts";
+import { projectionMovements } from "../api/projectionMovements.ts";
 import { dateLabel, money, percent, todayIso } from "../domain/format.ts";
+import {
+	fundingEvaluationName,
+	fundingLabels,
+} from "../domain/fundingTerminology.ts";
 import { finite, isRecord, stringValue } from "../domain/guards.ts";
 import type {
 	OtherEvaluationProgress,
@@ -323,7 +327,7 @@ function postingOutcome(
 	const fulfilled: OtherOutcome = {
 		goal: null,
 		outcomeDate: null,
-		outcomeText: "Fully fulfilled",
+		outcomeText: fundingLabels.clear,
 		qualifier: null,
 		progress: null,
 	};
@@ -364,108 +368,6 @@ function cycleOutcome(
 			current: money(spent),
 			share: `${Math.round(fraction * 100)}%`,
 		},
-	};
-}
-
-function movementSource(
-	event: MovementEvent,
-	document: FinancialModelDocument | null,
-): {
-	name: string;
-	sourceAccountId: string | null;
-	destinations: string[] | null;
-} | null {
-	const posting = document?.postings.find(
-		(item) => item.id === event.origin.postingId,
-	);
-	if (posting)
-		return {
-			name: posting.name,
-			sourceAccountId: posting.sourceAccountId,
-			destinations: posting.destinations,
-		};
-	const rule = (document?.recurrenceRules ?? []).find(
-		(item) => item.id === event.origin.postingId,
-	);
-	if (rule)
-		return {
-			name: rule.name,
-			sourceAccountId: rule.sourceAccountId,
-			destinations: rule.destinations,
-		};
-	return null;
-}
-
-function movementName(
-	event: MovementEvent,
-	document: FinancialModelDocument | null,
-): string {
-	return movementSource(event, document)?.name || event.origin.postingId;
-}
-
-function movementEndpoints(
-	event: MovementEvent,
-	document: FinancialModelDocument | null,
-): { fromId: string | null; toId: string | null } {
-	const deltas = event.accountDeltas ?? [];
-	const negative = deltas.find((delta) => delta.delta < 0)?.accountId ?? null;
-	const positive = deltas.find((delta) => delta.delta > 0)?.accountId ?? null;
-	const source = movementSource(event, document);
-	return {
-		fromId: source?.sourceAccountId ?? negative,
-		toId: source?.destinations?.[0] ?? positive,
-	};
-}
-
-type ServerMovementEvent = MovementEvent & {
-	bindingConstraints?: JsonValue;
-	availableAmount?: unknown;
-};
-
-function movementConstraintTypes(event: ServerMovementEvent): string[] {
-	if (!Array.isArray(event.bindingConstraints)) return [];
-	return event.bindingConstraints.flatMap((value) => {
-		const type = stringValue(valueRecord(value)?.type);
-		return type ? [type] : [];
-	});
-}
-
-function movementConstraintLabel(type: string): string {
-	switch (type) {
-		case "source-floor":
-			return "Protected account balance";
-		case "destination-ceiling":
-			return "Destination account ceiling";
-		case "action-limit":
-			return "Annual transaction limit";
-		case "source-unavailable":
-			return "Funding account unavailable";
-		default:
-			return type
-				.split("-")
-				.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-				.join(" ");
-	}
-}
-
-function movementEvidence(
-	event: MovementEvent,
-	constrained: boolean,
-): {
-	available: number | null;
-	constraint: string | null;
-	constraintTypes?: string[];
-} {
-	const serverEvent = event as ServerMovementEvent;
-	const types = movementConstraintTypes(serverEvent);
-	return {
-		available: finite(serverEvent.availableAmount),
-		constraint: types.length
-			? movementConstraintLabel(types[0]!)
-			: constrained
-				? "Backend funding constraint"
-				: null,
-		...(types.length ? { constraintTypes: types } : {}),
 	};
 }
 
@@ -532,28 +434,7 @@ export function projectionResultToLocal(
 		document?.checkpoints.some(
 			(checkpoint) => checkpoint.Date === projectionStartDate,
 		) ?? false;
-	const movements = (result.movementEvents ?? [])
-		.filter(
-			(event) =>
-				event.date > projectionStartDate ||
-				(event.date === projectionStartDate && !startCheckpoint),
-		)
-		.map((event) => {
-			const endpoints = movementEndpoints(event, document);
-			const constrained = event.realizedAmount + 0.01 < event.requestedAmount;
-			const evidence = movementEvidence(event, constrained);
-			return {
-				date: event.date,
-				movementId: event.origin.postingId,
-				name: movementName(event, document),
-				requested: event.requestedAmount,
-				realized: event.realizedAmount,
-				fromId: endpoints.fromId,
-				toId: endpoints.toId,
-				accountDeltas: event.accountDeltas ?? [],
-				...evidence,
-			};
-		});
+	const movements = projectionMovements(result, document);
 	const balances = new Map(
 		result.accountSummaries.map((summary) => [summary.accountId, summary]),
 	);
@@ -615,8 +496,11 @@ export function projectionResultToLocal(
 		}),
 		...(document?.evaluations.postingFulfillment ?? []).map((evaluation) => ({
 			id: evaluation.instanceId,
-			name: evaluation.name || evaluation.instanceId,
+			name: fundingEvaluationName(evaluation.name),
 			type: "postingFulfillment" as const,
+			postingIds: Array.isArray(valueRecord(evaluation.config)?.postingIds)
+				? (valueRecord(evaluation.config)!.postingIds as string[])
+				: null,
 			enabled: evaluation.enabled,
 			status:
 				result.evaluations.postingFulfillment.find(

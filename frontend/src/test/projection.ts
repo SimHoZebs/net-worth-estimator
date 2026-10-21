@@ -48,6 +48,13 @@ export function movementFixture(
 		available: 6350,
 		constraint: "Protected account balance",
 		accountDeltas: [{ accountId: "checking", delta: -6350 }],
+		fulfillment: {
+			unfulfilledAmount: Math.max(
+				0,
+				(overrides.requested ?? 9000) - (overrides.realized ?? 6350),
+			),
+			destinationLimitedAmount: 0,
+		},
 		...overrides,
 	};
 }
@@ -85,6 +92,10 @@ function event(
 		toId,
 		available: realized,
 		constraint,
+		fulfillment: {
+			unfulfilledAmount: Math.max(0, requested - realized),
+			destinationLimitedAmount: 0,
+		},
 		accountDeltas: [
 			...(fromId ? [{ accountId: fromId, delta: -realized }] : []),
 			...(toId ? [{ accountId: toId, delta: realized }] : []),

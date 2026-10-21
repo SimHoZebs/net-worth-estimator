@@ -166,7 +166,7 @@ describe("checkingShortfall", () => {
 		}),
 	];
 
-	it("sums requested-minus-realized gaps with the first short date", () => {
+	it("sums canonical unfulfilled amounts with the first short date", () => {
 		expect(
 			checkingShortfall({
 				movements,
@@ -197,6 +197,55 @@ describe("checkingShortfall", () => {
 				through: "2026-10-31",
 			}),
 		).toEqual({ total: 0, firstDate: null });
+	});
+
+	it("ignores destination limits and nonreportable residuals", () => {
+		expect(
+			checkingShortfall({
+				movements: [
+					movementFixture({
+						date: "2026-10-13",
+						fulfillment: {
+							unfulfilledAmount: 0,
+							destinationLimitedAmount: 2650,
+						},
+					}),
+					movementFixture({
+						date: "2026-10-14",
+						requested: 101,
+						realized: 100,
+						fulfillment: {
+							unfulfilledAmount: 0,
+							destinationLimitedAmount: 0,
+						},
+					}),
+				],
+				checkingIds: ["checking"],
+				after: "2026-10-09",
+				through: "2026-10-31",
+			}),
+		).toEqual({ total: 0, firstDate: null });
+	});
+
+	it("keeps a reportable shortfall when public amounts round to the same value", () => {
+		expect(
+			checkingShortfall({
+				movements: [
+					movementFixture({
+						date: "2026-10-13",
+						requested: 100,
+						realized: 100,
+						fulfillment: {
+							unfulfilledAmount: 1,
+							destinationLimitedAmount: 0,
+						},
+					}),
+				],
+				checkingIds: ["checking"],
+				after: "2026-10-09",
+				through: "2026-10-31",
+			}),
+		).toEqual({ total: 1, firstDate: "2026-10-13" });
 	});
 });
 

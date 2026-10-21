@@ -261,11 +261,9 @@ export function realizedCheckingOutflows({
 }
 
 /**
- * Bills the simulation cannot fully pay inside (after, through]: the same
- * requested-minus-realized gaps the posting-fulfillment evaluation
- * aggregates, scoped to the spendable accounts and the bills window. This
- * is the established shortfall signal — not a re-derivation of the
- * cushion. Returns the total gap with the first short date.
+ * Canonical unfulfilled amounts inside (after, through], scoped to the
+ * spendable accounts and bills window. The backend owns reportability and
+ * destination-limit classification, just as for posting fulfillment.
  */
 export function checkingShortfall({
 	movements,
@@ -287,7 +285,7 @@ export function checkingShortfall({
 	for (const movement of movements) {
 		if (movement.fromId === null || !sources.has(movement.fromId)) continue;
 		if (movement.date <= start || movement.date > end) continue;
-		const gap = movement.requested - movement.realized;
+		const gap = movement.fulfillment?.unfulfilledAmount ?? 0;
 		if (gap <= 0) continue;
 		total += gap;
 		if (firstDate === null || movement.date < firstDate) {

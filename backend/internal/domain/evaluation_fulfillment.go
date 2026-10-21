@@ -82,6 +82,13 @@ type evaluatedMovementEvent struct {
 	unfulfilled        float64
 }
 
+func (evaluated evaluatedMovementEvent) fulfillment() types.MovementFulfillment {
+	return types.MovementFulfillment{
+		UnfulfilledAmount:        roundAmount(evaluated.unfulfilled),
+		DestinationLimitedAmount: roundAmount(evaluated.destinationLimited),
+	}
+}
+
 func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent {
 	balancesBeforeBySequence := ReconstructBalancesBeforeEvents(path)
 	accountsByID := map[string]types.Account{}
@@ -181,6 +188,7 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 
 func toFulfillmentEvent(evaluated evaluatedMovementEvent) fulfillmentEventJSON {
 	event := evaluated.event
+	fulfillment := evaluated.fulfillment()
 	constraints := make([]types.JsonValue, 0, len(evaluated.bindingConstraints))
 	for _, constraint := range evaluated.bindingConstraints {
 		constraints = append(constraints, constraint.toTypes())
@@ -198,8 +206,8 @@ func toFulfillmentEvent(evaluated evaluatedMovementEvent) fulfillmentEventJSON {
 		PostingID:                event.Origin.PostingID,
 		RequestedAmount:          roundAmount(event.RequestedAmount),
 		RealizedAmount:           roundAmount(event.RealizedAmount),
-		DestinationLimitedAmount: roundAmount(evaluated.destinationLimited),
-		UnfulfilledAmount:        roundAmount(evaluated.unfulfilled),
+		DestinationLimitedAmount: fulfillment.DestinationLimitedAmount,
+		UnfulfilledAmount:        fulfillment.UnfulfilledAmount,
 		BindingConstraints:       constraints,
 		AccountDeltas:            deltas,
 	}
