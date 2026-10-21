@@ -34,7 +34,6 @@ export function WorkspacePage({
 					onEvidence={() => onEvidence({ kind: "position" })}
 					onFailure={() => onEvidence({ kind: "failure" })}
 					onTransactions={() => onNavigate("transactions")}
-					onEvaluation={(id) => onEvidence({ kind: "evaluation", id })}
 					safeSpendingDetail={safeSpendingDetail}
 					onSafeSpendingDetail={onSafeSpendingDetail}
 					onSafeSpendingTab={onSafeSpendingTab}
@@ -62,7 +61,6 @@ export function WorkspacePage({
 			return (
 				<EvaluationsPage
 					onEdit={(item) => onEdit({ kind: "evaluation", item })}
-					onEvidence={(id) => onEvidence({ kind: "evaluation", id })}
 				/>
 			);
 		case "sources":
