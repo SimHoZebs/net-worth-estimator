@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { projectionFixture } from "../test/projection.ts";
+import type { FundingGap } from "./fundingGaps.ts";
 import {
+	fundingGapChartModel,
+	lineChartModel,
 	nearestPointIndex,
 	projectionChartModel,
 	projectionCsv,
@@ -92,6 +95,69 @@ describe("chart presentation data", () => {
 			}
 		},
 	);
+	describe("shared line geometry", () => {
+		const gap: FundingGap = {
+			id: "rent",
+			date: "2030-09-25",
+			name: "Rent",
+			fundingAccount: { id: "checking", name: "Checking" },
+			openingBalance: 1000,
+			requiredAmount: 9000,
+			availableAmount: 2500,
+			unfulfilledAmount: 6500,
+			windowStartDate: "2030-09-01",
+			movements: [
+				{
+					id: "pay",
+					date: "2030-09-10",
+					name: "Payroll",
+					amount: 2000,
+					kind: "income",
+				},
+				{
+					id: "bill",
+					date: "2030-09-20",
+					name: "Bill",
+					amount: -500,
+					kind: "utilities",
+				},
+			],
+		};
+		it("builds the funding path on the same scales as the projection", () => {
+			const model = fundingGapChartModel({ gap, narrow: false });
+			expect(model.width).toBe(680);
+			expect(model.grid).toHaveLength(5);
+			for (const path of [
+				model.balancePath,
+				model.areaPath,
+				model.refusalPath,
+			]) {
+				expect(path).toMatch(/^M/);
+				expect(path).not.toMatch(/NaN|Infinity/);
+			}
+			// Refusal vector lands past the last executed movement, below it.
+			expect(model.failX).toBeGreaterThan(model.endX);
+			expect(model.failY).toBeGreaterThan(model.endY);
+			expect(model.summary.shortfall).toBe(9000 - 2500);
+		});
+		it("keeps lookup and geometry in bounds for a single movement", () => {
+			const geometry = lineChartModel({
+				xMax: 1,
+				low: -100,
+				high: 100,
+				width: 440,
+				height: 260,
+				left: 63,
+				right: 24,
+				top: 15,
+				bottom: 35,
+			});
+			expect(geometry.indexAt(-1)).toBe(0);
+			expect(geometry.indexAt(2)).toBe(1);
+			expect(geometry.line([10])).toMatch(/^M/);
+			expect(geometry.line([10])).not.toMatch(/NaN|Infinity/);
+		});
+	});
 	describe("nearestPointIndex", () => {
 		const points = [
 			{ date: "2026-01-01" },

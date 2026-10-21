@@ -1,4 +1,87 @@
+import type { FundingGap } from "./fundingGaps.ts";
+import { summarizeFundingGap } from "./fundingGaps.ts";
 import type { Projection, RangeResult } from "./result.ts";
+
+export interface LineChartGeometry {
+	width: number;
+	height: number;
+	left: number;
+	right: number;
+	top: number;
+	bottom: number;
+	low: number;
+	high: number;
+	x: (index: number) => number;
+	y: (value: number) => number;
+	line: (series: number[]) => string;
+	grid: number[];
+	indexAt: (fraction: number) => number;
+}
+
+/**
+ * Shared geometry for SVG line charts: uniform scales, path builders, five
+ * gridlines, and pointer-fraction lookup. Callers own their bounds
+ * (projection padding vs. funding window padding) and dimensions; every plot
+ * renders through these scales so strokes and dots stay undistorted.
+ */
+export function lineChartModel({
+	xMax,
+	low,
+	high,
+	width,
+	height,
+	left,
+	right,
+	top,
+	bottom,
+}: {
+	/** Maximum x index. Use slots - 1, or slots for a trailing marker slot. */
+	xMax: number;
+	low: number;
+	high: number;
+	width: number;
+	height: number;
+	left: number;
+	right: number;
+	top: number;
+	bottom: number;
+}): LineChartGeometry {
+	const x = (index: number) =>
+		left + (index / Math.max(1, xMax)) * (width - left - right);
+	const y = (value: number) =>
+		height - bottom - ((value - low) / (high - low)) * (height - top - bottom);
+	const line = (series: number[]) =>
+		series
+			.map(
+				(value, index) =>
+					`${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(value).toFixed(1)}`,
+			)
+			.join(" ");
+	return {
+		width,
+		height,
+		left,
+		right,
+		top,
+		bottom,
+		low,
+		high,
+		x,
+		y,
+		line,
+		grid: [0, 1, 2, 3, 4].map((index) => low + ((high - low) * index) / 4),
+		indexAt: (fraction: number) =>
+			Math.max(
+				0,
+				Math.min(
+					xMax,
+					Math.round(
+						((fraction * width - left) / (width - left - right)) * xMax,
+					),
+				),
+			),
+	};
+}
 
 export function projectionChartModel({
 	projection,
@@ -36,16 +119,18 @@ export function projectionChartModel({
 		right = 24,
 		top = 15,
 		bottom = 35;
-	const x = (index: number) =>
-		left + (index / Math.max(1, points.length - 1)) * (width - left - right);
-	const y = (value: number) =>
-		height - bottom - ((value - low) / (high - low)) * (height - top - bottom);
-	const line = (series: number[]) =>
-		series
-			.map(
-				(value, index) => `${index === 0 ? "M" : "L"}${x(index)},${y(value)}`,
-			)
-			.join(" ");
+	const geometry = lineChartModel({
+		xMax: points.length - 1,
+		low,
+		high,
+		width,
+		height,
+		left,
+		right,
+		top,
+		bottom,
+	});
+	const { x, y, line, grid, indexAt } = geometry;
 	const basePath = line(values);
 	const filledBasePath = `${basePath} L${x(points.length - 1)},${y(low)} L${left},${y(low)} Z`;
 	const medianPath = range
@@ -89,6 +174,8 @@ export function projectionChartModel({
 		bottom,
 		x,
 		y,
+		line,
+		grid,
 		basePath,
 		filledBasePath,
 		medianPath,
@@ -98,21 +185,85 @@ export function projectionChartModel({
 			.map((value, index) => `L${x(index)},${y(value)}`)
 			.reverse()
 			.join(" ")} Z`,
-		indexAt: (fraction: number) =>
-			Math.max(
-				0,
-				Math.min(
-					points.length - 1,
-					Math.round(
-						((fraction * width - left) / (width - left - right)) *
-							(points.length - 1),
-					),
-				),
-			),
+		indexAt,
 	};
 }
 
 export type ChartModel = NonNullable<ReturnType<typeof projectionChartModel>>;
+
+/**
+ * Balance-path model for one funding gap, built on lineChartModel. The
+ * trailing x slot holds the refused payment: an explanatory red vector past
+ * the last executed movement that is never posted.
+ */
+export function fundingGapChartModel({
+	gap,
+	narrow,
+}: {
+	gap: FundingGap;
+	narrow: boolean;
+}) {
+	const summary = summarizeFundingGap(gap);
+	const balances = [
+		gap.openingBalance,
+		...summary.rows.map((row) => row.balanceAfter),
+	];
+	const hypothetical = summary.projectedBalanceIfExecuted;
+	const peak = Math.max(0, ...balances, hypothetical);
+	const floor = Math.min(0, ...balances, hypothetical);
+	const span = Math.max(1, peak - floor);
+	const high = Math.max(1000, peak) + Math.max(450, span * 0.13);
+	const low = floor - Math.max(350, span * 0.09);
+	const width = narrow ? 440 : 680;
+	const height = narrow ? 260 : 280;
+	const left = 63,
+		right = 24,
+		top = 15,
+		bottom = 35;
+	const count = balances.length;
+	const { x, y, line, grid } = lineChartModel({
+		xMax: count,
+		low,
+		high,
+		width,
+		height,
+		left,
+		right,
+		top,
+		bottom,
+	});
+	const balancePath = line(balances);
+	const endX = x(count - 1);
+	const failX = x(count);
+	const endY = y(balances[count - 1] ?? 0);
+	const failY = y(hypothetical);
+	return {
+		summary,
+		balances,
+		hypothetical,
+		low,
+		high,
+		width,
+		height,
+		left,
+		right,
+		top,
+		bottom,
+		x,
+		y,
+		balancePath,
+		areaPath: `${balancePath} L${endX.toFixed(1)},${y(low).toFixed(1)} L${x(0).toFixed(1)},${y(low).toFixed(1)} Z`,
+		refusalPath: `M${endX.toFixed(1)},${endY.toFixed(1)} L${failX.toFixed(1)},${failY.toFixed(1)}`,
+		endX,
+		failX,
+		endY,
+		failY,
+		baseline: y(0),
+		grid,
+	};
+}
+
+export type FundingGapChartModel = ReturnType<typeof fundingGapChartModel>;
 
 /**
  * Index of the plotted point at or nearest `today` (a YYYY-MM-DD date).
