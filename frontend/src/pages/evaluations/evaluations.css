@@ -42,14 +42,6 @@
 	.evaluation-card-progress {
 		margin: 25px 0 14px;
 	}
-	.evaluation-card-footer {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding-top: 18px;
-		margin-top: 18px;
-		border-top: 1px solid var(--line);
-	}
 	.evaluation-card .scenario-evaluation {
 		font-size: 10px;
 	}
@@ -95,13 +87,5 @@
 	}
 	.threshold-evaluation-card > .scenario-evaluation {
 		margin: 0;
-	}
-	.threshold-evaluation-card .evaluation-card-footer {
-		gap: 12px;
-		margin: 0;
-		padding-block-start: 10px;
-	}
-	.threshold-evaluation-card .evaluation-card-footer > .text-button {
-		margin-inline-start: auto;
 	}
 }

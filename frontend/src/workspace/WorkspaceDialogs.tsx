@@ -18,8 +18,7 @@ export function WorkspaceEvidence({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	// Hooks subscribe only while the dialog is open: mounting attaches to the
-	// page's in-flight stream (or its cached result) instead of duplicating it.
+	// Evidence subscribes to the base case only while its dialog is open.
 	if (!overlays.evidence) return null;
 	return <WorkspaceEvidenceLoaded overlays={overlays} />;
 }
@@ -32,7 +31,7 @@ function WorkspaceEvidenceLoaded({
 	const workspace = useWorkspaceStore((state) => state.workspace);
 	const plan = workspace?.draft ?? workspace?.saved ?? null;
 	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
-	const projection = useRemoteProjection();
+	const projection = useRemoteProjection({ ranges: false });
 	const base =
 		projection.base instanceof Error || projection.base === null
 			? null
@@ -44,7 +43,6 @@ function WorkspaceEvidenceLoaded({
 				target={overlays.evidence}
 				plan={plan}
 				projection={base}
-				range={projection.range}
 				temporary={Boolean(workspace?.draft)}
 				onClose={overlays.closeEvidence}
 				onEdit={overlays.editFromEvidence}
