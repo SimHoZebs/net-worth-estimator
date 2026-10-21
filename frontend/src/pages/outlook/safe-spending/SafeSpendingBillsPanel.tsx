@@ -1,6 +1,4 @@
 import {
-	AlertCircle,
-	CheckCircle2,
 	Clock3,
 	CreditCard,
 	Landmark,
@@ -17,7 +15,6 @@ import {
 } from "../../../components/SegmentedBar.tsx";
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
 import { exactMoney, money, monthDay } from "../../../domain/format.ts";
-import type { MandatorySpendingGroup } from "../../../domain/safeSpending.ts";
 import type { Movement, Plan } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import {
@@ -26,11 +23,14 @@ import {
 } from "./TransactionSectionView.tsx";
 import type {
 	CashNowDecomposition,
-	MandatoryFrame,
 	PaycheckDecomposition,
 	SafeSpendingHeroes,
 	SafeSpendingMandatorySection,
 } from "./safeSpendingDetailModel.ts";
+import {
+	SAFE_SPENDING_LABELS as labels,
+	SAFE_SPENDING_FORMULAS as formulas,
+} from "./safeSpendingLabels.ts";
 
 function HouseholdPanel({
 	children,
@@ -73,69 +73,11 @@ function HouseholdMetricCard({
 	);
 }
 
-type HouseholdBillStatus = "posted" | "pending" | "assumed-funded" | "unpaid";
-
-function HouseholdBillChip({
-	name,
-	amount,
-	status,
-	note,
-}: {
-	name: string;
-	amount: number;
-	status: HouseholdBillStatus;
-	note?: string;
-}) {
-	return (
-		<div className="household-bill-chip" title={note ?? `${name}: ${status}`}>
-			<span className={`household-bill-status ${status}`} aria-label={status}>
-				{status === "posted" ? (
-					<CheckCircle2 size={19} />
-				) : status === "unpaid" ? (
-					<Clock3 size={19} />
-				) : status === "pending" ? (
-					<Clock3 size={19} />
-				) : (
-					<AlertCircle size={19} />
-				)}
-			</span>
-			<span className="household-tiny household-muted household-bill-name">
-				{name}
-			</span>
-			<strong>{money(amount)}</strong>
-		</div>
-	);
-}
-
-function billStatusForGroup({
-	group,
-	transactions,
-}: {
-	group: MandatorySpendingGroup;
-	transactions: AccountTransaction[];
-}): { status: HouseholdBillStatus; note?: string } {
-	const rows = transactions.filter(
-		(transaction) => transaction.movementId === group.movementId,
-	);
-	if (rows.some((row) => row.pending))
-		return { status: "pending", note: `${group.name}: pending` };
-	if (rows.some((row) => row.shortfall > 0.01))
-		return { status: "unpaid", note: `${group.name}: unpaid` };
-	if (rows.length > 0 && rows.every((row) => row.category === "transfer"))
-		return {
-			status: "assumed-funded",
-			note: `${group.name}: assumed funded via household transfer`,
-		};
-	return { status: "posted", note: `${group.name}: posted` };
-}
-
 export function SafeSpendingBillsPanel({
 	heroes,
 	cashNow,
 	paycheck,
 	section,
-	frame,
-	onFrameChange,
 	plan,
 	transactionOrder,
 	onTransactionOrderChange,
@@ -145,8 +87,6 @@ export function SafeSpendingBillsPanel({
 	cashNow: CashNowDecomposition;
 	paycheck: PaycheckDecomposition;
 	section: SafeSpendingMandatorySection;
-	frame: MandatoryFrame;
-	onFrameChange: (frame: MandatoryFrame) => void;
 	plan: Plan;
 	transactionOrder: TransactionOrder;
 	onTransactionOrderChange: (order: TransactionOrder) => void;
@@ -166,51 +106,44 @@ export function SafeSpendingBillsPanel({
 		<div className="safe-spending-mandatory">
 			<div className="household-metric-grid">
 				<HouseholdMetricCard
-					label="Cash cushion"
+					label={labels.cashAfterBills}
 					icon={<Landmark size={16} aria-hidden="true" />}
 					value={money(cashNow.cushion)}
-					foot={
-						heroes.checkingObservedOn
-							? "Verified balance"
-							: "Estimated · balance age unknown"
-					}
+					foot="After cash payments and bills before month-end"
 				/>
 				<HouseholdMetricCard
-					label="Conservative room"
+					label={labels.allowance}
 					icon={<CreditCard size={16} aria-hidden="true" />}
 					value={money(paycheck.allowance)}
 					tone={paycheck.allowance < 0 ? "normal" : "positive"}
-					foot={`Through ${monthDay(heroes.cycleEnd)}`}
+					foot="After protected reserve"
 				/>
 			</div>
 			<HouseholdPanel>
-				<div className="household-panel-heading">
-					<strong>Card cycle</strong>
-					<span className="household-muted household-tiny">
-						{monthDay(heroes.cycleStart)} – {monthDay(heroes.cycleEnd)}
-					</span>
-				</div>
 				<div className="household-two-col">
 					<div>
-						<div className="household-muted household-tiny">Committed</div>
+						<div className="household-muted household-tiny">
+							{labels.cardSpending}
+						</div>
 						<div className="household-big-number">
 							{money(heroes.committedTotal)}
 						</div>
 					</div>
 					<div className="household-align-right">
 						<div className="household-muted household-tiny">
-							Theoretical room
+							{labels.reserve}
 						</div>
 						<div className="household-medium-number">
-							{money(heroes.theoretical)}
+							{money(paycheck.reserve)}
 						</div>
 					</div>
 				</div>
 				<SegmentedBar
-					caption={`Card cycle ${money(heroes.committedTotal)} committed · ${money(Math.max(0, paycheck.allowance))} safe · ${money(paycheck.reserve)} reserve`}
+					showDetails={false}
+					caption={`${labels.cardSpending} ${money(heroes.committedTotal)} · ${labels.allowance} ${money(paycheck.allowance)} · ${labels.reserve} ${money(paycheck.reserve)}`}
 					segments={[
 						{
-							label: "Committed",
+							label: labels.cardSpending,
 							amount: heroes.committedTotal,
 							pattern: "solid",
 							tone: "tan",
@@ -218,7 +151,7 @@ export function SafeSpendingBillsPanel({
 						...(paycheck.allowance > 0
 							? [
 									{
-										label: "Safe",
+										label: labels.allowance,
 										amount: paycheck.allowance,
 										pattern: "solid",
 										tone: "plum",
@@ -226,14 +159,15 @@ export function SafeSpendingBillsPanel({
 								]
 							: []),
 						{
-							label: "Reserve",
+							label: labels.reserve,
 							amount: paycheck.reserve,
 							pattern: "dots",
 							tone: "blue",
 						} as BarSegment,
 					]}
-					ariaLabel={`Card cycle: committed ${money(heroes.committedTotal)}, safe ${money(Math.max(0, paycheck.allowance))}, reserve ${money(paycheck.reserve)}`}
+					ariaLabel={`${labels.cardSpending} ${money(heroes.committedTotal)}, ${labels.allowance} ${money(paycheck.allowance)}, ${labels.reserve} ${money(paycheck.reserve)}`}
 				/>
+				<p className="section-note">{formulas.allowance}</p>
 				<div className="household-divider" />
 				<div className="household-two-col household-card-breakdown">
 					{heroes.committedByCard.map((card, index) => {
@@ -255,7 +189,7 @@ export function SafeSpendingBillsPanel({
 			</HouseholdPanel>
 			<HouseholdPanel>
 				<div className="household-panel-heading">
-					<strong>Cash flow</strong>
+					<strong>{labels.cashAccounts}</strong>
 					<ShieldCheck
 						size={19}
 						className="household-positive"
@@ -263,14 +197,15 @@ export function SafeSpendingBillsPanel({
 					/>
 				</div>
 				<div className="household-amount-line">
-					<span className="household-muted">Checking snapshot</span>
+					<span className="household-muted">{labels.cashBalance}</span>
 					<strong>{exactMoney(cashNow.checking)}</strong>
 				</div>
 				<SegmentedBar
-					caption={`${exactMoney(cashNow.checking)} checking · ${exactMoney(Math.max(0, cashNow.bills))} unpaid bills · ${exactMoney(Math.max(0, cashNow.cushion))} cushion${cashNow.spentSinceStart > 0 ? ` · ${exactMoney(cashNow.spentSinceStart)} paid since ${monthDay(cashNow.since)}` : ""}`}
+					showDetails={false}
+					caption={`${labels.cashBalance} ${exactMoney(cashNow.checking)} · ${labels.remainingBills} ${exactMoney(cashNow.bills)} · ${labels.cashAfterBills} ${exactMoney(cashNow.cushion)}`}
 					segments={[
 						{
-							label: "Unpaid bills",
+							label: labels.remainingBills,
 							amount: Math.min(cashNow.checking, Math.max(0, cashNow.bills)),
 							pattern: "stripes",
 							tone: "sage",
@@ -278,7 +213,7 @@ export function SafeSpendingBillsPanel({
 						...(cashNow.cushion > 0
 							? [
 									{
-										label: "Cushion",
+										label: labels.cashAfterBills,
 										amount: cashNow.cushion,
 										pattern: "solid",
 										tone: "plum",
@@ -286,64 +221,25 @@ export function SafeSpendingBillsPanel({
 								]
 							: []),
 					]}
-					ariaLabel={`Checking ${exactMoney(cashNow.checking)}: unpaid bills ${exactMoney(Math.max(0, cashNow.bills))}, cushion ${exactMoney(Math.max(0, cashNow.cushion))}`}
+					ariaLabel={`${labels.cashBalance} ${exactMoney(cashNow.checking)}, ${labels.remainingBills} ${exactMoney(cashNow.bills)}, ${labels.cashAfterBills} ${exactMoney(cashNow.cushion)}`}
 				/>
 				<div className="household-amount-line">
 					<span>
-						<Clock3 size={16} aria-hidden="true" /> Unpaid cash bills
+						<Clock3 size={16} aria-hidden="true" /> {labels.remainingBills}
 					</span>
 					<strong>−{exactMoney(cashNow.bills)}</strong>
 				</div>
 				{cashNow.spentSinceStart > 0 ? (
 					<div className="household-amount-line">
 						<span className="household-muted">
-							Paid since {monthDay(cashNow.since)}
+							{labels.cashPayments} · {monthDay(cashNow.since)}
 						</span>
 						<strong>{exactMoney(cashNow.spentSinceStart)}</strong>
 					</div>
 				) : null}
+				<p className="section-note">{formulas.cashAfterBills}</p>
 				<div className="household-divider" />
-				{section.groups.length ? (
-					<div className="household-bill-grid">
-						{section.groups.map((group) => {
-							const { status, note } = billStatusForGroup({
-								group,
-								transactions: section.transactions,
-							});
-							return (
-								<HouseholdBillChip
-									key={group.movementId}
-									name={group.name}
-									amount={group.total}
-									status={status}
-									note={note}
-								/>
-							);
-						})}
-					</div>
-				) : (
-					<p className="household-muted household-tiny">
-						No bills due in this period.
-					</p>
-				)}
 				<div className="household-safe-spending-controls">
-					<div className="segmented" role="toolbar" aria-label="Bills window">
-						{(
-							[
-								{ id: "calendar", label: "Calendar month" },
-								{ id: "cycle", label: "Card cycle" },
-							] as const
-						).map((option) => (
-							<button
-								type="button"
-								key={option.id}
-								aria-pressed={frame === option.id}
-								onClick={() => onFrameChange(option.id)}
-							>
-								{option.label}
-							</button>
-						))}
-					</div>
 					<TransactionSortButton
 						order={transactionOrder}
 						onChange={onTransactionOrderChange}
@@ -366,61 +262,16 @@ export function SafeSpendingBillsPanel({
 			</HouseholdPanel>
 			<HouseholdPanel>
 				<div className="household-panel-heading">
-					<strong>Next paycheck</strong>
-					<span className="household-medium-number">
-						{money(paycheck.paycheck)}
-					</span>
+					<strong>{labels.dailyAllowance}</strong>
 				</div>
-				<div className="household-two-col household-paycheck-cols">
-					<div>
-						<div className="household-muted household-tiny">Fixed bills</div>
-						<div className="household-medium-number">
-							{money(paycheck.fixed)}
-						</div>
-					</div>
-					<div className="household-align-right">
-						<div className="household-muted household-tiny">Card spending</div>
-						<div className="household-medium-number">
-							{money(heroes.committedTotal)}
-						</div>
-					</div>
-				</div>
-				<div className="household-divider" />
-				<div className="household-amount-line">
-					<span className="household-muted">Protected reserve</span>
-					<strong>{money(paycheck.reserve)}</strong>
-				</div>
-				<div className="household-amount-line">
-					<span className="household-muted">Safe remainder</span>
-					<strong
-						className={
-							paycheck.allowance < 0
-								? "household-negative"
-								: "household-positive"
-						}
-					>
-						{money(paycheck.allowance)}
-					</strong>
-				</div>
-				<div className="household-divider" />
 				<div className="household-amount-line">
 					<span className="household-muted">
-						Daily · {heroes.fullDaysLeft} full{" "}
-						{heroes.fullDaysLeft === 1 ? "day" : "days"}
+						{heroes.fullDaysLeft} full{" "}
+						{heroes.fullDaysLeft === 1 ? "day" : "days"} left
 					</span>
 					<strong>
-						{heroes.fullDaysLeft > 0
-							? money(Math.max(0, heroes.dailySafe))
-							: "N/A"}{" "}
-						<span className="household-muted household-tiny">safe</span>
-					</strong>
-				</div>
-				<div className="household-amount-line">
-					<span className="household-muted">Daily theoretical</span>
-					<strong>
-						{heroes.fullDaysLeft > 0
-							? money(Math.max(0, heroes.dailyTheoretical))
-							: "N/A"}
+						{heroes.fullDaysLeft > 0 ? money(heroes.dailySafe) : "N/A"}{" "}
+						<span className="household-muted household-tiny">per day</span>
 					</strong>
 				</div>
 			</HouseholdPanel>

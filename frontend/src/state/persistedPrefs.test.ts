@@ -106,7 +106,7 @@ describe("unified persisted prefs", () => {
 		const state = useSafeSpendingSettings.getState();
 		expect(state.statementDay).toBe(5);
 		expect(state.reserve).toBe(100);
-		expect(state.mandatoryFrame).toBe("cycle");
+		expect(state).not.toHaveProperty("mandatoryFrame");
 	});
 
 	it("sanitizes safe spending settings with legacy 1st-day fallback", () => {
