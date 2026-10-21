@@ -1,12 +1,7 @@
 import { ArrowUpRight, Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
 import { useId } from "react";
 import type { EvaluationPin } from "../../components/evaluationCard.ts";
-import {
-	IconButton,
-	Progress,
-	Skeleton,
-	Toggle,
-} from "../../components/ui.tsx";
+import { IconButton, Progress, Skeleton } from "../../components/ui.tsx";
 import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { Evaluation } from "../../domain/model.ts";
 import type { EvaluationResult } from "../../domain/result.ts";
@@ -20,7 +15,6 @@ export function EvaluationCard({
 	probability,
 	onEdit,
 	onRemove,
-	onEnabledChange,
 	onEvidence,
 	pending = false,
 	pin = null,
@@ -30,7 +24,6 @@ export function EvaluationCard({
 	probability: number | null;
 	onEdit?: () => void;
 	onRemove?: () => void;
-	onEnabledChange?: (enabled: boolean) => void;
 	onEvidence: () => void;
 	pending?: boolean;
 	pin?: EvaluationPin | null;
@@ -137,13 +130,6 @@ export function EvaluationCard({
 				</p>
 			)}
 			<div className="evaluation-card-footer">
-				{onEnabledChange && (
-					<Toggle
-						label="Enabled"
-						checked={evaluation.enabled}
-						onChange={onEnabledChange}
-					/>
-				)}
 				<button
 					type="button"
 					className="text-button"

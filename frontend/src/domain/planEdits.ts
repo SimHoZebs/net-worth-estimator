@@ -55,22 +55,6 @@ export function removePlanItem({
 	};
 }
 
-export function setEvaluationEnabled({
-	plan,
-	id,
-	enabled,
-}: {
-	plan: Plan;
-	id: string;
-	enabled: boolean;
-}): Plan {
-	return {
-		...plan,
-		evaluations: plan.evaluations.map((item) =>
-			item.id === id ? { ...item, enabled } : item,
-		),
-	};
-}
 export function removeEvaluation({
 	plan,
 	id,

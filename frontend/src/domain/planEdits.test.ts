@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { testPlan } from "../test/plan.ts";
 import { changesBetween } from "./model.ts";
-import {
-	removeEvaluation,
-	removePlanItem,
-	setEvaluationEnabled,
-	upsertItem,
-} from "./planEdits.ts";
+import { removeEvaluation, removePlanItem, upsertItem } from "./planEdits.ts";
 
 describe("immutable plan edits", () => {
 	it("preserves unchanged item order and reports exactly one toggle", () => {
@@ -65,19 +60,9 @@ describe("immutable plan edits", () => {
 		expect(removePlanItem({ plan, target })).toBeInstanceOf(Error);
 		expect(plan.accounts).toHaveLength(1);
 	});
-	it("isolates evaluation toggles and removal", () => {
+	it("isolates evaluation removal", () => {
 		const evaluation = testPlan.evaluations[0];
 		if (!evaluation) throw new Error("Missing test evaluation");
-		expect(
-			changesBetween({
-				saved: testPlan,
-				current: setEvaluationEnabled({
-					plan: testPlan,
-					id: evaluation.id,
-					enabled: !evaluation.enabled,
-				}),
-			}),
-		).toHaveLength(1);
 		expect(
 			changesBetween({
 				saved: testPlan,

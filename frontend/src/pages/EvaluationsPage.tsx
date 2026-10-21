@@ -7,7 +7,7 @@ import {
 } from "../components/ui.tsx";
 import "./evaluations/evaluations.css";
 import type { Evaluation, Plan } from "../domain/model.ts";
-import { removeEvaluation, setEvaluationEnabled } from "../domain/planEdits.ts";
+import { removeEvaluation } from "../domain/planEdits.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
@@ -174,11 +174,6 @@ function EvaluationsContent({
 						onEdit={() => onEdit(evaluation)}
 						onRemove={() =>
 							onUpdate(removeEvaluation({ plan, id: evaluation.id }))
-						}
-						onEnabledChange={(enabled) =>
-							onUpdate(
-								setEvaluationEnabled({ plan, id: evaluation.id, enabled }),
-							)
 						}
 						onEvidence={() => onEvidence(evaluation.id)}
 					/>
