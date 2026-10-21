@@ -53,4 +53,55 @@
 	.evaluation-card .scenario-evaluation {
 		font-size: 10px;
 	}
+	.evaluation-card.threshold-evaluation-card {
+		display: flex;
+		flex-direction: column;
+		align-self: start;
+		min-inline-size: 0;
+		gap: 14px;
+		padding: 18px;
+	}
+	.threshold-evaluation-heading {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: start;
+		gap: 10px;
+	}
+	.threshold-evaluation-card h2 {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-block-size: 30px;
+		margin: 0;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+		overflow-wrap: anywhere;
+	}
+	.threshold-evaluation-card h2 > svg {
+		flex-shrink: 0;
+		color: var(--accent-green-text);
+	}
+	.threshold-evaluation-card .evaluation-card-outcome {
+		margin: 0 0 4px;
+		font-size: 1.75rem;
+		letter-spacing: -0.04em;
+		overflow-wrap: anywhere;
+	}
+	.threshold-evaluation-card .evaluation-card-progress {
+		margin: 0;
+	}
+	.threshold-evaluation-card .progress-label {
+		flex-wrap: wrap;
+	}
+	.threshold-evaluation-card > .scenario-evaluation {
+		margin: 0;
+	}
+	.threshold-evaluation-card .evaluation-card-footer {
+		gap: 12px;
+		margin: 0;
+		padding-block-start: 10px;
+	}
+	.threshold-evaluation-card .evaluation-card-footer > .text-button {
+		margin-inline-start: auto;
+	}
 }

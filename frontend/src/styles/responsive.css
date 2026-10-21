@@ -145,22 +145,14 @@
 		margin-top: 6px;
 		justify-self: start;
 	}
-	.outlook-secondary {
-		gap: 15px;
-	}
-	.evaluation-preview,
 	.safe-spending-preview {
 		padding: 20px 18px;
 	}
-	.evaluation-preview .section-top h2,
 	.safe-spending-preview .section-top h2 {
 		font-size: 11px;
 	}
 	.safe-spending-figures > div + div {
 		padding-left: 15px;
-	}
-	.evaluation-preview .section-top .text-button {
-		font-size: 9px;
 	}
 	.safe-spending-figures strong {
 		font-size: 24px;
@@ -168,7 +160,7 @@
 	.evaluations-grid {
 		gap: 15px;
 	}
-	.evaluation-card {
+	.evaluation-card:not(.threshold-evaluation-card) {
 		padding: 22px;
 	}
 	.sources-grid {
@@ -366,22 +358,13 @@
 		flex-shrink: 0;
 	}
 	.outlook-secondary {
-		grid-template-columns: 1fr;
 		margin-top: 20px;
 	}
-	.evaluation-preview,
 	.safe-spending-preview {
 		padding: 21px;
 	}
-	.evaluation-preview .section-top h2,
 	.safe-spending-preview .section-top h2 {
 		font-size: 13px;
-	}
-	.evaluation-preview-content {
-		padding: 19px 0 20px;
-	}
-	.evaluation-preview .section-top .text-button {
-		font-size: 10px;
 	}
 	.safe-spending-figures {
 		padding: 0;
@@ -743,7 +726,7 @@
 	.metric,
 	.panel,
 	.chart-card,
-	.evaluation-preview,
+	.evaluation-card,
 	.safe-spending-preview {
 		break-inside: avoid;
 	}

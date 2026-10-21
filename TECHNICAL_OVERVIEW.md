@@ -419,7 +419,7 @@ An evaluator failure is isolated to that instance as an error diagnostic. Other 
 
 Posting fulfillment and public transaction evidence share the per-event assessment in `evaluateMovementEvents`. Public `movementEvents[].fulfillment` reports unfulfilled and destination-limited amounts, including the canonical reportable threshold and rounding. Funding gaps and Safe spending consume these amounts rather than classify failures themselves. This evidence remains available when configured fulfillment evaluations are absent, disabled, or limited to selected transactions. The Funding gaps account-history ledger explains the result; it does not determine fundability.
 
-Outlook renders only saved evaluation pins in its pinned section, using the same evaluation card components as the Evaluations page. Funding gaps has no separate always-visible panel. Its pin controls Outlook visibility; unpinning does not disable the evaluation or remove per-transaction fulfillment evidence. The shared card's cash-flow inspector follows the evaluation's configured transaction selection.
+Outlook renders only saved evaluation pins, using the same compact evaluation card components as the Evaluations page. Net-worth and account-balance targets have no automatic preview or fallback selection. Funding gaps has no separate always-visible panel. Pins control Outlook visibility; unpinning does not disable an evaluation or remove its evidence. Threshold cards retain the first-crossing date, current amount, target, scenario result, and evidence action. The shared Funding gaps card's cash-flow inspector follows the evaluation's configured transaction selection.
 
 ### Financial independence
 

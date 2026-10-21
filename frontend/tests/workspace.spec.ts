@@ -1,6 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
+import type { FinancialModelDocument } from "../src/api/contracts.ts";
 import {
+	FIXTURE_API,
 	REMOTE_STORAGE_KEY,
 	readSavedServerPlan,
 	readTemporaryVersion,
@@ -56,6 +58,53 @@ test("outlook renders real calculations, scenario ranges and evidence", async ({
 	await page.getByRole("button", { name: "10 years", exact: true }).click();
 	await expect(page.getByText("Base case in 2036")).toBeVisible();
 	expect(errors).toEqual([]);
+});
+
+test("saved target pins control Outlook and retain evidence access", async ({
+	page,
+	request,
+}) => {
+	const response = await request.get(`${FIXTURE_API}/v1/financial-model`);
+	expect(response.ok()).toBe(true);
+	const { document } = (await response.json()) as {
+		document: FinancialModelDocument;
+	};
+	const evaluation = document.evaluations.netWorthThreshold.find(
+		(item) => item.enabled,
+	)!;
+	const card = () =>
+		page.getByRole("region", { name: evaluation.name, exact: true });
+	const pinWrite = () =>
+		page.waitForResponse(
+			(reply) =>
+				reply.url().endsWith("/v1/pinned-evaluations") &&
+				reply.request().method() === "PUT",
+		);
+	await page.goto("/#evaluations");
+	await expect(card()).toBeVisible();
+	await page.getByRole("link", { name: "Outlook", exact: true }).click();
+	await expect(page.getByText(evaluation.name, { exact: true })).toHaveCount(0);
+	await page.getByRole("link", { name: "Evaluations", exact: true }).click();
+	const saved = pinWrite();
+	await card().locator("button[aria-pressed]").click();
+	expect((await saved).ok()).toBe(true);
+	await page.getByRole("link", { name: "Outlook", exact: true }).click();
+	await expect(card()).toBeVisible();
+	await expect(page.getByText(evaluation.name, { exact: true })).toHaveCount(1);
+	await card().getByRole("button").last().click();
+	await expect(
+		page.getByRole("dialog", { name: evaluation.name, exact: true }),
+	).toBeVisible();
+	await page.keyboard.press("Escape");
+	const removed = pinWrite();
+	await card().getByRole("button", { pressed: true }).click();
+	expect((await removed).ok()).toBe(true);
+	await expect(card()).toHaveCount(0);
+	await page.reload();
+	const pins = await request.get(`${FIXTURE_API}/v1/pinned-evaluations`);
+	expect(pins.ok()).toBe(true);
+	expect((await pins.json()).instanceIds).not.toContain(evaluation.instanceId);
+	await expect(page.getByText(evaluation.name, { exact: true })).toHaveCount(0);
 });
 
 test("edits remain temporary, persist across reload, and save deliberately", async ({

@@ -21,9 +21,6 @@
 		margin-bottom: 0;
 	}
 	.outlook-secondary {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 22px;
 		margin-top: 25px;
 	}
 	.evaluations-grid {

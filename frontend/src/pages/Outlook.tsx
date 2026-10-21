@@ -6,7 +6,6 @@ import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
-import { EvaluationPreview } from "./outlook/EvaluationPreview.tsx";
 import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
 import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
 import type { SafeSpendingDetailTab } from "./outlook/safe-spending/safeSpendingDetailModel.ts";
@@ -17,7 +16,6 @@ type OutlookProps = {
 	onEvidence: () => void;
 	onFailure: () => void;
 	onTransactions: () => void;
-	onEvaluations: () => void;
 	onEvaluation: (id: string) => void;
 	safeSpendingDetail: SafeSpendingDetailTab | null;
 	onSafeSpendingDetail: (tab: SafeSpendingDetailTab | null) => void;
@@ -28,7 +26,6 @@ export function Outlook({
 	onEvidence,
 	onFailure,
 	onTransactions,
-	onEvaluations,
 	onEvaluation,
 	safeSpendingDetail,
 	onSafeSpendingDetail,
@@ -41,7 +38,6 @@ export function Outlook({
 			onEvidence={onEvidence}
 			onFailure={onFailure}
 			onTransactions={onTransactions}
-			onEvaluations={onEvaluations}
 			onEvaluation={onEvaluation}
 			safeSpendingDetail={safeSpendingDetail}
 			onSafeSpendingDetail={onSafeSpendingDetail}
@@ -52,7 +48,6 @@ export function Outlook({
 
 function OutlookContent({
 	onEvidence,
-	onEvaluations,
 	onEvaluation,
 	safeSpendingDetail,
 	onSafeSpendingDetail,
@@ -112,12 +107,6 @@ function OutlookContent({
 			</>
 		);
 	}
-	const evaluation =
-		base?.evaluations.find(
-			(result) => result.current < result.evaluation.target,
-		) ??
-		base?.evaluations[0] ??
-		null;
 	return (
 		<>
 			{baseLoadError && (
@@ -192,13 +181,6 @@ function OutlookContent({
 				onEvaluation={onEvaluation}
 			/>
 			<div className="outlook-secondary" aria-busy={pending}>
-				<EvaluationPreview
-					result={evaluation ?? null}
-					range={projection.range}
-					onEvaluations={onEvaluations}
-					onEvaluation={onEvaluation}
-					pending={pending}
-				/>
 				<SafeSpendingPreview
 					plan={plan}
 					projection={base}
