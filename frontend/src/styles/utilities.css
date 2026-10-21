@@ -25,6 +25,9 @@
 	.numeric {
 		font-variant-numeric: tabular-nums;
 	}
+	.inline-icon {
+		vertical-align: -2px;
+	}
 	.mobile-only {
 		display: none;
 	}

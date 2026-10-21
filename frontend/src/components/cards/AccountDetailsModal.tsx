@@ -77,13 +77,13 @@ export function AccountDetailsModal({
 			onClose={onClose}
 		>
 			<div className="section-top">
-				<div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+				<div className="account-details-summary">
 					<AccountIcon account={card.account} />
 					<div>
-						<strong className="type-value" style={{ fontSize: 20 }}>
+						<strong className="type-value account-details-balance">
 							{exactMoney(card.balance)}
 						</strong>
-						<div className="section-note" style={{ padding: 0 }}>
+						<div className="section-note section-note-flush">
 							{card.balanceLabel} · {card.summary}
 						</div>
 					</div>
@@ -97,7 +97,7 @@ export function AccountDetailsModal({
 				</span>
 			</div>
 			{card.creditUtilization !== undefined && (
-				<div style={{ marginTop: 14 }}>
+				<div className="account-utilization">
 					<div className="progress-label">
 						<span>Credit utilization</span>
 						<strong>{card.creditUtilization.toFixed(1)}%</strong>
@@ -107,7 +107,7 @@ export function AccountDetailsModal({
 						label="Credit utilization"
 						tone={card.creditUtilization > 80 ? "amber" : "green"}
 					/>
-					<p className="section-note" style={{ padding: "6px 0" }}>
+					<p className="section-note account-utilization-note">
 						Based on posted balance against the limit. Pending charges excluded.
 					</p>
 				</div>
@@ -120,14 +120,14 @@ export function AccountDetailsModal({
 					</div>
 				))}
 			</dl>
-			<div className="section-top" style={{ marginTop: 8 }}>
-				<h2 style={{ fontSize: 13 }}>Transactions</h2>
-				<span className="section-note" style={{ padding: 0 }}>
+			<div className="section-top account-transactions-heading">
+				<h2>Transactions</h2>
+				<span className="section-note section-note-flush">
 					{transactions.length} loaded
 				</span>
 			</div>
 			<div className="account-search-row">
-				<label className="search-field" style={{ flex: 1 }}>
+				<label className="search-field">
 					<Search size={15} aria-hidden="true" />
 					<input
 						aria-label="Search account transactions"
@@ -137,7 +137,7 @@ export function AccountDetailsModal({
 					/>
 				</label>
 				<div
-					className="segmented"
+					className="segmented account-posting-filter"
 					role="group"
 					aria-label="Filter by posting status"
 				>
@@ -147,7 +147,6 @@ export function AccountDetailsModal({
 							type="button"
 							aria-pressed={filter === key}
 							onClick={() => setFilter(key)}
-							style={{ textTransform: "capitalize" }}
 						>
 							{key}
 						</button>
@@ -177,14 +176,10 @@ export function AccountDetailsModal({
 			{shown.length > 60 && (
 				<p className="section-note">Showing 60 of {shown.length} matches.</p>
 			)}
-			<p className="section-note" style={{ padding: "8px 0" }}>
+			<p className="section-note">
 				{card.transactions.length > 0 && selected == null ? (
 					<span>
-						<Repeat2
-							size={12}
-							aria-hidden="true"
-							style={{ verticalAlign: -2 }}
-						/>{" "}
+						<Repeat2 size={12} aria-hidden="true" className="inline-icon" />{" "}
 						Recurring movements show in the plan with their schedule. Dates
 						shown {dateLabel(plan.startDate, true)} onward.
 					</span>

@@ -52,8 +52,8 @@ export function FundingGapsModal({
 			</div>
 			<div className="section-top">
 				<div>
-					<h2 style={{ fontSize: 20 }}>{gap.name}</h2>
-					<p className="section-note" style={{ padding: "4px 0" }}>
+					<h2 className="funding-gap-heading">{gap.name}</h2>
+					<p className="section-note funding-gap-summary">
 						{gap.fundingAccount.name} · Not executed — the payment has not
 						posted. The red vector shows what would happen if forced.
 					</p>
@@ -78,12 +78,8 @@ export function FundingGapsModal({
 					},
 				]}
 			/>
-			<p className="section-note" style={{ padding: "8px 0" }}>
-				<AlertCircle
-					size={13}
-					aria-hidden="true"
-					style={{ verticalAlign: -2 }}
-				/>{" "}
+			<p className="section-note">
+				<AlertCircle size={13} aria-hidden="true" className="inline-icon" />{" "}
 				{money(summary.shortfall)} short · Available {money(summary.available)}{" "}
 				· Required {money(gap.requiredAmount)}
 			</p>
@@ -102,8 +98,8 @@ export function FundingGapsModal({
 					<strong>−{money(summary.moneyOut)}</strong>
 				</div>
 			</div>
-			<h3 style={{ fontSize: 13, margin: "14px 0 4px" }}>Before the payment</h3>
-			<p className="section-note" style={{ padding: 0 }}>
+			<h3 className="funding-ledger-heading">Before the payment</h3>
+			<p className="section-note section-note-flush">
 				Opening balance {money(gap.openingBalance)} on{" "}
 				{dateLabel(gap.windowStartDate, true)} · {summary.rows.length} movements
 				in execution order · Later deposits excluded
@@ -132,28 +128,24 @@ export function FundingGapsModal({
 				))}
 			</ul>
 			<div className="funding-failed-row">
-				<span style={{ display: "flex", gap: 10, alignItems: "center" }}>
+				<span className="funding-failed-summary">
 					<TriangleAlert size={18} aria-hidden="true" />
 					<span>
-						<strong style={{ fontSize: 12 }}>{gap.name}</strong>
+						<strong className="funding-failed-name">{gap.name}</strong>
 						<br />
-						<small style={{ color: "var(--muted)" }}>
+						<small className="muted">
 							{dateLabel(gap.date, true)} · Not executed
 						</small>
 					</span>
 				</span>
-				<span className="numeric" style={{ textAlign: "right" }}>
+				<span className="numeric funding-failed-amount">
 					<strong>−{money(gap.requiredAmount)}</strong>
 					<br />
 					<small>{money(summary.shortfall)} gap</small>
 				</span>
 			</div>
-			<p className="section-note" style={{ padding: "12px 0 0" }}>
-				<CalendarDays
-					size={13}
-					aria-hidden="true"
-					style={{ verticalAlign: -2 }}
-				/>{" "}
+			<p className="section-note funding-window-note">
+				<CalendarDays size={13} aria-hidden="true" className="inline-icon" />{" "}
 				Projected schedule · Local {gap.fundingAccount.name} cash flow only —
 				transfers are not household income or expenses.
 			</p>

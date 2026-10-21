@@ -47,3 +47,17 @@ lint command, pre-push hook, and CI also run it. Warnings do not fail the comman
 overrides, family-changing `font` shorthands, and inline font properties. Its unit
 tests cover detection logic with isolated examples, not application fonts or
 markup. Change shared fonts or add a role without updating typography assertions.
+
+## Component styles
+
+Keep fixed appearance in the component's co-located stylesheet. Use classes or
+data attributes for finite variants, and reuse shared utilities before adding
+another selector. Shared primitives such as `Progress` own their CSS in `ui.css`.
+
+Pass runtime values through `cssVariables()` from `components/cssVariables.ts`.
+The helper accepts only custom property names, such as `--progress-width` or
+`--account-color`. CSS owns the declarations and token mixtures that consume them.
+Do not put fixed declarations or variant maps in JSX `style` props.
+
+Library-managed animation styles and imperative browser state, such as scroll
+locks and the active color scheme, remain separate from component appearance.

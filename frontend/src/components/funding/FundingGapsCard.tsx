@@ -98,7 +98,7 @@ export function FundingGapsCard({
 					<Badge tone="amber">{sorted.length} projected</Badge>
 				</span>
 				<span>
-					<span className="section-note" style={{ padding: 0 }}>
+					<span className="section-note section-note-flush">
 						First failure · {dateLabel(first.date, true)}
 					</span>
 					<span className="funding-gaps-hero">
@@ -144,7 +144,7 @@ export function FundingGapsCard({
 										<CalendarClock
 											size={14}
 											aria-hidden="true"
-											style={{ marginRight: 8, verticalAlign: -2 }}
+											className="inline-icon funding-gap-date-icon"
 										/>
 										{gap.name} <small>{dateLabel(gap.date, true)}</small>
 									</span>
