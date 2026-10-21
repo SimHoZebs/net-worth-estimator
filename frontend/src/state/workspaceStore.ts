@@ -66,47 +66,6 @@ export interface RemoteWorkspace {
 	draftStale: boolean;
 }
 
-export interface UseRemoteWorkspaceOptions {
-	client?: RemoteApiClient;
-	authToken?: string;
-}
-
-export interface RemoteWorkspaceState {
-	workspace: RemoteWorkspace | null;
-	plan: Plan | null;
-	status: ServerStatus | null;
-	serverDocument: FinancialModelDocument | null;
-	serverRevision: string | null;
-	recoveryDraft: Plan | null;
-	serverPresets: AmountPreset[] | null;
-	presetError: string | null;
-	adapterReport: AdapterReport | null;
-	savedPresentation: PlanPresentation | null;
-	draftPresentation: PlanPresentation | null;
-	loading: boolean;
-	error: string | null;
-	notice: string;
-	volatile: boolean;
-	stale: boolean;
-	draftStale: boolean;
-	storageConflict: boolean;
-	readOnly: boolean;
-	authRequired: boolean;
-	updatePlan: (next: Plan) => boolean;
-	save: () => Promise<boolean>;
-	discard: () => boolean;
-	reloadDraft: () => Promise<boolean>;
-	replace: (next: Plan) => boolean;
-	importServerDocument: (document: FinancialModelDocument) => Promise<boolean>;
-	retry: () => Promise<void>;
-	dismissNotice: () => void;
-	refreshPresets: () => Promise<void>;
-	createPreset: (preset: AmountPreset) => Promise<boolean>;
-	updatePreset: (preset: AmountPreset) => Promise<boolean>;
-	deletePreset: (id: string) => Promise<boolean>;
-	movePreset: (id: string, beforeId: string | null) => Promise<boolean>;
-}
-
 function messageFor(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message) return error.message;
 	return fallback;

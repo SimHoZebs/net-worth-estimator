@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook as renderHookRTL } from "@testing-library/react";
+import {
+	act,
+	renderHook as renderHookRTL,
+	waitFor,
+} from "@testing-library/react";
 import { createElement, Fragment, type ReactNode, StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RowWriteResponse } from "../api/index.ts";
@@ -32,14 +36,34 @@ import {
 	serverDocumentFingerprint,
 } from "./remoteStorage.ts";
 import { resetServerQueryCache } from "./serverQuery.ts";
-import { resetUiStore } from "./uiStore.ts";
+import { resetUiStore, useUiStore } from "./uiStore.ts";
 import {
 	projectionResultToLocal,
 	stochasticResultToLocal,
 	useRemoteProjection,
 } from "./useRemoteProjection.ts";
-import { useRemoteWorkspace } from "./useRemoteWorkspace.ts";
-import { deriveDraftDocument, resetWorkspaceStore } from "./workspaceStore.ts";
+import { useWorkspaceStartup } from "./useWorkspaceStartup.ts";
+import {
+	deriveDraftDocument,
+	resetWorkspaceStore,
+	useWorkspaceStore,
+} from "./workspaceStore.ts";
+
+// Behavior tests observe the store, not a state-returning production hook.
+function useRemoteWorkspace(
+	options: Parameters<typeof useWorkspaceStartup>[0],
+) {
+	useWorkspaceStartup(options);
+	const state = useWorkspaceStore();
+	return {
+		...state,
+		plan: state.workspace?.draft ?? state.workspace?.saved ?? null,
+		stale: Boolean(state.workspace?.draftStale),
+		draftStale: Boolean(state.workspace?.draftStale),
+		readOnly: Boolean(state.status?.readOnly || state.writeBlocked),
+		authRequired: state.authRequiredState,
+	};
+}
 
 interface Rendered<T> {
 	result: () => T;
@@ -538,15 +562,211 @@ describe("remote workspace state", () => {
 			document: modelFixture(),
 			issues: [],
 		}));
+		let resolveModel!: (value: FinancialModelResponse) => void;
+		client.getModel.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					resolveModel = resolve;
+				}),
+		);
 		const rendered = renderHookWith(() => useRemoteWorkspace({ client }), {
 			strictMode: true,
 		});
+		expect(client.getStatus).toHaveBeenCalledOnce();
+		expect(client.getModel).toHaveBeenCalledOnce();
+		expect(client.listAmountPresets).toHaveBeenCalledOnce();
+		expect(
+			useWorkspaceStore.getState().engine.hydrationController?.signal.aborted,
+		).toBe(false);
+		resolveModel({ document: modelFixture(), issues: [] });
 		await rendered.settle();
 
 		expect(rendered.result().loading).toBe(false);
 		expect(rendered.result().workspace).not.toBeNull();
 		expect(rendered.result().plan).not.toBeNull();
 		expect(rendered.result().error).toBeNull();
+		rendered.unmount();
+	});
+
+	it("leaves the initial load alive on unmount but ignores its result", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const { client } = clientFixture();
+		let resolveModel!: (value: FinancialModelResponse) => void;
+		client.getModel.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					resolveModel = resolve;
+				}),
+		);
+		const rendered = renderHookRTL(() => useWorkspaceStartup({ client }));
+		const controller = useWorkspaceStore.getState().engine.hydrationController!;
+		rendered.unmount();
+		expect(controller.signal.aborted).toBe(false);
+		await act(async () => {
+			resolveModel({ document: modelFixture(), issues: [] });
+			await useWorkspaceStore.getState().engine.hydrationPromise;
+		});
+		expect(useWorkspaceStore.getState().workspace).toBeNull();
+		expect(useWorkspaceStore.getState().engine.mounted).toBe(false);
+	});
+
+	it("binds UI token changes and explicit overrides without persisting them", async () => {
+		const storage = memoryStorage();
+		vi.stubGlobal("localStorage", storage);
+		const { client } = clientFixture();
+		useUiStore.getState().setAuthToken("ui-first");
+		const rendered = renderHookRTL(
+			({ authToken }: { authToken?: string }) =>
+				useWorkspaceStartup({ client, authToken }),
+			{ initialProps: { authToken: undefined as string | undefined } },
+		);
+		await waitFor(() =>
+			expect(useWorkspaceStore.getState().loading).toBe(false),
+		);
+		expect(useWorkspaceStore.getState().engine.authToken).toBe("ui-first");
+		await act(async () => useUiStore.getState().setAuthToken("ui-second"));
+		expect(client.getStatus).toHaveBeenCalledTimes(2);
+		await useWorkspaceStore.getState().refreshPresets();
+		expect(client.listAmountPresets).toHaveBeenLastCalledWith({
+			authToken: "ui-second",
+		});
+
+		rendered.rerender({ authToken: "explicit" });
+		await waitFor(() =>
+			expect(useWorkspaceStore.getState().loading).toBe(false),
+		);
+		await act(async () => useUiStore.getState().setAuthToken("ui-third"));
+		expect(client.getStatus).toHaveBeenCalledTimes(3);
+		expect(useWorkspaceStore.getState().engine.authToken).toBe("explicit");
+		rendered.rerender({ authToken: "" });
+		await waitFor(() =>
+			expect(useWorkspaceStore.getState().loading).toBe(false),
+		);
+		expect(useWorkspaceStore.getState().engine.authToken).toBe("");
+		rendered.rerender({ authToken: undefined });
+		await waitFor(() =>
+			expect(useWorkspaceStore.getState().loading).toBe(false),
+		);
+		expect(useWorkspaceStore.getState().engine.authToken).toBe("ui-third");
+		expect([...storage.values.values()].join("")).not.toMatch(
+			/ui-first|ui-second|ui-third|explicit/,
+		);
+		rendered.unmount();
+	});
+
+	it("rebinds a changed client and aborts the superseded load controller", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const first = clientFixture();
+		const second = clientFixture();
+		const changedModel = modelFixture();
+		changedModel.accounts[0]!.name = "Replacement cash";
+		second.client.getModel.mockResolvedValue({
+			document: changedModel,
+			issues: [],
+		});
+		const rendered = renderHookRTL(
+			({ client }) => useWorkspaceStartup({ client }),
+			{ initialProps: { client: first.client } },
+		);
+		await waitFor(() =>
+			expect(useWorkspaceStore.getState().loading).toBe(false),
+		);
+		const previous = useWorkspaceStore.getState().engine.hydrationController!;
+		rendered.rerender({ client: second.client });
+		await waitFor(() =>
+			expect(useWorkspaceStore.getState().loading).toBe(false),
+		);
+		expect(previous.signal.aborted).toBe(true);
+		expect(first.client.getModel).toHaveBeenCalledOnce();
+		expect(second.client.getModel).toHaveBeenCalledOnce();
+		expect(
+			useWorkspaceStore.getState().workspace?.saved.accounts[0]?.name,
+		).toBe("Replacement cash");
+		rendered.unmount();
+	});
+
+	it("aborts an active save on unmount and ignores its eventual result", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const { client } = clientFixture();
+		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		await rendered.settle();
+		expect(
+			rendered
+				.result()
+				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+		).toBe(true);
+		let resolvePut!: ResolveRowWrite;
+		client.updateRule.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					resolvePut = resolve;
+				}),
+		);
+		const saving = useWorkspaceStore.getState().save();
+		const controller = useWorkspaceStore.getState().engine.saveController!;
+		rendered.unmount();
+		expect(controller.signal.aborted).toBe(true);
+		resolvePut({
+			row: modelFixture().recurrenceRules[0]!,
+			persisted: true,
+			issues: [],
+			revision: '"sha256-test"',
+		});
+		expect(await saving).toBe(false);
+		expect(
+			useWorkspaceStore.getState().workspace?.draft?.movements[0]?.amount,
+		).toBe(125);
+		expect(client.getModel).toHaveBeenCalledOnce();
+	});
+
+	it("reuses a pending load on client change and uses the new binding on retry", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const first = clientFixture();
+		const second = clientFixture();
+		let resolveModel!: (value: FinancialModelResponse) => void;
+		first.client.getModel.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					resolveModel = resolve;
+				}),
+		);
+		const rendered = renderHookRTL(
+			({ client, authToken }) => useWorkspaceStartup({ client, authToken }),
+			{ initialProps: { client: first.client, authToken: "first-token" } },
+		);
+		const pending = useWorkspaceStore.getState().engine.hydrationPromise;
+		const controller = useWorkspaceStore.getState().engine.hydrationController!;
+		rendered.rerender({ client: second.client, authToken: "second-token" });
+		expect(useWorkspaceStore.getState().engine.hydrationPromise).toBe(pending);
+		expect(controller.signal.aborted).toBe(false);
+		expect(second.client.getModel).not.toHaveBeenCalled();
+		await act(async () => {
+			resolveModel({ document: modelFixture(), issues: [] });
+			await pending;
+		});
+		expect(useWorkspaceStore.getState().workspace).not.toBeNull();
+		expect(useWorkspaceStore.getState().engine.authToken).toBe("second-token");
+		await act(async () => useWorkspaceStore.getState().retry());
+		expect(controller.signal.aborted).toBe(true);
+		expect(second.client.getModel).toHaveBeenCalledOnce();
+		rendered.unmount();
+	});
+
+	it("keeps preset load errors separate from workspace recovery", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const { client } = clientFixture();
+		client.listAmountPresets.mockResolvedValueOnce(
+			new Error("Recipes unavailable") as never,
+		);
+		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		await rendered.settle();
+		expect(rendered.result().workspace).not.toBeNull();
+		expect(rendered.result().error).toBeNull();
+		expect(rendered.result().presetError).toBe("Recipes unavailable");
+		await rendered.result().refreshPresets();
+		await rendered.settle();
+		expect(rendered.result().serverPresets).toEqual([]);
+		expect(rendered.result().presetError).toBeNull();
 		rendered.unmount();
 	});
 

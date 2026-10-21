@@ -1,5 +1,5 @@
 import { useUiStore } from "../state/uiStore.ts";
-import { useRemoteWorkspace } from "../state/useRemoteWorkspace.ts";
+import { useWorkspaceStartup } from "../state/useWorkspaceStartup.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { WorkspaceShell } from "../WorkspaceShell.tsx";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
@@ -10,17 +10,18 @@ import "./app.css";
 export function ServerApp() {
 	// The engine boots here; everything below subscribes to the stores.
 	// No fetched data travels as props anywhere in this tree.
-	useRemoteWorkspace();
+	useWorkspaceStartup();
 	const navigation = useWorkspaceNavigation();
-	const workspace = useWorkspaceStore((state) => state.workspace);
-	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const hasPlan = useWorkspaceStore((state) =>
+		Boolean(state.workspace?.draft ?? state.workspace?.saved),
+	);
 	const loading = useWorkspaceStore((state) => state.loading);
 	const importing = useUiStore((state) => state.importing);
 
 	// Transient waits render the shell chrome with a loading panel so
 	// navigation stays usable. Only terminal load failures reach the
 	// dedicated recovery screen.
-	if (!workspace || !plan) {
+	if (!hasPlan) {
 		if (loading || importing)
 			return <ServerLoadingShell navigation={navigation} />;
 		return <ServerWorkspaceRecovery />;
