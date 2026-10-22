@@ -11,14 +11,15 @@ export function WorkspaceTopbar({
 	onOpenNavigation: () => void;
 }) {
 	return (
-		<header className="topbar">
+		<header className="hidden h-16 items-center gap-3 border-0 border-b border-solid border-line bg-surface px-6 [@media(max-width:800px)]:flex print:hidden">
 			<IconButton
 				icon={Menu}
 				label="Open navigation"
-				className="mobile-only"
 				onClick={onOpenNavigation}
 			/>
-			<span className="topbar-title">{page.label}</span>
+			<span className="truncate text-sm font-semibold tracking-tight">
+				{page.label}
+			</span>
 		</header>
 	);
 }

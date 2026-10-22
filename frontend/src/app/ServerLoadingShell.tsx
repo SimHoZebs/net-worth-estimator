@@ -6,7 +6,6 @@ import {
 } from "../workspace/WorkspaceHeader.tsx";
 import { WorkspaceLayout } from "../workspace/WorkspaceLayout.tsx";
 import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar.tsx";
-import "../workspace/workspace.css";
 
 /**
  * Boot chrome while the server workspace hydrates. Static chrome renders
@@ -39,7 +38,7 @@ export function ServerLoadingShell({
 				headingRef={navigation.headingRef}
 			/>
 			<section
-				className="workspace-loading"
+				className="mx-auto my-[12vh] flex max-w-156 flex-col gap-4 p-6"
 				aria-busy="true"
 				aria-label="Loading workspace"
 			>

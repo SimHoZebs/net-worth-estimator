@@ -1,10 +1,15 @@
 import { LockKeyhole, Pencil, Trash2, Wallet } from "lucide-react";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
-import { DataTable } from "../../components/DataTable.tsx";
-import { EmptyState, IconButton } from "../../components/ui.tsx";
+import {
+	DataTable,
+	TableCell,
+	TableHeader,
+	TableRow,
+} from "../../components/DataTable.tsx";
+import { IconButton } from "../../components/Button.tsx";
+import { EmptyState } from "../../components/ui.tsx";
 import { money } from "../../domain/format.ts";
 import type { Account } from "../../domain/model.ts";
-import "./plan.css";
 
 export function AccountsPanel({
 	accounts,
@@ -23,52 +28,65 @@ export function AccountsPanel({
 		return <EmptyState icon={Wallet} title="No matching accounts" />;
 	return (
 		<DataTable
-			className="plan-table"
 			caption="Accounts with balances and protected balances."
 			showHeaders={showHeaders}
 			columns={[
-				{ label: "Account" },
-				{ label: "Balance" },
-				{ label: "Protected balance" },
-				{ label: "Actions", srOnly: true },
+				{ label: "Account", className: "[@media(max-width:600px)]:p-4" },
+				{ label: "Balance", className: "[@media(max-width:600px)]:p-4" },
+				{
+					label: "Protected balance",
+					className: "[@media(max-width:600px)]:p-4",
+				},
+				{
+					label: "Actions",
+					srOnly: true,
+					className: "[@media(max-width:600px)]:p-4",
+				},
 			]}
 		>
 			{accounts.map((account) => (
-				<tr key={account.id}>
-					<th scope="row">
+				<TableRow key={account.id}>
+					<TableHeader scope="row" className="[@media(max-width:600px)]:p-4">
 						<button
 							type="button"
-							className="table-name account-name-button"
+							className="group flex items-center gap-3 rounded-control border-0 bg-transparent px-0 py-1 text-left text-inherit"
 							aria-label={`Open ${account.name} transactions`}
 							onClick={() => onAccount(account.id)}
 						>
 							<AccountLabel
 								account={account}
+								nameClassName="group-hover:text-primary group-hover:underline group-hover:underline-offset-4"
 								suffix={!account.enabled ? " · excluded" : undefined}
 							/>
 							{account.readOnly && (
 								<LockKeyhole size={14} aria-label="Read-only record" />
 							)}
 						</button>
-					</th>
-					<td className="numeric">{money(account.balance)}</td>
-					<td>{money(account.minBalance)}</td>
-					<td>
-						<div className="table-actions">
+					</TableHeader>
+					<TableCell className="tabular-nums [@media(max-width:600px)]:p-4">
+						{money(account.balance)}
+					</TableCell>
+					<TableCell className="[@media(max-width:600px)]:p-4">
+						{money(account.minBalance)}
+					</TableCell>
+					<TableCell className="[@media(max-width:600px)]:p-4">
+						<div className="flex justify-end gap-1">
 							<IconButton
 								icon={Pencil}
+								size="sm"
 								label={`Edit ${account.name}`}
 								onClick={() => onEdit(account)}
 							/>
 							<IconButton
 								icon={Trash2}
+								size="sm"
 								label={`Remove ${account.name}`}
 								disabled={account.readOnly}
 								onClick={() => onRemove(account)}
 							/>
 						</div>
-					</td>
-				</tr>
+					</TableCell>
+				</TableRow>
 			))}
 		</DataTable>
 	);

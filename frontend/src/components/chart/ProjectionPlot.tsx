@@ -1,6 +1,5 @@
 import type { ChartModel } from "../../domain/chart.ts";
 import { compactMoney, dateLabel, money } from "../../domain/format.ts";
-import "./plot-colors.css";
 
 export function ProjectionPlot({
 	model,
@@ -39,6 +38,7 @@ export function ProjectionPlot({
 	} = model;
 	return (
 		<svg
+			className="block min-h-59 w-full overflow-visible min-[1600px]:min-h-75 [@media(600px<width<=800px)]:min-h-65 [@media(max-width:600px)]:min-h-48"
 			viewBox={`0 0 ${width} ${height}`}
 			role="img"
 			aria-labelledby={`${id}-title ${id}-description`}
@@ -57,8 +57,16 @@ export function ProjectionPlot({
 			</desc>
 			<defs>
 				<linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
-					<stop offset="0%" className="plot-band-stop" stopOpacity=".55" />
-					<stop offset="100%" className="plot-band-stop" stopOpacity=".1" />
+					<stop
+						offset="0%"
+						className="[stop-color:var(--chart-band)]"
+						stopOpacity=".55"
+					/>
+					<stop
+						offset="100%"
+						className="[stop-color:var(--chart-band)]"
+						stopOpacity=".1"
+					/>
 				</linearGradient>
 			</defs>
 			{Array.from(
@@ -71,21 +79,21 @@ export function ProjectionPlot({
 						x2={width - right}
 						y1={y(value)}
 						y2={y(value)}
-						className="plot-grid"
+						className="stroke-line"
 						strokeDasharray="3 5"
 					/>
 					<text
 						x={left - 14}
 						y={y(value) + 4}
 						textAnchor="end"
-						className="axis-label"
+						className="fill-muted text-xs [@media(max-width:600px)]:text-sm"
 					>
 						{compactMoney(value)}
 					</text>
 				</g>
 			))}
 			{ranges && model.hasRange ? (
-				<path d={area} className="plot-band" fillOpacity=".7" />
+				<path d={area} className="fill-chart-band" fillOpacity=".7" />
 			) : (
 				<path d={filledBasePath} fill={`url(#${id}-fill)`} />
 			)}
@@ -93,7 +101,7 @@ export function ProjectionPlot({
 				<path
 					d={medianPath}
 					fill="none"
-					className="plot-median"
+					className="stroke-chart-median"
 					strokeWidth="1.5"
 					strokeDasharray="4 5"
 				/>
@@ -101,7 +109,7 @@ export function ProjectionPlot({
 			<path
 				d={basePath}
 				fill="none"
-				className="plot-line"
+				className="stroke-primary"
 				strokeWidth="3"
 				strokeLinejoin="round"
 				strokeLinecap="round"
@@ -112,14 +120,14 @@ export function ProjectionPlot({
 					x2={width - right}
 					y1={y(0)}
 					y2={y(0)}
-					className="plot-reference"
+					className="stroke-muted"
 					strokeWidth="1.5"
 				/>
 				<text
 					x={width - right - 6}
 					y={y(0) - 6}
 					textAnchor="end"
-					className="axis-label"
+					className="fill-muted text-xs [@media(max-width:600px)]:text-sm"
 				>
 					No debt · $0
 				</text>
@@ -134,7 +142,7 @@ export function ProjectionPlot({
 						textAnchor={
 							fraction === 0 ? "start" : fraction === 1 ? "end" : "middle"
 						}
-						className="axis-label"
+						className="fill-muted text-xs [@media(max-width:600px)]:text-sm"
 					>
 						{points[index]?.date.slice(0, 4)}
 					</text>
@@ -144,7 +152,7 @@ export function ProjectionPlot({
 				cx={x(points.length - 1)}
 				cy={y(values.at(-1) ?? 0)}
 				r="5"
-				className="plot-endpoint"
+				className="fill-primary stroke-surface"
 				strokeWidth="3"
 			/>
 			{inspected !== null && (
@@ -154,14 +162,14 @@ export function ProjectionPlot({
 						x2={x(selectedIndex)}
 						y1={top}
 						y2={height - bottom}
-						className="plot-reference"
+						className="stroke-muted"
 						strokeDasharray="4 4"
 					/>
 					<circle
 						cx={x(selectedIndex)}
 						cy={y(values[selectedIndex] ?? 0)}
 						r="5"
-						className="plot-inspection-point"
+						className="fill-primary stroke-surface"
 						strokeWidth="2"
 					/>
 				</g>

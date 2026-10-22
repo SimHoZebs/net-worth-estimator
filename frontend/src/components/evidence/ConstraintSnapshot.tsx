@@ -33,9 +33,9 @@ export function ConstraintSnapshot({
 		failing: boolean;
 	} | null>(null);
 	return (
-		<figure className="snapshot">
+		<figure className="mt-3 mb-0.5">
 			{ledger.accountIcon ? (
-				<ul className="account-entries">
+				<ul className="mt-4 mb-2 grid list-none gap-1 p-0">
 					<AccountEntry
 						account={ledger.accountIcon}
 						name={ledger.accountName}
@@ -43,7 +43,9 @@ export function ConstraintSnapshot({
 					/>
 				</ul>
 			) : (
-				<h3 className="snapshot-also">In {ledger.month}</h3>
+				<h3 className="mb-3 text-xs font-semibold text-ink">
+					In {ledger.month}
+				</h3>
 			)}
 			<TransactionTable caption={ledger.summary} showHeaders={showHeaders}>
 				{ledger.rows.map(({ transaction, movement, failing }) => (
@@ -59,7 +61,7 @@ export function ConstraintSnapshot({
 				))}
 			</TransactionTable>
 			{ledger.overflow > 0 && (
-				<p className="snapshot-more">+{ledger.overflow} more</p>
+				<p className="mt-2 text-xs text-muted">+{ledger.overflow} more</p>
 			)}
 			{selected && (
 				<TransactionDetail

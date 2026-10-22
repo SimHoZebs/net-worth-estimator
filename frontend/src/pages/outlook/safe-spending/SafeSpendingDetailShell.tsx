@@ -38,6 +38,8 @@ export function SafeSpendingDetailShell({
 					? `${dateLabel(range.start, true)} – ${dateLabel(range.end, true)}`
 					: undefined,
 				coverage: "full",
+				headerClassName: "border-b-0 pb-2",
+				bodyClassName: "pt-0",
 			}}
 		>
 			<Tabs
@@ -48,7 +50,7 @@ export function SafeSpendingDetailShell({
 				value={tab}
 				onChange={onTabChange}
 				label="SafeSpending detail view"
-				className="account-view-tabs safe-spending-detail-tabs"
+				className="mb-4"
 			>
 				{children}
 			</Tabs>

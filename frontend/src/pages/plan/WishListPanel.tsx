@@ -7,6 +7,7 @@ import {
 	Trash2,
 } from "lucide-react";
 import { useState } from "react";
+import { Button, IconButton } from "../../components/Button.tsx";
 import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
 import { EmptyState } from "../../components/ui.tsx";
 import { money } from "../../domain/format.ts";
@@ -21,7 +22,6 @@ import { useUiStore } from "../../state/uiStore.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { PurchaseTimeline } from "./PurchaseTimeline.tsx";
 import { WishListEditor } from "./WishListEditor.tsx";
-import "./wish-list.css";
 
 export function WishListPanel({
 	plan,
@@ -58,24 +58,29 @@ export function WishListPanel({
 			);
 	};
 	return (
-		<div className="wish-list">
-			<div className="wish-list-heading">
+		<section aria-label="Planned purchases" className="@container/wish-list">
+			<div className="mb-7 flex flex-wrap items-center justify-between gap-4">
 				<div>
-					<span className="eyebrow">After your commitments</span>
-					<h2>Planned purchases</h2>
-					<p>
+					<span className="text-xs font-bold tracking-widest text-muted">
+						After your commitments
+					</span>
+					<h2 className="my-2 text-2xl tracking-[-0.04em]">
+						Planned purchases
+					</h2>
+					<p className="max-w-[52ch] text-sm leading-relaxed text-muted">
 						Buy in order. If an item cannot fit, it and the items below it wait.
 						This evaluation does not change your main projection or FI results.
 					</p>
 				</div>
-				<button
+				<Button
 					type="button"
-					className="button primary small"
+					variant="primary"
+					size="sm"
 					disabled={locked}
 					onClick={() => setEditor({ item: null })}
 				>
 					<Plus size={16} aria-hidden="true" /> Add purchase
-				</button>
+				</Button>
 			</div>
 			{queue.length === 0 ? (
 				<EmptyState
@@ -85,26 +90,35 @@ export function WishListPanel({
 				/>
 			) : (
 				<>
-					<div className="wish-list-total">
-						<span>
+					<div className="flex flex-wrap items-baseline justify-between gap-4 border-y border-line-strong py-4">
+						<span className="text-sm text-muted">
 							{queue.filter((item) => item.enabled).length} items in queue
 						</span>
-						<strong className="type-value">{money(total)}</strong>
+						<strong className="type-value text-3xl">{money(total)}</strong>
 					</div>
-					{/* oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none. */}
-					<ol className="wish-list-items" role="list">
+					<ol
+						aria-label="Purchase priorities"
+						className="m-0 list-none p-0"
+						// oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none.
+						role="list"
+					>
 						{queue.map((item, index) => (
 							<li
 								key={item.id}
-								className="wish-list-item"
+								className="group/purchase grid grid-cols-[2rem_minmax(0,1fr)_auto_auto] items-center gap-4 border-b border-line py-5 @max-[36rem]/wish-list:grid-cols-[1.5rem_minmax(0,1fr)_auto] @max-[36rem]/wish-list:gap-3"
 								data-excluded={!item.enabled}
 							>
-								<span className="wish-list-rank" aria-hidden="true">
+								<span
+									className="text-sm text-muted tabular-nums"
+									aria-hidden="true"
+								>
 									{String(index + 1).padStart(2, "0")}
 								</span>
-								<div className="wish-list-item-name">
-									<strong>{item.name}</strong>
-									<span>
+								<div className="flex min-w-0 flex-col gap-2 [overflow-wrap:anywhere]">
+									<strong className="text-sm group-data-[excluded=true]/purchase:text-muted group-data-[excluded=true]/purchase:line-through">
+										{item.name}
+									</strong>
+									<span className="text-xs text-muted">
 										{
 											plan.accounts.find(
 												(account) => account.id === item.fromId,
@@ -113,46 +127,44 @@ export function WishListPanel({
 										{!item.enabled && " · Excluded"}
 									</span>
 								</div>
-								<strong className="wish-list-cost">{money(item.amount)}</strong>
-								<div className="wish-list-actions">
-									<button
-										type="button"
-										className="icon-button"
-										aria-label={`Move ${item.name} up`}
+								<strong className="text-sm tabular-nums">
+									{money(item.amount)}
+								</strong>
+								<div className="flex flex-wrap gap-1 @max-[36rem]/wish-list:col-[2/-1]">
+									<IconButton
+										icon={ArrowUp}
+										iconSize={16}
+										className="min-h-8 min-w-8 [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
+										label={`Move ${item.name} up`}
 										disabled={locked || item.readOnly || index === 0}
 										onClick={() => move(item, -1)}
-									>
-										<ArrowUp size={16} aria-hidden="true" />
-									</button>
-									<button
-										type="button"
-										className="icon-button"
-										aria-label={`Move ${item.name} down`}
+									/>
+									<IconButton
+										icon={ArrowDown}
+										iconSize={16}
+										className="min-h-8 min-w-8 [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
+										label={`Move ${item.name} down`}
 										disabled={
 											locked || item.readOnly || index === queue.length - 1
 										}
 										onClick={() => move(item, 1)}
-									>
-										<ArrowDown size={16} aria-hidden="true" />
-									</button>
-									<button
-										type="button"
-										className="icon-button"
-										aria-label={`Edit ${item.name}`}
+									/>
+									<IconButton
+										icon={Pencil}
+										iconSize={15}
+										className="min-h-8 min-w-8 [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
+										label={`Edit ${item.name}`}
 										disabled={locked || item.readOnly}
 										onClick={() => setEditor({ item })}
-									>
-										<Pencil size={15} aria-hidden="true" />
-									</button>
-									<button
-										type="button"
-										className="icon-button"
-										aria-label={`Remove ${item.name}`}
+									/>
+									<IconButton
+										icon={Trash2}
+										iconSize={15}
+										className="min-h-8 min-w-8 [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
+										label={`Remove ${item.name}`}
 										disabled={locked || item.readOnly}
 										onClick={() => setRemove(item)}
-									>
-										<Trash2 size={15} aria-hidden="true" />
-									</button>
+									/>
 								</div>
 							</li>
 						))}
@@ -199,6 +211,6 @@ export function WishListPanel({
 					<p>Your saved plan stays intact until you save these changes.</p>
 				</ConfirmDialog>
 			)}
-		</div>
+		</section>
 	);
 }

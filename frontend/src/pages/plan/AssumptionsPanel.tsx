@@ -2,7 +2,6 @@ import type { FocusEvent, KeyboardEvent } from "react";
 import { parseDisplayNumber } from "../../components/editors/formValues.ts";
 import { InputField } from "../../components/Field.tsx";
 import type { Plan } from "../../domain/model.ts";
-import "./plan.css";
 
 type AssumptionField = "inflation" | "volatility";
 
@@ -34,11 +33,11 @@ export function AssumptionsPanel({
 		},
 	});
 	return (
-		<div className="assumptions-page">
-			<div className="section-top">
+		<div className="p-6 [@media(max-width:600px)]:p-5">
+			<div className="flex items-center justify-between gap-4 [@media(max-width:600px)]:flex-wrap">
 				<h2>The inputs behind the outlook</h2>
 			</div>
-			<div className="form-grid">
+			<div className="grid grid-cols-2 gap-5 [@media(max-width:600px)]:gap-x-3 [@media(max-width:600px)]:gap-y-4 [@media(max-width:370px)]:grid-cols-1">
 				<InputField
 					key={plan.assumptions.inflation}
 					label="Annual inflation (%)"

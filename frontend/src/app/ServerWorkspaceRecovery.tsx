@@ -3,6 +3,8 @@ import { type ReactNode, type RefObject, useRef } from "react";
 import type { FinancialModelDocument } from "../api/index.ts";
 import { parseModelDocument } from "../api/modelImport.ts";
 import { Brand } from "../components/Brand.tsx";
+import { Button, TextButton } from "../components/Button.tsx";
+import { Notice } from "../components/Notice.tsx";
 import { ModelImportPreview } from "../components/imports/ModelImportPreview.tsx";
 import { ErrorNotice } from "../components/ui.tsx";
 import { download } from "../state/storage.ts";
@@ -88,15 +90,13 @@ export function ServerWorkspaceRecovery() {
 				)}
 				{missingModel && <p>Import a reviewed model JSON file to continue.</p>}
 				{showRecoveryDraft && recoveryDraft && (
-					<div className="inline-notice">
+					<Notice>
 						<FileJson size={18} />
 						<span>
 							A draft is available for recovery. Export it before retrying; it
 							will not be uploaded automatically.
 						</span>
-						<button
-							type="button"
-							className="text-button"
+						<TextButton
 							onClick={() =>
 								download({
 									name: "waypoint-remote-draft-recovery.json",
@@ -105,8 +105,8 @@ export function ServerWorkspaceRecovery() {
 							}
 						>
 							Export browser draft
-						</button>
-					</div>
+						</TextButton>
+					</Notice>
 				)}
 				<RemoteAuthControl />
 				{missingModel && (
@@ -129,31 +129,24 @@ export function ServerWorkspaceRecovery() {
 					onClose={clearCandidate}
 					footer={
 						<>
-							<button
-								type="button"
-								className="button secondary"
-								onClick={clearCandidate}
-							>
-								Cancel
-							</button>
-							<button
-								type="button"
-								className="button primary"
+							<Button onClick={clearCandidate}>Cancel</Button>
+							<Button
+								variant="primary"
 								onClick={() => {
 									void importCandidate();
 								}}
 							>
 								Import to server
-							</button>
+							</Button>
 						</>
 					}
 				>
-					<div className="inline-notice">
+					<Notice>
 						<LockKeyhole size={18} />
 						<span>
 							Validated before activation. Nothing is sent until you confirm.
 						</span>
-					</div>
+					</Notice>
 				</ModelImportPreview>
 			)}
 		</>
@@ -176,7 +169,7 @@ function ServerModelImport({
 	onFile: (file: File) => void;
 }) {
 	return (
-		<div className="server-import">
+		<div className="mt-6 flex flex-col items-center gap-3">
 			<input
 				ref={inputRef}
 				className="sr-only"
@@ -190,15 +183,14 @@ function ServerModelImport({
 				}}
 			/>
 			{error && <ErrorNotice message={error} />}
-			<button
-				type="button"
-				className="button primary"
+			<Button
+				variant="primary"
 				onClick={onChoose}
 				disabled={readOnly || reading}
 			>
 				<FileUp size={17} />
 				{reading ? "Reading model…" : "Choose server model JSON"}
-			</button>
+			</Button>
 			<small>
 				{readOnly
 					? "This server is read-only and cannot accept an import."
@@ -218,15 +210,15 @@ function ServerRecovery({
 	children?: ReactNode;
 }) {
 	return (
-		<div className="recovery-screen">
+		<div className="mx-auto my-[12vh] max-w-156 p-6 [&_p]:mb-6">
 			<Brand />
-			<h1>{title}.</h1>
+			<h1 className="mt-11 mb-6">{title}.</h1>
 			{children}
-			<div className="recovery-actions">
-				<button type="button" className="button secondary" onClick={onRetry}>
+			<div className="flex flex-wrap gap-3">
+				<Button onClick={onRetry}>
 					<RotateCcw size={15} />
 					Retry server load
-				</button>
+				</Button>
 			</div>
 		</div>
 	);

@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { mergeStyles } from "./mergeStyles.ts";
 import { useMediaQuery } from "../state/useMediaQuery.ts";
 import {
 	drawerHiddenX,
@@ -10,8 +11,8 @@ import {
 	useHorizontalSwipe,
 	type DrawerSide,
 } from "./drawer.ts";
-import "./drawer.css";
 import { IconButton } from "./ui.tsx";
+import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
 
 // The single drawer component: the left navigation sheet and the right
 // context sheet are the same backdrop, slide, border, focus, and gesture
@@ -36,6 +37,8 @@ export function Drawer({
 		coverage?: "sheet" | "full";
 		full?: boolean;
 		fullBreakpoint?: string;
+		headerClassName?: string;
+		bodyClassName?: string;
 	};
 	behavior?: {
 		modal?: boolean;
@@ -50,6 +53,8 @@ export function Drawer({
 		coverage = "sheet",
 		full,
 		fullBreakpoint = "(max-width: 600px)",
+		headerClassName,
+		bodyClassName,
 	} = appearance ?? {};
 	const { modal = true, backdrop = true, swipeClose = true } = behavior ?? {};
 	const panelEl = useRef<Element | null>(null);
@@ -178,7 +183,7 @@ export function Drawer({
 						<motion.button
 							key="drawer-backdrop"
 							type="button"
-							className={`drawer-backdrop drawer-backdrop-${side}`}
+							className={`fixed inset-0 border-0 bg-backdrop-film backdrop-blur-(--backdrop-blur) ${side === "left" ? "z-29" : "z-40"}`}
 							aria-label={`Close ${label}`}
 							onClick={requestClose}
 							initial={{ opacity: 0 }}
@@ -193,7 +198,7 @@ export function Drawer({
 							ref={(node) => {
 								panelEl.current = node;
 							}}
-							className="drawer drawer-left"
+							className="fixed inset-y-0 left-0 z-30 flex w-(--sidebar) touch-pan-y flex-col overflow-y-auto border-0 border-r border-solid border-line bg-surface px-5 pt-8 text-ink [@media(max-width:1250px)]:px-3 [@media(max-width:800px)]:w-60 [@media(max-width:800px)]:px-5 [@media(max-width:800px)]:pt-6 [@media(max-width:800px)]:shadow-2xl print:hidden"
 							aria-label={label}
 							{...(modal
 								? { role: "dialog", "aria-modal": true as const }
@@ -214,7 +219,11 @@ export function Drawer({
 							ref={(node) => {
 								panelEl.current = node;
 							}}
-							className={`drawer drawer-right ${coverage === "full" ? "drawer-full" : ""}`}
+							className={mergeStyles(
+								"fixed inset-y-0 right-0 z-41 flex w-[min(47.5rem,calc(100vw-4rem))] max-w-190 touch-pan-y flex-col overflow-y-auto border-0 border-l border-solid border-line bg-surface text-ink [@media(max-width:600px)]:w-[min(26rem,calc(100vw-3.5rem))] [@media(max-width:600px)]:shadow-overlay",
+								coverage === "full" &&
+									"[@media(max-width:600px)]:w-full [@media(max-width:600px)]:max-w-full [@media(max-width:600px)]:border-l-0 [@media(max-width:600px)]:shadow-none",
+							)}
 							role="dialog"
 							aria-modal="true"
 							aria-labelledby={titleId}
@@ -227,10 +236,19 @@ export function Drawer({
 							}}
 						>
 							{title && (
-								<div className="modal-header">
-									<div>
-										{eyebrow && <p className="eyebrow">{eyebrow}</p>}
-										<h2 id={titleId} className="type-display">
+								<div
+									className={mergeStyles(dialogHeaderStyles, headerClassName)}
+								>
+									<div className="min-w-0 flex-1">
+										{eyebrow && (
+											<p className="mb-2 text-xs font-bold tracking-widest text-muted">
+												{eyebrow}
+											</p>
+										)}
+										<h2
+											id={titleId}
+											className="type-display text-3xl leading-tight font-normal tracking-tight"
+										>
 											{title}
 										</h2>
 									</div>
@@ -241,7 +259,9 @@ export function Drawer({
 									/>
 								</div>
 							)}
-							<div className="modal-body">{children}</div>
+							<div className={mergeStyles(dialogBodyStyles, bodyClassName)}>
+								{children}
+							</div>
 						</motion.div>
 					)}
 				</>

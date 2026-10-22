@@ -7,7 +7,6 @@ import { useMediaQuery } from "../state/useMediaQuery.ts";
 import { AccountDot } from "./AccountIcon.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
 import { Skeleton, Toggle } from "./ui.tsx";
-import "./chart/ProjectionChart.css";
 
 export function ProjectionChart({
 	plan,
@@ -75,16 +74,22 @@ export function ProjectionChart({
 		// only data slots skeletonize, and only while data is absent.
 		if (!pending) return null;
 		return (
-			<section className="chart-card" aria-label="Net worth over time">
-				<div className="section-top chart-top">
-					<h2>Net worth over time</h2>
+			<section
+				className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
+				aria-label="Net worth over time"
+			>
+				<div className="flex items-center justify-between gap-4 px-6 pt-6 [@media(max-width:1250px)]:items-start [@media(600px<width<=1250px)]:px-5 [@media(max-width:600px)]:gap-2.5 [@media(max-width:600px)]:px-4 [@media(max-width:600px)]:pt-5 [@media(max-width:370px)]:flex-wrap">
+					<h2 className="[@media(max-width:600px)]:text-sm">
+						Net worth over time
+					</h2>
 					<div
-						className="segmented"
+						className="inline-flex gap-0.5 rounded-control border border-line bg-surface-2 p-1"
 						role="toolbar"
 						aria-label="Projection horizon"
 					>
 						{[10, 20, 30].map((year) => (
 							<button
+								className="rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs [@media(600px<width<=1250px)]:px-1.5 [@media(max-width:600px)]:p-1"
 								type="button"
 								key={year}
 								aria-pressed={years === year}
@@ -98,20 +103,20 @@ export function ProjectionChart({
 						))}
 					</div>
 				</div>
-				<div className="chart-toolbar">
-					<div className="chart-legend">
-						<span>
-							<i className="legend-line" />
+				<div className="flex items-center justify-between px-6 pt-6 pb-3.5 [@media(600px<width<=1250px)]:px-5 [@media(max-width:600px)]:px-4 [@media(max-width:600px)]:pt-5 [@media(max-width:600px)]:pb-2 [@media(max-width:370px)]:flex-wrap [@media(max-width:370px)]:gap-2.5">
+					<div className="flex flex-wrap items-center gap-4 text-xs text-muted [@media(max-width:600px)]:gap-3">
+						<span className="flex items-center gap-1.5">
+							<i className="inline-block h-0.5 w-4 bg-primary" />
 							Base case
 						</span>
 						{ranges && (
-							<span>
-								<i className="legend-band" />
+							<span className="flex items-center gap-1.5">
+								<i className="inline-block h-2 w-3 rounded-xs bg-chart-band" />
 								80% of scenarios
 							</span>
 						)}
-						<span>
-							<i className="legend-zero" />
+						<span className="flex items-center gap-1.5">
+							<i className="inline-block h-0 w-4 border-t-2 border-muted" />
 							$0 · no debt
 						</span>
 					</div>
@@ -124,16 +129,22 @@ export function ProjectionChart({
 		);
 	}
 	return (
-		<section className="chart-card" aria-labelledby={`${id}-title`}>
-			<div className="section-top chart-top">
-				<h2 id={`${id}-title`}>Net worth over time</h2>
+		<section
+			className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
+			aria-labelledby={`${id}-title`}
+		>
+			<div className="flex items-center justify-between gap-4 px-6 pt-6 [@media(max-width:1250px)]:items-start [@media(600px<width<=1250px)]:px-5 [@media(max-width:600px)]:gap-2.5 [@media(max-width:600px)]:px-4 [@media(max-width:600px)]:pt-5 [@media(max-width:370px)]:flex-wrap">
+				<h2 id={`${id}-title`} className="[@media(max-width:600px)]:text-sm">
+					Net worth over time
+				</h2>
 				<div
-					className="segmented"
+					className="inline-flex gap-0.5 rounded-control border border-line bg-surface-2 p-1"
 					role="toolbar"
 					aria-label="Projection horizon"
 				>
 					{[10, 20, 30].map((year) => (
 						<button
+							className="rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs [@media(600px<width<=1250px)]:px-1.5 [@media(max-width:600px)]:p-1"
 							type="button"
 							key={year}
 							aria-pressed={years === year}
@@ -147,26 +158,26 @@ export function ProjectionChart({
 					))}
 				</div>
 			</div>
-			<div className="chart-toolbar">
-				<div className="chart-legend">
-					<span>
-						<i className="legend-line" />
+			<div className="flex items-center justify-between px-6 pt-6 pb-3.5 [@media(600px<width<=1250px)]:px-5 [@media(max-width:600px)]:px-4 [@media(max-width:600px)]:pt-5 [@media(max-width:600px)]:pb-2 [@media(max-width:370px)]:flex-wrap [@media(max-width:370px)]:gap-2.5">
+				<div className="flex flex-wrap items-center gap-4 text-xs text-muted [@media(max-width:600px)]:gap-3">
+					<span className="flex items-center gap-1.5">
+						<i className="inline-block h-0.5 w-4 bg-primary" />
 						Base case
 					</span>
 					{ranges && (
-						<span>
-							<i className="legend-band" />
+						<span className="flex items-center gap-1.5">
+							<i className="inline-block h-2 w-3 rounded-xs bg-chart-band" />
 							80% of scenarios
 						</span>
 					)}
-					<span>
-						<i className="legend-zero" />
+					<span className="flex items-center gap-1.5">
+						<i className="inline-block h-0 w-4 border-t-2 border-muted" />
 						$0 · no debt
 					</span>
 				</div>
 				<Toggle label="Show range" checked={ranges} onChange={setRanges} />
 			</div>
-			<div className="chart-wrap">
+			<div className="relative px-1.5">
 				<ProjectionPlot
 					model={model}
 					id={id}
@@ -176,7 +187,7 @@ export function ProjectionChart({
 					onInspect={setInspected}
 				/>
 				<input
-					className="chart-keyboard"
+					className="absolute bottom-0 left-14 h-3 w-[calc(100%-80px)] cursor-ew-resize accent-primary opacity-0 focus-visible:opacity-100 print:hidden"
 					type="range"
 					min="0"
 					max={model.points.length - 1}
@@ -187,47 +198,65 @@ export function ProjectionChart({
 					onBlur={() => setInspected(null)}
 				/>
 				{ranges && !range && (
-					<div className="range-loading" role="status">
+					<div
+						className="absolute top-[35%] left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-control border border-line-strong bg-surface px-4 py-2 text-xs whitespace-nowrap shadow-overlay"
+						role="status"
+					>
 						{rangeError ? (
 							"Range unavailable · base case shown"
 						) : (
 							<>
-								<span className="spinner" />
+								<span
+									className="size-3 animate-spin rounded-full border-2 border-line-strong border-t-primary"
+									aria-hidden="true"
+								/>
 								Modeling scenarios · {Math.round(progress * 100)}%
 							</>
 						)}
 					</div>
 				)}
 			</div>
-			<div className="chart-inspection" aria-live="polite">
+			<div
+				className="mx-5 mt-1 mb-5 flex min-h-15 flex-wrap content-center gap-x-3 gap-y-1.5 rounded-control bg-surface-2 px-3 py-2 text-xs tabular-nums"
+				aria-live="polite"
+			>
 				<strong>{dateLabel(point.date)}</strong>
-				<span>
-					Base case <b>{money(model.adjust(point.total, point.date))}</b>
+				<span className="text-muted">
+					Base case{" "}
+					<b className="ml-1 text-ink">
+						{money(model.adjust(point.total, point.date))}
+					</b>
 				</span>
 				{selectedRange && (
-					<span>
+					<span className="text-muted">
 						80% range{" "}
-						<b>
+						<b className="ml-1 text-ink">
 							{money(model.adjust(selectedRange.lower, point.date))} –{" "}
 							{money(model.adjust(selectedRange.upper, point.date))}
 						</b>
 					</span>
 				)}
+				{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled flex lists. */}
 				<ul
-					className="chart-accounts"
+					className="m-0 flex basis-full list-none flex-wrap gap-x-4 gap-y-1 p-0"
+					role="list"
 					aria-label={`Account balances on ${dateLabel(point.date, true)}`}
 				>
 					{contributions.map((account) => (
-						<li key={account.id}>
+						<li
+							key={account.id}
+							className="inline-flex items-center gap-1.5 text-muted"
+						>
 							<AccountDot color={account.color} />
 							<span>
 								{account.name}
 								{account.enabled ? "" : " (excluded)"}
 							</span>
-							<b>{money(account.value)}</b>
+							<b className="ml-1 text-ink">{money(account.value)}</b>
 						</li>
 					))}
 				</ul>
+				{/* oxlint-enable jsx-a11y/no-redundant-roles */}
 			</div>
 		</section>
 	);

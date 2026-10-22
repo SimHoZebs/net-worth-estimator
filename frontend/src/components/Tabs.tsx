@@ -1,5 +1,5 @@
 import { type ReactNode, useId } from "react";
-import "./ui.css";
+import { mergeStyles } from "./mergeStyles.ts";
 
 export interface TabItem<T extends string> {
 	id: T;
@@ -30,7 +30,10 @@ export function Tabs<T extends string>({
 	return (
 		<>
 			<div
-				className={`page-tabs ${className}`}
+				className={mergeStyles(
+					"mb-6 flex gap-6 overflow-x-auto border-0 border-b border-solid border-line [@media(max-width:600px)]:gap-5",
+					className,
+				)}
 				role="tablist"
 				aria-label={label}
 			>
@@ -40,6 +43,7 @@ export function Tabs<T extends string>({
 						key={item.id}
 						id={`${id}-${item.id}`}
 						role="tab"
+						className="flex items-center gap-2 border-0 border-b-2 border-solid border-transparent bg-transparent px-0.5 pt-3 pb-4 text-sm whitespace-nowrap text-muted aria-selected:border-primary aria-selected:font-semibold aria-selected:text-ink"
 						aria-selected={value === item.id}
 						aria-controls={`${id}-panel`}
 						tabIndex={value === item.id ? 0 : -1}
@@ -64,7 +68,11 @@ export function Tabs<T extends string>({
 						}}
 					>
 						{item.label}
-						{item.count != null && <span>{item.count}</span>}
+						{item.count != null && (
+							<span className="min-w-5 rounded-control bg-active px-1 py-px text-xs text-success-text">
+								{item.count}
+							</span>
+						)}
 					</button>
 				))}
 			</div>

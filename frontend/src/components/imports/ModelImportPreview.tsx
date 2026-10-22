@@ -1,6 +1,7 @@
 import { FileJson } from "lucide-react";
 import type { ReactNode } from "react";
 import type { FinancialModelDocument } from "../../api/index.ts";
+import { dialogActionsStyles } from "../dialogStyles.ts";
 import { Modal } from "../ui.tsx";
 
 export function ModelImportPreview({
@@ -22,17 +23,17 @@ export function ModelImportPreview({
 			eyebrow={eyebrow}
 			onClose={onClose}
 		>
-			<div className="import-summary">
-				<FileJson size={30} />
-				<h3>
+			<div className="py-5 text-center">
+				<FileJson size={30} className="mb-3 text-primary" />
+				<h3 className="text-xl">
 					{document.sourcePath.split("/").filter(Boolean).at(-1) ||
 						"Waypoint model"}
 				</h3>
-				<p>
+				<p className="mt-2 text-xs">
 					{document.accounts.length} accounts · {document.postings.length}{" "}
 					postings · {document.checkpoints.length} checkpoints
 				</p>
-				<p>
+				<p className="mt-2 text-xs">
 					{document.evaluations.financialIndependence.length +
 						document.evaluations.netWorthThreshold.length +
 						document.evaluations.accountBalance.length +
@@ -42,7 +43,7 @@ export function ModelImportPreview({
 				</p>
 			</div>
 			{children}
-			<div className="modal-actions">{footer}</div>
+			<div className={dialogActionsStyles}>{footer}</div>
 		</Modal>
 	);
 }

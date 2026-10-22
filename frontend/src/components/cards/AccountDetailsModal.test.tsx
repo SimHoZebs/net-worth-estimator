@@ -1,0 +1,107 @@
+import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { toAccountCard } from "../../domain/accountCards.ts";
+import { testPlan } from "../../test/plan.ts";
+import { movementFixture, projectionFixture } from "../../test/projection.ts";
+import { AccountDetailsModal } from "./AccountDetailsModal.tsx";
+
+// Native modal focus and dismissal belong to Modal's browser coverage.
+vi.mock("../ui.tsx", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../ui.tsx")>()),
+	Modal: ({ title, children }: { title: string; children: ReactNode }) => (
+		<section aria-label={title}>{children}</section>
+	),
+}));
+
+afterEach(cleanup);
+
+describe("AccountDetailsModal", () => {
+	it("keeps metrics semantic and searches transactions through a labeled input", () => {
+		const projection = projectionFixture({
+			movements: [
+				movementFixture({
+					movementId: "living",
+					name: "Everyday living",
+					date: "2026-10-01",
+					requested: 5400,
+					realized: 5400,
+					constraint: null,
+				}),
+			],
+		});
+		const card = toAccountCard({
+			account: testPlan.accounts[0]!,
+			plan: testPlan,
+			projection,
+		});
+		const view = render(
+			<AccountDetailsModal
+				card={card}
+				plan={testPlan}
+				projection={projection}
+				onClose={() => {}}
+			/>,
+		);
+		const term = view.getByText("Protected balance");
+		expect(term.tagName).toBe("DT");
+		expect(term.nextElementSibling?.tagName).toBe("DD");
+		expect(term.closest("dl")).toBeTruthy();
+		const search = view.getByLabelText("Search account transactions");
+		expect(search.tagName).toBe("INPUT");
+		fireEvent.change(search, { target: { value: "Everyday living" } });
+		expect(
+			view.getByRole("button", { name: /View Everyday living/ }),
+		).toBeTruthy();
+		expect(
+			view.queryByRole("button", { name: /View Household payroll/ }),
+		).toBeNull();
+		fireEvent.change(search, { target: { value: "no such payment" } });
+		expect(view.getByText("No matching transactions")).toBeTruthy();
+	});
+
+	it("preserves native pressed states and posted-only filtering", () => {
+		const projection = projectionFixture({
+			movements: [
+				movementFixture({
+					movementId: "living",
+					name: "Everyday living",
+					date: "2026-10-01",
+				}),
+			],
+		});
+		const card = toAccountCard({
+			account: testPlan.accounts[0]!,
+			plan: testPlan,
+			projection,
+		});
+		const view = render(
+			<AccountDetailsModal
+				card={card}
+				plan={testPlan}
+				projection={projection}
+				onClose={() => {}}
+			/>,
+		);
+		const filters = within(
+			view.getByRole("group", { name: "Filter by posting status" }),
+		);
+		const all = filters.getByRole("button", {
+			name: "all",
+		}) as HTMLButtonElement;
+		const posted = filters.getByRole("button", {
+			name: "posted",
+		}) as HTMLButtonElement;
+		expect(all.type).toBe("button");
+		expect(all.getAttribute("aria-pressed")).toBe("true");
+		fireEvent.click(posted);
+		expect(all.getAttribute("aria-pressed")).toBe("false");
+		expect(posted.getAttribute("aria-pressed")).toBe("true");
+		expect(
+			view.queryByRole("button", { name: /View Everyday living/ }),
+		).toBeNull();
+		expect(
+			view.getAllByRole("button", { name: /View Household payroll/ }),
+		).toHaveLength(3);
+	});
+});

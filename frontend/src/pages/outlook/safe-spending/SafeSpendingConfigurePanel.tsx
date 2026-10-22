@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { AccountLabel } from "../../../components/AccountIcon.tsx";
-import { InputField } from "../../../components/Field.tsx";
+import { TextButton } from "../../../components/Button.tsx";
+import { Checkbox, InputField } from "../../../components/Field.tsx";
 import { dateLabel, exactMoney, money } from "../../../domain/format.ts";
 import type { Plan } from "../../../domain/model.ts";
 import type {
@@ -25,11 +26,15 @@ function AccountToggle({
 	return (
 		<button
 			type="button"
-			className="account-toggle table-name"
+			className="group cursor-pointer rounded-control border border-line-strong bg-surface py-1.5 pr-3 pl-1.5 text-left text-xs transition-[border-color,background] duration-150 hover:bg-hover aria-pressed:border-primary aria-pressed:bg-success-bg motion-reduce:transition-none"
 			aria-pressed={checked}
 			onClick={onToggle}
 		>
-			<AccountLabel account={account} />
+			<AccountLabel
+				account={account}
+				className="group-aria-[pressed=false]:opacity-55"
+				nameClassName="group-aria-[pressed=false]:text-muted"
+			/>
 		</button>
 	);
 }
@@ -55,6 +60,7 @@ export function SafeSpendingConfigurePanel({
 	onUpdateConfig: (next: Partial<TotalCycleSettings>) => void;
 	onResetConfig: (key: SafeSpendingResetKey) => void;
 }) {
+	const billsId = useId();
 	const accountsById = useMemo(
 		() => new Map(accounts.map((account) => [account.id, account])),
 		[accounts],
@@ -105,8 +111,8 @@ export function SafeSpendingConfigurePanel({
 		effect: string;
 	}[];
 	return (
-		<div className="cycle-config">
-			<p className="section-note">
+		<div className="grid content-start gap-3">
+			<p className="text-sm leading-relaxed text-muted">
 				Budget settings stay in this browser. Your saved plan and bank records
 				stay unchanged.
 			</p>
@@ -163,25 +169,23 @@ export function SafeSpendingConfigurePanel({
 							}
 						/>
 						{value !== null && (
-							<button
-								type="button"
-								className="text-button"
-								onClick={() => onResetConfig(field.key)}
-							>
+							<TextButton onClick={() => onResetConfig(field.key)}>
 								Use automatic {field.label}
-							</button>
+							</TextButton>
 						)}
 					</div>
 				);
 			})}
-			<fieldset className="cycle-accounts">
-				<legend>{labels.cashAccounts}</legend>
-				<p className="section-note">
+			<fieldset className="grid gap-2">
+				<legend className="m-0 p-0 text-xs font-semibold text-muted">
+					{labels.cashAccounts}
+				</legend>
+				<p className="text-sm leading-relaxed text-muted">
 					Feeds automatic {labels.cashBalance}, {labels.nextPaycheck},{" "}
 					{labels.remainingBills}, {labels.fixedBills}, and{" "}
 					{labels.cashPayments}. Overrides keep their entered values.
 				</p>
-				<div className="account-toggles">
+				<div className="flex flex-wrap gap-2">
 					{config.spendingAccounts.map((account) => {
 						const full = accountsById.get(account.id);
 						const checked = config.trackedSpendingIds.includes(account.id);
@@ -197,18 +201,20 @@ export function SafeSpendingConfigurePanel({
 					})}
 				</div>
 			</fieldset>
-			<fieldset className="cycle-accounts">
-				<legend>Tracked cards</legend>
-				<p className="section-note">
+			<fieldset className="grid gap-2">
+				<legend className="m-0 p-0 text-xs font-semibold text-muted">
+					Tracked cards
+				</legend>
+				<p className="text-sm leading-relaxed text-muted">
 					Feeds {labels.closedCards} in Last cycle and automatic{" "}
 					{labels.cardSpending} in This cycle. Changes both{" "}
 					{labels.recordedCharges} lists. Overrides keep their entered totals.
 				</p>
-				<p className="section-note">
+				<p className="text-sm leading-relaxed text-muted">
 					{labels.closedCards} uses each selected card's latest saved balance at
 					or before the last cycle ends.
 				</p>
-				<div className="account-toggles">
+				<div className="flex flex-wrap gap-2">
 					{config.cards.map((card) => {
 						const full = accountsById.get(card.id);
 						const checked = config.trackedIds.includes(card.id);
@@ -224,9 +230,11 @@ export function SafeSpendingConfigurePanel({
 					})}
 				</div>
 			</fieldset>
-			<fieldset className="cycle-accounts">
-				<legend>Included bills</legend>
-				<p className="section-note">
+			<fieldset className="grid gap-2">
+				<legend className="m-0 p-0 text-xs font-semibold text-muted">
+					Included bills
+				</legend>
+				<p className="text-sm leading-relaxed text-muted">
 					Feeds automatic {labels.remainingBills}, {labels.fixedBills}, and{" "}
 					{labels.cashPayments}. Also changes {labels.scheduledBills}. Overrides
 					keep their entered totals.
@@ -235,9 +243,14 @@ export function SafeSpendingConfigurePanel({
 					billCandidates.map((bill) => {
 						const checked = trackedBillIds.includes(bill.id);
 						return (
-							<label key={bill.id} className="cycle-account-option">
-								<input
-									type="checkbox"
+							<label
+								key={bill.id}
+								htmlFor={`${billsId}-${bill.id}`}
+								className="flex cursor-pointer items-center gap-2 text-xs text-ink"
+							>
+								<Checkbox
+									id={`${billsId}-${bill.id}`}
+									className="size-4"
 									checked={checked}
 									onChange={() => onToggleBill(bill.id)}
 								/>
@@ -248,7 +261,7 @@ export function SafeSpendingConfigurePanel({
 						);
 					})
 				) : (
-					<p className="section-note">
+					<p className="text-sm leading-relaxed text-muted">
 						No recurring bills found for the selected cash accounts.
 					</p>
 				)}

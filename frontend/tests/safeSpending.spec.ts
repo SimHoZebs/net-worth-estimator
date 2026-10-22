@@ -58,7 +58,7 @@ test("household budget shows paycheck allocation and one sortable cycle bill lis
 	await expect(
 		drawer.getByText("Jan 20, 2026 – Feb 19, 2026", { exact: true }),
 	).toHaveCount(1);
-	await expect(drawer.locator(".seg-legend")).toHaveCount(0);
+	await expect(drawer.getByRole("list", { name: / details$/ })).toHaveCount(0);
 	await expect(budget).toHaveCount(0);
 	await expect(
 		drawer.getByRole("list", { name: "Closed card balances" }),
@@ -200,9 +200,8 @@ test("Configure names each affected total and keeps cash, allowance, and closed 
 	const metric = (label: string) =>
 		page
 			.getByRole("dialog")
-			.locator(".household-metric-card")
-			.filter({ hasText: label })
-			.locator(".household-metric-value");
+			.getByRole("region", { name: label, exact: true })
+			.getByTestId("metric-value");
 	await expect(metric(labels.cashAfterBills)).toHaveText("$4,200");
 	await expect(metric(labels.allowance)).toHaveText("-$375");
 	await page.getByRole("tab", { name: "Configure", exact: true }).click();
@@ -285,7 +284,7 @@ for (const theme of ["light", "dark"] as const) {
 		);
 		expect(overflowing).toEqual([]);
 		const accessibility = await new AxeBuilder({ page })
-			.include(".household-budget")
+			.include(`[aria-label="${labels.paycheckAllocation}"]`)
 			.analyze();
 		expect(accessibility.violations).toEqual([]);
 		await page.getByRole("tab", { name: /Last cycle/ }).click();

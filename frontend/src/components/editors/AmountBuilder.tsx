@@ -8,7 +8,9 @@ import {
 	FALLBACK_TEMPLATES,
 	plainLanguageForAmount,
 } from "../../domain/amountCatalog.ts";
-import { InputField, SelectField } from "../Field.tsx";
+import { Button } from "../Button.tsx";
+import { dialogActionsStyles } from "../dialogStyles.ts";
+import { InputField, SelectField, TextAreaField } from "../Field.tsx";
 
 function numberOr(fallback: number, value: string): number {
 	const parsed = Number(value);
@@ -358,16 +360,14 @@ function TemplateFields({
 						placeholder="e.g. 1341.67"
 						{...set("deduction")}
 					/>
-					<label className="field">
-						<span>Brackets (JSON: upTo per paycheck, rate 0–1)</span>
-						<textarea
-							className="type-code"
-							name="brackets"
-							rows={4}
-							defaultValue={fields["brackets"] ?? DEFAULT_BRACKETS_JSON}
-							onChange={(event) => onField("brackets", event.target.value)}
-						/>
-					</label>
+					<TextAreaField
+						label="Brackets (JSON: upTo per paycheck, rate 0–1)"
+						className="type-code"
+						name="brackets"
+						rows={4}
+						defaultValue={fields["brackets"] ?? DEFAULT_BRACKETS_JSON}
+						onChange={(event) => onField("brackets", event.target.value)}
+					/>
 				</>
 			);
 		default:
@@ -404,10 +404,10 @@ export function AmountBuilder({
 	const plain = plainLanguageForAmount(amount);
 	const wire = JSON.stringify(amount, null, 2);
 	return (
-		<div className="amount-builder">
+		<div className="mt-3 mb-5 rounded-lg border border-solid border-line bg-transparent p-4">
 			{!hidePicker && (
 				<>
-					<div className="form-grid">
+					<div className="grid grid-cols-2 gap-5 max-[600px]:gap-x-3 max-[600px]:gap-y-4 max-[370px]:grid-cols-1">
 						<SelectField
 							label="What kind of amount?"
 							name="amountTemplate"
@@ -425,14 +425,14 @@ export function AmountBuilder({
 							))}
 						</SelectField>
 					</div>
-					<p className="muted">
+					<p className="text-muted">
 						<strong>{template.label}.</strong> {template.summary}{" "}
 						{template.whenToUse && <span>Use when: {template.whenToUse}</span>}
 					</p>
 				</>
 			)}
 			{!fixedAmount && (
-				<div className="form-grid">
+				<div className="grid grid-cols-2 gap-5 max-[600px]:gap-x-3 max-[600px]:gap-y-4 max-[370px]:grid-cols-1">
 					<TemplateFields
 						templateId={template.id}
 						accounts={accounts}
@@ -444,15 +444,17 @@ export function AmountBuilder({
 					/>
 				</div>
 			)}
-			<p className="muted">{plain}</p>
+			<p className="text-muted">{plain}</p>
 			<details>
 				<summary>Show saved data (JSON)</summary>
-				<pre className="code-block">{wire}</pre>
+				<pre className="max-h-70 overflow-auto rounded-lg border border-solid border-line bg-surface-2 p-3 text-xs whitespace-pre-wrap [word-break:break-word]">
+					{wire}
+				</pre>
 			</details>
-			<div className="modal-actions">
-				<button
+			<div className={dialogActionsStyles}>
+				<Button
 					type="button"
-					className="button secondary"
+					variant="secondary"
 					onClick={() => {
 						void navigator.clipboard?.writeText(wire).then(
 							() => setCopied(true),
@@ -461,15 +463,15 @@ export function AmountBuilder({
 					}}
 				>
 					{copied ? "Copied!" : "Copy JSON"}
-				</button>
+				</Button>
 				{onChange && (
-					<button
+					<Button
 						type="button"
-						className="button primary"
+						variant="primary"
 						onClick={() => onChange(amount)}
 					>
 						Use this amount
-					</button>
+					</Button>
 				)}
 			</div>
 		</div>

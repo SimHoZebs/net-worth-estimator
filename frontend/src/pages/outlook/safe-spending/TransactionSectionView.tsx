@@ -15,13 +15,17 @@ export function SafeSpendingSectionHeader({
 	total?: number;
 }) {
 	return (
-		<div className="section-top">
-			<div className="safe-spending-section-title">
-				<h3>{title}</h3>
-				{subtitle && <p className="section-note">{subtitle}</p>}
+		<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+			<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+				<h3 className="m-0 text-xs font-semibold text-ink">{title}</h3>
+				{subtitle && (
+					<p className="mt-1 text-xs leading-relaxed text-muted">{subtitle}</p>
+				)}
 			</div>
 			{total !== undefined && (
-				<strong className="safe-spending-total">{exactMoney(total)}</strong>
+				<strong className="text-sm font-bold tabular-nums">
+					{exactMoney(total)}
+				</strong>
 			)}
 		</div>
 	);
@@ -46,13 +50,14 @@ export function TransactionSectionView({
 }) {
 	if (!transactions.length) {
 		return (
-			<div className="cycle-breakdown">
+			<div className="border-t border-line pt-3">
 				<p>{emptyMessage}</p>
 			</div>
 		);
 	}
 	return (
 		<TransactionTable
+			className="border-t-0"
 			caption={`${caption}, ${order === "oldest" ? "oldest first" : "newest first"}`}
 			showHeaders={showHeaders}
 		>

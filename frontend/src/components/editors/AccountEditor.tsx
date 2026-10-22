@@ -1,7 +1,8 @@
+import { useId } from "react";
 import type { Account } from "../../domain/model.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
-import { InputField, SelectField } from "../Field.tsx";
+import { Checkbox, InputField, SelectField } from "../Field.tsx";
 import { Badge } from "../ui.tsx";
 import {
 	EditorForm,
@@ -15,6 +16,7 @@ export function AccountEditor({
 	plan,
 	...props
 }: EditorProps & { item: Account | null }) {
+	const enabledId = useId();
 	return (
 		<EditorForm
 			{...props}
@@ -76,10 +78,13 @@ export function AccountEditor({
 				<option value="property">Property</option>
 				<option value="debt">Debt</option>
 			</SelectField>
-			<label className="checkbox-field">
-				<input
+			<label
+				htmlFor={enabledId}
+				className="flex min-h-11 items-center gap-3 text-sm text-muted"
+			>
+				<Checkbox
+					id={enabledId}
 					name="enabled"
-					type="checkbox"
 					defaultChecked={item?.enabled ?? true}
 				/>
 				Include in net worth and projections
@@ -114,8 +119,13 @@ export function AccountEditor({
 				defaultValue={item?.maxBalance ?? ""}
 				placeholder="No ceiling"
 			/>
-			<div className="field field-wide">
-				<span id="account-source-label">Source</span>
+			<div className="col-span-full flex flex-col gap-2">
+				<span
+					id="account-source-label"
+					className="text-sm font-semibold text-muted"
+				>
+					Source
+				</span>
 				<div aria-labelledby="account-source-label">
 					<Badge tone="outline">{item?.source ?? "Manual entry"}</Badge>
 				</div>

@@ -1,11 +1,16 @@
 import { LockKeyhole } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useId, useMemo, useState, type FormEvent } from "react";
 import { money } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { type Account, type Plan, validatePlan } from "../../domain/model.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { parseDisplayNumber } from "../editors/formValues.ts";
-import { InputField, SelectField } from "../Field.tsx";
+import { Checkbox, Input, InputField, SelectField } from "../Field.tsx";
+import { Button } from "../Button.tsx";
+import { dialogActionsStyles } from "../dialogStyles.ts";
+import { mergeStyles } from "../mergeStyles.ts";
+import { DetailList, DetailRow } from "../DetailRow.tsx";
+import { Notice } from "../Notice.tsx";
 import { cssVariables } from "../cssVariables.ts";
 import { Badge, ErrorNotice } from "../ui.tsx";
 import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
@@ -25,6 +30,7 @@ export function AccountDetails({
 	endingBalance: number;
 	onApply: (plan: Plan) => boolean;
 }) {
+	const id = useId();
 	const [name, setName] = useState(account.name);
 	const [kind, setKind] = useState<Account["kind"]>(account.kind);
 	const [enabled, setEnabled] = useState(account.enabled);
@@ -113,15 +119,20 @@ export function AccountDetails({
 	};
 
 	return (
-		<form className="account-details-form" onSubmit={submit}>
+		<form className="flex flex-col gap-4" onSubmit={submit}>
 			{readOnly && (
-				<div className="inline-notice">
-					<LockKeyhole size={18} />
+				<Notice>
+					<LockKeyhole size={18} className="mt-px" aria-hidden="true" />
 					{sourceReadOnlyReason}
-				</div>
+				</Notice>
 			)}
-			<fieldset disabled={readOnly} className="form-grid">
-				<h3 className="details-heading">Account</h3>
+			<fieldset
+				disabled={readOnly}
+				className="m-0 grid grid-cols-2 gap-5 border-0 p-0 [@media(max-width:600px)]:grid-cols-1 [@media(max-width:600px)]:gap-x-3 [@media(max-width:600px)]:gap-y-4"
+			>
+				<h3 className="col-span-full mt-3 border-t border-line pt-4 text-xs font-semibold text-ink first:mt-0 first:border-t-0 first:pt-0 [@media(max-width:600px)]:mt-2 [@media(max-width:600px)]:pt-3">
+					Account
+				</h3>
 				<InputField
 					label="Account name"
 					wide
@@ -150,15 +161,20 @@ export function AccountDetails({
 					<option value="property">Property</option>
 					<option value="debt">Debt</option>
 				</SelectField>
-				<label className="checkbox-field">
-					<input
-						type="checkbox"
+				<label
+					htmlFor={`${id}-enabled`}
+					className="flex items-center gap-2 text-xs text-muted"
+				>
+					<Checkbox
+						id={`${id}-enabled`}
 						checked={enabled}
 						onChange={(event) => setEnabled(event.target.checked)}
 					/>
 					Include in net worth and projections
 				</label>
-				<h3 className="details-heading">Balance & limits</h3>
+				<h3 className="col-span-full mt-3 border-t border-line pt-4 text-xs font-semibold text-ink first:mt-0 first:border-t-0 first:pt-0 [@media(max-width:600px)]:mt-2 [@media(max-width:600px)]:pt-3">
+					Balance & limits
+				</h3>
 				<InputField
 					label="Balance (USD)"
 					type="number"
@@ -169,46 +185,49 @@ export function AccountDetails({
 					value={balance}
 					onChange={(event) => setBalance(event.target.value)}
 				/>
-				<fieldset className="field field-wide balance-range">
-					<legend>Balance limits (USD)</legend>
+				<fieldset className="col-span-full m-0 flex min-w-0 flex-col gap-2 border-0 p-0 text-sm font-semibold text-muted [@media(max-width:600px)]:text-xs">
+					<legend className="mb-2 p-0 text-xs font-semibold text-muted">
+						Balance limits (USD)
+					</legend>
 					<div
-						className="balance-range-track"
+						className="relative h-3 overflow-visible rounded-full border border-line bg-surface-3"
 						role="img"
 						aria-label={rangeLabel}
 					>
 						<div
-							className="balance-range-fill"
+							className="absolute inset-y-0 left-(--balance-start) w-(--balance-width) rounded-full bg-primary"
 							style={cssVariables({
 								"--balance-start": `${rangeStart}%`,
 								"--balance-width": `${Math.max(0, rangeEnd - rangeStart)}%`,
 							})}
 						/>
 						<div
-							className="balance-range-thumb"
+							className="absolute top-1/2 left-(--balance-position) size-4 -translate-1/2 rounded-full border-2 border-primary bg-input-bg shadow-xs"
 							aria-hidden="true"
 							style={cssVariables({ "--balance-position": `${rangeStart}%` })}
 							title={`Protected ${money(numbers.minValue)}`}
 						/>
 						{numbers.maxValue !== null && (
 							<div
-								className="balance-range-thumb"
+								className="absolute top-1/2 left-(--balance-position) size-4 -translate-1/2 rounded-full border-2 border-primary bg-input-bg shadow-xs"
 								aria-hidden="true"
 								style={cssVariables({ "--balance-position": `${rangeEnd}%` })}
 								title={`Ceiling ${money(numbers.maxValue)}`}
 							/>
 						)}
 						<div
-							className="balance-range-marker"
+							className="absolute -inset-y-1 left-(--balance-position) w-0.5 -translate-x-px bg-ink"
 							style={cssVariables({
 								"--balance-position": `${toPercent(numbers.balanceValue)}%`,
 							})}
 							title={`Current balance ${money(numbers.balanceValue)}`}
 						/>
 					</div>
-					<div className="balance-range-inputs">
-						<label>
+					<div className="mt-3 grid grid-cols-[1fr_1fr_auto] items-end gap-3 [@media(max-width:600px)]:grid-cols-2">
+						<label htmlFor={`${id}-protected`} className="flex flex-col gap-2">
 							<span>Protected</span>
-							<input
+							<Input
+								id={`${id}-protected`}
 								type="number"
 								aria-label="Protected balance in USD"
 								min="0"
@@ -219,9 +238,10 @@ export function AccountDetails({
 								onChange={(event) => setMinBalance(event.target.value)}
 							/>
 						</label>
-						<label>
+						<label htmlFor={`${id}-ceiling`} className="flex flex-col gap-2">
 							<span>Ceiling</span>
-							<input
+							<Input
+								id={`${id}-ceiling`}
 								type="number"
 								aria-label="Maximum balance in USD"
 								min="0"
@@ -233,9 +253,12 @@ export function AccountDetails({
 								onChange={(event) => setMaxBalance(event.target.value)}
 							/>
 						</label>
-						<label className="balance-range-ceiling-toggle">
-							<input
-								type="checkbox"
+						<label
+							htmlFor={`${id}-no-ceiling`}
+							className="flex flex-row items-center gap-2 pb-3 whitespace-nowrap [@media(max-width:600px)]:col-span-full [@media(max-width:600px)]:pb-0"
+						>
+							<Checkbox
+								id={`${id}-no-ceiling`}
 								checked={noCeiling}
 								onChange={(event) => {
 									setNoCeiling(event.target.checked);
@@ -247,25 +270,24 @@ export function AccountDetails({
 						</label>
 					</div>
 				</fieldset>
-				<div className="field field-wide account-source-row">
+				<div className="col-span-full flex flex-col gap-2 text-sm font-semibold text-muted [@media(max-width:600px)]:text-xs">
 					<span id="account-source-label">Source</span>
-					<div aria-labelledby="account-source-label">
+					<div className="flex" aria-labelledby="account-source-label">
 						<Badge tone="outline">{account.source}</Badge>
 					</div>
 				</div>
 			</fieldset>
 			{error && <ErrorNotice message={error} />}
-			<dl className="detail-list">
-				<div>
-					<dt>Base case at horizon</dt>
-					<dd>{money(endingBalance)}</dd>
-				</div>
-			</dl>
+			<DetailList className="m-0">
+				<DetailRow label="Base case at horizon">
+					{money(endingBalance)}
+				</DetailRow>
+			</DetailList>
 			{!readOnly && (
-				<div className="modal-actions">
-					<button type="submit" className="button primary" disabled={!dirty}>
+				<div className={mergeStyles(dialogActionsStyles, "mt-0")}>
+					<Button type="submit" variant="primary" disabled={!dirty}>
 						Apply unsaved changes
-					</button>
+					</Button>
 				</div>
 			)}
 		</form>

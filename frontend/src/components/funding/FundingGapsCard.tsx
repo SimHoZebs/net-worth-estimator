@@ -16,9 +16,13 @@ import {
 import { fundingLabels } from "../../domain/fundingTerminology.ts";
 import type { OtherEvaluationCardProps } from "../evaluationCard.ts";
 import { SegmentedBar } from "../SegmentedBar.tsx";
-import { Badge, IconButton } from "../ui.tsx";
+import { IconButton } from "../Button.tsx";
+import { Badge } from "../ui.tsx";
 import { FundingGapsModal } from "./FundingGapsModal.tsx";
-import "./funding-gaps.css";
+import {
+	fundingCardStyles,
+	fundingCardTitleStyles,
+} from "./fundingCardStyles.ts";
 
 /** The same configured funding-gap preview and inspector on both pages. */
 export function FundingGapsCard({
@@ -42,6 +46,7 @@ export function FundingGapsCard({
 	const clear =
 		item.enabled && item.status === "satisfied" && projection !== null;
 	const StateIcon = first ? TriangleAlert : clear ? ShieldCheck : Flag;
+	const state = first ? "gap" : clear ? "clear" : "unavailable";
 	const statusTitle = !item.enabled
 		? "Paused"
 		: !projection
@@ -57,19 +62,20 @@ export function FundingGapsCard({
 				: null));
 	return (
 		<>
-			<section
-				className={`evaluation-card funding-gaps-card${first ? "" : clear ? " funding-gaps-empty" : " funding-gaps-unavailable"}${item.enabled ? "" : " is-excluded"}`}
-			>
-				<div className="funding-gaps-top">
-					<h2 className="funding-gaps-title">
+			<section className={fundingCardStyles({ state })}>
+				<div className="flex items-center justify-between gap-3">
+					<h2 className={fundingCardTitleStyles({ state })}>
 						<StateIcon size={16} aria-hidden="true" />
 						{item.name}
 					</h2>
-					<div className="table-actions">
-						{first && <Badge tone="amber">{gaps.length} projected</Badge>}
+					<div className="flex items-center justify-end gap-1">
+						{first && <Badge tone="warning">{gaps.length} projected</Badge>}
 						{pin?.onPinChange && (
 							<IconButton
 								icon={Pin}
+								size="sm"
+								iconSize={16}
+								className="aria-pressed:border-success-border aria-pressed:bg-success-bg aria-pressed:text-success-text"
 								label={
 									pin.pinned
 										? `Unpin ${item.name} from Outlook`
@@ -85,27 +91,30 @@ export function FundingGapsCard({
 				{first && summary ? (
 					<>
 						<div>
-							<p className="section-note section-note-flush">
+							<p className="m-0 text-sm leading-relaxed text-muted">
 								First gap · {dateLabel(first.date, true)}
 							</p>
-							<div className="funding-gaps-hero">
+							<div className="flex items-start justify-between gap-3">
 								<div>
-									<span className="funding-gaps-short type-value">
+									<span className="block text-3xl leading-tight font-medium tracking-tight text-danger-text tabular-nums">
 										{money(summary.shortfall)} short
 									</span>
-									<span className="funding-gaps-name">
-										Missing for <strong>{first.name}</strong>
+									<span className="mt-1.5 block text-xs leading-relaxed text-muted">
+										Missing for{" "}
+										<strong className="text-ink">{first.name}</strong>
 									</span>
 								</div>
-								<div className="funding-gaps-required">
-									<span>Required</span>
-									<strong className="type-value">
+								<div className="flex-none text-right">
+									<span className="text-xs text-muted">Required</span>
+									<strong className="mt-1 block text-base tabular-nums">
 										{money(first.requiredAmount)}
 									</strong>
 								</div>
 							</div>
 						</div>
 						<SegmentedBar
+							className="mt-0.5"
+							captionClassName="text-xs text-muted"
 							caption={`Available ${money(summary.coveredAmount)} of ${money(first.requiredAmount)} required`}
 							ariaLabel={`${Math.round(summary.coveragePercent)} percent covered; ${money(summary.shortfall)} short`}
 							segments={[
@@ -123,34 +132,44 @@ export function FundingGapsCard({
 								},
 							]}
 						/>
+						{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled grid lists. */}
 						{gaps.length > 1 && (
-							/* oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled grid lists. */
-							<ul className="funding-gaps-next" role="list">
+							<ul
+								className="m-0 grid list-none gap-2.5 border-t border-warning-border px-0 pt-3 pb-0"
+								role="list"
+							>
 								{gaps.slice(1, 3).map((gap) => (
-									<li key={gap.id}>
+									<li
+										key={gap.id}
+										className="flex items-center justify-between gap-3 text-xs"
+									>
 										<span>
 											<CalendarClock
 												size={14}
 												aria-hidden="true"
-												className="inline-icon funding-gap-date-icon"
+												className="mr-2 inline align-middle"
 											/>
-											{gap.name} <small>{dateLabel(gap.date, true)}</small>
+											{gap.name}{" "}
+											<small className="text-xs text-muted">
+												{dateLabel(gap.date, true)}
+											</small>
 										</span>
-										<strong className="type-value">
+										<strong className="text-danger-text tabular-nums">
 											−{money(summarizeFundingGap(gap).shortfall)}
 										</strong>
 									</li>
 								))}
 							</ul>
 						)}
+						{/* oxlint-enable jsx-a11y/no-redundant-roles */}
 						{gaps.length > 3 && (
-							<span className="funding-gaps-more">
+							<span className="text-xs text-muted">
 								+{gaps.length - 3} additional gaps
 							</span>
 						)}
 						<button
 							type="button"
-							className="funding-gaps-cta"
+							className="mt-auto flex items-center justify-between rounded-control border border-warning-border bg-surface px-3 py-2.5 text-xs font-semibold text-warning-text"
 							aria-label={`Inspect cash flow for ${item.name}`}
 							onClick={() => setSelectedId(first.id)}
 						>
@@ -158,9 +177,13 @@ export function FundingGapsCard({
 						</button>
 					</>
 				) : (
-					<div className="funding-gaps-status">
-						<h3>{statusTitle}</h3>
-						{statusDescription && <p>{statusDescription}</p>}
+					<div>
+						<h3 className="m-0 text-sm font-semibold">{statusTitle}</h3>
+						{statusDescription && (
+							<p className="mt-1 mb-0 text-xs text-muted">
+								{statusDescription}
+							</p>
+						)}
 					</div>
 				)}
 			</section>

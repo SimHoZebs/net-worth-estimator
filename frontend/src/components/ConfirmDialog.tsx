@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
+import { Button } from "./Button.tsx";
+import { dialogActionsStyles } from "./dialogStyles.ts";
 import { ErrorNotice, Modal } from "./ui.tsx";
-import "./ui.css";
 
 export function ConfirmDialog({
 	title,
@@ -29,18 +30,18 @@ export function ConfirmDialog({
 		<Modal title={title} eyebrow={eyebrow} onClose={onCancel}>
 			{children}
 			{error && <ErrorNotice message={error} />}
-			<div className="modal-actions">
-				<button type="button" className="button secondary" onClick={onCancel}>
+			<div className={dialogActionsStyles}>
+				<Button type="button" variant="secondary" onClick={onCancel}>
 					{cancelLabel}
-				</button>
-				<button
+				</Button>
+				<Button
 					type="button"
-					className="button danger"
+					variant="danger"
 					disabled={busy}
 					onClick={onConfirm}
 				>
 					{busy ? (busyLabel ?? confirmLabel) : confirmLabel}
-				</button>
+				</Button>
 			</div>
 		</Modal>
 	);

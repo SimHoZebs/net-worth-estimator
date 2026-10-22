@@ -38,7 +38,12 @@ import {
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
-import { Badge, ErrorNotice, IconButton, Modal } from "../ui.tsx";
+import { Badge, ErrorNotice, Modal } from "../ui.tsx";
+import { Button, IconButton } from "../Button.tsx";
+import { Notice } from "../Notice.tsx";
+import { Checkbox, InputField, SelectField } from "../Field.tsx";
+import { movementIconStyles } from "./activityStyles.ts";
+import { transactionControlStyles } from "./transactionDetailStyles.ts";
 import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
 import { AccountOptions } from "../editors/AccountOptions.tsx";
 import { buildMovementPlan } from "../editors/MovementEditor.tsx";
@@ -109,8 +114,8 @@ function MetaRow({
 	children: ReactNode;
 }) {
 	return (
-		<label className="transaction-meta-row">
-			<span className="transaction-meta-label">
+		<label className="flex items-center justify-between gap-3 rounded-control py-2 [@media(max-width:480px)]:flex-col [@media(max-width:480px)]:items-stretch [@media(max-width:480px)]:gap-0.5">
+			<span className="inline-flex flex-none items-center gap-2 text-sm text-muted">
 				<Icon size={15} aria-hidden="true" />
 				{label}
 			</span>
@@ -150,6 +155,7 @@ function MoreOptions({
 	updateDraft: (patch: Partial<MovementDraft>, field: EditField) => void;
 	locked: boolean;
 }) {
+	const id = useId();
 	const frequency = draft.frequency;
 	const onFrequency = (next: Movement["frequency"]) =>
 		updateDraft({ frequency: next }, "schedule");
@@ -157,90 +163,85 @@ function MoreOptions({
 		(item) => item.frequency !== "once" && item.id !== movement.id,
 	);
 	return (
-		<details className="transaction-more">
-			<summary>
+		<details className="group mt-4">
+			<summary className="inline-flex w-fit cursor-pointer list-none items-center gap-1 rounded-control text-xs text-muted hover:text-ink hover:underline hover:underline-offset-4 [&::-webkit-details-marker]:hidden">
 				<ChevronDown
 					size={13}
 					aria-hidden="true"
-					className="transaction-more-chevron"
+					className="transition-transform duration-150 ease-out group-open:rotate-90"
 				/>
 				More options
 			</summary>
-			<div className="transaction-more-body">
-				<label className="field">
-					<span>Frequency</span>
-					<select
-						name="frequency"
-						disabled={locked}
-						value={frequency}
-						onChange={(event) => {
-							const next = parseUnion(event.target.value, [
-								"monthly",
-								"yearly",
-								"once",
-							] as const);
-							if (next) onFrequency(next);
-						}}
-					>
-						<FrequencyOptions />
-					</select>
-				</label>
-				<label className="field">
-					<span>Annual amount increase (%)</span>
-					<input
-						name="annualIncrease"
-						type="number"
-						required
-						disabled={locked}
-						min="-50"
-						max="50"
-						step="0.1"
-						value={draft.annualIncrease}
-						onChange={(event) =>
-							updateDraft({ annualIncrease: event.target.value }, "schedule")
-						}
-					/>
-				</label>
+			<div className="mt-3 flex flex-col gap-3 rounded-surface border border-line bg-surface-2 p-4">
+				<SelectField
+					label="Frequency"
+					name="frequency"
+					disabled={locked}
+					value={frequency}
+					onChange={(event) => {
+						const next = parseUnion(event.target.value, [
+							"monthly",
+							"yearly",
+							"once",
+						] as const);
+						if (next) onFrequency(next);
+					}}
+				>
+					<FrequencyOptions />
+				</SelectField>
+				<InputField
+					label="Annual amount increase (%)"
+					name="annualIncrease"
+					type="number"
+					required
+					disabled={locked}
+					min="-50"
+					max="50"
+					step="0.1"
+					value={draft.annualIncrease}
+					onChange={(event) =>
+						updateDraft({ annualIncrease: event.target.value }, "schedule")
+					}
+				/>
 				{frequency === "once" && (
 					<>
-						<label className="field">
-							<span>Records an occurrence of</span>
-							<select
-								name="claimRuleId"
-								disabled={locked}
-								value={draft.claimRuleId}
-								onChange={(event) =>
-									updateDraft({ claimRuleId: event.target.value }, "schedule")
-								}
-							>
-								<option value="">No link — standalone record</option>
-								{claimRules.map((rule) => (
-									<option key={rule.id} value={rule.id}>
-										{rule.name}
-									</option>
-								))}
-							</select>
-						</label>
-						<label className="field">
-							<span>Replaces occurrence on</span>
-							<input
-								type="date"
-								name="claimOccurrenceDate"
-								disabled={locked}
-								value={draft.claimOccurrenceDate}
-								onChange={(event) =>
-									updateDraft(
-										{ claimOccurrenceDate: event.target.value },
-										"schedule",
-									)
-								}
-							/>
-						</label>
+						<SelectField
+							label="Records an occurrence of"
+							name="claimRuleId"
+							disabled={locked}
+							value={draft.claimRuleId}
+							onChange={(event) =>
+								updateDraft({ claimRuleId: event.target.value }, "schedule")
+							}
+						>
+							<option value="">No link — standalone record</option>
+							{claimRules.map((rule) => (
+								<option key={rule.id} value={rule.id}>
+									{rule.name}
+								</option>
+							))}
+						</SelectField>
+						<InputField
+							label="Replaces occurrence on"
+							type="date"
+							name="claimOccurrenceDate"
+							disabled={locked}
+							value={draft.claimOccurrenceDate}
+							onChange={(event) =>
+								updateDraft(
+									{ claimOccurrenceDate: event.target.value },
+									"schedule",
+								)
+							}
+						/>
 					</>
 				)}
-				<label className="transaction-more-check">
-					<input
-						type="checkbox"
+				<label
+					htmlFor={`${id}-enabled`}
+					className="flex items-center gap-2 text-xs text-muted"
+				>
+					<Checkbox
+						id={`${id}-enabled`}
 						name="enabled"
 						disabled={locked}
 						checked={draft.enabled}
@@ -286,15 +287,20 @@ function ScheduleCapsule({
 	/** DOM id for the first schedule control. */
 	scheduleControlId?: string;
 }) {
+	const id = useId();
 	const frequency = draft.frequency;
 	if (frequency === "once") {
 		if (!draft.claimRuleId) return null;
 		return (
-			<p className="transaction-schedule">
+			<p className="mt-4 flex items-center gap-2 text-xs leading-[1.6] text-muted">
 				<Link2 size={15} aria-hidden="true" />
 				<span>
 					Replaces{" "}
 					<select
+						className={transactionControlStyles({
+							element: "select",
+							shape: "compact",
+						})}
 						aria-label="Records an occurrence of"
 						name="claimRuleId"
 						disabled={locked}
@@ -312,6 +318,7 @@ function ScheduleCapsule({
 					</select>{" "}
 					on{" "}
 					<input
+						className={transactionControlStyles({ shape: "compact" })}
 						aria-label="Replaces occurrence on"
 						type="date"
 						name="claimOccurrenceDate"
@@ -334,19 +341,22 @@ function ScheduleCapsule({
 			? null
 			: ` · ${annualIncrease > 0 ? "+" : ""}${annualIncrease}% yearly`;
 	return (
-		<div className="transaction-inset">
-			<div className="transaction-inset-head">
+		<div className="mt-5 rounded-surface bg-surface-2 p-4">
+			<div className="flex items-center gap-3 text-muted">
 				<Repeat size={16} aria-hidden="true" />
-				<div>
-					<strong>Recurring transaction</strong>
-					<span>
+				<div className="flex min-w-0 flex-col gap-0.5">
+					<strong className="text-sm font-semibold text-ink">
+						Recurring transaction
+					</strong>
+					<span className="text-xs text-muted">
 						{frequencyLabel(frequency)}
 						{growth}
 					</span>
 				</div>
 			</div>
-			<div className="transaction-schedule-dates">
+			<div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
 				<input
+					className={transactionControlStyles()}
 					id={scheduleControlId}
 					aria-label="First occurrence"
 					type="date"
@@ -363,6 +373,7 @@ function ScheduleCapsule({
 					"ongoing"
 				) : (
 					<input
+						className={transactionControlStyles()}
 						aria-label="Last occurrence"
 						type="date"
 						name="endDate"
@@ -375,9 +386,12 @@ function ScheduleCapsule({
 					/>
 				)}{" "}
 				{editing && (
-					<label className="transaction-inline-check">
-						<input
-							type="checkbox"
+					<label
+						htmlFor={`${id}-no-end-date`}
+						className="inline-flex items-center gap-1 whitespace-nowrap"
+					>
+						<Checkbox
+							id={`${id}-no-end-date`}
 							name="noEndDate"
 							disabled={locked}
 							checked={draft.noEndDate}
@@ -396,19 +410,19 @@ function ScheduleCapsule({
 function ReadOnlyNotice({ movement }: { movement: Movement }) {
 	if (movement.amountKnown === false) {
 		return (
-			<div className="inline-notice">
-				<LockKeyhole size={18} />
+			<Notice className="my-4">
+				<LockKeyhole size={18} className="mt-px" aria-hidden="true" />
 				This amount is calculated each time. See the transaction list for the
 				resolved amounts.
-			</div>
+			</Notice>
 		);
 	}
 	if (movement.readOnly) {
 		return (
-			<div className="inline-notice">
-				<LockKeyhole size={18} />
+			<Notice className="my-4">
+				<LockKeyhole size={18} className="mt-px" aria-hidden="true" />
 				{sourceReadOnlyReason}
-			</div>
+			</Notice>
 		);
 	}
 	return null;
@@ -619,17 +633,17 @@ function MarkAsSubscriptionAction({
 		else setError("That change could not be applied to the plan.");
 	};
 	return (
-		<div className="inline-notice">
-			<Repeat size={18} aria-hidden="true" />
+		<Notice className="my-4">
+			<Repeat size={18} className="mt-px" aria-hidden="true" />
 			<span>
 				Pay this every month? Marking it as a subscription creates a monthly
 				rule and links this transaction to its first occurrence.
 			</span>
-			<button type="button" className="button small" onClick={mark}>
+			<Button type="button" variant="ghost" size="sm" onClick={mark}>
 				Mark as subscription
-			</button>
+			</Button>
 			{error && <ErrorNotice message={error} />}
-		</div>
+		</Notice>
 	);
 }
 
@@ -641,15 +655,19 @@ function DiscardConfirm({
 	onDiscard: () => void;
 }) {
 	return (
-		<div className="confirm-inline" role="alert">
-			<p>Discard the changes in this form?</p>
-			<button type="button" className="button secondary" onClick={onContinue}>
-				Continue
-			</button>
-			<button type="button" className="button danger" onClick={onDiscard}>
-				Discard changes
-			</button>
-		</div>
+		<Notice tone="danger" className="mt-6 block" role="alert">
+			<p className="mb-3 text-sm text-danger-text">
+				Discard the changes in this form?
+			</p>
+			<div className="flex flex-wrap gap-2">
+				<Button type="button" variant="secondary" onClick={onContinue}>
+					Continue
+				</Button>
+				<Button type="button" variant="danger" onClick={onDiscard}>
+					Discard changes
+				</Button>
+			</div>
+		</Notice>
 	);
 }
 
@@ -704,13 +722,23 @@ export function TransactionDetail({
 	const editHeading = (
 		<>
 			<span className="sr-only">{edit.draft.name}</span>
-			<span className="transaction-detail-heading">
+			<span className="flex items-center gap-3">
 				<span
-					className={`movement-icon square ${kind === "transfer" ? "transfer" : kind === "in" ? "inflow" : "outflow"}`}
+					className={movementIconStyles({
+						tone:
+							kind === "transfer"
+								? "transfer"
+								: kind === "in"
+									? "inflow"
+									: "outflow",
+						size: "hero",
+					})}
 				>
 					<DirectionIcon kind={kind} size={22} />
 				</span>
-				<span className="transaction-detail-eyebrow">Transaction details</span>
+				<span className="text-xs font-semibold tracking-[0.08em] text-muted uppercase">
+					Transaction details
+				</span>
 			</span>
 		</>
 	);
@@ -719,13 +747,13 @@ export function TransactionDetail({
 			<Modal
 				title={editHeading}
 				titleSize="plain"
-				className="transaction-detail-modal"
+				headerClassName="border-b-0 pb-2 [@media(max-width:600px)]:pb-5"
 				actions={edit.actions}
 				onClose={edit.close}
 				focusPanelOnOpen
 			>
 				<form id={edit.formId} onSubmit={edit.submit}>
-					<div className="transaction-name-row">
+					<div className="mt-4 flex items-center gap-3">
 						<input
 							id={`${edit.formId}-name`}
 							aria-label="Transaction name"
@@ -738,25 +766,28 @@ export function TransactionDetail({
 							}
 							readOnly={!canEdit}
 							form={edit.formId}
-							className="transaction-name-input"
+							className={transactionControlStyles({ shape: "name" })}
 						/>
 						{movement.frequency !== "once" && (
 							<span
 								title="Recurring transaction"
 								aria-label="Recurring transaction"
 								role="img"
-								className="transaction-repeat-badge"
+								className="inline-flex size-9 flex-none items-center justify-center rounded-surface bg-surface-2 text-muted"
 							>
 								<Repeat size={16} aria-hidden="true" />
 							</span>
 						)}
 					</div>
-					<div className="transaction-detail-hero">
-						<div>
+					<div className="flex items-center gap-4 pt-1 pb-2">
+						<div className="flex min-w-0 max-w-[calc(100%_-_60px)] flex-auto flex-col gap-1">
 							<span
-								className={`transaction-amount-edit${transaction.direction === "in" ? " positive" : ""}`}
+								className={`type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-[-1px] whitespace-nowrap${transaction.direction === "in" ? " text-success-text" : ""}`}
 							>
-								<span aria-hidden="true">
+								<span
+									className="flex-none whitespace-nowrap"
+									aria-hidden="true"
+								>
 									{transaction.amount === 0
 										? "$"
 										: `${transaction.direction === "in" ? "+" : "−"}$`}
@@ -775,41 +806,49 @@ export function TransactionDetail({
 										edit.updateDraft({ amount: event.target.value }, "amount")
 									}
 									readOnly={!canEdit}
-									className={`transaction-amount-input${transaction.direction === "in" ? " positive" : ""}`}
+									className={transactionControlStyles({
+										shape: "amount",
+										positive: transaction.direction === "in",
+									})}
 								/>
 							</span>
 						</div>
 					</div>
-					<div className="transaction-status">
+					<div className="mt-3 flex flex-wrap items-center gap-2">
 						{transaction.pending ? (
-							<Badge tone="amber">
+							<Badge tone="warning">
 								<Clock3 size={10} aria-hidden="true" />
 								Pending
 							</Badge>
 						) : transaction.source === "historical" ? (
-							<Badge tone="green">
+							<Badge tone="success">
 								<Check size={10} aria-hidden="true" />
 								Posted
 							</Badge>
 						) : null}
-						{showExcluded && <Badge tone="amber">Excluded from plan</Badge>}
+						{showExcluded && <Badge tone="warning">Excluded from plan</Badge>}
 						{showShortfall && (
-							<Badge tone="amber">
+							<Badge tone="warning">
 								<TriangleAlert size={10} aria-hidden="true" />
 								{shortfallLabel ?? "Shortfall"}
 							</Badge>
 						)}
 						{!movement.enabled && !transaction.pending && !showExcluded && (
-							<Badge tone="amber">Excluded</Badge>
+							<Badge tone="warning">Excluded</Badge>
 						)}
-						{hasStatusPill && <span aria-hidden="true">·</span>}
-						<span className="transaction-category">{categoryLabel(kind)}</span>
+						{hasStatusPill && (
+							<span className="text-muted" aria-hidden="true">
+								·
+							</span>
+						)}
+						<span className="text-sm text-muted">{categoryLabel(kind)}</span>
 					</div>
 					{(once || transaction.pending || postedDiffers) && (
-						<div className="transaction-meta">
+						<div className="mt-5 border-t border-line pt-2">
 							{once && (
 								<MetaRow icon={CalendarDays} label="Transaction date">
 									<input
+										className={transactionControlStyles({ shape: "date" })}
 										id={`${edit.formId}-date`}
 										type="date"
 										name="startDate"
@@ -828,9 +867,10 @@ export function TransactionDetail({
 							{(transaction.pending || postedDiffers) && (
 								<MetaRow icon={CalendarCheck2} label="Date posted">
 									{transaction.pending ? (
-										<span className="transaction-muted">Not yet posted</span>
+										<span className="text-sm text-muted">Not yet posted</span>
 									) : (
 										<input
+											className={transactionControlStyles({ shape: "date" })}
 											id={`${edit.formId}-posted`}
 											type="date"
 											name="postedDate"
@@ -850,19 +890,24 @@ export function TransactionDetail({
 						</div>
 					)}
 					{kind === "transfer" && (
-						<div className="transaction-transfer">
-							<h3>Transfer details</h3>
-							<div className="transaction-transfer-box">
-								<div className="transaction-transfer-row">
+						<div className="mt-5">
+							<h3 className="mb-3 text-sm font-semibold">Transfer details</h3>
+							<div className="rounded-surface bg-surface-2 p-4">
+								<div className="flex items-center gap-3">
 									{fromAccount ? (
 										<AccountIcon account={fromAccount} />
 									) : (
-										<span className="transaction-transfer-icon">
+										<span className="inline-flex size-8 flex-none items-center justify-center rounded-surface border border-line bg-surface text-muted">
 											<Banknote size={15} aria-hidden="true" />
 										</span>
 									)}
-									<div>
-										<span aria-hidden="true">FROM ACCOUNT</span>
+									<div className="flex min-w-0 flex-auto flex-col gap-0.5">
+										<span
+											className="text-xs font-semibold tracking-[0.06em] text-muted"
+											aria-hidden="true"
+										>
+											FROM ACCOUNT
+										</span>
 										<select
 											id={`${edit.formId}-from`}
 											aria-label="From"
@@ -872,29 +917,40 @@ export function TransactionDetail({
 												edit.updateDraft({ fromId: event.target.value }, "from")
 											}
 											disabled={!canEdit}
-											className={
-												edit.activeField === "from" ? "editing" : undefined
-											}
+											className={transactionControlStyles({
+												element: "select",
+												shape: "account",
+												appearance:
+													edit.activeField === "from" ? "native" : "plain",
+											})}
 										>
 											<option value="">External income</option>
 											<AccountOptions accounts={fromAccountOptions(plan)} />
 										</select>
 									</div>
 								</div>
-								<div className="transaction-transfer-mid" aria-hidden="true">
+								<div
+									className="my-2 ml-3 flex items-center gap-3 text-muted"
+									aria-hidden="true"
+								>
 									<ArrowDown size={16} />
-									<span />
+									<span className="h-px flex-auto bg-line" />
 								</div>
-								<div className="transaction-transfer-row">
+								<div className="flex items-center gap-3">
 									{toAccount ? (
 										<AccountIcon account={toAccount} />
 									) : (
-										<span className="transaction-transfer-icon">
+										<span className="inline-flex size-8 flex-none items-center justify-center rounded-surface border border-line bg-surface text-muted">
 											<Banknote size={15} aria-hidden="true" />
 										</span>
 									)}
-									<div>
-										<span aria-hidden="true">TO ACCOUNT</span>
+									<div className="flex min-w-0 flex-auto flex-col gap-0.5">
+										<span
+											className="text-xs font-semibold tracking-[0.06em] text-muted"
+											aria-hidden="true"
+										>
+											TO ACCOUNT
+										</span>
 										<select
 											id={`${edit.formId}-to`}
 											aria-label="To"
@@ -904,9 +960,12 @@ export function TransactionDetail({
 												edit.updateDraft({ toId: event.target.value }, "to")
 											}
 											disabled={!canEdit}
-											className={
-												edit.activeField === "to" ? "editing" : undefined
-											}
+											className={transactionControlStyles({
+												element: "select",
+												shape: "account",
+												appearance:
+													edit.activeField === "to" ? "native" : "plain",
+											})}
 										>
 											<option value="">External spending</option>
 											<AccountOptions
@@ -989,13 +1048,23 @@ export function MovementDetail({
 	const editHeading = (
 		<>
 			<span className="sr-only">{edit.draft.name}</span>
-			<span className="transaction-detail-heading">
+			<span className="flex items-center gap-3">
 				<span
-					className={`movement-icon square ${kind === "transfer" ? "transfer" : kind === "in" ? "inflow" : "outflow"}`}
+					className={movementIconStyles({
+						tone:
+							kind === "transfer"
+								? "transfer"
+								: kind === "in"
+									? "inflow"
+									: "outflow",
+						size: "hero",
+					})}
 				>
 					<DirectionIcon kind={kind} size={22} />
 				</span>
-				<span className="transaction-detail-eyebrow">Transaction details</span>
+				<span className="text-xs font-semibold tracking-[0.08em] text-muted uppercase">
+					Transaction details
+				</span>
 			</span>
 		</>
 	);
@@ -1004,13 +1073,13 @@ export function MovementDetail({
 			<Modal
 				title={editHeading}
 				titleSize="plain"
-				className="transaction-detail-modal"
+				headerClassName="border-b-0 pb-2 [@media(max-width:600px)]:pb-5"
 				actions={edit.actions}
 				onClose={edit.close}
 				focusPanelOnOpen
 			>
 				<form id={edit.formId} onSubmit={edit.submit}>
-					<div className="transaction-name-row">
+					<div className="mt-4 flex items-center gap-3">
 						<input
 							id={`${edit.formId}-name`}
 							aria-label="Transaction name"
@@ -1023,23 +1092,28 @@ export function MovementDetail({
 							}
 							readOnly={!canEdit}
 							form={edit.formId}
-							className="transaction-name-input"
+							className={transactionControlStyles({ shape: "name" })}
 						/>
 						{movement.frequency !== "once" && (
 							<span
 								title="Recurring transaction"
 								aria-label="Recurring transaction"
 								role="img"
-								className="transaction-repeat-badge"
+								className="inline-flex size-9 flex-none items-center justify-center rounded-surface bg-surface-2 text-muted"
 							>
 								<Repeat size={16} aria-hidden="true" />
 							</span>
 						)}
 					</div>
-					<div className="transaction-detail-hero">
-						<div>
-							<span className="transaction-amount-edit">
-								<span aria-hidden="true">$</span>
+					<div className="flex items-center gap-4 pt-1 pb-2">
+						<div className="flex min-w-0 max-w-[calc(100%_-_60px)] flex-auto flex-col gap-1">
+							<span className="type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-[-1px] whitespace-nowrap">
+								<span
+									className="flex-none whitespace-nowrap"
+									aria-hidden="true"
+								>
+									$
+								</span>
 								<input
 									id={`${edit.formId}-amount`}
 									aria-label="Amount (USD)"
@@ -1054,10 +1128,10 @@ export function MovementDetail({
 										edit.updateDraft({ amount: event.target.value }, "amount")
 									}
 									readOnly={!canEdit}
-									className="transaction-amount-input"
+									className={transactionControlStyles({ shape: "amount" })}
 								/>
 							</span>
-							<span>
+							<span className="text-xs text-muted">
 								{movement.amountKnown
 									? "Per occurrence"
 									: resolvedAmount !== undefined && resolvedDate
@@ -1066,10 +1140,11 @@ export function MovementDetail({
 							</span>
 						</div>
 						{(once || postedDiffers) && (
-							<div className="transaction-meta">
+							<div className="mt-5 flex min-w-0 max-w-[calc(100%_-_60px)] flex-auto flex-col gap-1 border-t border-line pt-2">
 								{once && (
 									<MetaRow icon={CalendarDays} label="Transaction date">
 										<input
+											className={transactionControlStyles({ shape: "date" })}
 											id={`${edit.formId}-date`}
 											type="date"
 											name="startDate"
@@ -1088,6 +1163,7 @@ export function MovementDetail({
 								{postedDiffers && (
 									<MetaRow icon={CalendarCheck2} label="Date posted">
 										<input
+											className={transactionControlStyles({ shape: "date" })}
 											id={`${edit.formId}-posted`}
 											type="date"
 											name="postedDate"
@@ -1106,31 +1182,40 @@ export function MovementDetail({
 							</div>
 						)}
 					</div>
-					<div className="transaction-status">
+					<div className="mt-3 flex flex-wrap items-center gap-2">
 						{movement.readOnly && <Badge tone="neutral">Synced</Badge>}
 						{movement.amountKnown === false && (
 							<Badge tone="neutral">Varies</Badge>
 						)}
-						{!movement.enabled && <Badge tone="amber">Excluded</Badge>}
+						{!movement.enabled && <Badge tone="warning">Excluded</Badge>}
 						{(movement.readOnly ||
 							movement.amountKnown === false ||
-							!movement.enabled) && <span aria-hidden="true">·</span>}
-						<span className="transaction-category">{categoryLabel(kind)}</span>
+							!movement.enabled) && (
+							<span className="text-muted" aria-hidden="true">
+								·
+							</span>
+						)}
+						<span className="text-sm text-muted">{categoryLabel(kind)}</span>
 					</div>
 					{kind === "transfer" && (
-						<div className="transaction-transfer">
-							<h3>Transfer details</h3>
-							<div className="transaction-transfer-box">
-								<div className="transaction-transfer-row">
+						<div className="mt-5">
+							<h3 className="mb-3 text-sm font-semibold">Transfer details</h3>
+							<div className="rounded-surface bg-surface-2 p-4">
+								<div className="flex items-center gap-3">
 									{fromAccount ? (
 										<AccountIcon account={fromAccount} />
 									) : (
-										<span className="transaction-transfer-icon">
+										<span className="inline-flex size-8 flex-none items-center justify-center rounded-surface border border-line bg-surface text-muted">
 											<Banknote size={15} aria-hidden="true" />
 										</span>
 									)}
-									<div>
-										<span aria-hidden="true">FROM ACCOUNT</span>
+									<div className="flex min-w-0 flex-auto flex-col gap-0.5">
+										<span
+											className="text-xs font-semibold tracking-[0.06em] text-muted"
+											aria-hidden="true"
+										>
+											FROM ACCOUNT
+										</span>
 										<select
 											id={`${edit.formId}-from`}
 											aria-label="From"
@@ -1140,29 +1225,40 @@ export function MovementDetail({
 												edit.updateDraft({ fromId: event.target.value }, "from")
 											}
 											disabled={!canEdit}
-											className={
-												edit.activeField === "from" ? "editing" : undefined
-											}
+											className={transactionControlStyles({
+												element: "select",
+												shape: "account",
+												appearance:
+													edit.activeField === "from" ? "native" : "plain",
+											})}
 										>
 											<option value="">External income</option>
 											<AccountOptions accounts={fromAccountOptions(plan)} />
 										</select>
 									</div>
 								</div>
-								<div className="transaction-transfer-mid" aria-hidden="true">
+								<div
+									className="my-2 ml-3 flex items-center gap-3 text-muted"
+									aria-hidden="true"
+								>
 									<ArrowDown size={16} />
-									<span />
+									<span className="h-px flex-auto bg-line" />
 								</div>
-								<div className="transaction-transfer-row">
+								<div className="flex items-center gap-3">
 									{toAccount ? (
 										<AccountIcon account={toAccount} />
 									) : (
-										<span className="transaction-transfer-icon">
+										<span className="inline-flex size-8 flex-none items-center justify-center rounded-surface border border-line bg-surface text-muted">
 											<Banknote size={15} aria-hidden="true" />
 										</span>
 									)}
-									<div>
-										<span aria-hidden="true">TO ACCOUNT</span>
+									<div className="flex min-w-0 flex-auto flex-col gap-0.5">
+										<span
+											className="text-xs font-semibold tracking-[0.06em] text-muted"
+											aria-hidden="true"
+										>
+											TO ACCOUNT
+										</span>
 										<select
 											id={`${edit.formId}-to`}
 											aria-label="To"
@@ -1172,9 +1268,12 @@ export function MovementDetail({
 												edit.updateDraft({ toId: event.target.value }, "to")
 											}
 											disabled={!canEdit}
-											className={
-												edit.activeField === "to" ? "editing" : undefined
-											}
+											className={transactionControlStyles({
+												element: "select",
+												shape: "account",
+												appearance:
+													edit.activeField === "to" ? "native" : "plain",
+											})}
 										>
 											<option value="">External spending</option>
 											<AccountOptions

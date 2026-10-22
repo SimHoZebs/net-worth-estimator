@@ -3,7 +3,6 @@ import { fundingGapChartModel } from "../../domain/chart.ts";
 import { compactMoney, dateLabel, money } from "../../domain/format.ts";
 import type { FundingGap } from "../../domain/fundingGaps.ts";
 import { useMediaQuery } from "../../state/useMediaQuery.ts";
-import "../chart/plot-colors.css";
 
 /**
  * Projected account balance leading to a funding gap, plus the refused
@@ -47,12 +46,15 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 			: [at(0), at(1)];
 	}, [model, gap.windowStartDate, gap.date, summary.rows]);
 	return (
-		<div className="funding-chart-wrap">
-			<div className="funding-chart-head">
-				<h3>Account balance over time</h3>
-				<span>Through {money(summary.available)} available</span>
+		<div className="mt-3.5">
+			<div className="mb-2 flex items-center justify-between gap-2">
+				<h3 className="text-sm">Account balance over time</h3>
+				<span className="text-xs whitespace-nowrap text-muted">
+					Through {money(summary.available)} available
+				</span>
 			</div>
 			<svg
+				className="block h-auto w-full"
 				viewBox={`0 0 ${model.width} ${model.height}`}
 				role="img"
 				aria-labelledby={`${id}-title ${id}-description`}
@@ -66,8 +68,16 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 				</desc>
 				<defs>
 					<linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
-						<stop offset="0%" className="plot-band-stop" stopOpacity=".55" />
-						<stop offset="100%" className="plot-band-stop" stopOpacity=".1" />
+						<stop
+							offset="0%"
+							className="[stop-color:var(--chart-band)]"
+							stopOpacity=".55"
+						/>
+						<stop
+							offset="100%"
+							className="[stop-color:var(--chart-band)]"
+							stopOpacity=".1"
+						/>
 					</linearGradient>
 				</defs>
 				{model.grid.map((value) => (
@@ -77,14 +87,14 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 							x2={model.width - model.right}
 							y1={model.y(value)}
 							y2={model.y(value)}
-							className="plot-grid"
+							className="stroke-line"
 							strokeDasharray="3 5"
 						/>
 						<text
 							x={model.left - 14}
 							y={model.y(value) + 4}
 							textAnchor="end"
-							className="axis-label"
+							className="fill-muted text-xs [@media(max-width:600px)]:text-sm"
 						>
 							{compactMoney(value)}
 						</text>
@@ -94,7 +104,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 				<path
 					d={model.balancePath}
 					fill="none"
-					className="plot-line"
+					className="stroke-primary"
 					strokeWidth="3"
 					strokeLinejoin="round"
 					strokeLinecap="round"
@@ -105,7 +115,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 						x2={model.width - model.right}
 						y1={model.baseline}
 						y2={model.baseline}
-						className="plot-reference"
+						className="stroke-muted"
 						strokeWidth="1.5"
 						strokeDasharray="6 6"
 					/>
@@ -113,7 +123,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 						x={model.width - model.right - 6}
 						y={model.baseline - 6}
 						textAnchor="end"
-						className="axis-label"
+						className="fill-muted text-xs [@media(max-width:600px)]:text-sm"
 					>
 						$0 threshold
 					</text>
@@ -123,7 +133,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 					x2={model.failX}
 					y1={model.top}
 					y2={model.height - model.bottom}
-					className="plot-danger"
+					className="stroke-danger-solid"
 					strokeWidth="1"
 					strokeDasharray="5 5"
 					opacity=".6"
@@ -131,7 +141,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 				<path
 					d={model.refusalPath}
 					fill="none"
-					className="plot-danger"
+					className="stroke-danger-solid"
 					strokeWidth="4"
 					strokeLinecap="round"
 				/>
@@ -139,24 +149,21 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 					cx={model.endX}
 					cy={model.endY}
 					r="5"
-					className="plot-endpoint"
+					className="fill-primary stroke-surface"
 					strokeWidth="3"
 				/>
 				<circle
 					cx={model.failX}
 					cy={model.failY}
 					r="6"
-					className="plot-danger-endpoint"
+					className="fill-danger-solid stroke-surface"
 					strokeWidth="3"
 				/>
 				<text
 					x={model.failX - 6}
 					y={Math.max(20, model.failY - 12)}
-					fill="var(--danger-text)"
-					fontSize="12"
-					fontWeight="700"
+					className="fill-danger-text stroke-surface text-xs font-bold"
 					textAnchor="end"
-					stroke="var(--surface)"
 					strokeWidth="3"
 					paintOrder="stroke"
 				>
@@ -168,7 +175,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 						x={tick.x}
 						y={model.height - 9}
 						textAnchor={tick.anchor}
-						className="axis-label"
+						className="fill-muted text-xs [@media(max-width:600px)]:text-sm"
 					>
 						{tick.label}
 					</text>

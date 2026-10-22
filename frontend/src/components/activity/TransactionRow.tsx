@@ -10,6 +10,10 @@ import { dateLabel, exactMoney } from "../../domain/format.ts";
 import type { Movement } from "../../domain/model.ts";
 import { Badge } from "../ui.tsx";
 import { TransactionItemRow } from "./TransactionItem.tsx";
+import {
+	transactionAmountStyles,
+	transactionBadgeStyles,
+} from "./activityStyles.ts";
 
 export function TransactionRow({
 	transaction,
@@ -60,39 +64,49 @@ export function TransactionRow({
 					</span>
 				),
 				mobile: (
-					<time className="transaction-mobile-date" dateTime={transaction.date}>
+					<time dateTime={transaction.date}>
 						{dateLabel(transaction.date, true)}
 					</time>
 				),
 				badges: (transaction.pending ||
 					transaction.excluded ||
 					transaction.shortfall > 0.01) && (
-					<span className="transaction-badges">
+					<>
 						{transaction.pending ? (
-							<Badge tone="neutral">Pending</Badge>
+							<Badge tone="neutral" className={transactionBadgeStyles()}>
+								Pending
+							</Badge>
 						) : (
 							transaction.excluded && (
-								<Badge tone="amber">Excluded from plan</Badge>
+								<Badge tone="warning" className={transactionBadgeStyles()}>
+									Excluded from plan
+								</Badge>
 							)
 						)}
 						{transaction.shortfall > 0.01 && (
-							<Badge tone="amber">
+							<Badge tone="warning" className={transactionBadgeStyles()}>
 								<TriangleAlert size={10} />
 								{shortfallLabel ?? "Shortfall"}
 							</Badge>
 						)}
-					</span>
+					</>
 				),
 			}}
 			amount={
 				<>
-					<strong className={transaction.direction === "in" ? "positive" : ""}>
+					<strong
+						className={transactionAmountStyles({
+							positive: transaction.direction === "in",
+						})}
+					>
 						{transaction.amount === 0
 							? exactMoney(0)
 							: `${transaction.direction === "in" ? "+" : "−"}${exactMoney(transaction.amount)}`}
 					</strong>
 					{transaction.shortfall > 0.01 && (
-						<small>{exactMoney(transaction.requested)} planned</small>
+						<small className="m-0 block text-xs text-warning-text">
+							{exactMoney(transaction.requested)} planned
+						</small>
 					)}
 				</>
 			}

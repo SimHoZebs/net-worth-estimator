@@ -2,6 +2,9 @@ import { ArrowRight, LockKeyhole } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { type Plan, validatePlan } from "../../domain/model.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
+import { Button } from "../Button.tsx";
+import { dialogActionsStyles } from "../dialogStyles.ts";
+import { Notice } from "../Notice.tsx";
 import { ErrorNotice, Modal } from "../ui.tsx";
 
 export interface EditorProps {
@@ -30,10 +33,10 @@ export function EditorForm({
 	return (
 		<Modal title={title} onClose={close}>
 			{readOnlyReason && (
-				<div className="inline-notice">
-					<LockKeyhole size={18} />
+				<Notice>
+					<LockKeyhole size={18} aria-hidden="true" className="mt-px" />
 					{readOnlyReason}
-				</div>
+				</Notice>
 			)}
 			<form
 				onSubmit={(event) => {
@@ -50,36 +53,46 @@ export function EditorForm({
 				}}
 				onChange={() => setDirty(true)}
 			>
-				<fieldset disabled={Boolean(readOnlyReason)} className="form-grid">
+				<fieldset
+					disabled={Boolean(readOnlyReason)}
+					className="grid grid-cols-2 gap-5 max-[600px]:gap-x-3 max-[600px]:gap-y-4 max-[370px]:grid-cols-1"
+				>
 					{children}
 				</fieldset>
 				{error && <ErrorNotice message={error} />}
 				{confirmCancel ? (
-					<div className="confirm-inline" role="alert">
-						<p>Discard the changes in this form?</p>
-						<button
-							type="button"
-							className="button secondary"
-							onClick={() => setConfirmCancel(false)}
-						>
-							Continue
-						</button>
-						<button type="button" className="button danger" onClick={onClose}>
-							Discard changes
-						</button>
+					<div
+						className="mt-6 rounded-lg border border-solid border-danger-border bg-danger-bg p-4"
+						role="alert"
+					>
+						<p className="mb-3 text-sm text-danger-text">
+							Discard the changes in this form?
+						</p>
+						<div className="flex flex-wrap gap-2">
+							<Button
+								type="button"
+								variant="secondary"
+								onClick={() => setConfirmCancel(false)}
+							>
+								Continue
+							</Button>
+							<Button type="button" variant="danger" onClick={onClose}>
+								Discard changes
+							</Button>
+						</div>
 					</div>
 				) : (
-					<div className="modal-actions">
-						<button type="button" className="button secondary" onClick={close}>
+					<div className={dialogActionsStyles}>
+						<Button type="button" variant="secondary" onClick={close}>
 							Cancel
-						</button>
-						<button
+						</Button>
+						<Button
 							type="submit"
-							className="button primary"
+							variant="primary"
 							disabled={Boolean(readOnlyReason)}
 						>
-							Apply unsaved changes <ArrowRight size={16} />
-						</button>
+							Apply unsaved changes <ArrowRight size={16} aria-hidden="true" />
+						</Button>
 					</div>
 				)}
 			</form>

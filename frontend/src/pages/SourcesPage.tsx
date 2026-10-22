@@ -3,7 +3,6 @@ import { AmountCatalog } from "../components/editors/AmountCatalog.tsx";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
 import { SourceBanner } from "./sources/SourceHealth.tsx";
-import "./sources/sources.css";
 
 export function SourcesPage() {
 	// Everything subscribes here, including the access control.

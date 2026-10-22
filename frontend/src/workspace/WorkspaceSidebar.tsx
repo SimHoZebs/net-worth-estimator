@@ -5,6 +5,7 @@ import { IconButton, Skeleton } from "../components/ui.tsx";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { LastSync } from "./LastSync.tsx";
 import { type Page, pages } from "./navigation.ts";
+import { navigationLinkClassName } from "./navigationStyles.ts";
 import { workspaceStatusLabel } from "./WorkspaceNotices.tsx";
 
 export function WorkspaceSidebar({
@@ -26,23 +27,23 @@ export function WorkspaceSidebar({
 	const statusLabel = workspaceStatusLabel({ readOnly });
 	return (
 		<>
-			<div className="brand-row">
+			<div className="flex items-center justify-between px-2">
 				<Brand />
 				<IconButton
 					icon={PanelLeftClose}
 					label="Close navigation"
-					className="mobile-only"
+					className="hidden [@media(max-width:800px)]:inline-grid"
 					onClick={onClose}
 				/>
 			</div>
-			<nav aria-label="Main navigation">
-				<ul>
+			<nav className="mt-10" aria-label="Main navigation">
+				<ul className="grid list-none gap-1 p-0">
 					{pages
 						.filter((item) => item.id !== "sources")
 						.map((item) => (
 							<li key={item.id}>
 								<a
-									className={page === item.id ? "nav-link active" : "nav-link"}
+									className={navigationLinkClassName}
 									href={`#${item.id}`}
 									onClick={onClose}
 									aria-current={page === item.id ? "page" : undefined}
@@ -54,9 +55,9 @@ export function WorkspaceSidebar({
 						))}
 				</ul>
 			</nav>
-			<div className="sidebar-bottom">
+			<div className="mt-auto pt-12 [@media(max-width:800px)]:pt-9">
 				<a
-					className={`nav-link ${page === "sources" ? "active" : ""}`}
+					className={navigationLinkClassName}
 					href="#sources"
 					onClick={onClose}
 					aria-current={page === "sources" ? "page" : undefined}
@@ -65,17 +66,17 @@ export function WorkspaceSidebar({
 					<span>Configs</span>
 				</a>
 				<ThemeToggle />
-				<div className="sidebar-status">
-					<span className="status-dot" />
+				<div className="mt-4 flex items-center gap-2 border-0 border-t border-solid border-line px-2 pt-5 pb-1 text-xs text-muted">
+					<span className="size-1.5 rounded-full bg-primary" />
 					{pending ? (
 						<Skeleton width={80} height={10} />
 					) : (
 						<>
-							{statusLabel} <LockKeyhole size={12} />
+							{statusLabel} <LockKeyhole size={12} className="ml-auto" />
 						</>
 					)}
 				</div>
-				<div className="sidebar-sync">
+				<div className="px-2 pb-5 text-xs leading-relaxed text-muted">
 					{pending ? (
 						<Skeleton width={110} height={10} />
 					) : (

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { GitBranch, RotateCcw, Save } from "lucide-react";
+import { Button } from "../components/Button.tsx";
 import { changesBetween } from "../domain/model.ts";
 import { useUiStore } from "../state/uiStore.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
@@ -34,43 +35,44 @@ export function DraftBar({ onDiscard }: { onDiscard: () => void }) {
 		}
 	};
 	return (
-		<div className="draft-bar">
-			<div>
-				<span className="draft-icon">
+		<div
+			data-draft-bar=""
+			className="fixed right-10 bottom-5 left-[calc(var(--sidebar)+2.5rem)] z-20 flex justify-between gap-4 rounded-surface border border-solid border-line-strong bg-surface px-5 py-4 shadow-lg backdrop-blur-sm [@media(max-width:1250px)]:right-7 [@media(max-width:1250px)]:left-[calc(var(--sidebar)+1.75rem)] [@media(max-width:800px)]:right-5 [@media(max-width:800px)]:left-5 [@media(max-width:600px)]:right-3 [@media(max-width:600px)]:bottom-3 [@media(max-width:600px)]:left-3 [@media(max-width:600px)]:flex-wrap [@media(max-width:600px)]:gap-3 [@media(max-width:600px)]:p-3 print:hidden"
+		>
+			<div className="flex items-center gap-3">
+				<span className="grid size-9 place-items-center rounded-lg bg-success-bg text-success-text [@media(max-width:600px)]:size-8">
 					{loading ? (
-						<span className="spinner" aria-hidden="true" />
+						<span
+							className="size-3 animate-spin rounded-full border-2 border-solid border-line-strong border-t-primary"
+							aria-hidden="true"
+						/>
 					) : (
 						<GitBranch size={18} />
 					)}
 				</span>
-				<span>
-					<strong>
+				<span className="flex flex-col">
+					<strong className="text-xs">
 						{loading
 							? "Updating unsaved changes…"
 							: `${count} unsaved ${count === 1 ? "change" : "changes"} · saved plan unchanged`}
 					</strong>
 				</span>
 			</div>
-			<div>
-				<button
-					type="button"
-					className="button draft-discard"
-					onClick={onDiscard}
-					disabled={saving}
-				>
+			<div className="flex items-center gap-3 [@media(max-width:600px)]:ml-auto">
+				<Button variant="ghost" size="sm" onClick={onDiscard} disabled={saving}>
 					<RotateCcw size={15} />
 					<span>Discard</span>
-				</button>
-				<button
-					type="button"
-					className="button primary"
+				</Button>
+				<Button
+					variant="primary"
+					size="sm"
 					disabled={readOnly || saving || loading}
 					onClick={() => void saveChanges()}
 					aria-busy={saving}
 				>
 					<Save size={15} />
 					<span>{saving ? "Saving…" : "Save changes"}</span>
-				</button>
+				</Button>
 			</div>
 		</div>
 	);

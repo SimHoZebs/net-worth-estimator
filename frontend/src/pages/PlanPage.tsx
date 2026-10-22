@@ -1,10 +1,12 @@
-import { Plus, Search } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { TransactionSortButton } from "../components/activity/TransactionSortButton.tsx";
 import { BaseProjectionView } from "../components/BaseProjectionView.tsx";
 import { AccountCardGrid } from "../components/cards/AccountCardGrid.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { TablePagination } from "../components/DataTable.tsx";
+import { Button } from "../components/Button.tsx";
+import { SearchField } from "../components/Field.tsx";
 import { type TabItem, Tabs } from "../components/Tabs.tsx";
 import {
 	DEFAULT_TRANSACTION_ORDER,
@@ -147,25 +149,24 @@ function AccountsView({
 	return (
 		<>
 			<AccountsWithProjection plan={plan} query={query} />
-			<section className="plan-transactions">
-				<div className="plan-toolbar">
-					<label className="search-field">
-						<Search size={17} />
-						<input
-							aria-label="Search plan"
-							value={query}
-							onChange={(event) => setQuery(event.target.value)}
-							placeholder="Find an account…"
-						/>
-					</label>
-					<button
+			<section>
+				<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4">
+					<SearchField
+						label="Search plan"
+						value={query}
+						onChange={(event) => setQuery(event.target.value)}
+						placeholder="Find an account…"
+					/>
+					<Button
 						type="button"
-						className="button primary small"
+						variant="primary"
+						size="sm"
+						className="[@media(max-width:600px)]:px-3 [@media(max-width:600px)]:py-2"
 						onClick={() => onEdit({ kind: "account", item: null })}
 					>
 						<Plus size={16} />
 						Add account
-					</button>
+					</Button>
 				</div>
 				<AccountsPanel
 					accounts={accounts}
@@ -270,28 +271,25 @@ function TransactionsView({
 			onChange={resetFilters}
 			label="Transactions sections"
 			panelAs="section"
-			panelClassName="plan-transactions"
 		>
-			<div className="plan-toolbar">
-				<label className="search-field">
-					<Search size={17} />
-					<input
-						aria-label="Search plan"
-						value={query}
-						onChange={(event) => search(event.target.value)}
-						placeholder="Find a transaction…"
-					/>
-				</label>
-				<div className="plan-toolbar-actions">
+			<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4 [@media(max-width:600px)]:pb-4">
+				<SearchField
+					label="Search plan"
+					value={query}
+					onChange={(event) => search(event.target.value)}
+					placeholder="Find a transaction…"
+				/>
+				<div className="flex shrink-0 flex-wrap items-center gap-3">
 					<TransactionSortButton order={order} onChange={changeOrder} />
-					<button
+					<Button
 						type="button"
-						className="button primary small"
+						variant="primary"
+						size="sm"
 						onClick={() => onEdit({ kind: "movement", item: null })}
 					>
 						<Plus size={16} />
 						Add transaction
-					</button>
+					</Button>
 				</div>
 			</div>
 			<div id={listId}>
@@ -304,6 +302,8 @@ function TransactionsView({
 			</div>
 			{pageCount > 1 && (
 				<TablePagination
+					topBorder
+					className="px-0.5"
 					page={currentPage}
 					pageCount={pageCount}
 					total={movements.length}

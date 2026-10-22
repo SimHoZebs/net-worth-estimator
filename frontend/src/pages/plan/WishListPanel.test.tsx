@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Movement, Plan } from "../../domain/model.ts";
 import { testPlan } from "../../test/plan.ts";
@@ -31,6 +31,44 @@ const chair: Movement = {
 const plan = { ...testPlan, movements: [laptop, chair] };
 
 describe("wish list", () => {
+	it("names the purchase region and its independent priority and date lists", () => {
+		const view = render(<WishListPanel plan={plan} schedule={null} />);
+		const region = view.getByRole("region", { name: "Planned purchases" });
+		expect(region.tagName).toBe("SECTION");
+		for (const name of ["Purchase priorities", "Purchase dates"]) {
+			const list = within(region).getByRole("list", { name });
+			expect(list.tagName).toBe("OL");
+			expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+		}
+	});
+
+	it("preserves native labels, icons, and disabled queue boundaries", () => {
+		const update = vi.fn<(plan: Plan) => boolean>(() => true);
+		useWorkspaceStore.setState({ updatePlan: update });
+		const view = render(<WishListPanel plan={plan} schedule={null} />);
+		for (const [label, disabled, iconSize] of [
+			["Move Laptop up", true, "16"],
+			["Move Laptop down", false, "16"],
+			["Edit Laptop", false, "15"],
+			["Remove Laptop", false, "15"],
+			["Move Chair up", false, "16"],
+			["Move Chair down", true, "16"],
+		] as const) {
+			const button = view.getByRole("button", {
+				name: label,
+			}) as HTMLButtonElement;
+			expect(button.type).toBe("button");
+			expect(button.disabled).toBe(disabled);
+			expect(button.title).toBe(label);
+			expect(button.querySelector("svg")?.getAttribute("width")).toBe(iconSize);
+			expect(button.querySelector("svg")?.getAttribute("aria-hidden")).toBe(
+				"true",
+			);
+		}
+		fireEvent.click(view.getByRole("button", { name: "Move Laptop up" }));
+		expect(update).not.toHaveBeenCalled();
+	});
+
 	it("offers keyboard-operable priority controls and announces a move", () => {
 		const update = vi.fn<(plan: Plan) => boolean>(() => true);
 		useWorkspaceStore.setState({ updatePlan: update });
@@ -68,5 +106,27 @@ describe("wish list", () => {
 		const view = render(<WishListPanel plan={plan} schedule={null} />);
 		for (const button of view.getAllByRole("button"))
 			expect((button as HTMLButtonElement).disabled).toBe(true);
+	});
+
+	it("locks source-owned purchases without locking other items", () => {
+		const view = render(
+			<WishListPanel
+				plan={{ ...plan, movements: [{ ...laptop, readOnly: true }, chair] }}
+				schedule={null}
+			/>,
+		);
+		for (const name of [
+			"Move Laptop up",
+			"Move Laptop down",
+			"Edit Laptop",
+			"Remove Laptop",
+		])
+			expect(
+				(view.getByRole("button", { name }) as HTMLButtonElement).disabled,
+			).toBe(true);
+		expect(
+			(view.getByRole("button", { name: "Edit Chair" }) as HTMLButtonElement)
+				.disabled,
+		).toBe(false);
 	});
 });

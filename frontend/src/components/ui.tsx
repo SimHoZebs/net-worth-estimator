@@ -6,51 +6,34 @@ import {
 	X,
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import {
-	type ComponentProps,
-	type ReactNode,
-	useEffect,
-	useId,
-	useRef,
-	useState,
-} from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { cssVariables } from "./cssVariables.ts";
-import "./ui.css";
+import { mergeStyles } from "./mergeStyles.ts";
+import { Button, IconButton, TextButton } from "./Button.tsx";
+import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
+import { Notice } from "./Notice.tsx";
+import type { VariantProps } from "class-variance-authority";
+import {
+	badgeStyles,
+	progressFillStyles,
+	progressTrackStyles,
+} from "./uiStyles.ts";
 
-export function IconButton({
-	icon: Icon,
-	label,
-	onClick,
-	className = "",
-	disabled = false,
-	...buttonProps
-}: {
-	icon: LucideIcon;
-	label: string;
-} & Omit<ComponentProps<"button">, "children">) {
-	return (
-		<button
-			type="button"
-			{...buttonProps}
-			className={`icon-button ${className}`}
-			aria-label={label}
-			title={label}
-			onClick={onClick}
-			disabled={disabled}
-		>
-			<Icon size={18} aria-hidden="true" />
-		</button>
-	);
-}
+export { IconButton } from "./Button.tsx";
 
 export function Badge({
 	children,
 	tone = "neutral",
+	className,
 }: {
 	children: ReactNode;
-	tone?: "neutral" | "green" | "amber" | "outline";
-}) {
-	return <span className={`badge badge-${tone}`}>{children}</span>;
+	className?: string;
+} & VariantProps<typeof badgeStyles>) {
+	return (
+		<span className={mergeStyles(badgeStyles({ tone }), className)}>
+			{children}
+		</span>
+	);
 }
 
 export function Modal({
@@ -60,6 +43,8 @@ export function Modal({
 	onClose,
 	wide = false,
 	className = "",
+	headerClassName,
+	bodyClassName,
 	titleSize = "display",
 	actions,
 	focusPanelOnOpen = false,
@@ -70,6 +55,8 @@ export function Modal({
 	onClose: () => void;
 	wide?: boolean;
 	className?: string;
+	headerClassName?: string;
+	bodyClassName?: string;
 	/** Plain titles name the subject without competing with the content. */
 	titleSize?: "display" | "plain";
 	/** Extra icon buttons beside the corner close button. */
@@ -114,7 +101,10 @@ export function Modal({
 	return (
 		<dialog
 			ref={ref}
-			className={`modal ${wide ? "modal-wide" : ""} ${className}`}
+			className={mergeStyles(
+				`max-h-[min(90dvh,57.5rem)] rounded-surface border border-solid border-line-strong bg-surface p-0 text-ink shadow-overlay backdrop:bg-backdrop-film backdrop:backdrop-blur-(--backdrop-blur) [@media(max-width:600px)]:max-h-[92dvh] [@media(max-width:600px)]:w-[calc(100%-1.5rem)] ${wide ? "w-[min(48rem,calc(100%-2rem))]" : "w-[min(36rem,calc(100%-2rem))]"}`,
+				className,
+			)}
 			aria-labelledby={id}
 			onCancel={(event) => {
 				event.preventDefault();
@@ -127,7 +117,7 @@ export function Modal({
 			<motion.div
 				ref={panelRef}
 				tabIndex={focusPanelOnOpen ? -1 : undefined}
-				className="modal-panel"
+				className="focus:outline-none"
 				initial={initial}
 				animate={closing ? exit : enter}
 				transition={{
@@ -138,24 +128,32 @@ export function Modal({
 					if (closing) onClose();
 				}}
 			>
-				<div className="modal-header">
-					<div>
-						{eyebrow && <p className="eyebrow">{eyebrow}</p>}
+				<div className={mergeStyles(dialogHeaderStyles, headerClassName)}>
+					<div className="min-w-0 flex-1">
+						{eyebrow && (
+							<p className="mb-2 text-xs font-bold tracking-widest text-muted">
+								{eyebrow}
+							</p>
+						)}
 						<h2
 							id={id}
 							className={
-								titleSize === "plain" ? "modal-title-plain" : "type-display"
+								titleSize === "plain"
+									? "text-sm leading-snug font-semibold tracking-normal"
+									: "type-display text-3xl leading-tight font-normal tracking-tight"
 							}
 						>
 							{title}
 						</h2>
 					</div>
-					<div className="modal-header-actions">
+					<div className="flex flex-none flex-wrap items-center justify-end gap-1">
 						{actions}
 						<IconButton icon={X} label="Close dialog" onClick={requestClose} />
 					</div>
 				</div>
-				<div className="modal-body">{children}</div>
+				<div className={mergeStyles(dialogBodyStyles, bodyClassName)}>
+					{children}
+				</div>
 			</motion.div>
 		</dialog>
 	);
@@ -163,8 +161,14 @@ export function Modal({
 
 export function ProjectionUpdating() {
 	return (
-		<div className="projection-updating" role="status">
-			<span className="spinner" aria-hidden="true" />
+		<div
+			className="mb-4 flex items-center gap-3 text-sm text-muted"
+			role="status"
+		>
+			<span
+				className="size-3 animate-spin rounded-full border-2 border-solid border-line-strong border-t-primary"
+				aria-hidden="true"
+			/>
 			Updating projection…
 		</div>
 	);
@@ -180,17 +184,17 @@ export function ErrorNotice({
 	onAction?: () => void;
 }) {
 	return (
-		<div className="error-notice" role="alert">
-			<AlertCircle size={20} aria-hidden="true" />
+		<Notice tone="danger" className="mb-5 p-5 text-sm" role="alert">
+			<AlertCircle size={20} className="mt-0.5" aria-hidden="true" />
 			<div>
-				<p>{message}</p>
+				<p className="my-1 whitespace-pre-line text-danger-text">{message}</p>
 				{action && (
-					<button type="button" className="text-button" onClick={onAction}>
+					<TextButton tone="danger" className="mt-2" onClick={onAction}>
 						{action} <ArrowUpRight size={15} />
-					</button>
+					</TextButton>
 				)}
 			</div>
-		</div>
+		</Notice>
 	);
 }
 
@@ -208,16 +212,18 @@ export function EmptyState({
 	onAction?: () => void;
 }) {
 	return (
-		<div className="empty-state">
-			<span className="empty-icon">
+		<div className="flex flex-col items-center px-6 py-16 text-center">
+			<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
 				<Icon size={28} />
 			</span>
-			<h3>{title}</h3>
-			{description && <p>{description}</p>}
+			<h3 className="text-lg">{title}</h3>
+			{description && (
+				<p className="mt-2 mb-5 max-w-88 text-sm">{description}</p>
+			)}
 			{action && (
-				<button type="button" className="button primary" onClick={onAction}>
+				<Button variant="primary" onClick={onAction}>
 					{action}
-				</button>
+				</Button>
 			)}
 		</div>
 	);
@@ -233,16 +239,21 @@ export function Toggle({
 	onChange: (checked: boolean) => void;
 }) {
 	return (
-		<label className="toggle-label">
+		<label className="relative inline-flex cursor-pointer items-center gap-2 text-xs text-muted [@media(max-width:600px)]:min-h-7 [@media(max-width:600px)]:gap-1">
 			<input
 				type="checkbox"
 				role="switch"
 				aria-checked={checked}
 				checked={checked}
+				className="peer absolute w-px opacity-0"
 				onChange={(event) => onChange(event.target.checked)}
 			/>
-			<span className="toggle-track">
-				<span>{checked && <Check size={10} />}</span>
+			<span className="flex h-4 w-7 items-center rounded-full bg-line-strong p-0.5 transition-colors duration-150 peer-checked:bg-primary peer-focus-visible:outline-3 peer-focus-visible:outline-solid peer-focus-visible:outline-primary peer-focus-visible:outline-offset-1">
+				<span
+					className={`grid size-3 place-items-center rounded-full bg-surface text-primary transition-transform duration-150 ${checked ? "translate-x-3" : ""}`}
+				>
+					{checked && <Check size={10} />}
+				</span>
 			</span>
 			<span>{label}</span>
 		</label>
@@ -252,15 +263,14 @@ export function Toggle({
 export function Progress({
 	value,
 	label,
-	tone = "green",
+	tone = "success",
 }: {
 	value: number;
 	label: string;
-	tone?: "green" | "amber";
-}) {
+} & VariantProps<typeof progressTrackStyles>) {
 	return (
 		<div
-			className={`progress-track progress-${tone}`}
+			className={progressTrackStyles({ tone })}
 			role="progressbar"
 			aria-label={label}
 			aria-valuenow={Math.round(Math.min(100, Math.max(0, value)))}
@@ -268,6 +278,7 @@ export function Progress({
 			aria-valuemax={100}
 		>
 			<span
+				className={progressFillStyles({ tone })}
 				style={cssVariables({
 					"--progress-width": `${Math.min(100, Math.max(0, value))}%`,
 				})}
@@ -287,7 +298,7 @@ export function Skeleton({
 }) {
 	return (
 		<span
-			className="skeleton"
+			className="block h-[var(--skeleton-height,auto)] w-[var(--skeleton-width,auto)] animate-[skeleton-pulse_1.2s_ease-in-out_infinite] rounded-md bg-line-strong opacity-55"
 			role="status"
 			aria-label={label}
 			aria-busy="true"

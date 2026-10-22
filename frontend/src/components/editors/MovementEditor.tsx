@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
 	type Movement,
 	type Plan,
@@ -11,7 +11,8 @@ import {
 import { parseUnion } from "../../domain/guards.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
-import { InputField, SelectField } from "../Field.tsx";
+import { Checkbox, InputField, SelectField } from "../Field.tsx";
+import { Notice } from "../Notice.tsx";
 import { AccountOptions } from "./AccountOptions.tsx";
 import {
 	EditorForm,
@@ -77,6 +78,7 @@ export function MovementFormFields({
 	item: Movement | null;
 	plan: Plan;
 }) {
+	const id = useId();
 	const [noEndDate, setNoEndDate] = useState(item?.endDate == null);
 	const [frequency, setFrequency] = useState(item?.frequency ?? "monthly");
 	const isOnce = frequency === "once";
@@ -132,7 +134,7 @@ export function MovementFormFields({
 				)}
 			</SelectField>
 			{!advanced && (
-				<p className="muted small field-wide">
+				<p className="col-span-full text-xs text-muted">
 					{templateForKind.summary}{" "}
 					{templateForKind.whenToUse && (
 						<span>Use when: {templateForKind.whenToUse}</span>
@@ -173,7 +175,7 @@ export function MovementFormFields({
 				<>
 					<input type="hidden" name="amount" value="0" />
 					<input type="hidden" name="annualIncrease" value="0" />
-					<div className="inline-notice field-wide">
+					<Notice className="col-span-full">
 						<span>
 							{templates.some((template) => template.id === amountKind) ? (
 								<>
@@ -188,7 +190,7 @@ export function MovementFormFields({
 								</>
 							)}
 						</span>
-					</div>
+					</Notice>
 				</>
 			)}
 			<SelectField
@@ -257,10 +259,13 @@ export function MovementFormFields({
 						disabled={noEndDate}
 						defaultValue={item?.endDate ?? ""}
 					/>
-					<label className="checkbox-field">
-						<input
+					<label
+						htmlFor={`${id}-no-end-date`}
+						className="flex min-h-11 items-center gap-3 text-sm text-muted"
+					>
+						<Checkbox
+							id={`${id}-no-end-date`}
 							name="noEndDate"
-							type="checkbox"
 							checked={noEndDate}
 							onChange={(event) => setNoEndDate(event.target.checked)}
 						/>
@@ -268,10 +273,13 @@ export function MovementFormFields({
 					</label>
 				</>
 			)}
-			<label className="checkbox-field">
-				<input
+			<label
+				htmlFor={`${id}-enabled`}
+				className="flex min-h-11 items-center gap-3 text-sm text-muted"
+			>
+				<Checkbox
+					id={`${id}-enabled`}
 					name="enabled"
-					type="checkbox"
 					defaultChecked={item?.enabled ?? true}
 				/>
 				Include in projections

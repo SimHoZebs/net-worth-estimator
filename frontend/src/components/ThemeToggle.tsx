@@ -1,5 +1,6 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "../state/useTheme.ts";
+import { navigationLinkClassName } from "../workspace/navigationStyles.ts";
 
 const LABEL: Record<string, string> = {
 	system: "System",
@@ -14,7 +15,7 @@ export function ThemeToggle() {
 	return (
 		<button
 			type="button"
-			className="nav-link theme-toggle"
+			className={navigationLinkClassName}
 			onClick={cycle}
 			title="Switch theme (system, light, dark)"
 			aria-label={`Theme: ${LABEL[preference]}. Activate to switch theme.`}

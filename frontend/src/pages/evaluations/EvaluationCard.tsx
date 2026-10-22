@@ -1,11 +1,13 @@
 import { ArrowUpRight, Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
 import { useId } from "react";
+import { IconButton, TextButton } from "../../components/Button.tsx";
 import type { EvaluationPin } from "../../components/evaluationCard.ts";
-import { IconButton, Progress, Skeleton } from "../../components/ui.tsx";
+import { mergeStyles } from "../../components/mergeStyles.ts";
+import { Progress, Skeleton } from "../../components/ui.tsx";
 import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { Evaluation } from "../../domain/model.ts";
 import type { EvaluationResult } from "../../domain/result.ts";
-import "./evaluations.css";
+import { evaluationCard } from "./evaluationStyles.ts";
 
 export type { EvaluationPin } from "../../components/evaluationCard.ts";
 
@@ -39,19 +41,32 @@ export function EvaluationCard({
 	const StateIcon = evaluation.enabled && met ? Check : Flag;
 	return (
 		<section
-			className={`evaluation-card threshold-evaluation-card${evaluation.enabled ? "" : " is-excluded"}`}
+			className={mergeStyles(
+				evaluationCard({ enabled: evaluation.enabled }),
+				"flex min-w-0 flex-col gap-4 self-start p-5",
+			)}
 			aria-labelledby={headingId}
 			aria-busy={outcomePending}
 		>
-			<div className="threshold-evaluation-heading">
-				<h2 id={headingId}>
-					<StateIcon size={16} aria-hidden="true" />
+			<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+				<h2
+					id={headingId}
+					className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]"
+				>
+					<StateIcon
+						size={16}
+						aria-hidden="true"
+						className="shrink-0 text-success-text"
+					/>
 					<span>{evaluation.name}</span>
 				</h2>
-				<div className="table-actions">
+				<div className="flex justify-end gap-1">
 					{onPinChange && (
 						<IconButton
 							icon={Pin}
+							size="sm"
+							iconSize={16}
+							className="aria-pressed:border-success-border aria-pressed:bg-success-bg aria-pressed:text-success-text"
 							label={
 								pinned
 									? `Unpin ${evaluation.name} from Outlook`
@@ -65,6 +80,8 @@ export function EvaluationCard({
 					{onEdit && (
 						<IconButton
 							icon={Pencil}
+							size="sm"
+							iconSize={16}
 							label={`Edit ${evaluation.name}`}
 							onClick={onEdit}
 						/>
@@ -72,6 +89,8 @@ export function EvaluationCard({
 					{onRemove && (
 						<IconButton
 							icon={Trash2}
+							size="sm"
+							iconSize={16}
 							label={`Remove ${evaluation.name}`}
 							onClick={onRemove}
 						/>
@@ -79,7 +98,7 @@ export function EvaluationCard({
 				</div>
 			</div>
 			<div>
-				<div className="evaluation-card-outcome type-value">
+				<div className="type-value mt-0 mr-0 mb-1 ml-0 text-3xl font-medium leading-[1.2] tracking-[-0.04em] [overflow-wrap:anywhere]">
 					{!evaluation.enabled ? (
 						"Paused"
 					) : outcomePending ? (
@@ -92,7 +111,7 @@ export function EvaluationCard({
 						"Beyond this horizon"
 					)}
 				</div>
-				<p className="section-note section-note-flush">
+				<p className="text-sm leading-relaxed text-muted">
 					{outcomePending ? (
 						<Skeleton width={170} height={14} />
 					) : !evaluation.enabled ? (
@@ -111,8 +130,8 @@ export function EvaluationCard({
 					<Skeleton width="100%" height={32} />
 				) : (
 					result && (
-						<div className="evaluation-card-progress">
-							<div className="progress-label">
+						<div className="m-0">
+							<div className="mb-2 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
 								<span>{money(result.current)} today</span>
 								<span>{money(evaluation.target)} target</span>
 							</div>
@@ -124,20 +143,20 @@ export function EvaluationCard({
 					)
 				))}
 			{probability !== null && evaluation.enabled && !outcomePending && (
-				<p className="scenario-evaluation">
+				<p className="m-0 text-xs">
 					Reached in <strong>{percent(probability)}</strong> of modeled
 					scenarios.
 				</p>
 			)}
-			<div className="evaluation-card-footer">
-				<button
+			<div className="m-0 flex items-center justify-between gap-3 border-t border-line pt-3">
+				<TextButton
 					type="button"
-					className="text-button"
+					className="ml-auto"
 					disabled={!evaluation.enabled || outcomePending}
 					onClick={onEvidence}
 				>
 					Evidence <ArrowUpRight size={15} />
-				</button>
+				</TextButton>
 			</div>
 		</section>
 	);

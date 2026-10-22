@@ -1,6 +1,7 @@
 import { CalendarDays } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { BackendCheckpoint } from "../../../api/contracts.ts";
+import { TextButton } from "../../../components/Button.tsx";
 import {
 	DEFAULT_TRANSACTION_ORDER,
 	sortTransactionsByDate,
@@ -237,16 +238,16 @@ export function SafeSpendingPreview({
 	if (!cards.length) {
 		return (
 			<section
-				className="safe-spending-preview"
+				className="relative rounded-surface border border-line bg-surface px-6 pt-6 pb-5 [@media(max-width:1050px)]:px-5 [@media(max-width:1050px)]:py-5 [@media(max-width:600px)]:p-5 print:break-inside-avoid"
 				aria-label="Safe card spending"
 			>
-				<div className="section-top">
-					<h2>
-						<CalendarDays size={18} />
+				<div className="flex items-center justify-between gap-4">
+					<h2 className="flex items-center gap-2 text-sm [@media(600px<width<=1050px)]:text-xs">
+						<CalendarDays size={18} className="text-muted" aria-hidden="true" />
 						Safe card spending
 					</h2>
 				</div>
-				<p className="section-note">
+				<p className="px-6 py-5 text-sm leading-relaxed text-muted">
 					Add a debt account to track a card statement cycle here.
 				</p>
 			</section>
@@ -365,16 +366,16 @@ export function SafeSpendingPreview({
 	if (pending)
 		return (
 			<section
-				className="safe-spending-preview"
+				className="relative rounded-surface border border-line bg-surface px-6 pt-6 pb-5 [@media(max-width:1050px)]:px-5 [@media(max-width:1050px)]:py-5 [@media(max-width:600px)]:p-5 print:break-inside-avoid"
 				aria-label="Safe card spending"
 			>
-				<div className="section-top">
-					<h2>
-						<CalendarDays size={18} />
+				<div className="flex items-center justify-between gap-4">
+					<h2 className="flex items-center gap-2 text-sm [@media(600px<width<=1050px)]:text-xs">
+						<CalendarDays size={18} className="text-muted" aria-hidden="true" />
 						Safe card spending
 					</h2>
 				</div>
-				<p className="cycle-dates">
+				<p className="mt-4 text-xs">
 					{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
 					{fullDaysLeft === 1 ? "day" : "days"} left
 					{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
@@ -386,75 +387,83 @@ export function SafeSpendingPreview({
 		);
 
 	return (
-		<section className="safe-spending-preview" aria-label="Safe card spending">
+		<section
+			className="relative rounded-surface border border-line bg-surface px-6 pt-6 pb-5 [@media(max-width:1050px)]:px-5 [@media(max-width:1050px)]:py-5 [@media(max-width:600px)]:p-5 print:break-inside-avoid"
+			aria-label="Safe card spending"
+		>
 			<button
 				type="button"
-				className="safe-spending-open"
+				className="absolute inset-0 cursor-pointer rounded-surface border-0 bg-transparent p-0"
 				onClick={() => onDetail("cycle")}
 			>
 				<span className="sr-only">Open safe spending details</span>
 			</button>
-			<div className="section-top">
-				<h2>
-					<CalendarDays size={18} />
+			<div className="flex items-center justify-between gap-4">
+				<h2 className="flex items-center gap-2 text-sm [@media(600px<width<=1050px)]:text-xs">
+					<CalendarDays size={18} className="text-muted" aria-hidden="true" />
 					Safe card spending
 				</h2>
 			</div>
-			<p className="cycle-dates">
+			<p className="mt-4 text-xs">
 				{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
 				{fullDaysLeft === 1 ? "day" : "days"} left
 				{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
 			</p>
-			<div className="spend-answer">
-				<span>{labels.allowance}</span>
-				<strong className="type-value">{money(allowance)}</strong>
-				<span>
+			<div className="flex flex-col pt-7 pb-5">
+				<span className="text-xs text-muted">{labels.allowance}</span>
+				<strong className="mt-1.5 text-4xl leading-tight font-medium tracking-tight tabular-nums">
+					{money(allowance)}
+				</strong>
+				<span className="mt-1.5 text-xs text-muted">
 					{allowance >= 0
 						? `${money(dailySafe)} a day`
 						: `${money(-dailySafe)} a day over`}
 				</span>
 			</div>
-			<div className="cycle-remaining">
-				<div>
-					<span>{labels.cashBalance}</span>
-					<strong>{money(checking)}</strong>
+			<div className="grid grid-cols-3 gap-x-4 gap-y-0 border-t border-line pt-4 [@media(max-width:370px)]:gap-x-3">
+				<div className="flex min-w-0 flex-col">
+					<span className="mb-2 text-xs text-muted">{labels.cashBalance}</span>
+					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums [@media(max-width:370px)]:text-lg">
+						{money(checking)}
+					</strong>
 				</div>
-				<div>
-					<span>{labels.remainingBills}</span>
-					<strong>{money(remainingObligations)}</strong>
+				<div className="flex min-w-0 flex-col border-l border-line pl-4 [@media(max-width:370px)]:pl-3">
+					<span className="mb-2 text-xs text-muted">
+						{labels.remainingBills}
+					</span>
+					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums [@media(max-width:370px)]:text-lg">
+						{money(remainingObligations)}
+					</strong>
 				</div>
-				<div>
-					<span>
+				<div className="flex min-w-0 flex-col border-l border-line pl-4 [@media(max-width:370px)]:pl-3">
+					<span className="mb-2 text-xs text-muted">
 						{shortWindow.total > 0
 							? labels.billShortfall
 							: labels.cashAfterBills}
 					</span>
-					<strong>
+					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums [@media(max-width:370px)]:text-lg">
 						{money(shortWindow.total > 0 ? -shortWindow.total : cushion)}
 					</strong>
 				</div>
 			</div>
-			<div className="cycle-actions">
-				<button
-					type="button"
-					className="text-button"
+			<div className="relative z-1 mt-4 flex flex-wrap items-center gap-4 border-t border-line pt-3.5">
+				<TextButton
 					onClick={(event) => {
 						event.stopPropagation();
 						onDetail("cycle");
 					}}
 				>
 					This cycle
-				</button>
-				<button
-					type="button"
-					className="text-button"
+				</TextButton>
+				<TextButton
+					className="ml-auto"
 					onClick={(event) => {
 						event.stopPropagation();
 						onDetail("last-cycle");
 					}}
 				>
 					Last cycle
-				</button>
+				</TextButton>
 			</div>
 			{detail && (
 				<SafeSpendingDetailShell
@@ -472,7 +481,7 @@ export function SafeSpendingPreview({
 					onClose={() => onDetail(null)}
 				>
 					{isSafeSpendingCycleTab(detail) && (
-						<div className="safe-spending-mandatory">
+						<div className="grid content-start gap-4">
 							{detail === "cycle" ? (
 								<SafeSpendingBillsPanel
 									heroes={heroes}

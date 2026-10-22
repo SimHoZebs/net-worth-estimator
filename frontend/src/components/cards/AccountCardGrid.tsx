@@ -5,7 +5,6 @@ import type { Projection } from "../../domain/result.ts";
 import { AccountCard } from "./AccountCard.tsx";
 import { AccountDetailsModal } from "./AccountDetailsModal.tsx";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
-import "./account-cards.css";
 
 export function AccountCardGrid({
 	plan,
@@ -35,7 +34,7 @@ export function AccountCardGrid({
 		null;
 	return (
 		<>
-			<div className="account-card-grid">
+			<div className="mb-5 grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-4">
 				{shown.map((card) => (
 					<AccountCard
 						key={card.id}
