@@ -67,7 +67,7 @@ describe("purchase queue", () => {
 		).toEqual({ priority: 3 });
 		const loaded = backendToDisplayPlan({
 			document: converted.document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 		});
 		converted.document.evaluations.plannedPurchases = [
 			{

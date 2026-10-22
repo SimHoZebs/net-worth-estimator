@@ -71,8 +71,8 @@ pins and financial preferences also reset and reload within the verified scope.
 
 ## Deployment and migration
 
-The rule is the same in dev and production. Existing legacy bearer deployments
-remain unchanged until an explicit authenticated-stack migration.
+The rule is the same in dev and production. Casdoor is required. Token-only and
+unauthenticated server configurations fail closed at startup.
 
 Before an existing authenticated deployment starts the new code:
 

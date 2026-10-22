@@ -91,19 +91,16 @@ The split deployment has two images:
 - `backend/Dockerfile` builds the Go API. Local state comes from a database backup restored to the volume, never from files baked into the image.
 - `frontend/Dockerfile` builds the Waypoint bundle and serves it from Nginx. The image proxies `/v1` to the backend named by `BACKEND_URL` and keeps stochastic SSE streaming unbuffered.
 
-Run both services with the persistent local volume:
-
-```bash
-docker compose up --build
-```
+Initialize Casdoor and run the split stack through the [authentication guide](auth/README.md).
+For normal development, use the [dedicated dev stack](dev/README.md).
 
 The frontend is available at `http://localhost:8080` and the API at `http://localhost:8787`. Stop the stack with `docker compose down`; use `docker compose down -v` only when you intend to delete the SQLite volume.
 
 The root `Dockerfile` remains a legacy combined image. The split images do not embed or build one another, and the legacy image and Compose stack must not run against the same volume or port at the same time.
 
-Optional [local authentication](auth/README.md) adds Casdoor through a Compose overlay. The Go API verifies OIDC identity and calls Casdoor's built-in Casbin permission API. Each account owns a separate private plan. Guests can read and project only a separately published sample. No role choice is required at signup. Identities and plans stay in local SQLite. Signed logout notifications and periodic token checks enforce provider revocation. Provider mode requires the frontend and API on the same public origin. See [authentication](docs/authentication.md) and [plan authorization](docs/authorization.md) for boundaries and migration. The Better Auth comparison remains on branch `experiment/better-auth`.
+Casdoor authentication is required in dev and production. The Go API verifies OIDC identity and calls Casdoor's built-in Casbin permission API. Each account owns a separate private plan. Guests can read and project only a separately published sample. No role choice is required at signup. Identities and plans stay in local SQLite. Signed logout notifications and periodic token checks enforce provider revocation. The frontend and API must share one public origin. Shared bearer tokens and unauthenticated server startup are retired. See [authentication](docs/authentication.md) and [plan authorization](docs/authorization.md) for boundaries and migration. The Better Auth comparison remains on branch `experiment/better-auth`.
 
-For Vercel in legacy mode, set `VITE_API_BASE_URL` to the public backend origin. Add that exact frontend origin to `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`. A proxy cut during a seeded stochastic run detaches the client without an error event; repeat the same request to attach or read the saved result.
+Any frontend host must proxy `/v1` to the backend under the same public origin for session cookies and CSRF protection. A proxy cut during a seeded stochastic run detaches the client without an error event; repeat the same request to attach or read the saved result.
 
 Configure a backend service with this durable contract:
 
@@ -117,6 +114,7 @@ Configure a backend service with this durable contract:
 | Database               | `NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db`                                 |
 | Public exposure        | only behind suitable access control                                                   |
 | Optional origin policy | exact origins in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`                                |
-| Optional write policy  | `NET_WORTH_ESTIMATOR_READ_ONLY=1` or a secret-backed `NET_WORTH_ESTIMATOR_AUTH_TOKEN` |
+| Authentication         | Casdoor OIDC, durable sessions, and account-owned plan permissions                     |
+| Optional write policy  | `NET_WORTH_ESTIMATOR_READ_ONLY=1`                                                     |
 
 Keep one backend instance because the deployment contract uses one SQLite writer. Back up through SQLite-aware procedures and preserve the persistent volume across deploys.

@@ -30,9 +30,9 @@ The isolated browser-test harness still uses its own fixture API and ports.
 
 ## Deployment
 
-`backend/Dockerfile` builds the API image. `frontend/Dockerfile` builds a static Nginx image that serves the SPA and proxies `/v1` to the backend named by `BACKEND_URL`. `docker compose up --build` runs the split stack with a persistent `net-worth-estimator-data` volume. The root `Dockerfile` is a legacy combined image.
+`backend/Dockerfile` builds the API image. `frontend/Dockerfile` builds a static Nginx image that serves the SPA and proxies `/v1` to the backend named by `BACKEND_URL`. Initialize Casdoor and use the authenticated split stack in `auth/README.md`, with the persistent `net-worth-estimator-data` volume. The root `Dockerfile` is a legacy combined image.
 
-The frontend image is environment-independent. Vercel deployments set `VITE_API_BASE_URL` to the public backend origin, and the backend must allow that exact frontend origin through `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`. An unset `NET_WORTH_ESTIMATOR_AUTH_TOKEN` leaves guarded writes unauthenticated, and an unset `NET_WORTH_ESTIMATOR_READ_ONLY` leaves the backend writable.
+The frontend image is environment-independent. All deployments proxy `/v1` under the frontend's public origin for Casdoor session cookies and CSRF protection. Dev and production require Casdoor configuration and a verified owner for existing financial data. Shared bearer tokens and unauthenticated server startup are retired. `NET_WORTH_ESTIMATOR_READ_ONLY` remains a global write kill switch.
 
 ## Backend Map
 
@@ -40,7 +40,7 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 | ----------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `backend/cmd/server/`         | configuration, startup, graceful shutdown, SimpleFIN scheduler                                          |
 | `backend/cmd/importcsv/`      | offline CSV replacement into an existing SQLite database                                                |
-| `backend/internal/api/`       | HTTP routes, CORS, bearer guard, deterministic API, stochastic SSE, artifact identity                   |
+| `backend/internal/api/`       | HTTP routes, CORS, read-only kill switch, deterministic API, stochastic SSE, artifact identity            |
 | `backend/internal/types/`     | persisted model (postings, recurrence rules, claims), request, result, evaluation, and validation types |
 | `backend/internal/store/`     | `Store`, SQLite schema, model persistence, sync ownership, bounded artifacts                            |
 | `backend/internal/domain/`    | validation, request preparation, shared transitions, simulation, evaluations, stochastic kernels        |
@@ -63,7 +63,7 @@ The frontend image is environment-independent. Vercel deployments set `VITE_API_
 | `NET_WORTH_ESTIMATOR_FRONTEND_PATH`                  | empty                                                          | optional built frontend directory for binary-only same-origin static serving                                 |
 | `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`                | empty                                                          | comma-separated exact HTTP/S origins for direct cross-origin API access                                      |
 | `NET_WORTH_ESTIMATOR_READ_ONLY`                      | writable                                                       | `1`, `true`, or `yes` rejects guarded writes with 403                                                        |
-| `NET_WORTH_ESTIMATOR_AUTH_TOKEN`                     | empty                                                          | bearer token for guarded writes                                                                              |
+| `NET_WORTH_ESTIMATOR_AUTH_PROVIDER`                  | `casdoor`                                                      | required OIDC sessions and plan permissions; token-only and unauthenticated startup are unsupported            |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL`           | empty                                                          | Bridge Access URL secret; enables real sync                                                                  |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS`                | empty                                                          | model account IDs eligible for pending-charge seeds                                                          |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN`              | empty                                                          | exact value `1` plans counts without committing writes                                                       |

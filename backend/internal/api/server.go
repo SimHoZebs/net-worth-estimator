@@ -27,8 +27,6 @@ type Server struct {
 	// ReadOnly rejects canonical model writes with 403. Reads and compute
 	// endpoints are unaffected.
 	ReadOnly bool
-	// AuthEnabled reports whether a bearer token guards writes.
-	AuthEnabled bool
 	// SyncRunner runs the SimpleFIN sync on trigger. Nil when unconfigured.
 	SyncRunner *simplefin.Runner
 }
@@ -40,8 +38,6 @@ type Config struct {
 	CanWrite       func(context.Context) bool
 	AllowedOrigins []string
 	ReadOnly       bool
-	// AuthToken guards row writes. Empty means auth disabled.
-	AuthToken string
 	// SyncRunner runs the SimpleFIN sync on trigger. Nil when unconfigured.
 	SyncRunner  *simplefin.Runner
 	FrontendDir string
@@ -152,18 +148,18 @@ func frontendHandler(frontendDir string) http.HandlerFunc {
 // New builds the chi router with all routes.
 func New(store store.Store, serverConfig Config) http.Handler {
 	server := &Server{
-		ResourceID:  serverConfig.ResourceID,
-		CanWrite:    serverConfig.CanWrite,
-		store:       store,
-		ReadOnly:    serverConfig.ReadOnly,
-		AuthEnabled: serverConfig.AuthToken != "",
-		SyncRunner:  serverConfig.SyncRunner,
+		ResourceID: serverConfig.ResourceID,
+		CanWrite:   serverConfig.CanWrite,
+		store:      store,
+		ReadOnly:   serverConfig.ReadOnly,
+		SyncRunner: serverConfig.SyncRunner,
 	}
 	router := chi.NewRouter()
 	router.Use(middleware.Recoverer)
 	router.Use(corsMiddleware(serverConfig.AllowedOrigins))
-	router.Use(writeAuthMiddleware(serverConfig.ReadOnly, serverConfig.AuthToken))
-	// Provider-enabled servers intercept this endpoint before reaching the API.
+	router.Use(readOnlyMiddleware(serverConfig.ReadOnly))
+	// The server's identity boundary intercepts this endpoint. Bare API handlers
+	// are used only by unit tests and the isolated fixtureapi browser harness.
 	router.Get("/v1/auth/session", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "application/json")

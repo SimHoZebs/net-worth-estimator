@@ -51,13 +51,12 @@ describe("native API client", () => {
 			}
 		},
 	);
-	it("defaults to same-origin /v1 routes, preserves AbortSignal, and sends bearer auth only when supplied per call", async () => {
+	it("preserves AbortSignal and session cookies without forwarding shared bearer headers", async () => {
 		const fetcher = vi.fn<FetchLike>(async (_input, init) => {
-			expect(new Headers(init?.headers).get("authorization")).toBe(
-				"Bearer supplied-at-call",
-			);
+			expect(new Headers(init?.headers).get("authorization")).toBeNull();
+			expect(init?.credentials).toBe("same-origin");
 			expect(init?.signal).toBeInstanceOf(AbortSignal);
-			return response(JSON.stringify({ readOnly: false, authEnabled: true }), {
+			return response(JSON.stringify({ readOnly: false }), {
 				status: 200,
 				headers: { "content-type": "application/json" },
 			});
@@ -66,11 +65,11 @@ describe("native API client", () => {
 		const client = new ApiClient(options);
 		const controller = new AbortController();
 		const result = await client.getStatus({
-			authToken: "supplied-at-call",
+			headers: { Authorization: "Bearer retired-token" },
 			signal: controller.signal,
 		});
 
-		expect(result).toEqual({ readOnly: false, authEnabled: true });
+		expect(result).toEqual({ readOnly: false });
 		expect(fetcher).toHaveBeenCalledWith(
 			"/proxy/v1/status",
 			expect.objectContaining({
@@ -86,7 +85,7 @@ describe("native API client", () => {
 		const nativeFetch = vi.fn(function (this: unknown) {
 			receivers.push(this);
 			return Promise.resolve(
-				response(JSON.stringify({ readOnly: false, authEnabled: false }), {
+				response(JSON.stringify({ readOnly: false }), {
 					status: 200,
 					headers: { "content-type": "application/json" },
 				}),

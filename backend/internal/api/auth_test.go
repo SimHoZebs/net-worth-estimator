@@ -21,21 +21,16 @@ func postAccount(handler http.Handler, authorization string) *httptest.ResponseR
 	return response
 }
 
-func TestRowWriteAuthMatrix(t *testing.T) {
-	const token = "test-token-123"
+func TestRowWriteReadOnlyMatrix(t *testing.T) {
 	for _, test := range []struct {
 		name       string
 		config     Config
 		authHeader string
 		want       int
 	}{
-		{name: "writable without token configured", config: Config{}, authHeader: "", want: http.StatusOK},
-		{name: "writable with token missing", config: Config{AuthToken: token}, authHeader: "", want: http.StatusUnauthorized},
-		{name: "writable with wrong token", config: Config{AuthToken: token}, authHeader: "Bearer wrong", want: http.StatusUnauthorized},
-		{name: "writable with malformed scheme", config: Config{AuthToken: token}, authHeader: "Token " + token, want: http.StatusUnauthorized},
-		{name: "writable with correct token", config: Config{AuthToken: token}, authHeader: "Bearer " + token, want: http.StatusOK},
-		{name: "read-only without token", config: Config{ReadOnly: true}, authHeader: "", want: http.StatusForbidden},
-		{name: "read-only wins over valid token", config: Config{ReadOnly: true, AuthToken: token}, authHeader: "Bearer " + token, want: http.StatusForbidden},
+		{name: "writable API", config: Config{}, want: http.StatusOK},
+		{name: "read-only API", config: Config{ReadOnly: true}, want: http.StatusForbidden},
+		{name: "bearer cannot bypass read-only", config: Config{ReadOnly: true}, authHeader: "Bearer retired-token", want: http.StatusForbidden},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			database := openAPIStore(t)
@@ -76,23 +71,20 @@ func TestRowWriteAuthMatrix(t *testing.T) {
 	}
 }
 
-func TestStatusReportsAuthEnabled(t *testing.T) {
+func TestStatusOmitsRetiredTokenPolicy(t *testing.T) {
 	database := openAPIStore(t)
-	handler := New(database, Config{AuthToken: "test-token-123"})
+	handler := New(database, Config{})
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d", response.Code)
 	}
-	var payload struct {
-		ReadOnly    bool `json:"readOnly"`
-		AuthEnabled bool `json:"authEnabled"`
-	}
+	var payload map[string]any
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode status response: %v", err)
 	}
-	if payload.ReadOnly || !payload.AuthEnabled {
+	if _, present := payload["authEnabled"]; present || payload["readOnly"] != false {
 		t.Fatalf("status = %+v", payload)
 	}
 }

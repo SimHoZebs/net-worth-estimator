@@ -94,7 +94,6 @@ function setup(
 		.mockResolvedValue(undefined);
 	const options: ServerModelImportOptions = {
 		client,
-		authToken: "tab-token",
 		preconditions: {
 			hasWorkspace: true,
 			readOnly: false,
@@ -158,14 +157,11 @@ describe("server model replacement", () => {
 		},
 	);
 
-	it("creates the reviewed rows with the tab token, then reloads", async () => {
+	it("creates reviewed rows through the scoped session client, then reloads", async () => {
 		const { run, mocks: client, recover, reload } = setup();
 		expect(await run()).toBe(true);
 		expect(client.getModel).toHaveBeenCalledOnce();
-		expect(client.createAccount).toHaveBeenCalledExactlyOnceWith(
-			account,
-			expect.objectContaining({ authToken: "tab-token" }),
-		);
+		expect(client.createAccount).toHaveBeenCalledExactlyOnceWith(account, {});
 		expect(reload).toHaveBeenCalledOnce();
 		expect(recover).not.toHaveBeenCalled();
 	});

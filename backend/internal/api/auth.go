@@ -1,20 +1,17 @@
 package api
 
 import (
-	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"strings"
 )
 
-// writeAuthMiddleware guards canonical model writes and the SimpleFIN sync
-// trigger. Precedence: read-only rejects everything with 403 first;
-// otherwise a missing or wrong bearer token is 401. When no token is
-// configured (dev default) guarded routes stay open. Reads and compute
-// endpoints always pass through.
+// readOnlyMiddleware rejects canonical model writes and the SimpleFIN sync
+// trigger with 403. The outer identity boundary owns authentication and plan
+// permissions. Reads and compute endpoints pass through this kill switch.
 // New write routes must add a prefix here: the guard is a string table,
 // not derived from route registration, so an unlisted route stays open.
-func writeAuthMiddleware(readOnly bool, token string) func(http.Handler) http.Handler {
+func readOnlyMiddleware(readOnly bool) func(http.Handler) http.Handler {
 	guardedPrefixes := []string{
 		http.MethodPost + " /v1/accounts",
 		http.MethodPatch + " /v1/accounts/",
@@ -59,29 +56,9 @@ func writeAuthMiddleware(readOnly bool, token string) func(http.Handler) http.Ha
 				writeAPIError(w, http.StatusForbidden, "Forbidden", "server is read-only")
 				return
 			}
-			if token == "" {
-				next.ServeHTTP(w, r)
-				return
-			}
-			if !validBearer(r.Header.Get("Authorization"), token) {
-				writeAPIError(w, http.StatusUnauthorized, "Unauthorized", "valid bearer token required")
-				return
-			}
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-func validBearer(header, token string) bool {
-	const scheme = "Bearer "
-	if len(header) <= len(scheme) {
-		return false
-	}
-	given, expected := []byte(header), []byte(scheme+token)
-	if len(given) != len(expected) {
-		return false
-	}
-	return subtle.ConstantTimeCompare(given, expected) == 1
 }
 
 // writeAPIError mirrors the huma error envelope so middleware rejections

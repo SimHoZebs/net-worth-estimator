@@ -32,7 +32,7 @@ afterEach(() => {
 
 it("keeps account controls above navigation when the private plan is empty", () => {
 	useWorkspaceStore.setState({
-		status: { readOnly: false, authEnabled: false },
+		status: { readOnly: false },
 		serverDocument: null,
 		error: "no financial model",
 	});

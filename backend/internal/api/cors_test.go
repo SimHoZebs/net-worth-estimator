@@ -242,7 +242,7 @@ func TestCORSMiddlewareHandlesPreflight(t *testing.T) {
 	request := httptest.NewRequest(http.MethodOptions, "/v1/financial-model", nil)
 	request.Header.Set("Origin", allowedTestOrigin)
 	request.Header.Set("Access-Control-Request-Method", http.MethodPut)
-	request.Header.Set("Access-Control-Request-Headers", "content-type, authorization")
+	request.Header.Set("Access-Control-Request-Headers", "content-type, x-waypoint-resource")
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)
@@ -271,7 +271,7 @@ func TestCORSMiddlewareAllowsRowMethodPreflights(t *testing.T) {
 		request := httptest.NewRequest(http.MethodOptions, "/v1/accounts/x", nil)
 		request.Header.Set("Origin", allowedTestOrigin)
 		request.Header.Set("Access-Control-Request-Method", method)
-		request.Header.Set("Access-Control-Request-Headers", "content-type, authorization")
+		request.Header.Set("Access-Control-Request-Headers", "content-type, X-Waypoint-Resource")
 		response := httptest.NewRecorder()
 
 		handler.ServeHTTP(response, request)
@@ -306,6 +306,7 @@ func TestCORSMiddlewareRejectsUnsupportedPreflight(t *testing.T) {
 	}{
 		{name: "method", method: "TRACE"},
 		{name: "header", method: http.MethodPost, headers: "X-Custom-Header"},
+		{name: "retired bearer header", method: http.MethodPost, headers: "Authorization"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			handler := corsMiddleware([]string{allowedTestOrigin})(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {

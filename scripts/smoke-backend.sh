@@ -12,6 +12,9 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
 fi
 
 base="${BASE_URL:-http://localhost:8787}"
+: "${COOKIE_FILE:?Set COOKIE_FILE to a private disposable owner-session cookie jar}"
+: "${RESOURCE_ID:?Set RESOURCE_ID from session discovery}"
+: "${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN to the configured frontend origin}"
 for cmd in curl jq; do
 	if ! command -v "$cmd" >/dev/null 2>&1; then
 		echo "error: '$cmd' not found on PATH." >&2
@@ -25,7 +28,8 @@ trap 'rm -f "$tmp"' EXIT
 # request <METHOD> <path> : curls into $tmp, prints body on non-200, fails.
 request() {
 	local method="$1" path="$2" code
-	code="$(curl -sS -o "$tmp" -w '%{http_code}' -X "$method" "$base$path")"
+	code="$(curl -sS --cookie "$COOKIE_FILE" -H "X-Waypoint-Resource: $RESOURCE_ID" \
+		-H "Origin: $PUBLIC_ORIGIN" -o "$tmp" -w '%{http_code}' -X "$method" "$base$path")"
 	if [ "$code" != "200" ]; then
 		echo "FAIL $method $path -> HTTP $code" >&2
 		cat "$tmp" >&2

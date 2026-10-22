@@ -2,7 +2,7 @@
 // can restore that baseline on demand. It exists so browser tests exercise the
 // real Go engine and the real HTTP surface instead of a client-side stand-in.
 //
-// It reads the same environment contract as cmd/server. The only addition is
+// This isolated harness intentionally has no identity provider. Its addition is
 // POST /__fixture/reset, which clears persisted state, re-imports the fixture,
 // and optionally switches the read-only guard. That route belongs to this
 // harness and is absent from the production server.
@@ -38,7 +38,6 @@ func main() {
 	}
 	dbPath := envOr("NET_WORTH_ESTIMATOR_DB", filepath.Join(os.TempDir(), "waypoint-fixture.db"))
 	modelPath := envOr("NET_WORTH_ESTIMATOR_MODEL_PATH", "public/configs")
-	authToken := os.Getenv("NET_WORTH_ESTIMATOR_AUTH_TOKEN")
 	allowedOrigins := splitOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
 
 	database, err := store.Open(dbPath)
@@ -65,7 +64,6 @@ func main() {
 		live.set(api.New(database, api.Config{
 			AllowedOrigins: allowedOrigins,
 			ReadOnly:       readOnly,
-			AuthToken:      authToken,
 		}))
 		return nil
 	}

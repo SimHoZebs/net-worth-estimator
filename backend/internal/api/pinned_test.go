@@ -85,10 +85,4 @@ func TestPinnedEvaluationsGuarded(t *testing.T) {
 	if open.Code != http.StatusOK {
 		t.Fatalf("read-only get status = %d, want 200", open.Code)
 	}
-
-	guarded := New(database, Config{AuthToken: "secret"})
-	unauthorized := doRowRequest(t, guarded, http.MethodPut, "/v1/pinned-evaluations", `{"instanceIds":[]}`)
-	if unauthorized.Code != http.StatusUnauthorized {
-		t.Fatalf("unauthorized put status = %d, want 401", unauthorized.Code)
-	}
 }

@@ -45,10 +45,7 @@ func (s *Server) getModel(_ context.Context, _ *struct{}) (*getModelOutput, erro
 
 type statusOutput struct {
 	Body struct {
-		ReadOnly bool `json:"readOnly"`
-		// AuthEnabled controls the legacy bearer-token prompt. OIDC session
-		// discovery uses /v1/auth/session before the private workspace mounts.
-		AuthEnabled    bool `json:"authEnabled"`
+		ReadOnly       bool `json:"readOnly"`
 		SyncConfigured bool `json:"syncConfigured"`
 		// LastSyncAt is the last successful sync completion time (RFC3339
 		// UTC), omitted when no sync has completed yet.
@@ -62,7 +59,6 @@ func (s *Server) getStatus(ctx context.Context, _ *struct{}) (*statusOutput, err
 	if s.CanWrite != nil && !s.CanWrite(ctx) {
 		output.Body.ReadOnly = true
 	}
-	output.Body.AuthEnabled = s.AuthEnabled
 	output.Body.SyncConfigured = s.SyncRunner != nil
 	lastSync, err := s.store.GetLastSyncTime()
 	if err != nil {

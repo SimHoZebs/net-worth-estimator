@@ -58,13 +58,12 @@ func TestStatusReflectsReadOnlyFlag(t *testing.T) {
 			t.Fatalf("readOnly=%v status = %d, body %s", readOnly, response.Code, response.Body.String())
 		}
 		var payload struct {
-			ReadOnly    bool `json:"readOnly"`
-			AuthEnabled bool `json:"authEnabled"`
+			ReadOnly bool `json:"readOnly"`
 		}
 		if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 			t.Fatalf("decode status response: %v", err)
 		}
-		if payload.ReadOnly != readOnly || payload.AuthEnabled {
+		if payload.ReadOnly != readOnly {
 			t.Fatalf("readOnly=%v status = %+v", readOnly, payload)
 		}
 	}

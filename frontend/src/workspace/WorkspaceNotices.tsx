@@ -29,13 +29,7 @@ function useErrorRecovery(): { action: string; onAction: () => void } {
 	};
 }
 
-export function workspaceStatusLabel({
-	readOnly,
-}: {
-	readOnly: boolean;
-	authTokenActive?: boolean;
-	authRequired?: boolean;
-}) {
+export function workspaceStatusLabel({ readOnly }: { readOnly: boolean }) {
 	return readOnly ? "Read-only" : "Workspace";
 }
 

@@ -51,7 +51,7 @@ describe("workspace resource reset", () => {
 			capture: (finish: (value: FinancialModelResponse) => void) => void,
 		) =>
 			({
-				getStatus: async () => ({ readOnly: false, authEnabled: false }),
+				getStatus: async () => ({ readOnly: false }),
 				getModel: () =>
 					new Promise<FinancialModelResponse>((resolve) => capture(resolve)),
 				listAmountPresets: async () => ({ presets: [{ id }] }),
@@ -59,7 +59,7 @@ describe("workspace resource reset", () => {
 		const first = makeClient("private-a-recipe", (finish) => {
 			finishA = finish;
 		});
-		useWorkspaceStore.getState().bindEngine(first, "");
+		useWorkspaceStore.getState().bindEngine(first);
 		useWorkspaceStore.getState().bootWorkspace();
 		const old = useWorkspaceStore.getState().engine;
 		const oldHydration = old.hydrationPromise;
@@ -72,7 +72,6 @@ describe("workspace resource reset", () => {
 			makeClient("private-b-recipe", (finish) => {
 				finishB = finish;
 			}),
-			"",
 		);
 		useWorkspaceStore.getState().bootWorkspace();
 		finishA({ document: null, issues: [] });
@@ -91,45 +90,38 @@ describe("workspace resource reset", () => {
 
 	it("ignores a late status response instead of applying the previous account's access", async () => {
 		let finish: (value: ServerStatus) => void = () => {};
-		useWorkspaceStore.getState().bindEngine(
-			{
-				getStatus: () =>
-					new Promise<ServerStatus>((resolve) => {
-						finish = resolve;
-					}),
-			} as unknown as RemoteApiClient,
-			"",
-		);
+		useWorkspaceStore.getState().bindEngine({
+			getStatus: () =>
+				new Promise<ServerStatus>((resolve) => {
+					finish = resolve;
+				}),
+		} as unknown as RemoteApiClient);
 		const pending = useWorkspaceStore.getState().refreshStatus();
 		resetWorkspaceForResource();
 		owner("plans/b");
 		useWorkspaceStore.setState({
-			status: { readOnly: true, authEnabled: true },
+			status: { readOnly: true },
 		});
-		finish({ readOnly: false, authEnabled: false });
+		finish({ readOnly: false });
 		await pending;
 		expect(useWorkspaceStore.getState().status).toEqual({
 			readOnly: true,
-			authEnabled: true,
 		});
 	});
 
 	it("ignores late recipe reads and writes from the previous account", async () => {
 		let finishRead: (value: unknown) => void = () => {};
 		let finishWrite: (value: unknown) => void = () => {};
-		useWorkspaceStore.getState().bindEngine(
-			{
-				listAmountPresets: () =>
-					new Promise((resolve) => {
-						finishRead = resolve;
-					}),
-				createAmountPreset: () =>
-					new Promise((resolve) => {
-						finishWrite = resolve;
-					}),
-			} as unknown as RemoteApiClient,
-			"",
-		);
+		useWorkspaceStore.getState().bindEngine({
+			listAmountPresets: () =>
+				new Promise((resolve) => {
+					finishRead = resolve;
+				}),
+			createAmountPreset: () =>
+				new Promise((resolve) => {
+					finishWrite = resolve;
+				}),
+		} as unknown as RemoteApiClient);
 		const read = useWorkspaceStore.getState().refreshPresets();
 		const write = useWorkspaceStore.getState().createPreset({} as never);
 		resetWorkspaceForResource();

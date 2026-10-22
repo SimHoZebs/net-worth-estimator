@@ -44,12 +44,6 @@ export interface ApiClientOptions {
 
 export interface ApiRequestOptions {
 	signal?: AbortSignal;
-	/** Canonical token key. */
-	authToken?: string;
-	/** Deprecated alias for authToken. */
-	bearerToken?: string;
-	/** Deprecated alias for authToken. */
-	token?: string;
 	headers?: HeadersInit;
 }
 
@@ -199,7 +193,7 @@ async function readBody(response: Response): Promise<ParsedBody> {
 function httpMessage(status: number, detail: string | null): string {
 	const suffix = detail ? ` ${detail}` : "";
 	if (status === 401)
-		return `Authentication is required. Provide a valid bearer token for this request.${suffix}`;
+		return `Your session needs verification. Sign in and retry this request.${suffix}`;
 	if (status === 403)
 		return `The server is read-only. Enable writes on the server before saving.${suffix}`;
 	if (status === 409)
@@ -250,16 +244,10 @@ function path(baseUrl: string, route: string): string {
 
 function requestHeaders({
 	body,
-	authToken,
-	bearerToken,
-	token,
 	headers,
 	accept,
 }: {
 	body: boolean;
-	authToken?: string;
-	bearerToken?: string;
-	token?: string;
 	headers?: HeadersInit;
 	accept: string;
 }): Headers | ApiRequestError {
@@ -269,13 +257,8 @@ function requestHeaders({
 			if (body && !result.has("content-type"))
 				result.set("content-type", "application/json");
 			if (!result.has("accept")) result.set("accept", accept);
-			if (authToken == null && (bearerToken ?? token)) {
-				console.warn(
-					"API client uses deprecated bearerToken/token; use authToken.",
-				);
-			}
-			const suppliedToken = authToken ?? bearerToken ?? token;
-			if (suppliedToken) result.set("authorization", `Bearer ${suppliedToken}`);
+			// Application access uses HttpOnly session cookies, never a shared token.
+			result.delete("authorization");
 			return result;
 		},
 		catch: (cause) => new ApiRequestError(cause),
@@ -298,9 +281,6 @@ function requestInit(
 	if (encoded instanceof Error) return encoded;
 	const headers = requestHeaders({
 		body: hasBody,
-		authToken: options.authToken,
-		bearerToken: options.bearerToken,
-		token: options.token,
 		headers: options.headers,
 		accept,
 	});
@@ -308,6 +288,7 @@ function requestInit(
 	return {
 		method,
 		headers,
+		credentials: "same-origin",
 		...(hasBody ? { body: encoded } : {}),
 		...(options.signal ? { signal: options.signal } : {}),
 	};
