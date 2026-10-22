@@ -54,7 +54,6 @@ export interface UseRemoteProjectionOptions {
 	draftDocument?: FinancialModelDocument | null;
 	years?: number;
 	ranges?: boolean;
-	authToken?: string;
 	// Request-local evaluation scope. It participates in document/cache identity.
 	evaluations?: EvaluationTables;
 	// When false the hook issues no requests. The saved-plan projection is
@@ -72,12 +71,10 @@ async function runDeterministic(
 	api: RemoteProjectionClient,
 	document: FinancialModelDocument,
 	years: number,
-	authToken: string | undefined,
 	signal: AbortSignal,
 ): Promise<Projection> {
 	const request = projectionRequest(document, years);
 	const response = await api.projectDeterministic(request, {
-		authToken,
 		signal,
 	});
 	if (response instanceof Error) throw response;
@@ -644,7 +641,6 @@ export function useRemoteProjection({
 	draftDocument: draftOverride,
 	years: yearsOverride,
 	ranges: rangesOverride,
-	authToken: tokenOverride,
 	evaluations: evaluationsOverride,
 	enabled = true,
 }: UseRemoteProjectionOptions = {}) {
@@ -681,12 +677,10 @@ export function useRemoteProjection({
 		draftOverride !== undefined ? draftOverride : derivedDraftDocument;
 	const storeYears = useUiStore((state) => state.years);
 	const storeRanges = useUiStore((state) => state.ranges);
-	const storeToken = useUiStore((state) => state.authToken);
 	const document =
 		documentOverride !== undefined ? documentOverride : storeDocument;
 	const years = yearsOverride ?? storeYears;
 	const ranges = rangesOverride ?? storeRanges;
-	const authToken = tokenOverride ?? storeToken;
 	const sourceDocument = draftDocument ?? document ?? null;
 	const activeDocument = useMemo(
 		() =>
@@ -713,7 +707,7 @@ export function useRemoteProjection({
 		queryFn: ({ signal }) => {
 			const current = activeDocument;
 			if (!current) throw new Error(MISSING_DOCUMENT_MESSAGE);
-			return runDeterministic(api, current, years, authToken, signal);
+			return runDeterministic(api, current, years, signal);
 		},
 		enabled: enabled && hasDocument,
 		placeholderData: keepPreviousData,
@@ -777,7 +771,6 @@ export function useRemoteProjection({
 		// partials stay local; only the final result is cached.
 		const streamStochastic = async (): Promise<RangeResult> => {
 			const response = await api.projectStochastic(request, {
-				authToken,
 				signal: controller.signal,
 			});
 			// Rethrow intact: the client disguises aborts as ApiNetworkError
@@ -861,7 +854,7 @@ export function useRemoteProjection({
 		};
 		runStream();
 		return () => controller.abort();
-	}, [api, authToken, documentKey, enabled, rangeAttempt, ranges, years]);
+	}, [api, documentKey, enabled, rangeAttempt, ranges, years]);
 
 	const abort = useCallback(() => {
 		// Deterministic cancellation is Query-managed; only the streaming

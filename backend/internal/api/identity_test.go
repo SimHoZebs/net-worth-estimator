@@ -22,13 +22,12 @@ func TestIdentitySessionDefaultsAndViewerStatus(t *testing.T) {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
 		var status struct {
-			ReadOnly    bool `json:"readOnly"`
-			AuthEnabled bool `json:"authEnabled"`
+			ReadOnly bool `json:"readOnly"`
 		}
 		if err := json.Unmarshal(w.Body.Bytes(), &status); err != nil {
 			t.Fatal(err)
 		}
-		if status.ReadOnly == canWrite || status.AuthEnabled {
+		if status.ReadOnly == canWrite {
 			t.Fatalf("viewer status=%+v", status)
 		}
 		w = httptest.NewRecorder()
@@ -42,18 +41,16 @@ func TestIdentitySessionDefaultsAndViewerStatus(t *testing.T) {
 	}
 }
 
-func TestLegacyStatusRemainsPublic(t *testing.T) {
+func TestBareAPIStatusForFixtureHarness(t *testing.T) {
 	db, err := store.Open(filepath.Join(t.TempDir(), "model.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	for _, token := range []string{"", "legacy-token"} {
-		h := New(db, Config{AuthToken: token})
-		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
-		if w.Code != http.StatusOK {
-			t.Fatalf("legacy anonymous status=%d", w.Code)
-		}
+	h := New(db, Config{})
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("fixture status=%d", w.Code)
 	}
 }

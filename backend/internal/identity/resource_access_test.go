@@ -30,6 +30,8 @@ func TestResourceAssertionsPreventCrossIdentityRequests(t *testing.T) {
 	check := func(method, resource string, want int) {
 		t.Helper()
 		rq, _ := http.NewRequest(method, server.URL+"/v1/accounts", nil)
+		// A retired shared token cannot grant a guest access or replace a session.
+		rq.Header.Set("Authorization", "Bearer retired-token")
 		if resource != "" {
 			rq.Header.Set(ResourceHeader, resource)
 		}

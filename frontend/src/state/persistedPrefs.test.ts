@@ -124,16 +124,16 @@ afterEach(() => {
 });
 
 describe("unified persisted prefs", () => {
-	it("persists UI years/ranges without auth token", async () => {
+	it("persists only UI years/ranges, without credential fields", async () => {
 		useUiStore.getState().setYears(10);
 		useUiStore.getState().setRanges(false);
-		useUiStore.getState().setAuthToken("secret");
 		// Persist writes are async-adjacent; flush a tick.
 		await new Promise((resolve) => setTimeout(resolve, 0));
 		const raw = window.localStorage.getItem(UI_PREFS_STORAGE_KEY) ?? "";
 		expect(raw).toContain('"years":10');
 		expect(raw).toContain('"ranges":false');
-		expect(raw).not.toContain("secret");
+		expect(raw).not.toMatch(/authToken|bearerToken/);
+		expect(useUiStore.getState()).not.toHaveProperty("authToken");
 	});
 
 	it("falls back to UI defaults on corrupt prefs", async () => {

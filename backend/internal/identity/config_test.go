@@ -18,6 +18,8 @@ func TestProviderConfiguration(t *testing.T) {
 		fail             bool
 	}{
 		{"valid", "", "", false}, {"casdoor", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "casdoor", false},
+		{"default provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "", false},
+		{"disabled provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "none", true},
 		{"unknown provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "typo", true},
 		{"archived provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "better-auth", true},
 		{"legacy bypass", "NET_WORTH_ESTIMATOR_AUTH_TOKEN", "legacy", true},
@@ -48,7 +50,7 @@ func TestProviderConfiguration(t *testing.T) {
 		})
 	}
 	c, err := FromEnv(func(string) string { return "" }, "model.db")
-	if err != nil || c.Provider != "none" {
-		t.Fatalf("disabled mode: %+v %v", c, err)
+	if err == nil || c.Provider != "casdoor" {
+		t.Fatalf("missing identity configuration must fail closed: %+v %v", c, err)
 	}
 }

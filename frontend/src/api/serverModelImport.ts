@@ -19,7 +19,6 @@ export class ServerModelImportError extends errore.createTaggedError({
 
 export type ServerModelImportOptions = {
 	client: Pick<ApiClient, "getModel"> & RowWriter;
-	authToken: string;
 	preconditions: {
 		hasWorkspace: boolean;
 		readOnly: boolean;
@@ -36,7 +35,6 @@ export type ServerModelImportOptions = {
 export async function importServerModel({
 	document,
 	client,
-	authToken,
 	preconditions,
 	recover,
 	reload,
@@ -59,12 +57,12 @@ export async function importServerModel({
 			detail:
 				"Wait for the current server operation to finish before importing a model.",
 		});
-	const current = await client.getModel({ authToken });
+	const current = await client.getModel();
 	const stale = responseScopeError(scope);
 	if (stale) return stale;
 	if (current instanceof Error) return current;
 	const operations = diffFinancialModelDocuments(current.document, document);
-	const applied = await applyRowOperations(client, operations, { authToken });
+	const applied = await applyRowOperations(client, operations);
 	const changed = responseScopeError(scope);
 	if (changed) return changed;
 	if (applied instanceof Error) return applied;

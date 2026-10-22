@@ -75,9 +75,6 @@ func main() {
 		log.Fatalf("configure allowed origins: %v", err)
 	}
 	readOnly := parseReadOnly(os.Getenv("NET_WORTH_ESTIMATOR_READ_ONLY"))
-	// Never logged: bearer token guarding canonical model writes. Empty
-	// means auth disabled (dev default).
-	authToken := os.Getenv("NET_WORTH_ESTIMATOR_AUTH_TOKEN")
 	identityConfig, err := identity.FromEnv(os.Getenv, dbPath)
 	if err != nil {
 		log.Fatalf("configure identity: %v", err)
@@ -95,15 +92,12 @@ func main() {
 	if !exists {
 		fmt.Println("no financial model stored: import one through Configs or cmd/importcsv")
 	}
-	var resources resourceConfig
-	if identityConfig.Provider != "none" {
-		resources, err = resourceConfigFromEnv(os.Getenv, dbPath)
-		if err != nil {
-			log.Fatalf("configure plan resources: %v", err)
-		}
-		if exists && resources.OwnerSubject == "" {
-			log.Fatal("existing financial data requires NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT before authenticated startup")
-		}
+	resources, err := resourceConfigFromEnv(os.Getenv, dbPath)
+	if err != nil {
+		log.Fatalf("configure plan resources: %v", err)
+	}
+	if exists && resources.OwnerSubject == "" {
+		log.Fatal("existing financial data requires NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT before authenticated startup")
 	}
 
 	syncRunner, syncStop := configureSync(database)
@@ -112,21 +106,14 @@ func main() {
 	apiConfig := api.Config{
 		AllowedOrigins: allowedOrigins,
 		ReadOnly:       readOnly,
-		AuthToken:      authToken,
 		SyncRunner:     syncRunner,
 		FrontendDir:    frontendPath,
 	}
-	var handler http.Handler
-	if identityConfig.Provider != "none" {
-		var closeResources func() error
-		handler, closeResources, err = resourceHandler(context.Background(), database, dbPath, resources, identityConfig, apiConfig)
-		if err != nil {
-			log.Fatalf("configure resource access: %v", err)
-		}
-		defer closeResources()
-	} else {
-		handler = api.New(database, apiConfig)
+	handler, closeResources, err := resourceHandler(context.Background(), database, dbPath, resources, identityConfig, apiConfig)
+	if err != nil {
+		log.Fatalf("configure resource access: %v", err)
 	}
+	defer closeResources()
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),
 		Handler:           handler,

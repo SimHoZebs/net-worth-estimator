@@ -34,17 +34,16 @@ const syncTriggerFixture = `{
   ]
 }`
 
-func TestSyncTriggerRequiresAuth(t *testing.T) {
+func TestSyncTriggerReadOnlyPolicy(t *testing.T) {
 	for _, test := range []struct {
 		name       string
 		config     Config
 		authHeader string
 		want       int
 	}{
-		{name: "no token configured still serves when runner set", config: Config{}, authHeader: "", want: 503},
-		{name: "token missing", config: Config{AuthToken: "tok"}, authHeader: "", want: http.StatusUnauthorized},
-		{name: "token wrong", config: Config{AuthToken: "tok"}, authHeader: "Bearer nope", want: http.StatusUnauthorized},
-		{name: "read-only wins over valid token", config: Config{ReadOnly: true, AuthToken: "tok"}, authHeader: "Bearer tok", want: http.StatusForbidden},
+		{name: "unconfigured runner", config: Config{}, want: http.StatusServiceUnavailable},
+		{name: "read-only", config: Config{ReadOnly: true}, want: http.StatusForbidden},
+		{name: "bearer cannot bypass read-only", config: Config{ReadOnly: true}, authHeader: "Bearer retired-token", want: http.StatusForbidden},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			database := openAPIStore(t)
@@ -85,11 +84,10 @@ func TestSyncTriggerRunsDryRunAndGuardsInterval(t *testing.T) {
 		CardAccounts: map[string]struct{}{"prime_card": {}},
 		DryRun:       true,
 	}, &simplefin.Client{AccessURL: bridge.URL})
-	handler := New(database, Config{AuthToken: "tok", SyncRunner: runner})
+	handler := New(database, Config{SyncRunner: runner})
 
 	trigger := func() *httptest.ResponseRecorder {
 		request := httptest.NewRequest(http.MethodPost, "/v1/sync/simplefin", nil)
-		request.Header.Set("Authorization", "Bearer tok")
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)
 		return response

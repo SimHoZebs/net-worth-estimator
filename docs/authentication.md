@@ -31,7 +31,7 @@ The default signup form does not collect email or require a mail service.
 
 | Setting | Meaning |
 | --- | --- |
-| `NET_WORTH_ESTIMATOR_AUTH_PROVIDER` | `none` (legacy default) or `casdoor` |
+| `NET_WORTH_ESTIMATOR_AUTH_PROVIDER` | `casdoor` (default and only supported provider) |
 | `NET_WORTH_ESTIMATOR_AUTH_ISSUER` | Exact public issuer from OIDC discovery |
 | `NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL` | Optional private container origin. Public issuer verification remains unchanged |
 | `NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID` | Confidential OIDC client |
@@ -52,15 +52,21 @@ Register the callback `<PUBLIC_URL>/v1/auth/callback` and post-logout redirect
 sets these fields. It uses one-hour access/ID tokens and 30-day refresh grants.
 
 The frontend and API share one public origin through the proxy. The proxy
-preserves Origin for Go's browser CSRF protection. Direct cross-origin bearer
-deployments remain available in legacy mode. Cross-origin session login is
-outside this integration. Casdoor mode rejects the legacy `AUTH_TOKEN` setting.
+preserves Origin for Go's browser CSRF protection. Dev and production use the
+same Casdoor session boundary. The server rejects the retired `AUTH_TOKEN`
+setting and `AUTH_PROVIDER=none` before it opens financial storage. Missing
+identity settings stop startup rather than expose an unauthenticated API.
+Cross-origin session login is outside this integration.
 
 `GET /v1/auth/session` supplies identity and resource-capability discovery.
 The API checks Casdoor's resource permissions before any plan read or write.
-Guests read only sample status, which reports `readOnly: true`. Its `authEnabled` field
-still means legacy bearer-token authentication, not OIDC session login. This
-keeps the legacy token prompt separate from the session boundary.
+Guests read only sample status, which reports `readOnly: true`. Authentication
+discovery belongs to `/v1/auth/session`; status no longer contains `authEnabled`.
+The frontend has no shared-token prompt or token state. Its API client uses
+session cookies and strips caller-supplied Authorization headers.
+
+The isolated `cmd/fixtureapi` browser-test harness intentionally omits identity.
+That executable is not a supported deployment or manual-development entry point.
 
 Assign existing primary data to its verified owner before migration. New
 accounts receive their own empty private plan. Casdoor owns action/resource

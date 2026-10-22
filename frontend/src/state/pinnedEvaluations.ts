@@ -5,7 +5,6 @@ import {
 	getResourceScope,
 	subscribeResourceScope,
 } from "../auth/resourceScope.ts";
-import { useUiStore } from "./uiStore.ts";
 
 export interface PinnedEvaluationsState {
 	/** Pinned evaluation instance IDs in pin order. Null until loaded. */
@@ -24,11 +23,6 @@ function clientOrDefault(client?: ApiClient): ApiClient {
 	return defaultClient();
 }
 
-function authOptions(): { authToken?: string } {
-	const authToken = useUiStore.getState().authToken;
-	return authToken ? { authToken } : {};
-}
-
 /**
  * Server-persisted evaluation pins. The server is the source of truth;
  * toggles apply optimistically and revert when the PUT fails. Reads stay
@@ -45,8 +39,7 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 			if (scope.status === "pending") return;
 			if (get().loading) return;
 			set({ loading: true, error: null });
-			const result =
-				await clientOrDefault(client).getPinnedEvaluations(authOptions());
+			const result = await clientOrDefault(client).getPinnedEvaluations();
 			if (scope !== getResourceScope()) return;
 			if (result instanceof Error) {
 				set({ loading: false, error: result.message });
@@ -62,10 +55,7 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 				? previous.filter((item) => item !== id)
 				: [...previous, id];
 			set({ ids: next, error: null });
-			const result = await clientOrDefault(client).setPinnedEvaluations(
-				next,
-				authOptions(),
-			);
+			const result = await clientOrDefault(client).setPinnedEvaluations(next);
 			if (scope !== getResourceScope()) return false;
 			if (result instanceof Error) {
 				set({ ids: previous, error: result.message });

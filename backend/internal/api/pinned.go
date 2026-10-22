@@ -9,7 +9,7 @@ import (
 // Pinned evaluations are a display preference, not canonical model rows:
 // reads bypass validation and revision tracking, and the single PUT
 // replaces the whole ordered list. Unknown instance IDs are 404; the
-// guard middleware (read-only 403, bearer 401) applies to the write.
+// The read-only kill switch and outer session permissions apply to the write.
 type pinnedEvaluationsOutput struct {
 	Body struct {
 		InstanceIDs []string `json:"instanceIds"`

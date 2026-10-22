@@ -1,4 +1,4 @@
-# Local authentication with Casdoor
+# Authentication with Casdoor
 
 Casdoor owns passwords, passkeys, and local SQLite identities. The Go API owns
 OpenID Connect (OIDC) verification, persistent application sessions, and plan access.
@@ -28,8 +28,9 @@ docker compose --env-file auth/casdoor/.env up -d --build
 
 If initialization uses another project or state directory, use those same values.
 Never run two Casdoor processes against one SQLite directory. Keep the verified
-primary-data owner in private deployment configuration. Remove the legacy
-`NET_WORTH_ESTIMATOR_AUTH_TOKEN` in Casdoor mode.
+primary-data owner in private deployment configuration. Remove the retired
+`NET_WORTH_ESTIMATOR_AUTH_TOKEN` setting. Both dev and production require Casdoor;
+the server rejects token-only and unauthenticated configurations.
 
 The overlay routes server requests to `http://casdoor:8000` while preserving the
 public issuer and Host. The browser uses the public Casdoor URL. The frontend and

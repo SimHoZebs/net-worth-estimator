@@ -24,7 +24,7 @@ import { ServerApp } from "./ServerApp.tsx";
 vi.mock("../api/index.ts", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../api/index.ts")>()),
 	createApiClient: () => ({
-		getStatus: async () => ({ readOnly: false, authEnabled: false }),
+		getStatus: async () => ({ readOnly: false }),
 		getModel: async () => ({ document: null, issues: [] }),
 		listAmountPresets: async () => ({ presets: [] }),
 	}),

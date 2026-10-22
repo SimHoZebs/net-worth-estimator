@@ -27,7 +27,7 @@ The model aggregate is `types.FinancialModelDocument`. Payroll is modeled as ord
 
 ## 2. HTTP Contracts
 
-`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, bearer token, optional `simplefin.Runner`, and optional static frontend directory. When `FrontendDir` is set, the router serves built assets and falls back to `index.html` for non-asset GET paths while keeping API, health, docs, and OpenAPI routes reserved. The split container deployment leaves `FrontendDir` empty: the frontend image serves the SPA and proxies `/v1` to the backend.
+`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, optional `simplefin.Runner`, and optional static frontend directory. The server always wraps plan APIs with Casdoor-backed session and resource authorization. Only the isolated fixture API omits that boundary. The split container deployment leaves `FrontendDir` empty: the frontend image serves the SPA and proxies `/v1` to the backend.
 
 The container boundary is split. `backend/Dockerfile` produces an API-only image. `frontend/Dockerfile` produces a static Nginx image whose `BACKEND_URL` runtime setting controls the `/v1` proxy. The proxy removes the browser `Origin` header, disables response buffering, and keeps the SSE connection open for long stochastic runs. `docker compose.yml` is the local full-stack composition; the root `Dockerfile` is retained as a legacy combined image.
 
@@ -56,7 +56,7 @@ Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under
 
 ### Status
 
-`GET /v1/status` returns `readOnly`, `authEnabled`, `syncConfigured`, and `lastSyncAt` (omitted when no sync completed).
+`GET /v1/status` returns `readOnly`, `syncConfigured`, and `lastSyncAt` (omitted when no sync completed). Session and resource discovery use `/v1/auth/session`.
 
 The frontend displays these provider-neutral sync signals. Provider setup, account linking, and sync execution remain server concerns. The sidebar shows the last successful sync in the viewer's time zone, including read-only mode. Missing status fields mean unknown sync status, not "never synced."
 
@@ -137,8 +137,8 @@ An unseeded run does not use the shared registry or artifact cache. Its context 
 
 | Condition                                       | Status                        |
 | ----------------------------------------------- | ----------------------------- |
-| read-only mode                                  | 403, before bearer validation |
-| token configured and missing/wrong              | 401                           |
+| guest write                                     | 401                           |
+| denied plan permission or read-only mode         | 403                           |
 | sync unconfigured                               | 503                           |
 | another run is active                           | 409                           |
 | successful manual run was less than 6 hours ago | 429                           |
@@ -146,16 +146,16 @@ An unseeded run does not use the shared registry or artifact cache. Its context 
 
 ### Origin and write policy
 
-`ParseAllowedOrigins` accepts comma-separated exact HTTP/S origins. It rejects non-root paths, queries, fragments, credentials, invalid ports, empty entries, and wildcard values. CORS permits `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, and `OPTIONS`, and only `Content-Type` and `Authorization` request headers. Same-origin requests are accepted automatically; configured origins are checked exactly. A TLS-terminating proxy must forward exactly one valid `X-Forwarded-Proto` and `X-Forwarded-Host` value, or have its public HTTPS origin listed in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`.
+`ParseAllowedOrigins` accepts comma-separated exact HTTP/S origins. It rejects non-root paths, queries, fragments, credentials, invalid ports, empty entries, and wildcard values. CORS permits `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, and `OPTIONS`, and only `Content-Type` and `X-Waypoint-Resource` request headers. Same-origin requests are accepted automatically; configured origins are checked exactly. A TLS-terminating proxy must forward exactly one valid `X-Forwarded-Proto` and `X-Forwarded-Host` value, or have its public HTTPS origin listed in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`.
 
 A request without an `Origin` header passes. Origin filtering does not grant write access.
 
-`writeAuthMiddleware` guards row writes and sync endpoints:
+The identity boundary checks session and plan permissions for all plan reads, writes, and projections. `readOnlyMiddleware` adds the global write kill switch:
 
 - `POST`, `PATCH`, `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`;
 - `POST /v1/sync/simplefin` and link writes under `/v1/sync/simplefin/accounts`.
 
-Read-only mode rejects those routes first with 403. Otherwise, a configured token requires the exact `Bearer <token>` value and is compared in constant time. Reads and projection computation remain unguarded.
+The kill switch rejects those writes with 403. Guests can read and project only the separate sample. Shared bearer tokens and unauthenticated server startup are unsupported in dev and production. The server rejects the retired `AUTH_TOKEN` setting before opening financial storage.
 
 ## 3. Persistence
 
@@ -507,7 +507,7 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/cmd/server/sync.go`                        | SimpleFIN configuration and 6-hour scheduler     |
 | `backend/cmd/importcsv/main.go`                     | offline seed replacement                         |
 | `backend/internal/api/server.go`                    | router and operation registration                |
-| `backend/internal/api/auth.go`                      | read-only and bearer policy                      |
+| `backend/internal/api/auth.go`                      | read-only write kill switch                      |
 | `backend/internal/api/cors.go`                      | origin parsing and preflight enforcement         |
 | `backend/internal/api/model_handlers.go`            | model and status handlers                        |
 | `backend/internal/api/rows.go`                      | row create/update/delete/move and link handlers  |

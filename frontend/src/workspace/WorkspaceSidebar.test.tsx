@@ -11,7 +11,7 @@ import { WorkspaceSidebar } from "./WorkspaceSidebar.tsx";
 
 vi.mock("../components/ThemeToggle.tsx", () => ({ ThemeToggle: () => null }));
 
-const baseStatus: ServerStatus = { readOnly: false, authEnabled: false };
+const baseStatus: ServerStatus = { readOnly: false };
 const lastSyncAt = "2026-10-18T14:30:00Z";
 
 function renderSidebar(pending = false) {

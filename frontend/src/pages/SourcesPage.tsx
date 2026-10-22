@@ -1,4 +1,3 @@
-import { RemoteAuthControl } from "../app/RemoteAuthControl.tsx";
 import { AmountCatalog } from "../components/editors/AmountCatalog.tsx";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
@@ -23,7 +22,6 @@ export function SourcesPage() {
 				sourceAccess={sourceAccess}
 				serverDocument={serverDocument}
 			/>
-			<RemoteAuthControl />
 			<AmountCatalog
 				accounts={plan.accounts.map((account) => ({
 					id: account.id,

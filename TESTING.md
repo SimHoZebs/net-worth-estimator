@@ -82,7 +82,7 @@ For a backend change, it is the Go gate below.
 
 The pre-commit hook verifies the backend packages containing staged Go files, plus `oxlint` and `oxfmt --check` on staged frontend files. The pre-push hook verifies `./internal/...` and `./cmd/...`, plus whole-project `oxlint`. Remaining frontend gates (`typecheck`, `test`, `build`, `test:browser`) run only when invoked directly.
 
-## Optional Casdoor Authentication
+## Casdoor Authentication
 
 Unit checks need no identity container:
 
@@ -94,8 +94,8 @@ backend/scripts/verify.sh ./internal/api
 node --test auth/casdoor/*.test.mjs
 ```
 
-`scripts/smoke-compose.sh` targets the legacy unauthenticated stack. Casdoor
-requires the resource-scoped checks below. Guests see only a separate sample.
+`scripts/smoke-compose.sh` checks the guest sample on the authenticated stack.
+Guests see only a separate sample.
 Authenticated requests use the account's private plan and assert its resource ID.
 
 Use the [Casdoor test guide](auth/casdoor/README.md#verification) for real-provider
@@ -149,7 +149,7 @@ Direct commands are useful while diagnosing a failure:
 ```bash
 cd backend
 CGO_ENABLED=0 go test ./internal/domain/... -run 'TestGolden'
-CGO_ENABLED=0 go test ./internal/api -run 'TestPutAuthMatrix|TestCORSMiddleware'
+CGO_ENABLED=0 go test ./internal/api -run 'TestRowWriteReadOnlyMatrix|TestCORSMiddleware'
 CGO_ENABLED=0 go test ./internal/store -run 'TestStoreConformance|TestPurgeSyncScriptClearsSyncRows'
 CGO_ENABLED=0 go build ./...
 ```
@@ -171,13 +171,26 @@ The actual benchmark run uses the checked-in fixture and the Go toolchain.
 
 ## Real-Data Server
 
-Use a disposable database restored from a backup. From the repository root, copy a backup to a scratch path while no server is running, then start the server:
+Use a disposable database restored from a backup. Configure Casdoor and its verified primary-data owner through [the auth guide](auth/README.md). The server requires the same session configuration in dev and production. Copy a backup only while its database is stopped.
+
+Direct API snippets below require a valid session cookie file, the discovered resource ID, and the configured public origin. Use only disposable credentials:
+
+```bash
+export COOKIE_FILE=/path/to/private/disposable-cookie-jar
+export RESOURCE_ID=plans/your-discovered-resource-id
+export PUBLIC_ORIGIN=http://localhost:8080
+curl() {
+  command curl --cookie "$COOKIE_FILE" \
+    -H "X-Waypoint-Resource: $RESOURCE_ID" -H "Origin: $PUBLIC_ORIGIN" "$@"
+}
+```
+
+Then start the disposable API with its identity settings in the environment:
 
 ```bash
 export BASE_URL=http://127.0.0.1:8787
 export NET_WORTH_ESTIMATOR_DB=$PWD/tmp/net-worth-estimator-test.db
 unset NET_WORTH_ESTIMATOR_READ_ONLY
-unset NET_WORTH_ESTIMATOR_AUTH_TOKEN
 
 cp <backup>.db tmp/net-worth-estimator-test.db
 CGO_ENABLED=0 go -C backend run ./cmd/server
@@ -258,59 +271,27 @@ grep '^event:' /tmp/stochastic-events.sse
 
 A small seeded run should terminate with one `result` event. It may include `progress` and `partial` events. Repeating the same request should produce `X-Cache: hit` and one `result` event. Sending `"seed": null` exercises the request-bound path; disconnecting that stream cancels its work and must not create an artifact.
 
-## Read-Only and Bearer Matrix
+## Session and Read-Only Matrix
 
-Exercise each row against a disposable database and record the status and whether stored state changed.
+Exercise each row through the real identity boundary against disposable state.
 
-| Mode                          | Authorization  | row writes (`POST /v1/accounts`, …) | `POST /v1/sync/simplefin`              |
-| ----------------------------- | -------------- | ----------------------------------- | -------------------------------------- |
-| writable, no token configured | absent         | normal handling                     | 503 when sync is unconfigured          |
-| writable, token configured    | absent         | 401                                 | 401                                    |
-| writable, token configured    | wrong bearer   | 401                                 | 401                                    |
-| writable, token configured    | correct bearer | normal handling                     | normal handling or sync-specific error |
-| read-only, no token           | absent         | 403                                 | 403                                    |
-| read-only, token configured   | correct bearer | 403                                 | 403                                    |
-| either mode                   | any            | `GET` remains 200                   | reads and projections remain 200       |
+| Access | Plan reads/projections | Canonical writes and manual sync |
+| --- | --- | --- |
+| Guest, sample resource | allowed | 401 |
+| Signed-in owner, own resource | allowed | allowed, subject to validation/sync configuration |
+| Signed-in owner, another resource | 409 for stale resource assertion | rejected |
+| Owner without write permission | allowed when read/project permissions exist | 403 |
+| Owner with global read-only enabled | allowed | 403 |
+| Provider unavailable when verification is due | 503 | 503 |
 
-Read-only server:
+A shared Authorization bearer header cannot replace a session or bypass a denied
+permission. `AUTH_TOKEN` and `AUTH_PROVIDER=none` cause server startup to fail.
+After each rejected write, confirm financial data stays unchanged. Row validation
+can return 200 with error-severity issues and `persisted: false`.
 
-```bash
-export NET_WORTH_ESTIMATOR_READ_ONLY=1
-CGO_ENABLED=0 go -C backend run ./cmd/server
-```
-
-Bearer server:
-
-```bash
-unset NET_WORTH_ESTIMATOR_READ_ONLY
-export NET_WORTH_ESTIMATOR_AUTH_TOKEN=test-token-123
-CGO_ENABLED=0 go -C backend run ./cmd/server
-```
-
-Create one account, then compare the three requests:
-
-```bash
-curl -sS -o /tmp/no-token.json -w '%{http_code}\n' \
-  -X POST -H 'Content-Type: application/json' \
-  -d '{"name":"Probe","kind":"cash","enabled":true}' \
-  "$BASE_URL/v1/accounts"
-
-curl -sS -o /tmp/wrong-token.json -w '%{http_code}\n' \
-  -X POST -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer wrong' \
-  -d '{"name":"Probe","kind":"cash","enabled":true}' \
-  "$BASE_URL/v1/accounts"
-
-curl -sS -o /tmp/valid-token.json -w '%{http_code}\n' \
-  -X POST -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer test-token-123' \
-  -d '{"name":"Probe","kind":"cash","enabled":true}' \
-  "$BASE_URL/v1/accounts"
-```
-
-Expected statuses are 401, 401, and 200. Repeat with `NET_WORTH_ESTIMATOR_READ_ONLY=1` and the valid token; expected status is 403. After every rejected write, reload the model and confirm it is unchanged. Row writes validate one change: an invalid row returns 200 with error-severity issues and `persisted: false`.
-
-Use a cryptographically random token outside this disposable test setup. Store production values in a secret manager and serve guarded endpoints only through encrypted transport.
+`auth/test-integration.mjs` owns the disposable real-provider session, CSRF,
+owner/sample/second-account, and logout checks. Go identity tests also check that
+retired bearer headers cannot grant guest access.
 
 ## CORS Checks
 
@@ -319,17 +300,16 @@ Start with an exact allowlist:
 ```bash
 export NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS=https://app.example.com
 unset NET_WORTH_ESTIMATOR_READ_ONLY
-unset NET_WORTH_ESTIMATOR_AUTH_TOKEN
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-Allowed preflight with bearer support:
+Allowed preflight with resource assertion:
 
 ```bash
 curl -sS -o /dev/null -D - -X OPTIONS \
   -H 'Origin: https://app.example.com' \
   -H 'Access-Control-Request-Method: PATCH' \
-  -H 'Access-Control-Request-Headers: Content-Type, Authorization' \
+  -H 'Access-Control-Request-Headers: Content-Type, X-Waypoint-Resource' \
   "$BASE_URL/v1/financial-model"
 ```
 
@@ -361,11 +341,10 @@ For local fixture verification, set exact dry-run and fixture mode:
 export NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK=1
 export NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS=prime_card
 export NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1
-unset NET_WORTH_ESTIMATOR_AUTH_TOKEN
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-With writable, unauthenticated access, trigger and inspect counts:
+With a writable owner session and its resource assertion, trigger and inspect counts:
 
 ```bash
 curl -fsS -X POST "$BASE_URL/v1/sync/simplefin" | jq .
@@ -388,7 +367,9 @@ backend/scripts/verify.sh ./internal/api
 BASE_URL=http://127.0.0.1:8787 scripts/smoke-backend.sh
 ```
 
-Use it only against a writable instance without bearer enforcement and with SimpleFIN configured. For read-only, bearer, CORS, or unconfigured-sync behavior, use the direct checks above so the expected status is explicit.
+Supply `COOKIE_FILE`, `RESOURCE_ID`, and `PUBLIC_ORIGIN` for an authorized owner.
+Use a disposable writable instance. For read-only, session, CORS, or
+unconfigured-sync behavior, use direct checks with explicit expected statuses.
 
 ## Backend Completion Gate
 

@@ -405,7 +405,6 @@ function clientFixture(put?: PutCallback, model = modelFixture()) {
 	const client = {
 		getStatus: vi.fn(async (): Promise<ServerStatus> => ({
 			readOnly: false,
-			authEnabled: true,
 		})),
 		getModel: vi.fn(async (): Promise<FinancialModelResponse> => ({
 			document: structuredClone(current),
@@ -621,47 +620,20 @@ describe("remote workspace state", () => {
 		expect(useWorkspaceStore.getState().engine.mounted).toBe(false);
 	});
 
-	it("binds UI token changes and explicit overrides without persisting them", async () => {
+	it("keeps session credentials out of workspace and UI state", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const { client } = clientFixture();
-		useUiStore.getState().setAuthToken("ui-first");
-		const rendered = renderHookRTL(
-			({ authToken }: { authToken?: string }) =>
-				useWorkspaceStartup({ client, authToken }),
-			{ initialProps: { authToken: undefined as string | undefined } },
-		);
+		const rendered = renderHookRTL(() => useWorkspaceStartup({ client }));
 		await waitFor(() =>
 			expect(useWorkspaceStore.getState().loading).toBe(false),
 		);
-		expect(useWorkspaceStore.getState().engine.authToken).toBe("ui-first");
-		await act(async () => useUiStore.getState().setAuthToken("ui-second"));
-		expect(client.getStatus).toHaveBeenCalledTimes(2);
+		await act(async () => useUiStore.getState().setYears(10));
+		expect(client.getStatus).toHaveBeenCalledOnce();
 		await useWorkspaceStore.getState().refreshPresets();
-		expect(client.listAmountPresets).toHaveBeenLastCalledWith({
-			authToken: "ui-second",
-		});
-
-		rendered.rerender({ authToken: "explicit" });
-		await waitFor(() =>
-			expect(useWorkspaceStore.getState().loading).toBe(false),
-		);
-		await act(async () => useUiStore.getState().setAuthToken("ui-third"));
-		expect(client.getStatus).toHaveBeenCalledTimes(3);
-		expect(useWorkspaceStore.getState().engine.authToken).toBe("explicit");
-		rendered.rerender({ authToken: "" });
-		await waitFor(() =>
-			expect(useWorkspaceStore.getState().loading).toBe(false),
-		);
-		expect(useWorkspaceStore.getState().engine.authToken).toBe("");
-		rendered.rerender({ authToken: undefined });
-		await waitFor(() =>
-			expect(useWorkspaceStore.getState().loading).toBe(false),
-		);
-		expect(useWorkspaceStore.getState().engine.authToken).toBe("ui-third");
-		expect([...storage.values.values()].join("")).not.toMatch(
-			/ui-first|ui-second|ui-third|explicit/,
-		);
+		expect(client.listAmountPresets).toHaveBeenLastCalledWith();
+		expect(useWorkspaceStore.getState().engine).not.toHaveProperty("authToken");
+		expect(useUiStore.getState()).not.toHaveProperty("authToken");
 		rendered.unmount();
 	});
 
@@ -742,12 +714,12 @@ describe("remote workspace state", () => {
 				}),
 		);
 		const rendered = renderHookRTL(
-			({ client, authToken }) => useWorkspaceStartup({ client, authToken }),
-			{ initialProps: { client: first.client, authToken: "first-token" } },
+			({ client }) => useWorkspaceStartup({ client }),
+			{ initialProps: { client: first.client } },
 		);
 		const pending = useWorkspaceStore.getState().engine.hydrationPromise;
 		const controller = useWorkspaceStore.getState().engine.hydrationController!;
-		rendered.rerender({ client: second.client, authToken: "second-token" });
+		rendered.rerender({ client: second.client });
 		expect(useWorkspaceStore.getState().engine.hydrationPromise).toBe(pending);
 		expect(controller.signal.aborted).toBe(false);
 		expect(second.client.getModel).not.toHaveBeenCalled();
@@ -756,7 +728,7 @@ describe("remote workspace state", () => {
 			await pending;
 		});
 		expect(useWorkspaceStore.getState().workspace).not.toBeNull();
-		expect(useWorkspaceStore.getState().engine.authToken).toBe("second-token");
+		expect(useWorkspaceStore.getState().engine.client).toBe(second.client);
 		await act(async () => useWorkspaceStore.getState().retry());
 		expect(controller.signal.aborted).toBe(true);
 		expect(second.client.getModel).toHaveBeenCalledOnce();
@@ -781,21 +753,18 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("hydrates server state and persists a draft without storing the bearer token", async () => {
+	it("hydrates server state and persists a draft without credentials", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const { client } = clientFixture(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const rendered = renderHook(() =>
-			useRemoteWorkspace({ client, authToken: "secret-token" }),
-		);
+		const rendered = renderHook(() => useRemoteWorkspace({ client }));
 		await rendered.settle();
 
 		expect(rendered.result().status).toEqual({
 			readOnly: false,
-			authEnabled: true,
 		});
 		expect(
 			rendered.result().plan?.accounts.map((account) => account.id),
@@ -806,15 +775,13 @@ describe("remote workspace state", () => {
 		expect(rendered.result().updatePlan(edited)).toBe(true);
 		await rendered.settle();
 		const raw = storage.getItem(remoteStorageKey()!) ?? "";
-		expect(raw).not.toContain("secret-token");
+		expect(raw).not.toMatch(/authToken|bearerToken/);
 		expect(loadRemoteState()).toMatchObject({
 			version: 1,
 			draft: { movements: [{ id: "salary", amount: 125 }] },
 		});
 		rendered.unmount();
-		const rehydrated = renderHook(() =>
-			useRemoteWorkspace({ client, authToken: "secret-token" }),
-		);
+		const rehydrated = renderHook(() => useRemoteWorkspace({ client }));
 		await rehydrated.settle();
 		expect(rehydrated.result().plan?.movements[0]?.amount).toBe(125);
 		rehydrated.unmount();
@@ -1377,9 +1344,7 @@ describe("remote workspace state", () => {
 				},
 			],
 		}));
-		const rendered = renderHook(() =>
-			useRemoteWorkspace({ client, authToken: "write-token" }),
-		);
+		const rendered = renderHook(() => useRemoteWorkspace({ client }));
 		await rendered.settle();
 		expect(
 			rendered
@@ -1397,7 +1362,7 @@ describe("remote workspace state", () => {
 					config: expect.objectContaining({ expression: "125" }),
 				}),
 			}),
-			expect.objectContaining({ authToken: "write-token" }),
+			expect.objectContaining({ signal: expect.any(AbortSignal) }),
 		);
 		expect(client.getModel).toHaveBeenCalledTimes(2);
 		expect(rendered.result().workspace?.draft).toBeNull();
@@ -1455,13 +1420,11 @@ describe("remote workspace state", () => {
 		};
 		model.postings = [pending];
 		const { client } = clientFixture(undefined, model);
-		client.getStatus.mockResolvedValue({ readOnly: true, authEnabled: true });
-		const rendered = renderHook(() =>
-			useRemoteWorkspace({ client, authToken: "editor-session" }),
-		);
+		client.getStatus.mockResolvedValue({ readOnly: true });
+		const rendered = renderHook(() => useRemoteWorkspace({ client }));
 		await rendered.settle();
 		expect(rendered.result().plan?.readOnly).toBe(true);
-		client.getStatus.mockResolvedValue({ readOnly: false, authEnabled: true });
+		client.getStatus.mockResolvedValue({ readOnly: false });
 		await rendered.result().refreshStatus();
 		await rendered.settle();
 		const plan = rendered.result().plan!;
@@ -1499,14 +1462,14 @@ describe("remote workspace state", () => {
 		expect(rendered.result().workspace?.draft?.movements).toContainEqual(
 			purchase,
 		);
-		client.getStatus.mockResolvedValue({ readOnly: true, authEnabled: true });
+		client.getStatus.mockResolvedValue({ readOnly: true });
 		await rendered.result().refreshStatus();
 		await rendered.settle();
 		expect(rendered.result().plan?.readOnly).toBe(true);
 		expect(rendered.result().plan?.accounts[1]?.readOnly).toBe(true);
 		expect(await rendered.result().save()).toBe(false);
 		expect(client.createPosting).not.toHaveBeenCalled();
-		client.getStatus.mockResolvedValue({ readOnly: false, authEnabled: true });
+		client.getStatus.mockResolvedValue({ readOnly: false });
 		await rendered.result().refreshStatus();
 		await rendered.settle();
 		expect(rendered.result().plan?.readOnly).toBe(false);
@@ -1528,7 +1491,7 @@ describe("remote workspace state", () => {
 				},
 				purchase: { priority: 0 },
 			}),
-			expect.objectContaining({ authToken: "editor-session" }),
+			expect.objectContaining({ signal: expect.any(AbortSignal) }),
 		);
 		expect(client.createAccount).not.toHaveBeenCalled();
 		expect(client.updateAccount).not.toHaveBeenCalled();
@@ -1568,7 +1531,6 @@ describe("remote workspace state", () => {
 			const { client } = clientFixture(undefined, model);
 			client.getStatus.mockResolvedValue({
 				readOnly: fromReadOnly,
-				authEnabled: true,
 			});
 			const rendered = renderHook(() => useRemoteWorkspace({ client }));
 			await rendered.settle();
@@ -1581,7 +1543,6 @@ describe("remote workspace state", () => {
 			const baseFingerprint = rendered.result().workspace?.baseFingerprint;
 			client.getStatus.mockResolvedValue({
 				readOnly: toReadOnly,
-				authEnabled: true,
 			});
 
 			await rendered.result().retry();
@@ -1631,7 +1592,7 @@ describe("remote workspace state", () => {
 			).toBe(true);
 			await rendered.settle();
 			useWorkspaceStore.setState({
-				status: { readOnly, authEnabled: true },
+				status: { readOnly },
 				writeBlocked,
 			});
 
@@ -1759,7 +1720,6 @@ describe("remote workspace state", () => {
 		const first = renderHook(() =>
 			useRemoteWorkspace({
 				client: unauthorized.client,
-				authToken: "bad-token",
 			}),
 		);
 		await first.settle();
@@ -2609,7 +2569,6 @@ describe("remote projection mapping and SSE", () => {
 				document: modelFixture(),
 				years: 2,
 				ranges: true,
-				authToken: "projection-token",
 			}),
 		);
 		await rendered.settle();
@@ -2629,11 +2588,11 @@ describe("remote projection mapping and SSE", () => {
 					fallbackProjectionStartDate: "2026-01-31",
 				}),
 			}),
-			expect.objectContaining({ authToken: "projection-token" }),
+			expect.objectContaining({ signal: expect.any(AbortSignal) }),
 		);
 		expect(client.projectStochastic).toHaveBeenCalledWith(
 			expect.objectContaining({ config: { runCount: 400, seed: 42 } }),
-			expect.objectContaining({ authToken: "projection-token" }),
+			expect.objectContaining({ signal: expect.any(AbortSignal) }),
 		);
 		rendered.unmount();
 	});

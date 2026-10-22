@@ -167,7 +167,7 @@ describe("backend and display plan adapter", () => {
 		];
 		const { plan, presentation } = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 		});
 		const validated = validatePlan(plan);
@@ -183,7 +183,7 @@ describe("backend and display plan adapter", () => {
 		const document = documentFixture();
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: true },
+			status: { readOnly: false },
 			projection: projectionWithSalaryEvent(250),
 		});
 
@@ -220,7 +220,7 @@ describe("backend and display plan adapter", () => {
 		document.accounts[0]!.color = "#4287f5";
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate: "2026-02-01",
 		});
@@ -247,7 +247,7 @@ describe("backend and display plan adapter", () => {
 			document.checkpoints[0]!.source = source;
 			const conversion = backendToDisplayPlan({
 				document,
-				status: { readOnly, authEnabled: true },
+				status: { readOnly },
 				startDate: "2026-02-01",
 			});
 
@@ -267,7 +267,7 @@ describe("backend and display plan adapter", () => {
 		const document = documentFixture();
 		const initial = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: true },
+			status: { readOnly: false },
 			startDate: "2026-02-01",
 		});
 		document.checkpoints[0]!.source = "simplefin";
@@ -275,7 +275,7 @@ describe("backend and display plan adapter", () => {
 		for (const readOnly of [false, true, false]) {
 			const conversion = backendToDisplayPlan({
 				document,
-				status: { readOnly, authEnabled: true },
+				status: { readOnly },
 				presentation,
 				startDate: "2026-02-01",
 			});
@@ -300,7 +300,7 @@ describe("backend and display plan adapter", () => {
 			document.checkpoints[0]!.source = source;
 			const conversion = backendToDisplayPlan({
 				document,
-				status: { readOnly: false, authEnabled: true },
+				status: { readOnly: false },
 				startDate: "2026-02-01",
 			});
 			const reverse = displayPlanToBackendDocument(
@@ -346,7 +346,7 @@ describe("backend and display plan adapter", () => {
 		];
 		const pastConversion = backendToDisplayPlan({
 			document: past,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate,
 		});
@@ -368,7 +368,7 @@ describe("backend and display plan adapter", () => {
 		];
 		const futureConversion = backendToDisplayPlan({
 			document: future,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate,
 		});
@@ -384,7 +384,7 @@ describe("backend and display plan adapter", () => {
 		};
 		const recurringConversion = backendToDisplayPlan({
 			document: recurring,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate,
 		});
@@ -398,7 +398,7 @@ describe("backend and display plan adapter", () => {
 		syncedDocument.postings[0]!.source = "bank-sync";
 		const syncedConversion = backendToDisplayPlan({
 			document: syncedDocument,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate,
 		});
@@ -415,7 +415,7 @@ describe("backend and display plan adapter", () => {
 		const document = documentFixture();
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionWithSalaryEvent(250),
 			startDate: "2026-02-01",
 		});
@@ -449,7 +449,7 @@ describe("backend and display plan adapter", () => {
 		});
 		const reloaded = backendToDisplayPlan({
 			document: amountEdit.document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			presentation: conversion.presentation,
 			projection: projectionWithSalaryEvent(300),
 		});
@@ -466,7 +466,7 @@ describe("backend and display plan adapter", () => {
 			document.postings = [syncedPosting(id)];
 			const conversion = backendToDisplayPlan({
 				document,
-				status: { readOnly: false, authEnabled: true },
+				status: { readOnly: false },
 				startDate: "2026-02-01",
 			});
 			expect(
@@ -499,7 +499,7 @@ describe("backend and display plan adapter", () => {
 			document.postings = [syncedPosting(id)];
 			const conversion = backendToDisplayPlan({
 				document,
-				status: { readOnly: false, authEnabled: true },
+				status: { readOnly: false },
 				startDate: "2026-02-01",
 			});
 			const reverse = displayPlanToBackendDocument(conversion.plan, {
@@ -522,7 +522,7 @@ describe("backend and display plan adapter", () => {
 		document.postings = [posting];
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: true },
+			status: { readOnly: false },
 			startDate: "2026-02-01",
 		});
 		const reverse = displayPlanToBackendDocument(
@@ -561,7 +561,7 @@ describe("backend and display plan adapter", () => {
 		];
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate: "2026-02-01",
 		});
@@ -619,7 +619,7 @@ describe("backend and display plan adapter", () => {
 		};
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 		});
 		expect(conversion.plan.movements[0]).toMatchObject({
@@ -634,7 +634,7 @@ describe("backend and display plan adapter", () => {
 		document.checkpoints[0]!.source = "bank-sync";
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate: "2026-02-01",
 		});
@@ -665,7 +665,7 @@ describe("backend and display plan adapter", () => {
 		});
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate: "2026-02-01",
 		});
@@ -692,7 +692,7 @@ describe("backend and display plan adapter", () => {
 		document.accounts[0]!.enabled = false;
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate: "2026-02-01",
 		});
@@ -749,7 +749,7 @@ describe("backend and display plan adapter", () => {
 		const document = documentFixture();
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate: "2026-02-01",
 		});
@@ -829,7 +829,7 @@ describe("backend and display plan adapter", () => {
 					postingFulfillment: [],
 				},
 			},
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 		});
 
 		const evaluation = conversion.plan.evaluations.find(
@@ -855,7 +855,7 @@ describe("backend and display plan adapter", () => {
 		);
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate: "2026-02-01",
 		});
@@ -873,7 +873,7 @@ describe("backend and display plan adapter", () => {
 		const document = documentFixture();
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate: "2026-02-01",
 		});
@@ -901,7 +901,7 @@ describe("backend and display plan adapter", () => {
 		});
 		const conversion = backendToDisplayPlan({
 			document,
-			status: { readOnly: false, authEnabled: false },
+			status: { readOnly: false },
 			projection: projectionFixture(),
 			startDate: "2026-02-01",
 		});

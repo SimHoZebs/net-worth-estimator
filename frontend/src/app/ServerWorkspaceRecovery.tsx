@@ -7,7 +7,6 @@ import { Notice } from "../components/Notice.tsx";
 import { ModelImportPreview } from "../components/imports/ModelImportPreview.tsx";
 import { ErrorNotice } from "../components/ui.tsx";
 import { download } from "../state/storage.ts";
-import { useUiStore } from "../state/uiStore.ts";
 import { useFileReview } from "../state/useFileReview.ts";
 import { useServerModelImport } from "../state/useServerModelImport.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
@@ -15,7 +14,6 @@ import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { WorkspaceTopbar } from "../workspace/WorkspaceHeader.tsx";
 import { WorkspaceLayout } from "../workspace/WorkspaceLayout.tsx";
 import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar.tsx";
-import { RemoteAuthControl } from "./RemoteAuthControl.tsx";
 
 export function ServerWorkspaceRecovery() {
 	// Terminal load states subscribe everything they display, including the
@@ -33,9 +31,7 @@ export function ServerWorkspaceRecovery() {
 	const importServerDocument = useWorkspaceStore(
 		(state) => state.importServerDocument,
 	);
-	const authToken = useUiStore((state) => state.authToken);
 	const { importDocument } = useServerModelImport({
-		authToken,
 		preconditions: {
 			hasWorkspace: false,
 			readOnly,
@@ -111,7 +107,6 @@ export function ServerWorkspaceRecovery() {
 						</TextButton>
 					</Notice>
 				)}
-				<RemoteAuthControl />
 				{missingModel && (
 					<ServerModelImport
 						readOnly={readOnly}

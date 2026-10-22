@@ -224,7 +224,6 @@ function planHasChanges(saved: Plan, next: Plan): boolean {
 interface WorkspaceEngine {
 	client: RemoteApiClient | null;
 	resourceScope: ResourceScope;
-	authToken: string;
 	mounted: boolean;
 	hydrationController: AbortController | null;
 	saveController: AbortController | null;
@@ -247,7 +246,6 @@ function freshEngine(): WorkspaceEngine {
 	return {
 		client: null,
 		resourceScope: getResourceScope(),
-		authToken: "",
 		mounted: false,
 		hydrationController: null,
 		saveController: null,
@@ -305,7 +303,7 @@ function initialData(): WorkspaceData {
 }
 
 interface WorkspaceActions {
-	bindEngine: (client: RemoteApiClient | null, authToken: string) => void;
+	bindEngine: (client: RemoteApiClient | null) => void;
 	bootWorkspace: () => void;
 	shutdownWorkspace: () => void;
 	preserveQueuedError: (message: string) => void;
@@ -337,10 +335,9 @@ export const useWorkspaceStore = create<
 	...initialData(),
 	engine: freshEngine(),
 
-	bindEngine: (client, authToken) => {
+	bindEngine: (client) => {
 		get().engine.client = client;
 		get().engine.resourceScope = getResourceScope();
-		get().engine.authToken = authToken;
 	},
 
 	bootWorkspace: () => {
@@ -540,7 +537,7 @@ export const useWorkspaceStore = create<
 		}
 		set({
 			status: statusResult,
-			authRequiredState: statusResult.authEnabled,
+			authRequiredState: false,
 			writeBlocked: false,
 		});
 		const model = modelResult.document;
@@ -636,7 +633,7 @@ export const useWorkspaceStore = create<
 			adapterReport: conversion.report,
 			savedPresentation: conversion.presentation,
 			draftPresentation,
-			authRequiredState: statusResult.authEnabled,
+			authRequiredState: false,
 			writeBlocked: false,
 		});
 		if (draftStale) set({ volatile: true });
@@ -753,7 +750,6 @@ export const useWorkspaceStore = create<
 		const { engine } = get();
 		const api = engine.client;
 		if (!api) return false;
-		const authToken = engine.authToken;
 		const current = get().workspace;
 		if (!current?.draft) {
 			set({ error: "There are no unsaved changes to save." });
@@ -816,7 +812,6 @@ export const useWorkspaceStore = create<
 				document,
 			);
 			const applyResult = await applyRowOperations(api, operations, {
-				authToken,
 				signal: controller.signal,
 			});
 			if (
@@ -878,7 +873,7 @@ export const useWorkspaceStore = create<
 			try {
 				authoritativeConversion = backendToDisplayPlan({
 					document: authoritative.document,
-					status: get().status ?? { readOnly: false, authEnabled: false },
+					status: get().status ?? { readOnly: false },
 					presentation: get().draftPresentation ?? get().savedPresentation,
 				});
 			} catch (cause) {
@@ -986,7 +981,6 @@ export const useWorkspaceStore = create<
 		const { engine } = get();
 		const api = engine.client;
 		if (!api) return false;
-		const authToken = engine.authToken;
 		if (get().workspace) {
 			set({
 				error:
@@ -1015,7 +1009,6 @@ export const useWorkspaceStore = create<
 		try {
 			const operations = diffFinancialModelDocuments(null, document);
 			const result = await applyRowOperations(api, operations, {
-				authToken,
 				signal: controller.signal,
 			});
 			if (!get().engine.mounted || controller.signal.aborted) return false;
@@ -1272,7 +1265,7 @@ export const useWorkspaceStore = create<
 				: null;
 		set({
 			status: result,
-			authRequiredState: result.authEnabled,
+			authRequiredState: false,
 			writeBlocked: false,
 			...(current.workspace && savedAccess
 				? {
@@ -1292,7 +1285,7 @@ export const useWorkspaceStore = create<
 		const { engine } = get();
 		const api = engine.client;
 		if (!api) return;
-		const result = await api.listAmountPresets({ authToken: engine.authToken });
+		const result = await api.listAmountPresets();
 		if (get().engine !== engine) return;
 		if (result instanceof Error) {
 			set({
@@ -1311,9 +1304,7 @@ export const useWorkspaceStore = create<
 		const { engine } = get();
 		const api = engine.client;
 		if (!api) return false;
-		const result = await api.createAmountPreset(preset, {
-			authToken: engine.authToken,
-		});
+		const result = await api.createAmountPreset(preset);
 		if (get().engine !== engine) return false;
 		if (result instanceof Error) {
 			set({
@@ -1342,9 +1333,7 @@ export const useWorkspaceStore = create<
 		const { engine } = get();
 		const api = engine.client;
 		if (!api || !preset.id) return false;
-		const result = await api.updateAmountPreset(preset.id, preset, {
-			authToken: engine.authToken,
-		});
+		const result = await api.updateAmountPreset(preset.id, preset);
 		if (get().engine !== engine) return false;
 		if (result instanceof Error) {
 			set({
@@ -1375,9 +1364,7 @@ export const useWorkspaceStore = create<
 		const { engine } = get();
 		const api = engine.client;
 		if (!api) return false;
-		const result = await api.deleteAmountPreset(id, {
-			authToken: engine.authToken,
-		});
+		const result = await api.deleteAmountPreset(id);
 		if (get().engine !== engine) return false;
 		if (result instanceof Error) {
 			set({
@@ -1398,9 +1385,7 @@ export const useWorkspaceStore = create<
 		const { engine } = get();
 		const api = engine.client;
 		if (!api) return false;
-		const result = await api.moveAmountPreset(id, beforeId, {
-			authToken: engine.authToken,
-		});
+		const result = await api.moveAmountPreset(id, beforeId);
 		if (get().engine !== engine) return false;
 		if (result instanceof Error) {
 			set({

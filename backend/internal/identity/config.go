@@ -32,15 +32,14 @@ func FromEnv(getenv func(string) string, databasePath string) (Config, error) {
 		SessionDB:    databasePath + ".sessions", Lifetime: 7 * 24 * time.Hour, RecheckInterval: 30 * time.Second,
 		RequireResourceHeader: true,
 	}
-	if c.Provider == "" || c.Provider == "none" {
-		c.Provider = "none"
-		return c, nil
+	if getenv("NET_WORTH_ESTIMATOR_AUTH_TOKEN") != "" {
+		return c, fmt.Errorf("AUTH_TOKEN is retired; configure Casdoor session authentication")
+	}
+	if c.Provider == "" {
+		c.Provider = "casdoor"
 	}
 	if c.Provider != "casdoor" {
-		return c, fmt.Errorf("AUTH_PROVIDER must be none or casdoor")
-	}
-	if getenv("NET_WORTH_ESTIMATOR_AUTH_TOKEN") != "" {
-		return c, fmt.Errorf("AUTH_TOKEN cannot be combined with an identity provider")
+		return c, fmt.Errorf("AUTH_PROVIDER must be casdoor; unauthenticated server mode is retired")
 	}
 	if v := getenv("NET_WORTH_ESTIMATOR_AUTH_SESSION_DB"); v != "" {
 		c.SessionDB = v

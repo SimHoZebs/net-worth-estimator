@@ -101,7 +101,7 @@ describe("wish list", () => {
 
 	it("blocks edits on a read-only server", () => {
 		useWorkspaceStore.setState({
-			status: { readOnly: true, authEnabled: false },
+			status: { readOnly: true },
 		});
 		const view = render(<WishListPanel plan={plan} schedule={null} />);
 		for (const button of view.getAllByRole("button"))
