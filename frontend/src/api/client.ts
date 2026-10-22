@@ -214,6 +214,13 @@ function httpMessage(status: number, detail: string | null): string {
 export async function parseErrorResponse(
 	response: Response,
 ): Promise<ApiHttpError> {
+	if (
+		response.status === 401 &&
+		response.headers.get("www-authenticate") === "Session" &&
+		typeof window !== "undefined"
+	) {
+		window.dispatchEvent(new Event("waypoint:authentication-required"));
+	}
 	const body = await readBody(response);
 	if (body instanceof Error) {
 		return new ApiHttpError({

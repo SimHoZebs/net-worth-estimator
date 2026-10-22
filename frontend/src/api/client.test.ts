@@ -5,6 +5,7 @@ import {
 	ApiHttpError,
 	ApiNetworkError,
 	type FetchLike,
+	parseErrorResponse,
 } from "./client.ts";
 
 function response(body: string, init: ResponseInit): Response {
@@ -12,6 +13,32 @@ function response(body: string, init: ResponseInit): Response {
 }
 
 describe("native API client", () => {
+	it.each([
+		[401, "Session", 1],
+		[401, "Bearer", 0],
+		[401, "", 0],
+		[403, "Session", 0],
+	])(
+		"announces session authentication only for status %s and challenge %s",
+		async (status, challenge, calls) => {
+			const listener = vi.fn();
+			window.addEventListener("waypoint:authentication-required", listener);
+			try {
+				await parseErrorResponse(
+					response("Unauthorized", {
+						status,
+						headers: challenge ? { "WWW-Authenticate": challenge } : {},
+					}),
+				);
+				expect(listener).toHaveBeenCalledTimes(calls);
+			} finally {
+				window.removeEventListener(
+					"waypoint:authentication-required",
+					listener,
+				);
+			}
+		},
+	);
 	it("defaults to same-origin /v1 routes, preserves AbortSignal, and sends bearer auth only when supplied per call", async () => {
 		const fetcher = vi.fn<FetchLike>(async (_input, init) => {
 			expect(new Headers(init?.headers).get("authorization")).toBe(
