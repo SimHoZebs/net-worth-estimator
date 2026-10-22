@@ -19,7 +19,7 @@ docker compose --env-file auth/casdoor/.env \
   -f auth/casdoor/compose.yml -p waypoint-casdoor down
 export CASDOOR_STATE_DIR="$PWD/auth/casdoor/data"
 export COMPOSE_FILE="docker-compose.yml:auth/compose.casdoor.yml"
-export NET_WORTH_ESTIMATOR_AUTH_EDITORS="$(
+export NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT="$(
   node --input-type=module -e \
     'import {readFileSync} from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.env.CASDOOR_STATE_DIR + "/bootstrap.json", "utf8")).subject)'
 )"
@@ -28,7 +28,7 @@ docker compose --env-file auth/casdoor/.env up -d --build
 
 If initialization uses another project or state directory, use those same values.
 Never run two Casdoor processes against one SQLite directory. Keep the verified
-subject grant in private deployment configuration. Remove the legacy
+primary-data owner in private deployment configuration. Remove the legacy
 `NET_WORTH_ESTIMATOR_AUTH_TOKEN` in Casdoor mode.
 
 The overlay routes server requests to `http://casdoor:8000` while preserving the
@@ -42,11 +42,12 @@ Override its name or use a separate bind mount for disposable tests.
 
 ## Session and access contract
 
-- Anonymous application visits redirect directly to Casdoor's sign-in page.
-  Its account-creation link creates ordinary identities, not financial grants.
-- Login grants no plan access. Assign verified subjects to reader/editor lists.
-- Readers can read and compute projections. Editors can also save changes.
-- Provider administrator status never grants financial access.
+- Anonymous visitors read/project only a separately published sample plan.
+- Each verified account automatically owns its own private plan. Signup has no
+  role choice or subject-grant step. Existing primary data needs an explicit owner.
+- Casdoor's built-in Casbin API checks roles, actions, and plan resources.
+- Account data, artifacts, sync state, and browser drafts remain plan-scoped.
+- Provider administrator status never grants access to another account's plan.
 - Application sessions persist across browser and API restarts, with a seven-day
   absolute limit by default. Managed refresh grants renew short-lived tokens.
 - Signed back-channel logout deletes application grants. Token introspection
@@ -59,11 +60,12 @@ revocation bounds, recovery, backups, and current scope.
 
 ## Normal local development
 
-Use `./scripts/dev up`, then open **http://localhost:5178**. This uses the same
-Compose files, Go image, Nginx image, Casdoor image, and private-network OIDC
-routing as production. Dev data and credentials stay under `tmp/dev/`.
-`./scripts/dev down` retains them. `./scripts/dev refresh-db` replaces only
-financial data from a safe production snapshot. See [the dev guide](../dev/README.md).
+Run `./scripts/dev setup` once, then use
+`docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait`.
+The dedicated dev stack uses the production Dockerfiles, pinned Casdoor image, and
+private-network OIDC routing. `.env.dev` and `tmp/dev/` retain private settings and
+data. Compose `down` retains them. `./scripts/dev refresh-db` replaces only financial
+data from a safe production snapshot. See [the dev guide](../dev/README.md).
 
 Automated tests below use isolated data because they reset passwords, revoke
 sessions, and change client settings. They do not replace the normal dev setup.
@@ -95,9 +97,10 @@ AUTH_TEST_PASSWORD=<CASDOOR_USER_PASSWORD>
 node auth/test-integration.mjs
 ```
 
-The script owns a temporary financial database and browser profile under
-gitignored `tmp/`. It verifies editor/viewer grants, CSRF, restart persistence,
-projections, grant removal, logout, and captured-cookie rejection. It refuses an
+The script requires `CASDOOR_TEST_MUTATIONS=1` and a marked disposable identity
+fixture. It owns separate temporary owner, sample, and second-user financial
+stores. It verifies Casdoor permissions, CSRF, restart persistence, projections,
+cross-account isolation, logout, and captured-cookie rejection. It refuses an
 occupied application port. Retained browser profiles contain credentials.
 
 Physical phone passkeys and security keys require the manual checklist in the

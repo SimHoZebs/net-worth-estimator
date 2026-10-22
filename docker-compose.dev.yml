@@ -1,0 +1,82 @@
+# Daily use: docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait
+name: waypoint-dev
+
+services:
+  casdoor:
+    image: casbin/casdoor:v4.23.0@sha256:e13c9aada231f7338a03ab0ae7054d0a9480e77283338ab9fc319d88fe2b3ce0
+    user: "${DEV_UID:?Run scripts/dev setup}:${DEV_GID:?Run scripts/dev setup}"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./tmp/dev/casdoor/conf:/conf:ro
+      - ./tmp/dev/casdoor/db:/data
+      # Casdoor stores its file sessions in ./tmp.
+      - ./tmp/dev/casdoor/sessions:/tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 12
+
+  backend:
+    image: waypoint-dev-backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    user: "${DEV_UID:?Run scripts/dev setup}:${DEV_GID:?Run scripts/dev setup}"
+    ports:
+      - "127.0.0.1:8788:8787"
+    volumes:
+      - ./tmp/dev/data:/data
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+      NET_WORTH_ESTIMATOR_DB: /data/net-worth-estimator.db
+      NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: ${DEV_APP_PUBLIC_URL:?Run scripts/dev setup}
+      NET_WORTH_ESTIMATOR_AUTH_PROVIDER: casdoor
+      NET_WORTH_ESTIMATOR_AUTH_ISSUER: ${DEV_CASDOOR_PUBLIC_URL:?Run scripts/dev setup}
+      NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL: http://casdoor:8000
+      NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID: ${DEV_AUTH_CLIENT_ID:?Run scripts/dev setup}
+      NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET: ${DEV_AUTH_CLIENT_SECRET:?Run scripts/dev setup}
+      NET_WORTH_ESTIMATOR_PUBLIC_URL: ${DEV_APP_PUBLIC_URL:?Run scripts/dev setup}
+      NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL: ${DEV_CASDOOR_PUBLIC_URL:?Run scripts/dev setup}/account
+      NET_WORTH_ESTIMATOR_AUTH_SESSION_DB: /data/identity.db
+      NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME: 168h
+      NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL: 30s
+      NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL: waypoint/plan-access
+      # Fresh setup resolves the bootstrap subject before starting the API.
+      # The API rejects startup without an owner for an existing primary plan.
+      NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT: ${DEV_OWNER_SUBJECT:-}
+      NET_WORTH_ESTIMATOR_PLANS_DIR: /data/plans
+      NET_WORTH_ESTIMATOR_SAMPLE_DB: /data/sample.db
+      NET_WORTH_ESTIMATOR_AUTH_TOKEN: ""
+      NET_WORTH_ESTIMATOR_READ_ONLY: ""
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL: ""
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS: ""
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN: ""
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK: ""
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE: ""
+    depends_on:
+      casdoor:
+        condition: service_healthy
+
+  frontend:
+    image: waypoint-dev-frontend
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: ""
+    environment:
+      BACKEND_URL: http://backend:8787
+    ports:
+      - "127.0.0.1:5178:80"
+    depends_on:
+      backend:
+        condition: service_healthy

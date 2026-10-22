@@ -1,0 +1,109 @@
+# Plan-scoped authorization
+
+Casdoor authenticates accounts and hosts the Casbin authorization model. The Go
+API calls Casdoor's permission API with private application credentials. It does
+not embed a second Casbin engine or evaluate a custom policy language.
+
+## Resources, actions, and roles
+
+A plan is the permission boundary. Its accounts, postings, recurrence rules,
+checkpoints, evaluations, presets, pinned results, sync links, and projection
+artifacts stay inside that boundary.
+
+| Principal | Resource | Default capabilities |
+| --- | --- | --- |
+| Guest | `plans/sample` | `plan:read`, `plan:project` |
+| Verified account | Its own `plans/<opaque-id>` | `plan:read`, `plan:project`, `plan:write` |
+| Any other combination | Another account's plan | Denied |
+
+Signed-in accounts use their private plan, not the sample. Signup does not ask
+for a role. The owner relationship automatically supplies the plan-owner role.
+Casdoor policies define the actions that role permits. The global server
+read-only flag still overrides write permission.
+
+The resource ID derives from the exact OIDC issuer and immutable subject, not
+the display name, username, email, or browser input. A new account starts with
+an empty private plan. An explicitly assigned existing owner retains the primary
+financial database. There is no first-login claim of existing data.
+
+Casdoor stores the model, roles, and action/resource rules in its SQLite state.
+The backend submits server-derived identity, resource, ownership, and action
+values. Browser fields never supply an owner or a trusted role. Permission errors
+fail closed. Positive permission decisions do not have an application cache.
+
+## Data isolation
+
+Each private plan uses a separate SQLite store under `NET_WORTH_ESTIMATOR_PLANS_DIR`.
+The existing `NET_WORTH_ESTIMATOR_DB` remains the primary owner's store. Its owner
+must be assigned with `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT` before an
+authenticated server can serve existing financial data.
+
+The public sample uses a separate `NET_WORTH_ESTIMATOR_SAMPLE_DB`. It must not
+alias the primary database. Private plan paths use validated opaque IDs, not
+user-controlled path segments. New files use `0600` inside a `0700` directory.
+
+All API operations receive the store for the authorized resource. A guessed row
+ID in another plan cannot select another store. Projection artifact identities
+and seeded in-flight runs also include the resource ID. Server-level SimpleFIN
+credentials remain attached only to the explicitly assigned primary owner.
+Other accounts and the sample never inherit that integration.
+
+The sample is a published snapshot, not a live alias of the owner's plan.
+`./scripts/dev publish-sample` explicitly publishes the dev primary plan. It
+removes private projection history, Bridge links, sync timestamps, and the source
+filesystem path from the copy. Later private edits do not change the sample.
+Replacing the sample requires another explicit publication.
+
+## Browser isolation
+
+`GET /v1/auth/session` returns the selected resource ID, kind, and capabilities.
+Every financial request asserts that ID in `X-Waypoint-Resource`. The backend
+derives the current resource independently and rejects missing or stale assertions
+with 409. The header does not let a caller select an arbitrary plan.
+
+Financial responses include the same resource header. The browser namespaces
+draft storage by resource and clears active model/projection state before a
+resource transition. It does not adopt an old unscoped draft into an account's
+plan. Cross-tab login and logout cannot silently retarget an old tab's write.
+API clients retain their verification scope. A new verification creates new
+clients, while old clients reject further calls before network access. Evaluation
+pins and financial preferences also reset and reload within the verified scope.
+
+## Deployment and migration
+
+The rule is the same in dev and production. Existing legacy bearer deployments
+remain unchanged until an explicit authenticated-stack migration.
+
+Before an existing authenticated deployment starts the new code:
+
+1. Back up financial data and the whole Casdoor identity state.
+2. Assign the existing financial database to its verified owner subject.
+3. Install the reviewed Casdoor model, roles, and permissions.
+4. Publish a separate sample snapshot only after approval of its contents.
+5. Configure the sample path and private-plan directory.
+6. Verify guest, owner, second-account, denial, and provider-outage cases.
+
+No source update automatically publishes private data or changes live Casdoor
+permissions. Existing reader/editor environment lists no longer define access.
+The owner assignment is a one-time data migration, not signup role selection.
+
+## Scope limits
+
+The first resource boundary is the whole plan. Per-row sharing, a plan picker,
+an IAM management screen, and cross-account collaboration are not part of this
+change. New action/resource policies belong in Casdoor. New resource visibility
+must also pass the API's resource-resolution and storage-isolation boundary.
+
+Casdoor's external permission API evaluates the model and stored policy rows.
+Use the model's deny rules or remove the relevant policy/binding to revoke
+access. Do not treat application-sign-in approval or UI enable flags as an
+additional resource-security boundary.
+
+Browser draft namespaces prevent accidental cross-account restoration. Browser
+storage remains local to the same browser profile, not an encrypted user vault.
+People who share a browser profile can inspect that profile's local data.
+
+Controlling sources:
+- [Casdoor permission API](https://casdoor.ai/docs/permission/exposed-casbin-apis/)
+- [Permission configuration](https://casdoor.ai/docs/permission/permission-configuration/)
+- [Pinned permission model and role policy handling](https://github.com/casdoor/casdoor/blob/v4.23.0/object/permission_enforcer.go)

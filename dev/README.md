@@ -1,83 +1,113 @@
-# Repeatable development stack
+# Development stack
 
-Run the same Go API image, Nginx frontend image, Casdoor image, and Compose wiring
-as production. The dev override changes only local ports, isolated data mounts,
-the non-root bind-mount user, and external-sync settings. It does not use Vite
-or a fixture API.
+`docker-compose.dev.yml` runs the production Dockerfiles and pinned Casdoor image
+with isolated dev storage, loopback ports, and external sync disabled. Compose
+owns the container lifecycle. It does not load the production Compose files.
 
-Requires Docker Compose 2.24.4+ and Node 24+.
+## One-time setup
 
-```bash
-./scripts/dev up
-```
-
-Open **http://localhost:5178**. Casdoor runs on **8000**. The API debug port is
-**8788**. All three ports bind to loopback. The command fails on occupied ports
-instead of selecting another port or attaching to an unrelated process.
-
-On first use, `up` takes a SQLite-safe snapshot from the local production
-container named `net-worth-estimator`. A one-shot helper mounts production
-volumes **read-only**, has no network or Linux capabilities, and runs as the
-database's non-root owner. Production remains online. Only the financial database
-is copied. Production authentication credentials and sessions are not copied.
-The helper uses a 512 MiB temporary filesystem. For larger databases or another
-deployment, supply an existing SQLite backup instead:
+Requires Docker Compose 5.0+ and Node 24+. The data commands use
+[`docker compose start --wait`](https://github.com/docker/compose/blob/v5.0.0/cmd/compose/start.go).
 
 ```bash
-./scripts/dev up --from /absolute/path/production-backup.db
+./scripts/dev setup
 ```
 
-The command generates private dev identity configuration once. It initializes
-Casdoor in the same Compose project, records its generated subject, and starts
-the API/frontend after the identity service is ready. Further `up` calls reuse
-data, accounts, signing keys, passkeys, grants, and sessions. Image builds use
-Docker's cache. Source changes reach the browser through the production build.
+Setup generates private credentials, initializes Casdoor, and takes a SQLite-safe,
+read-only production snapshot. Use `setup --from /absolute/path/backup.db` instead
+to start from an existing backup. It starts Casdoor only if identity initialization
+is required. It does not start the API or frontend.
+
+For an existing dev stack, run the same setup command once. It preserves saved
+credentials, issuer URLs, primary ownership, financial data, and sessions. It
+exports runtime settings to the ignored `.env.dev` file without restarting services.
+
+`tmp/dev/config.json` retains setup credentials and the snapshot source. `.env.dev`
+contains only the runtime settings Compose needs. Both are private. Setup refuses
+to overwrite a different `.env.dev`. Preserve and reconcile any edits before retry.
 
 ## Daily commands
 
-```bash
-./scripts/dev up           # build/start or update the stack
-./scripts/dev down         # stop/remove containers, retain all local state
-./scripts/dev status
-./scripts/dev logs backend
-./scripts/dev refresh-db   # replace dev financial data from a fresh prod snapshot
-```
-
-`refresh-db` validates the new snapshot before it stops the dev API. It backs up
-the prior dev database under `tmp/dev/backups/`, replaces financial data, and
-restarts the API. Identity data stays unchanged. A failed replacement restarts
-the prior API database. `refresh-db --from /path/backup.db` changes the saved
-source to that backup file. Plain `up` never replaces an existing dev database.
-
-SimpleFIN and mock sync remain disabled in dev, including after a production
-database refresh. Dev writes change only the private dev copy. No command stops,
-reconfigures, or writes to production containers or volumes.
-
-## Login and access
-
-Anonymous visits redirect to Casdoor. Use `sign up now` to create your dev account.
-Copy the verified subject from the access-pending screen, then grant it access:
+Run from the repository root:
 
 ```bash
-./scripts/dev grant VERIFIED_SUBJECT editor
+docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait
+docker compose --env-file .env.dev -f docker-compose.dev.yml down
+docker compose --env-file .env.dev -f docker-compose.dev.yml ps
+docker compose --env-file .env.dev -f docker-compose.dev.yml logs -f backend
 ```
 
-Use `reader` for read-only access. Signup never grants financial access. The
-initializer's separate ordinary `household` account receives the initial editor
-grant. Its password and the Casdoor administrator password stay in private
-`tmp/dev/config.json`. Keep the administrator credential in a password manager.
+To reuse existing images without builds or registry pulls:
 
-## State and verification
+```bash
+docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --no-build --pull never --wait
+```
 
-All dev state lives in gitignored `tmp/dev/`. Directories use `0700`. Credentials
-and database snapshots use `0600`. Preserve this directory to retain dev logins.
-`down` never deletes it. A new checkout can create a fresh stack with `up`.
-Run one lifecycle command at a time. A process lock rejects overlap and recovers
-automatically after a terminated command.
+The local frontend is **http://localhost:5178**. Casdoor uses **8000**, and the API
+debug port is **8788**. All ports bind to loopback. The project name remains
+`waypoint-dev`, so existing containers and storage remain part of the same stack.
+Compose does not replace financial data or generate credentials on startup.
+The explicit `-f` overrides `COMPOSE_FILE`. This stack defines no optional profiles,
+so inherited `COMPOSE_PROFILES` does not change its services.
+
+## Tailnet access
+
+Remote browsers require HTTPS. An operator must configure these tailnet-only
+routes once from a privileged terminal:
+
+```bash
+sudo tailscale serve --bg --https=5178 http://127.0.0.1:5178
+sudo tailscale serve --bg --https=8000 http://127.0.0.1:8000
+```
+
+For a new dev identity, run `./scripts/dev setup --tailnet`. Setup checks the routes
+without changing them and prints the HTTPS frontend and issuer URLs. Daily Compose
+commands stay the same. Existing saved HTTPS origins remain unchanged when setup
+runs without flags. Never reset shared Serve settings or switch an existing issuer
+to another origin without an explicit identity migration.
+
+## Explicit data operations
+
+Start the stack before these operations. Each command validates the incoming
+database, stops the API for replacement, then starts the same API container.
+It does not build images or change production data.
+
+```bash
+./scripts/dev refresh-db
+./scripts/dev refresh-db --from /absolute/path/backup.db
+./scripts/dev publish-sample --from /absolute/path/approved-snapshot.db
+```
+
+`refresh-db` backs up the prior primary database under `tmp/dev/backups/`. It
+preserves identities, passkeys, sessions, and other accounts' plans. `--from`
+changes the saved refresh source. Plain Compose startup never refreshes data.
+
+`publish-sample` publishes a separate snapshot for guests. Without `--from`, it
+copies the current dev primary plan. Approve the exact financial data before
+publication. The copy omits private projection history, Bridge links, sync times,
+and the source path. Later private edits do not change the sample.
+
+## Access and state
+
+Casdoor grants access to each account's private plan. Signup needs no role choice
+or manual grant. Guests can read and project only the separate sample. Account
+controls appear above sidebar navigation.
+
+The primary database belongs to the verified `ownerSubject` in `tmp/dev/config.json`.
+Fresh setup assigns the bootstrap account. Existing setups require an explicit
+owner assignment. Other accounts start empty under `tmp/dev/data/plans/`.
+
+Back up `.env.dev` and `tmp/dev/` to retain the full dev state. Files use `0600`,
+and private directories use `0700`. Compose `down` retains the bind-mounted data.
+Existing Casdoor instances require the reviewed permission objects described in
+[the authorization contract](../docs/authorization.md).
+
+## Verification
+
+The configuration tests use the Docker Compose CLI without a daemon:
 
 ```bash
 node --test dev/*.test.mjs auth/casdoor/*.test.mjs
 ```
 
-Automated destructive recovery tests still use their own isolated state. They
-do not replace this normal manual-development stack.
+Destructive identity tests use separate disposable state, not the normal dev stack.

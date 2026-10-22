@@ -44,18 +44,21 @@ SimpleFIN sync writes balance checkpoints and disabled pending-charge postings. 
 ## Development
 
 ```bash
-./scripts/dev up
-./scripts/dev down
+./scripts/dev setup # once, including existing dev stacks
+docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait
+docker compose --env-file .env.dev -f docker-compose.dev.yml down
 ```
 
-Open **http://localhost:5178**. Dev uses the same API, Nginx frontend, Casdoor,
-and Compose service wiring as production. First startup takes a read-only,
-SQLite-safe production database snapshot. Later starts retain dev data and
-logins. `./scripts/dev refresh-db` explicitly refreshes financial data without
-resetting accounts or passkeys. External sync stays disabled.
+Use **http://localhost:5178**, or the HTTPS URL printed by setup for tailnet access.
+The dedicated dev Compose file uses the production Dockerfiles and pinned Casdoor
+image with isolated dev storage. Setup takes the initial SQLite-safe, read-only
+production snapshot. Daily Compose commands retain data and logins without a
+custom lifecycle wrapper. External sync stays disabled.
 
-Use `./scripts/dev up --from /path/backup.db` for an existing backup instead.
-See [the dev guide](dev/README.md) for access grants, logs, and state recovery.
+Use `setup --from /path/backup.db` for an existing backup. Use `./scripts/dev refresh-db`
+to refresh financial data explicitly without resetting accounts or passkeys.
+See [the dev guide](dev/README.md) for tailnet setup, private plans, the guest sample,
+logs, and state recovery.
 
 ## Run from Source (Advanced)
 
@@ -98,7 +101,7 @@ The frontend is available at `http://localhost:8080` and the API at `http://loca
 
 The root `Dockerfile` remains a legacy combined image. The split images do not embed or build one another, and the legacy image and Compose stack must not run against the same volume or port at the same time.
 
-Optional [local authentication](auth/README.md) adds Casdoor through a Compose overlay. The Go API uses standard OIDC verification, persistent application sessions, and explicit reader/editor subject grants. Identities stay in local SQLite. Signed logout notifications and periodic token checks enforce provider revocation. Provider mode requires the frontend and API on the same public origin. See [the authentication contract](docs/authentication.md) for session limits and recovery. The Better Auth comparison remains on branch `experiment/better-auth`.
+Optional [local authentication](auth/README.md) adds Casdoor through a Compose overlay. The Go API verifies OIDC identity and calls Casdoor's built-in Casbin permission API. Each account owns a separate private plan. Guests can read and project only a separately published sample. No role choice is required at signup. Identities and plans stay in local SQLite. Signed logout notifications and periodic token checks enforce provider revocation. Provider mode requires the frontend and API on the same public origin. See [authentication](docs/authentication.md) and [plan authorization](docs/authorization.md) for boundaries and migration. The Better Auth comparison remains on branch `experiment/better-auth`.
 
 For Vercel in legacy mode, set `VITE_API_BASE_URL` to the public backend origin. Add that exact frontend origin to `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`. A proxy cut during a seeded stochastic run detaches the client without an error event; repeat the same request to attach or read the saved result.
 
