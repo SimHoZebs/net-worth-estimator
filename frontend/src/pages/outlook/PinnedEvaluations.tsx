@@ -22,7 +22,6 @@ export function PinnedEvaluations({
 	pending = false,
 	pinsDisabled = false,
 	onPinChange,
-	onEvaluation,
 }: {
 	plan: Plan;
 	projection: Projection | null;
@@ -31,7 +30,6 @@ export function PinnedEvaluations({
 	pending?: boolean;
 	pinsDisabled?: boolean;
 	onPinChange: (id: string) => void;
-	onEvaluation: (id: string) => void;
 }) {
 	const headingId = useId();
 	// Only persisted pins select Outlook cards. Missing and unknown IDs never
@@ -81,7 +79,6 @@ export function PinnedEvaluations({
 									evaluation={item.result.evaluation}
 									result={item.result}
 									probability={range?.evaluationSuccess[id] ?? null}
-									onEvidence={() => onEvaluation(id)}
 									pin={pin}
 								/>
 							) : (

@@ -1,6 +1,6 @@
-import { ArrowUpRight, Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
+import { Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
 import { useId } from "react";
-import { IconButton, TextButton } from "../../components/Button.tsx";
+import { IconButton } from "../../components/Button.tsx";
 import type { EvaluationPin } from "../../components/evaluationCard.ts";
 import { mergeStyles } from "../../components/mergeStyles.ts";
 import { Progress, Skeleton } from "../../components/ui.tsx";
@@ -17,7 +17,6 @@ export function EvaluationCard({
 	probability,
 	onEdit,
 	onRemove,
-	onEvidence,
 	pending = false,
 	pin = null,
 }: {
@@ -26,7 +25,6 @@ export function EvaluationCard({
 	probability: number | null;
 	onEdit?: () => void;
 	onRemove?: () => void;
-	onEvidence: () => void;
 	pending?: boolean;
 	pin?: EvaluationPin | null;
 }) {
@@ -148,16 +146,6 @@ export function EvaluationCard({
 					scenarios.
 				</p>
 			)}
-			<div className="m-0 flex items-center justify-between gap-3 border-t border-line pt-3">
-				<TextButton
-					type="button"
-					className="ml-auto"
-					disabled={!evaluation.enabled || outcomePending}
-					onClick={onEvidence}
-				>
-					Evidence <ArrowUpRight size={15} />
-				</TextButton>
-			</div>
 		</section>
 	);
 }

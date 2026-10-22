@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { testPlan } from "../../test/plan.ts";
+import { evaluationFixture } from "../../test/projection.ts";
 import { EvaluationCard } from "./EvaluationCard.tsx";
 
 afterEach(cleanup);
@@ -8,10 +9,9 @@ afterEach(cleanup);
 const evaluation = testPlan.evaluations[0]!;
 
 describe("EvaluationCard", () => {
-	it("preserves icon actions, pin state, and the evidence action", () => {
+	it("preserves icon actions and pin state without an evidence action", () => {
 		const onEdit = vi.fn();
 		const onRemove = vi.fn();
-		const onEvidence = vi.fn();
 		const onPinChange = vi.fn();
 		const view = render(
 			<EvaluationCard
@@ -20,7 +20,6 @@ describe("EvaluationCard", () => {
 				probability={0.75}
 				onEdit={onEdit}
 				onRemove={onRemove}
-				onEvidence={onEvidence}
 				pin={{ pinned: true, onPinChange }}
 			/>,
 		);
@@ -35,8 +34,8 @@ describe("EvaluationCard", () => {
 		fireEvent.click(
 			view.getByRole("button", { name: `Remove ${evaluation.name}` }),
 		);
-		fireEvent.click(view.getByRole("button", { name: "Evidence" }));
-		for (const action of [onPinChange, onEdit, onRemove, onEvidence])
+		expect(view.queryByRole("button", { name: /Evidence/ })).toBeNull();
+		for (const action of [onPinChange, onEdit, onRemove])
 			expect(action).toHaveBeenCalledOnce();
 		expect(
 			view.getByRole("progressbar", { name: evaluation.name }),
@@ -44,19 +43,15 @@ describe("EvaluationCard", () => {
 		expect(view.getByText("75%", { exact: false })).toBeTruthy();
 	});
 
-	it("keeps pending outcomes and paused evaluations unavailable as evidence", () => {
+	it("keeps pending outcomes and paused evaluations explicit", () => {
 		const props = {
 			evaluation,
 			result: undefined,
 			probability: null,
-			onEvidence: vi.fn(),
 			pending: true,
 		};
 		const view = render(<EvaluationCard {...props} />);
-		expect(
-			(view.getByRole("button", { name: "Evidence" }) as HTMLButtonElement)
-				.disabled,
-		).toBe(true);
+		expect(view.queryByRole("button", { name: /Evidence/ })).toBeNull();
 		expect(
 			view
 				.getByRole("region", { name: evaluation.name })
@@ -71,9 +66,37 @@ describe("EvaluationCard", () => {
 		);
 		expect(view.getByText("Paused")).toBeTruthy();
 		expect(view.getByText("Excluded from evaluation")).toBeTruthy();
-		expect(
-			(view.getByRole("button", { name: "Evidence" }) as HTMLButtonElement)
-				.disabled,
-		).toBe(true);
+		expect(view.queryByRole("button", { name: /Evidence/ })).toBeNull();
 	});
+
+	it.each(testPlan.evaluations)(
+		"keeps the $kind target result and editor actions without evidence",
+		(evaluation) => {
+			const onEdit = vi.fn();
+			const onRemove = vi.fn();
+			const view = render(
+				<EvaluationCard
+					evaluation={evaluation}
+					result={evaluationFixture({ evaluation })}
+					probability={0.75}
+					onEdit={onEdit}
+					onRemove={onRemove}
+				/>,
+			);
+			expect(view.getByRole("heading", { name: evaluation.name })).toBeTruthy();
+			expect(
+				view.getByRole("progressbar", { name: evaluation.name }),
+			).toBeTruthy();
+			expect(view.getByText("75%")).toBeTruthy();
+			expect(view.queryByRole("button", { name: /Evidence/ })).toBeNull();
+			fireEvent.click(
+				view.getByRole("button", { name: `Edit ${evaluation.name}` }),
+			);
+			expect(onEdit).toHaveBeenCalledOnce();
+			fireEvent.click(
+				view.getByRole("button", { name: `Remove ${evaluation.name}` }),
+			);
+			expect(onRemove).toHaveBeenCalledOnce();
+		},
+	);
 });

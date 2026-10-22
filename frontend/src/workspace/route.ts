@@ -22,12 +22,7 @@ export type OverlayRoute =
 	| { type: "account"; key: string }
 	| { type: "accountEdit"; key: string }
 	| { type: "movementEdit"; key: string }
-	| { type: "evaluation"; key: string }
 	| { type: "evaluationEdit"; key: string }
-	// Single-segment outlook reference: an evaluation id wins, otherwise an
-	// account id-or-slug. Only produced by hand-typed URLs; serializers emit
-	// the explicit two-segment forms below.
-	| { type: "outlookItem"; key: string }
 	| { type: "position" }
 	| { type: "shortfall" }
 	| { type: "safe-spending" }
@@ -212,10 +207,8 @@ function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
 					case "accounts":
 					case "transactions":
 						return { type: "account", key: first };
-					case "evaluations":
-						return { type: "evaluation", key: first };
 					case "outlook":
-						return { type: "outlookItem", key: first };
+						return { type: "account", key: first };
 					default:
 						return { type: "invalid" };
 				}
@@ -230,8 +223,6 @@ function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
 			return { type: "evaluationEdit", key: second ?? "" };
 		case "account":
 			return { type: "account", key: second ?? "" };
-		case "evaluation":
-			return { type: "evaluation", key: second ?? "" };
 		default:
 			if (second === "edit") {
 				// `new` stays reserved for creation: an account literally
@@ -325,17 +316,6 @@ export function resolveOverlayRoute(
 					})
 				: unknown();
 		}
-		case "evaluation": {
-			const evaluation = plan.evaluations.find(
-				(item) => item.id === overlay.key,
-			);
-			return evaluation
-				? ready({
-						kind: "evidence",
-						target: { kind: "evaluation", id: evaluation.id },
-					})
-				: unknown();
-		}
 		case "evaluationEdit": {
 			if (overlay.key === "new")
 				return ready({
@@ -349,23 +329,6 @@ export function resolveOverlayRoute(
 				? ready({
 						kind: "editor",
 						target: { kind: "evaluation", item: evaluation },
-					})
-				: unknown();
-		}
-		case "outlookItem": {
-			const evaluation = plan.evaluations.find(
-				(item) => item.id === overlay.key,
-			);
-			if (evaluation)
-				return ready({
-					kind: "evidence",
-					target: { kind: "evaluation", id: evaluation.id },
-				});
-			const account = findAccount(plan, overlay.key);
-			return account
-				? ready({
-						kind: "evidence",
-						target: { kind: "account", id: account.id },
 					})
 				: unknown();
 		}
@@ -426,10 +389,6 @@ export function evidenceHash(
 				return `#${page}/${encode(slug)}`;
 			return `#${page}/account/${encode(slug ?? target.id)}`;
 		}
-		case "evaluation":
-			return page === "evaluations"
-				? `#${page}/${encode(target.id)}`
-				: `#${page}/evaluation/${encode(target.id)}`;
 	}
 }
 

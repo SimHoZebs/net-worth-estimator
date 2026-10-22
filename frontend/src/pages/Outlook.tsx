@@ -18,7 +18,6 @@ type OutlookProps = {
 	onEvidence: () => void;
 	onFailure: () => void;
 	onTransactions: () => void;
-	onEvaluation: (id: string) => void;
 	safeSpendingDetail: SafeSpendingDetailTab | null;
 	onSafeSpendingDetail: (tab: SafeSpendingDetailTab | null) => void;
 	onSafeSpendingTab: (tab: SafeSpendingDetailTab) => void;
@@ -28,7 +27,6 @@ export function Outlook({
 	onEvidence,
 	onFailure,
 	onTransactions,
-	onEvaluation,
 	safeSpendingDetail,
 	onSafeSpendingDetail,
 	onSafeSpendingTab,
@@ -40,7 +38,6 @@ export function Outlook({
 			onEvidence={onEvidence}
 			onFailure={onFailure}
 			onTransactions={onTransactions}
-			onEvaluation={onEvaluation}
 			safeSpendingDetail={safeSpendingDetail}
 			onSafeSpendingDetail={onSafeSpendingDetail}
 			onSafeSpendingTab={onSafeSpendingTab}
@@ -50,7 +47,6 @@ export function Outlook({
 
 function OutlookContent({
 	onEvidence,
-	onEvaluation,
 	safeSpendingDetail,
 	onSafeSpendingDetail,
 	onSafeSpendingTab,
@@ -186,7 +182,6 @@ function OutlookContent({
 				onPinChange={(id) => {
 					void togglePin(id);
 				}}
-				onEvaluation={onEvaluation}
 			/>
 			<div className="mt-6 [@media(max-width:600px)]:mt-5" aria-busy={pending}>
 				<SafeSpendingPreview
