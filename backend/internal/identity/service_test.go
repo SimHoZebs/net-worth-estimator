@@ -106,9 +106,9 @@ func newIDP(t *testing.T) *testIDP {
 	return p
 }
 
-func newService(t *testing.T, p *testIDP, path string) *Service {
+func newService(t *testing.T, p *testIDP, path string, options ...func(*Config)) *Service {
 	t.Helper()
-	s, err := New(context.Background(), Config{Provider: "casdoor", Issuer: p.server.URL, PublicURL: "http://localhost:8080", ClientID: "waypoint", ClientSecret: "secret", SessionDB: path, Lifetime: time.Hour,
+	config := Config{Provider: "casdoor", Issuer: p.server.URL, PublicURL: "http://localhost:8080", ClientID: "waypoint", ClientSecret: "secret", SessionDB: path, Lifetime: time.Hour,
 		ResolveAccess: func(_ context.Context, subject string) (authorization.Scope, error) {
 			permissions := []string{"plan:read", "plan:project"}
 			if subject != "" {
@@ -116,7 +116,11 @@ func newService(t *testing.T, p *testIDP, path string) *Service {
 			}
 			return authorization.Scope{Resource: authorization.ResourceFor(p.server.URL, subject), Permissions: permissions}, nil
 		},
-	})
+	}
+	for _, option := range options {
+		option(&config)
+	}
+	s, err := New(context.Background(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +131,17 @@ func newService(t *testing.T, p *testIDP, path string) *Service {
 func testClient(t *testing.T) *http.Client {
 	t.Helper()
 	jar, _ := cookiejar.New(nil)
-	return &http.Client{Jar: jar, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
+	return &http.Client{Jar: jar, Transport: testAppTransport{}, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
+}
+
+type testAppTransport struct{}
+
+func (testAppTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	clone := r.Clone(r.Context())
+	if clone.Host == "" || clone.Host == clone.URL.Host {
+		clone.Host = "localhost:8080"
+	}
+	return http.DefaultTransport.RoundTrip(clone)
 }
 
 func signIn(t *testing.T, s *Service, p *testIDP, server *httptest.Server, client *http.Client, changeNonce bool) *http.Response {

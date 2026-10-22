@@ -74,6 +74,48 @@ policies. Retired `AUTH_READERS`/`AUTH_EDITORS` lists do not grant plan access.
 
 ## Session lifecycle
 
+### LAN and tailnet browser addresses
+
+The issuer identifies accounts. It does not need to be the browser's login
+address. `NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS` maps additional app origins
+to browser-facing Casdoor origins. For example:
+
+```json
+{"https://node.example.ts.net:18081":"https://node.example.ts.net:18083"}
+```
+
+`PUBLIC_URL` and the issuer remain the primary addresses. Register each additional
+app's exact `/v1/auth/callback` and `/` URLs in the same Casdoor application.
+The initializer accepts this mapping for fresh state. For existing state, back up
+Casdoor and add only those redirect URIs through its authenticated administration
+API. Never regenerate identities or change the issuer to add a network address.
+
+The static frontend serves an optional provider gateway on container port 81.
+Publish it only on loopback behind HTTPS. Its requests reach the backend's
+`/v1/auth/provider/` proxy. Only configured provider Host values can use it.
+The backend forwards to the existing issuer over its private transport. The
+browser stays on its configured login address, without DNS for the primary issuer.
+Provider proxy requests have a one-minute deadline. The frontend health check
+probes both listeners. External HTTPS and the full login flow require separate
+runtime verification.
+
+Login state binds the starting app origin to its callback and token exchange.
+Account and logout links use that origin's provider address. Unknown auth hosts,
+cross-origin callbacks, and sibling-origin write requests fail closed. Proxies
+must preserve `Host`; forwarded host headers do not select redirects.
+
+With additional origins, application cookies use an issuer/client namespace.
+The provider gateway also isolates every Casdoor cookie. This prevents dev and
+production collisions on one ts.net hostname with different ports. Enabling this
+mode requires one fresh app sign-in. Cookies remain host-only and Secure on HTTPS.
+
+Password login works through either address with the same account and plan.
+Existing passkeys remain bound to the canonical Casdoor hostname. The alias does
+not migrate passkeys or bypass WebAuthn hostname checks. Verify physical passkeys
+on the canonical hostname; use password fallback on the alias.
+
+### Grants and revocation
+
 Application sessions have an absolute deadline. Refresh never extends it. The
 next request refreshes tokens near their expiry. Concurrent requests share one
 refresh per grant. Rotated credentials persist before the next provider check.

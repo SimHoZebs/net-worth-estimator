@@ -18,7 +18,8 @@ ENV BACKEND_URL=http://backend:8787 \
 COPY frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /build/frontend/dist /usr/share/nginx/html
 
-EXPOSE 80
+EXPOSE 80 81
 
 HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=6 \
-    CMD wget -q -O /dev/null http://127.0.0.1/ || exit 1
+    CMD wget -q -O /dev/null http://127.0.0.1/ \
+      && wget -q -O /dev/null http://127.0.0.1:81/__gateway_healthz || exit 1

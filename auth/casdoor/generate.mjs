@@ -41,6 +41,29 @@ export function settingsFromEnv(env) {
     email: env.CASDOOR_USER_EMAIL || '',
     displayName: env.CASDOOR_USER_DISPLAY_NAME || required('CASDOOR_USER_NAME'),
   };
+  settings.browserOrigins = {};
+  if (env.NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS) {
+    const aliases = JSON.parse(env.NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS);
+    if (!aliases || Array.isArray(aliases) || typeof aliases !== 'object') {
+      throw new Error('AUTH_BROWSER_ORIGINS must map app origins to Casdoor origins');
+    }
+    for (const [app, provider] of Object.entries(aliases)) {
+      const appUrl = origin(app, 'browser app URL');
+      const providerUrl = origin(provider, 'browser Casdoor URL');
+      if (appUrl === settings.appUrl && providerUrl !== settings.publicUrl) {
+        throw new Error('AUTH_BROWSER_ORIGINS cannot replace the primary browser endpoint');
+      }
+      if (new URL(appUrl).protocol !== new URL(settings.appUrl).protocol
+        || new URL(appUrl).protocol !== new URL(providerUrl).protocol) {
+        throw new Error('Browser aliases must use the primary app scheme');
+      }
+      settings.browserOrigins[appUrl] = providerUrl;
+    }
+    const appHosts = new Set([settings.appUrl, ...Object.keys(settings.browserOrigins)].map(value => new URL(value).host));
+    for (const provider of [settings.publicUrl, ...Object.values(settings.browserOrigins)]) {
+      if (appHosts.has(new URL(provider).host)) throw new Error('Browser app and provider hosts must be distinct');
+    }
+  }
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(settings.clientId)) {
     throw new Error('AUTH_CLIENT_ID must contain 1–100 URL-safe characters');
   }
@@ -102,7 +125,8 @@ export function buildSeed(settings) {
         ],
         grantTypes: ['authorization_code', 'refresh_token'],
         backchannelLogoutUri: settings.backchannelUrl,
-        redirectUris: [`${settings.appUrl}/v1/auth/callback`, `${settings.appUrl}/`],
+        redirectUris: [...new Set([settings.appUrl, ...Object.keys(settings.browserOrigins || {})])]
+          .flatMap(app => [`${app}/v1/auth/callback`, `${app}/`]),
         tokenFormat: 'JWT-Standard', tokenSigningMethod: 'RS256', expireInHours: 1,
         refreshExpireInHours: 720,
         cookieExpireInHours: 720, failedSigninLimit: 5, failedSigninFrozenTime: 15,

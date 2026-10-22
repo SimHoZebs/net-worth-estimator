@@ -19,20 +19,26 @@ import (
 const prefix = "/v1/auth/"
 
 type Service struct {
-	config         Config
-	sessions       *scs.SessionManager
-	store          *sessionStore
-	provider       *oidc.Provider
-	oauth          oauth2.Config
-	client         *http.Client
-	logoutEndpoint string
-	introspection  string
-	csrf           *http.CrossOriginProtection
-	validation     singleflight.Group
+	config           Config
+	browsers         map[string]browserEndpoint
+	browserProviders map[string]http.Handler
+	sessions         *scs.SessionManager
+	store            *sessionStore
+	provider         *oidc.Provider
+	oauth            oauth2.Config
+	client           *http.Client
+	logoutEndpoint   string
+	introspection    string
+	csrf             *http.CrossOriginProtection
+	validation       singleflight.Group
 }
 
 // New uses standard OIDC discovery and verification for Casdoor.
 func New(ctx context.Context, c Config) (*Service, error) {
+	browsers, err := browserEndpoints(c)
+	if err != nil {
+		return nil, err
+	}
 	if c.RecheckInterval <= 0 {
 		c.RecheckInterval = 30 * time.Second
 	}
@@ -65,9 +71,14 @@ func New(ctx context.Context, c Config) (*Service, error) {
 	sm.Store = store
 	sm.Lifetime = c.Lifetime
 	sm.Cookie.Name = "waypoint_session"
+	if len(c.BrowserOrigins) > 0 {
+		// Dev and production can share a ts.net hostname on different ports.
+		// Browsers scope cookies by hostname, not by port.
+		sm.Cookie.Name = browserCookieNamespace(c) + "session"
+	}
 	sm.Cookie.Secure = strings.HasPrefix(c.PublicURL, "https://")
 	if sm.Cookie.Secure {
-		sm.Cookie.Name = "__Host-waypoint_session"
+		sm.Cookie.Name = "__Host-" + sm.Cookie.Name
 	}
 	sm.Cookie.HttpOnly = true
 	sm.Cookie.Persist = true
@@ -85,8 +96,10 @@ func New(ctx context.Context, c Config) (*Service, error) {
 		store.db.Close()
 		return nil, fmt.Errorf("identity provider must support token introspection and back-channel logout")
 	}
-	return &Service{config: c, sessions: sm, store: store, provider: provider, client: client, logoutEndpoint: metadata.EndSessionEndpoint, introspection: metadata.IntrospectionEndpoint, csrf: csrf,
-		oauth: oauth2.Config{ClientID: c.ClientID, ClientSecret: c.ClientSecret, Endpoint: provider.Endpoint(), RedirectURL: strings.TrimRight(c.PublicURL, "/") + prefix + "callback", Scopes: []string{oidc.ScopeOpenID, "profile", "email", "offline_access"}}}, nil
+	service := &Service{config: c, browsers: browsers, sessions: sm, store: store, provider: provider, client: client, logoutEndpoint: metadata.EndSessionEndpoint, introspection: metadata.IntrospectionEndpoint, csrf: csrf,
+		oauth: oauth2.Config{ClientID: c.ClientID, ClientSecret: c.ClientSecret, Endpoint: provider.Endpoint(), RedirectURL: strings.TrimRight(c.PublicURL, "/") + prefix + "callback", Scopes: []string{oidc.ScopeOpenID, "profile", "email", "offline_access"}}}
+	service.browserProviders = service.browserProviderHandlers()
+	return service, nil
 }
 
 func (s *Service) Close() error { return s.store.db.Close() }
@@ -163,12 +176,28 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			s.backchannelLogout(w, r)
 			return
 		}
+		if strings.HasPrefix(r.URL.Path, prefix+"provider/") {
+			s.serveBrowserProvider(w, r)
+			return
+		}
+		if endpoint, ok := s.browserEndpoint(r); ok {
+			// A sibling app origin cannot submit this origin's cookies.
+			if origin := r.Header.Get("Origin"); origin != "" && origin != endpoint.app && !isSafeMethod(r.Method) {
+				failure(w, http.StatusForbidden, "The request origin does not match this application address.")
+				return
+			}
+		}
 		protected.ServeHTTP(w, r)
 	})
 }
 
 func (s *Service) serveAuth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
+	endpoint, ok := s.browserEndpoint(r)
+	if !ok {
+		failure(w, http.StatusForbidden, "This application address is not configured for sign-in.")
+		return
+	}
 	switch r.Method + " " + r.URL.Path {
 	case "GET " + prefix + "session":
 		p, err := s.principal(r)
@@ -182,7 +211,7 @@ func (s *Service) serveAuth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set(ResourceHeader, scope.Resource.ID)
-		respond(w, map[string]any{"enabled": true, "provider": s.config.Provider, "authenticated": p.Subject != "", "allowed": slices.Contains(scope.Permissions, "plan:read"), "user": p, "accountURL": s.config.AccountURL,
+		respond(w, map[string]any{"enabled": true, "provider": s.config.Provider, "authenticated": p.Subject != "", "allowed": slices.Contains(scope.Permissions, "plan:read"), "user": p, "accountURL": s.browserProviderURL(s.config.AccountURL, endpoint),
 			"resource": map[string]any{"id": scope.Resource.ID, "kind": scope.Resource.Kind, "permissions": scope.Permissions}})
 	case "GET " + prefix + "login":
 		s.login(w, r)
