@@ -54,6 +54,42 @@ test("planned purchases has a navigation entry, direct route, and browser histor
 	).toBeVisible();
 });
 
+for (const reducedMotion of ["reduce", "no-preference"] as const) {
+	test(`a dirty purchase form stays visible until discard is confirmed (${reducedMotion})`, async ({
+		page,
+	}) => {
+		await page.emulateMedia({ reducedMotion });
+		await openPurchases(page);
+		await page.getByRole("button", { name: "Add purchase" }).click();
+		const dialog = page.getByRole("dialog", { name: "Add purchase" });
+		await dialog.getByLabel("Purchase name").fill("Unsaved desk");
+		await dialog.getByRole("button", { name: "Close dialog" }).click();
+		await expect(dialog.getByRole("alert")).toContainText(
+			"Discard the changes in this form?",
+		);
+		await expect(dialog.locator(":scope > div")).toHaveCSS("opacity", "1");
+		await dialog.getByRole("button", { name: "Continue", exact: true }).click();
+		await expect(dialog.getByLabel("Purchase name")).toHaveValue(
+			"Unsaved desk",
+		);
+		await dialog.press("Escape");
+		await expect(dialog.getByRole("alert")).toContainText(
+			"Discard the changes in this form?",
+		);
+		await dialog
+			.getByRole("button", { name: "Discard changes", exact: true })
+			.click();
+		await expect(page.locator("dialog[open]")).toHaveCount(0);
+		await expect(
+			page.getByRole("button", { name: "Add purchase" }),
+		).toBeFocused();
+		await page.getByRole("button", { name: "Add purchase" }).click();
+		await expect(dialog.getByLabel("Purchase name")).toHaveValue("");
+		await dialog.getByRole("button", { name: "Close dialog" }).click();
+		await expect(page.locator("dialog[open]")).toHaveCount(0);
+	});
+}
+
 test("an editor can save a purchase with a synced account and pending UUID postings", async ({
 	page,
 	request,

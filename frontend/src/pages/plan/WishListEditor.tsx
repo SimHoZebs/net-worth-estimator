@@ -13,12 +13,14 @@ export function WishListEditor({
 	item,
 	onApply,
 	onClose,
+	applyError,
 	readOnly,
 }: {
 	plan: Plan;
 	item: Movement | null;
 	onApply: (plan: Plan) => boolean;
 	onClose: () => void;
+	applyError?: string | null;
 	readOnly: boolean;
 }) {
 	const includeId = useId();
@@ -30,6 +32,7 @@ export function WishListEditor({
 			title={item ? "Edit purchase" : "Add purchase"}
 			onApply={onApply}
 			onClose={onClose}
+			applyError={applyError}
 			readOnlyReason={
 				readOnly ? "These planned purchases are read-only." : undefined
 			}
