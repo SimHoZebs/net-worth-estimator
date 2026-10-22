@@ -54,7 +54,6 @@ describe("standard Tailwind spacing", () => {
 		"max-w-140",
 		"text-[13px]",
 		"font-[650]",
-		"rounded-[7px]",
 		"duration-[150ms]",
 		"border-[1px]",
 		"outline-offset-[3px]",
@@ -78,6 +77,19 @@ describe("standard Tailwind spacing", () => {
 		expect(normalizeSpacingClasses("flex  gap-[5px]\n px-[12px]")).toBe(
 			"flex  gap-1\n px-3",
 		);
+	});
+
+	it.each([
+		["gap-1.5", "gap-2"],
+		["sm:px-7!", "sm:px-8!"],
+		["-mt-3.5", "-mt-4"],
+		["p-10", "p-12"],
+		["rounded", "rounded-control"],
+		["rounded-md", "rounded-control"],
+		["hover:rounded-lg", "hover:rounded-surface"],
+		["rounded-t-xl", "rounded-t-surface"],
+	])("consolidates %s", (input, expected) => {
+		expect(normalizeSpacingUtility(input)).toBe(expected);
 	});
 });
 
@@ -126,6 +138,52 @@ const result = clsx("gap-[5px]", enabled && "mt-[8px]");`;
 		expect(styleScaleWarnings("src/table.ts", source)[1]).toContain(
 			"src/table.ts:2:",
 		);
+	});
+
+	it("checks exported static recipes and mergeStyles arguments", () => {
+		const source = `export const dialogBodyStyles = "p-7";
+const element = mergeStyles("rounded-md", active && "gap-2.5");`;
+		const fixed = normalizeStyleScale("src/recipes.ts", source);
+		expect(fixed).toContain('dialogBodyStyles = "p-8"');
+		expect(fixed).toContain(
+			'mergeStyles("rounded-control", active && "gap-3")',
+		);
+		expect(styleScaleWarnings("src/recipes.ts", source)).toHaveLength(3);
+		expect(styleScaleWarnings("src/recipes.ts", fixed)).toEqual([]);
+	});
+
+	it("preserves CVA variant selections while checking their class values", () => {
+		const source = `const recipe = cva("p-7", {
+  variants: { shape: { rounded: "rounded-lg", square: "rounded-none" } },
+  defaultVariants: { shape: "rounded" },
+  compoundVariants: [{ shape: "rounded", class: "gap-1.5" }],
+});`;
+		const fixed = normalizeStyleScale("src/recipe.ts", source);
+		expect(fixed).toContain('rounded: "rounded-surface"');
+		expect(fixed).toContain('defaultVariants: { shape: "rounded" }');
+		expect(fixed).toContain('shape: "rounded", class: "gap-2"');
+		expect(styleScaleWarnings("src/recipe.ts", fixed)).toEqual([]);
+	});
+
+	it.each([
+		"max-[600px]:p-4",
+		"[@media(max-width:800px)]:hidden",
+		"@max-[36rem]/card:p-4",
+		"rounded-[7px]",
+		"tracking-[-1px]",
+		"max-w-190",
+		"w-[calc(100%-80px)]",
+		"p-[calc(1rem+1px)]",
+		"grid-cols-[repeat(auto-fill,minmax(250px,1fr))]",
+	])("rejects an independent design choice: %s", (token) => {
+		expect(
+			styleScaleWarnings("src/Card.tsx", `<div className="${token}" />`),
+		).not.toEqual([]);
+	});
+
+	it("allows intrinsic constraints, runtime dimensions, hairlines, geometry, and named breakpoints", () => {
+		const source = `<div className="p-4 gap-px w-px rounded-[inherit] max-w-xl sm:max-lg:grid-cols-2 @max-xl/card:p-3 w-(--balance-width) w-[2ch] max-w-[52ch] grid-cols-[repeat(auto-fit,minmax(min(100%,var(--container-3xs)),1fr))] [@media(pointer:coarse)]:p-4"><svg viewBox="0 0 840 360"><rect width={32} rx={2} /></svg></div>`;
+		expect(styleScaleWarnings("src/Card.tsx", source)).toEqual([]);
 	});
 
 	it("leaves semantic fields beside a className property unchanged", () => {
@@ -200,5 +258,15 @@ function Card({ value }: Props) { return <div className={value} />; }`;
 }}`;
 		expect(normalizeStyleScale("src/card.css", source)).toBe(source);
 		expect(styleScaleWarnings("src/card.css", source)).toEqual([]);
+	});
+
+	it("applies the finite scale to raw CSS and spacing functions", () => {
+		const source = `.card { padding: --spacing(7); gap: 6px; margin: 10px; width: --spacing(7); }`;
+		const fixed = normalizeStyleScale("src/card.css", source);
+		expect(fixed).toContain("padding: --spacing(8)");
+		expect(fixed).toContain("gap: --spacing(2)");
+		expect(fixed).toContain("margin: --spacing(3)");
+		expect(fixed).toContain("width: --spacing(7)");
+		expect(styleScaleWarnings("src/card.css", fixed)).toEqual([]);
 	});
 });
