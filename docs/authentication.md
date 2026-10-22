@@ -16,16 +16,16 @@ hashed application-session IDs, provider grants, and logout replay records.
 Provider grants contain access, refresh, and ID tokens. SCS sessions hold only
 opaque grant references. Protect this database as a credential store.
 
-There is **one financial plan per financial database**. Explicit verified-subject
-grants cover that whole plan. Readers can read and compute. Editors can also
-write. The global read-only switch still rejects editor writes. Provider signup,
-email matching, and provider administrator roles grant no financial access.
+Casdoor's built-in Casbin system grants actions on plan resources. Guests can
+read and project only a separate published sample. Each signed-in account can
+read and edit only its own private plan. Signup has no role-selection or manual
+grant step. Plans, artifacts, sync state, and browser drafts remain isolated.
+See [plan-scoped authorization](authorization.md) for the resource and migration
+contract. The global read-only switch still rejects editor writes.
 
-Anonymous browser visits redirect straight to Casdoor for sign-in or account
-creation. Casdoor owns the signup form and password checks. New ordinary accounts
-remain on the access-denied screen until the owner grants their verified subject
-access. Built-in administrator signup stays disabled. The default signup form
-does not collect email or require an email provider.
+The sidebar offers sign-in and account creation for guests. Casdoor owns signup,
+password checks, and passkeys. Built-in administrator signup stays disabled.
+The default signup form does not collect email or require a mail service.
 
 ## Configuration
 
@@ -38,8 +38,10 @@ does not collect email or require an email provider.
 | `NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET` | Private client credential |
 | `NET_WORTH_ESTIMATOR_PUBLIC_URL` | Frontend origin, without a path |
 | `NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL` | Optional account/passkey page on the issuer origin |
-| `NET_WORTH_ESTIMATOR_AUTH_EDITORS` | Comma-separated verified OIDC subjects with read/write access |
-| `NET_WORTH_ESTIMATOR_AUTH_READERS` | Comma-separated verified OIDC subjects with read-only access |
+| `NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL` | Casdoor model ID, default `waypoint/plan-access` |
+| `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT` | Verified owner of the existing primary financial database |
+| `NET_WORTH_ESTIMATOR_PLANS_DIR` | Private per-account database directory, default `<financial-db>.plans` |
+| `NET_WORTH_ESTIMATOR_SAMPLE_DB` | Separate, explicitly published read-only guest sample database |
 | `NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME` | Absolute application lifetime, default `168h` |
 | `NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL` | Provider recheck interval, default `30s`, range `1s`–`5m` |
 | `NET_WORTH_ESTIMATOR_AUTH_SESSION_DB` | Optional identity/session database path |
@@ -54,22 +56,24 @@ preserves Origin for Go's browser CSRF protection. Direct cross-origin bearer
 deployments remain available in legacy mode. Cross-origin session login is
 outside this integration. Casdoor mode rejects the legacy `AUTH_TOKEN` setting.
 
-`GET /v1/auth/session` supplies anonymous authentication discovery. Casdoor mode
-protects `/v1/status` because it exposes plan sync state. Its `authEnabled` field
+`GET /v1/auth/session` supplies identity and resource-capability discovery.
+The API checks Casdoor's resource permissions before any plan read or write.
+Guests read only sample status, which reports `readOnly: true`. Its `authEnabled` field
 still means legacy bearer-token authentication, not OIDC session login. This
 keeps the legacy token prompt separate from the session boundary.
 
-Grant access by the generated subject in private `bootstrap.json`, or by a
-verified subject on the application's access-denied screen. Keep grants private
-and redeploy the API after changes. Never use a wildcard or an unverified email.
+Assign existing primary data to its verified owner before migration. New
+accounts receive their own empty private plan. Casdoor owns action/resource
+policies. Retired `AUTH_READERS`/`AUTH_EDITORS` lists do not grant plan access.
 
 ## Session lifecycle
 
 Application sessions have an absolute deadline. Refresh never extends it. The
 next request refreshes tokens near their expiry. Concurrent requests share one
 refresh per grant. Rotated credentials persist before the next provider check.
-Expired application sessions start OIDC again. Casdoor can reuse its browser
-session without another credential prompt.
+Expired application sessions lose private-plan access. A guest session uses
+only the sample resource. Casdoor can reuse its browser session for a new
+sign-in without another credential prompt.
 
 App logout deletes its provider grant and SCS session, then returns Casdoor's
 end-session URL. A captured app cookie cannot restore that grant. The browser
@@ -86,7 +90,8 @@ grants for the subject when it cannot match a precise provider session.
 
 Introspection covers disabled/deleted users, revoked tokens, administrator session
 deletion, and password resets. The next request after the configured interval
-checks the provider. An inactive token deletes the app grant and returns 401.
+checks the provider. An inactive token deletes the app grant and removes private
+plan access. Old private-resource assertions return 409. Guest writes return 401.
 A provider outage returns 503 when verification is due, retaining the grant for
 retry. Cached verification remains valid until the interval ends. Requests and
 SSE streams already admitted can finish. Revocation does not cancel them.
@@ -115,7 +120,7 @@ If a user loses a device:
 2. Remove the lost device's credential in Casdoor.
 3. Reset the password if it could be compromised.
 4. Delete that user's provider sessions in Casdoor's Sessions page.
-5. Confirm old application cookies return 401 after the recheck interval.
+5. Confirm old cookies cannot write or read the asserted private resource.
 6. Enroll and verify a replacement passkey.
 
 If all user credentials are lost, use the separate Casdoor administrator account
@@ -124,9 +129,10 @@ provider sessions too. Password reset expires OAuth tokens but does not replace
 the explicit session-deletion step. Never change the user's immutable subject
 to recover access. Do not grant the administrator access to the financial plan.
 
-For immediate application exclusion, remove the subject from both grant lists
-and recreate the API. Subsequent requests return 403 even with a valid identity.
-Also revoke provider credentials to prevent later reuse. Rotate the OIDC client
+For immediate resource exclusion, add a Casdoor deny policy for the exact actor,
+plan resource, and actions in the same plan model/adapter. Permission checks have
+no positive application cache. Also revoke provider credentials to prevent later
+reuse. Rotate the OIDC client
 secret if that secret leaks. Restore service only after both sides use it.
 
 ## Backups and restore
@@ -138,8 +144,9 @@ an active database file can omit WAL data. Keep the identity/session database
 separate from financial imports and public assets.
 
 Restore to the same issuer hostname and preserve generated subjects. Passkeys
-bind to that hostname. A new identity database or issuer needs new verified
-grants and passkey enrollment. Automatic identity migration is outside scope.
+bind to that hostname. A new identity database or issuer needs an explicit plan
+ownership/resource migration and passkey enrollment. Automatic identity migration
+is outside scope.
 
 A credential-store backup can restore old sessions and tokens. After incident
 recovery, revoke provider sessions and tokens again. With the API stopped,
@@ -150,6 +157,8 @@ application users through sign-in again. Keep financial data intact.
 
 ```bash
 backend/scripts/verify.sh ./internal/identity
+backend/scripts/verify.sh ./internal/authorization
+backend/scripts/verify.sh ./internal/plans
 backend/scripts/verify.sh ./internal/api
 go -C backend test -race ./internal/identity
 node --test auth/casdoor/*.test.mjs

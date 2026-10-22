@@ -3,3 +3,4 @@ core
 core.*
 uploads/
 tmp/
+.env.dev

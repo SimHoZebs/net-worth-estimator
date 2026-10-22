@@ -4,13 +4,20 @@ This checkout holds two packages: the Go backend in `backend/`, and the Waypoint
 
 ## Manual Development
 
-Use `./scripts/dev up` and open `http://localhost:5178`. Use `./scripts/dev down`
-to stop it. This is the production Compose stack with isolated dev data, not
-the Vite/fixture API browser-test harness. `./scripts/dev refresh-db` replaces
-only the dev financial database from a consistent production snapshot.
+Run `./scripts/dev setup` once, then use the dedicated dev Compose stack:
+
+```bash
+docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait
+docker compose --env-file .env.dev -f docker-compose.dev.yml down
+```
+
+This uses production Dockerfiles with isolated dev data, not the Vite/fixture API
+browser-test harness. `./scripts/dev refresh-db` replaces only the dev financial
+database from a consistent production snapshot.
 See [dev/README.md](dev/README.md).
 
 Dev setup checks: `node --test dev/*.test.mjs auth/casdoor/*.test.mjs`.
+Configuration checks require the Docker Compose CLI, but no running daemon.
 
 ## Frontend Gates
 
@@ -72,13 +79,15 @@ Unit checks need no identity container:
 
 ```bash
 backend/scripts/verify.sh ./internal/identity
+backend/scripts/verify.sh ./internal/authorization
+backend/scripts/verify.sh ./internal/plans
 backend/scripts/verify.sh ./internal/api
 node --test auth/casdoor/*.test.mjs
 ```
 
 `scripts/smoke-compose.sh` targets the legacy unauthenticated stack. Casdoor
-requires the authenticated checks below because private status and projections
-reject anonymous requests.
+requires the resource-scoped checks below. Guests see only a separate sample.
+Authenticated requests use the account's private plan and assert its resource ID.
 
 Use the [Casdoor test guide](auth/casdoor/README.md#verification) for real-provider
 passkey, restart, revocation, refresh, and administrator recovery checks. The
@@ -88,6 +97,13 @@ can abort module requests with `ERR_NETWORK_CHANGED` when host interfaces change
 
 Physical passkeys and phone recovery require the separate
 [manual checklist](docs/authentication.md#manual-physical-device-and-recovery-checklist).
+
+`auth/test-integration.mjs` checks owner, guest sample, and second-account isolation
+against a marked disposable Casdoor fixture. `CASDOOR_TEST_MUTATIONS=1` is required.
+Its `fixture.json` must identify isolated state under repository `tmp/` or
+`/tmp/opencode/`, never live `tmp/dev/`. The script verifies the real permission
+API, OIDC, CSRF, restart persistence, private writes, sample projection/SSE,
+cross-account rejection, stale resource headers, and logout.
 
 ---
 

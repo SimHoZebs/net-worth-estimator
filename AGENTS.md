@@ -5,17 +5,24 @@
 Use the production-like Compose dev stack from the repository root:
 
 ```bash
-./scripts/dev up
-./scripts/dev down
+./scripts/dev setup # once, including existing dev stacks
+docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait
+docker compose --env-file .env.dev -f docker-compose.dev.yml down
 ```
 
-The frontend is `http://localhost:5178`, Casdoor is on 8000, and the API debug
-port is 8788. Use the same API, Nginx frontend, and Casdoor images as production.
-Dev data and private configuration persist in gitignored `tmp/dev/`.
-First startup takes a SQLite-safe, read-only production database snapshot.
+Use the frontend URL printed by setup. The local profile uses
+`http://localhost:5178`. Casdoor is on 8000, and the private API debug port is
+8788. Use the same API, Nginx frontend, and Casdoor images as production.
+Daily lifecycle commands use the dedicated `docker-compose.dev.yml`, not a wrapper.
+Dev state persists in gitignored `.env.dev` and `tmp/dev/`.
+Setup takes a SQLite-safe, read-only production database snapshot.
 `./scripts/dev refresh-db` explicitly refreshes financial data and preserves
-identity/session state. Use `up --from /path/backup.db` for an existing backup.
-SimpleFIN stays disabled. See `dev/README.md` for commands and access grants.
+identity/session state. Use `setup --from /path/backup.db` for an existing backup.
+SimpleFIN stays disabled. See `dev/README.md` for commands and account access.
+For remote tailnet use, initialize with `setup --tailnet` after the operator sets
+the two HTTPS Serve routes in the guide. Saved profiles persist across restarts.
+Use the printed HTTPS hostname, not a raw tailnet IP over HTTP. Never reset the
+host's shared Serve configuration or silently change an existing identity issuer.
 
 Vite and direct Go processes are advanced source-debugging tools, not the normal
 manual-test entry point. Stop the dev frontend before using Vite on 5178.
