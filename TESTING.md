@@ -108,6 +108,12 @@ can abort module requests with `ERR_NETWORK_CHANGED` when host interfaces change
 Physical passkeys and phone recovery require the separate
 [manual checklist](docs/authentication.md#manual-physical-device-and-recovery-checklist).
 
+`go -C backend test ./internal/identity -run 'TestBrowser|TestProviderAlias|TestProviderProxy|TestSiblingApp'`
+checks browser-origin redirects, callback binding, provider cookie isolation,
+proxy transport, and sibling-origin denial. Additional browser aliases keep the
+same issuer and account-owned resource IDs. See
+[browser address configuration](docs/authentication.md#lan-and-tailnet-browser-addresses).
+
 `auth/test-integration.mjs` checks owner, guest sample, and second-account isolation
 against a marked disposable Casdoor fixture. `CASDOOR_TEST_MUTATIONS=1` is required.
 Its `fixture.json` must identify isolated state under repository `tmp/` or

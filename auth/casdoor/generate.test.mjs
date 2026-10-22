@@ -62,6 +62,29 @@ test('seeds one normal user, code/refresh grants, sessions, passkeys, and a fres
   assert.match(buildConfig(settings), /_pragma=busy_timeout\(5000\)&_pragma=journal_mode\(WAL\)/);
 });
 
+test('additional browser addresses add exact callbacks without changing identities or issuer', () => {
+  const baseline = settingsFromEnv(env);
+  const settings = settingsFromEnv({ ...env,
+    NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS: JSON.stringify({ 'http://localhost:18081': 'http://localhost:18083' }),
+  });
+  const before = buildSeed(baseline);
+  const after = buildSeed(settings);
+  const app = after.applications.find(app => app.name === 'waypoint');
+  assert.deepEqual(app.redirectUris, [
+    'http://localhost:5178/v1/auth/callback', 'http://localhost:5178/',
+    'http://localhost:18081/v1/auth/callback', 'http://localhost:18081/',
+  ]);
+  app.redirectUris = before.applications.find(app => app.name === 'waypoint').redirectUris;
+  assert.deepEqual(after, before);
+  assert.equal(buildConfig(settings), buildConfig(baseline));
+  for (const aliases of [null, [], { 'http://host.test': 'http://localhost:8000' },
+    { 'http://localhost:5178': 'http://localhost:18083' },
+    { 'http://localhost:18081': 'http://localhost:5178' },
+    { 'http://localhost:18081/path': 'http://localhost:18083' }]) {
+    assert.throws(() => settingsFromEnv({ ...env, NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS: JSON.stringify(aliases) }));
+  }
+});
+
 test('creates private files without overwriting existing configuration', async () => {
   const dir = await mkdtemp(resolve(tmpdir(), 'casdoor-generator-test-'));
   try {

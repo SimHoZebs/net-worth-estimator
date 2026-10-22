@@ -32,6 +32,17 @@ func TestProviderConfiguration(t *testing.T) {
 		{"disabled revocation checks", "NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL", "0s", true},
 		{"internal HTTP", "NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL", "http://casdoor:8000", false},
 		{"wrong account origin", "NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL", "https://elsewhere.test", true},
+		{"browser alias", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `{"http://localhost:8081":"http://localhost:8001"}`, false},
+		{"invalid browser mapping", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `[]`, true},
+		{"null browser mapping", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `null`, true},
+		{"insecure browser app", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `{"http://tail.test":"https://auth.test"}`, true},
+		{"insecure browser provider", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `{"http://localhost:8081":"http://auth.test"}`, true},
+		{"mixed app schemes", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `{"https://tail.test":"https://auth.test"}`, true},
+		{"browser app path", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `{"http://localhost:8081/path":"http://localhost:8001"}`, true},
+		{"browser provider query", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `{"http://localhost:8081":"http://localhost:8001?x=y"}`, true},
+		{"browser port range", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `{"http://localhost:65536":"http://localhost:8001"}`, true},
+		{"primary provider replacement", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `{"http://localhost:8080":"http://localhost:8001"}`, true},
+		{"app provider collision", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `{"http://localhost:8081":"http://localhost:8080"}`, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			env := func(k string) string {

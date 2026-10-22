@@ -3,6 +3,7 @@ package identity
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"time"
@@ -17,6 +18,9 @@ type Config struct {
 	RecheckInterval                                       time.Duration
 	ResolveAccess                                         func(context.Context, string) (authorization.Scope, error)
 	RequireResourceHeader                                 bool
+	// BrowserOrigins maps additional app origins to browser-facing Casdoor origins.
+	// Issuer and InternalURL remain the server-side identity and transport boundary.
+	BrowserOrigins map[string]string
 }
 
 // FromEnv keeps identity configuration separate from financial-server settings.
@@ -90,6 +94,14 @@ func FromEnv(getenv func(string) string, databasePath string) (Config, error) {
 		if err != nil || a.Scheme != i.Scheme || a.Host != i.Host || a.User != nil || a.Fragment != "" {
 			return c, fmt.Errorf("AUTH_ACCOUNT_URL must use the issuer origin")
 		}
+	}
+	if raw := getenv("NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS"); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &c.BrowserOrigins); err != nil || c.BrowserOrigins == nil {
+			return c, fmt.Errorf("AUTH_BROWSER_ORIGINS must be a JSON object mapping app origins to Casdoor origins")
+		}
+	}
+	if _, err := browserEndpoints(c); err != nil {
+		return c, err
 	}
 	return c, nil
 }
