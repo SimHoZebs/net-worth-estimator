@@ -85,7 +85,7 @@ function SortableRow({
 			dragControls={dragControls}
 			onDragStart={onDragStart}
 			onDragEnd={onDrop}
-			className="flex items-center gap-3 border-b border-line bg-transparent p-3 [@media(max-width:600px)]:gap-2 [@media(max-width:600px)]:px-2 [@media(max-width:600px)]:py-3"
+			className="flex items-center gap-3 border-b border-line bg-transparent p-3 max-sm:gap-2 max-sm:px-2 max-sm:py-3"
 			aria-label={label}
 		>
 			<span
@@ -327,7 +327,7 @@ export function RecurringRules({
 							}}
 							onDrop={handleDrop}
 							controls={
-								<span className="ml-auto flex items-center gap-1 [@media(max-width:600px)]:gap-0.5">
+								<span className="ml-auto flex items-center gap-1 max-sm:gap-0.5">
 									<IconButton
 										icon={ChevronUp}
 										label={`Move ${movement.name} up`}
@@ -365,7 +365,7 @@ export function RecurringRules({
 					{rules.map((movement, index) => (
 						<li
 							key={movement.id}
-							className="flex items-center gap-3 border-b border-line bg-transparent p-3 [@media(max-width:600px)]:gap-2 [@media(max-width:600px)]:px-2 [@media(max-width:600px)]:py-3"
+							className="flex items-center gap-3 border-b border-line bg-transparent p-3 max-sm:gap-2 max-sm:px-2 max-sm:py-3"
 						>
 							<button
 								type="button"

@@ -23,16 +23,16 @@ export const transactionRowStyles = cva("hover:bg-surface-2", {
 export const transactionCellStyles = cva("py-3", {
 	variants: {
 		column: {
-			date: "w-[1%] pr-3 pl-0 text-xs whitespace-nowrap text-muted [@media(max-width:600px)]:hidden",
-			name: "w-auto px-3 whitespace-normal [@media(max-width:600px)]:px-2",
+			date: "w-[1%] pr-3 pl-0 text-xs whitespace-nowrap text-muted max-sm:hidden",
+			name: "w-auto px-3 whitespace-normal max-sm:px-2",
 			amount:
-				"w-30 pr-1 pl-3 text-right whitespace-nowrap tabular-nums [@media(max-width:600px)]:w-23 [@media(max-width:600px)]:pr-0 [@media(max-width:600px)]:pl-2",
+				"w-32 pr-1 pl-3 text-right whitespace-nowrap tabular-nums max-sm:w-24 max-sm:pr-0 max-sm:pl-2",
 		},
 	},
 });
 
 export const transactionAmountStyles = cva(
-	"m-0 text-sm font-semibold [@media(max-width:600px)]:text-xs",
+	"m-0 text-sm font-semibold max-sm:text-xs",
 	{
 		variants: { positive: { true: "text-success-text", false: "" } },
 	},

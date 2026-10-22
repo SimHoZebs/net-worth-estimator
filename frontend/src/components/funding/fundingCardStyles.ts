@@ -1,7 +1,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 
 export const fundingCardStyles = cva(
-	"relative flex w-full min-w-0 flex-col gap-3 self-start rounded-surface border text-left text-inherit has-[>button:hover]:border-warning-text has-[>button:hover]:shadow-sm [@media(max-width:1050px)]:p-6 print:break-inside-avoid",
+	"relative flex w-full min-w-0 flex-col gap-3 self-start rounded-surface border text-left text-inherit has-[>button:hover]:border-warning-text has-[>button:hover]:shadow-sm max-lg:p-6 print:break-inside-avoid",
 	{
 		variants: {
 			state: {

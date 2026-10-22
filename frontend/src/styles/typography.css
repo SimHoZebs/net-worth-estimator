@@ -31,14 +31,14 @@
 		font-variant-numeric: tabular-nums;
 	}
 	body {
-		@apply min-w-80 text-sm leading-relaxed;
+		@apply min-w-xs text-sm leading-relaxed;
 	}
 	::selection {
 		background: var(--active);
 		color: var(--ink);
 	}
 	:focus-visible {
-		@apply rounded outline-3 outline-solid outline-primary outline-offset-1;
+		@apply rounded-control outline-3 outline-solid outline-primary outline-offset-1;
 	}
 	h1 {
 		@apply text-4xl leading-tight font-normal tracking-tight;

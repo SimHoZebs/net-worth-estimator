@@ -5,7 +5,7 @@ export function Brand() {
 			href="#outlook"
 			aria-label="Waypoint home"
 		>
-			<span className="grid size-8 place-items-center rounded-lg bg-primary">
+			<span className="grid size-8 place-items-center rounded-surface bg-primary">
 				<svg
 					className="w-7 fill-none stroke-success-bg [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]"
 					viewBox="0 0 32 32"

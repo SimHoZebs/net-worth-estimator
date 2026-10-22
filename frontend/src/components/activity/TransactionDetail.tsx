@@ -114,7 +114,7 @@ function MetaRow({
 	children: ReactNode;
 }) {
 	return (
-		<label className="flex items-center justify-between gap-3 rounded-control py-2 [@media(max-width:480px)]:flex-col [@media(max-width:480px)]:items-stretch [@media(max-width:480px)]:gap-0.5">
+		<label className="flex items-center justify-between gap-3 rounded-control py-2 max-sm:flex-col max-sm:items-stretch max-sm:gap-0.5">
 			<span className="inline-flex flex-none items-center gap-2 text-sm text-muted">
 				<Icon size={15} aria-hidden="true" />
 				{label}
@@ -736,7 +736,7 @@ export function TransactionDetail({
 				>
 					<DirectionIcon kind={kind} size={22} />
 				</span>
-				<span className="text-xs font-semibold tracking-[0.08em] text-muted uppercase">
+				<span className="text-xs font-semibold tracking-widest text-muted uppercase">
 					Transaction details
 				</span>
 			</span>
@@ -747,7 +747,7 @@ export function TransactionDetail({
 			<Modal
 				title={editHeading}
 				titleSize="plain"
-				headerClassName="border-b-0 pb-2 [@media(max-width:600px)]:pb-5"
+				headerClassName="border-b-0 pb-2 max-sm:pb-5"
 				actions={edit.actions}
 				onClose={edit.close}
 				focusPanelOnOpen
@@ -780,9 +780,9 @@ export function TransactionDetail({
 						)}
 					</div>
 					<div className="flex items-center gap-4 pt-1 pb-2">
-						<div className="flex min-w-0 max-w-[calc(100%_-_60px)] flex-auto flex-col gap-1">
+						<div className="flex min-w-0 flex-1 flex-col gap-1">
 							<span
-								className={`type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-[-1px] whitespace-nowrap${transaction.direction === "in" ? " text-success-text" : ""}`}
+								className={`type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-tight whitespace-nowrap${transaction.direction === "in" ? " text-success-text" : ""}`}
 							>
 								<span
 									className="flex-none whitespace-nowrap"
@@ -903,7 +903,7 @@ export function TransactionDetail({
 									)}
 									<div className="flex min-w-0 flex-auto flex-col gap-0.5">
 										<span
-											className="text-xs font-semibold tracking-[0.06em] text-muted"
+											className="text-xs font-semibold tracking-wide text-muted"
 											aria-hidden="true"
 										>
 											FROM ACCOUNT
@@ -946,7 +946,7 @@ export function TransactionDetail({
 									)}
 									<div className="flex min-w-0 flex-auto flex-col gap-0.5">
 										<span
-											className="text-xs font-semibold tracking-[0.06em] text-muted"
+											className="text-xs font-semibold tracking-wide text-muted"
 											aria-hidden="true"
 										>
 											TO ACCOUNT
@@ -1062,7 +1062,7 @@ export function MovementDetail({
 				>
 					<DirectionIcon kind={kind} size={22} />
 				</span>
-				<span className="text-xs font-semibold tracking-[0.08em] text-muted uppercase">
+				<span className="text-xs font-semibold tracking-widest text-muted uppercase">
 					Transaction details
 				</span>
 			</span>
@@ -1073,7 +1073,7 @@ export function MovementDetail({
 			<Modal
 				title={editHeading}
 				titleSize="plain"
-				headerClassName="border-b-0 pb-2 [@media(max-width:600px)]:pb-5"
+				headerClassName="border-b-0 pb-2 max-sm:pb-5"
 				actions={edit.actions}
 				onClose={edit.close}
 				focusPanelOnOpen
@@ -1106,8 +1106,8 @@ export function MovementDetail({
 						)}
 					</div>
 					<div className="flex items-center gap-4 pt-1 pb-2">
-						<div className="flex min-w-0 max-w-[calc(100%_-_60px)] flex-auto flex-col gap-1">
-							<span className="type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-[-1px] whitespace-nowrap">
+						<div className="flex min-w-0 flex-1 flex-col gap-1">
+							<span className="type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-tight whitespace-nowrap">
 								<span
 									className="flex-none whitespace-nowrap"
 									aria-hidden="true"
@@ -1140,7 +1140,7 @@ export function MovementDetail({
 							</span>
 						</div>
 						{(once || postedDiffers) && (
-							<div className="mt-5 flex min-w-0 max-w-[calc(100%_-_60px)] flex-auto flex-col gap-1 border-t border-line pt-2">
+							<div className="mt-5 flex min-w-0 flex-1 flex-col gap-1 border-t border-line pt-2">
 								{once && (
 									<MetaRow icon={CalendarDays} label="Transaction date">
 										<input
@@ -1211,7 +1211,7 @@ export function MovementDetail({
 									)}
 									<div className="flex min-w-0 flex-auto flex-col gap-0.5">
 										<span
-											className="text-xs font-semibold tracking-[0.06em] text-muted"
+											className="text-xs font-semibold tracking-wide text-muted"
 											aria-hidden="true"
 										>
 											FROM ACCOUNT
@@ -1254,7 +1254,7 @@ export function MovementDetail({
 									)}
 									<div className="flex min-w-0 flex-auto flex-col gap-0.5">
 										<span
-											className="text-xs font-semibold tracking-[0.06em] text-muted"
+											className="text-xs font-semibold tracking-wide text-muted"
 											aria-hidden="true"
 										>
 											TO ACCOUNT

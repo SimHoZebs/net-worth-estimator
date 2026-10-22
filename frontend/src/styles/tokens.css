@@ -47,21 +47,16 @@
 			transparent
 		);
 		--backdrop-blur: var(--blur-xs);
-		--sidebar: --spacing(56);
+		--sidebar: 0;
 	}
-	@media (max-width: 1250px) {
+	@media (width >= theme(--breakpoint-md)) {
 		:root {
-			--sidebar: --spacing(50);
+			--sidebar: --spacing(48);
 		}
 	}
-	@media (max-width: 1050px) {
+	@media (width >= theme(--breakpoint-xl)) {
 		:root {
-			--sidebar: --spacing(46);
-		}
-	}
-	@media (max-width: 800px) {
-		:root {
-			--sidebar: --spacing(0);
+			--sidebar: --spacing(56);
 		}
 	}
 }

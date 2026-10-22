@@ -210,9 +210,9 @@ function ServerRecovery({
 	children?: ReactNode;
 }) {
 	return (
-		<div className="mx-auto my-[12vh] max-w-156 p-6 [&_p]:mb-6">
+		<div className="mx-auto my-[12vh] max-w-2xl p-6 [&_p]:mb-6">
 			<Brand />
-			<h1 className="mt-11 mb-6">{title}.</h1>
+			<h1 className="mt-12 mb-6">{title}.</h1>
 			{children}
 			<div className="flex flex-wrap gap-3">
 				<Button onClick={onRetry}>

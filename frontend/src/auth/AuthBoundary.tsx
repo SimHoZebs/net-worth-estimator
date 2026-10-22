@@ -107,9 +107,9 @@ export function AuthBoundary({ children }: { children: ReactNode }) {
 			</>
 		);
 	return (
-		<main className="mx-auto my-[12vh] max-w-156 px-6">
+		<main className="mx-auto my-[12vh] max-w-2xl px-6">
 			<Brand />
-			<h1 className="mt-11 mb-4">
+			<h1 className="mt-12 mb-4">
 				{session?.authenticated
 					? "Access has not been granted"
 					: "Your plan. Your access."}

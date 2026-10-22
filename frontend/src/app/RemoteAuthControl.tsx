@@ -48,7 +48,7 @@ function RemoteAuthPrompt({ onApply }: { onApply: (token: string) => void }) {
 				<strong>Saving is locked.</strong>
 			</span>
 			<form
-				className="ml-auto flex items-center gap-2 [@media(max-width:600px)]:ml-7 [@media(max-width:600px)]:w-full"
+				className="ml-auto flex items-center gap-2 max-sm:ml-8 max-sm:w-full"
 				onSubmit={submit}
 			>
 				<label className="sr-only" htmlFor="waypoint-server-token">
@@ -56,7 +56,7 @@ function RemoteAuthPrompt({ onApply }: { onApply: (token: string) => void }) {
 				</label>
 				<Input
 					id="waypoint-server-token"
-					className="min-h-9 w-48 [@media(max-width:600px)]:w-auto [@media(max-width:600px)]:min-w-0 [@media(max-width:600px)]:flex-1"
+					className="min-h-9 w-48 max-sm:w-auto max-sm:min-w-0 max-sm:flex-1"
 					type="password"
 					value={token}
 					onChange={(event) => setToken(event.target.value)}

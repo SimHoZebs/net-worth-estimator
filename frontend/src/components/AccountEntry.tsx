@@ -40,7 +40,7 @@ export function AccountEntry({
 				<small className="text-xs text-muted">{caption}</small>
 			</span>
 			{value !== undefined && (
-				<strong className="whitespace-nowrap text-sm font-semibold tracking-[-0.3px] tabular-nums">
+				<strong className="whitespace-nowrap text-sm font-semibold tracking-tight tabular-nums">
 					{value}
 				</strong>
 			)}

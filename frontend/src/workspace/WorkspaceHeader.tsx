@@ -11,7 +11,7 @@ export function WorkspaceTopbar({
 	onOpenNavigation: () => void;
 }) {
 	return (
-		<header className="hidden h-16 items-center gap-3 border-0 border-b border-solid border-line bg-surface px-6 [@media(max-width:800px)]:flex print:hidden">
+		<header className="hidden h-16 items-center gap-3 border-0 border-b border-solid border-line bg-surface px-6 max-md:flex print:hidden">
 			<IconButton
 				icon={Menu}
 				label="Open navigation"

@@ -327,7 +327,7 @@ describe("search field", () => {
 			<SearchField
 				label="Search transactions"
 				placeholder="Search"
-				className="w-64 min-[601px]:w-64 px-3"
+				className="w-64 sm:w-64 px-3"
 				containerClassName="gap-4 text-muted"
 			/>,
 		);

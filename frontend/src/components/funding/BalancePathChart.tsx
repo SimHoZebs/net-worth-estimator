@@ -2,7 +2,7 @@ import { useId, useMemo } from "react";
 import { fundingGapChartModel } from "../../domain/chart.ts";
 import { compactMoney, dateLabel, money } from "../../domain/format.ts";
 import type { FundingGap } from "../../domain/fundingGaps.ts";
-import { useMediaQuery } from "../../state/useMediaQuery.ts";
+import { useMediaQuery, viewportQueries } from "../../state/useMediaQuery.ts";
 
 /**
  * Projected account balance leading to a funding gap, plus the refused
@@ -12,7 +12,7 @@ import { useMediaQuery } from "../../state/useMediaQuery.ts";
  * The refused payment is never posted.
  */
 export function BalancePathChart({ gap }: { gap: FundingGap }) {
-	const narrow = useMediaQuery("(max-width: 600px)");
+	const narrow = useMediaQuery(viewportQueries.belowSm);
 	const id = useId().replaceAll(":", "");
 	const model = useMemo(
 		() => fundingGapChartModel({ gap, narrow }),
@@ -46,7 +46,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 			: [at(0), at(1)];
 	}, [model, gap.windowStartDate, gap.date, summary.rows]);
 	return (
-		<div className="mt-3.5">
+		<div className="mt-4">
 			<div className="mb-2 flex items-center justify-between gap-2">
 				<h3 className="text-sm">Account balance over time</h3>
 				<span className="text-xs whitespace-nowrap text-muted">
@@ -94,7 +94,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 							x={model.left - 14}
 							y={model.y(value) + 4}
 							textAnchor="end"
-							className="fill-muted text-xs [@media(max-width:600px)]:text-sm"
+							className="fill-muted text-xs max-sm:text-sm"
 						>
 							{compactMoney(value)}
 						</text>
@@ -123,7 +123,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 						x={model.width - model.right - 6}
 						y={model.baseline - 6}
 						textAnchor="end"
-						className="fill-muted text-xs [@media(max-width:600px)]:text-sm"
+						className="fill-muted text-xs max-sm:text-sm"
 					>
 						$0 threshold
 					</text>
@@ -175,7 +175,7 @@ export function BalancePathChart({ gap }: { gap: FundingGap }) {
 						x={tick.x}
 						y={model.height - 9}
 						textAnchor={tick.anchor}
-						className="fill-muted text-xs [@media(max-width:600px)]:text-sm"
+						className="fill-muted text-xs max-sm:text-sm"
 					>
 						{tick.label}
 					</text>

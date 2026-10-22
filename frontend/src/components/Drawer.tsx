@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { mergeStyles } from "./mergeStyles.ts";
-import { useMediaQuery } from "../state/useMediaQuery.ts";
+import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 import {
 	drawerHiddenX,
 	useDrawerBackdropTransition,
@@ -36,7 +36,6 @@ export function Drawer({
 		eyebrow?: string;
 		coverage?: "sheet" | "full";
 		full?: boolean;
-		fullBreakpoint?: string;
 		headerClassName?: string;
 		bodyClassName?: string;
 	};
@@ -52,7 +51,6 @@ export function Drawer({
 		eyebrow,
 		coverage = "sheet",
 		full,
-		fullBreakpoint = "(max-width: 600px)",
 		headerClassName,
 		bodyClassName,
 	} = appearance ?? {};
@@ -75,7 +73,7 @@ export function Drawer({
 	useEffect(() => {
 		closeRef.current = onClose;
 	});
-	const queriedFull = useMediaQuery(fullBreakpoint);
+	const queriedFull = useMediaQuery(viewportQueries.belowSm);
 	const isFull = full ?? queriedFull;
 	const drawerTransition = useDrawerTransition(closing);
 	const backdropTransition = useDrawerBackdropTransition();
@@ -198,7 +196,7 @@ export function Drawer({
 							ref={(node) => {
 								panelEl.current = node;
 							}}
-							className="fixed inset-y-0 left-0 z-30 flex w-(--sidebar) touch-pan-y flex-col overflow-y-auto border-0 border-r border-solid border-line bg-surface px-5 pt-8 text-ink [@media(max-width:1250px)]:px-3 [@media(max-width:800px)]:w-60 [@media(max-width:800px)]:px-5 [@media(max-width:800px)]:pt-6 [@media(max-width:800px)]:shadow-2xl print:hidden"
+							className="fixed inset-y-0 left-0 z-30 flex w-(--sidebar) touch-pan-y flex-col overflow-y-auto border-0 border-r border-solid border-line bg-surface px-5 pt-8 text-ink max-xl:px-3 max-md:w-60 max-md:px-5 max-md:pt-6 max-md:shadow-2xl print:hidden"
 							aria-label={label}
 							{...(modal
 								? { role: "dialog", "aria-modal": true as const }
@@ -220,9 +218,9 @@ export function Drawer({
 								panelEl.current = node;
 							}}
 							className={mergeStyles(
-								"fixed inset-y-0 right-0 z-41 flex w-[min(47.5rem,calc(100vw-4rem))] max-w-190 touch-pan-y flex-col overflow-y-auto border-0 border-l border-solid border-line bg-surface text-ink [@media(max-width:600px)]:w-[min(26rem,calc(100vw-3.5rem))] [@media(max-width:600px)]:shadow-overlay",
+								"fixed inset-y-0 right-0 z-41 flex w-3xl max-w-[calc(100%_-_--spacing(12))] touch-pan-y flex-col overflow-y-auto border-0 border-l border-solid border-line bg-surface text-ink max-sm:w-md max-sm:shadow-overlay",
 								coverage === "full" &&
-									"[@media(max-width:600px)]:w-full [@media(max-width:600px)]:max-w-full [@media(max-width:600px)]:border-l-0 [@media(max-width:600px)]:shadow-none",
+									"max-sm:w-full max-sm:max-w-full max-sm:border-l-0 max-sm:shadow-none",
 							)}
 							role="dialog"
 							aria-modal="true"

@@ -59,14 +59,12 @@ export function WishListPanel({
 	};
 	return (
 		<section aria-label="Planned purchases" className="@container/wish-list">
-			<div className="mb-7 flex flex-wrap items-center justify-between gap-4">
+			<div className="mb-8 flex flex-wrap items-center justify-between gap-4">
 				<div>
 					<span className="text-xs font-bold tracking-widest text-muted">
 						After your commitments
 					</span>
-					<h2 className="my-2 text-2xl tracking-[-0.04em]">
-						Planned purchases
-					</h2>
+					<h2 className="my-2 text-2xl tracking-tight">Planned purchases</h2>
 					<p className="max-w-[52ch] text-sm leading-relaxed text-muted">
 						Buy in order. If an item cannot fit, it and the items below it wait.
 						This evaluation does not change your main projection or FI results.
@@ -105,7 +103,7 @@ export function WishListPanel({
 						{queue.map((item, index) => (
 							<li
 								key={item.id}
-								className="group/purchase grid grid-cols-[2rem_minmax(0,1fr)_auto_auto] items-center gap-4 border-b border-line py-5 @max-[36rem]/wish-list:grid-cols-[1.5rem_minmax(0,1fr)_auto] @max-[36rem]/wish-list:gap-3"
+								className="group/purchase grid grid-cols-[--spacing(8)_minmax(0,1fr)_auto_auto] items-center gap-4 border-b border-line py-5 @max-xl/wish-list:grid-cols-[--spacing(6)_minmax(0,1fr)_auto] @max-xl/wish-list:gap-3"
 								data-excluded={!item.enabled}
 							>
 								<span
@@ -130,11 +128,11 @@ export function WishListPanel({
 								<strong className="text-sm tabular-nums">
 									{money(item.amount)}
 								</strong>
-								<div className="flex flex-wrap gap-1 @max-[36rem]/wish-list:col-[2/-1]">
+								<div className="flex flex-wrap gap-1 @max-xl/wish-list:col-[2/-1]">
 									<IconButton
 										icon={ArrowUp}
 										iconSize={16}
-										className="min-h-8 min-w-8 [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
+										className="min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
 										label={`Move ${item.name} up`}
 										disabled={locked || item.readOnly || index === 0}
 										onClick={() => move(item, -1)}
@@ -142,7 +140,7 @@ export function WishListPanel({
 									<IconButton
 										icon={ArrowDown}
 										iconSize={16}
-										className="min-h-8 min-w-8 [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
+										className="min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
 										label={`Move ${item.name} down`}
 										disabled={
 											locked || item.readOnly || index === queue.length - 1
@@ -152,7 +150,7 @@ export function WishListPanel({
 									<IconButton
 										icon={Pencil}
 										iconSize={15}
-										className="min-h-8 min-w-8 [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
+										className="min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
 										label={`Edit ${item.name}`}
 										disabled={locked || item.readOnly}
 										onClick={() => setEditor({ item })}
@@ -160,7 +158,7 @@ export function WishListPanel({
 									<IconButton
 										icon={Trash2}
 										iconSize={15}
-										className="min-h-8 min-w-8 [@media(max-width:600px)]:min-h-9 [@media(max-width:600px)]:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
+										className="min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
 										label={`Remove ${item.name}`}
 										disabled={locked || item.readOnly}
 										onClick={() => setRemove(item)}

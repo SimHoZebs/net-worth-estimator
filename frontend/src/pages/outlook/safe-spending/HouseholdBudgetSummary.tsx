@@ -91,7 +91,7 @@ export function HouseholdBudgetSummary({
 						ariaLabel={`${labels.nextPaycheck} ${exactMoney(paycheck.paycheck)}, ${labels.fixedBills} ${exactMoney(paycheck.fixed)}, ${labels.closedCards} ${budgetMoney(heroes.closedCycle.total)}, ${labels.paycheckBeforeReserve} ${exactMoney(remainder)}`}
 					/>
 				)}
-				<dl className="m-0 grid grid-cols-3 gap-x-2 gap-y-4 @max-[320px]:grid-cols-2">
+				<dl className="m-0 grid grid-cols-3 gap-x-2 gap-y-4 @max-xs:grid-cols-2">
 					<div>
 						<dt className="mb-2 text-xs text-muted">{labels.fixedBills}</dt>
 						<dd className={householdValueStyles()}>
@@ -104,7 +104,7 @@ export function HouseholdBudgetSummary({
 							{budgetMoney(heroes.closedCycle.total)}
 						</dd>
 					</div>
-					<div className="text-end @max-[320px]:col-span-full @max-[320px]:text-start">
+					<div className="text-end @max-xs:col-span-full @max-xs:text-start">
 						<dt className="mb-2 text-xs text-muted">
 							{labels.paycheckBeforeReserve}
 						</dt>

@@ -37,7 +37,7 @@ function EvaluationSummaryCard({ item, pin = null }: OtherEvaluationCardProps) {
 		<section
 			className={mergeStyles(
 				evaluationCard({ enabled: item.enabled }),
-				"p-7 [@media(max-width:1050px)]:p-6",
+				"p-8 max-lg:p-6",
 			)}
 		>
 			<div className="flex items-center justify-between gap-4">
@@ -67,7 +67,7 @@ function EvaluationSummaryCard({ item, pin = null }: OtherEvaluationCardProps) {
 			{item.goal && item.goal !== item.name && (
 				<p className="my-2 text-xs">{item.goal}</p>
 			)}
-			<div className="type-value mt-6 mr-0 mb-1 ml-0 text-4xl font-medium leading-[1.2] tracking-[-1px]">
+			<div className="type-value mt-6 mr-0 mb-1 ml-0 text-4xl font-medium leading-[1.2] tracking-tight">
 				{!item.enabled
 					? "Paused"
 					: item.outcomeDate

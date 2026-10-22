@@ -31,7 +31,7 @@ export function Tabs<T extends string>({
 		<>
 			<div
 				className={mergeStyles(
-					"mb-6 flex gap-6 overflow-x-auto border-0 border-b border-solid border-line [@media(max-width:600px)]:gap-5",
+					"mb-6 flex gap-6 overflow-x-auto border-0 border-b border-solid border-line max-sm:gap-5",
 					className,
 				)}
 				role="tablist"

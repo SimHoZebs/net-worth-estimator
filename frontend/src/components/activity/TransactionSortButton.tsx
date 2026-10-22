@@ -21,7 +21,7 @@ export function TransactionSortButton({
 		<TextButton
 			type="button"
 			className={mergeStyles(
-				"whitespace-nowrap text-xs [@media(max-width:600px)]:ml-auto [@media(max-width:600px)]:min-h-8",
+				"whitespace-nowrap text-xs max-sm:ml-auto max-sm:min-h-8",
 				className,
 			)}
 			onClick={() => onChange(toggleTransactionOrder(order))}

@@ -31,7 +31,7 @@ export function AccountCard({
 				</span>
 			</span>
 			<span>
-				<span className="type-value text-2xl font-medium tracking-[-0.8px] tabular-nums">
+				<span className="type-value text-2xl font-medium tracking-tight tabular-nums">
 					{money(card.balance)}
 				</span>
 				<br />

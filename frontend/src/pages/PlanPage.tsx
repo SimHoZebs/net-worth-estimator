@@ -161,7 +161,7 @@ function AccountsView({
 						type="button"
 						variant="primary"
 						size="sm"
-						className="[@media(max-width:600px)]:px-3 [@media(max-width:600px)]:py-2"
+						className="max-sm:px-3 max-sm:py-2"
 						onClick={() => onEdit({ kind: "account", item: null })}
 					>
 						<Plus size={16} />
@@ -272,7 +272,7 @@ function TransactionsView({
 			label="Transactions sections"
 			panelAs="section"
 		>
-			<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4 [@media(max-width:600px)]:pb-4">
+			<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4 max-sm:pb-4">
 				<SearchField
 					label="Search plan"
 					value={query}

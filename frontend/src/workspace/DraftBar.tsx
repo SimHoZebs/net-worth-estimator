@@ -37,10 +37,10 @@ export function DraftBar({ onDiscard }: { onDiscard: () => void }) {
 	return (
 		<div
 			data-draft-bar=""
-			className="fixed right-10 bottom-5 left-[calc(var(--sidebar)+2.5rem)] z-20 flex justify-between gap-4 rounded-surface border border-solid border-line-strong bg-surface px-5 py-4 shadow-lg backdrop-blur-sm [@media(max-width:1250px)]:right-7 [@media(max-width:1250px)]:left-[calc(var(--sidebar)+1.75rem)] [@media(max-width:800px)]:right-5 [@media(max-width:800px)]:left-5 [@media(max-width:600px)]:right-3 [@media(max-width:600px)]:bottom-3 [@media(max-width:600px)]:left-3 [@media(max-width:600px)]:flex-wrap [@media(max-width:600px)]:gap-3 [@media(max-width:600px)]:p-3 print:hidden"
+			className="pointer-events-auto flex w-full flex-wrap items-center justify-between gap-3 rounded-surface border border-solid border-line-strong bg-surface p-3 shadow-lg backdrop-blur-sm sm:gap-4 sm:px-5 sm:py-4"
 		>
 			<div className="flex items-center gap-3">
-				<span className="grid size-9 place-items-center rounded-lg bg-success-bg text-success-text [@media(max-width:600px)]:size-8">
+				<span className="grid size-9 place-items-center rounded-surface bg-success-bg text-success-text max-sm:size-8">
 					{loading ? (
 						<span
 							className="size-3 animate-spin rounded-full border-2 border-solid border-line-strong border-t-primary"
@@ -58,7 +58,7 @@ export function DraftBar({ onDiscard }: { onDiscard: () => void }) {
 					</strong>
 				</span>
 			</div>
-			<div className="flex items-center gap-3 [@media(max-width:600px)]:ml-auto">
+			<div className="flex items-center gap-3 max-sm:ml-auto">
 				<Button variant="ghost" size="sm" onClick={onDiscard} disabled={saving}>
 					<RotateCcw size={15} />
 					<span>Discard</span>

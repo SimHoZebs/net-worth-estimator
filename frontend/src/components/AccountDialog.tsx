@@ -60,15 +60,11 @@ export function AccountDialog({
 				coverage: "full",
 			}}
 		>
-			<div className="flex items-center gap-4 pb-2 [@media(max-width:600px)]:flex-wrap [@media(max-width:600px)]:gap-3">
-				<AccountIcon
-					account={account}
-					size="lg"
-					className="[@media(max-width:600px)]:size-10"
-				/>
+			<div className="flex items-center gap-4 pb-2 max-sm:flex-wrap max-sm:gap-3">
+				<AccountIcon account={account} size="lg" className="max-sm:size-10" />
 				<div className="flex flex-col gap-1">
 					<span className="text-xs text-muted">Starting balance</span>
-					<strong className="type-value text-3xl leading-[1.3] font-medium tracking-[-1px]">
+					<strong className="type-value text-3xl leading-[1.3] font-medium tracking-tight">
 						{money(
 							!account.enabled
 								? 0
@@ -76,7 +72,7 @@ export function AccountDialog({
 						)}
 					</strong>
 				</div>
-				<div className="ml-auto flex flex-col items-end gap-2 [@media(max-width:600px)]:w-full [@media(max-width:600px)]:flex-row [@media(max-width:600px)]:items-center [@media(max-width:600px)]:gap-2 [@media(max-width:600px)]:pt-1">
+				<div className="ml-auto flex flex-col items-end gap-2 max-sm:w-full max-sm:flex-row max-sm:items-center max-sm:gap-2 max-sm:pt-1">
 					<span className="text-xs text-muted">
 						As of {dateLabel(account.observedOn, true)}
 					</span>

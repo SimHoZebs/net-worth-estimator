@@ -201,12 +201,12 @@ export function AmountCatalog({
 			<p className="text-muted">
 				Pick a starting point, fill in the blanks, copy the result.
 			</p>
-			<ul className="mt-3 mb-5 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,14rem),1fr))] gap-3 p-0">
+			<ul className="mt-3 mb-5 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,var(--container-3xs)),1fr))] gap-3 p-0">
 				{templates.map((template) => (
 					<li key={template.id} className="m-0">
 						<button
 							type="button"
-							className="block w-full cursor-pointer rounded-lg border border-solid border-line bg-transparent p-3 text-left text-inherit aria-pressed:border-success-border aria-pressed:bg-success-bg"
+							className="block w-full cursor-pointer rounded-surface border border-solid border-line bg-transparent p-3 text-left text-inherit aria-pressed:border-success-border aria-pressed:bg-success-bg"
 							aria-pressed={template.id === selected?.id}
 							onClick={() => {
 								setSelectedId(template.id);
@@ -271,11 +271,11 @@ export function AmountCatalog({
 			)}
 			{creating && (
 				<form
-					className="mt-3 mb-5 rounded-lg border border-solid border-line bg-transparent p-4"
+					className="mt-3 mb-5 rounded-surface border border-solid border-line bg-transparent p-4"
 					onSubmit={submitCreate}
 				>
 					<h4>New recipe</h4>
-					<div className="grid grid-cols-2 gap-5 max-[600px]:gap-x-3 max-[600px]:gap-y-4 max-[370px]:grid-cols-1">
+					<div className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1">
 						<InputField
 							label="Name"
 							name="name"
@@ -337,11 +337,11 @@ export function AmountCatalog({
 			)}
 			{editing && selectedPreset && (
 				<form
-					className="mt-3 mb-5 rounded-lg border border-solid border-line bg-transparent p-4"
+					className="mt-3 mb-5 rounded-surface border border-solid border-line bg-transparent p-4"
 					onSubmit={submitEdit}
 				>
 					<h4>Rename recipe</h4>
-					<div className="grid grid-cols-2 gap-5 max-[600px]:gap-x-3 max-[600px]:gap-y-4 max-[370px]:grid-cols-1">
+					<div className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1">
 						<InputField
 							label="Label"
 							name="label"

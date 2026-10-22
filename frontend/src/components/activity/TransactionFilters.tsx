@@ -6,7 +6,7 @@ import { TransactionSortButton } from "./TransactionSortButton.tsx";
 import { SearchField, Select } from "../Field.tsx";
 
 const filterSelectStyles = cva(
-	"min-h-9 w-full px-2 py-2 text-xs text-success-text [@media(max-width:600px)]:min-h-11 [@media(max-width:600px)]:px-2 [@media(max-width:600px)]:text-base",
+	"min-h-9 w-full px-2 py-2 text-xs text-success-text max-sm:min-h-11 max-sm:px-2 max-sm:text-base",
 );
 
 const sources = ["all", "historical", "projected"] as const;
@@ -27,11 +27,11 @@ export function TransactionFilters({
 	const id = useId();
 	return (
 		<>
-			<div className="flex items-center justify-between gap-4 [@media(max-width:600px)]:flex-wrap [@media(max-width:600px)]:gap-2">
+			<div className="flex items-center justify-between gap-4 max-sm:flex-wrap max-sm:gap-2">
 				<SearchField
 					label="Search account transactions"
-					containerClassName="min-w-0 flex-1 [@media(max-width:600px)]:basis-full"
-					className="w-full min-w-0 px-1 py-2 text-xs text-ellipsis [@media(max-width:600px)]:w-33"
+					containerClassName="min-w-0 flex-1 max-sm:basis-full"
+					className="w-full min-w-0 px-1 py-2 text-xs text-ellipsis max-sm:w-32"
 					type="search"
 					placeholder="Search transactions or accounts…"
 					value={filters.query}
@@ -42,10 +42,10 @@ export function TransactionFilters({
 					onChange={(order) => onChange({ order })}
 				/>
 			</div>
-			<div className="m-0 grid grid-cols-[1.2fr_1fr_1fr] gap-3 [@media(max-width:600px)]:grid-cols-2 [@media(max-width:600px)]:gap-3">
+			<div className="m-0 grid grid-cols-[1.2fr_1fr_1fr] gap-3 max-sm:grid-cols-2 max-sm:gap-3">
 				<label
 					htmlFor={`${id}-source`}
-					className="flex flex-col gap-1 [@media(max-width:600px)]:col-span-full"
+					className="flex flex-col gap-1 max-sm:col-span-full"
 				>
 					<span className="text-xs text-muted">Activity</span>
 					<Select

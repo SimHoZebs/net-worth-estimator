@@ -22,7 +22,7 @@ export const tableHeaderStyles = cva(
 );
 export const tableCellStyles = cva("border-0 px-5 py-4 whitespace-nowrap");
 export const tablePaginationStyles = cva(
-	"flex items-center justify-between gap-4 border-b border-line py-4 [@media(max-width:600px)]:gap-2",
+	"flex items-center justify-between gap-4 border-b border-line py-4 max-sm:gap-2",
 	{
 		variants: { topBorder: { true: "border-t", false: "" } },
 		defaultVariants: { topBorder: false },

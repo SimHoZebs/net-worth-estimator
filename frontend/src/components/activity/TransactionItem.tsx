@@ -55,7 +55,7 @@ export function TransactionItemRow({
 			>
 				<button
 					type="button"
-					className="flex w-full items-center gap-3 rounded-control border-0 bg-transparent px-2 py-0.5 text-left [@media(max-width:600px)]:gap-2"
+					className="flex w-full items-center gap-3 rounded-control border-0 bg-transparent px-2 py-0.5 text-left max-sm:gap-2"
 					aria-label={actionLabel}
 					onClick={onSelect}
 					disabled={selectDisabled}
@@ -63,7 +63,7 @@ export function TransactionItemRow({
 					<span
 						className={mergeStyles(
 							movementIconStyles({ tone }),
-							"[@media(max-width:600px)]:hidden",
+							"max-sm:hidden",
 						)}
 					>
 						{icon}
@@ -76,7 +76,7 @@ export function TransactionItemRow({
 							<span className="text-xs text-muted">{slots.subtitle}</span>
 						)}
 						{slots?.mobile && (
-							<span className="hidden text-xs text-muted [@media(max-width:600px)]:block">
+							<span className="hidden text-xs text-muted max-sm:block">
 								{slots.mobile}
 							</span>
 						)}
