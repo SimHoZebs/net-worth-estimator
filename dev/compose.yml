@@ -1,0 +1,31 @@
+# Merge last, after docker-compose.yml and auth/compose.casdoor.yml.
+# Runtime images and service wiring stay identical to the production stack.
+services:
+  backend:
+    user: "${DEV_UID:?}:${DEV_GID:?}"
+    ports: !override
+      - "127.0.0.1:8788:8787"
+    volumes: !override
+      - ${DEV_STATE_DIR:?}/data:/data
+    environment:
+      NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: http://localhost:5178
+      NET_WORTH_ESTIMATOR_AUTH_TOKEN: ""
+      NET_WORTH_ESTIMATOR_READ_ONLY: ""
+      NET_WORTH_ESTIMATOR_AUTH_SESSION_DB: /data/identity.db
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL: ""
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS: ""
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN: ""
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK: ""
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE: ""
+
+  frontend:
+    build:
+      args:
+        VITE_API_BASE_URL: ""
+    environment:
+      BACKEND_URL: http://backend:8787
+    ports: !override
+      - "127.0.0.1:5178:80"
+
+# The base stack's explicit production volume has no place in dev.
+volumes: !reset {}

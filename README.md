@@ -41,9 +41,27 @@ go run ./cmd/importcsv \
 
 SimpleFIN sync writes balance checkpoints and disabled pending-charge postings. Sync rows are not garbage-collected; keep mappings valid or purge source rows deliberately.
 
-## Run from Source
+## Development
 
-Run the API and frontend as separate processes from the repository root:
+```bash
+./scripts/dev up
+./scripts/dev down
+```
+
+Open **http://localhost:5178**. Dev uses the same API, Nginx frontend, Casdoor,
+and Compose service wiring as production. First startup takes a read-only,
+SQLite-safe production database snapshot. Later starts retain dev data and
+logins. `./scripts/dev refresh-db` explicitly refreshes financial data without
+resetting accounts or passkeys. External sync stays disabled.
+
+Use `./scripts/dev up --from /path/backup.db` for an existing backup instead.
+See [the dev guide](dev/README.md) for access grants, logs, and state recovery.
+
+## Run from Source (Advanced)
+
+For low-level source debugging, run the API and Vite separately. Normal manual
+testing uses the production-like dev stack above. Do not run both frontends on
+5178 at the same time.
 
 ```bash
 # terminal 1
@@ -80,7 +98,9 @@ The frontend is available at `http://localhost:8080` and the API at `http://loca
 
 The root `Dockerfile` remains a legacy combined image. The split images do not embed or build one another, and the legacy image and Compose stack must not run against the same volume or port at the same time.
 
-For Vercel, set `VITE_API_BASE_URL` to the public backend origin. Add that exact frontend origin to `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`. A proxy cut during a seeded stochastic run detaches the client without an error event; repeat the same request to attach or read the saved result.
+Optional [local authentication](auth/README.md) adds Casdoor through a Compose overlay. The Go API uses standard OIDC verification, persistent application sessions, and explicit reader/editor subject grants. Identities stay in local SQLite. Signed logout notifications and periodic token checks enforce provider revocation. Provider mode requires the frontend and API on the same public origin. See [the authentication contract](docs/authentication.md) for session limits and recovery. The Better Auth comparison remains on branch `experiment/better-auth`.
+
+For Vercel in legacy mode, set `VITE_API_BASE_URL` to the public backend origin. Add that exact frontend origin to `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`. A proxy cut during a seeded stochastic run detaches the client without an error event; repeat the same request to attach or read the saved result.
 
 Configure a backend service with this durable contract:
 
