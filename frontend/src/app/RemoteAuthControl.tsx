@@ -1,5 +1,8 @@
 import { LockKeyhole } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { Button, TextButton } from "../components/Button.tsx";
+import { Input } from "../components/Field.tsx";
+import { Notice } from "../components/Notice.tsx";
 import { useUiStore } from "../state/uiStore.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 
@@ -13,19 +16,13 @@ export function RemoteAuthControl() {
 	const retry = useWorkspaceStore((state) => state.retry);
 	if (tokenActive)
 		return (
-			<div className="inline-notice auth-notice">
+			<Notice className="flex-wrap items-center">
 				<LockKeyhole size={18} aria-hidden="true" />
-				<span>
+				<span className="min-w-56 flex-1">
 					<strong>Saving unlocked.</strong>
 				</span>
-				<button
-					type="button"
-					className="text-button"
-					onClick={() => setAuthToken("")}
-				>
-					Lock
-				</button>
-			</div>
+				<TextButton onClick={() => setAuthToken("")}>Lock</TextButton>
+			</Notice>
 		);
 	return required ? (
 		<RemoteAuthPrompt
@@ -45,17 +42,21 @@ function RemoteAuthPrompt({ onApply }: { onApply: (token: string) => void }) {
 		if (next) onApply(next);
 	};
 	return (
-		<div className="inline-notice auth-notice">
+		<Notice className="flex-wrap items-center">
 			<LockKeyhole size={18} aria-hidden="true" />
-			<span>
+			<span className="min-w-56 flex-1">
 				<strong>Saving is locked.</strong>
 			</span>
-			<form className="auth-form" onSubmit={submit}>
+			<form
+				className="ml-auto flex items-center gap-2 [@media(max-width:600px)]:ml-7 [@media(max-width:600px)]:w-full"
+				onSubmit={submit}
+			>
 				<label className="sr-only" htmlFor="waypoint-server-token">
 					Password
 				</label>
-				<input
+				<Input
 					id="waypoint-server-token"
+					className="min-h-9 w-48 [@media(max-width:600px)]:w-auto [@media(max-width:600px)]:min-w-0 [@media(max-width:600px)]:flex-1"
 					type="password"
 					value={token}
 					onChange={(event) => setToken(event.target.value)}
@@ -64,10 +65,10 @@ function RemoteAuthPrompt({ onApply }: { onApply: (token: string) => void }) {
 					placeholder="Password"
 					required
 				/>
-				<button type="submit" className="button primary small">
+				<Button type="submit" variant="primary" size="sm">
 					Unlock
-				</button>
+				</Button>
 			</form>
-		</div>
+		</Notice>
 	);
 }

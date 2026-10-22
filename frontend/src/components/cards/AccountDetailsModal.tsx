@@ -1,3 +1,4 @@
+import { cva } from "class-variance-authority";
 import { Repeat2, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { accountTransactions } from "../../domain/accountActivity.ts";
@@ -5,14 +6,28 @@ import { dateLabel, exactMoney } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { Projection } from "../../domain/result.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
+import { DetailList, DetailRow } from "../DetailRow.tsx";
+import { SearchField } from "../Field.tsx";
 import { TransactionDetail } from "../activity/TransactionDetail.tsx";
 import { TransactionRow } from "../activity/TransactionRow.tsx";
 import { TransactionTable } from "../activity/TransactionTable.tsx";
 import { Badge, EmptyState, Modal, Progress } from "../ui.tsx";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
-import "./account-cards.css";
 
 type StatusFilter = "all" | "pending" | "posted";
+
+const postingFilter = cva(
+	"rounded-control border-0 px-2 py-1 text-xs whitespace-nowrap capitalize",
+	{
+		variants: {
+			selected: {
+				true: "bg-surface font-bold text-ink shadow-xs",
+				false: "bg-transparent text-muted",
+			},
+		},
+		defaultVariants: { selected: false },
+	},
+);
 
 /**
  * Account detail dialog in the host Modal. Reuses TransactionRow and
@@ -76,19 +91,19 @@ export function AccountDetailsModal({
 			wide
 			onClose={onClose}
 		>
-			<div className="section-top">
-				<div className="account-details-summary">
+			<div className="flex items-center justify-between gap-4">
+				<div className="flex items-center gap-3">
 					<AccountIcon account={card.account} />
 					<div>
-						<strong className="type-value account-details-balance">
+						<strong className="type-value text-xl">
 							{exactMoney(card.balance)}
 						</strong>
-						<div className="section-note section-note-flush">
+						<div className="text-sm leading-relaxed text-muted">
 							{card.balanceLabel} · {card.summary}
 						</div>
 					</div>
 				</div>
-				<span className="account-card-badges">
+				<span className="flex flex-wrap gap-2">
 					{card.roles.map((role) => (
 						<Badge key={role} tone="neutral">
 							{role}
@@ -97,47 +112,44 @@ export function AccountDetailsModal({
 				</span>
 			</div>
 			{card.creditUtilization !== undefined && (
-				<div className="account-utilization">
-					<div className="progress-label">
+				<div className="mt-4">
+					<div className="mb-2 flex items-center justify-between gap-3 text-xs text-muted">
 						<span>Credit utilization</span>
 						<strong>{card.creditUtilization.toFixed(1)}%</strong>
 					</div>
 					<Progress
 						value={card.creditUtilization}
 						label="Credit utilization"
-						tone={card.creditUtilization > 80 ? "amber" : "green"}
+						tone={card.creditUtilization > 80 ? "warning" : "success"}
 					/>
-					<p className="section-note account-utilization-note">
+					<p className="py-2 text-sm leading-relaxed text-muted">
 						Based on posted balance against the limit. Pending charges excluded.
 					</p>
 				</div>
 			)}
-			<dl className="detail-list">
+			<DetailList>
 				{card.metrics.map((metric) => (
-					<div key={metric.label}>
-						<dt>{metric.label}</dt>
-						<dd>{metric.value}</dd>
-					</div>
+					<DetailRow key={metric.label} label={metric.label}>
+						{metric.value}
+					</DetailRow>
 				))}
-			</dl>
-			<div className="section-top account-transactions-heading">
-				<h2>Transactions</h2>
-				<span className="section-note section-note-flush">
+			</DetailList>
+			<div className="mt-2 flex items-center justify-between gap-4">
+				<h2 className="text-sm">Transactions</h2>
+				<span className="text-sm leading-relaxed text-muted">
 					{transactions.length} loaded
 				</span>
 			</div>
-			<div className="account-search-row">
-				<label className="search-field">
-					<Search size={15} aria-hidden="true" />
-					<input
-						aria-label="Search account transactions"
-						value={query}
-						onChange={(event) => setQuery(event.target.value)}
-						placeholder="Search transactions…"
-					/>
-				</label>
+			<div className="mb-3 flex flex-wrap items-center gap-3">
+				<SearchField
+					label="Search account transactions"
+					containerClassName="flex-1"
+					value={query}
+					onChange={(event) => setQuery(event.target.value)}
+					placeholder="Search transactions…"
+				/>
 				<div
-					className="segmented account-posting-filter"
+					className="inline-flex gap-0.5 rounded-control border border-line bg-surface-2 p-1"
 					role="group"
 					aria-label="Filter by posting status"
 				>
@@ -145,6 +157,7 @@ export function AccountDetailsModal({
 						<button
 							key={key}
 							type="button"
+							className={postingFilter({ selected: filter === key })}
 							aria-pressed={filter === key}
 							onClick={() => setFilter(key)}
 						>
@@ -174,12 +187,14 @@ export function AccountDetailsModal({
 				/>
 			)}
 			{shown.length > 60 && (
-				<p className="section-note">Showing 60 of {shown.length} matches.</p>
+				<p className="py-2 text-sm leading-relaxed text-muted">
+					Showing 60 of {shown.length} matches.
+				</p>
 			)}
-			<p className="section-note">
+			<p className="py-2 text-sm leading-relaxed text-muted">
 				{card.transactions.length > 0 && selected == null ? (
 					<span>
-						<Repeat2 size={12} aria-hidden="true" className="inline-icon" />{" "}
+						<Repeat2 size={12} aria-hidden="true" className="align-middle" />{" "}
 						Recurring movements show in the plan with their schedule. Dates
 						shown {dateLabel(plan.startDate, true)} onward.
 					</span>

@@ -29,7 +29,7 @@ export function FailureEvidence({
 	return (
 		<Modal title="First underfunded transaction" onClose={onClose}>
 			{!ledger && (
-				<div className="evidence-date">
+				<div className="flex items-center gap-2 text-xs text-warning-text">
 					<TriangleAlert size={18} />
 					{dateLabel(failure.date, true)}
 				</div>

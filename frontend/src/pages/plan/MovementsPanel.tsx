@@ -4,7 +4,10 @@ import { Badge, EmptyState } from "../../components/ui.tsx";
 import { TransactionItemRow } from "../../components/activity/TransactionItem.tsx";
 import { MovementDetail } from "../../components/activity/TransactionDetail.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
-import "../../components/activity/account-activity.css";
+import {
+	transactionAmountStyles,
+	transactionBadgeStyles,
+} from "../../components/activity/activityStyles.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import {
 	isPendingMovement,
@@ -13,7 +16,6 @@ import {
 	type Plan,
 } from "../../domain/model.ts";
 import type { ResolvedMovementAmount } from "../../domain/resolvedMovementAmounts.ts";
-import "./plan.css";
 
 export function MovementsPanel({
 	movements,
@@ -93,17 +95,27 @@ export function MovementsPanel({
 							title={movement.name}
 							slots={{
 								subtitle: route ? <span>{route}</span> : undefined,
-								mobile: (
-									<span className="transaction-mobile-date">{dateText}</span>
-								),
+								mobile: <span>{dateText}</span>,
 								badges: (pending || !movement.enabled) && (
-									<span className="transaction-badges">
+									<>
 										{pending ? (
-											<Badge tone="neutral">Pending</Badge>
+											<Badge
+												tone="neutral"
+												className={transactionBadgeStyles()}
+											>
+												Pending
+											</Badge>
 										) : (
-											!movement.enabled && <Badge tone="amber">Excluded</Badge>
+											!movement.enabled && (
+												<Badge
+													tone="warning"
+													className={transactionBadgeStyles()}
+												>
+													Excluded
+												</Badge>
+											)
 										)}
-									</span>
+									</>
 								),
 							}}
 							amount={
@@ -147,7 +159,12 @@ function MovementAmount({
 	movement: Movement;
 	resolved: ResolvedMovementAmount | undefined;
 }) {
-	if (movement.amountKnown) return <strong>{money(movement.amount)}</strong>;
+	if (movement.amountKnown)
+		return (
+			<strong className={transactionAmountStyles()}>
+				{money(movement.amount)}
+			</strong>
+		);
 	if (resolved) {
 		const label =
 			movement.frequency === "once"
@@ -155,13 +172,18 @@ function MovementAmount({
 				: `Next calculated amount ${dateLabel(resolved.date, true)} · varies each occurrence`;
 		return (
 			<>
-				<strong title={label}>{money(resolved.amount)}</strong>
+				<strong className={transactionAmountStyles()} title={label}>
+					{money(resolved.amount)}
+				</strong>
 				<Badge tone="neutral">Varies</Badge>
 			</>
 		);
 	}
 	return (
-		<strong title="Calculated during projection · varies each occurrence">
+		<strong
+			className={transactionAmountStyles()}
+			title="Calculated during projection · varies each occurrence"
+		>
 			Varies
 		</strong>
 	);

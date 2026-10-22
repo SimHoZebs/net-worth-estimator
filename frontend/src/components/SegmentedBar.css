@@ -1,135 +1,54 @@
-/* Co-located partial: owned by components/SegmentedBar.css. Global cascade order is set by the
-   @layer declaration in styles/index.css (reset, base, layout, components).
-   Responsive and accessibility overrides are unlayered and always win.
-   Keep selectors inside @layer components. */
+@reference "../styles/index.css";
+
+/* Texture carries meaning alongside each segment's semantic tone utility. */
 @layer components {
-	.seg-stack {
-		display: grid;
-		gap: 8px;
-	}
-	.seg-stack .seg-bar {
-		margin: 0;
-	}
-	.seg-stack .seg-legend {
-		margin: 0;
-	}
-	.seg-bar {
-		display: flex;
-		height: 14px;
-		border-radius: 7px;
-		overflow: hidden;
-		background: var(--surface-3);
-		margin: 10px 0 8px;
-	}
-	.seg-bar > span {
-		display: block;
-		width: var(--segment-width);
-		height: 100%;
-		min-width: 3px;
-	}
-	.seg-bar > span + span {
-		border-left: 2px solid var(--surface);
-	}
-	.seg-sage {
-		background-color: var(--seg-sage);
-	}
-	.seg-pale {
-		background-color: var(--seg-pale);
-	}
-	.seg-dark {
-		background-color: var(--track-fill);
-	}
-	.seg-tan {
-		background-color: var(--seg-tan);
-	}
-	.seg-blue {
-		background-color: var(--seg-blue);
-	}
-	.seg-plum {
-		background-color: var(--seg-plum);
-	}
-	.pat-stripes {
-		/* White stripes wash saturated tones out toward pale, so keep them
-		thin and soft: the base tone must dominate or striped sage reads
-		as pale next to a pale segment. */
+	[data-pattern="stripes"] {
+		/* Keep stripes soft so each series color remains distinct. */
 		background-image: repeating-linear-gradient(
 			45deg,
-			rgba(255, 255, 255, 0.35) 0 2px,
-			transparent 2px 7px
+			color-mix(in oklab, var(--color-white) 35%, transparent) 0 --spacing(0.5),
+			transparent --spacing(0.5) --spacing(2)
 		);
 	}
-	.seg-pale.pat-stripes {
-		background-image: repeating-linear-gradient(
-			45deg,
-			rgba(74, 93, 67, 0.4) 0 3px,
-			transparent 3px 8px
-		);
-	}
-	.pat-dots {
+	[data-pattern="dots"] {
 		background-image: radial-gradient(
 			circle,
-			rgba(255, 255, 255, 0.6) 1.5px,
-			transparent 1.6px
+			color-mix(in oklab, var(--color-white) 60%, transparent) --spacing(0.5),
+			transparent --spacing(0.5)
 		);
-		background-size: 8px 8px;
+		background-size: --spacing(2) --spacing(2);
 	}
-	.seg-pale.pat-dots {
+	[data-tone="blue"][data-pattern="dots"] {
 		background-image: radial-gradient(
 			circle,
-			rgba(74, 93, 67, 0.45) 1.5px,
-			transparent 1.6px
+			color-mix(in oklab, var(--chart-series-3) 45%, var(--color-black))
+				--spacing(0.5),
+			transparent --spacing(0.5)
 		);
-		background-size: 8px 8px;
+		background-size: --spacing(2) --spacing(2);
 	}
-	.seg-blue.pat-dots {
+	[data-tone="plum"][data-pattern="dots"] {
 		background-image: radial-gradient(
 			circle,
-			rgba(58, 90, 120, 0.45) 1.5px,
-			transparent 1.6px
+			color-mix(in oklab, var(--chart-series-4) 45%, var(--color-black))
+				--spacing(0.5),
+			transparent --spacing(0.5)
 		);
-		background-size: 8px 8px;
+		background-size: --spacing(2) --spacing(2);
 	}
-	.seg-plum.pat-dots {
-		background-image: radial-gradient(
-			circle,
-			rgba(100, 80, 130, 0.45) 1.5px,
-			transparent 1.6px
-		);
-		background-size: 8px 8px;
-	}
-	.pat-hatch {
+	[data-pattern="hatch"] {
 		background-image:
 			repeating-linear-gradient(
 				45deg,
-				rgba(255, 255, 255, 0.5) 0 2px,
-				transparent 2px 6px
+				color-mix(in oklab, var(--color-white) 50%, transparent) 0
+					--spacing(0.5),
+				transparent --spacing(0.5) --spacing(1.5)
 			),
 			repeating-linear-gradient(
 				-45deg,
-				rgba(255, 255, 255, 0.5) 0 2px,
-				transparent 2px 6px
+				color-mix(in oklab, var(--color-white) 50%, transparent) 0
+					--spacing(0.5),
+				transparent --spacing(0.5) --spacing(1.5)
 			);
-	}
-	.seg-legend {
-		list-style: none;
-		padding: 0;
-		margin: 0 0 6px;
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px 14px;
-		font-size: 10px;
-		color: var(--muted);
-	}
-	.seg-legend li {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-	}
-	.seg-swatch {
-		width: 14px;
-		height: 10px;
-		border-radius: 2px;
-		display: inline-block;
-		flex: none;
 	}
 }

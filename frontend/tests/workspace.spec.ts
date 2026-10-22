@@ -266,6 +266,42 @@ test("desktop pages and edit dialogs meet automated accessibility checks", async
 	expect(issues(results.violations)).toEqual([]);
 });
 
+for (const width of [1440, 390]) {
+	test(`dark theme pages and account editor remain accessible at ${width}px`, async ({
+		page,
+	}) => {
+		await page.setViewportSize({ width, height: 900 });
+		await page.emulateMedia({ colorScheme: "dark" });
+		for (const route of [
+			"outlook",
+			"accounts",
+			"transactions",
+			"purchases",
+			"evaluations",
+			"sources",
+		]) {
+			await page.goto(`/#${route}`);
+			await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+			await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+			expect(
+				await page.evaluate(() => document.documentElement.scrollWidth),
+				route,
+			).toBeLessThanOrEqual(width);
+			const audit = await new AxeBuilder({ page })
+				.withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+				.analyze();
+			expect(issues(audit.violations), route).toEqual([]);
+		}
+		await page.goto("/#accounts");
+		await page.getByRole("button", { name: "Add account" }).click();
+		await expect(page.getByRole("dialog")).toBeVisible();
+		const audit = await new AxeBuilder({ page })
+			.withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+			.analyze();
+		expect(issues(audit.violations)).toEqual([]);
+	});
+}
+
 test("mobile navigation, evidence and layouts stay usable", async ({
 	page,
 }) => {
@@ -332,6 +368,7 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 test("capture the completed desktop outlook", async ({ page }) => {
 	await page.goto("/");
 	await page.getByText(/80% of (400 )?scenarios/).waitFor({ timeout: 30_000 });
+	await page.getByRole("slider", { name: "Inspect projection date" }).waitFor();
 	await page.screenshot({
 		path: "test-results/waypoint-desktop.png",
 		fullPage: true,

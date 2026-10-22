@@ -1,6 +1,66 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { ReactNode } from "react";
-import { IconButton } from "./ui.tsx";
+import type { ComponentProps, ReactNode } from "react";
+import { mergeStyles } from "./mergeStyles.ts";
+import { IconButton } from "./Button.tsx";
+import {
+	tableCellStyles,
+	tableHeaderStyles,
+	tableHeadStyles,
+	tablePaginationStyles,
+	tableRowStyles,
+	tableScrollStyles,
+	tableStyles,
+} from "./tableStyles.ts";
+
+export function Table({ className, ...props }: ComponentProps<"table">) {
+	return <table {...props} className={mergeStyles(tableStyles(), className)} />;
+}
+
+export function TableHead({ className, ...props }: ComponentProps<"thead">) {
+	return (
+		<thead {...props} className={mergeStyles(tableHeadStyles(), className)} />
+	);
+}
+
+export function TableBody(props: ComponentProps<"tbody">) {
+	return <tbody {...props} />;
+}
+
+export function TableRow({ className, ...props }: ComponentProps<"tr">) {
+	return <tr {...props} className={mergeStyles(tableRowStyles(), className)} />;
+}
+
+export function TableHeader({
+	className,
+	scope = "col",
+	...props
+}: ComponentProps<"th">) {
+	return (
+		<th
+			{...props}
+			scope={scope}
+			className={mergeStyles(
+				tableHeaderStyles({
+					scope: scope === "row" || scope === "rowgroup" ? "row" : "col",
+				}),
+				className,
+			)}
+		/>
+	);
+}
+
+export function TableCell({ className, ...props }: ComponentProps<"td">) {
+	return (
+		<td {...props} className={mergeStyles(tableCellStyles(), className)} />
+	);
+}
+
+/** Name the region when keyboard scrolling needs an accessible landmark. */
+export function TableScroll({ className, ...props }: ComponentProps<"div">) {
+	return (
+		<div {...props} className={mergeStyles(tableScrollStyles(), className)} />
+	);
+}
 
 export interface DataTableColumn {
 	label: ReactNode;
@@ -21,8 +81,8 @@ export function DataTable({
 	showHeaders = false,
 	scrollId,
 	children,
-}: {
-	className?: string;
+	...props
+}: Omit<ComponentProps<"table">, "children"> & {
 	caption: string;
 	columns?: DataTableColumn[];
 	showHeaders?: boolean;
@@ -30,14 +90,14 @@ export function DataTable({
 	children: ReactNode;
 }) {
 	return (
-		<div className="table-scroll" {...(scrollId ? { id: scrollId } : {})}>
-			<table className={className}>
+		<TableScroll id={scrollId} tabIndex={0} role="region" aria-label={caption}>
+			<Table {...props} className={className}>
 				<caption className="sr-only">{caption}</caption>
 				{showHeaders && columns.length > 0 && (
-					<thead>
-						<tr>
+					<TableHead>
+						<TableRow>
 							{columns.map((column, index) => (
-								<th
+								<TableHeader
 									key={index}
 									scope="col"
 									{...(column.className ? { className: column.className } : {})}
@@ -47,14 +107,14 @@ export function DataTable({
 									) : (
 										column.label
 									)}
-								</th>
+								</TableHeader>
 							))}
-						</tr>
-					</thead>
+						</TableRow>
+					</TableHead>
 				)}
-				<tbody>{children}</tbody>
-			</table>
-		</div>
+				<TableBody>{children}</TableBody>
+			</Table>
+		</TableScroll>
 	);
 }
 
@@ -66,6 +126,8 @@ export function TablePagination({
 	pageSize,
 	itemNoun = "transactions",
 	onPage,
+	topBorder = false,
+	className,
 }: {
 	page: number;
 	pageCount: number;
@@ -73,22 +135,26 @@ export function TablePagination({
 	pageSize: number;
 	itemNoun?: string;
 	onPage: (next: number) => void;
+	topBorder?: boolean;
+	className?: string;
 }) {
 	const currentPage = Math.min(page, pageCount - 1);
 	return (
-		<div className="transaction-pagination">
-			<span role="status">
+		<div
+			className={mergeStyles(tablePaginationStyles({ topBorder }), className)}
+		>
+			<span className="text-xs text-muted" role="status">
 				Showing {currentPage * pageSize + 1}–
 				{Math.min((currentPage + 1) * pageSize, total)} of {total} {itemNoun}
 			</span>
-			<div>
+			<div className="flex items-center gap-3 [@media(max-width:600px)]:gap-1">
 				<IconButton
 					icon={ChevronLeft}
 					label="Previous transaction page"
 					disabled={currentPage === 0}
 					onClick={() => onPage(currentPage - 1)}
 				/>
-				<span>
+				<span className="text-xs text-muted tabular-nums">
 					{currentPage + 1} / {pageCount}
 				</span>
 				<IconButton

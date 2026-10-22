@@ -31,18 +31,11 @@ import {
 	SAFE_SPENDING_LABELS as labels,
 	SAFE_SPENDING_FORMULAS as formulas,
 } from "./safeSpendingLabels.ts";
-
-function HouseholdPanel({
-	children,
-	className = "",
-}: {
-	children: React.ReactNode;
-	className?: string;
-}) {
-	return (
-		<section className={`household-panel ${className}`}>{children}</section>
-	);
-}
+import {
+	householdPanelStyles,
+	householdValueStyles,
+	type HouseholdValueStyleProps,
+} from "./householdStyles.ts";
 
 function HouseholdMetricCard({
 	label,
@@ -55,21 +48,28 @@ function HouseholdMetricCard({
 	value: string;
 	icon: React.ReactNode;
 	foot?: string;
-	tone?: "normal" | "positive" | "negative";
+	tone?: HouseholdValueStyleProps["tone"];
 }) {
 	return (
-		<HouseholdPanel className="household-metric-card">
-			<div className="household-muted household-tiny household-metric-label">
+		<section
+			aria-label={label}
+			className={householdPanelStyles({
+				density: "compact",
+				className: "min-h-28",
+			})}
+		>
+			<div className="flex items-center gap-1.5 text-xs text-muted">
 				{icon}
 				{label}
 			</div>
 			<div
-				className={`household-metric-value ${tone === "positive" ? "household-positive" : tone === "negative" ? "household-negative" : ""}`}
+				data-testid="metric-value"
+				className={householdValueStyles({ size: "metric", tone })}
 			>
 				{value}
 			</div>
-			{foot && <div className="household-muted household-tiny">{foot}</div>}
-		</HouseholdPanel>
+			{foot && <div className="text-xs text-muted">{foot}</div>}
+		</section>
 	);
 }
 
@@ -103,8 +103,8 @@ export function SafeSpendingBillsPanel({
 	const inspect = (transaction: AccountTransaction, movement: Movement) =>
 		setSelected({ transaction, movement });
 	return (
-		<div className="safe-spending-mandatory">
-			<div className="household-metric-grid">
+		<div className="grid content-start gap-4">
+			<div className="grid grid-cols-2 gap-2.5">
 				<HouseholdMetricCard
 					label={labels.cashAfterBills}
 					icon={<Landmark size={16} aria-hidden="true" />}
@@ -119,21 +119,17 @@ export function SafeSpendingBillsPanel({
 					foot="After protected reserve"
 				/>
 			</div>
-			<HouseholdPanel>
-				<div className="household-two-col">
-					<div>
-						<div className="household-muted household-tiny">
-							{labels.cardSpending}
-						</div>
-						<div className="household-big-number">
+			<section className={householdPanelStyles()}>
+				<div className="flex items-center justify-between">
+					<div className="min-w-0">
+						<div className="text-xs text-muted">{labels.cardSpending}</div>
+						<div className={householdValueStyles({ size: "metric" })}>
 							{money(heroes.committedTotal)}
 						</div>
 					</div>
-					<div className="household-align-right">
-						<div className="household-muted household-tiny">
-							{labels.reserve}
-						</div>
-						<div className="household-medium-number">
+					<div className="min-w-0 text-right">
+						<div className="text-xs text-muted">{labels.reserve}</div>
+						<div className="text-xl font-bold tracking-tight text-ink tabular-nums">
 							{money(paycheck.reserve)}
 						</div>
 					</div>
@@ -167,37 +163,41 @@ export function SafeSpendingBillsPanel({
 					]}
 					ariaLabel={`${labels.cardSpending} ${money(heroes.committedTotal)}, ${labels.allowance} ${money(paycheck.allowance)}, ${labels.reserve} ${money(paycheck.reserve)}`}
 				/>
-				<p className="section-note">{formulas.allowance}</p>
-				<div className="household-divider" />
-				<div className="household-two-col household-card-breakdown">
+				<p className="text-sm leading-relaxed text-muted">
+					{formulas.allowance}
+				</p>
+				<div className="h-px w-full bg-line" />
+				<div className="flex items-center justify-between">
 					{heroes.committedByCard.map((card, index) => {
 						const Icon =
 							index === 0 ? CreditCard : index === 1 ? ShoppingBag : Wallet;
 						return (
-							<div key={card.id}>
+							<div key={card.id} className="flex min-w-0 items-center gap-2">
 								<Icon size={20} aria-hidden="true" />
-								<div>
-									<span className="household-muted household-tiny">
-										{card.name}
-									</span>
-									<strong>{money(card.amount)}</strong>
+								<div className="flex flex-col gap-1">
+									<span className="text-xs text-muted">{card.name}</span>
+									<strong className="text-sm text-ink">
+										{money(card.amount)}
+									</strong>
 								</div>
 							</div>
 						);
 					})}
 				</div>
-			</HouseholdPanel>
-			<HouseholdPanel>
-				<div className="household-panel-heading">
-					<strong>{labels.cashAccounts}</strong>
+			</section>
+			<section className={householdPanelStyles()}>
+				<div className="flex items-center justify-between">
+					<strong className="text-sm text-ink">{labels.cashAccounts}</strong>
 					<ShieldCheck
 						size={19}
-						className="household-positive"
+						className="text-success-text"
 						aria-hidden="true"
 					/>
 				</div>
-				<div className="household-amount-line">
-					<span className="household-muted">{labels.cashBalance}</span>
+				<div className="flex items-center justify-between gap-3 text-sm text-ink">
+					<span className="flex items-center gap-2 text-muted">
+						{labels.cashBalance}
+					</span>
 					<strong>{exactMoney(cashNow.checking)}</strong>
 				</div>
 				<SegmentedBar
@@ -223,23 +223,25 @@ export function SafeSpendingBillsPanel({
 					]}
 					ariaLabel={`${labels.cashBalance} ${exactMoney(cashNow.checking)}, ${labels.remainingBills} ${exactMoney(cashNow.bills)}, ${labels.cashAfterBills} ${exactMoney(cashNow.cushion)}`}
 				/>
-				<div className="household-amount-line">
-					<span>
+				<div className="flex items-center justify-between gap-3 text-sm text-ink">
+					<span className="flex items-center gap-2">
 						<Clock3 size={16} aria-hidden="true" /> {labels.remainingBills}
 					</span>
 					<strong>−{exactMoney(cashNow.bills)}</strong>
 				</div>
 				{cashNow.spentSinceStart > 0 ? (
-					<div className="household-amount-line">
-						<span className="household-muted">
+					<div className="flex items-center justify-between gap-3 text-sm text-ink">
+						<span className="flex items-center gap-2 text-muted">
 							{labels.cashPayments} · {monthDay(cashNow.since)}
 						</span>
 						<strong>{exactMoney(cashNow.spentSinceStart)}</strong>
 					</div>
 				) : null}
-				<p className="section-note">{formulas.cashAfterBills}</p>
-				<div className="household-divider" />
-				<div className="household-safe-spending-controls">
+				<p className="text-sm leading-relaxed text-muted">
+					{formulas.cashAfterBills}
+				</p>
+				<div className="h-px w-full bg-line" />
+				<div className="flex flex-wrap items-center justify-end gap-3">
 					<TransactionSortButton
 						order={transactionOrder}
 						onChange={onTransactionOrderChange}
@@ -259,22 +261,22 @@ export function SafeSpendingBillsPanel({
 					order={transactionOrder}
 					showHeaders={showHeaders}
 				/>
-			</HouseholdPanel>
-			<HouseholdPanel>
-				<div className="household-panel-heading">
-					<strong>{labels.dailyAllowance}</strong>
+			</section>
+			<section className={householdPanelStyles()}>
+				<div className="flex items-center justify-between">
+					<strong className="text-sm text-ink">{labels.dailyAllowance}</strong>
 				</div>
-				<div className="household-amount-line">
-					<span className="household-muted">
+				<div className="flex items-center justify-between gap-3 text-sm text-ink">
+					<span className="flex items-center gap-2 text-muted">
 						{heroes.fullDaysLeft} full{" "}
 						{heroes.fullDaysLeft === 1 ? "day" : "days"} left
 					</span>
 					<strong>
 						{heroes.fullDaysLeft > 0 ? money(heroes.dailySafe) : "N/A"}{" "}
-						<span className="household-muted household-tiny">per day</span>
+						<span className="text-xs text-muted">per day</span>
 					</strong>
 				</div>
-			</HouseholdPanel>
+			</section>
 			{selected && (
 				<TransactionDetail
 					transaction={selected.transaction}

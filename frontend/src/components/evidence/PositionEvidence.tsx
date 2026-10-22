@@ -3,7 +3,8 @@ import { dateLabel, money } from "../../domain/format.ts";
 import { type Plan, visibleAccounts } from "../../domain/model.ts";
 import { currentNetWorth, type Projection } from "../../domain/result.ts";
 import { AccountDot } from "../AccountIcon.tsx";
-import { DetailRow } from "../DetailRow.tsx";
+import { DetailList, DetailRow } from "../DetailRow.tsx";
+import { Notice } from "../Notice.tsx";
 import { Modal } from "../ui.tsx";
 
 export function PositionEvidence({
@@ -21,13 +22,13 @@ export function PositionEvidence({
 			eyebrow="Current position"
 			onClose={onClose}
 		>
-			<div className="evidence-amount type-value">
+			<div className="type-value mb-2 text-4xl leading-[1.2] font-medium tracking-[-1px]">
 				{money(currentNetWorth(projection))}
 			</div>
-			<p className="muted">
+			<p className="text-muted">
 				Assets minus debts · starting {dateLabel(plan.startDate, true)}
 			</p>
-			<dl className="detail-list">
+			<DetailList>
 				{visibleAccounts(plan.accounts)
 					.filter((account) => account.enabled)
 					.map((account) => (
@@ -35,27 +36,29 @@ export function PositionEvidence({
 							key={account.id}
 							label={
 								<>
-									<span className="account-name-line">
+									<span className="inline-flex items-center gap-2">
 										<AccountDot color={account.color} />
 										{account.name}
 									</span>
-									<small>{dateLabel(account.observedOn, true)}</small>
+									<small className="mt-1 block text-xs">
+										{dateLabel(account.observedOn, true)}
+									</small>
 								</>
 							}
 						>
 							{money(account.balance)}
 						</DetailRow>
 					))}
-			</dl>
-			<div className="inline-notice">
-				<Info size={18} />
+			</DetailList>
+			<Notice tone="info" className="my-4">
+				<Info size={18} aria-hidden="true" />
 				<span>
 					{plan.origin === "example"
 						? "All balances are illustrative example data. "
 						: ""}
 					Older values carry forward unchanged.
 				</span>
-			</div>
+			</Notice>
 		</Modal>
 	);
 }

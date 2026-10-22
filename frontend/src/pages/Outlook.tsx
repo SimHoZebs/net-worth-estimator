@@ -11,7 +11,6 @@ import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
 import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
 import type { SafeSpendingDetailTab } from "./outlook/safe-spending/safeSpendingDetailModel.ts";
 import { SafeSpendingPreview } from "./outlook/safe-spending/SafeSpendingPreview.tsx";
-import "./outlook/outlook.css";
 
 const EMPTY_CHECKPOINTS: BackendCheckpoint[] = [];
 
@@ -142,7 +141,10 @@ function OutlookContent({
 					Loading the projection.
 				</p>
 			)}
-			<div className="outlook-top" aria-busy={pending}>
+			<div
+				className="grid grid-cols-[minmax(0,1fr)_18.75rem] items-start gap-6 [@media(1050px<width<=1250px)]:grid-cols-[minmax(0,1fr)_16.25rem] [@media(max-width:1250px)]:gap-4 [@media(max-width:1050px)]:grid-cols-1 print:grid-cols-1!"
+				aria-busy={pending}
+			>
 				<ProjectionChart
 					plan={plan}
 					projection={base}
@@ -155,7 +157,7 @@ function OutlookContent({
 					rangeError={projection.rangeError}
 					pending={pending}
 				/>
-				<div className="outlook-rail">
+				<div className="sticky top-5 flex min-w-0 flex-col gap-4 [@media(max-width:1050px)]:static">
 					<OutlookMetrics
 						plan={plan}
 						projection={base}
@@ -186,7 +188,7 @@ function OutlookContent({
 				}}
 				onEvaluation={onEvaluation}
 			/>
-			<div className="outlook-secondary" aria-busy={pending}>
+			<div className="mt-6 [@media(max-width:600px)]:mt-5" aria-busy={pending}>
 				<SafeSpendingPreview
 					plan={plan}
 					checkpoints={checkpoints}

@@ -59,14 +59,16 @@ test("purchase priorities persist and purchases protect all established payments
 	await openPurchases(page);
 	await addPurchase(page, "Laptop", "500");
 	await addPurchase(page, "Chair", "150");
-	const queue = page.locator(".wish-list-items");
+	const queue = page.getByRole("list", { name: "Purchase priorities" });
 	await expect(queue.locator("li").first()).toContainText("Laptop");
 	await page.getByRole("button", { name: "Move Chair up" }).click();
 	await expect(queue.locator("li").first()).toContainText("Chair");
 	await expect(
 		page.getByRole("status").filter({ hasText: "Chair is now priority 1" }),
 	).toHaveText("Chair is now priority 1.");
-	await expect(page.locator(".purchase-paths time")).toHaveCount(2);
+	await expect(
+		page.getByRole("list", { name: "Purchase dates" }).locator("time"),
+	).toHaveCount(2);
 	const temporary = await readTemporaryVersion(page);
 	expect(
 		temporary.movements.find((item: { name: string }) => item.name === "Chair")
@@ -177,14 +179,23 @@ test("unfunded purchases hold lower priorities and the page remains accessible o
 	await expect(page.getByText("Not funded within this timeframe")).toHaveCount(
 		2,
 	);
-	await expect(page.locator(".purchase-paths time")).toHaveCount(0);
+	await expect(
+		page.getByRole("list", { name: "Purchase dates" }).locator("time"),
+	).toHaveCount(0);
 	await page.getByRole("button", { name: "Move Small item up" }).focus();
 	await page.keyboard.press("Enter");
-	await expect(page.locator(".wish-list-items li").first()).toContainText(
-		"Small item",
-	);
-	await expect(page.locator(".purchase-paths time")).toHaveCount(1);
-	const audit = await new AxeBuilder({ page }).include(".wish-list").analyze();
+	await expect(
+		page
+			.getByRole("list", { name: "Purchase priorities" })
+			.getByRole("listitem")
+			.first(),
+	).toContainText("Small item");
+	await expect(
+		page.getByRole("list", { name: "Purchase dates" }).locator("time"),
+	).toHaveCount(1);
+	const audit = await new AxeBuilder({ page })
+		.include('[aria-label="Planned purchases"]')
+		.analyze();
 	expect(audit.violations).toEqual([]);
 	for (const width of [320, 390, 768, 1440]) {
 		await page.setViewportSize({ width, height: 900 });

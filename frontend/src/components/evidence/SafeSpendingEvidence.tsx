@@ -10,6 +10,8 @@ import {
 	type TransactionOrder,
 } from "../../domain/transactionSort.ts";
 import { TransactionSortButton } from "../activity/TransactionSortButton.tsx";
+import { DataTable, TableCell, TableHeader, TableRow } from "../DataTable.tsx";
+import { Notice } from "../Notice.tsx";
 import { Badge, Modal } from "../ui.tsx";
 
 export function SafeSpendingEvidence({
@@ -45,44 +47,41 @@ export function SafeSpendingEvidence({
 			onClose={onClose}
 			wide
 		>
-			<p className="form-intro">These amounts are scheduled.</p>
-			<div className="table-toolbar">
+			<p className="mb-6 text-sm text-muted">These amounts are scheduled.</p>
+			<div className="my-2 flex justify-end">
 				<TransactionSortButton order={order} onChange={setOrder} />
 			</div>
-			<div className="table-scroll">
-				<table>
-					<thead>
-						<tr>
-							<th scope="col">Date</th>
-							<th scope="col">Transaction</th>
-							<th scope="col">Requested</th>
-							<th scope="col">Funded</th>
-						</tr>
-					</thead>
-					<tbody>
-						{ordered.map((event, index) => (
-							<tr key={`${event.movementId}-${index}`}>
-								<td>{dateLabel(event.date, true)}</td>
-								<th scope="row">{event.name}</th>
-								<td>{money(event.requested)}</td>
-								<td>
-									{money(event.realized)}
-									{event.constraint && <Badge tone="amber">Shortfall</Badge>}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-			</div>
+			<DataTable
+				caption="Scheduled transactions for the next 30 days."
+				columns={[
+					{ label: "Date" },
+					{ label: "Transaction" },
+					{ label: "Requested" },
+					{ label: "Funded" },
+				]}
+				showHeaders
+			>
+				{ordered.map((event, index) => (
+					<TableRow key={`${event.movementId}-${index}`}>
+						<TableCell>{dateLabel(event.date, true)}</TableCell>
+						<TableHeader scope="row">{event.name}</TableHeader>
+						<TableCell>{money(event.requested)}</TableCell>
+						<TableCell>
+							{money(event.realized)}
+							{event.constraint && <Badge tone="warning">Shortfall</Badge>}
+						</TableCell>
+					</TableRow>
+				))}
+			</DataTable>
 			{!events.length && <p>No transactions scheduled in this period.</p>}
-			<div className="inline-notice">
-				<Info size={18} />
+			<Notice tone="info" className="my-4">
+				<Info size={18} aria-hidden="true" />
 				<span>
 					Cash above protected balances is not a safe-to-spend recommendation.
 					Account safe spending, future commitments and unmodeled expenses can
 					still limit spending.
 				</span>
-			</div>
+			</Notice>
 		</Modal>
 	);
 }

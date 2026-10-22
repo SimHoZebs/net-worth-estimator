@@ -31,45 +31,35 @@
 		font-variant-numeric: tabular-nums;
 	}
 	body {
-		min-width: 320px;
-		font-size: 0.8125rem;
-		line-height: 1.6;
+		@apply min-w-80 text-sm leading-relaxed;
 	}
 	::selection {
 		background: var(--active);
 		color: var(--ink);
 	}
 	:focus-visible {
-		outline: 3px solid var(--track-fill);
-		outline-offset: 4px;
-		border-radius: 4px;
+		@apply rounded outline-3 outline-solid outline-primary outline-offset-1;
 	}
 	h1 {
-		font-size: clamp(1.875rem, 1rem + 2vw, 2.6875rem);
-		font-weight: 450;
-		letter-spacing: -1.15px;
-		line-height: 1.15;
+		@apply text-4xl leading-tight font-normal tracking-tight;
 	}
 	h1:focus {
 		outline: none;
 	}
 	h2 {
-		font-size: 15px;
-		font-weight: 700;
-		letter-spacing: -0.3px;
+		@apply text-base font-bold tracking-tight;
 	}
 	h3 {
-		font-size: 14px;
-		font-weight: 700;
+		@apply text-sm font-bold;
 	}
 	p {
 		color: var(--muted);
 	}
 	strong,
 	b {
-		font-weight: 650;
+		@apply font-semibold;
 	}
 	small {
-		font-size: 11px;
+		@apply text-xs;
 	}
 }

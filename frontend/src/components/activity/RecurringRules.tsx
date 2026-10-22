@@ -13,8 +13,12 @@ import { money } from "../../domain/format.ts";
 import type { Account, Movement, Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
-import { Badge, EmptyState, IconButton } from "../ui.tsx";
-import "./account-activity.css";
+import { Badge, EmptyState } from "../ui.tsx";
+import { Button, IconButton, TextButton } from "../Button.tsx";
+import {
+	movementIconStyles,
+	transactionBadgeStyles,
+} from "./activityStyles.ts";
 import { MovementDetail } from "./TransactionDetail.tsx";
 
 type Direction = "in" | "out" | "transfer";
@@ -81,11 +85,11 @@ function SortableRow({
 			dragControls={dragControls}
 			onDragStart={onDragStart}
 			onDragEnd={onDrop}
-			className="recurring-row"
+			className="flex items-center gap-3 border-b border-line bg-transparent p-3 [@media(max-width:600px)]:gap-2 [@media(max-width:600px)]:px-2 [@media(max-width:600px)]:py-3"
 			aria-label={label}
 		>
 			<span
-				className="recurring-drag"
+				className="flex touch-none cursor-grab text-muted"
 				aria-hidden="true"
 				onPointerDown={(event) => dragControls.start(event)}
 			>
@@ -244,25 +248,36 @@ export function RecurringRules({
 		return (
 			<>
 				<span
-					className="recurring-order"
+					className="min-w-[2ch] text-right text-xs whitespace-nowrap text-muted tabular-nums"
 					aria-hidden={compact ? undefined : true}
 				>
 					{order}
 				</span>
 				<span
-					className={`movement-icon ${direction === "transfer" ? "transfer" : direction === "in" ? "inflow" : "outflow"}`}
+					className={movementIconStyles({
+						tone:
+							direction === "transfer"
+								? "transfer"
+								: direction === "in"
+									? "inflow"
+									: "outflow",
+					})}
 				>
 					<DirectionIcon size={16} aria-hidden="true" />
 				</span>
-				<span className="transaction-name">
-					<strong>{movement.name}</strong>
-					<span>
+				<span className="flex min-w-0 flex-col gap-1">
+					<strong className="m-0 text-xs font-semibold [overflow-wrap:anywhere]">
+						{movement.name}
+					</strong>
+					<span className="m-0 text-xs text-muted">
 						{directionLabel(direction)} · {frequencyLabel(backendFrequency)} ·{" "}
 						{movement.amountKnown ? money(movement.amount) : "Varies"}
 					</span>
 					{!movement.enabled && (
-						<span className="transaction-badges">
-							<Badge tone="amber">Excluded from plan</Badge>
+						<span className="m-0 flex flex-wrap gap-1">
+							<Badge tone="warning" className={transactionBadgeStyles()}>
+								Excluded from plan
+							</Badge>
 						</span>
 					)}
 				</span>
@@ -272,15 +287,16 @@ export function RecurringRules({
 
 	return (
 		<>
-			<div className="recurring-toolbar">
-				<p className="transaction-context">
+			<div className="flex items-center justify-between gap-4">
+				<p className="p-0 text-xs leading-[1.8] text-muted">
 					Execution order for this account. Same-day movements apply in this
 					order.
 				</p>
 				{canEdit && (
-					<button
+					<Button
 						type="button"
-						className="button small"
+						variant="ghost"
+						size="sm"
 						aria-pressed={editing}
 						aria-label={
 							editing
@@ -290,7 +306,7 @@ export function RecurringRules({
 						onClick={() => setEditing((previous) => !previous)}
 					>
 						{editing ? "Done" : "Edit"}
-					</button>
+					</Button>
 				)}
 			</div>
 			{editing ? (
@@ -298,7 +314,7 @@ export function RecurringRules({
 					axis="y"
 					values={localIds}
 					onReorder={handleReorder}
-					className="recurring-list"
+					className="m-0 flex list-none flex-col border-t border-line p-0"
 					aria-label={`Reorder recurring transactions for ${account.name}`}
 				>
 					{orderedRules.map((movement, index) => (
@@ -311,7 +327,7 @@ export function RecurringRules({
 							}}
 							onDrop={handleDrop}
 							controls={
-								<span className="recurring-edit-controls">
+								<span className="ml-auto flex items-center gap-1 [@media(max-width:600px)]:gap-0.5">
 									<IconButton
 										icon={ChevronUp}
 										label={`Move ${movement.name} up`}
@@ -324,9 +340,8 @@ export function RecurringRules({
 										disabled={index === orderedRules.length - 1}
 										onClick={() => moveBy(movement.id, 1)}
 									/>
-									<button
+									<TextButton
 										type="button"
-										className="text-button"
 										aria-label={`Edit ${movement.name}`}
 										onClick={() => {
 											setEditing(false);
@@ -334,7 +349,7 @@ export function RecurringRules({
 										}}
 									>
 										Edit
-									</button>
+									</TextButton>
 								</span>
 							}
 						>
@@ -344,14 +359,17 @@ export function RecurringRules({
 				</Reorder.Group>
 			) : (
 				<ul
-					className="recurring-list"
+					className="m-0 flex list-none flex-col border-t border-line p-0"
 					aria-label={`Recurring transactions for ${account.name}`}
 				>
 					{rules.map((movement, index) => (
-						<li key={movement.id} className="recurring-row">
+						<li
+							key={movement.id}
+							className="flex items-center gap-3 border-b border-line bg-transparent p-3 [@media(max-width:600px)]:gap-2 [@media(max-width:600px)]:px-2 [@media(max-width:600px)]:py-3"
+						>
 							<button
 								type="button"
-								className="recurring-row-button"
+								className="flex min-w-0 flex-1 items-center gap-3 rounded-control border-0 bg-transparent px-2 py-0.5 text-left"
 								aria-label={`View ${movement.name}, ${directionLabel(directionFor(movement, account.id)).toLowerCase()} ${frequencyLabel(detailFor(movement).backendFrequency).toLowerCase()}, position ${index + 1} of ${rules.length}`}
 								onClick={() => setSelectedId(movement.id)}
 							>

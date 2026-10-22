@@ -5,7 +5,6 @@ import { WorkspaceShell } from "../WorkspaceShell.tsx";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { ServerLoadingShell } from "./ServerLoadingShell.tsx";
 import { ServerWorkspaceRecovery } from "./ServerWorkspaceRecovery.tsx";
-import "./app.css";
 
 export function ServerApp() {
 	// The engine boots here; everything below subscribes to the stores.

@@ -51,13 +51,19 @@ export function PinnedEvaluations({
 	}
 	if (!items.length) return null;
 	return (
-		<section className="pinned-evaluations" aria-labelledby={headingId}>
-			<h2 className="pinned-heading" id={headingId}>
+		<section className="mt-6" aria-labelledby={headingId}>
+			<h2
+				className="flex items-center gap-2 text-sm font-semibold"
+				id={headingId}
+			>
 				<Pin size={14} aria-hidden="true" />
 				Pinned evaluations
 			</h2>
-			{/* oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none grids. */}
-			<ul className="evaluations-grid" role="list">
+			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none grids. */}
+			<ul
+				className="mt-3 mb-0 grid list-none grid-cols-2 gap-6 p-0 [@media(max-width:1050px)]:gap-4 [@media(max-width:600px)]:grid-cols-1"
+				role="list"
+			>
 				{items.map((item) => {
 					const id =
 						item.kind === "evaluation"
@@ -69,7 +75,7 @@ export function PinnedEvaluations({
 						disabled: pinsDisabled,
 					};
 					return (
-						<li key={id}>
+						<li key={id} className="grid min-w-0">
 							{item.kind === "evaluation" ? (
 								<EvaluationCard
 									evaluation={item.result.evaluation}
@@ -90,6 +96,7 @@ export function PinnedEvaluations({
 					);
 				})}
 			</ul>
+			{/* oxlint-enable jsx-a11y/no-redundant-roles */}
 		</section>
 	);
 }

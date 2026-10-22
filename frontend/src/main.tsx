@@ -3,14 +3,10 @@ import { Component, type ErrorInfo, type ReactNode, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { serverQueryClient } from "./state/serverQuery.ts";
 import "@fontsource-variable/manrope";
-import "@fontsource-variable/newsreader";
-// Foundation first: this import must stay above App so the @layer order
-// declared in styles/index.css is established before any component partial
-// (imported transitively through App) declares its layer. Otherwise the
-// components layer sorts before reset/base and generic rules like
-// `button { color: inherit }` silently beat `.button.primary`.
+// Establish cascade order before component recipes and generated utilities.
 import "./styles/index.css";
 import App from "./App.tsx";
+import { Button } from "./components/Button.tsx";
 
 class ErrorBoundary extends Component<
 	{ children: ReactNode },
@@ -26,19 +22,15 @@ class ErrorBoundary extends Component<
 	render() {
 		if (this.state.failed)
 			return (
-				<main className="recovery-screen">
-					<h1>Let’s get your outlook back.</h1>
-					<p>
+				<main className="mx-auto my-[12vh] max-w-156 p-6">
+					<h1 className="mt-11 mb-6">Let’s get your outlook back.</h1>
+					<p className="mb-6">
 						The workspace could not be displayed. The server model and any
 						browser draft remain unchanged.
 					</p>
-					<button
-						type="button"
-						className="button primary"
-						onClick={() => window.location.reload()}
-					>
+					<Button variant="primary" onClick={() => window.location.reload()}>
 						Reload workspace
-					</button>
+					</Button>
 				</main>
 			);
 		return this.props.children;

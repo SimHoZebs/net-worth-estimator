@@ -3,11 +3,10 @@ import type { Movement, Plan } from "../../domain/model.ts";
 import { visibleAccounts } from "../../domain/model.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { purchaseQueue } from "../../domain/purchases.ts";
-import { InputField, SelectField } from "../../components/Field.tsx";
+import { Checkbox, InputField, SelectField } from "../../components/Field.tsx";
 import { AccountOptions } from "../../components/editors/AccountOptions.tsx";
 import { EditorForm } from "../../components/editors/EditorForm.tsx";
 import { numberValue, textValue } from "../../components/editors/formValues.ts";
-import "../../components/editors/editors.css";
 
 export function WishListEditor({
 	plan,
@@ -103,14 +102,16 @@ export function WishListEditor({
 				defaultValue={item?.startDate ?? plan.startDate}
 				wide
 			/>
-			<p className="muted small field-wide">
+			<p className="col-span-full text-xs text-muted">
 				The forecast defers this item until its full cost fits, after all
 				established payments. It never buys anything for you.
 			</p>
-			<label className="checkbox-field field-wide" htmlFor={includeId}>
-				<input
+			<label
+				className="col-span-full flex cursor-pointer items-center gap-2 text-sm text-muted"
+				htmlFor={includeId}
+			>
+				<Checkbox
 					id={includeId}
-					type="checkbox"
 					name="enabled"
 					defaultChecked={item?.enabled ?? true}
 				/>{" "}

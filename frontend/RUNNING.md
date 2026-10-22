@@ -53,7 +53,7 @@ Navigation uses URL fragments, so a static host does not need SPA route rewrites
 
 ## Typography
 
-Follow the [typography roles and ownership guidance](src/styles/README.md) for frontend changes. Newsreader serves display titles, Manrope serves UI and financial data, and system monospace serves code and editable JSON. `npm run lint` warns about font choices outside the shared owner. Font names and role assignments are not pinned by tests.
+Follow the [style and typography guidance](src/styles/README.md) for frontend changes. Manrope serves titles, UI, and financial data. System monospace serves code and editable JSON. Use Tailwind's stock palette and spacing scale. `npm run lint` checks spacing and warns about font choices outside the shared owner.
 
 ## Workspace and data
 

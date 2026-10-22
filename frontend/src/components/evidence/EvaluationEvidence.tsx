@@ -2,7 +2,9 @@ import { Pencil } from "lucide-react";
 import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { Account } from "../../domain/model.ts";
 import type { EvaluationResult, RangeResult } from "../../domain/result.ts";
-import { DetailRow } from "../DetailRow.tsx";
+import { Button } from "../Button.tsx";
+import { DetailList, DetailRow } from "../DetailRow.tsx";
+import { dialogActionsStyles } from "../dialogStyles.ts";
 import { Modal } from "../ui.tsx";
 
 export function EvaluationEvidence({
@@ -24,15 +26,15 @@ export function EvaluationEvidence({
 			eyebrow="Evaluation evidence"
 			onClose={onClose}
 		>
-			<div className="evidence-amount type-value">
+			<div className="type-value mb-2 text-4xl leading-[1.2] font-medium tracking-[-1px]">
 				{result.firstDate
 					? result.current >= result.evaluation.target
 						? "Already reached"
 						: dateLabel(result.firstDate)
 					: "Beyond this horizon"}
 			</div>
-			<p className="muted">First reached in the base case</p>
-			<dl className="detail-list">
+			<p className="text-muted">First reached in the base case</p>
+			<DetailList>
 				<DetailRow label="Measure">
 					{result.evaluation.kind === "net-worth"
 						? "Household net worth"
@@ -52,16 +54,16 @@ export function EvaluationEvidence({
 						{range.count}
 					</DetailRow>
 				)}
-			</dl>
-			<p className="section-note">
+			</DetailList>
+			<p className="py-2 text-sm leading-relaxed text-muted">
 				The first crossing of a threshold is a milestone. It does not establish
 				sustained spending coverage, retirement readiness, or future certainty.
 			</p>
-			<div className="modal-actions">
-				<button type="button" className="button primary" onClick={onEdit}>
+			<div className={dialogActionsStyles}>
+				<Button type="button" variant="primary" onClick={onEdit}>
 					<Pencil size={16} />
 					Edit evaluation
-				</button>
+				</Button>
 			</div>
 		</Modal>
 	);

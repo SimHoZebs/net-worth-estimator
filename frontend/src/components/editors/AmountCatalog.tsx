@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { ApiClient } from "../../api/client.ts";
 import type { PostingAmountResolution } from "../../api/contracts.ts";
 import {
@@ -9,7 +9,9 @@ import {
 	presetToTemplate,
 } from "../../domain/amountCatalog.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
-import { InputField } from "../Field.tsx";
+import { Button, TextButton } from "../Button.tsx";
+import { dialogActionsStyles } from "../dialogStyles.ts";
+import { Checkbox, InputField } from "../Field.tsx";
 import { ConfirmDialog } from "../ConfirmDialog.tsx";
 import { ErrorNotice } from "../ui.tsx";
 import { textValue } from "./formValues.ts";
@@ -76,9 +78,12 @@ function CompactList({
 	items: { key: string; title: string; text: string }[];
 }) {
 	return (
-		<ul className="catalog-list">
+		<ul className="mt-2 mb-5 list-none p-0">
 			{items.map((item) => (
-				<li key={item.key}>
+				<li
+					key={item.key}
+					className="border-0 border-b border-solid border-line py-2 text-sm"
+				>
 					<strong>{item.title}</strong> — {item.text}
 				</li>
 			))}
@@ -101,6 +106,7 @@ export function AmountCatalog({
 	accounts: { id: string; name: string }[];
 	postings: { id: string; name: string }[];
 }) {
+	const id = useId();
 	const remote = useRemoteNames();
 	const serverPresets = useWorkspaceStore((state) => state.serverPresets);
 	const presetError = useWorkspaceStore((state) => state.presetError);
@@ -192,54 +198,52 @@ export function AmountCatalog({
 	return (
 		<section aria-label="How amounts are calculated">
 			<h3>How amounts are calculated</h3>
-			<p className="muted">
+			<p className="text-muted">
 				Pick a starting point, fill in the blanks, copy the result.
 			</p>
-			<ul className="catalog-grid">
+			<ul className="mt-3 mb-5 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,14rem),1fr))] gap-3 p-0">
 				{templates.map((template) => (
-					<li key={template.id}>
+					<li key={template.id} className="m-0">
 						<button
 							type="button"
-							className="catalog-pick"
+							className="block w-full cursor-pointer rounded-lg border border-solid border-line bg-transparent p-3 text-left text-inherit aria-pressed:border-success-border aria-pressed:bg-success-bg"
 							aria-pressed={template.id === selected?.id}
 							onClick={() => {
 								setSelectedId(template.id);
 								closeForms();
 							}}
 						>
-							<strong>{template.label}</strong>
-							<span className="muted">{template.summary}</span>
+							<strong className="mb-1 block">{template.label}</strong>
+							<span className="m-0 text-xs text-muted">{template.summary}</span>
 						</button>
 					</li>
 				))}
 			</ul>
 			{!readOnly && serverPresets !== null && (
-				<div className="catalog-actions">
-					<button
+				<div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+					<Button
 						type="button"
-						className="button secondary"
+						variant="secondary"
 						onClick={() => {
 							closeForms();
 							setCreating(true);
 						}}
 					>
 						New recipe
-					</button>
+					</Button>
 					{selectedPreset && (
 						<>
-							<button
+							<TextButton
 								type="button"
-								className="text-button"
 								onClick={() => {
 									closeForms();
 									setEditing(true);
 								}}
 							>
 								Rename
-							</button>
-							<button
+							</TextButton>
+							<TextButton
 								type="button"
-								className="text-button"
 								disabled={!canMoveUp}
 								onClick={() => {
 									const previous = serverPresets[index - 1];
@@ -247,10 +251,9 @@ export function AmountCatalog({
 								}}
 							>
 								Move up
-							</button>
-							<button
+							</TextButton>
+							<TextButton
 								type="button"
-								className="text-button"
 								disabled={!canMoveDown}
 								onClick={() => {
 									const after = serverPresets[index + 2];
@@ -258,22 +261,21 @@ export function AmountCatalog({
 								}}
 							>
 								Move down
-							</button>
-							<button
-								type="button"
-								className="text-button"
-								onClick={() => setDeleting(true)}
-							>
+							</TextButton>
+							<TextButton type="button" onClick={() => setDeleting(true)}>
 								Delete
-							</button>
+							</TextButton>
 						</>
 					)}
 				</div>
 			)}
 			{creating && (
-				<form className="amount-builder" onSubmit={submitCreate}>
+				<form
+					className="mt-3 mb-5 rounded-lg border border-solid border-line bg-transparent p-4"
+					onSubmit={submitCreate}
+				>
 					<h4>New recipe</h4>
-					<div className="form-grid">
+					<div className="grid grid-cols-2 gap-5 max-[600px]:gap-x-3 max-[600px]:gap-y-4 max-[370px]:grid-cols-1">
 						<InputField
 							label="Name"
 							name="name"
@@ -304,8 +306,15 @@ export function AmountCatalog({
 							placeholder="e.g. Annual bonuses."
 						/>
 					</div>
-					<label className="checkbox-field">
-						<input name="enabled" type="checkbox" defaultChecked />
+					<label
+						htmlFor={`${id}-create-enabled`}
+						className="flex min-h-11 items-center gap-3 text-sm text-muted"
+					>
+						<Checkbox
+							id={`${id}-create-enabled`}
+							name="enabled"
+							defaultChecked
+						/>
 						Enabled
 					</label>
 					<AmountBuilder
@@ -315,29 +324,24 @@ export function AmountCatalog({
 						initialTemplateId="fixed"
 						onChange={setStagedAmount}
 					/>
-					{stagedAmount && <p className="muted">Amount ready to save.</p>}
-					<div className="modal-actions">
-						<button
-							type="button"
-							className="button secondary"
-							onClick={closeForms}
-						>
+					{stagedAmount && <p className="text-muted">Amount ready to save.</p>}
+					<div className={dialogActionsStyles}>
+						<Button type="button" variant="secondary" onClick={closeForms}>
 							Cancel
-						</button>
-						<button
-							type="submit"
-							className="button primary"
-							disabled={!stagedAmount}
-						>
+						</Button>
+						<Button type="submit" variant="primary" disabled={!stagedAmount}>
 							Save recipe
-						</button>
+						</Button>
 					</div>
 				</form>
 			)}
 			{editing && selectedPreset && (
-				<form className="amount-builder" onSubmit={submitEdit}>
+				<form
+					className="mt-3 mb-5 rounded-lg border border-solid border-line bg-transparent p-4"
+					onSubmit={submitEdit}
+				>
 					<h4>Rename recipe</h4>
-					<div className="form-grid">
+					<div className="grid grid-cols-2 gap-5 max-[600px]:gap-x-3 max-[600px]:gap-y-4 max-[370px]:grid-cols-1">
 						<InputField
 							label="Label"
 							name="label"
@@ -360,10 +364,13 @@ export function AmountCatalog({
 							defaultValue={selectedPreset.whenUse ?? ""}
 						/>
 					</div>
-					<label className="checkbox-field">
-						<input
+					<label
+						htmlFor={`${id}-edit-enabled`}
+						className="flex min-h-11 items-center gap-3 text-sm text-muted"
+					>
+						<Checkbox
+							id={`${id}-edit-enabled`}
 							name="enabled"
-							type="checkbox"
 							defaultChecked={selectedPreset.enabled}
 						/>
 						Enabled
@@ -382,17 +389,13 @@ export function AmountCatalog({
 							onChange={setStagedAmount}
 						/>
 					</details>
-					<div className="modal-actions">
-						<button
-							type="button"
-							className="button secondary"
-							onClick={closeForms}
-						>
+					<div className={dialogActionsStyles}>
+						<Button type="button" variant="secondary" onClick={closeForms}>
 							Cancel
-						</button>
-						<button type="submit" className="button primary">
+						</Button>
+						<Button type="submit" variant="primary">
 							Save changes
-						</button>
+						</Button>
 					</div>
 				</form>
 			)}

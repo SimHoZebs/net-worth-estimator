@@ -1,5 +1,7 @@
-import type { ReactNode } from "react";
+import type { ComponentProps } from "react";
 import { DataTable } from "../DataTable.tsx";
+import { mergeStyles } from "../mergeStyles.ts";
+import { transactionCellStyles } from "./activityStyles.ts";
 
 /**
  * The single account-activity table: date, transaction, amount. Headers are
@@ -11,22 +13,29 @@ export function TransactionTable({
 	showHeaders = false,
 	scrollId,
 	children,
-}: {
-	caption: string;
-	showHeaders?: boolean;
-	scrollId?: string;
-	children: ReactNode;
-}) {
+	className,
+	...props
+}: Omit<ComponentProps<typeof DataTable>, "columns">) {
 	return (
 		<DataTable
-			className="account-activity-table"
+			{...props}
+			className={mergeStyles("border-t border-line", className)}
 			caption={caption}
 			showHeaders={showHeaders}
 			scrollId={scrollId}
 			columns={[
-				{ label: "Date", className: "transaction-date-column" },
-				{ label: "Transaction" },
-				{ label: "Amount", className: "transaction-amount-column" },
+				{
+					label: "Date",
+					className: `${transactionCellStyles({ column: "date" })} pl-3`,
+				},
+				{
+					label: "Transaction",
+					className: transactionCellStyles({ column: "name" }),
+				},
+				{
+					label: "Amount",
+					className: transactionCellStyles({ column: "amount" }),
+				},
 			]}
 		>
 			{children}

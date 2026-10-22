@@ -1,7 +1,5 @@
-/* Design tokens: typefaces, palette, and shared dimensions. Every other
-   stylesheet reads these via var(); no selectors live here.
-   Dark overrides live in themes.css (unlayered) so they win over layered
-   values and accessibility remediation. */
+/* Semantic roles reference Tailwind's stock palette and spacing scale.
+   Theme overrides live in themes.css. Runtime charts share these variables. */
 @layer base {
 	:root {
 		color-scheme: light;
@@ -9,52 +7,105 @@
 		background: var(--paper);
 		font-synthesis: none;
 		--font-ui: "Manrope Variable", sans-serif;
-		--font-display: "Newsreader Variable", Georgia, serif;
+		--font-display: var(--font-ui);
 		--font-code: ui-monospace, monospace;
-		--forest: #254d3d;
-		--forest-hover: #193d2d;
-		--on-forest: #fafcf5;
-		--ink: #283b33;
-		--muted: #737970;
-		--subtle: #8d9388;
-		--line: #e4e7de;
-		--line-strong: #d4d9c9;
-		--paper: #f7f8f3;
-		--surface: #fffefa;
-		--surface-2: #f6f7f0;
-		--surface-3: #eef1e6;
-		--sidebar-bg: #fcfcf8;
-		--topbar-bg: #fbfcf7;
-		--input-bg: #fdfef8;
-		--hover: #f0f2e9;
-		--active: #e9efdf;
-		--nav-idle: #71786c;
-		--field-border: #dce2d2;
-		--field-text: #374a31;
-		--accent-green-bg: #eaf0df;
-		--accent-green-text: #52713b;
-		--accent-green-border: #dce5cb;
-		--accent-amber-bg: #f5ead2;
-		--accent-amber-text: #87642b;
-		--accent-amber-border: #e1d7b8;
-		--danger-bg: #fbefe7;
-		--danger-text: #9b493a;
-		--danger-border: #edd4c8;
-		--danger-solid: #a34536;
-		--chart-grid: #e5e8e0;
-		--chart-line: #315f47;
-		--chart-band: #dde6c7;
-		--chart-axis: #8a907e;
-		--chart-median: #8c997c;
-		--track: #e9eddf;
-		--track-fill: #7f965c;
-		--seg-sage: #7a8f5e;
-		--seg-pale: #c9d3b8;
-		--seg-tan: #bda074;
-		--seg-blue: #9fbdd4;
-		--seg-plum: #bcabd2;
-		--backdrop-film: #172d2b66;
-		--backdrop-blur: 3px;
-		--sidebar: 224px;
+		--primary: var(--color-emerald-700);
+		--primary-hover: var(--color-emerald-800);
+		--on-primary: var(--color-white);
+		--ink: var(--color-stone-800);
+		--muted: var(--color-stone-600);
+		--subtle: var(--color-stone-500);
+		--line: var(--color-stone-200);
+		--line-strong: var(--color-stone-300);
+		--paper: var(--color-stone-50);
+		--surface: var(--color-white);
+		--surface-2: var(--color-stone-50);
+		--surface-3: var(--color-stone-100);
+		--input-bg: var(--color-white);
+		--hover: var(--color-stone-100);
+		--active: var(--color-emerald-50);
+		--success-bg: var(--color-emerald-50);
+		--success-text: var(--color-emerald-800);
+		--success-border: var(--color-emerald-200);
+		--warning-bg: var(--color-amber-50);
+		--warning-text: var(--color-amber-800);
+		--warning-border: var(--color-amber-200);
+		--danger-bg: var(--color-red-50);
+		--danger-text: var(--color-red-800);
+		--danger-border: var(--color-red-200);
+		--danger-solid: var(--color-red-700);
+		--on-danger: var(--color-white);
+		--chart-band: var(--color-emerald-200);
+		--chart-median: var(--color-stone-500);
+		--chart-series-1: var(--color-emerald-600);
+		--chart-series-2: var(--color-amber-600);
+		--chart-series-3: var(--color-sky-600);
+		--chart-series-4: var(--color-violet-500);
+		--backdrop-film: color-mix(
+			in oklab,
+			var(--color-stone-950) 40%,
+			transparent
+		);
+		--backdrop-blur: var(--blur-xs);
+		--sidebar: --spacing(56);
+	}
+	@media (max-width: 1250px) {
+		:root {
+			--sidebar: --spacing(50);
+		}
+	}
+	@media (max-width: 1050px) {
+		:root {
+			--sidebar: --spacing(46);
+		}
+	}
+	@media (max-width: 800px) {
+		:root {
+			--sidebar: --spacing(0);
+		}
 	}
 }
+
+/* Expose semantic utilities without a second palette owner. */
+@theme inline {
+	--font-sans: var(--font-ui);
+	--font-mono: var(--font-code);
+	--radius-control: var(--radius-md);
+	--radius-surface: var(--radius-xl);
+	--shadow-overlay: var(--shadow-2xl);
+	--color-primary: var(--primary);
+	--color-primary-hover: var(--primary-hover);
+	--color-on-primary: var(--on-primary);
+	--color-ink: var(--ink);
+	--color-muted: var(--muted);
+	--color-subtle: var(--subtle);
+	--color-line: var(--line);
+	--color-line-strong: var(--line-strong);
+	--color-paper: var(--paper);
+	--color-surface: var(--surface);
+	--color-surface-2: var(--surface-2);
+	--color-surface-3: var(--surface-3);
+	--color-input-bg: var(--input-bg);
+	--color-hover: var(--hover);
+	--color-active: var(--active);
+	--color-success-bg: var(--success-bg);
+	--color-success-text: var(--success-text);
+	--color-success-border: var(--success-border);
+	--color-warning-bg: var(--warning-bg);
+	--color-warning-text: var(--warning-text);
+	--color-warning-border: var(--warning-border);
+	--color-danger-bg: var(--danger-bg);
+	--color-danger-text: var(--danger-text);
+	--color-danger-border: var(--danger-border);
+	--color-danger-solid: var(--danger-solid);
+	--color-on-danger: var(--on-danger);
+	--color-chart-band: var(--chart-band);
+	--color-chart-median: var(--chart-median);
+	--color-chart-series-1: var(--chart-series-1);
+	--color-chart-series-2: var(--chart-series-2);
+	--color-chart-series-3: var(--chart-series-3);
+	--color-chart-series-4: var(--chart-series-4);
+	--color-backdrop-film: var(--backdrop-film);
+}
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));

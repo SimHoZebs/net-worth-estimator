@@ -10,7 +10,6 @@ import {
 import { fundingLabels } from "../../domain/fundingTerminology.ts";
 import { BalancePathChart } from "./BalancePathChart.tsx";
 import { FundingMovementIcon } from "./FundingMovementIcon.tsx";
-import "./funding-gaps.css";
 
 export function FundingGapsModal({
 	gaps,
@@ -36,12 +35,13 @@ export function FundingGapsModal({
 			onClose={onClose}
 		>
 			<div
-				className="segmented funding-date-tabs"
+				className="mt-1 mb-4 inline-flex gap-0.5 rounded-control border border-line bg-surface-2 p-1"
 				role="group"
 				aria-label="Choose projected funding gap"
 			>
 				{sorted.map((item) => (
 					<button
+						className="rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs"
 						key={item.id}
 						type="button"
 						aria-pressed={item.id === gap.id}
@@ -51,15 +51,15 @@ export function FundingGapsModal({
 					</button>
 				))}
 			</div>
-			<div className="section-top">
+			<div className="flex items-center justify-between gap-4">
 				<div>
-					<h2 className="funding-gap-heading">{gap.name}</h2>
-					<p className="section-note funding-gap-summary">
+					<h2 className="text-xl">{gap.name}</h2>
+					<p className="mt-1 py-1 text-xs leading-relaxed text-muted">
 						{gap.fundingAccount.name} · Not executed — the payment has not
 						posted. The red vector shows what would happen if forced.
 					</p>
 				</div>
-				<Badge tone="amber">Unfunded</Badge>
+				<Badge tone="warning">Unfunded</Badge>
 			</div>
 			<SegmentedBar
 				caption={`Available ${money(summary.available)} of ${money(gap.requiredAmount)} required`}
@@ -79,74 +79,95 @@ export function FundingGapsModal({
 					},
 				]}
 			/>
-			<p className="section-note">
-				<AlertCircle size={13} aria-hidden="true" className="inline-icon" />{" "}
+			<p className="py-2 text-sm leading-relaxed text-muted">
+				<AlertCircle
+					size={13}
+					aria-hidden="true"
+					className="inline align-middle"
+				/>{" "}
 				{money(summary.shortfall)} short · Available {money(summary.available)}{" "}
 				· Required {money(gap.requiredAmount)}
 			</p>
 			<BalancePathChart gap={gap} />
-			<div className="funding-metrics">
-				<div>
-					<span>Opening</span>
-					<strong>{money(gap.openingBalance)}</strong>
+			<div className="my-3.5 grid grid-cols-3 gap-2.5">
+				<div className="rounded-control bg-surface-2 px-3 py-2.5">
+					<span className="text-xs text-muted">Opening</span>
+					<strong className="mt-1 block text-sm tabular-nums">
+						{money(gap.openingBalance)}
+					</strong>
 				</div>
-				<div>
-					<span>Money in</span>
-					<strong>+{money(summary.moneyIn)}</strong>
+				<div className="rounded-control bg-surface-2 px-3 py-2.5">
+					<span className="text-xs text-muted">Money in</span>
+					<strong className="mt-1 block text-sm tabular-nums">
+						+{money(summary.moneyIn)}
+					</strong>
 				</div>
-				<div>
-					<span>Money out</span>
-					<strong>−{money(summary.moneyOut)}</strong>
+				<div className="rounded-control bg-surface-2 px-3 py-2.5">
+					<span className="text-xs text-muted">Money out</span>
+					<strong className="mt-1 block text-sm tabular-nums">
+						−{money(summary.moneyOut)}
+					</strong>
 				</div>
 			</div>
-			<h3 className="funding-ledger-heading">Before the payment</h3>
-			<p className="section-note section-note-flush">
+			<h3 className="mt-3.5 mb-1 text-sm">Before the payment</h3>
+			<p className="text-sm leading-relaxed text-muted">
 				Opening balance {money(gap.openingBalance)} on{" "}
 				{dateLabel(gap.windowStartDate, true)} · {summary.rows.length} movements
 				in execution order · Later deposits excluded
 			</p>
-			<ul className="funding-ledger">
+			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled grid lists. */}
+			<ul className="mt-3 mb-0 grid list-none p-0" role="list">
 				{summary.rows.map((row) => (
-					<li key={row.id}>
+					<li
+						key={row.id}
+						className="flex items-center gap-3 border-t border-line py-2.5 text-xs"
+					>
 						<FundingMovementIcon kind={row.kind} />
-						<div>
+						<div className="min-w-0 flex-1">
 							<div>{row.name}</div>
-							<small>
+							<small className="text-xs text-muted">
 								{dateLabel(row.date, true)}
 								{row.counterpartAccountName
 									? ` · ${row.counterpartAccountName}`
 									: ""}
 							</small>
 						</div>
-						<div className="numeric">
+						<div className="min-w-0 flex-1 text-right tabular-nums">
 							<div>
 								{row.amount >= 0 ? "+" : "−"}
 								{money(Math.abs(row.amount))}
 							</div>
-							<small>→ {money(row.balanceAfter)}</small>
+							<small className="text-xs text-muted">
+								→ {money(row.balanceAfter)}
+							</small>
 						</div>
 					</li>
 				))}
 			</ul>
-			<div className="funding-failed-row">
-				<span className="funding-failed-summary">
+			{/* oxlint-enable jsx-a11y/no-redundant-roles */}
+			<div className="mt-3 flex items-center justify-between gap-3 rounded-surface border border-danger-border bg-danger-bg p-3">
+				<span className="flex items-center gap-2.5">
 					<TriangleAlert size={18} aria-hidden="true" />
 					<span>
-						<strong className="funding-failed-name">{gap.name}</strong>
+						<strong className="text-xs">{gap.name}</strong>
 						<br />
-						<small className="muted">
+						<small className="text-muted">
 							{dateLabel(gap.date, true)} · Not executed
 						</small>
 					</span>
 				</span>
-				<span className="numeric funding-failed-amount">
+				<span className="text-right tabular-nums">
 					<strong>−{money(gap.requiredAmount)}</strong>
 					<br />
 					<small>{money(summary.shortfall)} gap</small>
 				</span>
 			</div>
-			<p className="section-note funding-window-note">
-				<CalendarDays size={13} aria-hidden="true" className="inline-icon" />{" "}
+			<p className="pt-3 text-sm leading-relaxed text-muted">
+				<CalendarDays
+					size={13}
+					aria-hidden="true"
+					className="inline align-middle"
+				/>{" "}
 				Projected schedule · Local {gap.fundingAccount.name} cash flow only —
 				transfers are not household income or expenses.
 			</p>

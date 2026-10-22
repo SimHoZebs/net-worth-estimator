@@ -1,11 +1,11 @@
 import { Flag, Plus } from "lucide-react";
 import { useEffect, useMemo } from "react";
+import { Button } from "../components/Button.tsx";
 import {
 	EmptyState,
 	ErrorNotice,
 	ProjectionUpdating,
 } from "../components/ui.tsx";
-import "./evaluations/evaluations.css";
 import type { Evaluation, Plan } from "../domain/model.ts";
 import { removeEvaluation } from "../domain/planEdits.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
@@ -125,15 +125,11 @@ function EvaluationsContent({
 	);
 	return (
 		<>
-			<div className="section-top page-section-top">
-				<button
-					type="button"
-					className="button primary"
-					onClick={() => onEdit(null)}
-				>
+			<div className="mb-6 flex items-center justify-between gap-4 [@media(max-width:600px)]:flex-wrap">
+				<Button type="button" variant="primary" onClick={() => onEdit(null)}>
 					<Plus size={16} />
 					Add evaluation
-				</button>
+				</Button>
 			</div>
 			{pinnedError && (
 				<ErrorNotice
@@ -150,7 +146,10 @@ function EvaluationsContent({
 					Loading evaluation outcomes.
 				</p>
 			)}
-			<div className="evaluations-grid" aria-busy={pending}>
+			<div
+				className="grid grid-cols-2 gap-6 [@media(max-width:1050px)]:gap-4 [@media(max-width:600px)]:grid-cols-1"
+				aria-busy={pending}
+			>
 				{evaluations.map((evaluation) => (
 					<EvaluationCard
 						key={evaluation.id}

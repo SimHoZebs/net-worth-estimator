@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
+import { mergeStyles } from "../mergeStyles.ts";
+import { TableCell, TableHeader, TableRow } from "../DataTable.tsx";
+import {
+	movementIconStyles,
+	transactionCellStyles,
+	transactionRowStyles,
+	type TransactionTone,
+} from "./activityStyles.ts";
 
-export type TransactionTone = "transfer" | "inflow" | "outflow";
+export type { TransactionTone } from "./activityStyles.ts";
 
 export type TransactionItemSlots = {
 	subtitle?: ReactNode;
@@ -37,28 +45,50 @@ export function TransactionItemRow({
 	slots?: TransactionItemSlots;
 }) {
 	return (
-		<tr className={`transaction-row${dimmed ? " is-excluded" : ""}`}>
-			<td className="transaction-date-column">{date}</td>
-			<th scope="row">
+		<TableRow className={transactionRowStyles({ dimmed })}>
+			<TableCell className={transactionCellStyles({ column: "date" })}>
+				{date}
+			</TableCell>
+			<TableHeader
+				scope="row"
+				className={transactionCellStyles({ column: "name" })}
+			>
 				<button
 					type="button"
-					className="transaction-row-button"
+					className="flex w-full items-center gap-3 rounded-control border-0 bg-transparent px-2 py-0.5 text-left [@media(max-width:600px)]:gap-2"
 					aria-label={actionLabel}
 					onClick={onSelect}
 					disabled={selectDisabled}
 				>
-					<span className={`movement-icon ${tone}`}>{icon}</span>
-					<span className="transaction-name">
-						<strong>{title}</strong>
-						{slots?.subtitle}
-						{slots?.mobile}
-						{slots?.badges}
+					<span
+						className={mergeStyles(
+							movementIconStyles({ tone }),
+							"[@media(max-width:600px)]:hidden",
+						)}
+					>
+						{icon}
+					</span>
+					<span className="flex min-w-0 flex-col gap-1">
+						<strong className="text-xs font-semibold [overflow-wrap:anywhere]">
+							{title}
+						</strong>
+						{slots?.subtitle && (
+							<span className="text-xs text-muted">{slots.subtitle}</span>
+						)}
+						{slots?.mobile && (
+							<span className="hidden text-xs text-muted [@media(max-width:600px)]:block">
+								{slots.mobile}
+							</span>
+						)}
+						{slots?.badges && (
+							<span className="flex flex-wrap gap-1">{slots.badges}</span>
+						)}
 					</span>
 				</button>
-			</th>
-			<td className="transaction-amount-column">
-				<span className="transaction-amount">{amount}</span>
-			</td>
-		</tr>
+			</TableHeader>
+			<TableCell className={transactionCellStyles({ column: "amount" })}>
+				<span className="flex flex-col items-end gap-0.5">{amount}</span>
+			</TableCell>
+		</TableRow>
 	);
 }

@@ -1,7 +1,6 @@
 import { useBeforeUnload } from "./state/useBeforeUnload.ts";
 import { DraftBar } from "./workspace/DraftBar.tsx";
 import type { SafeSpendingDetailTab } from "./pages/outlook/safe-spending/safeSpendingDetailModel.ts";
-import "./workspace/workspace.css";
 import { useWorkspaceStore } from "./state/workspaceStore.ts";
 import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation.ts";
 import { useWorkspaceOverlays } from "./workspace/useWorkspaceOverlays.ts";

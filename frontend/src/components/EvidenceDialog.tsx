@@ -6,7 +6,6 @@ import { EvaluationEvidence } from "./evidence/EvaluationEvidence.tsx";
 import { FailureEvidence } from "./evidence/FailureEvidence.tsx";
 import { PositionEvidence } from "./evidence/PositionEvidence.tsx";
 import { SafeSpendingEvidence } from "./evidence/SafeSpendingEvidence.tsx";
-import "./evidence/evidence.css";
 
 export type EvidenceTarget =
 	| { kind: "position" }

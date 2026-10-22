@@ -10,7 +10,6 @@ import { RecurringRules } from "./activity/RecurringRules.tsx";
 import { Transactions } from "./activity/Transactions.tsx";
 import { Drawer } from "./Drawer.tsx";
 import { Tabs } from "./Tabs.tsx";
-import "./activity/account-activity.css";
 
 export function AccountDialog({
 	account,
@@ -61,11 +60,15 @@ export function AccountDialog({
 				coverage: "full",
 			}}
 		>
-			<div className="account-dialog-summary">
-				<AccountIcon account={account} />
-				<div>
-					<span>Starting balance</span>
-					<strong className="type-value">
+			<div className="flex items-center gap-4 pb-2 [@media(max-width:600px)]:flex-wrap [@media(max-width:600px)]:gap-3">
+				<AccountIcon
+					account={account}
+					size="lg"
+					className="[@media(max-width:600px)]:size-10"
+				/>
+				<div className="flex flex-col gap-1">
+					<span className="text-xs text-muted">Starting balance</span>
+					<strong className="type-value text-3xl leading-[1.3] font-medium tracking-[-1px]">
 						{money(
 							!account.enabled
 								? 0
@@ -73,8 +76,10 @@ export function AccountDialog({
 						)}
 					</strong>
 				</div>
-				<div className="account-dialog-basis">
-					<span>As of {dateLabel(account.observedOn, true)}</span>
+				<div className="ml-auto flex flex-col items-end gap-2 [@media(max-width:600px)]:w-full [@media(max-width:600px)]:flex-row [@media(max-width:600px)]:items-center [@media(max-width:600px)]:gap-2 [@media(max-width:600px)]:pt-1">
+					<span className="text-xs text-muted">
+						As of {dateLabel(account.observedOn, true)}
+					</span>
 				</div>
 			</div>
 			<Tabs
@@ -90,8 +95,8 @@ export function AccountDialog({
 				value={view}
 				onChange={setView}
 				label="Account view"
-				className="account-view-tabs"
-				panelClassName="account-activity-panel"
+				className="my-4"
+				panelClassName="flex flex-col gap-4"
 			>
 				{view === "transactions" ? (
 					<Transactions

@@ -20,20 +20,23 @@ export function PurchaseTimeline({
 	const startTime = Date.parse(start);
 	const duration = Math.max(1, Date.parse(end) - startTime);
 	return (
-		<figure className="purchase-timeline">
+		<figure className="mx-0 mt-8 mb-0 rounded-surface border border-line bg-surface-2 p-6 @max-[36rem]/wish-list:p-4">
 			<figcaption>
-				<h3>When each purchase fits</h3>
-				<p>
+				<h3 className="m-0 text-base">When each purchase fits</h3>
+				<p className="max-w-[52ch] text-sm leading-relaxed text-muted">
 					Base-case dates. Established one-time and recurring payments come
 					first, through {dateLabel(end, true)}.
 				</p>
 			</figcaption>
-			<div className="purchase-axis" aria-hidden="true">
+			<div
+				className="mt-6 mb-2 flex justify-between gap-4 text-xs text-muted"
+				aria-hidden="true"
+			>
 				<span>{dateLabel(start, true)}</span>
 				<span>{dateLabel(end, true)}</span>
 			</div>
 			{/* oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Safari removes list semantics for list-style:none. */}
-			<ol className="purchase-paths" role="list">
+			<ol aria-label="Purchase dates" className="m-0 list-none p-0" role="list">
 				{queue.map((item, index) => {
 					const event = events.get(item.id);
 					const date = item.enabled ? event?.date : undefined;
@@ -56,25 +59,27 @@ export function PurchaseTimeline({
 					return (
 						<li
 							key={item.id}
-							className="purchase-path"
+							className="group/path border-t border-line py-4"
 							data-funded={Boolean(date)}
 							data-excluded={!item.enabled}
 						>
-							<div className="purchase-path-label">
+							<div className="flex justify-between gap-4 text-sm [overflow-wrap:anywhere]">
 								<span>
 									{index + 1}. {item.name}
 								</span>
-								<strong>{money(item.amount)}</strong>
+								<strong className="whitespace-nowrap tabular-nums">
+									{money(item.amount)}
+								</strong>
 							</div>
 							<div
-								className="purchase-track"
+								className="relative mx-2 h-6 before:absolute before:inset-x-0 before:top-1/2 before:border-t before:border-dashed before:border-line-strong before:content-['']"
 								aria-hidden="true"
 								style={cssVariables({ "--purchase-position": `${position}%` })}
 							>
-								<span className="purchase-wait" />
-								<span className="purchase-marker" />
+								<span className="absolute start-0 top-1/2 w-(--purchase-position) border-t-2 border-primary group-data-[funded=false]/path:border-t group-data-[funded=false]/path:border-dashed group-data-[funded=false]/path:border-muted" />
+								<span className="absolute start-(--purchase-position) top-1/2 size-3 -translate-1/2 rounded-full border-2 border-primary bg-surface group-data-[funded=false]/path:rounded-none group-data-[funded=false]/path:border-muted" />
 							</div>
-							<span className="purchase-date">
+							<span className="block text-xs text-muted group-data-[funded=true]/path:font-semibold group-data-[funded=true]/path:text-primary">
 								{date ? <time dateTime={date}>{status}</time> : status}
 							</span>
 						</li>

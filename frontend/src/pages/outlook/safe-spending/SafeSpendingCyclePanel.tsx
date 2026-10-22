@@ -34,7 +34,7 @@ export function SafeSpendingCyclePanel({
 	const inspect = (transaction: AccountTransaction, movement: Movement) =>
 		setSelected({ transaction, movement });
 	return (
-		<div className="safe-spending-mandatory">
+		<div className="grid content-start gap-4">
 			<SafeSpendingSectionHeader
 				title={cycle.title}
 				total={
@@ -46,8 +46,10 @@ export function SafeSpendingCyclePanel({
 						: undefined
 				}
 			/>
-			{cycle.note && <p className="section-note">{cycle.note}</p>}
-			<div className="table-toolbar">
+			{cycle.note && (
+				<p className="text-sm leading-relaxed text-muted">{cycle.note}</p>
+			)}
+			<div className="flex justify-end">
 				<TransactionSortButton
 					order={transactionOrder}
 					onChange={onTransactionOrderChange}

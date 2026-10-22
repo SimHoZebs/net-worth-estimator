@@ -1,11 +1,13 @@
 import { Check, Flag, Pin } from "lucide-react";
 import type { ComponentType } from "react";
+import { IconButton } from "../../components/Button.tsx";
 import type { OtherEvaluationCardProps } from "../../components/evaluationCard.ts";
 import { FundingGapsCard } from "../../components/funding/FundingGapsCard.tsx";
-import { Badge, IconButton, Progress } from "../../components/ui.tsx";
+import { mergeStyles } from "../../components/mergeStyles.ts";
+import { Badge, Progress } from "../../components/ui.tsx";
 import { dateLabel } from "../../domain/format.ts";
 import type { OtherEvaluationType } from "../../domain/result.ts";
-import "./evaluations.css";
+import { evaluationCard } from "./evaluationStyles.ts";
 
 const cardViews: Partial<
 	Record<OtherEvaluationType, ComponentType<OtherEvaluationCardProps>>
@@ -27,20 +29,28 @@ function EvaluationSummaryCard({ item, pin = null }: OtherEvaluationCardProps) {
 		!item.enabled || item.status === "indeterminate"
 			? "neutral"
 			: item.status === "satisfied"
-				? "green"
+				? "success"
 				: item.status === "warning"
-					? "amber"
+					? "warning"
 					: "neutral";
 	return (
-		<section className={`evaluation-card ${item.enabled ? "" : "is-excluded"}`}>
-			<div className="section-top">
-				<span className="evaluation-icon">
+		<section
+			className={mergeStyles(
+				evaluationCard({ enabled: item.enabled }),
+				"p-7 [@media(max-width:1050px)]:p-6",
+			)}
+		>
+			<div className="flex items-center justify-between gap-4">
+				<span className="grid size-11 place-items-center rounded-full bg-success-bg text-success-text">
 					{satisfied ? <Check size={23} /> : <Flag size={23} />}
 				</span>
 				{onPinChange && (
-					<div className="table-actions">
+					<div className="flex justify-end gap-1">
 						<IconButton
 							icon={Pin}
+							size="sm"
+							iconSize={16}
+							className="aria-pressed:border-success-border aria-pressed:bg-success-bg aria-pressed:text-success-text"
 							label={
 								pinned
 									? `Unpin ${item.name} from Outlook`
@@ -53,9 +63,11 @@ function EvaluationSummaryCard({ item, pin = null }: OtherEvaluationCardProps) {
 					</div>
 				)}
 			</div>
-			<h2>{item.name}</h2>
-			{item.goal && item.goal !== item.name && <p>{item.goal}</p>}
-			<div className="evaluation-card-outcome type-value">
+			<h2 className="mt-5 text-xl font-semibold">{item.name}</h2>
+			{item.goal && item.goal !== item.name && (
+				<p className="my-2 text-xs">{item.goal}</p>
+			)}
+			<div className="type-value mt-6 mr-0 mb-1 ml-0 text-4xl font-medium leading-[1.2] tracking-[-1px]">
 				{!item.enabled
 					? "Paused"
 					: item.outcomeDate
@@ -63,7 +75,9 @@ function EvaluationSummaryCard({ item, pin = null }: OtherEvaluationCardProps) {
 						: item.outcomeText}
 			</div>
 			{item.enabled && item.qualifier && (
-				<p className="section-note">{item.qualifier}</p>
+				<p className="my-2 px-6 py-5 text-xs leading-relaxed text-muted">
+					{item.qualifier}
+				</p>
 			)}
 			<Badge tone={tone}>
 				{!item.enabled
@@ -77,8 +91,8 @@ function EvaluationSummaryCard({ item, pin = null }: OtherEvaluationCardProps) {
 								: "Indeterminate"}
 			</Badge>
 			{item.enabled && item.progress && (
-				<div className="evaluation-card-progress">
-					<div className="progress-label">
+				<div className="mt-6 mr-0 mb-4 ml-0">
+					<div className="mb-2 flex items-center justify-between gap-3 text-xs text-muted">
 						<span>{item.progress.current}</span>
 						{item.progress.share && <span>{item.progress.share}</span>}
 					</div>

@@ -1,7 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import type { Account } from "../domain/model.ts";
 import { AccountIcon } from "./AccountIcon.tsx";
-import "./AccountIcon.css";
 
 export type AccountEntryAccount = Pick<Account, "id" | "kind" | "color">;
 
@@ -25,23 +24,25 @@ export function AccountEntry({
 }) {
 	const ExternalIcon = external === "in" ? ArrowDownLeft : ArrowUpRight;
 	return (
-		<li className="account-entry">
+		<li className="flex min-w-0 items-center gap-3">
 			{account ? (
-				<AccountIcon account={account} />
+				<AccountIcon account={account} size="sm" />
 			) : (
 				<span
-					className={`account-entry-external account-entry-${external}`}
+					className={`grid size-8 shrink-0 place-items-center rounded-full ${external === "in" ? "bg-success-bg text-success-text" : external === "out" ? "bg-warning-bg text-warning-text" : ""}`}
 					aria-hidden="true"
 				>
 					<ExternalIcon size={15} strokeWidth={2} />
 				</span>
 			)}
-			<span className="account-entry-name">
-				<strong>{name}</strong>
-				<small>{caption}</small>
+			<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+				<strong className="truncate text-xs font-semibold">{name}</strong>
+				<small className="text-xs text-muted">{caption}</small>
 			</span>
 			{value !== undefined && (
-				<strong className="account-entry-value">{value}</strong>
+				<strong className="whitespace-nowrap text-sm font-semibold tracking-[-0.3px] tabular-nums">
+					{value}
+				</strong>
 			)}
 		</li>
 	);
