@@ -41,6 +41,7 @@ export function Modal({
 	eyebrow,
 	children,
 	onClose,
+	onCloseRequest,
 	wide = false,
 	className = "",
 	headerClassName,
@@ -53,6 +54,8 @@ export function Modal({
 	eyebrow?: string;
 	children: ReactNode;
 	onClose: () => void;
+	/** Return false to keep the dialog visible, such as for unsaved-form confirmation. */
+	onCloseRequest?: () => boolean;
 	wide?: boolean;
 	className?: string;
 	headerClassName?: string;
@@ -88,6 +91,7 @@ export function Modal({
 	}, []);
 	const requestClose = () => {
 		if (closeRequested.current) return;
+		if (onCloseRequest?.() === false) return;
 		closeRequested.current = true;
 		setClosing(true);
 	};

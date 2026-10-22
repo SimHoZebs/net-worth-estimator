@@ -15,6 +15,66 @@ vi.mock("../../components/ui.tsx", async (importOriginal) => ({
 afterEach(cleanup);
 
 describe("WishListEditor", () => {
+	it("shows the actual workspace rejection instead of a silent apply", () => {
+		const view = render(
+			<WishListEditor
+				plan={testPlan}
+				item={null}
+				onApply={() => false}
+				onClose={() => {}}
+				readOnly={false}
+				applyError="The authoritative plan changed. Reload before editing."
+			/>,
+		);
+		fireEvent.change(view.getByLabelText("Purchase name"), {
+			target: { value: "Desk" },
+		});
+		fireEvent.change(view.getByLabelText("Cost (USD)"), {
+			target: { value: "400" },
+		});
+		fireEvent.submit(
+			view
+				.getByRole("button", { name: "Apply unsaved changes" })
+				.closest("form")!,
+		);
+		expect(view.getByRole("alert").textContent).toContain(
+			"The authoritative plan changed. Reload before editing.",
+		);
+	});
+
+	it("reports a refused apply inside the form and preserves its values", () => {
+		const onApply = vi.fn(() => false);
+		const onClose = vi.fn();
+		const view = render(
+			<WishListEditor
+				plan={testPlan}
+				item={null}
+				onApply={onApply}
+				onClose={onClose}
+				readOnly={false}
+			/>,
+		);
+		fireEvent.change(view.getByLabelText("Purchase name"), {
+			target: { value: "Desk" },
+		});
+		fireEvent.change(view.getByLabelText("Cost (USD)"), {
+			target: { value: "400" },
+		});
+		fireEvent.submit(
+			view
+				.getByRole("button", { name: "Apply unsaved changes" })
+				.closest("form")!,
+		);
+		expect(view.getByRole("alert").textContent).toContain(
+			"could not be applied",
+		);
+		expect(
+			(view.getByLabelText("Purchase name") as HTMLInputElement).value,
+		).toBe("Desk");
+		expect(onApply).toHaveBeenCalledOnce();
+		expect(onClose).not.toHaveBeenCalled();
+	});
+
 	it("preserves labeled native fields and checkbox form values", () => {
 		const onApply = vi.fn<(plan: Plan) => boolean>(() => true);
 		const onClose = vi.fn();

@@ -31,6 +31,7 @@ export function WishListPanel({
 	schedule: PurchaseSchedule | null;
 }) {
 	const onUpdate = useWorkspaceStore((state) => state.updatePlan);
+	const applyError = useWorkspaceStore((state) => state.error);
 	const readOnly = useWorkspaceStore((state) =>
 		Boolean(
 			state.status?.readOnly ||
@@ -184,6 +185,7 @@ export function WishListPanel({
 					item={editor.item}
 					readOnly={locked || Boolean(editor.item?.readOnly)}
 					onApply={onUpdate}
+					applyError={applyError}
 					onClose={() => setEditor(null)}
 				/>
 			)}

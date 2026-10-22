@@ -11,11 +11,13 @@ export interface EditorProps {
 	plan: Plan;
 	onApply: (plan: Plan) => boolean;
 	onClose: () => void;
+	applyError?: string | null;
 }
 export function EditorForm({
 	title,
 	onApply,
 	onClose,
+	applyError,
 	readOnlyReason,
 	buildPlan,
 	children,
@@ -28,10 +30,24 @@ export function EditorForm({
 	const [error, setError] = useState<string | null>(null);
 	const [dirty, setDirty] = useState(false);
 	const [confirmCancel, setConfirmCancel] = useState(false);
+	const [applyFailed, setApplyFailed] = useState(false);
 	useBeforeUnload(dirty);
-	const close = () => (dirty ? setConfirmCancel(true) : onClose());
+	const requestClose = () => {
+		if (!dirty) return true;
+		setConfirmCancel(true);
+		return false;
+	};
+	const close = () => {
+		if (requestClose()) onClose();
+	};
+	const displayedError =
+		error ||
+		(applyFailed
+			? applyError ||
+				"Your change could not be applied. Review the form and try again."
+			: null);
 	return (
-		<Modal title={title} onClose={close}>
+		<Modal title={title} onClose={onClose} onCloseRequest={requestClose}>
 			{readOnlyReason && (
 				<Notice>
 					<LockKeyhole size={18} aria-hidden="true" className="mt-px" />
@@ -42,6 +58,8 @@ export function EditorForm({
 				onSubmit={(event) => {
 					event.preventDefault();
 					if (readOnlyReason) return;
+					setError(null);
+					setApplyFailed(false);
 					const validated = validatePlan(
 						buildPlan(new FormData(event.currentTarget)),
 					);
@@ -50,6 +68,7 @@ export function EditorForm({
 						return;
 					}
 					if (onApply(validated)) onClose();
+					else setApplyFailed(true);
 				}}
 				onChange={() => setDirty(true)}
 			>
@@ -59,7 +78,7 @@ export function EditorForm({
 				>
 					{children}
 				</fieldset>
-				{error && <ErrorNotice message={error} />}
+				{displayedError && <ErrorNotice message={displayedError} />}
 				{confirmCancel ? (
 					<div
 						className="mt-6 rounded-surface border border-solid border-danger-border bg-danger-bg p-4"

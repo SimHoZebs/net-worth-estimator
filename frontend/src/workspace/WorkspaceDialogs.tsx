@@ -60,6 +60,7 @@ export function WorkspaceDialogs({
 	const workspace = useWorkspaceStore((state) => state.workspace);
 	const plan = workspace?.draft ?? workspace?.saved ?? null;
 	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
+	const applyError = useWorkspaceStore((state) => state.error);
 	const changeCount =
 		workspace && plan
 			? changesBetween({ saved: workspace.saved, current: plan }).length
@@ -72,6 +73,7 @@ export function WorkspaceDialogs({
 					target={overlays.editor}
 					plan={plan}
 					onApply={updatePlan}
+					applyError={applyError}
 					onClose={overlays.closeEditor}
 				/>
 			)}
