@@ -55,14 +55,14 @@ export function EditorForm({
 			>
 				<fieldset
 					disabled={Boolean(readOnlyReason)}
-					className="grid grid-cols-2 gap-5 max-[600px]:gap-x-3 max-[600px]:gap-y-4 max-[370px]:grid-cols-1"
+					className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1"
 				>
 					{children}
 				</fieldset>
 				{error && <ErrorNotice message={error} />}
 				{confirmCancel ? (
 					<div
-						className="mt-6 rounded-lg border border-solid border-danger-border bg-danger-bg p-4"
+						className="mt-6 rounded-surface border border-solid border-danger-border bg-danger-bg p-4"
 						role="alert"
 					>
 						<p className="mb-3 text-sm text-danger-text">

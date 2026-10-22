@@ -38,7 +38,7 @@ function WorkspaceEvidenceLoaded({
 			: projection.base;
 	if (!overlays.evidence || !plan || !base) return null;
 	return (
-		<Suspense fallback={<Skeleton width="100%" height={120} />}>
+		<Suspense fallback={<Skeleton className="h-32 w-full" />}>
 			<EvidenceDialog
 				target={overlays.evidence}
 				plan={plan}

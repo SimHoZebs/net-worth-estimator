@@ -99,7 +99,7 @@ export function FundingGapsCard({
 									<span className="block text-3xl leading-tight font-medium tracking-tight text-danger-text tabular-nums">
 										{money(summary.shortfall)} short
 									</span>
-									<span className="mt-1.5 block text-xs leading-relaxed text-muted">
+									<span className="mt-2 block text-xs leading-relaxed text-muted">
 										Missing for{" "}
 										<strong className="text-ink">{first.name}</strong>
 									</span>
@@ -135,7 +135,7 @@ export function FundingGapsCard({
 						{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled grid lists. */}
 						{gaps.length > 1 && (
 							<ul
-								className="m-0 grid list-none gap-2.5 border-t border-warning-border px-0 pt-3 pb-0"
+								className="m-0 grid list-none gap-3 border-t border-warning-border px-0 pt-3 pb-0"
 								role="list"
 							>
 								{gaps.slice(1, 3).map((gap) => (
@@ -169,7 +169,7 @@ export function FundingGapsCard({
 						)}
 						<button
 							type="button"
-							className="mt-auto flex items-center justify-between rounded-control border border-warning-border bg-surface px-3 py-2.5 text-xs font-semibold text-warning-text"
+							className="mt-auto flex items-center justify-between rounded-control border border-warning-border bg-surface px-3 py-3 text-xs font-semibold text-warning-text"
 							aria-label={`Inspect cash flow for ${item.name}`}
 							onClick={() => setSelectedId(first.id)}
 						>

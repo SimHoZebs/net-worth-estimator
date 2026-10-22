@@ -138,7 +138,7 @@ function OutlookContent({
 				</p>
 			)}
 			<div
-				className="grid grid-cols-[minmax(0,1fr)_18.75rem] items-start gap-6 [@media(1050px<width<=1250px)]:grid-cols-[minmax(0,1fr)_16.25rem] [@media(max-width:1250px)]:gap-4 [@media(max-width:1050px)]:grid-cols-1 print:grid-cols-1!"
+				className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_var(--container-3xs)] xl:grid-cols-[minmax(0,1fr)_var(--container-2xs)] xl:gap-6 print:grid-cols-1!"
 				aria-busy={pending}
 			>
 				<ProjectionChart
@@ -153,7 +153,7 @@ function OutlookContent({
 					rangeError={projection.rangeError}
 					pending={pending}
 				/>
-				<div className="sticky top-5 flex min-w-0 flex-col gap-4 [@media(max-width:1050px)]:static">
+				<div className="sticky top-5 flex min-w-0 flex-col gap-4 max-lg:static">
 					<OutlookMetrics
 						plan={plan}
 						projection={base}
@@ -183,7 +183,7 @@ function OutlookContent({
 					void togglePin(id);
 				}}
 			/>
-			<div className="mt-6 [@media(max-width:600px)]:mt-5" aria-busy={pending}>
+			<div className="mt-6 max-sm:mt-5" aria-busy={pending}>
 				<SafeSpendingPreview
 					plan={plan}
 					checkpoints={checkpoints}

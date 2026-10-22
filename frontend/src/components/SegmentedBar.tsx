@@ -83,15 +83,15 @@ export function SegmentedBar({
 			</div>
 			{showDetails && (
 				<ul
-					className="m-0 flex list-none flex-wrap gap-x-3.5 gap-y-1.5 p-0 text-xs text-muted"
+					className="m-0 flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-xs text-muted"
 					role="list"
 					aria-label={`${caption} details`}
 				>
 					{segments.map((segment) => (
-						<li key={segment.label} className="flex items-center gap-1.5">
+						<li key={segment.label} className="flex items-center gap-2">
 							<span
 								className={mergeStyles(
-									"inline-block h-2.5 w-3.5 flex-none rounded-xs",
+									"inline-block h-2.5 w-3.5 flex-none rounded-control",
 									toneClasses[segment.tone],
 								)}
 								data-tone={segment.tone}

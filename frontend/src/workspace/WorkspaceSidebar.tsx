@@ -32,11 +32,11 @@ export function WorkspaceSidebar({
 				<IconButton
 					icon={PanelLeftClose}
 					label="Close navigation"
-					className="hidden [@media(max-width:800px)]:inline-grid"
+					className="hidden max-md:inline-grid"
 					onClick={onClose}
 				/>
 			</div>
-			<nav className="mt-10" aria-label="Main navigation">
+			<nav className="mt-12" aria-label="Main navigation">
 				<ul className="grid list-none gap-1 p-0">
 					{pages
 						.filter((item) => item.id !== "sources")
@@ -55,7 +55,7 @@ export function WorkspaceSidebar({
 						))}
 				</ul>
 			</nav>
-			<div className="mt-auto pt-12 [@media(max-width:800px)]:pt-9">
+			<div className="mt-auto pt-12 max-md:pt-8">
 				<a
 					className={navigationLinkClassName}
 					href="#sources"
@@ -69,7 +69,7 @@ export function WorkspaceSidebar({
 				<div className="mt-4 flex items-center gap-2 border-0 border-t border-solid border-line px-2 pt-5 pb-1 text-xs text-muted">
 					<span className="size-1.5 rounded-full bg-primary" />
 					{pending ? (
-						<Skeleton width={80} height={10} />
+						<Skeleton className="h-3 w-20" />
 					) : (
 						<>
 							{statusLabel} <LockKeyhole size={12} className="ml-auto" />
@@ -78,7 +78,7 @@ export function WorkspaceSidebar({
 				</div>
 				<div className="px-2 pb-5 text-xs leading-relaxed text-muted">
 					{pending ? (
-						<Skeleton width={110} height={10} />
+						<Skeleton className="h-3 w-28" />
 					) : (
 						<LastSync status={status} />
 					)}

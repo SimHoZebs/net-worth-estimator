@@ -34,7 +34,7 @@ export function AccountCardGrid({
 		null;
 	return (
 		<>
-			<div className="mb-5 grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-4">
+			<div className="mb-5 grid grid-cols-[repeat(auto-fill,minmax(min(100%,var(--container-3xs)),1fr))] gap-4">
 				{shown.map((card) => (
 					<AccountCard
 						key={card.id}

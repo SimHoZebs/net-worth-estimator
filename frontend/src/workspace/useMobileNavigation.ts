@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useHorizontalSwipe } from "../components/drawer.ts";
-import { useMediaQuery } from "../state/useMediaQuery.ts";
+import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 
 export function useMobileNavigation() {
 	const [open, setOpen] = useState(false);
-	const mobile = useMediaQuery("(max-width: 800px)");
+	const mobile = useMediaQuery(viewportQueries.belowMd);
 	const openRef = useRef(open);
 	useEffect(() => {
 		openRef.current = open;

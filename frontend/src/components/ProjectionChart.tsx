@@ -3,7 +3,7 @@ import { nearestPointIndex, projectionChartModel } from "../domain/chart.ts";
 import { dateLabel, money, todayIso } from "../domain/format.ts";
 import { type Plan, visibleAccounts } from "../domain/model.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
-import { useMediaQuery } from "../state/useMediaQuery.ts";
+import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 import { AccountDot } from "./AccountIcon.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
 import { Skeleton, Toggle } from "./ui.tsx";
@@ -32,7 +32,7 @@ export function ProjectionChart({
 	pending?: boolean;
 }) {
 	const [inspected, setInspected] = useState<number | null>(null);
-	const narrow = useMediaQuery("(max-width: 600px)");
+	const narrow = useMediaQuery(viewportQueries.belowSm);
 	const id = useId().replaceAll(":", "");
 	const model = useMemo(
 		() =>
@@ -78,10 +78,8 @@ export function ProjectionChart({
 				className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
 				aria-label="Net worth over time"
 			>
-				<div className="flex items-center justify-between gap-4 px-6 pt-6 [@media(max-width:1250px)]:items-start [@media(600px<width<=1250px)]:px-5 [@media(max-width:600px)]:gap-2.5 [@media(max-width:600px)]:px-4 [@media(max-width:600px)]:pt-5 [@media(max-width:370px)]:flex-wrap">
-					<h2 className="[@media(max-width:600px)]:text-sm">
-						Net worth over time
-					</h2>
+				<div className="flex items-center justify-between gap-4 px-6 pt-6 max-xl:items-start sm:max-xl:px-5 max-sm:gap-3 max-sm:px-4 max-sm:pt-5 max-sm:flex-wrap">
+					<h2 className="max-sm:text-sm">Net worth over time</h2>
 					<div
 						className="inline-flex gap-0.5 rounded-control border border-line bg-surface-2 p-1"
 						role="toolbar"
@@ -89,7 +87,7 @@ export function ProjectionChart({
 					>
 						{[10, 20, 30].map((year) => (
 							<button
-								className="rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs [@media(600px<width<=1250px)]:px-1.5 [@media(max-width:600px)]:p-1"
+								className="rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs sm:max-xl:px-2 max-sm:p-1"
 								type="button"
 								key={year}
 								aria-pressed={years === year}
@@ -103,19 +101,19 @@ export function ProjectionChart({
 						))}
 					</div>
 				</div>
-				<div className="flex items-center justify-between px-6 pt-6 pb-3.5 [@media(600px<width<=1250px)]:px-5 [@media(max-width:600px)]:px-4 [@media(max-width:600px)]:pt-5 [@media(max-width:600px)]:pb-2 [@media(max-width:370px)]:flex-wrap [@media(max-width:370px)]:gap-2.5">
-					<div className="flex flex-wrap items-center gap-4 text-xs text-muted [@media(max-width:600px)]:gap-3">
-						<span className="flex items-center gap-1.5">
+				<div className="flex items-center justify-between px-6 pt-6 pb-4 sm:max-xl:px-5 max-sm:px-4 max-sm:pt-5 max-sm:pb-2 max-sm:flex-wrap max-sm:gap-3">
+					<div className="flex flex-wrap items-center gap-4 text-xs text-muted max-sm:gap-3">
+						<span className="flex items-center gap-2">
 							<i className="inline-block h-0.5 w-4 bg-primary" />
 							Base case
 						</span>
 						{ranges && (
-							<span className="flex items-center gap-1.5">
-								<i className="inline-block h-2 w-3 rounded-xs bg-chart-band" />
+							<span className="flex items-center gap-2">
+								<i className="inline-block h-2 w-3 rounded-control bg-chart-band" />
 								80% of scenarios
 							</span>
 						)}
-						<span className="flex items-center gap-1.5">
+						<span className="flex items-center gap-2">
 							<i className="inline-block h-0 w-4 border-t-2 border-muted" />
 							$0 · no debt
 						</span>
@@ -123,7 +121,7 @@ export function ProjectionChart({
 					<Toggle label="Show range" checked={ranges} onChange={setRanges} />
 				</div>
 				<div aria-busy="true">
-					<Skeleton width={"100%"} height={220} />
+					<Skeleton className="h-56 w-full" />
 				</div>
 			</section>
 		);
@@ -133,8 +131,8 @@ export function ProjectionChart({
 			className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
 			aria-labelledby={`${id}-title`}
 		>
-			<div className="flex items-center justify-between gap-4 px-6 pt-6 [@media(max-width:1250px)]:items-start [@media(600px<width<=1250px)]:px-5 [@media(max-width:600px)]:gap-2.5 [@media(max-width:600px)]:px-4 [@media(max-width:600px)]:pt-5 [@media(max-width:370px)]:flex-wrap">
-				<h2 id={`${id}-title`} className="[@media(max-width:600px)]:text-sm">
+			<div className="flex items-center justify-between gap-4 px-6 pt-6 max-xl:items-start sm:max-xl:px-5 max-sm:gap-3 max-sm:px-4 max-sm:pt-5 max-sm:flex-wrap">
+				<h2 id={`${id}-title`} className="max-sm:text-sm">
 					Net worth over time
 				</h2>
 				<div
@@ -144,7 +142,7 @@ export function ProjectionChart({
 				>
 					{[10, 20, 30].map((year) => (
 						<button
-							className="rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs [@media(600px<width<=1250px)]:px-1.5 [@media(max-width:600px)]:p-1"
+							className="rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs sm:max-xl:px-2 max-sm:p-1"
 							type="button"
 							key={year}
 							aria-pressed={years === year}
@@ -158,26 +156,26 @@ export function ProjectionChart({
 					))}
 				</div>
 			</div>
-			<div className="flex items-center justify-between px-6 pt-6 pb-3.5 [@media(600px<width<=1250px)]:px-5 [@media(max-width:600px)]:px-4 [@media(max-width:600px)]:pt-5 [@media(max-width:600px)]:pb-2 [@media(max-width:370px)]:flex-wrap [@media(max-width:370px)]:gap-2.5">
-				<div className="flex flex-wrap items-center gap-4 text-xs text-muted [@media(max-width:600px)]:gap-3">
-					<span className="flex items-center gap-1.5">
+			<div className="flex items-center justify-between px-6 pt-6 pb-4 sm:max-xl:px-5 max-sm:px-4 max-sm:pt-5 max-sm:pb-2 max-sm:flex-wrap max-sm:gap-3">
+				<div className="flex flex-wrap items-center gap-4 text-xs text-muted max-sm:gap-3">
+					<span className="flex items-center gap-2">
 						<i className="inline-block h-0.5 w-4 bg-primary" />
 						Base case
 					</span>
 					{ranges && (
-						<span className="flex items-center gap-1.5">
-							<i className="inline-block h-2 w-3 rounded-xs bg-chart-band" />
+						<span className="flex items-center gap-2">
+							<i className="inline-block h-2 w-3 rounded-control bg-chart-band" />
 							80% of scenarios
 						</span>
 					)}
-					<span className="flex items-center gap-1.5">
+					<span className="flex items-center gap-2">
 						<i className="inline-block h-0 w-4 border-t-2 border-muted" />
 						$0 · no debt
 					</span>
 				</div>
 				<Toggle label="Show range" checked={ranges} onChange={setRanges} />
 			</div>
-			<div className="relative px-1.5">
+			<div className="relative grid grid-cols-[--spacing(12)_minmax(0,1fr)_--spacing(4)] px-2">
 				<ProjectionPlot
 					model={model}
 					id={id}
@@ -187,7 +185,7 @@ export function ProjectionChart({
 					onInspect={setInspected}
 				/>
 				<input
-					className="absolute bottom-0 left-14 h-3 w-[calc(100%-80px)] cursor-ew-resize accent-primary opacity-0 focus-visible:opacity-100 print:hidden"
+					className="relative col-start-2 row-start-1 h-3 w-full min-w-0 self-end cursor-ew-resize accent-primary opacity-0 focus-visible:opacity-100 print:hidden"
 					type="range"
 					min="0"
 					max={model.points.length - 1}
@@ -217,7 +215,7 @@ export function ProjectionChart({
 				)}
 			</div>
 			<div
-				className="mx-5 mt-1 mb-5 flex min-h-15 flex-wrap content-center gap-x-3 gap-y-1.5 rounded-control bg-surface-2 px-3 py-2 text-xs tabular-nums"
+				className="mx-5 mt-1 mb-5 flex min-h-15 flex-wrap content-center gap-x-3 gap-y-2 rounded-control bg-surface-2 px-3 py-2 text-xs tabular-nums"
 				aria-live="polite"
 			>
 				<strong>{dateLabel(point.date)}</strong>
@@ -245,7 +243,7 @@ export function ProjectionChart({
 					{contributions.map((account) => (
 						<li
 							key={account.id}
-							className="inline-flex items-center gap-1.5 text-muted"
+							className="inline-flex items-center gap-2 text-muted"
 						>
 							<AccountDot color={account.color} />
 							<span>

@@ -21,7 +21,7 @@ export function WorkspaceLayout({
 	return (
 		<div className="min-h-screen">
 			<a
-				className="fixed -top-20 left-60 z-100 rounded-lg bg-primary px-5 py-3 text-on-primary focus:top-3 [@media(max-width:800px)]:left-5"
+				className="fixed -top-20 left-60 z-100 rounded-surface bg-primary px-5 py-3 text-on-primary focus:top-3 max-md:left-5"
 				href="#main-content"
 			>
 				Skip to main content
@@ -36,18 +36,23 @@ export function WorkspaceLayout({
 			>
 				{navigation(close)}
 			</Drawer>
-			<div className="ml-(--sidebar) print:ml-0" inert={open}>
+			<div
+				className="ml-(--sidebar) flex min-h-dvh flex-col print:ml-0"
+				inert={open}
+			>
 				{header(show)}
 				<main
 					id="main-content"
-					className="mx-auto max-w-384 px-10 pt-8 pb-6 [body:has([data-draft-bar])_&]:pb-32 [@media(max-width:1250px)]:px-7 [@media(max-width:800px)]:px-6 [@media(max-width:800px)]:py-7 [@media(max-width:600px)]:px-5 [@media(max-width:600px)]:py-6 [@media(max-width:600px)]:[body:has([data-draft-bar])_&]:pb-40 print:p-0"
+					className="mx-auto w-full max-w-7xl flex-1 px-5 py-6 sm:px-6 md:py-8 xl:px-8 print:p-0"
 				>
 					{children}
 				</main>
-				{draftBar}
+				<div className="pointer-events-none sticky bottom-3 z-20 mx-auto flex w-full max-w-7xl flex-col items-end gap-3 px-5 empty:hidden sm:bottom-5 sm:px-6 xl:px-8 print:hidden">
+					{notification}
+					{draftBar}
+				</div>
 			</div>
 			{overlays}
-			{notification}
 		</div>
 	);
 }

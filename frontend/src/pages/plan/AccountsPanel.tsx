@@ -31,22 +31,22 @@ export function AccountsPanel({
 			caption="Accounts with balances and protected balances."
 			showHeaders={showHeaders}
 			columns={[
-				{ label: "Account", className: "[@media(max-width:600px)]:p-4" },
-				{ label: "Balance", className: "[@media(max-width:600px)]:p-4" },
+				{ label: "Account", className: "max-sm:p-4" },
+				{ label: "Balance", className: "max-sm:p-4" },
 				{
 					label: "Protected balance",
-					className: "[@media(max-width:600px)]:p-4",
+					className: "max-sm:p-4",
 				},
 				{
 					label: "Actions",
 					srOnly: true,
-					className: "[@media(max-width:600px)]:p-4",
+					className: "max-sm:p-4",
 				},
 			]}
 		>
 			{accounts.map((account) => (
 				<TableRow key={account.id}>
-					<TableHeader scope="row" className="[@media(max-width:600px)]:p-4">
+					<TableHeader scope="row" className="max-sm:p-4">
 						<button
 							type="button"
 							className="group flex items-center gap-3 rounded-control border-0 bg-transparent px-0 py-1 text-left text-inherit"
@@ -63,13 +63,13 @@ export function AccountsPanel({
 							)}
 						</button>
 					</TableHeader>
-					<TableCell className="tabular-nums [@media(max-width:600px)]:p-4">
+					<TableCell className="tabular-nums max-sm:p-4">
 						{money(account.balance)}
 					</TableCell>
-					<TableCell className="[@media(max-width:600px)]:p-4">
+					<TableCell className="max-sm:p-4">
 						{money(account.minBalance)}
 					</TableCell>
-					<TableCell className="[@media(max-width:600px)]:p-4">
+					<TableCell className="max-sm:p-4">
 						<div className="flex justify-end gap-1">
 							<IconButton
 								icon={Pencil}

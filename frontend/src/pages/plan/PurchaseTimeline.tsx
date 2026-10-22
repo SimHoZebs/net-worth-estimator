@@ -20,7 +20,7 @@ export function PurchaseTimeline({
 	const startTime = Date.parse(start);
 	const duration = Math.max(1, Date.parse(end) - startTime);
 	return (
-		<figure className="mx-0 mt-8 mb-0 rounded-surface border border-line bg-surface-2 p-6 @max-[36rem]/wish-list:p-4">
+		<figure className="mx-0 mt-8 mb-0 rounded-surface border border-line bg-surface-2 p-6 @max-xl/wish-list:p-4">
 			<figcaption>
 				<h3 className="m-0 text-base">When each purchase fits</h3>
 				<p className="max-w-[52ch] text-sm leading-relaxed text-muted">

@@ -21,7 +21,7 @@ export const controlStyles = cva(
 				select: [framedControl, "h-11"],
 				textarea: [framedControl, "min-h-[6lh] resize-y"],
 				search:
-					"h-11 w-32 rounded-none border-0 bg-transparent px-1 py-2 text-sm placeholder:text-subtle min-[601px]:w-50",
+					"h-11 w-32 rounded-none border-0 bg-transparent px-1 py-2 text-sm placeholder:text-subtle sm:w-48",
 			},
 		},
 		defaultVariants: { kind: "input" },

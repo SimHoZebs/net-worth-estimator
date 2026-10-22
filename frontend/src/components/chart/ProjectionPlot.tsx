@@ -38,7 +38,7 @@ export function ProjectionPlot({
 	} = model;
 	return (
 		<svg
-			className="block min-h-59 w-full overflow-visible min-[1600px]:min-h-75 [@media(600px<width<=800px)]:min-h-65 [@media(max-width:600px)]:min-h-48"
+			className="col-span-full col-start-1 row-start-1 block min-h-48 w-full overflow-visible sm:min-h-64 md:min-h-60 2xl:min-h-72"
 			viewBox={`0 0 ${width} ${height}`}
 			role="img"
 			aria-labelledby={`${id}-title ${id}-description`}
@@ -86,7 +86,7 @@ export function ProjectionPlot({
 						x={left - 14}
 						y={y(value) + 4}
 						textAnchor="end"
-						className="fill-muted text-xs [@media(max-width:600px)]:text-sm"
+						className="fill-muted text-xs max-sm:text-sm"
 					>
 						{compactMoney(value)}
 					</text>
@@ -127,7 +127,7 @@ export function ProjectionPlot({
 					x={width - right - 6}
 					y={y(0) - 6}
 					textAnchor="end"
-					className="fill-muted text-xs [@media(max-width:600px)]:text-sm"
+					className="fill-muted text-xs max-sm:text-sm"
 				>
 					No debt · $0
 				</text>
@@ -142,7 +142,7 @@ export function ProjectionPlot({
 						textAnchor={
 							fraction === 0 ? "start" : fraction === 1 ? "end" : "middle"
 						}
-						className="fill-muted text-xs [@media(max-width:600px)]:text-sm"
+						className="fill-muted text-xs max-sm:text-sm"
 					>
 						{points[index]?.date.slice(0, 4)}
 					</text>

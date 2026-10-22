@@ -120,7 +120,7 @@ function EvaluationsContent({
 	);
 	return (
 		<>
-			<div className="mb-6 flex items-center justify-between gap-4 [@media(max-width:600px)]:flex-wrap">
+			<div className="mb-6 flex items-center justify-between gap-4 max-sm:flex-wrap">
 				<Button type="button" variant="primary" onClick={() => onEdit(null)}>
 					<Plus size={16} />
 					Add evaluation
@@ -142,7 +142,7 @@ function EvaluationsContent({
 				</p>
 			)}
 			<div
-				className="grid grid-cols-2 gap-6 [@media(max-width:1050px)]:gap-4 [@media(max-width:600px)]:grid-cols-1"
+				className="grid grid-cols-2 gap-6 max-lg:gap-4 max-sm:grid-cols-1"
 				aria-busy={pending}
 			>
 				{evaluations.map((evaluation) => (

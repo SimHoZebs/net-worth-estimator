@@ -238,11 +238,11 @@ export function SafeSpendingPreview({
 	if (!cards.length) {
 		return (
 			<section
-				className="relative rounded-surface border border-line bg-surface px-6 pt-6 pb-5 [@media(max-width:1050px)]:px-5 [@media(max-width:1050px)]:py-5 [@media(max-width:600px)]:p-5 print:break-inside-avoid"
+				className="relative rounded-surface border border-line bg-surface px-6 pt-6 pb-5 max-lg:px-5 max-lg:py-5 max-sm:p-5 print:break-inside-avoid"
 				aria-label="Safe card spending"
 			>
 				<div className="flex items-center justify-between gap-4">
-					<h2 className="flex items-center gap-2 text-sm [@media(600px<width<=1050px)]:text-xs">
+					<h2 className="flex items-center gap-2 text-sm sm:max-lg:text-xs">
 						<CalendarDays size={18} className="text-muted" aria-hidden="true" />
 						Safe card spending
 					</h2>
@@ -366,11 +366,11 @@ export function SafeSpendingPreview({
 	if (pending)
 		return (
 			<section
-				className="relative rounded-surface border border-line bg-surface px-6 pt-6 pb-5 [@media(max-width:1050px)]:px-5 [@media(max-width:1050px)]:py-5 [@media(max-width:600px)]:p-5 print:break-inside-avoid"
+				className="relative rounded-surface border border-line bg-surface px-6 pt-6 pb-5 max-lg:px-5 max-lg:py-5 max-sm:p-5 print:break-inside-avoid"
 				aria-label="Safe card spending"
 			>
 				<div className="flex items-center justify-between gap-4">
-					<h2 className="flex items-center gap-2 text-sm [@media(600px<width<=1050px)]:text-xs">
+					<h2 className="flex items-center gap-2 text-sm sm:max-lg:text-xs">
 						<CalendarDays size={18} className="text-muted" aria-hidden="true" />
 						Safe card spending
 					</h2>
@@ -381,14 +381,14 @@ export function SafeSpendingPreview({
 					{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
 				</p>
 				<div aria-busy="true">
-					<Skeleton width={"100%"} height={120} />
+					<Skeleton className="h-32 w-full" />
 				</div>
 			</section>
 		);
 
 	return (
 		<section
-			className="relative rounded-surface border border-line bg-surface px-6 pt-6 pb-5 [@media(max-width:1050px)]:px-5 [@media(max-width:1050px)]:py-5 [@media(max-width:600px)]:p-5 print:break-inside-avoid"
+			className="relative rounded-surface border border-line bg-surface px-6 pt-6 pb-5 max-lg:px-5 max-lg:py-5 max-sm:p-5 print:break-inside-avoid"
 			aria-label="Safe card spending"
 		>
 			<button
@@ -399,7 +399,7 @@ export function SafeSpendingPreview({
 				<span className="sr-only">Open safe spending details</span>
 			</button>
 			<div className="flex items-center justify-between gap-4">
-				<h2 className="flex items-center gap-2 text-sm [@media(600px<width<=1050px)]:text-xs">
+				<h2 className="flex items-center gap-2 text-sm sm:max-lg:text-xs">
 					<CalendarDays size={18} className="text-muted" aria-hidden="true" />
 					Safe card spending
 				</h2>
@@ -409,44 +409,44 @@ export function SafeSpendingPreview({
 				{fullDaysLeft === 1 ? "day" : "days"} left
 				{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
 			</p>
-			<div className="flex flex-col pt-7 pb-5">
+			<div className="flex flex-col pt-8 pb-5">
 				<span className="text-xs text-muted">{labels.allowance}</span>
-				<strong className="mt-1.5 text-4xl leading-tight font-medium tracking-tight tabular-nums">
+				<strong className="mt-2 text-4xl leading-tight font-medium tracking-tight tabular-nums">
 					{money(allowance)}
 				</strong>
-				<span className="mt-1.5 text-xs text-muted">
+				<span className="mt-2 text-xs text-muted">
 					{allowance >= 0
 						? `${money(dailySafe)} a day`
 						: `${money(-dailySafe)} a day over`}
 				</span>
 			</div>
-			<div className="grid grid-cols-3 gap-x-4 gap-y-0 border-t border-line pt-4 [@media(max-width:370px)]:gap-x-3">
+			<div className="grid grid-cols-3 gap-x-4 gap-y-0 border-t border-line pt-4 max-sm:gap-x-3">
 				<div className="flex min-w-0 flex-col">
 					<span className="mb-2 text-xs text-muted">{labels.cashBalance}</span>
-					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums [@media(max-width:370px)]:text-lg">
+					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums max-sm:text-lg">
 						{money(checking)}
 					</strong>
 				</div>
-				<div className="flex min-w-0 flex-col border-l border-line pl-4 [@media(max-width:370px)]:pl-3">
+				<div className="flex min-w-0 flex-col border-l border-line pl-4 max-sm:pl-3">
 					<span className="mb-2 text-xs text-muted">
 						{labels.remainingBills}
 					</span>
-					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums [@media(max-width:370px)]:text-lg">
+					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums max-sm:text-lg">
 						{money(remainingObligations)}
 					</strong>
 				</div>
-				<div className="flex min-w-0 flex-col border-l border-line pl-4 [@media(max-width:370px)]:pl-3">
+				<div className="flex min-w-0 flex-col border-l border-line pl-4 max-sm:pl-3">
 					<span className="mb-2 text-xs text-muted">
 						{shortWindow.total > 0
 							? labels.billShortfall
 							: labels.cashAfterBills}
 					</span>
-					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums [@media(max-width:370px)]:text-lg">
+					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums max-sm:text-lg">
 						{money(shortWindow.total > 0 ? -shortWindow.total : cushion)}
 					</strong>
 				</div>
 			</div>
-			<div className="relative z-1 mt-4 flex flex-wrap items-center gap-4 border-t border-line pt-3.5">
+			<div className="relative z-1 mt-4 flex flex-wrap items-center gap-4 border-t border-line pt-4">
 				<TextButton
 					onClick={(event) => {
 						event.stopPropagation();

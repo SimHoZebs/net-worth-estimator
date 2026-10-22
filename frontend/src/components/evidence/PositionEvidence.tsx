@@ -22,7 +22,7 @@ export function PositionEvidence({
 			eyebrow="Current position"
 			onClose={onClose}
 		>
-			<div className="type-value mb-2 text-4xl leading-[1.2] font-medium tracking-[-1px]">
+			<div className="type-value mb-2 text-4xl leading-[1.2] font-medium tracking-tight">
 				{money(currentNetWorth(projection))}
 			</div>
 			<p className="text-muted">

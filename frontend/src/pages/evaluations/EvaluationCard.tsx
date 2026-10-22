@@ -96,11 +96,11 @@ export function EvaluationCard({
 				</div>
 			</div>
 			<div>
-				<div className="type-value mt-0 mr-0 mb-1 ml-0 text-3xl font-medium leading-[1.2] tracking-[-0.04em] [overflow-wrap:anywhere]">
+				<div className="type-value mt-0 mr-0 mb-1 ml-0 text-3xl font-medium leading-[1.2] tracking-tight [overflow-wrap:anywhere]">
 					{!evaluation.enabled ? (
 						"Paused"
 					) : outcomePending ? (
-						<Skeleton width={140} height={28} />
+						<Skeleton className="h-7 w-36" />
 					) : met ? (
 						"Already reached"
 					) : result?.firstDate ? (
@@ -111,7 +111,7 @@ export function EvaluationCard({
 				</div>
 				<p className="text-sm leading-relaxed text-muted">
 					{outcomePending ? (
-						<Skeleton width={170} height={14} />
+						<Skeleton className="h-4 w-44" />
 					) : !evaluation.enabled ? (
 						"Excluded from evaluation"
 					) : met ? (
@@ -125,7 +125,7 @@ export function EvaluationCard({
 			</div>
 			{evaluation.enabled &&
 				(outcomePending ? (
-					<Skeleton width="100%" height={32} />
+					<Skeleton className="h-8 w-full" />
 				) : (
 					result && (
 						<div className="m-0">

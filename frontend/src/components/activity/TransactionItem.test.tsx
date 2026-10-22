@@ -60,7 +60,7 @@ describe("TransactionItemRow", () => {
 		expect(
 			button
 				.querySelector("svg")
-				?.parentElement?.classList.contains("[@media(max-width:600px)]:hidden"),
+				?.parentElement?.classList.contains("max-sm:hidden"),
 		).toBe(true);
 		expect(screen.getByText("Employer").classList.contains("text-xs")).toBe(
 			true,

@@ -89,27 +89,27 @@ export function FundingGapsModal({
 				· Required {money(gap.requiredAmount)}
 			</p>
 			<BalancePathChart gap={gap} />
-			<div className="my-3.5 grid grid-cols-3 gap-2.5">
-				<div className="rounded-control bg-surface-2 px-3 py-2.5">
+			<div className="my-4 grid grid-cols-3 gap-3">
+				<div className="rounded-control bg-surface-2 px-3 py-3">
 					<span className="text-xs text-muted">Opening</span>
 					<strong className="mt-1 block text-sm tabular-nums">
 						{money(gap.openingBalance)}
 					</strong>
 				</div>
-				<div className="rounded-control bg-surface-2 px-3 py-2.5">
+				<div className="rounded-control bg-surface-2 px-3 py-3">
 					<span className="text-xs text-muted">Money in</span>
 					<strong className="mt-1 block text-sm tabular-nums">
 						+{money(summary.moneyIn)}
 					</strong>
 				</div>
-				<div className="rounded-control bg-surface-2 px-3 py-2.5">
+				<div className="rounded-control bg-surface-2 px-3 py-3">
 					<span className="text-xs text-muted">Money out</span>
 					<strong className="mt-1 block text-sm tabular-nums">
 						−{money(summary.moneyOut)}
 					</strong>
 				</div>
 			</div>
-			<h3 className="mt-3.5 mb-1 text-sm">Before the payment</h3>
+			<h3 className="mt-4 mb-1 text-sm">Before the payment</h3>
 			<p className="text-sm leading-relaxed text-muted">
 				Opening balance {money(gap.openingBalance)} on{" "}
 				{dateLabel(gap.windowStartDate, true)} · {summary.rows.length} movements
@@ -120,7 +120,7 @@ export function FundingGapsModal({
 				{summary.rows.map((row) => (
 					<li
 						key={row.id}
-						className="flex items-center gap-3 border-t border-line py-2.5 text-xs"
+						className="flex items-center gap-3 border-t border-line py-3 text-xs"
 					>
 						<FundingMovementIcon kind={row.kind} />
 						<div className="min-w-0 flex-1">
@@ -146,7 +146,7 @@ export function FundingGapsModal({
 			</ul>
 			{/* oxlint-enable jsx-a11y/no-redundant-roles */}
 			<div className="mt-3 flex items-center justify-between gap-3 rounded-surface border border-danger-border bg-danger-bg p-3">
-				<span className="flex items-center gap-2.5">
+				<span className="flex items-center gap-3">
 					<TriangleAlert size={18} aria-hidden="true" />
 					<span>
 						<strong className="text-xs">{gap.name}</strong>

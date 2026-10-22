@@ -404,10 +404,10 @@ export function AmountBuilder({
 	const plain = plainLanguageForAmount(amount);
 	const wire = JSON.stringify(amount, null, 2);
 	return (
-		<div className="mt-3 mb-5 rounded-lg border border-solid border-line bg-transparent p-4">
+		<div className="mt-3 mb-5 rounded-surface border border-solid border-line bg-transparent p-4">
 			{!hidePicker && (
 				<>
-					<div className="grid grid-cols-2 gap-5 max-[600px]:gap-x-3 max-[600px]:gap-y-4 max-[370px]:grid-cols-1">
+					<div className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1">
 						<SelectField
 							label="What kind of amount?"
 							name="amountTemplate"
@@ -432,7 +432,7 @@ export function AmountBuilder({
 				</>
 			)}
 			{!fixedAmount && (
-				<div className="grid grid-cols-2 gap-5 max-[600px]:gap-x-3 max-[600px]:gap-y-4 max-[370px]:grid-cols-1">
+				<div className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1">
 					<TemplateFields
 						templateId={template.id}
 						accounts={accounts}
@@ -447,7 +447,7 @@ export function AmountBuilder({
 			<p className="text-muted">{plain}</p>
 			<details>
 				<summary>Show saved data (JSON)</summary>
-				<pre className="max-h-70 overflow-auto rounded-lg border border-solid border-line bg-surface-2 p-3 text-xs whitespace-pre-wrap [word-break:break-word]">
+				<pre className="max-h-70 overflow-auto rounded-surface border border-solid border-line bg-surface-2 p-3 text-xs whitespace-pre-wrap [word-break:break-word]">
 					{wire}
 				</pre>
 			</details>

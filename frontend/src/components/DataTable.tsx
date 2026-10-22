@@ -147,7 +147,7 @@ export function TablePagination({
 				Showing {currentPage * pageSize + 1}–
 				{Math.min((currentPage + 1) * pageSize, total)} of {total} {itemNoun}
 			</span>
-			<div className="flex items-center gap-3 [@media(max-width:600px)]:gap-1">
+			<div className="flex items-center gap-3 max-sm:gap-1">
 				<IconButton
 					icon={ChevronLeft}
 					label="Previous transaction page"

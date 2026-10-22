@@ -28,11 +28,11 @@ export function OutlookMetrics({
 		Number.parseInt(plan.startDate.slice(0, 4), 10) + years;
 	return (
 		<div
-			className="mb-0 flex flex-col gap-3 [@media(1050px<width<=1250px)]:gap-2.5 [@media(max-width:1050px)]:grid [@media(max-width:1050px)]:grid-cols-2 [@media(600px<width<=1050px)]:gap-3 [@media(max-width:600px)]:gap-2.5"
+			className="grid grid-cols-2 gap-3 lg:grid-cols-1"
 			aria-busy={!projection || undefined}
 		>
 			<section className={outlookMetricStyles()}>
-				<div className="mb-1.5 flex min-h-6 items-center justify-between text-xs text-muted [@media(max-width:600px)]:mb-3 [@media(max-width:600px)]:gap-1">
+				<div className="mb-2 flex min-h-6 items-center justify-between text-xs text-muted max-sm:mb-3 max-sm:gap-1">
 					<span>Current net worth</span>
 					<IconButton
 						icon={CircleHelp}
@@ -45,13 +45,13 @@ export function OutlookMetrics({
 					/>
 				</div>
 				{current === null ? (
-					<Skeleton width={120} height={28} />
+					<Skeleton className="h-7 w-32" />
 				) : (
-					<div className="flex flex-wrap items-center gap-2 text-3xl leading-tight font-medium tracking-tight tabular-nums [@media(600px<width<=1250px)]:text-2xl [@media(max-width:600px)]:gap-y-2 [@media(max-width:370px)]:text-2xl">
+					<div className="flex flex-wrap items-center gap-2 text-xl leading-tight font-medium tracking-tight tabular-nums sm:text-2xl xl:text-3xl">
 						{money(current)}
 					</div>
 				)}
-				<div className="mt-2 flex items-center gap-2 text-xs text-muted [@media(max-width:600px)]:mt-3 [@media(max-width:600px)]:flex-wrap [@media(max-width:600px)]:gap-1">
+				<div className="mt-2 flex items-center gap-2 text-xs text-muted max-sm:mt-3 max-sm:flex-wrap max-sm:gap-1">
 					<span
 						className="inline-block size-1 rounded-full bg-primary"
 						aria-hidden="true"
@@ -60,29 +60,25 @@ export function OutlookMetrics({
 				</div>
 			</section>
 			<section className={outlookMetricStyles({ tone: "projected" })}>
-				<div className="mb-1.5 flex min-h-6 items-center justify-between text-xs text-muted [@media(max-width:600px)]:mb-3 [@media(max-width:600px)]:gap-1">
+				<div className="mb-2 flex min-h-6 items-center justify-between text-xs text-muted max-sm:mb-3 max-sm:gap-1">
 					<span>Base case in {finalYear}</span>
-					<TrendingUp
-						size={19}
-						className="[@media(max-width:600px)]:w-4"
-						aria-hidden="true"
-					/>
+					<TrendingUp size={19} className="max-sm:w-4" aria-hidden="true" />
 				</div>
 				{!final || current === null ? (
-					<Skeleton width={140} height={28} />
+					<Skeleton className="h-7 w-36" />
 				) : (
 					<div
-						className="flex flex-wrap items-center gap-2 text-3xl leading-tight font-medium tracking-tight text-ink tabular-nums [@media(max-width:1250px)]:text-2xl [@media(max-width:600px)]:gap-y-2 [@media(max-width:600px)]:text-3xl"
+						className="flex flex-wrap items-center gap-2 text-xl leading-tight font-medium tracking-tight text-ink tabular-nums sm:text-2xl xl:text-3xl"
 						title={money(final.total)}
 					>
 						{compactMoney(final.total)}
-						<span className="rounded-control bg-success-bg px-2 py-1 text-xs font-semibold tracking-normal text-success-text [@media(max-width:600px)]:px-1">
+						<span className="rounded-control bg-success-bg px-2 py-1 text-xs font-semibold tracking-normal text-success-text max-sm:px-1">
 							{final.total >= current ? "+" : ""}
 							{compactMoney(final.total - current)}
 						</span>
 					</div>
 				)}
-				<div className="mt-2 flex items-center gap-2 text-xs text-muted [@media(max-width:600px)]:mt-3 [@media(max-width:600px)]:flex-wrap [@media(max-width:600px)]:gap-1">
+				<div className="mt-2 flex items-center gap-2 text-xs text-muted max-sm:mt-3 max-sm:flex-wrap max-sm:gap-1">
 					{years}-year projection
 				</div>
 			</section>

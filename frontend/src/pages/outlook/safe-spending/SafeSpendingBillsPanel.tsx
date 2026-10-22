@@ -58,7 +58,7 @@ function HouseholdMetricCard({
 				className: "min-h-28",
 			})}
 		>
-			<div className="flex items-center gap-1.5 text-xs text-muted">
+			<div className="flex items-center gap-2 text-xs text-muted">
 				{icon}
 				{label}
 			</div>
@@ -104,7 +104,7 @@ export function SafeSpendingBillsPanel({
 		setSelected({ transaction, movement });
 	return (
 		<div className="grid content-start gap-4">
-			<div className="grid grid-cols-2 gap-2.5">
+			<div className="grid grid-cols-2 gap-3">
 				<HouseholdMetricCard
 					label={labels.cashAfterBills}
 					icon={<Landmark size={16} aria-hidden="true" />}

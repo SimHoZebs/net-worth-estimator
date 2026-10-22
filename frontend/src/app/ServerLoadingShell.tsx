@@ -38,14 +38,14 @@ export function ServerLoadingShell({
 				headingRef={navigation.headingRef}
 			/>
 			<section
-				className="mx-auto my-[12vh] flex max-w-156 flex-col gap-4 p-6"
+				className="mx-auto my-[12vh] flex max-w-2xl flex-col gap-4 p-6"
 				aria-busy="true"
 				aria-label="Loading workspace"
 			>
-				<Skeleton width={240} height={22} />
-				<Skeleton width={"100%"} height={12} />
-				<Skeleton width={"82%"} height={12} />
-				<Skeleton width={"100%"} height={220} />
+				<Skeleton className="h-6 w-60" />
+				<Skeleton className="h-3 w-full" />
+				<Skeleton className="h-3 w-5/6" />
+				<Skeleton className="h-56 w-full" />
 				<p className="sr-only" role="status">
 					Loading the saved model, status, and income snapshot.
 				</p>

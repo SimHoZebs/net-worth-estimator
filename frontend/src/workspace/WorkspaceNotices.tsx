@@ -72,7 +72,7 @@ export function WorkspaceNotification() {
 	const dismissNotice = useWorkspaceStore((state) => state.dismissNotice);
 	return notice ? (
 		<div
-			className="fixed right-7 bottom-6 z-50 flex max-w-[min(29rem,calc(100vw-2rem))] items-center gap-2 rounded-surface border border-solid border-primary bg-primary py-3 pr-3 pl-4 text-xs text-on-primary shadow-lg [body:has([data-draft-bar])_&]:bottom-28 [@media(max-width:600px)]:right-4 [@media(max-width:600px)]:bottom-4 [@media(max-width:600px)]:[body:has([data-draft-bar])_&]:bottom-36 print:hidden"
+			className="pointer-events-auto flex max-w-lg items-center gap-2 rounded-surface border border-solid border-primary bg-primary py-3 pr-3 pl-4 text-xs text-on-primary shadow-lg"
 			role="status"
 		>
 			<Check size={17} />

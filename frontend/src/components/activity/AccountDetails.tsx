@@ -128,9 +128,9 @@ export function AccountDetails({
 			)}
 			<fieldset
 				disabled={readOnly}
-				className="m-0 grid grid-cols-2 gap-5 border-0 p-0 [@media(max-width:600px)]:grid-cols-1 [@media(max-width:600px)]:gap-x-3 [@media(max-width:600px)]:gap-y-4"
+				className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1 max-sm:gap-x-3 max-sm:gap-y-4"
 			>
-				<h3 className="col-span-full mt-3 border-t border-line pt-4 text-xs font-semibold text-ink first:mt-0 first:border-t-0 first:pt-0 [@media(max-width:600px)]:mt-2 [@media(max-width:600px)]:pt-3">
+				<h3 className="col-span-full mt-3 border-t border-line pt-4 text-xs font-semibold text-ink first:mt-0 first:border-t-0 first:pt-0 max-sm:mt-2 max-sm:pt-3">
 					Account
 				</h3>
 				<InputField
@@ -172,7 +172,7 @@ export function AccountDetails({
 					/>
 					Include in net worth and projections
 				</label>
-				<h3 className="col-span-full mt-3 border-t border-line pt-4 text-xs font-semibold text-ink first:mt-0 first:border-t-0 first:pt-0 [@media(max-width:600px)]:mt-2 [@media(max-width:600px)]:pt-3">
+				<h3 className="col-span-full mt-3 border-t border-line pt-4 text-xs font-semibold text-ink first:mt-0 first:border-t-0 first:pt-0 max-sm:mt-2 max-sm:pt-3">
 					Balance & limits
 				</h3>
 				<InputField
@@ -185,7 +185,7 @@ export function AccountDetails({
 					value={balance}
 					onChange={(event) => setBalance(event.target.value)}
 				/>
-				<fieldset className="col-span-full m-0 flex min-w-0 flex-col gap-2 border-0 p-0 text-sm font-semibold text-muted [@media(max-width:600px)]:text-xs">
+				<fieldset className="col-span-full m-0 flex min-w-0 flex-col gap-2 border-0 p-0 text-sm font-semibold text-muted max-sm:text-xs">
 					<legend className="mb-2 p-0 text-xs font-semibold text-muted">
 						Balance limits (USD)
 					</legend>
@@ -223,7 +223,7 @@ export function AccountDetails({
 							title={`Current balance ${money(numbers.balanceValue)}`}
 						/>
 					</div>
-					<div className="mt-3 grid grid-cols-[1fr_1fr_auto] items-end gap-3 [@media(max-width:600px)]:grid-cols-2">
+					<div className="mt-3 grid grid-cols-[1fr_1fr_auto] items-end gap-3 max-sm:grid-cols-2">
 						<label htmlFor={`${id}-protected`} className="flex flex-col gap-2">
 							<span>Protected</span>
 							<Input
@@ -255,7 +255,7 @@ export function AccountDetails({
 						</label>
 						<label
 							htmlFor={`${id}-no-ceiling`}
-							className="flex flex-row items-center gap-2 pb-3 whitespace-nowrap [@media(max-width:600px)]:col-span-full [@media(max-width:600px)]:pb-0"
+							className="flex flex-row items-center gap-2 pb-3 whitespace-nowrap max-sm:col-span-full max-sm:pb-0"
 						>
 							<Checkbox
 								id={`${id}-no-ceiling`}
@@ -270,7 +270,7 @@ export function AccountDetails({
 						</label>
 					</div>
 				</fieldset>
-				<div className="col-span-full flex flex-col gap-2 text-sm font-semibold text-muted [@media(max-width:600px)]:text-xs">
+				<div className="col-span-full flex flex-col gap-2 text-sm font-semibold text-muted max-sm:text-xs">
 					<span id="account-source-label">Source</span>
 					<div className="flex" aria-labelledby="account-source-label">
 						<Badge tone="outline">{account.source}</Badge>

@@ -102,7 +102,8 @@ export function Modal({
 		<dialog
 			ref={ref}
 			className={mergeStyles(
-				`max-h-[min(90dvh,57.5rem)] rounded-surface border border-solid border-line-strong bg-surface p-0 text-ink shadow-overlay backdrop:bg-backdrop-film backdrop:backdrop-blur-(--backdrop-blur) [@media(max-width:600px)]:max-h-[92dvh] [@media(max-width:600px)]:w-[calc(100%-1.5rem)] ${wide ? "w-[min(48rem,calc(100%-2rem))]" : "w-[min(36rem,calc(100%-2rem))]"}`,
+				"max-h-[90dvh] w-full max-w-[calc(100%_-_--spacing(6))] rounded-surface border border-solid border-line-strong bg-surface p-0 text-ink shadow-overlay backdrop:bg-backdrop-film backdrop:backdrop-blur-(--backdrop-blur)",
+				wide ? "w-3xl" : "w-xl",
 				className,
 			)}
 			aria-labelledby={id}
@@ -212,13 +213,13 @@ export function EmptyState({
 	onAction?: () => void;
 }) {
 	return (
-		<div className="flex flex-col items-center px-6 py-16 text-center">
+		<div className="flex flex-col items-center px-6 py-12 text-center">
 			<span className="mb-5 grid size-16 place-items-center rounded-full bg-success-bg text-success-text">
 				<Icon size={28} />
 			</span>
 			<h3 className="text-lg">{title}</h3>
 			{description && (
-				<p className="mt-2 mb-5 max-w-88 text-sm">{description}</p>
+				<p className="mt-2 mb-5 max-w-sm text-sm">{description}</p>
 			)}
 			{action && (
 				<Button variant="primary" onClick={onAction}>
@@ -239,7 +240,7 @@ export function Toggle({
 	onChange: (checked: boolean) => void;
 }) {
 	return (
-		<label className="relative inline-flex cursor-pointer items-center gap-2 text-xs text-muted [@media(max-width:600px)]:min-h-7 [@media(max-width:600px)]:gap-1">
+		<label className="relative inline-flex cursor-pointer items-center gap-2 text-xs text-muted max-sm:min-h-7 max-sm:gap-1">
 			<input
 				type="checkbox"
 				role="switch"
@@ -288,25 +289,21 @@ export function Progress({
 }
 
 export function Skeleton({
-	width,
-	height,
+	className,
 	label = "Loading",
 }: {
-	width?: number | string;
-	height?: number | string;
+	className?: string;
 	label?: string;
 }) {
 	return (
 		<span
-			className="block h-[var(--skeleton-height,auto)] w-[var(--skeleton-width,auto)] animate-[skeleton-pulse_1.2s_ease-in-out_infinite] rounded-md bg-line-strong opacity-55"
+			className={mergeStyles(
+				"block h-4 w-full max-w-full animate-[skeleton-pulse_1.2s_ease-in-out_infinite] rounded-control bg-line-strong opacity-55",
+				className,
+			)}
 			role="status"
 			aria-label={label}
 			aria-busy="true"
-			style={cssVariables({
-				"--skeleton-width": typeof width === "number" ? `${width}px` : width,
-				"--skeleton-height":
-					typeof height === "number" ? `${height}px` : height,
-			})}
 		/>
 	);
 }

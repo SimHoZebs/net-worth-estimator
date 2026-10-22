@@ -33,11 +33,11 @@ export function AssumptionsPanel({
 		},
 	});
 	return (
-		<div className="p-6 [@media(max-width:600px)]:p-5">
-			<div className="flex items-center justify-between gap-4 [@media(max-width:600px)]:flex-wrap">
+		<div className="p-6 max-sm:p-5">
+			<div className="flex items-center justify-between gap-4 max-sm:flex-wrap">
 				<h2>The inputs behind the outlook</h2>
 			</div>
-			<div className="grid grid-cols-2 gap-5 [@media(max-width:600px)]:gap-x-3 [@media(max-width:600px)]:gap-y-4 [@media(max-width:370px)]:grid-cols-1">
+			<div className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1">
 				<InputField
 					key={plan.assumptions.inflation}
 					label="Annual inflation (%)"
