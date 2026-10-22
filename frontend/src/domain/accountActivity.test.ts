@@ -198,6 +198,46 @@ describe("account-scoped transactions", () => {
 		});
 	});
 
+	it.each(["sync-pending-", "sfin-pending-"])(
+		"keeps %s charges after the balance checkpoint visible without projecting them",
+		(prefix) => {
+			const plan = structuredClone(examplePlan);
+			const id = `${prefix}checking-new-charge`;
+			plan.movements.push({
+				...plan.movements[0]!,
+				id,
+				amount: 42.1,
+				fromId: "checking",
+				toId: null,
+				frequency: "once",
+				startDate: "2026-09-25",
+				enabled: false,
+				readOnly: true,
+			});
+			const projection = activityProjection(plan);
+			const rows = accountTransactions({
+				accountId: "checking",
+				plan,
+				projection,
+			});
+			expect(rows.filter((row) => row.movementId === id)).toEqual([
+				expect.objectContaining({
+					date: "2026-09-25",
+					amount: 42.1,
+					source: "historical",
+					pending: true,
+					excluded: true,
+				}),
+			]);
+			expect(projection.movements.some((row) => row.movementId === id)).toBe(
+				false,
+			);
+			expect(
+				plan.movements.find((movement) => movement.id === id)?.enabled,
+			).toBe(false);
+		},
+	);
+
 	it("has no manufactured transactions for growth-only or unknown accounts", () => {
 		expect(
 			accountTransactions({ accountId: "home", plan: examplePlan, projection }),

@@ -75,7 +75,11 @@ export function resolveStatementCycle({
 }
 
 export function isCycleOutflow(transaction: AccountTransaction): boolean {
-	return transaction.direction === "out" && !transaction.excluded;
+	// Pending charges commit spending even while disabled for projections.
+	return (
+		transaction.direction === "out" &&
+		(!transaction.excluded || transaction.pending)
+	);
 }
 
 /** Included card outflows in the inclusive [cycleStart, todayIso] window. */
