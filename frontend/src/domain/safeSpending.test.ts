@@ -11,7 +11,6 @@ import {
 	monthEndIso,
 	nextMonthObligations,
 	nextMonthRange,
-	nextPaycheck,
 	realizedCheckingOutflows,
 	remainingMonthlyObligations,
 	spendingBalance,
@@ -332,26 +331,6 @@ describe("projection-derived safe spending", () => {
 			}),
 		).toEqual({ total: 3200, start: "2026-11-01", end: "2026-11-30" });
 	});
-
-	it("finds the next paycheck after today", () => {
-		expect(
-			nextPaycheck({
-				movements,
-				checkingIds: ["checking"],
-				todayIso: "2026-10-08",
-			}),
-		).toEqual({ date: "2026-10-15", amount: 7579 });
-	});
-
-	it("returns null when no paycheck is projected", () => {
-		expect(
-			nextPaycheck({
-				movements: movements.filter((item) => item.fromId === "checking"),
-				checkingIds: ["checking"],
-				todayIso: "2026-10-08",
-			}),
-		).toBeNull();
-	});
 });
 
 describe("groupMandatorySpending", () => {
@@ -475,26 +454,5 @@ describe("filterMovementsById", () => {
 		const filtered = filterMovementsById(movements, ["living"]);
 		expect(filtered).toHaveLength(1);
 		expect(filtered[0]!.movementId).toBe("living");
-	});
-});
-
-describe("nextPaycheck with virtual pay account", () => {
-	it("counts take-home transfers from gross_pay", () => {
-		const result = nextPaycheck({
-			movements: [
-				movementFixture({
-					date: "2026-10-29",
-					movementId: "salary_net",
-					name: "Take-Home Pay",
-					fromId: "gross_pay",
-					toId: "checking",
-					requested: 7499,
-					realized: 7499,
-				}),
-			],
-			checkingIds: ["checking"],
-			todayIso: "2026-10-08",
-		});
-		expect(result).toEqual({ date: "2026-10-29", amount: 7499 });
 	});
 });

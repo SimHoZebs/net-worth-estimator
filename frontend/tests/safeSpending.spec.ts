@@ -2,10 +2,25 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { FIXTURE_API, resetFixture } from "./fixture.ts";
 import { SAFE_SPENDING_LABELS as labels } from "../src/pages/outlook/safe-spending/safeSpendingLabels.ts";
+import { SAFE_SPENDING_STORAGE_KEY } from "../src/state/persisted.ts";
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, request }) => {
 	await resetFixture();
 	await page.clock.setFixedTime(new Date("2026-01-31T12:00:00Z"));
+	// Make salary current, rather than a future-start rule, without changing
+	// any projected amounts after the January balance checkpoint.
+	const model = await request.get(`${FIXTURE_API}/v1/financial-model`);
+	const { document } = await model.json();
+	const salary = document.recurrenceRules.find(
+		(rule: { id: string }) => rule.id === "salary",
+	);
+	const response = await request.patch(
+		`${FIXTURE_API}/v1/recurrence-rules/salary`,
+		{
+			data: { ...salary, startDate: "2026-01-01" },
+		},
+	);
+	expect((await response.json()).persisted).toBe(true);
 });
 
 test("household budget shows paycheck allocation and one sortable cycle bill list", async ({
@@ -20,6 +35,9 @@ test("household budget shows paycheck allocation and one sortable cycle bill lis
 	page.on("pageerror", (error) => errors.push(error.message));
 	await page.goto("/#outlook/safe-spending-detail");
 	const drawer = page.getByRole("dialog");
+	await page.getByRole("tab", { name: "Configure", exact: true }).click();
+	await page.getByRole("checkbox", { name: /^Salary/ }).check();
+	await page.getByRole("tab", { name: /This cycle/ }).click();
 	await expect(page.getByRole("tab", { name: /This cycle/ })).toHaveAttribute(
 		"aria-selected",
 		"true",
@@ -179,7 +197,7 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 	expect(accessibility.violations).toEqual([]);
 });
 
-test("Configure names each affected total and keeps cash, allowance, and closed balances independent", async ({
+test("Configure only selects sources and settings, and ignores legacy overrides", async ({
 	page,
 	request,
 }) => {
@@ -187,6 +205,26 @@ test("Configure names each affected total and keeps cash, allowance, and closed 
 		data: { AccountId: "loan", Date: "2026-01-19", Balance: -4321 },
 	});
 	expect(response.ok()).toBe(true);
+	await page.addInitScript((key) => {
+		if (!localStorage.getItem(key))
+			localStorage.setItem(
+				key,
+				JSON.stringify({
+					state: {
+						statementDay: 20,
+						statementDaySet: true,
+						reserve: 725,
+						incomeRuleIds: ["salary"],
+						checkingOverride: 10000,
+						remainingOverride: 20000,
+						paycheckOverride: 30000,
+						fixedOverride: 40000,
+						spentOverride: 50000,
+					},
+					version: 4,
+				}),
+			);
+	}, SAFE_SPENDING_STORAGE_KEY);
 	const writes: string[] = [];
 	page.on("request", (request) => {
 		if (
@@ -205,14 +243,28 @@ test("Configure names each affected total and keeps cash, allowance, and closed 
 	await expect(metric(labels.cashAfterBills)).toHaveText("$4,200");
 	await expect(metric(labels.allowance)).toHaveText("-$375");
 	await page.getByRole("tab", { name: "Configure", exact: true }).click();
+	await expect(page.getByRole("spinbutton")).toHaveCount(2);
+	await expect(page.getByLabel("Calculated budget values")).toHaveCount(0);
+	for (const label of [
+		labels.cashBalance,
+		labels.remainingBills,
+		labels.nextPaycheck,
+		labels.fixedBills,
+		labels.cardSpending,
+	]) {
+		await expect(
+			page.getByRole("status", { name: label, exact: true }),
+		).toHaveCount(0);
+		await expect(page.getByLabel(`${label} ($)`, { exact: true })).toHaveCount(
+			0,
+		);
+	}
 	await page
-		.getByLabel(`${labels.cashBalance} ($)`, { exact: true })
-		.fill("6000");
-	await page
-		.getByLabel(`${labels.remainingBills} ($)`, { exact: true })
-		.fill("300");
+		.getByRole("group", { name: labels.cashAccounts })
+		.getByRole("button", { name: "Investment portfolio" })
+		.click();
 	await page.getByRole("tab", { name: /This cycle/ }).click();
-	await expect(metric(labels.cashAfterBills)).toHaveText("$5,700");
+	await expect(metric(labels.cashAfterBills)).toHaveText("$19,200");
 	await expect(metric(labels.allowance)).toHaveText("-$375");
 	await expect(
 		page
@@ -220,16 +272,23 @@ test("Configure names each affected total and keeps cash, allowance, and closed 
 			.locator("tbody tr"),
 	).toHaveCount(3);
 	await page.getByRole("tab", { name: "Configure", exact: true }).click();
-	for (const [label, value] of [
-		[labels.nextPaycheck, "7000"],
-		[labels.fixedBills, "1000"],
-		[labels.cardSpending, "200"],
-		[labels.reserve, "100"],
-	] as const) {
-		await page.getByLabel(`${label} ($)`, { exact: true }).fill(value);
-	}
+	await page
+		.getByRole("group", { name: "Included bills" })
+		.getByRole("checkbox", { name: /^Housing and living/ })
+		.uncheck();
+	await page.getByLabel(`${labels.reserve} ($)`, { exact: true }).fill("100");
+	await page.reload();
+	await expect(
+		page.getByRole("checkbox", { name: /^Housing and living/ }),
+	).not.toBeChecked();
+	await expect(
+		page
+			.getByRole("group", { name: labels.cashAccounts })
+			.getByRole("button", { name: "Investment portfolio" }),
+	).toHaveAttribute("aria-pressed", "true");
 	await page.getByRole("tab", { name: /This cycle/ }).click();
-	await expect(metric(labels.allowance)).toHaveText("$5,700");
+	await expect(metric(labels.cashAfterBills)).toHaveText("$19,200");
+	await expect(metric(labels.allowance)).toHaveText("$4,050");
 	await expect(
 		page.getByText("No recorded card charges in this cycle yet.", {
 			exact: true,
@@ -241,29 +300,85 @@ test("Configure names each affected total and keeps cash, allowance, and closed 
 		.getByText(labels.unallocated, { exact: true })
 		.locator("..")
 		.locator("dd");
-	await expect(unallocated).toHaveText("$1,579.00");
+	await expect(unallocated).toHaveText("-$271.00");
 	await expect(
 		page.getByRole("list", { name: labels.closedCardBalances }),
 	).toContainText("$4,321.00");
-	await page.getByRole("tab", { name: "Configure", exact: true }).click();
-	await page
-		.getByRole("button", {
-			name: `Use automatic ${labels.cashBalance}`,
-			exact: true,
-		})
-		.click();
-	await page
-		.getByRole("button", {
-			name: `Use automatic ${labels.cardSpending}`,
-			exact: true,
-		})
-		.click();
-	await page.getByRole("tab", { name: /This cycle/ }).click();
-	await expect(metric(labels.cashAfterBills)).toHaveText("$3,900");
-	await expect(metric(labels.allowance)).toHaveText("$5,900");
-	await page.getByRole("tab", { name: /Last cycle/ }).click();
-	await expect(unallocated).toHaveText("$1,579.00");
 	expect(writes).toEqual([]);
+});
+
+test("income sources combine independent recurrence rules and persist explicit deselection", async ({
+	page,
+	request,
+}) => {
+	const response = await request.post(`${FIXTURE_API}/v1/recurrence-rules`, {
+		data: {
+			id: "partner-income",
+			name: "Partner take-home pay",
+			sourceAccountId: "brokerage",
+			destinations: ["checking"],
+			amount: {
+				resolver: "expression",
+				config: { expression: "1400" },
+				inputs: {},
+			},
+			frequency: "monthly",
+			startDate: "2026-01-10",
+			endDate: null,
+			annualCap: null,
+			priority: 4,
+			enabled: true,
+		},
+	});
+	expect((await response.json()).persisted).toBe(true);
+	await page.goto("/#outlook/safe-spending-detail/configure");
+	const sources = page.getByRole("group", { name: "Income sources" });
+	const salary = sources.getByRole("checkbox", { name: /^Salary/ });
+	const partner = sources.getByRole("checkbox", {
+		name: /^Partner take-home pay/,
+	});
+	await expect(salary).not.toBeChecked();
+	await expect(partner).not.toBeChecked();
+	await salary.check();
+	await partner.focus();
+	await page.keyboard.press("Space");
+	await page.reload();
+	await expect(salary).toBeChecked();
+	await expect(partner).toBeChecked();
+	await page.getByRole("tab", { name: /This cycle/ }).click();
+	await expect(
+		page
+			.getByRole("region", { name: labels.allowance, exact: true })
+			.getByTestId("metric-value"),
+	).toHaveText("$1,025");
+	await page.getByRole("tab", { name: /Last cycle/ }).click();
+	await expect(
+		page.getByRole("region", { name: labels.paycheckAllocation }),
+	).toContainText("Next paycheck · Feb 1 – Feb 10");
+	await expect(
+		page
+			.getByRole("region", { name: labels.paycheckAllocation })
+			.getByText("$7,000.00", { exact: true }),
+	).toBeVisible();
+	await page.getByRole("tab", { name: "Configure", exact: true }).click();
+	await salary.uncheck();
+	await page.getByRole("tab", { name: /Last cycle/ }).click();
+	await expect(
+		page
+			.getByRole("region", { name: labels.paycheckAllocation })
+			.getByText("$1,400.00", { exact: true }),
+	).toBeVisible();
+	await page.getByRole("tab", { name: "Configure", exact: true }).click();
+	await partner.uncheck();
+	await page.reload();
+	await expect(salary).not.toBeChecked();
+	await expect(partner).not.toBeChecked();
+	await page.getByRole("tab", { name: /This cycle/ }).click();
+	await expect(
+		page
+			.getByRole("region", { name: labels.allowance, exact: true })
+			.getByTestId("metric-value"),
+	).toHaveText("-$5,975");
 });
 
 for (const theme of ["light", "dark"] as const) {

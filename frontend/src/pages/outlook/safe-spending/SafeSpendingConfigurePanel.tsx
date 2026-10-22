@@ -1,18 +1,16 @@
 import { useId, useMemo } from "react";
 import { AccountLabel } from "../../../components/AccountIcon.tsx";
-import { TextButton } from "../../../components/Button.tsx";
 import { Checkbox, InputField } from "../../../components/Field.tsx";
-import { dateLabel, exactMoney, money } from "../../../domain/format.ts";
+import { money } from "../../../domain/format.ts";
 import type { Plan } from "../../../domain/model.ts";
-import type {
-	SafeSpendingResetKey,
-	TotalCycleSettings,
-} from "../../../state/useSafeSpendingSettings.ts";
+import type { SafeSpendingIncome } from "../../../domain/safeSpendingIncome.ts";
+import type { TotalCycleSettings } from "../../../state/useSafeSpendingSettings.ts";
 import type {
 	BillCandidate,
 	SafeSpendingConfigHints,
 } from "./safeSpendingDetailModel.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
+import { IncomeSourcesFieldset } from "./IncomeSourcesFieldset.tsx";
 
 function AccountToggle({
 	account,
@@ -32,7 +30,6 @@ function AccountToggle({
 		>
 			<AccountLabel
 				account={account}
-				className="group-aria-[pressed=false]:opacity-55"
 				nameClassName="group-aria-[pressed=false]:text-muted"
 			/>
 		</button>
@@ -41,6 +38,7 @@ function AccountToggle({
 
 export function SafeSpendingConfigurePanel({
 	config,
+	income,
 	billCandidates,
 	trackedBillIds,
 	accounts,
@@ -48,9 +46,9 @@ export function SafeSpendingConfigurePanel({
 	onToggleAccount,
 	onToggleSpendingAccount,
 	onUpdateConfig,
-	onResetConfig,
 }: {
 	config: SafeSpendingConfigHints;
+	income: SafeSpendingIncome;
 	billCandidates: BillCandidate[];
 	trackedBillIds: string[];
 	accounts: Plan["accounts"];
@@ -58,58 +56,12 @@ export function SafeSpendingConfigurePanel({
 	onToggleAccount: (accountId: string) => void;
 	onToggleSpendingAccount: (accountId: string) => void;
 	onUpdateConfig: (next: Partial<TotalCycleSettings>) => void;
-	onResetConfig: (key: SafeSpendingResetKey) => void;
 }) {
 	const billsId = useId();
 	const accountsById = useMemo(
 		() => new Map(accounts.map((account) => [account.id, account])),
 		[accounts],
 	);
-	const overrideFields = [
-		{
-			key: "checking",
-			label: labels.cashBalance,
-			automatic: config.checkingHint ?? 0,
-			source: `${exactMoney(config.checkingHint ?? 0)} from selected cash accounts`,
-			effect: `Changes ${labels.cashBalance} and ${labels.cashAfterBills}. ${labels.allowance} stays unchanged.`,
-		},
-		{
-			key: "remaining",
-			label: labels.remainingBills,
-			automatic: config.remainingHint.total,
-			source: `${exactMoney(config.remainingHint.total)} through ${dateLabel(config.remainingHint.monthEnd, true)}`,
-			effect: `Changes ${labels.remainingBills} and ${labels.cashAfterBills}. The ${labels.scheduledBills} list stays unchanged.`,
-		},
-		{
-			key: "paycheck",
-			label: labels.nextPaycheck,
-			automatic: config.paycheckHint?.amount ?? 0,
-			source: config.paycheckHint
-				? `${exactMoney(config.paycheckHint.amount)} on ${dateLabel(config.paycheckHint.date, true)}`
-				: "$0.00. No upcoming paycheck in the projection",
-			effect: `Changes ${labels.allowance} in This cycle and ${labels.unallocated} in Last cycle.`,
-		},
-		{
-			key: "fixed",
-			label: labels.fixedBills,
-			automatic: config.fixedHint.total,
-			source: `${exactMoney(config.fixedHint.total)} for ${dateLabel(config.fixedHint.start, true)} to ${dateLabel(config.fixedHint.end, true)}`,
-			effect: `Reduces ${labels.allowance} in This cycle and ${labels.unallocated} in Last cycle.`,
-		},
-		{
-			key: "spent",
-			label: labels.cardSpending,
-			automatic: config.spentHint,
-			source: `${exactMoney(config.spentHint)} from this cycle's recorded card charges`,
-			effect: `Changes ${labels.cardSpending} and ${labels.allowance} in This cycle. ${labels.recordedCharges} and ${labels.closedCards} stay unchanged.`,
-		},
-	] satisfies {
-		key: SafeSpendingResetKey;
-		label: string;
-		automatic: number;
-		source: string;
-		effect: string;
-	}[];
 	return (
 		<div className="grid content-start gap-3">
 			<p className="text-sm leading-relaxed text-muted">
@@ -146,36 +98,10 @@ export function SafeSpendingConfigurePanel({
 					})
 				}
 			/>
-			{overrideFields.map((field) => {
-				const setting = `${field.key}Override` as const;
-				const value = config[setting];
-				return (
-					<div key={field.key}>
-						<InputField
-							label={`${field.label} ($)`}
-							hint={`${value === null ? "Automatic value active." : "Override active."} Automatic: ${field.source}. ${field.effect} Leave empty to use the automatic value.`}
-							type="number"
-							min={0}
-							step="0.01"
-							placeholder={String(field.automatic)}
-							value={value ?? ""}
-							onChange={(event) =>
-								onUpdateConfig({
-									[setting]:
-										event.target.value === ""
-											? null
-											: Math.max(0, Number(event.target.value) || 0),
-								})
-							}
-						/>
-						{value !== null && (
-							<TextButton onClick={() => onResetConfig(field.key)}>
-								Use automatic {field.label}
-							</TextButton>
-						)}
-					</div>
-				);
-			})}
+			<IncomeSourcesFieldset
+				income={income}
+				onChange={(incomeRuleIds) => onUpdateConfig({ incomeRuleIds })}
+			/>
 			<fieldset className="grid gap-2">
 				<legend className="m-0 p-0 text-xs font-semibold text-muted">
 					{labels.cashAccounts}
@@ -183,7 +109,7 @@ export function SafeSpendingConfigurePanel({
 				<p className="text-sm leading-relaxed text-muted">
 					Feeds automatic {labels.cashBalance}, {labels.nextPaycheck},{" "}
 					{labels.remainingBills}, {labels.fixedBills}, and{" "}
-					{labels.cashPayments}. Overrides keep their entered values.
+					{labels.cashPayments}.
 				</p>
 				<div className="flex flex-wrap gap-2">
 					{config.spendingAccounts.map((account) => {
@@ -208,7 +134,7 @@ export function SafeSpendingConfigurePanel({
 				<p className="text-sm leading-relaxed text-muted">
 					Feeds {labels.closedCards} in Last cycle and automatic{" "}
 					{labels.cardSpending} in This cycle. Changes both{" "}
-					{labels.recordedCharges} lists. Overrides keep their entered totals.
+					{labels.recordedCharges} lists.
 				</p>
 				<p className="text-sm leading-relaxed text-muted">
 					{labels.closedCards} uses each selected card's latest saved balance at
@@ -236,8 +162,7 @@ export function SafeSpendingConfigurePanel({
 				</legend>
 				<p className="text-sm leading-relaxed text-muted">
 					Feeds automatic {labels.remainingBills}, {labels.fixedBills}, and{" "}
-					{labels.cashPayments}. Also changes {labels.scheduledBills}. Overrides
-					keep their entered totals.
+					{labels.cashPayments}. Also changes {labels.scheduledBills}.
 				</p>
 				{billCandidates.length ? (
 					billCandidates.map((bill) => {

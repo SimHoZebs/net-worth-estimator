@@ -11,21 +11,14 @@ import type { MovementResult } from "./result.ts";
 // realized per event); `spendingBalance` reads saved Plan balances surfaced
 // as `ProjectionAccountSummary.startingBalance`. The Gap check
 // (`requested - realized`) is the same gap the posting-fulfillment Goal
-// check aggregates; the paycheck filter counts take-home sweep transfers
-// from the gross-pay staging account alongside external inflows.
+// check aggregates. Income source selection lives in safeSpendingIncome.ts.
 // Only the windows stay client-side:
-// they follow user-selected accounts, bills, statement day, and overrides,
+// they follow user-selected accounts, bills, statement day, and reserve,
 // which have no server contract (see PRODUCT_INTENT open decisions on
 // household safe spending). Do not add new windowed sums here; derive from these.
 
 export const DEFAULT_CYCLE_STATEMENT_DAY = 20;
 export const DEFAULT_PROTECTED_RESERVE = 725;
-/**
- * Virtual account staging gross pay before payroll splits. Take-home pay
- * arrives in checking as a transfer from here, so it counts as a paycheck
- * alongside external inflows.
- */
-export const VIRTUAL_PAY_ACCOUNT_ID = "gross_pay";
 
 /** Last calendar day of the month containing `todayIso`. */
 export function monthEndIso(todayIso: string): string {
@@ -127,45 +120,6 @@ export function nextMonthObligations({
 		)
 		.reduce((sum, movement) => sum + movement.requested, 0);
 	return { total, start, end };
-}
-
-/**
- * Expected next paycheck: total inflow into the spendable accounts on the
- * earliest date after today, from outside the household or from the
- * virtual pay account (take-home transfer). Null when no upcoming inflow
- * is projected.
- */
-export function nextPaycheck({
-	movements,
-	checkingIds,
-	todayIso,
-}: {
-	movements: MovementResult[];
-	checkingIds: string[];
-	todayIso: string;
-}): { date: string; amount: number } | null {
-	const today = todayIso.slice(0, 10);
-	const destinations = new Set(checkingIds);
-	const upcoming = movements.filter(
-		(movement) =>
-			movement.toId !== null &&
-			destinations.has(movement.toId) &&
-			(!movement.fromId || movement.fromId === VIRTUAL_PAY_ACCOUNT_ID) &&
-			movement.date > today &&
-			movement.requested > 0,
-	);
-	if (!upcoming.length) return null;
-	const first = upcoming[0];
-	if (!first) return null;
-	const earliest = upcoming.reduce(
-		(firstDate, movement) =>
-			movement.date < firstDate ? movement.date : firstDate,
-		first.date,
-	);
-	const amount = upcoming
-		.filter((movement) => movement.date === earliest)
-		.reduce((sum, movement) => sum + movement.requested, 0);
-	return { date: earliest, amount };
 }
 
 /**
