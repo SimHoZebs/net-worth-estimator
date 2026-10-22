@@ -2,25 +2,24 @@
 
 ## Start
 
-Run the API and frontend as separate processes from the repository root:
+Use the production-like Compose dev stack from the repository root:
 
 ```bash
-# terminal 1
-# Local state comes from a database backup, never the shipped CSVs: copy a
-# backup to the dev database path while the server is stopped. tmp/ is
-# gitignored and survives reboot, unlike /tmp.
-cp <backup>.db tmp/net-worth-estimator.db
-NET_WORTH_ESTIMATOR_DB=$PWD/tmp/net-worth-estimator.db \
-CGO_ENABLED=0 go -C backend run ./cmd/server
+./scripts/dev up
+./scripts/dev down
 ```
 
-```bash
-# terminal 2
-npm --prefix frontend ci
-npm --prefix frontend run dev
-```
+The frontend is `http://localhost:5178`, Casdoor is on 8000, and the API debug
+port is 8788. Use the same API, Nginx frontend, and Casdoor images as production.
+Dev data and private configuration persist in gitignored `tmp/dev/`.
+First startup takes a SQLite-safe, read-only production database snapshot.
+`./scripts/dev refresh-db` explicitly refreshes financial data and preserves
+identity/session state. Use `up --from /path/backup.db` for an existing backup.
+SimpleFIN stays disabled. See `dev/README.md` for commands and access grants.
 
-The Vite server runs on `http://localhost:5178` and proxies `/v1` to `127.0.0.1:8787`. The optional `NET_WORTH_ESTIMATOR_FRONTEND_PATH` remains available for binary-only all-in-one runs.
+Vite and direct Go processes are advanced source-debugging tools, not the normal
+manual-test entry point. Stop the dev frontend before using Vite on 5178.
+The isolated browser-test harness still uses its own fixture API and ports.
 
 ## Deployment
 

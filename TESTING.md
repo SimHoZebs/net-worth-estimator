@@ -2,6 +2,16 @@
 
 This checkout holds two packages: the Go backend in `backend/`, and the Waypoint frontend in `frontend/`. Both have their own gates. The backend is the calculation authority; the frontend renders its results and keeps local edits as a temporary review layer.
 
+## Manual Development
+
+Use `./scripts/dev up` and open `http://localhost:5178`. Use `./scripts/dev down`
+to stop it. This is the production Compose stack with isolated dev data, not
+the Vite/fixture API browser-test harness. `./scripts/dev refresh-db` replaces
+only the dev financial database from a consistent production snapshot.
+See [dev/README.md](dev/README.md).
+
+Dev setup checks: `node --test dev/*.test.mjs auth/casdoor/*.test.mjs`.
+
 ## Frontend Gates
 
 Run from the repository root:
@@ -55,6 +65,29 @@ npm --prefix frontend run test:browser
 For a backend change, it is the Go gate below.
 
 The pre-commit hook verifies the backend packages containing staged Go files, plus `oxlint` and `oxfmt --check` on staged frontend files. The pre-push hook verifies `./internal/...` and `./cmd/...`, plus whole-project `oxlint`. Remaining frontend gates (`typecheck`, `test`, `build`, `test:browser`) run only when invoked directly.
+
+## Optional Casdoor Authentication
+
+Unit checks need no identity container:
+
+```bash
+backend/scripts/verify.sh ./internal/identity
+backend/scripts/verify.sh ./internal/api
+node --test auth/casdoor/*.test.mjs
+```
+
+`scripts/smoke-compose.sh` targets the legacy unauthenticated stack. Casdoor
+requires the authenticated checks below because private status and projections
+reject anonymous requests.
+
+Use the [Casdoor test guide](auth/casdoor/README.md#verification) for real-provider
+passkey, restart, revocation, refresh, and administrator recovery checks. The
+lifecycle stack uses private disposable state under `tmp/`, not the live financial
+volume. Do not create or restart Docker networks during a browser gate. Chromium
+can abort module requests with `ERR_NETWORK_CHANGED` when host interfaces change.
+
+Physical passkeys and phone recovery require the separate
+[manual checklist](docs/authentication.md#manual-physical-device-and-recovery-checklist).
 
 ---
 
