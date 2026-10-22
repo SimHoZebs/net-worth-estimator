@@ -38,6 +38,7 @@ assert.equal(originalUser.id, bootstrap.subject);
 assert.equal(originalUser.isAdmin, false);
 const browser = await chromium.launch({ headless: true });
 let context;
+let resourceID;
 let passwordChanged = false;
 const failures = [];
 const replacement = randomBytes(24).toString('hex');
@@ -83,10 +84,12 @@ async function signIn(password = settings.password) {
   const session = await (await context.request.get(`${settings.appUrl}/v1/auth/session`)).json();
   assert.equal(session.user.subject, bootstrap.subject);
   assert.equal(session.allowed, true);
+  assert.equal(session.resource.kind, 'private');
+  resourceID = session.resource.id;
   return page;
 }
 async function expectRevoked() {
-  await eventually(async () => (await context.request.get(`${settings.appUrl}/v1/financial-model`)).status() === 401,
+  await eventually(async () => (await context.request.get(`${settings.appUrl}/v1/financial-model`, { headers: { 'X-Waypoint-Resource': resourceID } })).status() === 409,
     'Revocation did not reject the old application cookie. Set the disposable API recheck interval to 2s.');
   assert.ok(currentGrant() === null, 'Revoked provider grant must be deleted');
 }
@@ -118,7 +121,7 @@ try {
   const before = currentGrant();
   assert.ok(before?.RefreshToken);
   await setTimeout(12_000);
-  const responses = await Promise.all(Array.from({ length: 12 }, () => context.request.get(`${settings.appUrl}/v1/financial-model`)));
+  const responses = await Promise.all(Array.from({ length: 12 }, () => context.request.get(`${settings.appUrl}/v1/financial-model`, { headers: { 'X-Waypoint-Resource': resourceID } })));
   assert.ok(responses.every((response) => response.status() === 200), 'Concurrent refresh must preserve access');
   const after = currentGrant();
   assert.ok(after.RefreshToken !== before.RefreshToken, 'Refresh credential must rotate');
@@ -176,7 +179,8 @@ try {
   await eventually(() => logoutIDs().some((id) => !priorLogoutIDs.has(id)),
     'Signed logout did not reach the API over the private network');
   await expectRevoked();
-  assert.equal((await fetch(`${settings.appUrl}/v1/financial-model`, { headers: { Cookie: captured } })).status, 401);
+  assert.equal((await fetch(`${settings.appUrl}/v1/financial-model`, { headers: { Cookie: captured, 'X-Waypoint-Resource': resourceID } })).status, 409);
+  assert.equal((await fetch(`${settings.appUrl}/v1/accounts`, { method: 'POST', headers: { Cookie: captured, 'X-Waypoint-Resource': resourceID } })).status, 401);
   console.log('PASS real signed back-channel delivery, subject revocation, and captured-cookie rejection');
 } catch (error) {
   failures.push(error);

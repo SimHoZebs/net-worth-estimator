@@ -11,6 +11,8 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 )
 
 func (s *Service) login(w http.ResponseWriter, r *http.Request) {
@@ -110,6 +112,14 @@ func tokenDeadline(token *oauth2.Token, id *oidc.IDToken) int64 {
 
 func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
 	g, err := s.store.findGrant(s.sessions.GetString(r.Context(), "grant_id"), s.config.Issuer)
+	if err == nil {
+		resource := authorization.ResourceFor(s.config.Issuer, g.Subject)
+		if expected := r.Header.Get(ResourceHeader); expected != "" && expected != resource.ID {
+			w.Header().Set(ResourceHeader, resource.ID)
+			failure(w, 409, "The active plan changed. Reload the session before signing out.")
+			return
+		}
+	}
 	if err != nil || s.store.deleteGrant(g.ID, s.config.Issuer) != nil || s.sessions.Destroy(r.Context()) != nil {
 		failure(w, 500, "Could not end the session.")
 		return

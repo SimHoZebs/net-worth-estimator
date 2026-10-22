@@ -25,8 +25,6 @@ func TestProviderConfiguration(t *testing.T) {
 		{"insecure public URL", "NET_WORTH_ESTIMATOR_PUBLIC_URL", "http://my-server.local", true},
 		{"public path", "NET_WORTH_ESTIMATOR_PUBLIC_URL", "https://example.test/path", true},
 		{"missing secret", "NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET", "", true},
-		{"wildcard grant", "NET_WORTH_ESTIMATOR_AUTH_EDITORS", "*", true},
-		{"empty grant", "NET_WORTH_ESTIMATOR_AUTH_READERS", "alice,", true},
 		{"invalid TTL", "NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME", "-1h", true},
 		{"invalid revocation window", "NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL", "6m", true},
 		{"disabled revocation checks", "NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL", "0s", true},

@@ -7,6 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import { randomUUID } from 'node:crypto';
 
 export const databaseName = 'net-worth-estimator.db';
+export const sampleDatabaseName = 'sample.db';
 
 export function validateSnapshot(path) {
   const db = new DatabaseSync(path, { readOnly: true });
@@ -41,10 +42,29 @@ export async function snapshotFile(source, destination) {
   }
 }
 
-export async function installSnapshot(incoming, dataDir, backupDir) {
+// A published sample contains canonical data, not private artifact/link history.
+export async function sampleSnapshot(source, destination) {
+  await snapshotFile(source, destination);
+  const db = new DatabaseSync(destination);
+  try {
+    db.exec("BEGIN; DELETE FROM projection_artifacts; DELETE FROM account_links; UPDATE sync_state SET last_sync_at=''; UPDATE model_metadata SET source_path='sample'; COMMIT;");
+    for (const table of ['posting_sync_keys', 'posting_id_migrations']) {
+      if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table)) db.exec(`DELETE FROM ${table}`);
+    }
+  } catch (error) {
+    db.close();
+    await unlink(destination);
+    throw error;
+  }
+  db.close();
+  validateSnapshot(destination);
+}
+
+export async function installSnapshot(incoming, dataDir, backupDir, name = databaseName) {
+  if (![databaseName, sampleDatabaseName].includes(name)) throw new Error('Unknown dev snapshot destination');
   validateSnapshot(incoming);
   await mkdir(dataDir, { recursive: true, mode: 0o700 });
-  const destination = resolve(dataDir, databaseName);
+  const destination = resolve(dataDir, name);
   let present = true;
   try { await stat(destination); } catch (error) { if (error.code === 'ENOENT') present = false; else throw error; }
   if (present) {
@@ -55,7 +75,7 @@ export async function installSnapshot(incoming, dataDir, backupDir) {
       if (db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').get().busy !== 0) throw new Error('The dev database is still in use');
     } finally { db.close(); }
     await mkdir(backupDir, { recursive: true, mode: 0o700 });
-    await snapshotFile(destination, resolve(backupDir, `dev-${Date.now()}-${randomUUID()}.db`));
+    await snapshotFile(destination, resolve(backupDir, `${name === sampleDatabaseName ? 'sample' : 'dev'}-${Date.now()}-${randomUUID()}.db`));
   }
   for (const suffix of ['-wal', '-shm']) {
     await unlink(destination + suffix).catch((error) => { if (error.code !== 'ENOENT') throw error; });

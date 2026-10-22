@@ -82,15 +82,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure identity: %v", err)
 	}
-	var login *identity.Service
-	if identityConfig.Provider != "none" {
-		login, err = identity.New(context.Background(), identityConfig)
-		if err != nil {
-			log.Fatalf("configure identity: %v", err)
-		}
-		defer login.Close()
-	}
-
 	database, err := store.Open(dbPath)
 	if err != nil {
 		log.Fatalf("open store: %v", err)
@@ -104,6 +95,16 @@ func main() {
 	if !exists {
 		fmt.Println("no financial model stored: import one through Configs or cmd/importcsv")
 	}
+	var resources resourceConfig
+	if identityConfig.Provider != "none" {
+		resources, err = resourceConfigFromEnv(os.Getenv, dbPath)
+		if err != nil {
+			log.Fatalf("configure plan resources: %v", err)
+		}
+		if exists && resources.OwnerSubject == "" {
+			log.Fatal("existing financial data requires NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT before authenticated startup")
+		}
+	}
 
 	syncRunner, syncStop := configureSync(database)
 	defer syncStop()
@@ -115,12 +116,16 @@ func main() {
 		SyncRunner:     syncRunner,
 		FrontendDir:    frontendPath,
 	}
-	if login != nil {
-		apiConfig.CanWrite = identity.CanWrite
-	}
-	handler := api.New(database, apiConfig)
-	if login != nil {
-		handler = login.Wrap(handler)
+	var handler http.Handler
+	if identityConfig.Provider != "none" {
+		var closeResources func() error
+		handler, closeResources, err = resourceHandler(context.Background(), database, dbPath, resources, identityConfig, apiConfig)
+		if err != nil {
+			log.Fatalf("configure resource access: %v", err)
+		}
+		defer closeResources()
+	} else {
+		handler = api.New(database, apiConfig)
 	}
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),

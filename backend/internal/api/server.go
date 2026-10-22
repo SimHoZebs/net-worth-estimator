@@ -21,8 +21,9 @@ import (
 
 // Server carries runtime dependencies.
 type Server struct {
-	store    store.Store
-	CanWrite func(context.Context) bool
+	store      store.Store
+	ResourceID string
+	CanWrite   func(context.Context) bool
 	// ReadOnly rejects canonical model writes with 403. Reads and compute
 	// endpoints are unaffected.
 	ReadOnly bool
@@ -34,6 +35,8 @@ type Server struct {
 
 // Config controls HTTP integration behavior.
 type Config struct {
+	// ResourceID namespaces in-flight projections as well as persisted artifacts.
+	ResourceID     string
 	CanWrite       func(context.Context) bool
 	AllowedOrigins []string
 	ReadOnly       bool
@@ -149,6 +152,7 @@ func frontendHandler(frontendDir string) http.HandlerFunc {
 // New builds the chi router with all routes.
 func New(store store.Store, serverConfig Config) http.Handler {
 	server := &Server{
+		ResourceID:  serverConfig.ResourceID,
 		CanWrite:    serverConfig.CanWrite,
 		store:       store,
 		ReadOnly:    serverConfig.ReadOnly,
