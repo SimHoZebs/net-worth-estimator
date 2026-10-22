@@ -1,4 +1,4 @@
-import { isSyncReservedId, type Movement, type Plan } from "./model.ts";
+import type { Movement, Plan } from "./model.ts";
 
 export type SubscriptionFrequency = "monthly" | "yearly";
 
@@ -95,7 +95,7 @@ function markAsRecurring(
 			"That transaction already records a recurring occurrence.",
 		);
 	}
-	if (source.readOnly || isSyncReservedId(source.id)) {
+	if (source.readOnly || source.pending) {
 		return new Error("Synced transactions cannot be marked as recurring.");
 	}
 	const frequency: SubscriptionFrequency = options.frequency ?? "monthly";

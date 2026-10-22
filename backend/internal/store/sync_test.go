@@ -1,14 +1,18 @@
 package store
 
 import (
-	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 const syncTestAmountJSON = `{"resolver":"expression","config":{"expression":"50"},"inputs":{}}`
+const ownerPostingID = "01900000-0000-7000-8000-000000000010"
+const rawSyncedPostingID = "01900000-0000-7000-8000-000000000011"
+const otherSyncedPostingID = "01900000-0000-7000-8000-000000000012"
 
 func testSyncStateDefaultsEmptyAndRoundTrips(t *testing.T, newStore func(*testing.T) Store) {
 	t.Helper()
@@ -62,9 +66,10 @@ func seedSyncRows(t *testing.T, store *sqliteStore) {
 		`INSERT INTO accounts (id, position, name, enabled) VALUES ('prime_card', 1, 'Prime', 1)`,
 		`INSERT INTO entity_ids (id, kind) VALUES ('prime_card', 'account')`,
 		`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (10, '2026-08-01', 'checking', 111, 'simplefin')`,
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source)
-		 VALUES ('sync-pending-prime_card-tx1', 10, 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 0, 'simplefin')`,
-		`INSERT INTO entity_ids (id, kind) VALUES ('sync-pending-prime_card-tx1', 'posting')`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending)
+		 VALUES ('` + rawSyncedPostingID + `', 10, 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 0, 'simplefin', 1)`,
+		`INSERT INTO entity_ids (id, kind) VALUES ('` + rawSyncedPostingID + `', 'posting')`,
+		`INSERT INTO posting_sync_keys VALUES ('simplefin', 'bridge-prime', 'tx1', '` + rawSyncedPostingID + `')`,
 	})
 }
 
@@ -102,7 +107,7 @@ func ownerDocument() *types.FinancialModelDocument {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 		Postings: []types.Posting{{
-			ID: "owner-charge", Name: "Owner", SourceAccountID: &checking,
+			ID: ownerPostingID, Name: "Owner", SourceAccountID: &checking,
 			Amount:     types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime: 1782950400, TransactionTime: 1782950400,
 		}},
@@ -118,7 +123,7 @@ func seedSyncState(t *testing.T, store Store) {
 	}
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-01", Balance: 111}},
-		[]types.Posting{syncPendingPosting("sync-pending-prime_card-tx1", "prime_card", "2026-08-02")},
+		[]SyncPosting{syncPendingPosting("tx1", "prime_card", "2026-08-02")},
 		[]string{"prime_card"}, false,
 	)
 	if err != nil || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
@@ -169,15 +174,8 @@ func TestDeleteAccountLeavesSyncRows(t *testing.T) {
 	if _, ok := findCheckpoint(loaded, "checking", "2026-08-01"); !ok {
 		t.Fatalf("sync checkpoint was garbage-collected: %+v", loaded.Checkpoints)
 	}
-	ids, _ := loadPostingIDs(t, store)
-	found := false
-	for _, id := range ids {
-		if id == "sync-pending-prime_card-tx1" {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("sync pending posting was garbage-collected: %v", ids)
+	if len(syncedPendingIDs(loaded)) != 1 {
+		t.Fatal("sync pending posting was garbage-collected")
 	}
 	links, err := store.ListAccountLinks()
 	if err != nil {
@@ -196,27 +194,22 @@ func TestDeleteAccountLeavesSyncRows(t *testing.T) {
 	}
 }
 
-func TestRowWritesRejectForgedSyncNamespace(t *testing.T) {
-	testRowWritesRejectForgedSyncNamespace(t, openTestStore)
+func TestRowWritesUseStoredSyncOwnership(t *testing.T) {
+	testRowWritesUseStoredSyncOwnership(t, openTestStore)
 }
 
-func testRowWritesRejectForgedSyncNamespace(t *testing.T, newStore func(*testing.T) Store) {
+func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T) Store) {
 	t.Helper()
 	store := newStore(t)
 	seedOwnerDocument(t, store)
 	seedSyncState(t, store)
 
-	// Owner creates cannot claim the sync namespace.
-	prime := "prime_card"
-	forged := syncPendingPosting("sync-pending-prime_card-forged", prime, "2026-08-03")
-	if _, err := store.CreatePosting(forged); !IsReservedID(err) {
-		t.Fatalf("create forged sync posting err = %v, want reserved-id", err)
-	}
-	if _, err := store.CreateAccount(types.Account{ID: "sync-checking", Name: "Forged"}); !IsReservedID(err) {
-		t.Fatalf("create forged sync account err = %v, want reserved-id", err)
-	}
-	if _, err := store.CreateRule(types.RecurrenceRule{ID: "sync-rule", Name: "Forged"}); !IsReservedID(err) {
-		t.Fatalf("create forged sync rule err = %v, want reserved-id", err)
+	// UUIDs carry no ownership meaning. Owner writes cannot assert sync metadata.
+	forged := testPostingFixture("01900000-0000-7000-8000-000000000013")
+	forged.Source, forged.Pending = SourceSimpleFIN, true
+	created, err := store.CreatePosting(forged)
+	if err != nil || created.Source != SourceModel || created.Pending {
+		t.Fatalf("owner posting metadata = %+v, err %v", created, err)
 	}
 
 	// Sync-owned rows refuse owner updates and deletes.
@@ -226,7 +219,7 @@ func testRowWritesRejectForgedSyncNamespace(t *testing.T, newStore func(*testing
 	}
 	var synced types.Posting
 	for _, posting := range stored.Postings {
-		if posting.ID == "sync-pending-prime_card-tx1" {
+		if posting.Source == SourceSimpleFIN {
 			synced = posting
 		}
 	}
@@ -259,63 +252,21 @@ func testRowWritesRejectForgedSyncNamespace(t *testing.T, newStore func(*testing
 			t.Fatalf("forged checkpoint flag persisted: %+v", checkpoint)
 		}
 	}
-	ids, sources := loadPostingIDs(t, store)
-	for _, id := range ids {
-		if id == "sync-pending-prime_card-forged" {
-			t.Fatalf("forged sync posting persisted: %v", ids)
-		}
-	}
-	if sources["sync-pending-prime_card-tx1"] != SourceSimpleFIN {
+	_, sources := loadPostingIDs(t, store)
+	if sources[synced.ID] != SourceSimpleFIN {
 		t.Fatalf("stored sync posting lost flag: %v", sources)
 	}
-	if sources["owner-charge"] != SourceModel {
-		t.Fatalf("owner posting flag = %q", sources["owner-charge"])
+	if sources[ownerPostingID] != SourceModel || sources[created.ID] != SourceModel {
+		t.Fatalf("owner posting flags = %v", sources)
 	}
 }
 
-func TestLegacySyncNamespaceStillReserved(t *testing.T) {
+func TestPostingIDsMustBeUUIDs(t *testing.T) {
 	store := openTestStore(t)
-	seedOwnerDocument(t, store)
-	seedSyncState(t, store)
-	if !IsSyncPostingID(SyncPostingPrefix+"pending-x") ||
-		!IsSyncPostingID(LegacySyncPostingPrefix+"pending-x") {
-		t.Fatal("IsSyncPostingID must accept the current and legacy sync namespaces")
-	}
-	if IsSyncPostingID("owner-charge") {
-		t.Fatal("IsSyncPostingID claimed an owner ID")
-	}
-	prime := "prime_card"
-	if _, err := store.CreatePosting(syncPendingPosting(
-		LegacySyncPostingPrefix+"pending-"+prime+"-legacy", prime, "2026-08-03",
-	)); !IsReservedID(err) {
-		t.Fatalf("create forged legacy sync posting err = %v, want reserved-id", err)
-	}
-}
-
-func TestApplySyncPlanRefreshCleansLegacyPendingNamespace(t *testing.T) {
-	// SQLite-only: pre-rename sync rows carry sfin-pending-* IDs, which row
-	// writes and ApplySyncPlan can no longer produce, so only raw SQL can
-	// set up this coexistence case.
-	store := openSQLiteStore(t)
-	seedOwnerDocument(t, store)
-	execSyncSetup(t, store, []string{
-		`INSERT INTO accounts (id, position, name, enabled) VALUES ('prime_card', 1, 'Prime', 1)`,
-		`INSERT INTO entity_ids (id, kind) VALUES ('prime_card', 'account')`,
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source)
-		 VALUES ('sfin-pending-prime_card-old', 10, 'Legacy pending', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 0, 'simplefin')`,
-		`INSERT INTO entity_ids (id, kind) VALUES ('sfin-pending-prime_card-old', 'posting')`,
-	})
-	summary, err := store.ApplySyncPlan(nil, []types.Posting{
-		syncPendingPosting("sync-pending-prime_card-new", "prime_card", "2026-08-03"),
-	}, []string{"prime_card"}, false)
-	if err != nil || summary.PendingDeleted != 1 || summary.PendingInserted != 1 {
-		t.Fatalf("apply = %+v, err %v", summary, err)
-	}
-	if got := countRows(t, store, "postings", "id = 'sfin-pending-prime_card-old'"); got != 0 {
-		t.Fatal("legacy pending row survived refresh")
-	}
-	if got := countRows(t, store, "postings", "id = 'sync-pending-prime_card-new'"); got != 1 {
-		t.Fatal("refreshed pending row missing")
+	for _, id := range []string{"owner-charge", "sync-pending-card-tx1", "sfin-pending-card-tx1"} {
+		if _, err := store.CreatePosting(testPostingFixture(id)); !IsInvalidID(err) {
+			t.Fatalf("create %q err = %v, want invalid-id", id, err)
+		}
 	}
 }
 
@@ -328,9 +279,9 @@ func TestRemergePreservesProviderSources(t *testing.T) {
 	seedSyncRows(t, store)
 	execSyncSetup(t, store, []string{
 		`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (11, '2026-08-02', 'checking', 222, 'plaid')`,
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source)
-		 VALUES ('sync-pending-checking-plaid1', 11, 'Plaid pending', 'checking', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 0, 'plaid')`,
-		`INSERT INTO entity_ids (id, kind) VALUES ('sync-pending-checking-plaid1', 'posting')`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending)
+		 VALUES ('` + otherSyncedPostingID + `', 11, 'Plaid pending', 'checking', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 0, 'plaid', 1)`,
+		`INSERT INTO entity_ids (id, kind) VALUES ('` + otherSyncedPostingID + `', 'posting')`,
 	})
 	tx, err := store.db.Begin()
 	if err != nil {
@@ -355,12 +306,12 @@ func TestRemergePreservesProviderSources(t *testing.T) {
 		sources["posting:"+posting.ID] = posting.Source
 	}
 	for key, want := range map[string]string{
-		"checkpoint:checking:2026-08-01":       "simplefin",
-		"checkpoint:checking:2026-08-02":       "plaid",
-		"checkpoint:checking:2026-07-01":       "model",
-		"posting:sync-pending-prime_card-tx1":  "simplefin",
-		"posting:sync-pending-checking-plaid1": "plaid",
-		"posting:owner-charge":                 "model",
+		"checkpoint:checking:2026-08-01":  "simplefin",
+		"checkpoint:checking:2026-08-02":  "plaid",
+		"checkpoint:checking:2026-07-01":  "model",
+		"posting:" + rawSyncedPostingID:   "simplefin",
+		"posting:" + otherSyncedPostingID: "plaid",
+		"posting:" + ownerPostingID:       "model",
 	} {
 		if sources[key] != want {
 			t.Fatalf("source %q = %q, want %q (all rows: %v)", key, sources[key], want, sources)
@@ -402,18 +353,21 @@ func testOwnerCheckpointWinsKeyCollision(t *testing.T, newStore func(*testing.T)
 	}
 }
 
-func syncPendingPosting(id, accountID, day string) types.Posting {
+func syncPendingPosting(id, accountID, day string) SyncPosting {
 	stamp, err := time.ParseInLocation("2006-01-02", day, time.UTC)
 	if err != nil {
 		stamp = time.Unix(1785628800, 0).UTC()
 	}
-	return types.Posting{
-		ID:              id,
-		Name:            "Pending",
-		SourceAccountID: &accountID,
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
-		PostedTime:      stamp.Unix(),
-		TransactionTime: stamp.Unix(),
+	return SyncPosting{
+		ProviderAccountID: "bridge-" + accountID,
+		TransactionID:     id,
+		Posting: types.Posting{
+			Name:            "Pending " + id,
+			SourceAccountID: &accountID,
+			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+			PostedTime:      stamp.Unix(),
+			TransactionTime: stamp.Unix(),
+		},
 	}
 }
 
@@ -444,7 +398,7 @@ func findCheckpoint(document *types.FinancialModelDocument, accountID string, da
 	return types.Checkpoint{}, false
 }
 
-// syncedPendingIDs lists sync-namespace pending posting IDs in a loaded
+// syncedPendingIDs lists explicitly pending sync posting IDs in a loaded
 // document, replacing raw COUNT queries over the postings table.
 func syncedPendingIDs(document *types.FinancialModelDocument) []string {
 	var ids []string
@@ -452,7 +406,7 @@ func syncedPendingIDs(document *types.FinancialModelDocument) []string {
 		return ids
 	}
 	for _, posting := range document.Postings {
-		if strings.HasPrefix(posting.ID, SyncPostingPrefix+"pending-") {
+		if posting.Pending && posting.Source != SourceModel {
 			ids = append(ids, posting.ID)
 		}
 	}
@@ -561,19 +515,19 @@ func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*test
 	seedOwnerDocument(t, store)
 	cards := []string{"prime_card"}
 
-	first, err := store.ApplySyncPlan(nil, []types.Posting{
-		syncPendingPosting("sync-pending-prime_card-a", "prime_card", "2026-08-02"),
-		syncPendingPosting("sync-pending-prime_card-b", "prime_card", "2026-08-02"),
+	first, err := store.ApplySyncPlan(nil, []SyncPosting{
+		syncPendingPosting("a", "prime_card", "2026-08-02"),
+		syncPendingPosting("b", "prime_card", "2026-08-02"),
 	}, cards, false)
 	if err != nil || first.PendingInserted != 2 {
 		t.Fatalf("first apply = %+v, err %v", first, err)
 	}
 
-	second, err := store.ApplySyncPlan(nil, []types.Posting{
-		syncPendingPosting("sync-pending-prime_card-b", "prime_card", "2026-08-03"),
-		syncPendingPosting("sync-pending-prime_card-c", "prime_card", "2026-08-03"),
+	second, err := store.ApplySyncPlan(nil, []SyncPosting{
+		syncPendingPosting("b", "prime_card", "2026-08-03"),
+		syncPendingPosting("c", "prime_card", "2026-08-03"),
 	}, cards, false)
-	if err != nil || second.PendingDeleted != 2 || second.PendingInserted != 2 {
+	if err != nil || second.PendingDeleted != 1 || second.PendingInserted != 1 || second.PendingUpdated != 1 {
 		t.Fatalf("second apply = %+v, err %v", second, err)
 	}
 	loaded, err := store.LoadDocument()
@@ -585,29 +539,27 @@ func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*test
 		t.Fatalf("pending rows = %v, want 2", got)
 	}
 	for _, id := range got {
-		if id == "sync-pending-prime_card-a" {
-			t.Fatalf("stale pending row survived refresh: %v", got)
+		if _, err := uuid.Parse(id); err != nil {
+			t.Fatalf("pending identity is not a UUID: %v", got)
 		}
 	}
 }
 
 func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
-	// SQLite-only: a model-source row with a colliding sync-prefix ID can
-	// only exist as legacy data (row writes reject the sync- namespace),
-	// so only raw SQL can set up this coexistence case.
+	// Ownership, not lifecycle state or ID formatting, protects owner rows.
 	store := openSQLiteStore(t)
 	execSyncSetup(t, store, []string{
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source)
-		 VALUES ('sync-pending-prime_card-manual', 0, 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 1, 'model')`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending)
+		 VALUES ('` + ownerPostingID + `', 0, 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 1, 'model', 1)`,
 	})
-	summary, err := store.ApplySyncPlan(nil, []types.Posting{
-		syncPendingPosting("sync-pending-prime_card-a", "prime_card", "2026-08-02"),
+	summary, err := store.ApplySyncPlan(nil, []SyncPosting{
+		syncPendingPosting("a", "prime_card", "2026-08-02"),
 	}, []string{"prime_card"}, false)
 	if err != nil || summary.PendingInserted != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
-	if got := countRows(t, store, "postings", "id = 'sync-pending-prime_card-manual'"); got != 1 {
-		t.Fatal("user row with colliding prefix was deleted")
+	if got := countRows(t, store, "postings", "id = '"+ownerPostingID+"'"); got != 1 {
+		t.Fatal("owner row was deleted")
 	}
 }
 
@@ -621,7 +573,7 @@ func testApplySyncPlanDryRunWritesNothing(t *testing.T, newStore func(*testing.T
 	seedOwnerDocument(t, store)
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
-		[]types.Posting{syncPendingPosting("sync-pending-prime_card-a", "prime_card", "2026-08-02")},
+		[]SyncPosting{syncPendingPosting("a", "prime_card", "2026-08-02")},
 		[]string{"prime_card"}, true,
 	)
 	if err != nil || !summary.DryRun || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {

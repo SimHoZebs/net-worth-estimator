@@ -100,7 +100,7 @@ func insertPreset(tx *sql.Tx, position int, preset *types.AmountPreset) error {
 }
 
 // CreateAmountPreset inserts one preset. An empty ID gets a UUIDv7; names
-// are unique and sync-namespace IDs are rejected like every other row.
+// are unique. IDs carry no ownership meaning.
 func (s *sqliteStore) CreateAmountPreset(preset types.AmountPreset) (types.AmountPreset, error) {
 	if err := ValidateAmountPresetName(preset.Name); err != nil {
 		return types.AmountPreset{}, err
@@ -111,9 +111,6 @@ func (s *sqliteStore) CreateAmountPreset(preset types.AmountPreset) (types.Amoun
 			return types.AmountPreset{}, err
 		}
 		preset.ID = id
-	}
-	if IsSyncPostingID(preset.ID) {
-		return types.AmountPreset{}, &rowError{code: "reserved-id", id: preset.ID}
 	}
 	err := presetTx(s.db, func(tx *sql.Tx) error {
 		position, err := nextTablePosition(tx, "amount_presets")

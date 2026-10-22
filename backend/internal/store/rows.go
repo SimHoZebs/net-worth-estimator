@@ -25,7 +25,7 @@ const (
 )
 
 // Row errors map to API statuses: NotFound→404, IDConflict→409,
-// ReservedID/SyncOwned/AccountMissing→422.
+// InvalidID/SyncOwned/AccountMissing→422.
 type rowError struct {
 	code string
 	id   string
@@ -39,8 +39,8 @@ func IsNotFound(err error) bool { return isRowCode(err, "not-found") }
 // IsIDConflict reports a duplicate-ID error.
 func IsIDConflict(err error) bool { return isRowCode(err, "id-conflict") }
 
-// IsReservedID reports a forged sync-namespace ID.
-func IsReservedID(err error) bool { return isRowCode(err, "reserved-id") }
+// IsInvalidID reports a posting ID that is not a canonical UUID.
+func IsInvalidID(err error) bool { return isRowCode(err, "invalid-id") }
 
 // IsSyncOwned reports a write refused on a sync-owned row.
 func IsSyncOwned(err error) bool { return isRowCode(err, "sync-owned") }
@@ -285,9 +285,6 @@ func (s *sqliteStore) CreateAccount(account types.Account) (types.Account, error
 		}
 		account.ID = id
 	}
-	if IsSyncPostingID(account.ID) {
-		return types.Account{}, &rowError{code: "reserved-id", id: account.ID}
-	}
 	err := withRowTx(s.db, func(tx *sql.Tx) error {
 		if err := claimRowID(tx, account.ID, "account"); err != nil {
 			return err
@@ -387,8 +384,8 @@ func postingSource(tx *sql.Tx, id string) (string, error) {
 	return source.String, nil
 }
 
-// CreatePosting inserts one owner posting. Empty IDs get a UUIDv7;
-// sync-namespace IDs are rejected (sync owns that namespace).
+// CreatePosting inserts one owner posting. Empty IDs get a UUIDv7.
+// IDs carry no ownership or lifecycle meaning.
 func (s *sqliteStore) CreatePosting(posting types.Posting) (types.Posting, error) {
 	if posting.ID == "" {
 		id, err := newRowID()
@@ -397,10 +394,14 @@ func (s *sqliteStore) CreatePosting(posting types.Posting) (types.Posting, error
 		}
 		posting.ID = id
 	}
-	if IsSyncPostingID(posting.ID) {
-		return types.Posting{}, &rowError{code: "reserved-id", id: posting.ID}
+	parsed, err := uuid.Parse(posting.ID)
+	if err != nil || parsed.String() != posting.ID {
+		return types.Posting{}, &rowError{code: "invalid-id", id: posting.ID}
 	}
-	err := withRowTx(s.db, func(tx *sql.Tx) error {
+	posting.Source = SourceModel
+	posting.Pending = false
+	posting.ExecutionOrder = 0
+	err = withRowTx(s.db, func(tx *sql.Tx) error {
 		if err := claimRowID(tx, posting.ID, "posting"); err != nil {
 			return err
 		}
@@ -421,6 +422,8 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 	if posting.ID == "" {
 		return types.Posting{}, &rowError{code: "not-found", id: ""}
 	}
+	posting.Source = SourceModel
+	posting.Pending = false
 	err := withRowTx(s.db, func(tx *sql.Tx) error {
 		source, err := postingSource(tx, posting.ID)
 		if err != nil {
@@ -430,7 +433,7 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 			return &rowError{code: "sync-owned", id: posting.ID}
 		}
 		var position int
-		if err := tx.QueryRow(`SELECT position FROM postings WHERE id = ?`, posting.ID).Scan(&position); err != nil {
+		if err := tx.QueryRow(`SELECT position, execution_order FROM postings WHERE id = ?`, posting.ID).Scan(&position, &posting.ExecutionOrder); err != nil {
 			return fmt.Errorf("read posting %s: %w", posting.ID, err)
 		}
 		if _, err := tx.Exec(`DELETE FROM postings WHERE id = ?`, posting.ID); err != nil {
@@ -476,9 +479,6 @@ func (s *sqliteStore) CreateRule(rule types.RecurrenceRule) (types.RecurrenceRul
 			return types.RecurrenceRule{}, err
 		}
 		rule.ID = id
-	}
-	if IsSyncPostingID(rule.ID) {
-		return types.RecurrenceRule{}, &rowError{code: "reserved-id", id: rule.ID}
 	}
 	err := withRowTx(s.db, func(tx *sql.Tx) error {
 		if err := claimRowID(tx, rule.ID, "rule"); err != nil {

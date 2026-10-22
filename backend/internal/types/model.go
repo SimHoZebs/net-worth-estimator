@@ -202,9 +202,15 @@ type Posting struct {
 	Claim           *PostingClaim           `json:"claim,omitempty"`
 	Purchase        *PurchasePolicy         `json:"purchase,omitempty"`
 	Enabled         bool                    `json:"enabled"`
+	// Pending is bank lifecycle metadata, independent of identity and Enabled.
+	// Owner writes cannot set it.
+	Pending bool `json:"pending,omitempty"`
 	// Source names the row owner: "model" (owner/seed) or "simplefin".
 	// Read-only on GET; PUT ignores it (server recomputes ownership).
 	Source string `json:"source,omitempty"`
+	// ExecutionOrder breaks equal-time ties independently of identity and display
+	// position. The store assigns it on create and preserves it on owner updates.
+	ExecutionOrder int64 `json:"executionOrder,omitempty"`
 }
 
 // RecurrenceRule owns repetition. Its movement fields are the template

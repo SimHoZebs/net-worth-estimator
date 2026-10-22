@@ -1433,6 +1433,129 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
+	it("lets an editor add and save a planned purchase without rewriting synced accounts or postings", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const model = modelFixture();
+		model.checkpoints[0]!.source = "simplefin";
+		const pending: BackendPosting = {
+			id: "01900000-0000-7000-8000-000000000001",
+			name: "Pending bank charge",
+			sourceAccountId: "cash",
+			destinations: null,
+			amount: {
+				resolver: "expression",
+				config: { expression: "25.15" },
+				inputs: {},
+			},
+			postedTime: 0,
+			transactionTime: 1769904300,
+			enabled: false,
+			source: "simplefin",
+			pending: true,
+		};
+		model.postings = [pending];
+		const { client } = clientFixture(undefined, model);
+		client.getStatus.mockResolvedValue({ readOnly: true, authEnabled: true });
+		const rendered = renderHook(() =>
+			useRemoteWorkspace({ client, authToken: "editor-session" }),
+		);
+		await rendered.settle();
+		expect(rendered.result().plan?.readOnly).toBe(true);
+		client.getStatus.mockResolvedValue({ readOnly: false, authEnabled: true });
+		await rendered.result().refreshStatus();
+		await rendered.settle();
+		const plan = rendered.result().plan!;
+		expect(rendered.result().readOnly).toBe(false);
+		expect(plan.readOnly).toBe(false);
+		expect(plan.accounts[0]?.readOnly).toBe(true);
+		expect(plan.accounts[1]?.readOnly).toBe(false);
+		expect(rendered.result().workspace?.draft).toBeNull();
+		const purchase = {
+			id: "01900000-0000-7000-8000-000000000002",
+			name: "New laptop",
+			amount: 1200,
+			amountKnown: true,
+			fromId: "cash",
+			toId: null,
+			frequency: "once" as const,
+			startDate: "2026-02-15",
+			endDate: null,
+			annualIncrease: 0,
+			enabled: true,
+			readOnly: false,
+			claimRuleId: null,
+			claimOccurrenceDate: null,
+			postedDate: null,
+			purchasePriority: 0,
+		};
+
+		const accepted = rendered.result().updatePlan({
+			...plan,
+			movements: [...plan.movements, purchase],
+		});
+		await rendered.settle();
+		expect(rendered.result().error).toBeNull();
+		expect(accepted).toBe(true);
+		expect(rendered.result().workspace?.draft?.movements).toContainEqual(
+			purchase,
+		);
+		client.getStatus.mockResolvedValue({ readOnly: true, authEnabled: true });
+		await rendered.result().refreshStatus();
+		await rendered.settle();
+		expect(rendered.result().plan?.readOnly).toBe(true);
+		expect(rendered.result().plan?.accounts[1]?.readOnly).toBe(true);
+		expect(await rendered.result().save()).toBe(false);
+		expect(client.createPosting).not.toHaveBeenCalled();
+		client.getStatus.mockResolvedValue({ readOnly: false, authEnabled: true });
+		await rendered.result().refreshStatus();
+		await rendered.settle();
+		expect(rendered.result().plan?.readOnly).toBe(false);
+		expect(rendered.result().plan?.accounts[1]?.readOnly).toBe(false);
+		expect(rendered.result().workspace?.draft?.movements).toContainEqual(
+			purchase,
+		);
+		expect(await rendered.result().save()).toBe(true);
+		await rendered.settle();
+
+		expect(client.createPosting).toHaveBeenCalledExactlyOnceWith(
+			expect.objectContaining({
+				id: purchase.id,
+				sourceAccountId: "cash",
+				amount: {
+					resolver: "expression",
+					config: { expression: "1200" },
+					inputs: {},
+				},
+				purchase: { priority: 0 },
+			}),
+			expect.objectContaining({ authToken: "editor-session" }),
+		);
+		expect(client.createAccount).not.toHaveBeenCalled();
+		expect(client.updateAccount).not.toHaveBeenCalled();
+		expect(client.deleteAccount).not.toHaveBeenCalled();
+		expect(client.saveCheckpoint).not.toHaveBeenCalled();
+		expect(client.deleteCheckpoint).not.toHaveBeenCalled();
+		expect(client.updatePosting).not.toHaveBeenCalled();
+		expect(client.deletePosting).not.toHaveBeenCalled();
+		expect(rendered.result().serverDocument?.postings).toContainEqual(pending);
+		expect(rendered.result().serverDocument?.accounts).toEqual(model.accounts);
+		expect(rendered.result().serverDocument?.checkpoints).toEqual(
+			model.checkpoints,
+		);
+		expect(rendered.result().workspace?.draft).toBeNull();
+		expect(rendered.result().plan?.movements).toContainEqual(
+			expect.objectContaining({
+				id: purchase.id,
+				amount: purchase.amount,
+				fromId: purchase.fromId,
+				purchasePriority: purchase.purchasePriority,
+			}),
+		);
+		expect(rendered.result().plan?.accounts[0]?.readOnly).toBe(true);
+		expect(rendered.result().error).toBeNull();
+		rendered.unmount();
+	});
+
 	it.each([
 		{ fromReadOnly: true, toReadOnly: false },
 		{ fromReadOnly: false, toReadOnly: true },

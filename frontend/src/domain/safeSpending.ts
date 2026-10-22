@@ -319,6 +319,9 @@ export function mandatoryTransactions({
 		plan.accounts.map((account) => [account.id, account.name]),
 	);
 	const rows: AccountTransaction[] = [];
+	const pendingIds = new Set(
+		plan.movements.filter(isPendingMovement).map((movement) => movement.id),
+	);
 	let index = 0;
 	for (const movement of movements) {
 		if (movement.fromId === null || !sources.has(movement.fromId)) continue;
@@ -344,7 +347,7 @@ export function mandatoryTransactions({
 			shortfall: Math.max(0, movement.requested - amount),
 			constraint: movement.constraint,
 			excluded: false,
-			pending: isPendingMovement(movement.movementId),
+			pending: pendingIds.has(movement.movementId),
 		});
 	}
 	return rows;

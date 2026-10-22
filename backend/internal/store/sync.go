@@ -3,7 +3,6 @@ package store
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -21,23 +20,6 @@ const (
 	// lifecycle below.
 	SourceSimpleFIN = "simplefin"
 )
-
-// SyncPostingPrefix reserves posting IDs for sync-owned rows. Owner payloads
-// carrying it are dropped on save; validation never sees them.
-const SyncPostingPrefix = "sync-"
-
-// LegacySyncPostingPrefix is the pre-rename sync namespace. Existing
-// databases hold rows under it until their next sync refreshes them, so
-// reservation checks and pending cleanup accept both prefixes. New sync
-// output always uses SyncPostingPrefix.
-const LegacySyncPostingPrefix = "sfin-"
-
-// IsSyncPostingID reports whether an ID belongs to the sync namespace,
-// including the legacy prefix (see LegacySyncPostingPrefix).
-func IsSyncPostingID(id string) bool {
-	return strings.HasPrefix(id, SyncPostingPrefix) ||
-		strings.HasPrefix(id, LegacySyncPostingPrefix)
-}
 
 // syncCheckpointKey identifies an owner/sync checkpoint row for re-merge.
 func syncCheckpointKey(accountID, date string) string {
@@ -105,12 +87,15 @@ func remergeCheckpoints(tx *sql.Tx, incoming []types.Checkpoint, synced []types.
 	return position, nil
 }
 
-// remergePostings writes owner postings (dropping forged sync-namespace IDs)
-// then re-merges sync-owned rows. Returns the next free position.
+// remergePostings writes owner postings, then restores authoritative sync rows.
 func remergePostings(tx *sql.Tx, incoming []types.Posting, synced []types.Posting, startPosition int) (int, error) {
 	position := startPosition
+	syncedIDs := make(map[string]bool, len(synced))
+	for _, posting := range synced {
+		syncedIDs[posting.ID] = true
+	}
 	for i := range incoming {
-		if IsSyncPostingID(incoming[i].ID) {
+		if syncedIDs[incoming[i].ID] {
 			continue
 		}
 		if err := insertPosting(tx, position, &incoming[i], SourceModel); err != nil {
@@ -151,7 +136,7 @@ func loadSyncedCheckpoints(tx *sql.Tx) ([]types.Checkpoint, error) {
 }
 
 func loadSyncedPostings(tx *sql.Tx) ([]types.Posting, error) {
-	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source FROM postings WHERE source != ? ORDER BY position`, SourceModel)
+	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order FROM postings WHERE source != ? ORDER BY position`, SourceModel)
 	if err != nil {
 		return nil, err
 	}
@@ -215,15 +200,8 @@ type SyncApplySummary struct {
 	CheckpointsSkipped  int  `json:"checkpointsSkipped"`
 	PendingDeleted      int  `json:"pendingDeleted"`
 	PendingInserted     int  `json:"pendingInserted"`
+	PendingUpdated      int  `json:"pendingUpdated"`
 	DryRun              bool `json:"dryRun"`
-}
-
-// escapeLike escapes %, _, and the escape character for LIKE patterns.
-func escapeLike(value string) string {
-	value = strings.ReplaceAll(value, `\`, `\\`)
-	value = strings.ReplaceAll(value, `%`, `\%`)
-	value = strings.ReplaceAll(value, `_`, `\_`)
-	return value
 }
 
 // SyncProvision is one bridge account needing link resolution: an
@@ -291,10 +269,10 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision, dryRun bool) 
 
 // ApplySyncPlan upserts sync checkpoints and refreshes pending seed postings
 // in one transaction. Owner rows always win key conflicts. Pending rows are
-// snapshot-scoped per card account: existing sync pending rows for the given
-// accounts are deleted before the fresh set is inserted. With dryRun the
+// snapshot-scoped per card account. Exact provider keys preserve UUIDs across
+// refreshes; only missing pending rows are deleted. With dryRun the
 // transaction rolls back and only counts are returned.
-func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []types.Posting, cardAccounts []string, dryRun bool) (SyncApplySummary, error) {
+func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []SyncPosting, cardAccounts []string, dryRun bool) (SyncApplySummary, error) {
 	var summary SyncApplySummary
 	summary.DryRun = dryRun
 	tx, err := s.db.Begin()
@@ -345,72 +323,8 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []type
 		summary.CheckpointsUpdated++
 	}
 
-	for _, accountID := range cardAccounts {
-		// Clean both the current and legacy pending namespaces so a
-		// pre-rename database cannot orphan sfin-pending-* rows.
-		patterns := []string{
-			SyncPostingPrefix + "pending-" + escapeLike(accountID) + `-%`,
-			LegacySyncPostingPrefix + "pending-" + escapeLike(accountID) + `-%`,
-		}
-		var stale []string
-		var deleted int64
-		for _, pattern := range patterns {
-			rows, err := tx.Query(
-				`SELECT id FROM postings WHERE source = ? AND source_account_id = ? AND id LIKE ? ESCAPE '\'`,
-				SourceSimpleFIN, accountID, pattern,
-			)
-			if err != nil {
-				return summary, fmt.Errorf("sync read pending: %w", err)
-			}
-			for rows.Next() {
-				var id string
-				if err := rows.Scan(&id); err != nil {
-					rows.Close()
-					return summary, err
-				}
-				stale = append(stale, id)
-			}
-			if err := rows.Err(); err != nil {
-				rows.Close()
-				return summary, fmt.Errorf("sync read pending rows: %w", err)
-			}
-			rows.Close()
-			result, err := tx.Exec(
-				`DELETE FROM postings WHERE source = ? AND source_account_id = ? AND id LIKE ? ESCAPE '\'`,
-				SourceSimpleFIN, accountID, pattern,
-			)
-			if err != nil {
-				return summary, fmt.Errorf("sync clear pending: %w", err)
-			}
-			count, err := result.RowsAffected()
-			if err != nil {
-				return summary, fmt.Errorf("sync pending rows: %w", err)
-			}
-			deleted += count
-		}
-		summary.PendingDeleted += int(deleted)
-		for _, id := range stale {
-			if err := releaseRowID(tx, id); err != nil {
-				return summary, err
-			}
-		}
-	}
-	nextPostingPosition, err := nextTablePosition(tx, "postings")
-	if err != nil {
+	if err := applyPendingSnapshot(tx, pending, cardAccounts, &summary); err != nil {
 		return summary, err
-	}
-	for i := range pending {
-		// Sync-owned IDs live in the sync- namespace (plus the legacy sfin-
-		// namespace), which owner writes cannot claim, so idempotent
-		// re-claim is safe here.
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO entity_ids (id, kind) VALUES (?, 'posting')`, pending[i].ID); err != nil {
-			return summary, fmt.Errorf("sync claim pending id: %w", err)
-		}
-		if err := insertPosting(tx, nextPostingPosition, &pending[i], SourceSimpleFIN); err != nil {
-			return summary, fmt.Errorf("sync insert pending: %w", err)
-		}
-		nextPostingPosition++
-		summary.PendingInserted++
 	}
 
 	if dryRun {

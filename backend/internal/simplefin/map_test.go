@@ -75,8 +75,8 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 		t.Fatalf("pending = %+v", plan.Pending)
 	}
 	pending := plan.Pending[0]
-	if pending.ID != "sync-pending-prime_card-pend1" {
-		t.Fatalf("pending id = %q", pending.ID)
+	if pending.ID != "" || pending.ProviderAccountID != "bridge-prime" || pending.TransactionID != "pend1" || !pending.Pending {
+		t.Fatalf("pending identity/state = %+v", pending)
 	}
 	if pending.PostedTime != 1785628800 || pending.TransactionTime != 1785628800 {
 		t.Fatalf("pending time = %d/%d, want injected now", pending.PostedTime, pending.TransactionTime)
@@ -115,10 +115,21 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	}
 }
 
-func TestPendingPostingIDSanitizes(t *testing.T) {
-	id := PendingPostingID("prime_card", "a/b c.d")
-	if id != "sync-pending-prime_card-a_b_c_d" {
-		t.Fatalf("id = %q", id)
+func TestMapPreservesExactUpstreamTransactionKeys(t *testing.T) {
+	for _, key := range []string{"a/b", "a b", "a_b", "a.b"} {
+		var set AccountSet
+		if err := json.Unmarshal([]byte(fixtureAccountSet), &set); err != nil {
+			t.Fatal(err)
+		}
+		for i := range set.Accounts[1].Transactions {
+			if set.Accounts[1].Transactions[i].ID == "pend1" {
+				set.Accounts[1].Transactions[i].ID = key
+			}
+		}
+		plan, err := Map(&set, fixtureConfig(), map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
+		if err != nil || len(plan.Pending) != 1 || plan.Pending[0].TransactionID != key || plan.Pending[0].ID != "" {
+			t.Fatalf("upstream key was changed: plan %+v, err %v", plan, err)
+		}
 	}
 }
 

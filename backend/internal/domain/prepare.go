@@ -47,8 +47,8 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 	// posting with transaction day exactly on the start replays only when a
 	// start checkpoint exists; claimed rule occurrences never replay because
 	// the claiming actual stands in for them. Same-day order is one-time
-	// postings first by transaction time, posted time, then ID, followed by
-	// rule instances by priority (matching Simulate), via one shared
+	// postings first by transaction time, posted time, then execution order,
+	// followed by rule instances by priority (matching Simulate), via one shared
 	// resolution sequence.
 	occurrencesByDate := map[string][]DatedPostingOccurrence{}
 

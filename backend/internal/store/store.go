@@ -69,7 +69,7 @@ type Store interface {
 	SetLastSyncTime(completedAt string) error
 	GetArtifact(identity string) (string, bool, error)
 	PutArtifact(identity, kind, payload string) error
-	ApplySyncPlan(checkpoints []SyncCheckpoint, pending []types.Posting, cardAccounts []string, dryRun bool) (SyncApplySummary, error)
+	ApplySyncPlan(checkpoints []SyncCheckpoint, pending []SyncPosting, cardAccounts []string, dryRun bool) (SyncApplySummary, error)
 	Clear() error
 	Close() error
 }
@@ -82,8 +82,7 @@ type sqliteStore struct {
 
 // Open opens (creating if needed) the SQLite database and ensures the
 // current schema. It returns the Store interface so callers never name the
-// implementation. Old database files are unsupported: restore from a backup
-// or start fresh.
+// implementation. The preceding posting identity schema upgrades atomically.
 func Open(path string) (Store, error) {
 	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
 	if err != nil {

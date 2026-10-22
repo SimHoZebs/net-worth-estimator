@@ -182,17 +182,17 @@ Read-only mode rejects those routes first with 403. Otherwise, a configured toke
 - a 5-second busy timeout;
 - one open connection.
 
-Migrations are transactional and forward-only. A database newer than the supported schema is rejected.
+The posting identity upgrade is transactional and forward-only. Completed upgrades
+are recorded in `schema_migrations`. Restore a database backup before a downgrade.
 
 The current schema stores:
 
 | Table                  | Purpose                                                                                                       |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `PRAGMA user_version`  | applied migration version                                                                                     |
 | `model_metadata`       | source path and document-present flag                                                                         |
 | `accounts`             | ordered account definitions                                                                                   |
 | `checkpoints`          | ordered balance observations, unique by account/date, with owner                                              |
-| `postings`             | ordered posting definitions with owner                                                                        |
+| `postings`             | ordered UUID posting definitions with owner and explicit pending state                                         |
 | `recurrence_rules`     | ordered repetition templates with schedule, priority, and optional annual cap                                 |
 | `payment_terms`        | mechanism config for debt-account minimums, due anchors, and statement anchors                                |
 | `evaluations`          | type, globally keyed instance ID, order, label, enablement, and JSON config                                   |
@@ -202,6 +202,9 @@ The current schema stores:
 | `sync_state`           | last successful sync completion time                                                                          |
 | `projection_artifacts` | versioned content identity, kind, creation time, and JSON payload                                             |
 | `amount_presets`       | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
+| `posting_sync_keys`    | exact provider/account/transaction identity mapped to a local posting UUID                                     |
+| `posting_id_migrations` | private old-to-new posting identity audit for the one-way UUID migration                                      |
+| `schema_migrations`    | completed transactional schema upgrades                                                                       |
 
 ### First boot and import
 
@@ -215,13 +218,20 @@ Each row write runs one transaction: validate the resulting document, then inser
 
 1. Creates claim the row ID in `entity_ids` (server-generated UUIDv7 when omitted); duplicates return 409.
 2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
-3. Incoming `source` values are ignored and recomputed. Incoming IDs in the reserved `sfin-` namespace are rejected. Stored sync rows therefore cannot be forged through row writes; sync-owned postings also refuse owner updates and deletes.
+3. Posting IDs are canonical UUIDs. Incoming `source` and `pending` values are ignored and recomputed. Stored ownership protects sync rows from owner updates and deletes. ID prefixes carry no policy or lifecycle meaning.
 4. Owner checkpoints win key collisions; a later synchronization skips the owner-owned key until owner data is removed.
 5. Deleting an account keeps its bridge links; the link is the memory of the mapping, so recreating the account resumes sync flow. A link whose model account is gone resolves to nothing and is counted as `linked-account-missing` until relinked.
 
 ### Amount presets
 
-Amount presets are saved amount recipes managed through `GET /v1/amount-presets`, `POST`/`PATCH`/`DELETE /v1/amount-presets`, and `POST /v1/amount-presets/reorder`. Each write runs one transaction without touching the canonical document: creates generate UUIDv7 IDs when omitted and reject the reserved `sfin-` namespace; names are unique (duplicates return 409) and immutable; deletes and moves return the affected ID. Validation is shape-only (non-empty name and label, `ValidateAmountDescriptor` with no references so placeholder IDs pass); failures return issues with `persisted: false`. The table seeds 8 factory presets at migration time and survives `Clear` and CSV import: presets are user configuration, not model data.
+Amount presets are saved amount recipes managed through `GET /v1/amount-presets`, `POST`/`PATCH`/`DELETE /v1/amount-presets`, and `POST /v1/amount-presets/reorder`. Each write runs one transaction without touching the canonical document: creates generate UUIDv7 IDs when omitted; names are unique (duplicates return 409) and immutable; deletes and moves return the affected ID. Validation is shape-only (non-empty name and label, `ValidateAmountDescriptor` with no references so placeholder IDs pass); failures return issues with `persisted: false`. The table seeds 8 factory presets at migration time and survives `Clear` and CSV import: presets are user configuration, not model data.
+
+### Posting identity upgrade
+
+`store.Open` upgrades the preceding schema in one transaction. It converts every
+non-UUID posting ID, rewrites amount/evaluation/preset references, preserves row
+display order, equal-time execution order, and purchase policies, and invalidates derived projection caches. Account
+and recurrence-rule IDs remain unchanged. See [the migration contract](docs/posting-identity.md).
 
 ### Artifact durability
 
@@ -485,7 +495,7 @@ The seed controls the state sequence. Run-count normalization and seed-null beha
 
 `Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through links plus env bootstrap, provisions unmapped USD accounts, then `Map` emits one balance checkpoint per resolved account/date and only pending negative card charges as disabled postings. Posted, positive, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
 
-`Store.ApplySyncPlan` applies checkpoints and the pending snapshot in one transaction. Owner checkpoints win key collisions. Pending deletion is constrained by owner, account, and the escaped reserved prefix. Dry-run returns before commit, so the transaction rolls back.
+`Store.ApplySyncPlan` applies checkpoints and the pending snapshot in one transaction. Owner checkpoints win key collisions. Exact provider/account/transaction keys map to store-allocated UUIDs. Repeated snapshots update those same rows. Only absent rows with the matching provider, model account, and explicit pending state are deleted. Dry-run returns before commit, so the transaction rolls back. Summary counters distinguish `pendingInserted`, `pendingUpdated`, and `pendingDeleted`.
 
 The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00, 06, 12, 18 local) plus a random minute offset. Manual triggers use `Runner.Trigger`, which rejects concurrent and too-recent successful runs. Successful non-dry runs persist their completion time; `GET /v1/status` exposes it as `lastSyncAt` alongside `syncConfigured`.
 

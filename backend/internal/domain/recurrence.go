@@ -25,8 +25,8 @@ type DatedPostingOccurrence struct {
 
 // sortOccurrences orders same-day occurrences with one-time postings
 // first, then scheduled rule instances. Within one-time postings it orders
-// by transaction time, then posted time, then ID. Within rule instances it
-// orders by rule priority, then declaration sequence. Accepted purchases
+// by transaction time, then posted time, then explicit execution order.
+// Within rule instances it orders by rule priority, then declaration sequence. Accepted purchases
 // follow both, ordered by purchase priority then sequence. Simulate, history
 // replay, and the financial independence branch share this order so one edit
 // changes all three.
@@ -57,8 +57,8 @@ func sortOccurrences(occurrences []DatedPostingOccurrence) {
 			if leftPosting.PostedTime != rightPosting.PostedTime {
 				return leftPosting.PostedTime < rightPosting.PostedTime
 			}
-			if leftPosting.ID != rightPosting.ID {
-				return leftPosting.ID < rightPosting.ID
+			if leftPosting.ExecutionOrder != rightPosting.ExecutionOrder {
+				return leftPosting.ExecutionOrder < rightPosting.ExecutionOrder
 			}
 			return occurrences[i].Index < occurrences[j].Index
 		}

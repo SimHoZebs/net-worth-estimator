@@ -3,7 +3,6 @@ package store
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -16,11 +15,6 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	store := openSQLiteStore(t)
 	seedOwnerDocument(t, store)
 	seedSyncRows(t, store)
-	// Pre-rename databases hold legacy sfin- registry rows; the purge must
-	// release those too.
-	execSyncSetup(t, store, []string{
-		`INSERT INTO entity_ids (id, kind) VALUES ('sfin-pending-prime_card-legacy', 'posting')`,
-	})
 	if err := store.SetLastSyncTime("2026-10-18T14:30:00Z"); err != nil {
 		t.Fatalf("record last sync: %v", err)
 	}
@@ -32,23 +26,8 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read purge script: %v", err)
 	}
-	// The script is comment-heavy by design (procedure + preview queries),
-	// so collect only the active DELETE statements instead of splitting on
-	// semicolons, which also appear inside commented preview queries.
-	var statements []string
-	for _, line := range strings.Split(string(raw), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(strings.ToUpper(trimmed), "DELETE") {
-			statements = append(statements, strings.TrimSuffix(trimmed, ";"))
-		}
-	}
-	if len(statements) != 4 {
-		t.Fatalf("purge script DELETEs = %d, want 4 (postings + checkpoints + entity ids + sync state)", len(statements))
-	}
-	for _, statement := range statements {
-		if _, err := store.db.Exec(statement); err != nil {
-			t.Fatalf("purge statement %q: %v", statement, err)
-		}
+	if _, err := store.db.Exec(string(raw)); err != nil {
+		t.Fatalf("purge transaction: %v", err)
 	}
 
 	if got := countRows(t, store, "postings", "source = 'simplefin'"); got != 0 {
@@ -57,13 +36,16 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	if got := countRows(t, store, "checkpoints", "source = 'simplefin'"); got != 0 {
 		t.Fatalf("sync checkpoints after purge = %d, want 0", got)
 	}
-	if got := countRows(t, store, "entity_ids", "id LIKE 'sync-%' OR id LIKE 'sfin-%'"); got != 0 {
+	if got := countRows(t, store, "entity_ids", "id = '"+rawSyncedPostingID+"'"); got != 0 {
 		t.Fatalf("sync registry rows after purge = %d, want 0", got)
 	}
-	if got := countRows(t, store, "entity_ids", "id = 'owner-charge'"); got != 1 {
+	if got := countRows(t, store, "posting_sync_keys", ""); got != 0 {
+		t.Fatal("sync keys survived the purge")
+	}
+	if got := countRows(t, store, "entity_ids", "id = '"+ownerPostingID+"'"); got != 1 {
 		t.Fatal("owner registry row was purged")
 	}
-	if got := countRows(t, store, "postings", "id = 'owner-charge'"); got != 1 {
+	if got := countRows(t, store, "postings", "id = '"+ownerPostingID+"'"); got != 1 {
 		t.Fatal("owner posting was purged")
 	}
 	if got := countRows(t, store, "checkpoints", "source = 'model'"); got != 1 {

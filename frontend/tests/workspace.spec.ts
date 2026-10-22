@@ -189,7 +189,7 @@ test("failed saves retain the intended plan", async ({ page }) => {
 	await page.getByLabel("Amount (USD)").fill("900");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	// The server rejects the write, so the unsaved changes must survive.
-	await page.route("**/v1/postings/*", async (route) => {
+	await page.route("**/v1/recurrence-rules/*", async (route) => {
 		if (route.request().method() === "PATCH")
 			return route.fulfill({
 				status: 500,
@@ -219,7 +219,10 @@ test("corrupt persisted data never silently falls back to example content", asyn
 	// The remote workspace key holds the unsaved changes. Corrupt it and the
 	// app must surface a recovery path rather than invent a plan.
 	await page.addInitScript((key) => {
-		window.localStorage.setItem(key, "invalid");
+		window.localStorage.setItem(
+			`${key}:resource:${encodeURIComponent(window.location.origin)}:legacy`,
+			"invalid",
+		);
 	}, REMOTE_STORAGE_KEY);
 	await page.goto("/");
 	const storageNotice = page
@@ -423,7 +426,12 @@ test("a second tab cannot overwrite newer financial work", async ({
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await expect(page.getByRole("alert")).toContainText("another tab");
 	const stored = await page.evaluate(
-		(key) => JSON.parse(window.localStorage.getItem(key)!),
+		(key) =>
+			JSON.parse(
+				window.localStorage.getItem(
+					`${key}:resource:${encodeURIComponent(window.location.origin)}:legacy`,
+				)!,
+			),
 		REMOTE_STORAGE_KEY,
 	);
 	// The newer write from the other tab is what survives.

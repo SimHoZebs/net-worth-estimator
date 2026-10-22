@@ -29,7 +29,7 @@ func TestPurchasePostingHTTPRoundTrip(t *testing.T) {
 	if account.Code != 200 {
 		t.Fatal(account.Body.String())
 	}
-	body := `{"id":"wish","name":"Laptop","sourceAccountId":"cash","amount":{"resolver":"expression","config":{"expression":"500"},"inputs":{}},"postedTime":1769904000,"transactionTime":1769904000,"enabled":true,"purchase":{"priority":3}}`
+	body := `{"id":"01900000-0000-7000-8000-000000000022","name":"Laptop","sourceAccountId":"cash","amount":{"resolver":"expression","config":{"expression":"500"},"inputs":{}},"postedTime":1769904000,"transactionTime":1769904000,"enabled":true,"purchase":{"priority":3}}`
 	created := doRowRequest(t, handler, http.MethodPost, "/v1/postings", body)
 	if created.Code != 200 {
 		t.Fatalf("create = %d %s", created.Code, created.Body.String())
@@ -57,7 +57,7 @@ func TestPurchasePostingHTTPRoundTrip(t *testing.T) {
 	posting := payload.Row
 	posting.Purchase.Priority = 1
 	updatedBody, _ := json.Marshal(posting)
-	updated := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/wish", string(updatedBody))
+	updated := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/01900000-0000-7000-8000-000000000022", string(updatedBody))
 	if updated.Code != 200 {
 		t.Fatal(updated.Body.String())
 	}
@@ -69,7 +69,7 @@ func TestPurchasePostingHTTPRoundTrip(t *testing.T) {
 	}
 	posting.Amount.Config["expression"] = "-500"
 	invalidBody, _ := json.Marshal(posting)
-	rejected := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/wish", string(invalidBody))
+	rejected := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/01900000-0000-7000-8000-000000000022", string(invalidBody))
 	if err := json.Unmarshal(rejected.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestPurchasePostingHTTPRoundTrip(t *testing.T) {
 		t.Fatalf("rejected write changed model: %+v %v", loaded, err)
 	}
 	readOnly := New(database, Config{ReadOnly: true})
-	blocked := doRowRequest(t, readOnly, http.MethodPatch, "/v1/postings/wish", body)
+	blocked := doRowRequest(t, readOnly, http.MethodPatch, "/v1/postings/01900000-0000-7000-8000-000000000022", body)
 	if blocked.Code != http.StatusForbidden {
 		t.Fatalf("read-only = %d", blocked.Code)
 	}

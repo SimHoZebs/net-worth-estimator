@@ -66,8 +66,12 @@ func TestAmountPresetCRUD(t *testing.T) {
 	if _, err := store.CreateAmountPreset(testPresetFixture("custom")); !IsIDConflict(err) {
 		t.Fatalf("duplicate preset err = %v, want id-conflict", err)
 	}
-	if _, err := store.CreateAmountPreset(types.AmountPreset{ID: "sync-x", Name: "sync", Label: "Sync"}); !IsReservedID(err) {
-		t.Fatalf("reserved preset err = %v, want reserved-id", err)
+	prefixed, err := store.CreateAmountPreset(types.AmountPreset{ID: "sync-x", Name: "sync", Label: "Sync"})
+	if err != nil {
+		t.Fatalf("preset IDs have no reserved namespaces: %v", err)
+	}
+	if err := store.DeleteAmountPreset(prefixed.ID); err != nil {
+		t.Fatal(err)
 	}
 	created.Label = "Renamed"
 	created.Enabled = false

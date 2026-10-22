@@ -27,6 +27,7 @@ type Summary struct {
 	CheckpointsSkipped  int            `json:"checkpointsSkipped"`
 	PendingDeleted      int            `json:"pendingDeleted"`
 	PendingInserted     int            `json:"pendingInserted"`
+	PendingUpdated      int            `json:"pendingUpdated"`
 	AccountsProvisioned int            `json:"accountsProvisioned"`
 	Skipped             map[string]int `json:"skipped"`
 	DryRun              bool           `json:"dryRun"`
@@ -232,6 +233,7 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 		CheckpointsSkipped:  applied.CheckpointsSkipped,
 		PendingDeleted:      applied.PendingDeleted,
 		PendingInserted:     applied.PendingInserted,
+		PendingUpdated:      applied.PendingUpdated,
 		AccountsProvisioned: provisioned,
 		Skipped:             skipped,
 		DryRun:              applied.DryRun,

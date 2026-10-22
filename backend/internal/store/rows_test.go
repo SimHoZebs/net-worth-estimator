@@ -86,22 +86,23 @@ func TestRowAccountCRUD(t *testing.T) {
 
 func TestRowIDRegistrySpansTables(t *testing.T) {
 	store := openTestStore(t)
-	if _, err := store.CreateAccount(types.Account{ID: "shared", Name: "Account"}); err != nil {
+	const shared = "01900000-0000-7000-8000-000000000020"
+	if _, err := store.CreateAccount(types.Account{ID: shared, Name: "Account"}); err != nil {
 		t.Fatalf("create account: %v", err)
 	}
-	if _, err := store.CreatePosting(testPostingFixture("shared")); !IsIDConflict(err) {
+	if _, err := store.CreatePosting(testPostingFixture(shared)); !IsIDConflict(err) {
 		t.Fatalf("posting over account id err = %v, want id-conflict", err)
 	}
-	if _, err := store.CreateRule(testRuleFixture("shared")); !IsIDConflict(err) {
+	if _, err := store.CreateRule(testRuleFixture(shared)); !IsIDConflict(err) {
 		t.Fatalf("rule over account id err = %v, want id-conflict", err)
 	}
-	if _, err := store.CreateEvaluation(EvaluationUpdate{Type: "netWorthThreshold", InstanceID: "shared", Name: "Eval"}); !IsIDConflict(err) {
+	if _, err := store.CreateEvaluation(EvaluationUpdate{Type: "netWorthThreshold", InstanceID: shared, Name: "Eval"}); !IsIDConflict(err) {
 		t.Fatalf("evaluation over account id err = %v, want id-conflict", err)
 	}
-	if err := store.DeleteAccount("shared"); err != nil {
+	if err := store.DeleteAccount(shared); err != nil {
 		t.Fatalf("delete account: %v", err)
 	}
-	if _, err := store.CreatePosting(testPostingFixture("shared")); err != nil {
+	if _, err := store.CreatePosting(testPostingFixture(shared)); err != nil {
 		t.Fatalf("posting over released id: %v", err)
 	}
 }

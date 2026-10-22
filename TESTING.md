@@ -19,6 +19,15 @@ See [dev/README.md](dev/README.md).
 Dev setup checks: `node --test dev/*.test.mjs auth/casdoor/*.test.mjs`.
 Configuration checks require the Docker Compose CLI, but no running daemon.
 
+Posting UUID migration and exact upstream identity checks:
+
+```bash
+CGO_ENABLED=0 go -C backend test ./internal/store ./internal/types ./internal/csvio ./internal/simplefin ./internal/api
+```
+
+See [the posting identity contract](docs/posting-identity.md) for upgrade, backup,
+reference preservation, and rollback behavior.
+
 ## Frontend Gates
 
 Run from the repository root:
