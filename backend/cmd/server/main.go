@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
@@ -77,6 +78,18 @@ func main() {
 	// Never logged: bearer token guarding canonical model writes. Empty
 	// means auth disabled (dev default).
 	authToken := os.Getenv("NET_WORTH_ESTIMATOR_AUTH_TOKEN")
+	identityConfig, err := identity.FromEnv(os.Getenv, dbPath)
+	if err != nil {
+		log.Fatalf("configure identity: %v", err)
+	}
+	var login *identity.Service
+	if identityConfig.Provider != "none" {
+		login, err = identity.New(context.Background(), identityConfig)
+		if err != nil {
+			log.Fatalf("configure identity: %v", err)
+		}
+		defer login.Close()
+	}
 
 	database, err := store.Open(dbPath)
 	if err != nil {
@@ -95,13 +108,20 @@ func main() {
 	syncRunner, syncStop := configureSync(database)
 	defer syncStop()
 
-	handler := api.New(database, api.Config{
+	apiConfig := api.Config{
 		AllowedOrigins: allowedOrigins,
 		ReadOnly:       readOnly,
 		AuthToken:      authToken,
 		SyncRunner:     syncRunner,
 		FrontendDir:    frontendPath,
-	})
+	}
+	if login != nil {
+		apiConfig.CanWrite = identity.CanWrite
+	}
+	handler := api.New(database, apiConfig)
+	if login != nil {
+		handler = login.Wrap(handler)
+	}
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),
 		Handler:           handler,
