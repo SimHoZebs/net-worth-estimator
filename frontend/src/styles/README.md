@@ -5,20 +5,39 @@
 Tailwind CSS 4 uses the Vite plugin and CSS-first configuration in `index.css`
 and `tokens.css`. The native reset remains in place. Preflight is not imported.
 
-- Use standard spacing utilities for padding, margins, gaps, and fixed sizes.
+- Ordinary padding, margins, and gaps use `0`, `0.5`, `1`, `2`, `3`, `4`, `5`,
+  `6`, `8`, or `12`. These are nine nonzero steps, from 2px to 48px at the default
+  root font size. `px` remains available for hairline alignment.
 - Use `gap-1` for a small gap, rather than separate `gap-[4px]` and `gap-[5px]` values.
 - Use standard text sizes and weights. Shared controls use `rounded-control`,
   surfaces use `rounded-surface`, and overlays use `shadow-overlay`.
+- Use only these two nonzero radii. Square, pill, inherited rounding, and SVG
+  geometry remain separate. Use named letter spacing, such as `tracking-tight`.
+- Fixed control and icon dimensions use Tailwind sizing utilities. Large widths
+  use named containers such as `max-w-sm`, `w-xl`, or `max-w-7xl`. Use flex, grid,
+  fractions, and `min-w-0` before width arithmetic. Intrinsic `ch` constraints and
+  runtime chart values remain available.
+- Use stock `sm`, `md`, `lg`, `xl`, and `2xl` viewport breakpoints, or named
+  container breakpoints. Navigation switches at `md`. Charts and sheets switch
+  at `sm`. JavaScript uses `viewportQueries` from `state/useMediaQuery.ts`.
 - Semantic colors such as `bg-surface` and `bg-primary` reference Tailwind's stock
   stone, emerald, amber, and red palettes. `themes.css` supplies the dark roles.
-- Use arbitrary values only for runtime variables, chart geometry, intrinsic
-  constraints, and responsive breakpoints that standard utilities cannot express.
+- Use arbitrary values only for runtime variables, chart geometry, and intrinsic
+  constraints. Grid tracks can reference stock `--container-*` variables and
+  `--spacing()` values. Preserve pixel coordinates inside SVG geometry.
 - Keep finite variants as complete literal classes. Tailwind does not detect
   interpolated fragments such as `bg-${tone}-500`.
 
-`npm run lint:styles` rejects literal spacing in place of Tailwind scale utilities.
-`npm run lint:fix` converts existing literal spacing to scale utilities.
-The check covers JSX, class maps, shared recipes, and CSS declarations.
+`npm run lint:styles` enforces finite spacing. Class and `@apply` utilities also
+enforce radius roles and reject custom numeric breakpoints, arbitrary tracking,
+large numeric widths, and literal layout arithmetic. `npm run lint:fix`
+consolidates spacing and radius aliases.
+The check covers JSX, class maps, static `*Styles` exports, CVA, `mergeStyles()`,
+and CSS declarations. It does not constrain runtime data or SVG coordinates.
+
+The workspace footer uses sticky positioning in normal document flow. Draft
+actions and notifications stack there at their actual heights. Do not restore
+fixed sidebar-offset calculations or estimated bottom-clearance padding.
 
 ## Typography roles
 
@@ -102,7 +121,8 @@ preferences remain CSS responsibilities.
 
 `lint:styles` enforces the spacing scale and focused design-system rules.
 It does not decide whether a component abstraction earns its cost. Layout,
-responsive breakpoints, intrinsic constraints, and chart geometry stay flexible.
+intrinsic constraints and chart geometry stay flexible. Responsive layouts use
+Tailwind's named breakpoint vocabulary.
 Palette utilities belong in the token owner. Component `@apply` selector APIs
 and arbitrary selectors that name private classes fail the lint check.
 

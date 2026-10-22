@@ -3,100 +3,21 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import postcss from "postcss";
 import ts from "typescript";
+import {
+	approvedSpacing,
+	normalizeSpacingClasses,
+	normalizeSpacingUtility,
+	sizingWarning,
+	spacing,
+} from "./style-scale.ts";
+export {
+	normalizeSpacingClasses,
+	normalizeSpacingUtility,
+} from "./style-scale.ts";
 
-const utility =
-	/^(p[xytrblse]?|m[xytrblse]?|gap(?:-[xy])?|space-[xy]|[wh]|size|min-[wh]|max-[wh]|basis|indent|inset(?:-[xyse])?|top|right|bottom|left|start|end|translate(?:-[xy])?|scroll-[mp][xytrblse]?|border-spacing(?:-[xy])?)-\[(.+)\]$/;
 const cssSpacing =
 	/^(?:(?:padding|margin|scroll-padding|scroll-margin)(?:-(?:top|right|bottom|left|block(?:-start|-end)?|inline(?:-start|-end)?))?|(?:min-|max-)?(?:width|height|inline-size|block-size)|(?:row-|column-)?gap|grid-gap|inset(?:-(?:block|inline)(?:-start|-end)?)?|top|right|bottom|left|flex-basis|text-indent|border-spacing)$/;
-const className = /class(?:es|names?)?$/i;
-
-function spacing(value: string): { scale: string; negative: boolean } | null {
-	const match = /^(-?(?:\d+(?:\.\d+)?|\.\d+))(px|rem)?$/i.exec(value);
-	if (!match || (!match[2] && Number(match[1]) !== 0)) return null;
-	const pixels =
-		Number(match[1]) * (match[2]?.toLowerCase() === "rem" ? 16 : 1);
-	const absolute = Math.abs(pixels);
-	const rounded =
-		absolute >= 4
-			? Math.round(absolute / 4) * 4
-			: [0, 1, 2, 4].reduce((best, next) =>
-					Math.abs(next - absolute) <= Math.abs(best - absolute) ? next : best,
-				);
-	return {
-		scale: rounded === 1 ? "px" : String(rounded / 4),
-		negative: pixels < 0 && rounded !== 0,
-	};
-}
-
-/** Split variants only outside arbitrary selectors and function arguments. */
-function variantEnd(value: string): number {
-	let depth = 0;
-	let end = 0;
-	for (let index = 0; index < value.length; index++) {
-		const character = value[index];
-		if (character === "[" || character === "(") depth++;
-		if (character === "]" || character === ")") depth--;
-		if (character === ":" && depth === 0) end = index + 1;
-	}
-	return end;
-}
-
-/** A rem follows Tailwind's default scale: 1rem = four spacing units. */
-export function normalizeSpacingUtility(token: string): string {
-	const end = variantEnd(token);
-	const prefix = token.slice(0, end);
-	let base = token.slice(end);
-	const importantBefore = base.startsWith("!") ? "!" : "";
-	const importantAfter = base.endsWith("!") ? "!" : "";
-	base = base.replace(/^!|!$/g, "");
-	const negative = base.startsWith("-");
-	if (negative) base = base.slice(1);
-	const match = utility.exec(base);
-	if (!match) return token;
-	const name = match[1]!;
-	const values = match[2]!.split("_").map(spacing);
-	if (values.some((value) => value === null)) return token;
-	let names = [name];
-	if (values.length > 1) {
-		if (["p", "m", "scroll-p", "scroll-m", "inset"].includes(name)) {
-			const suffix = name === "inset" ? "-" : "";
-			names =
-				values.length === 2
-					? [`${name}${suffix}y`, `${name}${suffix}x`]
-					: values.length === 3
-						? [`${name}${suffix}t`, `${name}${suffix}x`, `${name}${suffix}b`]
-						: [
-								`${name}${suffix}t`,
-								`${name}${suffix}r`,
-								`${name}${suffix}b`,
-								`${name}${suffix}l`,
-							];
-			if (name === "inset" && values.length > 2)
-				names =
-					values.length === 3
-						? ["top", "inset-x", "bottom"]
-						: ["top", "right", "bottom", "left"];
-		} else if (
-			["gap", "border-spacing", "translate"].includes(name) &&
-			values.length === 2
-		) {
-			names = name === "gap" ? ["gap-y", "gap-x"] : [`${name}-x`, `${name}-y`];
-		} else return token;
-	}
-	if (names.length !== values.length) return token;
-	return names
-		.map((name, index) => {
-			const value = values[index]!;
-			const sign =
-				value.scale !== "0" && negative !== value.negative ? "-" : "";
-			return `${prefix}${importantBefore}${sign}${name}-${value.scale}${importantAfter}`;
-		})
-		.join(" ");
-}
-
-export function normalizeSpacingClasses(value: string): string {
-	return value.replace(/\S+/g, normalizeSpacingUtility);
-}
+const className = /(?:class(?:es|names?)?|styles)$/i;
 
 function isSource(path: string): boolean {
 	return (
@@ -118,10 +39,17 @@ function analyze(
 			`${path}:${line}: warning style-scale: ${before} -> ${after}`,
 		);
 	};
+	const check = (token: string, line: number) => {
+		const message = sizingWarning(token);
+		if (message) warn(line, token, message);
+	};
 	if (path.endsWith(".css")) {
 		const root = postcss.parse(source, { from: path });
 		root.walkAtRules("apply", (rule) => {
 			const normalized = normalizeSpacingClasses(rule.params);
+			normalized
+				.split(/\s+/)
+				.forEach((token) => check(token, rule.source?.start?.line ?? 1));
 			if (normalized === rule.params) return;
 			warn(
 				rule.source?.start?.line ?? 1,
@@ -134,9 +62,24 @@ function analyze(
 			if (!cssSpacing.test(declaration.prop.toLowerCase())) return;
 			// Function arguments and percentages are layout constraints, not scale values.
 			const parts = postcss.list.space(declaration.value);
+			const ordinary =
+				/^(?:padding|margin|scroll-padding|scroll-margin|(?:row-|column-)?gap|grid-gap|border-spacing)(?:-|$)/.test(
+					declaration.prop,
+				);
 			const values = parts.map((value) => {
-				const result = spacing(value);
+				const scaleCall = /^--spacing\((-?[\d.]+)\)$/.exec(value);
+				const result =
+					scaleCall && ordinary
+						? {
+								scale:
+									Math.abs(Number(scaleCall[1])) === 0.25
+										? "px"
+										: String(Math.abs(Number(scaleCall[1]))),
+								negative: Number(scaleCall[1]) < 0,
+							}
+						: spacing(value);
 				if (!result) return value;
+				if (ordinary) result.scale = approvedSpacing(result.scale);
 				if (result.scale === "0") return "0";
 				return `--spacing(${result.negative ? "-" : ""}${result.scale === "px" ? "0.25" : result.scale})`;
 			});
@@ -188,6 +131,10 @@ function analyze(
 				.slice(start, end)
 				.replace(/\S+/g, (token, offset: number) => {
 					const normalized = normalizeSpacingUtility(token);
+					check(
+						normalized,
+						file.getLineAndCharacterOfPosition(start + offset).line + 1,
+					);
 					if (normalized !== token)
 						warn(
 							file.getLineAndCharacterOfPosition(start + offset).line + 1,
@@ -244,9 +191,37 @@ function analyze(
 				if (property) visitClasses(property);
 			} else visitClasses(node.expression);
 		} else if (ts.isPropertyAssignment(node)) {
+			const name =
+				ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)
+					? node.name.text
+					: undefined;
+			// CVA defaults and compound conditions select variants; they are not classes.
+			if (name === "defaultVariants") return;
+			if (
+				name === "compoundVariants" &&
+				ts.isArrayLiteralExpression(node.initializer)
+			) {
+				for (const element of node.initializer.elements) {
+					if (!ts.isObjectLiteralExpression(element)) continue;
+					for (const property of element.properties) {
+						if (
+							ts.isPropertyAssignment(property) &&
+							(ts.isIdentifier(property.name) ||
+								ts.isStringLiteral(property.name)) &&
+							/^(?:class|className)$/.test(property.name.text)
+						)
+							visitClasses(property.initializer);
+					}
+				}
+				return;
+			}
 			visitClasses(node.initializer);
 		} else if (ts.isCallExpression(node)) {
-			if (/^(?:clsx|cx|cn|classNames|cva)$/.test(node.expression.getText(file)))
+			if (
+				/^(?:clsx|cx|cn|classNames|cva|mergeStyles)$/.test(
+					node.expression.getText(file),
+				)
+			)
 				node.arguments.forEach(visitClasses);
 			else if (
 				ts.isPropertyAccessExpression(node.expression) &&
@@ -269,7 +244,9 @@ function analyze(
 			visitClasses(node.initializer);
 		if (
 			ts.isCallExpression(node) &&
-			/^(?:clsx|cx|cn|classNames|cva)$/.test(node.expression.getText(file))
+			/^(?:clsx|cx|cn|classNames|cva|mergeStyles)$/.test(
+				node.expression.getText(file),
+			)
 		)
 			node.arguments.forEach(visitClasses);
 		ts.forEachChild(node, visit);
@@ -292,6 +269,7 @@ if (import.meta.main) {
 	const root = fileURLToPath(new URL("../src/", import.meta.url));
 	const fix = process.argv.includes("--fix");
 	let count = 0;
+	let remaining = 0;
 	for (const path of readdirSync(root, {
 		recursive: true,
 		encoding: "utf8",
@@ -303,8 +281,16 @@ if (import.meta.main) {
 		const result = analyze(relative, source);
 		count += result.warnings.length;
 		if (fix && source !== result.source) writeFileSync(absolute, result.source);
-		else for (const warning of result.warnings) console.warn(warning);
+		const unresolved = fix
+			? analyze(relative, result.source).warnings
+			: result.warnings;
+		remaining += unresolved.length;
+		for (const warning of unresolved) console.warn(warning);
 	}
-	console.log(`${fix ? "Fixed" : "Found"} ${count} style-scale violation(s).`);
-	if (count && !fix) process.exitCode = 1;
+	console.log(
+		fix
+			? `Fixed ${count - remaining} style-scale violation(s); ${remaining} remain.`
+			: `Found ${remaining} style-scale violation(s).`,
+	);
+	if (remaining) process.exitCode = 1;
 }
