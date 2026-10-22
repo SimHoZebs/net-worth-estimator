@@ -1,0 +1,140 @@
+/* Casdoor v4.23.0 AuthLayout owns the forms, tabs, labels, errors and actions. */
+.login-background {
+  --background: 60 9% 98%;
+  --foreground: 24 10% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 24 10% 16%;
+  --muted: 60 5% 96%;
+  --muted-foreground: 25 5% 37%;
+  --border: 20 6% 90%;
+  --input: 25 5% 45%;
+  --primary: 161.8 100% 23.92%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 161.8 100% 23.92%;
+  --accent: 152 81% 96%;
+  --accent-foreground: 163 88% 20%;
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+  font-family: "Manrope Variable", sans-serif;
+}
+.dark .login-background {
+  --background: 20 14% 4%;
+  --foreground: 60 5% 96%;
+  --card: 24 10% 10%;
+  --card-foreground: 60 5% 96%;
+  --muted: 12 6% 15%;
+  --muted-foreground: 24 5% 64%;
+  --border: 33 5% 32%;
+  --input: 24 5% 45%;
+  --primary: 157.55 75.96% 64.12%;
+  --primary-foreground: 166 91% 9%;
+  --ring: 157.55 75.96% 64.12%;
+  --accent: 166 91% 9%;
+  --accent-foreground: 157.55 75.96% 64.12%;
+}
+.login-content .login-panel {
+  padding: 0;
+  border-radius: 1rem;
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  box-shadow: 0 1rem 3rem -2rem rgb(28 25 23 / 18%);
+}
+.login-panel .side-image {
+  width: 44%;
+}
+.login-panel .login-form {
+  padding: 2.5rem;
+}
+.login-logo-box {
+  justify-content: flex-start;
+  margin-block-end: 2rem;
+}
+.login-logo-box a {
+  justify-content: flex-start;
+}
+.login-logo-box img {
+  inline-size: 11.625rem;
+  block-size: 2.5rem;
+  max-inline-size: 100%;
+}
+.login-form input:not([type="checkbox"]):not([type="radio"]),
+.login-form button.w-full,
+.login-form [role="combobox"] {
+  min-block-size: 3rem;
+  font-size: 1rem;
+}
+.login-form input {
+  background: hsl(var(--card));
+}
+.login-form :where(a, button, input, [role="checkbox"], [role="tab"]):focus-visible,
+.login-topbar :where(button, a):focus-visible {
+  outline: 3px solid hsl(var(--ring));
+  outline-offset: 3px;
+}
+.login-form :where(a) {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.waypoint-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 3rem;
+  min-block-size: 100%;
+  padding: 2.5rem;
+  color: #ecfdf5;
+  background: #002c22;
+}
+.waypoint-eyebrow {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+.waypoint-side h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(2rem, 3vw, 2.75rem);
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.04em;
+}
+.waypoint-side p:not(.waypoint-eyebrow) {
+  margin: 0;
+  color: #a4f4cf;
+  font-size: 0.875rem;
+  line-height: 1.75;
+}
+.waypoint-route {
+  inline-size: 100%;
+  block-size: auto;
+  color: #5ee9b5;
+}
+.waypoint-footer {
+  margin: 0;
+  padding-inline: 1rem;
+  line-height: 1.8;
+}
+.waypoint-footer span {
+  white-space: nowrap;
+}
+@media (max-width: 1023.98px) {
+  .login-panel .login-form {
+    padding: 2rem;
+  }
+}
+@media (max-width: 639.98px) {
+  .login-content .login-panel.login-panel-bleed {
+    padding: 0;
+  }
+  .login-panel .login-form {
+    padding: 1rem 1.25rem 1.5rem;
+  }
+  .login-logo-box {
+    margin-block-end: 2rem;
+  }
+}
+@media (forced-colors: active) {
+  .login-content .login-panel {
+    border: 1px solid CanvasText;
+  }
+}

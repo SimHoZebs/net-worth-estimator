@@ -1,6 +1,7 @@
 import { mkdir, writeFile, chmod, stat, readdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { buildBranding } from './branding.mjs';
 import { buildPermissionSeed } from './permissions.mjs';
 
 export const defaultStateDir = resolve(dirname(fileURLToPath(import.meta.url)), 'data');
@@ -77,6 +78,7 @@ export function buildSeed(settings) {
       { owner: 'admin', name: 'app-built-in', enableSignUp: false, disableSelfSignup: true },
       {
         owner: 'admin', name: 'waypoint', displayName: 'Waypoint',
+        ...buildBranding(),
         organization: 'waypoint', cert: 'cert-waypoint',
         homepageUrl: `${settings.appUrl}/`, enablePassword: true,
         enableSignUp: true, disableSelfSignup: false, enableWebAuthn: true,
