@@ -2,6 +2,8 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"path"
@@ -19,7 +21,8 @@ import (
 
 // Server carries runtime dependencies.
 type Server struct {
-	store store.Store
+	store    store.Store
+	CanWrite func(context.Context) bool
 	// ReadOnly rejects canonical model writes with 403. Reads and compute
 	// endpoints are unaffected.
 	ReadOnly bool
@@ -31,6 +34,7 @@ type Server struct {
 
 // Config controls HTTP integration behavior.
 type Config struct {
+	CanWrite       func(context.Context) bool
 	AllowedOrigins []string
 	ReadOnly       bool
 	// AuthToken guards row writes. Empty means auth disabled.
@@ -145,6 +149,7 @@ func frontendHandler(frontendDir string) http.HandlerFunc {
 // New builds the chi router with all routes.
 func New(store store.Store, serverConfig Config) http.Handler {
 	server := &Server{
+		CanWrite:    serverConfig.CanWrite,
 		store:       store,
 		ReadOnly:    serverConfig.ReadOnly,
 		AuthEnabled: serverConfig.AuthToken != "",
@@ -154,6 +159,12 @@ func New(store store.Store, serverConfig Config) http.Handler {
 	router.Use(middleware.Recoverer)
 	router.Use(corsMiddleware(serverConfig.AllowedOrigins))
 	router.Use(writeAuthMiddleware(serverConfig.ReadOnly, serverConfig.AuthToken))
+	// Provider-enabled servers intercept this endpoint before reaching the API.
+	router.Get("/v1/auth/session", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]bool{"enabled": false})
+	})
 
 	config := huma.DefaultConfig("Net Worth Estimator API", "1.0.0")
 	api := humachi.New(router, config)
