@@ -96,6 +96,7 @@ node --test auth/casdoor/*.test.mjs
 
 `scripts/smoke-compose.sh` checks the guest sample on the authenticated stack.
 Guests see only a separate sample.
+Run its request-contract regressions with `node --test scripts/smoke-compose.test.mjs`.
 Authenticated requests use the account's private plan and assert its resource ID.
 
 Use the [Casdoor test guide](auth/casdoor/README.md#verification) for real-provider
