@@ -3,6 +3,7 @@ import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { IconButton, Skeleton } from "../components/ui.tsx";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { LastSync } from "./LastSync.tsx";
 import { type Page, pages } from "./navigation.ts";
 import { workspaceStatusLabel } from "./WorkspaceNotices.tsx";
 
@@ -18,9 +19,8 @@ export function WorkspaceSidebar({
 	// Plan display values subscribe here so navigation never waits on props.
 	const workspace = useWorkspaceStore((state) => state.workspace);
 	const plan = workspace?.draft ?? workspace?.saved ?? null;
-	const statusReadOnly = useWorkspaceStore(
-		(state) => state.status?.readOnly ?? false,
-	);
+	const status = useWorkspaceStore((state) => state.status);
+	const statusReadOnly = status?.readOnly ?? false;
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
 	const readOnly = statusReadOnly || writeBlocked || (plan?.readOnly ?? true);
 	const statusLabel = workspaceStatusLabel({ readOnly });
@@ -73,6 +73,13 @@ export function WorkspaceSidebar({
 						<>
 							{statusLabel} <LockKeyhole size={12} />
 						</>
+					)}
+				</div>
+				<div className="sidebar-sync">
+					{pending ? (
+						<Skeleton width={110} height={10} />
+					) : (
+						<LastSync status={status} />
 					)}
 				</div>
 			</div>

@@ -58,6 +58,8 @@ Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under
 
 `GET /v1/status` returns `readOnly`, `authEnabled`, `syncConfigured`, and `lastSyncAt` (omitted when no sync completed).
 
+The frontend displays these provider-neutral sync signals. Provider setup, account linking, and sync execution remain server concerns. The sidebar shows the last successful sync in the viewer's time zone, including read-only mode. Missing status fields mean unknown sync status, not "never synced."
+
 ### Deterministic projection
 
 `POST /v1/projections/deterministic` accepts:
