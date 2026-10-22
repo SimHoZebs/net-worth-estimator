@@ -6,7 +6,11 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { createElement, Fragment, type ReactNode, StrictMode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	acceptResourceScope,
+	suspendResourceScope,
+} from "../auth/resourceScope.ts";
 import type { RowWriteResponse } from "../api/index.ts";
 import {
 	ApiHttpError,
@@ -32,7 +36,7 @@ type ResolveRowWrite = (
 import {
 	loadRemoteState,
 	persistRemoteState,
-	REMOTE_STORAGE_KEY,
+	remoteStorageKey,
 	serverDocumentFingerprint,
 } from "./remoteStorage.ts";
 import { resetServerQueryCache } from "./serverQuery.ts";
@@ -356,8 +360,8 @@ type PutCallback = (
 	document: FinancialModelDocument,
 ) => Error | FinancialModelResponse;
 
-function clientFixture(put?: PutCallback) {
-	const current = structuredClone(modelFixture());
+function clientFixture(put?: PutCallback, model = modelFixture()) {
+	const current = structuredClone(model);
 	// The optional put callback overrides row-write outcomes (error
 	// injection, warning issues) against the mutated server document.
 	const viaPut = <T>(row: T): Error | RowWriteResponse<T> => {
@@ -540,8 +544,15 @@ function clientFixture(put?: PutCallback) {
 			},
 		),
 	};
-	return { client, model: modelFixture() };
+	return { client, model };
 }
+
+beforeEach(() => {
+	acceptResourceScope(
+		{ apiBaseUrl: "http://localhost", resource: null, subject: null },
+		suspendResourceScope(),
+	);
+});
 
 afterEach(() => {
 	vi.unstubAllGlobals();
@@ -794,7 +805,7 @@ describe("remote workspace state", () => {
 		const edited = withMovementAmount(rendered.result().plan!, 125);
 		expect(rendered.result().updatePlan(edited)).toBe(true);
 		await rendered.settle();
-		const raw = storage.getItem(REMOTE_STORAGE_KEY) ?? "";
+		const raw = storage.getItem(remoteStorageKey()!) ?? "";
 		expect(raw).not.toContain("secret-token");
 		expect(loadRemoteState()).toMatchObject({
 			version: 1,
@@ -893,11 +904,11 @@ describe("remote workspace state", () => {
 		).toBe(true);
 		first.unmount();
 		const raw = JSON.parse(
-			storage.getItem(REMOTE_STORAGE_KEY) ?? "{}",
+			storage.getItem(remoteStorageKey()!) ?? "{}",
 		) as Record<string, unknown>;
 		delete raw.baseFingerprint;
 		delete raw.baseRevision;
-		storage.setItem(REMOTE_STORAGE_KEY, JSON.stringify(raw));
+		storage.setItem(remoteStorageKey()!, JSON.stringify(raw));
 
 		const rendered = renderHook(() => useRemoteWorkspace({ client }));
 		await rendered.settle();
@@ -1421,6 +1432,96 @@ describe("remote workspace state", () => {
 		);
 		rendered.unmount();
 	});
+
+	it.each([
+		{ fromReadOnly: true, toReadOnly: false },
+		{ fromReadOnly: false, toReadOnly: true },
+	])(
+		"refreshes a stored draft's display locks on hydration from readOnly $fromReadOnly to $toReadOnly",
+		async ({ fromReadOnly, toReadOnly }) => {
+			vi.stubGlobal("localStorage", memoryStorage());
+			const model = modelFixture();
+			model.checkpoints[0]!.source = "simplefin";
+			const { client } = clientFixture(undefined, model);
+			client.getStatus.mockResolvedValue({
+				readOnly: fromReadOnly,
+				authEnabled: true,
+			});
+			const rendered = renderHook(() => useRemoteWorkspace({ client }));
+			await rendered.settle();
+			expect(
+				rendered
+					.result()
+					.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+			).toBe(true);
+			await rendered.settle();
+			const baseFingerprint = rendered.result().workspace?.baseFingerprint;
+			client.getStatus.mockResolvedValue({
+				readOnly: toReadOnly,
+				authEnabled: true,
+			});
+
+			await rendered.result().retry();
+			await rendered.settle();
+			expect(rendered.result().plan?.readOnly).toBe(toReadOnly);
+			expect(rendered.result().plan?.accounts[0]?.readOnly).toBe(true);
+			expect(rendered.result().plan?.accounts[1]?.readOnly).toBe(toReadOnly);
+			expect(rendered.result().draftPresentation?.accounts.loan?.readOnly).toBe(
+				toReadOnly,
+			);
+			expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(
+				125,
+			);
+			expect(rendered.result().workspace?.baseFingerprint).toBe(
+				baseFingerprint,
+			);
+			expect(rendered.result().workspace?.draftStale).toBe(false);
+			expect(rendered.result().serverDocument).toEqual(model);
+			expect(
+				rendered
+					.result()
+					.updatePlan(withMovementAmount(rendered.result().plan!, 130)),
+			).toBe(true);
+			expect(client.updateRule).not.toHaveBeenCalled();
+			expect(client.updateAccount).not.toHaveBeenCalled();
+			expect(client.saveCheckpoint).not.toHaveBeenCalled();
+			rendered.unmount();
+		},
+	);
+
+	it.each([
+		{ readOnly: true, writeBlocked: false },
+		{ readOnly: false, writeBlocked: true },
+	])(
+		"still blocks saves with synced accounts when server readOnly is $readOnly and writeBlocked is $writeBlocked",
+		async ({ readOnly, writeBlocked }) => {
+			vi.stubGlobal("localStorage", memoryStorage());
+			const model = modelFixture();
+			model.checkpoints[0]!.source = "simplefin";
+			const { client } = clientFixture(undefined, model);
+			const rendered = renderHook(() => useRemoteWorkspace({ client }));
+			await rendered.settle();
+			expect(
+				rendered
+					.result()
+					.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+			).toBe(true);
+			await rendered.settle();
+			useWorkspaceStore.setState({
+				status: { readOnly, authEnabled: true },
+				writeBlocked,
+			});
+
+			expect(await rendered.result().save()).toBe(false);
+			await rendered.settle();
+			expect(rendered.result().error).toContain("The server is read-only.");
+			expect(rendered.result().workspace?.draft).not.toBeNull();
+			expect(client.updateRule).not.toHaveBeenCalled();
+			expect(client.updateAccount).not.toHaveBeenCalled();
+			expect(client.saveCheckpoint).not.toHaveBeenCalled();
+			rendered.unmount();
+		},
+	);
 
 	it("creates rows when importing into an empty server", async () => {
 		const storage = memoryStorage();
@@ -2498,6 +2599,52 @@ describe("remote projection mapping and SSE", () => {
 });
 
 describe("remote draft storage", () => {
+	it("restores only the active private resource's draft and never a sample or other account's draft", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const mount = async (id: string) => {
+			acceptResourceScope(
+				{
+					apiBaseUrl: "http://localhost",
+					resource: {
+						id,
+						kind: id === "plans/sample" ? "sample" : "private",
+						permissions: ["plan:read", "plan:project", "plan:write"],
+					},
+					subject: id === "plans/sample" ? null : id,
+				},
+				suspendResourceScope(),
+			);
+			resetWorkspaceStore();
+			const { client } = clientFixture();
+			const rendered = renderHook(() => useRemoteWorkspace({ client }));
+			await rendered.settle();
+			return rendered;
+		};
+		const first = await mount("plans/a");
+		expect(
+			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
+		).toBe(true);
+		first.unmount();
+		const second = await mount("plans/b");
+		expect(second.result().workspace?.draft).toBeNull();
+		expect(
+			second
+				.result()
+				.updatePlan(withMovementAmount(second.result().plan!, 175)),
+		).toBe(true);
+		second.unmount();
+		const sample = await mount("plans/sample");
+		expect(sample.result().workspace?.draft).toBeNull();
+		expect(sample.result().plan?.movements[0]?.amount).toBe(100);
+		sample.unmount();
+		const restoredA = await mount("plans/a");
+		expect(restoredA.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		restoredA.unmount();
+		const restoredB = await mount("plans/b");
+		expect(restoredB.result().workspace?.draft?.movements[0]?.amount).toBe(175);
+		restoredB.unmount();
+	});
+
 	it("uses a stable semantic server fingerprint", () => {
 		const document = modelFixture();
 		const reordered = {
@@ -2535,7 +2682,7 @@ describe("remote draft storage", () => {
 		};
 		expect(persistRemoteState(state)).toBeNull();
 		expect(loadRemoteState()).toEqual(state);
-		storage.setItem(REMOTE_STORAGE_KEY, "{bad");
+		storage.setItem(remoteStorageKey()!, "{bad");
 		expect(loadRemoteState()).toBeInstanceOf(Error);
 	});
 });

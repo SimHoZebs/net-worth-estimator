@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { createApiClient } from "../api/index.ts";
+import { resourceScopedFactory } from "../api/scopedRequest.ts";
 import { useUiStore } from "./uiStore.ts";
 import { type RemoteApiClient, useWorkspaceStore } from "./workspaceStore.ts";
 
@@ -8,7 +9,7 @@ interface WorkspaceStartupOptions {
 	authToken?: string;
 }
 
-let defaultClient: RemoteApiClient | null = null;
+const defaultClient = resourceScopedFactory(createApiClient);
 
 /** Bind and boot the store engine. Screens subscribe to their own state. */
 export function useWorkspaceStartup({
@@ -17,11 +18,7 @@ export function useWorkspaceStartup({
 }: WorkspaceStartupOptions = {}): void {
 	const api = useMemo(() => {
 		if (client) return client;
-		// Lazily-created module singleton: idempotent, so the shared client is
-		// stable across hook instances without an extra provider.
-		// oxlint-disable-next-line react/globals
-		if (!defaultClient) defaultClient = createApiClient();
-		return defaultClient;
+		return defaultClient();
 	}, [client]);
 	const uiToken = useUiStore((state) => state.authToken);
 	const resolvedToken = authToken ?? uiToken;

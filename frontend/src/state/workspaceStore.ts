@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { getResourceScope, type ResourceScope } from "../auth/resourceScope.ts";
 import {
 	type AdapterReport,
 	type AmountPreset,
@@ -12,6 +13,7 @@ import {
 	type PlanConversion,
 	type PlanPresentation,
 	READ_ONLY_IMPORT_MESSAGE,
+	refreshDisplayPlanAccess,
 	type ServerStatus,
 } from "../api/index.ts";
 import {
@@ -221,6 +223,7 @@ function planHasChanges(saved: Plan, next: Plan): boolean {
  */
 interface WorkspaceEngine {
 	client: RemoteApiClient | null;
+	resourceScope: ResourceScope;
 	authToken: string;
 	mounted: boolean;
 	hydrationController: AbortController | null;
@@ -243,6 +246,7 @@ interface WorkspaceEngine {
 function freshEngine(): WorkspaceEngine {
 	return {
 		client: null,
+		resourceScope: getResourceScope(),
 		authToken: "",
 		mounted: false,
 		hydrationController: null,
@@ -335,6 +339,7 @@ export const useWorkspaceStore = create<
 
 	bindEngine: (client, authToken) => {
 		get().engine.client = client;
+		get().engine.resourceScope = getResourceScope();
 		get().engine.authToken = authToken;
 	},
 
@@ -364,7 +369,11 @@ export const useWorkspaceStore = create<
 
 	writeLocalState: (next, fallback = next): boolean => {
 		const { engine } = get();
-		const result = persistRemoteState(next, engine.expectedRaw);
+		const result = persistRemoteState(
+			next,
+			engine.expectedRaw,
+			engine.resourceScope,
+		);
 		if (result) {
 			engine.volatileState = fallback;
 			get().reportStorageError(result);
@@ -410,13 +419,15 @@ export const useWorkspaceStore = create<
 		set({ loading: true, error: restoreError });
 		const finishHydration = () => {
 			clearTimeout(hydrationTimer);
-			if (get().engine.hydrationPromise === completion)
-				get().engine.hydrationPromise = null;
-			get().engine.hydrating = false;
+			if (get().engine === engine) {
+				if (engine.hydrationPromise === completion)
+					engine.hydrationPromise = null;
+				engine.hydrating = false;
+			}
 			resolveHydration();
 		};
-		const raw = readRemoteStateRaw();
-		const stored = loadRemoteState();
+		const raw = readRemoteStateRaw(engine.resourceScope);
+		const stored = loadRemoteState(engine.resourceScope);
 		const storageReadError = raw instanceof Error || stored instanceof Error;
 		if (raw instanceof Error) get().reportStorageError(raw);
 		if (stored instanceof Error) get().reportStorageError(stored);
@@ -460,7 +471,11 @@ export const useWorkspaceStore = create<
 				Error | { presets: AmountPreset[] },
 			];
 		} catch (cause) {
-			if (get().engine.mounted && (!controller.signal.aborted || timedOut)) {
+			if (
+				get().engine === engine &&
+				engine.mounted &&
+				(!controller.signal.aborted || timedOut)
+			) {
 				clearUnavailableWorkspace();
 				markApiFailure(
 					(value) => set({ error: value }),
@@ -478,6 +493,7 @@ export const useWorkspaceStore = create<
 		}
 		const [statusResult, modelResult, presetResult] = responses;
 		if (
+			get().engine !== engine ||
 			!get().engine.mounted ||
 			controller.signal.aborted ||
 			get().engine.hydrationController !== controller
@@ -568,7 +584,14 @@ export const useWorkspaceStore = create<
 			return;
 		}
 		const savedPlan = conversion.plan;
-		const storedDraft = localState?.draft ?? null;
+		const storedDraftAccess = localState?.draft
+			? refreshDisplayPlanAccess(localState.draft, {
+					document: model,
+					status: statusResult,
+					presentation: localState.draftPresentation ?? conversion.presentation,
+				})
+			: null;
+		const storedDraft = storedDraftAccess?.plan ?? null;
 		const storedBaseFingerprint = localState?.baseFingerprint ?? null;
 		const storedBaseRevision = localState?.baseRevision ?? null;
 		const identityMissing = Boolean(
@@ -591,7 +614,7 @@ export const useWorkspaceStore = create<
 		const draftStale = identityMissing || fingerprintChanged || revisionChanged;
 		const draftPresentation = storedDraft
 			? draftPresentationFor(
-					localState?.draftPresentation ?? conversion.presentation,
+					storedDraftAccess?.presentation ?? conversion.presentation,
 				)
 			: null;
 		const convertedDraft = storedDraft
@@ -1218,6 +1241,7 @@ export const useWorkspaceStore = create<
 		const api = engine.client;
 		if (!api) return;
 		const result = await api.getStatus();
+		if (get().engine !== engine) return;
 		if (result instanceof Error) {
 			markApiFailure(
 				(value) => set({ error: value }),
@@ -1228,10 +1252,39 @@ export const useWorkspaceStore = create<
 			);
 			return;
 		}
+		const current = get();
+		const savedAccess =
+			current.workspace && current.serverDocument
+				? refreshDisplayPlanAccess(current.workspace.saved, {
+						document: current.serverDocument,
+						status: result,
+						presentation: current.savedPresentation,
+					})
+				: null;
+		const draftAccess =
+			current.workspace?.draft && current.serverDocument
+				? refreshDisplayPlanAccess(current.workspace.draft, {
+						document: current.serverDocument,
+						status: result,
+						presentation:
+							current.draftPresentation ?? current.savedPresentation,
+					})
+				: null;
 		set({
 			status: result,
 			authRequiredState: result.authEnabled,
 			writeBlocked: false,
+			...(current.workspace && savedAccess
+				? {
+						workspace: {
+							...current.workspace,
+							saved: savedAccess.plan,
+							draft: draftAccess?.plan ?? null,
+						},
+						savedPresentation: savedAccess.presentation,
+						draftPresentation: draftAccess?.presentation ?? null,
+					}
+				: {}),
 		});
 	},
 
@@ -1240,6 +1293,7 @@ export const useWorkspaceStore = create<
 		const api = engine.client;
 		if (!api) return;
 		const result = await api.listAmountPresets({ authToken: engine.authToken });
+		if (get().engine !== engine) return;
 		if (result instanceof Error) {
 			set({
 				serverPresets: null,
@@ -1260,6 +1314,7 @@ export const useWorkspaceStore = create<
 		const result = await api.createAmountPreset(preset, {
 			authToken: engine.authToken,
 		});
+		if (get().engine !== engine) return false;
 		if (result instanceof Error) {
 			set({
 				presetError: messageFor(result, "The recipe could not be saved."),
@@ -1290,6 +1345,7 @@ export const useWorkspaceStore = create<
 		const result = await api.updateAmountPreset(preset.id, preset, {
 			authToken: engine.authToken,
 		});
+		if (get().engine !== engine) return false;
 		if (result instanceof Error) {
 			set({
 				presetError: messageFor(result, "The recipe could not be saved."),
@@ -1322,6 +1378,7 @@ export const useWorkspaceStore = create<
 		const result = await api.deleteAmountPreset(id, {
 			authToken: engine.authToken,
 		});
+		if (get().engine !== engine) return false;
 		if (result instanceof Error) {
 			set({
 				presetError: messageFor(result, "The recipe could not be deleted."),
@@ -1344,6 +1401,7 @@ export const useWorkspaceStore = create<
 		const result = await api.moveAmountPreset(id, beforeId, {
 			authToken: engine.authToken,
 		});
+		if (get().engine !== engine) return false;
 		if (result instanceof Error) {
 			set({
 				presetError: messageFor(result, "The recipe could not be moved."),
@@ -1355,7 +1413,23 @@ export const useWorkspaceStore = create<
 	},
 }));
 
+/** Abandon the old owner before a different resource can mount its workspace. */
+export function resetWorkspaceForResource({
+	preserveVolatile = false,
+} = {}): void {
+	const engine = useWorkspaceStore.getState().engine;
+	const volatileState = preserveVolatile ? engine.volatileState : null;
+	engine.mounted = false;
+	engine.workspaceEpoch += 1;
+	engine.hydrationController?.abort();
+	engine.saveController?.abort();
+	useWorkspaceStore.setState({
+		...initialData(),
+		engine: { ...freshEngine(), volatileState },
+	});
+}
+
 /** Test hook: restores a pristine engine and data between cases. */
 export function resetWorkspaceStore(): void {
-	useWorkspaceStore.setState({ ...initialData(), engine: freshEngine() });
+	resetWorkspaceForResource();
 }

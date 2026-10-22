@@ -1,10 +1,26 @@
 import { z } from "zod";
 import type { FinancialModelDocument, PlanPresentation } from "../api/index.ts";
+import {
+	getResourceScope,
+	resourceStorageKey,
+	type ResourceScope,
+} from "../auth/resourceScope.ts";
 import { isRecord } from "../domain/guards.ts";
 import { type Plan, planSchema } from "../domain/model.ts";
 import { StorageError } from "./storage.ts";
 
 export const REMOTE_STORAGE_KEY = "waypoint.remote-workspace.v1";
+
+/** Unscoped v1 drafts stay untouched. Their owner cannot be established safely. */
+export function remoteStorageKey(scope = getResourceScope()): string | null {
+	return resourceStorageKey(REMOTE_STORAGE_KEY, scope);
+}
+
+function storageScopeError(): StorageError {
+	return new StorageError({
+		detail: "Verify your session before accessing browser workspace data.",
+	});
+}
 
 function isPlanPresentation(value: unknown): value is PlanPresentation {
 	return (
@@ -180,11 +196,15 @@ export function serverDocumentFingerprint(
 	return `v1:${stableHash(canonicalJson(semanticDocument))}`;
 }
 
-export function readRemoteStateRaw(): string | StorageError | null {
+export function readRemoteStateRaw(
+	scope: ResourceScope = getResourceScope(),
+): string | StorageError | null {
 	try {
+		const key = remoteStorageKey(scope);
+		if (!key || scope !== getResourceScope()) return storageScopeError();
 		if (typeof localStorage === "undefined")
 			return new StorageError({ detail: "Browser storage is unavailable." });
-		return localStorage.getItem(REMOTE_STORAGE_KEY);
+		return localStorage.getItem(key);
 	} catch (cause) {
 		return new StorageError({
 			detail: "The stored remote workspace could not be read.",
@@ -193,8 +213,10 @@ export function readRemoteStateRaw(): string | StorageError | null {
 	}
 }
 
-export function loadRemoteState(): RemoteLocalState | StorageError | null {
-	const raw = readRemoteStateRaw();
+export function loadRemoteState(
+	scope: ResourceScope = getResourceScope(),
+): RemoteLocalState | StorageError | null {
+	const raw = readRemoteStateRaw(scope);
 	if (raw instanceof Error || raw === null) return raw;
 	try {
 		const parsed = remoteStateSchema.safeParse(JSON.parse(raw));
@@ -215,20 +237,23 @@ export function loadRemoteState(): RemoteLocalState | StorageError | null {
 export function persistRemoteState(
 	state: RemoteLocalState,
 	expectedRaw?: string | null,
+	scope: ResourceScope = getResourceScope(),
 ): StorageError | null {
 	try {
+		const key = remoteStorageKey(scope);
+		if (!key || scope !== getResourceScope()) return storageScopeError();
 		if (typeof localStorage === "undefined")
 			return new StorageError({ detail: "Browser storage is unavailable." });
 		if (
 			expectedRaw !== undefined &&
-			localStorage.getItem(REMOTE_STORAGE_KEY) !== expectedRaw
+			localStorage.getItem(key) !== expectedRaw
 		) {
 			return new StorageError({
 				detail:
 					"This remote workspace was changed in another tab. Export your temporary work, then reload the latest server model.",
 			});
 		}
-		localStorage.setItem(REMOTE_STORAGE_KEY, JSON.stringify(state));
+		localStorage.setItem(key, JSON.stringify(state));
 		return null;
 	} catch (cause) {
 		return new StorageError({

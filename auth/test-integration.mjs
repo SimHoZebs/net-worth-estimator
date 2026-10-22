@@ -1,165 +1,183 @@
-// Casdoor contract test. Uses a disposable financial database and browser.
-import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { mkdtemp, mkdir } from "node:fs/promises";
-import { once } from "node:events";
-import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium } from "../frontend/node_modules/@playwright/test/index.mjs";
-import { randomBytes } from "node:crypto";
+// Real-provider contract: isolated owner, guest sample, and second-account stores.
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { mkdir, mkdtemp, realpath, readFile } from 'node:fs/promises';
+import { resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { randomBytes } from 'node:crypto';
+import { chromium, expect } from '../frontend/node_modules/@playwright/test/index.mjs';
+import { sampleSnapshot } from '../dev/database.mjs';
 
-const root = fileURLToPath(new URL("../", import.meta.url));
+const root = fileURLToPath(new URL('../', import.meta.url));
 const publicURL = process.env.NET_WORTH_ESTIMATOR_PUBLIC_URL;
-const provider = process.env.NET_WORTH_ESTIMATOR_AUTH_PROVIDER;
 const subject = process.env.AUTH_TEST_SUBJECT;
 const username = process.env.AUTH_TEST_USERNAME;
 const password = process.env.AUTH_TEST_PASSWORD;
-assert.ok(publicURL && provider && subject && username && password,
-  "Set the provider's NET_WORTH_ESTIMATOR_AUTH_* configuration, PUBLIC_URL, AUTH_TEST_SUBJECT, AUTH_TEST_USERNAME, and AUTH_TEST_PASSWORD.");
-assert.equal(provider, "casdoor", "Mainline integration tests use Casdoor");
+assert.equal(process.env.CASDOOR_TEST_MUTATIONS, '1', 'Use an explicitly disposable Casdoor fixture');
+assert.equal(process.env.NET_WORTH_ESTIMATOR_AUTH_PROVIDER, 'casdoor');
+assert.ok(publicURL && subject && username && password && process.env.CASDOOR_STATE_DIR, 'Supply app/identity configuration and disposable test credentials');
+const state = await realpath(process.env.CASDOOR_STATE_DIR);
+assert.ok([resolve(root, 'tmp'), '/tmp/opencode'].some((base) => state.startsWith(base + sep))
+  && state !== resolve(root, 'tmp/dev') && !state.startsWith(resolve(root, 'tmp/dev') + sep), 'Identity state must be an isolated disposable directory');
+const fixture = JSON.parse(await readFile(resolve(state, 'fixture.json'), 'utf8'));
+assert.equal(fixture.disposable, 'waypoint-authorization-v1', 'The identity fixture must explicitly mark its state disposable');
+assert.equal(await realpath(fixture.stateDir), state);
+assert.equal(fixture.settings.publicUrl, process.env.NET_WORTH_ESTIMATOR_AUTH_ISSUER);
 const origin = new URL(publicURL);
-assert.ok(["localhost", "127.0.0.1"].includes(origin.hostname), "Tests only target loopback origins.");
+assert.ok(['localhost', '127.0.0.1'].includes(origin.hostname) && origin.protocol === 'http:', 'The app test only uses unused loopback HTTP origins');
 try {
-  await fetch(new URL("/healthz", origin));
-  throw new Error("The test application port is already occupied. Refusing to attach to an existing server.");
-} catch (error) {
-  if (error.message.includes("already occupied")) throw error;
-}
-await mkdir(resolve(root, "tmp"), { recursive: true });
-const scratch = await mkdtemp(resolve(root, "tmp/auth-integration-"));
-const binary = resolve(scratch, "server");
-const build = spawn("go", ["-C", resolve(root, "backend"), "build", "-o", binary, "./cmd/server"], {
-  env: { ...process.env, CGO_ENABLED: "0" }, stdio: "inherit",
+  await fetch(new URL('/healthz', origin));
+  throw new Error('Application port is occupied; refusing to attach');
+} catch (error) { if (error.message.includes('occupied')) throw error; }
+await mkdir(resolve(root, 'tmp'), { recursive: true });
+const scratch = await mkdtemp(resolve(root, 'tmp/auth-resource-integration-'));
+const binary = resolve(scratch, 'server');
+const primaryDB = resolve(scratch, 'financial.db');
+const sampleDB = resolve(scratch, 'sample.db');
+const build = spawn('go', ['-C', resolve(root, 'backend'), 'build', '-o', binary, './cmd/server'], {
+  env: { ...process.env, CGO_ENABLED: '0' }, stdio: 'inherit',
 });
-assert.equal((await once(build, "exit"))[0], 0, "Go build failed");
-const baseEnv = {
-  ...process.env,
-  HOST: "127.0.0.1", PORT: origin.port || "80",
-  NET_WORTH_ESTIMATOR_DB: resolve(scratch, "financial.db"),
-  NET_WORTH_ESTIMATOR_FRONTEND_PATH: resolve(root, "frontend/dist"),
-  NET_WORTH_ESTIMATOR_AUTH_TOKEN: "",
-  NET_WORTH_ESTIMATOR_READ_ONLY: "",
+assert.equal((await once(build, 'exit'))[0], 0, 'Go build failed');
+const env = {
+  ...process.env, HOST: '127.0.0.1', PORT: origin.port || '80',
+  NET_WORTH_ESTIMATOR_DB: primaryDB,
+  NET_WORTH_ESTIMATOR_FRONTEND_PATH: resolve(root, 'frontend/dist'),
+  NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT: subject,
+  NET_WORTH_ESTIMATOR_SAMPLE_DB: sampleDB,
+  NET_WORTH_ESTIMATOR_PLANS_DIR: resolve(scratch, 'plans'),
+  NET_WORTH_ESTIMATOR_AUTH_SESSION_DB: resolve(scratch, 'sessions.db'),
+  NET_WORTH_ESTIMATOR_AUTH_TOKEN: '', NET_WORTH_ESTIMATOR_READ_ONLY: '',
   NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: origin.origin,
-  NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL: "",
-  NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK: "",
+  NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL: '', NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK: '',
 };
 let server;
-let serverLog = "";
-let context;
-async function start(role) {
-  serverLog = "";
-  server = spawn(binary, [], { env: {
-    ...baseEnv,
-    NET_WORTH_ESTIMATOR_AUTH_EDITORS: role === "editor" ? subject : "",
-    NET_WORTH_ESTIMATOR_AUTH_READERS: role === "viewer" ? subject : "",
-  }, stdio: ["ignore", "pipe", "pipe"] });
-  server.stdout.on("data", (chunk) => { serverLog += chunk; });
-  server.stderr.on("data", (chunk) => { serverLog += chunk; });
+let browser;
+let log = '';
+async function start() {
+  log = '';
+  server = spawn(binary, [], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  server.stdout.on('data', (data) => { log += data; });
+  server.stderr.on('data', (data) => { log += data; });
   for (let attempt = 0; attempt < 150; attempt++) {
-    if (server.exitCode !== null) throw new Error(`Application exited: ${serverLog}`);
-    try { if ((await fetch(new URL("/healthz", origin))).ok) return; } catch { /* startup */ }
-    await new Promise((r) => setTimeout(r, 100));
+    if (server.exitCode !== null) throw new Error(`Application exited: ${log}`);
+    try { if ((await fetch(new URL('/healthz', origin))).ok) return; } catch { /* startup */ }
+    await new Promise((done) => setTimeout(done, 100));
   }
-  throw new Error(`Application did not start: ${serverLog}`);
+  throw new Error(`Application did not start: ${log}`);
 }
 async function stop() {
-  if (server && server.exitCode === null) { const exit = once(server, "exit"); server.kill("SIGTERM"); await exit; }
+  if (server?.exitCode === null) {
+    const stopped = once(server, 'exit');
+    server.kill('SIGTERM');
+    await stopped;
+  }
 }
-async function readSession() {
-  const r = await context.request.get(`${origin.origin}/v1/auth/session`);
-  assert.equal(r.status(), 200);
-  return r.json();
+async function session(context) {
+  const response = await context.request.get(`${origin.origin}/v1/auth/session`);
+  assert.equal(response.status(), 200, 'Identity and Casdoor resource permissions must resolve');
+  const result = await response.json();
+  assert.equal(response.headers()['x-waypoint-resource'], result.resource.id);
+  return result;
 }
-async function request(method, path, data, headers = {}) {
-  return context.request.fetch(`${origin.origin}${path}`, { method, data, headers });
+async function request(context, scope, method, path, data, headers = {}) {
+  return context.request.fetch(`${origin.origin}${path}`, { method, data,
+    headers: { 'X-Waypoint-Resource': scope.resource.id, ...headers } });
 }
-const projection = { settings: {
-  fallbackProjectionStartDate: "2026-01-01", horizonYears: 1,
-  evaluations: { financialIndependence: [], netWorthThreshold: [], accountBalance: [], postingFulfillment: [], cycleFulfillment: [] },
-} };
+async function login(context, signup = false) {
+  const page = await context.newPage();
+  await page.goto(`${origin.origin}/v1/auth/login`);
+  if (signup) {
+    await page.getByRole('link', { name: /sign up now/i }).click();
+    await page.locator('#username').fill(`isolated-${randomBytes(6).toString('hex')}`);
+    await page.locator('#name').fill('Separate plan owner');
+    const secret = randomBytes(24).toString('hex');
+    await page.locator('#password').fill(secret);
+    await page.locator('#confirm').fill(secret);
+    await page.getByRole('button', { name: /^sign up$/i }).click();
+  } else {
+    await page.locator('#username').fill(username);
+    await page.locator('input[type="password"]').first().fill(password);
+    await page.getByRole('button', { name: /^(sign in|continue with password)$/i }).last().click();
+  }
+  await page.waitForURL((url) => url.origin === origin.origin && url.pathname === '/', { timeout: 30_000 });
+  return page;
+}
 try {
-  await start("editor");
-  context = await chromium.launchPersistentContext(resolve(scratch, "browser"), { headless: true });
-  assert.equal((await request("GET", "/v1/financial-model")).status(), 401);
-  const page = context.pages()[0];
-  await page.goto(origin.origin);
-  const userInput = process.env.AUTH_TEST_USERNAME_SELECTOR
-    ? page.locator(process.env.AUTH_TEST_USERNAME_SELECTOR)
-    : page.locator('input[autocomplete="username"],input[autocomplete="username webauthn"],input[type="email"],input[name="username"],input#username').first();
-  await userInput.fill(username);
-  await page.locator('input[type="password"]').first().fill(password);
-  await page.getByRole("button", { name: /^(sign in|continue with password)$/i }).last().click();
-  await page.waitForURL((url) => url.origin === origin.origin && url.pathname === "/", { timeout: 30_000 });
-  let session = await readSession();
-  assert.equal(session.user.subject, subject);
-  assert.equal(session.allowed, true);
-  assert.equal((await request("GET", "/v1/financial-model")).status(), 200);
-  console.log(`${provider}: automatic anonymous redirect, OIDC login, and private read PASS`);
-
-  const created = await request("POST", "/v1/accounts", { name: "Auth integration account", kind: "cash", enabled: true });
+  await start();
+  browser = await chromium.launch({ headless: true });
+  const owner = await browser.newContext();
+  const ownerPage = await login(owner);
+  const own = await session(owner);
+  assert.equal(own.user.subject, subject);
+  assert.equal(own.user.role, 'editor');
+  assert.equal(own.resource.kind, 'private');
+  const created = await request(owner, own, 'POST', '/v1/accounts', { id: 'owner-checking', name: 'Owner checking', kind: 'cash', enabled: true });
   assert.equal(created.status(), 200);
   assert.equal((await created.json()).persisted, true);
-  assert.equal((await request("POST", "/v1/accounts", { name: "CSRF attempt", kind: "cash", enabled: true }, { Origin: "https://attacker.invalid" })).status(), 403);
-  console.log(`${provider}: editor write and CSRF rejection PASS`);
-
-  const cookies = await context.cookies();
-  const appCookie = cookies.find((c) => c.name === "waypoint_session");
-  assert.ok(appCookie?.httpOnly && appCookie.expires > Date.now() / 1000);
-  const cookie = `${appCookie.name}=${appCookie.value}`;
-  await context.close();
+  await ownerPage.reload();
+  await expect(ownerPage.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
+  assert.equal(await ownerPage.getByRole('button', { name: 'Sign out', exact: true }).evaluate((button) =>
+    !!(button.compareDocumentPosition(document.querySelector('nav[aria-label="Main navigation"]')) & Node.DOCUMENT_POSITION_FOLLOWING)), true);
+  assert.equal((await request(owner, own, 'POST', '/v1/accounts', { name: 'CSRF', kind: 'cash', enabled: true }, { Origin: 'https://attacker.invalid' })).status(), 403);
+  const cookies = await owner.cookies();
+  const cookie = cookies.find((item) => item.name === 'waypoint_session');
+  assert.ok(cookie?.httpOnly && cookie.expires > Date.now() / 1000);
   await stop();
-  await start("viewer");
-  context = await chromium.launchPersistentContext(resolve(scratch, "browser"), { headless: true });
-  session = await readSession();
-  assert.equal(session.authenticated, true);
-  assert.equal(session.user.role, "viewer");
-  assert.equal((await (await request("GET", "/v1/status")).json()).readOnly, true);
-  assert.equal((await request("POST", "/v1/accounts", { name: "Denied", kind: "cash", enabled: true })).status(), 403);
-  const deterministic = await request("POST", "/v1/projections/deterministic", projection);
-  assert.equal(deterministic.status(), 200, await deterministic.text());
-  const stream = await request("POST", "/v1/projections/stochastic", { ...projection, config: { runCount: 1, seed: 42 } });
+  await sampleSnapshot(primaryDB, sampleDB);
+  await start();
+  assert.equal((await session(owner)).resource.id, own.resource.id);
+  assert.equal((await request(owner, own, 'POST', '/v1/accounts', { id: 'private-after-publication', name: 'Later private account', kind: 'cash', enabled: true })).status(), 200);
+  console.log('Owner OIDC login, persistent session, own-plan write, and CSRF protection PASS');
+
+  const guest = await browser.newContext();
+  const sample = await session(guest);
+  assert.equal(sample.authenticated, false);
+  assert.equal(sample.allowed, true);
+  assert.equal(sample.resource.kind, 'sample');
+  const guestPage = await guest.newPage();
+  await guestPage.goto(origin.origin);
+  await expect(guestPage.getByText('Guest', { exact: true })).toBeVisible();
+  await expect(guestPage.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
+  await expect(guestPage.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0);
+  assert.equal((await (await request(guest, sample, 'GET', '/v1/status')).json()).readOnly, true);
+  const guestModel = await (await request(guest, sample, 'GET', '/v1/financial-model')).json();
+  assert.deepEqual(guestModel.document.accounts.map((item) => item.id), ['owner-checking']);
+  assert.equal((await request(guest, sample, 'POST', '/v1/accounts', { name: 'Blocked guest', kind: 'cash', enabled: true })).status(), 401);
+  assert.equal((await request(owner, sample, 'GET', '/v1/financial-model')).status(), 409);
+  const projection = { settings: { fallbackProjectionStartDate: '2026-01-01', horizonYears: 1,
+    evaluations: { financialIndependence: [], netWorthThreshold: [], accountBalance: [], postingFulfillment: [], cycleFulfillment: [] } } };
+  assert.equal((await request(guest, sample, 'POST', '/v1/projections/deterministic', projection)).status(), 200);
+  const stream = await request(guest, sample, 'POST', '/v1/projections/stochastic', { ...projection, config: { runCount: 1, seed: 42 } });
   assert.equal(stream.status(), 200);
   assert.match(await stream.text(), /event: result/);
-  console.log(`${provider}: browser/server restart, viewer permissions, and SSE PASS`);
+  console.log('Separate published sample, guest read/project, denied guest writes, and stale-scope rejection PASS');
 
-  await stop();
-  await start("none");
-  assert.equal((await request("GET", "/v1/financial-model")).status(), 403);
-  console.log(`${provider}: revoked application grant PASS`);
+  const second = await browser.newContext();
+  const secondPage = await login(second, true);
+  const other = await session(second);
+  assert.equal(other.allowed, true);
+  assert.equal(other.user.role, 'editor');
+  assert.notEqual(other.resource.id, own.resource.id);
+  assert.equal((await (await request(second, other, 'GET', '/v1/financial-model')).json()).document, null);
+  await expect(secondPage.getByRole('heading', { name: /No financial model/ })).toBeVisible();
+  await expect(secondPage.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
+  assert.equal((await request(second, other, 'POST', '/v1/accounts', { id: 'second-checking', name: 'Second checking', kind: 'cash', enabled: true })).status(), 200);
+  assert.equal((await request(second, own, 'GET', '/v1/financial-model')).status(), 409);
+  assert.equal((await request(second, other, 'PATCH', '/v1/accounts/owner-checking', { name: 'Cross-account attempt', kind: 'cash', enabled: true })).status(), 404);
+  const ownerModel = await (await request(owner, own, 'GET', '/v1/financial-model')).json();
+  assert.deepEqual(ownerModel.document.accounts.map((item) => item.id), ['owner-checking', 'private-after-publication']);
+  console.log('Signup with automatic own-plan permissions and cross-account storage isolation PASS');
 
-  await stop();
-  await start("editor");
-  const logout = await request("POST", "/v1/auth/logout");
-  assert.equal(logout.status(), 200);
-  assert.equal((await request("GET", "/v1/financial-model")).status(), 401);
-  const replay = await fetch(`${origin.origin}/v1/financial-model`, { headers: { Cookie: cookie } });
+  assert.equal((await request(owner, own, 'POST', '/v1/auth/logout')).status(), 200);
+  const replay = await fetch(`${origin.origin}/v1/accounts`, { method: 'POST', headers: {
+    Cookie: `${cookie.name}=${cookie.value}`, 'X-Waypoint-Resource': own.resource.id, 'Content-Type': 'application/json',
+  }, body: JSON.stringify({ name: 'Captured cookie attempt', kind: 'cash', enabled: true }) });
   assert.equal(replay.status, 401);
-  console.log(`${provider}: logout and captured-cookie replay rejection PASS`);
-  const logoutPage = context.pages()[0];
-  await logoutPage.goto((await logout.json()).logoutURL).catch(() => assert.fail("Provider logout navigation failed"));
-  const loginInput = process.env.AUTH_TEST_USERNAME_SELECTOR
-    ? logoutPage.locator(process.env.AUTH_TEST_USERNAME_SELECTOR)
-    : logoutPage.locator('#username').first();
-  await loginInput.waitFor({ state: "visible" });
-  console.log(`${provider}: provider logout requires a new login PASS`);
-
-  await logoutPage.getByRole("link", { name: /sign up now/i }).click();
-  await logoutPage.locator('#username').fill(`signup-${randomBytes(6).toString('hex')}`);
-  await logoutPage.locator('#name').fill('Signup integration user');
-  const signupPassword = randomBytes(24).toString('hex');
-  await logoutPage.locator('#password').fill(signupPassword);
-  await logoutPage.locator('#confirm').fill(signupPassword);
-  await logoutPage.getByRole('button', { name: 'Sign Up', exact: true }).click();
-  await logoutPage.waitForURL((url) => url.origin === origin.origin && url.pathname === '/');
-  await logoutPage.getByRole('heading', { name: 'Access has not been granted' }).waitFor();
-  session = await readSession();
-  assert.equal(session.authenticated, true);
-  assert.equal(session.allowed, false);
-  assert.ok(session.user.subject && session.user.subject !== subject);
-  assert.equal((await request('GET', '/v1/financial-model')).status(), 403);
-  assert.equal((await request('POST', '/v1/accounts', { name: 'Denied signup', kind: 'cash', enabled: true })).status(), 403);
-  console.log(`${provider}: account creation returns through OIDC without granting financial access PASS`);
+  assert.equal((await request(owner, own, 'GET', '/v1/financial-model')).status(), 409);
+  assert.equal((await session(owner)).resource.kind, 'sample');
+  console.log('Logout removes private-plan access; captured cookies cannot restore write permission PASS');
 } finally {
-  if (context) await context.close();
+  await browser?.close();
   await stop();
 }

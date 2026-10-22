@@ -181,6 +181,92 @@ describe("backend and display plan adapter", () => {
 		expect(reverse.document.accounts[1]?.color).toBeNull();
 	});
 
+	it.each([
+		{ source: "model", readOnly: false, expected: false },
+		{ source: "simplefin", readOnly: false, expected: true },
+		{ source: "other-sync", readOnly: false, expected: true },
+		{ source: "model", readOnly: true, expected: true },
+	])(
+		"round-trips an unchanged account with checkpoint source $source and server readOnly $readOnly",
+		({ source, readOnly, expected }) => {
+			const document = documentFixture();
+			document.checkpoints[0]!.source = source;
+			const conversion = backendToDisplayPlan({
+				document,
+				status: { readOnly, authEnabled: true },
+				startDate: "2026-02-01",
+			});
+
+			expect(conversion.plan.accounts[0]?.readOnly).toBe(expected);
+			expect(conversion.presentation.accounts.cash?.readOnly).toBe(expected);
+			const reverse = displayPlanToBackendDocument(conversion.plan, {
+				sourceDocument: document,
+				presentation: conversion.presentation,
+			});
+			expect(reverse.report.losses).toEqual([]);
+			expect(reverse.document).toEqual(document);
+			expect(reverse.document.accounts[0]).not.toHaveProperty("readOnly");
+		},
+	);
+
+	it("recomputes account locks through guest and editor transitions with the same presentation", () => {
+		const document = documentFixture();
+		const initial = backendToDisplayPlan({
+			document,
+			status: { readOnly: false, authEnabled: true },
+			startDate: "2026-02-01",
+		});
+		document.checkpoints[0]!.source = "simplefin";
+		let presentation = initial.presentation;
+		for (const readOnly of [false, true, false]) {
+			const conversion = backendToDisplayPlan({
+				document,
+				status: { readOnly, authEnabled: true },
+				presentation,
+				startDate: "2026-02-01",
+			});
+
+			expect(conversion.plan.readOnly).toBe(readOnly);
+			expect(conversion.presentation.accounts.cash?.readOnly).toBe(true);
+			expect(conversion.presentation.accounts.loan?.readOnly).toBe(readOnly);
+			const reverse = displayPlanToBackendDocument(conversion.plan, {
+				sourceDocument: document,
+				presentation: conversion.presentation,
+			});
+			expect(reverse.report.losses).toEqual([]);
+			expect(reverse.document).toEqual(document);
+			presentation = conversion.presentation;
+		}
+	});
+
+	it.each(["model", "simplefin"])(
+		"still rejects an account readOnly edit with checkpoint source %s",
+		(source) => {
+			const document = documentFixture();
+			document.checkpoints[0]!.source = source;
+			const conversion = backendToDisplayPlan({
+				document,
+				status: { readOnly: false, authEnabled: true },
+				startDate: "2026-02-01",
+			});
+			const reverse = displayPlanToBackendDocument(
+				{
+					...conversion.plan,
+					accounts: conversion.plan.accounts.map((account) =>
+						account.id === "cash"
+							? { ...account, readOnly: !account.readOnly }
+							: account,
+					),
+				},
+				{ sourceDocument: document, presentation: conversion.presentation },
+			);
+
+			expect(reverse.report.losses).toContainEqual(
+				expect.objectContaining({ field: "accounts.cash.readOnly" }),
+			);
+		},
+	);
+
 	// A one-time movement dated at or before the projection start is historical
 	// whoever authored it; a recurring rule is a projection, not a past event.
 	// Nothing is stored: the display plan is judged by frequency and date.

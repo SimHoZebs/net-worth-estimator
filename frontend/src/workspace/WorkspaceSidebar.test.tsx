@@ -2,6 +2,7 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ServerStatus } from "../api/index.ts";
+import { SessionContext, type Session } from "../auth/sessionContext.ts";
 import {
 	resetWorkspaceStore,
 	useWorkspaceStore,
@@ -101,5 +102,77 @@ describe("sidebar sync signals", () => {
 	it("defers sync copy until the sidebar finishes loading", () => {
 		const view = renderSidebar(true);
 		expect(view.queryByText(/synced|sync status/i)).toBeNull();
+	});
+});
+
+describe("sidebar account placement", () => {
+	afterEach(cleanup);
+
+	function renderSession(session: Session) {
+		return render(
+			<SessionContext
+				value={{
+					session,
+					logout: vi.fn(async () => {}),
+					logoutPending: false,
+					logoutError: "",
+				}}
+			>
+				<aside aria-label="Workspace navigation">
+					<WorkspaceSidebar page="outlook" onClose={() => {}} />
+				</aside>
+			</SessionContext>,
+		);
+	}
+
+	it("places signed-in user info and account actions above navigation", () => {
+		const view = renderSession({
+			enabled: true,
+			authenticated: true,
+			allowed: true,
+			accountURL: "https://identity.example/account",
+			user: { subject: "editor", name: "Sam Lee", role: "editor" },
+		});
+		const sidebar = view.getByRole("complementary", {
+			name: "Workspace navigation",
+		});
+		const navigation = view.getByRole("navigation", {
+			name: "Main navigation",
+		});
+		for (const control of [
+			view.getByText("Sam Lee"),
+			view.getByRole("link", { name: "Manage sign-in methods" }),
+			view.getByRole("button", { name: "Sign out" }),
+		]) {
+			expect(sidebar.contains(control)).toBe(true);
+			expect(navigation.contains(control)).toBe(false);
+			expect(
+				control.compareDocumentPosition(navigation) &
+					Node.DOCUMENT_POSITION_FOLLOWING,
+			).toBeTruthy();
+		}
+		expect(view.queryByRole("combobox")).toBeNull();
+		expect(view.queryByText("Editor")).toBeNull();
+	});
+
+	it("places the allowed guest preview and sign-in action above navigation", () => {
+		const view = renderSession({
+			enabled: true,
+			authenticated: false,
+			allowed: true,
+			user: { subject: "", name: "", role: "viewer" },
+		});
+		const navigation = view.getByRole("navigation", {
+			name: "Main navigation",
+		});
+		expect(view.getByText("Guest")).toBeTruthy();
+		expect(view.getByText("Read-only preview")).toBeTruthy();
+		expect(
+			view
+				.getByRole("button", { name: "Sign in" })
+				.compareDocumentPosition(navigation) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
+		expect(view.queryByRole("button", { name: "Sign out" })).toBeNull();
+		expect(view.queryByText("Manage sign-in methods")).toBeNull();
 	});
 });

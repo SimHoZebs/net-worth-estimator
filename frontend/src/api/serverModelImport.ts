@@ -1,6 +1,8 @@
 import * as errore from "errore";
 import type { ApiClient } from "./client.ts";
 import type { FinancialModelDocument } from "./contracts.ts";
+import { getResourceScope } from "../auth/resourceScope.ts";
+import { responseScopeError } from "./scopedRequest.ts";
 import {
 	applyRowOperations,
 	diffFinancialModelDocuments,
@@ -41,6 +43,7 @@ export async function importServerModel({
 }: ServerModelImportOptions & { document: FinancialModelDocument }): Promise<
 	boolean | Error
 > {
+	const scope = getResourceScope();
 	if (!preconditions.hasWorkspace) return recover(document);
 	if (preconditions.readOnly)
 		return new ServerModelImportError({
@@ -57,9 +60,13 @@ export async function importServerModel({
 				"Wait for the current server operation to finish before importing a model.",
 		});
 	const current = await client.getModel({ authToken });
+	const stale = responseScopeError(scope);
+	if (stale) return stale;
 	if (current instanceof Error) return current;
 	const operations = diffFinancialModelDocuments(current.document, document);
 	const applied = await applyRowOperations(client, operations, { authToken });
+	const changed = responseScopeError(scope);
+	if (changed) return changed;
 	if (applied instanceof Error) return applied;
 	if (!applied.ok) {
 		const details = applied.issues
@@ -72,5 +79,5 @@ export async function importServerModel({
 		});
 	}
 	await reload();
-	return true;
+	return responseScopeError(scope) ?? true;
 }

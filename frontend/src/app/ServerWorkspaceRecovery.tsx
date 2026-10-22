@@ -2,7 +2,6 @@ import { FileJson, FileUp, LockKeyhole, RotateCcw } from "lucide-react";
 import { type ReactNode, type RefObject, useRef } from "react";
 import type { FinancialModelDocument } from "../api/index.ts";
 import { parseModelDocument } from "../api/modelImport.ts";
-import { Brand } from "../components/Brand.tsx";
 import { Button, TextButton } from "../components/Button.tsx";
 import { Notice } from "../components/Notice.tsx";
 import { ModelImportPreview } from "../components/imports/ModelImportPreview.tsx";
@@ -12,6 +11,10 @@ import { useUiStore } from "../state/uiStore.ts";
 import { useFileReview } from "../state/useFileReview.ts";
 import { useServerModelImport } from "../state/useServerModelImport.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
+import { WorkspaceTopbar } from "../workspace/WorkspaceHeader.tsx";
+import { WorkspaceLayout } from "../workspace/WorkspaceLayout.tsx";
+import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar.tsx";
 import { RemoteAuthControl } from "./RemoteAuthControl.tsx";
 
 export function ServerWorkspaceRecovery() {
@@ -209,17 +212,32 @@ function ServerRecovery({
 	onRetry: () => void;
 	children?: ReactNode;
 }) {
+	const navigation = useWorkspaceNavigation();
 	return (
-		<div className="mx-auto my-[12vh] max-w-2xl p-6 [&_p]:mb-6">
-			<Brand />
-			<h1 className="mt-12 mb-6">{title}.</h1>
-			{children}
-			<div className="flex flex-wrap gap-3">
-				<Button onClick={onRetry}>
-					<RotateCcw size={15} />
-					Retry server load
-				</Button>
+		<WorkspaceLayout
+			navigation={(close) => (
+				<WorkspaceSidebar page={navigation.page} onClose={close} />
+			)}
+			header={(open) => (
+				<WorkspaceTopbar
+					page={navigation.currentPage}
+					onOpenNavigation={open}
+				/>
+			)}
+			draftBar={null}
+			overlays={null}
+			notification={null}
+		>
+			<div className="mx-auto my-[12vh] max-w-2xl p-6 [&_p]:mb-6">
+				<h1 className="mb-6">{title}.</h1>
+				{children}
+				<div className="flex flex-wrap gap-3">
+					<Button onClick={onRetry}>
+						<RotateCcw size={15} />
+						Retry server load
+					</Button>
+				</div>
 			</div>
-		</div>
+		</WorkspaceLayout>
 	);
 }

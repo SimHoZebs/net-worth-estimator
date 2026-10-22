@@ -1,21 +1,28 @@
 import { QueryClient } from "@tanstack/react-query";
+import { getResourceScope } from "../auth/resourceScope.ts";
 
 /**
  * Shared TanStack Query cache for derived projections. A projection is a
  * pure function of its inputs, so a cache key holding the full input set
  * can never go stale: identical concurrent requests attach to one in-flight
  * fetch instead of computing side by side, and completed results are reused
- * across remounts while fresh. Mutable server reads (status, model, income)
- * deliberately stay out: the server changes outside any key (syncs, other
- * tabs), so caching them would serve stale state. Reads are unguarded, so
- * the auth token stays out of every key on purpose.
+ * across remounts while fresh. Resource identity and verification epoch also
+ * belong in each key: identical inputs from different accounts never share
+ * data or in-flight requests. Session discovery uses a separate cache.
  */
 
 export function deterministicQueryKey(
 	documentKey: string,
 	years: number,
 ): readonly unknown[] {
-	return ["deterministic-projection", documentKey, years];
+	const scope = getResourceScope();
+	return [
+		"deterministic-projection",
+		scope.key,
+		scope.epoch,
+		documentKey,
+		years,
+	];
 }
 
 export function stochasticQueryKey(
@@ -25,7 +32,17 @@ export function stochasticQueryKey(
 	seed: number,
 	attempt: number,
 ): readonly unknown[] {
-	return ["stochastic-projection", documentKey, years, runCount, seed, attempt];
+	const scope = getResourceScope();
+	return [
+		"stochastic-projection",
+		scope.key,
+		scope.epoch,
+		documentKey,
+		years,
+		runCount,
+		seed,
+		attempt,
+	];
 }
 
 let shared: QueryClient | null = null;
@@ -50,4 +67,11 @@ export function serverQueryClient(): QueryClient {
 /** Test hook: keeps cached server state from leaking between cases. */
 export function resetServerQueryCache(): void {
 	shared?.clear();
+}
+
+/** Cancel first, then remove both data and in-flight projection identities. */
+export async function clearResourceQueryCache(): Promise<void> {
+	if (!shared) return;
+	await shared.cancelQueries();
+	shared.clear();
 }

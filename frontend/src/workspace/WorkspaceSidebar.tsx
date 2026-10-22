@@ -1,4 +1,5 @@
 import { LockKeyhole, PanelLeftClose, Settings } from "lucide-react";
+import { SessionAccountControl } from "../auth/SessionAccountControl.tsx";
 import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { IconButton, Skeleton } from "../components/ui.tsx";
@@ -23,7 +24,10 @@ export function WorkspaceSidebar({
 	const status = useWorkspaceStore((state) => state.status);
 	const statusReadOnly = status?.readOnly ?? false;
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
-	const readOnly = statusReadOnly || writeBlocked || (plan?.readOnly ?? true);
+	const readOnly =
+		statusReadOnly ||
+		writeBlocked ||
+		(plan?.readOnly ?? status?.readOnly ?? true);
 	const statusLabel = workspaceStatusLabel({ readOnly });
 	return (
 		<>
@@ -36,25 +40,28 @@ export function WorkspaceSidebar({
 					onClick={onClose}
 				/>
 			</div>
-			<nav className="mt-12" aria-label="Main navigation">
-				<ul className="grid list-none gap-1 p-0">
-					{pages
-						.filter((item) => item.id !== "sources")
-						.map((item) => (
-							<li key={item.id}>
-								<a
-									className={navigationLinkClassName}
-									href={`#${item.id}`}
-									onClick={onClose}
-									aria-current={page === item.id ? "page" : undefined}
-								>
-									<item.icon size={19} strokeWidth={1.7} />
-									<span>{item.label}</span>
-								</a>
-							</li>
-						))}
-				</ul>
-			</nav>
+			<div className="mt-12">
+				<SessionAccountControl />
+				<nav aria-label="Main navigation">
+					<ul className="grid list-none gap-1 p-0">
+						{pages
+							.filter((item) => item.id !== "sources")
+							.map((item) => (
+								<li key={item.id}>
+									<a
+										className={navigationLinkClassName}
+										href={`#${item.id}`}
+										onClick={onClose}
+										aria-current={page === item.id ? "page" : undefined}
+									>
+										<item.icon size={19} strokeWidth={1.7} />
+										<span>{item.label}</span>
+									</a>
+								</li>
+							))}
+					</ul>
+				</nav>
+			</div>
 			<div className="mt-auto pt-12 max-md:pt-8">
 				<a
 					className={navigationLinkClassName}

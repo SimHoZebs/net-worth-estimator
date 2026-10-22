@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ApiRequestOptions } from "./client.ts";
 import { ApiHttpError } from "./client.ts";
+import { suspendResourceScope } from "../auth/resourceScope.ts";
+import { ResourceScopeError } from "./scopedRequest.ts";
 import type {
 	BackendAccount,
 	FinancialModelDocument,
@@ -112,6 +114,27 @@ function setup(
 }
 
 describe("server model replacement", () => {
+	it("does not start writes if the resource changes after the initial read", async () => {
+		const { run, mocks, reload } = setup();
+		mocks.getModel.mockImplementation(async () => {
+			suspendResourceScope();
+			return { document: emptyDocument, issues: [] };
+		});
+		expect(await run()).toBeInstanceOf(ResourceScopeError);
+		expect(mocks.createAccount).not.toHaveBeenCalled();
+		expect(reload).not.toHaveBeenCalled();
+	});
+
+	it("does not reload a different resource after the last write", async () => {
+		const { run, mocks, reload } = setup();
+		mocks.createAccount.mockImplementation(async () => {
+			suspendResourceScope();
+			return rowResponse(account);
+		});
+		expect(await run()).toBeInstanceOf(ResourceScopeError);
+		expect(reload).not.toHaveBeenCalled();
+	});
+
 	it.each([
 		{
 			preconditions: { readOnly: true },
