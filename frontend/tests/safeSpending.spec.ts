@@ -123,8 +123,18 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 	});
 	expect(observations.ok()).toBe(true);
 	for (const [id, name, day, amount] of [
-		["last-cycle-purchase", "Prior cycle purchase", "2026-01-10", 50],
-		["this-cycle-purchase", "Current cycle purchase", "2026-01-25", 25],
+		[
+			"01900000-0000-7000-8000-000000000031",
+			"Prior cycle purchase",
+			"2026-01-10",
+			50,
+		],
+		[
+			"01900000-0000-7000-8000-000000000032",
+			"Current cycle purchase",
+			"2026-01-25",
+			25,
+		],
 	] as const) {
 		const time = new Date(`${day}T12:00:00Z`).getTime() / 1000;
 		const response = await request.post(`${FIXTURE_API}/v1/postings`, {
@@ -205,7 +215,8 @@ test("Configure only selects sources and settings, and ignores legacy overrides"
 		data: { AccountId: "loan", Date: "2026-01-19", Balance: -4321 },
 	});
 	expect(response.ok()).toBe(true);
-	await page.addInitScript((key) => {
+	await page.addInitScript((baseKey) => {
+		const key = `${baseKey}:resource:${encodeURIComponent(window.location.origin)}:legacy`;
 		if (!localStorage.getItem(key))
 			localStorage.setItem(
 				key,

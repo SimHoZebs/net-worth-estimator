@@ -10,9 +10,8 @@ import (
 // Schema owns the current SQLite DDL. Row methods (model.go, rows.go,
 // sync.go, pinned.go, presets.go, artifacts.go, import.go) operate on tables
 // but never define them; Open applies ensureSchema before serving traffic.
-// There is no version history and no upgrade path: old databases are not
-// supported. A replacement backend implements Store without importing
-// anything here.
+// posting_migration.go upgrades the previous posting identity schema atomically.
+// A replacement backend implements Store without importing anything here.
 
 // ensureSchema creates every table in its current shape and seeds the
 // singleton rows plus the factory-default amount presets. It is idempotent:
@@ -27,6 +26,9 @@ func (s *sqliteStore) ensureSchema() error {
 		if _, err := tx.Exec(statement); err != nil {
 			return fmt.Errorf("ensure schema: %w", err)
 		}
+	}
+	if err := migratePostingIdentity(tx); err != nil {
+		return err
 	}
 	if _, err := tx.Exec(`INSERT OR IGNORE INTO model_metadata (id, source_path, document_present) VALUES (1, '', 0)`); err != nil {
 		return fmt.Errorf("ensure model metadata: %w", err)
@@ -95,7 +97,23 @@ func schemaStatements() []string {
 			fulfills_rule_id TEXT,
 			fulfills_occurrence_date TEXT,
 			enabled INTEGER NOT NULL,
-			source TEXT NOT NULL DEFAULT 'model'
+			source TEXT NOT NULL DEFAULT 'model',
+			pending INTEGER NOT NULL DEFAULT 0 CHECK (pending IN (0, 1)),
+			execution_order INTEGER NOT NULL DEFAULT 0 CHECK (execution_order >= 0)
+		)`,
+		`CREATE TABLE IF NOT EXISTS posting_sync_keys (
+			provider TEXT NOT NULL,
+			account_id TEXT NOT NULL,
+			transaction_id TEXT NOT NULL,
+			posting_id TEXT NOT NULL UNIQUE REFERENCES postings(id) ON DELETE CASCADE,
+			PRIMARY KEY (provider, account_id, transaction_id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS posting_id_migrations (
+			old_id TEXT PRIMARY KEY,
+			new_id TEXT NOT NULL UNIQUE
+		)`,
+		`CREATE TABLE IF NOT EXISTS schema_migrations (
+			name TEXT PRIMARY KEY
 		)`,
 		`CREATE TABLE IF NOT EXISTS purchase_policies (
 			posting_id TEXT PRIMARY KEY REFERENCES postings(id) ON DELETE CASCADE,
@@ -297,6 +315,9 @@ func expectedSchemaTables() []string {
 		"accounts",
 		"checkpoints",
 		"postings",
+		"posting_sync_keys",
+		"posting_id_migrations",
+		"schema_migrations",
 		"purchase_policies",
 		"recurrence_rules",
 		"evaluations",

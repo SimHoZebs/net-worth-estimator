@@ -20,8 +20,8 @@ func RunConformance(t *testing.T, newStore func(*testing.T) Store) {
 	t.Run("RoundTripsCanonicalDocumentMetadataAndOrder", func(t *testing.T) {
 		testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t, newStore)
 	})
-	t.Run("RowWritesRejectForgedSyncNamespace", func(t *testing.T) {
-		testRowWritesRejectForgedSyncNamespace(t, newStore)
+	t.Run("RowWritesUseStoredSyncOwnership", func(t *testing.T) {
+		testRowWritesUseStoredSyncOwnership(t, newStore)
 	})
 	t.Run("OwnerCheckpointWinsKeyCollision", func(t *testing.T) {
 		testOwnerCheckpointWinsKeyCollision(t, newStore)

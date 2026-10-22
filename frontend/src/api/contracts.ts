@@ -169,8 +169,10 @@ export interface BackendPosting extends HumaMetadata {
 	transactionTime: number;
 	claim?: PostingClaim | null;
 	purchase?: { priority: number } | null;
+	executionOrder?: number;
 	enabled: boolean;
 	source?: string;
+	pending?: boolean;
 }
 export type Posting = BackendPosting;
 

@@ -2,7 +2,6 @@ package simplefin
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -49,16 +48,9 @@ type Provision struct {
 // Plan is the mapped sync output before applying.
 type Plan struct {
 	Checkpoints []Checkpoint
-	Pending     []types.Posting
+	Pending     []store.SyncPosting
 	Provisions  []Provision
 	Skipped     map[SkipReason]int
-}
-
-var idSanitizer = regexp.MustCompile(`[^A-Za-z0-9_-]`)
-
-// PendingPostingID builds the stable sync-namespace ID for a pending charge.
-func PendingPostingID(modelAccountID, transactionID string) string {
-	return store.SyncPostingPrefix + "pending-" + modelAccountID + "-" + idSanitizer.ReplaceAllString(transactionID, "_")
 }
 
 // parseBalance parses a bridge balance decimal.
@@ -195,18 +187,22 @@ func Map(set *AccountSet, config Config, resolved map[string]string, now time.Ti
 			if transaction.TransactedAt != nil && *transaction.TransactedAt > 0 {
 				transactionTime = *transaction.TransactedAt
 			}
-			plan.Pending = append(plan.Pending, types.Posting{
-				ID:              PendingPostingID(modelAccountID, transaction.ID),
-				Name:            truncateLabel(transaction.Description),
-				SourceAccountID: &source,
-				Amount: types.PostingAmountResolution{
-					Resolver: "expression",
-					Config:   map[string]any{"expression": abs},
-					Inputs:   map[string]types.AmountInputBinding{},
+			plan.Pending = append(plan.Pending, store.SyncPosting{
+				ProviderAccountID: account.ID,
+				TransactionID:     transaction.ID,
+				Posting: types.Posting{
+					Name:            truncateLabel(transaction.Description),
+					SourceAccountID: &source,
+					Amount: types.PostingAmountResolution{
+						Resolver: "expression",
+						Config:   map[string]any{"expression": abs},
+						Inputs:   map[string]types.AmountInputBinding{},
+					},
+					PostedTime:      postedTime,
+					TransactionTime: transactionTime,
+					Enabled:         false,
+					Pending:         true,
 				},
-				PostedTime:      postedTime,
-				TransactionTime: transactionTime,
-				Enabled:         false,
 			})
 		}
 	}

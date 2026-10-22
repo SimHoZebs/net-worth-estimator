@@ -137,8 +137,9 @@ describe("account-scoped transactions", () => {
 	it("flags sync pending charges instead of reporting them as user-excluded", () => {
 		const plan = structuredClone(examplePlan);
 		plan.movements.push({
-			id: "sync-pending-checking-mock-pend1",
+			id: "01900000-0000-7000-8000-000000000001",
 			name: "Mock Corner Store",
+			pending: true,
 			amount: 42.1,
 			amountKnown: true,
 			fromId: "checking",
@@ -159,14 +160,16 @@ describe("account-scoped transactions", () => {
 			projection: activityProjection(plan),
 		});
 		expect(
-			rows.find((row) => row.movementId === "sync-pending-checking-mock-pend1"),
+			rows.find(
+				(row) => row.movementId === "01900000-0000-7000-8000-000000000001",
+			),
 		).toMatchObject({
 			pending: true,
 			excluded: true,
 		});
 	});
 
-	it("still flags legacy pre-rename pending charges", () => {
+	it("does not infer pending status from a legacy ID prefix", () => {
 		const plan = structuredClone(examplePlan);
 		plan.movements.push({
 			id: "sfin-pending-checking-mock-pend1",
@@ -193,16 +196,18 @@ describe("account-scoped transactions", () => {
 		expect(
 			rows.find((row) => row.movementId === "sfin-pending-checking-mock-pend1"),
 		).toMatchObject({
-			pending: true,
+			pending: false,
 			excluded: true,
 		});
 	});
 
-	it.each(["sync-pending-", "sfin-pending-"])(
-		"keeps %s charges after the balance checkpoint visible without projecting them",
-		(prefix) => {
+	it.each([
+		"01900000-0000-7000-8000-000000000001",
+		"550e8400-e29b-41d4-a716-446655440000",
+	])(
+		"keeps pending UUID %s after the balance checkpoint visible without projecting it",
+		(id) => {
 			const plan = structuredClone(examplePlan);
-			const id = `${prefix}checking-new-charge`;
 			plan.movements.push({
 				...plan.movements[0]!,
 				id,
@@ -213,6 +218,7 @@ describe("account-scoped transactions", () => {
 				startDate: "2026-09-25",
 				enabled: false,
 				readOnly: true,
+				pending: true,
 			});
 			const projection = activityProjection(plan);
 			const rows = accountTransactions({

@@ -61,6 +61,9 @@ func clearDocument(tx *sql.Tx) error {
 	if _, err := tx.Exec(`DELETE FROM entity_ids`); err != nil {
 		return fmt.Errorf("clear entity ids: %w", err)
 	}
+	if _, err := tx.Exec(`DELETE FROM posting_id_migrations`); err != nil {
+		return fmt.Errorf("clear posting id history: %w", err)
+	}
 	if _, err := tx.Exec(`DELETE FROM account_links`); err != nil {
 		return fmt.Errorf("clear account links: %w", err)
 	}
@@ -77,8 +80,8 @@ func clearDocument(tx *sql.Tx) error {
 // rows while preserving sync-owned rows. Runtime writes use row CRUD.
 func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 	// Invariant: bank lines survive your saves. Sync-owned rows are managed
-	// only by the sync, never by seed payloads: snapshot them, drop
-	// forged sync-namespace rows from the incoming document, then re-merge. Incoming
+	// only by the sync, never by seed payloads: snapshot them, ignore
+	// incoming copies of those identities, then re-merge. Incoming
 	// owner checkpoints win key collisions, so owners always keep an override
 	// path. Accounts referenced only by sync rows are preserved so history
 	// never orphans.
@@ -87,6 +90,10 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 		return err
 	}
 	syncedPostings, err := loadSyncedPostings(tx)
+	if err != nil {
+		return err
+	}
+	syncKeys, err := loadPostingSyncKeys(tx)
 	if err != nil {
 		return err
 	}
@@ -150,6 +157,11 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 	if _, err := remergePostings(tx, document.Postings, syncedPostings, 0); err != nil {
 		return err
 	}
+	for _, key := range syncKeys {
+		if err := insertPostingSyncKey(tx, key); err != nil {
+			return err
+		}
+	}
 	position = 0
 	for _, rule := range document.RecurrenceRules {
 		if err := insertRule(tx, position, &rule); err != nil {
@@ -175,6 +187,11 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 }
 
 func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source string) error {
+	if posting.ExecutionOrder == 0 {
+		if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) + 1 FROM postings`).Scan(&posting.ExecutionOrder); err != nil {
+			return fmt.Errorf("allocate posting execution order: %w", err)
+		}
+	}
 	destinationsJSON := []byte("null")
 	if posting.Destinations != nil {
 		var err error
@@ -194,10 +211,10 @@ func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source stri
 		claimOccurrenceDate = posting.Claim.OccurrenceDate
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		posting.ID, position, posting.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
-		posting.PostedTime, posting.TransactionTime, claimRuleID, claimOccurrenceDate, boolToInt(posting.Enabled), source,
+		posting.PostedTime, posting.TransactionTime, claimRuleID, claimOccurrenceDate, boolToInt(posting.Enabled), source, boolToInt(source != SourceModel && posting.Pending), posting.ExecutionOrder,
 	); err != nil {
 		return fmt.Errorf("insert posting %s: %w", posting.ID, err)
 	}
@@ -258,9 +275,9 @@ func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 	var posting types.Posting
 	var sourceAccountID, claimRuleID, claimOccurrenceDate sql.NullString
 	var destinationsJSON, amountJSON string
-	var enabled int64
+	var enabled, pending int64
 	var source sql.NullString
-	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &posting.PostedTime, &posting.TransactionTime, &claimRuleID, &claimOccurrenceDate, &enabled, &source); err != nil {
+	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &posting.PostedTime, &posting.TransactionTime, &claimRuleID, &claimOccurrenceDate, &enabled, &source, &pending, &posting.ExecutionOrder); err != nil {
 		return types.Posting{}, err
 	}
 	if sourceAccountID.Valid {
@@ -281,6 +298,7 @@ func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 		posting.Claim = &types.PostingClaim{RuleID: claimRuleID.String, OccurrenceDate: claimOccurrenceDate.String}
 	}
 	posting.Enabled = enabled != 0
+	posting.Pending = pending != 0
 	if source.Valid {
 		posting.Source = source.String
 	}
@@ -453,7 +471,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close checkpoints: %w", err)
 	}
 
-	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source FROM postings ORDER BY position`)
+	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order FROM postings ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}

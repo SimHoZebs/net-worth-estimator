@@ -8,7 +8,7 @@ import (
 )
 
 type postingBody struct {
-	ID              *string                       `json:"id,omitempty"`
+	ID              *string                       `json:"id,omitempty" format:"uuid"`
 	Name            string                        `json:"name"`
 	SourceAccountID *string                       `json:"sourceAccountId,omitempty"`
 	Destinations    []string                      `json:"destinations,omitempty"`
@@ -21,6 +21,10 @@ type postingBody struct {
 	// Source is accepted and ignored: ownership is server-computed,
 	// mirroring the retired whole-document PUT contract.
 	Source *string `json:"source,omitempty"`
+	// Pending is also server-computed bank metadata.
+	Pending *bool `json:"pending,omitempty"`
+	// Equal-time execution order is assigned and preserved by the store.
+	ExecutionOrder *int64 `json:"executionOrder,omitempty"`
 }
 
 func (b postingBody) toPosting(id string) types.Posting {

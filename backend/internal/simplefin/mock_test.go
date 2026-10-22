@@ -42,8 +42,8 @@ func TestMockAccountSetMapsLikeBridge(t *testing.T) {
 		t.Fatalf("pending = %+v, want the one mock charge", plan.Pending)
 	}
 	pending := plan.Pending[0]
-	if pending.ID != "sync-pending-prime_card-mock-pend1" {
-		t.Fatalf("pending id = %q, want sync namespace", pending.ID)
+	if pending.ID != "" || pending.TransactionID != "mock-pend1" || pending.ProviderAccountID != "mock-prime" {
+		t.Fatalf("pending identity = %+v, want raw upstream keys and no local ID", pending)
 	}
 	if pending.Enabled {
 		t.Fatal("pending seed must be disabled")
@@ -78,7 +78,7 @@ func TestMockRunnerSyncPersistsAcrossRuns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("mock rerun: %v", err)
 	}
-	if second.CheckpointsUpdated != 2 || second.PendingDeleted != 1 || second.PendingInserted != 1 {
+	if second.CheckpointsUpdated != 2 || second.PendingDeleted != 0 || second.PendingInserted != 0 || second.PendingUpdated != 1 {
 		t.Fatalf("rerun summary = %+v, want updates + pending refresh", second)
 	}
 }

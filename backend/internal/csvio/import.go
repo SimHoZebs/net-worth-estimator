@@ -114,8 +114,8 @@ func parseOptionalString(value string) *string {
 }
 
 func isUUID(value string) bool {
-	_, err := uuid.Parse(value)
-	return err == nil
+	parsed, err := uuid.Parse(value)
+	return err == nil && parsed.String() == value
 }
 
 func newUUIDv7() string {
@@ -148,45 +148,6 @@ func parseUnixTime(value, fallbackDate string) (int64, error) {
 		return stamp, nil
 	}
 	return 0, fmt.Errorf("missing time")
-}
-
-func rewriteAmountInputs(amount *types.PostingAmountResolution, idMap map[string]string) {
-	if amount == nil || len(idMap) == 0 {
-		return
-	}
-	for key, binding := range amount.Inputs {
-		if binding.Arguments == nil {
-			continue
-		}
-		if raw, ok := binding.Arguments["id"].(string); ok {
-			if next, ok := idMap[raw]; ok {
-				binding.Arguments["id"] = next
-				amount.Inputs[key] = binding
-			}
-		}
-	}
-}
-
-func rewriteJSONValue(value any, idMap map[string]string) any {
-	switch typed := value.(type) {
-	case map[string]any:
-		for key, item := range typed {
-			typed[key] = rewriteJSONValue(item, idMap)
-		}
-		return typed
-	case []any:
-		for index, item := range typed {
-			typed[index] = rewriteJSONValue(item, idMap)
-		}
-		return typed
-	case string:
-		if next, ok := idMap[typed]; ok {
-			return next
-		}
-		return typed
-	default:
-		return value
-	}
 }
 
 // ParseNumberValue converts a JSON-decoded number to float64.
@@ -300,16 +261,12 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 		if err := strictUnmarshal([]byte(amountRaw), &amount); err != nil {
 			return nil, fmt.Errorf("posting %s amount: %w", rawID, err)
 		}
-		rewriteAmountInputs(&amount, idMap)
 		posting.Amount = amount
 		if ruleID := field(record, index, "ruleId"); ruleID != "" {
 			occurrenceDate := field(record, index, "occurrenceDate")
 			posting.Claim = &types.PostingClaim{RuleID: ruleID, OccurrenceDate: occurrenceDate}
 		}
 		document.Postings = append(document.Postings, posting)
-	}
-	for index := range document.Postings {
-		rewriteAmountInputs(&document.Postings[index].Amount, idMap)
 	}
 
 	records, err = readCSV(filepath.Join(csvPath, RulesFile))
@@ -360,17 +317,7 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 	if err := importFulfillmentEvaluations(csvPath, document); err != nil {
 		return nil, err
 	}
-	for index := range document.RecurrenceRules {
-		rewriteAmountInputs(&document.RecurrenceRules[index].Amount, idMap)
-	}
-	if len(idMap) > 0 {
-		for index := range document.Evaluations.FinancialIndependence {
-			document.Evaluations.FinancialIndependence[index].Config = rewriteJSONValue(document.Evaluations.FinancialIndependence[index].Config, idMap)
-		}
-		for index := range document.Evaluations.PostingFulfillment {
-			document.Evaluations.PostingFulfillment[index].Config = rewriteJSONValue(document.Evaluations.PostingFulfillment[index].Config, idMap)
-		}
-	}
+	types.RemapPostingReferences(document, idMap)
 	return document, nil
 }
 

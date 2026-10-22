@@ -1,12 +1,7 @@
 import { todayIso } from "../domain/format.ts";
 import { finite, isRecord } from "../domain/guards.ts";
 import { latestCheckpoint } from "./checkpoints.ts";
-import {
-	isSyncReservedId,
-	type Account,
-	type Movement,
-	type Plan,
-} from "../domain/model.ts";
+import type { Account, Movement, Plan } from "../domain/model.ts";
 import {
 	type AmountInputBinding,
 	type BackendAccount,
@@ -546,14 +541,14 @@ function movementDisplayFromPosting(
 		endDate: null,
 		annualIncrease: previous?.displayAnnualIncrease ?? 0,
 		enabled: posting.enabled,
-		readOnly:
-			previous?.readOnly ?? (amount === null || isSyncOwned(posting.source)),
+		readOnly: amount === null || isSyncOwned(posting.source),
 		claimRuleId: posting.claim?.ruleId ?? null,
+		claimOccurrenceDate: posting.claim?.occurrenceDate ?? null,
+		postedDate: settledDay(posting.postedTime),
 		...(posting.purchase
 			? { purchasePriority: posting.purchase.priority }
 			: {}),
-		claimOccurrenceDate: posting.claim?.occurrenceDate ?? null,
-		postedDate: settledDay(posting.postedTime),
+		pending: posting.pending === true,
 	};
 }
 
@@ -758,9 +753,7 @@ function buildPresentationPosting(
 			? previous.destinations
 			: posting.destinations;
 	return {
-		...(posting.source === undefined && previous?.source === undefined
-			? {}
-			: { source: previous?.source ?? posting.source }),
+		...(posting.source === undefined ? {} : { source: posting.source }),
 		amount: presentationAmount,
 		amountValue: previousAmountMatches
 			? (previous?.amountValue ?? amount)
@@ -768,8 +761,7 @@ function buildPresentationPosting(
 		destinations: presentationDestinations,
 		postedTime: previous?.postedTime ?? posting.postedTime,
 		transactionTime: previous?.transactionTime ?? posting.transactionTime,
-		readOnly:
-			previous?.readOnly ?? (amount === null || isSyncOwned(posting.source)),
+		readOnly: amount === null || isSyncOwned(posting.source),
 		displayToId: previous?.displayToId ?? posting.destinations?.[0] ?? null,
 		displayAnnualIncrease: previous?.displayAnnualIncrease ?? 0,
 	};
@@ -1215,17 +1207,18 @@ export function displayPlanToBackendDocument(
 		const storedPosting = sourcePostings.get(movement.id);
 		const storedRule = sourceRules.get(movement.id);
 		const storedAmount = storedPosting ?? storedRule;
-		// Reserved sync-output posting IDs use a backend namespace the
-		// workspace never invents; the backend drops forged rows on save.
-		if (isSyncReservedId(movement.id)) {
+		if (Boolean(movement.pending) !== Boolean(storedPosting?.pending)) {
 			lose(
 				conversionReport,
-				`movements.${movement.id}`,
-				"Reserved sync posting IDs cannot be created by the display plan.",
-				`movements.${index}.id`,
+				`movements.${movement.id}.pending`,
+				"Pending status is server-owned bank metadata.",
+				`movements.${index}.pending`,
 			);
 		}
-		if (isSyncOwned(storedPosting?.source) && movement.readOnly !== true) {
+		if (
+			isSyncOwned(storedPosting?.source) &&
+			(movement.readOnly !== true || movement.frequency !== "once")
+		) {
 			lose(
 				conversionReport,
 				`movements.${movement.id}.readOnly`,
@@ -1307,7 +1300,7 @@ export function displayPlanToBackendDocument(
 			`movements.${index}`,
 		);
 		if (movement.frequency === "once") {
-			const source = storedExtras?.source ?? storedPosting?.source;
+			const source = storedPosting?.source ?? storedExtras?.source;
 			const storedPostedTime =
 				storedExtras?.postedTime ?? storedPosting?.postedTime ?? null;
 			const storedTransactionTime =
@@ -1348,13 +1341,16 @@ export function displayPlanToBackendDocument(
 					: storedPosting?.purchase
 						? { purchase: null }
 						: {}),
-				claim:
-					movement.claimRuleId && movement.claimOccurrenceDate
-						? {
+				...(movement.claimRuleId && movement.claimOccurrenceDate
+					? {
+							claim: {
 								ruleId: movement.claimRuleId,
 								occurrenceDate: movement.claimOccurrenceDate,
-							}
-						: null,
+							},
+						}
+					: storedPosting?.claim === undefined
+						? {}
+						: { claim: null }),
 				enabled: movement.enabled,
 				...(source === undefined ? {} : { source }),
 			});

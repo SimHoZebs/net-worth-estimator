@@ -304,7 +304,7 @@ func TestRowWriteIgnoresEchoedSourceField(t *testing.T) {
 	// server-computed source flag. Writes must accept and ignore it.
 	post := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/postings", bytes.NewReader([]byte(
-		`{"id":"echo","name":"Echo","destinations":["checking"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true,"source":"model","claim":null}`,
+		`{"id":"01900000-0000-7000-8000-000000000023","name":"Echo","destinations":["checking"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true,"source":"simplefin","pending":true,"claim":null}`,
 	)))
 	request.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(post, request)
@@ -313,14 +313,15 @@ func TestRowWriteIgnoresEchoedSourceField(t *testing.T) {
 	}
 	var created struct {
 		Row struct {
-			Source string `json:"source"`
+			Source  string `json:"source"`
+			Pending bool   `json:"pending"`
 		} `json:"row"`
 		Persisted bool `json:"persisted"`
 	}
 	if err := json.Unmarshal(post.Body.Bytes(), &created); err != nil {
 		t.Fatalf("decode POST response: %v", err)
 	}
-	if !created.Persisted || created.Row.Source != "model" {
+	if !created.Persisted || created.Row.Source != "model" || created.Row.Pending {
 		t.Fatalf("echoed source response = %+v", created)
 	}
 }

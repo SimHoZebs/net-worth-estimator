@@ -151,6 +151,9 @@ export function accountTransactions({
 			excluded: !movement.enabled,
 			pending: isPendingMovement(movement),
 		}));
+	const pendingIds = new Set(
+		plan.movements.filter(isPendingMovement).map((movement) => movement.id),
+	);
 	const startDateHasCheckpoint = projection.startDateHasCheckpoint ?? true;
 	const projected: AccountTransaction[] = projection.movements
 		.filter(
@@ -192,7 +195,7 @@ export function accountTransactions({
 				shortfall: Math.max(0, accountRequested - accountAmount),
 				constraint: movement.constraint,
 				excluded: false,
-				pending: isPendingMovement(movement.movementId),
+				pending: pendingIds.has(movement.movementId),
 			};
 		});
 	return [...recorded, ...projected];

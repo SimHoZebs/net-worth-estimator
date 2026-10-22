@@ -102,6 +102,10 @@ and private directories use `0700`. Compose `down` retains the bind-mounted data
 Existing Casdoor instances require the reviewed permission objects described in
 [the authorization contract](../docs/authorization.md).
 
+The API upgrades older posting IDs to UUIDs on first open. Back up all financial
+databases before a schema update. See [the posting migration contract](../docs/posting-identity.md)
+for reference preservation and rollback. Identity state remains separate.
+
 ## Verification
 
 The configuration tests use the Docker Compose CLI without a daemon:

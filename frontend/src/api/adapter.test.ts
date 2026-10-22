@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	changesBetween,
 	isHistoricalMovement,
 	netWorth,
+	validatePlan,
 	visibleAccounts,
 	visibleMovements,
 } from "../domain/model.ts";
@@ -9,8 +11,13 @@ import {
 	backendToDisplayPlan,
 	displayPlanToBackendDocument,
 } from "./adapter.ts";
-import type { FinancialModelDocument, ProjectionResult } from "./contracts.ts";
+import type {
+	BackendPosting,
+	FinancialModelDocument,
+	ProjectionResult,
+} from "./contracts.ts";
 import { NO_CEILING_SENTINEL, NO_FLOOR_SENTINEL } from "./contracts.ts";
+import { diffFinancialModelDocuments } from "./rowSync.ts";
 
 function documentFixture(): FinancialModelDocument {
 	return {
@@ -108,6 +115,25 @@ function projectionFixture(): ProjectionResult {
 	};
 }
 
+function syncedPosting(id: string): BackendPosting {
+	return {
+		id,
+		name: "Pending card charge",
+		sourceAccountId: "cash",
+		destinations: null,
+		amount: {
+			resolver: "expression",
+			config: { expression: "25.15" },
+			inputs: {},
+		},
+		postedTime: 0,
+		transactionTime: 1769904300,
+		enabled: false,
+		source: "simplefin",
+		pending: true,
+	};
+}
+
 function projectionWithSalaryEvent(requestedAmount: number): ProjectionResult {
 	return {
 		...projectionFixture(),
@@ -125,6 +151,34 @@ function projectionWithSalaryEvent(requestedAmount: number): ProjectionResult {
 }
 
 describe("backend and display plan adapter", () => {
+	it("keeps posting property order stable through draft validation", () => {
+		const document = documentFixture();
+		document.postings = [
+			{
+				...syncedPosting("01900000-0000-7000-8000-000000000001"),
+				executionOrder: 2,
+			},
+			{
+				...syncedPosting("01900000-0000-7000-8000-000000000002"),
+				source: "model",
+				pending: false,
+				purchase: { priority: 1 },
+			},
+		];
+		const { plan, presentation } = backendToDisplayPlan({
+			document,
+			status: { readOnly: false, authEnabled: false },
+			projection: projectionFixture(),
+		});
+		const validated = validatePlan(plan);
+		if (validated instanceof Error) throw validated;
+		expect(changesBetween({ saved: plan, current: validated })).toEqual([]);
+		const reversed = displayPlanToBackendDocument(validated, {
+			presentation,
+			sourceDocument: document,
+		});
+		expect(reversed.document.postings[0]?.executionOrder).toBe(2);
+	});
 	it("uses the latest checkpoint at or before projection start and maps bounds, postings, and evaluations", () => {
 		const document = documentFixture();
 		const conversion = backendToDisplayPlan({
@@ -400,6 +454,90 @@ describe("backend and display plan adapter", () => {
 			projection: projectionWithSalaryEvent(300),
 		});
 		expect(reloaded.presentation.movements.salary?.amountValue).toBe(300);
+	});
+
+	it.each([
+		"01900000-0000-7000-8000-000000000001",
+		"550e8400-e29b-41d4-a716-446655440000",
+	])(
+		"round-trips an existing synced UUID posting %s without row writes",
+		(id) => {
+			const document = documentFixture();
+			document.postings = [syncedPosting(id)];
+			const conversion = backendToDisplayPlan({
+				document,
+				status: { readOnly: false, authEnabled: true },
+				startDate: "2026-02-01",
+			});
+			expect(
+				conversion.plan.movements.find((row) => row.id === id),
+			).toMatchObject({
+				readOnly: true,
+				enabled: false,
+				pending: true,
+			});
+			const reverse = displayPlanToBackendDocument(conversion.plan, {
+				sourceDocument: document,
+				presentation: conversion.presentation,
+			});
+
+			expect(reverse.report.losses).toEqual([]);
+			expect(reverse.document).toEqual(document);
+			expect(diffFinancialModelDocuments(document, reverse.document)).toEqual(
+				[],
+			);
+		},
+	);
+
+	it.each([
+		"01900000-0000-7000-8000-000000000001",
+		"550e8400-e29b-41d4-a716-446655440000",
+	])(
+		"rejects browser-forged pending metadata on a new UUID posting %s",
+		(id) => {
+			const document = documentFixture();
+			document.postings = [syncedPosting(id)];
+			const conversion = backendToDisplayPlan({
+				document,
+				status: { readOnly: false, authEnabled: true },
+				startDate: "2026-02-01",
+			});
+			const reverse = displayPlanToBackendDocument(conversion.plan, {
+				sourceDocument: documentFixture(),
+				presentation: conversion.presentation,
+			});
+
+			expect(reverse.report.losses).toContainEqual(
+				expect.objectContaining({
+					field: `movements.${id}.pending`,
+					message: "Pending status is server-owned bank metadata.",
+				}),
+			);
+		},
+	);
+
+	it("rejects converting an existing synced posting into a recurrence rule", () => {
+		const document = documentFixture();
+		const posting = syncedPosting("01900000-0000-7000-8000-000000000001");
+		document.postings = [posting];
+		const conversion = backendToDisplayPlan({
+			document,
+			status: { readOnly: false, authEnabled: true },
+			startDate: "2026-02-01",
+		});
+		const reverse = displayPlanToBackendDocument(
+			{
+				...conversion.plan,
+				movements: conversion.plan.movements.map((row) =>
+					row.id === posting.id ? { ...row, frequency: "monthly" } : row,
+				),
+			},
+			{ sourceDocument: document, presentation: conversion.presentation },
+		);
+
+		expect(reverse.report.losses).toContainEqual(
+			expect.objectContaining({ field: `movements.${posting.id}.readOnly` }),
+		);
 	});
 
 	it("round-trips a claim from a posting through the display movement", () => {
