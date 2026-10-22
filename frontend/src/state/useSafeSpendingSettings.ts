@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { persist, type PersistStorage } from "zustand/middleware";
-import { parseDisplayNumber } from "../components/editors/formValues.ts";
 import {
 	DEFAULT_CYCLE_STATEMENT_DAY,
 	DEFAULT_PROTECTED_RESERVE,
@@ -15,15 +14,12 @@ import {
 export interface TotalCycleSettings {
 	statementDay: number;
 	reserve: number;
-	spentOverride: number | null;
-	paycheckOverride: number | null;
-	fixedOverride: number | null;
-	checkingOverride: number | null;
-	remainingOverride: number | null;
 	/** Null means every debt account counts toward the total. */
 	accountIds: string[] | null;
 	/** Null means the detected checking account alone counts as spendable. */
 	spendingAccountIds: string[] | null;
+	/** Explicit recurrence rule sources. Empty means no automatic income. */
+	incomeRuleIds: string[];
 	/** Null means every recurring outflow counts as a bill. */
 	movementIds: string[] | null;
 	/** True once the statement day is explicitly chosen. Untouched legacy 1st falls back to the household 20th. */
@@ -33,23 +29,12 @@ export interface TotalCycleSettings {
 export const defaultSafeSpendingSettings = (): TotalCycleSettings => ({
 	statementDay: DEFAULT_CYCLE_STATEMENT_DAY,
 	reserve: DEFAULT_PROTECTED_RESERVE,
-	spentOverride: null,
-	paycheckOverride: null,
-	fixedOverride: null,
-	checkingOverride: null,
-	remainingOverride: null,
 	accountIds: null,
 	spendingAccountIds: null,
+	incomeRuleIds: [],
 	movementIds: null,
 	statementDaySet: false,
 });
-
-function optionalMoney(value: unknown): number | null {
-	if (value === null || value === undefined || value === "") return null;
-	const parsed = parseDisplayNumber(String(value));
-	if (parsed === null || parsed < 0) return null;
-	return parsed;
-}
 
 function stringIds(value: unknown): string[] | null {
 	if (!Array.isArray(value)) return null;
@@ -87,13 +72,9 @@ export function sanitizeSafeSpendingSettings(
 				? Number(record.reserve)
 				: DEFAULT_PROTECTED_RESERVE,
 		),
-		spentOverride: optionalMoney(record.spentOverride),
-		paycheckOverride: optionalMoney(record.paycheckOverride),
-		fixedOverride: optionalMoney(record.fixedOverride),
-		checkingOverride: optionalMoney(record.checkingOverride),
-		remainingOverride: optionalMoney(record.remainingOverride),
 		accountIds: stringIds(record.accountIds),
 		spendingAccountIds: stringIds(record.spendingAccountIds),
+		incomeRuleIds: [...new Set(stringIds(record.incomeRuleIds) ?? [])],
 		movementIds: stringIds(record.movementIds),
 	};
 }
@@ -105,6 +86,7 @@ function looksLikeSettings(value: unknown): boolean {
 		"statementDay" in record ||
 		"reserve" in record ||
 		"accountIds" in record ||
+		"incomeRuleIds" in record ||
 		"movementIds" in record ||
 		"mandatoryFrame" in record
 	);
@@ -185,16 +167,8 @@ function safeSpendingStorage(): PersistStorage<TotalCycleSettings> | undefined {
 	};
 }
 
-export type SafeSpendingResetKey =
-	| "paycheck"
-	| "fixed"
-	| "spent"
-	| "checking"
-	| "remaining";
-
 interface SafeSpendingSettingsState extends TotalCycleSettings {
 	updateSettings: (next: Partial<TotalCycleSettings>) => void;
-	resetConfig: (key: SafeSpendingResetKey) => void;
 }
 
 export const useSafeSpendingSettings = create<SafeSpendingSettingsState>()(
@@ -206,26 +180,6 @@ export const useSafeSpendingSettings = create<SafeSpendingSettingsState>()(
 					statementDay: next.statementDay ?? previous.statementDay,
 					statementDaySet: next.statementDaySet ?? previous.statementDaySet,
 					reserve: next.reserve ?? previous.reserve,
-					spentOverride:
-						next.spentOverride !== undefined
-							? next.spentOverride
-							: previous.spentOverride,
-					paycheckOverride:
-						next.paycheckOverride !== undefined
-							? next.paycheckOverride
-							: previous.paycheckOverride,
-					fixedOverride:
-						next.fixedOverride !== undefined
-							? next.fixedOverride
-							: previous.fixedOverride,
-					checkingOverride:
-						next.checkingOverride !== undefined
-							? next.checkingOverride
-							: previous.checkingOverride,
-					remainingOverride:
-						next.remainingOverride !== undefined
-							? next.remainingOverride
-							: previous.remainingOverride,
 					accountIds:
 						next.accountIds !== undefined
 							? next.accountIds
@@ -234,15 +188,11 @@ export const useSafeSpendingSettings = create<SafeSpendingSettingsState>()(
 						next.spendingAccountIds !== undefined
 							? next.spendingAccountIds
 							: previous.spendingAccountIds,
+					incomeRuleIds: next.incomeRuleIds ?? previous.incomeRuleIds,
 					movementIds:
 						next.movementIds !== undefined
 							? next.movementIds
 							: previous.movementIds,
-				})),
-			resetConfig: (key) =>
-				set((previous) => ({
-					...previous,
-					[`${key}Override`]: null,
 				})),
 		}),
 		{
@@ -252,13 +202,9 @@ export const useSafeSpendingSettings = create<SafeSpendingSettingsState>()(
 			partialize: (state) => ({
 				statementDay: state.statementDay,
 				reserve: state.reserve,
-				spentOverride: state.spentOverride,
-				paycheckOverride: state.paycheckOverride,
-				fixedOverride: state.fixedOverride,
-				checkingOverride: state.checkingOverride,
-				remainingOverride: state.remainingOverride,
 				accountIds: state.accountIds,
 				spendingAccountIds: state.spendingAccountIds,
+				incomeRuleIds: state.incomeRuleIds,
 				movementIds: state.movementIds,
 				statementDaySet: state.statementDaySet,
 			}),

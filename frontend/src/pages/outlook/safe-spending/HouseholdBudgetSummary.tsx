@@ -53,6 +53,15 @@ export function HouseholdBudgetSummary({
 								<time dateTime={heroes.paycheckDate}>
 									{monthDay(heroes.paycheckDate)}
 								</time>
+								{heroes.paycheckEndDate &&
+									heroes.paycheckEndDate !== heroes.paycheckDate && (
+										<>
+											{" – "}
+											<time dateTime={heroes.paycheckEndDate}>
+												{monthDay(heroes.paycheckEndDate)}
+											</time>
+										</>
+									)}
 							</>
 						)}
 					</span>

@@ -106,7 +106,68 @@ describe("unified persisted prefs", () => {
 		const state = useSafeSpendingSettings.getState();
 		expect(state.statementDay).toBe(5);
 		expect(state.reserve).toBe(100);
+		expect(state.incomeRuleIds).toEqual([]);
 		expect(state).not.toHaveProperty("mandatoryFrame");
+	});
+
+	it("persists explicit income sources and an empty selection across reloads", async () => {
+		useSafeSpendingSettings
+			.getState()
+			.updateSettings({ incomeRuleIds: ["salary", "partner"] });
+		await useSafeSpendingSettings.persist.rehydrate();
+		expect(useSafeSpendingSettings.getState().incomeRuleIds).toEqual([
+			"salary",
+			"partner",
+		]);
+		useSafeSpendingSettings.getState().updateSettings({ incomeRuleIds: [] });
+		await useSafeSpendingSettings.persist.rehydrate();
+		expect(useSafeSpendingSettings.getState().incomeRuleIds).toEqual([]);
+	});
+
+	it("discards legacy amount overrides and preserves source settings", async () => {
+		const overrides = {
+			checkingOverride: 10000,
+			remainingOverride: 20000,
+			paycheckOverride: 30000,
+			fixedOverride: 40000,
+			spentOverride: 50000,
+		};
+		window.localStorage.setItem(
+			SAFE_SPENDING_STORAGE_KEY,
+			JSON.stringify({
+				state: {
+					...overrides,
+					reserve: 100,
+					incomeRuleIds: ["salary"],
+					movementIds: ["rent"],
+				},
+				version: 4,
+			}),
+		);
+		await useSafeSpendingSettings.persist.rehydrate();
+		const state = useSafeSpendingSettings.getState();
+		expect(state.reserve).toBe(100);
+		expect(state.incomeRuleIds).toEqual(["salary"]);
+		expect(state.movementIds).toEqual(["rent"]);
+		for (const key of Object.keys(overrides))
+			expect(state).not.toHaveProperty(key);
+		state.updateSettings({ reserve: 200 });
+		expect(
+			window.localStorage.getItem(SAFE_SPENDING_STORAGE_KEY),
+		).not.toContain("Override");
+	});
+
+	it("sanitizes income rule IDs without an automatic fallback", () => {
+		expect(
+			sanitizeSafeSpendingSettings({
+				incomeRuleIds: ["salary", 123, "", "salary", "partner"],
+			}).incomeRuleIds,
+		).toEqual(["salary", "partner"]);
+		for (const incomeRuleIds of [null, undefined, [], "salary", [123]]) {
+			expect(
+				sanitizeSafeSpendingSettings({ incomeRuleIds }).incomeRuleIds,
+			).toEqual([]);
+		}
 	});
 
 	it("sanitizes safe spending settings with legacy 1st-day fallback", () => {

@@ -81,6 +81,7 @@ export interface SafeSpendingHeroes {
 	committedByCard: { id: string; name: string; amount: number }[];
 	paycheckAmount: number;
 	paycheckDate: string | null;
+	paycheckEndDate: string | null;
 	fixedAmount: number;
 	reserveAmount: number;
 }
@@ -88,16 +89,6 @@ export interface SafeSpendingHeroes {
 export interface SafeSpendingConfigHints {
 	statementDay: number;
 	reserve: number;
-	spentOverride: number | null;
-	paycheckOverride: number | null;
-	fixedOverride: number | null;
-	checkingOverride: number | null;
-	remainingOverride: number | null;
-	paycheckHint: { date: string; amount: number } | null;
-	fixedHint: { total: number; start: string; end: string };
-	checkingHint: number | null;
-	remainingHint: { total: number; monthEnd: string };
-	spentHint: number;
 	cards: { id: string; name: string }[];
 	trackedIds: string[];
 	spendingAccounts: { id: string; name: string }[];

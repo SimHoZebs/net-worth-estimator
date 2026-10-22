@@ -67,6 +67,7 @@ const heroes: SafeSpendingHeroes = {
 	committedByCard: [],
 	paycheckAmount: 3000,
 	paycheckDate: "2026-09-30",
+	paycheckEndDate: "2026-09-30",
 	fixedAmount: 1500,
 	reserveAmount: 200,
 };
@@ -99,16 +100,6 @@ const section: SafeSpendingMandatorySection = {
 const config: SafeSpendingConfigHints = {
 	statementDay: 20,
 	reserve: 200,
-	spentOverride: null,
-	paycheckOverride: null,
-	fixedOverride: null,
-	checkingOverride: null,
-	remainingOverride: null,
-	paycheckHint: null,
-	fixedHint: { total: 1500, start: "2026-10-01", end: "2026-10-31" },
-	checkingHint: 5000,
-	remainingHint: { total: 1000, monthEnd: "2026-09-30" },
-	spentHint: 800,
 	cards: [],
 	trackedIds: [],
 	spendingAccounts: [],
@@ -185,6 +176,7 @@ describe("HouseholdBudgetSummary", () => {
 						],
 					},
 					paycheckDate: "2026-10-30",
+					paycheckEndDate: "2026-10-30",
 					committedTotal: 500,
 					recordedTotal: 125.25,
 				}}
@@ -225,7 +217,7 @@ describe("HouseholdBudgetSummary", () => {
 	it("shows negative amounts and an unavailable paycheck date", () => {
 		render(
 			<HouseholdBudgetSummary
-				heroes={{ ...heroes, paycheckDate: null }}
+				heroes={{ ...heroes, paycheckDate: null, paycheckEndDate: null }}
 				paycheck={{ ...paycheck, paycheck: 1000 }}
 			/>,
 		);
@@ -234,6 +226,21 @@ describe("HouseholdBudgetSummary", () => {
 		expect(screen.getByText("-$1,300.00")).toBeTruthy();
 		expect(screen.getByRole("img").getAttribute("aria-label")).toContain(
 			`${labels.paycheckBeforeReserve} -$1,100.00`,
+		);
+	});
+
+	it("shows the payment date range for multiple income sources", () => {
+		render(
+			<HouseholdBudgetSummary
+				heroes={{ ...heroes, paycheckEndDate: "2026-10-05" }}
+				paycheck={paycheck}
+			/>,
+		);
+		expect(screen.getByText("Sep 30").getAttribute("datetime")).toBe(
+			"2026-09-30",
+		);
+		expect(screen.getByText("Oct 5").getAttribute("datetime")).toBe(
+			"2026-10-05",
 		);
 	});
 
@@ -296,6 +303,7 @@ describe("SafeSpendingConfigurePanel", () => {
 		render(
 			<SafeSpendingConfigurePanel
 				config={config}
+				income={{ candidates: [], selectedRuleIds: [], paycheck: null }}
 				billCandidates={[]}
 				trackedBillIds={[]}
 				accounts={testPlan.accounts}
@@ -303,7 +311,6 @@ describe("SafeSpendingConfigurePanel", () => {
 				onToggleAccount={noop}
 				onToggleSpendingAccount={noop}
 				onUpdateConfig={noop}
-				onResetConfig={noop}
 			/>,
 		);
 		expect(screen.getByText(`${labels.cycleStart} (1–28)`)).toBeTruthy();
@@ -316,46 +323,69 @@ describe("SafeSpendingConfigurePanel", () => {
 		).toBeTruthy();
 	});
 
-	it.each([
-		[labels.cashBalance, "checkingOverride", "checking"],
-		[labels.remainingBills, "remainingOverride", "remaining"],
-		[labels.nextPaycheck, "paycheckOverride", "paycheck"],
-		[labels.fixedBills, "fixedOverride", "fixed"],
-		[labels.cardSpending, "spentOverride", "spent"],
-	] as const)(
-		"connects %s to its override, explanation, and reset",
-		(label, setting, reset) => {
-			const update = vi.fn();
-			const onReset = vi.fn();
-			render(
-				<SafeSpendingConfigurePanel
-					config={{ ...config, [setting]: 50 }}
-					billCandidates={[]}
-					trackedBillIds={[]}
-					accounts={testPlan.accounts}
-					onToggleBill={noop}
-					onToggleAccount={noop}
-					onToggleSpendingAccount={noop}
-					onUpdateConfig={update}
-					onResetConfig={onReset}
-				/>,
-			);
-			const input = screen.getByLabelText(`${label} ($)`);
-			const hint = document.getElementById(
-				input.getAttribute("aria-describedby")!,
-			);
-			expect(hint?.textContent).toContain("Override active.");
-			expect(hint?.textContent).toContain("Automatic:");
-			fireEvent.change(input, { target: { value: "123.45" } });
-			expect(update).toHaveBeenLastCalledWith({ [setting]: 123.45 });
-			fireEvent.change(input, { target: { value: "" } });
-			expect(update).toHaveBeenLastCalledWith({ [setting]: null });
-			fireEvent.click(
-				screen.getByRole("button", {
-					name: `Use automatic ${label}`,
-				}),
-			);
-			expect(onReset).toHaveBeenCalledWith(reset);
-		},
-	);
+	it("shows source selections without calculated-total fields or outputs", () => {
+		render(
+			<SafeSpendingConfigurePanel
+				config={config}
+				income={{ candidates: [], selectedRuleIds: [], paycheck: null }}
+				billCandidates={[]}
+				trackedBillIds={[]}
+				accounts={testPlan.accounts}
+				onToggleBill={noop}
+				onToggleAccount={noop}
+				onToggleSpendingAccount={noop}
+				onUpdateConfig={noop}
+			/>,
+		);
+		for (const label of [
+			labels.cashBalance,
+			labels.remainingBills,
+			labels.nextPaycheck,
+			labels.fixedBills,
+			labels.cardSpending,
+		]) {
+			expect(screen.queryByLabelText(`${label} ($)`)).toBeNull();
+			expect(screen.queryByText(label, { exact: true })).toBeNull();
+		}
+		expect(screen.queryByRole("status")).toBeNull();
+		expect(screen.queryByLabelText("Calculated budget values")).toBeNull();
+		expect(screen.getAllByRole("spinbutton")).toHaveLength(2);
+		for (const name of [
+			"Income sources",
+			labels.cashAccounts,
+			"Tracked cards",
+			"Included bills",
+		]) {
+			expect(screen.getByRole("group", { name })).toBeTruthy();
+		}
+		expect(screen.queryByRole("button", { name: /Use automatic/ })).toBeNull();
+	});
+
+	it("keeps cycle start and reserve as editable settings", () => {
+		const update = vi.fn();
+		render(
+			<SafeSpendingConfigurePanel
+				config={config}
+				income={{ candidates: [], selectedRuleIds: [], paycheck: null }}
+				billCandidates={[]}
+				trackedBillIds={[]}
+				accounts={testPlan.accounts}
+				onToggleBill={noop}
+				onToggleAccount={noop}
+				onToggleSpendingAccount={noop}
+				onUpdateConfig={update}
+			/>,
+		);
+		fireEvent.change(screen.getByLabelText(`${labels.cycleStart} (1–28)`), {
+			target: { value: "15" },
+		});
+		expect(update).toHaveBeenLastCalledWith({
+			statementDay: 15,
+			statementDaySet: true,
+		});
+		fireEvent.change(screen.getByLabelText(`${labels.reserve} ($)`), {
+			target: { value: "100" },
+		});
+		expect(update).toHaveBeenLastCalledWith({ reserve: 100 });
+	});
 });

@@ -23,11 +23,11 @@ import {
 	filterMovementsById,
 	mandatoryTransactions,
 	nextMonthObligations,
-	nextPaycheck,
 	realizedCheckingOutflows,
 	remainingMonthlyObligations,
 	spendingBalance,
 } from "../../../domain/safeSpending.ts";
+import { safeSpendingIncome } from "../../../domain/safeSpendingIncome.ts";
 import type { Plan } from "../../../domain/model.ts";
 import { visibleAccounts } from "../../../domain/model.ts";
 import type { Projection } from "../../../domain/result.ts";
@@ -74,7 +74,7 @@ export function SafeSpendingPreview({
 		[plan.accounts],
 	);
 	const settingsState = useSafeSpendingSettings();
-	const { updateSettings, resetConfig, ...settings } = settingsState;
+	const { updateSettings, ...settings } = settingsState;
 	const [transactionOrder, setTransactionOrder] = useState<TransactionOrder>(
 		DEFAULT_TRANSACTION_ORDER,
 	);
@@ -156,14 +156,18 @@ export function SafeSpendingPreview({
 			todayIso: displayToday,
 		});
 	}, [obligationMovements, spendingIds, displayToday]);
-	const paycheckDerived = useMemo(() => {
-		if (!spendingIds.length) return null;
-		return nextPaycheck({
-			movements,
-			checkingIds: spendingIds,
-			todayIso: displayToday,
-		});
-	}, [movements, spendingIds, displayToday]);
+	const income = useMemo(
+		() =>
+			safeSpendingIncome({
+				plan,
+				movements,
+				spendingAccountIds: spendingIds,
+				incomeRuleIds: settings.incomeRuleIds,
+				todayIso: displayToday,
+			}),
+		[plan, movements, spendingIds, settings.incomeRuleIds, displayToday],
+	);
+	const paycheckDerived = income.paycheck;
 	const spentSinceStart = useMemo(
 		() =>
 			spendingIds.length
@@ -256,18 +260,17 @@ export function SafeSpendingPreview({
 
 	const derivedSpent = perAccount.reduce((sum, item) => sum + item.derived, 0);
 
-	const checking = settings.checkingOverride ?? spendingDerived;
-	const remainingObligations =
-		settings.remainingOverride ?? remainingDerived.total;
+	const checking = spendingDerived;
+	const remainingObligations = remainingDerived.total;
 	const cushion = cashCushion({
 		checking,
 		spentSinceStart,
 		remainingObligations,
 	});
 
-	const paycheck = settings.paycheckOverride ?? paycheckDerived?.amount ?? 0;
-	const fixedObligations = settings.fixedOverride ?? fixedDerived.total;
-	const spent = settings.spentOverride ?? derivedSpent;
+	const paycheck = paycheckDerived?.amount ?? 0;
+	const fixedObligations = fixedDerived.total;
+	const spent = derivedSpent;
 	const allowance = cycleAllowance({
 		paycheck,
 		fixedObligations,
@@ -307,6 +310,7 @@ export function SafeSpendingPreview({
 		})),
 		paycheckAmount: paycheck,
 		paycheckDate: paycheckDerived?.date ?? null,
+		paycheckEndDate: paycheckDerived?.endDate ?? null,
 		fixedAmount: fixedObligations,
 		reserveAmount: settings.reserve,
 	};
@@ -517,19 +521,10 @@ export function SafeSpendingPreview({
 					)}
 					{detail === "configure" && (
 						<SafeSpendingConfigurePanel
+							income={income}
 							config={{
 								statementDay: settings.statementDay,
 								reserve: settings.reserve,
-								spentOverride: settings.spentOverride,
-								paycheckOverride: settings.paycheckOverride,
-								fixedOverride: settings.fixedOverride,
-								checkingOverride: settings.checkingOverride,
-								remainingOverride: settings.remainingOverride,
-								paycheckHint: paycheckDerived,
-								fixedHint: fixedDerived,
-								checkingHint: spendingDerived,
-								remainingHint: remainingDerived,
-								spentHint: derivedSpent,
 								cards: cards.map((card) => ({ id: card.id, name: card.name })),
 								trackedIds,
 								spendingAccounts: spendableAccounts.map((account) => ({
@@ -545,7 +540,6 @@ export function SafeSpendingPreview({
 							onToggleAccount={toggleAccount}
 							onToggleSpendingAccount={toggleSpendingAccount}
 							onUpdateConfig={updateSettings}
-							onResetConfig={resetConfig}
 						/>
 					)}
 				</SafeSpendingDetailShell>
