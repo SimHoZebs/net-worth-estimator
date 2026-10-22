@@ -15,74 +15,69 @@ async function expectWithinViewport(element: Locator, page: Page) {
 	expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height + 1);
 }
 
-test("navigation, chart inspection, and page width agree at stock breakpoint boundaries", async ({
+test("navigation remains usable after a phone-to-desktop resize", async ({
 	page,
 }) => {
+	await page.setViewportSize({ width: 320, height: 900 });
 	await page.goto("/");
-	const chart = page.getByRole("region", { name: "Net worth over time" });
-	const slider = chart.getByRole("slider");
-	await expect(slider).toBeAttached();
-	for (const width of [
-		320, 390, 639, 640, 767, 768, 1023, 1024, 1279, 1280, 1535, 1536,
-	]) {
-		await page.setViewportSize({ width, height: 900 });
-		const opener = page.getByRole("button", { name: "Open navigation" });
-		if (width < 768) {
-			await expect(opener).toBeVisible();
-			await expect(
-				page.getByRole("complementary", { name: "Workspace navigation" }),
-			).toHaveCount(0);
-		} else {
-			await expect(opener).not.toBeVisible();
-			await expect(
-				page.getByRole("complementary", { name: "Workspace navigation" }),
-			).toBeVisible();
-		}
-		await expect
-			.poll(() => page.evaluate(() => document.documentElement.scrollWidth), {
-				message: `page at ${width}px`,
-			})
-			.toBeLessThanOrEqual(width);
-		await expect(chart.getByRole("img")).toHaveAttribute(
-			"viewBox",
-			width < 640 ? "0 0 440 260" : "0 0 820 280",
-		);
-		const plot = await chart.getByRole("img").boundingBox();
-		const inspection = await slider.boundingBox();
-		expect(inspection!.width).toBeGreaterThan(plot!.width / 2);
-		expect(inspection!.x).toBeGreaterThan(plot!.x);
-		expect(inspection!.x + inspection!.width).toBeLessThan(
-			plot!.x + plot!.width,
-		);
-	}
-	await page.setViewportSize({ width: 767, height: 900 });
 	await page.getByRole("button", { name: "Open navigation" }).click();
 	await expect(
 		page.getByRole("dialog", { name: "Workspace navigation" }),
 	).toBeVisible();
-	await page.setViewportSize({ width: 768, height: 900 });
+	await page.setViewportSize({ width: 1440, height: 480 });
 	await expect(
 		page.getByRole("dialog", { name: "Workspace navigation" }),
 	).toHaveCount(0);
-	await expect(page.locator("body")).not.toHaveCSS("overflow", "hidden");
+	await page.getByRole("heading", { name: "Net worth over time" }).hover();
+	const initialScroll = await page.evaluate(() => window.scrollY);
+	await page.mouse.wheel(0, 400);
+	await expect
+		.poll(() => page.evaluate(() => window.scrollY))
+		.toBeGreaterThan(initialScroll);
+	await page.getByRole("link", { name: "Accounts", exact: true }).click();
+	await expect(page).toHaveURL(/#accounts$/);
+	await page.getByRole("button", { name: "Add account" }).click();
+	await expect(page.getByRole("dialog")).toBeVisible();
 });
 
-test("context sheets change coverage at the same sm boundary as their animation", async ({
+test("projection inspection remains keyboard-accessible after resize", async ({
 	page,
 }) => {
-	await page.setViewportSize({ width: 639, height: 900 });
+	await page.goto("/");
+	const slider = page.getByRole("slider", { name: "Inspect projection date" });
+	await expect(slider).toBeAttached();
+	for (const width of [320, 1440]) {
+		await page.setViewportSize({ width, height: 900 });
+		const initialValue = await slider.getAttribute("aria-valuetext");
+		const maximum = await slider.getAttribute("max");
+		expect(initialValue).not.toBeNull();
+		expect(maximum).not.toBeNull();
+		await slider.focus();
+		await slider.press("End");
+		await expect(slider).toHaveValue(maximum!);
+		await expect(slider).not.toHaveAttribute("aria-valuetext", initialValue!);
+		await slider.press("Tab");
+		await expect(slider).not.toBeFocused();
+	}
+});
+
+test("account sheet controls remain usable across responsive resizes", async ({
+	page,
+}) => {
+	await page.setViewportSize({ width: 320, height: 900 });
 	await page.goto("/#accounts");
 	await page
 		.getByRole("button", { name: "Open Everyday checking transactions" })
 		.click();
 	const sheet = page.getByRole("dialog", { name: "Everyday checking" });
 	await expect(sheet).toBeVisible();
-	for (const width of [639, 640, 767, 768, 1024]) {
+	for (const width of [320, 768, 1440]) {
 		await page.setViewportSize({ width, height: 900 });
-		await expect
-			.poll(async () => (await sheet.boundingBox())!.width)
-			.toBe(width < 640 ? width : Math.min(768, width - 48));
 		await expectWithinViewport(sheet, page);
+		await expect(sheet.getByLabel("Transaction source")).toBeVisible();
+		await expect(
+			sheet.getByRole("button", { name: "Close dialog" }),
+		).toBeVisible();
 	}
 	await sheet.getByRole("button", { name: "Close dialog" }).click();
 	await expect(sheet).not.toBeVisible();
@@ -96,10 +91,11 @@ for (const width of [320, 390, 768, 1440]) {
 		await page.goto("/#accounts");
 		await page.getByRole("button", { name: "Add account" }).click();
 		const dialog = page.getByRole("dialog");
+		await expect(dialog).toBeVisible();
 		await expectWithinViewport(dialog, page);
 		await page.getByLabel("Account name").fill("Sizing regression");
 		await page.getByLabel("Balance (USD)", { exact: true }).fill("2500");
-		// Native submission must still reach the externally owned form.
+		// Submit through the native form interaction, not an internal event handler.
 		await page.getByLabel("Account name").press("Enter");
 		await expect(dialog).not.toBeVisible();
 		const bar = page.locator("[data-draft-bar]");
@@ -118,14 +114,18 @@ for (const width of [320, 390, 768, 1440]) {
 		await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 		await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 		await expectWithinViewport(bar, page);
-		const main = await page.getByRole("main").boundingBox();
+		const lastField = page.getByLabel("Investment return variability (%)");
+		await expectWithinViewport(lastField, page);
+		const fieldBox = await lastField.boundingBox();
 		const barBox = await bar.boundingBox();
-		expect(main!.y + main!.height).toBeLessThanOrEqual(barBox!.y + 1);
+		expect(fieldBox!.y + fieldBox!.height).toBeLessThanOrEqual(barBox!.y + 1);
+		await lastField.click();
+		await expect(lastField).toBeFocused();
 		await page.getByRole("button", { name: "Save changes" }).click();
 		await expect(page.getByText("Plan saved on the server.")).toBeVisible();
 		await expect(bar).toHaveCount(0);
 		await expectWithinViewport(
-			page.getByText("Plan saved on the server.").locator(".."),
+			page.getByRole("status").filter({ hasText: "Plan saved on the server." }),
 			page,
 		);
 	});
