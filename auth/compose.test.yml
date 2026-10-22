@@ -1,0 +1,20 @@
+# Disposable test overlay only. Merge last, after the base and Casdoor files.
+# The lifecycle script requires both state paths under repository tmp/.
+services:
+  backend:
+    user: "${CASDOOR_UID:-1000}:${CASDOOR_GID:-1000}"
+    ports: !override
+      - "127.0.0.1:${AUTH_TEST_BACKEND_PORT:-18008}:8787"
+    volumes: !override
+      - ${AUTH_TEST_DATA_DIR:?Set absolute disposable AUTH_TEST_DATA_DIR}:/data
+    environment:
+      NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL: 2s
+      NET_WORTH_ESTIMATOR_AUTH_SESSION_DB: /data/identity.db
+      NET_WORTH_ESTIMATOR_READ_ONLY: ""
+      NET_WORTH_ESTIMATOR_AUTH_TOKEN: ""
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL: ""
+      NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK: ""
+
+  frontend:
+    ports: !override
+      - "127.0.0.1:${FRONTEND_PORT:-18007}:80"

@@ -1,0 +1,24 @@
+# Initialize Casdoor first. CASDOOR_STATE_DIR must be an absolute path.
+# Merge after docker-compose.yml from the repository root.
+services:
+  casdoor:
+    extends:
+      file: ./auth/casdoor/compose.yml
+      service: casdoor
+    volumes:
+      - ${CASDOOR_STATE_DIR:?Set absolute CASDOOR_STATE_DIR}/conf:/conf:ro
+      - ${CASDOOR_STATE_DIR:?Set absolute CASDOOR_STATE_DIR}/db:/data
+      - ${CASDOOR_STATE_DIR:?Set absolute CASDOOR_STATE_DIR}/sessions:/tmp
+
+  backend:
+    environment:
+      NET_WORTH_ESTIMATOR_AUTH_PROVIDER: casdoor
+      NET_WORTH_ESTIMATOR_AUTH_ISSUER: ${CASDOOR_PUBLIC_URL:-http://localhost:8000}
+      NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL: http://casdoor:8000
+      NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-waypoint-local}
+      NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET: ${AUTH_CLIENT_SECRET:?Set AUTH_CLIENT_SECRET}
+      NET_WORTH_ESTIMATOR_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8080}
+      NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL: ${CASDOOR_PUBLIC_URL:-http://localhost:8000}/account
+    depends_on:
+      casdoor:
+        condition: service_healthy
