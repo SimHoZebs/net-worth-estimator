@@ -29,6 +29,8 @@ npm --prefix frontend run test:browser
 
 Run it from a stopped dev server on 5178, or it will reuse yours and test the wrong backend. The suite is single-worker because it shares one seeded server.
 
+If another dev server uses 5178, set `TEST_FRONTEND_PORT=5179` to give the browser suite its own frontend port.
+
 To exercise the production build instead of the dev server:
 
 ```bash

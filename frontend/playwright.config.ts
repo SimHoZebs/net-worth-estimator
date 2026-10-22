@@ -1,7 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const production = process.env.TEST_PRODUCTION === "1";
-const baseURL = production ? "http://127.0.0.1:4178" : "http://127.0.0.1:5178";
+const frontendPort = Number(
+	process.env.TEST_FRONTEND_PORT ?? (production ? 4178 : 5178),
+);
+const baseURL = `http://127.0.0.1:${frontendPort}`;
 
 // Browser tests run against the real Go engine over real HTTP. The backend is
 // the fixtureapi harness seeded from the canonical CSV model, on its own port
@@ -61,7 +64,7 @@ export default defineConfig({
 			stdout: "pipe",
 		},
 		{
-			command: production ? "npm run preview" : "npm run dev",
+			command: `${production ? "npm run preview" : "npm run dev"} -- --port ${frontendPort}`,
 			env: { NET_WORTH_ESTIMATOR_BACKEND: apiOrigin },
 			url: baseURL,
 			reuseExistingServer: !process.env.CI,
