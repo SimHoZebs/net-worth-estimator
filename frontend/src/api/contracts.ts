@@ -477,6 +477,10 @@ export type StochasticResponse = StochasticProjectionResponse;
 export interface ServerStatus extends HumaMetadata {
 	readOnly: boolean;
 	authEnabled: boolean;
+	/** Whether the server has a sync runner. Absent from older backends. */
+	syncConfigured?: boolean;
+	/** Last successful sync completion (RFC3339 UTC). Omitted before the first sync. */
+	lastSyncAt?: string;
 }
 
 export type StatusResponse = ServerStatus;
