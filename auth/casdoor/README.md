@@ -76,14 +76,13 @@ For combined Compose, set the private back-channel target to
 destinations. Native loopback development can use the API's bounded introspection
 fallback. Keep the public OIDC issuer unchanged when private routing is used.
 
-Read the generated subject from `bootstrap.json`. Grant that verified subject
-in `NET_WORTH_ESTIMATOR_AUTH_EDITORS` or `NET_WORTH_ESTIMATOR_AUTH_READERS`.
-Usernames, emails, and Casdoor administrator roles grant no financial access.
+`bootstrap.json` records the provider's generated subject. Application permissions
+and per-account plans follow [the authentication contract](../../docs/authentication.md).
+Branding does not change permissions, account policy, or plan ownership.
 
-Anonymous app visits redirect to Casdoor's login page. `sign up now` opens
-Casdoor's username, display-name, and password form. Newly created identities
-return through OIDC to the access-denied screen until the owner grants access.
-Signup does not require email or a configured mail service.
+Application sign-in sends the browser to Casdoor. `sign up now` opens Casdoor's
+username, display-name, and password form. Signup returns through the existing
+OIDC callback. It does not require email or a configured mail service.
 
 Existing initialized instances retain their sealed settings. To enable account
 creation there, use Casdoor's application editor for `waypoint`. Enable signup,
@@ -92,6 +91,150 @@ configure username/display-name/password/confirmation signup fields. Keep
 generated IDs random and built-in administrator signup disabled.
 
 See [combined deployment](../README.md) and [session/recovery rules](../../docs/authentication.md).
+
+## Plan permissions
+
+Fresh initialization includes the `waypoint/plan-access` Casbin model, the
+plan-owner and guest roles, and one dedicated same-database policy adapter.
+Casdoor evaluates `plan:read`, `plan:project`, and `plan:write` on plan resources.
+Owners receive actions on their private plan automatically. Guests receive only
+read/project actions on a separate sample. Signup needs no role choice or
+permission-object write.
+
+Existing sealed instances require an explicit policy installation. Preview it
+offline, review the exact JSON, and approve its SHA-256 before any shared write:
+
+```bash
+node --env-file=auth/casdoor/.env auth/casdoor/apply-permissions.mjs --preview
+```
+
+After approval, run the same command with `--apply <approved.json>`,
+`--sha256 <approved-digest>`, and `--backup <new-private-backup.json>`. Set
+`CASDOOR_STATE_DIR` to the existing sealed state. The command adds missing
+objects only. It refuses drift, extra model permissions, unknown versions,
+and mismatched application identity. It never overwrites operator policies.
+The API fails closed until the permission model resolves.
+
+The application still owns plan storage isolation. See the
+[authorization contract](../../docs/authorization.md) for existing-data ownership,
+sample publication, per-account stores, and resource-header checks.
+
+## Waypoint hosted login and signup branding
+
+New seeds include the Waypoint mark, outlined wordmark, emerald/stone palette,
+and Manrope font. Casdoor retains its own forms, labels, tabs, errors, password
+checks, passkeys, and OIDC flow. No custom credential form replaces them.
+The emerald colors match the current Tailwind palette's sRGB equivalents:
+`#007a55` in light mode and `#5ee9b5` in dark mode.
+
+`branding.mjs` builds the presentation from checked-in assets under `branding/`.
+Logo, favicon, and font use embedded data URLs. Branding requires no external
+font service, asset upload, container mount, or frontend build. The Manrope Latin
+font is the unmodified `@fontsource-variable/manrope@5.3.0` file, under
+[`branding/OFL.txt`](branding/OFL.txt). Its SHA-256 is
+`a30ddcd349703aff7464c34bef3fffdff405ee50c113440d7c8693c02d210972`.
+The SVG wordmark outlines use Manrope weight 700. The mark preserves the geometry
+in `frontend/src/components/Brand.tsx`.
+
+Visible application content:
+
+- Browser title: `Waypoint account`.
+- Desktop eyebrow: `A CLEARER FINANCIAL PICTURE`.
+- Desktop heading: `Make room for what comes next.`
+- Desktop text: `A clearer view of your money, today and ahead.`
+- Footer: `Your Waypoint account. Identity by Casdoor.`
+
+The native UI supplies `Password`, `Passkey`, `Sign In`, `Sign Up`, field labels,
+and account links. Branding makes no claims about financial access or plan sharing.
+
+### Existing sealed instances: preview, approve, then apply
+
+Existing instances keep their sealed settings. Source changes do not update them.
+Do not rerun initialization, generation, provisioning, or seed import for branding.
+
+Create a new local approval directory. This command reads only public target
+settings and checked-in assets. It performs no network requests:
+
+```bash
+node --env-file=auth/casdoor/.env auth/casdoor/branding.approval.mjs \
+  --output /tmp/opencode/waypoint-branding-review
+```
+
+Open `review.html` in that directory. Review the target issuer/client, visible
+content, and every exact field value. `plan.json` contains the exact proposed
+values. `plan.sha256` pins its bytes. Obtain explicit approval for that content
+and target before a shared-system write. A summary or source approval is insufficient.
+
+After approval, set `CASDOOR_STATE_DIR` to the existing sealed state directory.
+Use the matching environment file and current built-in administrator credential.
+Choose a new private backup filename:
+
+```bash
+node --env-file=auth/casdoor/.env auth/casdoor/apply-branding.mjs \
+  --apply /tmp/opencode/waypoint-branding-review/plan.json \
+  --sha256 <approved-plan-sha256> \
+  --backup /path/to/private/previous-waypoint-branding.json
+```
+
+The command changes these application fields only:
+
+```text
+logo logoDark title favicon headerHtml footerHtml formCss formCssMobile
+formOffset formSideHtml formBackgroundUrl formBackgroundUrlMobile themeData
+```
+
+The apply command:
+
+1. Requires the exact approved bytes, current source values, and matching target.
+2. Checks the SQLite driver, sealed import flags, and bootstrap issuer/client metadata.
+3. Refuses an existing backup path before any network request.
+4. Authenticates through Casdoor as the built-in administrator.
+5. Requires server version `v4.23.0` with commit offset zero.
+6. Checks `admin/waypoint`, its organization/client, and absence of replacement forms.
+7. Saves previous presentation fields to a new `0600` file.
+8. Rechecks the application snapshot before its update.
+9. Verifies presentation values and every unchanged non-presentation field.
+10. Ends its administrator session, including after an update failure.
+
+Casdoor v4.23 uses Xorm `MustCols` for the API's `columns` parameter. This forces
+empty values to update, but it does **not** restrict other nonempty fields.
+The command therefore sends a sparse body: the branding fields, unchanged name,
+and the `***` client-secret mask. It sends no client ID, organization, providers,
+grants, callback URLs, token settings, or full application snapshot. Casdoor uses
+the mask to omit its stored client secret. Native-provider tests verify this path.
+
+Avoid concurrent application-editor changes during apply. Casdoor offers no
+conditional-update transaction for this endpoint. A failed post-update check
+preserves the backup and stops without automatic rollback. Review that backup
+before any manual restoration through Casdoor's application editor. The backup
+contains presentation fields only. Do not import it as a full application or
+unseal seed imports. Fresh page navigation displays the new branding. No runtime
+restart is necessary.
+
+### Scope and version limits
+
+- Desktop uses Casdoor's supported side panel. Mobile uses its native single column.
+- The provider's theme preference controls light/dark mode independently of Waypoint.
+- Account management, passkey enrollment, and recovery remain Casdoor-owned screens.
+- Browser and operating-system passkey prompts retain their platform appearance.
+- Organization and administrator-console branding remain unchanged.
+- Casdoor can show default icons or its startup screen before application data loads.
+- Casdoor injects `headerHtml` once per page. Its font can persist across SPA navigation.
+- Embedded authentication frames skip custom form CSS under Casdoor's own rules.
+
+The longer SVG data URLs work with this repository's pinned SQLite deployment.
+SQLite does not enforce the model's `varchar(200)` logo/favicon widths. Recheck
+asset storage before a database-engine change. Do not assume the same strings
+fit a length-enforcing SQL database. All branding fields and native layout hooks
+must receive another review before a Casdoor upgrade.
+
+Controlling sources for v4.23.0:
+[native auth layout](https://github.com/casdoor/casdoor/blob/v4.23.0/web/src/components/auth/AuthLayout.tsx),
+[head/theme hooks](https://github.com/casdoor/casdoor/blob/v4.23.0/web/src/hooks/use-application-chrome.ts),
+[application update controller](https://github.com/casdoor/casdoor/blob/v4.23.0/controllers/application.go),
+[application persistence](https://github.com/casdoor/casdoor/blob/v4.23.0/object/application.go),
+[action responses](https://github.com/casdoor/casdoor/blob/v4.23.0/controllers/base.go), and
+[pinned Xorm MustCols](https://github.com/xorm-io/xorm/blob/v1.1.6/internal/statements/statement.go).
 
 ## Passwords, passkeys, and recovery
 
@@ -125,6 +268,41 @@ Set `CASDOOR_RESTART_CONTAINER` to the explicit disposable container name to
 verify key and remembered-session persistence. Software checks do not verify
 phone passkeys, hardware keys, or real-device recovery.
 
+### Disposable branding check
+
+The normal Node gate skips the optional native-provider browser test. To run it,
+copy `/server` and `/web/build` from an existing container of the pinned image.
+`docker cp` reads those files without a container restart. Do not copy its identity
+configuration, sessions, or database. Use explicit local paths:
+
+```bash
+CASDOOR_BRANDING_TEST_SERVER=/path/to/copied/server \
+CASDOOR_BRANDING_TEST_BUILD=/path/to/copied/build \
+  node --test auth/casdoor/branding.browser.test.mjs
+```
+
+The copied server is a static Linux executable. This test requires a compatible
+Linux host, frontend Playwright dependencies, and Chromium. It creates fresh
+identity state under the OS temporary directory and a random loopback port.
+It neither reads live environment credentials nor starts a Docker network.
+`TMPDIR=/tmp/opencode` selects the preferred OpenCode scratch directory.
+The fixture stops its own process after the test. Scratch state remains private
+for diagnostics. It never starts or stops an existing provider.
+
+Checks cover the real sparse update, preserved client/security fields, cleared
+background, idempotent apply, native login/signup, passkey-tab access, fonts,
+keyboard focus, input-border contrast, and horizontal overflow. Viewports include 1280, 768, 375, and
+320 pixels, each in light and dark modes. For manual visual review, the same
+environment variables plus `node auth/casdoor/branding.fixture.mjs` create a
+fresh branded fixture and print its URL and process ID. Stop that preview process
+after review. Never point these variables at live identity state.
+
+Before live use, check the real OIDC callback and signup return flow on the
+approved HTTPS hostname. Also check password-manager autofill, screen-reader
+labels/errors, 200% zoom, account/passkey management, and physical-device recovery.
+The branding browser test does not verify browser password login, account creation,
+credential registration, hardware passkeys, or email delivery.
+
 ### Revocation and recovery integration
 
 Use a fresh initialized `CASDOOR_STATE_DIR` under repository `tmp/`. Set the
@@ -138,10 +316,6 @@ export AUTH_TEST_DATA_DIR="$PWD/tmp/casdoor-lifecycle-app"
 mkdir -m 700 "$AUTH_TEST_DATA_DIR"
 export AUTH_TEST_SESSION_DB="$AUTH_TEST_DATA_DIR/identity.db"
 export COMPOSE_FILE="docker-compose.yml:auth/compose.casdoor.yml:auth/compose.test.yml"
-export NET_WORTH_ESTIMATOR_AUTH_EDITORS="$(
-  node --input-type=module -e \
-    'import {readFileSync} from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.env.CASDOOR_STATE_DIR + "/bootstrap.json", "utf8")).subject)'
-)"
 docker compose --env-file auth/casdoor/.env -p waypoint-auth-test up -d --build --wait
 CASDOOR_TEST_MUTATIONS=1 CASDOOR_RESTART_CONTAINER=waypoint-auth-test-casdoor-1 \
   node --env-file=auth/casdoor/.env auth/casdoor/test-lifecycle.mjs
