@@ -60,7 +60,7 @@ test("outlook renders real calculations, scenario ranges and evidence", async ({
 	expect(errors).toEqual([]);
 });
 
-test("saved target pins control Outlook and retain evidence access", async ({
+test("saved target pins control Outlook without an evidence dialog", async ({
 	page,
 	request,
 }) => {
@@ -91,11 +91,8 @@ test("saved target pins control Outlook and retain evidence access", async ({
 	await page.getByRole("link", { name: "Outlook", exact: true }).click();
 	await expect(card()).toBeVisible();
 	await expect(page.getByText(evaluation.name, { exact: true })).toHaveCount(1);
-	await card().getByRole("button").last().click();
-	await expect(
-		page.getByRole("dialog", { name: evaluation.name, exact: true }),
-	).toBeVisible();
-	await page.keyboard.press("Escape");
+	await expect(card().getByRole("button", { name: /Evidence/ })).toHaveCount(0);
+	await expect(page.getByRole("dialog")).not.toBeVisible();
 	const removed = pinWrite();
 	await card().getByRole("button", { pressed: true }).click();
 	expect((await removed).ok()).toBe(true);

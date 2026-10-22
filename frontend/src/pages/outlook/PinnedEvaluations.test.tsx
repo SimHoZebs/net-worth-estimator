@@ -28,7 +28,6 @@ function props() {
 		range: null,
 		pinnedIds: [funding.id],
 		onPinChange: vi.fn(),
-		onEvaluation: vi.fn(),
 	};
 }
 
@@ -65,12 +64,18 @@ describe("pinned evaluation cards", () => {
 	});
 
 	it.each(testPlan.evaluations)(
-		"pins and inspects the configured $kind target",
+		"shows and pins the configured $kind target without an evidence action",
 		(evaluation) => {
 			const result = evaluationFixture({ evaluation });
 			const input = {
 				...props(),
 				projection: projectionFixture({ evaluations: [result] }),
+				range: {
+					points: [],
+					count: 400,
+					evaluationSuccess: { [evaluation.id]: 0.75 },
+					failureShare: 0,
+				},
 				pinnedIds: [evaluation.id],
 			};
 			const view = render(<PinnedEvaluations {...input} />);
@@ -84,10 +89,13 @@ describe("pinned evaluation cards", () => {
 					),
 				),
 			);
-			const [pin, evidence] = card.getAllByRole("button");
-			fireEvent.click(evidence!);
-			expect(input.onEvaluation).toHaveBeenCalledWith(evaluation.id);
-			fireEvent.click(pin!);
+			expect(card.queryByRole("button", { name: /Evidence/ })).toBeNull();
+			expect(card.getByText("75%")).toBeTruthy();
+			fireEvent.click(
+				card.getByRole("button", {
+					name: `Unpin ${evaluation.name} from Outlook`,
+				}),
+			);
 			expect(input.onPinChange).toHaveBeenCalledWith(evaluation.id);
 			view.rerender(<PinnedEvaluations {...input} pinnedIds={[]} />);
 			expect(view.container.childElementCount).toBe(0);
