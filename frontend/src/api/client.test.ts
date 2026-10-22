@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	acceptResourceScope,
+	suspendResourceScope,
+} from "../auth/resourceScope.ts";
 import {
 	ApiClient,
 	type ApiClientOptions,
@@ -11,6 +15,14 @@ import {
 function response(body: string, init: ResponseInit): Response {
 	return new Response(body, init);
 }
+
+beforeEach(() => {
+	acceptResourceScope(
+		{ apiBaseUrl: "http://localhost", resource: null, subject: null },
+		suspendResourceScope(),
+	);
+});
+afterEach(() => suspendResourceScope());
 
 describe("native API client", () => {
 	it.each([
@@ -61,7 +73,10 @@ describe("native API client", () => {
 		expect(result).toEqual({ readOnly: false, authEnabled: true });
 		expect(fetcher).toHaveBeenCalledWith(
 			"/proxy/v1/status",
-			expect.objectContaining({ method: "GET", signal: controller.signal }),
+			expect.objectContaining({
+				method: "GET",
+				signal: expect.any(AbortSignal),
+			}),
 		);
 	});
 

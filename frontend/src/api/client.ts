@@ -1,5 +1,6 @@
 import * as errore from "errore";
 import { isRecord } from "../domain/guards.ts";
+import { getResourceScope } from "../auth/resourceScope.ts";
 import type {
 	AmountCatalogResponse,
 	AmountPreset,
@@ -25,6 +26,7 @@ import type {
 	StochasticProjectionResult,
 } from "./contracts.ts";
 import { getApiBaseUrl } from "./runtime.ts";
+import { responseScopeError, scopedRequest } from "./scopedRequest.ts";
 
 export const DEFAULT_API_BASE_URL = "";
 export const API_PREFIX = "/v1";
@@ -314,6 +316,7 @@ function requestInit(
 export class ApiClient {
 	readonly baseUrl: string;
 	private readonly fetcher: FetchLike;
+	private readonly resourceScope = getResourceScope();
 
 	constructor(options: ApiClientOptions | string = {}) {
 		const config = typeof options === "string" ? { baseUrl: options } : options;
@@ -417,12 +420,19 @@ export class ApiClient {
 	): Promise<Error | Response> {
 		const init = requestInit("POST", request, options, "text/event-stream");
 		if (init instanceof Error) return init;
-		const response = await this.fetcher(
+		const scoped = await scopedRequest(
+			this.baseUrl,
 			path(this.baseUrl, `${API_PREFIX}/projections/stochastic`),
 			init,
+			this.fetcher,
+			this.resourceScope,
 		).catch((cause) => new ApiNetworkError(cause));
-		if (response instanceof Error) return response;
-		if (!response.ok) return parseErrorResponse(response);
+		if (scoped instanceof Error) return scoped;
+		const { response, scope } = scoped;
+		if (!response.ok) {
+			const error = await parseErrorResponse(response);
+			return responseScopeError(scope) ?? error;
+		}
 		return response;
 	}
 
@@ -646,13 +656,22 @@ export class ApiClient {
 		init: RequestInit | ApiRequestError,
 	): Promise<Error | T> {
 		if (init instanceof Error) return init;
-		const response = await this.fetcher(
+		const scoped = await scopedRequest(
+			this.baseUrl,
 			path(this.baseUrl, `${API_PREFIX}/${route}`),
 			init,
+			this.fetcher,
+			this.resourceScope,
 		).catch((cause) => new ApiNetworkError(cause));
-		if (response instanceof Error) return response;
-		if (!response.ok) return parseErrorResponse(response);
+		if (scoped instanceof Error) return scoped;
+		const { response, scope } = scoped;
+		if (!response.ok) {
+			const error = await parseErrorResponse(response);
+			return responseScopeError(scope) ?? error;
+		}
 		const body = await readBody(response);
+		const stale = responseScopeError(scope);
+		if (stale) return stale;
 		if (body instanceof Error) return body;
 		if (body.kind === "empty") return null as T;
 		if (body.kind !== "json")

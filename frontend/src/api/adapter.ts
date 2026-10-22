@@ -48,6 +48,7 @@ export interface AdapterReport {
 export interface AccountPresentation {
 	balanceCheck: boolean;
 	source: string;
+	/** Derived display baseline for conversion checks, not persisted access policy. */
 	readOnly: boolean;
 	enabled: boolean;
 	minBalance: number | null;
@@ -205,6 +206,20 @@ function boundValue(
  */
 function isSyncOwned(source: string | undefined | null): boolean {
 	return source != null && source !== "model";
+}
+
+function accountReadOnly(
+	accountId: string,
+	document: FinancialModelDocument,
+	status: ServerStatus,
+): boolean {
+	return (
+		status.readOnly ||
+		document.checkpoints.some(
+			(checkpoint) =>
+				checkpoint.AccountId === accountId && isSyncOwned(checkpoint.source),
+		)
+	);
 }
 
 function checkpointSourceLabel(
@@ -437,9 +452,8 @@ function accountDisplay(
 	account: BackendAccount,
 	checkpoint: BackendCheckpoint | null,
 	observedOn: IsoDate,
-	status: ServerStatus,
+	readOnly: boolean,
 	previous: AccountPresentation | undefined,
-	syncCheckpoint: boolean,
 	archived: boolean,
 ): Account {
 	const minBalance = boundValue(account.minBalance, sentinelMap.floor);
@@ -457,7 +471,7 @@ function accountDisplay(
 		observedOn,
 		balanceCheck: previous?.balanceCheck ?? Boolean(checkpoint),
 		source: previous?.source ?? checkpointSourceLabel(checkpoint),
-		readOnly: previous?.readOnly || syncCheckpoint || status.readOnly,
+		readOnly,
 	};
 }
 
@@ -679,19 +693,16 @@ function addForwardPostingWarnings(
 
 function buildPresentationAccount(
 	account: BackendAccount,
-	checkpoint: BackendCheckpoint | null,
-	observedOn: IsoDate,
-	status: ServerStatus,
-	previous?: AccountPresentation,
+	display: Account,
 ): AccountPresentation {
 	return {
-		balanceCheck: previous?.balanceCheck ?? Boolean(checkpoint),
-		source: previous?.source ?? checkpointSourceLabel(checkpoint),
-		readOnly: previous?.readOnly ?? status.readOnly,
+		balanceCheck: display.balanceCheck,
+		source: display.source,
+		readOnly: display.readOnly,
 		enabled: account.enabled,
 		minBalance: account.minBalance,
 		maxBalance: account.maxBalance,
-		observedOn,
+		observedOn: display.observedOn,
 	};
 }
 
@@ -785,25 +796,18 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		);
 		const observedOn = checkpointDate(checkpoint, projectionStartDate);
 		const previous = previousPresentation?.accounts[account.id];
-		const syncCheckpoint = document.checkpoints.some(
-			(item) => item.AccountId === account.id && isSyncOwned(item.source),
-		);
 		const archived = isArchivedDebt(account, document, projectionStartDate);
 		const display = accountDisplay(
 			account,
 			checkpoint,
 			observedOn,
-			status,
+			accountReadOnly(account.id, document, status),
 			previous,
-			syncCheckpoint,
 			archived,
 		);
 		accountPresentations[account.id] = buildPresentationAccount(
 			account,
-			checkpoint,
-			observedOn,
-			status,
-			previous,
+			display,
 		);
 		addForwardAccountWarnings(conversionReport, account, checkpoint, path);
 		return display;
@@ -973,6 +977,37 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		report: conversionReport,
 		warnings: conversionReport.warnings,
 		losses: conversionReport.losses,
+	};
+}
+
+/** Refresh derived access metadata without rebuilding canonical rows or draft edits. */
+export function refreshDisplayPlanAccess(
+	plan: Plan,
+	{
+		document,
+		status,
+		presentation,
+	}: Pick<DisplayPlanInput, "document" | "status" | "presentation">,
+): Pick<PlanConversion, "plan" | "presentation"> {
+	return {
+		plan: {
+			...plan,
+			readOnly: status.readOnly,
+			accounts: plan.accounts.map((account) => ({
+				...account,
+				readOnly: accountReadOnly(account.id, document, status),
+			})),
+		},
+		presentation: {
+			...presentation,
+			accounts: Object.fromEntries(
+				Object.entries(presentation?.accounts ?? {}).map(([id, account]) => [
+					id,
+					{ ...account, readOnly: accountReadOnly(id, document, status) },
+				]),
+			),
+			movements: presentation?.movements ?? {},
+		},
 	};
 }
 

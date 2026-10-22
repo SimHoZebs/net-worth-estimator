@@ -34,11 +34,21 @@ export async function resetFixture(
  * Server mode keeps unsaved changes in this browser and the saved plan on
  * the server, so a test that needs both has to read both.
  */
-export async function readTemporaryVersion(page: Page) {
-	return page.evaluate((key) => {
-		const raw = window.localStorage.getItem(key);
-		return raw ? JSON.parse(raw).draft : null;
-	}, REMOTE_STORAGE_KEY);
+export async function readTemporaryVersion(
+	page: Page,
+	resource?: { id: string; kind: "private" | "sample" },
+) {
+	return page.evaluate(
+		({ prefix, resource }) => {
+			const owner = resource
+				? `${resource.kind}:${encodeURIComponent(resource.id)}`
+				: "legacy";
+			const key = `${prefix}:resource:${encodeURIComponent(window.location.origin)}:${owner}`;
+			const raw = window.localStorage.getItem(key);
+			return raw ? JSON.parse(raw).draft : null;
+		},
+		{ prefix: REMOTE_STORAGE_KEY, resource },
+	);
 }
 
 export async function readSavedServerPlan() {

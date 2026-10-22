@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import { createApiClient, type ApiClient } from "../api/index.ts";
+import { resourceScopedFactory } from "../api/scopedRequest.ts";
+import {
+	getResourceScope,
+	subscribeResourceScope,
+} from "../auth/resourceScope.ts";
 import { useUiStore } from "./uiStore.ts";
 
 export interface PinnedEvaluationsState {
@@ -12,12 +17,11 @@ export interface PinnedEvaluationsState {
 	reset: () => void;
 }
 
-let defaultClient: ApiClient | null = null;
+let defaultClient = resourceScopedFactory(createApiClient);
 
 function clientOrDefault(client?: ApiClient): ApiClient {
 	if (client) return client;
-	if (!defaultClient) defaultClient = createApiClient();
-	return defaultClient;
+	return defaultClient();
 }
 
 function authOptions(): { authToken?: string } {
@@ -37,10 +41,13 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 		loading: false,
 		error: null,
 		refresh: async (client) => {
+			const scope = getResourceScope();
+			if (scope.status === "pending") return;
 			if (get().loading) return;
 			set({ loading: true, error: null });
 			const result =
 				await clientOrDefault(client).getPinnedEvaluations(authOptions());
+			if (scope !== getResourceScope()) return;
 			if (result instanceof Error) {
 				set({ loading: false, error: result.message });
 				return;
@@ -48,6 +55,8 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 			set({ ids: [...result.instanceIds], loading: false });
 		},
 		toggle: async (id, client) => {
+			const scope = getResourceScope();
+			if (scope.status === "pending") return false;
 			const previous = get().ids ?? [];
 			const next = previous.includes(id)
 				? previous.filter((item) => item !== id)
@@ -57,6 +66,7 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 				next,
 				authOptions(),
 			);
+			if (scope !== getResourceScope()) return false;
 			if (result instanceof Error) {
 				set({ ids: previous, error: result.message });
 				return false;
@@ -68,7 +78,9 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 	}),
 );
 
+subscribeResourceScope(() => usePinnedEvaluationsStore.getState().reset());
+
 /** Test hook: clears the module client between cases. */
 export function resetPinnedEvaluationsClient(): void {
-	defaultClient = null;
+	defaultClient = resourceScopedFactory(createApiClient);
 }

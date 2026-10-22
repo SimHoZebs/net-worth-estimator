@@ -3,6 +3,11 @@ import {
 	type PersistStorage,
 	type StateStorage,
 } from "zustand/middleware";
+import {
+	getResourceScope,
+	resourceStorageKey,
+	type ResourceScope,
+} from "../auth/resourceScope.ts";
 
 export const THEME_STORAGE_KEY = "waypoint-theme";
 export const UI_PREFS_STORAGE_KEY = "waypoint.ui-prefs.v1";
@@ -69,6 +74,36 @@ export function clearPersistedMemory(): void {
 
 export function appJsonStorage<T>() {
 	return createJSONStorage<T>(() => appLocalStorage);
+}
+
+/** Financial preferences bind to one verified owner, including memory fallbacks. */
+export function resourceLocalStorage(scope: ResourceScope): StateStorage {
+	const keyFor = (name: string) =>
+		scope === getResourceScope() ? resourceStorageKey(name, scope) : null;
+	return {
+		getItem: (name) => {
+			const key = keyFor(name);
+			if (!key) return null;
+			try {
+				const raw = appLocalStorage.getItem(key);
+				if (raw instanceof Promise)
+					return raw
+						.then((value) => (keyFor(name) ? value : null))
+						.catch(() => null);
+				return keyFor(name) ? raw : null;
+			} catch {
+				return null;
+			}
+		},
+		setItem: (name, value) => {
+			const key = keyFor(name);
+			if (key) return appLocalStorage.setItem(key, value);
+		},
+		removeItem: (name) => {
+			const key = keyFor(name);
+			if (key) return appLocalStorage.removeItem(key);
+		},
+	};
 }
 
 /**

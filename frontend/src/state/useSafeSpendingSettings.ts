@@ -1,13 +1,16 @@
 import { create } from "zustand";
 import { persist, type PersistStorage } from "zustand/middleware";
 import {
+	getResourceScope,
+	subscribeResourceScope,
+	type ResourceScope,
+} from "../auth/resourceScope.ts";
+import {
 	DEFAULT_CYCLE_STATEMENT_DAY,
 	DEFAULT_PROTECTED_RESERVE,
 } from "../domain/safeSpending.ts";
 import {
-	appJsonStorage,
-	appLocalStorage,
-	SAFE_SPENDING_LEGACY_KEYS,
+	resourceLocalStorage,
 	SAFE_SPENDING_STORAGE_KEY,
 } from "./persisted.ts";
 
@@ -93,12 +96,14 @@ function looksLikeSettings(value: unknown): boolean {
 }
 
 /**
- * Reads the persist envelope plus the pre-migration raw settings object
- * (`{"statementDay":20,...}`) and legacy keys v3/v2. Writes always target
- * the primary key in envelope form.
+ * Reads envelopes and raw settings only within the verified resource namespace.
+ * Unscoped financial settings and legacy keys have no established owner.
  */
-function safeSpendingStorage(): PersistStorage<TotalCycleSettings> | undefined {
-	const fallback = appJsonStorage<TotalCycleSettings>();
+function safeSpendingStorage(
+	scope: ResourceScope,
+	canWrite: () => boolean,
+): PersistStorage<TotalCycleSettings> {
+	const storage = resourceLocalStorage(scope);
 	const readRawSettings = (raw: string | null): TotalCycleSettings | null => {
 		if (raw === null) return null;
 		try {
@@ -122,48 +127,17 @@ function safeSpendingStorage(): PersistStorage<TotalCycleSettings> | undefined {
 	};
 	return {
 		getItem: (name) => {
-			const primary = readRawSettings(
-				(() => {
-					try {
-						return appLocalStorage.getItem(name) as string | null;
-					} catch {
-						return null;
-					}
-				})(),
-			);
-			if (primary !== null) return { state: primary, version: 4 };
-			for (const key of SAFE_SPENDING_LEGACY_KEYS) {
-				try {
-					const legacy = readRawSettings(
-						appLocalStorage.getItem(key) as string | null,
-					);
-					if (legacy !== null) return { state: legacy, version: 0 };
-				} catch {
-					continue;
-				}
-			}
-			return null;
+			const parse = (raw: string | null) => {
+				const state = readRawSettings(raw);
+				return state ? { state, version: 4 } : null;
+			};
+			const raw = storage.getItem(name);
+			return raw instanceof Promise ? raw.then(parse) : parse(raw);
 		},
 		setItem: (name, value) => {
-			if (fallback) fallback.setItem(name, value);
-			else {
-				try {
-					appLocalStorage.setItem(name, JSON.stringify(value));
-				} catch {
-					// Storage is best-effort; the tracker still works this session.
-				}
-			}
+			if (canWrite()) return storage.setItem(name, JSON.stringify(value));
 		},
-		removeItem: (name) => {
-			if (fallback) fallback.removeItem(name);
-			else {
-				try {
-					appLocalStorage.removeItem(name);
-				} catch {
-					// Ignore.
-				}
-			}
-		},
+		removeItem: (name) => storage.removeItem(name),
 	};
 }
 
@@ -171,34 +145,43 @@ interface SafeSpendingSettingsState extends TotalCycleSettings {
 	updateSettings: (next: Partial<TotalCycleSettings>) => void;
 }
 
+let writableScope: ResourceScope | null = null;
+let boundScope = getResourceScope();
+let hydration: Promise<void> = Promise.resolve();
+
+function updateSettingsForScope(scope: ResourceScope) {
+	return (next: Partial<TotalCycleSettings>) => {
+		if (scope !== getResourceScope() || writableScope !== scope) return;
+		useSafeSpendingSettings.setState((previous) => ({
+			statementDay: next.statementDay ?? previous.statementDay,
+			statementDaySet: next.statementDaySet ?? previous.statementDaySet,
+			reserve: next.reserve ?? previous.reserve,
+			accountIds:
+				next.accountIds !== undefined ? next.accountIds : previous.accountIds,
+			spendingAccountIds:
+				next.spendingAccountIds !== undefined
+					? next.spendingAccountIds
+					: previous.spendingAccountIds,
+			incomeRuleIds: next.incomeRuleIds ?? previous.incomeRuleIds,
+			movementIds:
+				next.movementIds !== undefined
+					? next.movementIds
+					: previous.movementIds,
+		}));
+	};
+}
+
 export const useSafeSpendingSettings = create<SafeSpendingSettingsState>()(
 	persist(
-		(set) => ({
+		() => ({
 			...defaultSafeSpendingSettings(),
-			updateSettings: (next) =>
-				set((previous) => ({
-					statementDay: next.statementDay ?? previous.statementDay,
-					statementDaySet: next.statementDaySet ?? previous.statementDaySet,
-					reserve: next.reserve ?? previous.reserve,
-					accountIds:
-						next.accountIds !== undefined
-							? next.accountIds
-							: previous.accountIds,
-					spendingAccountIds:
-						next.spendingAccountIds !== undefined
-							? next.spendingAccountIds
-							: previous.spendingAccountIds,
-					incomeRuleIds: next.incomeRuleIds ?? previous.incomeRuleIds,
-					movementIds:
-						next.movementIds !== undefined
-							? next.movementIds
-							: previous.movementIds,
-				})),
+			updateSettings: updateSettingsForScope(boundScope),
 		}),
 		{
 			name: SAFE_SPENDING_STORAGE_KEY,
 			version: 4,
-			storage: safeSpendingStorage(),
+			storage: safeSpendingStorage(boundScope, () => false),
+			skipHydration: true,
 			partialize: (state) => ({
 				statementDay: state.statementDay,
 				reserve: state.reserve,
@@ -216,6 +199,47 @@ export const useSafeSpendingSettings = create<SafeSpendingSettingsState>()(
 		},
 	),
 );
+
+function bindFinancialPreferences(): void {
+	const scope = getResourceScope();
+	boundScope = scope;
+	writableScope = null;
+	useSafeSpendingSettings.persist.setOptions({
+		storage: safeSpendingStorage(scope, () => writableScope === scope),
+	});
+	// Reset without writing defaults over this owner's saved preferences.
+	useSafeSpendingSettings.setState({
+		...defaultSafeSpendingSettings(),
+		updateSettings: updateSettingsForScope(scope),
+	});
+	// Rehydrate even while pending to invalidate an older asynchronous hydration.
+	const result = useSafeSpendingSettings.persist.rehydrate();
+	const finish = () => {
+		if (
+			scope === getResourceScope() &&
+			scope.status !== "pending" &&
+			useSafeSpendingSettings.persist.hasHydrated()
+		)
+			writableScope = scope;
+	};
+	if (result instanceof Promise) hydration = result.then(finish);
+	else {
+		finish();
+		hydration = Promise.resolve();
+	}
+}
+
+/** The session boundary waits for this owner before it mounts financial screens. */
+export async function hydrateFinancialPreferences(
+	scope: ResourceScope,
+): Promise<boolean> {
+	if (boundScope !== scope) return false;
+	await hydration;
+	return scope === getResourceScope() && writableScope === scope;
+}
+
+subscribeResourceScope(bindFinancialPreferences);
+bindFinancialPreferences();
 
 /** Test hook: restores safe spending defaults between cases. */
 export function resetSafeSpendingSettings(): void {

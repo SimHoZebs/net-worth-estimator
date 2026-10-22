@@ -16,6 +16,7 @@ import {
 	type StochasticProjectionResult,
 } from "../api/index.ts";
 import { projectionMovements } from "../api/projectionMovements.ts";
+import { resourceScopedFactory } from "../api/scopedRequest.ts";
 import { dateLabel, money, percent, todayIso } from "../domain/format.ts";
 import {
 	fundingEvaluationName,
@@ -65,12 +66,7 @@ export interface UseRemoteProjectionOptions {
 const MISSING_DOCUMENT_MESSAGE =
 	"No server financial model is available for projection. Load or replace a model before calculating.";
 
-let defaultProjectionClient: RemoteProjectionClient | null = null;
-
-function defaultApiClient(): RemoteProjectionClient {
-	if (!defaultProjectionClient) defaultProjectionClient = createApiClient();
-	return defaultProjectionClient;
-}
+const defaultApiClient = resourceScopedFactory(createApiClient);
 
 async function runDeterministic(
 	api: RemoteProjectionClient,
