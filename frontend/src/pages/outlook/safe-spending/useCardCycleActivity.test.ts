@@ -111,6 +111,47 @@ describe("useCardCycleActivity", () => {
 		).toEqual(["closed-end", "other-card", "closed-start"]);
 	});
 
+	it("includes pending charges before and after the checkpoint without changing saved balances or projections", () => {
+		const pending = [
+			purchase("sfin-pending-closed", "2026-10-19", 10, { enabled: false }),
+			purchase("sync-pending-before", "2026-10-20", 40, { enabled: false }),
+			purchase("sync-pending-checkpoint", "2026-10-21", 15, { enabled: false }),
+			purchase("sync-pending-after", "2026-10-22", 20, { enabled: false }),
+			purchase("sync-pending-future", "2026-10-23", 999, { enabled: false }),
+			purchase("sync-pending-other-card", "2026-10-22", 999, {
+				enabled: false,
+				fromId: otherCard.id,
+			}),
+		];
+		const projectionBefore = structuredClone(input.projection);
+		const { result } = renderHook(() =>
+			useCardCycleActivity({
+				...input,
+				plan: { ...plan, movements: [...plan.movements, ...pending] },
+				displayToday: "2026-10-22",
+			}),
+		);
+		expect(result.current.perAccount[0]!.derived).toBe(150);
+		const currentPending =
+			result.current.chargeCycles.cycle.transactions.filter(
+				(row) => row.pending,
+			);
+		expect(currentPending.map((row) => row.movementId)).toEqual([
+			"sync-pending-before",
+			"sync-pending-checkpoint",
+			"sync-pending-after",
+		]);
+		expect(currentPending.every((row) => row.excluded)).toBe(true);
+		expect(
+			result.current.chargeCycles["last-cycle"].transactions.map(
+				(row) => row.movementId,
+			),
+		).toEqual(["closed-start", "closed-end", "sfin-pending-closed"]);
+		expect(result.current.closedCycle.total).toBe(500);
+		expect(pending.every((movement) => !movement.enabled)).toBe(true);
+		expect(input.projection).toEqual(projectionBefore);
+	});
+
 	it("resolves a closed cycle across a year boundary and a custom statement day", () => {
 		const { result } = renderHook(() =>
 			useCardCycleActivity({

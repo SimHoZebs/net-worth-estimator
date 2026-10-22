@@ -122,10 +122,13 @@ export function accountTransactions({
 			counterparty: direction === "in" ? from : to,
 		};
 	};
+	// Pending charges are bank evidence even after the latest checkpoint.
+	// They stay disabled for projections, so no projected event supplies them.
 	const recorded: AccountTransaction[] = plan.movements
 		.filter(
 			(movement) =>
-				isHistoricalMovement(movement, plan.startDate) &&
+				(isHistoricalMovement(movement, plan.startDate) ||
+					isPendingMovement(movement)) &&
 				(movement.fromId === accountId || movement.toId === accountId),
 		)
 		.map((movement) => ({
