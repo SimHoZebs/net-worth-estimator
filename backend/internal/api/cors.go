@@ -25,8 +25,8 @@ var allowedCORSMethods = map[string]struct{}{
 	http.MethodOptions: {},
 }
 
-// Two deploy modes: Nginx proxy strips Origin so same-origin requests pass
-// without an allowlist entry; direct Vercel mode enforces the exact
+// Two deploy modes: Nginx preserves Origin so same-origin requests pass
+// the origin comparison; direct Vercel mode enforces the exact
 // NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS list. Disallowed origins get an
 // explicit 403 (not a silent header omit) so tests and direct callers see
 // the rejection. Preflight answers 204 with a 600s cache. Single-value
