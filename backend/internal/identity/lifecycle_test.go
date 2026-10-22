@@ -56,9 +56,9 @@ func staleGrant(t *testing.T, s *Service, expireToken bool) grant {
 	return g
 }
 
-func status(t *testing.T, client *http.Client, address string) int {
+func writeStatus(t *testing.T, client *http.Client, address string) int {
 	t.Helper()
-	r, err := client.Get(address + "/v1/financial-model")
+	r, err := client.Post(address+"/v1/accounts", "application/json", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestProviderRevocationAndOutage(t *testing.T) {
 			} else {
 				p.introspectionStatus.Store(503)
 			}
-			if got := status(t, client, server.URL); got != want {
+			if got := writeStatus(t, client, server.URL); got != want {
 				t.Fatalf("provider check=%d want=%d", got, want)
 			}
 			persisted, err := s.store.findGrant(g.ID, g.Issuer)
@@ -88,7 +88,7 @@ func TestProviderRevocationAndOutage(t *testing.T) {
 			}
 			if !revoked {
 				p.introspectionStatus.Store(0)
-				if got := status(t, client, server.URL); got != 204 {
+				if got := writeStatus(t, client, server.URL); got != 204 {
 					t.Fatalf("recovery after provider outage=%d", got)
 				}
 			}
@@ -132,7 +132,7 @@ func TestRefreshRejectsRevocationAndIdentityChanges(t *testing.T) {
 			} else {
 				p.refreshReject.Store(true)
 			}
-			if got := status(t, client, server.URL); got != 401 {
+			if got := writeStatus(t, client, server.URL); got != 401 {
 				t.Fatalf("invalid refresh=%d", got)
 			}
 		})
@@ -144,14 +144,14 @@ func TestRefreshRotationSurvivesIntrospectionOutage(t *testing.T) {
 	s, server, client := signedIn(t, p, filepath.Join(t.TempDir(), "sessions.db"))
 	staleGrant(t, s, true)
 	p.introspectionStatus.Store(503)
-	if got := status(t, client, server.URL); got != 503 {
+	if got := writeStatus(t, client, server.URL); got != 503 {
 		t.Fatalf("outage after refresh=%d", got)
 	}
 	if currentGrant(t, s).AccessToken != "access-refreshed" {
 		t.Fatal("rotated credentials were lost during introspection outage")
 	}
 	p.introspectionStatus.Store(0)
-	if got := status(t, client, server.URL); got != 204 || p.refreshes.Load() != 1 {
+	if got := writeStatus(t, client, server.URL); got != 204 || p.refreshes.Load() != 1 {
 		t.Fatalf("retry after outage=%d refreshes=%d", got, p.refreshes.Load())
 	}
 }
@@ -211,7 +211,7 @@ func TestBackchannelLogoutVerification(t *testing.T) {
 			if got := sendLogout(t, server, logoutToken(t, p, claims)); got != 400 {
 				t.Fatalf("invalid notification=%d", got)
 			}
-			if got := status(t, client, server.URL); got != 204 {
+			if got := writeStatus(t, client, server.URL); got != 204 {
 				t.Fatalf("invalid notification changed session=%d", got)
 			}
 		})
@@ -237,7 +237,7 @@ func TestBackchannelScopeReplayAndPersistence(t *testing.T) {
 				claims["sid"] = "unknown-provider-session"
 			}
 			raw := logoutToken(t, p, claims)
-			if got := sendLogout(t, server, raw); got != 200 || status(t, client, server.URL) != 401 {
+			if got := sendLogout(t, server, raw); got != 200 || writeStatus(t, client, server.URL) != 401 {
 				t.Fatalf("logout notification=%d", got)
 			}
 			if err := s.store.updateGrant(before); !errors.Is(err, errGrantRevoked) {
@@ -257,7 +257,7 @@ func TestBackchannelScopeReplayAndPersistence(t *testing.T) {
 			if r.StatusCode != 302 {
 				t.Fatalf("new login after notification=%d", r.StatusCode)
 			}
-			if got := sendLogout(t, other, raw); got != 200 || status(t, client, other.URL) != 204 {
+			if got := sendLogout(t, other, raw); got != 200 || writeStatus(t, client, other.URL) != 204 {
 				t.Fatalf("replayed logout revoked a new login after restart: status=%d", got)
 			}
 		})
@@ -277,7 +277,7 @@ func TestBackchannelRejectsMethodBodyAndSignature(t *testing.T) {
 	}
 	r, _ = http.Post(server.URL+prefix+"backchannel-logout", "application/x-www-form-urlencoded", strings.NewReader("logout_token="+strings.Repeat("x", 40<<10)))
 	r.Body.Close()
-	if r.StatusCode != 400 || status(t, client, server.URL) != 204 {
+	if r.StatusCode != 400 || writeStatus(t, client, server.URL) != 204 {
 		t.Fatalf("oversized notification=%d", r.StatusCode)
 	}
 }

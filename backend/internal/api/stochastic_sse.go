@@ -271,7 +271,7 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 	cacheEligible := body.Config.Seed != nil
 	var cacheKey string
 	if cacheEligible {
-		cacheKey = artifactKey("stochastic", map[string]any{
+		cacheKey = s.resourceArtifactKey("stochastic", map[string]any{
 			"document":  document,
 			"overrides": body.Overrides,
 			"settings":  projectionSettingsDescriptor(body.Settings),

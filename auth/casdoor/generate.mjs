@@ -1,10 +1,11 @@
 import { mkdir, writeFile, chmod, stat, readdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { buildPermissionSeed } from './permissions.mjs';
 
 export const defaultStateDir = resolve(dirname(fileURLToPath(import.meta.url)), 'data');
 
-function origin(value, name) {
+export function origin(value, name) {
   const url = new URL(value);
   const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
   if (!['http:', 'https:'].includes(url.protocol) || (url.protocol === 'http:' && !loopback)) {
@@ -64,6 +65,7 @@ export function settingsFromEnv(env) {
 
 export function buildSeed(settings) {
   return {
+    ...buildPermissionSeed(),
     organizations: [{
       owner: 'admin', name: 'waypoint', displayName: 'Waypoint',
       websiteUrl: settings.appUrl, passwordType: 'bcrypt', passwordOptions: ['AtLeast8'],

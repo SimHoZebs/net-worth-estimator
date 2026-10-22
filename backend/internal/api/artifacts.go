@@ -31,6 +31,13 @@ func mustCanonical(payload any) string {
 	return string(encoded)
 }
 
+func (s *Server) resourceArtifactKey(kind string, descriptor any) string {
+	if s.ResourceID == "" {
+		return artifactKey(kind, descriptor)
+	}
+	return artifactKey(kind, map[string]any{"resource": s.ResourceID, "request": descriptor})
+}
+
 func artifactKey(kind string, descriptor any) string {
 	digest := sha256.Sum256([]byte(mustCanonical(map[string]any{
 		"artifactCacheVersion": artifactCacheVersion,

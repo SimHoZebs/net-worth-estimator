@@ -14,12 +14,12 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 )
 
 type testIDP struct {
@@ -108,7 +108,15 @@ func newIDP(t *testing.T) *testIDP {
 
 func newService(t *testing.T, p *testIDP, path string) *Service {
 	t.Helper()
-	s, err := New(context.Background(), Config{Provider: "casdoor", Issuer: p.server.URL, PublicURL: "http://localhost:8080", ClientID: "waypoint", ClientSecret: "secret", SessionDB: path, Lifetime: time.Hour, Editors: []string{"editor"}, Readers: []string{"reader"}})
+	s, err := New(context.Background(), Config{Provider: "casdoor", Issuer: p.server.URL, PublicURL: "http://localhost:8080", ClientID: "waypoint", ClientSecret: "secret", SessionDB: path, Lifetime: time.Hour,
+		ResolveAccess: func(_ context.Context, subject string) (authorization.Scope, error) {
+			permissions := []string{"plan:read", "plan:project"}
+			if subject != "" {
+				permissions = append(permissions, "plan:write")
+			}
+			return authorization.Scope{Resource: authorization.ResourceFor(p.server.URL, subject), Permissions: permissions}, nil
+		},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +192,7 @@ func TestOIDCIdentityVerification(t *testing.T) {
 	}
 }
 
-func TestAccessGrantsSessionsAndCSRF(t *testing.T) {
+func TestAccountAccessSessionsAndCSRF(t *testing.T) {
 	p := newIDP(t)
 	s := newService(t, p, filepath.Join(t.TempDir(), "sessions.db"))
 	server := httptest.NewServer(s.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -203,7 +211,7 @@ func TestAccessGrantsSessionsAndCSRF(t *testing.T) {
 			client := testClient(t)
 			r, _ := client.Get(server.URL + "/v1/financial-model")
 			r.Body.Close()
-			if r.StatusCode != 401 {
+			if r.StatusCode != 204 {
 				t.Fatalf("anonymous status=%d", r.StatusCode)
 			}
 			p.subject = subject
@@ -216,11 +224,6 @@ func TestAccessGrantsSessionsAndCSRF(t *testing.T) {
 				{"GET", "/v1/financial-model", 204}, {"POST", "/v1/projections/deterministic", 204}, {"POST", "/v1/new-write-route", 204}, {"PATCH", "/v1/accounts/a", 204},
 			} {
 				want := req.want
-				if subject == "uninvited" {
-					want = 403
-				} else if subject == "reader" && req.method != "GET" && !strings.Contains(req.path, "projections") {
-					want = 403
-				}
 				rq, _ := http.NewRequest(req.method, server.URL+req.path, nil)
 				r, err := client.Do(rq)
 				if err != nil {
@@ -246,7 +249,7 @@ func TestAccessGrantsSessionsAndCSRF(t *testing.T) {
 			}
 			r, _ = client.Get(server.URL + "/v1/financial-model")
 			r.Body.Close()
-			if r.StatusCode != 401 {
+			if r.StatusCode != 204 {
 				t.Fatalf("logged-out status=%d", r.StatusCode)
 			}
 		})
@@ -306,7 +309,7 @@ func TestAnonymousDiscoveryBoundary(t *testing.T) {
 	for _, item := range []struct {
 		path string
 		want int
-	}{{"/v1/status", 401}, {prefix + "session", 200}, {"/healthz", 204}} {
+	}{{"/v1/status", 204}, {prefix + "session", 200}, {"/healthz", 204}} {
 		response, err := client.Get(server.URL + item.path)
 		if err != nil {
 			t.Fatal(err)
@@ -341,26 +344,27 @@ func TestStateCannotBeReplayedAndSessionsFailClosed(t *testing.T) {
 	// A provider switch cannot carry an old provider's grants or session across.
 	issuer := s.config.Issuer
 	s.config.Issuer = "https://other-provider.test"
-	r, _ = client.Get(server.URL + "/v1/financial-model")
+	req, _ := http.NewRequest("POST", server.URL+"/v1/accounts", nil)
+	r, _ = client.Do(req)
 	r.Body.Close()
 	if r.StatusCode != 401 {
 		t.Fatalf("cross-provider session=%d", r.StatusCode)
 	}
 	s.config.Issuer = issuer
-	s.config.Editors = nil
-	r, _ = client.Get(server.URL + "/v1/financial-model")
+	req, _ = http.NewRequest("POST", server.URL+"/v1/accounts", nil)
+	r, _ = client.Do(req)
 	r.Body.Close()
-	if r.StatusCode != 403 {
-		t.Fatalf("removed grant=%d", r.StatusCode)
+	if r.StatusCode != 204 {
+		t.Fatalf("restored provider session=%d", r.StatusCode)
 	}
-	s.config.Editors = []string{"editor"}
-	req, _ := http.NewRequest("POST", server.URL+prefix+"logout", nil)
+	req, _ = http.NewRequest("POST", server.URL+prefix+"logout", nil)
 	r, _ = client.Do(req)
 	r.Body.Close()
 	// Browser logout destroys server state, not just the browser cookie.
 	replay := testClient(t)
 	replay.Jar.SetCookies(u, oldCookies)
-	r, _ = replay.Get(server.URL + "/v1/financial-model")
+	req, _ = http.NewRequest("POST", server.URL+"/v1/accounts", nil)
+	r, _ = replay.Do(req)
 	r.Body.Close()
 	if r.StatusCode != 401 {
 		t.Fatalf("captured logged-out cookie=%d", r.StatusCode)

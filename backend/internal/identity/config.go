@@ -2,10 +2,12 @@
 package identity
 
 import (
+	"context"
 	"fmt"
 	"net/url"
-	"strings"
 	"time"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 )
 
 type Config struct {
@@ -13,7 +15,8 @@ type Config struct {
 	PublicURL, AccountURL, SessionDB                      string
 	Lifetime                                              time.Duration
 	RecheckInterval                                       time.Duration
-	Readers, Editors                                      []string
+	ResolveAccess                                         func(context.Context, string) (authorization.Scope, error)
+	RequireResourceHeader                                 bool
 }
 
 // FromEnv keeps identity configuration separate from financial-server settings.
@@ -27,6 +30,7 @@ func FromEnv(getenv func(string) string, databasePath string) (Config, error) {
 		PublicURL:    getenv("NET_WORTH_ESTIMATOR_PUBLIC_URL"),
 		AccountURL:   getenv("NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL"),
 		SessionDB:    databasePath + ".sessions", Lifetime: 7 * 24 * time.Hour, RecheckInterval: 30 * time.Second,
+		RequireResourceHeader: true,
 	}
 	if c.Provider == "" || c.Provider == "none" {
 		c.Provider = "none"
@@ -88,13 +92,6 @@ func FromEnv(getenv func(string) string, databasePath string) (Config, error) {
 			return c, fmt.Errorf("AUTH_ACCOUNT_URL must use the issuer origin")
 		}
 	}
-	var err error
-	if c.Readers, err = subjects(getenv("NET_WORTH_ESTIMATOR_AUTH_READERS")); err != nil {
-		return c, err
-	}
-	if c.Editors, err = subjects(getenv("NET_WORTH_ESTIMATOR_AUTH_EDITORS")); err != nil {
-		return c, err
-	}
 	return c, nil
 }
 
@@ -113,19 +110,4 @@ func validateURL(raw string, origin bool) error {
 		return fmt.Errorf("HTTP is restricted to loopback hosts; use HTTPS for network access")
 	}
 	return nil
-}
-
-func subjects(raw string) ([]string, error) {
-	if raw == "" {
-		return nil, nil
-	}
-	var result []string
-	for _, s := range strings.Split(raw, ",") {
-		s = strings.TrimSpace(s)
-		if s == "" || s == "*" {
-			return nil, fmt.Errorf("AUTH_READERS/AUTH_EDITORS require explicit nonempty OIDC subjects, not wildcards")
-		}
-		result = append(result, s)
-	}
-	return result, nil
 }

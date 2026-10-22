@@ -99,25 +99,22 @@ type Principal struct {
 }
 
 func CanWrite(ctx context.Context) bool {
-	p, ok := ctx.Value(principalKey{}).(Principal)
-	return ok && p.Role == "editor"
+	scope, ok := Scope(ctx)
+	return ok && slices.Contains(scope.Permissions, "plan:write")
 }
 
 func (s *Service) principal(r *http.Request) (Principal, error) {
 	g, err := s.validateGrant(r.Context(), s.sessions.GetString(r.Context(), "grant_id"))
-	if err != nil || g.ID == "" {
+	if err != nil {
 		return Principal{}, err
 	}
-	p := Principal{Subject: g.Subject, Name: g.Name}
-	if slices.Contains(s.config.Editors, p.Subject) {
-		p.Role = "editor"
-	} else if slices.Contains(s.config.Readers, p.Subject) {
-		p.Role = "viewer"
+	if g.ID == "" {
+		return Principal{}, nil
 	}
-	return p, nil
+	return Principal{Subject: g.Subject, Name: g.Name}, nil
 }
 
-// Wrap protects every API route by default. Compute POSTs are read operations.
+// Wrap verifies sessions and enforces Casdoor decisions for the selected plan.
 func (s *Service) Wrap(next http.Handler) http.Handler {
 	router := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w = flushWriter{w}
@@ -132,21 +129,28 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 				failure(w, 503, "Identity verification is temporarily unavailable. Retry this request.")
 				return
 			}
-			if p.Subject == "" {
-				w.Header().Set("WWW-Authenticate", "Session")
-				failure(w, 401, "Sign in to access this plan.")
+			scope, p, err := s.resolveAccess(r.Context(), p)
+			if err != nil {
+				failure(w, 503, "Resource permissions are temporarily unavailable. Retry this request.")
 				return
 			}
-			if p.Role == "" {
-				failure(w, 403, "This identity has no grant for this plan.")
+			w.Header().Set(ResourceHeader, scope.Resource.ID)
+			if !slices.Contains(scope.Permissions, requestAction(r)) {
+				if p.Subject == "" {
+					w.Header().Set("WWW-Authenticate", "Session")
+					failure(w, 401, "Sign in to edit your own plan.")
+				} else {
+					failure(w, 403, "This action is not permitted on this plan.")
+				}
 				return
 			}
-			compute := r.Method == http.MethodPost && (r.URL.Path == "/v1/projections/deterministic" || r.URL.Path == "/v1/projections/stochastic")
-			if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" && !compute && p.Role != "editor" {
-				failure(w, 403, "This identity has read-only access.")
+			expected := r.Header.Get(ResourceHeader)
+			if (expected != "" && expected != scope.Resource.ID) || (s.config.RequireResourceHeader && expected == "" && r.Method != http.MethodOptions) {
+				failure(w, 409, "The active plan changed. Reload the session before this request.")
 				return
 			}
 			r = r.WithContext(context.WithValue(r.Context(), principalKey{}, p))
+			r = r.WithContext(context.WithValue(r.Context(), scopeKey{}, scope))
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -172,7 +176,14 @@ func (s *Service) serveAuth(w http.ResponseWriter, r *http.Request) {
 			failure(w, 503, "Identity verification is temporarily unavailable.")
 			return
 		}
-		respond(w, map[string]any{"enabled": true, "provider": s.config.Provider, "authenticated": p.Subject != "", "allowed": p.Role != "", "user": p, "accountURL": s.config.AccountURL})
+		scope, p, err := s.resolveAccess(r.Context(), p)
+		if err != nil {
+			failure(w, 503, "Resource permissions are temporarily unavailable.")
+			return
+		}
+		w.Header().Set(ResourceHeader, scope.Resource.ID)
+		respond(w, map[string]any{"enabled": true, "provider": s.config.Provider, "authenticated": p.Subject != "", "allowed": slices.Contains(scope.Permissions, "plan:read"), "user": p, "accountURL": s.config.AccountURL,
+			"resource": map[string]any{"id": scope.Resource.ID, "kind": scope.Resource.Kind, "permissions": scope.Permissions}})
 	case "GET " + prefix + "login":
 		s.login(w, r)
 	case "GET " + prefix + "callback":

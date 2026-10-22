@@ -63,7 +63,7 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 
 	// Key the RESOLVED document so omitted fields track the
 	// stored state: a model save changes stored content and therefore the key.
-	cacheKey := artifactKey("deterministic", map[string]any{
+	cacheKey := s.resourceArtifactKey("deterministic", map[string]any{
 		"publicResultVersion": deterministicResultCacheVersion,
 		"document":            document,
 		"overrides":           input.Body.Overrides,
