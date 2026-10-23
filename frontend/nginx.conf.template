@@ -51,6 +51,9 @@ server {
         proxy_set_header Origin $http_origin;
         proxy_set_header Connection "";
         proxy_redirect off;
+        # Casdoor's branding cookies exceed the default response-header buffer.
+        proxy_buffer_size 16k;
+        proxy_buffers 4 16k;
         proxy_buffering off;
         proxy_read_timeout 60s;
     }

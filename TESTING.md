@@ -97,6 +97,11 @@ node --test auth/casdoor/*.test.mjs
 `scripts/smoke-compose.sh` checks the guest sample on the authenticated stack.
 Guests see only a separate sample.
 Run its request-contract regressions with `node --test scripts/smoke-compose.test.mjs`.
+Run the real-Nginx provider-header regression with
+`NGINX_TEST_IMAGE=nginx:alpine node --test scripts/nginx-provider.test.mjs`.
+The test requires an available local image and Docker. It runs without root
+inside the container and checks both the corrected buffer and default-buffer 502.
+Without `NGINX_TEST_IMAGE`, it skips the Docker-only test.
 Authenticated requests use the account's private plan and assert its resource ID.
 
 Use the [Casdoor test guide](auth/casdoor/README.md#verification) for real-provider
