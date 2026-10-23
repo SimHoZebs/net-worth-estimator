@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { FIXTURE_API, resetFixture } from "./fixture.ts";
+import { FIXTURE_API, resetFixture, seedResourceStorage } from "./fixture.ts";
 import { SAFE_SPENDING_LABELS as labels } from "../src/pages/outlook/safe-spending/safeSpendingLabels.ts";
 import { SAFE_SPENDING_STORAGE_KEY } from "../src/state/persisted.ts";
 
@@ -215,27 +215,24 @@ test("Configure only selects sources and settings, and ignores legacy overrides"
 		data: { AccountId: "loan", Date: "2026-01-19", Balance: -4321 },
 	});
 	expect(response.ok()).toBe(true);
-	await page.addInitScript((baseKey) => {
-		const key = `${baseKey}:resource:${encodeURIComponent(window.location.origin)}:legacy`;
-		if (!localStorage.getItem(key))
-			localStorage.setItem(
-				key,
-				JSON.stringify({
-					state: {
-						statementDay: 20,
-						statementDaySet: true,
-						reserve: 725,
-						incomeRuleIds: ["salary"],
-						checkingOverride: 10000,
-						remainingOverride: 20000,
-						paycheckOverride: 30000,
-						fixedOverride: 40000,
-						spentOverride: 50000,
-					},
-					version: 4,
-				}),
-			);
-	}, SAFE_SPENDING_STORAGE_KEY);
+	await seedResourceStorage(
+		page,
+		SAFE_SPENDING_STORAGE_KEY,
+		JSON.stringify({
+			state: {
+				statementDay: 20,
+				statementDaySet: true,
+				reserve: 725,
+				incomeRuleIds: ["salary"],
+				checkingOverride: 10000,
+				remainingOverride: 20000,
+				paycheckOverride: 30000,
+				fixedOverride: 40000,
+				spentOverride: 50000,
+			},
+			version: 4,
+		}),
+	);
 	const writes: string[] = [];
 	page.on("request", (request) => {
 		if (

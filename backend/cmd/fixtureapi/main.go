@@ -25,10 +25,37 @@ import (
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
 const resetPath = "/__fixture/reset"
+
+// Only this test executable supplies a synthetic, scoped identity without OIDC.
+var fixtureResource = authorization.ResourceFor("http://fixture.invalid", "browser-test")
+
+func fixtureHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set(identity.ResourceHeader, fixtureResource.ID)
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/auth/session" {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"enabled": true, "authenticated": true, "allowed": true,
+				"user": map[string]string{"subject": "browser-test", "name": "Browser test"},
+				"resource": map[string]any{"id": fixtureResource.ID, "kind": fixtureResource.Kind,
+					"permissions": []string{authorization.Read, authorization.Project, authorization.Write}},
+			})
+			return
+		}
+		if expected := r.Header.Get(identity.ResourceHeader); expected != "" && expected != fixtureResource.ID {
+			http.Error(w, "The fixture plan assertion does not match.", http.StatusConflict)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 
 func main() {
 	host := envOr("HOST", "127.0.0.1")
@@ -64,6 +91,7 @@ func main() {
 		live.set(api.New(database, api.Config{
 			AllowedOrigins: allowedOrigins,
 			ReadOnly:       readOnly,
+			ResourceID:     fixtureResource.ID,
 		}))
 		return nil
 	}
@@ -100,7 +128,7 @@ func main() {
 			"model": modelPath,
 		})
 	}))
-	mux.Handle("/", live)
+	mux.Handle("/", fixtureHandler(live))
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),

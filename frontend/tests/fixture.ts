@@ -7,6 +7,30 @@ export const FIXTURE_API =
 
 export const REMOTE_STORAGE_KEY = "waypoint.remote-workspace.v1";
 
+type FixtureResource = { id: string; kind: "private" | "sample" };
+
+async function fixtureResource(page: Page): Promise<FixtureResource> {
+	const response = await page.request.get("/v1/auth/session");
+	if (!response.ok())
+		throw new Error(`fixture session failed: ${response.status()}`);
+	return (await response.json()).resource as FixtureResource;
+}
+
+/** Seed this fixture account without overwriting changes on browser reload. */
+export async function seedResourceStorage(
+	page: Page,
+	baseKey: string,
+	raw: string,
+): Promise<void> {
+	await page.addInitScript(
+		({ baseKey, raw, resource }) => {
+			const key = `${baseKey}:resource:${encodeURIComponent(window.location.origin)}:${resource.kind}:${encodeURIComponent(resource.id)}`;
+			if (localStorage.getItem(key) === null) localStorage.setItem(key, raw);
+		},
+		{ baseKey, raw, resource: await fixtureResource(page) },
+	);
+}
+
 export async function resetFixture(
 	options: { readOnly?: boolean; pinnedEvaluationIds?: string[] } = {},
 ): Promise<void> {
@@ -36,18 +60,19 @@ export async function resetFixture(
  */
 export async function readTemporaryVersion(
 	page: Page,
-	resource?: { id: string; kind: "private" | "sample" },
+	resource?: FixtureResource,
 ) {
 	return page.evaluate(
 		({ prefix, resource }) => {
-			const owner = resource
-				? `${resource.kind}:${encodeURIComponent(resource.id)}`
-				: "legacy";
+			const owner = `${resource.kind}:${encodeURIComponent(resource.id)}`;
 			const key = `${prefix}:resource:${encodeURIComponent(window.location.origin)}:${owner}`;
 			const raw = window.localStorage.getItem(key);
 			return raw ? JSON.parse(raw).draft : null;
 		},
-		{ prefix: REMOTE_STORAGE_KEY, resource },
+		{
+			prefix: REMOTE_STORAGE_KEY,
+			resource: resource ?? (await fixtureResource(page)),
+		},
 	);
 }
 

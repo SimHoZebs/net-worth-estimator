@@ -7,6 +7,7 @@ import {
 	readSavedServerPlan,
 	readTemporaryVersion,
 	resetFixture,
+	seedResourceStorage,
 } from "./fixture.ts";
 
 test.beforeEach(async () => {
@@ -218,12 +219,7 @@ test("corrupt persisted data never silently falls back to example content", asyn
 }) => {
 	// The remote workspace key holds the unsaved changes. Corrupt it and the
 	// app must surface a recovery path rather than invent a plan.
-	await page.addInitScript((key) => {
-		window.localStorage.setItem(
-			`${key}:resource:${encodeURIComponent(window.location.origin)}:legacy`,
-			"invalid",
-		);
-	}, REMOTE_STORAGE_KEY);
+	await seedResourceStorage(page, REMOTE_STORAGE_KEY, "invalid");
 	await page.goto("/");
 	const storageNotice = page
 		.getByRole("alert")
@@ -425,18 +421,10 @@ test("a second tab cannot overwrite newer financial work", async ({
 	await page.getByLabel("Amount (USD)").fill("1300");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await expect(page.getByRole("alert")).toContainText("another tab");
-	const stored = await page.evaluate(
-		(key) =>
-			JSON.parse(
-				window.localStorage.getItem(
-					`${key}:resource:${encodeURIComponent(window.location.origin)}:legacy`,
-				)!,
-			),
-		REMOTE_STORAGE_KEY,
-	);
+	const stored = await readTemporaryVersion(page);
 	// The newer write from the other tab is what survives.
 	expect(
-		stored.draft.movements.find(
+		stored.movements.find(
 			(movement: { id: string }) => movement.id === "invest",
 		).amount,
 	).toBe(1200);
