@@ -104,7 +104,7 @@ func TestCasdoorDecisionsAndOutagesAreNeverBypassed(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.Body.Close()
-	if !session.Allowed || session.User.Role != "viewer" || session.Resource.Kind != "private" || len(session.Resource.Permissions) != 1 {
+	if !session.Allowed || session.Resource.Kind != "private" || len(session.Resource.Permissions) != 1 || session.Resource.Permissions[0] != authorization.Read {
 		t.Fatalf("session did not reflect the resource permissions: %+v", session)
 	}
 	s.config.ResolveAccess = func(context.Context, string) (authorization.Scope, error) {

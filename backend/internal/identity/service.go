@@ -108,7 +108,6 @@ type principalKey struct{}
 type Principal struct {
 	Subject string `json:"subject"`
 	Name    string `json:"name"`
-	Role    string `json:"role"`
 }
 
 func CanWrite(ctx context.Context) bool {
@@ -142,7 +141,7 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 				failure(w, 503, "Identity verification is temporarily unavailable. Retry this request.")
 				return
 			}
-			scope, p, err := s.resolveAccess(r.Context(), p)
+			scope, err := s.resolveAccess(r.Context(), p)
 			if err != nil {
 				failure(w, 503, "Resource permissions are temporarily unavailable. Retry this request.")
 				return
@@ -205,7 +204,7 @@ func (s *Service) serveAuth(w http.ResponseWriter, r *http.Request) {
 			failure(w, 503, "Identity verification is temporarily unavailable.")
 			return
 		}
-		scope, p, err := s.resolveAccess(r.Context(), p)
+		scope, err := s.resolveAccess(r.Context(), p)
 		if err != nil {
 			failure(w, 503, "Resource permissions are temporarily unavailable.")
 			return

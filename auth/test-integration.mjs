@@ -110,7 +110,7 @@ try {
   const ownerPage = await login(owner);
   const own = await session(owner);
   assert.equal(own.user.subject, subject);
-  assert.equal(own.user.role, 'editor');
+  assert.ok(own.resource.permissions.includes('plan:write'));
   assert.equal(own.resource.kind, 'private');
   const created = await request(owner, own, 'POST', '/v1/accounts', { id: 'owner-checking', name: 'Owner checking', kind: 'cash', enabled: true });
   assert.equal(created.status(), 200);
@@ -157,7 +157,7 @@ try {
   const secondPage = await login(second, true);
   const other = await session(second);
   assert.equal(other.allowed, true);
-  assert.equal(other.user.role, 'editor');
+  assert.ok(other.resource.permissions.includes('plan:write'));
   assert.notEqual(other.resource.id, own.resource.id);
   assert.equal((await (await request(second, other, 'GET', '/v1/financial-model')).json()).document, null);
   await expect(secondPage.getByRole('heading', { name: /No financial model/ })).toBeVisible();
