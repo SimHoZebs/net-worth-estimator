@@ -94,10 +94,11 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 	page,
 	request,
 }) => {
-	const resource = {
-		id: `plans/${"a".repeat(64)}`,
-		kind: "private" as const,
-		permissions: ["plan:read", "plan:project", "plan:write"],
+	const { resource, user } = (await (
+		await request.get(`${FIXTURE_API}/v1/auth/session`)
+	).json()) as {
+		resource: { id: string; kind: "private"; permissions: string[] };
+		user: { name: string };
 	};
 	const baselineResponse = await request.get(
 		`${FIXTURE_API}/v1/financial-model`,
@@ -127,38 +128,15 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 	expect(status.ok()).toBe(true);
 	expect(await status.json()).toMatchObject({ readOnly: false });
 
-	// The fixture has no identity provider or sync runner. Supply their display
-	// metadata only. Financial rows, projections, and purchase writes use the API.
-	await page.route("**/v1/**", async (route) => {
-		const response = await route.fetch();
-		await route.fulfill({
-			response,
-			headers: { ...response.headers(), "X-Waypoint-Resource": resource.id },
-		});
-	});
-	await page.route("**/v1/auth/session", async (route) => {
-		await route.fulfill({
-			headers: { "X-Waypoint-Resource": resource.id },
-			json: {
-				enabled: true,
-				authenticated: true,
-				allowed: true,
-				resource,
-				user: {
-					subject: "purchase-editor",
-					name: "Purchase editor",
-					role: "editor",
-				},
-			},
-		});
-	});
+	// Identity and resource headers come from the fixture. Supply only the
+	// sync display metadata absent from its real financial API.
 	await page.route("**/v1/financial-model", async (route) => {
 		const response = await route.fetch();
+		expect(response.headers()["x-waypoint-resource"]).toBe(resource.id);
 		const body = (await response.json()) as FinancialModelResponse;
 		if (!body.document) throw new Error("The fixture model is missing.");
 		await route.fulfill({
 			response,
-			headers: { ...response.headers(), "X-Waypoint-Resource": resource.id },
 			json: {
 				...body,
 				document: {
@@ -192,9 +170,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 	});
 
 	await openPurchases(page);
-	await expect(
-		page.getByText("Purchase editor", { exact: true }),
-	).toBeVisible();
+	await expect(page.getByText(user.name, { exact: true })).toBeVisible();
 	await addPurchase(page, "Synced-account laptop", "500");
 	const draft = (await readTemporaryVersion(page, resource)) as Plan;
 	expect(draft.readOnly).toBe(false);

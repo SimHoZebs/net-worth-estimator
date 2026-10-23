@@ -48,7 +48,7 @@ Font roles follow `frontend/src/styles/README.md`. `npm --prefix frontend run li
 
 ## Frontend Browser Tests
 
-The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness on port 8799, seeded from `frontend/tests/fixtures/`, and the Vite dev server on 5178 pointed at it. No running backend of your own is needed, and none of your data is touched.
+The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness on port 8799, seeded from `frontend/tests/fixtures/`, and the Vite dev server on 5178 pointed at it. The harness returns a synthetic account and plan through the production session contract. It does not enable a legacy authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched.
 
 ```bash
 npm --prefix frontend exec playwright install chromium
