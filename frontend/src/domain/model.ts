@@ -105,7 +105,7 @@ export const planSchema = z.preprocess(
 			updatedAt: z.iso.datetime(),
 			revision: z.number().int().min(1),
 			readOnly: z.boolean(),
-			accounts: z.array(accountSchema).min(1).max(50),
+			accounts: z.array(accountSchema).max(50),
 			movements: z.array(movementSchema).max(300),
 			evaluations: z.array(evaluationSchema).max(30),
 			assumptions: z.object({

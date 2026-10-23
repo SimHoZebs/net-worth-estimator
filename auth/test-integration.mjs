@@ -159,15 +159,42 @@ try {
   assert.equal(other.allowed, true);
   assert.ok(other.resource.permissions.includes('plan:write'));
   assert.notEqual(other.resource.id, own.resource.id);
-  assert.equal((await (await request(second, other, 'GET', '/v1/financial-model')).json()).document, null);
-  await expect(secondPage.getByRole('heading', { name: /No financial model/ })).toBeVisible();
+  const blank = (await (await request(second, other, 'GET', '/v1/financial-model')).json()).document;
+  assert.ok(blank, 'Signup activates a usable blank model without an import');
+  assert.deepEqual(blank.accounts, []);
+  assert.deepEqual(blank.postings, []);
+  assert.deepEqual(blank.recurrenceRules, []);
+  await expect(secondPage.getByRole('heading', { name: 'Your workspace is ready' })).toBeVisible();
   await expect(secondPage.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
-  assert.equal((await request(second, other, 'POST', '/v1/accounts', { id: 'second-checking', name: 'Second checking', kind: 'cash', enabled: true })).status(), 200);
+  // All normal pages work before the first account exists. No import or
+  // administrator action occurs between native signup and the editor.
+  for (const route of ['accounts', 'transactions', 'purchases', 'evaluations', 'sources', 'outlook']) {
+    await secondPage.goto(`${origin.origin}/#${route}`);
+    await expect(secondPage.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(secondPage.getByRole('heading', { name: /No financial model/ })).toHaveCount(0);
+  }
+  await secondPage.getByRole('button', { name: 'Add your first account' }).click();
+  await secondPage.getByLabel('Account name', { exact: true }).fill('Second checking');
+  await secondPage.getByLabel('Balance (USD)', { exact: true }).fill('1250');
+  await secondPage.getByRole('button', { name: 'Apply unsaved changes', exact: true }).click();
+  await secondPage.reload();
+  await expect(secondPage.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
+  await secondPage.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(secondPage.locator('[data-draft-bar]')).toHaveCount(0);
+  await stop();
+  await start();
+  await secondPage.goto(`${origin.origin}/#accounts`);
+  await secondPage.reload();
+  await expect(secondPage.getByRole('button', { name: 'Open Second checking transactions', exact: true })).toBeVisible();
+  const secondModel = (await (await request(second, other, 'GET', '/v1/financial-model')).json()).document;
+  assert.equal(secondModel.accounts.length, 1);
+  assert.equal(secondModel.accounts[0].name, 'Second checking');
+  assert.equal(secondModel.checkpoints[0].Balance, 1250);
   assert.equal((await request(second, own, 'GET', '/v1/financial-model')).status(), 409);
   assert.equal((await request(second, other, 'PATCH', '/v1/accounts/owner-checking', { name: 'Cross-account attempt', kind: 'cash', enabled: true })).status(), 404);
   const ownerModel = await (await request(owner, own, 'GET', '/v1/financial-model')).json();
   assert.deepEqual(ownerModel.document.accounts.map((item) => item.id), ['owner-checking', 'private-after-publication']);
-  console.log('Signup with automatic own-plan permissions and cross-account storage isolation PASS');
+  console.log('Signup without approval/import, blank navigation, first-account draft/save, restart persistence, and storage isolation PASS');
 
   assert.equal((await request(owner, own, 'POST', '/v1/auth/logout')).status(), 200);
   const replay = await fetch(`${origin.origin}/v1/accounts`, { method: 'POST', headers: {

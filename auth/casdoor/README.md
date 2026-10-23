@@ -83,6 +83,8 @@ Branding does not change permissions, account policy, or plan ownership.
 Application sign-in sends the browser to Casdoor. `sign up now` opens Casdoor's
 username, display-name, and password form. Signup returns through the existing
 OIDC callback. It does not require email or a configured mail service.
+New accounts receive an editable blank private workspace immediately. No
+administrator confirmation or financial-model import is required.
 
 Existing initialized instances retain their sealed settings. To enable account
 creation there, use Casdoor's application editor for `waypoint`. Enable signup,

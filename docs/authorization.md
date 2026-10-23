@@ -23,8 +23,10 @@ read-only flag still overrides write permission.
 
 The resource ID derives from the exact OIDC issuer and immutable subject, not
 the display name, username, email, or browser input. A new account starts with
-an empty private plan. An explicitly assigned existing owner retains the primary
-financial database. There is no first-login claim of existing data.
+an editable blank private plan with no import or administrator approval step.
+The plan router activates the empty model on first access. Initialization never
+replaces existing financial rows. An explicitly assigned existing owner retains
+the primary financial database. There is no first-login claim of existing data.
 
 Casdoor stores the model, roles, and action/resource rules in its SQLite state.
 The backend submits server-derived identity, resource, ownership, and action

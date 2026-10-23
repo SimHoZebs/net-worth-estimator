@@ -60,6 +60,11 @@ func New(primary store.Store, config Config) (*Router, error) {
 			return nil, errors.New("sample plan must use a separate absolute database path")
 		}
 	}
+	if config.PrimaryResourceID != "" {
+		if err := primary.InitializeDocument(); err != nil {
+			return nil, err
+		}
+	}
 	config.API.ResourceID = config.PrimaryResourceID
 	return &Router{config: config, primary: endpoint{primary, api.New(primary, config.API)}, opened: map[string]endpoint{}}, nil
 }
@@ -150,6 +155,12 @@ func (p *Router) handlerFor(resource authorization.Resource) (http.Handler, erro
 	database, err := store.Open(path)
 	if err != nil {
 		return nil, err
+	}
+	if resource.Kind == "private" {
+		if err := database.InitializeDocument(); err != nil {
+			_ = database.Close()
+			return nil, err
+		}
 	}
 	config := p.config.API
 	config.ResourceID = resource.ID

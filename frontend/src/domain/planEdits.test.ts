@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { testPlan } from "../test/plan.ts";
-import { changesBetween } from "./model.ts";
+import { changesBetween, validatePlan } from "./model.ts";
 import { removeEvaluation, removePlanItem, upsertItem } from "./planEdits.ts";
 
 describe("immutable plan edits", () => {
@@ -59,6 +59,16 @@ describe("immutable plan edits", () => {
 		};
 		expect(removePlanItem({ plan, target })).toBeInstanceOf(Error);
 		expect(plan.accounts).toHaveLength(1);
+	});
+	it("accepts blank workspaces and the first account without weakening references", () => {
+		const blank = { ...testPlan, accounts: [], movements: [], evaluations: [] };
+		expect(validatePlan(blank)).toEqual(blank);
+		expect(
+			validatePlan({ ...blank, accounts: testPlan.accounts.slice(0, 1) }),
+		).not.toBeInstanceOf(Error);
+		expect(
+			validatePlan({ ...blank, movements: testPlan.movements }),
+		).toBeInstanceOf(Error);
 	});
 	it("isolates evaluation removal", () => {
 		const evaluation = testPlan.evaluations[0];
