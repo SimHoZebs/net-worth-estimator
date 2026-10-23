@@ -17,6 +17,9 @@ import (
 // in TestOpen* and TestPurge* alongside this file.
 func RunConformance(t *testing.T, newStore func(*testing.T) Store) {
 	t.Helper()
+	t.Run("InitializeDocument", func(t *testing.T) {
+		testInitializeDocument(t, newStore)
+	})
 	t.Run("RoundTripsCanonicalDocumentMetadataAndOrder", func(t *testing.T) {
 		testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t, newStore)
 	})

@@ -1,7 +1,12 @@
+import { Wallet } from "lucide-react";
 import { useEffect } from "react";
 import type { BackendCheckpoint } from "../api/contracts.ts";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
-import { ErrorNotice, ProjectionUpdating } from "../components/ui.tsx";
+import {
+	EmptyState,
+	ErrorNotice,
+	ProjectionUpdating,
+} from "../components/ui.tsx";
 import type { Projection } from "../domain/result.ts";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
@@ -15,6 +20,7 @@ import { SafeSpendingPreview } from "./outlook/safe-spending/SafeSpendingPreview
 const EMPTY_CHECKPOINTS: BackendCheckpoint[] = [];
 
 type OutlookProps = {
+	onAddAccount: () => void;
 	onEvidence: () => void;
 	onFailure: () => void;
 	onTransactions: () => void;
@@ -24,6 +30,7 @@ type OutlookProps = {
 };
 
 export function Outlook({
+	onAddAccount,
 	onEvidence,
 	onFailure,
 	onTransactions,
@@ -35,6 +42,7 @@ export function Outlook({
 	// OutlookContent where the queries are declared.
 	return (
 		<OutlookContent
+			onAddAccount={onAddAccount}
 			onEvidence={onEvidence}
 			onFailure={onFailure}
 			onTransactions={onTransactions}
@@ -46,6 +54,7 @@ export function Outlook({
 }
 
 function OutlookContent({
+	onAddAccount,
 	onEvidence,
 	safeSpendingDetail,
 	onSafeSpendingDetail,
@@ -62,13 +71,16 @@ function OutlookContent({
 	const setYears = useUiStore((state) => state.setYears);
 	const ranges = useUiStore((state) => state.ranges);
 	const setRanges = useUiStore((state) => state.setRanges);
-	const projection = useRemoteProjection();
+	const projection = useRemoteProjection({
+		enabled: (plan?.accounts.length ?? 0) > 0,
+	});
 	const pinnedIds = usePinnedEvaluationsStore((state) => state.ids);
 	const refreshPins = usePinnedEvaluationsStore((state) => state.refresh);
 	const togglePin = usePinnedEvaluationsStore((state) => state.toggle);
 	const pinsLoading = usePinnedEvaluationsStore((state) => state.loading);
 	const pinnedError = usePinnedEvaluationsStore((state) => state.error);
 	const status = useWorkspaceStore((state) => state.status);
+	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
 	useEffect(() => {
 		void refreshPins();
 	}, [refreshPins]);
@@ -80,6 +92,18 @@ function OutlookContent({
 		projection.base instanceof Error ? null : projection.base;
 	const pending = base === null;
 	if (!plan) return null;
+	if (plan.accounts.length === 0) {
+		const readOnly = plan.readOnly || status?.readOnly || writeBlocked;
+		return (
+			<EmptyState
+				icon={Wallet}
+				title="Your workspace is ready"
+				description="Start with an account and its current balance. Add income, expenses, and plans at your own pace."
+				action={readOnly ? undefined : "Add your first account"}
+				onAction={onAddAccount}
+			/>
+		);
+	}
 	if (base === null && !pending) {
 		return (
 			<>

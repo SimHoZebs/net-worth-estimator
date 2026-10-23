@@ -2,6 +2,7 @@ package plans
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -82,7 +83,8 @@ func TestPlansIsolateEveryAccountFromSampleAndOtherAccounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if model(t, owner).Accounts[0].ID != "primary" || model(t, guest).Accounts[0].ID != "sample" || model(t, other) != nil {
+	blank := model(t, other)
+	if model(t, owner).Accounts[0].ID != "primary" || model(t, guest).Accounts[0].ID != "sample" || blank == nil || len(blank.Accounts) != 0 {
 		t.Fatal("a plan exposed another plan's financial rows")
 	}
 	write := `{"id":"other","name":"Other account checking","kind":"cash","enabled":true}`
@@ -120,6 +122,55 @@ func TestPlansIsolateEveryAccountFromSampleAndOtherAccounts(t *testing.T) {
 	other, err = restarted.handlerFor(authorization.Resource{ID: privateID("b"), Kind: "private"})
 	if err != nil || model(t, other).Accounts[0].ID != "other" {
 		t.Fatalf("private plan did not persist across restart: %v", err)
+	}
+}
+
+func TestPrivatePlansInitializeBlankWorkspaces(t *testing.T) {
+	for _, primaryOwner := range []bool{false, true} {
+		t.Run(fmt.Sprint("primary=", primaryOwner), func(t *testing.T) {
+			router, primary, config := newRouter(t, privateID("a"))
+			if primaryOwner {
+				if err := primary.Clear(); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				// Previously created, absent private stores also need usable workspaces.
+				if err := os.MkdirAll(config.PrivateDir, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				empty, err := store.Open(filepath.Join(config.PrivateDir, strings.Repeat("b", 64)+".db"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := empty.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := router.Close(); err != nil {
+				t.Fatal(err)
+			}
+			restarted, err := New(primary, config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer restarted.Close()
+			id := privateID("b")
+			if primaryOwner {
+				id = privateID("a")
+			}
+			handler, err := restarted.handlerFor(authorization.Resource{ID: id, Kind: "private"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			blank := model(t, handler)
+			if blank == nil || len(blank.Accounts) != 0 || len(blank.Postings) != 0 || blank.SourcePath != "" {
+				t.Fatalf("new private workspace = %+v", blank)
+			}
+			projection := `{"settings":{"fallbackProjectionStartDate":"2026-01-01","horizonYears":1,"evaluations":{"financialIndependence":[],"netWorthThreshold":[],"accountBalance":[],"postingFulfillment":[],"cycleFulfillment":[]}}}`
+			if w := request(t, handler, "POST", "/v1/projections/deterministic", projection); w.Code != 200 {
+				t.Fatalf("blank projection = %d %s", w.Code, w.Body.String())
+			}
+		})
 	}
 }
 

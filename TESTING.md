@@ -125,6 +125,8 @@ Its `fixture.json` must identify isolated state under repository `tmp/` or
 `/tmp/opencode/`, never live `tmp/dev/`. The script verifies the real permission
 API, OIDC, CSRF, restart persistence, private writes, sample projection/SSE,
 cross-account rejection, stale resource headers, and logout.
+Signup checks include immediate blank-workspace access without administrator
+approval or import, first-account editing, draft reload, and saved restart persistence.
 
 ---
 

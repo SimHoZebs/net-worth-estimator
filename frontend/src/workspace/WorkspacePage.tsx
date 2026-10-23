@@ -32,6 +32,7 @@ export function WorkspacePage({
 		case "outlook":
 			return (
 				<Outlook
+					onAddAccount={() => onEdit({ kind: "account", item: null })}
 					onEvidence={() => onEvidence({ kind: "position" })}
 					onFailure={() => onEvidence({ kind: "failure" })}
 					onTransactions={() => onNavigate("transactions")}

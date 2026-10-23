@@ -23,12 +23,14 @@ import (
 //   - Readers always see the latest committed state (no stale replicas).
 //   - SQL must stay portable: plain DDL/DML plus ON CONFLICT only. No
 //     SQLite pragmas, extensions, or file assumptions outside Open.
-//   - An empty backend reports DocumentExists() == false; the server
-//     boots empty and Open ensures the schema itself.
+//   - A fresh backend reports DocumentExists() == false. InitializeDocument
+//     activates an empty model without replacing existing data. Open only
+//     ensures the schema itself.
 //   - Clear resets all persisted state; the conformance suite relies on it.
 type Store interface {
 	LoadDocument() (*types.FinancialModelDocument, error)
 	DocumentExists() (bool, error)
+	InitializeDocument() error
 	ImportCSV(modelPath string) (*types.FinancialModelDocument, error)
 	CreateAccount(account types.Account) (types.Account, error)
 	UpdateAccount(account types.Account) (types.Account, error)
