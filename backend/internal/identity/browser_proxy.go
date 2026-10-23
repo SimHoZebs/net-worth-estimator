@@ -33,7 +33,7 @@ func (s *Service) browserProviderHandlers() map[string]http.Handler {
 				pr.Out.Header.Del("Authorization")
 				pr.Out.Header.Del("Cookie")
 				for _, cookie := range pr.In.Cookies() {
-					if name, found := strings.CutPrefix(cookie.Name, cookiePrefix); found && name != "" {
+					if name, found := strings.CutPrefix(cookie.Name, cookiePrefix); found && name != "" && !casdoorLogoCookie(name) {
 						pr.Out.AddCookie(&http.Cookie{Name: name, Value: cookie.Value})
 					}
 				}
@@ -51,6 +51,9 @@ func (s *Service) browserProviderHandlers() map[string]http.Handler {
 				cookies := response.Cookies()
 				response.Header.Del("Set-Cookie")
 				for _, cookie := range cookies {
+					if casdoorLogoCookie(cookie.Name) {
+						continue
+					}
 					cookie.Name = cookiePrefix + cookie.Name
 					cookie.Domain, cookie.Path = "", "/"
 					cookie.Secure = provider.Scheme == "https"
@@ -78,6 +81,13 @@ func (s *Service) browserProviderHandlers() map[string]http.Handler {
 		})
 	}
 	return handlers
+}
+
+// Casdoor uses these only to cache presentation before application metadata
+// loads. Inline SVG values can exceed browser cookie and proxy header limits.
+// The login UI still obtains its unchanged logos from application metadata.
+func casdoorLogoCookie(name string) bool {
+	return name == "organizationLogo" || name == "organizationLogoDark"
 }
 
 func (s *Service) serveBrowserProvider(w http.ResponseWriter, r *http.Request) {
