@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"slices"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 )
@@ -24,19 +23,11 @@ func Subject(ctx context.Context) string {
 	return p.Subject
 }
 
-func (s *Service) resolveAccess(ctx context.Context, p Principal) (authorization.Scope, Principal, error) {
+func (s *Service) resolveAccess(ctx context.Context, p Principal) (authorization.Scope, error) {
 	if s.config.ResolveAccess == nil {
-		return authorization.Scope{}, p, errors.New("resource permissions are not configured")
+		return authorization.Scope{}, errors.New("resource permissions are not configured")
 	}
-	scope, err := s.config.ResolveAccess(ctx, p.Subject)
-	if err != nil {
-		return authorization.Scope{}, p, err
-	}
-	p.Role = "viewer"
-	if slices.Contains(scope.Permissions, "plan:write") {
-		p.Role = "editor"
-	}
-	return scope, p, nil
+	return s.config.ResolveAccess(ctx, p.Subject)
 }
 
 // Every unknown state-changing route requires write permission by default.

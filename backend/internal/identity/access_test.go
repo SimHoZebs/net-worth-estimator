@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -25,7 +26,7 @@ func TestResourceCapabilitiesDriveAPIReadOnlyStatus(t *testing.T) {
 	defer server.Close()
 	client := testClient(t)
 
-	checkSession := func(authenticated bool, role string) {
+	checkSession := func(authenticated, writable bool) {
 		t.Helper()
 		r, err := client.Get(server.URL + prefix + "session")
 		if err != nil {
@@ -34,13 +35,17 @@ func TestResourceCapabilitiesDriveAPIReadOnlyStatus(t *testing.T) {
 		defer r.Body.Close()
 		var session struct {
 			Authenticated, Allowed bool
-			User                   Principal
+			User                   map[string]any
+			Resource               struct{ Permissions []string }
 		}
 		if err := json.NewDecoder(r.Body).Decode(&session); err != nil {
 			t.Fatal(err)
 		}
-		if r.StatusCode != 200 || session.Authenticated != authenticated || !session.Allowed || session.User.Role != role {
+		if r.StatusCode != 200 || session.Authenticated != authenticated || !session.Allowed || slices.Contains(session.Resource.Permissions, "plan:write") != writable {
 			t.Fatalf("session status=%d body=%+v", r.StatusCode, session)
+		}
+		if _, exists := session.User["role"]; exists {
+			t.Fatal("session contains a redundant role instead of capabilities")
 		}
 	}
 	checkStatus := func(readOnly bool) {
@@ -75,7 +80,7 @@ func TestResourceCapabilitiesDriveAPIReadOnlyStatus(t *testing.T) {
 		}
 	}
 
-	checkSession(false, "viewer")
+	checkSession(false, false)
 	checkStatus(true)
 	checkWrite(http.StatusUnauthorized, "")
 	r, err := client.Get(server.URL + "/v1/financial-model")
@@ -91,7 +96,7 @@ func TestResourceCapabilitiesDriveAPIReadOnlyStatus(t *testing.T) {
 	if r.StatusCode != http.StatusFound {
 		t.Fatalf("login=%d", r.StatusCode)
 	}
-	checkSession(true, "editor")
+	checkSession(true, true)
 	checkStatus(false)
 	checkWrite(http.StatusOK, "")
 	checkWrite(http.StatusForbidden, "https://evil.test")
@@ -119,7 +124,7 @@ func TestResourceCapabilitiesDriveAPIReadOnlyStatus(t *testing.T) {
 	if r.StatusCode != http.StatusOK {
 		t.Fatalf("logout=%d", r.StatusCode)
 	}
-	checkSession(false, "viewer")
+	checkSession(false, false)
 	checkStatus(true)
 	checkWrite(http.StatusUnauthorized, "")
 }
