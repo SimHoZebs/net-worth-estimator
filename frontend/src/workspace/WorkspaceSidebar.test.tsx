@@ -131,7 +131,12 @@ describe("sidebar account placement", () => {
 			authenticated: true,
 			allowed: true,
 			accountURL: "https://identity.example/account",
-			user: { subject: "editor", name: "Sam Lee", role: "editor" },
+			resource: {
+				id: `plans/${"a".repeat(64)}`,
+				kind: "private",
+				permissions: ["plan:read", "plan:write"],
+			},
+			user: { subject: "editor", name: "Sam Lee" },
 		});
 		const sidebar = view.getByRole("complementary", {
 			name: "Workspace navigation",
@@ -160,7 +165,12 @@ describe("sidebar account placement", () => {
 			enabled: true,
 			authenticated: false,
 			allowed: true,
-			user: { subject: "", name: "", role: "viewer" },
+			resource: {
+				id: "plans/sample",
+				kind: "sample",
+				permissions: ["plan:read", "plan:project"],
+			},
+			user: { subject: "", name: "" },
 		});
 		const navigation = view.getByRole("navigation", {
 			name: "Main navigation",

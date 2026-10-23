@@ -5,7 +5,7 @@ import { useSession } from "./sessionContext.ts";
 
 export function SessionAccountControl() {
 	const account = useSession();
-	if (!account?.session.enabled || !account.session.allowed) return null;
+	if (!account?.session.allowed) return null;
 	const { session, logout, logoutPending, logoutError } = account;
 	const authenticated = session.authenticated === true;
 	return (
@@ -62,7 +62,7 @@ export function SessionAccountControl() {
 					</Button>
 				)}
 			</div>
-			{authenticated && logoutError && (
+			{logoutError && (
 				<p
 					role="alert"
 					className="mt-3 mb-0 break-words text-xs text-danger-text"

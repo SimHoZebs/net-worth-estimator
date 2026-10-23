@@ -11,7 +11,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
-func TestIdentitySessionDefaultsAndViewerStatus(t *testing.T) {
+func TestCapabilitiesDriveReadOnlyStatusWithoutIdentityFallback(t *testing.T) {
 	db, err := store.Open(filepath.Join(t.TempDir(), "model.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -32,11 +32,8 @@ func TestIdentitySessionDefaultsAndViewerStatus(t *testing.T) {
 		}
 		w = httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/auth/session", nil))
-		var session struct {
-			Enabled bool `json:"enabled"`
-		}
-		if err := json.Unmarshal(w.Body.Bytes(), &session); err != nil || session.Enabled || w.Header().Get("Cache-Control") != "no-store" {
-			t.Fatalf("disabled discovery=%s %v", w.Body.String(), err)
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("bare API must not provide an authentication bypass: %d %s", w.Code, w.Body.String())
 		}
 	}
 }

@@ -31,7 +31,7 @@ const signedInSession = {
 		kind: "private",
 		permissions: ["plan:read", "plan:project", "plan:write"],
 	},
-	user: { subject: "household-editor", name: "Sam Lee", role: "editor" },
+	user: { subject: "household-editor", name: "Sam Lee" },
 };
 
 function response(body: unknown, code = 200) {
@@ -76,13 +76,14 @@ describe("session account controls", () => {
 		expect(view.container.textContent).toBe("");
 	});
 
-	it("leaves authentication-disabled deployments without account controls", async () => {
+	it("does not open a workspace for authentication-disabled discovery", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () => response({ enabled: false })),
 		);
 		renderAccount();
-		await screen.findByText("Workspace content");
+		await screen.findByRole("alert");
+		expect(screen.queryByText("Workspace content")).toBeNull();
 		expect(
 			screen.queryByRole("button", { name: /sign in|sign out/i }),
 		).toBeNull();
@@ -102,7 +103,7 @@ describe("session account controls", () => {
 						kind: "sample",
 						permissions: ["plan:read", "plan:project"],
 					},
-					user: { subject: "", name: "", role: "viewer" },
+					user: { subject: "", name: "" },
 				}),
 			),
 		);
@@ -331,6 +332,136 @@ describe("session account controls", () => {
 			defaultSafeSpendingSettings(),
 		);
 		await act(async () => finish({ logoutURL: "#signed-out" }));
+		await waitFor(() => expect(window.location.hash).toBe("#signed-out"));
+	});
+
+	it("completes provider logout after a same-account focus check during the POST", async () => {
+		let finish: (response: Response) => void = () => {};
+		const fetcher = vi.fn(async (input: RequestInfo | URL) =>
+			String(input).endsWith("/v1/auth/logout")
+				? new Promise<Response>((resolve) => {
+						finish = resolve;
+					})
+				: response(signedInSession),
+		);
+		vi.stubGlobal("fetch", fetcher);
+		renderAccount();
+		fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+		act(() => window.dispatchEvent(new Event("focus")));
+		await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
+		await act(async () => finish(response({ logoutURL: "#signed-out" })));
+		await waitFor(() => expect(window.location.hash).toBe("#signed-out"));
+	});
+
+	it.each(["guest", "different account", "own broadcast"])(
+		"coordinates a delayed logout body with %s verification",
+		async (change) => {
+			if (change === "own broadcast") {
+				const channels = new Set<TestBroadcastChannel>();
+				class TestBroadcastChannel {
+					onmessage: ((event: { data: unknown }) => void) | null = null;
+					constructor() {
+						channels.add(this);
+					}
+					postMessage(data: unknown) {
+						const recipients = [...channels].filter(
+							(channel) => channel !== this,
+						);
+						queueMicrotask(() => {
+							for (const recipient of recipients)
+								if (channels.has(recipient)) recipient.onmessage?.({ data });
+						});
+					}
+					close() {
+						channels.delete(this);
+					}
+				}
+				vi.stubGlobal("BroadcastChannel", TestBroadcastChannel);
+			}
+			let finish: (value: { logoutURL: string }) => void = () => {};
+			const body = new Promise<{ logoutURL: string }>((resolve) => {
+				finish = resolve;
+			});
+			const logoutResponse = response({});
+			vi.spyOn(logoutResponse, "json").mockImplementation(() => body);
+			let current = signedInSession;
+			let checks = 0;
+			vi.stubGlobal(
+				"fetch",
+				vi.fn(async (input: RequestInfo | URL) => {
+					if (String(input).endsWith("/v1/auth/logout")) return logoutResponse;
+					checks += 1;
+					return response(current);
+				}),
+			);
+			renderAccount();
+			await screen.findByText("Sam Lee");
+			// Initial same-tab broadcast must settle before the explicit logout.
+			await waitFor(() =>
+				expect(checks).toBeGreaterThan(change === "own broadcast" ? 1 : 0),
+			);
+			await screen.findByRole("button", { name: "Sign out" });
+			current =
+				change === "different account"
+					? {
+							...signedInSession,
+							resource: {
+								...signedInSession.resource,
+								id: `plans/${"b".repeat(64)}`,
+							},
+							user: { subject: "other-account", name: "Other account" },
+						}
+					: {
+							...signedInSession,
+							authenticated: false,
+							resource: {
+								id: "plans/sample",
+								kind: "sample",
+								permissions: ["plan:read", "plan:project"],
+							},
+							user: { subject: "", name: "" },
+						};
+			const before = checks;
+			fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+			await waitFor(() => expect(logoutResponse.json).toHaveBeenCalled());
+			if (change !== "own broadcast")
+				act(() => window.dispatchEvent(new Event("focus")));
+			await waitFor(() => expect(checks).toBeGreaterThan(before));
+			await act(async () => finish({ logoutURL: "#signed-out" }));
+			const different = change === "different account";
+			await waitFor(() => {
+				expect(window.location.hash).toBe(different ? "" : "#signed-out");
+				expect(screen.queryByRole("alert")?.textContent).toBe(
+					different
+						? "Your session changed. Retry the session check."
+						: undefined,
+				);
+			});
+			expect(getResourceScope().resource?.id).toBe(
+				different ? `plans/${"b".repeat(64)}` : undefined,
+			);
+		},
+	);
+
+	it("keeps local logout available after a session-discovery outage", async () => {
+		let unavailable = false;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: RequestInfo | URL) =>
+				String(input).endsWith("/v1/auth/logout")
+					? response({ logoutURL: "#signed-out" })
+					: unavailable
+						? response({}, 503)
+						: response(signedInSession),
+			),
+		);
+		renderAccount();
+		await screen.findByText("Sam Lee");
+		unavailable = true;
+		act(() => window.dispatchEvent(new Event("focus")));
+		await screen.findByRole("alert");
+		expect(screen.queryByText("Workspace content")).toBeNull();
+		fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 		await waitFor(() => expect(window.location.hash).toBe("#signed-out"));
 	});
 });

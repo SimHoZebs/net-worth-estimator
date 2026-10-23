@@ -68,6 +68,11 @@ plan. Cross-tab login and logout cannot silently retarget an old tab's write.
 API clients retain their verification scope. A new verification creates new
 clients, while old clients reject further calls before network access. Evaluation
 pins and financial preferences also reset and reload within the verified scope.
+One browser session hook owns verification, account transitions, and logout.
+Rechecks suspend requests and hide financial screens immediately. Same-account
+rechecks preserve drafts and completed projection results. Account, API address,
+or permission changes reset active workspace data. Failed checks retain recovery
+data behind the previous account boundary until that account is verified again.
 
 ## Deployment and migration
 

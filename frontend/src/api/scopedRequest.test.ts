@@ -300,28 +300,4 @@ describe("resource assertion at the API boundary", () => {
 		expect(result).toBeInstanceOf(ResourceScopeError);
 		expect(getResourceScope().status).toBe("pending");
 	});
-
-	it("preserves legacy clients without assertions, response headers, or session rechecks on 409", async () => {
-		acceptResourceScope(
-			{ apiBaseUrl: "https://legacy.example", resource: null, subject: null },
-			suspendResourceScope(),
-		);
-		const fetcher = vi.fn<FetchLike>(async () => response("{}", null));
-		expect(
-			await new ApiClient({
-				baseUrl: "https://another-legacy.example",
-				fetch: fetcher,
-			}).getModel(),
-		).toEqual({});
-		expect(
-			new Headers(fetcher.mock.calls[0]![1]?.headers).has(
-				"X-Waypoint-Resource",
-			),
-		).toBe(false);
-		const result = await new ApiClient({
-			fetch: async () => response("{}", null, 409),
-		}).getModel();
-		expect(result).toBeInstanceOf(ApiHttpError);
-		expect(getResourceScope().status).toBe("legacy");
-	});
 });

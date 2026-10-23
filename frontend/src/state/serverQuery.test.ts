@@ -5,6 +5,7 @@ import {
 } from "../auth/resourceScope.ts";
 import {
 	clearResourceQueryCache,
+	cancelResourceQueries,
 	deterministicQueryKey,
 	resetServerQueryCache,
 	serverQueryClient,
@@ -47,12 +48,12 @@ describe("resource-scoped projection cache", () => {
 		expect(serverQueryClient().getQueryData(stochasticB)).toBeUndefined();
 	});
 
-	it("uses a new generation after verification even when a resource ID returns", () => {
+	it("reuses results after a same-account verification", () => {
 		owner("plans/a");
 		const before = deterministicQueryKey("same-document", 10);
 		expect(deterministicQueryKey("same-document", 10)).toEqual(before);
 		owner("plans/a");
-		expect(deterministicQueryKey("same-document", 10)).not.toEqual(before);
+		expect(deterministicQueryKey("same-document", 10)).toEqual(before);
 	});
 
 	it("aborts old fetches, removes data, and ignores late non-cooperative results", async () => {
@@ -79,5 +80,33 @@ describe("resource-scoped projection cache", () => {
 		await pending;
 		expect(client.getQueryData(key)).toBeUndefined();
 		expect(client.getQueryCache().getAll()).toHaveLength(0);
+	});
+
+	it("cancels verification-era work without losing completed same-account results", async () => {
+		owner("plans/a");
+		const client = serverQueryClient();
+		const key = deterministicQueryKey("same-document", 10);
+		client.setQueryData(key, "completed-result");
+		let finish: (value: string) => void = () => {};
+		let signal: AbortSignal | undefined;
+		const pending = client
+			.fetchQuery({
+				queryKey: key,
+				staleTime: 0,
+				queryFn: ({ signal: requestSignal }) => {
+					signal = requestSignal;
+					return new Promise<string>((resolve) => {
+						finish = resolve;
+					});
+				},
+			})
+			.catch(() => null);
+		await cancelResourceQueries();
+		owner("plans/a");
+		finish("late-result");
+		await pending;
+		expect(signal?.aborted).toBe(true);
+		expect(deterministicQueryKey("same-document", 10)).toEqual(key);
+		expect(client.getQueryData(key)).toBe("completed-result");
 	});
 });

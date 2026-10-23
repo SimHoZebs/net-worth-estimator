@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	acceptResourceScope,
+	canonicalApiBaseUrl,
 	suspendResourceScope,
 } from "../auth/resourceScope.ts";
 import {
@@ -13,14 +14,28 @@ import {
 } from "./client.ts";
 
 function response(body: string, init: ResponseInit): Response {
-	return new Response(body, init);
+	const headers = new Headers(init.headers);
+	headers.set("X-Waypoint-Resource", "plans/sample");
+	return new Response(body, { ...init, headers });
+}
+
+function scope(baseUrl = "") {
+	acceptResourceScope(
+		{
+			apiBaseUrl: canonicalApiBaseUrl(baseUrl),
+			resource: {
+				id: "plans/sample",
+				kind: "sample",
+				permissions: ["plan:read", "plan:project"],
+			},
+			subject: null,
+		},
+		suspendResourceScope(),
+	);
 }
 
 beforeEach(() => {
-	acceptResourceScope(
-		{ apiBaseUrl: "http://localhost", resource: null, subject: null },
-		suspendResourceScope(),
-	);
+	scope();
 });
 afterEach(() => suspendResourceScope());
 
@@ -62,6 +77,7 @@ describe("native API client", () => {
 			});
 		});
 		const options: ApiClientOptions = { baseUrl: "/proxy/", fetch: fetcher };
+		scope("/proxy");
 		const client = new ApiClient(options);
 		const controller = new AbortController();
 		const result = await client.getStatus({
@@ -184,6 +200,7 @@ describe("native API client", () => {
 				headers: { "content-type": "text/event-stream" },
 			});
 		});
+		scope("/api");
 		const client = new ApiClient({ baseUrl: "/api", fetch: fetcher });
 		const result = await client.projectStochastic({
 			settings: {

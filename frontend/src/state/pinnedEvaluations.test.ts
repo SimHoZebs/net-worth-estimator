@@ -24,7 +24,15 @@ function fakeClient(
 
 beforeEach(() => {
 	acceptResourceScope(
-		{ apiBaseUrl: "http://localhost", resource: null, subject: null },
+		{
+			apiBaseUrl: "http://localhost",
+			resource: {
+				id: "plans/sample",
+				kind: "sample",
+				permissions: ["plan:read", "plan:project"],
+			},
+			subject: null,
+		},
 		suspendResourceScope(),
 	);
 	usePinnedEvaluationsStore.setState({
