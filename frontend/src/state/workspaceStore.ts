@@ -430,7 +430,9 @@ export const useWorkspaceStore = create<
 		if (stored instanceof Error) get().reportStorageError(stored);
 		const storedState = stored instanceof Error ? null : stored;
 		const volatileState = get().engine.volatileState;
-		const inMemoryState = get().workspace
+		// Saved-only data needs no recovery write. An empty write can invalidate
+		// another tab's compare-before-write token during session verification.
+		const inMemoryState = get().workspace?.draft
 			? localStateFor(get().workspace!, get().draftPresentation)
 			: null;
 		const localState = volatileState ?? storedState ?? inMemoryState;
@@ -1398,16 +1400,25 @@ export const useWorkspaceStore = create<
 	},
 }));
 
+/** Stop old callbacks without deleting account-owned data during verification. */
+export function suspendWorkspaceForVerification(): void {
+	const engine = useWorkspaceStore.getState().engine;
+	engine.mounted = false;
+	engine.workspaceEpoch += 1;
+	engine.hydrationController?.abort();
+	engine.saveController?.abort();
+	useWorkspaceStore.setState({
+		engine: { ...freshEngine(), volatileState: engine.volatileState },
+	});
+}
+
 /** Abandon the old owner before a different resource can mount its workspace. */
 export function resetWorkspaceForResource({
 	preserveVolatile = false,
 } = {}): void {
 	const engine = useWorkspaceStore.getState().engine;
 	const volatileState = preserveVolatile ? engine.volatileState : null;
-	engine.mounted = false;
-	engine.workspaceEpoch += 1;
-	engine.hydrationController?.abort();
-	engine.saveController?.abort();
+	suspendWorkspaceForVerification();
 	useWorkspaceStore.setState({
 		...initialData(),
 		engine: { ...freshEngine(), volatileState },

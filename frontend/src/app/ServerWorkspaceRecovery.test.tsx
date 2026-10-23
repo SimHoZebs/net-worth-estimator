@@ -44,10 +44,14 @@ it("keeps account controls above navigation when the private plan is empty", () 
 					enabled: true,
 					authenticated: true,
 					allowed: true,
+					resource: {
+						id: `plans/${"a".repeat(64)}`,
+						kind: "private",
+						permissions: ["plan:read", "plan:write"],
+					},
 					user: {
 						subject: "new-owner",
 						name: "New account owner",
-						role: "editor",
 					},
 				},
 				logout,

@@ -51,7 +51,7 @@ function status(body: unknown, code = 200) {
 }
 
 describe("provider-independent authentication boundary", () => {
-	it("keeps legacy deployments unchanged", async () => {
+	it("rejects authentication-disabled discovery instead of opening a legacy workspace", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () => status({ enabled: false })),
@@ -61,7 +61,8 @@ describe("provider-independent authentication boundary", () => {
 				<p>Private workspace</p>
 			</AuthBoundary>,
 		);
-		expect(await screen.findByText("Private workspace")).toBeTruthy();
+		expect(await screen.findByRole("alert")).toBeTruthy();
+		expect(screen.queryByText("Private workspace")).toBeNull();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
 	it("mounts an allowed guest workspace without a forced sign-in redirect", async () => {
@@ -73,7 +74,7 @@ describe("provider-independent authentication boundary", () => {
 					authenticated: false,
 					allowed: true,
 					resource: sampleResource,
-					user: { subject: "", name: "", role: "viewer" },
+					user: { subject: "", name: "" },
 				}),
 			),
 		);
@@ -88,11 +89,16 @@ describe("provider-independent authentication boundary", () => {
 		).toBeNull();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("supports legacy backends that redirect anonymous users instead of guest access", async () => {
+	it("redirects guests to sign in when no sample is published", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () =>
-				status({ enabled: true, authenticated: false, allowed: false }),
+				status({
+					enabled: true,
+					authenticated: false,
+					allowed: false,
+					resource: { ...sampleResource, permissions: [] },
+				}),
 			),
 		);
 		render(
@@ -109,52 +115,48 @@ describe("provider-independent authentication boundary", () => {
 		expect(screen.queryByText("Private workspace")).toBeNull();
 		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalled());
 	});
-	it.each([false, undefined])(
-		"fails closed on inconsistent authenticated access %s with retry and sign-out",
-		async (allowed) => {
-			const fetcher = vi.fn(async () =>
-				status({
-					enabled: true,
-					authenticated: true,
-					allowed,
-					user: { subject: "known-account", name: "User", role: "editor" },
-				}),
-			);
-			vi.stubGlobal("fetch", fetcher);
-			render(
-				<AuthBoundary>
-					<p>Public workspace</p>
-				</AuthBoundary>,
-			);
-			expect(
-				await screen.findByRole("heading", {
-					name: "Session access is unavailable",
-				}),
-			).toBeTruthy();
-			expect(screen.getByRole("alert").textContent).toBe(
-				"Your session could not be verified.",
-			);
-			expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
-			expect(
-				screen.queryByText(/server owner|grant.*access|OIDC subject/i),
-			).toBeNull();
-			expect(screen.queryByText("Public workspace")).toBeNull();
-			expect(redirectToSignIn).not.toHaveBeenCalled();
-			fetcher.mockImplementation(async () =>
-				status({
-					enabled: true,
-					authenticated: true,
-					allowed: true,
-					resource: privateResource,
-					user: { subject: "known-account", name: "User", role: "editor" },
-				}),
-			);
-			fireEvent.click(
-				screen.getByRole("button", { name: "Retry access check" }),
-			);
-			expect(await screen.findByText("Public workspace")).toBeTruthy();
-		},
-	);
+	it("keeps denied accounts closed with retry and sign-out", async () => {
+		const fetcher = vi.fn(async () =>
+			status({
+				enabled: true,
+				authenticated: true,
+				allowed: false,
+				resource: { ...privateResource, permissions: [] },
+				user: { subject: "known-account", name: "User" },
+			}),
+		);
+		vi.stubGlobal("fetch", fetcher);
+		render(
+			<AuthBoundary>
+				<p>Public workspace</p>
+			</AuthBoundary>,
+		);
+		expect(
+			await screen.findByRole("heading", {
+				name: "Session access is unavailable",
+			}),
+		).toBeTruthy();
+		expect(screen.getByRole("alert").textContent).toBe(
+			"This account does not have access to this plan.",
+		);
+		expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+		expect(
+			screen.queryByText(/server owner|grant.*access|OIDC subject/i),
+		).toBeNull();
+		expect(screen.queryByText("Public workspace")).toBeNull();
+		expect(redirectToSignIn).not.toHaveBeenCalled();
+		fetcher.mockImplementation(async () =>
+			status({
+				enabled: true,
+				authenticated: true,
+				allowed: true,
+				resource: privateResource,
+				user: { subject: "known-account", name: "User" },
+			}),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Retry access check" }));
+		expect(await screen.findByText("Public workspace")).toBeTruthy();
+	});
 	it("retains guest workspace access when a verified editor's session expires", async () => {
 		const fetcher = vi.fn(async () =>
 			status({
@@ -162,7 +164,7 @@ describe("provider-independent authentication boundary", () => {
 				authenticated: true,
 				allowed: true,
 				resource: privateResource,
-				user: { subject: "known-account", name: "User", role: "editor" },
+				user: { subject: "known-account", name: "User" },
 			}),
 		);
 		vi.stubGlobal("fetch", fetcher);
@@ -200,7 +202,14 @@ describe("provider-independent authentication boundary", () => {
 		expect(await screen.findByRole("alert")).toBeTruthy();
 		expect(screen.queryByText("Private workspace")).toBeNull();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
-		fetcher.mockImplementation(async () => status({ enabled: false }));
+		fetcher.mockImplementation(async () =>
+			status({
+				enabled: true,
+				authenticated: false,
+				allowed: true,
+				resource: sampleResource,
+			}),
+		);
 		fireEvent.click(screen.getByRole("button", { name: "Retry access check" }));
 		await waitFor(() =>
 			expect(screen.getByText("Private workspace")).toBeTruthy(),

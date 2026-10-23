@@ -3,7 +3,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"os"
 	"path"
@@ -158,14 +157,6 @@ func New(store store.Store, serverConfig Config) http.Handler {
 	router.Use(middleware.Recoverer)
 	router.Use(corsMiddleware(serverConfig.AllowedOrigins))
 	router.Use(readOnlyMiddleware(serverConfig.ReadOnly))
-	// The server's identity boundary intercepts this endpoint. Bare API handlers
-	// are used only by unit tests and the isolated fixtureapi browser harness.
-	router.Get("/v1/auth/session", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]bool{"enabled": false})
-	})
-
 	config := huma.DefaultConfig("Net Worth Estimator API", "1.0.0")
 	api := humachi.New(router, config)
 

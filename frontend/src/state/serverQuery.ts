@@ -6,9 +6,9 @@ import { getResourceScope } from "../auth/resourceScope.ts";
  * pure function of its inputs, so a cache key holding the full input set
  * can never go stale: identical concurrent requests attach to one in-flight
  * fetch instead of computing side by side, and completed results are reused
- * across remounts while fresh. Resource identity and verification epoch also
- * belong in each key: identical inputs from different accounts never share
- * data or in-flight requests. Session discovery uses a separate cache.
+ * across remounts while fresh. Resource identity belongs in each key:
+ * identical inputs from different accounts never share
+ * data or in-flight requests. Session discovery belongs to its own hook.
  */
 
 export function deterministicQueryKey(
@@ -16,13 +16,7 @@ export function deterministicQueryKey(
 	years: number,
 ): readonly unknown[] {
 	const scope = getResourceScope();
-	return [
-		"deterministic-projection",
-		scope.key,
-		scope.epoch,
-		documentKey,
-		years,
-	];
+	return ["deterministic-projection", scope.key, documentKey, years];
 }
 
 export function stochasticQueryKey(
@@ -36,7 +30,6 @@ export function stochasticQueryKey(
 	return [
 		"stochastic-projection",
 		scope.key,
-		scope.epoch,
 		documentKey,
 		years,
 		runCount,
@@ -72,6 +65,11 @@ export function resetServerQueryCache(): void {
 /** Cancel first, then remove both data and in-flight projection identities. */
 export async function clearResourceQueryCache(): Promise<void> {
 	if (!shared) return;
-	await shared.cancelQueries();
+	await cancelResourceQueries();
 	shared.clear();
+}
+
+/** Verification cancels old requests without evicting this owner's results. */
+export async function cancelResourceQueries(): Promise<void> {
+	await shared?.cancelQueries();
 }

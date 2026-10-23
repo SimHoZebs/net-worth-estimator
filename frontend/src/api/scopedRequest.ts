@@ -125,14 +125,11 @@ export async function scopedRequest(
 ): Promise<ScopedResponse | ResourceScopeError> {
 	const changed = responseScopeError(scope);
 	if (changed) return changed;
-	if (scope.status === "pending")
+	if (scope.status === "pending" || !scope.resource)
 		return new ResourceScopeError(
 			"Verify your session before requesting workspace data.",
 		);
-	if (
-		scope.status === "ready" &&
-		canonicalApiBaseUrl(baseUrl) !== scope.apiBaseUrl
-	)
+	if (canonicalApiBaseUrl(baseUrl) !== scope.apiBaseUrl)
 		return new ResourceScopeError(
 			"The API address does not match the verified workspace.",
 		);
@@ -140,16 +137,16 @@ export async function scopedRequest(
 	const headers = new Headers(init.headers);
 	// The assertion always comes from discovery, never caller-supplied options.
 	headers.delete("X-Waypoint-Resource");
-	if (scope.resource) headers.set("X-Waypoint-Resource", scope.resource.id);
+	headers.set("X-Waypoint-Resource", scope.resource.id);
 	let response: Response;
 	try {
 		response = await fetcher(url, {
 			...init,
 			headers,
 			signal: lifetime.signal,
-			...(scope.status === "ready"
-				? { credentials: "same-origin", redirect: "error", cache: "no-store" }
-				: {}),
+			credentials: "same-origin",
+			redirect: "error",
+			cache: "no-store",
 		});
 	} catch (cause) {
 		lifetime.dispose();
@@ -160,10 +157,9 @@ export async function scopedRequest(
 	const stale = responseScopeError(scope);
 	if (
 		stale ||
-		(scope.status === "ready" &&
-			(response.status === 409 ||
-				(response.ok &&
-					response.headers.get("X-Waypoint-Resource") !== scope.resource?.id)))
+		response.status === 409 ||
+		(response.ok &&
+			response.headers.get("X-Waypoint-Resource") !== scope.resource.id)
 	) {
 		lifetime.dispose();
 		void response.body?.cancel().catch(() => {});

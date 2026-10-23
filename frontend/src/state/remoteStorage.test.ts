@@ -120,12 +120,9 @@ describe("resource-scoped browser drafts", () => {
 		expect(loadRemoteState()).toEqual(draftB);
 	});
 
-	it("does not expose unscoped drafts to an authentication-disabled deployment", () => {
+	it("does not adopt unscoped drafts into a verified plan", () => {
 		localStorage.setItem(REMOTE_STORAGE_KEY, JSON.stringify(draftA));
-		acceptResourceScope(
-			{ apiBaseUrl: "https://legacy.example", resource: null, subject: null },
-			suspendResourceScope(),
-		);
+		owner("plans/private-a");
 		expect(loadRemoteState()).toBeNull();
 		expect(persistRemoteState(draftB)).toBeNull();
 		expect(loadRemoteState()).toEqual(draftB);

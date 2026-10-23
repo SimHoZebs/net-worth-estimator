@@ -8,6 +8,7 @@ import type { FinancialModelResponse, ServerStatus } from "../api/index.ts";
 import {
 	resetWorkspaceForResource,
 	resetWorkspaceStore,
+	suspendWorkspaceForVerification,
 	type RemoteApiClient,
 	useWorkspaceStore,
 } from "./workspaceStore.ts";
@@ -43,6 +44,41 @@ afterEach(() => {
 });
 
 describe("workspace resource reset", () => {
+	it("suspends old engine callbacks without deleting same-account data or recovery", async () => {
+		let finish: (value: FinancialModelResponse) => void = () => {};
+		useWorkspaceStore.getState().bindEngine({
+			getStatus: async () => ({ readOnly: false }),
+			getModel: () =>
+				new Promise<FinancialModelResponse>((resolve) => {
+					finish = resolve;
+				}),
+			listAmountPresets: async () => ({ presets: [] }),
+		} as unknown as RemoteApiClient);
+		useWorkspaceStore.setState({ serverRevision: "verified-account-data" });
+		useWorkspaceStore.getState().bootWorkspace();
+		const old = useWorkspaceStore.getState().engine;
+		const pending = old.hydrationPromise;
+		old.saveController = new AbortController();
+		const recovery = {
+			version: 1 as const,
+			draft: null,
+			draftPresentation: null,
+			baseRevision: "private-draft",
+		};
+		old.volatileState = recovery;
+		suspendResourceScope();
+		suspendWorkspaceForVerification();
+		expect(old.hydrationController?.signal.aborted).toBe(true);
+		expect(old.saveController.signal.aborted).toBe(true);
+		finish({ document: null, issues: [] });
+		await pending;
+		expect(useWorkspaceStore.getState().engine).not.toBe(old);
+		expect(useWorkspaceStore.getState().engine.volatileState).toBe(recovery);
+		expect(useWorkspaceStore.getState().serverRevision).toBe(
+			"verified-account-data",
+		);
+	});
+
 	it("aborts old model/save work and prevents late hydration from changing the new engine", async () => {
 		let finishA: (value: FinancialModelResponse) => void = () => {};
 		let finishB: (value: FinancialModelResponse) => void = () => {};

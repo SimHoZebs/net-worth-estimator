@@ -44,7 +44,6 @@ function session(id = A) {
 		user: {
 			subject: id === "plans/sample" ? "" : id,
 			name: "Account",
-			role: id === "plans/sample" ? "viewer" : "editor",
 		},
 	};
 }
@@ -90,6 +89,7 @@ beforeEach(() => {
 });
 afterEach(() => {
 	cleanup();
+	delete window.__WAYPOINT_CONFIG__;
 	resetWorkspaceStore();
 	resetServerQueryCache();
 	clearPersistedMemory();
@@ -101,7 +101,6 @@ describe("authentication resource isolation", () => {
 	it("waits for resource-owned financial preferences before mounting children", async () => {
 		const key = resourceStorageKey(SAFE_SPENDING_STORAGE_KEY, {
 			status: "ready",
-			epoch: 1,
 			key: "fixture",
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: { id: A, kind: "private", permissions: ["plan:read"] },
@@ -274,6 +273,152 @@ describe("authentication resource isolation", () => {
 			`${B}:empty`,
 		);
 		expect(getResourceScope().resource?.id).toBe(B);
+	});
+
+	it("preserves workspace data, recovery, and completed results across a same-account check", async () => {
+		const fetcher = vi.fn(async () => response(session()));
+		vi.stubGlobal("fetch", fetcher);
+		renderWorkspace();
+		await screen.findByTestId("active-workspace");
+		const recovery = {
+			version: 1 as const,
+			draft: { name: "Private A draft" } as never,
+			draftPresentation: null,
+			baseRevision: "a",
+		};
+		const key = deterministicQueryKey("private-a-document", 10);
+		act(() => {
+			useWorkspaceStore.getState().engine.volatileState = recovery;
+			useWorkspaceStore.setState({
+				serverRevision: "private-a-revision",
+				volatile: true,
+			});
+			serverQueryClient().setQueryData(key, "private-a-result");
+			window.dispatchEvent(new Event("focus"));
+		});
+		expect(screen.queryByTestId("active-workspace")).toBeNull();
+		await waitFor(() =>
+			expect(screen.getByTestId("active-workspace").textContent).toBe(
+				`${A}:private-a-revision`,
+			),
+		);
+		expect(useWorkspaceStore.getState().engine.volatileState).toBe(recovery);
+		expect(useWorkspaceStore.getState().volatile).toBe(true);
+		expect(deterministicQueryKey("private-a-document", 10)).toEqual(key);
+		expect(serverQueryClient().getQueryData(key)).toBe("private-a-result");
+	});
+
+	it.each([A, B])(
+		"retains recovery after a failed check and restores it only to account %s",
+		async (nextId) => {
+			const fetcher = vi.fn(async () => response(session()));
+			vi.stubGlobal("fetch", fetcher);
+			renderWorkspace();
+			await screen.findByTestId("active-workspace");
+			const recovery = {
+				version: 1 as const,
+				draft: { name: "Private A draft" } as never,
+				draftPresentation: null,
+				baseRevision: "a",
+			};
+			act(() => {
+				useWorkspaceStore.getState().engine.volatileState = recovery;
+				useWorkspaceStore.setState({ volatile: true });
+			});
+			fetcher.mockImplementationOnce(
+				async () => new Response("", { status: 503 }),
+			);
+			act(() => window.dispatchEvent(new Event("focus")));
+			await screen.findByRole("alert");
+			expect(screen.queryByTestId("active-workspace")).toBeNull();
+			expect(getResourceScope().status).toBe("pending");
+			expect(useWorkspaceStore.getState().engine.volatileState).toBe(recovery);
+			fetcher.mockImplementation(async () => response(session(nextId), nextId));
+			act(() => window.dispatchEvent(new Event("focus")));
+			await screen.findByTestId("active-workspace");
+			expect(getResourceScope().resource?.id).toBe(nextId);
+			expect(useWorkspaceStore.getState().engine.volatileState).toBe(
+				nextId === A ? recovery : null,
+			);
+		},
+	);
+
+	it("resets active data and projection results after a permission change", async () => {
+		const fetcher = vi.fn(async () => response(session()));
+		vi.stubGlobal("fetch", fetcher);
+		renderWorkspace();
+		await screen.findByTestId("active-workspace");
+		act(() =>
+			useWorkspaceStore.setState({ serverRevision: "old-write-capability" }),
+		);
+		const key = deterministicQueryKey("private-a-document", 10);
+		serverQueryClient().setQueryData(key, "old-permissions-result");
+		fetcher.mockImplementation(async () =>
+			response({
+				...session(),
+				resource: { ...session().resource, permissions: ["plan:read"] },
+			}),
+		);
+		act(() => window.dispatchEvent(new Event("focus")));
+		await waitFor(() =>
+			expect(screen.getByTestId("active-workspace").textContent).toBe(
+				`${A}:empty`,
+			),
+		);
+		expect(serverQueryClient().getQueryData(key)).toBeUndefined();
+		expect(getResourceScope().resource?.permissions).toEqual(["plan:read"]);
+	});
+
+	it("does not reuse data or recovery when the API address changes for the same account", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => response(session())),
+		);
+		renderWorkspace();
+		await screen.findByTestId("active-workspace");
+		const key = deterministicQueryKey("private-a-document", 10);
+		serverQueryClient().setQueryData(key, "first-api-result");
+		act(() => {
+			useWorkspaceStore.setState({ serverRevision: "first-api-data" });
+			useWorkspaceStore.getState().engine.volatileState = {
+				version: 1,
+				draft: { name: "First API draft" } as never,
+				draftPresentation: null,
+				baseRevision: "first-api",
+			};
+			window.__WAYPOINT_CONFIG__ = { apiBaseUrl: "/second-api" };
+			window.dispatchEvent(new Event("focus"));
+		});
+		await waitFor(() =>
+			expect(screen.getByTestId("active-workspace").textContent).toBe(
+				`${A}:empty`,
+			),
+		);
+		expect(getResourceScope().apiBaseUrl).toBe(
+			canonicalApiBaseUrl("/second-api"),
+		);
+		expect(useWorkspaceStore.getState().engine.volatileState).toBeNull();
+		expect(serverQueryClient().getQueryData(key)).toBeUndefined();
+	});
+
+	it("rejects discovery if its API address changes while the response is pending", async () => {
+		let finish: (value: Response) => void = () => {};
+		const fetcher = vi.fn(
+			() =>
+				new Promise<Response>((resolve) => {
+					finish = resolve;
+				}),
+		);
+		vi.stubGlobal("fetch", fetcher);
+		renderWorkspace();
+		await waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+		window.__WAYPOINT_CONFIG__ = { apiBaseUrl: "/second-api" };
+		await act(async () => finish(response(session())));
+		expect((await screen.findByRole("alert")).textContent).toBe(
+			"The API address changed. Retry the session check.",
+		);
+		expect(screen.queryByTestId("active-workspace")).toBeNull();
+		expect(getResourceScope().status).toBe("pending");
 	});
 
 	it.each([

@@ -60,21 +60,16 @@ function stubStorage(storage: Storage) {
 const A = `plans/${"a".repeat(64)}`;
 const B = `plans/${"b".repeat(64)}`;
 
-function acceptOwner(
-	id: string | null = A,
-	apiBaseUrl = canonicalApiBaseUrl(""),
-) {
+function acceptOwner(id: string = A, apiBaseUrl = canonicalApiBaseUrl("")) {
 	const scope = acceptResourceScope(
 		{
 			apiBaseUrl,
-			resource: id
-				? {
-						id,
-						kind: id === "plans/sample" ? "sample" : "private",
-						permissions: ["plan:read"],
-					}
-				: null,
-			subject: id && id !== "plans/sample" ? id : null,
+			resource: {
+				id,
+				kind: id === "plans/sample" ? "sample" : "private",
+				permissions: ["plan:read"],
+			},
+			subject: id !== "plans/sample" ? id : null,
 		},
 		suspendResourceScope(),
 	);
@@ -83,7 +78,7 @@ function acceptOwner(
 }
 
 async function verifyOwner(
-	id: string | null = A,
+	id: string = A,
 	apiBaseUrl = canonicalApiBaseUrl(""),
 ) {
 	const scope = acceptOwner(id, apiBaseUrl);
@@ -330,7 +325,7 @@ describe("financial preference owner isolation", () => {
 		});
 		for (const key of keys) window.localStorage.setItem(key, raw);
 		const read = vi.spyOn(window.localStorage, "getItem");
-		for (const id of [A, B, "plans/sample", null]) {
+		for (const id of [A, B, "plans/sample"]) {
 			await verifyOwner(id);
 			expect(useSafeSpendingSettings.getState()).toMatchObject(
 				defaultSafeSpendingSettings(),
@@ -342,7 +337,7 @@ describe("financial preference owner isolation", () => {
 		for (const key of keys) expect(window.localStorage.getItem(key)).toBe(raw);
 	});
 
-	it("isolates legacy deployments and API origins without changing global display preferences", async () => {
+	it("isolates the sample and API origins without changing global display preferences", async () => {
 		useThemeStore.getState().setPreference("dark");
 		useUiStore.getState().setYears(30);
 		useUiStore.getState().setRanges(false);
@@ -351,16 +346,16 @@ describe("financial preference owner isolation", () => {
 		expect(useSafeSpendingSettings.getState().reserve).toBe(
 			defaultSafeSpendingSettings().reserve,
 		);
-		await verifyOwner(null);
+		await verifyOwner("plans/sample");
 		useSafeSpendingSettings
 			.getState()
-			.updateSettings({ reserve: 200, incomeRuleIds: ["legacy-income"] });
+			.updateSettings({ reserve: 200, incomeRuleIds: ["sample-income"] });
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState().reserve).toBe(100);
-		await verifyOwner(null);
+		await verifyOwner("plans/sample");
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
 			reserve: 200,
-			incomeRuleIds: ["legacy-income"],
+			incomeRuleIds: ["sample-income"],
 		});
 		suspendResourceScope();
 		expect(useThemeStore.getState().preference).toBe("dark");

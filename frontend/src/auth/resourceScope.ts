@@ -6,21 +6,20 @@ export interface SessionResource {
 
 export interface ResourceScopeInput {
 	apiBaseUrl: string;
-	resource: SessionResource | null;
+	resource: SessionResource;
 	subject: string | null;
 }
 
-export interface ResourceScope extends ResourceScopeInput {
-	status: "pending" | "legacy" | "ready";
-	epoch: number;
+export interface ResourceScope extends Omit<ResourceScopeInput, "resource"> {
+	resource: SessionResource | null;
+	status: "pending" | "ready";
 	key: string;
 }
 
 const listeners = new Set<() => void>();
 let current: ResourceScope = {
 	status: "pending",
-	epoch: 0,
-	key: "pending:0",
+	key: "pending",
 	apiBaseUrl: "",
 	resource: null,
 	subject: null,
@@ -30,25 +29,23 @@ export function canonicalApiBaseUrl(baseUrl: string): string {
 	return new URL(baseUrl || "/", location.href).href.replace(/\/+$/, "");
 }
 
-/** One namespace rule for all resource-owned browser data, including legacy mode. */
+/** Browser data always belongs to a verified plan. */
 export function resourceStorageKey(
 	baseKey: string,
 	scope: ResourceScope = getResourceScope(),
 ): string | null {
-	if (scope.status === "pending") return null;
-	const owner = scope.resource
-		? `${scope.resource.kind}:${encodeURIComponent(scope.resource.id)}`
-		: "legacy";
+	if (scope.status === "pending" || !scope.resource) return null;
+	const owner = `${scope.resource.kind}:${encodeURIComponent(scope.resource.id)}`;
 	return `${baseKey}:resource:${encodeURIComponent(scope.apiBaseUrl)}:${owner}`;
 }
 
 export function resourceScopeKey(input: ResourceScopeInput): string {
 	return JSON.stringify([
 		input.apiBaseUrl,
-		input.resource?.id ?? null,
-		input.resource?.kind ?? "legacy",
+		input.resource.id,
+		input.resource.kind,
 		input.subject,
-		[...(input.resource?.permissions ?? [])].sort(),
+		[...input.resource.permissions].sort(),
 	]);
 }
 
@@ -69,11 +66,9 @@ function publish(scope: ResourceScope): ResourceScope {
 
 /** Invalidate captured requests immediately, before React removes the workspace. */
 export function suspendResourceScope(): ResourceScope {
-	const epoch = current.epoch + 1;
 	return publish({
 		status: "pending",
-		epoch,
-		key: `pending:${epoch}`,
+		key: "pending",
 		apiBaseUrl: current.apiBaseUrl,
 		resource: null,
 		subject: null,
@@ -88,8 +83,7 @@ export function acceptResourceScope(
 	if (current !== expected) return null;
 	return publish({
 		...input,
-		status: input.resource ? "ready" : "legacy",
-		epoch: expected.epoch,
+		status: "ready",
 		key: resourceScopeKey(input),
 	});
 }

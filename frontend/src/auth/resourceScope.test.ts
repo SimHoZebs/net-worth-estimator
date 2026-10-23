@@ -52,6 +52,17 @@ describe("verified resource scope", () => {
 			expect(resourceScopeKey(changed)).not.toBe(key);
 	});
 
+	it("replaces request guards even when the verified identity stays the same", () => {
+		const first = acceptResourceScope(input, suspendResourceScope())!;
+		const pending = suspendResourceScope();
+		const newer = suspendResourceScope();
+		expect(newer).not.toBe(pending);
+		expect(acceptResourceScope(input, pending)).toBeNull();
+		const second = acceptResourceScope(input, newer)!;
+		expect(second).not.toBe(first);
+		expect(second.key).toBe(first.key);
+	});
+
 	it("invalidates captured requests before it requests a session recheck", () => {
 		const captured = acceptResourceScope(input, suspendResourceScope());
 		const listener = vi.fn(() =>

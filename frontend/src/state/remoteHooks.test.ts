@@ -548,7 +548,15 @@ function clientFixture(put?: PutCallback, model = modelFixture()) {
 
 beforeEach(() => {
 	acceptResourceScope(
-		{ apiBaseUrl: "http://localhost", resource: null, subject: null },
+		{
+			apiBaseUrl: "http://localhost",
+			resource: {
+				id: "plans/sample",
+				kind: "sample",
+				permissions: ["plan:read", "plan:project"],
+			},
+			subject: null,
+		},
 		suspendResourceScope(),
 	);
 });
@@ -561,6 +569,23 @@ afterEach(() => {
 });
 
 describe("remote workspace state", () => {
+	it("does not publish an empty browser draft when saved-only data is checked again", async () => {
+		const storage = memoryStorage();
+		vi.stubGlobal("localStorage", storage);
+		const { client } = clientFixture(() => ({
+			document: modelFixture(),
+			issues: [],
+		}));
+		const view = renderHook(() => useRemoteWorkspace({ client }));
+		await waitFor(() => expect(view.result().loading).toBe(false));
+		const key = remoteStorageKey()!;
+		expect(view.result().workspace?.draft).toBeNull();
+		expect(storage.getItem(key)).toBeNull();
+		await act(async () => useWorkspaceStore.getState().hydrate());
+		expect(storage.getItem(key)).toBeNull();
+		view.unmount();
+	});
+
 	// Regression: the mount effect used to abort its in-flight load on cleanup.
 	// React's development double-mount tears that effect down immediately, and
 	// the remount reused the same in-flight promise, so hydration never

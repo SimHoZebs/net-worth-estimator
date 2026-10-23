@@ -1,80 +1,23 @@
-import { type ReactNode, useEffect, useState } from "react";
-import { getApiBaseUrl } from "../api/runtime.ts";
+import { type ReactNode, useEffect } from "react";
 import { Brand } from "../components/Brand.tsx";
 import { Button } from "../components/Button.tsx";
-import { clearResourceQueryCache } from "../state/serverQuery.ts";
-import {
-	resetWorkspaceForResource,
-	useWorkspaceStore,
-} from "../state/workspaceStore.ts";
 import { redirectToSignIn } from "./navigation.ts";
 import { SessionContext } from "./sessionContext.ts";
 import { useResourceSession } from "./useResourceSession.ts";
-import { announceSessionChange } from "./sessionChanges.ts";
-import { getResourceScope, suspendResourceScope } from "./resourceScope.ts";
 
 export function AuthBoundary({ children }: { children: ReactNode }) {
-	const [logoutError, setLogoutError] = useState("");
-	const [logoutPending, setLogoutPending] = useState(false);
-	const { session, error: sessionError, refresh, ready } = useResourceSession();
-	const error =
-		logoutError ||
-		sessionError ||
-		(session?.authenticated && !session.allowed
-			? "Your session could not be verified."
-			: "");
+	const { session, error, refresh, phase, logout, logoutPending } =
+		useResourceSession();
 	useEffect(() => {
-		if (
-			session?.enabled &&
-			session.authenticated === false &&
-			!session.allowed
-		) {
+		if (phase === "denied" && session?.authenticated === false) {
 			redirectToSignIn();
 		}
-	}, [session]);
-	const logout = async () => {
-		if (logoutPending) return;
-		if (useWorkspaceStore.getState().volatile) {
-			setLogoutError(
-				"Your draft has recovery data. Export or discard the draft before signing out.",
-			);
-			return;
-		}
-		setLogoutError("");
-		setLogoutPending(true);
-		try {
-			const scope = getResourceScope();
-			const response = await fetch(`${getApiBaseUrl()}/v1/auth/logout`, {
-				method: "POST",
-				credentials: "same-origin",
-				headers: scope.resource
-					? { "X-Waypoint-Resource": scope.resource.id }
-					: undefined,
-			});
-			if (!response.ok) throw new Error("Sign-out failed. Please retry.");
-			if (scope !== getResourceScope())
-				throw new Error("Your session changed. Retry the session check.");
-			const signedOut = suspendResourceScope();
-			resetWorkspaceForResource();
-			await clearResourceQueryCache();
-			announceSessionChange();
-			const result = (await response.json()) as { logoutURL: string };
-			if (signedOut !== getResourceScope())
-				throw new Error("Your session changed. Retry the session check.");
-			// The server supplies a configured OIDC logout URL, never a user redirect.
-			window.location.assign(result.logoutURL);
-		} catch (cause) {
-			setLogoutError(
-				cause instanceof Error ? cause.message : "Sign-out failed.",
-			);
-		} finally {
-			setLogoutPending(false);
-		}
-	};
-	if (ready && session && !session.enabled) return children;
-	if (ready && session?.allowed)
+	}, [phase, session]);
+	if (phase === "ready" && session?.allowed)
 		return (
-			<SessionContext value={{ session, logout, logoutPending, logoutError }}>
+			<SessionContext
+				value={{ session, logout, logoutPending, logoutError: error }}
+			>
 				{children}
 			</SessionContext>
 		);
