@@ -22,13 +22,18 @@ func TestProviderAliasIsolatesCookiesAndPreservesIssuerTransport(t *testing.T) {
 			t.Errorf("unexpected provider request: host=%s path=%s origin=%s", r.Host, r.URL.String(), r.Header.Get("Origin"))
 		}
 		if cookie := r.Header.Get("Cookie"); cookie != "casdoor_session_id=production" {
-			t.Errorf("cookies escaped their namespace: %s", cookie)
+			t.Errorf("unexpected provider cookies (%d bytes)", len(cookie))
 		}
 		if r.Header.Get("Authorization") != "" {
 			t.Error("browser authorization header reached Casdoor")
 		}
 		http.SetCookie(w, &http.Cookie{Name: "casdoor_session_id", Value: "new-production", HttpOnly: true, Path: "/", SameSite: http.SameSiteLaxMode})
 		http.SetCookie(w, &http.Cookie{Name: "language", Value: "en", Path: "/"})
+		// Casdoor copies inline SVG logo URLs into optional theme-cache cookies.
+		// These reproduce the production response's roughly 10 KiB headers.
+		for _, name := range []string{"organizationLogo", "organizationLogoDark"} {
+			http.SetCookie(w, &http.Cookie{Name: name, Value: strings.Repeat("x", 4792), Path: "/"})
+		}
 		w.Header().Set("Location", p.server.URL+"/account")
 		w.WriteHeader(302)
 	}))
@@ -42,6 +47,8 @@ func TestProviderAliasIsolatesCookiesAndPreservesIssuerTransport(t *testing.T) {
 		{Name: "casdoor_session_id", Value: "dev-session"},
 		{Name: "__Host-waypoint_session", Value: "dev-app"},
 		{Name: namespace + "casdoor_session_id", Value: "production"},
+		{Name: namespace + "organizationLogo", Value: strings.Repeat("x", 4792)},
+		{Name: namespace + "organizationLogoDark", Value: strings.Repeat("x", 4792)},
 	}
 	w := browserRequest(h, "POST", tailProvider, prefix+"provider/api/login?probe=1", cookies,
 		map[string]string{"Origin": tailProvider, "Authorization": "Bearer untrusted"})
@@ -54,7 +61,16 @@ func TestProviderAliasIsolatesCookiesAndPreservesIssuerTransport(t *testing.T) {
 		}
 	}
 	if len(w.Result().Cookies()) != 2 {
-		t.Fatal("provider cookies were lost")
+		t.Fatal("provider session/language cookies were lost or branding caches escaped")
+	}
+	var headerBytes int
+	for name, values := range w.Header() {
+		for _, value := range values {
+			headerBytes += len(name) + len(value) + 4
+		}
+	}
+	if headerBytes > 1024 {
+		t.Fatalf("provider headers still contain presentation payloads: %d bytes", headerBytes)
 	}
 	w = browserRequest(h, "POST", tailProvider, prefix+"provider/api/login", cookies, map[string]string{"Origin": "https://node.tail.test:8000"})
 	if w.Code != 403 || calls != 1 {

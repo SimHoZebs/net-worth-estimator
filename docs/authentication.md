@@ -109,6 +109,12 @@ The provider gateway also isolates every Casdoor cookie. This prevents dev and
 production collisions on one ts.net hostname with different ports. Enabling this
 mode requires one fresh app sign-in. Cookies remain host-only and Secure on HTTPS.
 
+The gateway omits Casdoor's `organizationLogo` and `organizationLogoDark` cache
+cookies in both directions. Casdoor copies inline SVG logos into these optional
+presentation caches. They exceed normal cookie limits and inflate response
+headers. The native login UI still reads its logos from application metadata.
+Session and other provider cookies remain intact.
+
 Password login works through either address with the same account and plan.
 Existing passkeys remain bound to the canonical Casdoor hostname. The alias does
 not migrate passkeys or bypass WebAuthn hostname checks. Verify physical passkeys
