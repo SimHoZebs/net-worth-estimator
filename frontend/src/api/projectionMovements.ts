@@ -1,21 +1,36 @@
 import { finite, isRecord, stringValue } from "../domain/guards.ts";
 import type { MovementResult } from "../domain/result.ts";
-import type {
-	FinancialModelDocument,
-	MovementEvent,
-	ProjectionResult,
-} from "./contracts.ts";
+import type { FinancialModelDocument, ProjectionResult } from "./contracts.ts";
 
-function movementSource(
-	event: MovementEvent,
+type MovementSource = {
+	name: string;
+	sourceAccountId: string | null;
+	destinations: string[] | null;
+};
+
+/** Index sources once per call so per-event lookup stays O(1). */
+function movementSourceIndex(
 	document: FinancialModelDocument | null,
-) {
-	return (
-		document?.postings.find((item) => item.id === event.origin.postingId) ??
-		document?.recurrenceRules?.find(
-			(item) => item.id === event.origin.postingId,
-		)
-	);
+): Map<string, MovementSource> {
+	const index = new Map<string, MovementSource>();
+	if (!document) return index;
+	for (const item of document.postings) {
+		if (!index.has(item.id))
+			index.set(item.id, {
+				name: item.name,
+				sourceAccountId: item.sourceAccountId,
+				destinations: item.destinations,
+			});
+	}
+	for (const item of document.recurrenceRules ?? []) {
+		if (!index.has(item.id))
+			index.set(item.id, {
+				name: item.name,
+				sourceAccountId: item.sourceAccountId,
+				destinations: item.destinations,
+			});
+	}
+	return index;
 }
 
 function movementConstraintLabel(type: string): string {
@@ -42,16 +57,17 @@ export function projectionMovements(
 	document: FinancialModelDocument | null,
 ): MovementResult[] {
 	const start = result.milestones.projectionStartDate;
-	const startCheckpoint =
-		document?.checkpoints.some((checkpoint) => checkpoint.Date === start) ??
-		false;
+	const startCheckpoint = document?.checkpoints.some(
+		(checkpoint) => checkpoint.Date === start,
+	);
+	const sources = movementSourceIndex(document);
 	return (result.movementEvents ?? [])
 		.filter(
 			(event) =>
 				event.date > start || (event.date === start && !startCheckpoint),
 		)
 		.map((event) => {
-			const source = movementSource(event, document);
+			const source = sources.get(event.origin.postingId);
 			const deltas = event.accountDeltas ?? [];
 			const constraints = Array.isArray(event.bindingConstraints)
 				? event.bindingConstraints
