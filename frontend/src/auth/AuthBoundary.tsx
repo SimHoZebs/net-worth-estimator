@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { Brand } from "../components/Brand.tsx";
 import { Button } from "../components/Button.tsx";
 import { redirectToSignIn } from "./navigation.ts";
@@ -8,8 +8,17 @@ import { useResourceSession } from "./useResourceSession.ts";
 export function AuthBoundary({ children }: { children: ReactNode }) {
 	const { session, error, refresh, phase, logout, logoutPending } =
 		useResourceSession();
+	// Automatic sign-in fires at most once per mount. Re-verification on
+	// back-button restore or focus must land on the stable prompt with its
+	// manual button instead of starting a second login that orphans the first.
+	const redirected = useRef(false);
 	useEffect(() => {
-		if (phase === "denied" && session?.authenticated === false) {
+		if (
+			phase === "denied" &&
+			session?.authenticated === false &&
+			!redirected.current
+		) {
+			redirected.current = true;
 			redirectToSignIn();
 		}
 	}, [phase, session]);
