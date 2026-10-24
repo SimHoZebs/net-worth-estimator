@@ -218,6 +218,16 @@ func (s *Service) serveAuth(w http.ResponseWriter, r *http.Request) {
 		s.callback(w, r)
 	case "POST " + prefix + "logout":
 		s.logout(w, r)
+	case "GET " + prefix + "profile":
+		s.accountProfile(w, r)
+	case "PATCH " + prefix + "profile":
+		s.accountUpdateProfile(w, r)
+	case "POST " + prefix + "change-password":
+		s.accountChangePassword(w, r)
+	case "GET " + prefix + "sessions":
+		s.accountSessions(w, r)
+	case "DELETE " + prefix + "sessions":
+		s.accountRevokeSession(w, r)
 	default:
 		http.NotFound(w, r)
 	}

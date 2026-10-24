@@ -33,6 +33,11 @@ type testIDP struct {
 	refreshReject                    atomic.Bool
 	refreshedSubject                 string
 	sid                              string
+	accountWriteError                string
+	getAccountError                  string
+	getAccountStatus                 int
+	accountSubOverride               string
+	lastUpdateID                     string
 	key                              *rsa.PrivateKey
 }
 
@@ -98,6 +103,37 @@ func newIDP(t *testing.T) *testIDP {
 				t.Error("introspection client authentication missing")
 			}
 			respond(w, map[string]any{"active": p.active.Load(), "sub": p.subject, "client_id": "waypoint", "iss": p.server.URL, "aud": []string{"waypoint"}})
+		case "/api/get-account":
+			if p.getAccountError != "" {
+				respond(w, map[string]any{"status": "error", "msg": p.getAccountError})
+				return
+			}
+			sub := p.subject
+			if p.accountSubOverride != "" {
+				sub = p.accountSubOverride
+			}
+			if p.getAccountStatus != 0 {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(p.getAccountStatus)
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "sub": sub})
+				return
+			}
+			respond(w, map[string]any{"status": "ok", "sub": sub, "data": map[string]any{
+				"owner": "waypoint", "name": "editor", "displayName": "Sam Lee", "avatar": "",
+			}})
+		case "/api/update-user":
+			p.lastUpdateID = r.URL.Query().Get("id")
+			if p.accountWriteError != "" {
+				respond(w, map[string]any{"status": "error", "msg": p.accountWriteError})
+				return
+			}
+			respond(w, map[string]any{"status": "ok"})
+		case "/api/set-password":
+			if p.accountWriteError != "" {
+				respond(w, map[string]any{"status": "error", "msg": p.accountWriteError})
+				return
+			}
+			respond(w, map[string]any{"status": "ok"})
 		default:
 			http.NotFound(w, r)
 		}
@@ -142,6 +178,49 @@ func (testAppTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 		clone.Host = "localhost:8080"
 	}
 	return http.DefaultTransport.RoundTrip(clone)
+}
+
+func TestConcurrentLoginAttempts(t *testing.T) {
+	p := newIDP(t)
+	s := newService(t, p, filepath.Join(t.TempDir(), "sessions.db"))
+	server := httptest.NewServer(s.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })))
+	defer server.Close()
+	client := testClient(t)
+	start := func() string {
+		t.Helper()
+		r, err := client.Get(server.URL + prefix + "login")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer r.Body.Close()
+		return r.Header.Get("Location")
+	}
+	first, second := start(), start()
+	if first == second {
+		t.Fatal("expected distinct login states")
+	}
+	// The mock IDP echoes whatever nonce each attempt stored, so each
+	// callback validates against its own entry.
+	finish := func(location string) int {
+		t.Helper()
+		authorize, err := url.Parse(location)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p.nonce = authorize.Query().Get("nonce")
+		r, err := client.Get(server.URL + prefix + "callback?code=code&state=" + url.QueryEscape(authorize.Query().Get("state")))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer r.Body.Close()
+		return r.StatusCode
+	}
+	if code := finish(first); code != 302 {
+		t.Fatalf("first callback=%d want 302", code)
+	}
+	if code := finish(second); code != 302 {
+		t.Fatalf("second callback=%d want 302", code)
+	}
 }
 
 func signIn(t *testing.T, s *Service, p *testIDP, server *httptest.Server, client *http.Client, changeNonce bool) *http.Response {
