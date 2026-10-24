@@ -144,7 +144,7 @@ Visible application content:
 - Desktop eyebrow: `A CLEARER FINANCIAL PICTURE`.
 - Desktop heading: `Make room for what comes next.`
 - Desktop text: `A clearer view of your money, today and ahead.`
-- Footer: `Your Waypoint account. Identity by Casdoor.`
+- Footer: none. `footerHtml` is empty; no provider attribution renders.
 
 The native UI supplies `Password`, `Passkey`, `Sign In`, `Sign Up`, field labels,
 and account links. Branding makes no claims about financial access or plan sharing.
@@ -217,7 +217,7 @@ restart is necessary.
 
 - Desktop uses Casdoor's supported side panel. Mobile uses its native single column.
 - The provider's theme preference controls light/dark mode independently of Waypoint.
-- Account management, passkey enrollment, and recovery remain Casdoor-owned screens.
+- Account profile, password change, and app-session revocation are native Waypoint screens backed by a thin Casdoor proxy. Passkey enrollment, removal, and recovery remain Casdoor-owned screens.
 - Browser and operating-system passkey prompts retain their platform appearance.
 - Organization and administrator-console branding remain unchanged.
 - Casdoor can show default icons or its startup screen before application data loads.

@@ -21,7 +21,7 @@ export function buildBranding() {
     title: 'Waypoint account',
     favicon: svgUrl(asset('mark.svg')),
     headerHtml: `<style>@font-face{font-family:"Manrope Variable";font-style:normal;font-weight:200 800;font-display:swap;src:url(data:font/woff2;base64,${font}) format("woff2")}body,button,input,select,textarea{font-family:"Manrope Variable",sans-serif}</style>`,
-    footerHtml: '<p class="waypoint-footer">Your Waypoint account. <span>Identity by Casdoor.</span></p>',
+    footerHtml: '',
     // v4.23 chooses one stylesheet, rather than adding mobile rules to desktop.
     formCss: css,
     formCssMobile: css,

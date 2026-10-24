@@ -76,7 +76,7 @@ test('pinned provider sparse update and native branded login/signup at desktop/m
           return (values[0] + 0.05) / (values[1] + 0.05);
         });
         assert.ok(borderContrast >= 3, `Input border contrast ${borderContrast} must reach 3:1`);
-        await expect(page.locator('.waypoint-footer')).toHaveText('Your Waypoint account. Identity by Casdoor.');
+        await expect(page.locator('.waypoint-footer')).toHaveCount(0);
         const side = page.getByRole('complementary', { name: 'About Waypoint' });
         if (viewport.width >= 1024) await expect(side).toBeVisible();
         else await expect(side).toBeHidden();
