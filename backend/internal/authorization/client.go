@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -30,6 +32,11 @@ type Client struct {
 	config   Config
 	endpoint string
 	client   *http.Client
+	// inFlight shares one provider call between concurrent Resolve calls
+	// for one subject. Only overlapping calls share; sequential calls
+	// always recheck, so revoked permissions still fail closed on the
+	// next request.
+	inFlight singleflight.Group
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9_-]{1,100}$`)
@@ -88,8 +95,20 @@ func providerURL(raw string, origin bool) (*url.URL, error) {
 }
 
 // Resolve checks all plan actions for the caller's single server-selected plan.
-// Every invocation contacts Casdoor, including guest and denied invocations.
+// Sequential invocations always contact Casdoor, including guest and denied
+// invocations. Overlapping invocations for one subject share one provider
+// call and receive the same fresh decision.
 func (c *Client) Resolve(ctx context.Context, subject string) (Scope, error) {
+	value, err, _ := c.inFlight.Do(subject, func() (any, error) {
+		return c.resolveUnshared(ctx, subject)
+	})
+	if err != nil {
+		return Scope{}, err
+	}
+	return value.(Scope), nil
+}
+
+func (c *Client) resolveUnshared(ctx context.Context, subject string) (Scope, error) {
 	resource := ResourceFor(c.config.Issuer, subject)
 	actions := []string{Read, Project, Write}
 	decisions, err := c.Check(ctx, subject, resource, actions)
