@@ -40,7 +40,9 @@
       {
         "name": "historical_checking",
         "sourceAccountId": null,
-        "destinations": ["checking"],
+        "destinations": [
+          "checking"
+        ],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -56,7 +58,9 @@
       {
         "name": "historical_brokerage",
         "sourceAccountId": null,
-        "destinations": ["brokerage"],
+        "destinations": [
+          "brokerage"
+        ],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -90,7 +94,9 @@
       {
         "name": "salary",
         "sourceAccountId": null,
-        "destinations": ["checking"],
+        "destinations": [
+          "checking"
+        ],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -128,7 +134,9 @@
       {
         "name": "invest",
         "sourceAccountId": "checking",
-        "destinations": ["brokerage"],
+        "destinations": [
+          "brokerage"
+        ],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -147,7 +155,9 @@
       {
         "name": "paydown",
         "sourceAccountId": "checking",
-        "destinations": ["loan"],
+        "destinations": [
+          "loan"
+        ],
         "amount": {
           "resolver": "expression",
           "config": {
@@ -499,7 +509,9 @@
         {
           "name": "historical_checking",
           "sourceAccountId": null,
-          "destinations": ["checking"],
+          "destinations": [
+            "checking"
+          ],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -518,7 +530,9 @@
         {
           "name": "historical_brokerage",
           "sourceAccountId": null,
-          "destinations": ["brokerage"],
+          "destinations": [
+            "brokerage"
+          ],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -556,7 +570,9 @@
         {
           "name": "salary",
           "sourceAccountId": null,
-          "destinations": ["checking"],
+          "destinations": [
+            "checking"
+          ],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -594,7 +610,9 @@
         {
           "name": "invest",
           "sourceAccountId": "checking",
-          "destinations": ["brokerage"],
+          "destinations": [
+            "brokerage"
+          ],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -613,7 +631,9 @@
         {
           "name": "paydown",
           "sourceAccountId": "checking",
-          "destinations": ["loan"],
+          "destinations": [
+            "loan"
+          ],
           "amount": {
             "resolver": "expression",
             "config": {
@@ -892,242 +912,9 @@
             "unfulfilledAmount": 0,
             "completionRate": 1,
             "firstUnderfulfilledDate": null,
-            "events": [
-              {
-                "date": "2026-02-05",
-                "sequence": 0,
-                "postingId": "salary",
-                "requestedAmount": 1000,
-                "realizedAmount": 1000,
-                "destinationLimitedAmount": 0,
-                "unfulfilledAmount": 0,
-                "bindingConstraints": [],
-                "accountDeltas": [
-                  {
-                    "accountId": "checking",
-                    "delta": 1000
-                  }
-                ]
-              },
-              {
-                "date": "2026-02-06",
-                "sequence": 1,
-                "postingId": "spend",
-                "requestedAmount": 200,
-                "realizedAmount": 200,
-                "destinationLimitedAmount": 0,
-                "unfulfilledAmount": 0,
-                "bindingConstraints": [],
-                "accountDeltas": [
-                  {
-                    "accountId": "checking",
-                    "delta": -200
-                  }
-                ]
-              },
-              {
-                "date": "2026-02-10",
-                "sequence": 2,
-                "postingId": "invest",
-                "requestedAmount": 900,
-                "realizedAmount": 900,
-                "destinationLimitedAmount": 0,
-                "unfulfilledAmount": 0,
-                "bindingConstraints": [],
-                "accountDeltas": [
-                  {
-                    "accountId": "checking",
-                    "delta": -900
-                  },
-                  {
-                    "accountId": "brokerage",
-                    "delta": 900
-                  }
-                ]
-              },
-              {
-                "date": "2026-02-20",
-                "sequence": 3,
-                "postingId": "paydown",
-                "requestedAmount": 250,
-                "realizedAmount": 250,
-                "destinationLimitedAmount": 0,
-                "unfulfilledAmount": 0,
-                "bindingConstraints": [],
-                "accountDeltas": [
-                  {
-                    "accountId": "checking",
-                    "delta": -250
-                  },
-                  {
-                    "accountId": "loan",
-                    "delta": 250
-                  }
-                ]
-              }
-            ],
-            "dates": [
-              {
-                "date": "2026-02-05",
-                "requestedAmount": 1000,
-                "realizedAmount": 1000,
-                "destinationLimitedAmount": 0,
-                "unfulfilledAmount": 0
-              },
-              {
-                "date": "2026-02-06",
-                "requestedAmount": 200,
-                "realizedAmount": 200,
-                "destinationLimitedAmount": 0,
-                "unfulfilledAmount": 0
-              },
-              {
-                "date": "2026-02-10",
-                "requestedAmount": 900,
-                "realizedAmount": 900,
-                "destinationLimitedAmount": 0,
-                "unfulfilledAmount": 0
-              },
-              {
-                "date": "2026-02-20",
-                "requestedAmount": 250,
-                "realizedAmount": 250,
-                "destinationLimitedAmount": 0,
-                "unfulfilledAmount": 0
-              }
-            ],
-            "postings": [
-              {
-                "postingId": "historical_checking",
-                "name": "historical_checking",
-                "sourceAccountId": null,
-                "sourceAccountLabel": null,
-                "destinations": [
-                  {
-                    "accountId": "checking",
-                    "name": "checking"
-                  }
-                ],
-                "annualCap": null,
-                "requestedAmount": 0,
-                "realizedAmount": 0,
-                "destinationLimitedAmount": 0,
-                "utilizationRate": 0,
-                "completionRate": 1,
-                "firstUnderfulfilledDate": null,
-                "unfulfilledAmount": 0
-              },
-              {
-                "postingId": "historical_brokerage",
-                "name": "historical_brokerage",
-                "sourceAccountId": null,
-                "sourceAccountLabel": null,
-                "destinations": [
-                  {
-                    "accountId": "brokerage",
-                    "name": "brokerage"
-                  }
-                ],
-                "annualCap": null,
-                "requestedAmount": 0,
-                "realizedAmount": 0,
-                "destinationLimitedAmount": 0,
-                "utilizationRate": 0,
-                "completionRate": 1,
-                "firstUnderfulfilledDate": null,
-                "unfulfilledAmount": 0
-              },
-              {
-                "postingId": "historical_loan",
-                "name": "historical_loan",
-                "sourceAccountId": "loan",
-                "sourceAccountLabel": "loan",
-                "destinations": null,
-                "annualCap": null,
-                "requestedAmount": 0,
-                "realizedAmount": 0,
-                "destinationLimitedAmount": 0,
-                "utilizationRate": 0,
-                "completionRate": 1,
-                "firstUnderfulfilledDate": null,
-                "unfulfilledAmount": 0
-              },
-              {
-                "postingId": "salary",
-                "name": "salary",
-                "sourceAccountId": null,
-                "sourceAccountLabel": null,
-                "destinations": [
-                  {
-                    "accountId": "checking",
-                    "name": "checking"
-                  }
-                ],
-                "annualCap": null,
-                "requestedAmount": 1000,
-                "realizedAmount": 1000,
-                "destinationLimitedAmount": 0,
-                "utilizationRate": 1,
-                "completionRate": 1,
-                "firstUnderfulfilledDate": null,
-                "unfulfilledAmount": 0
-              },
-              {
-                "postingId": "spend",
-                "name": "spend",
-                "sourceAccountId": "checking",
-                "sourceAccountLabel": "checking",
-                "destinations": null,
-                "annualCap": null,
-                "requestedAmount": 200,
-                "realizedAmount": 200,
-                "destinationLimitedAmount": 0,
-                "utilizationRate": 1,
-                "completionRate": 1,
-                "firstUnderfulfilledDate": null,
-                "unfulfilledAmount": 0
-              },
-              {
-                "postingId": "invest",
-                "name": "invest",
-                "sourceAccountId": "checking",
-                "sourceAccountLabel": "checking",
-                "destinations": [
-                  {
-                    "accountId": "brokerage",
-                    "name": "brokerage"
-                  }
-                ],
-                "annualCap": null,
-                "requestedAmount": 900,
-                "realizedAmount": 900,
-                "destinationLimitedAmount": 0,
-                "utilizationRate": 1,
-                "completionRate": 1,
-                "firstUnderfulfilledDate": null,
-                "unfulfilledAmount": 0
-              },
-              {
-                "postingId": "paydown",
-                "name": "paydown",
-                "sourceAccountId": "checking",
-                "sourceAccountLabel": "checking",
-                "destinations": [
-                  {
-                    "accountId": "loan",
-                    "name": "loan"
-                  }
-                ],
-                "annualCap": null,
-                "requestedAmount": 250,
-                "realizedAmount": 250,
-                "destinationLimitedAmount": 0,
-                "utilizationRate": 1,
-                "completionRate": 1,
-                "firstUnderfulfilledDate": null,
-                "unfulfilledAmount": 0
-              }
-            ]
+            "events": [],
+            "dates": [],
+            "postings": []
           },
           "probabilistic": null,
           "diagnostics": []

@@ -301,8 +301,14 @@ var postingFulfillmentDefinition = &EvaluationDefinition{
 
 	EvaluatePath: func(ctx *EvaluationContext, config any) (PathResult, error) {
 		typed := config.(types.PostingFulfillmentConfig)
-		includeDetails := ctx.DetailLevel != "summary"
-		return EvaluatePostingFulfillment(ctx.Path, typed, includeDetails), nil
+		// Served projections always use summary detail: the only reader of
+		// this envelope takes scalars (firstUnderfulfilledDate,
+		// completionRate) while per-event evidence travels once on the
+		// public movementEvents timeline. Building the per-event, per-date,
+		// and per-posting arrays here duplicated those 7446 events (~2.3 MB).
+		// EvaluatePostingFulfillment keeps its detail capability for direct
+		// callers; the served path never pays for it.
+		return EvaluatePostingFulfillment(ctx.Path, typed, false), nil
 	},
 	DiagnoseConfig: func(ctx *EvaluationContext, config any) []types.EvaluationDiagnostic {
 		return diagnoseFulfillmentConfig(ctx.Path, config.(types.PostingFulfillmentConfig))
