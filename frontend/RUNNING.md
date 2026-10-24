@@ -60,11 +60,10 @@ Follow the [style and typography guidance](src/styles/README.md) for frontend ch
 - Browser tests run against the fixtureapi harness, which serves the real API from a recorded CSV fixture.
 - Server mode loads the canonical model from the Go API. Temporary versions and recovery snapshots stay in this browser under `waypoint.remote-workspace.v1` until an explicit save or discard.
 - Applying a form creates or changes a temporary version. Saving explicitly replaces the saved plan; discarding explicitly restores it.
-- A failed storage write retains the in-memory temporary version and offers export. A stale browser tab cannot overwrite a newer stored workspace.
+- A failed storage write retains the in-memory temporary version. A stale browser tab cannot overwrite a newer stored workspace.
 - A server draft is also protected by the model content identity returned by the API. A concurrent server change blocks the save and preserves the draft for explicit recovery.
-- Read-only plans allow experimentation and export. Saving back to the read-only source is disabled. Source-owned read-only records cannot be edited or removed.
-- Imports accept a version 1 Waypoint plan JSON file, validate its structure and account references, and show a preview before replacement. Export the example plan to obtain a complete format reference.
-- Plan exports can be imported. Full workspace backups also contain the saved state and the temporary version; their individual `saved` or `draft` plan can be extracted for import.
+- Read-only plans allow experimentation. Saving back to the read-only source is disabled. Source-owned read-only records cannot be edited or removed.
+- Imports accept a version 1 Waypoint plan JSON file, validate its structure and account references, and show a preview before replacement.
 
 ## Account transactions
 

@@ -146,7 +146,7 @@ export function useResourceSession() {
 			setStatus((previous) => ({
 				...previous,
 				error:
-					"Your draft has recovery data. Export or discard the draft before signing out.",
+					"Your draft has recovery data. Discard the draft before signing out.",
 			}));
 			return;
 		}

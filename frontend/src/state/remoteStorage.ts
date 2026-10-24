@@ -250,7 +250,7 @@ export function persistRemoteState(
 		) {
 			return new StorageError({
 				detail:
-					"This remote workspace was changed in another tab. Export your temporary work, then reload the latest server model.",
+					"This remote workspace was changed in another tab. Reload the latest server model.",
 			});
 		}
 		localStorage.setItem(key, JSON.stringify(state));

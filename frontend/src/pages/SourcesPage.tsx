@@ -18,10 +18,7 @@ export function SourcesPage() {
 	const sourceAccess = readOnly ? "Read-only" : "Writable";
 	return (
 		<>
-			<SourceBanner
-				sourceAccess={sourceAccess}
-				serverDocument={serverDocument}
-			/>
+			<SourceBanner sourceAccess={sourceAccess} />
 			<AmountCatalog
 				accounts={plan.accounts.map((account) => ({
 					id: account.id,

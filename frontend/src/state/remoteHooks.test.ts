@@ -932,7 +932,7 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("keeps a stored draft available for export when hydration fails", async () => {
+	it("keeps a stored draft for recovery when hydration fails", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const { client: firstClient } = clientFixture(() => ({

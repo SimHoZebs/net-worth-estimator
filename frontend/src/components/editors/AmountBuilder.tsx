@@ -395,7 +395,6 @@ export function AmountBuilder({
 	const list = templates?.length ? templates : FALLBACK_TEMPLATES;
 	const [templateId, setTemplateId] = useState(initialTemplateId ?? "fixed");
 	const [fields, setFields] = useState<Record<string, string>>({});
-	const [copied, setCopied] = useState(false);
 	const template = list.find((item) => item.id === templateId) ?? list[0]!;
 	const amount = useMemo(
 		() => fixedAmount ?? buildTemplateAmount(template.id, fields, accounts),
@@ -415,7 +414,6 @@ export function AmountBuilder({
 							onChange={(event) => {
 								setTemplateId(event.target.value);
 								setFields({});
-								setCopied(false);
 							}}
 						>
 							{list.map((item) => (
@@ -451,20 +449,8 @@ export function AmountBuilder({
 					{wire}
 				</pre>
 			</details>
-			<div className={dialogActionsStyles}>
-				<Button
-					type="button"
-					variant="secondary"
-					onClick={() => {
-						void navigator.clipboard?.writeText(wire).then(
-							() => setCopied(true),
-							() => setCopied(false),
-						);
-					}}
-				>
-					{copied ? "Copied!" : "Copy JSON"}
-				</Button>
-				{onChange && (
+			{onChange && (
+				<div className={dialogActionsStyles}>
 					<Button
 						type="button"
 						variant="primary"
@@ -472,8 +458,8 @@ export function AmountBuilder({
 					>
 						Use this amount
 					</Button>
-				)}
-			</div>
+				</div>
+			)}
 		</div>
 	);
 }
