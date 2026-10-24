@@ -157,6 +157,10 @@ func New(store store.Store, serverConfig Config) http.Handler {
 	router.Use(middleware.Recoverer)
 	router.Use(corsMiddleware(serverConfig.AllowedOrigins))
 	router.Use(readOnlyMiddleware(serverConfig.ReadOnly))
+	// Compress JSON payloads (8 MB deterministic results gzip to ~400 KB).
+	// text/event-stream is not a compressible type, so stochastic SSE
+	// streams pass through uncompressed with flushing intact.
+	router.Use(middleware.Compress(5, "application/json"))
 	config := huma.DefaultConfig("Net Worth Estimator API", "1.0.0")
 	api := humachi.New(router, config)
 
