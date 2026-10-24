@@ -146,7 +146,7 @@ describe("sidebar account placement", () => {
 		});
 		for (const control of [
 			view.getByText("Sam Lee"),
-			view.getByRole("link", { name: "Manage sign-in methods" }),
+			view.getByRole("link", { name: "Account settings" }),
 			view.getByRole("button", { name: "Sign out" }),
 		]) {
 			expect(sidebar.contains(control)).toBe(true);
@@ -183,6 +183,6 @@ describe("sidebar account placement", () => {
 				.compareDocumentPosition(navigation) & Node.DOCUMENT_POSITION_FOLLOWING,
 		).toBeTruthy();
 		expect(view.queryByRole("button", { name: "Sign out" })).toBeNull();
-		expect(view.queryByText("Manage sign-in methods")).toBeNull();
+		expect(view.queryByText("Account settings")).toBeNull();
 	});
 });

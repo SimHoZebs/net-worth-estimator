@@ -45,7 +45,7 @@ export function WorkspaceSidebar({
 				<nav aria-label="Main navigation">
 					<ul className="grid list-none gap-1 p-0">
 						{pages
-							.filter((item) => item.id !== "sources")
+							.filter((item) => item.id !== "sources" && item.id !== "account")
 							.map((item) => (
 								<li key={item.id}>
 									<a

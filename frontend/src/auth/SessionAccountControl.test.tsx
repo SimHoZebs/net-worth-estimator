@@ -87,7 +87,7 @@ describe("session account controls", () => {
 		expect(
 			screen.queryByRole("button", { name: /sign in|sign out/i }),
 		).toBeNull();
-		expect(screen.queryByText("Manage sign-in methods")).toBeNull();
+		expect(screen.queryByText("Account settings")).toBeNull();
 		expect(screen.queryByText("Guest")).toBeNull();
 	});
 
@@ -110,7 +110,7 @@ describe("session account controls", () => {
 		renderAccount();
 		await screen.findByText("Guest");
 		expect(screen.getByText("Read-only preview")).toBeTruthy();
-		expect(screen.queryByText("Manage sign-in methods")).toBeNull();
+		expect(screen.queryByText("Account settings")).toBeNull();
 		expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 		fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
@@ -126,16 +126,16 @@ describe("session account controls", () => {
 		await screen.findByText("Sam Lee");
 		expect(
 			screen
-				.getByRole("link", { name: "Manage sign-in methods" })
+				.getByRole("link", { name: "Account settings" })
 				.getAttribute("href"),
-		).toBe(signedInSession.accountURL);
+		).toBe("#account");
 		expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
 		expect(screen.queryByRole("button", { name: "Sign in" })).toBeNull();
 		expect(screen.queryByRole("combobox")).toBeNull();
 		expect(screen.queryByText("Editor")).toBeNull();
 	});
 
-	it("falls back to the subject and omits an unconfigured account link", async () => {
+	it("falls back to the subject for the in-app account link", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () =>
@@ -148,7 +148,7 @@ describe("session account controls", () => {
 		);
 		renderAccount();
 		await screen.findByText("household-editor");
-		expect(screen.queryByText("Manage sign-in methods")).toBeNull();
+		expect(screen.queryByText("Account settings")).toBeTruthy();
 	});
 
 	it("posts logout with same-origin credentials and announces a failed attempt", async () => {

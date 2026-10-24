@@ -29,12 +29,12 @@ export function SessionAccountControl() {
 				</div>
 			</div>
 			<div className="mt-3 grid gap-1">
-				{authenticated && session.accountURL && (
+				{authenticated && (
 					<a
-						href={session.accountURL}
+						href="#account"
 						className="flex min-h-9 items-center rounded-control text-xs leading-relaxed font-medium text-muted underline decoration-line-strong underline-offset-4 hover:text-primary pointer-coarse:min-h-12"
 					>
-						Manage sign-in methods
+						Account settings
 					</a>
 				)}
 				{authenticated ? (
