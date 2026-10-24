@@ -21,7 +21,7 @@ import (
 // is global (maxArtifacts in store/artifacts.go): stochastic floods can evict
 // deterministic. Keep a per-kind floor only with product sign-off.
 
-const artifactCacheVersion = 5
+const artifactCacheVersion = 6
 
 func mustCanonical(payload any) string {
 	encoded, err := json.Marshal(payload)

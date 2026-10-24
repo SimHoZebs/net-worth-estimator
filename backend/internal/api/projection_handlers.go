@@ -15,7 +15,7 @@ import (
 // deterministicResultCacheVersion covers the deterministic payload shape.
 // See artifactCacheVersion in artifacts.go: bump both together so old
 // payloads never read as hits.
-const deterministicResultCacheVersion = 6
+const deterministicResultCacheVersion = 7
 
 // domainValidate avoids importing the domain package in multiple files.
 func domainValidate(document *types.FinancialModelDocument) []types.ModelValidationIssue {
