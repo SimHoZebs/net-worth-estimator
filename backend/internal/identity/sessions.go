@@ -34,7 +34,11 @@ func openSessions(path string) (*sessionStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
+	// Session lookups are independent point reads shared by parallel API
+	// calls from one page load. Writes stay short transactions guarded by
+	// the busy timeout, so a small pool removes head-of-line blocking
+	// without changing session semantics.
+	db.SetMaxOpenConns(8)
 	if _, err = db.Exec(`CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, data BLOB NOT NULL, expiry INTEGER NOT NULL)`); err != nil {
 		db.Close()
 		return nil, err
