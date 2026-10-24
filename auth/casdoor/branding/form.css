@@ -109,14 +109,6 @@
   block-size: auto;
   color: #5ee9b5;
 }
-.waypoint-footer {
-  margin: 0;
-  padding-inline: 1rem;
-  line-height: 1.8;
-}
-.waypoint-footer span {
-  white-space: nowrap;
-}
 @media (max-width: 1023.98px) {
   .login-panel .login-form {
     padding: 2rem;

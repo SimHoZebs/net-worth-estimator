@@ -64,6 +64,7 @@ test('writes a reproducible offline approval bundle with exact fields and visibl
     const bytes = await readFile(resolve(directory, 'plan.json'), 'utf8');
     const plan = approvedPlan(bytes, result.sha256, target);
     assert.deepEqual(plan.fields, buildBranding());
+    assert.equal(plan.fields.footerHtml, "", "provider footer stays removed");
     assert.equal(await readFile(resolve(directory, 'plan.sha256'), 'utf8'), `${digest(bytes)}  plan.json\n`);
     const html = await readFile(resolve(directory, 'review.html'), 'utf8');
     assert.ok(html.includes(plan.fields.formSideHtml));

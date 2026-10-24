@@ -36,14 +36,14 @@ a{color:#007a55}:focus-visible{outline:3px solid #007a55;outline-offset:3px}code
 <div><img src="${plan.fields.logo}" alt="Waypoint light logo"><p>Light wordmark and the existing Waypoint mark.</p></div>
 <div class="dark-logo"><img src="${plan.fields.logoDark}" alt="Waypoint dark logo"></div>
 ${plan.fields.formSideHtml}
-<div><footer>${plan.fields.footerHtml}</footer><p>The side panel appears on desktop. Mobile retains the logo and footer.</p></div>
+<div><footer>${plan.fields.footerHtml}</footer><p>The side panel appears on desktop. Mobile retains the logo.</p></div>
 </div>
 <h2>Exact presentation fields</h2>
 <p>The JSON file is authoritative. Each section below shows its exact field value, including embedded font and SVG data.</p>
 ${details}
 <h2>Limits</h2>
 <p>This changes application presentation only. It does not change permissions, plan ownership, OIDC, account policy, passwords, or passkeys.</p>
-<p>Account management and passkey enrollment remain Casdoor screens. Device passkey prompts remain browser and operating-system screens.</p>
+<p>Profile, password, and app-session management are native Waypoint screens backed by a thin Casdoor proxy. Passkey enrollment and removal remain Casdoor screens. Device passkey prompts remain browser and operating-system screens.</p>
 </main></html>\n`;
   await mkdir(directory, { mode: 0o700 });
   for (const [name, value] of Object.entries({ 'plan.json': bytes, 'plan.sha256': `${sha256}  plan.json\n`, 'review.html': html })) {
