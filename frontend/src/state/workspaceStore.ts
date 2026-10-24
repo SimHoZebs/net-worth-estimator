@@ -159,9 +159,9 @@ function conversionLossError(
 }
 
 const staleDraftMessage =
-	"This browser draft is stale because the authoritative server model changed after the draft was created. It remains available for export, but saving and editing are blocked. Discard the draft and load the latest server model before continuing.";
+	"This browser draft is stale because the authoritative server model changed after the draft was created. Saving and editing are blocked. Discard the draft and load the latest server model before continuing.";
 const missingIdentityDraftMessage =
-	"This stale browser draft has no recorded server identity, so it cannot be checked safely against the current model. It remains available for export, but saving and editing are blocked until it is discarded or explicitly recreated.";
+	"This stale browser draft has no recorded server identity, so it cannot be checked safely against the current model. Saving and editing are blocked until it is discarded or explicitly recreated.";
 
 function localStateFor(
 	workspace: RemoteWorkspace,
@@ -267,6 +267,7 @@ interface WorkspaceData {
 	status: ServerStatus | null;
 	serverDocument: FinancialModelDocument | null;
 	serverRevision: string | null;
+	// Retained for programmatic recovery/debugging; no UI reader after export removal.
 	recoveryDraft: Plan | null;
 	serverPresets: AmountPreset[] | null;
 	presetError: string | null;
@@ -551,7 +552,7 @@ export const useWorkspaceStore = create<
 				serverRevision: null,
 				recoveryDraft: localState?.draft ?? null,
 				error:
-					"The server has no financial model to display. Import and review a model before continuing. Any browser draft remains available for export.",
+					"The server has no financial model to display. Import and review a model before continuing.",
 				loading: false,
 			});
 			finishHydration();
@@ -787,8 +788,7 @@ export const useWorkspaceStore = create<
 		}
 		if (get().status?.readOnly || get().writeBlocked) {
 			set({
-				error:
-					"The server is read-only. The temporary plan remains available for export.",
+				error: "The server is read-only. The temporary plan remains unsaved.",
 			});
 			return false;
 		}

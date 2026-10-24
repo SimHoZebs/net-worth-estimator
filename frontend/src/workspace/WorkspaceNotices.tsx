@@ -1,7 +1,5 @@
 import { Check, X } from "lucide-react";
-import { Button } from "../components/Button.tsx";
 import { ErrorNotice, IconButton } from "../components/ui.tsx";
-import { download } from "../state/storage.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 
 function useErrorRecovery(): { action: string; onAction: () => void } {
@@ -35,28 +33,10 @@ export function workspaceStatusLabel({ readOnly }: { readOnly: boolean }) {
 
 export function WorkspaceNotices() {
 	const error = useWorkspaceStore((state) => state.error);
-	const volatile = useWorkspaceStore((state) => state.volatile);
-	const plan = useWorkspaceStore((state) => {
-		const workspace = state.workspace;
-		return workspace?.draft ?? workspace?.saved ?? null;
-	});
 	const recovery = useErrorRecovery();
 	return (
 		<>
 			{error && <ErrorNotice message={error} {...recovery} />}
-			{volatile && plan && (
-				<Button
-					className="mb-5"
-					onClick={() =>
-						download({
-							name: "waypoint-recovery.json",
-							content: JSON.stringify(plan, null, 2),
-						})
-					}
-				>
-					"Export local draft recovery"
-				</Button>
-			)}
 		</>
 	);
 }

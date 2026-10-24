@@ -117,9 +117,7 @@ describe("ServerApp subscriptions", () => {
 		expect(useWorkspaceNavigation).toHaveBeenCalledTimes(rootRenders);
 
 		act(() => useWorkspaceStore.setState({ volatile: true }));
-		expect(
-			screen.getByRole("button", { name: /Export local draft recovery/ }),
-		).toBeTruthy();
+		expect(screen.queryByRole("button", { name: /local draft/ })).toBeNull();
 		expect(useWorkspaceNavigation).toHaveBeenCalledTimes(rootRenders);
 
 		act(() =>

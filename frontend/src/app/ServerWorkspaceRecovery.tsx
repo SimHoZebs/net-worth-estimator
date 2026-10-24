@@ -1,12 +1,11 @@
-import { FileJson, FileUp, LockKeyhole, RotateCcw } from "lucide-react";
+import { FileUp, LockKeyhole, RotateCcw } from "lucide-react";
 import { type ReactNode, type RefObject, useRef } from "react";
 import type { FinancialModelDocument } from "../api/index.ts";
 import { parseModelDocument } from "../api/modelImport.ts";
-import { Button, TextButton } from "../components/Button.tsx";
+import { Button } from "../components/Button.tsx";
 import { Notice } from "../components/Notice.tsx";
 import { ModelImportPreview } from "../components/imports/ModelImportPreview.tsx";
 import { ErrorNotice } from "../components/ui.tsx";
-import { download } from "../state/storage.ts";
 import { useFileReview } from "../state/useFileReview.ts";
 import { useServerModelImport } from "../state/useServerModelImport.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
@@ -20,7 +19,6 @@ export function ServerWorkspaceRecovery() {
 	// model import flow and access control.
 	const status = useWorkspaceStore((state) => state.status);
 	const serverDocument = useWorkspaceStore((state) => state.serverDocument);
-	const recoveryDraft = useWorkspaceStore((state) => state.recoveryDraft);
 	const statusReadOnly = useWorkspaceStore(
 		(state) => state.status?.readOnly ?? false,
 	);
@@ -53,7 +51,6 @@ export function ServerWorkspaceRecovery() {
 		});
 	const inputRef = useRef<HTMLInputElement>(null);
 	const missingModel = status !== null && serverDocument === null;
-	const showRecoveryDraft = Boolean(recoveryDraft);
 	const importCandidate = async () => {
 		if (!candidate || readOnly) return;
 		clearCandidate();
@@ -88,25 +85,6 @@ export function ServerWorkspaceRecovery() {
 					/>
 				)}
 				{missingModel && <p>Import a reviewed model JSON file to continue.</p>}
-				{showRecoveryDraft && recoveryDraft && (
-					<Notice>
-						<FileJson size={18} />
-						<span>
-							A draft is available for recovery. Export it before retrying; it
-							will not be uploaded automatically.
-						</span>
-						<TextButton
-							onClick={() =>
-								download({
-									name: "waypoint-remote-draft-recovery.json",
-									content: JSON.stringify(recoveryDraft, null, 2),
-								})
-							}
-						>
-							Export browser draft
-						</TextButton>
-					</Notice>
-				)}
 				{missingModel && (
 					<ServerModelImport
 						readOnly={readOnly}

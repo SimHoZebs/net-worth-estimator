@@ -194,7 +194,7 @@ describe("session account controls", () => {
 		act(() => useWorkspaceStore.setState({ volatile: true }));
 		fireEvent.click(logoutButton);
 		expect((await screen.findByRole("alert")).textContent).toBe(
-			"Your draft has recovery data. Export or discard the draft before signing out.",
+			"Your draft has recovery data. Discard the draft before signing out.",
 		);
 		expect(fetcher).toHaveBeenCalledTimes(1);
 		expect(useWorkspaceStore.getState().volatile).toBe(true);
