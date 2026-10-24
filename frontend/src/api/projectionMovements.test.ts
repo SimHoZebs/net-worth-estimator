@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { deriveFundingGaps } from "../domain/fundingGaps.ts";
 import { testPlan } from "../test/plan.ts";
 import { projectionFixture } from "../test/projection.ts";
-import type { MovementEvent, ProjectionResult } from "./contracts.ts";
+import type {
+	FinancialModelDocument,
+	MovementEvent,
+	ProjectionResult,
+} from "./contracts.ts";
 import { projectionMovements } from "./projectionMovements.ts";
 
 function serverProjection(events: MovementEvent[]): ProjectionResult {
@@ -102,5 +106,39 @@ describe("projection movement evidence", () => {
 			"z-first",
 			"a-second",
 		]);
+	});
+
+	it("resolves names from the document index with postings winning ties", () => {
+		const document = {
+			checkpoints: [],
+			postings: [
+				{
+					id: "bill",
+					name: "Electric bill",
+					sourceAccountId: "checking",
+					destinations: ["utility"],
+					enabled: true,
+				},
+			],
+			recurrenceRules: [
+				{
+					id: "bill",
+					name: "Stale rule bill",
+					sourceAccountId: "savings",
+					destinations: ["utility"],
+					enabled: true,
+				},
+			],
+		} as unknown as FinancialModelDocument;
+		const movements = projectionMovements(
+			serverProjection([event()]),
+			document,
+		);
+		expect(movements[0]).toMatchObject({
+			movementId: "bill",
+			name: "Electric bill",
+			fromId: "checking",
+			toId: "utility",
+		});
 	});
 });
