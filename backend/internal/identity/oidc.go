@@ -3,6 +3,7 @@ package identity
 import (
 	"context"
 	"crypto/subtle"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -20,13 +21,57 @@ func (s *Service) login(w http.ResponseWriter, r *http.Request) {
 		s.sessions.SetDeadline(r.Context(), time.Now().Add(10*time.Minute))
 	}
 	state, nonce, verifier := oauth2.GenerateVerifier(), oauth2.GenerateVerifier(), oauth2.GenerateVerifier()
-	s.sessions.Put(r.Context(), "state", state)
-	s.sessions.Put(r.Context(), "nonce", nonce)
-	s.sessions.Put(r.Context(), "verifier", verifier)
-	s.sessions.Put(r.Context(), "login_at", time.Now().UnixNano())
-	s.sessions.Put(r.Context(), "login_origin", endpoint.app)
+	pending := loadPendingLogins(s.sessions.GetString(r.Context(), "pending_logins"))
+	pending[state] = pendingLogin{Nonce: nonce, Verifier: verifier, Origin: endpoint.app, At: time.Now().UnixNano()}
+	s.sessions.Put(r.Context(), "pending_logins", savePendingLogins(pending))
 	oauth := s.browserOAuth(endpoint)
 	http.Redirect(w, r, oauth.AuthCodeURL(state, oidc.Nonce(nonce), oauth2.S256ChallengeOption(verifier)), http.StatusFound)
+}
+
+// pendingLogin tracks one outstanding authorization redirect. Several can
+// coexist when sign-in starts twice (a second tap, a restored tab, back and
+// forth between app and provider). Each callback consumes only its own entry,
+// so finishing the older flow still validates.
+type pendingLogin struct {
+	Nonce    string
+	Verifier string
+	Origin   string
+	At       int64
+}
+
+func loadPendingLogins(raw string) map[string]pendingLogin {
+	pending := map[string]pendingLogin{}
+	if raw == "" {
+		return pending
+	}
+	var decoded map[string]pendingLogin
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		return pending
+	}
+	for state, entry := range decoded {
+		if entry.Nonce == "" || entry.Verifier == "" || entry.Origin == "" || time.Since(time.Unix(0, entry.At)) > 10*time.Minute {
+			continue
+		}
+		pending[state] = entry
+	}
+	for len(pending) > 3 {
+		oldest := ""
+		for state, entry := range pending {
+			if oldest == "" || entry.At < pending[oldest].At {
+				oldest = state
+			}
+		}
+		delete(pending, oldest)
+	}
+	return pending
+}
+
+func savePendingLogins(pending map[string]pendingLogin) string {
+	raw, err := json.Marshal(pending)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
 }
 
 func (s *Service) verifiedIdentity(ctx context.Context, token *oauth2.Token, nonce, subject string) (*oidc.IDToken, error) {
@@ -53,25 +98,29 @@ func (s *Service) verifiedIdentity(ctx context.Context, token *oauth2.Token, non
 
 func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 	endpoint, _ := s.browserEndpoint(r)
-	loginOrigin := s.sessions.PopString(r.Context(), "login_origin")
-	state := s.sessions.PopString(r.Context(), "state")
-	nonce := s.sessions.PopString(r.Context(), "nonce")
-	verifier := s.sessions.PopString(r.Context(), "verifier")
-	loginAt := s.sessions.GetInt64(r.Context(), "login_at")
-	s.sessions.Remove(r.Context(), "login_at")
-	started := time.Unix(0, loginAt)
-	if loginOrigin != endpoint.app || state == "" || nonce == "" || verifier == "" || time.Since(started) > 10*time.Minute || started.After(time.Now().Add(30*time.Second)) || subtle.ConstantTimeCompare([]byte(state), []byte(r.URL.Query().Get("state"))) != 1 || r.URL.Query().Get("code") == "" {
+	pending := loadPendingLogins(s.sessions.GetString(r.Context(), "pending_logins"))
+	var entry pendingLogin
+	for state, candidate := range pending {
+		if subtle.ConstantTimeCompare([]byte(state), []byte(r.URL.Query().Get("state"))) == 1 {
+			entry = candidate
+			delete(pending, state)
+			break
+		}
+	}
+	s.sessions.Put(r.Context(), "pending_logins", savePendingLogins(pending))
+	started := time.Unix(0, entry.At)
+	if entry.Origin != endpoint.app || entry.Nonce == "" || entry.Verifier == "" || time.Since(started) > 10*time.Minute || started.After(time.Now().Add(30*time.Second)) || r.URL.Query().Get("code") == "" {
 		failure(w, 400, "The login expired or its state is invalid. Start sign-in again.")
 		return
 	}
 	ctx := oidc.ClientContext(r.Context(), s.client)
 	oauth := s.browserOAuth(endpoint)
-	token, err := oauth.Exchange(ctx, r.URL.Query().Get("code"), oauth2.VerifierOption(verifier))
+	token, err := oauth.Exchange(ctx, r.URL.Query().Get("code"), oauth2.VerifierOption(entry.Verifier))
 	if err != nil {
 		failure(w, 401, "The provider did not complete sign-in.")
 		return
 	}
-	id, err := s.verifiedIdentity(ctx, token, nonce, "")
+	id, err := s.verifiedIdentity(ctx, token, entry.Nonce, "")
 	if err != nil || token.AccessToken == "" || token.RefreshToken == "" {
 		failure(w, 401, "The provider identity and persistent grant could not be verified.")
 		return
@@ -83,8 +132,8 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	raw, _ := token.Extra("id_token").(string)
 	g := grant{ID: oauth2.GenerateVerifier(), Issuer: s.config.Issuer, Subject: id.Subject, SID: claims.SID,
-		Name: claims.Name, Nonce: nonce, AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, IDToken: raw,
-		LoginStartedAt: loginAt, TokenExpiry: tokenDeadline(token, id), Expiry: time.Now().Add(s.config.Lifetime).Unix()}
+		Name: claims.Name, Nonce: entry.Nonce, AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, IDToken: raw,
+		LoginStartedAt: entry.At, TokenExpiry: tokenDeadline(token, id), Expiry: time.Now().Add(s.config.Lifetime).Unix()}
 	if err := s.introspect(ctx, g); err != nil {
 		failure(w, 401, "The provider grant is no longer active. Start sign-in again.")
 		return

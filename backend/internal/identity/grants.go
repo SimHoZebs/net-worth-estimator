@@ -108,6 +108,36 @@ func (s *sessionStore) deleteGrant(id, issuer string) error {
 	return err
 }
 
+// deleteSubjectGrants ends every app session for a subject, for example after
+// a password change. Provider tokens are already expired by Casdoor at that
+// point; this keeps the local session list honest immediately instead of
+// waiting for the next recheck to discard each grant lazily.
+func (s *sessionStore) deleteSubjectGrants(issuer, subject string) error {
+	_, err := s.db.Exec(`DELETE FROM identity_grants WHERE issuer=? AND subject=?`, issuer, subject)
+	return err
+}
+
+func (s *sessionStore) listGrants(issuer, subject string) ([]grant, error) {
+	rows, err := s.db.Query(`SELECT data FROM identity_grants WHERE issuer=? AND subject=? AND expiry>?`, issuer, subject, time.Now().Unix())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []grant
+	for rows.Next() {
+		var data []byte
+		if err := rows.Scan(&data); err != nil {
+			return nil, err
+		}
+		var g grant
+		if err := json.Unmarshal(data, &g); err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
 // Replay records and grant deletion share a transaction. Retries cannot revoke
 // a later login twice, and a delayed callback cannot restore an older login.
 func (s *sessionStore) revokeGrants(issuer, subject, sid, jti string, lifetime time.Duration) error {
