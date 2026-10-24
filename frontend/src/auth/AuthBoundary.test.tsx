@@ -26,11 +26,23 @@ const privateResource = {
 
 beforeEach(() => vi.stubGlobal("BroadcastChannel", undefined));
 
+let savedVisibilityState: PropertyDescriptor | undefined;
+let visibilityStateTouched = false;
+
 afterEach(() => {
 	cleanup();
 	resetServerQueryCache();
 	vi.unstubAllGlobals();
 	vi.clearAllMocks();
+	if (visibilityStateTouched) {
+		if (savedVisibilityState) {
+			Object.defineProperty(document, "visibilityState", savedVisibilityState);
+		} else {
+			Reflect.deleteProperty(document, "visibilityState");
+		}
+		savedVisibilityState = undefined;
+		visibilityStateTouched = false;
+	}
 });
 
 function status(body: unknown, code = 200) {
@@ -114,6 +126,54 @@ describe("provider-independent authentication boundary", () => {
 		).toBeTruthy();
 		expect(screen.queryByText("Private workspace")).toBeNull();
 		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalled());
+	});
+	it("starts only one automatic sign-in across re-verification", async () => {
+		const fetcher = vi.fn(async () =>
+			status({
+				enabled: true,
+				authenticated: false,
+				allowed: false,
+				resource: { ...sampleResource, permissions: [] },
+			}),
+		);
+		vi.stubGlobal("fetch", fetcher);
+		render(
+			<AuthBoundary>
+				<p>Private workspace</p>
+			</AuthBoundary>,
+		);
+		await screen.findByRole("button", { name: "Continue to sign in" });
+		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalledTimes(1));
+		// Back-button restore, focus, and visibility re-verify the session.
+		// Settle each re-verification first, then assert no second login
+		// started that would orphan the first attempt.
+		const settled = async () => {
+			const calls = fetcher.mock.calls.length;
+			await waitFor(() =>
+				expect(fetcher.mock.calls.length).toBeGreaterThan(calls),
+			);
+			expect(screen.queryByText("Private workspace")).toBeNull();
+		};
+		window.dispatchEvent(new Event("focus"));
+		await settled();
+		expect(redirectToSignIn).toHaveBeenCalledTimes(1);
+		savedVisibilityState = Object.getOwnPropertyDescriptor(
+			document,
+			"visibilityState",
+		);
+		visibilityStateTouched = true;
+		Object.defineProperty(document, "visibilityState", {
+			value: "visible",
+			configurable: true,
+		});
+		document.dispatchEvent(new Event("visibilitychange"));
+		await settled();
+		expect(redirectToSignIn).toHaveBeenCalledTimes(1);
+		const pageshow = new Event("pageshow");
+		Object.defineProperty(pageshow, "persisted", { value: true });
+		window.dispatchEvent(pageshow);
+		await settled();
+		expect(redirectToSignIn).toHaveBeenCalledTimes(1);
 	});
 	it("keeps denied accounts closed with retry and sign-out", async () => {
 		const fetcher = vi.fn(async () =>
