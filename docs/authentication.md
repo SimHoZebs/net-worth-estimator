@@ -160,6 +160,15 @@ caps the provider session at 24 hours despite a 30-day cookie. Application
 refresh grants remain separate. They can outlive that provider browser session
 until revoked or their own deadline ends.
 
+## Account management
+
+The in-app Account page covers display name, password change, and other-device
+sign-out. It forwards to Casdoor as the caller and passes Casdoor's own
+validation through. Password rules, history, and lockout stay in Casdoor.
+Changing the password ends every app session and requires a fresh sign-in.
+Passkeys stay bound to the provider hostname, so enrollment and removal link
+out to the provider page from the Account page.
+
 ## Account recovery
 
 Keep the Casdoor administrator credential in a password manager with an offline

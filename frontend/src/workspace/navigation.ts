@@ -5,6 +5,7 @@ import {
 	LayoutDashboard,
 	Settings,
 	ShoppingBag,
+	UserRound,
 	Wallet,
 } from "lucide-react";
 
@@ -14,7 +15,8 @@ export type Page =
 	| "transactions"
 	| "purchases"
 	| "evaluations"
-	| "sources";
+	| "sources"
+	| "account";
 export type PageDefinition = {
 	id: Page;
 	label: string;
@@ -58,6 +60,12 @@ export const pages: PageDefinition[] = [
 		label: "Configs",
 		icon: Settings,
 		title: "How the plan is configured",
+	},
+	{
+		id: "account",
+		label: "Account",
+		icon: UserRound,
+		title: "Account and sign-in",
 	},
 ];
 
