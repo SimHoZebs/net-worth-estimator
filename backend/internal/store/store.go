@@ -62,16 +62,16 @@ type Store interface {
 	ListAccountLinks() ([]AccountLink, error)
 	SaveAccountLink(link AccountLink) (AccountLink, error)
 	DeleteAccountLink(bridgeAccountID string) error
-	ProvisionSyncAccounts(items []SyncProvision, dryRun bool) (map[string]string, int, []string, error)
+	ProvisionSyncAccounts(items []SyncProvision) (map[string]string, int, []string, error)
 	// GetLastSyncTime reports the completion time of the last successful
 	// SimpleFIN sync as RFC3339 UTC, or "" when no sync has completed yet.
 	GetLastSyncTime() (string, error)
 	// SetLastSyncTime records a successful sync completion time. Callers
-	// pass RFC3339 UTC; dry runs and failed runs must not record.
+	// pass RFC3339 UTC; failed runs must not record.
 	SetLastSyncTime(completedAt string) error
 	GetArtifact(identity string) (string, bool, error)
 	PutArtifact(identity, kind, payload string) error
-	ApplySyncPlan(checkpoints []SyncCheckpoint, pending []SyncPosting, cardAccounts []string, dryRun bool) (SyncApplySummary, error)
+	ApplySyncPlan(checkpoints []SyncCheckpoint, pending []SyncPosting, cardAccounts []string) (SyncApplySummary, error)
 	Clear() error
 	Close() error
 }

@@ -14,8 +14,6 @@ type Config struct {
 	// CardAccounts lists model account IDs treated as cards: only these get
 	// pending seed postings.
 	CardAccounts map[string]struct{}
-	// DryRun logs planned writes without applying them.
-	DryRun bool
 	// MinTriggerInterval spaces successful manual trigger runs. Zero means
 	// DefaultMinTriggerInterval, matching the Bridge daily-update quota.
 	MinTriggerInterval time.Duration
@@ -34,12 +32,6 @@ func ParseCardAccounts(value string) map[string]struct{} {
 		}
 	}
 	return accounts
-}
-
-// ParseDryRun reports whether dry-run mode is on. Only "1" enables it, so
-// the first live run cannot happen by typo.
-func ParseDryRun(value string) bool {
-	return strings.TrimSpace(value) == "1"
 }
 
 // ParsePositiveDuration parses a Go duration string (e.g. "6h", "90m") for

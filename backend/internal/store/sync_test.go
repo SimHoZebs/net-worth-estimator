@@ -124,8 +124,7 @@ func seedSyncState(t *testing.T, store Store) {
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-01", Balance: 111}},
 		[]SyncPosting{syncPendingPosting("tx1", "prime_card", "2026-08-02")},
-		[]string{"prime_card"}, false,
-	)
+		[]string{"prime_card"})
 	if err != nil || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
 		t.Fatalf("seed sync state = %+v, err %v", summary, err)
 	}
@@ -413,20 +412,6 @@ func syncedPendingIDs(document *types.FinancialModelDocument) []string {
 	return ids
 }
 
-// hasSimpleFINRows reports whether a loaded document carries any sync-owned
-// rows (used to prove dry runs write nothing).
-func hasSimpleFINRows(document *types.FinancialModelDocument) bool {
-	if document == nil {
-		return false
-	}
-	for _, checkpoint := range document.Checkpoints {
-		if checkpoint.Source == SourceSimpleFIN {
-			return true
-		}
-	}
-	return len(syncedPendingIDs(document)) > 0
-}
-
 func TestApplySyncPlanCheckpointLifecycle(t *testing.T) {
 	testApplySyncPlanCheckpointLifecycle(t, openTestStore)
 }
@@ -441,24 +426,21 @@ func testApplySyncPlanCheckpointLifecycle(t *testing.T, newStore func(*testing.T
 
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
-		nil, cards, false,
-	)
+		nil, cards)
 	if err != nil || summary.CheckpointsInserted != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
 
 	again, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
-		nil, cards, false,
-	)
+		nil, cards)
 	if err != nil || again.CheckpointsUpdated != 1 || again.CheckpointsInserted != 0 {
 		t.Fatalf("rerun = %+v, err %v", again, err)
 	}
 
 	changed, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 150}},
-		nil, cards, false,
-	)
+		nil, cards)
 	if err != nil || changed.CheckpointsUpdated != 1 {
 		t.Fatalf("update = %+v, err %v", changed, err)
 	}
@@ -490,8 +472,7 @@ func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T
 	_ = extra
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
-		nil, []string{"checking"}, false,
-	)
+		nil, []string{"checking"})
 	if err != nil || summary.CheckpointsSkipped != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
@@ -518,7 +499,7 @@ func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*test
 	first, err := store.ApplySyncPlan(nil, []SyncPosting{
 		syncPendingPosting("a", "prime_card", "2026-08-02"),
 		syncPendingPosting("b", "prime_card", "2026-08-02"),
-	}, cards, false)
+	}, cards)
 	if err != nil || first.PendingInserted != 2 {
 		t.Fatalf("first apply = %+v, err %v", first, err)
 	}
@@ -526,7 +507,7 @@ func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*test
 	second, err := store.ApplySyncPlan(nil, []SyncPosting{
 		syncPendingPosting("b", "prime_card", "2026-08-03"),
 		syncPendingPosting("c", "prime_card", "2026-08-03"),
-	}, cards, false)
+	}, cards)
 	if err != nil || second.PendingDeleted != 1 || second.PendingInserted != 1 || second.PendingUpdated != 1 {
 		t.Fatalf("second apply = %+v, err %v", second, err)
 	}
@@ -554,36 +535,11 @@ func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
 	})
 	summary, err := store.ApplySyncPlan(nil, []SyncPosting{
 		syncPendingPosting("a", "prime_card", "2026-08-02"),
-	}, []string{"prime_card"}, false)
+	}, []string{"prime_card"})
 	if err != nil || summary.PendingInserted != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
 	if got := countRows(t, store, "postings", "id = '"+ownerPostingID+"'"); got != 1 {
 		t.Fatal("owner row was deleted")
-	}
-}
-
-func TestApplySyncPlanDryRunWritesNothing(t *testing.T) {
-	testApplySyncPlanDryRunWritesNothing(t, openTestStore)
-}
-
-func testApplySyncPlanDryRunWritesNothing(t *testing.T, newStore func(*testing.T) Store) {
-	t.Helper()
-	store := newStore(t)
-	seedOwnerDocument(t, store)
-	summary, err := store.ApplySyncPlan(
-		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
-		[]SyncPosting{syncPendingPosting("a", "prime_card", "2026-08-02")},
-		[]string{"prime_card"}, true,
-	)
-	if err != nil || !summary.DryRun || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
-		t.Fatalf("dry run = %+v, err %v", summary, err)
-	}
-	loaded, err := store.LoadDocument()
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	if hasSimpleFINRows(loaded) {
-		t.Fatalf("dry run wrote sync rows: %+v", loaded)
 	}
 }

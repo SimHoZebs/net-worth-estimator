@@ -6,11 +6,10 @@ import (
 	"testing"
 )
 
-// TestPurgeSyncScriptClearsSyncRows executes the versioned cutover script
+// TestPurgeSyncScriptClearsSyncRows executes the versioned purge script
 // and proves it removes all sync-owned rows while preserving owner rows.
-// The script intentionally deletes by source, not by ID: mock and real rows
-// are identical by design, so cutover purges both and the first real sync
-// re-inserts fresh state.
+// The script intentionally deletes by source, not by ID, so it clears all
+// sync-owned rows and the next sync re-inserts fresh state.
 func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	store := openSQLiteStore(t)
 	seedOwnerDocument(t, store)

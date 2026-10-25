@@ -20,7 +20,7 @@ func TestPendingUUIDsUseExactUpstreamKeysAndSurviveRefresh(t *testing.T) {
 	other := syncPendingPosting("a/b", "other_card", "2026-08-02")
 	incoming = append(incoming, other)
 	cards := []string{"prime_card", "other_card"}
-	first, err := database.ApplySyncPlan(nil, incoming, cards, false)
+	first, err := database.ApplySyncPlan(nil, incoming, cards)
 	if err != nil || first.PendingInserted != len(incoming) {
 		t.Fatalf("first = %+v, err %v", first, err)
 	}
@@ -42,7 +42,7 @@ func TestPendingUUIDsUseExactUpstreamKeysAndSurviveRefresh(t *testing.T) {
 	if len(ids) != len(incoming) || countRows(t, database, "posting_sync_keys", "") != len(incoming) {
 		t.Fatal("distinct raw provider keys collapsed into one identity")
 	}
-	again, err := database.ApplySyncPlan(nil, incoming, cards, false)
+	again, err := database.ApplySyncPlan(nil, incoming, cards)
 	if err != nil || again.PendingUpdated != len(incoming) || again.PendingInserted != 0 || again.PendingDeleted != 0 {
 		t.Fatalf("repeat = %+v, err %v", again, err)
 	}
@@ -51,7 +51,7 @@ func TestPendingUUIDsUseExactUpstreamKeysAndSurviveRefresh(t *testing.T) {
 		t.Fatal("repeated snapshot changed local IDs or financial content")
 	}
 	// A duplicate delivery of the same upstream identity remains one row.
-	if _, err := database.ApplySyncPlan(nil, append(incoming, incoming[0]), cards, false); err != nil {
+	if _, err := database.ApplySyncPlan(nil, append(incoming, incoming[0]), cards); err != nil {
 		t.Fatal(err)
 	}
 	if countRows(t, database, "posting_sync_keys", "") != len(incoming) {
@@ -72,30 +72,8 @@ func TestPendingUUIDsUseExactUpstreamKeysAndSurviveRefresh(t *testing.T) {
 	if countRows(t, database, "posting_sync_keys", "") != len(incoming) {
 		t.Fatal("owner replacement lost private upstream identities")
 	}
-	final, err := database.ApplySyncPlan(nil, incoming, cards, false)
+	final, err := database.ApplySyncPlan(nil, incoming, cards)
 	if err != nil || final.PendingInserted != 0 || final.PendingDeleted != 0 {
 		t.Fatalf("sync after owner replacement = %+v, err %v", final, err)
-	}
-}
-
-func TestPendingSnapshotDryRunPreservesExistingIdentities(t *testing.T) {
-	database := openSQLiteStore(t)
-	seedOwnerDocument(t, database)
-	original := []SyncPosting{syncPendingPosting("same", "card", "2026-08-02"), syncPendingPosting("remove", "card", "2026-08-02")}
-	if _, err := database.ApplySyncPlan(nil, original, []string{"card"}, false); err != nil {
-		t.Fatal(err)
-	}
-	before, err := database.LoadDocument()
-	if err != nil {
-		t.Fatal(err)
-	}
-	updated := []SyncPosting{syncPendingPosting("same", "card", "2026-08-03"), syncPendingPosting("new", "card", "2026-08-03")}
-	summary, err := database.ApplySyncPlan(nil, updated, []string{"card"}, true)
-	if err != nil || summary.PendingInserted != 1 || summary.PendingUpdated != 1 || summary.PendingDeleted != 1 {
-		t.Fatalf("dry run = %+v, err %v", summary, err)
-	}
-	after, err := database.LoadDocument()
-	if err != nil || !reflect.DeepEqual(before, after) || countRows(t, database, "posting_sync_keys", "") != 2 {
-		t.Fatal("dry run changed stored posting identities or financial data")
 	}
 }

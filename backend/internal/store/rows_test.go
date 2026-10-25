@@ -261,24 +261,10 @@ func TestProvisionSyncAccounts(t *testing.T) {
 	if _, err := store.SaveAccountLink(AccountLink{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", BridgeName: "Old"}); err != nil {
 		t.Fatalf("save link: %v", err)
 	}
-	// Dry run resolves and counts without committing.
 	resolved, provisioned, stale, err := store.ProvisionSyncAccounts([]SyncProvision{
 		{BridgeID: "bridge-checking", Name: "College", Currency: "USD", Kind: types.AccountKind("cash")},
 		{BridgeID: "bridge-new", Name: "New Card", Currency: "USD", Kind: types.AccountKind("debt")},
-	}, true)
-	if err != nil {
-		t.Fatalf("dry-run provision: %v", err)
-	}
-	if provisioned != 1 || resolved["bridge-checking"] != "checking" || resolved["bridge-new"] == "" {
-		t.Fatalf("dry-run resolved = %v provisioned = %d", resolved, provisioned)
-	}
-	if links, err := store.ListAccountLinks(); err != nil || len(links) != 1 {
-		t.Fatalf("dry run changed links: %+v, err %v", links, err)
-	}
-	resolved, provisioned, stale, err = store.ProvisionSyncAccounts([]SyncProvision{
-		{BridgeID: "bridge-checking", Name: "College", Currency: "USD", Kind: types.AccountKind("cash")},
-		{BridgeID: "bridge-new", Name: "New Card", Currency: "USD", Kind: types.AccountKind("debt")},
-	}, false)
+	})
 	if err != nil {
 		t.Fatalf("provision: %v", err)
 	}
@@ -306,7 +292,7 @@ func TestProvisionSyncAccounts(t *testing.T) {
 	// Re-running is idempotent: links resolve, nothing new is created.
 	_, provisioned, stale, err = store.ProvisionSyncAccounts([]SyncProvision{
 		{BridgeID: "bridge-new", Name: "Renamed Card", Currency: "USD", Kind: types.AccountKind("debt")},
-	}, false)
+	})
 	if err != nil || provisioned != 0 {
 		t.Fatalf("re-provision = %d, err %v", provisioned, err)
 	}
@@ -337,7 +323,7 @@ func TestProvisionReportsStaleLinks(t *testing.T) {
 	}
 	resolved, provisioned, stale, err := store.ProvisionSyncAccounts([]SyncProvision{
 		{BridgeID: "bridge-checking", Name: "College", Currency: "USD", Kind: types.AccountKind("cash")},
-	}, false)
+	})
 	if err != nil {
 		t.Fatalf("provision: %v", err)
 	}
@@ -356,7 +342,7 @@ func TestProvisionReportsStaleLinks(t *testing.T) {
 	}
 	resolved, _, stale, err = store.ProvisionSyncAccounts([]SyncProvision{
 		{BridgeID: "bridge-checking", Name: "College", Currency: "USD", Kind: types.AccountKind("cash")},
-	}, false)
+	})
 	if err != nil || resolved["bridge-checking"] != "checking" || len(stale) != 0 {
 		t.Fatalf("relink resolved = %v stale = %v err %v", resolved, stale, err)
 	}
