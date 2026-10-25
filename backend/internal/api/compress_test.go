@@ -36,6 +36,7 @@ func deterministicTestBody(t *testing.T) []byte {
 	raw, err := json.Marshal(projectionRequestBody{
 		Document: fixture.Document,
 		Settings: fixture.Settings,
+		Range:    fullSpanRange(),
 	})
 	if err != nil {
 		t.Fatalf("encode deterministic body: %v", err)

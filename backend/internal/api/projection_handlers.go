@@ -42,10 +42,12 @@ type projectionRequestBody struct {
 	Overrides types.ModelOverrides            `json:"overrides,omitempty"`
 	Settings  types.ProjectionRuntimeSettings `json:"settings"`
 	// Range clips the returned timeline to [startDate, endDate], both
-	// inclusive ISO dates. Either bound may be omitted for an open end;
-	// an omitted range returns everything. The stored artifact is always
-	// the full result, so a narrow request warms the later full one.
-	Range *projectionRange `json:"range,omitempty"`
+	// inclusive ISO dates. Either bound may be omitted for an open end,
+	// but the range itself is required: without one the server cannot
+	// know what to return, and it guesses nothing. The stored artifact is
+	// always the full result, so a narrow request warms the later full
+	// one.
+	Range *projectionRange `json:"range,omitempty" required:"true"`
 }
 
 // projectionRange is a closed date interval over the timeline.
@@ -117,11 +119,12 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 	return output, nil
 }
 
-// validateProjectionRange rejects malformed or inverted intervals before
+// validateProjectionRange enforces the no-fallback contract: a missing
+// or empty range, malformed dates, and inverted intervals all fail before
 // any resolve, lookup, or compute. ISO dates compare lexicographically.
 func validateProjectionRange(r *projectionRange) error {
-	if r == nil {
-		return nil
+	if r == nil || (r.StartDate == "" && r.EndDate == "") {
+		return huma.Error400BadRequest("range is required: set startDate and/or endDate")
 	}
 	for _, date := range []string{r.StartDate, r.EndDate} {
 		if date != "" && !domain.IsValidIsoDate(date) {
@@ -149,12 +152,17 @@ func formatProjectionRange(r *projectionRange) string {
 	return start + ".." + end
 }
 
-// clipProjectionRange returns the requested timeline slice. It builds new
-// row and event slices and never mutates the cached or computed result, so
-// shared backing arrays stay intact for later requests. Evaluations ride
+// clipProjectionRange returns the requested timeline slice. The range is
+// always present here: the handler rejects missing and empty ranges, so
+// there is no default to maintain. It builds new row and event slices and
+// never mutates the cached or computed result, so shared backing arrays
+// stay intact for later requests. Evaluations ride
 // along only when the slice holds projected rows: they summarize the whole
 // projection and are meaningless over history alone.
 func clipProjectionRange(result *types.ProjectionResult, r *projectionRange) *types.ProjectionResult {
+	// Defensive: the handler rejects nil ranges, so this branch is
+	// unreachable in production. It keeps the helper safe for
+	// direct callers.
 	if r == nil {
 		return result
 	}

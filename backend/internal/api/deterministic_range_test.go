@@ -15,6 +15,13 @@ import (
 
 // The range parameter clips one cached full result by date: narrowed
 // requests share the full artifact instead of computing separately.
+// fullSpanRange states the whole timeline explicitly: the endpoint has
+// no default range, so tests wanting everything name a span that covers
+// any fixture.
+func fullSpanRange() *projectionRange {
+	return &projectionRange{StartDate: "2000-01-01", EndDate: "2100-01-01"}
+}
+
 func rangeRequest(t *testing.T, handler http.Handler, body []byte) *httptest.ResponseRecorder {
 	t.Helper()
 	request := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
@@ -66,7 +73,7 @@ func TestDeterministicRangeClipsOneArtifact(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 
-	full := decodeRangeResult(t, rangeRequest(t, handler, rangeBody(t, nil)))
+	full := decodeRangeResult(t, rangeRequest(t, handler, rangeBody(t, fullSpanRange())))
 	if len(full.Timeline.Rows) == 0 || len(full.MovementEvents) == 0 {
 		t.Fatal("fixture has no rows or events to clip")
 	}
@@ -140,7 +147,7 @@ func TestDeterministicRangeClipsOneArtifact(t *testing.T) {
 func TestDeterministicNarrowWarmsFullRequest(t *testing.T) {
 	probe := openAPIStore(t)
 	probeHandler := New(probe, Config{})
-	full := decodeRangeResult(t, rangeRequest(t, probeHandler, rangeBody(t, nil)))
+	full := decodeRangeResult(t, rangeRequest(t, probeHandler, rangeBody(t, fullSpanRange())))
 	mid := full.Timeline.Rows[len(full.Timeline.Rows)/2].Date
 
 	database := openAPIStore(t)
@@ -149,7 +156,7 @@ func TestDeterministicNarrowWarmsFullRequest(t *testing.T) {
 	if got := first.Header().Get("X-Cache"); got != "miss" {
 		t.Fatalf("narrow X-Cache = %q, want miss", got)
 	}
-	second := rangeRequest(t, handler, rangeBody(t, nil))
+	second := rangeRequest(t, handler, rangeBody(t, fullSpanRange()))
 	if got := second.Header().Get("X-Cache"); got != "hit" {
 		t.Fatalf("full X-Cache after narrow = %q, want hit", got)
 	}
@@ -158,14 +165,21 @@ func TestDeterministicNarrowWarmsFullRequest(t *testing.T) {
 func TestDeterministicRangeRejectsBadIntervals(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
-	for _, r := range []*projectionRange{
-		{StartDate: "2026-05-01", EndDate: "2026-01-01"},
-		{StartDate: "not-a-date"},
-		{StartDate: "2026-13-99"},
+	// A missing range fails huma request validation (422); a present
+	// but empty or invalid range fails in the handler (400).
+	for _, test := range []struct {
+		r    *projectionRange
+		want int
+	}{
+		{nil, http.StatusUnprocessableEntity},
+		{&projectionRange{}, http.StatusBadRequest},
+		{&projectionRange{StartDate: "2026-05-01", EndDate: "2026-01-01"}, http.StatusBadRequest},
+		{&projectionRange{StartDate: "not-a-date"}, http.StatusBadRequest},
+		{&projectionRange{StartDate: "2026-13-99"}, http.StatusBadRequest},
 	} {
-		response := rangeRequest(t, handler, rangeBody(t, r))
-		if response.Code != http.StatusBadRequest {
-			t.Fatalf("range %+v status = %d, want 400", r, response.Code)
+		response := rangeRequest(t, handler, rangeBody(t, test.r))
+		if response.Code != test.want {
+			t.Fatalf("range %+v status = %d, want %d", test.r, response.Code, test.want)
 		}
 	}
 }

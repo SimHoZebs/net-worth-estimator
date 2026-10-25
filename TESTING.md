@@ -253,7 +253,8 @@ jq -n --arg start "$START_DATE" '{
       netWorthThreshold: [],
       postingFulfillment: []
     }
-  }
+  },
+  range: { startDate: "2000-01-01", endDate: "2100-01-01" }
 }' > /tmp/deterministic-request.json
 
 curl -fsS -D /tmp/deterministic-headers \

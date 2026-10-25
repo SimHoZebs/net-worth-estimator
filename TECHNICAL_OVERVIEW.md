@@ -92,7 +92,7 @@ Resolution rules:
 - If `document` is omitted, the stored model supplies it.
 - A supplied document affects only that request.
 - `overrides` are applied by `types.ApplyModelOverrides` to a new document value; stored state is unchanged.
-- `range` clips the returned timeline to a closed date interval. Either bound may be omitted for an open end; an omitted range returns everything. Rows and movement events outside the interval are dropped. Evaluations ride along only when the slice holds projected rows. Totals, summary, milestones, and account summaries keep full-result values in every range. Unknown shapes return 400. The stored artifact is always the full result regardless of range, so a narrow request warms the later full request instead of computing twice.
+- `range` clips the returned timeline to a closed date interval and is required: a missing range fails request validation (422), and an empty, malformed, or inverted range returns 400. Either bound may be omitted for an open end. Rows and movement events outside the interval are dropped. Evaluations ride along only when the slice holds projected rows. Totals, summary, milestones, and account summaries keep full-result values in every range. The stored artifact is always the full result regardless of range, so a narrow request warms the later full request instead of computing twice.
 
 A successful response has `result` and `X-Cache: hit|miss`.
 

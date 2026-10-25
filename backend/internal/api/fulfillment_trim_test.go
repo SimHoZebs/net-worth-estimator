@@ -28,7 +28,7 @@ func TestDeterministicFulfillmentOmitsDetailArrays(t *testing.T) {
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
 		t.Fatalf("decode projection fixture: %v", err)
 	}
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings})
+	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatalf("encode projection request: %v", err)
 	}
