@@ -11,6 +11,8 @@ import {
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
 import { AuthBoundary } from "./AuthBoundary.tsx";
+import { NotificationCenter } from "../components/NotificationCenter.tsx";
+import { resetNotifications } from "../state/notifications.ts";
 import { getResourceScope, suspendResourceScope } from "./resourceScope.ts";
 import { useSession } from "./sessionContext.ts";
 import {
@@ -77,6 +79,7 @@ function renderWorkspace() {
 	return render(
 		<AuthBoundary>
 			<WorkspaceProbe />
+			<NotificationCenter />
 		</AuthBoundary>,
 	);
 }
@@ -92,6 +95,7 @@ afterEach(() => {
 	delete window.__WAYPOINT_CONFIG__;
 	resetWorkspaceStore();
 	resetServerQueryCache();
+	resetNotifications();
 	clearPersistedMemory();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
@@ -344,8 +348,8 @@ describe("authentication resource isolation", () => {
 			);
 			act(() => window.dispatchEvent(new Event("focus")));
 			await screen.findByRole("alert");
-			// Transient outages keep the verified workspace mounted behind
-			// a retry banner instead of wiping the UI.
+			// Transient outages keep the verified workspace mounted with a
+			// retry toast instead of wiping the UI.
 			expect(screen.getByTestId("active-workspace")).toBeTruthy();
 			expect(getResourceScope().status).toBe("ready");
 			expect(useWorkspaceStore.getState().engine.volatileState).toBe(recovery);

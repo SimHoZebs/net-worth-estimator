@@ -1,12 +1,17 @@
 import { LogIn, LogOut, UserRound } from "lucide-react";
 import { Button } from "../components/Button.tsx";
+import { useErrorToast } from "../components/NotificationCenter.tsx";
 import { redirectToSignIn } from "./navigation.ts";
 import { useSession } from "./sessionContext.ts";
 
 export function SessionAccountControl() {
 	const account = useSession();
+	useErrorToast(
+		"session-logout",
+		account?.session.allowed ? account.logoutError || null : null,
+	);
 	if (!account?.session.allowed) return null;
-	const { session, logout, logoutPending, logoutError } = account;
+	const { session, logout, logoutPending } = account;
 	const authenticated = session.authenticated === true;
 	return (
 		<div className="mb-6 min-w-0 border-0 border-b border-solid border-line px-2 pb-5">
@@ -62,14 +67,6 @@ export function SessionAccountControl() {
 					</Button>
 				)}
 			</div>
-			{logoutError && (
-				<p
-					role="alert"
-					className="mt-3 mb-0 break-words text-xs text-danger-text"
-				>
-					{logoutError}
-				</p>
-			)}
 		</div>
 	);
 }

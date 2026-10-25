@@ -8,6 +8,8 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AccountPage } from "./AccountPage.tsx";
+import { NotificationCenter } from "../components/NotificationCenter.tsx";
+import { resetNotifications } from "../state/notifications.ts";
 import { redirectToSignIn } from "./navigation.ts";
 import { SessionContext, type Session } from "./sessionContext.ts";
 
@@ -41,6 +43,7 @@ function renderPage(
 			}}
 		>
 			<AccountPage />
+			<NotificationCenter />
 		</SessionContext>,
 	);
 }
@@ -54,6 +57,7 @@ function json(body: unknown, status = 200) {
 
 afterEach(() => {
 	cleanup();
+	resetNotifications();
 	vi.unstubAllGlobals();
 	vi.clearAllMocks();
 });
