@@ -2,7 +2,7 @@ import { X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { IconButton } from "./Button.tsx";
-import { useOpenModalRegistration } from "./modalStack.ts";
+import { useOpenModalRegistration } from "../state/modalStack.ts";
 import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
 import { mergeStyles } from "./mergeStyles.ts";
 

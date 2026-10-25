@@ -13,7 +13,10 @@ import {
 	useHorizontalSwipe,
 	type DrawerSide,
 } from "./drawer.ts";
-import { isTopmostModal, useOpenModalRegistration } from "./modalStack.ts";
+import {
+	isTopmostModal,
+	useOpenModalRegistration,
+} from "../state/modalStack.ts";
 import { IconButton } from "./Button.tsx";
 import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
 
