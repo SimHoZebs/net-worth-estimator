@@ -37,7 +37,7 @@ import {
 	serverQueryClient,
 	stochasticQueryKey,
 } from "./serverQuery.ts";
-import { notifyError } from "./notifications.ts";
+import { dismissKey, notifyError } from "./notifications.ts";
 import { useUiStore } from "./uiStore.ts";
 import { deriveDraftDocument, useWorkspaceStore } from "./workspaceStore.ts";
 import { purchaseEvaluationResult } from "./purchaseEvaluation.ts";
@@ -722,8 +722,12 @@ export function useRemoteProjection({
 		queryFn: ({ signal, queryKey }) => {
 			const current = activeDocument;
 			if (!current) throw new Error(MISSING_DOCUMENT_MESSAGE);
-			return runDeterministic(api, current, years, signal).catch(
-				(cause: unknown) => {
+			return runDeterministic(api, current, years, signal)
+				.then((result) => {
+					dismissKey("projection");
+					return result;
+				})
+				.catch((cause: unknown) => {
 					if (!isAbortError(cause) && !(cause instanceof ResourceScopeError))
 						notifyError(
 							"projection",
@@ -733,8 +737,7 @@ export function useRemoteProjection({
 							reportDeterministicError(queryKey),
 						);
 					throw cause;
-				},
-			);
+				});
 		},
 		enabled: enabled && hasDocument,
 		placeholderData: keepPreviousData,
@@ -825,6 +828,7 @@ export function useRemoteProjection({
 						setProgress(1);
 						setRange(finalRange);
 						setRangeError(null);
+						dismissKey("projection-range");
 					},
 					onError: (data) => {
 						if (!mounted.current || controller.signal.aborted) return;
@@ -866,6 +870,7 @@ export function useRemoteProjection({
 					setProgress(1);
 					setRange(finalRange);
 					setRangeError(null);
+					dismissKey("projection-range");
 				})
 				.catch((cause: unknown) => {
 					if (!mounted.current || controller.signal.aborted) return;

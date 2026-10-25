@@ -16,8 +16,7 @@ import { DetailList, DetailRow } from "../DetailRow.tsx";
 import { Notice } from "../Notice.tsx";
 import { cssVariables } from "../cssVariables.ts";
 import { Badge } from "../Badge.tsx";
-import { useErrorToast } from "../NotificationCenter.tsx";
-import { notifyError } from "../../state/notifications.ts";
+import { dismissKey, notifyError } from "../../state/notifications.ts";
 import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
 
 function toAmountInput(value: number | null): string {
@@ -45,8 +44,6 @@ export function AccountDetails({
 		toAmountInput(account.maxBalance),
 	);
 	const [noCeiling, setNoCeiling] = useState(account.maxBalance === null);
-	const [error, setError] = useState<string | null>(null);
-	useErrorToast("account-details", error);
 
 	const readOnly = account.readOnly;
 
@@ -87,6 +84,7 @@ export function AccountDetails({
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
 		if (readOnly) return;
+		dismissKey("account-details");
 		const trimmedName = name.trim();
 		const balanceValue = parseDisplayNumber(balance) ?? 0;
 		const minValue = parseDisplayNumber(minBalance) ?? 0;
@@ -111,11 +109,9 @@ export function AccountDetails({
 		};
 		const validated = validatePlan(upsertAccount(plan, next));
 		if (validated instanceof Error) {
-			setError(validated.message);
 			notifyError("account-details", validated.message);
 			return;
 		}
-		setError(null);
 		onApply(validated);
 	};
 

@@ -18,7 +18,6 @@ import {
 import { testPlan } from "../test/plan.ts";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import { DraftBar } from "./DraftBar.tsx";
-import { WorkspaceNotification } from "./WorkspaceNotices.tsx";
 
 function workspace(draft = false) {
 	return {
@@ -78,12 +77,7 @@ describe("draft bar presence", () => {
 
 	it("preserves the toast status and dismissal without a test-only styling hook", () => {
 		useWorkspaceStore.setState({ notice: "Plan saved." });
-		const view = render(
-			<>
-				<WorkspaceNotification />
-				<NotificationCenter />
-			</>,
-		);
+		const view = render(<NotificationCenter />);
 		expect(view.getByRole("status").textContent).toContain("Plan saved.");
 		fireEvent.click(view.getByRole("button", { name: "Dismiss notification" }));
 		expect(view.queryByRole("status")).toBeNull();

@@ -80,3 +80,9 @@ export function notifySuccess(
 		.getState()
 		.notify({ key, kind: "success", message, onDismiss });
 }
+
+/** Clear every toast for a key, e.g. when its source resolves. */
+export function dismissKey(key: string): void {
+	for (const item of useNotifications.getState().items)
+		if (item.key === key) useNotifications.getState().dismiss(item.id);
+}

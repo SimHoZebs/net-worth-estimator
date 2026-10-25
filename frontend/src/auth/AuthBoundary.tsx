@@ -1,7 +1,6 @@
 import { type ReactNode, useEffect, useRef } from "react";
 import { Brand } from "../components/Brand.tsx";
 import { Button } from "../components/Button.tsx";
-import { useErrorToast } from "../components/NotificationCenter.tsx";
 import { redirectToSignIn } from "./navigation.ts";
 import { SessionContext } from "./sessionContext.ts";
 import { useResourceSession } from "./useResourceSession.ts";
@@ -27,28 +26,9 @@ export function AuthBoundary({ children }: { children: ReactNode }) {
 	// later check runs or fails transiently. Only an explicit denial or a
 	// first load without any verified session takes over the full screen.
 	// Transient outages float a retry toast instead of wiping the UI.
-	useErrorToast(
-		"session",
-		phase === "unavailable" ? error || "Session check failed." : null,
-		{
-			label: "Retry access check",
-			onAction: () => {
-				void refresh();
-			},
-		},
-	);
 	if (session?.allowed)
 		return (
-			<SessionContext
-				value={{
-					session,
-					logout,
-					logoutPending,
-					// The session toast owns unavailable errors; passing them
-					// through as logout errors would announce the same failure twice.
-					logoutError: phase === "unavailable" ? "" : error,
-				}}
-			>
+			<SessionContext value={{ session, logout, logoutPending }}>
 				{children}
 			</SessionContext>
 		);

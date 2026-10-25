@@ -56,7 +56,6 @@ it("keeps account controls above navigation when the private plan is empty", () 
 				},
 				logout,
 				logoutPending: false,
-				logoutError: "",
 			}}
 		>
 			<ServerWorkspaceRecovery />

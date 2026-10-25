@@ -2,7 +2,6 @@ import { Flag, Plus } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Button } from "../components/Button.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
-import { useErrorToast } from "../components/NotificationCenter.tsx";
 import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
 import type { Evaluation, Plan } from "../domain/model.ts";
 import { removeEvaluation } from "../domain/planEdits.ts";
@@ -59,18 +58,11 @@ function EvaluationsContent({
 	const serverDocument = useWorkspaceStore((state) => state.serverDocument);
 	const status = useWorkspaceStore((state) => state.status);
 	const pinnedIds = usePinnedEvaluationsStore((state) => state.ids);
-	const pinnedError = usePinnedEvaluationsStore((state) => state.error);
 	const refreshPins = usePinnedEvaluationsStore((state) => state.refresh);
 	const togglePin = usePinnedEvaluationsStore((state) => state.toggle);
 	useEffect(() => {
 		void refreshPins();
 	}, [refreshPins]);
-	useErrorToast("evaluation-pins", pinnedError, {
-		label: "Reload pins",
-		onAction: () => {
-			void refreshPins();
-		},
-	});
 	// Pins name persisted server instances: draft-only evaluations have no
 	// server row yet, so their pin control stays disabled until saved.
 	const savedEvaluationIds = useMemo(() => {

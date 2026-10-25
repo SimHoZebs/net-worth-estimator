@@ -8,7 +8,10 @@ import { useWorkspaceStore, selectPlan } from "../state/workspaceStore.ts";
 import { LastSync } from "./LastSync.tsx";
 import { type Page, pages } from "./navigation.ts";
 import { navigationLinkClassName } from "./navigationStyles.ts";
-import { workspaceStatusLabel } from "./WorkspaceNotices.tsx";
+
+function workspaceStatusLabel({ readOnly }: { readOnly: boolean }) {
+	return readOnly ? "Read-only" : "Workspace";
+}
 
 export function WorkspaceSidebar({
 	page,
