@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { toAccountCards } from "../../domain/accountCards.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { Projection } from "../../domain/result.ts";
 import { AccountCard } from "./AccountCard.tsx";
 import { AccountDetailsModal } from "./AccountDetailsModal.tsx";
+import { useSelectedId } from "../entrySelection.ts";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
 
 export function AccountCardGrid({
@@ -15,7 +16,7 @@ export function AccountCardGrid({
 	projection: Projection | null;
 	query: string;
 }) {
-	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [selectedId, setSelectedId] = useSelectedId(plan);
 	const cards = useMemo(
 		() => toAccountCards({ plan, projection }),
 		[plan, projection],

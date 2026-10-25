@@ -6,7 +6,7 @@ import {
 	ShieldCheck,
 	TriangleAlert,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { dateLabel, money } from "../../domain/format.ts";
 import {
 	deriveFundingGaps,
@@ -19,6 +19,7 @@ import { SegmentedBar } from "../SegmentedBar.tsx";
 import { IconButton } from "../Button.tsx";
 import { Badge } from "../Badge.tsx";
 import { FundingGapsModal } from "./FundingGapsModal.tsx";
+import { useSelectedId } from "../entrySelection.ts";
 import {
 	fundingCardStyles,
 	fundingCardTitleStyles,
@@ -40,7 +41,7 @@ export function FundingGapsCard({
 			),
 		[item.enabled, item.postingIds, plan, projection],
 	);
-	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [selectedId, setSelectedId] = useSelectedId(plan);
 	const first = gaps[0];
 	const summary = first ? summarizeFundingGap(first) : null;
 	const clear =

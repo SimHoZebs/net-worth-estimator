@@ -10,6 +10,7 @@ import type { Movement } from "../../domain/model.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
 import { TablePagination } from "../DataTable.tsx";
+import { useSelectedEntry } from "../entrySelection.ts";
 import { EmptyState } from "../EmptyState.tsx";
 import { TransactionDetail } from "./TransactionDetail.tsx";
 import { TransactionFilters } from "./TransactionFilters.tsx";
@@ -33,10 +34,10 @@ export function Transactions({
 		defaultAccountViewFilters,
 	);
 	const [page, setPage] = useState(0);
-	const [selected, setSelected] = useState<{
+	const [selected, setSelected] = useSelectedEntry<{
 		transaction: AccountTransaction;
 		movement: Movement;
-	} | null>(null);
+	}>(plan);
 	const id = useId();
 	const filtered = useMemo(
 		() =>
