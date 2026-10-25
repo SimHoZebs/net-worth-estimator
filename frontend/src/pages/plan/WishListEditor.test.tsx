@@ -5,8 +5,8 @@ import type { Plan } from "../../domain/model.ts";
 import { testPlan } from "../../test/plan.ts";
 import { WishListEditor } from "./WishListEditor.tsx";
 
-vi.mock("../../components/ui.tsx", async (importOriginal) => ({
-	...(await importOriginal<typeof import("../../components/ui.tsx")>()),
+vi.mock("../../components/Modal.tsx", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../../components/Modal.tsx")>()),
 	Modal: ({ children }: { children: ReactNode }) => (
 		<section>{children}</section>
 	),

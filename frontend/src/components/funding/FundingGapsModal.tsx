@@ -1,6 +1,7 @@
 import { AlertCircle, CalendarDays, TriangleAlert } from "lucide-react";
 import { SegmentedBar } from "../SegmentedBar.tsx";
-import { Badge, Modal } from "../ui.tsx";
+import { Badge } from "../Badge.tsx";
+import { Modal } from "../Modal.tsx";
 import { dateLabel, money } from "../../domain/format.ts";
 import {
 	orderedFundingGaps,

@@ -12,7 +12,8 @@ import { mergeStyles } from "../mergeStyles.ts";
 import { DetailList, DetailRow } from "../DetailRow.tsx";
 import { Notice } from "../Notice.tsx";
 import { cssVariables } from "../cssVariables.ts";
-import { Badge, ErrorNotice } from "../ui.tsx";
+import { Badge } from "../Badge.tsx";
+import { ErrorNotice } from "../ErrorNotice.tsx";
 import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
 
 function toAmountInput(value: number | null): string {

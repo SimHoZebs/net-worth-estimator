@@ -3,7 +3,7 @@ import { dateLabel } from "../../domain/format.ts";
 import { failureLedger } from "../../domain/constraintSnapshot.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { MovementResult, Projection } from "../../domain/result.ts";
-import { Modal } from "../ui.tsx";
+import { Modal } from "../Modal.tsx";
 import { ConstraintSnapshot } from "./ConstraintSnapshot.tsx";
 
 export function FailureEvidence({

@@ -13,7 +13,7 @@ import { Button, TextButton } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { Checkbox, InputField } from "../Field.tsx";
 import { ConfirmDialog } from "../ConfirmDialog.tsx";
-import { ErrorNotice } from "../ui.tsx";
+import { ErrorNotice } from "../ErrorNotice.tsx";
 import { textValue } from "./formValues.ts";
 import { AmountBuilder } from "./AmountBuilder.tsx";
 

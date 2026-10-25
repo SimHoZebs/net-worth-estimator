@@ -17,7 +17,7 @@ import { fundingLabels } from "../../domain/fundingTerminology.ts";
 import type { OtherEvaluationCardProps } from "../evaluationCard.ts";
 import { SegmentedBar } from "../SegmentedBar.tsx";
 import { IconButton } from "../Button.tsx";
-import { Badge } from "../ui.tsx";
+import { Badge } from "../Badge.tsx";
 import { FundingGapsModal } from "./FundingGapsModal.tsx";
 import {
 	fundingCardStyles,

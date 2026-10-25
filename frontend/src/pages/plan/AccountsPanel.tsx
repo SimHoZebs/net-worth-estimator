@@ -7,7 +7,7 @@ import {
 	TableRow,
 } from "../../components/DataTable.tsx";
 import { IconButton } from "../../components/Button.tsx";
-import { EmptyState } from "../../components/ui.tsx";
+import { EmptyState } from "../../components/EmptyState.tsx";
 import { money } from "../../domain/format.ts";
 import type { Account } from "../../domain/model.ts";
 

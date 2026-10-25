@@ -1,11 +1,9 @@
 import { Flag, Plus } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Button } from "../components/Button.tsx";
-import {
-	EmptyState,
-	ErrorNotice,
-	ProjectionUpdating,
-} from "../components/ui.tsx";
+import { EmptyState } from "../components/EmptyState.tsx";
+import { ErrorNotice } from "../components/ErrorNotice.tsx";
+import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
 import type { Evaluation, Plan } from "../domain/model.ts";
 import { removeEvaluation } from "../domain/planEdits.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";

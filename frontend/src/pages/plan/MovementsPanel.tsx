@@ -1,6 +1,7 @@
 import { ArrowDownLeft, ArrowRight, ArrowUpRight } from "lucide-react";
 import { useState } from "react";
-import { Badge, EmptyState } from "../../components/ui.tsx";
+import { Badge } from "../../components/Badge.tsx";
+import { EmptyState } from "../../components/EmptyState.tsx";
 import { TransactionItemRow } from "../../components/activity/TransactionItem.tsx";
 import { MovementDetail } from "../../components/activity/TransactionDetail.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";

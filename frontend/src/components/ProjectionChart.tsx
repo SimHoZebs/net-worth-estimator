@@ -6,7 +6,8 @@ import type { Projection, RangeResult } from "../domain/result.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 import { AccountDot } from "./AccountIcon.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
-import { Skeleton, Toggle } from "./ui.tsx";
+import { Skeleton } from "./Skeleton.tsx";
+import { Toggle } from "./Toggle.tsx";
 
 export function ProjectionChart({
 	plan,

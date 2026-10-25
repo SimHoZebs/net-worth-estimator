@@ -12,7 +12,8 @@ import {
 import { TransactionSortButton } from "../activity/TransactionSortButton.tsx";
 import { DataTable, TableCell, TableHeader, TableRow } from "../DataTable.tsx";
 import { Notice } from "../Notice.tsx";
-import { Badge, Modal } from "../ui.tsx";
+import { Badge } from "../Badge.tsx";
+import { Modal } from "../Modal.tsx";
 
 export function SafeSpendingEvidence({
 	plan,

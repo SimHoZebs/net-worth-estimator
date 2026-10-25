@@ -8,7 +8,7 @@ import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, exactMoney } from "../../domain/format.ts";
 import type { Movement } from "../../domain/model.ts";
-import { Badge } from "../ui.tsx";
+import { Badge } from "../Badge.tsx";
 import { TransactionItemRow } from "./TransactionItem.tsx";
 import {
 	transactionAmountStyles,

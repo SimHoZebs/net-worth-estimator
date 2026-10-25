@@ -5,7 +5,7 @@ import { currentNetWorth, type Projection } from "../../domain/result.ts";
 import { AccountDot } from "../AccountIcon.tsx";
 import { DetailList, DetailRow } from "../DetailRow.tsx";
 import { Notice } from "../Notice.tsx";
-import { Modal } from "../ui.tsx";
+import { Modal } from "../Modal.tsx";
 
 export function PositionEvidence({
 	plan,

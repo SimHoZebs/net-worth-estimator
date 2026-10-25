@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { Button } from "./Button.tsx";
 import { dialogActionsStyles } from "./dialogStyles.ts";
-import { ErrorNotice, Modal } from "./ui.tsx";
+import { ErrorNotice } from "./ErrorNotice.tsx";
+import { Modal } from "./Modal.tsx";
 
 export function ConfirmDialog({
 	title,

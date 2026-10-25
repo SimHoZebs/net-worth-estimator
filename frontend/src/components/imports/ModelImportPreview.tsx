@@ -2,7 +2,7 @@ import { FileJson } from "lucide-react";
 import type { ReactNode } from "react";
 import type { FinancialModelDocument } from "../../api/index.ts";
 import { dialogActionsStyles } from "../dialogStyles.ts";
-import { Modal } from "../ui.tsx";
+import { Modal } from "../Modal.tsx";
 
 export function ModelImportPreview({
 	document,

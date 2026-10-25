@@ -5,7 +5,8 @@ import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { Button } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { Notice } from "../Notice.tsx";
-import { ErrorNotice, Modal } from "../ui.tsx";
+import { ErrorNotice } from "../ErrorNotice.tsx";
+import { Modal } from "../Modal.tsx";
 
 export interface EditorProps {
 	plan: Plan;

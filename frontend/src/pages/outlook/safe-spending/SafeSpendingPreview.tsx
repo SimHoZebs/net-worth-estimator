@@ -14,7 +14,7 @@ import {
 	sum,
 	todayIso,
 } from "../../../domain/format.ts";
-import { Skeleton } from "../../../components/ui.tsx";
+import { Skeleton } from "../../../components/Skeleton.tsx";
 import {
 	cashCushion,
 	checkingAccountId,

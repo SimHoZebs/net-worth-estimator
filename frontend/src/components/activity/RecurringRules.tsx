@@ -13,7 +13,8 @@ import { money } from "../../domain/format.ts";
 import type { Account, Movement, Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
-import { Badge, EmptyState } from "../ui.tsx";
+import { Badge } from "../Badge.tsx";
+import { EmptyState } from "../EmptyState.tsx";
 import { Button, IconButton, TextButton } from "../Button.tsx";
 import {
 	movementIconStyles,
