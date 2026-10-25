@@ -3,8 +3,11 @@ import { useId, useMemo, useState, type FormEvent } from "react";
 import { money } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { type Account, type Plan, validatePlan } from "../../domain/model.ts";
-import { upsertItem } from "../../domain/planEdits.ts";
 import { parseDisplayNumber } from "../editors/formValues.ts";
+import {
+	preservedAccountMeta,
+	upsertAccount,
+} from "../editors/accountFields.ts";
 import { Checkbox, Input, InputField, SelectField } from "../Field.tsx";
 import { Button } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
@@ -13,7 +16,7 @@ import { DetailList, DetailRow } from "../DetailRow.tsx";
 import { Notice } from "../Notice.tsx";
 import { cssVariables } from "../cssVariables.ts";
 import { Badge } from "../Badge.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { useErrorToast } from "../NotificationCenter.tsx";
 import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
 
 function toAmountInput(value: number | null): string {
@@ -42,6 +45,7 @@ export function AccountDetails({
 	);
 	const [noCeiling, setNoCeiling] = useState(account.maxBalance === null);
 	const [error, setError] = useState<string | null>(null);
+	useErrorToast("account-details", error);
 
 	const readOnly = account.readOnly;
 
@@ -90,6 +94,7 @@ export function AccountDetails({
 			: maxBalance.trim()
 				? (parseDisplayNumber(maxBalance) ?? 0)
 				: null;
+		const meta = preservedAccountMeta(account, plan);
 		const next: Account = {
 			...account,
 			name: trimmedName,
@@ -98,19 +103,12 @@ export function AccountDetails({
 			balance: balanceValue,
 			minBalance: minValue,
 			maxBalance: maxValue,
-			// The observation date is system-owned (projection start or the
-			// latest checkpoint). It is never edited here; the stored value
-			// is preserved so the balance keeps its observation date.
-			observedOn: account.observedOn,
-			// Source is display provenance only. It is never edited here; the
-			// stored value is preserved so edits cannot change it.
-			source: account.source,
+			// System-owned fields stay preserved; see accountFields.ts.
+			observedOn: meta.observedOn,
+			source: meta.source,
 			readOnly: false,
 		};
-		const validated = validatePlan({
-			...plan,
-			accounts: upsertItem({ items: plan.accounts, item: next }),
-		});
+		const validated = validatePlan(upsertAccount(plan, next));
 		if (validated instanceof Error) {
 			setError(validated.message);
 			return;
@@ -278,7 +276,6 @@ export function AccountDetails({
 					</div>
 				</div>
 			</fieldset>
-			{error && <ErrorNotice message={error} />}
 			<DetailList className="m-0">
 				<DetailRow label="Base case at horizon">
 					{money(endingBalance)}

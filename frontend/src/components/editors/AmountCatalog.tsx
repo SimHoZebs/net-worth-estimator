@@ -5,17 +5,16 @@ import {
 	BUILT_IN_TEMPLATE_IDS,
 	FALLBACK_PROVIDERS,
 	FALLBACK_RESOLVERS,
-	FALLBACK_TEMPLATES,
-	presetToTemplate,
 } from "../../domain/amountCatalog.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { Button, TextButton } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { Checkbox, InputField } from "../Field.tsx";
 import { ConfirmDialog } from "../ConfirmDialog.tsx";
-import { ErrorNotice } from "../ErrorNotice.tsx";
+import { useErrorToast } from "../NotificationCenter.tsx";
 import { textValue } from "./formValues.ts";
 import { AmountBuilder } from "./AmountBuilder.tsx";
+import { useAmountTemplates } from "./amountTemplates.ts";
 
 function useRemoteNames() {
 	const [remote, setRemote] = useState<{
@@ -110,6 +109,7 @@ export function AmountCatalog({
 	const remote = useRemoteNames();
 	const serverPresets = useWorkspaceStore((state) => state.serverPresets);
 	const presetError = useWorkspaceStore((state) => state.presetError);
+	useErrorToast("amount-presets", presetError);
 	const createPreset = useWorkspaceStore((state) => state.createPreset);
 	const updatePreset = useWorkspaceStore((state) => state.updatePreset);
 	const deletePreset = useWorkspaceStore((state) => state.deletePreset);
@@ -123,12 +123,8 @@ export function AmountCatalog({
 		writeBlocked ||
 		(workspace?.saved.readOnly ?? false);
 
-	// Server presets are the source of truth; the local list only covers
-	// the offline gap before the first load.
-	const templates =
-		serverPresets === null
-			? FALLBACK_TEMPLATES
-			: serverPresets.map(presetToTemplate);
+	// Server presets are the source of truth; the hook covers the offline gap.
+	const templates = useAmountTemplates();
 	const [selectedId, setSelectedId] = useState("fixed");
 	const selected =
 		templates.find((item) => item.id === selectedId) ?? templates[0];
@@ -420,7 +416,6 @@ export function AmountCatalog({
 					</p>
 				</ConfirmDialog>
 			)}
-			{presetError && <ErrorNotice message={presetError} />}
 			{selected && !creating && !editing && (
 				<AmountBuilder
 					key={selected.id}
