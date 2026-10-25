@@ -93,24 +93,36 @@ func stochasticWarmDescriptor(document *types.FinancialModelDocument, settings t
 	}
 }
 
+// reportsMutation decides whether a request can change projection inputs.
+// Projections never mutate stored data, and sync, pins, presets, and auth
+// never affect projection identity (sync trigger reports separately with
+// its dry-run flag), so warming for them would only waste work.
+func reportsMutation(method, path string) bool {
+	if method != http.MethodPost && method != http.MethodPatch && method != http.MethodPut && method != http.MethodDelete {
+		return false
+	}
+	if !strings.HasPrefix(path, "/v1/") {
+		return false
+	}
+	if strings.HasPrefix(path, "/v1/projections/") ||
+		strings.HasPrefix(path, "/v1/auth/") ||
+		strings.HasPrefix(path, "/v1/sync/") ||
+		path == "/v1/pinned-evaluations" ||
+		strings.HasPrefix(path, "/v1/pinned-evaluations/") ||
+		path == "/v1/amount-presets" ||
+		strings.HasPrefix(path, "/v1/amount-presets/") {
+		return false
+	}
+	return true
+}
+
 // mutationNotifyMiddleware reports successful state changes to the owner.
-// Only 2xx responses to state-changing methods outside read/compute routes
-// report: projections never mutate stored data, and pins, presets, and auth
-// never affect projection identity, so warming for them would only waste
-// work. A rejected write still reports, but WarmResource skips present
+// A rejected write still reports, but WarmResource skips present
 // artifacts, so false positives cost lookups instead of recomputes.
 func mutationNotifyMiddleware(onMutated func(string), resourceID string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if onMutated == nil ||
-				(r.Method != http.MethodPost && r.Method != http.MethodPatch && r.Method != http.MethodPut && r.Method != http.MethodDelete) ||
-				!strings.HasPrefix(r.URL.Path, "/v1/") ||
-				strings.HasPrefix(r.URL.Path, "/v1/projections/") ||
-				strings.HasPrefix(r.URL.Path, "/v1/auth/") ||
-				r.URL.Path == "/v1/pinned-evaluations" ||
-				strings.HasPrefix(r.URL.Path, "/v1/pinned-evaluations/") ||
-				r.URL.Path == "/v1/amount-presets" ||
-				strings.HasPrefix(r.URL.Path, "/v1/amount-presets/") {
+			if onMutated == nil || !reportsMutation(r.Method, r.URL.Path) {
 				next.ServeHTTP(w, r)
 				return
 			}

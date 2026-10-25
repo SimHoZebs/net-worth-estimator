@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -169,5 +171,62 @@ func TestWarmedKeysMatchHandlerRequests(t *testing.T) {
 	}
 	if events := sseEvents(t, stochResponse.Body.String()); len(events["result"]) != 1 {
 		t.Fatalf("stochastic response has %d result events", len(events["result"]))
+	}
+}
+
+func TestReportsMutationTable(t *testing.T) {
+	for _, test := range []struct {
+		method, path string
+		want         bool
+	}{
+		{http.MethodPost, "/v1/accounts", true},
+		{http.MethodPatch, "/v1/postings/id", true},
+		{http.MethodDelete, "/v1/checkpoints", true},
+		{http.MethodPut, "/v1/sync/simplefin/accounts/bridge-1", false},
+		{http.MethodPost, "/v1/sync/simplefin", false},
+		{http.MethodPost, "/v1/projections/deterministic", false},
+		{http.MethodPost, "/v1/projections/stochastic", false},
+		{http.MethodGet, "/v1/auth/session", false},
+		{http.MethodPut, "/v1/pinned-evaluations", false},
+		{http.MethodGet, "/v1/amount-presets", false},
+		{http.MethodPost, "/v1/amount-presets/reorder", false},
+		{http.MethodGet, "/v1/financial-model", false},
+		{http.MethodGet, "/healthz", false},
+	} {
+		if got := reportsMutation(test.method, test.path); got != test.want {
+			t.Errorf("reportsMutation(%s, %s) = %v, want %v", test.method, test.path, got, test.want)
+		}
+	}
+}
+
+func TestDryTriggerReportsDryRun(t *testing.T) {
+	database := openAPIStore(t)
+	var mu sync.Mutex
+	var reports []struct {
+		id  string
+		dry bool
+	}
+	handler := New(database, Config{
+		ResourceID: "plans/sample",
+		SyncRunner: simplefin.NewMockRunner(database, simplefin.Config{DryRun: true}),
+		OnSyncApplied: func(resourceID string, dryRun bool) {
+			mu.Lock()
+			reports = append(reports, struct {
+				id  string
+				dry bool
+			}{resourceID, dryRun})
+			mu.Unlock()
+		},
+	})
+	request := httptest.NewRequest(http.MethodPost, "/v1/sync/simplefin", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("trigger status = %d, body %s", response.Code, response.Body.String())
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(reports) != 1 || reports[0].id != "plans/sample" || !reports[0].dry {
+		t.Fatalf("sync reports = %+v, want one dry report for plans/sample", reports)
 	}
 }

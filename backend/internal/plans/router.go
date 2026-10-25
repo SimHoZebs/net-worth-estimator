@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
@@ -26,6 +27,10 @@ type Config struct {
 	SampleDBPath      string
 	PrivateDir        string
 	API               api.Config
+	// WarmDebounce waits for a save burst to settle before warming
+	// cached projections. Zero selects the 30-second default.
+	// Negative disables warming.
+	WarmDebounce time.Duration
 }
 
 type endpoint struct {
@@ -39,6 +44,7 @@ type Router struct {
 	primary endpoint
 	opened  map[string]endpoint
 	closed  bool
+	warmer  *Warmer
 }
 
 func New(primary store.Store, config Config) (*Router, error) {
@@ -66,7 +72,49 @@ func New(primary store.Store, config Config) (*Router, error) {
 		}
 	}
 	config.API.ResourceID = config.PrimaryResourceID
-	return &Router{config: config, primary: endpoint{primary, api.New(primary, config.API)}, opened: map[string]endpoint{}}, nil
+	router := &Router{config: config, opened: map[string]endpoint{}}
+	router.warmer = newWarmer(config.WarmDebounce, defaultWarmFunc, router.warmStore)
+	config.API.OnMutated = router.MarkDirty
+	config.API.OnSyncApplied = router.noteSync
+	router.primary = endpoint{primary, api.New(primary, config.API)}
+	if config.PrimaryResourceID != "" {
+		// Fresh deploys and offline imports start cold; warm once so
+		// pins read hits instead of triggering foreground runs.
+		router.MarkDirty(config.PrimaryResourceID)
+	}
+	return router, nil
+}
+
+// PrimaryID reports the resource warmed on startup and after sync runs.
+func (p *Router) PrimaryID() string { return p.config.PrimaryResourceID }
+
+// MarkDirty schedules a debounced warm run for a known resource.
+func (p *Router) MarkDirty(resourceID string) { p.warmer.MarkDirty(resourceID) }
+
+// noteSync schedules warming for applied sync runs. Dry runs commit
+// nothing, so their content keys cannot have changed.
+func (p *Router) noteSync(resourceID string, dryRun bool) {
+	if !dryRun {
+		p.warmer.MarkDirty(resourceID)
+	}
+}
+
+// warmStore resolves the store for a known resource without opening new
+// files: unknown IDs report false so a mark never creates a database.
+func (p *Router) warmStore(resourceID string) (store.Store, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		return nil, false
+	}
+	if resourceID == p.config.PrimaryResourceID {
+		return p.primary.store, true
+	}
+	entry, ok := p.opened[resourceID]
+	if !ok {
+		return nil, false
+	}
+	return entry.store, true
 }
 
 func sameFile(a, b string) bool {
@@ -164,6 +212,8 @@ func (p *Router) handlerFor(resource authorization.Resource) (http.Handler, erro
 	}
 	config := p.config.API
 	config.ResourceID = resource.ID
+	config.OnMutated = p.MarkDirty
+	config.OnSyncApplied = p.noteSync
 	config.SyncRunner = nil // Server-level Bridge credentials belong only to the primary owner.
 	if resource.Kind == "sample" {
 		config.ReadOnly = true
@@ -175,6 +225,7 @@ func (p *Router) handlerFor(resource authorization.Resource) (http.Handler, erro
 
 // Close owns only the additional stores. The caller retains the primary store.
 func (p *Router) Close() error {
+	p.warmer.Stop()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.closed = true
