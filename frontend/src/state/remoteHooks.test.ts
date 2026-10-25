@@ -2624,6 +2624,123 @@ describe("remote projection mapping and SSE", () => {
 		rendered.unmount();
 	});
 
+	it("sends the horizon end as the default range", async () => {
+		const stream = `event: result\ndata: ${JSON.stringify({ result: stochasticFixture() })}\n\n`;
+		const client = {
+			projectDeterministic: vi.fn(async () => ({
+				result: projectionFixture(),
+				issues: [],
+			})),
+			projectStochastic: vi.fn(
+				async () =>
+					new Response(stream, {
+						status: 200,
+						headers: { "content-type": "text/event-stream" },
+					}),
+			),
+		};
+		const rendered = renderHook(() =>
+			useRemoteProjection({
+				client,
+				document: modelFixture(),
+				years: 2,
+				ranges: true,
+			}),
+		);
+		await rendered.settle();
+		expect(client.projectDeterministic).toHaveBeenCalledWith(
+			expect.objectContaining({ range: { endDate: "2028-01-31" } }),
+			expect.objectContaining({ signal: expect.any(AbortSignal) }),
+		);
+		expect(client.projectStochastic).toHaveBeenCalledWith(
+			expect.not.objectContaining({ range: expect.anything() }),
+			expect.objectContaining({ signal: expect.any(AbortSignal) }),
+		);
+		rendered.unmount();
+	});
+
+	it("sends a malformed start date as data instead of throwing during render", async () => {
+		const broken = modelFixture();
+		broken.checkpoints = [
+			{ Date: "not-a-date", AccountId: "cash", Balance: 100 },
+		];
+		const client = {
+			projectDeterministic: vi.fn(async () => ({
+				result: projectionFixture(),
+				issues: [],
+			})),
+			projectStochastic: vi.fn(async () => new Error("not requested")),
+		};
+		let thrown: unknown = null;
+		let rendered: ReturnType<typeof renderHook> | null = null;
+		try {
+			rendered = renderHook(() =>
+				useRemoteProjection({
+					client,
+					document: broken,
+					years: 2,
+					ranges: false,
+				}),
+			);
+			await rendered.settle();
+		} catch (cause) {
+			thrown = cause;
+		}
+		expect(thrown).toBeNull();
+		expect(client.projectDeterministic).toHaveBeenCalledWith(
+			expect.objectContaining({ range: {} }),
+			expect.objectContaining({ signal: expect.any(AbortSignal) }),
+		);
+		rendered?.unmount();
+	});
+
+	it("passes an explicit date range through to the deterministic body", async () => {
+		const first = {
+			projectDeterministic: vi.fn(async () => ({
+				result: projectionFixture(),
+				issues: [],
+			})),
+			projectStochastic: vi.fn(async () => new Error("not requested")),
+		};
+		const second = {
+			projectDeterministic: vi.fn(async () => ({
+				result: projectionFixture(),
+				issues: [],
+			})),
+			projectStochastic: vi.fn(async () => new Error("not requested")),
+		};
+		const narrowed = { startDate: "2026-01-31", endDate: "2026-06-30" };
+		const one = renderHook(() =>
+			useRemoteProjection({
+				client: first,
+				document: modelFixture(),
+				years: 2,
+				ranges: false,
+				dateRange: narrowed,
+			}),
+		);
+		const two = renderHook(() =>
+			useRemoteProjection({
+				client: second,
+				document: modelFixture(),
+				years: 2,
+				ranges: false,
+			}),
+		);
+		await one.settle();
+		await two.settle();
+		expect(first.projectDeterministic).toHaveBeenCalledWith(
+			expect.objectContaining({ range: narrowed }),
+			expect.objectContaining({ signal: expect.any(AbortSignal) }),
+		);
+		expect(second.projectDeterministic).toHaveBeenCalledWith(
+			expect.objectContaining({ range: { endDate: "2028-01-31" } }),
+			expect.objectContaining({ signal: expect.any(AbortSignal) }),
+		);
+		one.unmount();
+		two.unmount();
+	});
+
 	it("redrives the range stream when a shared fetch dies under remount", async () => {
 		// A remount can attach to an in-flight shared fetch that another
 		// mount's cleanup then aborts. The client disguises the abortion as a

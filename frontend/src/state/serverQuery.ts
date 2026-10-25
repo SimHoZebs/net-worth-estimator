@@ -14,9 +14,10 @@ import { getResourceScope } from "../auth/resourceScope.ts";
 export function deterministicQueryKey(
 	documentKey: string,
 	years: number,
+	rangeKey = "",
 ): readonly unknown[] {
 	const scope = getResourceScope();
-	return ["deterministic-projection", scope.key, documentKey, years];
+	return ["deterministic-projection", scope.key, documentKey, years, rangeKey];
 }
 
 export function stochasticQueryKey(

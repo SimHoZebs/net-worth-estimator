@@ -32,6 +32,7 @@ import type {
 	Projection,
 	RangeResult,
 } from "../domain/result.ts";
+import { horizonDate } from "../domain/result.ts";
 import {
 	deterministicQueryKey,
 	serverQueryClient,
@@ -53,6 +54,11 @@ export interface RemoteProjectionClient {
 	): Promise<Error | Response>;
 }
 
+export interface ProjectionDateRange {
+	startDate?: string;
+	endDate?: string;
+}
+
 export interface UseRemoteProjectionOptions {
 	client?: RemoteProjectionClient;
 	document?: FinancialModelDocument | null;
@@ -61,6 +67,9 @@ export interface UseRemoteProjectionOptions {
 	ranges?: boolean;
 	// Request-local evaluation scope. It participates in document/cache identity.
 	evaluations?: EvaluationTables;
+	// Requested timeline slice. Undefined keeps the full span the hook has
+	// always fetched: everything through the horizon end.
+	dateRange?: ProjectionDateRange;
 	// When false the hook issues no requests. The saved-plan projection is
 	// identical to the active one whenever there is no draft, so running it
 	// separately would compute the same projection twice.
@@ -76,9 +85,13 @@ async function runDeterministic(
 	api: RemoteProjectionClient,
 	document: FinancialModelDocument,
 	years: number,
+	range: ProjectionDateRange,
 	signal: AbortSignal,
 ): Promise<Projection> {
-	const request = projectionRequest(document, years);
+	const request: DeterministicProjectionRequest = {
+		...projectionRequest(document, years),
+		range,
+	};
 	const response = await api.projectDeterministic(request, {
 		signal,
 	});
@@ -145,6 +158,37 @@ export function projectionRequest(
 			evaluations: document.evaluations,
 		},
 	};
+}
+
+// The default timeline slice keeps the full span this hook has always
+// fetched: everything through the horizon end, which matches the backend
+// clamped end date exactly. Callers narrow it with dateRange; the server
+// requires a range on every request and guesses nothing. Total: a malformed
+// start date still sends a request (with an empty range the server rejects
+// as data) instead of throwing during render.
+export function resolveProjectionRange(
+	document: FinancialModelDocument,
+	years: number,
+	override?: ProjectionDateRange,
+): ProjectionDateRange {
+	if (override) return override;
+	const horizonYears = Number.isFinite(years)
+		? Math.max(1, Math.trunc(years))
+		: 1;
+	try {
+		return {
+			endDate: horizonDate({
+				start: projectionStartDate(document),
+				years: horizonYears,
+			}),
+		};
+	} catch {
+		return {};
+	}
+}
+
+export function projectionRangeKey(range: ProjectionDateRange): string {
+	return `${range.startDate ?? ""}..${range.endDate ?? ""}`;
 }
 
 function evaluationDate(
@@ -647,6 +691,7 @@ export function useRemoteProjection({
 	years: yearsOverride,
 	ranges: rangesOverride,
 	evaluations: evaluationsOverride,
+	dateRange: dateRangeOverride,
 	enabled = true,
 }: UseRemoteProjectionOptions = {}) {
 	const api = useMemo(() => client ?? defaultApiClient(), [client]);
@@ -700,6 +745,16 @@ export function useRemoteProjection({
 		() => (activeDocument ? JSON.stringify(activeDocument) : "null"),
 		[activeDocument],
 	);
+	// The requested slice participates in cache identity alongside the
+	// document: different ranges hold different payloads.
+	const effectiveRange = useMemo(
+		() =>
+			activeDocument
+				? resolveProjectionRange(activeDocument, years, dateRangeOverride)
+				: null,
+		[activeDocument, years, dateRangeOverride],
+	);
+	const rangeKey = effectiveRange ? projectionRangeKey(effectiveRange) : "";
 	// Refs give the streaming effect latest values without keying it on
 	// object identity (callers may rebuild equivalent documents per render).
 	// Render-time sync keeps them fresh regardless of effect order.
@@ -718,11 +773,12 @@ export function useRemoteProjection({
 		},
 	});
 	const deterministic = useQuery({
-		queryKey: deterministicQueryKey(documentKey, years),
+		queryKey: deterministicQueryKey(documentKey, years, rangeKey),
 		queryFn: ({ signal, queryKey }) => {
 			const current = activeDocument;
 			if (!current) throw new Error(MISSING_DOCUMENT_MESSAGE);
-			return runDeterministic(api, current, years, signal)
+			const range = effectiveRange ?? resolveProjectionRange(current, years);
+			return runDeterministic(api, current, years, range, signal)
 				.then((result) => {
 					dismissKey("projection");
 					return result;

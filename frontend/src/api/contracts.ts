@@ -395,6 +395,12 @@ export interface DeterministicProjectionRequest extends HumaMetadata {
 	document?: FinancialModelDocument | null;
 	overrides?: ModelOverrides;
 	settings: ProjectionRuntimeSettings;
+	// Closed timeline slice to return. Either bound may be omitted for an
+	// open end. The server requires it: callers always state the range.
+	range?: {
+		startDate?: string;
+		endDate?: string;
+	};
 }
 
 export interface DeterministicProjectionResponse extends HumaMetadata {
