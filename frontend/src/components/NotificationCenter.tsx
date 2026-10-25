@@ -1,71 +1,7 @@
 import { AlertCircle, Check, X } from "lucide-react";
-import { useEffect, useRef } from "react";
-import {
-	useNotifications,
-	type Toast,
-	type ToastAction,
-} from "../state/notifications.ts";
+import { useNotifications, type Toast } from "../state/notifications.ts";
 import { IconButton, TextButton } from "./Button.tsx";
 import { mergeStyles } from "./mergeStyles.ts";
-
-/**
- * Bridge one error or notice value into the floating stack. The toast lives
- * while the message is present; clearing the value removes it. Manual
- * dismissal hides the toast until the message changes or the binder
- * remounts, and optionally clears the source through onDismiss.
- */
-export function useToast(
-	key: string,
-	kind: Toast["kind"],
-	message: string | null,
-	action?: ToastAction,
-	onDismiss?: () => void,
-): void {
-	const notify = useNotifications((state) => state.notify);
-	const latest = useRef({ action, onDismiss });
-	useEffect(() => {
-		latest.current = { action, onDismiss };
-	});
-	useEffect(() => {
-		if (!message) return;
-		const id = notify({
-			key,
-			kind,
-			message,
-			action: latest.current.action
-				? {
-						label: latest.current.action.label,
-						onAction: () => latest.current.action?.onAction(),
-					}
-				: undefined,
-			onDismiss: latest.current.onDismiss
-				? () => latest.current.onDismiss?.()
-				: undefined,
-		});
-		return () => {
-			useNotifications.getState().dismiss(id);
-		};
-		// Action closures refresh through the ref; only identity changes re-push.
-		// oxlint-disable-next-line react/exhaustive-deps
-	}, [notify, key, kind, message, action?.label]);
-}
-
-export function useErrorToast(
-	key: string,
-	message: string | null,
-	action?: ToastAction,
-	onDismiss?: () => void,
-): void {
-	useToast(key, "error", message, action, onDismiss);
-}
-
-export function useSuccessToast(
-	key: string,
-	message: string | null,
-	onDismiss?: () => void,
-): void {
-	useToast(key, "success", message, undefined, onDismiss);
-}
 
 const toastToneStyles: Record<Toast["kind"], string> = {
 	error: "border-danger-border bg-danger-bg text-danger-text",

@@ -146,7 +146,8 @@ try {
   assert.equal((await request(guest, sample, 'POST', '/v1/accounts', { name: 'Blocked guest', kind: 'cash', enabled: true })).status(), 401);
   assert.equal((await request(owner, sample, 'GET', '/v1/financial-model')).status(), 409);
   const projection = { settings: { fallbackProjectionStartDate: '2026-01-01', horizonYears: 1,
-    evaluations: { financialIndependence: [], netWorthThreshold: [], accountBalance: [], postingFulfillment: [], cycleFulfillment: [] } } };
+    evaluations: { financialIndependence: [], netWorthThreshold: [], accountBalance: [], postingFulfillment: [], cycleFulfillment: [] } },
+    range: { startDate: '2000-01-01', endDate: '2100-01-01' } };
   assert.equal((await request(guest, sample, 'POST', '/v1/projections/deterministic', projection)).status(), 200);
   const stream = await request(guest, sample, 'POST', '/v1/projections/stochastic', { ...projection, config: { runCount: 1, seed: 42 } });
   assert.equal(stream.status(), 200);

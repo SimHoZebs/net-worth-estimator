@@ -78,7 +78,6 @@ it("waits for the session boundary before it starts another owner's workspace", 
 				session,
 				logout: async () => {},
 				logoutPending: false,
-				logoutError: "",
 			}}
 		>
 			{children}

@@ -11,7 +11,6 @@ import { Button, TextButton } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { Checkbox, InputField } from "../Field.tsx";
 import { ConfirmDialog } from "../ConfirmDialog.tsx";
-import { useErrorToast } from "../NotificationCenter.tsx";
 import { textValue } from "./formValues.ts";
 import { AmountBuilder } from "./AmountBuilder.tsx";
 import { useAmountTemplates } from "./amountTemplates.ts";
@@ -108,8 +107,6 @@ export function AmountCatalog({
 	const id = useId();
 	const remote = useRemoteNames();
 	const serverPresets = useWorkspaceStore((state) => state.serverPresets);
-	const presetError = useWorkspaceStore((state) => state.presetError);
-	useErrorToast("amount-presets", presetError);
 	const createPreset = useWorkspaceStore((state) => state.createPreset);
 	const updatePreset = useWorkspaceStore((state) => state.updatePreset);
 	const deletePreset = useWorkspaceStore((state) => state.deletePreset);

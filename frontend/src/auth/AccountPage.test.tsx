@@ -39,7 +39,6 @@ function renderPage(
 				session: next,
 				logout: vi.fn(),
 				logoutPending: false,
-				logoutError: "",
 			}}
 		>
 			<AccountPage />
@@ -250,6 +249,8 @@ describe("account page", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Retry" }));
 		await screen.findByText("Signed in as editor.");
 		expect(screen.getByLabelText("Display name")).toBeTruthy();
+		// The reload clears the floating load failure.
+		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
 	it("explains unavailable passkey management without a provider link", async () => {

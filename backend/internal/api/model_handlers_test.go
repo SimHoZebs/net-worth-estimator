@@ -384,6 +384,7 @@ func TestDeterministicResponseIncludesMovementEvents(t *testing.T) {
 	body, err := json.Marshal(projectionRequestBody{
 		Document: fixture.Document,
 		Settings: fixture.Settings,
+		Range:    fullSpanRange(),
 	})
 	if err != nil {
 		t.Fatalf("encode projection request: %v", err)
@@ -466,7 +467,7 @@ func TestDeterministicMovementEvidenceIncludesBindingConstraints(t *testing.T) {
 			fixture.Document.Postings[index].Amount.Config = map[string]any{"expression": "200.49"}
 		}
 	}
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings})
+	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatalf("encode projection request: %v", err)
 	}
@@ -551,7 +552,7 @@ func TestDeterministicMovementEvidenceReportsAnnualCapAvailability(t *testing.T)
 			fixture.Document.RecurrenceRules[index].AnnualCap = &cap
 		}
 	}
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings})
+	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatalf("encode projection request: %v", err)
 	}
@@ -604,7 +605,7 @@ func TestDeterministicMovementEvidenceCarriesHistoricalAnnualCapUsage(t *testing
 			fixture.Document.RecurrenceRules[index].AnnualCap = &cap
 		}
 	}
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings})
+	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatalf("encode projection request: %v", err)
 	}
@@ -663,7 +664,7 @@ func TestDeterministicMovementEvidenceReportsDestinationHeadroom(t *testing.T) {
 			fixture.Document.RecurrenceRules[index].Amount.Inputs = map[string]types.AmountInputBinding{}
 		}
 	}
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings})
+	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatalf("encode projection request: %v", err)
 	}
@@ -729,7 +730,7 @@ func TestDeterministicMovementEvidenceRoundsPayrollFields(t *testing.T) {
 		t.Fatal("payroll projection fixture is incomplete")
 	}
 	fixture.Settings.HorizonYears = 1
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings})
+	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatalf("encode payroll projection request: %v", err)
 	}

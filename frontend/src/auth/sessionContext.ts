@@ -15,7 +15,6 @@ interface SessionContextValue {
 	session: Session;
 	logout: () => Promise<void>;
 	logoutPending: boolean;
-	logoutError: string;
 }
 
 // AuthBoundary exposes the session hook's state and actions. Sidebar
