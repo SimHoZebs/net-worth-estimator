@@ -132,7 +132,8 @@ export function useResourceSession() {
 					if (changed) announceSessionChange();
 					return;
 				}
-				if (!changed) {
+				// A rejected request needs a fresh scope even if the same plan returns.
+				if (!changed && getResourceScope().status === "ready") {
 					if (!next.session.allowed) {
 						suspendResourceScope();
 						suspendWorkspaceForVerification();
@@ -193,7 +194,7 @@ export function useResourceSession() {
 				owner.current = next;
 				setSession(next.session);
 				setStatus({ phase: "ready", error: "" });
-				announceSessionChange();
+				if (changed) announceSessionChange();
 			} catch (cause) {
 				if (signal.aborted) return;
 				check.error =

@@ -5,7 +5,7 @@ import {
 	subscribeResourceScope,
 	type ResourceScope,
 } from "../auth/resourceScope.ts";
-import type { FetchLike } from "./client.ts";
+import type { ApiHttpError, FetchLike } from "./client.ts";
 
 export class ResourceScopeError extends Error {
 	readonly status = 409;
@@ -36,6 +36,20 @@ export function responseScopeError(
 	scope: ResourceScope,
 ): ResourceScopeError | null {
 	return scope === getResourceScope() ? null : new ResourceScopeError();
+}
+
+/** Only the server's resource-change error requests a new session check. */
+export function scopedResponseError(
+	scope: ResourceScope,
+	error: ApiHttpError,
+): ApiHttpError | ResourceScopeError {
+	const stale = responseScopeError(scope);
+	if (stale) return stale;
+	if (error.status === 409 && error.problem?.code === "RESOURCE_CHANGED") {
+		requireSessionRecheck();
+		return new ResourceScopeError();
+	}
+	return error;
 }
 
 /** One lifetime covers fetch, JSON body reads, and streaming response consumption. */
@@ -123,6 +137,7 @@ export async function scopedRequest(
 	fetcher: FetchLike,
 	scope: ResourceScope,
 ): Promise<ScopedResponse | ResourceScopeError> {
+	// Canceled workspace work stays canceled, even if the same plan is active again.
 	const changed = responseScopeError(scope);
 	if (changed) return changed;
 	if (scope.status === "pending" || !scope.resource)
@@ -157,7 +172,6 @@ export async function scopedRequest(
 	const stale = responseScopeError(scope);
 	if (
 		stale ||
-		response.status === 409 ||
 		(response.ok &&
 			response.headers.get("X-Waypoint-Resource") !== scope.resource.id)
 	) {

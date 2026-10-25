@@ -7,7 +7,11 @@ import {
 } from "../auth/resourceScope.ts";
 import { ApiClient, ApiHttpError, type FetchLike } from "./client.ts";
 import { applyRowOperations } from "./rowSync.ts";
-import { ResourceScopeError, resourceScopedFactory } from "./scopedRequest.ts";
+import {
+	ResourceScopeError,
+	resourceScopedFactory,
+	scopedResponseError,
+} from "./scopedRequest.ts";
 
 const A = `plans/${"a".repeat(64)}`;
 const B = `plans/${"b".repeat(64)}`;
@@ -115,6 +119,16 @@ describe("resource assertion at the API boundary", () => {
 			expect(fetcher).not.toHaveBeenCalled();
 		},
 	);
+
+	it("does not send a canceled save after the same plan is verified again", async () => {
+		const fetcher = vi.fn<FetchLike>(async () => response("{}"));
+		const client = new ApiClient({ fetch: fetcher });
+		owner(A);
+		expect(await client.createAccount({} as never)).toBeInstanceOf(
+			ResourceScopeError,
+		);
+		expect(fetcher).not.toHaveBeenCalled();
+	});
 
 	it.each(["json", "sse"] as const)(
 		"blocks %s before network access while discovery is pending",
@@ -285,19 +299,95 @@ describe("resource assertion at the API boundary", () => {
 		expect(getResourceScope().status).toBe("ready");
 	});
 
-	it("rechecks a scoped 409 while preserving ordinary 401, 403, and 503 failures", async () => {
-		for (const status of [401, 403, 503]) {
+	it.each(["json", "sse"] as const)(
+		"preserves ordinary %s HTTP failures without a session recheck",
+		async (kind) => {
+			for (const status of [401, 403, 409, 503]) {
+				const scope = getResourceScope();
+				const result = await request(
+					new ApiClient({ fetch: async () => response("{}", A, status) }),
+					kind,
+				);
+				expect(result).toBeInstanceOf(ApiHttpError);
+				expect(result).toMatchObject({ status });
+				expect(getResourceScope()).toBe(scope);
+			}
+		},
+	);
+
+	it.each(["json", "sse"] as const)(
+		"rechecks %s only after the server reports RESOURCE_CHANGED",
+		async (kind) => {
+			const fetcher = vi.fn<FetchLike>(async (_url, init) => {
+				expect(new Headers(init?.headers).get("X-Waypoint-Resource")).toBe(A);
+				return response(
+					JSON.stringify({ status: 409, code: "RESOURCE_CHANGED" }),
+					B,
+					409,
+				);
+			});
+			const result = await request(new ApiClient({ fetch: fetcher }), kind);
+			expect(result).toBeInstanceOf(ResourceScopeError);
+			expect(getResourceScope().status).toBe("pending");
+			expect(fetcher).toHaveBeenCalledOnce();
+		},
+	);
+
+	it.each([null, A, B])(
+		"preserves a duplicate-row conflict with resource header %s",
+		async (resource) => {
+			const scope = getResourceScope();
+			const problem = { status: 409, detail: "That account already exists." };
 			const result = await new ApiClient({
-				fetch: async () => response("{}", null, status),
-			}).getModel();
+				fetch: async () => response(JSON.stringify(problem), resource, 409),
+			}).createAccount({} as never);
 			expect(result).toBeInstanceOf(ApiHttpError);
-			expect(result).toMatchObject({ status });
-			expect(getResourceScope().status).toBe("ready");
-		}
+			expect(result).toMatchObject({ status: 409, problem });
+			expect((result as ApiHttpError).message).toBe(
+				"The request conflicts with the current server data. That account already exists.",
+			);
+			expect(getResourceScope()).toBe(scope);
+		},
+	);
+
+	it("preserves a non-409 failure even with a resource-change code", async () => {
+		const scope = getResourceScope();
 		const result = await new ApiClient({
-			fetch: async () => response("{}", null, 409),
+			fetch: async () =>
+				response(
+					JSON.stringify({ status: 503, code: "RESOURCE_CHANGED" }),
+					A,
+					503,
+				),
 		}).getModel();
+		expect(result).toBeInstanceOf(ApiHttpError);
+		expect(result).toMatchObject({ status: 503 });
+		expect(getResourceScope()).toBe(scope);
+	});
+
+	it("preserves an operation conflict with another problem code", async () => {
+		const scope = getResourceScope();
+		const problem = { status: 409, code: "ID_CONFLICT" };
+		const result = await new ApiClient({
+			fetch: async () => response(JSON.stringify(problem), A, 409),
+		}).createAccount({} as never);
+		expect(result).toBeInstanceOf(ApiHttpError);
+		expect(result).toMatchObject({ status: 409, problem });
+		expect(getResourceScope()).toBe(scope);
+	});
+
+	it("does not invalidate a new workspace for an old resource-change error", () => {
+		const oldScope = getResourceScope();
+		const current = owner(B);
+		const result = scopedResponseError(
+			oldScope,
+			new ApiHttpError({
+				message: "The active plan changed.",
+				status: 409,
+				problem: { status: 409, code: "RESOURCE_CHANGED" },
+			}),
+		);
 		expect(result).toBeInstanceOf(ResourceScopeError);
-		expect(getResourceScope().status).toBe("pending");
+		expect(getResourceScope()).toBe(current);
 	});
 });
