@@ -4,3 +4,4 @@ core.*
 uploads/
 tmp/
 .env.dev
+/node_modules/
