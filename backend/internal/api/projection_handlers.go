@@ -41,12 +41,17 @@ type projectionRequestBody struct {
 	Document  *types.FinancialModelDocument   `json:"document,omitempty"`
 	Overrides types.ModelOverrides            `json:"overrides,omitempty"`
 	Settings  types.ProjectionRuntimeSettings `json:"settings"`
-	// Window selects which timeline slice to return: "history" (past to
-	// projection start), "projection" (projection start onward), or "both"
-	// (default). The stored artifact is always the full result; the window
-	// only filters the response, so a history request warms the later full
-	// request instead of computing twice.
-	Window string `json:"window,omitempty"`
+	// Range clips the returned timeline to [startDate, endDate], both
+	// inclusive ISO dates. Either bound may be omitted for an open end;
+	// an omitted range returns everything. The stored artifact is always
+	// the full result, so a narrow request warms the later full one.
+	Range *projectionRange `json:"range,omitempty"`
+}
+
+// projectionRange is a closed date interval over the timeline.
+type projectionRange struct {
+	StartDate string `json:"startDate,omitempty"`
+	EndDate   string `json:"endDate,omitempty"`
 }
 
 type deterministicOutput struct {
@@ -62,12 +67,8 @@ type deterministicOutput struct {
 func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 	Body projectionRequestBody
 }) (*deterministicOutput, error) {
-	window := input.Body.Window
-	if window == "" {
-		window = "both"
-	}
-	if window != "history" && window != "projection" && window != "both" {
-		return nil, huma.Error400BadRequest("window must be history, projection, or both")
+	if err := validateProjectionRange(input.Body.Range); err != nil {
+		return nil, err
 	}
 	document, err := s.resolveDocument(input.Body.Document)
 	if err != nil {
@@ -76,8 +77,8 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 
 	// Key the RESOLVED document so omitted fields track the
 	// stored state: a model save changes stored content and therefore the key.
-	// The window stays out of the key: history and full requests share one
-	// stored artifact, and a history request warms the full one.
+	// The range stays out of the key: narrow and full requests share one
+	// stored artifact, and a narrow request warms the full one.
 	cacheKey := s.resourceArtifactKey("deterministic", map[string]any{
 		"publicResultVersion": deterministicResultCacheVersion,
 		"document":            document,
@@ -88,13 +89,13 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 		// huma writes Status verbatim; leaving it zero panics the writer.
 		output := &deterministicOutput{Status: http.StatusOK, Cache: "hit"}
 		cachedCopy := cached.value
-		output.Body.Result = filterProjectionWindow(&cachedCopy, window)
+		output.Body.Result = clipProjectionRange(&cachedCopy, input.Body.Range)
 		return output, nil
 	}
 	_, prefix := parseArtifactKeyMeta(cacheKey)
-	log.Printf("deterministic recalc key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d window=%s",
+	log.Printf("deterministic recalc key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d range=%s",
 		prefix, len(document.Accounts), len(document.Postings), len(document.Checkpoints),
-		input.Body.Settings.HorizonYears, window)
+		input.Body.Settings.HorizonYears, formatProjectionRange(input.Body.Range))
 
 	result, err := domain.ProjectFinancialModelDocument(document, &input.Body.Settings, input.Body.Overrides, nil)
 	// huma writes this status verbatim; default to 200 and only raise it for
@@ -112,32 +113,87 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 		return output, nil
 	}
 	putArtifact(s.store, cacheKey, "deterministic", result)
-	output.Body.Result = filterProjectionWindow(result, window)
+	output.Body.Result = clipProjectionRange(result, input.Body.Range)
 	return output, nil
 }
 
-// filterProjectionWindow returns the requested timeline slice. It builds new
+// validateProjectionRange rejects malformed or inverted intervals before
+// any resolve, lookup, or compute. ISO dates compare lexicographically.
+func validateProjectionRange(r *projectionRange) error {
+	if r == nil {
+		return nil
+	}
+	for _, date := range []string{r.StartDate, r.EndDate} {
+		if date != "" && !domain.IsValidIsoDate(date) {
+			return huma.Error400BadRequest("range dates must be YYYY-MM-DD")
+		}
+	}
+	if r.StartDate != "" && r.EndDate != "" && r.StartDate > r.EndDate {
+		return huma.Error400BadRequest("range startDate must not be after endDate")
+	}
+	return nil
+}
+
+// formatProjectionRange renders the range for recalc log lines.
+func formatProjectionRange(r *projectionRange) string {
+	if r == nil {
+		return "full"
+	}
+	start, end := r.StartDate, r.EndDate
+	if start == "" {
+		start = "beginning"
+	}
+	if end == "" {
+		end = "end"
+	}
+	return start + ".." + end
+}
+
+// clipProjectionRange returns the requested timeline slice. It builds new
 // row and event slices and never mutates the cached or computed result, so
-// shared backing arrays stay intact for later requests.
-func filterProjectionWindow(result *types.ProjectionResult, window string) *types.ProjectionResult {
-	if window == "both" {
+// shared backing arrays stay intact for later requests. Evaluations ride
+// along only when the slice holds projected rows: they summarize the whole
+// projection and are meaningless over history alone.
+func clipProjectionRange(result *types.ProjectionResult, r *projectionRange) *types.ProjectionResult {
+	if r == nil {
 		return result
 	}
 	filtered := *result
-	if window == "history" {
-		rows := make([]types.ProjectionRow, 0, len(result.Timeline.Rows))
-		for _, row := range result.Timeline.Rows {
-			if row.IsHistorical {
-				rows = append(rows, row)
-			}
+	rows := make([]types.ProjectionRow, 0, len(result.Timeline.Rows))
+	for _, row := range result.Timeline.Rows {
+		if r.StartDate != "" && row.Date < types.IsoDate(r.StartDate) {
+			continue
 		}
-		filtered.Timeline.Rows = rows
-		filtered.MovementEvents = nil
+		if r.EndDate != "" && row.Date > types.IsoDate(r.EndDate) {
+			continue
+		}
+		rows = append(rows, row)
+	}
+	filtered.Timeline.Rows = rows
+	events := make([]types.MovementEvent, 0, len(result.MovementEvents))
+	for _, event := range result.MovementEvents {
+		if r.StartDate != "" && event.Date < types.IsoDate(r.StartDate) {
+			continue
+		}
+		if r.EndDate != "" && event.Date > types.IsoDate(r.EndDate) {
+			continue
+		}
+		events = append(events, event)
+	}
+	filtered.MovementEvents = events
+	hasProjected := false
+	for _, row := range rows {
+		if !row.IsHistorical {
+			hasProjected = true
+			break
+		}
+	}
+	if !hasProjected {
 		// Empty arrays, not nulls: readers map over the non-optional
 		// tables without nil checks. PlannedPurchases stays omitempty
 		// and is therefore absent rather than []. Totals, summary,
 		// milestones, and account summaries keep full-result values;
-		// only rows (plus history events/evaluations) are sliced.
+		// only rows and events are clipped.
 		filtered.Evaluations = types.EvaluationResultTables{
 			FinancialIndependence: []types.EvaluationResultEnvelope{},
 			NetWorthThreshold:     []types.EvaluationResultEnvelope{},
@@ -146,14 +202,6 @@ func filterProjectionWindow(result *types.ProjectionResult, window string) *type
 			CycleFulfillment:      []types.EvaluationResultEnvelope{},
 			PlannedPurchases:      []types.EvaluationResultEnvelope{},
 		}
-		return &filtered
 	}
-	rows := make([]types.ProjectionRow, 0, len(result.Timeline.Rows))
-	for _, row := range result.Timeline.Rows {
-		if !row.IsHistorical {
-			rows = append(rows, row)
-		}
-	}
-	filtered.Timeline.Rows = rows
 	return &filtered
 }
