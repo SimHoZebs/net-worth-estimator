@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { useWorkspaceStore, selectPlan } from "../state/workspaceStore.ts";
 import {
 	discardHash,
 	editorHash,
@@ -31,9 +31,7 @@ export function useWorkspaceOverlays({
 	pushHash: (hash: string) => void;
 	replaceHash: (hash: string) => void;
 }) {
-	const plan: PlanLike | null = useWorkspaceStore(
-		(state) => state.workspace?.draft ?? state.workspace?.saved ?? null,
-	);
+	const plan: PlanLike | null = useWorkspaceStore(selectPlan);
 	const resolution = resolveOverlayRoute(route, plan);
 	const [returnTo, setReturnTo] = useState<EvidenceTarget | null>(null);
 	const [discarding, setDiscarding] = useState(false);
@@ -44,6 +42,17 @@ export function useWorkspaceOverlays({
 	useEffect(() => {
 		if (resolution.state === "unknown") replaceHash(pageHash(page));
 	}, [resolution.state, page, replaceHash]);
+
+	// The hash is the overlay source of truth: once it resolves to no
+	// overlay (closed or normalized), any stacked return target is stale and
+	// must clear so a later editor does not reopen old evidence. Pending
+	// (plan not loaded yet) preserves the stack: the URL still names the
+	// same editor.
+	useEffect(() => {
+		if (resolution.state === "none" || resolution.state === "unknown")
+			// oxlint-disable-next-line react/set-state-in-effect
+			setReturnTo(null);
+	}, [resolution.state]);
 
 	const ready = resolution.state === "ready" ? resolution.overlay : null;
 	const evidence = ready?.kind === "evidence" ? ready.target : null;
