@@ -53,7 +53,7 @@ export async function discoverSession(
 		!resource.permissions.every(
 			(permission) => typeof permission === "string" && permission.length > 0,
 		) ||
-		response.headers.get("X-Waypoint-Resource") !== resource.id ||
+		response.headers.get("Waypoint-Resource") !== resource.id ||
 		(next.authenticated &&
 			(!isRecord(next.user) ||
 				typeof next.user.subject !== "string" ||

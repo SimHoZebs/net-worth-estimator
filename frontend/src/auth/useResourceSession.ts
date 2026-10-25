@@ -247,7 +247,7 @@ export function useResourceSession() {
 			const response = await fetch(`${attempt.apiBaseUrl}/v1/auth/logout`, {
 				method: "POST",
 				credentials: "same-origin",
-				headers: { "X-Waypoint-Resource": attempt.session.resource.id },
+				headers: { "Waypoint-Resource": attempt.session.resource.id },
 			});
 			if (signingOut.current !== attempt) return;
 			if (!response.ok) {

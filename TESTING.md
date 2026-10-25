@@ -195,7 +195,7 @@ export RESOURCE_ID=plans/your-discovered-resource-id
 export PUBLIC_ORIGIN=http://localhost:8080
 curl() {
   command curl --cookie "$COOKIE_FILE" \
-    -H "X-Waypoint-Resource: $RESOURCE_ID" -H "Origin: $PUBLIC_ORIGIN" "$@"
+    -H "Waypoint-Resource: $RESOURCE_ID" -H "Origin: $PUBLIC_ORIGIN" "$@"
 }
 ```
 
@@ -263,10 +263,10 @@ curl -fsS -D /tmp/deterministic-headers \
   "$BASE_URL/v1/projections/deterministic" \
   | jq '{hasResult: (.result != null), issueCount: (.issues | length // 0), error}'
 
-grep '^X-Cache:' /tmp/deterministic-headers
+grep '^Cache-Status:' /tmp/deterministic-headers
 ```
 
-Run the same request again. The second response should normally report `X-Cache: hit` when artifact persistence is available.
+Run the same request again. The second response should normally report `Cache-Status: waypoint; hit` when artifact persistence is available.
 
 Seeded stochastic request:
 
@@ -280,11 +280,11 @@ curl -fsS -N -D /tmp/stochastic-headers \
   "$BASE_URL/v1/projections/stochastic" \
   | tee /tmp/stochastic-events.sse
 
-grep '^X-Cache:' /tmp/stochastic-headers
+grep '^Cache-Status:' /tmp/stochastic-headers
 grep '^event:' /tmp/stochastic-events.sse
 ```
 
-A small seeded run should terminate with one `result` event. It may include `progress` and `partial` events. Repeating the same request should produce `X-Cache: hit` and one `result` event. Sending `"seed": null` exercises the request-bound path; disconnecting that stream cancels its work and must not create an artifact.
+A small seeded run should terminate with one `result` event. It may include `progress` and `partial` events. Repeating the same request should produce `Cache-Status: waypoint; hit` and one `result` event. Sending `"seed": null` exercises the request-bound path; disconnecting that stream cancels its work and must not create an artifact.
 
 ## Session and Read-Only Matrix
 
@@ -324,7 +324,7 @@ Allowed preflight with resource assertion:
 curl -sS -o /dev/null -D - -X OPTIONS \
   -H 'Origin: https://app.example.com' \
   -H 'Access-Control-Request-Method: PATCH' \
-  -H 'Access-Control-Request-Headers: Content-Type, X-Waypoint-Resource' \
+  -H 'Access-Control-Request-Headers: Content-Type, Waypoint-Resource' \
   "$BASE_URL/v1/financial-model"
 ```
 

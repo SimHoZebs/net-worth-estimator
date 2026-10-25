@@ -160,11 +160,10 @@ func (run *sharedStochasticRun) outcome() (*types.StochasticProjectionResult, er
 
 // writeSSEPreamble emits shared SSE headers plus the reconnect hint. Both
 // seeded (shared) and unseeded (inline) streams use this so proxy behavior
-// and retry timing stay identical. Callers set X-Cache before calling.
+// and retry timing stay identical. Callers set Cache-Status before calling.
 func writeSSEPreamble(w http.ResponseWriter, flusher http.Flusher) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Connection", "keep-alive")
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 	if _, err := fmt.Fprintf(w, "retry: %d\n\n", sseRetryMs); err == nil {
@@ -283,7 +282,7 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 		if cached, err := lookupArtifact[types.StochasticProjectionResult](s.store, cacheKey); err == nil && cached.hit {
 			w.Header().Set("Content-Type", "text/event-stream")
 			w.Header().Set("Cache-Control", "no-store")
-			w.Header().Set("X-Cache", "hit")
+			w.Header().Set("Cache-Status", cacheStatusHit)
 			w.WriteHeader(http.StatusOK)
 			encoded, marshalErr := json.Marshal(map[string]any{"result": cached.value})
 			if marshalErr == nil {
@@ -299,17 +298,16 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 		s.serveStochasticInline(w, r, document, body.Settings, body.Overrides, body.Config)
 		return
 	}
-	w.Header().Set("X-Cache", "miss")
+	w.Header().Set("Cache-Status", cacheStatusMiss)
 	_, prefix := parseArtifactKeyMeta(cacheKey)
 	// Miss line with the input summary: identical summaries on later misses
 	// mean the same data recomputed (registry lost or backend restarted).
 	log.Printf("stochastic recalc key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d runs=%d",
 		prefix, len(document.Accounts), len(document.Postings), len(document.Checkpoints),
 		body.Settings.HorizonYears, body.Config.RunCount)
+	// Header reports miss for both owner and attach; the log lines below
+	// distinguish them.
 	run, owner := getOrStartSharedRun(cacheKey)
-	if !owner {
-		w.Header().Set("X-Cache", "attach")
-	}
 
 	writeSSEPreamble(w, flusher)
 
@@ -412,7 +410,7 @@ func (s *Server) serveStochasticInline(
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("X-Cache", "miss")
+	w.Header().Set("Cache-Status", cacheStatusMiss)
 	writeSSEPreamble(w, flusher)
 
 	var writeMu sync.Mutex

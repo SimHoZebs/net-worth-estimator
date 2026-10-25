@@ -15,7 +15,6 @@ type parseResultBody struct {
 }
 
 type getModelOutput struct {
-	ETag string `header:"ETag"`
 	Body parseResultBody
 }
 
@@ -40,7 +39,7 @@ func (s *Server) getModel(_ context.Context, _ *struct{}) (*getModelOutput, erro
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	return &getModelOutput{ETag: revision, Body: parseResultBody{Document: document, Issues: issues, Revision: revision}}, nil
+	return &getModelOutput{Body: parseResultBody{Document: document, Issues: issues, Revision: revision}}, nil
 }
 
 type statusOutput struct {

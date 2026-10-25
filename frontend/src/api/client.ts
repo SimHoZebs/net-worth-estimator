@@ -139,6 +139,18 @@ function isJsonContentType(contentType: string | null): boolean {
 	return value === "application/json" || value.endsWith("+json");
 }
 
+// WWW-Authenticate scheme is case-insensitive per RFC 9110; challenge may
+// carry params like `Session realm="waypoint"`.
+function authScheme(value: string | null): string {
+	if (!value) return "";
+	return (
+		value
+			.split(/[\s;,]/, 1)[0]
+			?.trim()
+			.toLowerCase() ?? ""
+	);
+}
+
 function looksLikeJson(text: string): boolean {
 	const value = text.trim();
 	return value.startsWith("{") || value.startsWith("[");
@@ -216,7 +228,7 @@ export async function parseErrorResponse(
 ): Promise<ApiHttpError> {
 	if (
 		response.status === 401 &&
-		response.headers.get("www-authenticate") === "Session" &&
+		authScheme(response.headers.get("www-authenticate")) === "session" &&
 		typeof window !== "undefined"
 	) {
 		window.dispatchEvent(new Event("waypoint:authentication-required"));

@@ -202,8 +202,14 @@ func TestRowWriteReturnsRevision(t *testing.T) {
 	}
 	afterGet := httptest.NewRecorder()
 	handler.ServeHTTP(afterGet, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
-	if created.Revision != afterGet.Header().Get("ETag") {
-		t.Fatalf("revision = %q, persisted ETag = %q", created.Revision, afterGet.Header().Get("ETag"))
+	var afterPayload struct {
+		Revision string `json:"revision"`
+	}
+	if err := json.Unmarshal(afterGet.Body.Bytes(), &afterPayload); err != nil {
+		t.Fatalf("decode GET response: %v", err)
+	}
+	if created.Revision != afterPayload.Revision {
+		t.Fatalf("revision = %q, persisted revision = %q", created.Revision, afterPayload.Revision)
 	}
 }
 
@@ -426,8 +432,8 @@ func TestDeterministicResponseIncludesMovementEvents(t *testing.T) {
 	cachedRequest := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
 	cachedRequest.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(cachedResponse, cachedRequest)
-	if cachedResponse.Code != http.StatusOK || cachedResponse.Header().Get("X-Cache") != "hit" {
-		t.Fatalf("cached projection status = %d, cache = %q, body %s", cachedResponse.Code, cachedResponse.Header().Get("X-Cache"), cachedResponse.Body.String())
+	if cachedResponse.Code != http.StatusOK || cachedResponse.Header().Get("Cache-Status") != cacheStatusHit {
+		t.Fatalf("cached projection status = %d, cache = %q, body %s", cachedResponse.Code, cachedResponse.Header().Get("Cache-Status"), cachedResponse.Body.String())
 	}
 	var cachedPayload struct {
 		Result *types.ProjectionResult `json:"result"`
@@ -508,8 +514,8 @@ func TestDeterministicMovementEvidenceIncludesBindingConstraints(t *testing.T) {
 	cachedRequest := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
 	cachedRequest.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(cachedResponse, cachedRequest)
-	if cachedResponse.Code != http.StatusOK || cachedResponse.Header().Get("X-Cache") != "hit" {
-		t.Fatalf("cached projection status = %d, cache = %q, body %s", cachedResponse.Code, cachedResponse.Header().Get("X-Cache"), cachedResponse.Body.String())
+	if cachedResponse.Code != http.StatusOK || cachedResponse.Header().Get("Cache-Status") != cacheStatusHit {
+		t.Fatalf("cached projection status = %d, cache = %q, body %s", cachedResponse.Code, cachedResponse.Header().Get("Cache-Status"), cachedResponse.Body.String())
 	}
 	var cachedPayload struct {
 		Result *types.ProjectionResult `json:"result"`

@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	corsAllowedHeaders = "Content-Type, X-Waypoint-Resource"
+	corsAllowedHeaders = "Content-Type, Waypoint-Resource"
 	corsAllowedMethods = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-	corsExposedHeaders = "ETag, X-Cache, Link, Retry-After"
+	corsExposedHeaders = "Cache-Status, Retry-After"
 )
 
 var allowedCORSMethods = map[string]struct{}{
@@ -256,7 +256,7 @@ func corsHeadersAllowed(value string) bool {
 		if trimmed == "" {
 			continue
 		}
-		if strings.EqualFold(trimmed, "Content-Type") || strings.EqualFold(trimmed, "X-Waypoint-Resource") {
+		if strings.EqualFold(trimmed, "Content-Type") || strings.EqualFold(trimmed, "Waypoint-Resource") {
 			continue
 		}
 		return false

@@ -52,7 +52,7 @@ function session(id = A) {
 
 function response(body: unknown, resource: string | null = A) {
 	const headers = new Headers({ "content-type": "application/json" });
-	if (resource) headers.set("X-Waypoint-Resource", resource);
+	if (resource) headers.set("Waypoint-Resource", resource);
 	return new Response(JSON.stringify(body), { headers });
 }
 

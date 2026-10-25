@@ -23,7 +23,7 @@ function response(body: unknown, status = 200) {
 		status,
 		headers: {
 			"content-type": "application/json",
-			"X-Waypoint-Resource": session.resource.id,
+			"Waypoint-Resource": session.resource.id,
 		},
 	});
 }
@@ -126,7 +126,7 @@ it("blocks an unverified logout redirect and recovers to the guest through an ex
 			},
 			user: undefined,
 		}),
-		{ headers: { "X-Waypoint-Resource": "plans/sample" } },
+		{ headers: { "Waypoint-Resource": "plans/sample" } },
 	);
 	await act(async () => result.current.refresh());
 	expect(result.current.phase).toBe("ready");

@@ -15,7 +15,7 @@ import {
 
 function response(body: string, init: ResponseInit): Response {
 	const headers = new Headers(init.headers);
-	headers.set("X-Waypoint-Resource", "plans/sample");
+	headers.set("Waypoint-Resource", "plans/sample");
 	return new Response(body, { ...init, headers });
 }
 

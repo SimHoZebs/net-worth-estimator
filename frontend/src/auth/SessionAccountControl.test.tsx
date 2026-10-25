@@ -46,7 +46,7 @@ function response(body: unknown, code = 200) {
 		typeof body.resource === "object" &&
 		"id" in body.resource
 	)
-		headers.set("X-Waypoint-Resource", String(body.resource.id));
+		headers.set("Waypoint-Resource", String(body.resource.id));
 	return new Response(JSON.stringify(body), {
 		status: code,
 		headers,
@@ -170,7 +170,7 @@ describe("session account controls", () => {
 		expect(fetcher).toHaveBeenCalledWith("/v1/auth/logout", {
 			method: "POST",
 			credentials: "same-origin",
-			headers: { "X-Waypoint-Resource": signedInSession.resource.id },
+			headers: { "Waypoint-Resource": signedInSession.resource.id },
 		});
 		expect(screen.getByText("Sam Lee")).toBeTruthy();
 		expect(
