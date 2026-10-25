@@ -5,15 +5,13 @@ import { parseModelDocument } from "../api/modelImport.ts";
 import { Button } from "../components/Button.tsx";
 import { Notice } from "../components/Notice.tsx";
 import { ModelImportPreview } from "../components/imports/ModelImportPreview.tsx";
-import { useErrorToast } from "../components/NotificationCenter.tsx";
-import { notifyError } from "../state/notifications.ts";
+import { dismissKey, notifyError } from "../state/notifications.ts";
 import { useFileReview } from "../state/useFileReview.ts";
 import { useServerModelImport } from "../state/useServerModelImport.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { WorkspaceTopbar } from "../workspace/WorkspaceHeader.tsx";
 import { WorkspaceLayout } from "../workspace/WorkspaceLayout.tsx";
-import { WorkspaceNotices } from "../workspace/WorkspaceNotices.tsx";
 import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar.tsx";
 
 export function ServerWorkspaceRecovery() {
@@ -41,7 +39,7 @@ export function ServerWorkspaceRecovery() {
 		recover: importServerDocument,
 		reload: retry,
 	});
-	const { candidate, error, reading, setError, readFile, clearCandidate } =
+	const { candidate, reading, readFile, clearCandidate } =
 		useFileReview<FinancialModelDocument>({
 			parse: (text) =>
 				parseModelDocument({
@@ -54,7 +52,6 @@ export function ServerWorkspaceRecovery() {
 		});
 	const inputRef = useRef<HTMLInputElement>(null);
 	const failImport = (message: string) => {
-		setError(message);
 		notifyError("model-import", message);
 	};
 	const missingModel =
@@ -63,7 +60,7 @@ export function ServerWorkspaceRecovery() {
 	const importCandidate = async () => {
 		if (!candidate || readOnly) return;
 		clearCandidate();
-		setError(null);
+		dismissKey("model-import");
 		const imported = await importDocument(candidate);
 		if (!imported)
 			failImport(
@@ -87,10 +84,10 @@ export function ServerWorkspaceRecovery() {
 					<ServerModelImport
 						readOnly={readOnly}
 						reading={reading}
-						error={error}
 						inputRef={inputRef}
 						onChoose={() => inputRef.current?.click()}
 						onFile={(file) => {
+							dismissKey("model-import");
 							void readFile(file);
 						}}
 					/>
@@ -130,19 +127,16 @@ export function ServerWorkspaceRecovery() {
 function ServerModelImport({
 	readOnly,
 	reading,
-	error,
 	inputRef,
 	onChoose,
 	onFile,
 }: {
 	readOnly: boolean;
 	reading: boolean;
-	error: string | null;
 	inputRef: RefObject<HTMLInputElement | null>;
 	onChoose: () => void;
 	onFile: (file: File) => void;
 }) {
-	useErrorToast("model-import", error);
 	return (
 		<div className="mt-6 flex flex-col items-center gap-3">
 			<input
@@ -198,7 +192,6 @@ function ServerRecovery({
 			draftBar={null}
 			overlays={null}
 		>
-			<WorkspaceNotices />
 			<div className="mx-auto my-[12vh] max-w-2xl p-6 [&_p]:mb-6">
 				<h1 className="mb-6">{title}.</h1>
 				{children}

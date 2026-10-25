@@ -21,10 +21,6 @@ import {
 } from "../state/workspaceStore.ts";
 import { testPlan } from "../test/plan.ts";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
-import {
-	WorkspaceNotices,
-	WorkspaceNotification,
-} from "../workspace/WorkspaceNotices.tsx";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { ServerApp } from "./ServerApp.tsx";
 
@@ -50,8 +46,6 @@ vi.mock("../WorkspaceShell.tsx", () => ({
 	WorkspaceShell: () => (
 		<>
 			<p>Workspace screen</p>
-			<WorkspaceNotices />
-			<WorkspaceNotification />
 			<NotificationCenter />
 			<StoreReadout />
 		</>

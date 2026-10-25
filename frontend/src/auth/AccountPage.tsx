@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Button } from "../components/Button.tsx";
 import { InputField } from "../components/Field.tsx";
 import {
-	useErrorToast,
-	useSuccessToast,
-} from "../components/NotificationCenter.tsx";
-import { notifyError, notifySuccess } from "../state/notifications.ts";
+	dismissKey,
+	notifyError,
+	notifySuccess,
+} from "../state/notifications.ts";
 import { redirectToSignIn } from "./navigation.ts";
 import { useSession } from "./sessionContext.ts";
 import {
@@ -26,8 +26,6 @@ export function AccountPage() {
 	const [displayName, setDisplayName] = useState("");
 	const [oldPassword, setOldPassword] = useState("");
 	const [newPassword, setNewPassword] = useState("");
-	const [notice, setNotice] = useState("");
-	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(true);
 	const [reloadKey, setReloadKey] = useState(0);
 	const [savingProfile, setSavingProfile] = useState(false);
@@ -39,6 +37,8 @@ export function AccountPage() {
 			setLoading(false);
 			return;
 		}
+		dismissKey("account");
+		dismissKey("account-notice");
 		const controller = new AbortController();
 		(async () => {
 			try {
@@ -52,12 +52,12 @@ export function AccountPage() {
 				setSessions(nextSessions);
 			} catch (cause) {
 				if (!controller.signal.aborted) {
-					const message =
+					notifyError(
+						"account",
 						cause instanceof Error
 							? cause.message
-							: "Account details are unavailable.";
-					setError(message);
-					notifyError("account", message);
+							: "Account details are unavailable.",
+					);
 				}
 			} finally {
 				if (!controller.signal.aborted) setLoading(false);
@@ -65,9 +65,6 @@ export function AccountPage() {
 		})();
 		return () => controller.abort();
 	}, [session?.authenticated, reloadKey]);
-
-	useErrorToast("account", error || null);
-	useSuccessToast("account-notice", notice || null, () => setNotice(""));
 
 	if (!session?.allowed) return null;
 	if (!session.authenticated) {
@@ -85,23 +82,22 @@ export function AccountPage() {
 	async function onSaveProfile(event: React.FormEvent) {
 		event.preventDefault();
 		setSavingProfile(true);
-		setError("");
-		setNotice("");
+		dismissKey("account");
+		dismissKey("account-notice");
 		try {
 			const next = await updateAccountProfile({
 				displayName: displayName.trim(),
 			});
 			setProfile(next);
 			setDisplayName(next.displayName);
-			setNotice("Display name updated.");
 			notifySuccess("account-notice", "Display name updated.");
 		} catch (cause) {
-			const message =
+			notifyError(
+				"account",
 				cause instanceof Error
 					? cause.message
-					: "The account update was rejected.";
-			setError(message);
-			notifyError("account", message);
+					: "The account update was rejected.",
+			);
 		} finally {
 			setSavingProfile(false);
 		}
@@ -110,49 +106,47 @@ export function AccountPage() {
 	async function onChangePassword(event: React.FormEvent) {
 		event.preventDefault();
 		setSavingPassword(true);
-		setError("");
-		setNotice("");
+		dismissKey("account");
+		dismissKey("account-notice");
 		try {
 			await changeAccountPassword({ oldPassword, newPassword });
 			redirectToSignIn();
 		} catch (cause) {
-			const message =
+			notifyError(
+				"account",
 				cause instanceof Error
 					? cause.message
-					: "The password change was rejected.";
-			setError(message);
-			notifyError("account", message);
+					: "The password change was rejected.",
+			);
 			setSavingPassword(false);
 		}
 	}
 
 	async function onRevoke(id: string) {
-		setError("");
-		setNotice("");
+		dismissKey("account");
+		dismissKey("account-notice");
 		try {
 			await revokeAccountSession(id);
 		} catch (cause) {
-			const message =
+			notifyError(
+				"account",
 				cause instanceof Error
 					? cause.message
-					: "That session could not be revoked.";
-			setError(message);
-			notifyError("account", message);
+					: "That session could not be revoked.",
+			);
 			return;
 		}
 		try {
 			setSessions(await listAccountSessions());
-			setNotice("Session revoked.");
 			notifySuccess("account-notice", "Session revoked.");
 		} catch (cause) {
-			const message =
+			notifySuccess("account-notice", "Session revoked.");
+			notifyError(
+				"account",
 				cause instanceof Error
 					? cause.message
-					: "The session list could not be refreshed.";
-			setNotice("Session revoked.");
-			notifySuccess("account-notice", "Session revoked.");
-			setError(message);
-			notifyError("account", message);
+					: "The session list could not be refreshed.",
+			);
 		}
 	}
 
@@ -175,7 +169,6 @@ export function AccountPage() {
 					<div>
 						<Button
 							onClick={() => {
-								setError("");
 								setLoading(true);
 								setReloadKey((key) => key + 1);
 							}}

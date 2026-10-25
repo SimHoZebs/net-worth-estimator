@@ -24,7 +24,7 @@ import {
 } from "./sessionChanges.ts";
 import type { Session } from "./sessionContext.ts";
 import { discoverSession, sessionScopeInput } from "./sessionDiscovery.ts";
-import { notifyError } from "../state/notifications.ts";
+import { dismissKey, notifyError } from "../state/notifications.ts";
 
 interface SessionOwner {
 	session: Session;
@@ -129,6 +129,7 @@ export function useResourceSession() {
 					owner.current = next;
 					setSession(next.session);
 					setStatus({ phase: "ready", error: "" });
+					dismissKey("session");
 					if (changed) announceSessionChange();
 					return;
 				}
@@ -159,6 +160,7 @@ export function useResourceSession() {
 					owner.current = next;
 					setSession(next.session);
 					setStatus({ phase: "ready", error: "" });
+					dismissKey("session");
 					return;
 				}
 				const hardPending = suspendResourceScope();
@@ -194,6 +196,7 @@ export function useResourceSession() {
 				owner.current = next;
 				setSession(next.session);
 				setStatus({ phase: "ready", error: "" });
+				dismissKey("session");
 				if (changed) announceSessionChange();
 			} catch (cause) {
 				if (signal.aborted) return;
@@ -229,17 +232,17 @@ export function useResourceSession() {
 	const logout = useCallback(async () => {
 		if (signingOut.current || !owner.current) return;
 		if (useWorkspaceStore.getState().volatile) {
-			setStatus((previous) => ({
-				...previous,
-				error:
-					"Your draft has recovery data. Discard the draft before signing out.",
-			}));
+			const blocked =
+				"Your draft has recovery data. Discard the draft before signing out.";
+			setStatus((previous) => ({ ...previous, error: blocked }));
+			notifyError("session-logout", blocked);
 			return;
 		}
 		const attempt: LogoutAttempt = { ...owner.current };
 		signingOut.current = attempt;
 		setLogoutPending(true);
 		setStatus((previous) => ({ ...previous, error: "" }));
+		dismissKey("session-logout");
 		try {
 			const response = await fetch(`${attempt.apiBaseUrl}/v1/auth/logout`, {
 				method: "POST",
@@ -275,13 +278,15 @@ export function useResourceSession() {
 			if (signingOut.current !== attempt) return;
 			signingOut.current = null;
 			const error = cause instanceof Error ? cause.message : "Sign-out failed.";
-			notifyError("session-logout", error);
 			if (
 				getResourceScope().status === "pending" &&
 				!verification.current?.error
 			)
 				await refresh();
 			if (mounted.current) setStatus((previous) => ({ ...previous, error }));
+			// Notify last: the refresh above can drive a scope transition
+			// that clears the stack, which must not swallow this failure.
+			notifyError("session-logout", error);
 		} finally {
 			if (
 				mounted.current &&

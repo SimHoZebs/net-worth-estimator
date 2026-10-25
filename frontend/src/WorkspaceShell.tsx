@@ -13,10 +13,6 @@ import {
 	WorkspaceTopbar,
 } from "./workspace/WorkspaceHeader.tsx";
 import { WorkspaceLayout } from "./workspace/WorkspaceLayout.tsx";
-import {
-	WorkspaceNotices,
-	WorkspaceNotification,
-} from "./workspace/WorkspaceNotices.tsx";
 import { WorkspacePage } from "./workspace/WorkspacePage.tsx";
 import { WorkspaceSidebar } from "./workspace/WorkspaceSidebar.tsx";
 
@@ -57,8 +53,6 @@ export function WorkspaceShell() {
 			draftBar={<DraftBar onDiscard={overlays.openDiscard} />}
 			overlays={<WorkspaceDialogs overlays={overlays} />}
 		>
-			<WorkspaceNotices />
-			<WorkspaceNotification />
 			<WorkspaceHeading
 				page={navigation.currentPage}
 				headingRef={navigation.headingRef}

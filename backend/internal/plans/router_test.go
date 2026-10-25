@@ -166,7 +166,7 @@ func TestPrivatePlansInitializeBlankWorkspaces(t *testing.T) {
 			if blank == nil || len(blank.Accounts) != 0 || len(blank.Postings) != 0 || blank.SourcePath != "" {
 				t.Fatalf("new private workspace = %+v", blank)
 			}
-			projection := `{"settings":{"fallbackProjectionStartDate":"2026-01-01","horizonYears":1,"evaluations":{"financialIndependence":[],"netWorthThreshold":[],"accountBalance":[],"postingFulfillment":[],"cycleFulfillment":[]}}}`
+			projection := `{"settings":{"fallbackProjectionStartDate":"2026-01-01","horizonYears":1,"evaluations":{"financialIndependence":[],"netWorthThreshold":[],"accountBalance":[],"postingFulfillment":[],"cycleFulfillment":[]}},"range":{"startDate":"2000-01-01","endDate":"2100-01-01"}}`
 			if w := request(t, handler, "POST", "/v1/projections/deterministic", projection); w.Code != 200 {
 				t.Fatalf("blank projection = %d %s", w.Code, w.Body.String())
 			}

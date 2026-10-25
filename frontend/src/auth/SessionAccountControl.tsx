@@ -1,15 +1,10 @@
 import { LogIn, LogOut, UserRound } from "lucide-react";
 import { Button } from "../components/Button.tsx";
-import { useErrorToast } from "../components/NotificationCenter.tsx";
 import { redirectToSignIn } from "./navigation.ts";
 import { useSession } from "./sessionContext.ts";
 
 export function SessionAccountControl() {
 	const account = useSession();
-	useErrorToast(
-		"session-logout",
-		account?.session.allowed ? account.logoutError || null : null,
-	);
 	if (!account?.session.allowed) return null;
 	const { session, logout, logoutPending } = account;
 	const authenticated = session.authenticated === true;
