@@ -72,7 +72,7 @@ export function Drawer({
 	} = behavior ?? {};
 	const panelEl = useRef<HTMLElement | null>(null);
 	const titleId = useId();
-	// The element that held focus when the drawer opened. Captured once per
+	// The element that held focus when the modal drawer opened. Captured once per
 	// open cycle (never overwritten by StrictMode remounts or later
 	// re-runs, which would see focus already inside the drawer) so focus
 	// reliably returns to the opener on close.
@@ -80,7 +80,7 @@ export function Drawer({
 	// Starts false so the first open always captures, including drawers
 	// that mount already open. Refs survive StrictMode remounts, so later
 	// runs keep the original opener.
-	const wasOpenRef = useRef(false);
+	const wasModalOpenRef = useRef(false);
 	// Closing mirrors Modal: the exit animation plays first, the parent's
 	// onClose (hash navigation, unmount) runs after it completes.
 	const [closing, setClosing] = useState(false);
@@ -127,8 +127,10 @@ export function Drawer({
 			: { onSwipeRight: closeIfOver }),
 	});
 	useEffect(() => {
-		if (open && !wasOpenRef.current) openerRef.current = document.activeElement;
-		wasOpenRef.current = open;
+		const modalOpen = open && modal;
+		if (modalOpen && !wasModalOpenRef.current)
+			openerRef.current = document.activeElement;
+		wasModalOpenRef.current = modalOpen;
 		if (!open) return;
 		const previous = openerRef.current ?? document.activeElement;
 		// Focus lands on the panel container itself, never on a child, so
@@ -139,11 +141,10 @@ export function Drawer({
 		}
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key !== "Escape") return;
-			// Only the drawer holding focus handles Escape. A persistent
-			// drawer (desktop navigation) must never preventDefault here:
-			// that would swallow the keydown a native <dialog> above it
-			// needs to fire its own cancel event.
-			if (panelEl.current?.contains(document.activeElement)) {
+			// The topmost modal owns Escape even when opening the inert
+			// background blurs the opener before focus enters the panel.
+			// Persistent navigation and sheets below a native dialog stay silent.
+			if (modal && isTopmostModal(modalId)) {
 				event.preventDefault();
 				closeRef.current();
 			}
@@ -164,7 +165,7 @@ export function Drawer({
 		return () => {
 			window.removeEventListener("keydown", onKey);
 			window.removeEventListener("focusin", onFocusIn);
-			if (previous instanceof HTMLElement && previous.isConnected) {
+			if (modal && previous instanceof HTMLElement && previous.isConnected) {
 				// The inert effect below removes the #root inertness in its
 				// own cleanup. Focusing must wait until that runs: elements
 				// inside an inert subtree refuse focus, so a synchronous
