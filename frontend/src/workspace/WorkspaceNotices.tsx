@@ -1,5 +1,7 @@
-import { Check, X } from "lucide-react";
-import { ErrorNotice, IconButton } from "../components/ui.tsx";
+import {
+	useSuccessToast,
+	useErrorToast,
+} from "../components/NotificationCenter.tsx";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 
 function useErrorRecovery(): { action: string; onAction: () => void } {
@@ -35,28 +37,31 @@ export function workspaceStatusLabel({ readOnly }: { readOnly: boolean }) {
 	return readOnly ? "Read-only" : "Workspace";
 }
 
+/**
+ * Bridges workspace store state into the floating notification stack.
+ * Renders nothing; WorkspaceShell and the recovery screen mount it so
+ * errors and confirmations float instead of shoving content.
+ */
 export function WorkspaceNotices() {
 	const error = useWorkspaceStore((state) => state.error);
+	const errorCode = useWorkspaceStore((state) => state.errorCode);
 	const recovery = useErrorRecovery();
-	return <>{error && <ErrorNotice message={error} {...recovery} />}</>;
+	// The recovery screen explains a missing model itself with an import
+	// call to action; floating the same message would only duplicate it.
+	const visible =
+		errorCode !== "missing-model" && !error?.includes("no financial model")
+			? error
+			: null;
+	useErrorToast("workspace", visible, {
+		label: recovery.action,
+		onAction: recovery.onAction,
+	});
+	return null;
 }
 
 export function WorkspaceNotification() {
 	const notice = useWorkspaceStore((state) => state.notice);
 	const dismissNotice = useWorkspaceStore((state) => state.dismissNotice);
-	return notice ? (
-		<div
-			className="pointer-events-auto flex max-w-lg items-center gap-2 rounded-surface border border-solid border-primary bg-primary py-3 pr-3 pl-4 text-xs text-on-primary shadow-lg"
-			role="status"
-		>
-			<Check size={17} />
-			<span>{notice}</span>
-			<IconButton
-				icon={X}
-				label="Dismiss notification"
-				className="text-on-primary enabled:hover:bg-black/15 enabled:hover:text-on-primary"
-				onClick={dismissNotice}
-			/>
-		</div>
-	) : null;
+	useSuccessToast("workspace-notice", notice || null, dismissNotice);
+	return null;
 }

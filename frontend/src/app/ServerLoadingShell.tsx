@@ -1,5 +1,5 @@
 import type { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
-import { Skeleton } from "../components/ui.tsx";
+import { Skeleton } from "../components/Skeleton.tsx";
 import {
 	WorkspaceHeading,
 	WorkspaceTopbar,
@@ -31,7 +31,6 @@ export function ServerLoadingShell({
 			)}
 			draftBar={null}
 			overlays={null}
-			notification={null}
 		>
 			<WorkspaceHeading
 				page={navigation.currentPage}

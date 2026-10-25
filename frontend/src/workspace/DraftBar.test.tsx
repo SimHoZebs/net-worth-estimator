@@ -8,10 +8,15 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetUiStore } from "../state/uiStore.ts";
 import {
+	resetNotifications,
+	useNotifications,
+} from "../state/notifications.ts";
+import {
 	resetWorkspaceStore,
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
 import { testPlan } from "../test/plan.ts";
+import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import { DraftBar } from "./DraftBar.tsx";
 import { WorkspaceNotification } from "./WorkspaceNotices.tsx";
 
@@ -29,6 +34,7 @@ function workspace(draft = false) {
 beforeEach(() => {
 	resetWorkspaceStore();
 	resetUiStore();
+	resetNotifications();
 	useWorkspaceStore.setState({ workspace: workspace(), loading: false });
 });
 
@@ -36,6 +42,7 @@ afterEach(() => {
 	cleanup();
 	resetWorkspaceStore();
 	resetUiStore();
+	resetNotifications();
 });
 
 describe("draft bar presence", () => {
@@ -71,9 +78,16 @@ describe("draft bar presence", () => {
 
 	it("preserves the toast status and dismissal without a test-only styling hook", () => {
 		useWorkspaceStore.setState({ notice: "Plan saved." });
-		const view = render(<WorkspaceNotification />);
+		const view = render(
+			<>
+				<WorkspaceNotification />
+				<NotificationCenter />
+			</>,
+		);
 		expect(view.getByRole("status").textContent).toContain("Plan saved.");
 		fireEvent.click(view.getByRole("button", { name: "Dismiss notification" }));
 		expect(view.queryByRole("status")).toBeNull();
+		expect(useWorkspaceStore.getState().notice).toBe("");
+		expect(useNotifications.getState().items).toHaveLength(0);
 	});
 });

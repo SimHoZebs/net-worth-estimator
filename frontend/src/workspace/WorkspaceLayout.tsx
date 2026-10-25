@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Drawer } from "../components/Drawer.tsx";
+import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import { useMobileNavigation } from "./useMobileNavigation.ts";
 
 export function WorkspaceLayout({
@@ -8,14 +9,12 @@ export function WorkspaceLayout({
 	children,
 	draftBar,
 	overlays,
-	notification,
 }: {
 	navigation: (close: () => void) => ReactNode;
 	header: (open: () => void) => ReactNode;
 	children: ReactNode;
 	draftBar: ReactNode;
 	overlays: ReactNode;
-	notification: ReactNode;
 }) {
 	const { open, mobile, close, show } = useMobileNavigation();
 	return (
@@ -52,8 +51,8 @@ export function WorkspaceLayout({
 				>
 					{children}
 				</main>
-				<div className="pointer-events-none sticky bottom-3 z-20 mx-auto flex w-full max-w-7xl flex-col items-end gap-3 px-5 empty:hidden sm:bottom-5 sm:px-6 xl:px-8 print:hidden">
-					{notification}
+				<div className="pointer-events-none sticky bottom-3 z-50 mx-auto flex w-full max-w-7xl flex-col items-end gap-3 px-5 empty:hidden sm:bottom-5 sm:px-6 xl:px-8 print:hidden">
+					<NotificationCenter />
 					{draftBar}
 				</div>
 			</div>

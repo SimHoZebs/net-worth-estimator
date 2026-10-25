@@ -56,13 +56,13 @@ export function WorkspaceShell() {
 			)}
 			draftBar={<DraftBar onDiscard={overlays.openDiscard} />}
 			overlays={<WorkspaceDialogs overlays={overlays} />}
-			notification={<WorkspaceNotification />}
 		>
+			<WorkspaceNotices />
+			<WorkspaceNotification />
 			<WorkspaceHeading
 				page={navigation.currentPage}
 				headingRef={navigation.headingRef}
 			/>
-			<WorkspaceNotices />
 			<WorkspacePage
 				page={navigation.page}
 				onEdit={overlays.openEditor}
