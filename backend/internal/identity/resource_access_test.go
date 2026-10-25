@@ -43,6 +43,15 @@ func TestResourceAssertionsPreventCrossIdentityRequests(t *testing.T) {
 		if r.StatusCode != want {
 			t.Fatalf("%s resource %q=%d want %d", method, resource, r.StatusCode, want)
 		}
+		if want == http.StatusConflict {
+			var problem struct{ Code string }
+			if err := json.NewDecoder(r.Body).Decode(&problem); err != nil {
+				t.Fatal(err)
+			}
+			if problem.Code != "RESOURCE_CHANGED" || r.Header.Get(ResourceHeader) == "" {
+				t.Fatalf("resource conflict lacks its code or current resource: %+v", problem)
+			}
+		}
 	}
 	check("GET", "", 409)
 	check("GET", guestID, 204)
@@ -59,9 +68,13 @@ func TestResourceAssertionsPreventCrossIdentityRequests(t *testing.T) {
 	staleLogout, _ := http.NewRequest("POST", server.URL+prefix+"logout", nil)
 	staleLogout.Header.Set(ResourceHeader, guestID)
 	r, _ = client.Do(staleLogout)
+	var problem struct{ Code string }
+	if err := json.NewDecoder(r.Body).Decode(&problem); err != nil {
+		t.Fatal(err)
+	}
 	r.Body.Close()
-	if r.StatusCode != 409 {
-		t.Fatalf("stale tab ended another resource's session=%d", r.StatusCode)
+	if r.StatusCode != 409 || problem.Code != "RESOURCE_CHANGED" {
+		t.Fatalf("stale logout status=%d problem=%+v", r.StatusCode, problem)
 	}
 	check("POST", ownerID, 204)
 	rq, _ := http.NewRequest("POST", server.URL+prefix+"logout", nil)
@@ -70,6 +83,21 @@ func TestResourceAssertionsPreventCrossIdentityRequests(t *testing.T) {
 	check("GET", ownerID, 409)
 	check("POST", ownerID, 401)
 	check("GET", guestID, 204)
+}
+
+func TestOrdinaryConflictDoesNotReportResourceChange(t *testing.T) {
+	w := httptest.NewRecorder()
+	failure(w, http.StatusConflict, "That account already exists.")
+	var problem map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &problem); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := problem["code"]; exists {
+		t.Fatalf("ordinary conflict has a resource-change code: %+v", problem)
+	}
+	if w.Code != http.StatusConflict || problem["detail"] != "That account already exists." {
+		t.Fatalf("ordinary conflict changed: status=%d problem=%+v", w.Code, problem)
+	}
 }
 
 func TestCasdoorDecisionsAndOutagesAreNeverBypassed(t *testing.T) {

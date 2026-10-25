@@ -158,7 +158,7 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			}
 			expected := r.Header.Get(ResourceHeader)
 			if (expected != "" && expected != scope.Resource.ID) || (s.config.RequireResourceHeader && expected == "" && r.Method != http.MethodOptions) {
-				failure(w, 409, "The active plan changed. Reload the session before this request.")
+				WriteResourceChanged(w)
 				return
 			}
 			r = r.WithContext(context.WithValue(r.Context(), principalKey{}, p))
@@ -238,10 +238,18 @@ func respond(w http.ResponseWriter, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 func failure(w http.ResponseWriter, status int, detail string) {
+	failureWithCode(w, status, detail, "")
+}
+
+func failureWithCode(w http.ResponseWriter, status int, detail, code string) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "title": http.StatusText(status), "detail": detail})
+	problem := map[string]any{"status": status, "title": http.StatusText(status), "detail": detail}
+	if code != "" {
+		problem["code"] = code
+	}
+	_ = json.NewEncoder(w).Encode(problem)
 }
 
 // SCS unwraps through ResponseController; preserve the API's Flusher contract.

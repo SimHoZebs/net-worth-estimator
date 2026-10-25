@@ -10,6 +10,11 @@ import (
 
 const ResourceHeader = "X-Waypoint-Resource"
 
+// WriteResourceChanged distinguishes a stale plan assertion from an operation conflict.
+func WriteResourceChanged(w http.ResponseWriter) {
+	failureWithCode(w, http.StatusConflict, "The active plan changed. Reload the session before this request.", "RESOURCE_CHANGED")
+}
+
 type scopeKey struct{}
 
 // Scope is set only after identity verification and Casdoor authorization.

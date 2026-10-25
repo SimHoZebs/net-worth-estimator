@@ -44,5 +44,14 @@ func TestFixtureSessionUsesScopedProductionContract(t *testing.T) {
 		if w.Code != want || w.Header().Get(identity.ResourceHeader) != fixtureResource.ID {
 			t.Fatalf("assertion %q: status=%d want=%d", expected, w.Code, want)
 		}
+		if want == http.StatusConflict {
+			var problem struct{ Code string }
+			if err := json.Unmarshal(w.Body.Bytes(), &problem); err != nil {
+				t.Fatal(err)
+			}
+			if problem.Code != "RESOURCE_CHANGED" {
+				t.Fatalf("resource conflict lacks its production code: %+v", problem)
+			}
+		}
 	}
 }
