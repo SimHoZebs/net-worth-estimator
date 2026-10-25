@@ -5,12 +5,18 @@ import { createPortal } from "react-dom";
 import { mergeStyles } from "./mergeStyles.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 import {
+	acquireModalLock,
 	drawerHiddenX,
+	releaseModalLock,
 	useDrawerBackdropTransition,
 	useDrawerTransition,
 	useHorizontalSwipe,
 	type DrawerSide,
 } from "./drawer.ts";
+import {
+	isTopmostDialog,
+	useOpenDialogRegistration,
+} from "./dialogPresence.ts";
 import { IconButton } from "./ui.tsx";
 import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
 
@@ -43,6 +49,10 @@ export function Drawer({
 		modal?: boolean;
 		backdrop?: boolean;
 		swipeClose?: boolean;
+		/** Sync panel focus on open. The mobile navigation skips it to avoid
+		 * a focus jump on open; containment still returns stray focus to
+		 * the panel while open. No child is ever focused. */
+		autoFocus?: boolean;
 	};
 	children: ReactNode;
 }) {
@@ -54,8 +64,13 @@ export function Drawer({
 		headerClassName,
 		bodyClassName,
 	} = appearance ?? {};
-	const { modal = true, backdrop = true, swipeClose = true } = behavior ?? {};
-	const panelEl = useRef<Element | null>(null);
+	const {
+		modal = true,
+		backdrop = true,
+		swipeClose = true,
+		autoFocus = true,
+	} = behavior ?? {};
+	const panelEl = useRef<HTMLElement | null>(null);
 	const titleId = useId();
 	// The element that held focus when the drawer opened. Captured once per
 	// open cycle (never overwritten by StrictMode remounts or later
@@ -73,6 +88,14 @@ export function Drawer({
 	useEffect(() => {
 		closeRef.current = onClose;
 	});
+	// Presence is React state, not a document query: only modal sheets count.
+	// The persistent desktop sheet stays unregistered. The id backs the
+	// topmost check so stacked sheets never fight over focus.
+	const dialogId = useOpenDialogRegistration(open && modal);
+	const closingRef = useRef(closing);
+	useEffect(() => {
+		closingRef.current = closing;
+	}, [closing]);
 	const queriedFull = useMediaQuery(viewportQueries.belowSm);
 	const isFull = full ?? queriedFull;
 	const drawerTransition = useDrawerTransition(closing);
@@ -108,43 +131,39 @@ export function Drawer({
 		wasOpenRef.current = open;
 		if (!open) return;
 		const previous = openerRef.current ?? document.activeElement;
-		// Modal drawers take focus on open; the persistent desktop
-		// navigation must never steal it on page load.
-		if (modal) {
-			panelEl.current?.querySelector<HTMLElement>("button, a[href]")?.focus();
+		// Focus lands on the panel container itself, never on a child, so
+		// no brand link or value ever takes a focus ring on open. The
+		// persistent desktop sheet never moves focus on load.
+		if (modal && autoFocus && isTopmostDialog(dialogId)) {
+			panelEl.current?.focus({ preventScroll: true });
 		}
 		const onKey = (event: KeyboardEvent) => {
-			if (event.key === "Escape") {
-				// Only the drawer holding focus handles Escape. A persistent
-				// drawer (desktop navigation) must never preventDefault here:
-				// that would swallow the keydown a native <dialog> above it
-				// needs to fire its own cancel event.
-				if (panelEl.current?.contains(document.activeElement)) {
-					event.preventDefault();
-					closeRef.current();
-				}
-				return;
-			}
-			if (event.key !== "Tab") return;
-			const elements = Array.from(
-				panelEl.current?.querySelectorAll<HTMLElement>(
-					'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
-				) ?? [],
-			);
-			const first = elements[0];
-			const last = elements.at(-1);
-			if (event.shiftKey && document.activeElement === first) {
+			if (event.key !== "Escape") return;
+			// Only the drawer holding focus handles Escape. A persistent
+			// drawer (desktop navigation) must never preventDefault here:
+			// that would swallow the keydown a native <dialog> above it
+			// needs to fire its own cancel event.
+			if (panelEl.current?.contains(document.activeElement)) {
 				event.preventDefault();
-				last?.focus();
-			}
-			if (!event.shiftKey && document.activeElement === last) {
-				event.preventDefault();
-				first?.focus();
+				closeRef.current();
 			}
 		};
+		// Focus stays in the topmost panel while open. Any focusin outside
+		// returns to that panel only; lower sheets sleep. The stack is read
+		// live so overlapping sheets never act on a stale closure.
+		const onFocusIn = (event: FocusEvent) => {
+			if (!modal || closingRef.current) return;
+			if (!isTopmostDialog(dialogId)) return;
+			const target = event.target as Node | null;
+			const panel = panelEl.current;
+			if (!panel || !target) return;
+			if (!panel.contains(target)) panel.focus({ preventScroll: true });
+		};
 		window.addEventListener("keydown", onKey);
+		window.addEventListener("focusin", onFocusIn);
 		return () => {
 			window.removeEventListener("keydown", onKey);
+			window.removeEventListener("focusin", onFocusIn);
 			if (previous instanceof HTMLElement && previous.isConnected) {
 				// The inert effect below removes the #root inertness in its
 				// own cleanup. Focusing must wait until that runs: elements
@@ -156,16 +175,14 @@ export function Drawer({
 				});
 			}
 		};
-	}, [open, modal]);
+	}, [open, modal, autoFocus, dialogId]);
 	useEffect(() => {
 		if (!open || !modal) return;
-		const root = document.getElementById("root");
-		const previousOverflow = document.body.style.overflow;
-		document.body.style.overflow = "hidden";
-		root?.setAttribute("inert", "");
+		// Shared lock: overlapping sheets must not restore scroll or remove
+		// inertness while the other sheet is still open.
+		acquireModalLock();
 		return () => {
-			document.body.style.overflow = previousOverflow;
-			root?.removeAttribute("inert");
+			releaseModalLock();
 		};
 	}, [open, modal]);
 	const slide = {
@@ -196,8 +213,9 @@ export function Drawer({
 							ref={(node) => {
 								panelEl.current = node;
 							}}
-							className="fixed inset-y-0 left-0 z-30 flex w-(--sidebar) touch-pan-y flex-col overflow-y-auto border-0 border-r border-solid border-line bg-surface px-5 pt-8 text-ink max-xl:px-3 max-md:w-60 max-md:px-5 max-md:pt-6 max-md:shadow-2xl print:hidden"
+							className="fixed inset-y-0 left-0 z-30 flex w-(--sidebar) touch-pan-y flex-col overflow-y-auto border-0 border-r border-solid border-line bg-surface px-5 pt-8 text-ink focus:outline-none max-xl:px-3 max-md:w-60 max-md:px-5 max-md:pt-6 max-md:shadow-2xl print:hidden"
 							aria-label={label}
+							tabIndex={-1}
 							{...(modal
 								? { role: "dialog", "aria-modal": true as const }
 								: {})}
@@ -218,10 +236,11 @@ export function Drawer({
 								panelEl.current = node;
 							}}
 							className={mergeStyles(
-								"fixed inset-y-0 right-0 z-41 flex w-3xl max-w-[calc(100%_-_--spacing(12))] touch-pan-y flex-col overflow-y-auto border-0 border-l border-solid border-line bg-surface text-ink max-sm:w-md max-sm:shadow-overlay",
+								"fixed inset-y-0 right-0 z-41 flex w-3xl max-w-[calc(100%_-_--spacing(12))] touch-pan-y flex-col overflow-y-auto border-0 border-l border-solid border-line bg-surface text-ink focus:outline-none max-sm:w-md max-sm:shadow-overlay",
 								coverage === "full" &&
 									"max-sm:w-full max-sm:max-w-full max-sm:border-l-0 max-sm:shadow-none",
 							)}
+							tabIndex={-1}
 							role="dialog"
 							aria-modal="true"
 							aria-labelledby={titleId}

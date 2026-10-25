@@ -1,14 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useHorizontalSwipe } from "../components/drawer.ts";
+import { useHasOpenDialog } from "../components/dialogPresence.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 
 export function useMobileNavigation() {
 	const [open, setOpen] = useState(false);
 	const mobile = useMediaQuery(viewportQueries.belowMd);
-	const openRef = useRef(open);
-	useEffect(() => {
-		openRef.current = open;
-	}, [open]);
 	useEffect(() => {
 		// Viewport reset: closing the drawer when leaving mobile widths is the
 		// intended sync, not a render cascade.
@@ -24,16 +21,25 @@ export function useMobileNavigation() {
 	// drawer. Closing (leftward swipe, Escape, backdrop, focus) is owned by
 	// the shared Drawer component. Listeners are passive and act only on
 	// touchend, so vertical scrolling is never intercepted.
+	// The hamburger is already unreachable while a dialog holds the top
+	// layer (root inert plus showModal). The window swipe listener bypasses
+	// inertness, so it reads presence from React state and never stacks the
+	// nav sheet above an open modal.
+	const hasDialog = useHasOpenDialog();
+	const show = useCallback(() => {
+		if (open || hasDialog) return;
+		setOpen(true);
+	}, [open, hasDialog]);
 	useHorizontalSwipe({
 		enabled: mobile,
 		onSwipeRight: () => {
-			if (!openRef.current) setOpen(true);
+			show();
 		},
 	});
 	return {
 		open,
 		mobile,
 		close: () => setOpen(false),
-		show: () => setOpen(true),
+		show,
 	};
 }
