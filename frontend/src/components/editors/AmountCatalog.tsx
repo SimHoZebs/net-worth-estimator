@@ -1,12 +1,15 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
-import { ApiClient } from "../../api/client.ts";
+import { defaultScopedApiClient } from "../../api/scopedClients.ts";
 import type { PostingAmountResolution } from "../../api/contracts.ts";
 import {
 	BUILT_IN_TEMPLATE_IDS,
 	FALLBACK_PROVIDERS,
 	FALLBACK_RESOLVERS,
 } from "../../domain/amountCatalog.ts";
-import { useWorkspaceStore } from "../../state/workspaceStore.ts";
+import {
+	useWorkspaceStore,
+	selectIsReadOnly,
+} from "../../state/workspaceStore.ts";
 import { Button, TextButton } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { Checkbox, InputField } from "../Field.tsx";
@@ -22,7 +25,7 @@ function useRemoteNames() {
 	} | null>(null);
 	useEffect(() => {
 		let cancelled = false;
-		new ApiClient()
+		defaultScopedApiClient()
 			.getAmountCatalog()
 			.then((result) => {
 				if (cancelled || result instanceof Error) return;
@@ -112,13 +115,7 @@ export function AmountCatalog({
 	const deletePreset = useWorkspaceStore((state) => state.deletePreset);
 	const movePreset = useWorkspaceStore((state) => state.movePreset);
 	const presetThunks = { createPreset, updatePreset, deletePreset, movePreset };
-	const status = useWorkspaceStore((state) => state.status);
-	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
-	const workspace = useWorkspaceStore((state) => state.workspace);
-	const readOnly =
-		(status?.readOnly ?? false) ||
-		writeBlocked ||
-		(workspace?.saved.readOnly ?? false);
+	const readOnly = useWorkspaceStore(selectIsReadOnly);
 
 	// Server presets are the source of truth; the hook covers the offline gap.
 	const templates = useAmountTemplates();
