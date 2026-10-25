@@ -41,19 +41,9 @@ type projectionRequestBody struct {
 	Document  *types.FinancialModelDocument   `json:"document,omitempty"`
 	Overrides types.ModelOverrides            `json:"overrides,omitempty"`
 	Settings  types.ProjectionRuntimeSettings `json:"settings"`
-	// Range clips the returned timeline to [startDate, endDate], both
-	// inclusive ISO dates. Either bound may be omitted for an open end,
-	// but the range itself is required: without one the server cannot
-	// know what to return, and it guesses nothing. The stored artifact is
-	// always the full result, so a narrow request warms the later full
-	// one.
+	// Range selects response rows and movement events by inclusive ISO dates.
+	// At least one bound is required. Other result sections remain unchanged.
 	Range *projectionRange `json:"range,omitempty" required:"true"`
-}
-
-// projectionRange is a closed date interval over the timeline.
-type projectionRange struct {
-	StartDate string `json:"startDate,omitempty"`
-	EndDate   string `json:"endDate,omitempty"`
 }
 
 type deterministicOutput struct {
@@ -79,8 +69,7 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 
 	// Key the RESOLVED document so omitted fields track the
 	// stored state: a model save changes stored content and therefore the key.
-	// The range stays out of the key: narrow and full requests share one
-	// stored artifact, and a narrow request warms the full one.
+	// Response ranges stay out of the key: all ranges share the complete artifact.
 	cacheKey := s.resourceArtifactKey("deterministic", map[string]any{
 		"publicResultVersion": deterministicResultCacheVersion,
 		"document":            document,
@@ -117,99 +106,4 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 	putArtifact(s.store, cacheKey, "deterministic", result)
 	output.Body.Result = clipProjectionRange(result, input.Body.Range)
 	return output, nil
-}
-
-// validateProjectionRange enforces the no-fallback contract: a missing
-// or empty range, malformed dates, and inverted intervals all fail before
-// any resolve, lookup, or compute. ISO dates compare lexicographically.
-func validateProjectionRange(r *projectionRange) error {
-	if r == nil || (r.StartDate == "" && r.EndDate == "") {
-		return huma.Error400BadRequest("range is required: set startDate and/or endDate")
-	}
-	for _, date := range []string{r.StartDate, r.EndDate} {
-		if date != "" && !domain.IsValidIsoDate(date) {
-			return huma.Error400BadRequest("range dates must be YYYY-MM-DD")
-		}
-	}
-	if r.StartDate != "" && r.EndDate != "" && r.StartDate > r.EndDate {
-		return huma.Error400BadRequest("range startDate must not be after endDate")
-	}
-	return nil
-}
-
-// formatProjectionRange renders the range for recalc log lines.
-func formatProjectionRange(r *projectionRange) string {
-	if r == nil {
-		return "full"
-	}
-	start, end := r.StartDate, r.EndDate
-	if start == "" {
-		start = "beginning"
-	}
-	if end == "" {
-		end = "end"
-	}
-	return start + ".." + end
-}
-
-// clipProjectionRange returns the requested timeline slice. The range is
-// always present here: the handler rejects missing and empty ranges, so
-// there is no default to maintain. It builds new row and event slices and
-// never mutates the cached or computed result, so shared backing arrays
-// stay intact for later requests. Evaluations ride
-// along only when the slice holds projected rows: they summarize the whole
-// projection and are meaningless over history alone.
-func clipProjectionRange(result *types.ProjectionResult, r *projectionRange) *types.ProjectionResult {
-	// Defensive: the handler rejects nil ranges, so this branch is
-	// unreachable in production. It keeps the helper safe for
-	// direct callers.
-	if r == nil {
-		return result
-	}
-	filtered := *result
-	rows := make([]types.ProjectionRow, 0, len(result.Timeline.Rows))
-	for _, row := range result.Timeline.Rows {
-		if r.StartDate != "" && row.Date < types.IsoDate(r.StartDate) {
-			continue
-		}
-		if r.EndDate != "" && row.Date > types.IsoDate(r.EndDate) {
-			continue
-		}
-		rows = append(rows, row)
-	}
-	filtered.Timeline.Rows = rows
-	events := make([]types.MovementEvent, 0, len(result.MovementEvents))
-	for _, event := range result.MovementEvents {
-		if r.StartDate != "" && event.Date < types.IsoDate(r.StartDate) {
-			continue
-		}
-		if r.EndDate != "" && event.Date > types.IsoDate(r.EndDate) {
-			continue
-		}
-		events = append(events, event)
-	}
-	filtered.MovementEvents = events
-	hasProjected := false
-	for _, row := range rows {
-		if !row.IsHistorical {
-			hasProjected = true
-			break
-		}
-	}
-	if !hasProjected {
-		// Empty arrays, not nulls: readers map over the non-optional
-		// tables without nil checks. PlannedPurchases stays omitempty
-		// and is therefore absent rather than []. Totals, summary,
-		// milestones, and account summaries keep full-result values;
-		// only rows and events are clipped.
-		filtered.Evaluations = types.EvaluationResultTables{
-			FinancialIndependence: []types.EvaluationResultEnvelope{},
-			NetWorthThreshold:     []types.EvaluationResultEnvelope{},
-			AccountBalance:        []types.EvaluationResultEnvelope{},
-			PostingFulfillment:    []types.EvaluationResultEnvelope{},
-			CycleFulfillment:      []types.EvaluationResultEnvelope{},
-			PlannedPurchases:      []types.EvaluationResultEnvelope{},
-		}
-	}
-	return &filtered
 }
