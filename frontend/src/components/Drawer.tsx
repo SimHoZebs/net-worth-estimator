@@ -13,11 +13,8 @@ import {
 	useHorizontalSwipe,
 	type DrawerSide,
 } from "./drawer.ts";
-import {
-	isTopmostDialog,
-	useOpenDialogRegistration,
-} from "./dialogPresence.ts";
-import { IconButton } from "./ui.tsx";
+import { isTopmostDialog, useOpenDialogRegistration } from "./dialogStack.ts";
+import { IconButton } from "./Button.tsx";
 import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
 
 // The single drawer component: the left navigation sheet and the right
@@ -88,7 +85,7 @@ export function Drawer({
 	useEffect(() => {
 		closeRef.current = onClose;
 	});
-	// Presence is React state, not a document query: only modal sheets count.
+	// The stack lives in React state, not a document query: only modal sheets count.
 	// The persistent desktop sheet stays unregistered. The id backs the
 	// topmost check so stacked sheets never fight over focus.
 	const dialogId = useOpenDialogRegistration(open && modal);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useHorizontalSwipe } from "../components/drawer.ts";
-import { useHasOpenDialog } from "../components/dialogPresence.ts";
+import { useHasOpenDialog } from "../components/dialogStack.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 
 export function useMobileNavigation() {
@@ -23,7 +23,7 @@ export function useMobileNavigation() {
 	// touchend, so vertical scrolling is never intercepted.
 	// The hamburger is already unreachable while a dialog holds the top
 	// layer (root inert plus showModal). The window swipe listener bypasses
-	// inertness, so it reads presence from React state and never stacks the
+	// inertness, so it reads the stack from React state and never stacks the
 	// nav sheet above an open modal.
 	const hasDialog = useHasOpenDialog();
 	const show = useCallback(() => {
