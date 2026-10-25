@@ -5,6 +5,7 @@ import { money } from "../../../domain/format.ts";
 import type { Plan } from "../../../domain/model.ts";
 import type { SafeSpendingIncome } from "../../../domain/safeSpendingIncome.ts";
 import type { TotalCycleSettings } from "../../../state/useSafeSpendingSettings.ts";
+import { clampStatementDay } from "../../../state/useSafeSpendingSettings.ts";
 import type {
 	BillCandidate,
 	SafeSpendingConfigHints,
@@ -77,10 +78,7 @@ export function SafeSpendingConfigurePanel({
 				value={config.statementDay}
 				onChange={(event) =>
 					onUpdateConfig({
-						statementDay: Math.min(
-							28,
-							Math.max(1, Math.floor(Number(event.target.value) || 20)),
-						),
+						statementDay: clampStatementDay(event.target.value),
 						statementDaySet: true,
 					})
 				}
