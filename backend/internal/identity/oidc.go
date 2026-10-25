@@ -171,7 +171,7 @@ func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
 		resource := authorization.ResourceFor(s.config.Issuer, g.Subject)
 		if expected := r.Header.Get(ResourceHeader); expected != "" && expected != resource.ID {
 			w.Header().Set(ResourceHeader, resource.ID)
-			failure(w, 409, "The active plan changed. Reload the session before signing out.")
+			WriteResourceChanged(w)
 			return
 		}
 	}

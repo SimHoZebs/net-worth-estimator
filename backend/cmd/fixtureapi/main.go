@@ -50,7 +50,7 @@ func fixtureHandler(next http.Handler) http.Handler {
 			return
 		}
 		if expected := r.Header.Get(identity.ResourceHeader); expected != "" && expected != fixtureResource.ID {
-			http.Error(w, "The fixture plan assertion does not match.", http.StatusConflict)
+			identity.WriteResourceChanged(w)
 			return
 		}
 		next.ServeHTTP(w, r)
