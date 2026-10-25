@@ -119,8 +119,8 @@ func TestDeterministicRangeClipsOneArtifact(t *testing.T) {
 			t.Fatalf("history row %s is not historical", row.Date)
 		}
 	}
-	if len(historyOnly.Evaluations.PostingFulfillment) != 0 || len(historyOnly.Evaluations.NetWorthThreshold) != 0 {
-		t.Fatal("history-only slice carries evaluations")
+	if !reflect.DeepEqual(historyOnly.Evaluations, full.Evaluations) {
+		t.Fatal("history-only response changed evaluations")
 	}
 	for _, event := range historyOnly.MovementEvents {
 		if event.Date > histEnd {
@@ -145,7 +145,7 @@ func TestDeterministicRangeClipsOneArtifact(t *testing.T) {
 	}
 }
 
-func TestDeterministicNarrowWarmsFullRequest(t *testing.T) {
+func TestDeterministicResponseRangesShareCompleteArtifact(t *testing.T) {
 	probe := openAPIStore(t)
 	probeHandler := New(probe, Config{})
 	full := decodeRangeResult(t, rangeRequest(t, probeHandler, rangeBody(t, fullSpanRange())))
@@ -157,9 +157,20 @@ func TestDeterministicNarrowWarmsFullRequest(t *testing.T) {
 	if got := first.Header().Get("Cache-Status"); got != cacheStatusMiss {
 		t.Fatalf("narrow Cache-Status = %q, want miss", got)
 	}
+	firstResult := decodeRangeResult(t, first)
+	repeated := rangeRequest(t, handler, rangeBody(t, &projectionRange{EndDate: string(mid)}))
+	if got := repeated.Header().Get("Cache-Status"); got != cacheStatusHit {
+		t.Fatalf("repeated range Cache-Status = %q, want hit", got)
+	}
+	if !reflect.DeepEqual(firstResult, decodeRangeResult(t, repeated)) {
+		t.Fatal("response filtering differs between cache miss and hit")
+	}
 	second := rangeRequest(t, handler, rangeBody(t, fullSpanRange()))
 	if got := second.Header().Get("Cache-Status"); got != cacheStatusHit {
 		t.Fatalf("full Cache-Status after narrow = %q, want hit", got)
+	}
+	if !reflect.DeepEqual(full, decodeRangeResult(t, second)) {
+		t.Fatal("date filtering changed the stored complete result")
 	}
 }
 
