@@ -370,6 +370,11 @@ Everything else goes:
 
 Error messages, read-only locks, destructive-action confirmations, and empty states with no guiding action are not hints; they are state and remain.
 
+Errors and confirmations float in the bottom-right notification stack instead
+of displacing content: one toast per failure with its retry action, dismissed
+manually, cleared on plan change. Only errors that gate an open native dialog
+stay inline inside it, where the top layer would hide a toast.
+
 ## Core Principle
 
 Communicate with the lowest-cost representation that preserves the meaning the user needs.
