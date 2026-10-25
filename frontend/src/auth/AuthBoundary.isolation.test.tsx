@@ -171,11 +171,15 @@ describe("authentication resource isolation", () => {
 				}),
 			),
 		);
-		expect(screen.queryByTestId("financial-preferences")).toBeNull();
-		expect(useSafeSpendingSettings.getState()).toMatchObject(
-			defaultSafeSpendingSettings(),
+		// Stale-while-revalidate keeps the previous owner's preferences
+		// visible until discovery proves the new owner.
+		expect(screen.getByTestId("financial-preferences").textContent).toBe(
+			"123456:private-a-income",
 		);
 		await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+		expect(screen.getByTestId("financial-preferences").textContent).toBe(
+			"123456:private-a-income",
+		);
 		await act(async () => finish(response(session(B), B)));
 		expect(
 			(await screen.findByTestId("financial-preferences")).textContent,
@@ -204,7 +208,7 @@ describe("authentication resource isolation", () => {
 	});
 
 	it.each([B, "plans/sample"])(
-		"hides the old workspace during a cross-tab check and clears it before resource %s mounts",
+		"keeps the old workspace during a cross-tab check and clears it before resource %s mounts",
 		async (nextId) => {
 			const fetcher = vi.fn(async () => response(session()));
 			vi.stubGlobal("fetch", fetcher);
@@ -232,9 +236,16 @@ describe("authentication resource isolation", () => {
 					}),
 				),
 			);
-			expect(getResourceScope().status).toBe("pending");
-			expect(screen.queryByTestId("active-workspace")).toBeNull();
+			// Stale-while-revalidate: the previous workspace stays mounted
+			// with its scope until the new resource is verified.
+			expect(getResourceScope().status).toBe("ready");
+			expect(screen.getByTestId("active-workspace").textContent).toBe(
+				`${A}:account-a-private-revision`,
+			);
 			await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+			expect(screen.getByTestId("active-workspace").textContent).toBe(
+				`${A}:account-a-private-revision`,
+			);
 			await act(async () => finish(response(session(nextId), nextId)));
 			expect((await screen.findByTestId("active-workspace")).textContent).toBe(
 				`${nextId}:empty`,
@@ -296,7 +307,10 @@ describe("authentication resource isolation", () => {
 			serverQueryClient().setQueryData(key, "private-a-result");
 			window.dispatchEvent(new Event("focus"));
 		});
-		expect(screen.queryByTestId("active-workspace")).toBeNull();
+		// Same-account revalidation never unmounts the workspace.
+		expect(screen.getByTestId("active-workspace").textContent).toBe(
+			`${A}:private-a-revision`,
+		);
 		await waitFor(() =>
 			expect(screen.getByTestId("active-workspace").textContent).toBe(
 				`${A}:private-a-revision`,
@@ -309,7 +323,7 @@ describe("authentication resource isolation", () => {
 	});
 
 	it.each([A, B])(
-		"retains recovery after a failed check and restores it only to account %s",
+		"keeps the workspace during a failed check and restores it only to account %s",
 		async (nextId) => {
 			const fetcher = vi.fn(async () => response(session()));
 			vi.stubGlobal("fetch", fetcher);
@@ -330,8 +344,10 @@ describe("authentication resource isolation", () => {
 			);
 			act(() => window.dispatchEvent(new Event("focus")));
 			await screen.findByRole("alert");
-			expect(screen.queryByTestId("active-workspace")).toBeNull();
-			expect(getResourceScope().status).toBe("pending");
+			// Transient outages keep the verified workspace mounted behind
+			// a retry banner instead of wiping the UI.
+			expect(screen.getByTestId("active-workspace")).toBeTruthy();
+			expect(getResourceScope().status).toBe("ready");
 			expect(useWorkspaceStore.getState().engine.volatileState).toBe(recovery);
 			fetcher.mockImplementation(async () => response(session(nextId), nextId));
 			act(() => window.dispatchEvent(new Event("focus")));

@@ -325,11 +325,13 @@ describe("session account controls", () => {
 				.updateSettings({ reserve: 99999, incomeRuleIds: ["private-income"] }),
 		);
 		fireEvent.click(logoutButton);
+		// Explicit logout clears scoped data immediately. The verified shell
+		// stays mounted stale until the provider redirect; private
+		// preferences must already be reset to defaults.
 		await waitFor(() =>
-			expect(screen.queryByText("Workspace content")).toBeNull(),
-		);
-		expect(useSafeSpendingSettings.getState()).toMatchObject(
-			defaultSafeSpendingSettings(),
+			expect(useSafeSpendingSettings.getState()).toMatchObject(
+				defaultSafeSpendingSettings(),
+			),
 		);
 		await act(async () => finish({ logoutURL: "#signed-out" }));
 		await waitFor(() => expect(window.location.hash).toBe("#signed-out"));
@@ -460,7 +462,10 @@ describe("session account controls", () => {
 		unavailable = true;
 		act(() => window.dispatchEvent(new Event("focus")));
 		await screen.findByRole("alert");
-		expect(screen.queryByText("Workspace content")).toBeNull();
+		// Transient outages keep the workspace mounted behind a single retry
+		// banner instead of wiping to a full-screen error.
+		expect(screen.getByText("Workspace content")).toBeTruthy();
+		expect(screen.getAllByRole("alert")).toHaveLength(1);
 		fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 		await waitFor(() => expect(window.location.hash).toBe("#signed-out"));
 	});
