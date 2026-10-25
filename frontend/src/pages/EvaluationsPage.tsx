@@ -2,7 +2,10 @@ import { Flag, Plus } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Button } from "../components/Button.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
-import { ErrorNotice } from "../components/ErrorNotice.tsx";
+import {
+	useErrorToast,
+	useProjectionToasts,
+} from "../components/NotificationCenter.tsx";
 import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
 import type { Evaluation, Plan } from "../domain/model.ts";
 import { removeEvaluation } from "../domain/planEdits.ts";
@@ -25,36 +28,10 @@ export function EvaluationsPage({
 	const onUpdate = useWorkspaceStore((state) => state.updatePlan);
 	const ranges = useUiStore((state) => state.ranges);
 	const projection = useRemoteProjection();
+	const { base } = useProjectionToasts("evaluations", projection, ranges);
 	if (!plan) return null;
-	const baseLoadError =
-		projection.base instanceof Error && !projection.loading
-			? projection.base
-			: null;
-	const base: Projection | null =
-		projection.base instanceof Error ? null : projection.base;
 	return (
 		<>
-			{baseLoadError && (
-				<ErrorNotice
-					message={baseLoadError.message}
-					action="Retry calculation"
-					onAction={projection.retryProjection}
-				/>
-			)}
-			{projection.baseError && base && (
-				<ErrorNotice
-					message={projection.baseError}
-					action="Retry calculation"
-					onAction={projection.retryProjection}
-				/>
-			)}
-			{projection.rangeError && ranges && (
-				<ErrorNotice
-					message={projection.rangeError}
-					action="Retry scenario calculation"
-					onAction={projection.retryRange}
-				/>
-			)}
 			{projection.loading && base && <ProjectionUpdating />}
 			<EvaluationsContent
 				plan={plan}
@@ -93,6 +70,12 @@ function EvaluationsContent({
 	useEffect(() => {
 		void refreshPins();
 	}, [refreshPins]);
+	useErrorToast("evaluation-pins", pinnedError, {
+		label: "Reload pins",
+		onAction: () => {
+			void refreshPins();
+		},
+	});
 	// Pins name persisted server instances: draft-only evaluations have no
 	// server row yet, so their pin control stays disabled until saved.
 	const savedEvaluationIds = useMemo(() => {
@@ -123,13 +106,6 @@ function EvaluationsContent({
 					Add evaluation
 				</Button>
 			</div>
-			{pinnedError && (
-				<ErrorNotice
-					message={pinnedError}
-					action="Reload pins"
-					onAction={() => refreshPins()}
-				/>
-			)}
 			{!pending && !evaluations.length && !others.length && (
 				<EmptyState icon={Flag} title="What are you working toward?" />
 			)}
