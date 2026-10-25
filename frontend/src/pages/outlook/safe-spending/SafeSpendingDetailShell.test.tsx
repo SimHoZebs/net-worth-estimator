@@ -109,6 +109,27 @@ const config: SafeSpendingConfigHints = {
 const noop = () => {};
 
 describe("SafeSpendingDetailShell", () => {
+	it.each(["cycle", "last-cycle", "configure"] as const)(
+		"keeps the modal title on %s",
+		(tab) => {
+			render(
+				<SafeSpendingDetailShell
+					tab={tab}
+					onTabChange={noop}
+					cycleCounts={{}}
+					onClose={noop}
+				>
+					Content
+				</SafeSpendingDetailShell>,
+			);
+			expect(
+				screen.getByRole("dialog", { name: "Safe card spending" }),
+			).toBeTruthy();
+			expect(
+				screen.getByRole("heading", { name: "Safe card spending" }),
+			).toBeTruthy();
+		},
+	);
 	it("switches tabs through the shell", () => {
 		const onTabChange = vi.fn();
 		render(

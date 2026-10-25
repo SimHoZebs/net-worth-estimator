@@ -66,8 +66,8 @@ export function SafeSpendingConfigurePanel({
 	return (
 		<div className="grid content-start gap-3">
 			<p className="text-sm leading-relaxed text-muted">
-				Budget settings stay in this browser. Your saved plan and bank records
-				stay unchanged.
+				Budget settings save to your plan on the server and are available across
+				browsers. Your bank records stay unchanged.
 			</p>
 			<InputField
 				label={`${labels.cycleStart} (1–28)`}

@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiClient, ApiHttpError } from "../api/client.ts";
+import { useNotifications } from "./notifications.ts";
+import type { SafeSpendingSettings } from "../api/contracts.ts";
 import {
 	acceptResourceScope,
 	canonicalApiBaseUrl,
@@ -67,7 +70,7 @@ function acceptOwner(id: string = A, apiBaseUrl = canonicalApiBaseUrl("")) {
 			resource: {
 				id,
 				kind: id === "plans/sample" ? "sample" : "private",
-				permissions: ["plan:read"],
+				permissions: ["plan:read", "plan:write"],
 			},
 			subject: id !== "plans/sample" ? id : null,
 		},
@@ -103,6 +106,18 @@ beforeEach(async () => {
 	resetUiStore();
 	useThemeStore.setState({ preference: "system" });
 	resetSafeSpendingSettings();
+	const backend = new Map<string, SafeSpendingSettings>();
+	const key = () =>
+		`${getResourceScope().apiBaseUrl}:${getResourceScope().resource?.id}`;
+	vi.spyOn(ApiClient.prototype, "getSafeSpendingSettings").mockImplementation(
+		async () => ({ settings: backend.get(key()) ?? null }),
+	);
+	vi.spyOn(ApiClient.prototype, "setSafeSpendingSettings").mockImplementation(
+		async (settings) => {
+			backend.set(key(), structuredClone(settings));
+			return { settings };
+		},
+	);
 	try {
 		window.localStorage.clear();
 	} catch {
@@ -119,6 +134,76 @@ afterEach(() => {
 });
 
 describe("unified persisted prefs", () => {
+	it("keeps the browser import for later when the server is read-only", async () => {
+		window.localStorage.setItem(
+			financialKey(),
+			JSON.stringify({ reserve: 999 }),
+		);
+		vi.mocked(ApiClient.prototype.setSafeSpendingSettings).mockResolvedValue(
+			new ApiHttpError({ status: 403, message: "Read-only" }),
+		);
+		await verifyOwner();
+		expect(useSafeSpendingSettings.getState().reserve).toBe(
+			defaultSafeSpendingSettings().reserve,
+		);
+		expect(window.localStorage.getItem(financialKey())).toContain("999");
+	});
+
+	it("reports a failed save and retries the latest settings", async () => {
+		const save = vi.mocked(ApiClient.prototype.setSafeSpendingSettings);
+		save.mockResolvedValueOnce(new Error("Offline"));
+		useSafeSpendingSettings.getState().updateSettings({ reserve: 123 });
+		await vi.waitFor(() =>
+			expect(useNotifications.getState().items[0]?.message).toContain(
+				"not saved",
+			),
+		);
+		useNotifications.getState().items[0]?.action?.onAction();
+		await vi.waitFor(() =>
+			expect(useNotifications.getState().items).toHaveLength(0),
+		);
+		expect(save.mock.lastCall?.[0].reserve).toBe(123);
+	});
+	it("prefers backend settings over an old browser record", async () => {
+		window.localStorage.setItem(
+			financialKey(),
+			JSON.stringify({ reserve: 999 }),
+		);
+		vi.mocked(ApiClient.prototype.getSafeSpendingSettings).mockResolvedValue({
+			settings: { ...defaultSafeSpendingSettings(), reserve: 123 },
+		});
+		await useSafeSpendingSettings.persist.rehydrate();
+		expect(useSafeSpendingSettings.getState().reserve).toBe(123);
+		expect(ApiClient.prototype.setSafeSpendingSettings).not.toHaveBeenCalled();
+	});
+
+	it("does not mount financial preferences when the backend read fails", async () => {
+		vi.mocked(ApiClient.prototype.getSafeSpendingSettings).mockResolvedValue(
+			new Error("Settings unavailable"),
+		);
+		const scope = acceptOwner(B);
+		await expect(hydrateFinancialPreferences(scope)).rejects.toThrow(
+			"Settings unavailable",
+		);
+		useSafeSpendingSettings.getState().updateSettings({ reserve: 999 });
+		expect(useSafeSpendingSettings.getState().reserve).toBe(
+			defaultSafeSpendingSettings().reserve,
+		);
+		expect(ApiClient.prototype.setSafeSpendingSettings).not.toHaveBeenCalled();
+	});
+
+	it("serializes rapid edits and stores them only in the backend", async () => {
+		useSafeSpendingSettings.getState().updateSettings({ reserve: 123 });
+		useSafeSpendingSettings.getState().updateSettings({ reserve: 456 });
+		await useSafeSpendingSettings.persist.rehydrate();
+		expect(
+			vi
+				.mocked(ApiClient.prototype.setSafeSpendingSettings)
+				.mock.calls.map(([settings]) => settings.reserve),
+		).toEqual([123, 456]);
+		expect(useSafeSpendingSettings.getState().reserve).toBe(456);
+		expect(window.localStorage.getItem(financialKey())).toBeNull();
+	});
 	it("persists only UI years/ranges, without credential fields", async () => {
 		useUiStore.getState().setYears(10);
 		useUiStore.getState().setRanges(false);
@@ -210,9 +295,11 @@ describe("unified persisted prefs", () => {
 		for (const key of Object.keys(overrides))
 			expect(state).not.toHaveProperty(key);
 		state.updateSettings({ reserve: 200 });
-		expect(window.localStorage.getItem(financialKey())).not.toContain(
-			"Override",
-		);
+		expect(window.localStorage.getItem(financialKey())).toBeNull();
+		await useSafeSpendingSettings.persist.rehydrate();
+		expect(
+			vi.mocked(ApiClient.prototype.setSafeSpendingSettings).mock.lastCall?.[0],
+		).not.toHaveProperty("checkingOverride");
 	});
 
 	it("sanitizes income rule IDs without an automatic fallback", () => {
@@ -255,6 +342,7 @@ describe("financial preference owner isolation", () => {
 			movementIds: ["private-a-bill"],
 		};
 		useSafeSpendingSettings.getState().updateSettings(settingsA);
+		await useSafeSpendingSettings.persist.rehydrate();
 		await verifyOwner(B);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
@@ -269,6 +357,7 @@ describe("financial preference owner isolation", () => {
 			movementIds: ["private-b-bill"],
 		};
 		useSafeSpendingSettings.getState().updateSettings(settingsB);
+		await useSafeSpendingSettings.persist.rehydrate();
 		await verifyOwner("plans/sample");
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
@@ -276,6 +365,7 @@ describe("financial preference owner isolation", () => {
 		useSafeSpendingSettings
 			.getState()
 			.updateSettings({ reserve: 42, incomeRuleIds: ["sample-income"] });
+		await useSafeSpendingSettings.persist.rehydrate();
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(settingsA);
 		await verifyOwner(B);
@@ -290,6 +380,7 @@ describe("financial preference owner isolation", () => {
 	it("resets synchronously during verification and rejects stale actions without overwriting saved preferences", async () => {
 		const oldAction = useSafeSpendingSettings.getState().updateSettings;
 		oldAction({ reserve: 123, incomeRuleIds: ["private-a-income"] });
+		await useSafeSpendingSettings.persist.rehydrate();
 		const keyA = financialKey();
 		const rawA = window.localStorage.getItem(keyA);
 		suspendResourceScope();
@@ -342,6 +433,7 @@ describe("financial preference owner isolation", () => {
 		useUiStore.getState().setYears(30);
 		useUiStore.getState().setRanges(false);
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 100 });
+		await useSafeSpendingSettings.persist.rehydrate();
 		await verifyOwner(A, "https://different-api.example");
 		expect(useSafeSpendingSettings.getState().reserve).toBe(
 			defaultSafeSpendingSettings().reserve,
@@ -350,6 +442,7 @@ describe("financial preference owner isolation", () => {
 		useSafeSpendingSettings
 			.getState()
 			.updateSettings({ reserve: 200, incomeRuleIds: ["sample-income"] });
+		await useSafeSpendingSettings.persist.rehydrate();
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState().reserve).toBe(100);
 		await verifyOwner("plans/sample");
@@ -366,7 +459,7 @@ describe("financial preference owner isolation", () => {
 		);
 	});
 
-	it("keeps memory fallbacks scoped when browser storage is blocked", async () => {
+	it("uses the backend when browser storage is blocked", async () => {
 		stubStorage({
 			...memoryStorage(),
 			getItem: () => {
@@ -380,6 +473,7 @@ describe("financial preference owner isolation", () => {
 		useSafeSpendingSettings
 			.getState()
 			.updateSettings({ reserve: 111, movementIds: ["private-a-bill"] });
+		await useSafeSpendingSettings.persist.rehydrate();
 		await verifyOwner(B);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
@@ -434,8 +528,6 @@ describe("financial preference owner isolation", () => {
 			reserve: 222,
 			incomeRuleIds: ["private-b-income"],
 		});
-		expect(window.localStorage.getItem(financialKey())).not.toContain(
-			"late-private-a",
-		);
+		expect(window.localStorage.getItem(financialKey())).toBeNull();
 	});
 });

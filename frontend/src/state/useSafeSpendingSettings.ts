@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { persist, type PersistStorage } from "zustand/middleware";
+import type { SafeSpendingSettings } from "../api/contracts.ts";
+import { persist } from "zustand/middleware";
 import {
 	getResourceScope,
 	subscribeResourceScope,
@@ -9,25 +10,10 @@ import {
 	DEFAULT_CYCLE_STATEMENT_DAY,
 	DEFAULT_PROTECTED_RESERVE,
 } from "../domain/safeSpending.ts";
-import {
-	resourceLocalStorage,
-	SAFE_SPENDING_STORAGE_KEY,
-} from "./persisted.ts";
+import { SAFE_SPENDING_STORAGE_KEY } from "./persisted.ts";
+import { safeSpendingStorage } from "./safeSpendingStorage.ts";
 
-export interface TotalCycleSettings {
-	statementDay: number;
-	reserve: number;
-	/** Null means every debt account counts toward the total. */
-	accountIds: string[] | null;
-	/** Null means the detected checking account alone counts as spendable. */
-	spendingAccountIds: string[] | null;
-	/** Explicit recurrence rule sources. Empty means no automatic income. */
-	incomeRuleIds: string[];
-	/** Null means every recurring outflow counts as a bill. */
-	movementIds: string[] | null;
-	/** True once the statement day is explicitly chosen. Untouched legacy 1st falls back to the household 20th. */
-	statementDaySet: boolean;
-}
+export type TotalCycleSettings = SafeSpendingSettings;
 
 export const defaultSafeSpendingSettings = (): TotalCycleSettings => ({
 	statementDay: DEFAULT_CYCLE_STATEMENT_DAY,
@@ -99,65 +85,6 @@ export function sanitizeSafeSpendingSettings(
 	};
 }
 
-function looksLikeSettings(value: unknown): boolean {
-	if (typeof value !== "object" || value === null) return false;
-	const record = value as Record<string, unknown>;
-	return (
-		"statementDay" in record ||
-		"reserve" in record ||
-		"accountIds" in record ||
-		"incomeRuleIds" in record ||
-		"movementIds" in record ||
-		"mandatoryFrame" in record
-	);
-}
-
-/**
- * Reads envelopes and raw settings only within the verified resource namespace.
- * Unscoped financial settings and legacy keys have no established owner.
- */
-function safeSpendingStorage(
-	scope: ResourceScope,
-	canWrite: () => boolean,
-): PersistStorage<TotalCycleSettings> {
-	const storage = resourceLocalStorage(scope);
-	const readRawSettings = (raw: string | null): TotalCycleSettings | null => {
-		if (raw === null) return null;
-		try {
-			const parsed = JSON.parse(raw) as unknown;
-			if (typeof parsed === "object" && parsed !== null) {
-				const record = parsed as Record<string, unknown>;
-				if (
-					typeof record.state === "object" &&
-					record.state !== null &&
-					looksLikeSettings(record.state)
-				) {
-					return sanitizeSafeSpendingSettings(record.state);
-				}
-				if (looksLikeSettings(parsed))
-					return sanitizeSafeSpendingSettings(parsed);
-			}
-		} catch {
-			return null;
-		}
-		return null;
-	};
-	return {
-		getItem: (name) => {
-			const parse = (raw: string | null) => {
-				const state = readRawSettings(raw);
-				return state ? { state, version: 4 } : null;
-			};
-			const raw = storage.getItem(name);
-			return raw instanceof Promise ? raw.then(parse) : parse(raw);
-		},
-		setItem: (name, value) => {
-			if (canWrite()) return storage.setItem(name, JSON.stringify(value));
-		},
-		removeItem: (name) => storage.removeItem(name),
-	};
-}
-
 interface SafeSpendingSettingsState extends TotalCycleSettings {
 	updateSettings: (next: Partial<TotalCycleSettings>) => void;
 }
@@ -165,6 +92,22 @@ interface SafeSpendingSettingsState extends TotalCycleSettings {
 let writableScope: ResourceScope | null = null;
 let boundScope = getResourceScope();
 let hydration: Promise<void> = Promise.resolve();
+let loadError: Error | null = null;
+
+function backendStorage(scope: ResourceScope, canWrite: () => boolean) {
+	return safeSpendingStorage(
+		scope,
+		canWrite,
+		sanitizeSafeSpendingSettings,
+		(error) => {
+			loadError = error;
+		},
+		() => {
+			if (scope === getResourceScope())
+				useSafeSpendingSettings.getState().updateSettings({});
+		},
+	);
+}
 
 function updateSettingsForScope(scope: ResourceScope) {
 	return (next: Partial<TotalCycleSettings>) => {
@@ -197,7 +140,7 @@ export const useSafeSpendingSettings = create<SafeSpendingSettingsState>()(
 		{
 			name: SAFE_SPENDING_STORAGE_KEY,
 			version: 4,
-			storage: safeSpendingStorage(boundScope, () => false),
+			storage: backendStorage(boundScope, () => false),
 			skipHydration: true,
 			partialize: (state) => ({
 				statementDay: state.statementDay,
@@ -221,8 +164,9 @@ function bindFinancialPreferences(): void {
 	const scope = getResourceScope();
 	boundScope = scope;
 	writableScope = null;
+	loadError = null;
 	useSafeSpendingSettings.persist.setOptions({
-		storage: safeSpendingStorage(scope, () => writableScope === scope),
+		storage: backendStorage(scope, () => writableScope === scope),
 	});
 	// Reset without writing defaults over this owner's saved preferences.
 	useSafeSpendingSettings.setState({
@@ -235,6 +179,7 @@ function bindFinancialPreferences(): void {
 		if (
 			scope === getResourceScope() &&
 			scope.status !== "pending" &&
+			!loadError &&
 			useSafeSpendingSettings.persist.hasHydrated()
 		)
 			writableScope = scope;
@@ -252,6 +197,7 @@ export async function hydrateFinancialPreferences(
 ): Promise<boolean> {
 	if (boundScope !== scope) return false;
 	await hydration;
+	if (scope === getResourceScope() && loadError) throw loadError;
 	return scope === getResourceScope() && writableScope === scope;
 }
 

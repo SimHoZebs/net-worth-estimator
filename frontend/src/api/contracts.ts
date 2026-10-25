@@ -542,3 +542,21 @@ export type StochasticSSEData =
 	| PartialSSEData
 	| ResultSSEData
 	| ErrorSSEData;
+export interface SafeSpendingSettings {
+	statementDay: number;
+	reserve: number;
+	/** Null uses the default card selection. */
+	accountIds: string[] | null;
+	/** Null uses the detected checking account. */
+	spendingAccountIds: string[] | null;
+	/** Explicit recurrence rule sources. Empty means no automatic income. */
+	incomeRuleIds: string[];
+	/** Null includes all recurring outflows. */
+	movementIds: string[] | null;
+	/** Explicitly chosen day, including the legacy first-of-month case. */
+	statementDaySet: boolean;
+}
+
+export interface SafeSpendingSettingsResponse {
+	settings: SafeSpendingSettings | null;
+}

@@ -22,9 +22,7 @@ export function SafeSpendingDetailShell({
 	onClose: () => void;
 	children: React.ReactNode;
 }) {
-	const title =
-		SAFE_SPENDING_DETAIL_TABS.find((item) => item.id === tab)?.label ??
-		"This cycle";
+	const title = "Safe card spending";
 	const counts: Partial<Record<SafeSpendingDetailTab, number>> = cycleCounts;
 	return (
 		<Drawer

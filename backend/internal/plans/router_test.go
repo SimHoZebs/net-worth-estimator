@@ -97,7 +97,20 @@ func TestPlansIsolateEveryAccountFromSampleAndOtherAccounts(t *testing.T) {
 	if model(t, other).Accounts[0].ID != "other" || len(model(t, owner).Accounts) != 1 || len(model(t, guest).Accounts) != 1 {
 		t.Fatal("canonical writes crossed the plan boundary")
 	}
-	for _, suffix := range []string{"/v1/amount-presets", "/v1/pinned-evaluations", "/v1/sync/simplefin/accounts"} {
+	settings := `{"statementDay":15,"statementDaySet":true,"reserve":321,"accountIds":null,"spendingAccountIds":null,"incomeRuleIds":[],"movementIds":null}`
+	if w := request(t, other, "PUT", "/v1/safe-spending-settings", settings); w.Code != 200 {
+		t.Fatalf("save budget settings=%d %s", w.Code, w.Body.String())
+	}
+	for _, isolated := range []http.Handler{owner, guest} {
+		w := request(t, isolated, "GET", "/v1/safe-spending-settings", "")
+		if w.Code != 200 || !strings.Contains(w.Body.String(), `"settings":null`) {
+			t.Fatalf("budget settings crossed plan boundary: %d %s", w.Code, w.Body.String())
+		}
+	}
+	if w := request(t, guest, "PUT", "/v1/safe-spending-settings", settings); w.Code != 403 {
+		t.Fatalf("sample settings write=%d", w.Code)
+	}
+	for _, suffix := range []string{"/v1/amount-presets", "/v1/pinned-evaluations", "/v1/safe-spending-settings", "/v1/sync/simplefin/accounts"} {
 		if w := request(t, guest, "GET", suffix, ""); w.Code != 200 {
 			t.Fatalf("guest scoped read %s=%d", suffix, w.Code)
 		}

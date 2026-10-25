@@ -23,6 +23,46 @@ test.beforeEach(async ({ page, request }) => {
 	expect((await response.json()).persisted).toBe(true);
 });
 
+test("Configure settings survive in a fresh browser context", async ({
+	page,
+	browser,
+	request,
+}) => {
+	await page.goto("/#outlook/safe-spending-detail/configure");
+	await expect(
+		page
+			.getByRole("dialog", { name: "Safe card spending" })
+			.getByRole("heading", { name: "Safe card spending" }),
+	).toBeVisible();
+	const saved = page.waitForResponse(
+		(response) =>
+			response.url().endsWith("/v1/safe-spending-settings") &&
+			response.request().method() === "PUT" &&
+			response.request().postDataJSON().reserve === 321,
+	);
+	await page.getByLabel(`${labels.reserve} ($)`, { exact: true }).fill("321");
+	expect((await saved).ok()).toBe(true);
+	const settings = await request.get(
+		`${FIXTURE_API}/v1/safe-spending-settings`,
+	);
+	expect((await settings.json()).settings.reserve).toBe(321);
+	const fresh = await browser.newContext();
+	try {
+		const otherPage = await fresh.newPage();
+		await otherPage.goto(page.url());
+		await expect(
+			otherPage.getByLabel(`${labels.reserve} ($)`, { exact: true }),
+		).toHaveValue("321");
+		await expect(
+			otherPage
+				.getByRole("dialog", { name: "Safe card spending" })
+				.getByRole("heading", { name: "Safe card spending" }),
+		).toBeVisible();
+	} finally {
+		await fresh.close();
+	}
+});
+
 test("household budget shows paycheck allocation and one sortable cycle bill list", async ({
 	page,
 	request,
@@ -159,7 +199,10 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 	await page.goto("/#outlook/safe-spending-detail/mandatory");
 	await page.getByRole("tab", { name: /Last cycle/ }).click();
 	await expect(page).toHaveURL(/safe-spending-detail\/last-cycle$/);
-	const last = page.getByRole("dialog", { name: "Last cycle", exact: true });
+	const last = page.getByRole("dialog", {
+		name: "Safe card spending",
+		exact: true,
+	});
 	await expect(
 		last.getByRole("list", { name: "Closed card balances" }),
 	).toContainText("$4,321.00");
@@ -284,7 +327,14 @@ test("Configure only selects sources and settings, and ignores legacy overrides"
 		.getByRole("group", { name: "Included bills" })
 		.getByRole("checkbox", { name: /^Housing and living/ })
 		.uncheck();
+	const reserveSaved = page.waitForResponse(
+		(response) =>
+			response.url().endsWith("/v1/safe-spending-settings") &&
+			response.request().method() === "PUT" &&
+			response.request().postDataJSON().reserve === 100,
+	);
 	await page.getByLabel(`${labels.reserve} ($)`, { exact: true }).fill("100");
+	expect((await reserveSaved).ok()).toBe(true);
 	await page.reload();
 	await expect(
 		page.getByRole("checkbox", { name: /^Housing and living/ }),
@@ -312,7 +362,14 @@ test("Configure only selects sources and settings, and ignores legacy overrides"
 	await expect(
 		page.getByRole("list", { name: labels.closedCardBalances }),
 	).toContainText("$4,321.00");
-	expect(writes).toEqual([]);
+	expect(writes.length).toBeGreaterThan(0);
+	expect(
+		writes.every(
+			(write) =>
+				write.endsWith("/v1/safe-spending-settings") &&
+				write.startsWith("PUT "),
+		),
+	).toBe(true);
 });
 
 test("income sources combine independent recurrence rules and persist explicit deselection", async ({
@@ -349,7 +406,14 @@ test("income sources combine independent recurrence rules and persist explicit d
 	await expect(partner).not.toBeChecked();
 	await salary.check();
 	await partner.focus();
+	const sourcesSaved = page.waitForResponse(
+		(response) =>
+			response.url().endsWith("/v1/safe-spending-settings") &&
+			response.request().method() === "PUT" &&
+			response.request().postDataJSON().incomeRuleIds.length === 2,
+	);
 	await page.keyboard.press("Space");
+	expect((await sourcesSaved).ok()).toBe(true);
 	await page.reload();
 	await expect(salary).toBeChecked();
 	await expect(partner).toBeChecked();
@@ -377,7 +441,14 @@ test("income sources combine independent recurrence rules and persist explicit d
 			.getByText("$1,400.00", { exact: true }),
 	).toBeVisible();
 	await page.getByRole("tab", { name: "Configure", exact: true }).click();
+	const deselectionSaved = page.waitForResponse(
+		(response) =>
+			response.url().endsWith("/v1/safe-spending-settings") &&
+			response.request().method() === "PUT" &&
+			response.request().postDataJSON().incomeRuleIds.length === 0,
+	);
 	await partner.uncheck();
+	expect((await deselectionSaved).ok()).toBe(true);
 	await page.reload();
 	await expect(salary).not.toBeChecked();
 	await expect(partner).not.toBeChecked();
@@ -412,7 +483,7 @@ for (const theme of ["light", "dark"] as const) {
 		expect(accessibility.violations).toEqual([]);
 		await page.getByRole("tab", { name: /Last cycle/ }).click();
 		await expect(
-			page.getByRole("dialog", { name: "Last cycle", exact: true }),
+			page.getByRole("dialog", { name: "Safe card spending", exact: true }),
 		).toBeVisible();
 		await expect(
 			page.getByRole("tab", { name: /This cycle/ }),

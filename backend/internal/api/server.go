@@ -163,6 +163,8 @@ func New(store store.Store, serverConfig Config) http.Handler {
 	router.Use(middleware.Compress(5, "application/json"))
 	config := huma.DefaultConfig("Net Worth Estimator API", "1.0.0")
 	api := humachi.New(router, config)
+	huma.Register(api, huma.Operation{OperationID: "get-safe-spending-settings", Method: "GET", Path: "/v1/safe-spending-settings", Summary: "Load safe card spending settings"}, server.getSafeSpendingSettings)
+	huma.Register(api, huma.Operation{OperationID: "set-safe-spending-settings", Method: "PUT", Path: "/v1/safe-spending-settings", Summary: "Save safe card spending settings"}, server.setSafeSpendingSettings)
 
 	huma.Register(api, huma.Operation{
 		OperationID: "get-financial-model",

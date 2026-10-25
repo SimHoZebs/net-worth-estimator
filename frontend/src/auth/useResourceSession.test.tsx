@@ -28,10 +28,16 @@ function response(body: unknown, status = 200) {
 	});
 }
 
-beforeEach(() => vi.stubGlobal("BroadcastChannel", undefined));
+beforeEach(() => {
+	vi.stubGlobal("BroadcastChannel", undefined);
+	vi.spyOn(ApiClient.prototype, "getSafeSpendingSettings").mockResolvedValue({
+		settings: null,
+	});
+});
 afterEach(() => {
 	cleanup();
 	resetServerQueryCache();
+	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 	window.history.replaceState(null, "", "/");
 });

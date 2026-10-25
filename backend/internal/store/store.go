@@ -58,6 +58,8 @@ type Store interface {
 	DeleteAmountPreset(id string) error
 	MoveAmountPreset(id, beforeID string) error
 	ListPinnedEvaluations() ([]string, error)
+	GetSafeSpendingSettings() (*types.SafeSpendingSettings, error)
+	SetSafeSpendingSettings(types.SafeSpendingSettings) error
 	SetPinnedEvaluations(ids []string) ([]string, error)
 	ListAccountLinks() ([]AccountLink, error)
 	SaveAccountLink(link AccountLink) (AccountLink, error)
