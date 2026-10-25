@@ -127,8 +127,6 @@ With a configured SimpleFIN runner, verify the same access matrix for `POST /v1/
 | active run                                       | 409                                                   |
 | successful manual run under 20 hours old         | 429                                                   |
 
-Keep dry-run enabled for the first policy check. Confirm the response counts are marked `dryRun: true` and no source row is committed.
-
 ## Secret Lifecycle
 
 ### Storage
@@ -172,7 +170,6 @@ Clearing the token while the service remains writable disables authentication. R
 - Direct HTTP checks record the 401/403/200 matrix for both guarded routes.
 - Read-only rejection leaves canonical state unchanged.
 - A valid write round-trip preserves sync-owned rows and owner checkpoint precedence.
-- A bearer-guarded SimpleFIN dry-run commits nothing.
 - Status output exposes only policy booleans.
 - No secret value appears in tracked files, test output, or service logs.
 - Scoped production-package verification passes before rollout; the repository-wide gate remains blocked by the copy-only benchmark template described in `TESTING.md`.

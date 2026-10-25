@@ -173,7 +173,7 @@ The kill switch rejects those writes with 403. Guests can read and project only 
 - transactional SimpleFIN application with provisioning;
 - test/import clear and close.
 
-`store.Open` returns the interface, not the SQLite implementation. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, import rollback, dry-run rollback, and artifact first-write behavior.
+`store.Open` returns the interface, not the SQLite implementation. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, import rollback, and artifact first-write behavior.
 
 ### SQLite setup
 
@@ -491,15 +491,12 @@ The seed controls the state sequence. Run-count normalization and seed-null beha
 - `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` selects model accounts eligible for pending-charge seeds.
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.
 - A bridge account that vanishes keeps its link, rows, and data (stale, never deleted by sync).
-- `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1` plans without committing.
-- `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK=1` enables fixture mode; an optional fixture file is reloaded for each fetch.
-- Fixture mode and a real Access URL are mutually exclusive.
 
 `Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through links plus env bootstrap, provisions unmapped USD accounts, then `Map` emits one balance checkpoint per resolved account/date and only pending negative card charges as disabled postings. Posted, positive, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
 
-`Store.ApplySyncPlan` applies checkpoints and the pending snapshot in one transaction. Owner checkpoints win key collisions. Exact provider/account/transaction keys map to store-allocated UUIDs. Repeated snapshots update those same rows. Only absent rows with the matching provider, model account, and explicit pending state are deleted. Dry-run returns before commit, so the transaction rolls back. Summary counters distinguish `pendingInserted`, `pendingUpdated`, and `pendingDeleted`.
+`Store.ApplySyncPlan` applies checkpoints and the pending snapshot in one transaction. Owner checkpoints win key collisions. Exact provider/account/transaction keys map to store-allocated UUIDs. Repeated snapshots update those same rows. Only absent rows with the matching provider, model account, and explicit pending state are deleted. Summary counters distinguish `pendingInserted`, `pendingUpdated`, and `pendingDeleted`.
 
-The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00, 06, 12, 18 local) plus a random minute offset. Manual triggers use `Runner.Trigger`, which rejects concurrent and too-recent successful runs. Successful non-dry runs persist their completion time; `GET /v1/status` exposes it as `lastSyncAt` alongside `syncConfigured`.
+The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00, 06, 12, 18 local) plus a random minute offset. Manual triggers use `Runner.Trigger`, which rejects concurrent and too-recent successful runs. Successful runs persist their completion time; `GET /v1/status` exposes it as `lastSyncAt` alongside `syncConfigured`.
 
 ## 12. Backend Key Files
 

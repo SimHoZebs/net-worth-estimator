@@ -45,7 +45,7 @@ The frontend image is environment-independent. All deployments proxy `/v1` under
 | `backend/internal/store/`     | `Store`, SQLite schema, model persistence, sync ownership, bounded artifacts                            |
 | `backend/internal/domain/`    | validation, request preparation, shared transitions, simulation, evaluations, stochastic kernels        |
 | `backend/internal/csvio/`     | canonical model CSV import                                                                              |
-| `backend/internal/simplefin/` | Bridge client, mapping, scheduler-safe runner, dry-run, mock fixture mode                               |
+| `backend/internal/simplefin/` | Bridge client, mapping, scheduler-safe runner                                                          |
 | `backend/scripts/`            | verification and benchmark entry points                                                                 |
 | `scripts/`                    | backend smoke and container smoke                                                                       |
 | `backend/Dockerfile`          | API-only container image                                                                                |
@@ -66,9 +66,6 @@ The frontend image is environment-independent. All deployments proxy `/v1` under
 | `NET_WORTH_ESTIMATOR_AUTH_PROVIDER`                  | `casdoor`                                                      | required OIDC sessions and plan permissions; token-only and unauthenticated startup are unsupported            |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL`           | empty                                                          | Bridge Access URL secret; enables real sync                                                                  |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS`                | empty                                                          | model account IDs eligible for pending-charge seeds                                                          |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN`              | empty                                                          | exact value `1` plans counts without committing writes                                                       |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK`                 | empty                                                          | exact value `1` enables fixture mode                                                                         |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE`            | empty                                                          | optional fixture file, valid only with mock mode                                                             |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_MIN_TRIGGER_INTERVAL` | `6h`                                                           | Go duration spacing successful manual sync triggers; Bridge expects 24 requests or fewer per day             |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_RATE_LIMIT_COOLDOWN`  | `1h`                                                           | Go duration Bridge-fetch blackout after an upstream 429; excess triggers return local 429 with `Retry-After` |
 
