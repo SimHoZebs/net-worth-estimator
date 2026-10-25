@@ -32,10 +32,14 @@ func mustCanonical(payload any) string {
 }
 
 func (s *Server) resourceArtifactKey(kind string, descriptor any) string {
-	if s.ResourceID == "" {
+	return resourceArtifactKeyFor(s.ResourceID, kind, descriptor)
+}
+
+func resourceArtifactKeyFor(resourceID, kind string, descriptor any) string {
+	if resourceID == "" {
 		return artifactKey(kind, descriptor)
 	}
-	return artifactKey(kind, map[string]any{"resource": s.ResourceID, "request": descriptor})
+	return artifactKey(kind, map[string]any{"resource": resourceID, "request": descriptor})
 }
 
 func artifactKey(kind string, descriptor any) string {
