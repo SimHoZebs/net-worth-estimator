@@ -25,6 +25,7 @@ export function ServerWorkspaceRecovery() {
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
 	const readOnly = statusReadOnly || writeBlocked;
 	const workspaceError = useWorkspaceStore((state) => state.error);
+	const errorCode = useWorkspaceStore((state) => state.errorCode);
 	const retry = useWorkspaceStore((state) => state.retry);
 	const importServerDocument = useWorkspaceStore(
 		(state) => state.importServerDocument,
@@ -50,7 +51,9 @@ export function ServerWorkspaceRecovery() {
 				"The model file is larger than 2 MB. Choose a smaller JSON file.",
 		});
 	const inputRef = useRef<HTMLInputElement>(null);
-	const missingModel = status !== null && serverDocument === null;
+	const missingModel =
+		status !== null &&
+		(serverDocument === null || errorCode === "missing-model");
 	const importCandidate = async () => {
 		if (!candidate || readOnly) return;
 		clearCandidate();
@@ -73,17 +76,18 @@ export function ServerWorkspaceRecovery() {
 					void retry();
 				}}
 			>
-				{!workspaceError?.includes("no financial model") && (
-					<ErrorNotice
-						message={
-							workspaceError ?? "The server workspace could not be loaded."
-						}
-						action="Retry server load"
-						onAction={() => {
-							void retry();
-						}}
-					/>
-				)}
+				{errorCode !== "missing-model" &&
+					!workspaceError?.includes("no financial model") && (
+						<ErrorNotice
+							message={
+								workspaceError ?? "The server workspace could not be loaded."
+							}
+							action="Retry server load"
+							onAction={() => {
+								void retry();
+							}}
+						/>
+					)}
 				{missingModel && <p>Import a reviewed model JSON file to continue.</p>}
 				{missingModel && (
 					<ServerModelImport

@@ -262,6 +262,12 @@ function freshEngine(): WorkspaceEngine {
 	};
 }
 
+export type WorkspaceErrorCode =
+	| "stale-draft"
+	| "storage-conflict"
+	| "missing-model"
+	| null;
+
 interface WorkspaceData {
 	workspace: RemoteWorkspace | null;
 	status: ServerStatus | null;
@@ -275,7 +281,9 @@ interface WorkspaceData {
 	savedPresentation: PlanPresentation | null;
 	draftPresentation: PlanPresentation | null;
 	loading: boolean;
+	saving: boolean;
 	error: string | null;
+	errorCode: WorkspaceErrorCode;
 	notice: string;
 	volatile: boolean;
 	authRequiredState: boolean;
@@ -295,12 +303,25 @@ function initialData(): WorkspaceData {
 		savedPresentation: null,
 		draftPresentation: null,
 		loading: true,
+		saving: false,
 		error: null,
+		errorCode: null,
 		notice: "",
 		volatile: false,
 		authRequiredState: false,
 		writeBlocked: false,
 	};
+}
+
+/** Single derived readers so views do not duplicate `draft ?? saved`. */
+export function selectPlan(state: WorkspaceData): Plan | null {
+	return state.workspace?.draft ?? state.workspace?.saved ?? null;
+}
+
+export function selectDraftChangeCount(state: WorkspaceData): number {
+	const plan = selectPlan(state);
+	if (!state.workspace || !plan) return 0;
+	return changesBetween({ saved: state.workspace.saved, current: plan }).length;
 }
 
 interface WorkspaceActions {
@@ -362,7 +383,12 @@ export const useWorkspaceStore = create<
 	},
 
 	reportStorageError: (storageError) => {
-		set({ error: storageError.message, volatile: true });
+		const conflict = storageError.message.includes("changed in another tab");
+		set({
+			error: storageError.message,
+			errorCode: conflict ? "storage-conflict" : null,
+			volatile: true,
+		});
 	},
 
 	writeLocalState: (next, fallback = next): boolean => {
@@ -414,7 +440,7 @@ export const useWorkspaceStore = create<
 		const restoreError = engine.pendingHydrationError;
 		engine.pendingHydrationError = null;
 		engine.hydrating = true;
-		set({ loading: true, error: restoreError });
+		set({ loading: true, error: restoreError, errorCode: null });
 		const finishHydration = () => {
 			clearTimeout(hydrationTimer);
 			if (get().engine === engine) {
@@ -478,7 +504,7 @@ export const useWorkspaceStore = create<
 			) {
 				clearUnavailableWorkspace();
 				markApiFailure(
-					(value) => set({ error: value }),
+					(value) => set({ error: value, errorCode: null }),
 					(value) => set({ authRequiredState: value }),
 					(value) => set({ writeBlocked: value }),
 					cause,
@@ -504,7 +530,7 @@ export const useWorkspaceStore = create<
 		if (statusResult instanceof Error) {
 			clearUnavailableWorkspace();
 			markApiFailure(
-				(value) => set({ error: value }),
+				(value) => set({ error: value, errorCode: null }),
 				(value) => set({ authRequiredState: value }),
 				(value) => set({ writeBlocked: value }),
 				statusResult,
@@ -517,7 +543,7 @@ export const useWorkspaceStore = create<
 		if (modelResult instanceof Error) {
 			clearUnavailableWorkspace();
 			markApiFailure(
-				(value) => set({ error: value }),
+				(value) => set({ error: value, errorCode: null }),
 				(value) => set({ authRequiredState: value }),
 				(value) => set({ writeBlocked: value }),
 				modelResult,
@@ -553,6 +579,7 @@ export const useWorkspaceStore = create<
 				recoveryDraft: localState?.draft ?? null,
 				error:
 					"The server has no financial model to display. Import and review a model before continuing.",
+				errorCode: "missing-model",
 				loading: false,
 			});
 			finishHydration();
@@ -578,6 +605,7 @@ export const useWorkspaceStore = create<
 					cause,
 					"The server model could not be converted for display.",
 				),
+				errorCode: null,
 				loading: false,
 			});
 			finishHydration();
@@ -662,11 +690,14 @@ export const useWorkspaceStore = create<
 								"The stored draft contains unsupported changes",
 							)
 						: "";
-			set({ error: [message, conversionMessage].filter(Boolean).join(" ") });
+			set({
+				error: [message, conversionMessage].filter(Boolean).join(" "),
+				errorCode: "stale-draft",
+			});
 		} else if (convertedDraft instanceof Error)
-			set({ error: convertedDraft.message });
+			set({ error: convertedDraft.message, errorCode: null });
 		else if (!storageWriteFailed && (!storageReadError || shouldRetryStorage))
-			set({ error: restoreError });
+			set({ error: restoreError, errorCode: null });
 		set({ loading: false });
 		finishHydration();
 	},
@@ -677,6 +708,7 @@ export const useWorkspaceStore = create<
 			set({
 				error:
 					"Wait for the current server save to finish before editing the plan.",
+				errorCode: null,
 			});
 			return false;
 		}
@@ -684,21 +716,25 @@ export const useWorkspaceStore = create<
 			set({
 				error:
 					"Wait for the current server load to finish before editing the plan.",
+				errorCode: null,
 			});
 			return false;
 		}
 		const current = get().workspace;
 		if (!current) {
-			set({ error: "Load the server workspace before editing it." });
+			set({
+				error: "Load the server workspace before editing it.",
+				errorCode: null,
+			});
 			return false;
 		}
 		if (current.draftStale) {
-			set({ error: staleDraftMessage });
+			set({ error: staleDraftMessage, errorCode: "stale-draft" });
 			return false;
 		}
 		const validated = validatePlan(next);
 		if (validated instanceof Error) {
-			set({ error: validated.message });
+			set({ error: validated.message, errorCode: null });
 			return false;
 		}
 		const draft = planHasChanges(current.saved, validated) ? validated : null;
@@ -712,7 +748,7 @@ export const useWorkspaceStore = create<
 				)
 			: null;
 		if (conversion instanceof Error) {
-			set({ error: conversion.message });
+			set({ error: conversion.message, errorCode: null });
 			return false;
 		}
 		if (conversion?.report.hasLosses) {
@@ -721,6 +757,7 @@ export const useWorkspaceStore = create<
 					conversion,
 					"This change cannot be saved to the server",
 				),
+				errorCode: null,
 			});
 			return false;
 		}
@@ -745,7 +782,7 @@ export const useWorkspaceStore = create<
 		const nextLocal = localStateFor(nextWorkspace, nextDraftPresentation);
 		const persisted = get().writeLocalState(nextLocal, nextLocal);
 		set({ notice: "Unsaved changes updated. Saved plan unchanged." });
-		if (persisted) set({ error: null });
+		if (persisted) set({ error: null, errorCode: null });
 		return true;
 	},
 
@@ -755,17 +792,18 @@ export const useWorkspaceStore = create<
 		if (!api) return false;
 		const current = get().workspace;
 		if (!current?.draft) {
-			set({ error: "There are no unsaved changes to save." });
+			set({ error: "There are no unsaved changes to save.", errorCode: null });
 			return false;
 		}
 		if (current.draftStale) {
-			set({ error: staleDraftMessage });
+			set({ error: staleDraftMessage, errorCode: "stale-draft" });
 			return false;
 		}
 		if (!get().serverDocument && !get().serverRevision) {
 			set({
 				error:
 					"The server model has not loaded yet. Wait for the current server load to finish before saving.",
+				errorCode: null,
 			});
 			return false;
 		}
@@ -777,24 +815,28 @@ export const useWorkspaceStore = create<
 		if (conversion instanceof Error) {
 			set({
 				error: `${conversion.message} The temporary plan remains available locally.`,
+				errorCode: null,
 			});
 			return false;
 		}
 		if (conversion.report.hasLosses) {
 			set({
 				error: `${conversionLossError(conversion, "Unsaved changes cannot be saved to the server")}. It remains available locally.`,
+				errorCode: null,
 			});
 			return false;
 		}
 		if (get().status?.readOnly || get().writeBlocked) {
 			set({
 				error: "The server is read-only. The temporary plan remains unsaved.",
+				errorCode: null,
 			});
 			return false;
 		}
 		if (engine.hydrating) {
 			set({
 				error: "Wait for the current server load to finish before saving.",
+				errorCode: null,
 			});
 			return false;
 		}
@@ -806,7 +848,7 @@ export const useWorkspaceStore = create<
 		engine.saveController?.abort();
 		const controller = new AbortController();
 		engine.saveController = controller;
-		set({ loading: true, error: null });
+		set({ loading: true, saving: true, error: null, errorCode: null });
 		try {
 			const document = conversion.document;
 			const operations = diffFinancialModelDocuments(
@@ -824,7 +866,7 @@ export const useWorkspaceStore = create<
 				return false;
 			if (applyResult instanceof Error) {
 				const message = markApiFailure(
-					(value) => set({ error: value }),
+					(value) => set({ error: value, errorCode: null }),
 					(value) => set({ authRequiredState: value }),
 					(value) => set({ writeBlocked: value }),
 					applyResult,
@@ -842,7 +884,7 @@ export const useWorkspaceStore = create<
 					.filter(Boolean)
 					.join(" ");
 				const message = `The temporary plan could not be saved to the server${details ? `: ${details}` : "."} It remains available locally.`;
-				set({ error: message });
+				set({ error: message, errorCode: null });
 				get().preserveQueuedError(message);
 				return false;
 			}
@@ -855,7 +897,7 @@ export const useWorkspaceStore = create<
 				return false;
 			if (authoritative instanceof Error) {
 				const message = markApiFailure(
-					(value) => set({ error: value }),
+					(value) => set({ error: value, errorCode: null }),
 					(value) => set({ authRequiredState: value }),
 					(value) => set({ writeBlocked: value }),
 					authoritative,
@@ -867,7 +909,7 @@ export const useWorkspaceStore = create<
 			if (!authoritative.document) {
 				const message =
 					"The save completed, but the server returned no authoritative model. Your temporary plan remains available locally.";
-				set({ error: message });
+				set({ error: message, errorCode: null });
 				get().preserveQueuedError(message);
 				return false;
 			}
@@ -883,7 +925,7 @@ export const useWorkspaceStore = create<
 					cause,
 					"The authoritative model was saved but could not be converted for display. Your temporary plan remains available locally.",
 				);
-				set({ error: message });
+				set({ error: message, errorCode: null });
 				get().preserveQueuedError(message);
 				return false;
 			}
@@ -943,6 +985,7 @@ export const useWorkspaceStore = create<
 				set({
 					error:
 						"The server model was saved, but browser draft storage could not be updated. The temporary plan remains available locally.",
+					errorCode: null,
 				});
 			return persisted;
 		} catch (cause) {
@@ -951,7 +994,7 @@ export const useWorkspaceStore = create<
 				get().engine.workspaceEpoch === operationEpoch
 			) {
 				const message = markApiFailure(
-					(value) => set({ error: value }),
+					(value) => set({ error: value, errorCode: null }),
 					(value) => set({ authRequiredState: value }),
 					(value) => set({ writeBlocked: value }),
 					cause,
@@ -968,7 +1011,7 @@ export const useWorkspaceStore = create<
 					get().engine.mounted &&
 					get().engine.workspaceEpoch === operationEpoch
 				)
-					set({ loading: false });
+					set({ loading: false, saving: false });
 				if (get().engine.pendingHydrate && get().engine.mounted) {
 					get().engine.pendingHydrate = false;
 					await get().hydrate();
@@ -987,16 +1030,18 @@ export const useWorkspaceStore = create<
 			set({
 				error:
 					"A server model is already loaded. Use the reviewed import action in Configs.",
+				errorCode: null,
 			});
 			return false;
 		}
 		if (get().status?.readOnly || get().writeBlocked) {
-			set({ error: READ_ONLY_IMPORT_MESSAGE });
+			set({ error: READ_ONLY_IMPORT_MESSAGE, errorCode: null });
 			return false;
 		}
 		if (engine.hydrating) {
 			set({
 				error: "Wait for the current server load to finish before importing.",
+				errorCode: null,
 			});
 			return false;
 		}
@@ -1007,7 +1052,7 @@ export const useWorkspaceStore = create<
 		engine.saveController?.abort();
 		const controller = new AbortController();
 		engine.saveController = controller;
-		set({ loading: true, error: null });
+		set({ loading: true, saving: true, error: null, errorCode: null });
 		try {
 			const operations = diffFinancialModelDocuments(null, document);
 			const result = await applyRowOperations(api, operations, {
@@ -1016,7 +1061,7 @@ export const useWorkspaceStore = create<
 			if (!get().engine.mounted || controller.signal.aborted) return false;
 			if (result instanceof Error) {
 				const message = markApiFailure(
-					(value) => set({ error: value }),
+					(value) => set({ error: value, errorCode: null }),
 					(value) => set({ authRequiredState: value }),
 					(value) => set({ writeBlocked: value }),
 					result,
@@ -1032,7 +1077,7 @@ export const useWorkspaceStore = create<
 					.filter(Boolean)
 					.join(" ");
 				const message = `The selected model could not be imported${details ? `: ${details}` : "."}`;
-				set({ error: message });
+				set({ error: message, errorCode: null });
 				get().preserveQueuedError(message);
 				return false;
 			}
@@ -1044,7 +1089,7 @@ export const useWorkspaceStore = create<
 		} catch (cause) {
 			if (!controller.signal.aborted) {
 				const message = markApiFailure(
-					(value) => set({ error: value }),
+					(value) => set({ error: value, errorCode: null }),
 					(value) => set({ authRequiredState: value }),
 					(value) => set({ writeBlocked: value }),
 					cause,
@@ -1057,7 +1102,7 @@ export const useWorkspaceStore = create<
 			if (get().engine.activeSaveToken === saveToken) {
 				get().engine.activeSaveToken = null;
 				get().engine.saving = false;
-				if (get().engine.mounted) set({ loading: false });
+				if (get().engine.mounted) set({ loading: false, saving: false });
 				if (get().engine.pendingHydrate && get().engine.mounted) {
 					get().engine.pendingHydrate = false;
 					await get().hydrate();
@@ -1072,13 +1117,14 @@ export const useWorkspaceStore = create<
 			set({
 				error:
 					"Wait for the current server operation to finish before discarding changes.",
+				errorCode: null,
 			});
 			return false;
 		}
 		const current = get().workspace;
 		if (!current) return false;
 		if (current.draftStale) {
-			set({ error: staleDraftMessage });
+			set({ error: staleDraftMessage, errorCode: "stale-draft" });
 			return false;
 		}
 		const nextWorkspace: RemoteWorkspace = {
@@ -1097,6 +1143,7 @@ export const useWorkspaceStore = create<
 			draftPresentation: null,
 			notice: "Unsaved changes discarded. Saved server plan restored.",
 			error: null,
+			errorCode: null,
 		});
 		return true;
 	},
@@ -1107,6 +1154,7 @@ export const useWorkspaceStore = create<
 			set({
 				error:
 					"Wait for the current server operation to finish before reloading the draft.",
+				errorCode: null,
 			});
 			return false;
 		}
@@ -1127,6 +1175,7 @@ export const useWorkspaceStore = create<
 			workspace: nextWorkspace,
 			draftPresentation: null,
 			error: null,
+			errorCode: null,
 			notice: "Stale draft discarded. Loading the latest server model.",
 		});
 		await get().hydrate();
@@ -1139,24 +1188,29 @@ export const useWorkspaceStore = create<
 			set({
 				error:
 					"Wait for the current server operation to finish before replacing the plan.",
+				errorCode: null,
 			});
 			return false;
 		}
 		const current = get().workspace;
 		if (!current) {
-			set({ error: "Load the server workspace before replacing it." });
+			set({
+				error: "Load the server workspace before replacing it.",
+				errorCode: null,
+			});
 			return false;
 		}
 		if (current.draft) {
 			set({
 				error:
 					"Save or discard the current temporary plan before importing another plan.",
+				errorCode: null,
 			});
 			return false;
 		}
 		const validated = validatePlan(next);
 		if (validated instanceof Error) {
-			set({ error: validated.message });
+			set({ error: validated.message, errorCode: null });
 			return false;
 		}
 		let conversion: ReturnType<typeof displayPlanToBackendDocument>;
@@ -1171,6 +1225,7 @@ export const useWorkspaceStore = create<
 					cause,
 					"The imported display plan could not be reviewed for server conversion.",
 				),
+				errorCode: null,
 			});
 			return false;
 		}
@@ -1178,6 +1233,7 @@ export const useWorkspaceStore = create<
 			const firstLoss = conversion.report.losses[0];
 			set({
 				error: `This import needs explicit conversion review before it can replace the server model${firstLoss ? `: ${firstLoss.message}` : "."}`,
+				errorCode: null,
 			});
 			return false;
 		}
@@ -1198,7 +1254,7 @@ export const useWorkspaceStore = create<
 		const nextLocal = localStateFor(nextWorkspace, draftPresentation);
 		const persisted = get().writeLocalState(nextLocal, nextLocal);
 		set({ notice: "Imported plan is ready for review and save." });
-		if (persisted) set({ error: null });
+		if (persisted) set({ error: null, errorCode: null });
 		return true;
 	},
 
@@ -1220,6 +1276,7 @@ export const useWorkspaceStore = create<
 			engine.saveController?.abort();
 			engine.saveController = null;
 			engine.saving = false;
+			set({ saving: false });
 			engine.pendingHydrate = false;
 			await get().hydrate({ deferDuringSave: false });
 			return;
@@ -1239,7 +1296,7 @@ export const useWorkspaceStore = create<
 		if (get().engine !== engine) return;
 		if (result instanceof Error) {
 			markApiFailure(
-				(value) => set({ error: value }),
+				(value) => set({ error: value, errorCode: null }),
 				(value) => set({ authRequiredState: value }),
 				(value) => set({ writeBlocked: value }),
 				result,

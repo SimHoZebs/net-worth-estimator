@@ -12,7 +12,7 @@ import type { Projection, RangeResult } from "../domain/result.ts";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { useWorkspaceStore, selectPlan } from "../state/workspaceStore.ts";
 import { EvaluationCard } from "./evaluations/EvaluationCard.tsx";
 import { OtherEvaluationCard } from "./evaluations/OtherEvaluationCard.tsx";
 
@@ -23,8 +23,7 @@ export function EvaluationsPage({
 }) {
 	// Plan, actions, and projection subscribe where the query is declared;
 	// only UI callbacks arrive as props.
-	const workspace = useWorkspaceStore((state) => state.workspace);
-	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const plan = useWorkspaceStore(selectPlan);
 	const onUpdate = useWorkspaceStore((state) => state.updatePlan);
 	const ranges = useUiStore((state) => state.ranges);
 	const projection = useRemoteProjection();

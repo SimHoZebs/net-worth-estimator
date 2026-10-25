@@ -3,7 +3,7 @@ import { SessionAccountControl } from "../auth/SessionAccountControl.tsx";
 import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { IconButton, Skeleton } from "../components/ui.tsx";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { useWorkspaceStore, selectPlan } from "../state/workspaceStore.ts";
 import { LastSync } from "./LastSync.tsx";
 import { type Page, pages } from "./navigation.ts";
 import { navigationLinkClassName } from "./navigationStyles.ts";
@@ -19,8 +19,7 @@ export function WorkspaceSidebar({
 	pending?: boolean;
 }) {
 	// Plan display values subscribe here so navigation never waits on props.
-	const workspace = useWorkspaceStore((state) => state.workspace);
-	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const plan = useWorkspaceStore(selectPlan);
 	const status = useWorkspaceStore((state) => state.status);
 	const statusReadOnly = status?.readOnly ?? false;
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
