@@ -56,6 +56,21 @@ describe("resource-scoped projection cache", () => {
 		expect(deterministicQueryKey("same-document", 10)).toEqual(before);
 	});
 
+	it("isolates deterministic cache entries by range", () => {
+		owner("plans/a");
+		const full = deterministicQueryKey("same-document", 10, "..2028-01-31");
+		const narrowed = deterministicQueryKey(
+			"same-document",
+			10,
+			"2026-01-31..2026-06-30",
+		);
+		serverQueryClient().setQueryData(full, "full-result");
+		expect(serverQueryClient().getQueryData(narrowed)).toBeUndefined();
+		expect(deterministicQueryKey("same-document", 10, "..2028-01-31")).toEqual(
+			full,
+		);
+	});
+
 	it("aborts old fetches, removes data, and ignores late non-cooperative results", async () => {
 		owner("plans/a");
 		const client = serverQueryClient();

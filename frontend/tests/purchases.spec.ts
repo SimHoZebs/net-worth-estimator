@@ -277,6 +277,7 @@ test("purchase priorities persist and purchases protect all established payments
 						],
 					},
 				},
+				range: { startDate: "2000-01-01", endDate: "2100-01-01" },
 			},
 		},
 	);
@@ -308,6 +309,7 @@ test("purchase priorities persist and purchases protect all established payments
 					horizonYears: 20,
 					evaluations: document.evaluations,
 				},
+				range: { startDate: "2000-01-01", endDate: "2100-01-01" },
 			},
 		},
 	);

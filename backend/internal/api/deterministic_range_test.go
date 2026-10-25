@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -162,6 +163,27 @@ func TestDeterministicNarrowWarmsFullRequest(t *testing.T) {
 	}
 }
 
+// An end date at or past the last timeline row returns the full payload:
+// this is the contract the default horizon-end range relies on.
+func TestDeterministicHorizonEndEqualsFullSpan(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	wide := decodeRangeResult(t, rangeRequest(t, handler, rangeBody(t, fullSpanRange())))
+	last := wide.Timeline.Rows[len(wide.Timeline.Rows)-1].Date
+	capped := decodeRangeResult(t, rangeRequest(t, handler, rangeBody(t, &projectionRange{EndDate: string(last)})))
+	wideRaw, err := json.Marshal(wide)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cappedRaw, err := json.Marshal(capped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(wideRaw) != string(cappedRaw) {
+		t.Fatal("horizon-end response differs from the full-span response")
+	}
+}
+
 func TestDeterministicRangeRejectsBadIntervals(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
@@ -180,6 +202,84 @@ func TestDeterministicRangeRejectsBadIntervals(t *testing.T) {
 		response := rangeRequest(t, handler, rangeBody(t, test.r))
 		if response.Code != test.want {
 			t.Fatalf("range %+v status = %d, want %d", test.r, response.Code, test.want)
+		}
+	}
+}
+
+// Overlapping narrow and full requests share one artifact key on a cold
+// store: whichever computes first stores the full result, and every
+// response stays correct whether one or two computations run. Workers
+// report values, never through t. Run with -race to cover the shared
+// backing arrays.
+func TestDeterministicOverlappingRangesStayCorrect(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	narrowBody := rangeBody(t, &projectionRange{EndDate: "2026-06-30"})
+	fullBody := rangeBody(t, fullSpanRange())
+
+	const workers = 4
+	type outcome struct {
+		body []byte
+		code int
+	}
+	results := make([]outcome, workers)
+	var group sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		group.Add(1)
+		go func(index int) {
+			defer group.Done()
+			body := narrowBody
+			if index%2 != 0 {
+				body = fullBody
+			}
+			request := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
+			request.Header.Set("Content-Type", "application/json")
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			results[index] = outcome{body: response.Body.Bytes(), code: response.Code}
+		}(i)
+	}
+	group.Wait()
+
+	decode := func(index int) *types.ProjectionResult {
+		t.Helper()
+		if results[index].code != http.StatusOK {
+			t.Fatalf("worker %d status = %d, body %s", index, results[index].code, results[index].body)
+		}
+		var payload struct {
+			Result *types.ProjectionResult `json:"result"`
+		}
+		if err := json.Unmarshal(results[index].body, &payload); err != nil || payload.Result == nil {
+			t.Fatalf("worker %d decode failed: %v", index, err)
+		}
+		return payload.Result
+	}
+	narrowA, narrowB := decode(0), decode(2)
+	fullA, fullB := decode(1), decode(3)
+	for _, result := range []*types.ProjectionResult{narrowA, narrowB} {
+		for _, row := range result.Timeline.Rows {
+			if row.Date > "2026-06-30" {
+				t.Fatalf("narrow row %s past end bound", row.Date)
+			}
+		}
+	}
+	narrowRawA, _ := json.Marshal(narrowA)
+	narrowRawB, _ := json.Marshal(narrowB)
+	if string(narrowRawA) != string(narrowRawB) {
+		t.Fatal("narrow responses disagree")
+	}
+	fullRawA, _ := json.Marshal(fullA)
+	fullRawB, _ := json.Marshal(fullB)
+	if string(fullRawA) != string(fullRawB) {
+		t.Fatal("full responses disagree")
+	}
+	narrowDates := map[string]bool{}
+	for _, row := range narrowA.Timeline.Rows {
+		narrowDates[string(row.Date)] = true
+	}
+	for _, row := range fullA.Timeline.Rows {
+		if row.Date <= "2026-06-30" && !narrowDates[string(row.Date)] {
+			t.Fatalf("full row %s within bound missing from narrow response", row.Date)
 		}
 	}
 }
