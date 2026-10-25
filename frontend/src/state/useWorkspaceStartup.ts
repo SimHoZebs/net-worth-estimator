@@ -1,13 +1,12 @@
 import { useEffect, useMemo } from "react";
-import { createApiClient } from "../api/index.ts";
-import { resourceScopedFactory } from "../api/scopedRequest.ts";
+import { defaultScopedApiClient } from "../api/scopedClients.ts";
 import { type RemoteApiClient, useWorkspaceStore } from "./workspaceStore.ts";
 
 interface WorkspaceStartupOptions {
 	client?: RemoteApiClient;
 }
 
-const defaultClient = resourceScopedFactory(createApiClient);
+const defaultClient = defaultScopedApiClient;
 
 /** Bind and boot the store engine. Screens subscribe to their own state. */
 export function useWorkspaceStartup({

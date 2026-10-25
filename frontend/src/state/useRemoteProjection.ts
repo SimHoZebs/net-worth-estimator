@@ -2,7 +2,6 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	type ApiRequestOptions,
-	createApiClient,
 	type DeterministicProjectionRequest,
 	type DeterministicProjectionResponse,
 	type EvaluationResultEnvelope,
@@ -16,7 +15,7 @@ import {
 	type StochasticProjectionResult,
 } from "../api/index.ts";
 import { projectionMovements } from "../api/projectionMovements.ts";
-import { resourceScopedFactory } from "../api/scopedRequest.ts";
+import { defaultScopedApiClient } from "../api/scopedClients.ts";
 import { dateLabel, money, percent, todayIso } from "../domain/format.ts";
 import {
 	fundingEvaluationName,
@@ -65,7 +64,7 @@ export interface UseRemoteProjectionOptions {
 const MISSING_DOCUMENT_MESSAGE =
 	"No server financial model is available for projection. Load or replace a model before calculating.";
 
-const defaultApiClient = resourceScopedFactory(createApiClient);
+const defaultApiClient = defaultScopedApiClient;
 
 async function runDeterministic(
 	api: RemoteProjectionClient,
