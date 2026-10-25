@@ -3,7 +3,6 @@ package main
 import (
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 func TestResourceConfigurationRequiresExplicitSafePathsAndOwner(t *testing.T) {
@@ -25,30 +24,6 @@ func TestResourceConfigurationRequiresExplicitSafePathsAndOwner(t *testing.T) {
 		}, base)
 		if err == nil {
 			t.Errorf("accepted invalid %s", key)
-		}
-	}
-	for _, test := range []struct {
-		value string
-		want  time.Duration
-		ok    bool
-	}{
-		{"", 0, true},
-		{"45s", 45 * time.Second, true},
-		{"-1s", -time.Second, true},
-		{"bogus", 0, false},
-	} {
-		c, err := resourceConfigFromEnv(func(name string) string {
-			if name == "NET_WORTH_ESTIMATOR_WARM_DEBOUNCE" {
-				return test.value
-			}
-			return ""
-		}, base)
-		if test.ok {
-			if err != nil || c.WarmDebounce != test.want {
-				t.Errorf("warm debounce %q = %v, %v; want %v, nil", test.value, c.WarmDebounce, err, test.want)
-			}
-		} else if err == nil {
-			t.Errorf("accepted invalid warm debounce %q", test.value)
 		}
 	}
 }

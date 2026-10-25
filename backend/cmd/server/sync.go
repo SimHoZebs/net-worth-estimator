@@ -29,7 +29,7 @@ import (
 // trigger runs share one singleflight guard, and an upstream 429 arms a
 // RATE_LIMIT_COOLDOWN blackout (default 1h) so frontend bursts degrade to
 // local 429s with Retry-After instead of further Bridge hits.
-func configureSync(database store.Store, onApplied func(summary *simplefin.Summary)) (*simplefin.Runner, func()) {
+func configureSync(database store.Store) (*simplefin.Runner, func()) {
 	triggerInterval, err := simplefin.ParsePositiveDuration(
 		os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_MIN_TRIGGER_INTERVAL"),
 		simplefin.MinTriggerInterval,
@@ -66,7 +66,7 @@ func configureSync(database store.Store, onApplied func(summary *simplefin.Summa
 		} else {
 			runner = simplefin.NewMockRunner(database, config)
 		}
-		stop := startSyncScheduler(runner, onApplied)
+		stop := startSyncScheduler(runner)
 		fmt.Println("simplefin sync in MOCK mode [simplefin-mock]: responses are fabricated, nothing talks to the Bridge")
 		if config.DryRun {
 			fmt.Println("simplefin sync in dry-run mode: planned writes are logged, nothing is stored")
@@ -84,7 +84,7 @@ func configureSync(database store.Store, onApplied func(summary *simplefin.Summa
 		RateLimitCooldown:  rateLimitCooldown,
 	}
 	runner := simplefin.NewRunner(database, config, &simplefin.Client{AccessURL: accessURL})
-	stop := startSyncScheduler(runner, onApplied)
+	stop := startSyncScheduler(runner)
 	if config.DryRun {
 		fmt.Println("simplefin sync in dry-run mode: planned writes are logged, nothing is stored")
 	}
@@ -110,7 +110,7 @@ func nextSyncDelay(now time.Time, randMinute int) time.Duration {
 	return syncInterval + time.Duration(randMinute)*time.Minute
 }
 
-func startSyncScheduler(runner *simplefin.Runner, onApplied func(summary *simplefin.Summary)) func() {
+func startSyncScheduler(runner *simplefin.Runner) func() {
 	stop := make(chan struct{})
 	go func() {
 		timer := time.NewTimer(nextSyncDelay(time.Now(), rand.N(60)))
@@ -125,11 +125,6 @@ func startSyncScheduler(runner *simplefin.Runner, onApplied func(summary *simple
 					log.Printf("simplefin scheduled sync failed: %v", err)
 				} else {
 					log.Printf("simplefin scheduled sync: %+v", summary)
-					// Dry runs commit nothing, so their content keys cannot
-					// have changed; skip warming for them.
-					if onApplied != nil && !summary.DryRun {
-						onApplied(summary)
-					}
 				}
 				timer.Reset(syncInterval)
 			}

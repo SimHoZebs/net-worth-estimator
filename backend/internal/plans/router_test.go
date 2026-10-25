@@ -20,7 +20,7 @@ func privateID(letter string) string { return "plans/" + strings.Repeat(letter, 
 func newRouter(t *testing.T, owner string) (*Router, store.Store, Config) {
 	t.Helper()
 	dir := t.TempDir()
-	config := Config{PrimaryResourceID: owner, PrimaryDBPath: filepath.Join(dir, "primary.db"), SampleDBPath: filepath.Join(dir, "sample.db"), PrivateDir: filepath.Join(dir, "plans"), WarmDebounce: -1}
+	config := Config{PrimaryResourceID: owner, PrimaryDBPath: filepath.Join(dir, "primary.db"), SampleDBPath: filepath.Join(dir, "sample.db"), PrivateDir: filepath.Join(dir, "plans")}
 	primary, err := store.Open(config.PrimaryDBPath)
 	if err != nil {
 		t.Fatal(err)
