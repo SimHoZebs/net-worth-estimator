@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { money } from "../../domain/format.ts";
 import type { Account, Plan } from "../../domain/model.ts";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
@@ -7,6 +6,7 @@ import type { Movement } from "../../domain/model.ts";
 import type { MovementResult } from "../../domain/result.ts";
 import { AccountEntry } from "../AccountEntry.tsx";
 import { TransactionDetail } from "../activity/TransactionDetail.tsx";
+import { useSelectedEntry } from "../entrySelection.ts";
 import { TransactionRow } from "../activity/TransactionRow.tsx";
 import { TransactionTable } from "../activity/TransactionTable.tsx";
 
@@ -27,11 +27,11 @@ export function ConstraintSnapshot({
 	showHeaders?: boolean;
 }) {
 	const gap = failure.requested - failure.realized;
-	const [selected, setSelected] = useState<{
+	const [selected, setSelected] = useSelectedEntry<{
 		transaction: AccountTransaction;
 		movement: Movement;
 		failing: boolean;
-	} | null>(null);
+	}>(plan);
 	return (
 		<figure className="mt-3 mb-0.5">
 			{ledger.accountIcon ? (

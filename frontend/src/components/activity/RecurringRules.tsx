@@ -21,6 +21,7 @@ import {
 	transactionBadgeStyles,
 } from "./activityStyles.ts";
 import { MovementDetail } from "./TransactionDetail.tsx";
+import { useSelectedId } from "../entrySelection.ts";
 
 type Direction = "in" | "out" | "transfer";
 
@@ -121,7 +122,7 @@ export function RecurringRules({
 		(state) => state.savedPresentation,
 	);
 	const [editing, setEditing] = useState(false);
-	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [selectedId, setSelectedId] = useSelectedId(plan);
 
 	const presentation = draftPresentation ?? savedPresentation;
 	const serverRules = useMemo(

@@ -16,6 +16,7 @@ import { EmptyState } from "../EmptyState.tsx";
 import { Modal } from "../Modal.tsx";
 import { Progress } from "../Progress.tsx";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
+import { useSelectedId } from "../entrySelection.ts";
 
 type StatusFilter = "all" | "pending" | "posted";
 
@@ -50,7 +51,7 @@ export function AccountDetailsModal({
 }) {
 	const [query, setQuery] = useState("");
 	const [filter, setFilter] = useState<StatusFilter>("all");
-	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [selectedId, setSelectedId] = useSelectedId(plan);
 	const transactions = useMemo(
 		() =>
 			projection
