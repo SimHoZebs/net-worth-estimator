@@ -115,7 +115,6 @@ describe("sidebar account placement", () => {
 					session,
 					logout: vi.fn(async () => {}),
 					logoutPending: false,
-					logoutError: "",
 				}}
 			>
 				<aside aria-label="Workspace navigation">

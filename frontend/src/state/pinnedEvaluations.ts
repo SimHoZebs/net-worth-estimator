@@ -5,7 +5,7 @@ import {
 	getResourceScope,
 	subscribeResourceScope,
 } from "../auth/resourceScope.ts";
-import { notifyError } from "./notifications.ts";
+import { dismissKey, notifyError } from "./notifications.ts";
 
 export interface PinnedEvaluationsState {
 	/** Pinned evaluation instance IDs in pin order. Null until loaded. */
@@ -57,12 +57,6 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 			if (scope !== getResourceScope()) return;
 			if (result instanceof Error) {
 				set({ loading: false, error: result.message });
-				notifyError("evaluation-pins", result.message, {
-					label: "Reload pins",
-					onAction: () => {
-						void get().refresh();
-					},
-				});
 				return;
 			}
 			lastFetchedAt = Date.now();
@@ -81,12 +75,6 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 			if (scope !== getResourceScope()) return false;
 			if (result instanceof Error) {
 				set({ ids: previous, error: result.message });
-				notifyError("evaluation-pins", result.message, {
-					label: "Reload pins",
-					onAction: () => {
-						void get().refresh();
-					},
-				});
 				return false;
 			}
 			lastFetchedAt = Date.now();
@@ -103,6 +91,21 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 );
 
 subscribeResourceScope(() => usePinnedEvaluationsStore.getState().reset());
+
+/**
+ * Explicit triggers for the notification stack. Failure transitions float
+ * with a reload action; resolving back to no error clears the toast.
+ */
+usePinnedEvaluationsStore.subscribe((state, previous) => {
+	if (state.error && state.error !== previous.error)
+		notifyError("evaluation-pins", state.error, {
+			label: "Reload pins",
+			onAction: () => {
+				void usePinnedEvaluationsStore.getState().refresh();
+			},
+		});
+	else if (!state.error && previous.error) dismissKey("evaluation-pins");
+});
 
 /** Test hook: clears the pins TTL between cases (client is now shared). */
 export function resetPinnedEvaluationsClient(): void {

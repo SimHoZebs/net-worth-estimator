@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import type { BackendCheckpoint } from "../api/contracts.ts";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
-import { useErrorToast } from "../components/NotificationCenter.tsx";
 import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
@@ -74,18 +73,11 @@ function OutlookContent({
 	const refreshPins = usePinnedEvaluationsStore((state) => state.refresh);
 	const togglePin = usePinnedEvaluationsStore((state) => state.toggle);
 	const pinsLoading = usePinnedEvaluationsStore((state) => state.loading);
-	const pinnedError = usePinnedEvaluationsStore((state) => state.error);
 	const status = useWorkspaceStore((state) => state.status);
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
 	useEffect(() => {
 		void refreshPins();
 	}, [refreshPins]);
-	useErrorToast("evaluation-pins", pinnedError, {
-		label: "Reload pins",
-		onAction: () => {
-			void refreshPins();
-		},
-	});
 	const base = projection.base instanceof Error ? null : projection.base;
 	const pending = base === null;
 	if (!plan) return null;

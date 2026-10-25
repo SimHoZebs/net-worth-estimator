@@ -30,6 +30,7 @@ import {
 	serverDocumentFingerprint,
 } from "./remoteStorage.ts";
 import {
+	dismissKey,
 	notifyError,
 	notifySuccess,
 	type ToastAction,
@@ -1499,12 +1500,16 @@ useWorkspaceStore.subscribe((state, previous) => {
 		!state.error.includes("no financial model")
 	)
 		notifyError("workspace", state.error, workspaceToastAction(state));
+	else if (!state.error && previous.error) dismissKey("workspace");
 	if (state.notice && state.notice !== previous.notice)
 		notifySuccess("workspace-notice", state.notice, () =>
 			useWorkspaceStore.getState().dismissNotice(),
 		);
+	else if (!state.notice && previous.notice) dismissKey("workspace-notice");
 	if (state.presetError && state.presetError !== previous.presetError)
 		notifyError("amount-presets", state.presetError);
+	else if (!state.presetError && previous.presetError)
+		dismissKey("amount-presets");
 });
 
 /** Stop old callbacks without deleting account-owned data during verification. */

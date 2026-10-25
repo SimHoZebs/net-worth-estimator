@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { suspendResourceScope } from "../auth/resourceScope.ts";
-import { resetNotifications, useNotifications } from "./notifications.ts";
+import {
+	dismissKey,
+	resetNotifications,
+	useNotifications,
+} from "./notifications.ts";
 
 afterEach(() => {
 	resetNotifications();
@@ -47,5 +51,15 @@ describe("notification stack", () => {
 			.notify({ key: "workspace", kind: "error", message: "Load failed." });
 		suspendResourceScope();
 		expect(useNotifications.getState().items).toHaveLength(0);
+	});
+
+	it("clears one key while keeping the rest", () => {
+		const store = useNotifications.getState();
+		store.notify({ key: "account", kind: "error", message: "First." });
+		store.notify({ key: "workspace", kind: "error", message: "Second." });
+		dismissKey("account");
+		const items = useNotifications.getState().items;
+		expect(items).toHaveLength(1);
+		expect(items[0]?.key).toBe("workspace");
 	});
 });
