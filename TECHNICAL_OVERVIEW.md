@@ -79,7 +79,8 @@ The frontend displays these provider-neutral sync signals. Provider setup, accou
     "fallbackProjectionStartDate": "YYYY-MM-DD",
     "horizonYears": 1,
     "evaluations": {}
-  }
+  },
+  "window": "history|projection|both"
 }
 ```
 
@@ -88,6 +89,7 @@ Resolution rules:
 - If `document` is omitted, the stored model supplies it.
 - A supplied document affects only that request.
 - `overrides` are applied by `types.ApplyModelOverrides` to a new document value; stored state is unchanged.
+- `window` selects the returned timeline slice and defaults to `both`. `history` returns past rows only with no movement events or evaluations; `projection` returns future rows only with the full result shape. Unknown values return 400. Totals, summary, milestones, and account summaries keep full-result values in every window. The stored artifact is always the full result regardless of window, so a history request warms the later full request instead of computing twice.
 
 A successful response has `result` and `X-Cache: hit|miss`.
 
