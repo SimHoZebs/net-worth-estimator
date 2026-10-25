@@ -12,7 +12,7 @@ import {
 	useDrawerTransition,
 	useHorizontalSwipe,
 	type DrawerSide,
-} from "./drawer.ts";
+} from "../state/drawer.ts";
 import {
 	isTopmostModal,
 	useOpenModalRegistration,
