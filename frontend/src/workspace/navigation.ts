@@ -69,9 +69,7 @@ export const pages: PageDefinition[] = [
 	},
 ];
 
-export const getPage = (): Page => {
-	const hash = window.location.hash.slice(1);
-	if (hash === "plan") return "accounts";
-	if (hash === "goals") return "evaluations";
-	return pages.find((page) => page.id === hash)?.id ?? "outlook";
+export const LEGACY_PAGES: Record<string, Page> = {
+	plan: "accounts",
+	goals: "evaluations",
 };
