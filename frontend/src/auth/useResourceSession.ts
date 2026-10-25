@@ -24,6 +24,7 @@ import {
 } from "./sessionChanges.ts";
 import type { Session } from "./sessionContext.ts";
 import { discoverSession, sessionScopeInput } from "./sessionDiscovery.ts";
+import { notifyError } from "../state/notifications.ts";
 
 interface SessionOwner {
 	session: Session;
@@ -61,7 +62,7 @@ export function useResourceSession() {
 	const signingOut = useRef<LogoutAttempt | null>(null);
 	const mounted = useRef(false);
 
-	const verify = useCallback((): Promise<void> => {
+	const verify = useCallback(function verifySession(): Promise<void> {
 		verification.current?.controller.abort();
 		const check: Verification = { controller: new AbortController() };
 		verification.current = check;
@@ -200,6 +201,15 @@ export function useResourceSession() {
 						? cause.message
 						: "Authentication status is unavailable.";
 				setStatus({ phase: "unavailable", error: check.error });
+				// First-load outages use the full-screen fallback; only a
+				// revalidation floats, since a verified workspace is mounted.
+				if (previous)
+					notifyError("session", check.error, {
+						label: "Retry access check",
+						onAction: () => {
+							void verifySession();
+						},
+					});
 			}
 		})().finally(() => {
 			check.pending = undefined;
@@ -264,6 +274,7 @@ export function useResourceSession() {
 			if (signingOut.current !== attempt) return;
 			signingOut.current = null;
 			const error = cause instanceof Error ? cause.message : "Sign-out failed.";
+			notifyError("session-logout", error);
 			if (
 				getResourceScope().status === "pending" &&
 				!verification.current?.error

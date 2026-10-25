@@ -135,7 +135,9 @@ describe("ServerApp subscriptions", () => {
 		act(() =>
 			useWorkspaceStore.setState({ presetError: "Recipe service unavailable" }),
 		);
-		expect(screen.getByText("Recipe service unavailable")).toBeTruthy();
+		// The test readout renders the raw value while the notification
+		// subscription floats the same failure as a toast.
+		expect(screen.getAllByText("Recipe service unavailable")).toHaveLength(2);
 		expect(useWorkspaceNavigation).toHaveBeenCalledTimes(rootRenders);
 
 		act(() => useWorkspaceStore.setState({ volatile: true }));

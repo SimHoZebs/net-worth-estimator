@@ -54,3 +54,29 @@ export function resetNotifications(): void {
 	sequence = 0;
 	useNotifications.setState({ items: [] });
 }
+
+/**
+ * Explicit triggers. Call these where a failure or confirmation happens —
+ * catch blocks, failed submit branches, store failure paths — instead of
+ * watching state. Keys upsert, so repeats replace rather than stack.
+ */
+export function notifyError(
+	key: string,
+	message: string,
+	action?: ToastAction,
+	onDismiss?: () => void,
+): string {
+	return useNotifications
+		.getState()
+		.notify({ key, kind: "error", message, action, onDismiss });
+}
+
+export function notifySuccess(
+	key: string,
+	message: string,
+	onDismiss?: () => void,
+): string {
+	return useNotifications
+		.getState()
+		.notify({ key, kind: "success", message, onDismiss });
+}

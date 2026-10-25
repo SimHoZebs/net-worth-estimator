@@ -40,6 +40,7 @@ import {
 	serverDocumentFingerprint,
 } from "./remoteStorage.ts";
 import { resetServerQueryCache } from "./serverQuery.ts";
+import { resetNotifications, useNotifications } from "./notifications.ts";
 import { resetUiStore, useUiStore } from "./uiStore.ts";
 import {
 	projectionResultToLocal,
@@ -566,6 +567,7 @@ afterEach(() => {
 	resetServerQueryCache();
 	resetUiStore();
 	resetWorkspaceStore();
+	resetNotifications();
 });
 
 describe("remote workspace state", () => {
@@ -2691,6 +2693,49 @@ describe("remote projection mapping and SSE", () => {
 		);
 		await rendered.settle();
 		expect(rendered.result().rangeError).not.toBeNull();
+		const items = useNotifications.getState().items;
+		expect(items).toHaveLength(1);
+		expect(items[0]).toMatchObject({
+			key: "projection-range",
+			kind: "error",
+			message: "range failed",
+		});
+		expect(items[0]?.action?.label).toBe("Retry scenario calculation");
+		rendered.unmount();
+	});
+
+	it("floats deterministic failures with a retry action", async () => {
+		const client = {
+			projectDeterministic: vi.fn(async () => new Error("no numbers today")),
+			// Ranges are off, so this never runs; it only satisfies the client type.
+			projectStochastic: vi.fn(async () => new Error("stochastic disabled")),
+		};
+		const rendered = renderHook(() =>
+			useRemoteProjection({
+				client,
+				document: modelFixture(),
+				years: 1,
+				ranges: false,
+			}),
+		);
+		await rendered.settle();
+		expect(rendered.result().base).toBeNull();
+		expect(rendered.result().baseError).toContain("no numbers today");
+		const items = useNotifications.getState().items;
+		expect(items).toHaveLength(1);
+		expect(items[0]).toMatchObject({
+			key: "projection",
+			kind: "error",
+			message: "no numbers today",
+		});
+		expect(items[0]?.action?.label).toBe("Retry calculation");
+		const calls = client.projectDeterministic.mock.calls.length;
+		items[0]?.action?.onAction();
+		await waitFor(() =>
+			expect(client.projectDeterministic.mock.calls.length).toBeGreaterThan(
+				calls,
+			),
+		);
 		rendered.unmount();
 	});
 

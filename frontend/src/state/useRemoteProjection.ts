@@ -1,4 +1,8 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+	keepPreviousData,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	type ApiRequestOptions,
@@ -16,6 +20,7 @@ import {
 } from "../api/index.ts";
 import { projectionMovements } from "../api/projectionMovements.ts";
 import { defaultScopedApiClient } from "../api/scopedClients.ts";
+import { ResourceScopeError } from "../api/scopedRequest.ts";
 import { dateLabel, money, percent, todayIso } from "../domain/format.ts";
 import {
 	fundingEvaluationName,
@@ -32,6 +37,7 @@ import {
 	serverQueryClient,
 	stochasticQueryKey,
 } from "./serverQuery.ts";
+import { notifyError } from "./notifications.ts";
 import { useUiStore } from "./uiStore.ts";
 import { deriveDraftDocument, useWorkspaceStore } from "./workspaceStore.ts";
 import { purchaseEvaluationResult } from "./purchaseEvaluation.ts";
@@ -701,12 +707,34 @@ export function useRemoteProjection({
 	// oxlint-disable-next-line react/refs
 	activeDocumentRef.current = activeDocument;
 	const hasDocument = activeDocument !== null;
+	const queryClient = useQueryClient();
+	const queryClientRef = useRef(queryClient);
+	// oxlint-disable-next-line react/refs
+	queryClientRef.current = queryClient;
+	const reportDeterministicError = (queryKey: readonly unknown[]) => ({
+		label: "Retry calculation",
+		onAction: () => {
+			void queryClientRef.current.refetchQueries({ queryKey, exact: true });
+		},
+	});
 	const deterministic = useQuery({
 		queryKey: deterministicQueryKey(documentKey, years),
-		queryFn: ({ signal }) => {
+		queryFn: ({ signal, queryKey }) => {
 			const current = activeDocument;
 			if (!current) throw new Error(MISSING_DOCUMENT_MESSAGE);
-			return runDeterministic(api, current, years, signal);
+			return runDeterministic(api, current, years, signal).catch(
+				(cause: unknown) => {
+					if (!isAbortError(cause) && !(cause instanceof ResourceScopeError))
+						notifyError(
+							"projection",
+							cause instanceof Error && cause.message
+								? cause.message
+								: "The deterministic projection request failed. Retry the connection.",
+							reportDeterministicError(queryKey),
+						);
+					throw cause;
+				},
+			);
 		},
 		enabled: enabled && hasDocument,
 		placeholderData: keepPreviousData,
@@ -800,8 +828,15 @@ export function useRemoteProjection({
 					},
 					onError: (data) => {
 						if (!mounted.current || controller.signal.aborted) return;
+						// A server-sent error event on a live stream is genuine
+						// content, not a transport rejection, so it floats.
+						// Scope transitions abort the stream above instead.
 						streamError = data.error;
 						setRangeError(data.error);
+						notifyError("projection-range", data.error, {
+							label: "Retry scenario calculation",
+							onAction: () => setRangeAttempt((value) => value + 1),
+						});
 					},
 				},
 				controller.signal,
@@ -844,11 +879,19 @@ export function useRemoteProjection({
 						runStream();
 						return;
 					}
-					setRangeError(
-						cause instanceof Error
+					// Stale-assertion rejections belong to the session layer,
+					// never to a toast: the recheck flow owns them.
+					const scopeOwned = cause instanceof ResourceScopeError;
+					const message =
+						cause instanceof Error && cause.message
 							? cause.message
-							: "The range request failed. Retry the calculation.",
-					);
+							: "The range request failed. Retry the calculation.";
+					setRangeError(message);
+					if (!scopeOwned)
+						notifyError("projection-range", message, {
+							label: "Retry scenario calculation",
+							onAction: () => setRangeAttempt((value) => value + 1),
+						});
 				});
 		};
 		runStream();

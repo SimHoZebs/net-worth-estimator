@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import type { EvaluationTables } from "../api/contracts.ts";
 import type { Projection } from "../domain/result.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { useProjectionToasts } from "./NotificationCenter.tsx";
 import { ProjectionUpdating } from "./ProjectionUpdating.tsx";
 
 // Pages that need only base-case evidence share calculation state and recovery.
@@ -15,7 +14,7 @@ export function BaseProjectionView({
 	evaluations?: EvaluationTables;
 }) {
 	const projection = useRemoteProjection({ ranges: false, evaluations });
-	const { base } = useProjectionToasts("base-projection", projection);
+	const base = projection.base instanceof Error ? null : projection.base;
 	return (
 		<>
 			{projection.loading && base && <ProjectionUpdating />}
