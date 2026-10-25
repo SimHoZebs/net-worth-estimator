@@ -58,8 +58,5 @@ func (s *Server) triggerSync(ctx context.Context, _ *struct{}) (*syncOutput, err
 		}
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	if s.onSyncApplied != nil {
-		s.onSyncApplied(s.ResourceID, summary.DryRun)
-	}
 	return &syncOutput{Body: *summary}, nil
 }

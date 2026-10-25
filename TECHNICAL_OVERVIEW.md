@@ -241,10 +241,6 @@ Artifact writes are best-effort. A malformed stored payload is treated as a miss
 
 The cache is durable only when the SQLite file is durable. A container or service without persistent storage for its database loses canonical edits and artifacts on replacement.
 
-### Warming
-
-After mutations settle, the server recomputes the default cached projections in the background so pins read hits instead of triggering foreground runs. Warm parameters mirror the frontend defaults (20-year horizon, 400 seeded runs); other horizons still compute on demand. Row writes report through the API mutation middleware, applied sync runs report with their dry flag, and each plan debounces marks for 30 seconds (`NET_WORTH_ESTIMATOR_WARM_DEBOUNCE` overrides, negative disables). Rejected writes and dry syncs are filtered before scheduling and cost nothing; duplicate marks on unchanged plans cost a document load plus lookups and skip recompute. Warming joins the shared seeded-run registry as owner or waiter. Failures log and never fail requests.
-
 ## 4. Artifact Identity
 
 `api.artifactKey` hashes a versioned descriptor with SHA-256. The identity prefix is `<kind>:1:<digest>`.
