@@ -41,6 +41,12 @@ type projectionRequestBody struct {
 	Document  *types.FinancialModelDocument   `json:"document,omitempty"`
 	Overrides types.ModelOverrides            `json:"overrides,omitempty"`
 	Settings  types.ProjectionRuntimeSettings `json:"settings"`
+	// Window selects which timeline slice to return: "history" (past to
+	// projection start), "projection" (projection start onward), or "both"
+	// (default). The stored artifact is always the full result; the window
+	// only filters the response, so a history request warms the later full
+	// request instead of computing twice.
+	Window string `json:"window,omitempty"`
 }
 
 type deterministicOutput struct {
@@ -56,6 +62,13 @@ type deterministicOutput struct {
 func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 	Body projectionRequestBody
 }) (*deterministicOutput, error) {
+	window := input.Body.Window
+	if window == "" {
+		window = "both"
+	}
+	if window != "history" && window != "projection" && window != "both" {
+		return nil, huma.Error400BadRequest("window must be history, projection, or both")
+	}
 	document, err := s.resolveDocument(input.Body.Document)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
@@ -63,6 +76,8 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 
 	// Key the RESOLVED document so omitted fields track the
 	// stored state: a model save changes stored content and therefore the key.
+	// The window stays out of the key: history and full requests share one
+	// stored artifact, and a history request warms the full one.
 	cacheKey := s.resourceArtifactKey("deterministic", map[string]any{
 		"publicResultVersion": deterministicResultCacheVersion,
 		"document":            document,
@@ -73,13 +88,13 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 		// huma writes Status verbatim; leaving it zero panics the writer.
 		output := &deterministicOutput{Status: http.StatusOK, Cache: "hit"}
 		cachedCopy := cached.value
-		output.Body.Result = &cachedCopy
+		output.Body.Result = filterProjectionWindow(&cachedCopy, window)
 		return output, nil
 	}
 	_, prefix := parseArtifactKeyMeta(cacheKey)
-	log.Printf("deterministic recalc key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d",
+	log.Printf("deterministic recalc key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d window=%s",
 		prefix, len(document.Accounts), len(document.Postings), len(document.Checkpoints),
-		input.Body.Settings.HorizonYears)
+		input.Body.Settings.HorizonYears, window)
 
 	result, err := domain.ProjectFinancialModelDocument(document, &input.Body.Settings, input.Body.Overrides, nil)
 	// huma writes this status verbatim; default to 200 and only raise it for
@@ -97,6 +112,48 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 		return output, nil
 	}
 	putArtifact(s.store, cacheKey, "deterministic", result)
-	output.Body.Result = result
+	output.Body.Result = filterProjectionWindow(result, window)
 	return output, nil
+}
+
+// filterProjectionWindow returns the requested timeline slice. It builds new
+// row and event slices and never mutates the cached or computed result, so
+// shared backing arrays stay intact for later requests.
+func filterProjectionWindow(result *types.ProjectionResult, window string) *types.ProjectionResult {
+	if window == "both" {
+		return result
+	}
+	filtered := *result
+	if window == "history" {
+		rows := make([]types.ProjectionRow, 0, len(result.Timeline.Rows))
+		for _, row := range result.Timeline.Rows {
+			if row.IsHistorical {
+				rows = append(rows, row)
+			}
+		}
+		filtered.Timeline.Rows = rows
+		filtered.MovementEvents = nil
+		// Empty arrays, not nulls: readers map over the non-optional
+		// tables without nil checks. PlannedPurchases stays omitempty
+		// and is therefore absent rather than []. Totals, summary,
+		// milestones, and account summaries keep full-result values;
+		// only rows (plus history events/evaluations) are sliced.
+		filtered.Evaluations = types.EvaluationResultTables{
+			FinancialIndependence: []types.EvaluationResultEnvelope{},
+			NetWorthThreshold:     []types.EvaluationResultEnvelope{},
+			AccountBalance:        []types.EvaluationResultEnvelope{},
+			PostingFulfillment:    []types.EvaluationResultEnvelope{},
+			CycleFulfillment:      []types.EvaluationResultEnvelope{},
+			PlannedPurchases:      []types.EvaluationResultEnvelope{},
+		}
+		return &filtered
+	}
+	rows := make([]types.ProjectionRow, 0, len(result.Timeline.Rows))
+	for _, row := range result.Timeline.Rows {
+		if !row.IsHistorical {
+			rows = append(rows, row)
+		}
+	}
+	filtered.Timeline.Rows = rows
+	return &filtered
 }
