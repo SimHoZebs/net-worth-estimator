@@ -66,12 +66,19 @@ export function useResourceSession() {
 		const check: Verification = { controller: new AbortController() };
 		verification.current = check;
 		const { signal } = check.controller;
-		const pending = suspendResourceScope();
+		const previous = owner.current;
 		const apiBaseUrl = getApiBaseUrl();
-		suspendWorkspaceForVerification();
+		// Stale-while-revalidate: the first check fails closed, but later
+		// rechecks keep the verified scope, workspace, and query results
+		// mounted until discovery proves the owner changed or denies access.
+		// Suspending upfront wiped the UI on every focus event and on
+		// transient outages, which flickered and hid usable data.
+		const pending = previous ? null : suspendResourceScope();
+		if (!previous) suspendWorkspaceForVerification();
 		check.pending = (async () => {
 			try {
-				await cancelResourceQueries();
+				if (!previous) await cancelResourceQueries();
+				else await Promise.resolve();
 				if (signal.aborted) return;
 				const next = {
 					session: await discoverSession(signal, apiBaseUrl),
@@ -88,19 +95,83 @@ export function useResourceSession() {
 					signingOut.current.checkedSession = next;
 					return;
 				}
-				const previous = owner.current;
 				const input = sessionScopeInput(next.session, apiBaseUrl);
 				const changed =
 					!previous ||
 					resourceScopeKey(
 						sessionScopeInput(previous.session, previous.apiBaseUrl),
 					) !== resourceScopeKey(input);
-				if (changed) {
-					resetWorkspaceForResource({
-						preserveVolatile: !!previous && sameOwner(previous, next),
-					});
-					await clearResourceQueryCache();
+				if (!previous) {
+					if (changed) {
+						resetWorkspaceForResource({
+							preserveVolatile: !!previous && sameOwner(previous, next),
+						});
+						await clearResourceQueryCache();
+					}
+					if (signal.aborted) return;
+					if (!next.session.allowed) {
+						owner.current = next;
+						setSession(next.session);
+						setStatus({
+							phase: "denied",
+							error: "This account does not have access to this plan.",
+						});
+						return;
+					}
+					const verified = acceptResourceScope(input, pending!);
+					if (
+						!verified ||
+						!(await hydrateFinancialPreferences(verified)) ||
+						signal.aborted
+					)
+						return;
+					owner.current = next;
+					setSession(next.session);
+					setStatus({ phase: "ready", error: "" });
+					if (changed) announceSessionChange();
+					return;
 				}
+				if (!changed) {
+					if (!next.session.allowed) {
+						suspendResourceScope();
+						suspendWorkspaceForVerification();
+						await cancelResourceQueries();
+						if (signal.aborted) return;
+						const activeLogout = signingOut.current as LogoutAttempt | null;
+						if (activeLogout) {
+							activeLogout.checkedSession = next;
+							return;
+						}
+						resetWorkspaceForResource({ preserveVolatile: true });
+						await clearResourceQueryCache();
+						if (signal.aborted) return;
+						owner.current = next;
+						setSession(next.session);
+						setStatus({
+							phase: "denied",
+							error: "This account does not have access to this plan.",
+						});
+						return;
+					}
+					if (signal.aborted) return;
+					owner.current = next;
+					setSession(next.session);
+					setStatus({ phase: "ready", error: "" });
+					return;
+				}
+				const hardPending = suspendResourceScope();
+				suspendWorkspaceForVerification();
+				await cancelResourceQueries();
+				if (signal.aborted) return;
+				const activeLogout = signingOut.current as LogoutAttempt | null;
+				if (activeLogout) {
+					activeLogout.checkedSession = next;
+					return;
+				}
+				resetWorkspaceForResource({
+					preserveVolatile: sameOwner(previous, next),
+				});
+				await clearResourceQueryCache();
 				if (signal.aborted) return;
 				if (!next.session.allowed) {
 					owner.current = next;
@@ -111,7 +182,7 @@ export function useResourceSession() {
 					});
 					return;
 				}
-				const verified = acceptResourceScope(input, pending);
+				const verified = acceptResourceScope(input, hardPending);
 				if (
 					!verified ||
 					!(await hydrateFinancialPreferences(verified)) ||
@@ -121,7 +192,7 @@ export function useResourceSession() {
 				owner.current = next;
 				setSession(next.session);
 				setStatus({ phase: "ready", error: "" });
-				if (changed) announceSessionChange();
+				announceSessionChange();
 			} catch (cause) {
 				if (signal.aborted) return;
 				check.error =
@@ -136,7 +207,11 @@ export function useResourceSession() {
 		return check.pending;
 	}, []);
 	const refresh = useCallback(() => {
-		setStatus({ phase: "checking", error: "" });
+		// Background revalidation keeps the verified workspace mounted.
+		// Only the first check (no owner yet) uses the full-screen
+		// checking state; later checks stay silent until discovery proves
+		// a new owner, a denial, or an outage that keeps stale data visible.
+		if (!owner.current) setStatus({ phase: "checking", error: "" });
 		return verify();
 	}, [verify]);
 

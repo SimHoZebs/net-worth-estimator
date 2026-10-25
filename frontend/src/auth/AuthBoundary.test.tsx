@@ -275,4 +275,44 @@ describe("provider-independent authentication boundary", () => {
 			expect(screen.getByText("Private workspace")).toBeTruthy(),
 		);
 	});
+	it("keeps a verified workspace mounted behind a retry banner on a transient outage", async () => {
+		const fetcher = vi.fn(async () =>
+			status({
+				enabled: true,
+				authenticated: true,
+				allowed: true,
+				resource: privateResource,
+				user: { subject: "known-account", name: "User" },
+			}),
+		);
+		vi.stubGlobal("fetch", fetcher);
+		render(
+			<AuthBoundary>
+				<p>Private workspace</p>
+			</AuthBoundary>,
+		);
+		expect(await screen.findByText("Private workspace")).toBeTruthy();
+		fetcher.mockImplementationOnce(async () => status({}, 503));
+		fireEvent(window, new Event("focus"));
+		expect(await screen.findByRole("alert")).toBeTruthy();
+		expect(screen.getByText("Private workspace")).toBeTruthy();
+		expect(
+			screen.getByRole("button", { name: "Retry access check" }),
+		).toBeTruthy();
+		expect(
+			screen.queryByRole("heading", { name: "Session access is unavailable" }),
+		).toBeNull();
+		fetcher.mockImplementation(async () =>
+			status({
+				enabled: true,
+				authenticated: true,
+				allowed: true,
+				resource: privateResource,
+				user: { subject: "known-account", name: "User" },
+			}),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Retry access check" }));
+		await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+		expect(screen.getByText("Private workspace")).toBeTruthy();
+	});
 });

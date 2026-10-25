@@ -71,10 +71,14 @@ API clients retain their verification scope. A new verification creates new
 clients, while old clients reject further calls before network access. Evaluation
 pins and financial preferences also reset and reload within the verified scope.
 One browser session hook owns verification, account transitions, and logout.
-Rechecks suspend requests and hide financial screens immediately. Same-account
-rechecks preserve drafts and completed projection results. Account, API address,
-or permission changes reset active workspace data. Failed checks retain recovery
-data behind the previous account boundary until that account is verified again.
+Rechecks keep the verified workspace mounted while discovery runs. Same-account
+rechecks preserve drafts and completed projection results without flicker.
+Account, API address, or permission changes reset active workspace data only
+after the new resource is verified, then the workspace swaps to the new owner.
+Failed checks keep the verified workspace mounted behind a retry banner instead
+of wiping the UI; recovery data stays behind the previous account boundary
+until that account is verified again. Only an explicit denial or a first load
+without a verified session takes over the full screen.
 
 ## Deployment and migration
 

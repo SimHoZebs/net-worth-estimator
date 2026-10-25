@@ -22,11 +22,44 @@ export function AuthBoundary({ children }: { children: ReactNode }) {
 			redirectToSignIn();
 		}
 	}, [phase, session]);
-	if (phase === "ready" && session?.allowed)
+	// Stale-while-revalidate: a verified workspace stays mounted while a
+	// later check runs or fails transiently. Only an explicit denial or a
+	// first load without any verified session takes over the full screen.
+	// Transient outages keep usable data visible behind a retry banner
+	// instead of wiping the UI with "Session access is unavailable".
+	if (session?.allowed)
 		return (
 			<SessionContext
-				value={{ session, logout, logoutPending, logoutError: error }}
+				value={{
+					session,
+					logout,
+					logoutPending,
+					// The banner owns unavailable errors; passing them through
+					// as logout errors would announce the same failure twice.
+					logoutError: phase === "unavailable" ? "" : error,
+				}}
 			>
+				{phase === "unavailable" && (
+					<div className="mx-auto max-w-5xl px-6 pt-4">
+						<div
+							role="alert"
+							className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-surface border border-solid border-danger-border bg-danger-bg px-4 py-3 text-xs leading-relaxed text-danger-text"
+						>
+							<span className="min-w-0 flex-1">
+								Session check failed{error ? `: ${error}` : "."} Your workspace
+								is unchanged.
+							</span>
+							<Button
+								size="sm"
+								onClick={() => {
+									void refresh();
+								}}
+							>
+								Retry access check
+							</Button>
+						</div>
+					</div>
+				)}
 				{children}
 			</SessionContext>
 		);
