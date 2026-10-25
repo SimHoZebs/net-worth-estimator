@@ -330,6 +330,17 @@ export function selectDraftChangeCount(state: WorkspaceData): number {
 	return changesBetween({ saved: state.workspace.saved, current: plan }).length;
 }
 
+/** Single edit-gating reader so views do not recompute the status, write-block,
+ * and effective-plan flags. Unreachable null-plan differences are preserved:
+ * every current reader only renders it when a plan is loaded. */
+export function selectIsReadOnly(state: WorkspaceData): boolean {
+	return (
+		(state.status?.readOnly ?? false) ||
+		state.writeBlocked ||
+		(selectPlan(state)?.readOnly ?? state.status?.readOnly ?? true)
+	);
+}
+
 interface WorkspaceActions {
 	bindEngine: (client: RemoteApiClient | null) => void;
 	bootWorkspace: () => void;
