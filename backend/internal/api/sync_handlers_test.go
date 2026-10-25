@@ -61,7 +61,7 @@ func TestSyncTriggerReadOnlyPolicy(t *testing.T) {
 	}
 }
 
-func TestSyncTriggerRunsDryRunAndGuardsInterval(t *testing.T) {
+func TestSyncTriggerRunsAndGuardsInterval(t *testing.T) {
 	bridge := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(syncTriggerFixture))
@@ -82,7 +82,6 @@ func TestSyncTriggerRunsDryRunAndGuardsInterval(t *testing.T) {
 	runner := simplefin.NewRunner(database, simplefin.Config{
 		AccessURL:    bridge.URL,
 		CardAccounts: map[string]struct{}{"prime_card": {}},
-		DryRun:       true,
 	}, &simplefin.Client{AccessURL: bridge.URL})
 	handler := New(database, Config{SyncRunner: runner})
 
@@ -101,12 +100,11 @@ func TestSyncTriggerRunsDryRunAndGuardsInterval(t *testing.T) {
 		CheckpointsInserted int            `json:"checkpointsInserted"`
 		PendingInserted     int            `json:"pendingInserted"`
 		Skipped             map[string]int `json:"skipped"`
-		DryRun              bool           `json:"dryRun"`
 	}
 	if err := json.Unmarshal(first.Body.Bytes(), &summary); err != nil {
 		t.Fatalf("decode summary: %v", err)
 	}
-	if summary.CheckpointsInserted != 2 || summary.PendingInserted != 1 || !summary.DryRun {
+	if summary.CheckpointsInserted != 2 || summary.PendingInserted != 1 {
 		t.Fatalf("summary = %+v", summary)
 	}
 

@@ -1,9 +1,7 @@
--- SimpleFIN sync cutover purge (mock interlude).
+-- SimpleFIN sync purge.
 --
--- Intent: mock and real sync rows are intentionally identical
--- (source 'simplefin', opaque UUIDs), so selective mock-only deletion
--- is impossible by design. This script removes ALL sync-owned rows; the
--- first real sync re-inserts fresh checkpoints and the pending snapshot.
+-- Intent: removes ALL sync-owned rows; the
+-- next sync re-inserts fresh checkpoints and the pending snapshot.
 -- Owner rows (source 'model') are untouched: model saves already protect
 -- them via strip-and-merge, and the sync never writes them.
 --
@@ -13,8 +11,8 @@
 --   3. Preview what will go (uncomment the SELECTs below).
 --   4. Run this transaction against the current schema, e.g.:
 --        sqlite3 "$NET_WORTH_ESTIMATOR_DB" < backend/scripts/purge-simplefin-sync.sql
---   5. Unset NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK, set the real access URL +
---      Access URL, restart, then POST /v1/sync/simplefin (dry-run first).
+--   5. Set the real access URL +
+--      Access URL, restart, then POST /v1/sync/simplefin.
 --
 -- Note: this script was tested through equivalent sqlite execution, not the
 -- sqlite3 CLI itself; run step 4 verbatim once on a machine with sqlite3

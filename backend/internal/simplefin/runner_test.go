@@ -103,9 +103,7 @@ func TestSyncSkipsStaleLinksWithoutWriting(t *testing.T) {
 func TestTriggerGuardsInterval(t *testing.T) {
 	database := openRunnerStore(t)
 	calls := 0
-	runner := NewRunner(database, Config{
-		DryRun: true,
-	}, nil)
+	runner := NewRunner(database, Config{}, nil)
 	runner.fetch = func(ctx context.Context, start, end time.Time) (*AccountSet, error) {
 		calls++
 		return &AccountSet{}, nil
@@ -127,9 +125,7 @@ func TestTriggerGuardsInterval(t *testing.T) {
 func TestTriggerRetriesAfterFailure(t *testing.T) {
 	database := openRunnerStore(t)
 	calls := 0
-	runner := NewRunner(database, Config{
-		DryRun: true,
-	}, nil)
+	runner := NewRunner(database, Config{}, nil)
 	runner.fetch = func(ctx context.Context, start, end time.Time) (*AccountSet, error) {
 		calls++
 		if calls == 1 {
@@ -153,9 +149,7 @@ func TestTriggerRefusesConcurrentRun(t *testing.T) {
 	database := openRunnerStore(t)
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	runner := NewRunner(database, Config{
-		DryRun: true,
-	}, nil)
+	runner := NewRunner(database, Config{}, nil)
 	runner.fetch = func(ctx context.Context, start, end time.Time) (*AccountSet, error) {
 		close(entered)
 		select {
@@ -201,19 +195,7 @@ func TestSyncRecordsLastSyncTime(t *testing.T) {
 	}
 }
 
-func TestDryRunAndFailedSyncsDoNotRecordSyncTime(t *testing.T) {
-	dryRunStore := openRunnerStore(t)
-	dryRunner := NewRunner(dryRunStore, Config{DryRun: true}, nil)
-	dryRunner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
-		return &AccountSet{}, nil
-	}
-	if _, err := dryRunner.Sync(context.Background()); err != nil {
-		t.Fatalf("dry-run sync: %v", err)
-	}
-	if got, err := dryRunStore.GetLastSyncTime(); err != nil || got != "" {
-		t.Fatalf("dry-run last sync = %q, err %v, want empty", got, err)
-	}
-
+func TestFailedSyncsDoNotRecordSyncTime(t *testing.T) {
 	failedStore := openRunnerStore(t)
 	failedRunner := NewRunner(failedStore, Config{}, nil)
 	failedRunner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
@@ -245,7 +227,6 @@ func TestTriggerHonorsConfiguredInterval(t *testing.T) {
 	database := openRunnerStore(t)
 	calls := 0
 	runner := NewRunner(database, Config{
-		DryRun:             true,
 		MinTriggerInterval: time.Hour,
 	}, nil)
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
@@ -282,7 +263,6 @@ func TestTriggerBacksOffAfterBridgeRateLimit(t *testing.T) {
 	database := openRunnerStore(t)
 	calls := 0
 	runner := NewRunner(database, Config{
-		DryRun:             true,
 		MinTriggerInterval: time.Millisecond,
 		RateLimitCooldown:  200 * time.Millisecond,
 	}, nil)
@@ -327,7 +307,7 @@ func TestSyncSharesSingleflightWithTrigger(t *testing.T) {
 	database := openRunnerStore(t)
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	runner := NewRunner(database, Config{DryRun: true}, nil)
+	runner := NewRunner(database, Config{}, nil)
 	runner.fetch = func(ctx context.Context, start, end time.Time) (*AccountSet, error) {
 		close(entered)
 		select {
@@ -358,7 +338,6 @@ func TestSyncHonorsRateLimitBlackout(t *testing.T) {
 	database := openRunnerStore(t)
 	calls := 0
 	runner := NewRunner(database, Config{
-		DryRun:             true,
 		MinTriggerInterval: time.Millisecond,
 		RateLimitCooldown:  time.Hour,
 	}, nil)

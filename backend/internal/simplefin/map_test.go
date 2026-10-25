@@ -132,9 +132,3 @@ func TestMapPreservesExactUpstreamTransactionKeys(t *testing.T) {
 		}
 	}
 }
-
-func TestParseDryRunStrict(t *testing.T) {
-	if !ParseDryRun("1") || ParseDryRun("true") || ParseDryRun("") {
-		t.Fatal("dry run must accept only 1")
-	}
-}

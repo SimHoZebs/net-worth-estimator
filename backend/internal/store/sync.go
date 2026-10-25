@@ -195,13 +195,12 @@ type SyncCheckpoint struct {
 
 // SyncApplySummary counts applied sync rows.
 type SyncApplySummary struct {
-	CheckpointsInserted int  `json:"checkpointsInserted"`
-	CheckpointsUpdated  int  `json:"checkpointsUpdated"`
-	CheckpointsSkipped  int  `json:"checkpointsSkipped"`
-	PendingDeleted      int  `json:"pendingDeleted"`
-	PendingInserted     int  `json:"pendingInserted"`
-	PendingUpdated      int  `json:"pendingUpdated"`
-	DryRun              bool `json:"dryRun"`
+	CheckpointsInserted int `json:"checkpointsInserted"`
+	CheckpointsUpdated  int `json:"checkpointsUpdated"`
+	CheckpointsSkipped  int `json:"checkpointsSkipped"`
+	PendingDeleted      int `json:"pendingDeleted"`
+	PendingInserted     int `json:"pendingInserted"`
+	PendingUpdated      int `json:"pendingUpdated"`
 }
 
 // SyncProvision is one bridge account needing link resolution: an
@@ -219,9 +218,8 @@ type SyncProvision struct {
 // and unknown accounts get a provisioned account plus an auto link.
 // A link whose model account no longer exists resolves to nothing and
 // is reported stale: no checkpoints are written for it, nothing is
-// auto-recreated, and the link stays for relinking. dryRun rolls
-// everything back and still returns the resolved map.
-func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision, dryRun bool) (map[string]string, int, []string, error) {
+// auto-recreated, and the link stays for relinking.
+func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]string, int, []string, error) {
 	resolved := map[string]string{}
 	var stale []string
 	provisioned := 0
@@ -258,9 +256,6 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision, dryRun bool) 
 		}
 		resolved[item.BridgeID] = modelAccountID
 	}
-	if dryRun {
-		return resolved, provisioned, stale, nil
-	}
 	if err := tx.Commit(); err != nil {
 		return nil, 0, nil, fmt.Errorf("provision commit: %w", err)
 	}
@@ -270,11 +265,9 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision, dryRun bool) 
 // ApplySyncPlan upserts sync checkpoints and refreshes pending seed postings
 // in one transaction. Owner rows always win key conflicts. Pending rows are
 // snapshot-scoped per card account. Exact provider keys preserve UUIDs across
-// refreshes; only missing pending rows are deleted. With dryRun the
-// transaction rolls back and only counts are returned.
-func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []SyncPosting, cardAccounts []string, dryRun bool) (SyncApplySummary, error) {
+// refreshes; only missing pending rows are deleted.
+func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []SyncPosting, cardAccounts []string) (SyncApplySummary, error) {
 	var summary SyncApplySummary
-	summary.DryRun = dryRun
 	tx, err := s.db.Begin()
 	if err != nil {
 		return summary, fmt.Errorf("sync begin: %w", err)
@@ -327,9 +320,6 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []Sync
 		return summary, err
 	}
 
-	if dryRun {
-		return summary, nil
-	}
 	if err := tx.Commit(); err != nil {
 		return summary, fmt.Errorf("sync commit: %w", err)
 	}

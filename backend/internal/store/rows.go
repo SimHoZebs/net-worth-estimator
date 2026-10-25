@@ -845,7 +845,7 @@ func (s *sqliteStore) DeleteAccountLink(bridgeAccountID string) error {
 
 // EnsureLinkedAccount resolves a bridge account to a model account,
 // provisioning both the account and an auto link when unknown. It runs
-// inside the caller's sync transaction so dry-run rolls everything back.
+// inside the caller's sync transaction so errors roll everything back.
 func EnsureLinkedAccount(tx *sql.Tx, bridgeAccountID, bridgeName, currency string, kind types.AccountKind) (string, bool, error) {
 	var modelAccountID string
 	if err := tx.QueryRow(`SELECT model_account_id FROM account_links WHERE bridge_account_id = ?`, bridgeAccountID).Scan(&modelAccountID); err == nil {
