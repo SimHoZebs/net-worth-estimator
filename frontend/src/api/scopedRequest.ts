@@ -137,9 +137,6 @@ export async function scopedRequest(
 	fetcher: FetchLike,
 	scope: ResourceScope,
 ): Promise<ScopedResponse | ResourceScopeError> {
-	// Canceled workspace work stays canceled, even if the same plan is active again.
-	const changed = responseScopeError(scope);
-	if (changed) return changed;
 	if (scope.status === "pending" || !scope.resource)
 		return new ResourceScopeError(
 			"Verify your session before requesting workspace data.",
@@ -148,6 +145,20 @@ export async function scopedRequest(
 		return new ResourceScopeError(
 			"The API address does not match the verified workspace.",
 		);
+	const current = getResourceScope();
+	if (scope !== current) {
+		// Retired same-plan work stays retired. The server cannot tell it
+		// apart (same plan ID, same cookie), so block it before network access.
+		// A signed-out browser has no verified workspace: fail fast.
+		if (
+			current.status === "pending" ||
+			!current.resource ||
+			current.resource.id === scope.resource.id
+		)
+			return new ResourceScopeError();
+		// Different plan: send the pinned original ID and let the backend
+		// reject with 409 RESOURCE_CHANGED. Never retarget the header.
+	}
 	const lifetime = requestLifetime(scope, init.signal);
 	const headers = new Headers(init.headers);
 	// The assertion always comes from discovery, never caller-supplied options.
