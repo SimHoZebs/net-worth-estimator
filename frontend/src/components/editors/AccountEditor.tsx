@@ -1,7 +1,6 @@
 import { useId } from "react";
 import type { Account } from "../../domain/model.ts";
 import { parseUnion } from "../../domain/guards.ts";
-import { upsertItem } from "../../domain/planEdits.ts";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
 import { Badge } from "../Badge.tsx";
 import {
@@ -10,6 +9,11 @@ import {
 	sourceReadOnlyReason,
 } from "./EditorForm.tsx";
 import { numberValue, textValue } from "./formValues.ts";
+import {
+	newAccountId,
+	preservedAccountMeta,
+	upsertAccount,
+} from "./accountFields.ts";
 
 export function AccountEditor({
 	item,
@@ -23,8 +27,9 @@ export function AccountEditor({
 			title={`${item ? "Edit" : "Add"} account`}
 			readOnlyReason={item?.readOnly ? sourceReadOnlyReason : undefined}
 			buildPlan={(data) => {
+				const meta = preservedAccountMeta(item, plan);
 				const account: Account = {
-					id: item?.id ?? crypto.randomUUID(),
+					id: newAccountId(item),
 					name: textValue(data, "name"),
 					kind:
 						parseUnion(textValue(data, "kind"), [
@@ -34,29 +39,26 @@ export function AccountEditor({
 							"debt",
 						] as const) ?? "cash",
 					enabled: textValue(data, "enabled") === "on",
-					archived: item?.archived ?? false,
+					archived: meta.archived,
 					balance: numberValue(data, "balance"),
 					minBalance: numberValue(data, "minBalance"),
 					maxBalance: textValue(data, "maxBalance")
 						? numberValue(data, "maxBalance")
 						: null,
-					color: item?.color ?? null,
+					color: meta.color,
 					// The observation date is system-owned (projection start
 					// or the latest checkpoint). It is never read from the
 					// form; the stored value is preserved so the balance
 					// keeps its observation date.
-					observedOn: item?.observedOn ?? plan.startDate,
+					observedOn: meta.observedOn,
 					balanceCheck: item?.balanceCheck ?? true,
 					// Source is display provenance only (e.g. "Manual entry",
 					// "Backend checkpoint"). It is never read from the form;
 					// the stored value is preserved so user edits cannot change it.
-					source: item?.source ?? "Manual entry",
+					source: meta.source,
 					readOnly: false,
 				};
-				return {
-					...plan,
-					accounts: upsertItem({ items: plan.accounts, item: account }),
-				};
+				return upsertAccount(plan, account);
 			}}
 		>
 			<InputField
