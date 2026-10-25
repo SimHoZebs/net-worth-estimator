@@ -10,10 +10,17 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetUiStore, useUiStore } from "../state/uiStore.ts";
 import {
+	acceptResourceScope,
+	canonicalApiBaseUrl,
+	suspendResourceScope,
+} from "../auth/resourceScope.ts";
+import { resetNotifications } from "../state/notifications.ts";
+import {
 	resetWorkspaceStore,
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
 import { testPlan } from "../test/plan.ts";
+import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import {
 	WorkspaceNotices,
 	WorkspaceNotification,
@@ -21,9 +28,8 @@ import {
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { ServerApp } from "./ServerApp.tsx";
 
-vi.mock("../api/index.ts", async (importOriginal) => ({
-	...(await importOriginal<typeof import("../api/index.ts")>()),
-	createApiClient: () => ({
+vi.mock("../api/scopedClients.ts", () => ({
+	defaultScopedApiClient: () => ({
 		getStatus: async () => ({ readOnly: false }),
 		getModel: async () => ({ document: null, issues: [] }),
 		listAmountPresets: async () => ({ presets: [] }),
@@ -46,6 +52,7 @@ vi.mock("../WorkspaceShell.tsx", () => ({
 			<p>Workspace screen</p>
 			<WorkspaceNotices />
 			<WorkspaceNotification />
+			<NotificationCenter />
 			<StoreReadout />
 		</>
 	),
@@ -78,6 +85,20 @@ function loadedWorkspace() {
 
 beforeEach(() => {
 	vi.stubGlobal("localStorage", { getItem: () => null, setItem: vi.fn() });
+	// ServerApp mounts the workspace without the session boundary, so verify
+	// a fixture scope first like AuthBoundary would in production.
+	acceptResourceScope(
+		{
+			apiBaseUrl: canonicalApiBaseUrl(""),
+			resource: {
+				id: `plans/${"a".repeat(64)}`,
+				kind: "private",
+				permissions: ["plan:read"],
+			},
+			subject: "test-account",
+		},
+		suspendResourceScope(),
+	);
 	vi.clearAllMocks();
 });
 
@@ -85,6 +106,7 @@ afterEach(() => {
 	cleanup();
 	resetWorkspaceStore();
 	resetUiStore();
+	resetNotifications();
 	vi.unstubAllGlobals();
 });
 
@@ -132,7 +154,10 @@ describe("ServerApp subscriptions", () => {
 		expect(useWorkspaceNavigation).toHaveBeenCalledTimes(rootRenders);
 
 		act(() =>
-			useWorkspaceStore.setState({ error: "Storage changed in another tab" }),
+			useWorkspaceStore.setState({
+				error: "Storage changed in another tab",
+				errorCode: null,
+			}),
 		);
 		expect(screen.getByText("Storage changed in another tab")).toBeTruthy();
 		expect(

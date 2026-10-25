@@ -5,13 +5,14 @@ import { parseModelDocument } from "../api/modelImport.ts";
 import { Button } from "../components/Button.tsx";
 import { Notice } from "../components/Notice.tsx";
 import { ModelImportPreview } from "../components/imports/ModelImportPreview.tsx";
-import { ErrorNotice } from "../components/ui.tsx";
+import { useErrorToast } from "../components/NotificationCenter.tsx";
 import { useFileReview } from "../state/useFileReview.ts";
 import { useServerModelImport } from "../state/useServerModelImport.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { WorkspaceTopbar } from "../workspace/WorkspaceHeader.tsx";
 import { WorkspaceLayout } from "../workspace/WorkspaceLayout.tsx";
+import { WorkspaceNotices } from "../workspace/WorkspaceNotices.tsx";
 import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar.tsx";
 
 export function ServerWorkspaceRecovery() {
@@ -24,7 +25,6 @@ export function ServerWorkspaceRecovery() {
 	);
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
 	const readOnly = statusReadOnly || writeBlocked;
-	const workspaceError = useWorkspaceStore((state) => state.error);
 	const errorCode = useWorkspaceStore((state) => state.errorCode);
 	const retry = useWorkspaceStore((state) => state.retry);
 	const importServerDocument = useWorkspaceStore(
@@ -76,18 +76,6 @@ export function ServerWorkspaceRecovery() {
 					void retry();
 				}}
 			>
-				{errorCode !== "missing-model" &&
-					!workspaceError?.includes("no financial model") && (
-						<ErrorNotice
-							message={
-								workspaceError ?? "The server workspace could not be loaded."
-							}
-							action="Retry server load"
-							onAction={() => {
-								void retry();
-							}}
-						/>
-					)}
 				{missingModel && <p>Import a reviewed model JSON file to continue.</p>}
 				{missingModel && (
 					<ServerModelImport
@@ -148,6 +136,7 @@ function ServerModelImport({
 	onChoose: () => void;
 	onFile: (file: File) => void;
 }) {
+	useErrorToast("model-import", error);
 	return (
 		<div className="mt-6 flex flex-col items-center gap-3">
 			<input
@@ -162,7 +151,6 @@ function ServerModelImport({
 					if (file) onFile(file);
 				}}
 			/>
-			{error && <ErrorNotice message={error} />}
 			<Button
 				variant="primary"
 				onClick={onChoose}
@@ -203,8 +191,8 @@ function ServerRecovery({
 			)}
 			draftBar={null}
 			overlays={null}
-			notification={null}
 		>
+			<WorkspaceNotices />
 			<div className="mx-auto my-[12vh] max-w-2xl p-6 [&_p]:mb-6">
 				<h1 className="mb-6">{title}.</h1>
 				{children}
