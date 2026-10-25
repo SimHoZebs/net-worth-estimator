@@ -82,7 +82,7 @@ func sseEvents(t *testing.T, body string) map[string][]string {
 	return out
 }
 
-func TestStochasticSSESeededLifecycleMissThenHit(t *testing.T) {
+func TestStochasticSSESeededComputedThenStored(t *testing.T) {
 	resetSharedRunsForTest()
 	t.Cleanup(resetSharedRunsForTest)
 	database := openAPIStore(t)
@@ -91,11 +91,14 @@ func TestStochasticSSESeededLifecycleMissThenHit(t *testing.T) {
 	body := stochasticTestBody(t, 4, &seed)
 
 	first := postStochastic(t, handler, body)
+	if got := first.Header().Get("Cache-Status"); got != "" {
+		t.Fatalf("obsolete Cache-Status header = %q", got)
+	}
 	if first.Code != http.StatusOK {
 		t.Fatalf("first status = %d, body %s", first.Code, first.Body.String())
 	}
-	if got := first.Header().Get("Cache-Status"); got != cacheStatusMiss {
-		t.Fatalf("first Cache-Status = %q, want miss", got)
+	if got := first.Header().Get("Projection-Source"); got != projectionSourceComputed {
+		t.Fatalf("first Projection-Source = %q, want computed", got)
 	}
 	events := sseEvents(t, first.Body.String())
 	if len(events["result"]) != 1 {
@@ -103,11 +106,11 @@ func TestStochasticSSESeededLifecycleMissThenHit(t *testing.T) {
 	}
 
 	second := postStochastic(t, handler, body)
-	if got := second.Header().Get("Cache-Status"); got != cacheStatusHit {
-		t.Fatalf("second Cache-Status = %q, want hit", got)
+	if got := second.Header().Get("Projection-Source"); got != projectionSourceStored {
+		t.Fatalf("second Projection-Source = %q, want stored", got)
 	}
 	if sseEvents(t, second.Body.String())["result"][0] != events["result"][0] {
-		t.Fatalf("cached result differs from computed result")
+		t.Fatalf("stored result differs from computed result")
 	}
 }
 
@@ -144,8 +147,8 @@ func TestStochasticSSEAttachJoinsInFlightRun(t *testing.T) {
 	}
 
 	second := postStochastic(t, handler, body)
-	if got := second.Header().Get("Cache-Status"); got != cacheStatusMiss {
-		t.Fatalf("second Cache-Status = %q, want miss", got)
+	if got := second.Header().Get("Projection-Source"); got != projectionSourceShared {
+		t.Fatalf("second Projection-Source = %q, want shared", got)
 	}
 	secondEvents := sseEvents(t, second.Body.String())
 	if len(secondEvents["partial"]) == 0 {
@@ -156,6 +159,9 @@ func TestStochasticSSEAttachJoinsInFlightRun(t *testing.T) {
 	}
 
 	first := <-firstDone
+	if got := first.Header().Get("Projection-Source"); got != projectionSourceComputed {
+		t.Fatalf("owner Projection-Source = %q, want computed", got)
+	}
 	firstEvents := sseEvents(t, first.Body.String())
 	if len(firstEvents["result"]) != 1 {
 		t.Fatalf("owner stream has %d result events", len(firstEvents["result"]))
@@ -177,8 +183,8 @@ func TestStochasticSSEUnseededBypassesRegistry(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, body %s", response.Code, response.Body.String())
 	}
-	if got := response.Header().Get("Cache-Status"); got != cacheStatusMiss {
-		t.Fatalf("Cache-Status = %q, want miss", got)
+	if got := response.Header().Get("Projection-Source"); got != projectionSourceComputed {
+		t.Fatalf("Projection-Source = %q, want computed", got)
 	}
 	if len(sseEvents(t, response.Body.String())["result"]) != 1 {
 		t.Fatalf("unseeded response has no result event, body %s", response.Body.String())

@@ -94,9 +94,9 @@ Resolution rules:
 - `overrides` are applied by `types.ApplyModelOverrides` to a new document value; stored state is unchanged.
 - `range` selects response dates inclusively and is required: a missing range fails request validation (422), and an empty, malformed, or inverted range returns 400. Either bound may be omitted for an open end. Only timeline rows and movement events are filtered. Evaluations, totals, summary, milestones, and account summaries retain complete-result values, even for history-only or empty intervals. The simulation receives no response range. The API stores the complete result before response filtering and excludes the range from artifact identity, so requests for different intervals reuse the same artifact.
 
-A successful response has `result` and `Cache-Status: waypoint; hit|miss`.
+A successful response has `result` and `Projection-Source: stored|computed`. `stored` means the backend retrieved the identified simulation result. `computed` means this request took the simulation execution path. The header does not guarantee successful completion or storage; preparation and execution errors also report `computed`.
 
-A `domain.SimulationPreparationError`, including model validation failure, returns HTTP 200 with `issues`. An unexpected execution error returns HTTP 500 with `error`. Cache read and write failures do not prevent computation.
+A `domain.SimulationPreparationError`, including model validation failure, returns HTTP 200 with `issues`. An unexpected execution error returns HTTP 500 with `error`. Result-storage read and write failures do not prevent computation.
 
 ### Stochastic projection and SSE
 
@@ -124,16 +124,19 @@ The response is `text/event-stream` with `Cache-Control: no-store`. It writes `r
 
 A `partial` result is a cumulative snapshot. A slow attached stream may skip intermediate snapshots because the next one supersedes them.
 
-`Cache-Status` semantics (RFC 9211):
+`Projection-Source` identifies where the result originates:
 
 | Value           | Meaning                                                                        |
 | --------------- | ------------------------------------------------------------------------------ |
-| `waypoint; hit` | completed seeded result loaded from SQLite; stream contains one `result` event |
-| `waypoint; miss`| this request owns a new seeded run, or an unseeded request-bound run, or attached to an identical seeded run already in progress |
+| `stored` | completed seeded result retrieved from SQLite; stream contains one `result` event |
+| `computed` | this request owns a new seeded run or an unseeded request-bound run |
+| `shared` | this request attaches to an identical seeded run in the shared-run registry |
 
-An attached seeded request receives the latest cumulative snapshot, if one exists, and then remaining events. A stream disconnect detaches only that stream. The shared seeded computation continues. Completed seeded runs are evicted from the in-process registry at completion; later reconnects use the SQLite artifact cache.
+`computed` and `shared` streams may end with an `error` event. These values describe execution origin, not successful completion or storage. `Projection-Source` replaces the former `Cache-Status` header for both projection endpoints.
 
-An unseeded run does not use the shared registry or artifact cache. Its context follows the request, so disconnect cancels computation and no result is persisted.
+An attached seeded request receives the latest cumulative snapshot, if one exists, and then remaining events. A stream disconnect detaches only that stream. The shared seeded computation continues. Completed seeded runs leave the in-process registry; later reconnects retrieve the identified result from SQLite when available.
+
+An unseeded run does not use the shared registry or result storage. Its context follows the request, so disconnect cancels computation and no result is persisted.
 
 ### SimpleFIN trigger
 
@@ -234,38 +237,38 @@ Amount presets are saved amount recipes managed through `GET /v1/amount-presets`
 
 `store.Open` upgrades the preceding schema in one transaction. It converts every
 non-UUID posting ID, rewrites amount/evaluation/preset references, preserves row
-display order, equal-time execution order, and purchase policies, and invalidates derived projection caches. Account
+display order, equal-time execution order, and purchase policies, and removes derived simulation results. Account
 and recurrence-rule IDs remain unchanged. See [the migration contract](docs/posting-identity.md).
 
 ### Artifact durability
 
 Completed deterministic results and completed seeded stochastic results are stored in `projection_artifacts`. The table is bounded to 256 rows across both kinds; the oldest rows are evicted after insertion.
 
-Artifact writes are best-effort. A malformed stored payload is treated as a miss. A store failure fails open and the requested projection is still computed.
+Result writes are best-effort. A malformed stored payload is unavailable for retrieval. A storage failure does not prevent the requested simulation from execution.
 
-The cache is durable only when the SQLite file is durable. A container or service without persistent storage for its database loses canonical edits and artifacts on replacement.
+Stored simulation results are durable only when the SQLite file is durable. A container or service without persistent storage for its database loses canonical edits and results on replacement.
 
 ## 4. Artifact Identity
 
-`api.artifactKey` hashes a versioned descriptor with SHA-256. The identity prefix is `<kind>:1:<digest>`.
+`api.artifactKey` hashes a versioned descriptor with SHA-256. The identity format is `<kind>:<artifactIdentityVersion>:<digest>`. The serialized envelope retains the legacy `artifactCacheVersion` field name to preserve existing identities.
 
 Deterministic identity includes:
 
 - the resolved model document;
 - request overrides;
 - fallback projection start date and horizon;
-- every enabled evaluation instance ID and config, excluding evaluation labels.
+- every enabled settings evaluation instance ID and config, excluding settings evaluation labels. The complete model document also contributes its evaluation tables.
 
 Seeded stochastic identity adds the requested run count and the exact seed.
 
 Consequences:
 
 - omitting the model body still tracks saved model changes because the handler hashes the resolved stored snapshot;
-- disabled evaluation configs do not affect computation identity;
-- evaluation label-only changes do not invalidate a result;
+- disabled settings evaluation configs do not affect result identity, but model-document changes still do;
+- settings evaluation label-only changes do not change result identity, but model-document renames do;
 - a seed is part of stochastic identity;
 - unseeded stochastic runs are not content-addressed;
-- identities are backend-owned and contain no cross-runtime cache compatibility requirement.
+- result identities are backend-owned and have no cross-runtime compatibility requirement.
 
 ## 5. Model Semantics
 
@@ -512,9 +515,9 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/api/cors.go`                      | origin parsing and preflight enforcement         |
 | `backend/internal/api/model_handlers.go`            | model and status handlers                        |
 | `backend/internal/api/rows.go`                      | row create/update/delete/move and link handlers  |
-| `backend/internal/api/projection_handlers.go`       | deterministic resolution, execution, and cache   |
+| `backend/internal/api/projection_handlers.go`       | deterministic resolution, execution, and result storage |
 | `backend/internal/api/stochastic_sse.go`            | shared seeded runs and event serialization       |
-| `backend/internal/api/artifacts.go`                 | content identity and cache helpers               |
+| `backend/internal/api/artifacts.go`                 | simulation result identity and storage helpers   |
 | `backend/internal/store/store.go`                   | `Store`, `store.Open`, migrations                |
 | `backend/internal/store/model.go`                   | seed/import replacement and ordered reload       |
 | `backend/internal/store/rows.go`                    | row CRUD, ID registry, links, provisioning       |

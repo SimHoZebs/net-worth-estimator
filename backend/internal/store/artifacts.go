@@ -7,7 +7,8 @@ import (
 
 const maxArtifacts = 256
 
-// GetArtifact / PutArtifact implement the bounded artifact cache.
+// GetArtifact / PutArtifact retrieve and store completed simulation results.
+// Retention is bounded across result kinds by maxArtifacts.
 func (s *sqliteStore) GetArtifact(identity string) (string, bool, error) {
 	row := s.db.QueryRow(`SELECT payload FROM projection_artifacts WHERE identity = ?`, identity)
 	var payload string

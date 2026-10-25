@@ -263,10 +263,10 @@ curl -fsS -D /tmp/deterministic-headers \
   "$BASE_URL/v1/projections/deterministic" \
   | jq '{hasResult: (.result != null), issueCount: (.issues | length // 0), error}'
 
-grep '^Cache-Status:' /tmp/deterministic-headers
+grep -i '^Projection-Source:' /tmp/deterministic-headers
 ```
 
-Run the same request again. The second response should normally report `Cache-Status: waypoint; hit` when artifact persistence is available.
+Run the same request again. The second response should normally report `Projection-Source: stored` when result storage is available. A newly executed simulation reports `Projection-Source: computed`.
 
 Seeded stochastic request:
 
@@ -280,11 +280,11 @@ curl -fsS -N -D /tmp/stochastic-headers \
   "$BASE_URL/v1/projections/stochastic" \
   | tee /tmp/stochastic-events.sse
 
-grep '^Cache-Status:' /tmp/stochastic-headers
+grep -i '^Projection-Source:' /tmp/stochastic-headers
 grep '^event:' /tmp/stochastic-events.sse
 ```
 
-A small seeded run should terminate with one `result` event. It may include `progress` and `partial` events. Repeating the same request should produce `Cache-Status: waypoint; hit` and one `result` event. Sending `"seed": null` exercises the request-bound path; disconnecting that stream cancels its work and must not create an artifact.
+A small seeded run should terminate with one `result` event. It may include `progress` and `partial` events. Repeating the same request should produce `Projection-Source: stored` and one `result` event. A new run reports `computed`; attachment to an existing shared run reports `shared`. Sending `"seed": null` exercises the request-bound path; disconnecting that stream cancels its work and must not store a result.
 
 ## Session and Read-Only Matrix
 

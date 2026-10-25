@@ -14,8 +14,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// The range parameter clips one cached full result by date: narrowed
-// requests share the full artifact instead of computing separately.
+// The range parameter filters one stored complete result by date.
+// Requests for different intervals identify the same simulation result.
 // fullSpanRange states the whole timeline explicitly: the endpoint has
 // no default range, so tests wanting everything name a span that covers
 // any fixture.
@@ -154,20 +154,23 @@ func TestDeterministicResponseRangesShareCompleteArtifact(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	first := rangeRequest(t, handler, rangeBody(t, &projectionRange{EndDate: string(mid)}))
-	if got := first.Header().Get("Cache-Status"); got != cacheStatusMiss {
-		t.Fatalf("narrow Cache-Status = %q, want miss", got)
+	if got := first.Header().Get("Cache-Status"); got != "" {
+		t.Fatalf("obsolete Cache-Status header = %q", got)
+	}
+	if got := first.Header().Get("Projection-Source"); got != projectionSourceComputed {
+		t.Fatalf("first Projection-Source = %q, want computed", got)
 	}
 	firstResult := decodeRangeResult(t, first)
 	repeated := rangeRequest(t, handler, rangeBody(t, &projectionRange{EndDate: string(mid)}))
-	if got := repeated.Header().Get("Cache-Status"); got != cacheStatusHit {
-		t.Fatalf("repeated range Cache-Status = %q, want hit", got)
+	if got := repeated.Header().Get("Projection-Source"); got != projectionSourceStored {
+		t.Fatalf("repeated range Projection-Source = %q, want stored", got)
 	}
 	if !reflect.DeepEqual(firstResult, decodeRangeResult(t, repeated)) {
-		t.Fatal("response filtering differs between cache miss and hit")
+		t.Fatal("response filtering differs between computed and stored results")
 	}
 	second := rangeRequest(t, handler, rangeBody(t, fullSpanRange()))
-	if got := second.Header().Get("Cache-Status"); got != cacheStatusHit {
-		t.Fatalf("full Cache-Status after narrow = %q, want hit", got)
+	if got := second.Header().Get("Projection-Source"); got != projectionSourceStored {
+		t.Fatalf("full-span Projection-Source = %q, want stored", got)
 	}
 	if !reflect.DeepEqual(full, decodeRangeResult(t, second)) {
 		t.Fatal("date filtering changed the stored complete result")

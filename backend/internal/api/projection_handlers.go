@@ -12,10 +12,10 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// deterministicResultCacheVersion covers the deterministic payload shape.
-// See artifactCacheVersion in artifacts.go: bump both together so old
-// payloads never read as hits.
-const deterministicResultCacheVersion = 7
+// deterministicResultVersion covers the deterministic payload shape.
+// See artifactIdentityVersion in artifacts.go: bump both together so
+// incompatible stored results are not retrieved.
+const deterministicResultVersion = 7
 
 // domainValidate avoids importing the domain package in multiple files.
 func domainValidate(document *types.FinancialModelDocument) []types.ModelValidationIssue {
@@ -48,7 +48,7 @@ type projectionRequestBody struct {
 
 type deterministicOutput struct {
 	Status int    `json:"-"`
-	Cache  string `header:"Cache-Status"`
+	Source string `header:"Projection-Source"`
 	Body   struct {
 		Result *types.ProjectionResult      `json:"result,omitempty"`
 		Issues []types.ModelValidationIssue `json:"issues,omitempty"`
@@ -70,28 +70,27 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 	// Key the RESOLVED document so omitted fields track the
 	// stored state: a model save changes stored content and therefore the key.
 	// Response ranges stay out of the key: all ranges share the complete artifact.
-	cacheKey := s.resourceArtifactKey("deterministic", map[string]any{
-		"publicResultVersion": deterministicResultCacheVersion,
+	resultKey := s.resourceArtifactKey("deterministic", map[string]any{
+		"publicResultVersion": deterministicResultVersion,
 		"document":            document,
 		"overrides":           input.Body.Overrides,
 		"settings":            projectionSettingsDescriptor(input.Body.Settings),
 	})
-	if cached, err := lookupArtifact[types.ProjectionResult](s.store, cacheKey); err == nil && cached.hit {
+	if stored, err := lookupArtifact[types.ProjectionResult](s.store, resultKey); err == nil && stored.found {
 		// huma writes Status verbatim; leaving it zero panics the writer.
-		output := &deterministicOutput{Status: http.StatusOK, Cache: cacheStatusHit}
-		cachedCopy := cached.value
-		output.Body.Result = clipProjectionRange(&cachedCopy, input.Body.Range)
+		output := &deterministicOutput{Status: http.StatusOK, Source: projectionSourceStored}
+		output.Body.Result = clipProjectionRange(&stored.value, input.Body.Range)
 		return output, nil
 	}
-	_, prefix := parseArtifactKeyMeta(cacheKey)
-	log.Printf("deterministic recalc key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d range=%s",
+	_, prefix := parseArtifactKeyMeta(resultKey)
+	log.Printf("deterministic simulation key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d range=%s",
 		prefix, len(document.Accounts), len(document.Postings), len(document.Checkpoints),
 		input.Body.Settings.HorizonYears, formatProjectionRange(input.Body.Range))
 
 	result, err := domain.ProjectFinancialModelDocument(document, &input.Body.Settings, input.Body.Overrides, nil)
 	// huma writes this status verbatim; default to 200 and only raise it for
 	// unexpected failures.
-	output := &deterministicOutput{Status: http.StatusOK, Cache: cacheStatusMiss}
+	output := &deterministicOutput{Status: http.StatusOK, Source: projectionSourceComputed}
 	if err != nil {
 		output.Body.Error = err.Error()
 		if preparationError, ok := err.(*domain.SimulationPreparationError); ok {
@@ -103,7 +102,7 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 		output.Status = http.StatusInternalServerError
 		return output, nil
 	}
-	putArtifact(s.store, cacheKey, "deterministic", result)
+	putArtifact(s.store, resultKey, "deterministic", result)
 	output.Body.Result = clipProjectionRange(result, input.Body.Range)
 	return output, nil
 }

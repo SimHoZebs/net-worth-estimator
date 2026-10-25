@@ -13,7 +13,7 @@ import (
 const (
 	corsAllowedHeaders = "Content-Type, Waypoint-Resource"
 	corsAllowedMethods = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-	corsExposedHeaders = "Cache-Status, Retry-After"
+	corsExposedHeaders = "Projection-Source, Retry-After"
 )
 
 var allowedCORSMethods = map[string]struct{}{
