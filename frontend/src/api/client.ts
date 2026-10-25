@@ -26,7 +26,11 @@ import type {
 	StochasticProjectionResult,
 } from "./contracts.ts";
 import { getApiBaseUrl } from "./runtime.ts";
-import { responseScopeError, scopedRequest } from "./scopedRequest.ts";
+import {
+	responseScopeError,
+	scopedRequest,
+	scopedResponseError,
+} from "./scopedRequest.ts";
 
 export const DEFAULT_API_BASE_URL = "";
 export const API_PREFIX = "/v1";
@@ -197,7 +201,7 @@ function httpMessage(status: number, detail: string | null): string {
 	if (status === 403)
 		return `The server is read-only. Enable writes on the server before saving.${suffix}`;
 	if (status === 409)
-		return `The server could not start this request because it is already in progress.${suffix}`;
+		return `The request conflicts with the current server data.${suffix}`;
 	if (status === 429)
 		return `The server rate-limited this request. Wait before retrying.${suffix}`;
 	if (status === 503)
@@ -412,7 +416,7 @@ export class ApiClient {
 		const { response, scope } = scoped;
 		if (!response.ok) {
 			const error = await parseErrorResponse(response);
-			return responseScopeError(scope) ?? error;
+			return scopedResponseError(scope, error);
 		}
 		return response;
 	}
@@ -648,7 +652,7 @@ export class ApiClient {
 		const { response, scope } = scoped;
 		if (!response.ok) {
 			const error = await parseErrorResponse(response);
-			return responseScopeError(scope) ?? error;
+			return scopedResponseError(scope, error);
 		}
 		const body = await readBody(response);
 		const stale = responseScopeError(scope);

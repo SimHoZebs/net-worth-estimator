@@ -24,6 +24,7 @@ export interface HumaMetadata {
 
 export interface ProblemDetails extends HumaMetadata {
 	type?: string;
+	code?: string;
 	title?: string;
 	status?: number;
 	detail?: string;

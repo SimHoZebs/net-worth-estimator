@@ -61,7 +61,10 @@ Replacing the sample requires another explicit publication.
 `GET /v1/auth/session` returns the selected resource ID, kind, and capabilities.
 Every financial request asserts that ID in `X-Waypoint-Resource`. The backend
 derives the current resource independently and rejects missing or stale assertions
-with 409. The header does not let a caller select an arbitrary plan.
+with 409 and problem code `RESOURCE_CHANGED`. The header does not let a caller
+select an arbitrary plan. Each save retains its original plan ID. A resource-change
+error stops the save and triggers session discovery, never a retry under a new
+plan. Ordinary 409 operation conflicts do not trigger session discovery.
 
 Financial responses include the same resource header. The browser namespaces
 draft storage by resource and clears active model/projection state before a
@@ -70,6 +73,8 @@ plan. Cross-tab login and logout cannot silently retarget an old tab's write.
 API clients retain their verification scope. A new verification creates new
 clients, while old clients reject further calls before network access. Evaluation
 pins and financial preferences also reset and reload within the verified scope.
+The old-client check stops canceled work, including after the same plan returns.
+The backend alone validates access. Saves do not require a new session lookup.
 One browser session hook owns verification, account transitions, and logout.
 Rechecks keep the verified workspace mounted while discovery runs. Same-account
 rechecks preserve drafts and completed projection results without flicker.

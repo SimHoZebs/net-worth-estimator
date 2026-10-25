@@ -1,5 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { ApiClient } from "../api/client.ts";
+import { ResourceScopeError } from "../api/scopedRequest.ts";
 import { resetServerQueryCache } from "../state/serverQuery.ts";
 import { getResourceScope } from "./resourceScope.ts";
 import { useResourceSession } from "./useResourceSession.ts";
@@ -19,7 +21,10 @@ const session = {
 function response(body: unknown, status = 200) {
 	return new Response(JSON.stringify(body), {
 		status,
-		headers: { "X-Waypoint-Resource": session.resource.id },
+		headers: {
+			"content-type": "application/json",
+			"X-Waypoint-Resource": session.resource.id,
+		},
 	});
 }
 
@@ -48,6 +53,32 @@ it("keeps failed logout after a discovery outage closed without an implicit retr
 	expect(result.current.phase).toBe("unavailable");
 	expect(result.current.error).toBe("Sign-out failed. Please retry.");
 	expect(fetcher).toHaveBeenCalledTimes(3);
+});
+
+it("restores requests when resource-change discovery returns to the same plan", async () => {
+	const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+		if (String(input).endsWith("/v1/auth/session")) return response(session);
+		if (String(input).endsWith("/v1/accounts"))
+			return response({ status: 409, code: "RESOURCE_CHANGED" }, 409);
+		return response({ readOnly: false });
+	});
+	vi.stubGlobal("fetch", fetcher);
+	const { result } = renderHook(useResourceSession);
+	await waitFor(() => expect(result.current.phase).toBe("ready"));
+	const oldScope = getResourceScope();
+	const oldClient = new ApiClient();
+	await act(async () => {
+		expect(await oldClient.createAccount({} as never)).toBeInstanceOf(
+			ResourceScopeError,
+		);
+	});
+	await waitFor(() => expect(getResourceScope().status).toBe("ready"));
+	expect(result.current.phase).toBe("ready");
+	expect(getResourceScope()).not.toBe(oldScope);
+	expect(getResourceScope().resource?.id).toBe(session.resource.id);
+	expect(await new ApiClient().getStatus()).toEqual({ readOnly: false });
+	expect(await oldClient.getStatus()).toBeInstanceOf(ResourceScopeError);
+	expect(fetcher).toHaveBeenCalledTimes(4);
 });
 
 it("blocks an unverified logout redirect and recovers to the guest through an explicit check", async () => {
