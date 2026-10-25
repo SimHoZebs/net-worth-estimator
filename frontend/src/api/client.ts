@@ -22,6 +22,8 @@ import type {
 	RowDeleteResponse,
 	RowWriteResponse,
 	ServerStatus,
+	SafeSpendingSettings,
+	SafeSpendingSettingsResponse,
 	StochasticProjectionRequest,
 	StochasticProjectionResult,
 } from "./contracts.ts";
@@ -626,6 +628,22 @@ export class ApiClient {
 				{ type: evaluationType, instanceId, beforeId: beforeId ?? "" },
 				options,
 			),
+		);
+	}
+
+	getSafeSpendingSettings(): Promise<Error | SafeSpendingSettingsResponse> {
+		return this.requestJson<SafeSpendingSettingsResponse>(
+			"safe-spending-settings",
+			requestInit("GET", undefined, {}),
+		);
+	}
+
+	setSafeSpendingSettings(
+		settings: SafeSpendingSettings,
+	): Promise<Error | SafeSpendingSettingsResponse> {
+		return this.requestJson<SafeSpendingSettingsResponse>(
+			"safe-spending-settings",
+			requestInit("PUT", settings, {}),
 		);
 	}
 

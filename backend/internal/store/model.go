@@ -55,6 +55,9 @@ func deleteDocumentRows(tx *sql.Tx) error {
 }
 
 func clearDocument(tx *sql.Tx) error {
+	if _, err := tx.Exec(`DELETE FROM safe_spending_settings`); err != nil {
+		return err
+	}
 	if err := deleteDocumentRows(tx); err != nil {
 		return err
 	}

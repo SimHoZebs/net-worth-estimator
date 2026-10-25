@@ -1,5 +1,7 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
+import { ApiClient } from "../api/client.ts";
+import type { SafeSpendingSettingsResponse } from "../api/contracts.ts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	deterministicQueryKey,
@@ -15,16 +17,12 @@ import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import { resetNotifications } from "../state/notifications.ts";
 import { getResourceScope, suspendResourceScope } from "./resourceScope.ts";
 import { useSession } from "./sessionContext.ts";
-import {
-	appLocalStorage,
-	clearPersistedMemory,
-	SAFE_SPENDING_STORAGE_KEY,
-} from "../state/persisted.ts";
+import { clearPersistedMemory } from "../state/persisted.ts";
 import {
 	defaultSafeSpendingSettings,
 	useSafeSpendingSettings,
 } from "../state/useSafeSpendingSettings.ts";
-import { canonicalApiBaseUrl, resourceStorageKey } from "./resourceScope.ts";
+import { canonicalApiBaseUrl } from "./resourceScope.ts";
 
 const A = `plans/${"a".repeat(64)}`;
 const B = `plans/${"b".repeat(64)}`;
@@ -85,6 +83,12 @@ function renderWorkspace() {
 }
 
 beforeEach(() => {
+	vi.spyOn(ApiClient.prototype, "getSafeSpendingSettings").mockResolvedValue({
+		settings: null,
+	});
+	vi.spyOn(ApiClient.prototype, "setSafeSpendingSettings").mockImplementation(
+		async (settings) => ({ settings }),
+	);
 	vi.stubGlobal("BroadcastChannel", undefined);
 	suspendResourceScope();
 	clearPersistedMemory();
@@ -103,23 +107,14 @@ afterEach(() => {
 
 describe("authentication resource isolation", () => {
 	it("waits for resource-owned financial preferences before mounting children", async () => {
-		const key = resourceStorageKey(SAFE_SPENDING_STORAGE_KEY, {
-			status: "ready",
-			key: "fixture",
-			apiBaseUrl: canonicalApiBaseUrl(""),
-			resource: { id: A, kind: "private", permissions: ["plan:read"] },
-			subject: A,
-		});
-		let finish: (raw: string) => void = () => {};
-		const getItem = appLocalStorage.getItem;
+		let finish: (value: SafeSpendingSettingsResponse) => void = () => {};
 		const read = vi
-			.spyOn(appLocalStorage, "getItem")
-			.mockImplementation((name) =>
-				name === key
-					? new Promise<string>((resolve) => {
-							finish = resolve;
-						})
-					: getItem(name),
+			.mocked(ApiClient.prototype.getSafeSpendingSettings)
+			.mockImplementationOnce(
+				() =>
+					new Promise((resolve) => {
+						finish = resolve;
+					}),
 			);
 		vi.stubGlobal(
 			"fetch",
@@ -130,15 +125,16 @@ describe("authentication resource isolation", () => {
 				<FinancialPreferencesProbe />
 			</AuthBoundary>,
 		);
-		await waitFor(() => expect(read).toHaveBeenCalledWith(key));
+		await waitFor(() => expect(read).toHaveBeenCalledOnce());
 		expect(screen.queryByTestId("financial-preferences")).toBeNull();
 		await act(async () =>
-			finish(
-				JSON.stringify({
-					state: { reserve: 123, incomeRuleIds: ["private-a-income"] },
-					version: 4,
-				}),
-			),
+			finish({
+				settings: {
+					...defaultSafeSpendingSettings(),
+					reserve: 123,
+					incomeRuleIds: ["private-a-income"],
+				},
+			}),
 		);
 		expect(
 			(await screen.findByTestId("financial-preferences")).textContent,

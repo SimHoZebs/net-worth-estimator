@@ -146,7 +146,7 @@ func TestGuestComputeAndFutureWriteBoundary(t *testing.T) {
 		{"GET", "/v1/accounts", 204}, {"HEAD", "/v1/financial-model", 204},
 		{"POST", "/v1/projections/deterministic", 204}, {"POST", "/v1/projections/stochastic", 204},
 		{"POST", "/v1/future-write", 401}, {"PATCH", "/v1/accounts/a", 401},
-		{"DELETE", "/v1/accounts/a", 401}, {"PUT", "/v1/pinned-evaluations", 401},
+		{"DELETE", "/v1/accounts/a", 401}, {"PUT", "/v1/pinned-evaluations", 401}, {"PUT", "/v1/safe-spending-settings", 401},
 	} {
 		rq, _ := http.NewRequest(test.method, server.URL+test.path, nil)
 		r, err := testClient(t).Do(rq)

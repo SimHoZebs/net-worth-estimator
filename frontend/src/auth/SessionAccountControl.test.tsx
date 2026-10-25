@@ -7,6 +7,7 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiClient } from "../api/client.ts";
 import { resetServerQueryCache } from "../state/serverQuery.ts";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import { resetNotifications } from "../state/notifications.ts";
@@ -63,7 +64,15 @@ function renderAccount() {
 	);
 }
 
-beforeEach(() => vi.stubGlobal("BroadcastChannel", undefined));
+beforeEach(() => {
+	vi.stubGlobal("BroadcastChannel", undefined);
+	vi.spyOn(ApiClient.prototype, "getSafeSpendingSettings").mockResolvedValue({
+		settings: null,
+	});
+	vi.spyOn(ApiClient.prototype, "setSafeSpendingSettings").mockImplementation(
+		async (settings) => ({ settings }),
+	);
+});
 
 afterEach(() => {
 	cleanup();
@@ -71,6 +80,7 @@ afterEach(() => {
 	resetNotifications();
 	vi.unstubAllGlobals();
 	vi.clearAllMocks();
+	vi.restoreAllMocks();
 	window.history.replaceState(null, "", "/");
 });
 

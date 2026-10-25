@@ -66,6 +66,10 @@ func (s *sqliteStore) ensureSchema() error {
 
 func schemaStatements() []string {
 	return []string{
+		`CREATE TABLE IF NOT EXISTS safe_spending_settings (
+			id INTEGER PRIMARY KEY CHECK (id = 1),
+			settings_json TEXT NOT NULL
+		)`,
 		`CREATE TABLE IF NOT EXISTS accounts (
 			id TEXT PRIMARY KEY,
 			position INTEGER NOT NULL,
@@ -327,6 +331,7 @@ func expectedSchemaTables() []string {
 		"entity_ids",
 		"account_links",
 		"pinned_evaluations",
+		"safe_spending_settings",
 		"sync_state",
 		"amount_presets",
 	}
