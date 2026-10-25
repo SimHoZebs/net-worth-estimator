@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import type { EvaluationTables } from "../api/contracts.ts";
 import type { Projection } from "../domain/result.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { ErrorNotice, ProjectionUpdating } from "./ui.tsx";
+import { ErrorNotice } from "./ErrorNotice.tsx";
+import { ProjectionUpdating } from "./ProjectionUpdating.tsx";
 
 // Pages that need only base-case evidence share calculation state and recovery.
 // Consumers can keep prior evidence visible or require a current result.

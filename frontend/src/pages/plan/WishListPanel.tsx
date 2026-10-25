@@ -9,7 +9,7 @@ import {
 import { useState } from "react";
 import { Button, IconButton } from "../../components/Button.tsx";
 import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
-import { EmptyState } from "../../components/ui.tsx";
+import { EmptyState } from "../../components/EmptyState.tsx";
 import { money } from "../../domain/format.ts";
 import {
 	type Movement,

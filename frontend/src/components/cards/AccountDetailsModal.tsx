@@ -11,7 +11,10 @@ import { SearchField } from "../Field.tsx";
 import { TransactionDetail } from "../activity/TransactionDetail.tsx";
 import { TransactionRow } from "../activity/TransactionRow.tsx";
 import { TransactionTable } from "../activity/TransactionTable.tsx";
-import { Badge, EmptyState, Modal, Progress } from "../ui.tsx";
+import { Badge } from "../Badge.tsx";
+import { EmptyState } from "../EmptyState.tsx";
+import { Modal } from "../Modal.tsx";
+import { Progress } from "../Progress.tsx";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
 
 type StatusFilter = "all" | "pending" | "posted";

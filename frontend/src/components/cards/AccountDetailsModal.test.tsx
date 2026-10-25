@@ -7,8 +7,8 @@ import { movementFixture, projectionFixture } from "../../test/projection.ts";
 import { AccountDetailsModal } from "./AccountDetailsModal.tsx";
 
 // Native modal focus and dismissal belong to Modal's browser coverage.
-vi.mock("../ui.tsx", async (importOriginal) => ({
-	...(await importOriginal<typeof import("../ui.tsx")>()),
+vi.mock("../Modal.tsx", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../Modal.tsx")>()),
 	Modal: ({ title, children }: { title: string; children: ReactNode }) => (
 		<section aria-label={title}>{children}</section>
 	),

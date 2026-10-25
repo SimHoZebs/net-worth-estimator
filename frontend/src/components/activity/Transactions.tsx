@@ -10,7 +10,7 @@ import type { Movement } from "../../domain/model.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
 import { TablePagination } from "../DataTable.tsx";
-import { EmptyState } from "../ui.tsx";
+import { EmptyState } from "../EmptyState.tsx";
 import { TransactionDetail } from "./TransactionDetail.tsx";
 import { TransactionFilters } from "./TransactionFilters.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";

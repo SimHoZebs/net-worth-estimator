@@ -3,7 +3,7 @@ import type { Account } from "../../domain/model.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
-import { Badge } from "../ui.tsx";
+import { Badge } from "../Badge.tsx";
 import {
 	EditorForm,
 	type EditorProps,

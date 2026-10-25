@@ -1,6 +1,6 @@
 import { Menu } from "lucide-react";
 import type { Ref } from "react";
-import { IconButton } from "../components/ui.tsx";
+import { IconButton } from "../components/Button.tsx";
 import type { PageDefinition } from "./navigation.ts";
 
 export function WorkspaceTopbar({

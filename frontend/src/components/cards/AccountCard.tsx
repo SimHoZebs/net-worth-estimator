@@ -1,6 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import { AccountIcon } from "../AccountIcon.tsx";
-import { Badge } from "../ui.tsx";
+import { Badge } from "../Badge.tsx";
 import { money } from "../../domain/format.ts";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
 

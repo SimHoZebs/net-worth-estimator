@@ -2,11 +2,9 @@ import { Wallet } from "lucide-react";
 import { useEffect } from "react";
 import type { BackendCheckpoint } from "../api/contracts.ts";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
-import {
-	EmptyState,
-	ErrorNotice,
-	ProjectionUpdating,
-} from "../components/ui.tsx";
+import { EmptyState } from "../components/EmptyState.tsx";
+import { ErrorNotice } from "../components/ErrorNotice.tsx";
+import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
 import type { Projection } from "../domain/result.ts";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";

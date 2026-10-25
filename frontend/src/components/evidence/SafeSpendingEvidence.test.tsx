@@ -6,8 +6,8 @@ import { movementFixture, projectionFixture } from "../../test/projection.ts";
 import { SafeSpendingEvidence } from "./SafeSpendingEvidence.tsx";
 
 // This test covers evidence content rather than the native modal lifecycle.
-vi.mock("../ui.tsx", async (importOriginal) => ({
-	...(await importOriginal<typeof import("../ui.tsx")>()),
+vi.mock("../Modal.tsx", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../Modal.tsx")>()),
 	Modal: ({ children }: { children: ReactNode }) => (
 		<section>{children}</section>
 	),

@@ -1,7 +1,7 @@
 import { Suspense, lazy } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { PlanEditor } from "../components/PlanEditor.tsx";
-import { Skeleton } from "../components/ui.tsx";
+import { Skeleton } from "../components/Skeleton.tsx";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import {
 	selectDraftChangeCount,

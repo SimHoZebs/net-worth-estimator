@@ -1,6 +1,6 @@
 import { CircleHelp, TrendingUp } from "lucide-react";
 import { IconButton } from "../../components/Button.tsx";
-import { Skeleton } from "../../components/ui.tsx";
+import { Skeleton } from "../../components/Skeleton.tsx";
 import { compactMoney, dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import { currentNetWorth, type Projection } from "../../domain/result.ts";

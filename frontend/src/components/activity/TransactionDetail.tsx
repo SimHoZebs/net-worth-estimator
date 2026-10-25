@@ -38,7 +38,9 @@ import {
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
-import { Badge, ErrorNotice, Modal } from "../ui.tsx";
+import { Badge } from "../Badge.tsx";
+import { ErrorNotice } from "../ErrorNotice.tsx";
+import { Modal } from "../Modal.tsx";
 import { Button, IconButton } from "../Button.tsx";
 import { Notice } from "../Notice.tsx";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";

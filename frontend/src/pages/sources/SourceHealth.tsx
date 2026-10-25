@@ -1,5 +1,5 @@
 import { HardDrive, LockKeyhole } from "lucide-react";
-import { Badge } from "../../components/ui.tsx";
+import { Badge } from "../../components/Badge.tsx";
 
 export function SourceBanner({ sourceAccess }: { sourceAccess: string }) {
 	return (
