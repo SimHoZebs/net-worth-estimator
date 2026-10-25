@@ -47,6 +47,29 @@ function stringIds(value: unknown): string[] | null {
 	return ids.length ? ids : null;
 }
 
+export function clampStatementDay(value: unknown): number {
+	return Math.min(
+		28,
+		Math.max(1, Math.floor(Number(value) || DEFAULT_CYCLE_STATEMENT_DAY)),
+	);
+}
+
+/** Single null-means-all resolver: stored `null` means every known id;
+ * unknown ids drop out; an empty selection falls back to the full set so a
+ * deleted account never silently empties the effective set. Pass `fallback`
+ * to override the empty-selection result (e.g. the detected checking
+ * account instead of every account). */
+export function resolveEffectiveIds(
+	stored: string[] | null,
+	knownIds: string[],
+	fallback?: string[],
+): string[] {
+	const known = new Set(knownIds);
+	const fallbackIds = (fallback ?? knownIds).filter((id) => known.has(id));
+	if (!stored) return fallbackIds;
+	const selected = stored.filter((id) => known.has(id));
+	return selected.length ? selected : fallbackIds;
+}
 export function sanitizeSafeSpendingSettings(
 	value: unknown,
 ): TotalCycleSettings {
@@ -56,13 +79,7 @@ export function sanitizeSafeSpendingSettings(
 	if (typeof parsed !== "object" || parsed === null) return fallback;
 	const record = parsed as Record<string, unknown>;
 	const statementDaySet = record.statementDaySet === true;
-	const storedDay = Math.min(
-		28,
-		Math.max(
-			1,
-			Math.floor(Number(record.statementDay) || DEFAULT_CYCLE_STATEMENT_DAY),
-		),
-	);
+	const storedDay = clampStatementDay(record.statementDay);
 	return {
 		statementDay:
 			!statementDaySet && storedDay === 1
