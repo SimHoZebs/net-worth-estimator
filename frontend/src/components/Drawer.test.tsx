@@ -29,9 +29,8 @@ describe("drawer semantics", () => {
 		);
 		const dialog = view.getByRole("dialog", { name: "Workspace navigation" });
 		expect(dialog.getAttribute("aria-modal")).toBe("true");
-		expect(document.activeElement).toBe(
-			within(dialog).getByRole("button", { name: "Navigation action" }),
-		);
+		// Focus lands on the panel itself, never on a queried child.
+		expect(document.activeElement).toBe(dialog);
 		expect(
 			view.getByRole("button", { name: "Close Workspace navigation" }),
 		).toBeTruthy();
@@ -65,6 +64,27 @@ describe("drawer semantics", () => {
 			view.queryByRole("button", { name: "Close Workspace navigation" }),
 		).toBeNull();
 		expect(document.activeElement).toBe(action);
+	});
+
+	it("settles focus on the topmost sheet when two modal drawers overlap", () => {
+		const view = render(
+			<>
+				<Drawer side="left" open label="Lower sheet" onClose={() => {}}>
+					<button type="button">Lower action</button>
+				</Drawer>
+				<Drawer
+					side="right"
+					open
+					label="Upper sheet"
+					onClose={() => {}}
+					appearance={{ title: "Upper" }}
+				>
+					<p>Upper content</p>
+				</Drawer>
+			</>,
+		);
+		const upper = view.getByRole("dialog", { name: "Upper" });
+		expect(document.activeElement).toBe(upper);
 	});
 
 	it("names a context dialog from its heading", () => {

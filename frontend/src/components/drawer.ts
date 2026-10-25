@@ -15,6 +15,33 @@ export const DRAWER_DESKTOP_OFFSET = 48;
 
 export type DrawerSide = "left" | "right";
 
+// Reference-counted modal lock: overlapping drawers (nav sheet plus a
+// context sheet) share one body scroll lock and one root inert. Saving and
+// restoring per drawer races when both close together and leaves the body
+// stuck hidden or the background interactive while a sheet is still open.
+let modalLockCount = 0;
+let savedBodyOverflow: string | null = null;
+
+export function acquireModalLock(): void {
+	if (typeof document === "undefined") return;
+	if (modalLockCount === 0) {
+		savedBodyOverflow = document.body.style.overflow;
+		document.body.style.overflow = "hidden";
+		document.getElementById("root")?.setAttribute("inert", "");
+	}
+	modalLockCount += 1;
+}
+
+export function releaseModalLock(): void {
+	if (typeof document === "undefined") return;
+	modalLockCount = Math.max(0, modalLockCount - 1);
+	if (modalLockCount === 0) {
+		document.body.style.overflow = savedBodyOverflow ?? "";
+		savedBodyOverflow = null;
+		document.getElementById("root")?.removeAttribute("inert");
+	}
+}
+
 /** Off-canvas resting position: full width on mobile, subtle offset docked. */
 export function drawerHiddenX(
 	side: DrawerSide,
