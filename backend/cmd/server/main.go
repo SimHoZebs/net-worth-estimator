@@ -12,11 +12,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/plans"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
@@ -100,7 +103,15 @@ func main() {
 		log.Fatal("existing financial data requires NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT before authenticated startup")
 	}
 
-	syncRunner, syncStop := configureSync(database)
+	// The scheduler starts before the router exists; resolve it atomically
+	// when a sync lands. Applied syncs change checkpoints, so cached
+	// probabilities go stale the same way row writes do.
+	var routerRef atomic.Pointer[plans.Router]
+	syncRunner, syncStop := configureSync(database, func(summary *simplefin.Summary) {
+		if router := routerRef.Load(); router != nil && !summary.DryRun {
+			router.MarkDirty(router.PrimaryID())
+		}
+	})
 	defer syncStop()
 
 	apiConfig := api.Config{
@@ -109,10 +120,11 @@ func main() {
 		SyncRunner:     syncRunner,
 		FrontendDir:    frontendPath,
 	}
-	handler, closeResources, err := resourceHandler(context.Background(), database, dbPath, resources, identityConfig, apiConfig)
+	handler, router, closeResources, err := resourceHandler(context.Background(), database, dbPath, resources, identityConfig, apiConfig)
 	if err != nil {
 		log.Fatalf("configure resource access: %v", err)
 	}
+	routerRef.Store(router)
 	defer closeResources()
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),

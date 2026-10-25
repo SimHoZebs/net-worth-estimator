@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
@@ -17,6 +18,7 @@ import (
 
 type resourceConfig struct {
 	OwnerSubject, PrivateDir, SampleDB, ModelID string
+	WarmDebounce                                time.Duration
 }
 
 func resourceConfigFromEnv(getenv func(string) string, dbPath string) (resourceConfig, error) {
@@ -25,6 +27,13 @@ func resourceConfigFromEnv(getenv func(string) string, dbPath string) (resourceC
 		PrivateDir:   getenv("NET_WORTH_ESTIMATOR_PLANS_DIR"),
 		SampleDB:     getenv("NET_WORTH_ESTIMATOR_SAMPLE_DB"),
 		ModelID:      getenv("NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL"),
+	}
+	if raw := strings.TrimSpace(getenv("NET_WORTH_ESTIMATOR_WARM_DEBOUNCE")); raw != "" {
+		debounce, err := time.ParseDuration(raw)
+		if err != nil {
+			return c, errors.New("WARM_DEBOUNCE requires a Go duration (empty selects 30s, negative disables warming)")
+		}
+		c.WarmDebounce = debounce
 	}
 	if c.OwnerSubject != strings.TrimSpace(c.OwnerSubject) || strings.ContainsAny(c.OwnerSubject, "*\x00\r\n") {
 		return c, errors.New("PLAN_OWNER_SUBJECT must be one verified OIDC subject")
@@ -42,13 +51,13 @@ func resourceConfigFromEnv(getenv func(string) string, dbPath string) (resourceC
 	return c, nil
 }
 
-func resourceHandler(ctx context.Context, primary store.Store, dbPath string, config resourceConfig, loginConfig identity.Config, apiConfig api.Config) (http.Handler, func() error, error) {
+func resourceHandler(ctx context.Context, primary store.Store, dbPath string, config resourceConfig, loginConfig identity.Config, apiConfig api.Config) (http.Handler, *plans.Router, func() error, error) {
 	permissions, err := authorization.New(authorization.Config{
 		Issuer: loginConfig.Issuer, InternalURL: loginConfig.InternalURL,
 		ClientID: loginConfig.ClientID, ClientSecret: loginConfig.ClientSecret, ModelID: config.ModelID,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	primaryID := ""
 	if config.OwnerSubject != "" {
@@ -58,9 +67,10 @@ func resourceHandler(ctx context.Context, primary store.Store, dbPath string, co
 	router, err := plans.New(primary, plans.Config{
 		PrimaryResourceID: primaryID, PrimaryDBPath: dbPath,
 		SampleDBPath: config.SampleDB, PrivateDir: config.PrivateDir, API: apiConfig,
+		WarmDebounce: config.WarmDebounce,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	loginConfig.ResolveAccess = func(ctx context.Context, subject string) (authorization.Scope, error) {
 		scope, err := permissions.Resolve(ctx, subject)
@@ -80,7 +90,7 @@ func resourceHandler(ctx context.Context, primary store.Store, dbPath string, co
 	login, err := identity.New(ctx, loginConfig)
 	if err != nil {
 		router.Close()
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return login.Wrap(router), func() error { return errors.Join(login.Close(), router.Close()) }, nil
+	return login.Wrap(router), router, func() error { return errors.Join(login.Close(), router.Close()) }, nil
 }

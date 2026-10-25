@@ -28,6 +28,8 @@ type Server struct {
 	ReadOnly bool
 	// SyncRunner runs the SimpleFIN sync on trigger. Nil when unconfigured.
 	SyncRunner *simplefin.Runner
+	// onSyncApplied reports successful sync triggers for warming.
+	onSyncApplied func(resourceID string, dryRun bool)
 }
 
 // Config controls HTTP integration behavior.
@@ -41,6 +43,10 @@ type Config struct {
 	// listed read/compute routes. Owners use it to schedule background
 	// projection warming. Nil disables it.
 	OnMutated func(resourceID string)
+	// OnSyncApplied fires after a successful sync trigger with the run's
+	// dry-run flag. Owners warm only applied runs; dry runs commit
+	// nothing. Nil disables it.
+	OnSyncApplied func(resourceID string, dryRun bool)
 	// SyncRunner runs the SimpleFIN sync on trigger. Nil when unconfigured.
 	SyncRunner  *simplefin.Runner
 	FrontendDir string
@@ -151,11 +157,12 @@ func frontendHandler(frontendDir string) http.HandlerFunc {
 // New builds the chi router with all routes.
 func New(store store.Store, serverConfig Config) http.Handler {
 	server := &Server{
-		ResourceID: serverConfig.ResourceID,
-		CanWrite:   serverConfig.CanWrite,
-		store:      store,
-		ReadOnly:   serverConfig.ReadOnly,
-		SyncRunner: serverConfig.SyncRunner,
+		ResourceID:    serverConfig.ResourceID,
+		CanWrite:      serverConfig.CanWrite,
+		store:         store,
+		ReadOnly:      serverConfig.ReadOnly,
+		SyncRunner:    serverConfig.SyncRunner,
+		onSyncApplied: serverConfig.OnSyncApplied,
 	}
 	router := chi.NewRouter()
 	router.Use(middleware.Recoverer)
