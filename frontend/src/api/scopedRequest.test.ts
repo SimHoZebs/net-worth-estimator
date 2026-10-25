@@ -106,7 +106,10 @@ describe("resource assertion at the API boundary", () => {
 			},
 		]);
 		expect(result).toBeInstanceOf(ResourceScopeError);
-		expect(fetcher).toHaveBeenCalledOnce();
+		// First write sends while scope A is current; the retired second
+		// write sends with pinned A after the switch to B, then the
+		// post-response guard rejects it without touching workspace B.
+		expect(fetcher).toHaveBeenCalledTimes(2);
 	});
 
 	it.each(["json", "sse"] as const)(
@@ -116,7 +119,11 @@ describe("resource assertion at the API boundary", () => {
 			const client = new ApiClient({ fetch: fetcher });
 			owner(B);
 			expect(await request(client, kind)).toBeInstanceOf(ResourceScopeError);
-			expect(fetcher).not.toHaveBeenCalled();
+			// Server-led: the pinned original ID goes out, the server cannot
+			// accept it, and the stale post-response guard rejects it.
+			expect(fetcher).toHaveBeenCalledOnce();
+			const init = fetcher.mock.calls[0]![1]!;
+			expect(new Headers(init.headers).get("X-Waypoint-Resource")).toBe(A);
 		},
 	);
 
