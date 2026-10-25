@@ -10,7 +10,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { cssVariables } from "./cssVariables.ts";
 import { mergeStyles } from "./mergeStyles.ts";
 import { Button, IconButton, TextButton } from "./Button.tsx";
-import { useOpenDialogRegistration } from "./dialogStack.ts";
+import { useOpenModalRegistration } from "./modalStack.ts";
 import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
 import { Notice } from "./Notice.tsx";
 import type { VariantProps } from "class-variance-authority";
@@ -75,7 +75,7 @@ export function Modal({
 	const ref = useRef<HTMLDialogElement>(null);
 	const panelRef = useRef<HTMLDivElement>(null);
 	// Mounted means open for this component: showModal runs on mount.
-	useOpenDialogRegistration(true);
+	useOpenModalRegistration(true);
 	const [closing, setClosing] = useState(false);
 	const closeRequested = useRef(false);
 	const reduceMotion = useReducedMotion();

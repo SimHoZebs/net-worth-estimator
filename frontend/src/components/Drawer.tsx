@@ -13,7 +13,7 @@ import {
 	useHorizontalSwipe,
 	type DrawerSide,
 } from "./drawer.ts";
-import { isTopmostDialog, useOpenDialogRegistration } from "./dialogStack.ts";
+import { isTopmostModal, useOpenModalRegistration } from "./modalStack.ts";
 import { IconButton } from "./Button.tsx";
 import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
 
@@ -88,7 +88,7 @@ export function Drawer({
 	// The stack lives in React state, not a document query: only modal sheets count.
 	// The persistent desktop sheet stays unregistered. The id backs the
 	// topmost check so stacked sheets never fight over focus.
-	const dialogId = useOpenDialogRegistration(open && modal);
+	const modalId = useOpenModalRegistration(open && modal);
 	const closingRef = useRef(closing);
 	useEffect(() => {
 		closingRef.current = closing;
@@ -131,7 +131,7 @@ export function Drawer({
 		// Focus lands on the panel container itself, never on a child, so
 		// no brand link or value ever takes a focus ring on open. The
 		// persistent desktop sheet never moves focus on load.
-		if (modal && autoFocus && isTopmostDialog(dialogId)) {
+		if (modal && autoFocus && isTopmostModal(modalId)) {
 			panelEl.current?.focus({ preventScroll: true });
 		}
 		const onKey = (event: KeyboardEvent) => {
@@ -150,7 +150,7 @@ export function Drawer({
 		// live so overlapping sheets never act on a stale closure.
 		const onFocusIn = (event: FocusEvent) => {
 			if (!modal || closingRef.current) return;
-			if (!isTopmostDialog(dialogId)) return;
+			if (!isTopmostModal(modalId)) return;
 			const target = event.target as Node | null;
 			const panel = panelEl.current;
 			if (!panel || !target) return;
@@ -172,7 +172,7 @@ export function Drawer({
 				});
 			}
 		};
-	}, [open, modal, autoFocus, dialogId]);
+	}, [open, modal, autoFocus, modalId]);
 	useEffect(() => {
 		if (!open || !modal) return;
 		// Shared lock: overlapping sheets must not restore scroll or remove
