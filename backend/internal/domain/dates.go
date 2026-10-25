@@ -5,16 +5,9 @@ import (
 	"time"
 )
 
-// Date helpers. All dates are UTC calendar dates
-// formatted "YYYY-MM-DD".
-//
-// Hot-path note: simulation calls CompareIsoDates, DaysBetween,
-// ProjectionYearIndex, and AddMonthsClamped millions of times per stochastic
-// run. Those use integer math on the validated YYYY-MM-DD shape instead of
-// time.Parse/time.Format: the format is fixed-width and zero-padded, so
-// lexicographic order is chronological order. time.Parse stays behind
-// ParseIsoDate/IsValidIsoDate (input validation) and the daily/weekly
-// advanceDate path, which is rare in practice.
+// Date helpers operate on validated UTC dates in YYYY-MM-DD format.
+// Fixed-width, zero-padded dates sort chronologically as strings.
+// Callers must validate user-supplied dates before use.
 
 const msPerDay = 24 * 60 * 60 * 1000
 
