@@ -428,21 +428,21 @@ func TestDeterministicResponseIncludesMovementEvents(t *testing.T) {
 		t.Fatalf("fully funded movement evidence = constraints %+v available %v", event.BindingConstraints, event.AvailableAmount)
 	}
 
-	cachedResponse := httptest.NewRecorder()
-	cachedRequest := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
-	cachedRequest.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(cachedResponse, cachedRequest)
-	if cachedResponse.Code != http.StatusOK || cachedResponse.Header().Get("Cache-Status") != cacheStatusHit {
-		t.Fatalf("cached projection status = %d, cache = %q, body %s", cachedResponse.Code, cachedResponse.Header().Get("Cache-Status"), cachedResponse.Body.String())
+	storedResponse := httptest.NewRecorder()
+	storedRequest := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
+	storedRequest.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(storedResponse, storedRequest)
+	if storedResponse.Code != http.StatusOK || storedResponse.Header().Get("Projection-Source") != projectionSourceStored {
+		t.Fatalf("stored projection status = %d, source = %q, body %s", storedResponse.Code, storedResponse.Header().Get("Projection-Source"), storedResponse.Body.String())
 	}
-	var cachedPayload struct {
+	var storedPayload struct {
 		Result *types.ProjectionResult `json:"result"`
 	}
-	if err := json.Unmarshal(cachedResponse.Body.Bytes(), &cachedPayload); err != nil {
-		t.Fatalf("decode cached projection response: %v", err)
+	if err := json.Unmarshal(storedResponse.Body.Bytes(), &storedPayload); err != nil {
+		t.Fatalf("decode stored projection response: %v", err)
 	}
-	if cachedPayload.Result == nil || len(cachedPayload.Result.MovementEvents) != len(payload.Result.MovementEvents) {
-		t.Fatalf("cached movement events = %+v", cachedPayload.Result)
+	if storedPayload.Result == nil || len(storedPayload.Result.MovementEvents) != len(payload.Result.MovementEvents) {
+		t.Fatalf("stored movement events = %+v", storedPayload.Result)
 	}
 }
 
@@ -510,32 +510,32 @@ func TestDeterministicMovementEvidenceIncludesBindingConstraints(t *testing.T) {
 		t.Fatalf("binding constraint = %+v", event.BindingConstraints[0])
 	}
 
-	cachedResponse := httptest.NewRecorder()
-	cachedRequest := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
-	cachedRequest.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(cachedResponse, cachedRequest)
-	if cachedResponse.Code != http.StatusOK || cachedResponse.Header().Get("Cache-Status") != cacheStatusHit {
-		t.Fatalf("cached projection status = %d, cache = %q, body %s", cachedResponse.Code, cachedResponse.Header().Get("Cache-Status"), cachedResponse.Body.String())
+	storedResponse := httptest.NewRecorder()
+	storedRequest := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
+	storedRequest.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(storedResponse, storedRequest)
+	if storedResponse.Code != http.StatusOK || storedResponse.Header().Get("Projection-Source") != projectionSourceStored {
+		t.Fatalf("stored projection status = %d, source = %q, body %s", storedResponse.Code, storedResponse.Header().Get("Projection-Source"), storedResponse.Body.String())
 	}
-	var cachedPayload struct {
+	var storedPayload struct {
 		Result *types.ProjectionResult `json:"result"`
 	}
-	if err := json.Unmarshal(cachedResponse.Body.Bytes(), &cachedPayload); err != nil {
-		t.Fatalf("decode cached projection response: %v", err)
+	if err := json.Unmarshal(storedResponse.Body.Bytes(), &storedPayload); err != nil {
+		t.Fatalf("decode stored projection response: %v", err)
 	}
-	if cachedPayload.Result == nil {
-		t.Fatal("cached projection has no result")
+	if storedPayload.Result == nil {
+		t.Fatal("stored projection has no result")
 	}
 	computedEvents, err := json.Marshal(payload.Result.MovementEvents)
 	if err != nil {
 		t.Fatalf("encode computed movement events: %v", err)
 	}
-	cachedEvents, err := json.Marshal(cachedPayload.Result.MovementEvents)
+	storedEvents, err := json.Marshal(storedPayload.Result.MovementEvents)
 	if err != nil {
-		t.Fatalf("encode cached movement events: %v", err)
+		t.Fatalf("encode stored movement events: %v", err)
 	}
-	if !bytes.Equal(cachedEvents, computedEvents) {
-		t.Fatalf("cached movement evidence differs from computed response")
+	if !bytes.Equal(storedEvents, computedEvents) {
+		t.Fatalf("stored movement evidence differs from computed response")
 	}
 }
 

@@ -31,7 +31,7 @@ func TestCORSMiddlewareAllowsConfiguredOrigin(t *testing.T) {
 	if origin := response.Header().Get("Access-Control-Allow-Origin"); origin != allowedTestOrigin {
 		t.Fatalf("Access-Control-Allow-Origin = %q", origin)
 	}
-	if exposed := response.Header().Get("Access-Control-Expose-Headers"); exposed != corsExposedHeaders {
+	if exposed := response.Header().Get("Access-Control-Expose-Headers"); exposed != "Projection-Source, Retry-After" {
 		t.Fatalf("Access-Control-Expose-Headers = %q", exposed)
 	}
 	if vary := response.Header().Values("Vary"); !slices.Contains(vary, "Origin") {

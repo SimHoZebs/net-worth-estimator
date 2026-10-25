@@ -27,7 +27,7 @@ import (
 // shared-run registry below. A caller that drops its stream re-POSTs the same
 // body and attaches to the still-running computation: it immediately receives
 // the latest partial, then the remaining stream. Post-completion reconnects
-// are served from the DB artifact cache. Unseeded runs bypass the registry
+// retrieve the stored result from SQLite. Unseeded runs bypass the registry
 // because fresh random draws cannot be shared. A `retry` hint plus `: heartbeat`
 // comments keep proxied streams alive.
 const (
@@ -137,7 +137,7 @@ func (run *sharedStochasticRun) publish(event stochasticStreamEvent) {
 
 // finish records the outcome, wakes every attached stream, persists the
 // completed result, and evicts the run: post-completion reconnects are
-// served from the artifact cache.
+// served from result storage.
 func (run *sharedStochasticRun) finish(key string, persist func(*types.StochasticProjectionResult), result *types.StochasticProjectionResult, runErr error) {
 	run.mu.Lock()
 	run.result = result
@@ -160,7 +160,7 @@ func (run *sharedStochasticRun) outcome() (*types.StochasticProjectionResult, er
 
 // writeSSEPreamble emits shared SSE headers plus the reconnect hint. Both
 // seeded (shared) and unseeded (inline) streams use this so proxy behavior
-// and retry timing stay identical. Callers set Cache-Status before calling.
+// and retry timing stay identical. Callers set Projection-Source before calling.
 func writeSSEPreamble(w http.ResponseWriter, flusher http.Flusher) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-store")
@@ -264,13 +264,13 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Unseeded runs are never cached or shared: a nil seed means "fresh
+	// Unseeded results are not stored or shared: a nil seed means "fresh
 	// random draw". Seeded requests are eligible for the shared registry and
-	// artifact cache; an explicit null keeps fresh-draw semantics.
-	cacheEligible := body.Config.Seed != nil
-	var cacheKey string
-	if cacheEligible {
-		cacheKey = s.resourceArtifactKey("stochastic", map[string]any{
+	// result storage; an explicit null keeps fresh-draw semantics.
+	identifiedRun := body.Config.Seed != nil
+	var resultKey string
+	if identifiedRun {
+		resultKey = s.resourceArtifactKey("stochastic", map[string]any{
 			"document":  document,
 			"overrides": body.Overrides,
 			"settings":  projectionSettingsDescriptor(body.Settings),
@@ -279,12 +279,12 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 				"seed":     body.Config.Seed,
 			},
 		})
-		if cached, err := lookupArtifact[types.StochasticProjectionResult](s.store, cacheKey); err == nil && cached.hit {
+		if stored, err := lookupArtifact[types.StochasticProjectionResult](s.store, resultKey); err == nil && stored.found {
 			w.Header().Set("Content-Type", "text/event-stream")
 			w.Header().Set("Cache-Control", "no-store")
-			w.Header().Set("Cache-Status", cacheStatusHit)
+			w.Header().Set("Projection-Source", projectionSourceStored)
 			w.WriteHeader(http.StatusOK)
-			encoded, marshalErr := json.Marshal(map[string]any{"result": cached.value})
+			encoded, marshalErr := json.Marshal(map[string]any{"result": stored.value})
 			if marshalErr == nil {
 				fmt.Fprintf(w, "retry: %d\n\n", sseRetryMs)
 				fmt.Fprintf(w, "id: done\nevent: result\ndata: %s\n\n", encoded)
@@ -298,16 +298,16 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 		s.serveStochasticInline(w, r, document, body.Settings, body.Overrides, body.Config)
 		return
 	}
-	w.Header().Set("Cache-Status", cacheStatusMiss)
-	_, prefix := parseArtifactKeyMeta(cacheKey)
-	// Miss line with the input summary: identical summaries on later misses
-	// mean the same data recomputed (registry lost or backend restarted).
-	log.Printf("stochastic recalc key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d runs=%d",
+	_, prefix := parseArtifactKeyMeta(resultKey)
+	log.Printf("stochastic simulation request key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d runs=%d",
 		prefix, len(document.Accounts), len(document.Postings), len(document.Checkpoints),
 		body.Settings.HorizonYears, body.Config.RunCount)
-	// Header reports miss for both owner and attach; the log lines below
-	// distinguish them.
-	run, owner := getOrStartSharedRun(cacheKey)
+	run, owner := getOrStartSharedRun(resultKey)
+	if owner {
+		w.Header().Set("Projection-Source", projectionSourceComputed)
+	} else {
+		w.Header().Set("Projection-Source", projectionSourceShared)
+	}
 
 	writeSSEPreamble(w, flusher)
 
@@ -327,17 +327,16 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 	if owner {
 		log.Printf("stochastic run start key_prefix=%s runs=%d", prefix, body.Config.RunCount)
 		// The computation is detached from the request context: this
-		// stream dropping must never cancel the shared run. The work is
-		// bounded (runCount) and always lands in the artifact cache, so an
-		// abandoned run still pays off for the next identical request.
+		// stream dropping must never cancel the shared run. Successful results
+		// are submitted to storage independently of stream lifetime.
 		computeCtx := context.WithoutCancel(r.Context())
 		go func() {
 			progressCallback := func(progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
 				run.publish(stochasticStreamEvent{progress: progress, partial: partial})
 			}
 			result, runErr := domain.StochasticProjection(computeCtx, document, &body.Settings, body.Overrides, body.Config, progressCallback)
-			run.finish(cacheKey, func(result *types.StochasticProjectionResult) {
-				putArtifact(s.store, cacheKey, "stochastic", result)
+			run.finish(resultKey, func(result *types.StochasticProjectionResult) {
+				putArtifact(s.store, resultKey, "stochastic", result)
 			}, result, runErr)
 			if runErr != nil {
 				log.Printf("stochastic finish key_prefix=%s status=error error=%v", prefix, runErr)
@@ -410,7 +409,7 @@ func (s *Server) serveStochasticInline(
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Cache-Status", cacheStatusMiss)
+	w.Header().Set("Projection-Source", projectionSourceComputed)
 	writeSSEPreamble(w, flusher)
 
 	var writeMu sync.Mutex

@@ -12,22 +12,21 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Server-side artifact cache: content-addressed reuse of completed
-// projections across requests and reloads. artifactKey defines the identity;
-// identity is Go-owned, so hashes are not cross-implementation compatible.
-// artifactCacheVersion covers the key envelope; deterministicResultCacheVersion
-// (projection_handlers.go) covers the deterministic payload shape. Bump both
-// together when either changes so old payloads never read as hits. Eviction
-// is global (maxArtifacts in store/artifacts.go): stochastic floods can evict
-// deterministic. Keep a per-kind floor only with product sign-off.
+// Completed simulation results are stored as content-addressed artifacts.
+// artifactKey defines the backend-owned identity from simulation inputs.
+// artifactIdentityVersion covers the key envelope; deterministicResultVersion
+// covers the deterministic payload shape. Bump both when either changes so
+// incompatible results are not retrieved. Storage retains at most maxArtifacts
+// across result kinds (store/artifacts.go).
 
-const artifactCacheVersion = 6
+const artifactIdentityVersion = 6
 
-// Cache-Status values (RFC 9211). Shared-run attach collapses to miss in
-// the header; logs distinguish owner miss from attach.
+// Projection-Source identifies the result's origin, not persistence success.
+// Computed and shared responses may still end with an execution error.
 const (
-	cacheStatusHit  = "waypoint; hit"
-	cacheStatusMiss = "waypoint; miss"
+	projectionSourceStored   = "stored"
+	projectionSourceComputed = "computed"
+	projectionSourceShared   = "shared"
 )
 
 func mustCanonical(payload any) string {
@@ -47,48 +46,48 @@ func (s *Server) resourceArtifactKey(kind string, descriptor any) string {
 
 func artifactKey(kind string, descriptor any) string {
 	digest := sha256.Sum256([]byte(mustCanonical(map[string]any{
-		"artifactCacheVersion": artifactCacheVersion,
+		// Keep the serialized field name stable to preserve existing identities.
+		"artifactCacheVersion": artifactIdentityVersion,
 		"kind":                 kind,
 		"descriptor":           descriptor,
 	})))
-	return fmt.Sprintf("%s:%d:%s", kind, artifactCacheVersion, hex.EncodeToString(digest[:]))
+	return fmt.Sprintf("%s:%d:%s", kind, artifactIdentityVersion, hex.EncodeToString(digest[:]))
 }
 
-type cachedPayload[T any] struct {
+type storedArtifact[T any] struct {
 	value T
-	hit   bool
+	found bool
 }
 
-func lookupArtifact[T any](st store.Store, key string) (cachedPayload[T], error) {
+func lookupArtifact[T any](st store.Store, key string) (storedArtifact[T], error) {
 	payload, ok, err := st.GetArtifact(key)
 	if err != nil || !ok {
 		logArtifactLookup(key, false)
-		return cachedPayload[T]{}, err
+		return storedArtifact[T]{}, err
 	}
 	var value T
 	if err := json.Unmarshal([]byte(payload), &value); err != nil {
-		// Corrupt or foreign payload: treat as a miss.
+		// Corrupt or foreign payload: no usable stored result.
 		logArtifactLookup(key, false)
-		return cachedPayload[T]{}, nil
+		return storedArtifact[T]{}, nil
 	}
 	logArtifactLookup(key, true)
-	return cachedPayload[T]{value: value, hit: true}, nil
+	return storedArtifact[T]{value: value, found: true}, nil
 }
 
-// logArtifactLookup emits one measurement line per artifact lookup for
-// week-long hit-rate analysis. Only the cache kind, hit/miss outcome, and
-// the first 8 hex chars of the identity hash are logged; never payloads.
-func logArtifactLookup(key string, hit bool) {
+// logArtifactLookup logs availability, result kind, and an identity prefix,
+// never simulation inputs or result payloads.
+func logArtifactLookup(key string, found bool) {
 	kind, prefix := parseArtifactKeyMeta(key)
-	result := "miss"
-	if hit {
-		result = "hit"
+	result := "unavailable"
+	if found {
+		result = "found"
 	}
-	log.Printf("artifact cache lookup kind=%s result=%s key_prefix=%s", kind, result, prefix)
+	log.Printf("simulation result lookup kind=%s result=%s key_prefix=%s", kind, result, prefix)
 }
 
 // parseArtifactKeyMeta splits keys shaped "kind:version:hexdigest" into the
-// cache kind and the first 8 hex chars of the digest.
+// result kind and the first 8 hex chars of the digest.
 func parseArtifactKeyMeta(key string) (string, string) {
 	kind := "unknown"
 	if idx := strings.Index(key, ":"); idx > 0 {
@@ -110,13 +109,13 @@ func parseArtifactKeyMeta(key string) (string, string) {
 func putArtifact[T any](st store.Store, key, kind string, value T) {
 	payload, err := json.Marshal(value)
 	if err != nil {
-		return // best-effort cache write
+		return // best-effort result storage
 	}
 	_ = st.PutArtifact(key, kind, string(payload))
 }
 
-// projectionSettingsDescriptor strips name-only fields from evaluation
-// tables so renaming an instance does not invalidate cached computation.
+// projectionSettingsDescriptor omits names from settings evaluation tables.
+// The complete model document contributes separately to result identity.
 func projectionSettingsDescriptor(settings types.ProjectionRuntimeSettings) map[string]any {
 	return map[string]any{
 		"fallbackProjectionStartDate": settings.FallbackProjectionStartDate,
@@ -133,9 +132,8 @@ func evaluationDescriptor(tables *types.EvaluationTables) map[string]any {
 	return out
 }
 
-// enabledEvaluationConfigs strips name-only fields from evaluation tables
-// so renaming an instance does not invalidate cached computation. Disabled
-// configs never affect computation.
+// enabledEvaluationConfigs describes enabled evaluation IDs and configs,
+// without labels, for the settings portion of result identity.
 func enabledEvaluationConfigs(items []types.EvaluationInstance[types.JsonValue]) []map[string]any {
 	out := make([]map[string]any, 0, len(items))
 	for _, item := range items {

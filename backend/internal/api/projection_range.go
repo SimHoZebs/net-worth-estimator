@@ -28,7 +28,7 @@ func validateProjectionRange(r *projectionRange) error {
 	return nil
 }
 
-// formatProjectionRange renders the range for recalc log lines.
+// formatProjectionRange renders the range for simulation log lines.
 func formatProjectionRange(r *projectionRange) string {
 	if r == nil {
 		return "full"
