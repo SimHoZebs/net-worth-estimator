@@ -508,6 +508,9 @@ test("evidence dialogs and the mobile navigation preserve accessible semantics",
 	expect(issues(result.violations)).toEqual([]);
 	await page.keyboard.press("Escape");
 	await expect(
+		page.getByRole("dialog", { name: "Workspace navigation" }),
+	).toBeHidden();
+	await expect(
 		page.getByRole("button", { name: "Open navigation" }),
 	).toBeFocused();
 });

@@ -132,7 +132,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 	// sync display metadata absent from its real financial API.
 	await page.route("**/v1/financial-model", async (route) => {
 		const response = await route.fetch();
-		expect(response.headers()["x-waypoint-resource"]).toBe(resource.id);
+		expect(response.headers()["waypoint-resource"]).toBe(resource.id);
 		const body = (await response.json()) as FinancialModelResponse;
 		if (!body.document) throw new Error("The fixture model is missing.");
 		await route.fulfill({
