@@ -37,6 +37,10 @@ type Config struct {
 	CanWrite       func(context.Context) bool
 	AllowedOrigins []string
 	ReadOnly       bool
+	// OnMutated fires after a 2xx state-changing request outside the
+	// listed read/compute routes. Owners use it to schedule background
+	// projection warming. Nil disables it.
+	OnMutated func(resourceID string)
 	// SyncRunner runs the SimpleFIN sync on trigger. Nil when unconfigured.
 	SyncRunner  *simplefin.Runner
 	FrontendDir string
@@ -157,6 +161,9 @@ func New(store store.Store, serverConfig Config) http.Handler {
 	router.Use(middleware.Recoverer)
 	router.Use(corsMiddleware(serverConfig.AllowedOrigins))
 	router.Use(readOnlyMiddleware(serverConfig.ReadOnly))
+	if serverConfig.OnMutated != nil {
+		router.Use(mutationNotifyMiddleware(serverConfig.OnMutated, serverConfig.ResourceID))
+	}
 	// Compress JSON payloads (8 MB deterministic results gzip to ~400 KB).
 	// text/event-stream is not a compressible type, so stochastic SSE
 	// streams pass through uncompressed with flushing intact.
