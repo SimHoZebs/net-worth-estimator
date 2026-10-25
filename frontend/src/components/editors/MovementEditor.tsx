@@ -4,16 +4,12 @@ import {
 	type Plan,
 	visibleAccounts,
 } from "../../domain/model.ts";
-import {
-	FALLBACK_TEMPLATES,
-	presetToTemplate,
-} from "../../domain/amountCatalog.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
-import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
 import { Notice } from "../Notice.tsx";
 import { AccountOptions } from "./AccountOptions.tsx";
+import { useAmountTemplates } from "./amountTemplates.ts";
 import {
 	EditorForm,
 	type EditorProps,
@@ -92,11 +88,7 @@ export function MovementFormFields({
 				? "growth"
 				: "fixed";
 	const [amountKind, setAmountKind] = useState(initialKind);
-	const serverPresets = useWorkspaceStore((state) => state.serverPresets);
-	const templates =
-		serverPresets === null
-			? FALLBACK_TEMPLATES
-			: serverPresets.map(presetToTemplate);
+	const templates = useAmountTemplates();
 	const advanced = amountKind !== "fixed" && amountKind !== "growth";
 	const templateForKind =
 		templates.find((template) => template.id === amountKind) ??
