@@ -5,6 +5,7 @@ import {
 	getResourceScope,
 	subscribeResourceScope,
 } from "../auth/resourceScope.ts";
+import { notifyError } from "./notifications.ts";
 
 export interface PinnedEvaluationsState {
 	/** Pinned evaluation instance IDs in pin order. Null until loaded. */
@@ -56,6 +57,12 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 			if (scope !== getResourceScope()) return;
 			if (result instanceof Error) {
 				set({ loading: false, error: result.message });
+				notifyError("evaluation-pins", result.message, {
+					label: "Reload pins",
+					onAction: () => {
+						void get().refresh();
+					},
+				});
 				return;
 			}
 			lastFetchedAt = Date.now();
@@ -74,6 +81,12 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 			if (scope !== getResourceScope()) return false;
 			if (result instanceof Error) {
 				set({ ids: previous, error: result.message });
+				notifyError("evaluation-pins", result.message, {
+					label: "Reload pins",
+					onAction: () => {
+						void get().refresh();
+					},
+				});
 				return false;
 			}
 			lastFetchedAt = Date.now();

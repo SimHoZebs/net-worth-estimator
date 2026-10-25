@@ -17,6 +17,7 @@ import { Notice } from "../Notice.tsx";
 import { cssVariables } from "../cssVariables.ts";
 import { Badge } from "../Badge.tsx";
 import { useErrorToast } from "../NotificationCenter.tsx";
+import { notifyError } from "../../state/notifications.ts";
 import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
 
 function toAmountInput(value: number | null): string {
@@ -111,6 +112,7 @@ export function AccountDetails({
 		const validated = validatePlan(upsertAccount(plan, next));
 		if (validated instanceof Error) {
 			setError(validated.message);
+			notifyError("account-details", validated.message);
 			return;
 		}
 		setError(null);

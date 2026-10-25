@@ -3,10 +3,7 @@ import { useEffect } from "react";
 import type { BackendCheckpoint } from "../api/contracts.ts";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
-import {
-	useErrorToast,
-	useProjectionToasts,
-} from "../components/NotificationCenter.tsx";
+import { useErrorToast } from "../components/NotificationCenter.tsx";
 import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
@@ -89,7 +86,7 @@ function OutlookContent({
 			void refreshPins();
 		},
 	});
-	const { base } = useProjectionToasts("outlook", projection, ranges);
+	const base = projection.base instanceof Error ? null : projection.base;
 	const pending = base === null;
 	if (!plan) return null;
 	if (plan.accounts.length === 0) {

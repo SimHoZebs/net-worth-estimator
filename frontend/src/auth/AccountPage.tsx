@@ -5,6 +5,7 @@ import {
 	useErrorToast,
 	useSuccessToast,
 } from "../components/NotificationCenter.tsx";
+import { notifyError, notifySuccess } from "../state/notifications.ts";
 import { redirectToSignIn } from "./navigation.ts";
 import { useSession } from "./sessionContext.ts";
 import {
@@ -51,11 +52,12 @@ export function AccountPage() {
 				setSessions(nextSessions);
 			} catch (cause) {
 				if (!controller.signal.aborted) {
-					setError(
+					const message =
 						cause instanceof Error
 							? cause.message
-							: "Account details are unavailable.",
-					);
+							: "Account details are unavailable.";
+					setError(message);
+					notifyError("account", message);
 				}
 			} finally {
 				if (!controller.signal.aborted) setLoading(false);
@@ -92,12 +94,14 @@ export function AccountPage() {
 			setProfile(next);
 			setDisplayName(next.displayName);
 			setNotice("Display name updated.");
+			notifySuccess("account-notice", "Display name updated.");
 		} catch (cause) {
-			setError(
+			const message =
 				cause instanceof Error
 					? cause.message
-					: "The account update was rejected.",
-			);
+					: "The account update was rejected.";
+			setError(message);
+			notifyError("account", message);
 		} finally {
 			setSavingProfile(false);
 		}
@@ -112,11 +116,12 @@ export function AccountPage() {
 			await changeAccountPassword({ oldPassword, newPassword });
 			redirectToSignIn();
 		} catch (cause) {
-			setError(
+			const message =
 				cause instanceof Error
 					? cause.message
-					: "The password change was rejected.",
-			);
+					: "The password change was rejected.";
+			setError(message);
+			notifyError("account", message);
 			setSavingPassword(false);
 		}
 	}
@@ -127,23 +132,27 @@ export function AccountPage() {
 		try {
 			await revokeAccountSession(id);
 		} catch (cause) {
-			setError(
+			const message =
 				cause instanceof Error
 					? cause.message
-					: "That session could not be revoked.",
-			);
+					: "That session could not be revoked.";
+			setError(message);
+			notifyError("account", message);
 			return;
 		}
 		try {
 			setSessions(await listAccountSessions());
 			setNotice("Session revoked.");
+			notifySuccess("account-notice", "Session revoked.");
 		} catch (cause) {
-			setNotice("Session revoked.");
-			setError(
+			const message =
 				cause instanceof Error
 					? cause.message
-					: "The session list could not be refreshed.",
-			);
+					: "The session list could not be refreshed.";
+			setNotice("Session revoked.");
+			notifySuccess("account-notice", "Session revoked.");
+			setError(message);
+			notifyError("account", message);
 		}
 	}
 

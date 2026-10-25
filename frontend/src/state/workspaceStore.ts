@@ -29,6 +29,11 @@ import {
 	readRemoteStateRaw,
 	serverDocumentFingerprint,
 } from "./remoteStorage.ts";
+import {
+	notifyError,
+	notifySuccess,
+	type ToastAction,
+} from "./notifications.ts";
 import type { StorageError } from "./storage.ts";
 
 export interface RemoteApiClient extends RowWriter {
@@ -1456,6 +1461,51 @@ export const useWorkspaceStore = create<
 		return true;
 	},
 }));
+
+/** Recovery action for a workspace failure, mirroring the toast it floats. */
+function workspaceToastAction(state: WorkspaceData): ToastAction {
+	const stale =
+		(state.workspace?.draftStale ?? false) || state.errorCode === "stale-draft";
+	if (stale)
+		return {
+			label: "Discard draft and load latest",
+			onAction: () => void useWorkspaceStore.getState().reloadDraft(),
+		};
+	const storageConflict =
+		state.errorCode === "storage-conflict" ||
+		(state.error?.includes("changed in another tab") ?? false);
+	if (storageConflict)
+		return {
+			label: "Reload latest saved plan",
+			onAction: () => window.location.reload(),
+		};
+	return {
+		label: "Retry server request",
+		onAction: () => void useWorkspaceStore.getState().retry(),
+	};
+}
+
+/**
+ * Explicit failure triggers for the notification stack. One subscription
+ * covers every branch that reports a workspace, notice, or preset error,
+ * so no failure path needs its own notify call. Toasts are sticky: they
+ * live until dismissed, and a repeated failure re-floats by key.
+ */
+useWorkspaceStore.subscribe((state, previous) => {
+	if (
+		state.error &&
+		state.error !== previous.error &&
+		state.errorCode !== "missing-model" &&
+		!state.error.includes("no financial model")
+	)
+		notifyError("workspace", state.error, workspaceToastAction(state));
+	if (state.notice && state.notice !== previous.notice)
+		notifySuccess("workspace-notice", state.notice, () =>
+			useWorkspaceStore.getState().dismissNotice(),
+		);
+	if (state.presetError && state.presetError !== previous.presetError)
+		notifyError("amount-presets", state.presetError);
+});
 
 /** Stop old callbacks without deleting account-owned data during verification. */
 export function suspendWorkspaceForVerification(): void {

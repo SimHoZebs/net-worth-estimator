@@ -1,6 +1,5 @@
 import { AlertCircle, Check, X } from "lucide-react";
 import { useEffect, useRef } from "react";
-import type { Projection } from "../domain/result.ts";
 import {
 	useNotifications,
 	type Toast,
@@ -8,7 +7,6 @@ import {
 } from "../state/notifications.ts";
 import { IconButton, TextButton } from "./Button.tsx";
 import { mergeStyles } from "./mergeStyles.ts";
-import type { useRemoteProjection } from "../state/useRemoteProjection.ts";
 
 /**
  * Bridge one error or notice value into the floating stack. The toast lives
@@ -67,56 +65,6 @@ export function useSuccessToast(
 	onDismiss?: () => void,
 ): void {
 	useToast(key, "success", message, undefined, onDismiss);
-}
-
-type ProjectionState = Pick<
-	ReturnType<typeof useRemoteProjection>,
-	| "loading"
-	| "base"
-	| "baseError"
-	| "rangeError"
-	| "retryProjection"
-	| "retryRange"
->;
-
-/**
- * Shared projection error mapping. Scope prefixes the toast keys per page.
- * Returns the display-ready base projection so callers do not duplicate
- * the load/stale conditions.
- */
-export function useProjectionToasts(
-	scope: string,
-	projection: ProjectionState,
-	rangesVisible = false,
-): { base: Projection | null } {
-	const base = projection.base instanceof Error ? null : projection.base;
-	const loadError =
-		!projection.loading && !base
-			? projection.base instanceof Error
-				? projection.base.message
-				: projection.baseError
-			: null;
-	useErrorToast(`${scope}:load`, loadError, {
-		label: "Retry calculation",
-		onAction: projection.retryProjection,
-	});
-	useErrorToast(
-		`${scope}:stale`,
-		projection.baseError && base ? projection.baseError : null,
-		{
-			label: "Retry calculation",
-			onAction: projection.retryProjection,
-		},
-	);
-	useErrorToast(
-		`${scope}:range`,
-		rangesVisible ? projection.rangeError : null,
-		{
-			label: "Retry scenario calculation",
-			onAction: projection.retryRange,
-		},
-	);
-	return { base };
 }
 
 const toastToneStyles: Record<Toast["kind"], string> = {

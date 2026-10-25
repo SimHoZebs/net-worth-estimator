@@ -6,6 +6,7 @@ import { Button } from "../components/Button.tsx";
 import { Notice } from "../components/Notice.tsx";
 import { ModelImportPreview } from "../components/imports/ModelImportPreview.tsx";
 import { useErrorToast } from "../components/NotificationCenter.tsx";
+import { notifyError } from "../state/notifications.ts";
 import { useFileReview } from "../state/useFileReview.ts";
 import { useServerModelImport } from "../state/useServerModelImport.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
@@ -49,8 +50,13 @@ export function ServerWorkspaceRecovery() {
 				}),
 			oversizedMessage:
 				"The model file is larger than 2 MB. Choose a smaller JSON file.",
+			onError: (message) => notifyError("model-import", message),
 		});
 	const inputRef = useRef<HTMLInputElement>(null);
+	const failImport = (message: string) => {
+		setError(message);
+		notifyError("model-import", message);
+	};
 	const missingModel =
 		status !== null &&
 		(serverDocument === null || errorCode === "missing-model");
@@ -60,7 +66,7 @@ export function ServerWorkspaceRecovery() {
 		setError(null);
 		const imported = await importDocument(candidate);
 		if (!imported)
-			setError(
+			failImport(
 				"The server did not activate this model. Review the recovery message before trying again.",
 			);
 	};

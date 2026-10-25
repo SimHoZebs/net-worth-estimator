@@ -2,16 +2,12 @@ import { Flag, Plus } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Button } from "../components/Button.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
-import {
-	useErrorToast,
-	useProjectionToasts,
-} from "../components/NotificationCenter.tsx";
+import { useErrorToast } from "../components/NotificationCenter.tsx";
 import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
 import type { Evaluation, Plan } from "../domain/model.ts";
 import { removeEvaluation } from "../domain/planEdits.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
-import { useUiStore } from "../state/uiStore.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useWorkspaceStore, selectPlan } from "../state/workspaceStore.ts";
 import { EvaluationCard } from "./evaluations/EvaluationCard.tsx";
@@ -26,9 +22,8 @@ export function EvaluationsPage({
 	// only UI callbacks arrive as props.
 	const plan = useWorkspaceStore(selectPlan);
 	const onUpdate = useWorkspaceStore((state) => state.updatePlan);
-	const ranges = useUiStore((state) => state.ranges);
 	const projection = useRemoteProjection();
-	const { base } = useProjectionToasts("evaluations", projection, ranges);
+	const base = projection.base instanceof Error ? null : projection.base;
 	if (!plan) return null;
 	return (
 		<>

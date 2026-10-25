@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ApiClient } from "../api/index.ts";
 import {
 	acceptResourceScope,
 	suspendResourceScope,
 } from "../auth/resourceScope.ts";
+import { resetNotifications, useNotifications } from "./notifications.ts";
 import {
 	resetPinnedEvaluationsClient,
 	usePinnedEvaluationsStore,
@@ -60,6 +61,10 @@ beforeEach(() => {
 		error: null,
 	});
 	resetPinnedEvaluationsClient();
+});
+
+afterEach(() => {
+	resetNotifications();
 });
 
 describe("pinned evaluations", () => {
@@ -163,6 +168,23 @@ describe("pinned evaluations", () => {
 		expect(retry.calls()).toBe(1);
 		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["a"]);
 		expect(usePinnedEvaluationsStore.getState().error).toBeNull();
+	});
+
+	it("floats failures with a reload action", async () => {
+		const store = usePinnedEvaluationsStore.getState();
+		const failed = await store.toggle(
+			"y",
+			fakeClient(["x"], true) as ApiClient,
+		);
+		expect(failed).toBe(false);
+		const items = useNotifications.getState().items;
+		expect(items).toHaveLength(1);
+		expect(items[0]).toMatchObject({
+			key: "evaluation-pins",
+			kind: "error",
+		});
+		expect(items[0]?.message).toContain("read-only");
+		expect(items[0]?.action?.label).toBe("Reload pins");
 	});
 
 	it("refetches after reset within the TTL", async () => {
