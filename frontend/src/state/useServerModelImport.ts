@@ -1,38 +1,49 @@
-import { useEffect, useMemo, useState } from "react";
-import { createApiClient } from "../api/client.ts";
+import { useMemo } from "react";
 import type { FinancialModelDocument } from "../api/contracts.ts";
+import { defaultScopedApiClient } from "../api/scopedClients.ts";
+import { responseScopeError } from "../api/scopedRequest.ts";
 import {
-	resourceScopedFactory,
-	responseScopeError,
-} from "../api/scopedRequest.ts";
-import { getResourceScope } from "../auth/resourceScope.ts";
+	getResourceScope,
+	subscribeResourceScope,
+} from "../auth/resourceScope.ts";
 import {
 	importServerModel,
 	type ServerModelImportOptions,
 } from "../api/serverModelImport.ts";
 import { useUiStore } from "./uiStore.ts";
 
-const defaultClient = resourceScopedFactory(createApiClient);
+const defaultClient = defaultScopedApiClient;
+
+// A scope transition orphans any in-flight import on the old scope (its
+// guarded requests abort and its finally skips the clear by design), so the
+// shared flag resets on publish instead of sticking until reload. This does
+// not restore the old unmount cleanup, which cleared the flag while a
+// different import on the same scope was still running.
+subscribeResourceScope(() => {
+	useUiStore.getState().setImporting(false);
+});
 
 export function useServerModelImport(
 	options: Omit<ServerModelImportOptions, "client"> & {
 		client?: ServerModelImportOptions["client"];
 	},
 ) {
-	const [importing, setImporting] = useState(false);
 	const scope = getResourceScope();
 	const api = useMemo(
 		() => options.client ?? defaultClient(),
 		[options.client],
 	);
+	// Single source of truth: the shared uiStore flag. The hook no longer
+	// keeps a local copy that can drift or clear the global on unmount while
+	// another importer runs. The flag clears in `importDocument`'s finally,
+	// not on unmount.
+	const importing = useUiStore((state) => state.importing);
 	const setSharedImporting = useUiStore((state) => state.setImporting);
-	useEffect(() => () => setSharedImporting(false), [setSharedImporting]);
 	const importDocument = async (
 		document: FinancialModelDocument,
 	): Promise<boolean> => {
 		const stale = responseScopeError(scope);
 		if (stale) throw stale;
-		setImporting(true);
 		setSharedImporting(true);
 		try {
 			const result = await importServerModel({
@@ -45,7 +56,6 @@ export function useServerModelImport(
 			return result;
 		} finally {
 			if (!responseScopeError(scope)) {
-				setImporting(false);
 				setSharedImporting(false);
 			}
 		}

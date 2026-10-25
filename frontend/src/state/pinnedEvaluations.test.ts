@@ -22,6 +22,25 @@ function fakeClient(
 	} as Pick<ApiClient, "getPinnedEvaluations" | "setPinnedEvaluations">;
 }
 
+function countingClient(pins: string[]): {
+	calls: () => number;
+	client: ApiClient;
+} {
+	let calls = 0;
+	return {
+		calls: () => calls,
+		client: {
+			getPinnedEvaluations: async () => {
+				calls += 1;
+				return { instanceIds: [...pins] };
+			},
+			setPinnedEvaluations: async (next: string[]) => ({
+				instanceIds: [...next],
+			}),
+		} as unknown as ApiClient,
+	};
+}
+
 beforeEach(() => {
 	acceptResourceScope(
 		{
@@ -110,6 +129,49 @@ describe("pinned evaluations", () => {
 		const store = usePinnedEvaluationsStore.getState();
 		await store.refresh(fakeClient(["a", "b"]) as ApiClient);
 		await store.toggle("a", fakeClient(["a", "b"]) as ApiClient);
+		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["b"]);
+	});
+
+	it("suppresses duplicate refreshes within the TTL and refetches with force", async () => {
+		const store = usePinnedEvaluationsStore.getState();
+		const first = countingClient(["a"]);
+		await store.refresh(first.client);
+		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["a"]);
+
+		const second = countingClient(["b"]);
+		await store.refresh(second.client);
+		expect(second.calls()).toBe(0);
+		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["a"]);
+
+		await store.refresh(second.client, true);
+		expect(second.calls()).toBe(1);
+		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["b"]);
+	});
+
+	it("refetches after an error without force", async () => {
+		const store = usePinnedEvaluationsStore.getState();
+		await store.refresh(fakeClient(["a"]) as ApiClient);
+		const failed = await store.toggle(
+			"y",
+			fakeClient(["a"], true) as ApiClient,
+		);
+		expect(failed).toBe(false);
+		expect(usePinnedEvaluationsStore.getState().error).toContain("read-only");
+
+		const retry = countingClient(["a"]);
+		await store.refresh(retry.client);
+		expect(retry.calls()).toBe(1);
+		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["a"]);
+		expect(usePinnedEvaluationsStore.getState().error).toBeNull();
+	});
+
+	it("refetches after reset within the TTL", async () => {
+		const store = usePinnedEvaluationsStore.getState();
+		await store.refresh(countingClient(["a"]).client);
+		store.reset();
+		const next = countingClient(["b"]);
+		await store.refresh(next.client);
+		expect(next.calls()).toBe(1);
 		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["b"]);
 	});
 });

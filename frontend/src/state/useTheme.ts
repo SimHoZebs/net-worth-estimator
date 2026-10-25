@@ -195,18 +195,10 @@ export function useTheme() {
 	const resolved = resolvePreference(preference);
 
 	useEffect(() => {
-		applyTheme(resolvePreference(useThemeStore.getState().preference));
-	}, []);
-
-	useEffect(() => {
 		applyTheme(resolvePreference(preference));
-	}, [preference]);
-
-	useEffect(() => {
 		if (preference !== "system" || typeof window === "undefined") return;
 		const media = window.matchMedia("(prefers-color-scheme: dark)");
 		const update = () => applyTheme(media.matches ? "dark" : "light");
-		update();
 		media.addEventListener("change", update);
 		return () => media.removeEventListener("change", update);
 	}, [preference]);

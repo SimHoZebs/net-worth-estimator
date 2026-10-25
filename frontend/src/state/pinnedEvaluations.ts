@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { createApiClient, type ApiClient } from "../api/index.ts";
-import { resourceScopedFactory } from "../api/scopedRequest.ts";
+import { type ApiClient } from "../api/index.ts";
+import { defaultScopedApiClient } from "../api/scopedClients.ts";
 import {
 	getResourceScope,
 	subscribeResourceScope,
@@ -11,17 +11,22 @@ export interface PinnedEvaluationsState {
 	ids: string[] | null;
 	loading: boolean;
 	error: string | null;
-	refresh: (client?: ApiClient) => Promise<void>;
+	refresh: (client?: ApiClient, force?: boolean) => Promise<void>;
 	toggle: (id: string, client?: ApiClient) => Promise<boolean>;
 	reset: () => void;
 }
 
-let defaultClient = resourceScopedFactory(createApiClient);
-
 function clientOrDefault(client?: ApiClient): ApiClient {
 	if (client) return client;
-	return defaultClient();
+	return defaultScopedApiClient();
 }
+
+// Last successful fetch per scope key so two mounted pages sharing one refresh
+// do not issue duplicate GETs. `force` bypasses the TTL after a toggle; an
+// errored state always refetches so the Reload action cannot be swallowed.
+let lastFetchedAt = 0;
+let lastFetchedScope: string | null = null;
+const PINS_TTL_MS = 30_000;
 
 /**
  * Server-persisted evaluation pins. The server is the source of truth;
@@ -34,10 +39,18 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 		ids: null,
 		loading: false,
 		error: null,
-		refresh: async (client) => {
+		refresh: async (client, force = false) => {
 			const scope = getResourceScope();
 			if (scope.status === "pending") return;
 			if (get().loading) return;
+			if (
+				!force &&
+				get().ids !== null &&
+				get().error === null &&
+				scope.key === lastFetchedScope &&
+				Date.now() - lastFetchedAt < PINS_TTL_MS
+			)
+				return;
 			set({ loading: true, error: null });
 			const result = await clientOrDefault(client).getPinnedEvaluations();
 			if (scope !== getResourceScope()) return;
@@ -45,6 +58,8 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 				set({ loading: false, error: result.message });
 				return;
 			}
+			lastFetchedAt = Date.now();
+			lastFetchedScope = scope.key;
 			set({ ids: [...result.instanceIds], loading: false });
 		},
 		toggle: async (id, client) => {
@@ -61,16 +76,23 @@ export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
 				set({ ids: previous, error: result.message });
 				return false;
 			}
+			lastFetchedAt = Date.now();
+			lastFetchedScope = scope.key;
 			set({ ids: [...result.instanceIds] });
 			return true;
 		},
-		reset: () => set({ ids: null, loading: false, error: null }),
+		reset: () => {
+			lastFetchedAt = 0;
+			lastFetchedScope = null;
+			set({ ids: null, loading: false, error: null });
+		},
 	}),
 );
 
 subscribeResourceScope(() => usePinnedEvaluationsStore.getState().reset());
 
-/** Test hook: clears the module client between cases. */
+/** Test hook: clears the pins TTL between cases (client is now shared). */
 export function resetPinnedEvaluationsClient(): void {
-	defaultClient = resourceScopedFactory(createApiClient);
+	lastFetchedAt = 0;
+	lastFetchedScope = null;
 }
