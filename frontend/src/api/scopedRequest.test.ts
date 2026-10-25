@@ -37,7 +37,7 @@ function response(
 	status = 200,
 ) {
 	const headers = new Headers({ "content-type": "application/json" });
-	if (resource) headers.set("X-Waypoint-Resource", resource);
+	if (resource) headers.set("Waypoint-Resource", resource);
 	return new Response(body, { status, headers });
 }
 
@@ -123,7 +123,7 @@ describe("resource assertion at the API boundary", () => {
 			// accept it, and the stale post-response guard rejects it.
 			expect(fetcher).toHaveBeenCalledOnce();
 			const init = fetcher.mock.calls[0]![1]!;
-			expect(new Headers(init.headers).get("X-Waypoint-Resource")).toBe(A);
+			expect(new Headers(init.headers).get("Waypoint-Resource")).toBe(A);
 		},
 	);
 
@@ -152,11 +152,11 @@ describe("resource assertion at the API boundary", () => {
 	it("sends the verified assertion, credentials, and redirect policy instead of caller assertions", async () => {
 		const fetcher = vi.fn<FetchLike>(async () => response());
 		const result = await new ApiClient({ fetch: fetcher }).getModel({
-			headers: { "X-Waypoint-Resource": B },
+			headers: { "Waypoint-Resource": B },
 		});
 		expect(result).toEqual({ private: "account-a" });
 		const init = fetcher.mock.calls[0]![1]!;
-		expect(new Headers(init.headers).get("X-Waypoint-Resource")).toBe(A);
+		expect(new Headers(init.headers).get("Waypoint-Resource")).toBe(A);
 		expect(init).toMatchObject({
 			credentials: "same-origin",
 			redirect: "error",
@@ -222,7 +222,7 @@ describe("resource assertion at the API boundary", () => {
 			const cancel = vi.fn();
 			finish(
 				new Response(new ReadableStream({ cancel }), {
-					headers: { "X-Waypoint-Resource": A },
+					headers: { "Waypoint-Resource": A },
 				}),
 			);
 			expect(await pending).toBeInstanceOf(ResourceScopeError);
@@ -247,7 +247,7 @@ describe("resource assertion at the API boundary", () => {
 			fetch: async () =>
 				new Response(body, {
 					headers: {
-						"X-Waypoint-Resource": A,
+						"Waypoint-Resource": A,
 						"content-type": "application/json",
 					},
 				}),
@@ -268,7 +268,7 @@ describe("resource assertion at the API boundary", () => {
 			fetch: async () =>
 				new Response(body, {
 					headers: {
-						"X-Waypoint-Resource": A,
+						"Waypoint-Resource": A,
 						"content-type": "text/event-stream",
 					},
 				}),
@@ -290,7 +290,7 @@ describe("resource assertion at the API boundary", () => {
 			fetch: async (_url, init) => {
 				signal = init?.signal;
 				return new Response(new ReadableStream({ cancel }), {
-					headers: { "X-Waypoint-Resource": A },
+					headers: { "Waypoint-Resource": A },
 				});
 			},
 		});
@@ -326,7 +326,7 @@ describe("resource assertion at the API boundary", () => {
 		"rechecks %s only after the server reports RESOURCE_CHANGED",
 		async (kind) => {
 			const fetcher = vi.fn<FetchLike>(async (_url, init) => {
-				expect(new Headers(init?.headers).get("X-Waypoint-Resource")).toBe(A);
+				expect(new Headers(init?.headers).get("Waypoint-Resource")).toBe(A);
 				return response(
 					JSON.stringify({ status: 409, code: "RESOURCE_CHANGED" }),
 					B,

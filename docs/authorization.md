@@ -59,7 +59,7 @@ Replacing the sample requires another explicit publication.
 ## Browser isolation
 
 `GET /v1/auth/session` returns the selected resource ID, kind, and capabilities.
-Every financial request asserts that ID in `X-Waypoint-Resource`. The backend
+Every financial request asserts that ID in `Waypoint-Resource`. The backend
 derives the current resource independently and rejects missing or stale assertions
 with 409 and problem code `RESOURCE_CHANGED`. The header does not let a caller
 select an arbitrary plan. Each save retains its original plan ID. A resource-change

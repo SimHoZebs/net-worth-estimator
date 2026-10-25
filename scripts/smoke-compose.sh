@@ -20,12 +20,12 @@ missing_status=$(curl --silent --show-error -o /dev/null -w '%{http_code}' "${fr
 test "$missing_status" = 404
 rejected_origin_status=$(curl --silent --show-error -o /dev/null -w '%{http_code}' \
 	-H "Origin: http://unlisted.example" \
-	-H "X-Waypoint-Resource: $resource" \
+	-H "Waypoint-Resource: $resource" \
 	"${frontend_url}/v1/status")
 test "$rejected_origin_status" = 403
-curl --fail --silent --show-error -H "X-Waypoint-Resource: $resource" "${frontend_url}/v1/status" | grep -q '"readOnly":true'
+curl --fail --silent --show-error -H "Waypoint-Resource: $resource" "${frontend_url}/v1/status" | grep -q '"readOnly":true'
 projection_request=$(curl --fail --silent --show-error \
-	-H "X-Waypoint-Resource: $resource" "${frontend_url}/v1/financial-model" | node --input-type=module -e '
+	-H "Waypoint-Resource: $resource" "${frontend_url}/v1/financial-model" | node --input-type=module -e '
   let data = "";
   for await (const chunk of process.stdin) data += chunk;
   const model = JSON.parse(data).document;
@@ -34,7 +34,7 @@ projection_request=$(curl --fail --silent --show-error \
 ')
 sse_response=$(curl --fail --silent --show-error --no-buffer --max-time 120 \
 	-H "Content-Type: application/json" \
-	-H "X-Waypoint-Resource: $resource" -H "Origin: $frontend_url" \
+	-H "Waypoint-Resource: $resource" -H "Origin: $frontend_url" \
 	-X POST "${frontend_url}/v1/projections/stochastic" \
 	--data "$projection_request")
 printf '%s' "$sse_response" | grep -q 'event: result'

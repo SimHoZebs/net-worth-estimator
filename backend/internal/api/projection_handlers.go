@@ -58,7 +58,7 @@ type projectionRange struct {
 
 type deterministicOutput struct {
 	Status int    `json:"-"`
-	Cache  string `header:"X-Cache"`
+	Cache  string `header:"Cache-Status"`
 	Body   struct {
 		Result *types.ProjectionResult      `json:"result,omitempty"`
 		Issues []types.ModelValidationIssue `json:"issues,omitempty"`
@@ -89,7 +89,7 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 	})
 	if cached, err := lookupArtifact[types.ProjectionResult](s.store, cacheKey); err == nil && cached.hit {
 		// huma writes Status verbatim; leaving it zero panics the writer.
-		output := &deterministicOutput{Status: http.StatusOK, Cache: "hit"}
+		output := &deterministicOutput{Status: http.StatusOK, Cache: cacheStatusHit}
 		cachedCopy := cached.value
 		output.Body.Result = clipProjectionRange(&cachedCopy, input.Body.Range)
 		return output, nil
@@ -102,7 +102,7 @@ func (s *Server) projectDeterministic(ctx context.Context, input *struct {
 	result, err := domain.ProjectFinancialModelDocument(document, &input.Body.Settings, input.Body.Overrides, nil)
 	// huma writes this status verbatim; default to 200 and only raise it for
 	// unexpected failures.
-	output := &deterministicOutput{Status: http.StatusOK, Cache: "miss"}
+	output := &deterministicOutput{Status: http.StatusOK, Cache: cacheStatusMiss}
 	if err != nil {
 		output.Body.Error = err.Error()
 		if preparationError, ok := err.(*domain.SimulationPreparationError); ok {

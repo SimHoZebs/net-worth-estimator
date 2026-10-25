@@ -58,7 +58,7 @@ function status(body: unknown, code = 200) {
 		typeof body.resource === "object" &&
 		"id" in body.resource
 	)
-		headers.set("X-Waypoint-Resource", String(body.resource.id));
+		headers.set("Waypoint-Resource", String(body.resource.id));
 	return new Response(JSON.stringify(body), {
 		status: code,
 		headers,

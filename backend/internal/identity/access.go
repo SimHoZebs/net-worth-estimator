@@ -8,7 +8,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 )
 
-const ResourceHeader = "X-Waypoint-Resource"
+const ResourceHeader = "Waypoint-Resource"
 
 // WriteResourceChanged distinguishes a stale plan assertion from an operation conflict.
 func WriteResourceChanged(w http.ResponseWriter) {

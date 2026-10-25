@@ -43,7 +43,7 @@ The container boundary is split. `backend/Dockerfile` produces an API-only image
 }
 ```
 
-Each issue contains `severity`, `code`, `message`, and `path`. The stored model is loaded in one read transaction. The response always includes a non-null issue array; `document` is null when the store has no canonical model. `revision` and the `ETag` response header identify canonical content for reads and caching.
+Each issue contains `severity`, `code`, `message`, and `path`. The stored model is loaded in one read transaction. The response always includes a non-null issue array; `document` is null when the store has no canonical model. `revision` in the body identifies canonical content for reads and caching.
 
 Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, and `/v1/sync/simplefin/accounts` validates the resulting document and returns `{row, issues, persisted, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions.
 
@@ -94,7 +94,7 @@ Resolution rules:
 - `overrides` are applied by `types.ApplyModelOverrides` to a new document value; stored state is unchanged.
 - `range` clips the returned timeline to a closed date interval and is required: a missing range fails request validation (422), and an empty, malformed, or inverted range returns 400. Either bound may be omitted for an open end. Rows and movement events outside the interval are dropped. Evaluations ride along only when the slice holds projected rows. Totals, summary, milestones, and account summaries keep full-result values in every range. The stored artifact is always the full result regardless of range, so a narrow request warms the later full request instead of computing twice.
 
-A successful response has `result` and `X-Cache: hit|miss`.
+A successful response has `result` and `Cache-Status: waypoint; hit|miss`.
 
 A `domain.SimulationPreparationError`, including model validation failure, returns HTTP 200 with `issues`. An unexpected execution error returns HTTP 500 with `error`. Cache read and write failures do not prevent computation.
 
@@ -124,13 +124,12 @@ The response is `text/event-stream` with `Cache-Control: no-store`. It writes `r
 
 A `partial` result is a cumulative snapshot. A slow attached stream may skip intermediate snapshots because the next one supersedes them.
 
-`X-Cache` semantics:
+`Cache-Status` semantics (RFC 9211):
 
-| Value    | Meaning                                                                        |
-| -------- | ------------------------------------------------------------------------------ |
-| `hit`    | completed seeded result loaded from SQLite; stream contains one `result` event |
-| `miss`   | this request owns a new seeded run, or an unseeded request-bound run           |
-| `attach` | this request attached to an identical seeded run already in progress           |
+| Value           | Meaning                                                                        |
+| --------------- | ------------------------------------------------------------------------------ |
+| `waypoint; hit` | completed seeded result loaded from SQLite; stream contains one `result` event |
+| `waypoint; miss`| this request owns a new seeded run, or an unseeded request-bound run, or attached to an identical seeded run already in progress |
 
 An attached seeded request receives the latest cumulative snapshot, if one exists, and then remaining events. A stream disconnect detaches only that stream. The shared seeded computation continues. Completed seeded runs are evicted from the in-process registry at completion; later reconnects use the SQLite artifact cache.
 
@@ -151,7 +150,7 @@ An unseeded run does not use the shared registry or artifact cache. Its context 
 
 ### Origin and write policy
 
-`ParseAllowedOrigins` accepts comma-separated exact HTTP/S origins. It rejects non-root paths, queries, fragments, credentials, invalid ports, empty entries, and wildcard values. CORS permits `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, and `OPTIONS`, and only `Content-Type` and `X-Waypoint-Resource` request headers. Same-origin requests are accepted automatically; configured origins are checked exactly. A TLS-terminating proxy must forward exactly one valid `X-Forwarded-Proto` and `X-Forwarded-Host` value, or have its public HTTPS origin listed in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`.
+`ParseAllowedOrigins` accepts comma-separated exact HTTP/S origins. It rejects non-root paths, queries, fragments, credentials, invalid ports, empty entries, and wildcard values. CORS permits `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, and `OPTIONS`, and only `Content-Type` and `Waypoint-Resource` request headers. Same-origin requests are accepted automatically; configured origins are checked exactly. A TLS-terminating proxy must forward exactly one valid `X-Forwarded-Proto` and `X-Forwarded-Host` value, or have its public HTTPS origin listed in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`.
 
 A request without an `Origin` header passes. Origin filtering does not grant write access.
 

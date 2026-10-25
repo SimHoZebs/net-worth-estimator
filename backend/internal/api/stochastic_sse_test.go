@@ -94,8 +94,8 @@ func TestStochasticSSESeededLifecycleMissThenHit(t *testing.T) {
 	if first.Code != http.StatusOK {
 		t.Fatalf("first status = %d, body %s", first.Code, first.Body.String())
 	}
-	if got := first.Header().Get("X-Cache"); got != "miss" {
-		t.Fatalf("first X-Cache = %q, want miss", got)
+	if got := first.Header().Get("Cache-Status"); got != cacheStatusMiss {
+		t.Fatalf("first Cache-Status = %q, want miss", got)
 	}
 	events := sseEvents(t, first.Body.String())
 	if len(events["result"]) != 1 {
@@ -103,8 +103,8 @@ func TestStochasticSSESeededLifecycleMissThenHit(t *testing.T) {
 	}
 
 	second := postStochastic(t, handler, body)
-	if got := second.Header().Get("X-Cache"); got != "hit" {
-		t.Fatalf("second X-Cache = %q, want hit", got)
+	if got := second.Header().Get("Cache-Status"); got != cacheStatusHit {
+		t.Fatalf("second Cache-Status = %q, want hit", got)
 	}
 	if sseEvents(t, second.Body.String())["result"][0] != events["result"][0] {
 		t.Fatalf("cached result differs from computed result")
@@ -144,8 +144,8 @@ func TestStochasticSSEAttachJoinsInFlightRun(t *testing.T) {
 	}
 
 	second := postStochastic(t, handler, body)
-	if got := second.Header().Get("X-Cache"); got != "attach" {
-		t.Fatalf("second X-Cache = %q, want attach", got)
+	if got := second.Header().Get("Cache-Status"); got != cacheStatusMiss {
+		t.Fatalf("second Cache-Status = %q, want miss", got)
 	}
 	secondEvents := sseEvents(t, second.Body.String())
 	if len(secondEvents["partial"]) == 0 {
@@ -177,8 +177,8 @@ func TestStochasticSSEUnseededBypassesRegistry(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, body %s", response.Code, response.Body.String())
 	}
-	if got := response.Header().Get("X-Cache"); got != "miss" {
-		t.Fatalf("X-Cache = %q, want miss", got)
+	if got := response.Header().Get("Cache-Status"); got != cacheStatusMiss {
+		t.Fatalf("Cache-Status = %q, want miss", got)
 	}
 	if len(sseEvents(t, response.Body.String())["result"]) != 1 {
 		t.Fatalf("unseeded response has no result event, body %s", response.Body.String())

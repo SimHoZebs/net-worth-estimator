@@ -162,8 +162,8 @@ export async function scopedRequest(
 	const lifetime = requestLifetime(scope, init.signal);
 	const headers = new Headers(init.headers);
 	// The assertion always comes from discovery, never caller-supplied options.
-	headers.delete("X-Waypoint-Resource");
-	headers.set("X-Waypoint-Resource", scope.resource.id);
+	headers.delete("Waypoint-Resource");
+	headers.set("Waypoint-Resource", scope.resource.id);
 	let response: Response;
 	try {
 		response = await fetcher(url, {
@@ -184,7 +184,7 @@ export async function scopedRequest(
 	if (
 		stale ||
 		(response.ok &&
-			response.headers.get("X-Waypoint-Resource") !== scope.resource.id)
+			response.headers.get("Waypoint-Resource") !== scope.resource.id)
 	) {
 		lifetime.dispose();
 		void response.body?.cancel().catch(() => {});

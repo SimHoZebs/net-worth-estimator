@@ -82,7 +82,7 @@ async function session(context) {
 }
 async function request(context, scope, method, path, data, headers = {}) {
   return context.request.fetch(`${origin.origin}${path}`, { method, data,
-    headers: { 'X-Waypoint-Resource': scope.resource.id, ...headers } });
+    headers: { 'Waypoint-Resource': scope.resource.id, ...headers } });
 }
 async function login(context, signup = false) {
   const page = await context.newPage();
@@ -199,7 +199,7 @@ try {
 
   assert.equal((await request(owner, own, 'POST', '/v1/auth/logout')).status(), 200);
   const replay = await fetch(`${origin.origin}/v1/accounts`, { method: 'POST', headers: {
-    Cookie: `${cookie.name}=${cookie.value}`, 'X-Waypoint-Resource': own.resource.id, 'Content-Type': 'application/json',
+    Cookie: `${cookie.name}=${cookie.value}`, 'Waypoint-Resource': own.resource.id, 'Content-Type': 'application/json',
   }, body: JSON.stringify({ name: 'Captured cookie attempt', kind: 'cash', enabled: true }) });
   assert.equal(replay.status, 401);
   assert.equal((await request(owner, own, 'GET', '/v1/financial-model')).status(), 409);

@@ -35,9 +35,7 @@ test("an ordinary save conflict preserves edits without another session check", 
 			status: 409,
 			contentType: "application/problem+json",
 			headers: {
-				"X-Waypoint-Resource": route.request().headers()[
-					"x-waypoint-resource"
-				]!,
+				"Waypoint-Resource": route.request().headers()["waypoint-resource"]!,
 			},
 			json: { status: 409, detail: "That change conflicts with server data." },
 		});

@@ -242,7 +242,7 @@ func TestCORSMiddlewareHandlesPreflight(t *testing.T) {
 	request := httptest.NewRequest(http.MethodOptions, "/v1/financial-model", nil)
 	request.Header.Set("Origin", allowedTestOrigin)
 	request.Header.Set("Access-Control-Request-Method", http.MethodPut)
-	request.Header.Set("Access-Control-Request-Headers", "content-type, x-waypoint-resource")
+	request.Header.Set("Access-Control-Request-Headers", "content-type, waypoint-resource")
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)
@@ -271,7 +271,7 @@ func TestCORSMiddlewareAllowsRowMethodPreflights(t *testing.T) {
 		request := httptest.NewRequest(http.MethodOptions, "/v1/accounts/x", nil)
 		request.Header.Set("Origin", allowedTestOrigin)
 		request.Header.Set("Access-Control-Request-Method", method)
-		request.Header.Set("Access-Control-Request-Headers", "content-type, X-Waypoint-Resource")
+		request.Header.Set("Access-Control-Request-Headers", "content-type, Waypoint-Resource")
 		response := httptest.NewRecorder()
 
 		handler.ServeHTTP(response, request)

@@ -23,6 +23,13 @@ import (
 
 const artifactCacheVersion = 6
 
+// Cache-Status values (RFC 9211). Shared-run attach collapses to miss in
+// the header; logs distinguish owner miss from attach.
+const (
+	cacheStatusHit  = "waypoint; hit"
+	cacheStatusMiss = "waypoint; miss"
+)
+
 func mustCanonical(payload any) string {
 	encoded, err := json.Marshal(payload)
 	if err != nil {

@@ -28,7 +28,7 @@ trap 'rm -f "$tmp"' EXIT
 # request <METHOD> <path> : curls into $tmp, prints body on non-200, fails.
 request() {
 	local method="$1" path="$2" code
-	code="$(curl -sS --cookie "$COOKIE_FILE" -H "X-Waypoint-Resource: $RESOURCE_ID" \
+	code="$(curl -sS --cookie "$COOKIE_FILE" -H "Waypoint-Resource: $RESOURCE_ID" \
 		-H "Origin: $PUBLIC_ORIGIN" -o "$tmp" -w '%{http_code}' -X "$method" "$base$path")"
 	if [ "$code" != "200" ]; then
 		echo "FAIL $method $path -> HTTP $code" >&2
