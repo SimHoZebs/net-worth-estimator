@@ -117,8 +117,9 @@ func reportsMutation(method, path string) bool {
 }
 
 // mutationNotifyMiddleware reports successful state changes to the owner.
-// A rejected write still reports, but WarmResource skips present
-// artifacts, so false positives cost lookups instead of recomputes.
+// Only 2xx responses report, so rejected writes cost nothing. Reports that
+// arrive without content changes still skip recomputation inside
+// WarmResource, costing a document load plus lookups.
 func mutationNotifyMiddleware(onMutated func(string), resourceID string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
