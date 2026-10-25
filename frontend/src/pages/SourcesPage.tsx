@@ -1,20 +1,19 @@
 import { AmountCatalog } from "../components/editors/AmountCatalog.tsx";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { useWorkspaceStore, selectPlan } from "../state/workspaceStore.ts";
 import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
 import { SourceBanner } from "./sources/SourceHealth.tsx";
 
 export function SourcesPage() {
 	// Everything subscribes here, including the access control.
-	const workspace = useWorkspaceStore((state) => state.workspace);
-	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const plan = useWorkspaceStore(selectPlan);
 	const serverDocument = useWorkspaceStore((state) => state.serverDocument);
 	const statusReadOnly = useWorkspaceStore(
 		(state) => state.status?.readOnly ?? false,
 	);
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
 	const onUpdatePlan = useWorkspaceStore((state) => state.updatePlan);
-	if (!workspace || !plan) return null;
-	const readOnly = statusReadOnly || writeBlocked || workspace.saved.readOnly;
+	if (!plan) return null;
+	const readOnly = statusReadOnly || writeBlocked || plan.readOnly;
 	const sourceAccess = readOnly ? "Read-only" : "Writable";
 	return (
 		<>

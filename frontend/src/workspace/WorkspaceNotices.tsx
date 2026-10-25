@@ -4,10 +4,14 @@ import { useWorkspaceStore } from "../state/workspaceStore.ts";
 
 function useErrorRecovery(): { action: string; onAction: () => void } {
 	const stale = useWorkspaceStore(
-		(state) => state.workspace?.draftStale ?? false,
+		(state) =>
+			(state.workspace?.draftStale ?? false) ||
+			state.errorCode === "stale-draft",
 	);
 	const storageConflict = useWorkspaceStore(
-		(state) => state.error?.includes("changed in another tab") ?? false,
+		(state) =>
+			state.errorCode === "storage-conflict" ||
+			(state.error?.includes("changed in another tab") ?? false),
 	);
 	const reloadDraft = useWorkspaceStore((state) => state.reloadDraft);
 	const retry = useWorkspaceStore((state) => state.retry);
@@ -34,11 +38,7 @@ export function workspaceStatusLabel({ readOnly }: { readOnly: boolean }) {
 export function WorkspaceNotices() {
 	const error = useWorkspaceStore((state) => state.error);
 	const recovery = useErrorRecovery();
-	return (
-		<>
-			{error && <ErrorNotice message={error} {...recovery} />}
-		</>
-	);
+	return <>{error && <ErrorNotice message={error} {...recovery} />}</>;
 }
 
 export function WorkspaceNotification() {

@@ -11,7 +11,7 @@ import type { Projection } from "../domain/result.ts";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { useWorkspaceStore, selectPlan } from "../state/workspaceStore.ts";
 import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
 import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
 import type { SafeSpendingDetailTab } from "./outlook/safe-spending/safeSpendingDetailModel.ts";
@@ -62,11 +62,10 @@ function OutlookContent({
 }: OutlookProps) {
 	// Every data input subscribes where the query is declared; only UI
 	// callbacks arrive as props.
-	const workspace = useWorkspaceStore((state) => state.workspace);
 	const checkpoints = useWorkspaceStore(
 		(state) => state.serverDocument?.checkpoints ?? EMPTY_CHECKPOINTS,
 	);
-	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const plan = useWorkspaceStore(selectPlan);
 	const years = useUiStore((state) => state.years);
 	const setYears = useUiStore((state) => state.setYears);
 	const ranges = useUiStore((state) => state.ranges);

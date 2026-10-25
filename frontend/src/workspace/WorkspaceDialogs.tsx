@@ -2,9 +2,12 @@ import { Suspense, lazy } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { PlanEditor } from "../components/PlanEditor.tsx";
 import { Skeleton } from "../components/ui.tsx";
-import { changesBetween } from "../domain/model.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import {
+	selectDraftChangeCount,
+	selectPlan,
+	useWorkspaceStore,
+} from "../state/workspaceStore.ts";
 import type { WorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 
 const EvidenceDialog = lazy(() =>
@@ -28,8 +31,8 @@ function WorkspaceEvidenceLoaded({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const workspace = useWorkspaceStore((state) => state.workspace);
-	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const plan = useWorkspaceStore(selectPlan);
+	const hasDraft = useWorkspaceStore((state) => state.workspace?.draft != null);
 	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	const projection = useRemoteProjection({ ranges: false });
 	const base =
@@ -43,7 +46,7 @@ function WorkspaceEvidenceLoaded({
 				target={overlays.evidence}
 				plan={plan}
 				projection={base}
-				temporary={Boolean(workspace?.draft)}
+				temporary={hasDraft}
 				onClose={overlays.closeEvidence}
 				onEdit={overlays.editFromEvidence}
 				onApply={updatePlan}
@@ -57,14 +60,10 @@ export function WorkspaceDialogs({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const workspace = useWorkspaceStore((state) => state.workspace);
-	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const plan = useWorkspaceStore(selectPlan);
 	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	const applyError = useWorkspaceStore((state) => state.error);
-	const changeCount =
-		workspace && plan
-			? changesBetween({ saved: workspace.saved, current: plan }).length
-			: 0;
+	const changeCount = useWorkspaceStore(selectDraftChangeCount);
 	if (!plan) return null;
 	return (
 		<>

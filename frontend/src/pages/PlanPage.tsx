@@ -26,7 +26,7 @@ import {
 import { resolveMovementAmounts } from "../domain/resolvedMovementAmounts.ts";
 import type { Projection } from "../domain/result.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { useWorkspaceStore, selectPlan } from "../state/workspaceStore.ts";
 import { AccountsPanel } from "./plan/AccountsPanel.tsx";
 import { MovementsPanel } from "./plan/MovementsPanel.tsx";
 
@@ -47,8 +47,7 @@ export function PlanPage({
 }) {
 	// Plan data and actions subscribe here; only the viewed tab and UI
 	// callbacks arrive as props.
-	const workspace = useWorkspaceStore((state) => state.workspace);
-	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const plan = useWorkspaceStore(selectPlan);
 	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	if (!plan) return null;
 	if (view === "accounts") {

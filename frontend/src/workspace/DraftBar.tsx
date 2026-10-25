@@ -1,38 +1,31 @@
-import { useState } from "react";
 import { GitBranch, RotateCcw, Save } from "lucide-react";
 import { Button } from "../components/Button.tsx";
-import { changesBetween } from "../domain/model.ts";
 import { useUiStore } from "../state/uiStore.ts";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import {
+	selectDraftChangeCount,
+	selectPlan,
+	useWorkspaceStore,
+} from "../state/workspaceStore.ts";
 
 export function DraftBar({ onDiscard }: { onDiscard: () => void }) {
 	// Draft state subscribes here; the save runs against the store directly so
 	// no review step or navigation callback is needed.
-	const workspace = useWorkspaceStore((state) => state.workspace);
-	const plan = workspace?.draft ?? workspace?.saved ?? null;
+	const plan = useWorkspaceStore(selectPlan);
 	const workspaceLoading = useWorkspaceStore((state) => state.loading);
+	const saving = useWorkspaceStore((state) => state.saving);
 	const statusReadOnly = useWorkspaceStore(
 		(state) => state.status?.readOnly ?? false,
 	);
 	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
 	const save = useWorkspaceStore((state) => state.save);
 	const importing = useUiStore((state) => state.importing);
-	const [saving, setSaving] = useState(false);
-	const loading = workspaceLoading || importing;
+	const count = useWorkspaceStore(selectDraftChangeCount);
+	const loading = workspaceLoading || importing || saving;
 	const readOnly = statusReadOnly || writeBlocked || (plan?.readOnly ?? true);
-	const count =
-		workspace && plan
-			? changesBetween({ saved: workspace.saved, current: plan }).length
-			: 0;
 	if (!count) return null;
-	const saveChanges = async () => {
+	const saveChanges = () => {
 		if (saving) return;
-		setSaving(true);
-		try {
-			await save();
-		} finally {
-			setSaving(false);
-		}
+		void save();
 	};
 	return (
 		<div

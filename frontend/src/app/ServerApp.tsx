@@ -1,6 +1,6 @@
 import { useUiStore } from "../state/uiStore.ts";
 import { useWorkspaceStartup } from "../state/useWorkspaceStartup.ts";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { selectPlan, useWorkspaceStore } from "../state/workspaceStore.ts";
 import { WorkspaceShell } from "../WorkspaceShell.tsx";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { ServerLoadingShell } from "./ServerLoadingShell.tsx";
@@ -11,9 +11,7 @@ export function ServerApp() {
 	// No fetched data travels as props anywhere in this tree.
 	useWorkspaceStartup();
 	const navigation = useWorkspaceNavigation();
-	const hasPlan = useWorkspaceStore((state) =>
-		Boolean(state.workspace?.draft ?? state.workspace?.saved),
-	);
+	const hasPlan = useWorkspaceStore((state) => selectPlan(state) != null);
 	const loading = useWorkspaceStore((state) => state.loading);
 	const importing = useUiStore((state) => state.importing);
 
