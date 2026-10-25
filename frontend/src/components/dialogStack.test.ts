@@ -4,13 +4,13 @@ import {
 	isTopmostDialog,
 	useHasOpenDialog,
 	useOpenDialogRegistration,
-} from "./dialogPresence.ts";
+} from "./dialogStack.ts";
 
 afterEach(() => {
 	cleanup();
 });
 
-describe("dialog presence", () => {
+describe("dialog stack", () => {
 	it("reports no dialog when none registers", () => {
 		expect(renderHook(() => useHasOpenDialog()).result.current).toBe(false);
 	});

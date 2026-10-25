@@ -10,7 +10,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { cssVariables } from "./cssVariables.ts";
 import { mergeStyles } from "./mergeStyles.ts";
 import { Button, IconButton, TextButton } from "./Button.tsx";
-import { useOpenDialogRegistration } from "./dialogPresence.ts";
+import { useOpenDialogRegistration } from "./dialogStack.ts";
 import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
 import { Notice } from "./Notice.tsx";
 import type { VariantProps } from "class-variance-authority";
