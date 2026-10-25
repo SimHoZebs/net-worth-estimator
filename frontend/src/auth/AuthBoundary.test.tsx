@@ -7,6 +7,8 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthBoundary } from "./AuthBoundary.tsx";
+import { NotificationCenter } from "../components/NotificationCenter.tsx";
+import { resetNotifications } from "../state/notifications.ts";
 import { resetServerQueryCache } from "../state/serverQuery.ts";
 import { redirectToSignIn } from "./navigation.ts";
 import { SessionAccountControl } from "./SessionAccountControl.tsx";
@@ -32,6 +34,7 @@ let visibilityStateTouched = false;
 afterEach(() => {
 	cleanup();
 	resetServerQueryCache();
+	resetNotifications();
 	vi.unstubAllGlobals();
 	vi.clearAllMocks();
 	if (visibilityStateTouched) {
@@ -275,7 +278,7 @@ describe("provider-independent authentication boundary", () => {
 			expect(screen.getByText("Private workspace")).toBeTruthy(),
 		);
 	});
-	it("keeps a verified workspace mounted behind a retry banner on a transient outage", async () => {
+	it("keeps a verified workspace mounted with a retry toast on a transient outage", async () => {
 		const fetcher = vi.fn(async () =>
 			status({
 				enabled: true,
@@ -289,6 +292,7 @@ describe("provider-independent authentication boundary", () => {
 		render(
 			<AuthBoundary>
 				<p>Private workspace</p>
+				<NotificationCenter />
 			</AuthBoundary>,
 		);
 		expect(await screen.findByText("Private workspace")).toBeTruthy();

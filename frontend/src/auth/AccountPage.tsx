@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { Button } from "../components/Button.tsx";
 import { InputField } from "../components/Field.tsx";
+import {
+	useErrorToast,
+	useSuccessToast,
+} from "../components/NotificationCenter.tsx";
 import { redirectToSignIn } from "./navigation.ts";
 import { useSession } from "./sessionContext.ts";
 import {
@@ -59,6 +63,9 @@ export function AccountPage() {
 		})();
 		return () => controller.abort();
 	}, [session?.authenticated, reloadKey]);
+
+	useErrorToast("account", error || null);
+	useSuccessToast("account-notice", notice || null, () => setNotice(""));
 
 	if (!session?.allowed) return null;
 	if (!session.authenticated) {
@@ -267,17 +274,6 @@ export function AccountPage() {
 						)}
 					</div>
 				</>
-			)}
-
-			{notice && (
-				<p role="status" className="m-0 text-sm text-primary">
-					{notice}
-				</p>
-			)}
-			{error && (
-				<p role="alert" className="m-0 text-sm text-danger-text">
-					{error}
-				</p>
 			)}
 		</section>
 	);

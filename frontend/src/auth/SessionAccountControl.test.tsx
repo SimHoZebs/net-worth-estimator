@@ -8,6 +8,8 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetServerQueryCache } from "../state/serverQuery.ts";
+import { NotificationCenter } from "../components/NotificationCenter.tsx";
+import { resetNotifications } from "../state/notifications.ts";
 import { AuthBoundary } from "./AuthBoundary.tsx";
 import { redirectToSignIn } from "./navigation.ts";
 import { SessionAccountControl } from "./SessionAccountControl.tsx";
@@ -56,6 +58,7 @@ function renderAccount() {
 		<AuthBoundary>
 			<SessionAccountControl />
 			<p>Workspace content</p>
+			<NotificationCenter />
 		</AuthBoundary>,
 	);
 }
@@ -65,6 +68,7 @@ beforeEach(() => vi.stubGlobal("BroadcastChannel", undefined));
 afterEach(() => {
 	cleanup();
 	resetServerQueryCache();
+	resetNotifications();
 	vi.unstubAllGlobals();
 	vi.clearAllMocks();
 	window.history.replaceState(null, "", "/");
@@ -462,8 +466,8 @@ describe("session account controls", () => {
 		unavailable = true;
 		act(() => window.dispatchEvent(new Event("focus")));
 		await screen.findByRole("alert");
-		// Transient outages keep the workspace mounted behind a single retry
-		// banner instead of wiping to a full-screen error.
+		// Transient outages keep the workspace mounted with a single retry
+		// toast instead of wiping to a full-screen error.
 		expect(screen.getByText("Workspace content")).toBeTruthy();
 		expect(screen.getAllByRole("alert")).toHaveLength(1);
 		fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
