@@ -36,8 +36,8 @@ func seedRunnerAccounts(t *testing.T, database store.Store) {
 		}
 	}
 	for _, link := range []store.AccountLink{
-		{BridgeAccountID: "mock-checking", ModelAccountID: "checking", Origin: store.LinkOriginManual},
-		{BridgeAccountID: "mock-prime", ModelAccountID: "prime_card", Origin: store.LinkOriginManual},
+		{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", Origin: store.LinkOriginManual},
+		{BridgeAccountID: "bridge-prime", ModelAccountID: "prime_card", Origin: store.LinkOriginManual},
 	} {
 		if _, err := database.SaveAccountLink(link); err != nil {
 			t.Fatalf("seed link %s: %v", link.BridgeAccountID, err)
@@ -51,8 +51,8 @@ func TestSyncProvisionsUnmappedBridgeAccounts(t *testing.T) {
 	runner := NewRunner(database, Config{}, nil)
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return &AccountSet{Accounts: []Account{
-			{ID: "mock-checking", Name: "Checking", Currency: "USD", Balance: "100.00"},
-			{ID: "mock-new", Name: "New Savings", Currency: "USD", Balance: "10.00"},
+			{ID: "bridge-checking", Name: "Checking", Currency: "USD", Balance: "100.00"},
+			{ID: "bridge-new", Name: "New Savings", Currency: "USD", Balance: "10.00"},
 		}}, nil
 	}
 	summary, err := runner.Sync(context.Background())
@@ -67,7 +67,7 @@ func TestSyncProvisionsUnmappedBridgeAccounts(t *testing.T) {
 		t.Fatalf("links = %+v, err %v", links, err)
 	}
 	for _, link := range links {
-		if link.BridgeAccountID == "mock-new" && link.Origin != "auto" {
+		if link.BridgeAccountID == "bridge-new" && link.Origin != "auto" {
 			t.Fatalf("provisioned link = %+v, want auto origin", link)
 		}
 	}
@@ -79,7 +79,7 @@ func TestSyncSkipsStaleLinksWithoutWriting(t *testing.T) {
 	if _, err := database.CreateAccount(types.Account{ID: "ghost", Name: "Ghost"}); err != nil {
 		t.Fatalf("create ghost: %v", err)
 	}
-	if _, err := database.SaveAccountLink(store.AccountLink{BridgeAccountID: "mock-old", ModelAccountID: "ghost", BridgeName: "Old"}); err != nil {
+	if _, err := database.SaveAccountLink(store.AccountLink{BridgeAccountID: "bridge-old", ModelAccountID: "ghost", BridgeName: "Old"}); err != nil {
 		t.Fatalf("save link: %v", err)
 	}
 	if err := database.DeleteAccount("ghost"); err != nil {
@@ -88,7 +88,7 @@ func TestSyncSkipsStaleLinksWithoutWriting(t *testing.T) {
 	runner := NewRunner(database, Config{}, nil)
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return &AccountSet{Accounts: []Account{
-			{ID: "mock-old", Name: "Old", Currency: "USD", Balance: "10.00"},
+			{ID: "bridge-old", Name: "Old", Currency: "USD", Balance: "10.00"},
 		}}, nil
 	}
 	summary, err := runner.Sync(context.Background())

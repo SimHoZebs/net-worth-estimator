@@ -89,7 +89,6 @@ test('native Compose consumes the exported environment and isolates dev from pro
     assert.ok(interpolation.stdout.split('\n').includes(`DEV_OWNER_SUBJECT=${config.ownerSubject}`));
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_AUTH_PROVIDER, 'casdoor');
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL, '');
-    assert.equal(backend.environment.NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK, '');
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_AUTH_TOKEN, undefined);
     assert.equal(backend.user, `${process.getuid()}:${process.getgid()}`);
     assert.equal(backend.volumes[0].source, resolve('tmp/dev/data'));

@@ -349,12 +349,11 @@ Expected status: 200. Also verify unsupported preflight methods and request head
 
 ## SimpleFIN Checks
 
-For local fixture verification, set exact dry-run and fixture mode:
+For live Bridge verification, set the access URL and card set:
 
 ```bash
-export NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK=1
+export NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL=https://bridge.simplefin.org/simplefin/claim/...
 export NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS=prime_card
-export NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
@@ -364,7 +363,7 @@ With a writable owner session and its resource assertion, trigger and inspect co
 curl -fsS -X POST "$BASE_URL/v1/sync/simplefin" | jq .
 ```
 
-The response must report `dryRun: true` with `accountsProvisioned: 2` (mock accounts auto-provision on first sync). Reload the model and confirm no rows were committed. Link a mock bridge account to a model account through `PUT /v1/sync/simplefin/accounts/{bridgeAccountId}` and list links with `GET` on the same path. Restart the server (clears the in-memory trigger stamp), trigger again, and confirm checkpoints resolve to the linked accounts. A second successful trigger inside the configured interval (default 6 hours) returns 429; the interval guard stamps successful runs only.
+The response reports `checkpointsInserted`, `pendingInserted`, and `accountsProvisioned`. Link a bridge account to a model account through `PUT /v1/sync/simplefin/accounts/{bridgeAccountId}` and list links with `GET` on the same path. Restart the server (clears the in-memory trigger stamp), trigger again, and confirm checkpoints resolve to the linked accounts. A second successful trigger inside the configured interval (default 6 hours) returns 429; the interval guard stamps successful runs only.
 
 A guard test belongs in Go and runs with:
 

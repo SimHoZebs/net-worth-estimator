@@ -4,7 +4,7 @@ Status: implemented. Current contracts live in `backend/cmd/server/sync.go`, `ba
 
 ## Objective
 
-Synchronize the narrow set of source data that the financial model cannot infer safely: current mapped account balances and pending negative card charges. Keep the source secret, make row ownership explicit, make dry-run the first live operator step, and preserve a recoverable cutover path.
+Synchronize the narrow set of source data that the financial model cannot infer safely: current mapped account balances and pending negative card charges. Keep the source secret, make row ownership explicit, and preserve a recoverable backup path.
 
 ## Scope
 
@@ -31,24 +31,18 @@ Rows outside scope are counted by reason. Amounts and descriptions are omitted f
 - Protocol errors disclose only the Bridge host and status. HTTP transport errors can wrap the full request URL; failed trigger responses and scheduler logs are therefore sensitive until error redaction is implemented.
 - Derived checkpoints and pending labels are visible through `GET /v1/financial-model`; protect that route according to the separate access-control plan if the resulting balances are sensitive.
 - `POST /v1/sync/simplefin` uses the same read-only and bearer policy as row writes.
-- Dry-run mode must not commit source rows, even when the fetch and mapping succeed.
 - One service instance owns the scheduler and SQLite writer. Multiple scheduler replicas are outside this plan.
 
 ## Configuration
 
-| Variable                                   | Required          | Meaning                                                          |
-| ------------------------------------------ | ----------------- | ---------------------------------------------------------------- |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` | real mode         | Bridge Access URL secret; an empty value disables the runner     |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS`      | for pending seeds | comma-separated model account IDs treated as cards               |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN`    | optional          | exact value `1` enables dry-run; all other values disable it     |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK`       | fixture mode only | exact value `1` enables deterministic fixture responses          |
-| `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE`  | optional          | Bridge-shaped JSON file, valid only when fixture mode is enabled |
+| Variable                                   | Required          | Meaning                                                      |
+| ------------------------------------------ | ----------------- | ------------------------------------------------------------ |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` | real mode         | Bridge Access URL secret; an empty value disables the runner |
+| `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS`      | for pending seeds | comma-separated model account IDs treated as cards           |
 
 Startup rules:
 
-- fixture mode and a real Access URL are mutually exclusive;
-- a fixture file without fixture mode is fatal;
-- an empty Access URL without fixture mode disables synchronization and makes the trigger return 503;
+- an empty Access URL disables synchronization and makes the trigger return 503;
 - env bootstrap entries pointing at missing model accounts fail the sync loudly instead of writing ghost checkpoints;
 - changing a secret requires a service restart.
 
@@ -136,7 +130,7 @@ The trigger summary returns counts only. It does not return raw account balances
 3. skip it when an owner checkpoint owns the key;
 4. delete the existing sync pending snapshot for each configured card;
 5. insert the fresh pending snapshot;
-6. commit, unless dry-run is active.
+6. commit.
 
 Pending deletion is constrained by all of:
 
@@ -145,8 +139,6 @@ Pending deletion is constrained by all of:
 - escaped `sfin-pending-<account>-%` pattern.
 
 It never uses a broad namespace match across all accounts.
-
-Dry-run performs the same count work and returns before commit. The deferred rollback then leaves every table unchanged.
 
 ## Fetch and Failure Semantics
 
@@ -189,18 +181,6 @@ Operational constraints:
 
 The interval stamp is in memory and clears on process restart.
 
-## Fixture Mode
-
-Fixture mode is a temporary operator aid, not a separate persistence mode.
-
-- Built-in fixture account IDs are `mock-checking` and `mock-prime`.
-- The default fixture contains one checking balance, one card balance, one pending charge, one posted charge, one positive pending transaction, and one card payment.
-- An optional fixture file is reloaded on every fetch.
-- Fixture and real runs both pass through `Map`, `Runner.Sync`, and `Store.ApplySyncPlan`.
-- Stored rows are indistinguishable by design: both use `source='simplefin'` and `sfin-pending-*`.
-
-This makes cutover an explicit database purge rather than a code branch.
-
 ## Cutover Plan
 
 ### Prerequisites
@@ -209,37 +189,15 @@ This makes cutover an explicit database purge rather than a code branch.
 2. Decide which model accounts are cards.
 3. Confirm the persistent database path and create a verified SQLite backup.
 4. Confirm the service has one instance.
-5. Start with dry-run enabled.
-
-### From fixture to real source
-
-1. Stop the service so no scheduled or manual run can write during cutover.
-2. Open the backed-up database and run the preview statements in `backend/scripts/purge-simplefin-sync.sql`.
-3. Confirm the preview lists the expected sync-owned postings and checkpoints.
-4. Execute the two `DELETE` statements in that script. It removes all `simplefin` rows; owner rows remain.
-5. Unset `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK` and `NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK_FILE`.
-6. Set the real Access URL and card list as secrets or runtime variables. The first sync auto-provisions model accounts and links; review and relink through the links endpoint.
-7. Keep `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN=1` and restart the service.
-8. Trigger once through `POST /v1/sync/simplefin` with the required bearer token.
-9. Inspect checkpoint insert/update/skip counts, pending delete/insert counts, skip reasons, and `dryRun: true`.
-10. Reload the model and confirm the database contains no newly committed source rows from the dry-run.
 
 ### First real write
 
-1. Set `NET_WORTH_ESTIMATOR_SIMPLEFIN_DRY_RUN` to an empty value and restart the service.
-2. Trigger immediately, or allow the next scheduled run. An immediate manual trigger is available because restart clears the in-memory trigger stamp.
-3. Inspect the non-dry-run summary.
-4. Reload the model and verify source markers, account/date keys, negative card checkpoint, and disabled pending rows.
-5. Repeat a planned run and verify owner checkpoint collisions, pending snapshot replacement, and idempotent count behavior.
-
-### Removal of fixture mode
-
-Once real synchronization is proven:
-
-- delete the fixture implementation and tests;
-- remove fixture parsing and runner wiring from `cmd/server`;
-- remove fixture variables from environment documentation and retained operator docs;
-- verify no fixture symbols or mock-mode variables remain in the backend.
+1. Set the real Access URL and card list as secrets or runtime variables. The first sync auto-provisions model accounts and links; review and relink through the links endpoint.
+2. Restart the service.
+3. Trigger immediately, or allow the next scheduled run. An immediate manual trigger is available because restart clears the in-memory trigger stamp.
+4. Inspect the summary.
+5. Reload the model and verify source markers, account/date keys, negative card checkpoint, and disabled pending rows.
+6. Repeat a planned run and verify owner checkpoint collisions, pending snapshot replacement, and idempotent count behavior.
 
 ## Verification
 
@@ -259,7 +217,6 @@ Required coverage:
 - deterministic pending IDs and row shape;
 - checkpoint insert/update/owner-skip behavior;
 - pending snapshot replacement and owner-posting preservation;
-- dry-run rollback;
 - row-write guards (reserved IDs, sync ownership, dangling references);
 - forged reserved IDs being dropped;
 - exact owner checkpoint collision precedence;
@@ -271,21 +228,18 @@ Required coverage:
 
 ### Operator checks
 
-1. Dry-run returns 200 with `dryRun: true` and zero committed source-row changes.
-2. First real run creates or updates only mapped balance checkpoints.
-3. Only configured card accounts receive pending rows.
-4. Pending rows are disabled one-time postings with negative charge magnitude and reserved IDs.
-5. A second real run refreshes pending rows without duplicating checkpoints.
-6. An owner checkpoint at the same account/date is not overwritten.
-7. A rejected trigger leaves the database unchanged.
-8. A server restart does not erase owner rows or the last committed source snapshot.
+1. First real run creates or updates only mapped balance checkpoints.
+2. Only configured card accounts receive pending rows.
+3. Pending rows are disabled one-time postings with negative charge magnitude and reserved IDs.
+4. A second real run refreshes pending rows without duplicating checkpoints.
+5. An owner checkpoint at the same account/date is not overwritten.
+6. A rejected trigger leaves the database unchanged.
+7. A server restart does not erase owner rows or the last committed source snapshot.
 
 ## Completion Criteria
 
 - The Access URL is stored in server-side secret configuration and omitted from successful payloads; transport-error redaction is a production requirement.
-- Dry-run is verified before the first committed run.
 - Scheduler and manual-trigger behavior remain single-process and guarded.
 - Sync-owned rows survive owner writes and cannot be forged by row payloads.
 - Owner checkpoint precedence is covered by package and operator checks.
-- Fixture-to-real cutover uses the versioned purge script and a verified backup.
-- All listed production-package verification gates pass before fixture removal and before production cutover.
+- All listed production-package verification gates pass.

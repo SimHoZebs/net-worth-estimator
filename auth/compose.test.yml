@@ -12,7 +12,6 @@ services:
       NET_WORTH_ESTIMATOR_AUTH_SESSION_DB: /data/identity.db
       NET_WORTH_ESTIMATOR_READ_ONLY: ""
       NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL: ""
-      NET_WORTH_ESTIMATOR_SIMPLEFIN_MOCK: ""
 
   frontend:
     ports: !override

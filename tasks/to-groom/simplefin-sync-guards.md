@@ -7,6 +7,6 @@ Merge that surrounding code into one private `runSync(ctx, manual bool)` method.
 - Implementations: `backend/internal/simplefin/runner.go:123-149,246-284`.
 - Existing tests: `backend/internal/simplefin/runner_test.go:103-383`.
 
-Verify that the two entry methods cannot overlap, failures permit retry, Bridge retry waits work, and only successful manual syncs restart the manual wait. Include successful manual dry runs and both arrival orders. Run the SimpleFIN/API checks and the backend completion gate.
+Verify that the two entry methods cannot overlap, failures permit retry, Bridge retry waits work, and only successful manual syncs restart the manual wait. Include successful manual runs and both arrival orders. Run the SimpleFIN/API checks and the backend completion gate.
 
 Risk is medium because concurrency and retry timing can change accidentally. Line savings remain unmeasured. The separate [HTTP error-handling cleanup](simplefin-retry-error-ownership.md) is not part of this merge.
