@@ -1,9 +1,9 @@
 import { ServerApp } from "./app/ServerApp.tsx";
 import { AuthBoundary } from "./auth/AuthBoundary.tsx";
-import { useTheme } from "./state/useTheme.ts";
+import { useThemeSync } from "./state/useTheme.ts";
 
 export default function App() {
-	useTheme();
+	useThemeSync();
 	return (
 		<AuthBoundary>
 			<ServerApp />

@@ -122,12 +122,8 @@ export const useThemeStore = create<ThemeState>()(
 			preference: "system",
 			setPreference: (next) => {
 				if (!isPreference(next)) return;
-				if (get().preference === next) {
-					applyTheme(resolvePreference(next));
-					return;
-				}
+				if (get().preference === next) return;
 				set({ preference: next });
-				applyTheme(resolvePreference(next));
 				emitChange(next);
 			},
 			cycle: () => {
@@ -139,7 +135,6 @@ export const useThemeStore = create<ThemeState>()(
 							? "dark"
 							: "system";
 				set({ preference: next });
-				applyTheme(resolvePreference(next));
 				emitChange(next);
 			},
 		}),
@@ -188,12 +183,8 @@ export function resolveTheme(preference: ThemePreference): ResolvedTheme {
 	return resolvePreference(preference);
 }
 
-export function useTheme() {
+export function useThemeSync() {
 	const preference = useThemeStore((state) => state.preference);
-	const setPreference = useThemeStore((state) => state.setPreference);
-	const cycle = useThemeStore((state) => state.cycle);
-	const resolved = resolvePreference(preference);
-
 	useEffect(() => {
 		applyTheme(resolvePreference(preference));
 		if (preference !== "system" || typeof window === "undefined") return;
@@ -202,16 +193,21 @@ export function useTheme() {
 		media.addEventListener("change", update);
 		return () => media.removeEventListener("change", update);
 	}, [preference]);
-
 	useEffect(() => {
-		if (typeof window === "undefined") return;
 		const onStorage = (event: StorageEvent) => {
-			if (event.key !== THEME_STORAGE_KEY) return;
-			void useThemeStore.persist.rehydrate();
+			if (event.key === THEME_STORAGE_KEY)
+				void useThemeStore.persist.rehydrate();
 		};
 		window.addEventListener("storage", onStorage);
 		return () => window.removeEventListener("storage", onStorage);
 	}, []);
+}
+
+export function useTheme() {
+	const preference = useThemeStore((state) => state.preference);
+	const setPreference = useThemeStore((state) => state.setPreference);
+	const cycle = useThemeStore((state) => state.cycle);
+	const resolved = resolvePreference(preference);
 
 	const setStoredPreference = useCallback(
 		(next: ThemePreference) => {
