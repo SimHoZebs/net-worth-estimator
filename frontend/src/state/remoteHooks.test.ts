@@ -32,6 +32,7 @@ import {
 	remoteStorageKey,
 	serverDocumentFingerprint,
 } from "./remoteStorage.ts";
+import { memoryStorage } from "../mocks/storage.ts";
 import {
 	clearResourceQueryCache,
 	resetServerQueryCache,
@@ -69,7 +70,7 @@ import {
 	useWorkspaceWriteError,
 	useWorkspaceSaving,
 } from "./workspaceWrites.ts";
-import { modelFixture, stubTestServer } from "../test/waypointServer.ts";
+import { modelFixture, stubTestServer } from "../mocks/waypointServer.ts";
 
 // Test observations compose the public owners.
 function useRemoteWorkspace() {
@@ -295,25 +296,6 @@ function scenarioStreamClient(cancelBody = true) {
 		return selected;
 	};
 	return { client, stream, fetcher, deterministicCalls, stochasticCalls };
-}
-
-function memoryStorage(): Storage & { values: Map<string, string> } {
-	const values = new Map<string, string>();
-	return {
-		values,
-		getItem: (key) => values.get(key) ?? null,
-		setItem: (key, value) => {
-			values.set(key, value);
-		},
-		removeItem: (key) => {
-			values.delete(key);
-		},
-		clear: () => values.clear(),
-		key: (index) => [...values.keys()][index] ?? null,
-		get length() {
-			return values.size;
-		},
-	};
 }
 
 function withMovementAmount(plan: Plan, amount: number): Plan {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { testPlan } from "../test/plan.ts";
+import { testPlan } from "../mocks/plan.ts";
 import { changesBetween, validatePlan } from "./model.ts";
 import { removeEvaluation, removePlanItem, upsertItem } from "./planEdits.ts";
 

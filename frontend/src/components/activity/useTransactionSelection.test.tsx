@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
-import { testPlan } from "../../test/plan.ts";
+import { testPlan } from "../../mocks/plan.ts";
 import { useTransactionSelection } from "./useTransactionSelection.ts";
 
 afterEach(cleanup);

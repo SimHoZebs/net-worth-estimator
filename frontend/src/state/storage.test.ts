@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { testPlan } from "../test/plan.ts";
+import { testPlan } from "../mocks/plan.ts";
 import { ImportError, parsePlan } from "./storage.ts";
 
 describe("local plan import", () => {

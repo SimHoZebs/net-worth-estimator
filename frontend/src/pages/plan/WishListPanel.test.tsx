@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { acceptTestResource } from "../../test/resource.ts";
-import { setServerStatusFixture } from "../../test/workspace.ts";
+import { acceptTestResource } from "../../mocks/resource.ts";
+import { setServerStatusFixture } from "../../mocks/workspace.ts";
 import type { Movement, Plan } from "../../domain/model.ts";
-import { testPlan } from "../../test/plan.ts";
+import { testPlan } from "../../mocks/plan.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { WishListPanel } from "./WishListPanel.tsx";
 

@@ -14,7 +14,7 @@ import { AuthBoundary } from "./AuthBoundary.tsx";
 import { redirectToSignIn } from "./navigation.ts";
 import { SessionAccountControl } from "./SessionAccountControl.tsx";
 import { defaultSafeSpendingSettings } from "../state/useSafeSpendingSettings.ts";
-import { safeSpendingSettingsObserver as useSafeSpendingSettings } from "../test/safeSpendingSettings.ts";
+import { safeSpendingSettingsObserver as useSafeSpendingSettings } from "../mocks/safeSpendingSettings.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { getResourceScope } from "./resourceScope.ts";
 import { remoteStorageKey } from "../state/remoteStorage.ts";

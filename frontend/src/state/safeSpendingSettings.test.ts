@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { acceptTestResource } from "../test/resource.ts";
-import { ok } from "../test/fetch.ts";
+import { acceptTestResource } from "../mocks/resource.ts";
+import { ok } from "../mocks/fetch.ts";
 import {
 	hydrateFinancialPreferences,
 	resolveEffectiveIds,

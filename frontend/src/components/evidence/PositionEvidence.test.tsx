@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import { testPlan } from "../../test/plan.ts";
+import { testPlan } from "../../mocks/plan.ts";
 import { PositionEvidence } from "./PositionEvidence.tsx";
 
 it("does not report a missing account balance as zero", () => {

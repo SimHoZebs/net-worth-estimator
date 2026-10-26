@@ -5,8 +5,8 @@ import type { ServerStatus } from "../api/index.ts";
 import { SessionContext, type Session } from "../auth/sessionContext.ts";
 import { resetWorkspaceStore } from "../state/workspaceStore.ts";
 import { WorkspaceSidebar } from "./WorkspaceSidebar.tsx";
-import { acceptTestResource } from "../test/resource.ts";
-import { setServerStatusFixture } from "../test/workspace.ts";
+import { acceptTestResource } from "../mocks/resource.ts";
+import { setServerStatusFixture } from "../mocks/workspace.ts";
 import { resetServerQueryCache } from "../state/serverQuery.ts";
 
 vi.mock("../components/ThemeToggle.tsx", () => ({ ThemeToggle: () => null }));

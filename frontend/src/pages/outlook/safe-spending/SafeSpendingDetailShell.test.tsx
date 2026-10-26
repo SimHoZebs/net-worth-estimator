@@ -6,7 +6,7 @@ import {
 	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { testPlan } from "../../../test/plan.ts";
+import { testPlan } from "../../../mocks/plan.ts";
 import { SafeSpendingBillsPanel } from "./SafeSpendingBillsPanel.tsx";
 import { SafeSpendingConfigurePanel } from "./SafeSpendingConfigurePanel.tsx";
 import { SafeSpendingDetailShell } from "./SafeSpendingDetailShell.tsx";

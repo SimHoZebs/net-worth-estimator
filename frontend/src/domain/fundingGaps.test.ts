@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { testPlan } from "../test/plan.ts";
-import { movementFixture, projectionFixture } from "../test/projection.ts";
+import { testPlan } from "../mocks/plan.ts";
+import { movementFixture, projectionFixture } from "../mocks/projection.ts";
 import { deriveFundingGaps, summarizeFundingGap } from "./fundingGaps.ts";
 
 describe("derive funding gaps", () => {

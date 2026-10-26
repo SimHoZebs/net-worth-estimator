@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { acceptTestResource } from "../test/resource.ts";
+import { acceptTestResource } from "../mocks/resource.ts";
 import { getResourceScope } from "../auth/resourceScope.ts";
 import { displayPlanToBackendDocument } from "../api/adapter.ts";
 import type {
@@ -10,7 +10,7 @@ import type {
 	EvaluationResultTables,
 	ProjectionResult,
 } from "../api/contracts.ts";
-import { testPlan } from "../test/plan.ts";
+import { testPlan } from "../mocks/plan.ts";
 import {
 	PURCHASE_EVALUATIONS,
 	PURCHASE_EVALUATION_ID,

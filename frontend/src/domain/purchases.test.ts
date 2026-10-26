@@ -6,8 +6,8 @@ import {
 import { accountTransactions } from "./accountActivity.ts";
 import { isHistoricalMovement, type Movement, validatePlan } from "./model.ts";
 import { movePurchase, purchaseQueue } from "./purchases.ts";
-import { testPlan } from "../test/plan.ts";
-import { projectionFixture } from "../test/projection.ts";
+import { testPlan } from "../mocks/plan.ts";
+import { projectionFixture } from "../mocks/projection.ts";
 
 function wish(id: string, priority: number): Movement {
 	return {

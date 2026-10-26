@@ -7,8 +7,8 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { testPlan } from "../../test/plan.ts";
-import { acceptTestResource } from "../../test/resource.ts";
+import { testPlan } from "../../mocks/plan.ts";
+import { acceptTestResource } from "../../mocks/resource.ts";
 import {
 	resetWorkspaceStore,
 	useWorkspaceStore,

@@ -1,8 +1,8 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Movement, Plan } from "../../../domain/model.ts";
-import { testPlan } from "../../../test/plan.ts";
-import { projectionFixture } from "../../../test/projection.ts";
+import { testPlan } from "../../../mocks/plan.ts";
+import { projectionFixture } from "../../../mocks/projection.ts";
 import { useCardCycleActivity } from "./useCardCycleActivity.ts";
 
 afterEach(cleanup);

@@ -15,21 +15,21 @@ import {
 	useServerModel,
 	workspaceResourceKey,
 } from "@/state/workspaceResources.ts";
-import { setServerRevisionFixture } from "@/test/workspace.ts";
+import { setServerRevisionFixture } from "@/mocks/workspace.ts";
 import { NotificationCenter } from "@/components/NotificationCenter.tsx";
 import { resetNotifications } from "@/state/notifications.ts";
 import {
 	getResourceScope,
 	suspendResourceScope,
 } from "@/auth/resourceScope.ts";
-import { ok } from "@/test/fetch.ts";
+import { ok } from "@/mocks/fetch.ts";
 import { useSession } from "@/auth/sessionContext.ts";
 import { clearPersistedMemory } from "@/state/persisted.ts";
 import {
 	defaultSafeSpendingSettings,
 	useSafeSpendingSettings,
 } from "@/state/useSafeSpendingSettings.ts";
-import { safeSpendingSettingsObserver } from "@/test/safeSpendingSettings.ts";
+import { safeSpendingSettingsObserver } from "@/mocks/safeSpendingSettings.ts";
 import { canonicalApiBaseUrl } from "@/auth/resourceScope.ts";
 
 const A = `plans/${"a".repeat(64)}`;

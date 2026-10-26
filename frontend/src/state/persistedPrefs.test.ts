@@ -27,39 +27,8 @@ import {
 	hydrateFinancialPreferences,
 	refreshSafeSpendingSettings,
 } from "./useSafeSpendingSettings.ts";
-import { safeSpendingSettingsObserver as useSafeSpendingSettings } from "../test/safeSpendingSettings.ts";
-
-function memoryStorage(): Storage {
-	const values = new Map<string, string>();
-	return {
-		get length() {
-			return values.size;
-		},
-		key: (index) => [...values.keys()][index] ?? null,
-		getItem: (key) => values.get(key) ?? null,
-		setItem: (key, value) => {
-			values.set(key, value);
-		},
-		removeItem: (key) => {
-			values.delete(key);
-		},
-		clear: () => values.clear(),
-	};
-}
-
-function stubStorage(storage: Storage) {
-	vi.stubGlobal("localStorage", storage);
-	// appLocalStorage reads window.localStorage; keep both in sync in jsdom.
-	try {
-		Object.defineProperty(window, "localStorage", {
-			value: storage,
-			configurable: true,
-			writable: true,
-		});
-	} catch {
-		// Ignore when window is unavailable.
-	}
-}
+import { safeSpendingSettingsObserver as useSafeSpendingSettings } from "../mocks/safeSpendingSettings.ts";
+import { memoryStorage, stubStorage } from "../mocks/storage.ts";
 
 const A = `plans/${"a".repeat(64)}`;
 const B = `plans/${"b".repeat(64)}`;

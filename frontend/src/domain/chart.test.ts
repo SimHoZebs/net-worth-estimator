@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { projectionFixture } from "../test/projection.ts";
+import { projectionFixture } from "../mocks/projection.ts";
 import type { FundingGap } from "./fundingGaps.ts";
 import {
 	fundingGapChartModel,
