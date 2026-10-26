@@ -105,12 +105,13 @@ func truncateLabel(description string) string {
 }
 
 // Map converts an account set into checkpoints plus pending seed postings.
-// resolved maps bridge account IDs to model account IDs (links plus env
-// bootstrap). Mapped accounts emit checkpoints with model IDs; mappable
+// cards lists model account IDs treated as cards: only these get pending
+// seed postings. resolved maps bridge account IDs to model account IDs
+// (stored links). Mapped accounts emit checkpoints with model IDs; mappable
 // USD accounts without a resolution emit bridge-keyed checkpoints plus a
 // Provision the runner fulfills before apply. Posted transactions are
 // never materialized; neither are checking flows.
-func Map(set *AccountSet, config Config, resolved map[string]string, now time.Time) (*Plan, error) {
+func Map(set *AccountSet, cards map[string]struct{}, resolved map[string]string, now time.Time) (*Plan, error) {
 	plan := &Plan{Skipped: map[SkipReason]int{}}
 	seenCheckpoints := map[string]struct{}{}
 	for _, account := range set.Accounts {
@@ -156,7 +157,7 @@ func Map(set *AccountSet, config Config, resolved map[string]string, now time.Ti
 			plan.Checkpoints = append(plan.Checkpoints, Checkpoint{AccountID: modelAccountID, BridgeID: account.ID, Date: day, Balance: balance})
 		}
 
-		if _, isCard := config.CardAccounts[modelAccountID]; !isCard {
+		if _, isCard := cards[modelAccountID]; !isCard {
 			continue
 		}
 		for _, transaction := range account.Transactions {

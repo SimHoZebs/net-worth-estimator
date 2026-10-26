@@ -52,8 +52,6 @@ services:
       # Bridge credential selection only. Migration records plan ownership.
       NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT: ${DEV_OWNER_SUBJECT:-}
       NET_WORTH_ESTIMATOR_READ_ONLY: ""
-      NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL: ""
-      NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS: ""
     depends_on:
       casdoor:
         condition: service_healthy

@@ -44,11 +44,9 @@ jq -r '"healthz body: \(.)"' "$tmp"
 request GET "/v1/financial-model"
 jq -r '"model: \(.document.accounts | length) accounts, \(.document.postings | length) postings, \(.document.checkpoints | length) checkpoints, \(.issues | length) issues"' "$tmp"
 
-# SimpleFIN sync returns 503 without NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL.
-# That is a pass when unconfigured; a green run with sync needs the secret.
-if [ -z "${NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL:-}" ]; then
-	echo "skip POST /v1/sync/simplefin (no access URL configured)"
-else
-	request POST "/v1/sync/simplefin"
-	jq -r '"sync: \(.)"' "$tmp"
-fi
+# SimpleFIN sync stays unconfigured until a key is connected through
+# POST /v1/sync/simplefin/credential (setup token or access URL). That is a
+# pass when unconfigured; a green run with sync needs a connected key.
+echo "skip POST /v1/sync/simplefin (connect a key through POST /v1/sync/simplefin/credential first)"
+request GET "/v1/sync/simplefin/credential"
+jq -r '"credential: \(.)"' "$tmp"

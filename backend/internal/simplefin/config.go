@@ -6,14 +6,10 @@ import (
 	"time"
 )
 
-// Config wires the sync from environment values. The access URL and card
-// set are read in main; account links live in the database, never here.
+// Config wires the sync throttling. The Bridge credential and card set live
+// in the database per plan (see store.SyncCredential), never here and never
+// in the environment.
 type Config struct {
-	// AccessURL is the Bridge Access URL secret.
-	AccessURL string
-	// CardAccounts lists model account IDs treated as cards: only these get
-	// pending seed postings.
-	CardAccounts map[string]struct{}
 	// MinTriggerInterval spaces successful manual trigger runs. Zero means
 	// DefaultMinTriggerInterval, matching the Bridge daily-update quota.
 	MinTriggerInterval time.Duration
@@ -21,17 +17,6 @@ type Config struct {
 	// frontend burst cannot cost the Access Token. Zero means
 	// DefaultRateLimitCooldown.
 	RateLimitCooldown time.Duration
-}
-
-// ParseCardAccounts parses a comma-separated list of model account IDs.
-func ParseCardAccounts(value string) map[string]struct{} {
-	accounts := map[string]struct{}{}
-	for _, entry := range strings.Split(value, ",") {
-		if id := strings.TrimSpace(entry); id != "" {
-			accounts[id] = struct{}{}
-		}
-	}
-	return accounts
 }
 
 // ParsePositiveDuration parses a Go duration string (e.g. "6h", "90m") for

@@ -104,48 +104,17 @@ func TestPlanProvisioningRequiresAuthorizedIdentity(t *testing.T) {
 	}
 }
 
-func TestBridgeCredentialsRequireExistingConfiguredOwner(t *testing.T) {
+func TestOwnerSyncStoreSkipsMissingPlan(t *testing.T) {
 	database, err := store.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer database.Close()
 	const issuer, subject = "https://identity.test", "owner"
-	if scoped, err := bridgeStore(database, issuer, "", false); err != nil || scoped != nil {
-		t.Fatalf("disabled Bridge requires a plan: %v", err)
-	}
-	if _, err := bridgeStore(database, issuer, "", true); err == nil {
-		t.Fatal("Bridge accepted an unconfigured owner")
-	}
-	if _, err := bridgeStore(database, issuer, subject, true); err == nil {
-		t.Fatal("Bridge accepted a missing owner plan")
-	}
-	resource := authorization.ResourceFor(issuer, subject)
-	if exists, err := database.HasPlan(resource.ID); err != nil || exists {
-		t.Fatalf("startup provisioned an owner: %v", err)
-	}
-	if _, err := database.EnsurePrivatePlan(resource.ID, resource.Owner, issuer, subject); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := bridgeStore(database, issuer, subject, true); err != nil {
-		t.Fatalf("existing owner rejected: %v", err)
-	}
-	if _, err := bridgeStore(database, issuer, "someone-else", true); err == nil {
-		t.Fatal("Bridge fell back to another owner's plan")
-	}
-}
-
-func TestBridgeBYOKStoreSkipsMissingPlan(t *testing.T) {
-	database, err := store.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer database.Close()
-	const issuer, subject = "https://identity.test", "owner"
-	if scoped, err := bridgeBYOKStore(database, issuer, ""); err != nil || scoped != nil {
+	if scoped, err := ownerSyncStore(database, issuer, ""); err != nil || scoped != nil {
 		t.Fatalf("empty subject = %v, %v; want nil, nil", scoped, err)
 	}
-	if scoped, err := bridgeBYOKStore(database, issuer, subject); err != nil || scoped != nil {
+	if scoped, err := ownerSyncStore(database, issuer, subject); err != nil || scoped != nil {
 		t.Fatalf("missing plan = %v, %v; want nil, nil", scoped, err)
 	}
 	resource := authorization.ResourceFor(issuer, subject)
@@ -155,7 +124,10 @@ func TestBridgeBYOKStoreSkipsMissingPlan(t *testing.T) {
 	if _, err := database.EnsurePrivatePlan(resource.ID, resource.Owner, issuer, subject); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := bridgeBYOKStore(database, issuer, subject); err != nil {
+	if _, err := ownerSyncStore(database, issuer, subject); err != nil {
 		t.Fatalf("existing owner rejected: %v", err)
+	}
+	if scoped, err := ownerSyncStore(database, issuer, "someone-else"); err != nil || scoped != nil {
+		t.Fatalf("unrelated subject without a plan = %v, %v; want nil, nil", scoped, err)
 	}
 }

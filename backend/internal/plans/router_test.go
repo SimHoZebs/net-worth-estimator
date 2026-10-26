@@ -219,7 +219,7 @@ func TestServerBridgeCredentialsStayInConfiguredOwnersPlan(t *testing.T) {
 	}
 	router, err := New(database, Config{
 		PrimaryResourceID: privateID("a"),
-		API:               api.Config{SyncRunner: simplefin.NewRunner(ownerStore, simplefin.Config{AccessURL: "https://bridge.test/simplefin"}, nil)},
+		API:               api.Config{SyncRunner: simplefin.NewRunnerWithProvider(ownerStore, simplefin.Config{}, func() (string, map[string]struct{}) { return "https://bridge.test/simplefin", nil }, nil)},
 	})
 	if err != nil {
 		t.Fatal(err)

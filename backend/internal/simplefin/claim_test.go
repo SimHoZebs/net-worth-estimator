@@ -190,16 +190,14 @@ func TestFetchWithoutCredentialIsNotConfigured(t *testing.T) {
 	}
 }
 
-func TestEffectiveCardsUnionsEnvAndProvider(t *testing.T) {
+func TestEffectiveCardsComeFromProvider(t *testing.T) {
 	database := openRunnerStore(t)
-	runner := NewRunnerWithProvider(database, Config{
-		CardAccounts: map[string]struct{}{"env_card": {}},
-	}, func() (string, map[string]struct{}) {
+	runner := NewRunnerWithProvider(database, Config{}, func() (string, map[string]struct{}) {
 		return "https://user:pass@bridge.example/simplefin", map[string]struct{}{"db_card": {}}
 	}, nil)
 	merged := runner.effectiveCards()
-	if _, ok := merged["env_card"]; !ok {
-		t.Fatalf("merged = %+v, want env_card", merged)
+	if len(merged) != 1 {
+		t.Fatalf("merged = %+v, want only db_card", merged)
 	}
 	if _, ok := merged["db_card"]; !ok {
 		t.Fatalf("merged = %+v, want db_card", merged)

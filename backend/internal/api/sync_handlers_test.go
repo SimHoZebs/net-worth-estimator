@@ -79,10 +79,9 @@ func TestSyncTriggerRunsAndGuardsInterval(t *testing.T) {
 			t.Fatalf("seed link: %v", err)
 		}
 	}
-	runner := simplefin.NewRunner(database, simplefin.Config{
-		AccessURL:    bridge.URL,
-		CardAccounts: map[string]struct{}{"prime_card": {}},
-	}, &simplefin.Client{AccessURL: bridge.URL})
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+		return bridge.URL, map[string]struct{}{"prime_card": {}}
+	}, bridge.Client())
 	handler := New(database, Config{SyncRunner: runner})
 
 	trigger := func() *httptest.ResponseRecorder {

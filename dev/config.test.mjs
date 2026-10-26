@@ -66,7 +66,7 @@ test('native Compose consumes the exported environment and isolates dev from pro
       encoding: 'utf8', env: { PATH: process.env.PATH, HOME: process.env.HOME,
         APP_PUBLIC_URL: 'https://production.invalid', AUTH_CLIENT_SECRET: 'production-secret',
         COMPOSE_FILE: '/nonexistent/production-compose.yml', COMPOSE_PROFILES: 'unused-production-profile',
-        DEV_STATE_DIR: '/production', CASDOOR_STATE_DIR: '/production', NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL: 'production-bridge' },
+        DEV_STATE_DIR: '/production', CASDOOR_STATE_DIR: '/production' },
     };
     const result = spawnSync('docker', [...args, '--format', 'json'], options);
     assert.equal(result.status, 0, result.stderr);
@@ -92,7 +92,9 @@ test('native Compose consumes the exported environment and isolates dev from pro
     for (const key of ['NET_WORTH_ESTIMATOR_PLANS_DIR', 'NET_WORTH_ESTIMATOR_SAMPLE_DB', 'NET_WORTH_ESTIMATOR_AUTH_SESSION_DB']) {
       assert.equal(backend.environment[key], undefined, `${key} must not configure split application storage`);
     }
-    assert.equal(backend.environment.NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL, '');
+    for (const key of ['NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL', 'NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS']) {
+      assert.equal(backend.environment[key], undefined, `${key} is retired; the Bridge key lives in the plan database`);
+    }
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_AUTH_TOKEN, undefined);
     assert.equal(backend.user, `${process.getuid()}:${process.getgid()}`);
     assert.equal(backend.volumes[0].source, resolve('tmp/dev/data'));
