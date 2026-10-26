@@ -1,114 +1,146 @@
-import { create } from "zustand";
-import { type ApiClient } from "../api/index.ts";
+import { useQuery } from "@tanstack/react-query";
+import { useSyncExternalStore } from "react";
+import type { ApiClient } from "../api/index.ts";
 import { defaultScopedApiClient } from "../api/scopedClients.ts";
 import {
 	getResourceScope,
 	subscribeResourceScope,
 } from "../auth/resourceScope.ts";
 import { dismissKey, notifyError } from "./notifications.ts";
+import { serverQueryClient } from "./serverQuery.ts";
 
-export interface PinnedEvaluationsState {
-	/** Pinned evaluation instance IDs in pin order. Null until loaded. */
-	ids: string[] | null;
-	loading: boolean;
-	error: string | null;
-	refresh: (client?: ApiClient, force?: boolean) => Promise<void>;
-	toggle: (id: string, client?: ApiClient) => Promise<boolean>;
-	reset: () => void;
+export function pinnedEvaluationsKey() {
+	return ["pinned-evaluations", getResourceScope().key] as const;
 }
 
-function clientOrDefault(client?: ApiClient): ApiClient {
-	if (client) return client;
-	return defaultScopedApiClient();
-}
-
-// Last successful fetch per scope key so two mounted pages sharing one refresh
-// do not issue duplicate GETs. `force` bypasses the TTL after a toggle; an
-// errored state always refetches so the Reload action cannot be swallowed.
-let lastFetchedAt = 0;
-let lastFetchedScope: string | null = null;
-const PINS_TTL_MS = 30_000;
-
-/**
- * Server-persisted evaluation pins. The server is the source of truth;
- * toggles apply optimistically and revert when the PUT fails. Reads stay
- * out of the TanStack projection cache: pins are mutable server state,
- * like the model and status reads.
- */
-export const usePinnedEvaluationsStore = create<PinnedEvaluationsState>()(
-	(set, get) => ({
-		ids: null,
-		loading: false,
-		error: null,
-		refresh: async (client, force = false) => {
-			const scope = getResourceScope();
-			if (scope.status === "pending") return;
-			if (get().loading) return;
-			if (
-				!force &&
-				get().ids !== null &&
-				get().error === null &&
-				scope.key === lastFetchedScope &&
-				Date.now() - lastFetchedAt < PINS_TTL_MS
-			)
-				return;
-			set({ loading: true, error: null });
-			const result = await clientOrDefault(client).getPinnedEvaluations();
-			if (scope !== getResourceScope()) return;
-			if (result instanceof Error) {
-				set({ loading: false, error: result.message });
-				return;
+function pinsOptions(client?: ApiClient) {
+	const scope = getResourceScope();
+	return {
+		queryKey: pinnedEvaluationsKey(),
+		staleTime: 30_000,
+		queryFn: async ({ signal }: { signal: AbortSignal }) => {
+			try {
+				const result = await (
+					client ?? defaultScopedApiClient()
+				).getPinnedEvaluations({ signal });
+				if (scope !== getResourceScope())
+					throw new Error("The active resource changed.");
+				if (result instanceof Error) throw result;
+				dismissKey("evaluation-pins");
+				return result.instanceIds;
+			} catch (error) {
+				if (scope === getResourceScope() && !signal.aborted)
+					notifyError(
+						"evaluation-pins",
+						error instanceof Error
+							? error.message
+							: "Pins could not be loaded.",
+						{
+							label: "Reload pins",
+							onAction: () => void refreshPins(client, true),
+						},
+					);
+				throw error;
 			}
-			lastFetchedAt = Date.now();
-			lastFetchedScope = scope.key;
-			set({ ids: [...result.instanceIds], loading: false });
 		},
-		toggle: async (id, client) => {
-			const scope = getResourceScope();
-			if (scope.status === "pending") return false;
-			const previous = get().ids ?? [];
+	};
+}
+
+export async function refreshPins(
+	client?: ApiClient,
+	force = false,
+): Promise<void> {
+	if (getResourceScope().status === "pending") return;
+	const options = pinsOptions(client);
+	try {
+		if (force)
+			await serverQueryClient().invalidateQueries({
+				queryKey: options.queryKey,
+				refetchType: "none",
+			});
+		await serverQueryClient().fetchQuery(options);
+	} catch {
+		/* The query reports its current-resource failure. */
+	}
+}
+
+export async function togglePin(
+	id: string,
+	client?: ApiClient,
+): Promise<boolean> {
+	const scope = getResourceScope();
+	if (scope.status === "pending") return false;
+	const cache = serverQueryClient();
+	const key = pinnedEvaluationsKey();
+	const mutation = cache.getMutationCache().build(cache, {
+		mutationKey: key,
+		scope: { id: JSON.stringify(key) },
+		mutationFn: async () => {
+			if (scope !== getResourceScope())
+				throw new Error("The active resource changed.");
+			if (cache.getQueryData(key) === undefined)
+				await cache.fetchQuery(pinsOptions(client));
+			if (scope !== getResourceScope())
+				throw new Error("The active resource changed.");
+			await cache.cancelQueries({ queryKey: key });
+			if (scope !== getResourceScope())
+				throw new Error("The active resource changed.");
+			const previous = cache.getQueryData<string[]>(key) ?? [];
 			const next = previous.includes(id)
 				? previous.filter((item) => item !== id)
 				: [...previous, id];
-			set({ ids: next, error: null });
-			const result = await clientOrDefault(client).setPinnedEvaluations(next);
-			if (scope !== getResourceScope()) return false;
-			if (result instanceof Error) {
-				set({ ids: previous, error: result.message });
-				return false;
+			cache.setQueryData(key, next);
+			try {
+				const result = await (
+					client ?? defaultScopedApiClient()
+				).setPinnedEvaluations(next);
+				if (result instanceof Error) throw result;
+				if (scope === getResourceScope())
+					cache.setQueryData(key, result.instanceIds);
+			} catch (error) {
+				if (scope === getResourceScope()) cache.setQueryData(key, previous);
+				throw error;
 			}
-			lastFetchedAt = Date.now();
-			lastFetchedScope = scope.key;
-			set({ ids: [...result.instanceIds] });
-			return true;
 		},
-		reset: () => {
-			lastFetchedAt = 0;
-			lastFetchedScope = null;
-			set({ ids: null, loading: false, error: null });
-		},
-	}),
-);
+	});
+	try {
+		await mutation.execute(undefined);
+		if (scope !== getResourceScope()) return false;
+		dismissKey("evaluation-pins");
+		return true;
+	} catch (error) {
+		if (scope === getResourceScope()) {
+			await cache.invalidateQueries({ queryKey: key, refetchType: "none" });
+			notifyError(
+				"evaluation-pins",
+				error instanceof Error ? error.message : "Pins could not be saved.",
+				{
+					label: "Reload pins",
+					onAction: () => void refreshPins(client, true),
+				},
+			);
+		}
+		return false;
+	}
+}
 
-subscribeResourceScope(() => usePinnedEvaluationsStore.getState().reset());
+export function resetPinnedEvaluationsClient() {
+	serverQueryClient().removeQueries({ queryKey: ["pinned-evaluations"] });
+}
 
-/**
- * Explicit triggers for the notification stack. Failure transitions float
- * with a reload action; resolving back to no error clears the toast.
- */
-usePinnedEvaluationsStore.subscribe((state, previous) => {
-	if (state.error && state.error !== previous.error)
-		notifyError("evaluation-pins", state.error, {
-			label: "Reload pins",
-			onAction: () => {
-				void usePinnedEvaluationsStore.getState().refresh();
-			},
-		});
-	else if (!state.error && previous.error) dismissKey("evaluation-pins");
-});
+subscribeResourceScope(resetPinnedEvaluationsClient);
 
-/** Test hook: clears the pins TTL between cases (client is now shared). */
-export function resetPinnedEvaluationsClient(): void {
-	lastFetchedAt = 0;
-	lastFetchedScope = null;
+export function usePinnedEvaluations() {
+	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const query = useQuery(
+		{ ...pinsOptions(), enabled: scope.status === "ready" },
+		serverQueryClient(),
+	);
+	return {
+		ids: query.data ?? null,
+		loading: query.isFetching,
+		error: query.error?.message ?? null,
+		refresh: refreshPins,
+		toggle: togglePin,
+	};
 }

@@ -1,11 +1,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import {
-	resetWorkspaceStore,
-	type RemoteWorkspace,
-	useWorkspaceStore,
-} from "../state/workspaceStore.ts";
+import { resetWorkspaceStore } from "../state/workspaceStore.ts";
 import { testPlan } from "../test/plan.ts";
+import { acceptTestResource } from "../test/resource.ts";
+import {
+	setServerModelFixture,
+	setServerStatusFixture,
+} from "../test/workspace.ts";
 import { Outlook } from "./Outlook.tsx";
 
 vi.mock("../state/useRemoteProjection.ts", () => ({
@@ -26,14 +27,6 @@ vi.mock("../state/useCurrentPosition.ts", () => ({
 }));
 
 const blankPlan = { ...testPlan, accounts: [], movements: [], evaluations: [] };
-const workspace: RemoteWorkspace = {
-	version: 1,
-	saved: blankPlan,
-	draft: null,
-	baseFingerprint: null,
-	baseRevision: null,
-	draftStale: false,
-};
 const props = {
 	onAddAccount: vi.fn(),
 	onEvidence: vi.fn(),
@@ -45,10 +38,9 @@ const props = {
 };
 
 beforeEach(() => {
-	useWorkspaceStore.setState({
-		workspace,
-		status: { readOnly: false },
-	});
+	acceptTestResource();
+	setServerModelFixture(blankPlan);
+	setServerStatusFixture({ readOnly: false });
 });
 
 afterEach(() => {
@@ -71,15 +63,11 @@ it("opens the first-account editor from an active blank workspace", () => {
 it.each(["plan", "server", "writeBlocked"])(
 	"honors %s write restrictions on a blank workspace",
 	(restriction) => {
-		useWorkspaceStore.setState({
-			workspace: {
-				...workspace,
-				saved: { ...blankPlan, readOnly: restriction === "plan" },
-				draft: null,
-			},
-			status: { readOnly: restriction === "server" },
-			writeBlocked: restriction === "writeBlocked",
+		setServerModelFixture({
+			...blankPlan,
+			readOnly: restriction === "plan" || restriction === "writeBlocked",
 		});
+		setServerStatusFixture({ readOnly: restriction === "server" });
 		render(<Outlook {...props} />);
 		expect(
 			screen.queryByRole("button", { name: "Add your first account" }),

@@ -1,76 +1,58 @@
 import { useEffect } from "react";
 import { getResourceScope } from "../auth/resourceScope.ts";
 import { financialQueryFilter, serverQueryClient } from "./serverQuery.ts";
-import { type RemoteApiClient, useWorkspaceStore } from "./workspaceStore.ts";
+import type { RemoteApiClient } from "./workspaceStore.ts";
+import {
+	getServerStatus,
+	reloadWorkspace,
+	statusOptions,
+	workspaceIsBusy,
+	workspaceResourceKey,
+} from "./workspaceResources.ts";
 
-/** Only status is polled. Loaded financial data has no time-based expiry. */
 export function useWorkspaceSyncMonitor(api: RemoteApiClient | null): void {
 	useEffect(() => {
 		if (!api) return;
 		const scope = getResourceScope();
-		const controller = new AbortController();
-		let pending = false;
-		const isCurrent = () =>
-			!controller.signal.aborted && getResourceScope() === scope;
+		const cache = serverQueryClient();
 		const check = async () => {
-			const before = useWorkspaceStore.getState();
 			if (
-				pending ||
-				!isCurrent() ||
+				scope !== getResourceScope() ||
 				document.visibilityState === "hidden" ||
-				!before.workspace ||
-				!before.status ||
-				before.engine.saving ||
-				before.engine.hydrating
+				workspaceIsBusy() ||
+				cache.isFetching({ queryKey: workspaceResourceKey("status", scope) })
 			)
 				return;
-			pending = true;
+			const before = getServerStatus(scope)?.lastSyncAt ?? "";
 			try {
-				const status = await api.getStatus({ signal: controller.signal });
-				if (!isCurrent() || status instanceof Error) return;
-				const current = useWorkspaceStore.getState();
+				const status = await cache.fetchQuery({
+					...statusOptions(api, scope),
+					staleTime: 0,
+				});
 				if (
-					current.engine !== before.engine ||
-					current.engine.saving ||
-					current.engine.hydrating
+					scope !== getResourceScope() ||
+					workspaceIsBusy() ||
+					before === (status.lastSyncAt ?? "")
 				)
 					return;
-				if ((status.lastSyncAt ?? "") === (current.status?.lastSyncAt ?? ""))
-					return;
-				const client = serverQueryClient();
 				const filter = financialQueryFilter(scope.key);
-				await client.invalidateQueries({ ...filter, refetchType: "none" });
-				if (!isCurrent()) return;
-				const latest = useWorkspaceStore.getState();
-				// A save can start during invalidation. Retry next minute instead
-				// of queueing a foreground hydration behind that save.
-				if (
-					latest.engine !== before.engine ||
-					latest.engine.saving ||
-					latest.engine.hydrating
-				)
-					return;
-				await latest.hydrate({ background: true });
-				if (isCurrent())
-					await client.refetchQueries({
+				await cache.invalidateQueries({ ...filter, refetchType: "none" });
+				await reloadWorkspace(api);
+				if (scope === getResourceScope())
+					await cache.refetchQueries({
 						...filter,
 						type: "active",
 						stale: true,
 					});
 			} catch {
-				// Retain the last good data. The next poll retries the check.
-			} finally {
-				pending = false;
+				/* A failed poll retains Query's last good data. */
 			}
 		};
-		const onResume = () => {
-			void check();
-		};
+		const onResume = () => void check();
 		const timer = window.setInterval(onResume, 60_000);
 		window.addEventListener("online", onResume);
 		document.addEventListener("visibilitychange", onResume);
 		return () => {
-			controller.abort();
 			window.clearInterval(timer);
 			window.removeEventListener("online", onResume);
 			document.removeEventListener("visibilitychange", onResume);

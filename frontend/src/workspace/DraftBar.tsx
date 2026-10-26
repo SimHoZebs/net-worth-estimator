@@ -3,24 +3,25 @@ import { Button } from "../components/Button.tsx";
 import { useUiStore } from "../state/uiStore.ts";
 import {
 	selectDraftChangeCount,
-	selectIsReadOnly,
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
+import { useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
+import { useServerModel } from "../state/workspaceResources.ts";
+import { saveWorkspace, useWorkspaceSaving } from "../state/workspaceWrites.ts";
 
 export function DraftBar({ onDiscard }: { onDiscard: () => void }) {
-	// Draft state subscribes here; the save runs against the store directly so
+	// Draft state subscribes here; the save runs through Query directly so
 	// no review step or navigation callback is needed.
-	const workspaceLoading = useWorkspaceStore((state) => state.loading);
-	const saving = useWorkspaceStore((state) => state.saving);
-	const readOnly = useWorkspaceStore(selectIsReadOnly);
-	const save = useWorkspaceStore((state) => state.save);
+	const workspaceLoading = useServerModel().isFetching;
+	const saving = useWorkspaceSaving();
+	const readOnly = useWorkspaceReadOnly();
 	const importing = useUiStore((state) => state.importing);
 	const count = useWorkspaceStore(selectDraftChangeCount);
 	const loading = workspaceLoading || importing || saving;
 	if (!count) return null;
 	const saveChanges = () => {
 		if (saving) return;
-		void save();
+		void saveWorkspace();
 	};
 	return (
 		<div

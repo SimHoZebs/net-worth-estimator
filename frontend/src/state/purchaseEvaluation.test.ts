@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { acceptTestResource } from "../test/resource.ts";
 import { displayPlanToBackendDocument } from "../api/adapter.ts";
 import type {
 	DeterministicProjectionRequest,
@@ -21,6 +22,7 @@ import {
 } from "./useRemoteProjection.ts";
 
 afterEach(cleanup);
+beforeEach(acceptTestResource);
 
 function resultFixture(evaluations: EvaluationResultTables): ProjectionResult {
 	return {

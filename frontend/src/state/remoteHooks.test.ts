@@ -2,6 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	act,
+	cleanup,
 	renderHook as renderHookRTL,
 	waitFor,
 } from "@testing-library/react";
@@ -57,21 +58,98 @@ import {
 	deriveDraftDocument,
 	resetWorkspaceStore,
 	useWorkspaceStore,
+	draftConflict,
 } from "./workspaceStore.ts";
+import {
+	useServerModel,
+	useServerStatus,
+	useAmountPresets,
+	getServerModel,
+	modelOptions,
+	presetsOptions,
+	statusOptions,
+	reloadWorkspace,
+	workspaceResourceKey,
+} from "./workspaceResources.ts";
+import {
+	saveWorkspace,
+	importServerDocument,
+	reloadDraft,
+	useWorkspaceWriteError,
+	useWorkspaceSaving,
+} from "./workspaceWrites.ts";
 
-// Behavior tests observe the store, not a state-returning production hook.
+// Test observations compose the public owners. Production has no combined store interface.
 function useRemoteWorkspace(
 	options: Parameters<typeof useWorkspaceStartup>[0],
 ) {
 	useWorkspaceStartup(options);
 	const state = useWorkspaceStore();
+	const model = useServerModel();
+	const status = useServerStatus();
+	const presets = useAmountPresets();
+	const mutationError = useWorkspaceWriteError();
+	const saving = useWorkspaceSaving();
+	const conflict = draftConflict(state, model.data);
+	const saved = model.data?.conversion?.plan;
+	const error =
+		state.error ??
+		conflict ??
+		(mutationError instanceof Error ? mutationError.message : null) ??
+		model.error?.message ??
+		(model.data && !model.data.document
+			? "The server has no financial model to display."
+			: null);
 	return {
 		...state,
-		plan: state.workspace?.draft ?? state.workspace?.saved ?? null,
-		stale: Boolean(state.workspace?.draftStale),
-		draftStale: Boolean(state.workspace?.draftStale),
-		readOnly: Boolean(state.status?.readOnly || state.writeBlocked),
-		authRequired: state.authRequiredState,
+		plan: saved ? (state.draft ?? saved) : null,
+		workspace: saved
+			? {
+					saved,
+					draft: state.draft,
+					baseRevision: state.baseRevision,
+					baseFingerprint: state.baseFingerprint,
+					draftStale: Boolean(conflict),
+				}
+			: null,
+		serverDocument: model.data?.document ?? null,
+		serverPresets: presets.data ?? null,
+		presetError: presets.error?.message ?? null,
+		savedPresentation: model.data?.conversion?.presentation ?? null,
+		adapterReport: model.data?.conversion?.report ?? null,
+		status: status.data ?? null,
+		recoveryDraft: saved ? null : state.draft,
+		error,
+		loading: model.isFetching,
+		saving,
+		stale: Boolean(conflict),
+		draftStale: Boolean(conflict),
+		readOnly: Boolean(
+			status.data?.readOnly ||
+			(mutationError instanceof ApiHttpError && mutationError.status === 403),
+		),
+		authRequired:
+			mutationError instanceof ApiHttpError && mutationError.status === 401,
+		save: () => saveWorkspace(options?.client),
+		retry: () => reloadWorkspace(options?.client),
+		reloadDraft: () => reloadDraft(options?.client),
+		importServerDocument: (document: FinancialModelDocument) =>
+			importServerDocument(document, options?.client),
+		refreshPresets: async () => {
+			await serverQueryClient().invalidateQueries({
+				queryKey: workspaceResourceKey("presets"),
+				refetchType: "none",
+			});
+			await serverQueryClient()
+				.fetchQuery(presetsOptions(options?.client))
+				.catch(() => {});
+		},
+		refreshStatus: async () => {
+			await serverQueryClient().fetchQuery({
+				...statusOptions(options?.client),
+				staleTime: 0,
+			});
+		},
 	};
 }
 
@@ -115,6 +193,13 @@ function renderHookWith<T>(
 	return {
 		result: () => rendered.result.current,
 		settle: async () => {
+			await waitFor(() =>
+				expect(
+					serverQueryClient().isFetching({
+						queryKey: workspaceResourceKey("model"),
+					}),
+				).toBe(0),
+			);
 			await act(async () => {
 				await new Promise((resolve) => setTimeout(resolve, 0));
 			});
@@ -470,12 +555,18 @@ function clientFixture(put?: PutCallback, model = modelFixture()) {
 		getStatus: vi.fn(async (): Promise<ServerStatus> => ({
 			readOnly: false,
 		})),
-		getModel: vi.fn(async (): Promise<FinancialModelResponse> => ({
-			document: structuredClone(current),
-			issues: [],
-			revision: '"sha256-test"',
+		getModel: vi.fn(
+			async (
+				_options?: ApiRequestOptions,
+			): Promise<FinancialModelResponse> => ({
+				document: structuredClone(current),
+				issues: [],
+				revision: '"sha256-test"',
+			}),
+		),
+		listAmountPresets: vi.fn(async (_options?: ApiRequestOptions) => ({
+			presets: [],
 		})),
-		listAmountPresets: vi.fn(async () => ({ presets: [] })),
 		createAmountPreset: vi.fn(async (row: AmountPreset) => ({
 			row: { ...row, id: row.id || "preset-1" },
 			issues: [],
@@ -626,6 +717,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	cleanup();
 	vi.unstubAllGlobals();
 	resetServerQueryCache();
 	resetUiStore();
@@ -642,9 +734,8 @@ describe("remote workspace state", () => {
 		const previous = view.result().serverDocument;
 		expect(previous).not.toBeNull();
 		client.getModel.mockRejectedValueOnce(new Error("offline"));
-		await act(async () =>
-			useWorkspaceStore.getState().hydrate({ background: true }),
-		);
+		await act(async () => reloadWorkspace(client));
+		await view.settle();
 		expect(view.result().serverDocument).toBe(previous);
 		expect(view.result().workspace).not.toBeNull();
 		expect(view.result().error).toContain("offline");
@@ -661,7 +752,7 @@ describe("remote workspace state", () => {
 			expect(view.result().updatePlan(edited)).toBe(true);
 		});
 		await act(async () => {
-			await useWorkspaceStore.getState().hydrate({ background: true });
+			await reloadWorkspace(client);
 		});
 		expect(view.result().workspace?.draft?.movements).toEqual(edited.movements);
 		view.unmount();
@@ -679,7 +770,7 @@ describe("remote workspace state", () => {
 		const key = remoteStorageKey()!;
 		expect(view.result().workspace?.draft).toBeNull();
 		expect(storage.getItem(key)).toBeNull();
-		await act(async () => useWorkspaceStore.getState().hydrate());
+		await act(async () => reloadWorkspace(client));
 		expect(storage.getItem(key)).toBeNull();
 		view.unmount();
 	});
@@ -705,12 +796,9 @@ describe("remote workspace state", () => {
 		const rendered = renderHookWith(() => useRemoteWorkspace({ client }), {
 			strictMode: true,
 		});
-		expect(client.getStatus).toHaveBeenCalledOnce();
-		expect(client.getModel).toHaveBeenCalledOnce();
-		expect(client.listAmountPresets).toHaveBeenCalledOnce();
-		expect(
-			useWorkspaceStore.getState().engine.hydrationController?.signal.aborted,
-		).toBe(false);
+		expect(client.getStatus).toHaveBeenCalled();
+		expect(client.getModel).toHaveBeenCalled();
+		expect(client.listAmountPresets).toHaveBeenCalled();
 		resolveModel({ document: modelFixture(), issues: [] });
 		await rendered.settle();
 
@@ -721,7 +809,7 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("leaves the initial load alive on unmount but ignores its result", async () => {
+	it("lets Query cancel the initial load on its last observer's unmount", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
 		const { client } = clientFixture();
 		let resolveModel!: (value: FinancialModelResponse) => void;
@@ -732,15 +820,14 @@ describe("remote workspace state", () => {
 				}),
 		);
 		const rendered = renderHookRTL(() => useWorkspaceStartup({ client }));
-		const controller = useWorkspaceStore.getState().engine.hydrationController!;
+		const signal = client.getModel.mock.calls[0]?.[0]?.signal;
 		rendered.unmount();
-		expect(controller.signal.aborted).toBe(false);
+		expect(signal?.aborted).toBe(true);
 		await act(async () => {
 			resolveModel({ document: modelFixture(), issues: [] });
-			await useWorkspaceStore.getState().engine.hydrationPromise;
 		});
-		expect(useWorkspaceStore.getState().workspace).toBeNull();
-		expect(useWorkspaceStore.getState().engine.mounted).toBe(false);
+		expect(getServerModel()).toBeUndefined();
+		expect(useWorkspaceStore.getState().draft).toBeNull();
 	});
 
 	it("keeps session credentials out of workspace and UI state", async () => {
@@ -749,18 +836,27 @@ describe("remote workspace state", () => {
 		const { client } = clientFixture();
 		const rendered = renderHookRTL(() => useWorkspaceStartup({ client }));
 		await waitFor(() =>
-			expect(useWorkspaceStore.getState().loading).toBe(false),
+			expect(
+				serverQueryClient().isFetching({
+					queryKey: workspaceResourceKey("model"),
+				}),
+			).toBe(0),
 		);
 		await act(async () => useUiStore.getState().setYears(10));
 		expect(client.getStatus).toHaveBeenCalledOnce();
-		await useWorkspaceStore.getState().refreshPresets();
-		expect(client.listAmountPresets).toHaveBeenLastCalledWith();
-		expect(useWorkspaceStore.getState().engine).not.toHaveProperty("authToken");
+		await serverQueryClient().fetchQuery({
+			...presetsOptions(client),
+			staleTime: 0,
+		});
+		expect(client.listAmountPresets.mock.lastCall?.[0]).not.toHaveProperty(
+			"authToken",
+		);
+		expect(useWorkspaceStore.getState()).not.toHaveProperty("authToken");
 		expect(useUiStore.getState()).not.toHaveProperty("authToken");
 		rendered.unmount();
 	});
 
-	it("rebinds a changed client and aborts the superseded load controller", async () => {
+	it("uses a replacement client on an explicit Query refresh", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
 		const first = clientFixture();
 		const second = clientFixture();
@@ -774,24 +870,18 @@ describe("remote workspace state", () => {
 			({ client }) => useWorkspaceStartup({ client }),
 			{ initialProps: { client: first.client } },
 		);
-		await waitFor(() =>
-			expect(useWorkspaceStore.getState().loading).toBe(false),
-		);
-		const previous = useWorkspaceStore.getState().engine.hydrationController!;
+		await waitFor(() => expect(getServerModel()?.document).toBeDefined());
 		rendered.rerender({ client: second.client });
-		await waitFor(() =>
-			expect(useWorkspaceStore.getState().loading).toBe(false),
-		);
-		expect(previous.signal.aborted).toBe(true);
+		await act(async () => reloadWorkspace(second.client));
 		expect(first.client.getModel).toHaveBeenCalledOnce();
 		expect(second.client.getModel).toHaveBeenCalledOnce();
-		expect(
-			useWorkspaceStore.getState().workspace?.saved.accounts[0]?.name,
-		).toBe("Replacement cash");
+		expect(getServerModel()?.conversion?.plan.accounts[0]?.name).toBe(
+			"Replacement cash",
+		);
 		rendered.unmount();
 	});
 
-	it("aborts an active save on unmount and ignores its eventual result", async () => {
+	it("ignores an active save's result after its resource retires", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
 		const { client } = clientFixture();
 		const rendered = renderHook(() => useRemoteWorkspace({ client }));
@@ -808,10 +898,10 @@ describe("remote workspace state", () => {
 					resolvePut = resolve;
 				}),
 		);
-		const saving = useWorkspaceStore.getState().save();
-		const controller = useWorkspaceStore.getState().engine.saveController!;
+		const saving = saveWorkspace(client);
+		await waitFor(() => expect(resolvePut).toBeDefined());
+		suspendResourceScope();
 		rendered.unmount();
-		expect(controller.signal.aborted).toBe(true);
 		resolvePut({
 			row: modelFixture().recurrenceRules[0]!,
 			persisted: true,
@@ -819,9 +909,7 @@ describe("remote workspace state", () => {
 			revision: '"sha256-test"',
 		});
 		expect(await saving).toBe(false);
-		expect(
-			useWorkspaceStore.getState().workspace?.draft?.movements[0]?.amount,
-		).toBe(125);
+		expect(useWorkspaceStore.getState().draft?.movements[0]?.amount).toBe(125);
 		expect(client.getModel).toHaveBeenCalledOnce();
 	});
 
@@ -840,20 +928,21 @@ describe("remote workspace state", () => {
 			({ client }) => useWorkspaceStartup({ client }),
 			{ initialProps: { client: first.client } },
 		);
-		const pending = useWorkspaceStore.getState().engine.hydrationPromise;
-		const controller = useWorkspaceStore.getState().engine.hydrationController!;
+		const pending = serverQueryClient().fetchQuery(modelOptions(first.client));
+		const signal = first.client.getModel.mock.calls[0]?.[0]?.signal;
 		rendered.rerender({ client: second.client });
-		expect(useWorkspaceStore.getState().engine.hydrationPromise).toBe(pending);
-		expect(controller.signal.aborted).toBe(false);
+		expect(
+			serverQueryClient().getQueryState(workspaceResourceKey("model"))
+				?.fetchStatus,
+		).toBe("fetching");
+		expect(signal?.aborted).toBe(false);
 		expect(second.client.getModel).not.toHaveBeenCalled();
 		await act(async () => {
 			resolveModel({ document: modelFixture(), issues: [] });
 			await pending;
 		});
-		expect(useWorkspaceStore.getState().workspace).not.toBeNull();
-		expect(useWorkspaceStore.getState().engine.client).toBe(second.client);
-		await act(async () => useWorkspaceStore.getState().retry());
-		expect(controller.signal.aborted).toBe(true);
+		expect(getServerModel()?.document).not.toBeNull();
+		await act(async () => reloadWorkspace(second.client));
 		expect(second.client.getModel).toHaveBeenCalledOnce();
 		rendered.unmount();
 	});
@@ -957,7 +1046,7 @@ describe("remote workspace state", () => {
 
 		expect(rendered.result().stale).toBe(true);
 		expect(rendered.result().draftStale).toBe(true);
-		expect(rendered.result().volatile).toBe(true);
+		expect(rendered.result().volatile).toBe(false);
 		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
 		expect(rendered.result().error).not.toBeNull();
 		expect(await rendered.result().save()).toBe(false);
@@ -1043,6 +1132,7 @@ describe("remote workspace state", () => {
 			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
 		).toBe(true);
 		first.unmount();
+		resetServerQueryCache();
 
 		const { client: failedClient } = clientFixture(() => ({
 			document: modelFixture(),
@@ -1061,7 +1151,7 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("surfaces a draft for recovery when retry fails after a workspace was loaded", async () => {
+	it("retains the last good model and draft when a refresh fails", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const { client } = clientFixture(() => ({
@@ -1081,13 +1171,13 @@ describe("remote workspace state", () => {
 
 		await rendered.result().retry();
 		await rendered.settle();
-		expect(rendered.result().workspace).toBeNull();
-		expect(rendered.result().recoveryDraft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().workspace).not.toBeNull();
+		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
 		expect(rendered.result().error).not.toBeNull();
 		rendered.unmount();
 	});
 
-	it("does not restore a stale workspace after a save loses a hydration race", async () => {
+	it("defers refresh until a rejected save settles and retains the last good model", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const { client } = clientFixture(() => ({
@@ -1115,12 +1205,14 @@ describe("remote workspace state", () => {
 		client.getStatus.mockResolvedValue(
 			new Error("connection unavailable") as never,
 		);
-		await rendered.result().retry();
+		const retryPromise = rendered.result().retry();
+		await waitFor(() => expect(resolvePut).toBeDefined());
 		resolvePut(new ApiHttpError({ message: "stale", status: 412 }));
 		expect(await savePromise).toBe(false);
+		await retryPromise;
 		await rendered.settle();
-		expect(rendered.result().workspace).toBeNull();
-		expect(rendered.result().recoveryDraft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().workspace).not.toBeNull();
+		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
 		rendered.unmount();
 	});
 
@@ -1169,6 +1261,7 @@ describe("remote workspace state", () => {
 
 		const savePromise = rendered.result().save();
 		const retryPromise = rendered.result().retry();
+		await waitFor(() => expect(resolvePut).toBeDefined());
 		resolvePut();
 		expect(await savePromise).toBe(true);
 		await retryPromise;
@@ -1205,6 +1298,7 @@ describe("remote workspace state", () => {
 		);
 		const savePromise = rendered.result().save();
 		const retryPromise = rendered.result().retry();
+		await waitFor(() => expect(resolvePut).toBeDefined());
 		resolvePut({
 			row: modelFixture().recurrenceRules[0] as BackendRecurrenceRule,
 			issues: [
@@ -1228,7 +1322,7 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("cancels an unsettled save on retry and restores the workspace", async () => {
+	it("does not cancel or replay an unsettled save when refresh is requested", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const { client } = clientFixture(() => ({
@@ -1242,14 +1336,31 @@ describe("remote workspace state", () => {
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
-		client.updateRule.mockImplementation(() => new Promise(() => {}));
+		let finish!: ResolveRowWrite;
+		client.updateRule.mockImplementation(
+			() =>
+				new Promise((resolve) => {
+					finish = resolve;
+				}),
+		);
 
 		const savePromise = rendered.result().save();
-		await rendered.result().retry();
+		let refreshed = false;
+		const refresh = rendered
+			.result()
+			.retry()
+			.then(() => {
+				refreshed = true;
+			});
+		await waitFor(() => expect(finish).toBeDefined());
+		expect(refreshed).toBe(false);
+		expect(client.updateRule).toHaveBeenCalledOnce();
+		finish(new Error("offline"));
+		await savePromise;
+		await refresh;
 		await rendered.settle();
 		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
 		expect(rendered.result().draftStale).toBe(false);
-		void savePromise;
 		rendered.unmount();
 	});
 
@@ -1292,7 +1403,7 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("does not let a canceled save clear a newer save lock", async () => {
+	it("lets Query prevent overlapping saves and edits", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const { client } = clientFixture(() => ({
@@ -1317,14 +1428,13 @@ describe("remote workspace state", () => {
 				),
 		);
 		const firstSave = rendered.result().save();
-		await rendered.result().retry();
-		await rendered.settle();
+		await waitFor(() => expect(resolvers).toHaveLength(1));
 		expect(
 			rendered
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 150)),
-		).toBe(true);
-		const secondSave = rendered.result().save();
+		).toBe(false);
+		expect(await rendered.result().save()).toBe(false);
 		resolvers[0]?.(new ApiHttpError({ message: "stale", status: 412 }));
 		await firstSave;
 		await rendered.settle();
@@ -1332,8 +1442,7 @@ describe("remote workspace state", () => {
 			rendered
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 175)),
-		).toBe(false);
-		void secondSave;
+		).toBe(true);
 		rendered.unmount();
 	});
 
@@ -1475,7 +1584,15 @@ describe("remote workspace state", () => {
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
+		// Exercise reconciliation before the fetch promise returns, rather than rely on React's batched effects.
+		const stop = serverQueryClient()
+			.getQueryCache()
+			.subscribe(() => {
+				const model = getServerModel();
+				if (model) useWorkspaceStore.getState().reconcile(model);
+			});
 		expect(await rendered.result().save()).toBe(true);
+		stop();
 		await rendered.settle();
 		expect(client.updateRule).toHaveBeenCalledWith(
 			expect.any(String),
@@ -1485,12 +1602,90 @@ describe("remote workspace state", () => {
 					config: expect.objectContaining({ expression: "125" }),
 				}),
 			}),
-			expect.objectContaining({ signal: expect.any(AbortSignal) }),
+			{},
 		);
 		expect(client.getModel).toHaveBeenCalledTimes(2);
 		expect(rendered.result().workspace?.draft).toBeNull();
 		expect(loadRemoteState()).toMatchObject({ version: 1, draft: null });
 		rendered.unmount();
+	});
+
+	it("retains the draft when a row write is rejected without an error issue", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const { client } = clientFixture();
+		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		await rendered.settle();
+		expect(
+			rendered
+				.result()
+				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+		).toBe(true);
+		client.updateRule.mockResolvedValueOnce({
+			row: modelFixture().recurrenceRules[0]!,
+			revision: '"rejected"',
+			issues: [],
+			persisted: false,
+		});
+		expect(await rendered.result().save()).toBe(false);
+		await rendered.settle();
+		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		expect(client.getModel).toHaveBeenCalledOnce();
+		rendered.unmount();
+	});
+
+	it("clears a rejected write's temporary read-only guard after an authoritative reload", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const { client } = clientFixture();
+		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		await rendered.settle();
+		expect(
+			rendered
+				.result()
+				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+		).toBe(true);
+		client.updateRule.mockResolvedValueOnce(
+			new ApiHttpError({ status: 403, message: "Read-only" }),
+		);
+		expect(await rendered.result().save()).toBe(false);
+		await rendered.settle();
+		expect(rendered.result().readOnly).toBe(true);
+		await rendered.result().retry();
+		await rendered.settle();
+		expect(rendered.result().readOnly).toBe(false);
+		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		rendered.unmount();
+	});
+
+	it("refuses a recovery import while the initial model query is pending", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const { client } = clientFixture();
+		let finish!: (value: FinancialModelResponse) => void;
+		client.getModel.mockImplementationOnce(
+			() =>
+				new Promise((resolve) => {
+					finish = resolve;
+				}),
+		);
+		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		expect(await importServerDocument(modelFixture(), client)).toBe(false);
+		expect(client.createAccount).not.toHaveBeenCalled();
+		expect(
+			useNotifications
+				.getState()
+				.items.some((item) => item.message.includes("before importing")),
+		).toBe(true);
+		await act(async () => finish({ document: null, issues: [] }));
+		await rendered.settle();
+		rendered.unmount();
+	});
+
+	it("does not persist or announce discard when there is no draft", () => {
+		const storage = memoryStorage();
+		vi.stubGlobal("localStorage", storage);
+		const write = vi.spyOn(storage, "setItem");
+		expect(useWorkspaceStore.getState().discard()).toBe(false);
+		expect(write).not.toHaveBeenCalled();
+		expect(useNotifications.getState().items).toHaveLength(0);
 	});
 
 	it("applies movement edits as rule updates", async () => {
@@ -1614,7 +1809,7 @@ describe("remote workspace state", () => {
 				},
 				purchase: { priority: 0 },
 			}),
-			expect.objectContaining({ signal: expect.any(AbortSignal) }),
+			{},
 		);
 		expect(client.createAccount).not.toHaveBeenCalled();
 		expect(client.updateAccount).not.toHaveBeenCalled();
@@ -1714,9 +1909,8 @@ describe("remote workspace state", () => {
 					.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 			).toBe(true);
 			await rendered.settle();
-			useWorkspaceStore.setState({
-				status: { readOnly },
-				writeBlocked,
+			serverQueryClient().setQueryData(workspaceResourceKey("status"), {
+				readOnly: readOnly || writeBlocked,
 			});
 
 			expect(await rendered.result().save()).toBe(false);

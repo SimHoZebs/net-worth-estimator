@@ -1,5 +1,49 @@
-import { describe, expect, it } from "vitest";
-import { resolveEffectiveIds } from "./useSafeSpendingSettings.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { ApiClient } from "../api/client.ts";
+import { acceptTestResource } from "../test/resource.ts";
+import {
+	hydrateFinancialPreferences,
+	resolveEffectiveIds,
+	useSafeSpendingSettings,
+} from "./useSafeSpendingSettings.ts";
+
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+});
+
+it("updates a controlled checkbox synchronously from the optimistic query value", async () => {
+	vi.spyOn(ApiClient.prototype, "getSafeSpendingSettings").mockResolvedValue({
+		settings: null,
+	});
+	vi.spyOn(ApiClient.prototype, "setSafeSpendingSettings").mockImplementation(
+		async (settings) => ({ settings }),
+	);
+	const scope = acceptTestResource()!;
+	await hydrateFinancialPreferences(scope);
+	function Control() {
+		const settings = useSafeSpendingSettings();
+		return createElement("input", {
+			type: "checkbox",
+			"aria-label": "Salary",
+			checked: settings.incomeRuleIds.includes("salary"),
+			onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
+				settings.updateSettings({
+					incomeRuleIds: event.target.checked ? ["salary"] : [],
+				}),
+		});
+	}
+	render(createElement(Control));
+	const checkbox = screen.getByRole("checkbox", {
+		name: "Salary",
+	}) as HTMLInputElement;
+	fireEvent.click(checkbox);
+	expect(checkbox.checked).toBe(true);
+	fireEvent.click(checkbox);
+	expect(checkbox.checked).toBe(false);
+});
 
 describe("resolveEffectiveIds", () => {
 	it("returns every known id when nothing is stored", () => {

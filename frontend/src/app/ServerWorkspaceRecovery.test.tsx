@@ -1,14 +1,18 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, expect, it, vi } from "vitest";
-import { SessionContext } from "../auth/sessionContext.ts";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { acceptTestResource } from "../test/resource.ts";
 import {
-	resetWorkspaceStore,
-	useWorkspaceStore,
-} from "../state/workspaceStore.ts";
+	setServerModelFixture,
+	setServerStatusFixture,
+} from "../test/workspace.ts";
+import { SessionContext } from "../auth/sessionContext.ts";
+import { resetWorkspaceStore } from "../state/workspaceStore.ts";
 import { ServerWorkspaceRecovery } from "./ServerWorkspaceRecovery.tsx";
 
 vi.mock("../components/ThemeToggle.tsx", () => ({ ThemeToggle: () => null }));
+
+beforeEach(acceptTestResource);
 
 vi.mock("../workspace/WorkspaceLayout.tsx", () => ({
 	WorkspaceLayout: ({
@@ -31,11 +35,8 @@ afterEach(() => {
 });
 
 it("keeps account controls above navigation when the private plan is empty", () => {
-	useWorkspaceStore.setState({
-		status: { readOnly: false },
-		serverDocument: null,
-		error: "no financial model",
-	});
+	setServerStatusFixture({ readOnly: false });
+	setServerModelFixture(undefined, { document: null, conversion: null });
 	const logout = vi.fn(async () => {});
 	render(
 		<SessionContext

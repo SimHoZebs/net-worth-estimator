@@ -8,7 +8,6 @@ import {
 import { hydrateFinancialPreferences } from "../state/useSafeSpendingSettings.ts";
 import {
 	resetWorkspaceForResource,
-	suspendWorkspaceForVerification,
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
 import {
@@ -75,7 +74,6 @@ export function useResourceSession() {
 		// Suspending upfront wiped the UI on every focus event and on
 		// transient outages, which flickered and hid usable data.
 		const pending = previous ? null : suspendResourceScope();
-		if (!previous) suspendWorkspaceForVerification();
 		check.pending = (async () => {
 			try {
 				if (!previous) await cancelResourceQueries();
@@ -137,7 +135,6 @@ export function useResourceSession() {
 				if (!changed && getResourceScope().status === "ready") {
 					if (!next.session.allowed) {
 						suspendResourceScope();
-						suspendWorkspaceForVerification();
 						await cancelResourceQueries();
 						if (signal.aborted) return;
 						const activeLogout = signingOut.current as LogoutAttempt | null;
@@ -164,7 +161,6 @@ export function useResourceSession() {
 					return;
 				}
 				const hardPending = suspendResourceScope();
-				suspendWorkspaceForVerification();
 				await cancelResourceQueries();
 				if (signal.aborted) return;
 				const activeLogout = signingOut.current as LogoutAttempt | null;

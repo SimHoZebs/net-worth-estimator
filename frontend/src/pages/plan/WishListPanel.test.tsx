@@ -1,9 +1,16 @@
 import { cleanup, fireEvent, render, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { acceptTestResource } from "../../test/resource.ts";
+import { setServerStatusFixture } from "../../test/workspace.ts";
 import type { Movement, Plan } from "../../domain/model.ts";
 import { testPlan } from "../../test/plan.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { WishListPanel } from "./WishListPanel.tsx";
+
+beforeEach(() => {
+	acceptTestResource();
+	setServerStatusFixture({ readOnly: false });
+});
 
 afterEach(() => {
 	cleanup();
@@ -100,9 +107,7 @@ describe("wish list", () => {
 	});
 
 	it("blocks edits on a read-only server", () => {
-		useWorkspaceStore.setState({
-			status: { readOnly: true },
-		});
+		setServerStatusFixture({ readOnly: true });
 		const view = render(<WishListPanel plan={plan} schedule={null} />);
 		for (const button of view.getAllByRole("button"))
 			expect((button as HTMLButtonElement).disabled).toBe(true);

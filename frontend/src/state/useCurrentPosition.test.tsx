@@ -10,6 +10,7 @@ import {
 } from "../auth/resourceScope.ts";
 import { useCurrentPosition } from "./useCurrentPosition.ts";
 import { resetWorkspaceStore } from "./workspaceStore.ts";
+import { acceptTestResource } from "../test/resource.ts";
 
 afterEach(() => {
 	cleanup();
@@ -39,6 +40,7 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 let cache: QueryClient;
 function setup() {
+	acceptTestResource();
 	cache = new QueryClient({
 		defaultOptions: { queries: { retry: false, staleTime: 60_000 } },
 	});

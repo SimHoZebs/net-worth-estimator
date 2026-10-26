@@ -4,10 +4,8 @@ import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { IconButton } from "../components/Button.tsx";
 import { Skeleton } from "../components/Skeleton.tsx";
-import {
-	useWorkspaceStore,
-	selectIsReadOnly,
-} from "../state/workspaceStore.ts";
+import { useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
+import { useServerStatus } from "../state/workspaceResources.ts";
 import { LastSync } from "./LastSync.tsx";
 import { type Page, pages } from "./navigation.ts";
 import { navigationLinkClassName } from "./navigationStyles.ts";
@@ -26,8 +24,8 @@ export function WorkspaceSidebar({
 	pending?: boolean;
 }) {
 	// Plan display values subscribe here so navigation never waits on props.
-	const status = useWorkspaceStore((state) => state.status);
-	const readOnly = useWorkspaceStore(selectIsReadOnly);
+	const status = useServerStatus().data;
+	const readOnly = useWorkspaceReadOnly();
 	const statusLabel = workspaceStatusLabel({ readOnly });
 	return (
 		<>
@@ -87,7 +85,7 @@ export function WorkspaceSidebar({
 					{pending ? (
 						<Skeleton className="h-3 w-28" />
 					) : (
-						<LastSync status={status} />
+						<LastSync status={status ?? null} />
 					)}
 				</div>
 			</div>

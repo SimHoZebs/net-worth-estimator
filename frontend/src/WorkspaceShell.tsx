@@ -21,7 +21,7 @@ import { WorkspaceSidebar } from "./workspace/WorkspaceSidebar.tsx";
 export function WorkspaceShell() {
 	const navigation = useWorkspaceNavigation();
 	const volatile = useWorkspaceStore((state) => state.volatile);
-	const hasDraft = useWorkspaceStore((state) => state.workspace?.draft != null);
+	const hasDraft = useWorkspaceStore((state) => state.draft != null);
 	const discard = useWorkspaceStore((state) => state.discard);
 	const overlays = useWorkspaceOverlays({
 		discard,
@@ -37,7 +37,7 @@ export function WorkspaceShell() {
 		if (tab) overlays.openSafeSpendingDetail(tab);
 		else overlays.closeSafeSpendingDetail();
 	};
-	// DraftBar runs its own save against the store; only the discard overlay
+	// DraftBar runs its own Query mutation. Only the discard overlay
 	// stays a prop.
 	return (
 		<WorkspaceLayout
