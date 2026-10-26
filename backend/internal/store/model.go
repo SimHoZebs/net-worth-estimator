@@ -73,6 +73,9 @@ func clearDocument(tx *planTx) error {
 	if _, err := tx.Exec(`UPDATE sync_state SET last_sync_at = '' WHERE plan_id = :plan_id`); err != nil {
 		return fmt.Errorf("clear sync state: %w", err)
 	}
+	if _, err := tx.Exec(`DELETE FROM sync_credentials WHERE plan_id = :plan_id`); err != nil {
+		return fmt.Errorf("clear sync credentials: %w", err)
+	}
 	if _, err := tx.Exec(`DELETE FROM projection_artifacts WHERE plan_id = :plan_id`); err != nil {
 		return err
 	}

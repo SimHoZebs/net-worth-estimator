@@ -23,7 +23,7 @@ var financialTables = []string{
 	"accounts", "checkpoints", "postings", "posting_sync_keys",
 	"posting_id_migrations", "purchase_policies", "recurrence_rules", "evaluations",
 	"projection_artifacts", "model_metadata", "payment_terms", "entity_ids",
-	"account_links", "pinned_evaluations", "sync_state", "amount_presets", "safe_spending_settings",
+	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "amount_presets", "safe_spending_settings",
 }
 
 func main() {
@@ -158,6 +158,11 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 			case sample && table.name == "model_metadata" && column == "source_path":
 				values = append(values, "'sample'")
 			case sample && table.name == "sync_state" && column == "last_sync_at":
+				values = append(values, "''")
+			case table.name == "sync_credentials" && (column == "access_url" || column == "bridge_host" || column == "updated_at"):
+				// The Bridge key never travels with a refresh or a sample:
+				// reconnect it where it will run. Card selection is safe
+				// configuration and copies through.
 				values = append(values, "''")
 			default:
 				values = append(values, quote(column))

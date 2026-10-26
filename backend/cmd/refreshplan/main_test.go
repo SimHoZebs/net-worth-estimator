@@ -153,8 +153,22 @@ func TestRefreshPreservesOtherPlansAndIdentity(t *testing.T) {
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
 	seed(t, source)
 	seed(t, target)
+	sourceDB, err := store.OpenDatabase(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sourceDB.SQL().Exec(`UPDATE sync_credentials SET access_url='https://user:pass@bridge.example/simplefin', bridge_host='bridge.example', updated_at='2026-01-01T00:00:00Z', cards_json='["prime_card"]' WHERE plan_id='plans/other'`); err != nil {
+		t.Fatal(err)
+	}
+	sourceDB.Close()
 	if err := refresh(target, source, "plans/other", "plans/owner", false); err != nil {
 		t.Fatal(err)
+	}
+	if got := query(t, target, "SELECT access_url FROM sync_credentials WHERE plan_id='plans/owner'"); got != "" {
+		t.Fatalf("refresh copied the Bridge secret: %q", got)
+	}
+	if got := query(t, target, `SELECT cards_json FROM sync_credentials WHERE plan_id='plans/owner'`); got != `["prime_card"]` {
+		t.Fatalf("refresh dropped card selection: %q", got)
 	}
 	if got := query(t, target, "SELECT name FROM accounts WHERE plan_id='plans/owner'"); got != "other" {
 		t.Fatal(got)
@@ -191,7 +205,8 @@ func TestSamplePublicationStripsPrivateHistory(t *testing.T) {
 	_, err = db.SQL().Exec(`INSERT INTO account_links(plan_id, bridge_account_id, model_account_id) VALUES ('plans/owner','secret-bridge-id','checking');
 		INSERT INTO projection_artifacts(plan_id, identity, kind, payload) VALUES ('plans/owner','secret-artifact','deterministic','private');
 		INSERT INTO posting_id_migrations(plan_id, old_id, new_id) VALUES ('plans/owner','legacy','uuid');
-		UPDATE sync_state SET last_sync_at='2026-01-01' WHERE plan_id='plans/owner';`)
+		UPDATE sync_state SET last_sync_at='2026-01-01' WHERE plan_id='plans/owner';
+		UPDATE sync_credentials SET access_url='https://user:pass@bridge.example/simplefin', bridge_host='bridge.example', updated_at='2026-01-01T00:00:00Z', cards_json='["prime_card"]' WHERE plan_id='plans/owner';`)
 	db.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -212,6 +227,12 @@ func TestSamplePublicationStripsPrivateHistory(t *testing.T) {
 	}
 	if got := query(t, target, "SELECT last_sync_at FROM sync_state WHERE plan_id='plans/sample'"); got != "" {
 		t.Fatal(got)
+	}
+	if got := query(t, target, "SELECT access_url FROM sync_credentials WHERE plan_id='plans/sample'"); got != "" {
+		t.Fatalf("sample copied the Bridge secret: %q", got)
+	}
+	if got := query(t, target, "SELECT cards_json FROM sync_credentials WHERE plan_id='plans/sample'"); got != `["prime_card"]` {
+		t.Fatalf("sample dropped card selection: %q", got)
 	}
 	if got := query(t, target, "SELECT data FROM identity_grants"); got != "sealed-credentials" {
 		t.Fatal(got)
