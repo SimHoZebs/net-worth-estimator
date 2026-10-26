@@ -351,7 +351,10 @@ interface WorkspaceActions {
 		next: RemoteLocalState,
 		fallback?: RemoteLocalState,
 	) => boolean;
-	hydrate: (options?: { deferDuringSave?: boolean }) => Promise<void>;
+	hydrate: (options?: {
+		deferDuringSave?: boolean;
+		background?: boolean;
+	}) => Promise<void>;
 	refreshStatus: () => Promise<void>;
 	updatePlan: (next: Plan) => boolean;
 	save: () => Promise<boolean>;
@@ -426,7 +429,10 @@ export const useWorkspaceStore = create<
 		return true;
 	},
 
-	hydrate: async (options?: { deferDuringSave?: boolean }) => {
+	hydrate: async (options?: {
+		deferDuringSave?: boolean;
+		background?: boolean;
+	}) => {
 		const { engine } = get();
 		const api = engine.client;
 		if (!api) return;
@@ -457,6 +463,8 @@ export const useWorkspaceStore = create<
 		const restoreError = engine.pendingHydrationError;
 		engine.pendingHydrationError = null;
 		engine.hydrating = true;
+		// Background reloads retain the last good model on failure. They still
+		// lock edits/saves until draft revision checks finish, like manual loads.
 		set({ loading: true, error: restoreError, errorCode: null });
 		const finishHydration = () => {
 			clearTimeout(hydrationTimer);
@@ -483,6 +491,7 @@ export const useWorkspaceStore = create<
 		set({ recoveryDraft: localState?.draft ?? null });
 		get().engine.expectedRaw = raw instanceof Error ? undefined : raw;
 		const clearUnavailableWorkspace = () => {
+			if (options?.background) return;
 			const inner = get().engine;
 			inner.workspaceEpoch += 1;
 			inner.saveController?.abort();

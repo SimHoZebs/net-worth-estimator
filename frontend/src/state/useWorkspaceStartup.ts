@@ -6,6 +6,7 @@ import {
 } from "../auth/resourceScope.ts";
 import { useSession } from "../auth/sessionContext.ts";
 import { type RemoteApiClient, useWorkspaceStore } from "./workspaceStore.ts";
+import { useWorkspaceSyncMonitor } from "./useWorkspaceSyncMonitor.ts";
 
 interface WorkspaceStartupOptions {
 	client?: RemoteApiClient;
@@ -28,6 +29,7 @@ export function useWorkspaceStartup({
 			return null;
 		return client ?? defaultClient();
 	}, [client, scope, resourceId]);
+	useWorkspaceSyncMonitor(api);
 	const bindEngine = useWorkspaceStore((state) => state.bindEngine);
 	const bootWorkspace = useWorkspaceStore((state) => state.bootWorkspace);
 	const shutdownWorkspace = useWorkspaceStore(

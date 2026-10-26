@@ -571,6 +571,39 @@ afterEach(() => {
 });
 
 describe("remote workspace state", () => {
+	it("retains the loaded financial model after a failed background reload", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const { client } = clientFixture();
+		const view = renderHook(() => useRemoteWorkspace({ client }));
+		await waitFor(() => expect(view.result().loading).toBe(false));
+		const previous = view.result().serverDocument;
+		expect(previous).not.toBeNull();
+		client.getModel.mockRejectedValueOnce(new Error("offline"));
+		await act(async () =>
+			useWorkspaceStore.getState().hydrate({ background: true }),
+		);
+		expect(view.result().serverDocument).toBe(previous);
+		expect(view.result().workspace).not.toBeNull();
+		expect(view.result().error).toContain("offline");
+		view.unmount();
+	});
+
+	it("preserves an unsaved draft during a background model reload", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const { client } = clientFixture();
+		const view = renderHook(() => useRemoteWorkspace({ client }));
+		await waitFor(() => expect(view.result().loading).toBe(false));
+		const edited = withMovementAmount(view.result().plan!, 125);
+		await act(async () => {
+			expect(view.result().updatePlan(edited)).toBe(true);
+		});
+		await act(async () => {
+			await useWorkspaceStore.getState().hydrate({ background: true });
+		});
+		expect(view.result().workspace?.draft?.movements).toEqual(edited.movements);
+		view.unmount();
+	});
+
 	it("does not publish an empty browser draft when saved-only data is checked again", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
@@ -2837,7 +2870,9 @@ describe("remote projection mapping and SSE", () => {
 		);
 		await rendered.settle();
 		expect(rendered.result().base).toBeNull();
-		expect(rendered.result().baseError).toContain("no numbers today");
+		await waitFor(() =>
+			expect(rendered.result().baseError).toContain("no numbers today"),
+		);
 		const items = useNotifications.getState().items;
 		expect(items).toHaveLength(1);
 		expect(items[0]).toMatchObject({
