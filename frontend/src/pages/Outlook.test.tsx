@@ -9,7 +9,20 @@ import { testPlan } from "../test/plan.ts";
 import { Outlook } from "./Outlook.tsx";
 
 vi.mock("../state/useRemoteProjection.ts", () => ({
-	useRemoteProjection: () => ({ base: null, loading: false }),
+	useRemoteProjection: () => ({
+		base: null,
+		loading: false,
+		status: "disabled",
+	}),
+}));
+
+vi.mock("../state/useCurrentPosition.ts", () => ({
+	useCurrentPosition: () => ({
+		data: null,
+		status: "disabled",
+		error: null,
+		retry: vi.fn(),
+	}),
 }));
 
 const blankPlan = { ...testPlan, accounts: [], movements: [], evaluations: [] };

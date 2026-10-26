@@ -235,6 +235,18 @@ Expected baseline:
 - `issues` is an array;
 - warning-severity model issues may be present, but a projection must not run with error-severity issues.
 
+`POST /v1/position` accepts `{ "asOfDate": "YYYY-MM-DD", "document": ... }`.
+The document is optional and defaults to the scoped stored model. It returns
+`result: { asOfDate, netWorth, accounts: [{ accountId, balance }] }` from the same
+historical preparation as projections, without a future simulation. It requires
+`plan:project`, allows read-only/sample access, and stores no additional history.
+Model/date errors return HTTP 200 with `issues` and `error`, without `result`.
+
+`frontend/tests/position.spec.ts` holds forecast requests open to verify that the
+current-position card and evidence work independently. It also checks separate
+position/forecast failures and retries. Outlook hides previous-input forecast
+placeholders until the active forecast arrives.
+
 ## Direct Projection Checks
 
 Choose a projection start on or after the latest checkpoint. The following command derives that date from the stored model:

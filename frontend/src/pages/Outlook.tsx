@@ -4,6 +4,9 @@ import type { BackendCheckpoint } from "../api/contracts.ts";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
+import { Notice } from "../components/Notice.tsx";
+import { TextButton } from "../components/Button.tsx";
+import { useCurrentPosition } from "../state/useCurrentPosition.ts";
 import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
@@ -69,6 +72,9 @@ function OutlookContent({
 	const projection = useRemoteProjection({
 		enabled: (plan?.accounts.length ?? 0) > 0,
 	});
+	const position = useCurrentPosition({
+		enabled: (plan?.accounts.length ?? 0) > 0,
+	});
 	const pinnedIds = usePinnedEvaluationsStore((state) => state.ids);
 	const refreshPins = usePinnedEvaluationsStore((state) => state.refresh);
 	const togglePin = usePinnedEvaluationsStore((state) => state.toggle);
@@ -78,8 +84,14 @@ function OutlookContent({
 	useEffect(() => {
 		void refreshPins();
 	}, [refreshPins]);
-	const base = projection.base instanceof Error ? null : projection.base;
-	const pending = base === null;
+	// Previous-input placeholders are not forecasts for the active model.
+	const base =
+		projection.base instanceof Error || projection.isPlaceholderData
+			? null
+			: projection.base;
+	const pending =
+		projection.status === "pending" ||
+		(projection.isPlaceholderData && projection.loading);
 	if (!plan) return null;
 	if (plan.accounts.length === 0) {
 		const readOnly = plan.readOnly || status?.readOnly || writeBlocked;
@@ -101,10 +113,15 @@ function OutlookContent({
 					Loading the projection.
 				</p>
 			)}
-			<div
-				className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_var(--container-3xs)] xl:grid-cols-[minmax(0,1fr)_var(--container-2xs)] xl:gap-6 print:grid-cols-1!"
-				aria-busy={pending}
-			>
+			{projection.status === "error" && (
+				<Notice tone="danger" className="mb-4">
+					<span>Could not calculate forecast. {projection.baseError}</span>
+					<TextButton onClick={projection.retryProjection}>
+						Retry forecast
+					</TextButton>
+				</Notice>
+			)}
+			<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_var(--container-3xs)] xl:grid-cols-[minmax(0,1fr)_var(--container-2xs)] xl:gap-6 print:grid-cols-1!">
 				<ProjectionChart
 					plan={plan}
 					projection={base}
@@ -121,6 +138,7 @@ function OutlookContent({
 					<OutlookMetrics
 						plan={plan}
 						projection={base}
+						position={position}
 						years={years}
 						onEvidence={onEvidence}
 						pending={pending}
@@ -138,17 +156,19 @@ function OutlookContent({
 					void togglePin(id);
 				}}
 			/>
-			<div className="mt-6 max-sm:mt-5" aria-busy={pending}>
-				<SafeSpendingPreview
-					plan={plan}
-					checkpoints={checkpoints}
-					projection={base}
-					pending={pending}
-					detail={safeSpendingDetail}
-					onDetail={onSafeSpendingDetail}
-					onTabChange={onSafeSpendingTab}
-				/>
-			</div>
+			{(base || pending) && (
+				<div className="mt-6 max-sm:mt-5" aria-busy={pending}>
+					<SafeSpendingPreview
+						plan={plan}
+						checkpoints={checkpoints}
+						projection={base}
+						pending={pending}
+						detail={safeSpendingDetail}
+						onDetail={onSafeSpendingDetail}
+						onTabChange={onSafeSpendingTab}
+					/>
+				</div>
+			)}
 		</>
 	);
 }

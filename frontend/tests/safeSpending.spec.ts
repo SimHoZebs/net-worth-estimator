@@ -281,7 +281,8 @@ test("Configure only selects sources and settings, and ignores legacy overrides"
 		if (
 			request.url().includes("/v1/") &&
 			request.method() !== "GET" &&
-			!request.url().includes("/projections/")
+			!request.url().includes("/projections/") &&
+			!request.url().endsWith("/v1/position")
 		)
 			writes.push(`${request.method()} ${request.url()}`);
 	});
