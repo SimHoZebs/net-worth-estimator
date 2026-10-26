@@ -178,8 +178,14 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 	return &transitions.State, historicalSnapshots, !hasStartDateCheckpoint, nil
 }
 
-// PrepareSimulationRequest resolves overrides, validation, history, and dates.
-func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.PreparedProjection, error) {
+type preparedPosition struct {
+	document               types.FinancialModelDocument
+	state                  *SimulationState
+	snapshots              []types.HistoricalObservationSnapshot
+	includeStartDateEvents bool
+}
+
+func preparePosition(document *types.FinancialModelDocument, startDate string, overrides types.ModelOverrides) (*preparedPosition, error) {
 	effectiveDocument := types.ApplyModelOverrides(*document, overrides)
 	issues := ValidateFinancialModel(&effectiveDocument)
 	validationErrors := []types.ModelValidationIssue{}
@@ -192,7 +198,6 @@ func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *
 		return nil, &SimulationPreparationError{Issues: validationErrors}
 	}
 
-	startDate := settings.FallbackProjectionStartDate
 	if !IsValidIsoDate(startDate) {
 		return nil, &SimulationPreparationError{Issues: []types.ModelValidationIssue{{
 			Severity: types.SeverityError,
@@ -206,9 +211,19 @@ func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *
 		return nil, err
 	}
 
+	return &preparedPosition{effectiveDocument, state, historicalSnapshots, includeStartDateEvents}, nil
+}
+
+// PrepareSimulationRequest resolves overrides, validation, history, and dates.
+func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.PreparedProjection, error) {
+	position, err := preparePosition(document, settings.FallbackProjectionStartDate, overrides)
+	if err != nil {
+		return nil, err
+	}
+	effectiveDocument := position.document
 	prepared := &types.PreparedProjection{
 		EffectiveDocument:   effectiveDocument,
-		HistoricalSnapshots: historicalSnapshots,
+		HistoricalSnapshots: position.snapshots,
 		Request: types.SimulationRequest{
 			Model: types.FinancialModel{
 				Accounts:        effectiveDocument.Accounts,
@@ -216,10 +231,10 @@ func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *
 				RecurrenceRules: effectiveDocument.RecurrenceRules,
 				PaymentTerms:    effectiveDocument.PaymentTerms,
 			},
-			InitialState:           *state,
-			StartDate:              startDate,
-			EndDate:                AddYearsClamped(startDate, settings.HorizonYears),
-			IncludeStartDateEvents: includeStartDateEvents,
+			InitialState:           *position.state,
+			StartDate:              settings.FallbackProjectionStartDate,
+			EndDate:                AddYearsClamped(settings.FallbackProjectionStartDate, settings.HorizonYears),
+			IncludeStartDateEvents: position.includeStartDateEvents,
 			MonteCarloSample:       monteCarloSample,
 		},
 	}
