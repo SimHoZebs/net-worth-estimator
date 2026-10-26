@@ -30,6 +30,7 @@ type testIDP struct {
 	accessTokenHash                  string
 	active                           atomic.Bool
 	introspectionStatus              atomic.Int64
+	deviceApproved                   atomic.Bool
 	refreshes                        atomic.Int64
 	refreshReject                    atomic.Bool
 	refreshedSubject                 string
@@ -53,15 +54,68 @@ func newIDP(t *testing.T) *testIDP {
 	p.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			respond(w, map[string]any{"issuer": p.server.URL, "authorization_endpoint": p.server.URL + "/authorize", "token_endpoint": p.server.URL + "/token", "jwks_uri": p.server.URL + "/jwks", "introspection_endpoint": p.server.URL + "/introspect", "backchannel_logout_supported": true, "id_token_signing_alg_values_supported": []string{"RS256"}})
+			respond(w, map[string]any{"issuer": p.server.URL, "authorization_endpoint": p.server.URL + "/authorize", "token_endpoint": p.server.URL + "/token", "device_authorization_endpoint": p.server.URL + "/device", "jwks_uri": p.server.URL + "/jwks", "introspection_endpoint": p.server.URL + "/introspect", "backchannel_logout_supported": true, "id_token_signing_alg_values_supported": []string{"RS256"}})
 		case "/jwks":
 			respond(w, jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &p.key.PublicKey, KeyID: "test", Algorithm: "RS256", Use: "sig"}}})
+		case "/device":
+			_ = r.ParseForm()
+			client, secret, ok := r.BasicAuth()
+			if !ok || client != "waypoint" || secret != "secret" {
+				t.Error("device request missing client authentication")
+			}
+			if r.Form.Get("client_id") == "" {
+				t.Error("device request missing client_id")
+			}
+			respond(w, map[string]any{"device_code": "device-code", "user_code": "USER-CODE", "verification_uri": p.server.URL + "/device/USER-CODE", "expires_in": 600, "interval": 0})
 		case "/token":
 			_ = r.ParseForm()
+			if r.Form.Get("grant_type") == "urn:ietf:params:oauth:grant-type:device_code" {
+				client, secret, ok := r.BasicAuth()
+				if !ok || client != "waypoint" || secret != "secret" {
+					t.Error("device token request missing client authentication")
+				}
+				switch r.Form.Get("device_code") {
+				case "slow-device":
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(400)
+					respond(w, map[string]string{"error": "slow_down"})
+					return
+				case "denied-device":
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(400)
+					respond(w, map[string]string{"error": "access_denied"})
+					return
+				case "device-code":
+					if !p.deviceApproved.Load() {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(400)
+						respond(w, map[string]string{"error": "authorization_pending"})
+						return
+					}
+					respond(w, map[string]any{"access_token": "access-device", "refresh_token": "refresh-device", "token_type": "Bearer", "expires_in": 3600})
+					return
+				default:
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(400)
+					respond(w, map[string]string{"error": "expired_token"})
+					return
+				}
+			}
 			refresh := r.Form.Get("grant_type") == "refresh_token"
 			if refresh {
+				// Casdoor accepts the application secret by header or by
+				// body; the OAuth client retries a rejection in the other
+				// style, so either one proves the caller authenticated.
+				client, secret, ok := r.BasicAuth()
+				if !ok {
+					client, secret = r.Form.Get("client_id"), r.Form.Get("client_secret")
+					ok = client != "" && secret != ""
+				}
+				if !ok || client != "waypoint" || secret != "secret" {
+					t.Error("refresh request missing client authentication")
+				}
 				p.refreshes.Add(1)
-				if p.refreshReject.Load() {
+				if p.refreshReject.Load() || (r.Form.Get("refresh_token") != "" && r.Form.Get("refresh_token") != "refresh" && r.Form.Get("refresh_token") != "refresh-device") {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(400)
 					respond(w, map[string]string{"error": "invalid_grant"})
@@ -103,7 +157,13 @@ func newIDP(t *testing.T) *testIDP {
 			if !ok || client != "waypoint" || secret != "secret" {
 				t.Error("introspection client authentication missing")
 			}
-			respond(w, map[string]any{"active": p.active.Load(), "sub": p.subject, "client_id": "waypoint", "iss": p.server.URL, "aud": []string{"waypoint"}})
+			_ = r.ParseForm()
+			known := map[string]bool{"access": true, "access-refreshed": true, "access-device": true, "foreign-token": true}
+			audience := []string{"waypoint"}
+			if r.Form.Get("token") == "foreign-token" {
+				audience = []string{"other"}
+			}
+			respond(w, map[string]any{"active": p.active.Load() && known[r.Form.Get("token")], "sub": p.subject, "client_id": "waypoint", "iss": p.server.URL, "aud": audience})
 		case "/api/get-account":
 			if p.getAccountError != "" {
 				respond(w, map[string]any{"status": "error", "msg": p.getAccountError})
