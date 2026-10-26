@@ -15,49 +15,69 @@ import (
 )
 
 func (s *Service) introspect(ctx context.Context, g grant) error {
-	form := url.Values{"token": {g.AccessToken}, "token_type_hint": {"access_token"}}
-	r, err := http.NewRequestWithContext(ctx, http.MethodPost, s.introspection, strings.NewReader(form.Encode()))
+	result, err := s.postIntrospection(ctx, g.AccessToken)
 	if err != nil {
 		return err
+	}
+	if result.Subject != g.Subject || result.ClientID != s.config.ClientID || result.Issuer != s.config.Issuer || !audienceMatches(result.Audience, s.config.ClientID) {
+		return errGrantRevoked
+	}
+	return nil
+}
+
+// introspectionResult mirrors the provider response fields the server
+// trusts. Audience matching stays with the result so every caller applies
+// the same client binding.
+type introspectionResult struct {
+	Active   *bool           `json:"active"`
+	Subject  string          `json:"sub"`
+	ClientID string          `json:"client_id"`
+	Issuer   string          `json:"iss"`
+	Audience json.RawMessage `json:"aud"`
+}
+
+// audienceMatches accepts the provider's string-or-array audience encoding
+// and reports whether it names this application client.
+func audienceMatches(raw json.RawMessage, clientID string) bool {
+	var audiences []string
+	if json.Unmarshal(raw, &audiences) != nil {
+		var audience string
+		if json.Unmarshal(raw, &audience) == nil {
+			audiences = []string{audience}
+		}
+	}
+	for _, audience := range audiences {
+		if audience == clientID {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) postIntrospection(ctx context.Context, accessToken string) (introspectionResult, error) {
+	var result introspectionResult
+	form := url.Values{"token": {accessToken}, "token_type_hint": {"access_token"}}
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, s.introspection, strings.NewReader(form.Encode()))
+	if err != nil {
+		return result, err
 	}
 	r.SetBasicAuth(s.config.ClientID, s.config.ClientSecret)
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	response, err := s.client.Do(r)
 	if err != nil {
-		return errors.New("provider introspection unavailable")
+		return result, errors.New("provider introspection unavailable")
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return errors.New("provider introspection rejected request")
-	}
-	var result struct {
-		Active   *bool           `json:"active"`
-		Subject  string          `json:"sub"`
-		ClientID string          `json:"client_id"`
-		Issuer   string          `json:"iss"`
-		Audience json.RawMessage `json:"aud"`
+		return result, errors.New("provider introspection rejected request")
 	}
 	if err := json.NewDecoder(io.LimitReader(response.Body, 32<<10)).Decode(&result); err != nil || result.Active == nil {
-		return errors.New("invalid provider introspection response")
+		return result, errors.New("invalid provider introspection response")
 	}
 	if !*result.Active {
-		return errGrantRevoked
+		return result, errGrantRevoked
 	}
-	var audiences []string
-	if json.Unmarshal(result.Audience, &audiences) != nil {
-		var audience string
-		if json.Unmarshal(result.Audience, &audience) == nil {
-			audiences = []string{audience}
-		}
-	}
-	matched := false
-	for _, audience := range audiences {
-		matched = matched || audience == s.config.ClientID
-	}
-	if result.Subject != g.Subject || result.ClientID != s.config.ClientID || result.Issuer != g.Issuer || !matched {
-		return errGrantRevoked
-	}
-	return nil
+	return result, nil
 }
 
 func (s *Service) validateGrant(ctx context.Context, id string) (grant, error) {

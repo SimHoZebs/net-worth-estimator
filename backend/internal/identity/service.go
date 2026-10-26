@@ -25,6 +25,7 @@ type Service struct {
 	sessions         *scs.SessionManager
 	store            *sessionStore
 	provider         *oidc.Provider
+	deviceAuth       string
 	oauth            oauth2.Config
 	client           *http.Client
 	logoutEndpoint   string
@@ -91,6 +92,7 @@ func New(ctx context.Context, c Config) (*Service, error) {
 	var metadata struct {
 		EndSessionEndpoint    string `json:"end_session_endpoint"`
 		IntrospectionEndpoint string `json:"introspection_endpoint"`
+		DeviceAuthEndpoint    string `json:"device_authorization_endpoint"`
 		BackchannelSupported  bool   `json:"backchannel_logout_supported"`
 	}
 	if err := provider.Claims(&metadata); err != nil {
@@ -101,7 +103,7 @@ func New(ctx context.Context, c Config) (*Service, error) {
 		store.Close()
 		return nil, fmt.Errorf("identity provider must support token introspection and back-channel logout")
 	}
-	service := &Service{config: c, browsers: browsers, sessions: sm, store: store, provider: provider, client: client, logoutEndpoint: metadata.EndSessionEndpoint, introspection: metadata.IntrospectionEndpoint, csrf: csrf,
+	service := &Service{config: c, browsers: browsers, sessions: sm, store: store, provider: provider, client: client, deviceAuth: metadata.DeviceAuthEndpoint, logoutEndpoint: metadata.EndSessionEndpoint, introspection: metadata.IntrospectionEndpoint, csrf: csrf,
 		oauth: oauth2.Config{ClientID: c.ClientID, ClientSecret: c.ClientSecret, Endpoint: provider.Endpoint(), RedirectURL: strings.TrimRight(c.PublicURL, "/") + prefix + "callback", Scopes: []string{oidc.ScopeOpenID, "profile", "email", "offline_access"}}}
 	service.browserProviders = service.browserProviderHandlers()
 	return service, nil
@@ -121,6 +123,28 @@ func CanWrite(ctx context.Context) bool {
 }
 
 func (s *Service) principal(r *http.Request) (Principal, error) {
+	// An explicit bearer identity wins when it verifies. An unverifiable
+	// bearer never replaces a session: validation falls back to the session
+	// path, and a provider outage falls back to a cached-valid session
+	// before reporting unavailable. Retired or foreign tokens therefore
+	// keep exact guest behavior.
+	if token, ok := bearerToken(r); ok {
+		if p, err := s.bearerPrincipal(r.Context(), token); err == nil {
+			if p.Subject != "" {
+				return p, nil
+			}
+		} else if p, serr := s.sessionPrincipal(r); serr == nil && p.Subject != "" {
+			return p, nil
+		} else if serr != nil {
+			return Principal{}, serr
+		} else {
+			return Principal{}, err
+		}
+	}
+	return s.sessionPrincipal(r)
+}
+
+func (s *Service) sessionPrincipal(r *http.Request) (Principal, error) {
 	g, err := s.validateGrant(r.Context(), s.sessions.GetString(r.Context(), "grant_id"))
 	if err != nil {
 		return Principal{}, err
@@ -229,6 +253,12 @@ func (s *Service) serveAuth(w http.ResponseWriter, r *http.Request) {
 		s.accountUpdateProfile(w, r)
 	case "POST " + prefix + "change-password":
 		s.accountChangePassword(w, r)
+	case "POST " + prefix + "device/start":
+		s.deviceStart(w, r)
+	case "POST " + prefix + "device/poll":
+		s.devicePoll(w, r)
+	case "POST " + prefix + "device/refresh":
+		s.deviceRefresh(w, r)
 	case "GET " + prefix + "sessions":
 		s.accountSessions(w, r)
 	case "DELETE " + prefix + "sessions":
