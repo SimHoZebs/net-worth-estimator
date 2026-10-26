@@ -71,7 +71,7 @@ The frontend image is environment-independent. All deployments proxy `/v1` under
 
 ## API and Persistence Flow
 
-- `api.New(store.Store, api.Config)` builds the router. Current routes: `GET /healthz`, `GET /v1/financial-model`, row endpoints under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, amount presets under `/v1/amount-presets`, pinned evaluations under `/v1/pinned-evaluations`, link endpoints under `/v1/sync/simplefin/accounts`, `GET /v1/status`, `GET /v1/amount-resolvers`, `POST /v1/projections/deterministic`, `POST /v1/projections/stochastic`, and `POST /v1/sync/simplefin`.
+- `api.New(store.Store, api.Config)` builds the router. Current routes: `GET /healthz`, `GET /v1/financial-model`, row endpoints under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, amount presets under `/v1/amount-presets`, pinned evaluations under `/v1/pinned-evaluations`, SimpleFIN credential endpoints under `/v1/sync/simplefin/credential` (`GET`/`POST`/`DELETE`), card selection under `/v1/sync/simplefin/cards` (`GET`/`PUT`), link endpoints under `/v1/sync/simplefin/accounts`, `GET /v1/status` (includes `syncHost` when configured), `GET /v1/amount-resolvers`, `POST /v1/projections/deterministic`, `POST /v1/projections/stochastic`, and `POST /v1/sync/simplefin`. DB credential wins over `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL`; card selection unions stored per-plan cards with `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS`.
 
 ## Core Go APIs
 

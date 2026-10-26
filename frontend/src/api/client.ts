@@ -24,6 +24,10 @@ import type {
 	ServerStatus,
 	SafeSpendingSettings,
 	SafeSpendingSettingsResponse,
+	SyncCardsRequest,
+	SyncCardsResponse,
+	SyncCredentialConnectRequest,
+	SyncCredentialStatus,
 	StochasticProjectionRequest,
 	StochasticProjectionResult,
 } from "./contracts.ts";
@@ -679,6 +683,53 @@ export class ApiClient {
 		return this.requestJson<PinnedEvaluationsResponse>(
 			"pinned-evaluations",
 			requestInit("PUT", { instanceIds }, options),
+		);
+	}
+
+	getSyncCredential(
+		options: ApiRequestOptions = {},
+	): Promise<Error | SyncCredentialStatus> {
+		return this.requestJson<SyncCredentialStatus>(
+			"sync/simplefin/credential",
+			requestInit("GET", undefined, options),
+		);
+	}
+
+	connectSyncCredential(
+		request: SyncCredentialConnectRequest,
+		options: ApiRequestOptions = {},
+	): Promise<Error | SyncCredentialStatus> {
+		return this.requestJson<SyncCredentialStatus>(
+			"sync/simplefin/credential",
+			requestInit("POST", request, options),
+		);
+	}
+
+	disconnectSyncCredential(
+		options: ApiRequestOptions = {},
+	): Promise<Error | SyncCredentialStatus> {
+		return this.requestJson<SyncCredentialStatus>(
+			"sync/simplefin/credential",
+			requestInit("DELETE", undefined, options),
+		);
+	}
+
+	getSyncCards(
+		options: ApiRequestOptions = {},
+	): Promise<Error | SyncCardsResponse> {
+		return this.requestJson<SyncCardsResponse>(
+			"sync/simplefin/cards",
+			requestInit("GET", undefined, options),
+		);
+	}
+
+	setSyncCards(
+		request: SyncCardsRequest,
+		options: ApiRequestOptions = {},
+	): Promise<Error | SyncCardsResponse> {
+		return this.requestJson<SyncCardsResponse>(
+			"sync/simplefin/cards",
+			requestInit("PUT", request, options),
 		);
 	}
 

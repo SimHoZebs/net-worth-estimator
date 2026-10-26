@@ -487,8 +487,29 @@ export interface ServerStatus extends HumaMetadata {
 	readOnly: boolean;
 	/** Whether the server has a sync runner. Absent from older backends. */
 	syncConfigured?: boolean;
+	/** Bridge host for display. Omitted when unconfigured. Never the secret. */
+	syncHost?: string;
 	/** Last successful sync completion (RFC3339 UTC). Omitted before the first sync. */
 	lastSyncAt?: string;
+}
+
+export interface SyncCredentialStatus extends HumaMetadata {
+	configured: boolean;
+	bridgeHost?: string;
+	updatedAt?: string;
+}
+
+export interface SyncCredentialConnectRequest extends HumaMetadata {
+	setupToken?: string;
+	accessUrl?: string;
+}
+
+export interface SyncCardsResponse extends HumaMetadata {
+	cards: string[];
+}
+
+export interface SyncCardsRequest extends HumaMetadata {
+	cards: string[];
 }
 
 export type StatusResponse = ServerStatus;
