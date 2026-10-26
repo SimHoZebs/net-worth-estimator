@@ -16,6 +16,7 @@ export function LastSync({ status }: { status: ServerStatus | null }) {
 		return (
 			<time dateTime={status.lastSyncAt}>
 				Last synced {syncTimeFormat.format(time)}
+				{status.syncHost ? ` · ${status.syncHost}` : ""}
 			</time>
 		);
 	}
