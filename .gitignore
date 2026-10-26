@@ -4,4 +4,5 @@ core.*
 uploads/
 tmp/
 .env.dev
+/tasks/to-groom/long-chaining/
 /node_modules/
