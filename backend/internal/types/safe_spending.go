@@ -6,6 +6,7 @@ type SafeSpendingSettings struct {
 	Reserve            float64  `json:"reserve" minimum:"0"`
 	AccountIDs         []string `json:"accountIds" nullable:"true"`
 	SpendingAccountIDs []string `json:"spendingAccountIds" nullable:"true"`
+	IncomeAccountIDs   []string `json:"incomeAccountIds" nullable:"true"`
 	IncomeRuleIDs      []string `json:"incomeRuleIds"`
 	MovementIDs        []string `json:"movementIds" nullable:"true"`
 	StatementDaySet    bool     `json:"statementDaySet"`

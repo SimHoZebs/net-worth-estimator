@@ -110,7 +110,7 @@ func TestPlansIsolateEveryAccountFromSampleAndOtherAccounts(t *testing.T) {
 	if model(t, other).Accounts[0].ID != "other" || len(model(t, owner).Accounts) != 1 || len(model(t, guest).Accounts) != 1 {
 		t.Fatal("canonical writes crossed the plan boundary")
 	}
-	settings := `{"statementDay":15,"statementDaySet":true,"reserve":321,"accountIds":null,"spendingAccountIds":null,"incomeRuleIds":[],"movementIds":null}`
+	settings := `{"statementDay":15,"statementDaySet":true,"reserve":321,"accountIds":null,"spendingAccountIds":null,"incomeAccountIds":null,"incomeRuleIds":[],"movementIds":null}`
 	if w := request(t, other, "PUT", "/v1/safe-spending-settings", settings); w.Code != 200 {
 		t.Fatalf("save budget settings=%d %s", w.Code, w.Body.String())
 	}
