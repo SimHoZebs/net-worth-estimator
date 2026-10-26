@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Plan } from "../../domain/model.ts";
 import { testPlan } from "../../test/plan.ts";
 import { AccountDetails } from "./AccountDetails.tsx";
@@ -16,6 +16,60 @@ function input(name: string): HTMLInputElement {
 }
 
 describe("AccountDetails", () => {
+	it("refreshes untouched fields without creating a local edit", () => {
+		const onApply = vi.fn(() => true);
+		const props = {
+			account: home,
+			plan: testPlan,
+			endingBalance: 480000,
+			onApply,
+		};
+		const view = render(<AccountDetails {...props} />);
+		view.rerender(
+			<AccountDetails {...props} account={{ ...home, name: "Current home" }} />,
+		);
+		expect(input("Account name").value).toBe("Current home");
+		expect(
+			(
+				screen.getByRole("button", {
+					name: "Apply unsaved changes",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true);
+	});
+
+	it("preserves edits across unrelated refreshes and rejects same-field conflicts", () => {
+		const onApply = vi.fn(() => true);
+		const props = {
+			account: home,
+			plan: testPlan,
+			endingBalance: 480000,
+			onApply,
+		};
+		const view = render(<AccountDetails {...props} />);
+		fireEvent.change(input("Account name"), { target: { value: "My home" } });
+		view.rerender(
+			<AccountDetails
+				{...props}
+				account={{ ...home, balance: home.balance + 100 }}
+			/>,
+		);
+		expect(input("Account name").value).toBe("My home");
+		view.rerender(
+			<AccountDetails {...props} account={{ ...home, name: "Another name" }} />,
+		);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Apply unsaved changes" }),
+		);
+		expect(onApply).not.toHaveBeenCalled();
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: "Discard edits and use current values",
+			}),
+		);
+		expect(input("Account name").value).toBe("Another name");
+	});
+
 	it("edits inline with source display-only and a grouped balance range", () => {
 		const applied: { plan: Plan | null } = { plan: null };
 		render(

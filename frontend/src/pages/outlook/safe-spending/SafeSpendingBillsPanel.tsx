@@ -6,16 +6,16 @@ import {
 	ShoppingBag,
 	Wallet,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useTransactionSelection } from "../../../components/activity/useTransactionSelection.ts";
 import { TransactionSortButton } from "../../../components/activity/TransactionSortButton.tsx";
 import { TransactionDetail } from "../../../components/activity/TransactionDetail.tsx";
 import {
 	type BarSegment,
 	SegmentedBar,
 } from "../../../components/SegmentedBar.tsx";
-import type { AccountTransaction } from "../../../domain/accountActivity.ts";
 import { exactMoney, money, monthDay } from "../../../domain/format.ts";
-import type { Movement, Plan } from "../../../domain/model.ts";
+import type { Plan } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import {
 	TransactionSectionView,
@@ -96,12 +96,10 @@ export function SafeSpendingBillsPanel({
 		() => new Map(plan.movements.map((movement) => [movement.id, movement])),
 		[plan.movements],
 	);
-	const [selected, setSelected] = useState<{
-		transaction: AccountTransaction;
-		movement: Movement;
-	} | null>(null);
-	const inspect = (transaction: AccountTransaction, movement: Movement) =>
-		setSelected({ transaction, movement });
+	const { selected, inspect, close } = useTransactionSelection(
+		section.transactions,
+		movements,
+	);
 	return (
 		<div className="grid content-start gap-4">
 			<div className="grid grid-cols-2 gap-3">
@@ -290,7 +288,7 @@ export function SafeSpendingBillsPanel({
 								)?.name ?? null)
 							: null
 					}
-					onClose={() => setSelected(null)}
+					onClose={close}
 				/>
 			)}
 		</div>
