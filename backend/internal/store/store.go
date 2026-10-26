@@ -26,8 +26,10 @@ import (
 //     SQLite pragmas, extensions, or file assumptions outside database setup.
 //   - A fresh backend reports DocumentExists() == false. InitializeDocument
 //     activates an empty model without replacing existing data.
-//   - Clear resets this plan's model, sync state, settings, and artifacts. It
-//     preserves amount presets, plan ownership, other plans, and identity state.
+//   - Clear resets this plan's model, sync state (including the Bridge key
+//     and card selection), settings, and artifacts. It preserves amount
+//     presets, plan ownership, other plans, and identity state. Use
+//     ClearSyncCredential to disconnect the key while keeping cards.
 type Store interface {
 	LoadDocument() (*types.FinancialModelDocument, error)
 	DocumentExists() (bool, error)
@@ -66,6 +68,18 @@ type Store interface {
 	SaveAccountLink(link AccountLink) (AccountLink, error)
 	DeleteAccountLink(bridgeAccountID string) error
 	ProvisionSyncAccounts(items []SyncProvision) (map[string]string, int, []string, error)
+	// GetSyncCredential reports the stored per-plan SimpleFIN credential, or
+	// a zero credential when no key is connected. The AccessURL is a secret
+	// and must never leave the server in API payloads or logs.
+	GetSyncCredential() (SyncCredential, error)
+	// SetSyncCredential stores the Bridge Access URL with display metadata.
+	SetSyncCredential(accessURL, bridgeHost string) (SyncCredential, error)
+	// ClearSyncCredential disconnects the Bridge key, keeping card selection.
+	ClearSyncCredential() error
+	// GetSyncCards reports the per-plan card account selection.
+	GetSyncCards() ([]string, error)
+	// SetSyncCards replaces the per-plan card account selection.
+	SetSyncCards(cards []string) ([]string, error)
 	// GetLastSyncTime reports the completion time of the last successful
 	// SimpleFIN sync as RFC3339 UTC, or "" when no sync has completed yet.
 	GetLastSyncTime() (string, error)

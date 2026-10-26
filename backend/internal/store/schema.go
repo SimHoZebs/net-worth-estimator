@@ -23,6 +23,9 @@ func seedPlan(tx *planTx) error {
 	if _, err := tx.Exec(`INSERT OR IGNORE INTO sync_state (id, last_sync_at, plan_id) VALUES (1, '', :plan_id)`); err != nil {
 		return fmt.Errorf("ensure sync state: %w", err)
 	}
+	if _, err := tx.Exec(`INSERT OR IGNORE INTO sync_credentials (id, access_url, bridge_host, updated_at, cards_json, plan_id) VALUES (1, '', '', '', '[]', :plan_id)`); err != nil {
+		return fmt.Errorf("ensure sync credentials: %w", err)
+	}
 	var presetCount int
 	if err := tx.QueryRow(`SELECT COUNT(*) FROM amount_presets WHERE plan_id = :plan_id`).Scan(&presetCount); err != nil {
 		return fmt.Errorf("count amount presets: %w", err)
@@ -251,6 +254,15 @@ func schemaStatements() []string {
 			last_sync_at TEXT NOT NULL DEFAULT '',
 			PRIMARY KEY(plan_id, id)
 		)`,
+		`CREATE TABLE IF NOT EXISTS sync_credentials (
+			plan_id TEXT NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
+			id INTEGER NOT NULL CHECK (id = 1),
+			access_url TEXT NOT NULL DEFAULT '',
+			bridge_host TEXT NOT NULL DEFAULT '',
+			updated_at TEXT NOT NULL DEFAULT '',
+			cards_json TEXT NOT NULL DEFAULT '[]',
+			PRIMARY KEY(plan_id, id)
+		)`,
 		`CREATE TABLE IF NOT EXISTS amount_presets (
 			plan_id TEXT NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,
@@ -407,6 +419,7 @@ var requiredSchemaColumns = map[string]string{
 	"pinned_evaluations":     "plan_id, instance_id, position",
 	"safe_spending_settings": "plan_id, id, settings_json",
 	"sync_state":             "plan_id, id, last_sync_at",
+	"sync_credentials":       "plan_id, id, access_url, bridge_host, updated_at, cards_json",
 	"amount_presets":         "plan_id, id, position, name, label, summary, when_use, amount_json, enabled",
 }
 
@@ -460,6 +473,7 @@ func expectedSchemaTables() []string {
 		"pinned_evaluations",
 		"safe_spending_settings",
 		"sync_state",
+		"sync_credentials",
 		"amount_presets",
 	}
 }
