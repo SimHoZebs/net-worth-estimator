@@ -1,6 +1,6 @@
 -- SimpleFIN sync purge.
 --
--- Intent: removes ALL sync-owned rows; the
+-- Intent: removes SimpleFIN-owned rows in one explicitly selected plan; the
 -- next sync re-inserts fresh checkpoints and the pending snapshot.
 -- Owner rows (source 'model') are untouched: model saves already protect
 -- them via strip-and-merge, and the sync never writes them.
@@ -8,26 +8,30 @@
 -- Procedure:
 --   1. Back up the database file (NET_WORTH_ESTIMATOR_DB).
 --   2. Stop the server (or disable the scheduler) so no sync runs mid-purge.
---   3. Preview what will go (uncomment the SELECTs below).
+--   3. Set :plan_id to the verified plan resource and preview the selected rows.
 --   4. Run this transaction against the current schema, e.g.:
---        sqlite3 "$NET_WORTH_ESTIMATOR_DB" < backend/scripts/purge-simplefin-sync.sql
+--        sqlite3 -cmd ".parameter init" \
+--          -cmd ".parameter set :plan_id 'plans/<verified-resource-id>'" \
+--          "$NET_WORTH_ESTIMATOR_DB" < backend/scripts/purge-simplefin-sync.sql
 --   5. Set the real access URL +
 --      Access URL, restart, then POST /v1/sync/simplefin.
 --
--- Note: this script was tested through equivalent sqlite execution, not the
--- sqlite3 CLI itself; run step 4 verbatim once on a machine with sqlite3
--- before relying on it for cutover.
+-- SQLite and CLI checks cover plan isolation, an omitted binding, and cascades.
 --
 -- Preview (run before deleting):
--- SELECT date, account_id, balance FROM checkpoints WHERE source = 'simplefin' ORDER BY date;
--- SELECT id, source_account_id FROM postings WHERE source = 'simplefin' ORDER BY id;
+-- SELECT date, account_id, balance FROM checkpoints WHERE plan_id = :plan_id AND source = 'simplefin' ORDER BY date;
+-- SELECT id, source_account_id FROM postings WHERE plan_id = :plan_id AND source = 'simplefin' ORDER BY id;
+-- An omitted :plan_id matches no rows. There is no all-plans fallback.
 
+PRAGMA foreign_keys = ON;
 BEGIN;
-DELETE FROM posting_sync_keys WHERE provider = 'simplefin';
-DELETE FROM entity_ids WHERE id IN (SELECT id FROM postings WHERE source = 'simplefin');
-DELETE FROM postings WHERE source = 'simplefin';
-DELETE FROM checkpoints WHERE source = 'simplefin';
+DELETE FROM posting_sync_keys WHERE plan_id = :plan_id AND provider = 'simplefin';
+DELETE FROM entity_ids WHERE plan_id = :plan_id AND id IN (
+    SELECT id FROM postings WHERE plan_id = :plan_id AND source = 'simplefin'
+);
+DELETE FROM postings WHERE plan_id = :plan_id AND source = 'simplefin';
+DELETE FROM checkpoints WHERE plan_id = :plan_id AND source = 'simplefin';
 -- Reset the last-sync timestamp so the sidebar does not report a stale
 -- time against an empty sync state. The next successful sync re-stamps it.
-DELETE FROM sync_state;
+UPDATE sync_state SET last_sync_at = '' WHERE plan_id = :plan_id;
 COMMIT;

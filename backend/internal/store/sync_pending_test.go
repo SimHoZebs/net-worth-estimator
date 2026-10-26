@@ -10,6 +10,8 @@ import (
 func TestPendingUUIDsUseExactUpstreamKeysAndSurviveRefresh(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedOwnerDocument(t, database)
+	seedAccount(t, database, "prime_card")
+	seedAccount(t, database, "other_card")
 	var incoming []SyncPosting
 	for _, raw := range []string{"a/b", "a b", "a_b", "a.b", "a'b"} {
 		item := syncPendingPosting(raw, "prime_card", "2026-08-02")

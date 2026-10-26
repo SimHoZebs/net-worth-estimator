@@ -152,6 +152,13 @@ func openTestStore(t *testing.T) Store {
 	return openSQLiteStore(t)
 }
 
+func seedAccount(t *testing.T, store Store, id string) {
+	t.Helper()
+	if _, err := store.CreateAccount(types.Account{ID: id, Name: id, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // openSQLiteStore opens the embedded-SQLite backend directly. Tests that
 // assert on SQL-level details (raw scripts) use this;
 // behavioral tests go through RunConformance with the interface instead.

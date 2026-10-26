@@ -29,9 +29,9 @@ func syncCheckpointKey(accountID, date string) string {
 // nextTablePosition returns MAX(position)+1 for a position-ordered table, or
 // 0 when empty. One position-management helper shared by the sync apply and
 // document re-merge paths.
-func nextTablePosition(tx *sql.Tx, table string) (int, error) {
+func nextTablePosition(tx *planTx, table string) (int, error) {
 	var maxPosition sql.NullInt64
-	if err := tx.QueryRow(`SELECT MAX(position) FROM ` + table).Scan(&maxPosition); err != nil {
+	if err := tx.QueryRow(`SELECT MAX(position) FROM ` + table + ` WHERE plan_id = :plan_id`).Scan(&maxPosition); err != nil {
 		return 0, fmt.Errorf("next %s position: %w", table, err)
 	}
 	if maxPosition.Valid {
@@ -43,7 +43,7 @@ func nextTablePosition(tx *sql.Tx, table string) (int, error) {
 // remergeCheckpoints writes owner checkpoints then re-merges sync-owned rows.
 // Incoming owner checkpoints win key collisions, so owners always keep an
 // override path. Returns the next free position.
-func remergeCheckpoints(tx *sql.Tx, incoming []types.Checkpoint, synced []types.Checkpoint, startPosition int) (int, error) {
+func remergeCheckpoints(tx *planTx, incoming []types.Checkpoint, synced []types.Checkpoint, startPosition int) (int, error) {
 	incomingKeys := make(map[string]struct{}, len(incoming))
 	for _, checkpoint := range incoming {
 		incomingKeys[syncCheckpointKey(checkpoint.AccountID, checkpoint.Date)] = struct{}{}
@@ -62,7 +62,7 @@ func remergeCheckpoints(tx *sql.Tx, incoming []types.Checkpoint, synced []types.
 			continue
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (?,?,?,?,?)`,
+			`INSERT INTO checkpoints (position, date, account_id, balance, source, plan_id, id) VALUES (?,?,?,?,?, :plan_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE plan_id = :plan_id))`,
 			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceModel,
 		); err != nil {
 			return 0, fmt.Errorf("insert checkpoint: %w", err)
@@ -77,7 +77,7 @@ func remergeCheckpoints(tx *sql.Tx, incoming []types.Checkpoint, synced []types.
 			}
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (?,?,?,?,?)`,
+			`INSERT INTO checkpoints (position, date, account_id, balance, source, plan_id, id) VALUES (?,?,?,?,?, :plan_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE plan_id = :plan_id))`,
 			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, syncedSource(checkpoint.Source),
 		); err != nil {
 			return 0, fmt.Errorf("re-merge synced checkpoint: %w", err)
@@ -88,7 +88,7 @@ func remergeCheckpoints(tx *sql.Tx, incoming []types.Checkpoint, synced []types.
 }
 
 // remergePostings writes owner postings, then restores authoritative sync rows.
-func remergePostings(tx *sql.Tx, incoming []types.Posting, synced []types.Posting, startPosition int) (int, error) {
+func remergePostings(tx *planTx, incoming []types.Posting, synced []types.Posting, startPosition int) (int, error) {
 	position := startPosition
 	syncedIDs := make(map[string]bool, len(synced))
 	for _, posting := range synced {
@@ -112,11 +112,11 @@ func remergePostings(tx *sql.Tx, incoming []types.Posting, synced []types.Postin
 	return position, nil
 }
 
-func loadSyncedCheckpoints(tx *sql.Tx) ([]types.Checkpoint, error) {
+func loadSyncedCheckpoints(tx *planTx) ([]types.Checkpoint, error) {
 	// Any non-model source is sync-owned. Sources stay per-provider
 	// (simplefin, plaid, ...) so metrics and debugging can tell bank-data
 	// origins apart; the lifecycle treats them uniformly.
-	rows, err := tx.Query(`SELECT date, account_id, balance, source FROM checkpoints WHERE source != ? ORDER BY position`, SourceModel)
+	rows, err := tx.Query(`SELECT date, account_id, balance, source FROM checkpoints WHERE source != ? AND plan_id = :plan_id ORDER BY position`, SourceModel)
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +135,8 @@ func loadSyncedCheckpoints(tx *sql.Tx) ([]types.Checkpoint, error) {
 	return checkpoints, rows.Close()
 }
 
-func loadSyncedPostings(tx *sql.Tx) ([]types.Posting, error) {
-	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order FROM postings WHERE source != ? ORDER BY position`, SourceModel)
+func loadSyncedPostings(tx *planTx) ([]types.Posting, error) {
+	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order FROM postings WHERE source != ? AND plan_id = :plan_id ORDER BY position`, SourceModel)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func syncedSource(source string) string {
 // when no sync has completed (fresh or cleared database).
 func (s *sqliteStore) GetLastSyncTime() (string, error) {
 	var value string
-	if err := s.db.QueryRow(`SELECT last_sync_at FROM sync_state WHERE id = 1`).Scan(&value); err != nil {
+	if err := s.db.QueryRow(`SELECT last_sync_at FROM sync_state WHERE id = 1 AND plan_id = :plan_id`).Scan(&value); err != nil {
 		if err == sql.ErrNoRows {
 			return "", nil
 		}
@@ -179,8 +179,8 @@ func (s *sqliteStore) GetLastSyncTime() (string, error) {
 
 // SetLastSyncTime records a successful sync completion time.
 func (s *sqliteStore) SetLastSyncTime(completedAt string) error {
-	if _, err := s.db.Exec(`INSERT INTO sync_state (id, last_sync_at) VALUES (1, ?)
-		ON CONFLICT(id) DO UPDATE SET last_sync_at = excluded.last_sync_at`, completedAt); err != nil {
+	if _, err := s.db.Exec(`INSERT INTO sync_state (id, last_sync_at, plan_id) VALUES (1, ?, :plan_id)
+		ON CONFLICT(plan_id, id) DO UPDATE SET last_sync_at = excluded.last_sync_at`, completedAt); err != nil {
 		return fmt.Errorf("record last sync time: %w", err)
 	}
 	return nil
@@ -230,7 +230,7 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 	defer tx.Rollback()
 	for _, item := range items {
 		var modelAccountID string
-		if err := tx.QueryRow(`SELECT model_account_id FROM account_links WHERE bridge_account_id = ?`, item.BridgeID).Scan(&modelAccountID); err == nil {
+		if err := tx.QueryRow(`SELECT model_account_id FROM account_links WHERE bridge_account_id = ? AND plan_id = :plan_id`, item.BridgeID).Scan(&modelAccountID); err == nil {
 			exists, err := accountExists(tx, modelAccountID)
 			if err != nil {
 				return nil, 0, nil, err
@@ -280,7 +280,7 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []Sync
 	}
 	for _, checkpoint := range checkpoints {
 		result, err := tx.Exec(
-			`INSERT OR IGNORE INTO checkpoints (position, date, account_id, balance, source) VALUES (?,?,?,?,?)`,
+			`INSERT OR IGNORE INTO checkpoints (position, date, account_id, balance, source, plan_id, id) VALUES (?,?,?,?,?, :plan_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE plan_id = :plan_id))`,
 			nextPosition, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceSimpleFIN,
 		)
 		if err != nil {
@@ -298,7 +298,7 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []Sync
 		var existingSource string
 		var existingBalance float64
 		if err := tx.QueryRow(
-			`SELECT source, balance FROM checkpoints WHERE account_id = ? AND date = ?`,
+			`SELECT source, balance FROM checkpoints WHERE account_id = ? AND date = ? AND plan_id = :plan_id`,
 			checkpoint.AccountID, checkpoint.Date,
 		).Scan(&existingSource, &existingBalance); err != nil {
 			return summary, fmt.Errorf("sync read checkpoint conflict: %w", err)
@@ -308,7 +308,7 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []Sync
 			continue
 		}
 		if _, err := tx.Exec(
-			`UPDATE checkpoints SET balance = ? WHERE account_id = ? AND date = ?`,
+			`UPDATE checkpoints SET balance = ? WHERE account_id = ? AND date = ? AND plan_id = :plan_id`,
 			checkpoint.Balance, checkpoint.AccountID, checkpoint.Date,
 		); err != nil {
 			return summary, fmt.Errorf("sync update checkpoint: %w", err)

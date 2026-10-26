@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { generate } from '../auth/casdoor/generate.mjs';
 import { writeBootstrap } from '../auth/casdoor/provision.mjs';
-import { databaseName, installSnapshot, sampleDatabaseName, sampleSnapshot, snapshotFile, validateSnapshot } from './database.mjs';
+import { databaseName, snapshotFile, validateSnapshot } from './database.mjs';
 import { composeEnvironment, loadConfig, originProfile, project, saveConfig, settings, withLock, writeComposeEnv } from './config.mjs';
 import { checkServe, nodeHostname } from './tailnet.mjs';
 
@@ -68,14 +68,18 @@ async function snapshot(config) {
   return destination;
 }
 
-async function setup(config) {
+async function setup(config, sourcePlan) {
   if (originProfile(config.identity.APP_PUBLIC_URL, config.identity.CASDOOR_PUBLIC_URL)) {
     checkServe(config, JSON.parse(run('tailscale', ['status', '--json'], { capture: true })),
       JSON.parse(run('tailscale', ['serve', 'status', '--json'], { capture: true })));
   }
   const identityDir = resolve(stateDir, 'casdoor');
   if (!await exists(resolve(identityDir, 'conf/app.conf'))) await generate(settings(config), identityDir);
-  if (!await exists(resolve(stateDir, 'data', databaseName))) await installSnapshot(await snapshot(config), resolve(stateDir, 'data'), resolve(stateDir, 'backups'));
+  const destination = resolve(stateDir, 'data', databaseName);
+  const fresh = !await exists(destination);
+  if (!fresh && validateSnapshot(destination) !== 'application') {
+    throw new Error('Existing dev database requires offline migration. Preserve its identity and plan files, migrate with cmd/migratedb to a new path, then install the reviewed result explicitly.');
+  }
   const bootstrapPath = resolve(identityDir, 'bootstrap.json');
   if (!await exists(bootstrapPath)) {
     compose(config, ['up', '-d', '--wait', 'casdoor']);
@@ -90,7 +94,16 @@ async function setup(config) {
     config.ownerSubject = bootstrap.subject;
     await saveConfig(stateDir, config);
   }
-  if (!config.ownerSubject) throw new Error('Existing dev data needs an explicit ownerSubject in tmp/dev/config.json. Assign the verified owner before startup; no account inherits this plan automatically.');
+  if (!config.ownerSubject) throw new Error('Set the verified Bridge ownerSubject in tmp/dev/config.json. Plan ownership comes from the application database and its migration manifest.');
+  if (fresh) {
+    const incoming = await snapshot(config);
+    if (validateSnapshot(incoming) !== 'application') throw new Error(`Legacy snapshot saved at ${incoming}. Use setup --manifest with explicit source ownership to migrate it first.`);
+    const helper = resolve(stateDir, 'refreshplan');
+    run('go', ['-C', 'backend', 'build', '-o', helper, './cmd/refreshplan']);
+    run(helper, ['--db', destination, '--source', incoming,
+      '--init-issuer', bootstrap.issuer, '--init-subject', bootstrap.subject,
+      ...(sourcePlan ? ['--source-plan', sourcePlan] : [])]);
+  }
   await writeComposeEnv(config, resolve(root, '.env.dev'));
   console.log(`Dev setup ready: ${config.identity.APP_PUBLIC_URL} (Casdoor: ${config.identity.CASDOOR_PUBLIC_URL})`);
   console.log('Start with: docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait');
@@ -99,49 +112,66 @@ async function setup(config) {
 export async function main(args) {
   process.umask(0o077);
   const { values, positionals } = parseArgs({ args, allowPositionals: true,
-    options: { from: { type: 'string' }, tailnet: { type: 'boolean' }, help: { type: 'boolean', short: 'h' } } });
+    options: { from: { type: 'string' }, manifest: { type: 'string' }, plan: { type: 'string' }, 'source-plan': { type: 'string' }, tailnet: { type: 'boolean' }, help: { type: 'boolean', short: 'h' } } });
   const [command] = positionals;
   if (values.help) {
-    console.log('Usage: scripts/dev setup [--tailnet] [--from backup.db] | refresh-db [--from backup.db] | publish-sample [--from approved-snapshot.db]');
+    console.log('Usage: scripts/dev setup [--tailnet] [--from migrated-app.db | --manifest migration.json] [--source-plan SOURCE_ID] | refresh-db --plan PLAN_ID --source-plan SOURCE_ID [--from migrated-app.db] | publish-sample --source-plan SOURCE_ID [--from approved-app.db]');
     return;
   }
   if (command === 'grant') throw new Error('Access is automatic for each account\'s own plan. Casdoor manages resource permissions; no global editor grant is needed.');
   if (!['setup', 'refresh-db', 'publish-sample'].includes(command)) throw new Error('Use scripts/dev setup once. Use docker compose --env-file .env.dev -f docker-compose.dev.yml for up, down, ps, and logs.');
   if (positionals.length > 1) throw new Error('Unexpected dev arguments. Use scripts/dev --help.');
   if (values.tailnet && command !== 'setup') throw new Error('--tailnet applies only to setup');
-  const source = values.from ? { file: resolve(values.from) } : undefined;
+  validateOperation(command, values);
+  let source = values.from ? { file: resolve(values.from) } : undefined;
   await withLock(stateDir, async () => {
     const hostname = values.tailnet ? nodeHostname(JSON.parse(run('tailscale', ['status', '--json'], { capture: true }))) : undefined;
     const config = await loadConfig(stateDir, command === 'setup', source, hostname);
     if (command === 'setup') {
-      if (source && await exists(resolve(stateDir, 'data', databaseName))) {
-        throw new Error('Dev data already exists. Use refresh-db --from to replace it explicitly.');
+      if ((source || values.manifest) && await exists(resolve(stateDir, 'data', databaseName))) {
+        throw new Error('Dev data already exists. Use refresh-db --plan PLAN_ID --source-plan SOURCE_ID --from to replace only the selected financial scope.');
+      }
+      if (values['source-plan'] && await exists(resolve(stateDir, 'data', databaseName))) throw new Error('Dev data already exists. Select a plan through refresh-db instead of setup.');
+      if (values.manifest) {
+        const directory = resolve(stateDir, 'snapshots');
+        await mkdir(directory, { recursive: true, mode: 0o700 });
+        const migrated = resolve(directory, `migrated-${Date.now()}-${randomUUID()}.db`);
+        run('go', ['-C', 'backend', 'run', './cmd/migratedb', '--manifest', resolve(values.manifest), '--db', migrated]);
+        source = { file: migrated };
       }
       if (source) { config.source = source; await saveConfig(stateDir, config); }
-      await setup(config);
-    } else if (command === 'publish-sample') {
-      if (!config.ownerSubject) throw new Error('Assign the verified primary ownerSubject before publishing a sample.');
-      const incoming = resolve(stateDir, 'snapshots', `sample-${Date.now()}-${randomUUID()}.db`);
-      await mkdir(resolve(stateDir, 'snapshots'), { recursive: true, mode: 0o700 });
-      await sampleSnapshot(source?.file ?? resolve(stateDir, 'data', databaseName), incoming);
+      await setup(config, values['source-plan']);
+    } else {
+      const publishing = command === 'publish-sample';
+      const incoming = await snapshot({ ...config, source: source ?? (publishing ? { file: resolve(stateDir, 'data', databaseName) } : config.source) });
+      if (validateSnapshot(incoming) !== 'application') throw new Error('Migrate the source snapshot with cmd/migratedb first. Refresh never imports an unscoped legacy database.');
+      const destination = resolve(stateDir, 'data', databaseName);
+      const backupDir = resolve(stateDir, 'backups');
+      await mkdir(backupDir, { recursive: true, mode: 0o700 });
+      // Build before service interruption. This also proves the helper contract
+      // matches the application's current schema and store API.
+      const helper = resolve(stateDir, 'refreshplan');
+      run('go', ['-C', 'backend', 'build', '-o', helper, './cmd/refreshplan']);
       compose(config, ['stop', 'backend']);
       try {
-        await installSnapshot(incoming, resolve(stateDir, 'data'), resolve(stateDir, 'backups'), sampleDatabaseName);
-      } finally { compose(config, ['start', '--wait', 'backend']); }
-      console.log('Sample snapshot published. Guests can read this financial data. The private primary plan and all account plans remain separate.');
-    } else if (command === 'refresh-db') {
-      if (source) config.source = source;
-      const incoming = await snapshot(config);
-      compose(config, ['stop', 'backend']);
-      try {
-        await installSnapshot(incoming, resolve(stateDir, 'data'), resolve(stateDir, 'backups'));
-        await saveConfig(stateDir, config);
+        await snapshotFile(destination, resolve(backupDir, `application-${Date.now()}-${randomUUID()}.db`));
+        run(helper, ['--db', destination, '--source', incoming, '--source-plan', values['source-plan'],
+          ...(publishing ? ['--sample'] : ['--plan', values.plan])]);
       } finally {
         compose(config, ['start', '--wait', 'backend']);
       }
-      console.log('Dev financial database refreshed. The prior copy is in tmp/dev/backups/. Identity state is unchanged.');
+      console.log(publishing ? 'Sample published in the application database. Private plans and all identity state remain unchanged.' : 'Selected dev plan refreshed. Other plans and all identity state remain unchanged.');
+      console.log('The prior application database is in tmp/dev/backups/.');
     }
   });
+}
+
+export function validateOperation(command, values) {
+  if (values.manifest && (command !== 'setup' || values.from)) throw new Error('--manifest applies only to setup and cannot combine with --from');
+  if (command === 'setup' && values.plan) throw new Error('--plan applies only to refresh-db; setup binds a new plan to its verified dev identity');
+  if (command !== 'setup' && !values['source-plan']) throw new Error('--source-plan is required. Select the reviewed financial scope explicitly.');
+  if (command === 'refresh-db' && (!values.plan || values.plan === 'plans/sample')) throw new Error('refresh-db requires --plan for an existing private plan');
+  if (command === 'publish-sample' && values.plan) throw new Error('publish-sample always targets plans/sample; omit --plan');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

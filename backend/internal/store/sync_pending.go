@@ -20,8 +20,8 @@ type postingSyncKey struct {
 	provider, accountID, transactionID, postingID string
 }
 
-func loadPostingSyncKeys(tx *sql.Tx) ([]postingSyncKey, error) {
-	rows, err := tx.Query(`SELECT provider, account_id, transaction_id, posting_id FROM posting_sync_keys`)
+func loadPostingSyncKeys(tx *planTx) ([]postingSyncKey, error) {
+	rows, err := tx.Query(`SELECT provider, account_id, transaction_id, posting_id FROM posting_sync_keys WHERE plan_id = :plan_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -37,13 +37,13 @@ func loadPostingSyncKeys(tx *sql.Tx) ([]postingSyncKey, error) {
 	return keys, rows.Err()
 }
 
-func insertPostingSyncKey(tx *sql.Tx, key postingSyncKey) error {
-	_, err := tx.Exec(`INSERT INTO posting_sync_keys (provider, account_id, transaction_id, posting_id) VALUES (?, ?, ?, ?)`,
+func insertPostingSyncKey(tx *planTx, key postingSyncKey) error {
+	_, err := tx.Exec(`INSERT INTO posting_sync_keys (provider, account_id, transaction_id, posting_id, plan_id) VALUES (?, ?, ?, ?, :plan_id)`,
 		key.provider, key.accountID, key.transactionID, key.postingID)
 	return err
 }
 
-func applyPendingSnapshot(tx *sql.Tx, incoming []SyncPosting, accounts []string, summary *SyncApplySummary) error {
+func applyPendingSnapshot(tx *planTx, incoming []SyncPosting, accounts []string, summary *SyncApplySummary) error {
 	position, err := nextTablePosition(tx, "postings")
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func applyPendingSnapshot(tx *sql.Tx, incoming []SyncPosting, accounts []string,
 		posting.Pending = true
 		posting.Enabled = false
 		key := postingSyncKey{provider: SourceSimpleFIN, accountID: item.ProviderAccountID, transactionID: item.TransactionID}
-		err := tx.QueryRow(`SELECT posting_id FROM posting_sync_keys WHERE provider = ? AND account_id = ? AND transaction_id = ?`,
+		err := tx.QueryRow(`SELECT posting_id FROM posting_sync_keys WHERE provider = ? AND account_id = ? AND transaction_id = ? AND plan_id = :plan_id`,
 			key.provider, key.accountID, key.transactionID).Scan(&key.postingID)
 		switch err {
 		case sql.ErrNoRows:
@@ -91,7 +91,7 @@ func applyPendingSnapshot(tx *sql.Tx, incoming []SyncPosting, accounts []string,
 		seen[posting.ID] = true
 	}
 	for _, accountID := range accounts {
-		rows, err := tx.Query(`SELECT id FROM postings WHERE source = ? AND source_account_id = ? AND pending = 1`, SourceSimpleFIN, accountID)
+		rows, err := tx.Query(`SELECT id FROM postings WHERE source = ? AND source_account_id = ? AND pending = 1 AND plan_id = :plan_id`, SourceSimpleFIN, accountID)
 		if err != nil {
 			return err
 		}
@@ -112,7 +112,7 @@ func applyPendingSnapshot(tx *sql.Tx, incoming []SyncPosting, accounts []string,
 		}
 		rows.Close()
 		for _, id := range stale {
-			if _, err := tx.Exec(`DELETE FROM postings WHERE id = ?`, id); err != nil {
+			if _, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND plan_id = :plan_id`, id); err != nil {
 				return err
 			}
 			if err := releaseRowID(tx, id); err != nil {
@@ -124,7 +124,7 @@ func applyPendingSnapshot(tx *sql.Tx, incoming []SyncPosting, accounts []string,
 	return nil
 }
 
-func updatePendingPosting(tx *sql.Tx, posting types.Posting) error {
+func updatePendingPosting(tx *planTx, posting types.Posting) error {
 	amount, err := json.Marshal(posting.Amount)
 	if err != nil {
 		return err
@@ -133,7 +133,7 @@ func updatePendingPosting(tx *sql.Tx, posting types.Posting) error {
 	if err != nil {
 		return err
 	}
-	result, err := tx.Exec(`UPDATE postings SET name = ?, source_account_id = ?, destinations = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, enabled = 0, pending = 1 WHERE id = ? AND source = ?`,
+	result, err := tx.Exec(`UPDATE postings SET name = ?, source_account_id = ?, destinations = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, enabled = 0, pending = 1 WHERE id = ? AND source = ? AND plan_id = :plan_id`,
 		posting.Name, nullable(posting.SourceAccountID), string(destinations), string(amount), posting.PostedTime, posting.TransactionTime, posting.ID, SourceSimpleFIN)
 	if err != nil {
 		return err

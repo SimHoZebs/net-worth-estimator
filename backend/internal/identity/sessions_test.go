@@ -1,0 +1,154 @@
+package identity
+
+import (
+	"context"
+	"database/sql"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+)
+
+func TestIdentityUsesSharedApplicationDatabaseAcrossRestart(t *testing.T) {
+	p := newIDP(t)
+	path := filepath.Join(t.TempDir(), "app.db")
+	database, err := store.SetupDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	fallback := filepath.Join(t.TempDir(), "must-not-exist.db")
+	s := newService(t, p, fallback, func(c *Config) { c.Database = database.SQL() })
+	if s.store.db != database.SQL() {
+		t.Fatal("identity did not retain the shared connection")
+	}
+	server := httptest.NewServer(s.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })))
+	client := testClient(t)
+	r := signIn(t, s, p, server, client, false)
+	r.Body.Close()
+	if r.StatusCode != http.StatusFound {
+		t.Fatalf("sign in=%d", r.StatusCode)
+	}
+	g := currentGrant(t, s)
+	for _, table := range []string{"sessions", "identity_grants", "identity_logout_marks", "identity_logout_tokens"} {
+		var name string
+		if err := database.SQL().QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&name); err != nil {
+			t.Fatalf("shared table %s missing: %v", table, err)
+		}
+	}
+	if err := s.store.Commit("storage-test-token", []byte("session data"), time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.store.revokeGrants(p.server.URL, "revoked-user", "", "logout-token", time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	server.Close()
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.SQL().PingContext(context.Background()); err != nil {
+		t.Fatalf("identity closed the application connection: %v", err)
+	}
+	if _, err := os.Stat(fallback); !os.IsNotExist(err) {
+		t.Fatalf("identity opened fallback path with an injected connection: %v", err)
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := store.OpenDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	restarted := newService(t, p, "", func(c *Config) { c.Database = reopened.SQL() })
+	data, found, err := restarted.store.Find("storage-test-token")
+	if err != nil || !found || string(data) != "session data" {
+		t.Fatalf("session did not persist: data=%q found=%v err=%v", data, found, err)
+	}
+	persisted, err := restarted.store.findGrant(g.ID, p.server.URL)
+	if err != nil || persisted.Subject != g.Subject || persisted.AccessToken != g.AccessToken {
+		t.Fatalf("grant did not persist: %+v %v", persisted, err)
+	}
+	var logoutToken string
+	if err := reopened.SQL().QueryRow(`SELECT jti FROM identity_logout_tokens WHERE issuer=? AND jti=?`, p.server.URL, "logout-token").Scan(&logoutToken); err != nil {
+		t.Fatalf("logout replay token did not persist: %v", err)
+	}
+	if err := restarted.store.createGrant(grant{ID: "late-callback", Issuer: p.server.URL, Subject: "revoked-user", LoginStartedAt: time.Now().Add(-time.Hour).UnixNano(), Expiry: time.Now().Add(time.Hour).Unix()}); err != errGrantRevoked {
+		t.Fatalf("logout mark did not block a delayed callback: %v", err)
+	}
+	restartedServer := httptest.NewServer(restarted.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })))
+	defer restartedServer.Close()
+	if status := writeStatus(t, client, restartedServer.URL); status != 204 {
+		t.Fatalf("persisted login status=%d", status)
+	}
+}
+
+func TestSessionsRequireExplicitConnectionOrTestPath(t *testing.T) {
+	if _, err := openSessions(""); err == nil {
+		t.Fatal("sessions opened an implicit database")
+	}
+	if _, err := sharedSessions(nil); err == nil {
+		t.Fatal("sessions accepted a nil shared connection")
+	}
+}
+
+func TestSessionsNeverCreateDatabaseOrIdentitySchema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing", "application.db")
+	if _, err := openSessions(path); err == nil {
+		t.Fatal("sessions created a missing database")
+	}
+	if _, err := os.Stat(filepath.Dir(path)); !os.IsNotExist(err) {
+		t.Fatalf("session startup created a directory: %v", err)
+	}
+	// The test explicitly creates an incomplete deployment fixture. Identity
+	// startup must report its missing schema rather than repair it.
+	path = filepath.Join(t.TempDir(), "incomplete.db")
+	database, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	if _, err := database.Exec(`CREATE TABLE sessions(token TEXT PRIMARY KEY, data BLOB NOT NULL, expiry INTEGER NOT NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sharedSessions(database); err == nil {
+		t.Fatal("identity accepted incomplete deployment schema")
+	}
+	var tables int
+	if err := database.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table'`).Scan(&tables); err != nil {
+		t.Fatal(err)
+	}
+	if tables != 1 {
+		t.Fatalf("identity startup created tables: got %d, want 1", tables)
+	}
+}
+
+func TestIdentityStartupFailureDoesNotCloseSharedDatabase(t *testing.T) {
+	database, err := store.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	var provider *httptest.Server
+	provider = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		respond(w, map[string]any{
+			"issuer": provider.URL, "authorization_endpoint": provider.URL + "/authorize",
+			"token_endpoint": provider.URL + "/token", "jwks_uri": provider.URL + "/jwks",
+		})
+	}))
+	defer provider.Close()
+	_, err = New(context.Background(), Config{
+		Provider: "casdoor", Issuer: provider.URL, PublicURL: "http://localhost:8080",
+		ClientID: "waypoint", ClientSecret: "secret", Database: database.SQL(),
+	})
+	if err == nil {
+		t.Fatal("identity accepted a provider without revocation support")
+	}
+	if err := database.SQL().Ping(); err != nil {
+		t.Fatalf("failed identity startup closed the application connection: %v", err)
+	}
+}

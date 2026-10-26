@@ -14,8 +14,8 @@ import { casdoorSession } from './provision.mjs';
 assert.equal(process.env.CASDOOR_TEST_MUTATIONS, '1', 'Explicitly permit disposable account mutations');
 const settings = settingsFromEnv(process.env);
 const scratch = await realpath(fileURLToPath(new URL('../../tmp/', import.meta.url)));
-for (const path of [process.env.CASDOOR_STATE_DIR, process.env.AUTH_TEST_SESSION_DB]) {
-  assert.ok(path, 'Set disposable identity and application-session paths');
+for (const path of [process.env.CASDOOR_STATE_DIR, process.env.NET_WORTH_ESTIMATOR_DB]) {
+  assert.ok(path, 'Set disposable identity and application database paths');
   const within = relative(scratch, await realpath(resolve(path)));
   assert.ok(within && !within.startsWith('..') && !within.startsWith('/'), 'Test state must be under repository tmp/');
 }
@@ -25,7 +25,7 @@ for (const origin of [settings.publicUrl, settings.appUrl]) {
 const bootstrap = JSON.parse(await readFile(resolve(process.env.CASDOOR_STATE_DIR, 'bootstrap.json'), 'utf8'));
 assert.equal(bootstrap.issuer, settings.publicUrl);
 assert.equal(bootstrap.username, settings.username);
-const db = new DatabaseSync(process.env.AUTH_TEST_SESSION_DB, { readOnly: true });
+const db = new DatabaseSync(process.env.NET_WORTH_ESTIMATOR_DB, { readOnly: true });
 db.exec('PRAGMA busy_timeout=5000');
 const admin = casdoorSession(settings.publicUrl);
 await admin('/api/login', { method: 'POST', body: { type: 'login', signinMethod: 'Password',

@@ -87,6 +87,7 @@ func TestRowAccountCRUD(t *testing.T) {
 func TestRowIDRegistrySpansTables(t *testing.T) {
 	store := openTestStore(t)
 	const shared = "01900000-0000-7000-8000-000000000020"
+	seedAccount(t, store, "checking")
 	if _, err := store.CreateAccount(types.Account{ID: shared, Name: "Account"}); err != nil {
 		t.Fatalf("create account: %v", err)
 	}

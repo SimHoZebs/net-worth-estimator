@@ -1,10 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { databaseName, installSnapshot, sampleDatabaseName, sampleSnapshot, snapshotFile, validateSnapshot } from './database.mjs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
+import { snapshotFile, validateSnapshot } from './database.mjs';
+
+const exec = promisify(execFile);
+const root = fileURLToPath(new URL('../', import.meta.url));
 
 function seed(path, value) {
   const db = new DatabaseSync(path);
@@ -45,57 +51,44 @@ test('invalid sources do not leave an accepted snapshot or overwrite an existing
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
-test('financial refresh backs up the prior model and leaves identity storage untouched', async () => {
-  const dir = await mkdtemp(resolve(tmpdir(), 'waypoint-refresh-'));
-  const data = resolve(dir, 'data');
-  const backups = resolve(dir, 'backups');
-  await mkdir(data);
-  seed(resolve(data, databaseName), 'old model').close();
-  seed(resolve(dir, 'incoming.db'), 'new model').close();
-  await writeFile(resolve(data, 'identity.db'), 'persistent sessions');
+test('application snapshot includes multiple plans and identity state in one file', async () => {
+  const dir = await mkdtemp(resolve(tmpdir(), 'waypoint-application-snapshot-'));
+  const source = resolve(dir, 'app.db');
+  const writer = new DatabaseSync(source);
+  writer.exec("PRAGMA journal_mode=WAL; CREATE TABLE plans(id TEXT); INSERT INTO plans VALUES('owner'),('second'),('plans/sample'); CREATE TABLE model_metadata(plan_id TEXT, id INTEGER, document_present INTEGER); INSERT INTO model_metadata VALUES('owner',1,1),('second',1,1),('plans/sample',1,1); CREATE TABLE identity_grants(data TEXT); INSERT INTO identity_grants VALUES('sealed grant');");
   try {
-    await installSnapshot(resolve(dir, 'incoming.db'), data, backups);
-    const current = new DatabaseSync(resolve(data, databaseName), { readOnly: true });
-    try { assert.equal(current.prepare('SELECT value FROM facts').get().value, 'new model'); }
-    finally { current.close(); }
-    const files = (await readdir(backups)).filter((file) => file.endsWith('.db'));
-    assert.equal(files.length, 1);
-    const prior = new DatabaseSync(resolve(backups, files[0]), { readOnly: true });
-    try { assert.equal(prior.prepare('SELECT value FROM facts').get().value, 'old model'); }
-    finally { prior.close(); }
-    assert.equal(await readFile(resolve(data, 'identity.db'), 'utf8'), 'persistent sessions');
-    await writeFile(resolve(dir, 'bad.db'), 'invalid');
-    await assert.rejects(() => installSnapshot(resolve(dir, 'bad.db'), data, backups));
-    validateSnapshot(resolve(data, databaseName));
-  } finally { await rm(dir, { recursive: true, force: true }); }
+    const target = resolve(dir, 'snapshot.db');
+    await snapshotFile(source, target);
+    const sample = new DatabaseSync(target, { readOnly: true });
+    try {
+      assert.equal(sample.prepare('SELECT COUNT(*) AS n FROM plans').get().n, 3);
+      assert.equal(sample.prepare('SELECT data FROM identity_grants').get().data, 'sealed grant');
+    } finally { sample.close(); }
+  } finally { writer.close(); await rm(dir, { recursive: true, force: true }); }
 });
 
-test('sample publication isolates canonical data and omits private artifact and bridge history', async () => {
-  const dir = await mkdtemp(resolve(tmpdir(), 'waypoint-sample-'));
-  const data = resolve(dir, 'data');
-  await mkdir(data);
-  const source = resolve(data, databaseName);
-  const writer = seed(source, 'owner financial data');
-  writer.exec("ALTER TABLE model_metadata ADD COLUMN source_path TEXT DEFAULT 'private/path'; CREATE TABLE projection_artifacts(payload TEXT); INSERT INTO projection_artifacts VALUES('private unsaved scenario'); CREATE TABLE account_links(bridge_account_id TEXT); INSERT INTO account_links VALUES('private-bridge-id'); CREATE TABLE sync_state(last_sync_at TEXT); INSERT INTO sync_state VALUES('2026-01-01');");
-  writer.exec("CREATE TABLE posting_sync_keys(provider TEXT, transaction_id TEXT); INSERT INTO posting_sync_keys VALUES('bank', 'private-upstream-key'); CREATE TABLE posting_id_migrations(old_id TEXT, new_id TEXT); INSERT INTO posting_id_migrations VALUES('private-legacy-id', 'uuid');");
-  const incoming = resolve(dir, 'incoming.db');
-  await writeFile(resolve(data, 'identity.db'), 'owner sessions');
+test('explicit setup provisions an empty application snapshot and repeat setup preserves identity state', async () => {
+  const dir = await mkdtemp(resolve(tmpdir(), 'waypoint-setup-'));
+  const source = resolve(dir, 'new', 'app.db');
+  const binary = resolve(dir, 'setupdb');
   try {
-    await sampleSnapshot(source, incoming);
-    await installSnapshot(incoming, data, resolve(dir, 'backups'), sampleDatabaseName);
-    const sample = new DatabaseSync(resolve(data, sampleDatabaseName), { readOnly: true });
+    await exec('go', ['-C', resolve(root, 'backend'), 'build', '-o', binary, './cmd/setupdb']);
+    await exec(binary, ['--db', source]);
+    assert.equal(validateSnapshot(source), 'application');
+    const first = new DatabaseSync(source);
     try {
-      assert.equal(sample.prepare('SELECT value FROM facts').get().value, 'owner financial data');
-      assert.equal(sample.prepare('SELECT COUNT(*) AS n FROM projection_artifacts').get().n, 0);
-      assert.equal(sample.prepare('SELECT COUNT(*) AS n FROM account_links').get().n, 0);
-      assert.equal(sample.prepare('SELECT COUNT(*) AS n FROM posting_sync_keys').get().n, 0);
-      assert.equal(sample.prepare('SELECT COUNT(*) AS n FROM posting_id_migrations').get().n, 0);
-      assert.equal(sample.prepare('SELECT source_path FROM model_metadata').get().source_path, 'sample');
-      assert.equal(sample.prepare('SELECT last_sync_at FROM sync_state').get().last_sync_at, '');
-    } finally { sample.close(); }
-    assert.equal(writer.prepare('SELECT COUNT(*) AS n FROM projection_artifacts').get().n, 1);
-    assert.equal(writer.prepare('SELECT COUNT(*) AS n FROM account_links').get().n, 1);
-    assert.equal(await readFile(resolve(data, 'identity.db'), 'utf8'), 'owner sessions');
-    await assert.rejects(() => installSnapshot(source, data, resolve(dir, 'backups'), '../escape.db'), /destination/);
-  } finally { writer.close(); await rm(dir, { recursive: true, force: true }); }
+      assert.equal(first.prepare('SELECT COUNT(*) AS n FROM plans').get().n, 0);
+      for (const table of ['sessions', 'identity_grants', 'identity_logout_marks', 'identity_logout_tokens']) {
+        assert.equal(first.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n, 0);
+      }
+      first.exec("INSERT INTO sessions VALUES('cookie', X'0100', 999)");
+    } finally { first.close(); }
+    await exec(binary, ['--db', source]);
+    const target = resolve(dir, 'snapshot.db');
+    await snapshotFile(source, target);
+    const copy = new DatabaseSync(target, { readOnly: true });
+    try {
+      assert.equal(copy.prepare('SELECT token FROM sessions').get().token, 'cookie');
+    } finally { copy.close(); }
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });

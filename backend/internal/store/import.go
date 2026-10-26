@@ -23,17 +23,17 @@ func (s *sqliteStore) ImportCSV(modelPath string) (*types.FinancialModelDocument
 	}
 	// Rebuild the ID registry from the seed; account links survive a
 	// reseed so bridge bindings are not lost.
-	if _, err := tx.Exec(`DELETE FROM entity_ids`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM entity_ids WHERE plan_id = :plan_id`); err != nil {
 		return nil, fmt.Errorf("import clear entity ids: %w", err)
 	}
 	for _, seed := range []struct {
 		kind  string
 		query string
 	}{
-		{"account", `INSERT INTO entity_ids (id, kind) SELECT id, 'account' FROM accounts`},
-		{"posting", `INSERT INTO entity_ids (id, kind) SELECT id, 'posting' FROM postings`},
-		{"rule", `INSERT INTO entity_ids (id, kind) SELECT id, 'rule' FROM recurrence_rules`},
-		{"evaluation", `INSERT INTO entity_ids (id, kind) SELECT instance_id, 'evaluation' FROM evaluations`},
+		{"account", `INSERT INTO entity_ids (id, kind, plan_id) SELECT id, 'account', :plan_id FROM accounts WHERE plan_id = :plan_id`},
+		{"posting", `INSERT INTO entity_ids (id, kind, plan_id) SELECT id, 'posting', :plan_id FROM postings WHERE plan_id = :plan_id`},
+		{"rule", `INSERT INTO entity_ids (id, kind, plan_id) SELECT id, 'rule', :plan_id FROM recurrence_rules WHERE plan_id = :plan_id`},
+		{"evaluation", `INSERT INTO entity_ids (id, kind, plan_id) SELECT instance_id, 'evaluation', :plan_id FROM evaluations WHERE plan_id = :plan_id`},
 	} {
 		if _, err := tx.Exec(seed.query); err != nil {
 			return nil, fmt.Errorf("import seed entity ids %s: %w", seed.kind, err)

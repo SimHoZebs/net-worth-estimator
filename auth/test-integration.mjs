@@ -1,4 +1,4 @@
-// Real-provider contract: isolated owner, guest sample, and second-account stores.
+// Real-provider contract: owner, guest sample, and second account in one DB.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -7,7 +7,8 @@ import { resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { chromium, expect } from '../frontend/node_modules/@playwright/test/index.mjs';
-import { sampleSnapshot } from '../dev/database.mjs';
+import { DatabaseSync } from 'node:sqlite';
+import { snapshotFile } from '../dev/database.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const publicURL = process.env.NET_WORTH_ESTIMATOR_PUBLIC_URL;
@@ -34,23 +35,29 @@ await mkdir(resolve(root, 'tmp'), { recursive: true });
 const scratch = await mkdtemp(resolve(root, 'tmp/auth-resource-integration-'));
 const binary = resolve(scratch, 'server');
 const primaryDB = resolve(scratch, 'financial.db');
-const sampleDB = resolve(scratch, 'sample.db');
+const publisher = resolve(scratch, 'refreshplan');
+const setupDB = resolve(scratch, 'setupdb');
 const build = spawn('go', ['-C', resolve(root, 'backend'), 'build', '-o', binary, './cmd/server'], {
   env: { ...process.env, CGO_ENABLED: '0' }, stdio: 'inherit',
 });
 assert.equal((await once(build, 'exit'))[0], 0, 'Go build failed');
+const buildPublisher = spawn('go', ['-C', resolve(root, 'backend'), 'build', '-o', publisher, './cmd/refreshplan'], { stdio: 'inherit' });
+assert.equal((await once(buildPublisher, 'exit'))[0], 0, 'Sample publisher build failed');
+const buildSetup = spawn('go', ['-C', resolve(root, 'backend'), 'build', '-o', setupDB, './cmd/setupdb'], { stdio: 'inherit' });
+assert.equal((await once(buildSetup, 'exit'))[0], 0, 'Database setup build failed');
+const provision = spawn(setupDB, ['--db', primaryDB], { stdio: 'inherit' });
+assert.equal((await once(provision, 'exit'))[0], 0, 'Database setup failed');
 const env = {
   ...process.env, HOST: '127.0.0.1', PORT: origin.port || '80',
   NET_WORTH_ESTIMATOR_DB: primaryDB,
   NET_WORTH_ESTIMATOR_FRONTEND_PATH: resolve(root, 'frontend/dist'),
   NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT: subject,
-  NET_WORTH_ESTIMATOR_SAMPLE_DB: sampleDB,
-  NET_WORTH_ESTIMATOR_PLANS_DIR: resolve(scratch, 'plans'),
-  NET_WORTH_ESTIMATOR_AUTH_SESSION_DB: resolve(scratch, 'sessions.db'),
   NET_WORTH_ESTIMATOR_READ_ONLY: '',
   NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: origin.origin,
   NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL: '',
 };
+// Retired split-storage settings must not leak from the operator's environment.
+for (const key of ['NET_WORTH_ESTIMATOR_SAMPLE_DB', 'NET_WORTH_ESTIMATOR_PLANS_DIR', 'NET_WORTH_ESTIMATOR_AUTH_SESSION_DB']) delete env[key];
 let server;
 let browser;
 let log = '';
@@ -77,7 +84,7 @@ async function session(context) {
   const response = await context.request.get(`${origin.origin}/v1/auth/session`);
   assert.equal(response.status(), 200, 'Identity and Casdoor resource permissions must resolve');
   const result = await response.json();
-  assert.equal(response.headers()['x-waypoint-resource'], result.resource.id);
+  assert.equal(response.headers()['waypoint-resource'], result.resource.id);
   return result;
 }
 async function request(context, scope, method, path, data, headers = {}) {
@@ -124,7 +131,10 @@ try {
   const cookie = cookies.find((item) => item.name === 'waypoint_session');
   assert.ok(cookie?.httpOnly && cookie.expires > Date.now() / 1000);
   await stop();
-  await sampleSnapshot(primaryDB, sampleDB);
+  const approvedSnapshot = resolve(scratch, 'approved-app.db');
+  await snapshotFile(primaryDB, approvedSnapshot);
+  const publish = spawn(publisher, ['--db', primaryDB, '--source', approvedSnapshot, '--source-plan', own.resource.id, '--sample'], { stdio: 'inherit' });
+  assert.equal((await once(publish, 'exit'))[0], 0, 'Sample publication failed');
   await start();
   assert.equal((await session(owner)).resource.id, own.resource.id);
   assert.equal((await request(owner, own, 'POST', '/v1/accounts', { id: 'private-after-publication', name: 'Later private account', kind: 'cash', enabled: true })).status(), 200);
@@ -195,6 +205,13 @@ try {
   assert.equal((await request(second, other, 'PATCH', '/v1/accounts/owner-checking', { name: 'Cross-account attempt', kind: 'cash', enabled: true })).status(), 404);
   const ownerModel = await (await request(owner, own, 'GET', '/v1/financial-model')).json();
   assert.deepEqual(ownerModel.document.accounts.map((item) => item.id), ['owner-checking', 'private-after-publication']);
+  const shared = new DatabaseSync(primaryDB, { readOnly: true });
+  try {
+    const accounts = shared.prepare('SELECT plan_id, id FROM accounts ORDER BY plan_id, id').all();
+    assert.equal(new Set(accounts.map((row) => row.plan_id)).size, 3, 'Owner, sample, and second account must share one database');
+    assert.deepEqual(accounts.filter((row) => row.plan_id === sample.resource.id).map((row) => row.id), ['owner-checking']);
+    assert.ok(shared.prepare('SELECT COUNT(*) AS n FROM identity_grants').get().n >= 2, 'Provider grants share the application database');
+  } finally { shared.close(); }
   console.log('Signup without approval/import, blank navigation, first-account draft/save, restart persistence, and storage isolation PASS');
 
   assert.equal((await request(owner, own, 'POST', '/v1/auth/logout')).status(), 200);

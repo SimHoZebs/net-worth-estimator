@@ -4,51 +4,65 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"os"
-	"path/filepath"
+	"errors"
+	"fmt"
 	"time"
 
-	_ "modernc.org/sqlite"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
 // sessionStore implements SCS storage. Session tokens are hashed at rest.
-// This database has no financial rows and survives financial imports.
-type sessionStore struct{ db *sql.DB }
+// The application owns an injected connection; isolated tests may own a file.
+type sessionStore struct {
+	db    *sql.DB
+	owned bool
+}
 
 func openSessions(path string) (*sessionStore, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return nil, err
+	if path == "" {
+		return nil, errors.New("sessions require the application database")
 	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	database, err := store.OpenDatabase(path)
 	if err != nil {
 		return nil, err
 	}
-	if err := f.Chmod(0o600); err != nil {
-		f.Close()
-		return nil, err
-	}
-	if err := f.Close(); err != nil {
-		return nil, err
-	}
-	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
+	sessions, err := sharedSessions(database.SQL())
 	if err != nil {
+		database.Close()
 		return nil, err
 	}
-	// Session lookups are independent point reads shared by parallel API
-	// calls from one page load. Writes stay short transactions guarded by
-	// the busy timeout, so a small pool removes head-of-line blocking
-	// without changing session semantics.
-	db.SetMaxOpenConns(8)
-	if _, err = db.Exec(`CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, data BLOB NOT NULL, expiry INTEGER NOT NULL)`); err != nil {
-		db.Close()
-		return nil, err
+	sessions.owned = true
+	return sessions, nil
+}
+
+func sharedSessions(db *sql.DB) (*sessionStore, error) {
+	if db == nil {
+		return nil, errors.New("sessions require the application database")
 	}
-	store := &sessionStore{db}
-	if err := store.initGrants(); err != nil {
-		db.Close()
-		return nil, err
+	// Schema belongs to the deployment setup command. Validate injected handles
+	// without creating or repairing tables during identity initialization.
+	for _, query := range []string{
+		`SELECT token, data, expiry FROM sessions LIMIT 0`,
+		`SELECT id, issuer, subject, sid, expiry, data FROM identity_grants LIMIT 0`,
+		`SELECT issuer, kind, identifier, seen_at, expiry FROM identity_logout_marks LIMIT 0`,
+		`SELECT issuer, jti, expiry FROM identity_logout_tokens LIMIT 0`,
+	} {
+		rows, err := db.Query(query)
+		if err != nil {
+			return nil, fmt.Errorf("application identity schema is not ready; run setupdb before startup: %w", err)
+		}
+		if err := rows.Close(); err != nil {
+			return nil, err
+		}
 	}
-	return store, nil
+	return &sessionStore{db: db}, nil
+}
+
+func (s *sessionStore) Close() error {
+	if s.owned {
+		return s.db.Close()
+	}
+	return nil
 }
 
 func tokenHash(token string) string {

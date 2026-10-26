@@ -1,50 +1,62 @@
 package plans
 
 import (
+	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func privateID(letter string) string { return "plans/" + strings.Repeat(letter, 64) }
+const testIssuer = "https://identity.test"
 
-func newRouter(t *testing.T, owner string) (*Router, store.Store, Config) {
+func privateID(subject string) string { return authorization.ResourceFor(testIssuer, subject).ID }
+
+func ensurePrivate(t *testing.T, db *store.Database, subject string) store.Store {
 	t.Helper()
-	dir := t.TempDir()
-	config := Config{PrimaryResourceID: owner, PrimaryDBPath: filepath.Join(dir, "primary.db"), SampleDBPath: filepath.Join(dir, "sample.db"), PrivateDir: filepath.Join(dir, "plans")}
-	primary, err := store.Open(config.PrimaryDBPath)
+	scoped, err := db.EnsurePrivatePlan(privateID(subject), authorization.ActorKey(testIssuer, subject), testIssuer, subject)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = primary.Close() })
-	if _, err := primary.CreateAccount(types.Account{ID: "primary", Name: "Private owner checking", Kind: "cash", Enabled: true}); err != nil {
+	if err := scoped.InitializeDocument(); err != nil {
 		t.Fatal(err)
 	}
-	sample, err := store.Open(config.SampleDBPath)
+	return scoped
+}
+
+func newRouter(t *testing.T) (*Router, *store.Database, string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "app.db")
+	database, err := store.SetupDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	owner := ensurePrivate(t, database, "a")
+	if _, err := owner.CreateAccount(types.Account{ID: "primary", Name: "Private owner checking", Kind: "cash", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	sample, err := database.EnsureSamplePlan()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := sample.CreateAccount(types.Account{ID: "sample", Name: "Published sample", Kind: "cash", Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := sample.Close(); err != nil {
-		t.Fatal(err)
-	}
-	router, err := New(primary, config)
+	router, err := New(database, Config{PrimaryResourceID: privateID("a")})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = router.Close() })
-	return router, primary, config
+	return router, database, path
 }
 
 func request(t *testing.T, handler http.Handler, method, path, body string) *httptest.ResponseRecorder {
@@ -70,16 +82,17 @@ func model(t *testing.T, handler http.Handler) *types.FinancialModelDocument {
 }
 
 func TestPlansIsolateEveryAccountFromSampleAndOtherAccounts(t *testing.T) {
-	router, _, config := newRouter(t, privateID("a"))
-	owner, err := router.handlerFor(authorization.Resource{ID: privateID("a"), Kind: "private"})
+	router, database, path := newRouter(t)
+	ensurePrivate(t, database, "b")
+	owner, err := router.handlerFor(authorization.ResourceFor(testIssuer, "a"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	guest, err := router.handlerFor(authorization.Resource{ID: "plans/sample", Kind: "sample"})
+	guest, err := router.handlerFor(authorization.ResourceFor(testIssuer, ""))
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := router.handlerFor(authorization.Resource{ID: privateID("b"), Kind: "private"})
+	other, err := router.handlerFor(authorization.ResourceFor(testIssuer, "b"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +105,7 @@ func TestPlansIsolateEveryAccountFromSampleAndOtherAccounts(t *testing.T) {
 		t.Fatalf("other account write=%d %s", w.Code, w.Body.String())
 	}
 	if w := request(t, guest, "POST", "/v1/accounts", write); w.Code != 403 {
-		t.Fatalf("guest canonical write=%d", w.Code)
+		t.Fatalf("sample canonical write=%d", w.Code)
 	}
 	if model(t, other).Accounts[0].ID != "other" || len(model(t, owner).Accounts) != 1 || len(model(t, guest).Accounts) != 1 {
 		t.Fatal("canonical writes crossed the plan boundary")
@@ -112,123 +125,141 @@ func TestPlansIsolateEveryAccountFromSampleAndOtherAccounts(t *testing.T) {
 	}
 	for _, suffix := range []string{"/v1/amount-presets", "/v1/pinned-evaluations", "/v1/safe-spending-settings", "/v1/sync/simplefin/accounts"} {
 		if w := request(t, guest, "GET", suffix, ""); w.Code != 200 {
-			t.Fatalf("guest scoped read %s=%d", suffix, w.Code)
+			t.Fatalf("sample scoped read %s=%d", suffix, w.Code)
 		}
-	}
-	file := filepath.Join(config.PrivateDir, strings.Repeat("b", 64)+".db")
-	if info, err := os.Stat(file); err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("private database permissions: %v %v", info, err)
 	}
 	if err := router.Close(); err != nil {
 		t.Fatal(err)
 	}
-	primary, err := store.Open(config.PrimaryDBPath)
+	// Closing a router must not close its shared connection.
+	if err := database.SQL().Ping(); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := store.OpenDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer primary.Close()
-	restarted, err := New(primary, config)
+	defer reopened.Close()
+	restarted, err := New(reopened, Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer restarted.Close()
-	other, err = restarted.handlerFor(authorization.Resource{ID: privateID("b"), Kind: "private"})
+	other, err = restarted.handlerFor(authorization.ResourceFor(testIssuer, "b"))
 	if err != nil || model(t, other).Accounts[0].ID != "other" {
 		t.Fatalf("private plan did not persist across restart: %v", err)
 	}
 }
 
 func TestPrivatePlansInitializeBlankWorkspaces(t *testing.T) {
-	for _, primaryOwner := range []bool{false, true} {
-		t.Run(fmt.Sprint("primary=", primaryOwner), func(t *testing.T) {
-			router, primary, config := newRouter(t, privateID("a"))
-			if primaryOwner {
-				if err := primary.Clear(); err != nil {
-					t.Fatal(err)
-				}
-			} else {
-				// Previously created, absent private stores also need usable workspaces.
-				if err := os.MkdirAll(config.PrivateDir, 0o700); err != nil {
-					t.Fatal(err)
-				}
-				empty, err := store.Open(filepath.Join(config.PrivateDir, strings.Repeat("b", 64)+".db"))
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := empty.Close(); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if err := router.Close(); err != nil {
-				t.Fatal(err)
-			}
-			restarted, err := New(primary, config)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer restarted.Close()
-			id := privateID("b")
-			if primaryOwner {
-				id = privateID("a")
-			}
-			handler, err := restarted.handlerFor(authorization.Resource{ID: id, Kind: "private"})
-			if err != nil {
-				t.Fatal(err)
-			}
-			blank := model(t, handler)
-			if blank == nil || len(blank.Accounts) != 0 || len(blank.Postings) != 0 || blank.SourcePath != "" {
-				t.Fatalf("new private workspace = %+v", blank)
-			}
-			projection := `{"settings":{"fallbackProjectionStartDate":"2026-01-01","horizonYears":1,"evaluations":{"financialIndependence":[],"netWorthThreshold":[],"accountBalance":[],"postingFulfillment":[],"cycleFulfillment":[]}},"range":{"startDate":"2000-01-01","endDate":"2100-01-01"}}`
-			if w := request(t, handler, "POST", "/v1/projections/deterministic", projection); w.Code != 200 {
-				t.Fatalf("blank projection = %d %s", w.Code, w.Body.String())
-			}
-		})
+	router, database, _ := newRouter(t)
+	ensurePrivate(t, database, "new-user")
+	handler, err := router.handlerFor(authorization.ResourceFor(testIssuer, "new-user"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	blank := model(t, handler)
+	if blank == nil || len(blank.Accounts) != 0 || len(blank.Postings) != 0 || blank.SourcePath != "" {
+		t.Fatalf("new private workspace = %+v", blank)
+	}
+	if w := request(t, handler, "GET", "/v1/amount-presets", ""); w.Code != 200 || !strings.Contains(w.Body.String(), `"name":"fixed"`) {
+		t.Fatalf("default amount presets = %d %s", w.Code, w.Body.String())
+	}
+	projection := `{"settings":{"fallbackProjectionStartDate":"2026-01-01","horizonYears":1,"evaluations":{"financialIndependence":[],"netWorthThreshold":[],"accountBalance":[],"postingFulfillment":[],"cycleFulfillment":[]}},"range":{"startDate":"2000-01-01","endDate":"2100-01-01"}}`
+	if w := request(t, handler, "POST", "/v1/projections/deterministic", projection); w.Code != 200 {
+		t.Fatalf("blank projection = %d %s", w.Code, w.Body.String())
 	}
 }
 
-func TestPlanRoutingFailsClosedOnMissingScopeAndUnsafeResources(t *testing.T) {
-	router, primary, config := newRouter(t, privateID("a"))
+func TestPlanRoutingFailsClosedWithoutProvisioning(t *testing.T) {
+	database, err := store.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	router, err := New(database, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer router.Close()
 	if w := request(t, router, "GET", "/v1/financial-model", ""); w.Code != 403 {
 		t.Fatalf("unverified plan routing=%d", w.Code)
 	}
-	if _, err := os.Stat(config.PrivateDir); !os.IsNotExist(err) {
-		t.Fatalf("unauthorized request created private stores: %v", err)
-	}
 	for _, resource := range []authorization.Resource{
 		{ID: "plans/../../primary.db", Kind: "private"}, {ID: "plans/sample", Kind: "private"},
-		{ID: privateID("a"), Kind: "sample"}, {ID: privateID("g"), Kind: "private"},
+		{ID: privateID("a"), Kind: "sample"}, {ID: "plans/" + strings.Repeat("g", 64), Kind: "private"},
+		authorization.ResourceFor(testIssuer, "missing"), authorization.ResourceFor(testIssuer, ""),
 	} {
 		if _, err := router.handlerFor(resource); err == nil {
-			t.Errorf("unsafe resource accepted: %+v", resource)
+			t.Errorf("unsafe or absent resource accepted: %+v", resource)
 		}
 	}
-	withoutOwner := config
-	withoutOwner.PrimaryResourceID = ""
-	if _, err := New(primary, withoutOwner); err == nil {
-		t.Fatal("nonempty legacy data received an implicit owner")
+	for _, id := range []string{privateID("missing"), "plans/sample"} {
+		if exists, err := database.HasPlan(id); err != nil || exists {
+			t.Fatalf("routing provisioned %s: exists=%v err=%v", id, exists, err)
+		}
 	}
-	aliased := config
-	aliased.SampleDBPath = aliased.PrimaryDBPath
-	if _, err := New(primary, aliased); err == nil {
-		t.Fatal("sample plan aliases the primary database")
+	if w := request(t, router, "GET", "/healthz", ""); w.Code != 200 {
+		t.Fatalf("health without a plan=%d", w.Code)
 	}
-	alias := filepath.Join(filepath.Dir(config.PrimaryDBPath), "sample-alias.db")
-	if err := os.Link(config.PrimaryDBPath, alias); err != nil {
+	if _, err := New(database, Config{PrimaryResourceID: "plans/sample"}); err == nil {
+		t.Fatal("sample can own server Bridge credentials")
+	}
+}
+
+func TestServerBridgeCredentialsStayInConfiguredOwnersPlan(t *testing.T) {
+	_, database, _ := newRouter(t)
+	ensurePrivate(t, database, "b")
+	router, err := New(database, Config{
+		PrimaryResourceID: privateID("a"),
+		API:               api.Config{SyncRunner: &simplefin.Runner{}},
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
-	aliased.SampleDBPath = alias
-	if _, err := New(primary, aliased); err == nil {
-		t.Fatal("hard-linked sample aliases the primary database")
+	defer router.Close()
+	for _, subject := range []string{"a", "b", ""} {
+		handler, err := router.handlerFor(authorization.ResourceFor(testIssuer, subject))
+		if err != nil {
+			t.Fatal(err)
+		}
+		w := request(t, handler, "GET", "/v1/status", "")
+		var status struct {
+			SyncConfigured bool `json:"syncConfigured"`
+			ReadOnly       bool `json:"readOnly"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &status); err != nil {
+			t.Fatal(err)
+		}
+		if w.Code != 200 || status.SyncConfigured != (subject == "a") || status.ReadOnly != (subject == "") {
+			t.Fatalf("subject %q status=%d %+v", subject, w.Code, status)
+		}
 	}
-	if err := os.MkdirAll(config.PrivateDir, 0o700); err != nil {
+}
+
+func TestLegacyUnscopedDatabaseRequiresExplicitMigration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	legacy, err := sql.Open("sqlite", path)
+	if err != nil {
 		t.Fatal(err)
 	}
-	privatePath := filepath.Join(config.PrivateDir, strings.Repeat("c", 64)+".db")
-	if err := os.Symlink(config.PrimaryDBPath, privatePath); err != nil {
+	if _, err := legacy.Exec(`CREATE TABLE model_metadata (id INTEGER PRIMARY KEY, source_path TEXT NOT NULL, document_present INTEGER NOT NULL);
+		INSERT INTO model_metadata VALUES (1, 'legacy/private.csv', 1)`); err != nil {
+		legacy.Close()
 		t.Fatal(err)
 	}
-	if _, err := router.handlerFor(authorization.Resource{ID: privateID("c"), Kind: "private"}); err == nil {
-		t.Fatal("symbolic link exposed another plan")
+	if err := legacy.Close(); err != nil {
+		t.Fatal(err)
+	}
+	database, err := store.OpenDatabase(path)
+	if err == nil {
+		database.Close()
+		t.Fatal("runtime accepted an unscoped legacy database")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "migration") {
+		t.Fatalf("legacy database lacks explicit migration error: %v", err)
 	}
 }

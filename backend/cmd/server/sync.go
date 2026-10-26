@@ -2,14 +2,28 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"math/rand/v2"
 	"os"
 	"time"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
+
+// Bridge credentials may target only an explicitly configured, existing owner.
+// Startup never provisions a plan on behalf of an unverified identity.
+func bridgeStore(database *store.Database, issuer, subject string, enabled bool) (store.Store, error) {
+	if !enabled {
+		return nil, nil
+	}
+	if subject == "" {
+		return nil, errors.New("SimpleFIN requires PLAN_OWNER_SUBJECT for an existing private plan")
+	}
+	return database.Plan(authorization.ResourceFor(issuer, subject).ID)
+}
 
 // configureSync builds the SimpleFIN runner from environment. An empty
 // access URL disables the sync (nil runner, trigger returns 503).

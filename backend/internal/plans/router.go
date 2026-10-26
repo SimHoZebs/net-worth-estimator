@@ -4,10 +4,7 @@ package plans
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -21,66 +18,36 @@ import (
 var privateResource = regexp.MustCompile(`^plans/[a-f0-9]{64}$`)
 
 type Config struct {
+	// PrimaryResourceID assigns server Bridge credentials, not data ownership.
 	PrimaryResourceID string
-	PrimaryDBPath     string
-	SampleDBPath      string
-	PrivateDir        string
 	API               api.Config
 }
 
-type endpoint struct {
-	store   store.Store
-	handler http.Handler
-}
-
 type Router struct {
-	mu      sync.Mutex
-	config  Config
-	primary endpoint
-	opened  map[string]endpoint
-	closed  bool
+	mu       sync.Mutex
+	database *store.Database
+	config   Config
+	public   http.Handler
+	opened   map[string]http.Handler
+	closed   bool
 }
 
-func New(primary store.Store, config Config) (*Router, error) {
+func New(database *store.Database, config Config) (*Router, error) {
+	if database == nil {
+		return nil, errors.New("plan routing requires the application database")
+	}
 	if config.PrimaryResourceID != "" && !privateResource.MatchString(config.PrimaryResourceID) {
 		return nil, errors.New("primary plan requires an explicit private resource ID")
 	}
-	exists, err := primary.DocumentExists()
-	if err != nil {
-		return nil, err
-	}
-	if exists && config.PrimaryResourceID == "" {
-		return nil, errors.New("existing financial data needs an explicit verified owner: set NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT")
-	}
-	if config.PrivateDir == "" || !filepath.IsAbs(config.PrivateDir) {
-		return nil, errors.New("private plan directory must be absolute")
-	}
-	if config.SampleDBPath != "" {
-		if !filepath.IsAbs(config.SampleDBPath) || sameFile(config.PrimaryDBPath, config.SampleDBPath) {
-			return nil, errors.New("sample plan must use a separate absolute database path")
-		}
-	}
-	if config.PrimaryResourceID != "" {
-		if err := primary.InitializeDocument(); err != nil {
-			return nil, err
-		}
-	}
-	config.API.ResourceID = config.PrimaryResourceID
-	return &Router{config: config, primary: endpoint{primary, api.New(primary, config.API)}, opened: map[string]endpoint{}}, nil
-}
-
-func sameFile(a, b string) bool {
-	if filepath.Clean(a) == filepath.Clean(b) {
-		return true
-	}
-	ai, ae := os.Stat(a)
-	bi, be := os.Stat(b)
-	return ae == nil && be == nil && os.SameFile(ai, bi)
+	// Health and static files do not access financial state.
+	publicConfig := config.API
+	publicConfig.SyncRunner = nil
+	return &Router{database: database, config: config, public: api.New(nil, publicConfig), opened: map[string]http.Handler{}}, nil
 }
 
 func (p *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/v1" && !strings.HasPrefix(r.URL.Path, "/v1/") {
-		p.primary.handler.ServeHTTP(w, r)
+		p.public.ServeHTTP(w, r)
 		return
 	}
 	scope, ok := identity.Scope(r.Context())
@@ -95,7 +62,6 @@ func (p *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	handler, err := p.handlerFor(scope.Resource)
 	if err != nil {
-		// File paths and underlying SQLite errors are private operator details.
 		http.Error(w, "The selected plan is temporarily unavailable.", http.StatusServiceUnavailable)
 		return
 	}
@@ -107,81 +73,38 @@ func (p *Router) handlerFor(resource authorization.Resource) (http.Handler, erro
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.closed {
-		return nil, errors.New("plan stores are closed")
+		return nil, errors.New("plan router is closed")
 	}
 	if !((resource.Kind == "sample" && resource.ID == "plans/sample") || (resource.Kind == "private" && privateResource.MatchString(resource.ID))) {
 		return nil, errors.New("invalid plan resource")
 	}
-	if resource.Kind == "private" && privateResource.MatchString(resource.ID) && resource.ID == p.config.PrimaryResourceID {
-		return p.primary.handler, nil
-	}
 	if existing, ok := p.opened[resource.ID]; ok {
-		return existing.handler, nil
+		return existing, nil
 	}
-	var path string
-	switch {
-	case resource.Kind == "sample" && resource.ID == "plans/sample":
-		path = p.config.SampleDBPath
-		if path == "" {
-			return nil, errors.New("sample plan is not configured")
-		}
-		info, err := os.Lstat(path)
-		if err != nil || !info.Mode().IsRegular() {
-			return nil, errors.New("sample plan must be an existing regular database file")
-		}
-		if sameFile(path, p.config.PrimaryDBPath) {
-			return nil, errors.New("sample plan aliases the primary database")
-		}
-	case resource.Kind == "private" && privateResource.MatchString(resource.ID):
-		if err := os.MkdirAll(p.config.PrivateDir, 0o700); err != nil {
-			return nil, err
-		}
-		path = filepath.Join(p.config.PrivateDir, strings.TrimPrefix(resource.ID, "plans/")+".db")
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-		if err == nil {
-			if err := file.Close(); err != nil {
-				return nil, err
-			}
-		} else if !errors.Is(err, os.ErrExist) {
-			return nil, err
-		}
-		info, err := os.Lstat(path)
-		if err != nil || !info.Mode().IsRegular() || sameFile(path, p.config.PrimaryDBPath) || (p.config.SampleDBPath != "" && sameFile(path, p.config.SampleDBPath)) {
-			return nil, errors.New("private plan must use its own regular database file")
-		}
-	default:
-		return nil, fmt.Errorf("invalid plan resource")
-	}
-	database, err := store.Open(path)
+	// Provisioning belongs to the verified authorization boundary, not routing.
+	scoped, err := p.database.Plan(resource.ID)
 	if err != nil {
 		return nil, err
 	}
-	if resource.Kind == "private" {
-		if err := database.InitializeDocument(); err != nil {
-			_ = database.Close()
-			return nil, err
-		}
-	}
 	config := p.config.API
 	config.ResourceID = resource.ID
-	config.SyncRunner = nil // Server-level Bridge credentials belong only to the primary owner.
+	if resource.ID != p.config.PrimaryResourceID {
+		config.SyncRunner = nil
+	}
 	if resource.Kind == "sample" {
 		config.ReadOnly = true
+		config.SyncRunner = nil
 	}
-	handler := api.New(database, config)
-	p.opened[resource.ID] = endpoint{database, handler}
+	handler := api.New(scoped, config)
+	p.opened[resource.ID] = handler
 	return handler, nil
 }
 
-// Close owns only the additional stores. The caller retains the primary store.
+// Close releases handler references. The caller owns the shared database.
 func (p *Router) Close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.closed = true
-	var result error
-	for _, entry := range p.opened {
-		result = errors.Join(result, entry.store.Close())
-	}
-	p.opened = map[string]endpoint{}
-	return result
+	p.opened = map[string]http.Handler{}
+	return nil
 }

@@ -23,6 +23,7 @@ func TestProviderConfiguration(t *testing.T) {
 		{"unknown provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "typo", true},
 		{"archived provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "better-auth", true},
 		{"legacy bypass", "NET_WORTH_ESTIMATOR_AUTH_TOKEN", "legacy", true},
+		{"separate identity database", "NET_WORTH_ESTIMATOR_AUTH_SESSION_DB", "/data/sessions.db", true},
 		{"empty issuer", "NET_WORTH_ESTIMATOR_AUTH_ISSUER", "", true},
 		{"insecure public URL", "NET_WORTH_ESTIMATOR_PUBLIC_URL", "http://my-server.local", true},
 		{"public path", "NET_WORTH_ESTIMATOR_PUBLIC_URL", "https://example.test/path", true},
@@ -51,16 +52,16 @@ func TestProviderConfiguration(t *testing.T) {
 				}
 				return base[k]
 			}
-			c, err := FromEnv(env, "/data/model.db")
+			c, err := FromEnv(env)
 			if (err != nil) != test.fail {
 				t.Fatalf("error=%v, fail=%v", err, test.fail)
 			}
-			if err == nil && (c.SessionDB != "/data/model.db.sessions" || c.Lifetime != 7*24*time.Hour) {
+			if err == nil && (c.SessionDB != "" || c.Database != nil || c.Lifetime != 7*24*time.Hour) {
 				t.Fatalf("unexpected defaults: %+v", c)
 			}
 		})
 	}
-	c, err := FromEnv(func(string) string { return "" }, "model.db")
+	c, err := FromEnv(func(string) string { return "" })
 	if err == nil || c.Provider != "casdoor" {
 		t.Fatalf("missing identity configuration must fail closed: %+v %v", c, err)
 	}

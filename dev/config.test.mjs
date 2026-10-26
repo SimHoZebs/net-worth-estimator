@@ -88,6 +88,10 @@ test('native Compose consumes the exported environment and isolates dev from pro
     assert.equal(interpolation.status, 0, interpolation.stderr);
     assert.ok(interpolation.stdout.split('\n').includes(`DEV_OWNER_SUBJECT=${config.ownerSubject}`));
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_AUTH_PROVIDER, 'casdoor');
+    assert.equal(backend.environment.NET_WORTH_ESTIMATOR_DB, '/data/net-worth-estimator.db');
+    for (const key of ['NET_WORTH_ESTIMATOR_PLANS_DIR', 'NET_WORTH_ESTIMATOR_SAMPLE_DB', 'NET_WORTH_ESTIMATOR_AUTH_SESSION_DB']) {
+      assert.equal(backend.environment[key], undefined, `${key} must not configure split application storage`);
+    }
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL, '');
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_AUTH_TOKEN, undefined);
     assert.equal(backend.user, `${process.getuid()}:${process.getgid()}`);

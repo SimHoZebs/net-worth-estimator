@@ -9,8 +9,8 @@ COPY backend/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -ldflags="-s -w" \
-    -o /out/server \
-    ./cmd/server
+    -o /out/ \
+    ./cmd/server ./cmd/setupdb ./cmd/migratedb ./cmd/importcsv ./cmd/refreshplan
 
 FROM alpine:3.22
 
@@ -22,7 +22,7 @@ RUN apk add --no-cache ca-certificates \
 
 WORKDIR /app
 
-COPY --from=build --chown=app:app /out/server /app/server
+COPY --from=build --chown=app:app /out/ /app/
 
 ENV HOST=0.0.0.0 \
     PORT=8787 \
