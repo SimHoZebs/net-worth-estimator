@@ -4,7 +4,7 @@ import {
 	canonicalApiBaseUrl,
 	suspendResourceScope,
 } from "../auth/resourceScope.ts";
-import { ok } from "../test/fetch.ts";
+import { ok } from "../mocks/fetch.ts";
 import { ApiHttpError, ApiNetworkError } from "./http.ts";
 import { ResourceScopeError } from "./scopedRequest.ts";
 import type { BackendAccount, FinancialModelDocument } from "./contracts.ts";

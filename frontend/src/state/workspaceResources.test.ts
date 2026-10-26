@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { acceptTestResource } from "../test/resource.ts";
-import { testPlan } from "../test/plan.ts";
+import { acceptTestResource } from "../mocks/resource.ts";
+import { testPlan } from "../mocks/plan.ts";
 import {
 	getServerModel,
 	modelOptions,
@@ -8,8 +8,8 @@ import {
 } from "./workspaceResources.ts";
 import { serverQueryClient, resetServerQueryCache } from "./serverQuery.ts";
 import { resetWorkspaceStore, useWorkspaceStore } from "./workspaceStore.ts";
-import { setServerModelFixture } from "../test/workspace.ts";
-import { stubTestServer } from "../test/waypointServer.ts";
+import { setServerModelFixture } from "../mocks/workspace.ts";
+import { stubTestServer } from "../mocks/waypointServer.ts";
 
 beforeEach(() => {
 	acceptTestResource();

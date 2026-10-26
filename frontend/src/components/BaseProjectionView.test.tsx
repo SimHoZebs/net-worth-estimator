@@ -1,7 +1,7 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Projection } from "../domain/result.ts";
-import { projectionFixture } from "../test/projection.ts";
+import { projectionFixture } from "../mocks/projection.ts";
 import { BaseProjectionView } from "./BaseProjectionView.tsx";
 
 const { state } = vi.hoisted(() => ({

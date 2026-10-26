@@ -1,26 +1,16 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import {
-	acceptResourceScope,
-	canonicalApiBaseUrl,
-	suspendResourceScope,
-} from "../auth/resourceScope.ts";
-import { stubTestServer } from "../test/waypointServer.ts";
+import { suspendResourceScope } from "../auth/resourceScope.ts";
+import { acceptOwnerResource } from "../mocks/resource.ts";
+import { stubTestServer } from "../mocks/waypointServer.ts";
 import { SessionContext } from "../auth/sessionContext.ts";
 import { resetServerQueryCache } from "./serverQuery.ts";
 import { resetWorkspaceStore } from "./workspaceStore.ts";
 import { useWorkspaceStartup } from "./useWorkspaceStartup.ts";
 
 function owner(id: string) {
-	acceptResourceScope(
-		{
-			apiBaseUrl: canonicalApiBaseUrl(""),
-			resource: { id, kind: "private", permissions: ["plan:read"] },
-			subject: id,
-		},
-		suspendResourceScope(),
-	);
+	acceptOwnerResource(id);
 }
 
 beforeEach(() => {

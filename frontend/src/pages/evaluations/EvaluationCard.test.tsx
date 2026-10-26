@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { testPlan } from "../../test/plan.ts";
-import { evaluationFixture } from "../../test/projection.ts";
+import { testPlan } from "../../mocks/plan.ts";
+import { evaluationFixture } from "../../mocks/projection.ts";
 import { EvaluationCard } from "./EvaluationCard.tsx";
 
 afterEach(cleanup);

@@ -1,11 +1,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { acceptTestResource } from "../test/resource.ts";
+import { acceptTestResource } from "../mocks/resource.ts";
 import {
 	setServerModelFixture,
 	setServerStatusFixture,
-} from "../test/workspace.ts";
+} from "../mocks/workspace.ts";
 import { SessionContext } from "../auth/sessionContext.ts";
 import { resetWorkspaceStore } from "../state/workspaceStore.ts";
 import { ServerWorkspaceRecovery } from "./ServerWorkspaceRecovery.tsx";

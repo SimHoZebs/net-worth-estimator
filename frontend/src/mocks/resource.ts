@@ -18,3 +18,15 @@ export function acceptTestResource() {
 		suspendResourceScope(),
 	);
 }
+
+/** Parameterized private owner for tests that rotate the resource identity. */
+export function acceptOwnerResource(id: string) {
+	return acceptResourceScope(
+		{
+			apiBaseUrl: canonicalApiBaseUrl(""),
+			resource: { id, kind: "private", permissions: ["plan:read"] },
+			subject: id,
+		},
+		suspendResourceScope(),
+	);
+}

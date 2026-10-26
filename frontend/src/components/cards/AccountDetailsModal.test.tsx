@@ -2,8 +2,8 @@ import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { toAccountCard } from "../../domain/accountCards.ts";
-import { testPlan } from "../../test/plan.ts";
-import { movementFixture, projectionFixture } from "../../test/projection.ts";
+import { testPlan } from "../../mocks/plan.ts";
+import { movementFixture, projectionFixture } from "../../mocks/projection.ts";
 import { AccountDetailsModal } from "./AccountDetailsModal.tsx";
 
 // Native modal focus and dismissal belong to Modal's browser coverage.

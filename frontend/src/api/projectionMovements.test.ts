@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { deriveFundingGaps } from "../domain/fundingGaps.ts";
-import { testPlan } from "../test/plan.ts";
-import { projectionFixture } from "../test/projection.ts";
+import { testPlan } from "../mocks/plan.ts";
+import { projectionFixture } from "../mocks/projection.ts";
 import type {
 	FinancialModelDocument,
 	MovementEvent,

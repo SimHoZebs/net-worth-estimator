@@ -15,7 +15,7 @@ import {
 	diffFinancialModelDocuments,
 	type RowOperation,
 } from "@/api/rowSync.ts";
-import { ok } from "@/test/fetch.ts";
+import { ok } from "@/mocks/fetch.ts";
 import { ApiNetworkError } from "@/api/http.ts";
 
 const account = (id: string, name = id): BackendAccount => ({

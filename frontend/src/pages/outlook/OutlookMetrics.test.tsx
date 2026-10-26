@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { testPlan } from "../../test/plan.ts";
-import { projectionFixture } from "../../test/projection.ts";
+import { testPlan } from "../../mocks/plan.ts";
+import { projectionFixture } from "../../mocks/projection.ts";
 import { OutlookMetrics } from "./OutlookMetrics.tsx";
 
 afterEach(cleanup);

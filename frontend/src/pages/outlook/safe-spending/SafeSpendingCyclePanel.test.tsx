@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { testPlan } from "../../../test/plan.ts";
+import { testPlan } from "../../../mocks/plan.ts";
 import { SafeSpendingCyclePanel } from "./SafeSpendingCyclePanel.tsx";
 import type { SafeSpendingChargeCycle } from "./safeSpendingDetailModel.ts";
 

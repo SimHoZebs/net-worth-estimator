@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { acceptTestResource } from "../test/resource.ts";
-import { setServerStatusFixture } from "../test/workspace.ts";
+import { acceptTestResource } from "../mocks/resource.ts";
+import { setServerStatusFixture } from "../mocks/workspace.ts";
 import {
 	deterministicQueryKey,
 	resetServerQueryCache,

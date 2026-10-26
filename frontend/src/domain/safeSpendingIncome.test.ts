@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { testPlan } from "../test/plan.ts";
-import { movementFixture } from "../test/projection.ts";
+import { testPlan } from "../mocks/plan.ts";
+import { movementFixture } from "../mocks/projection.ts";
 import type { Movement, Plan } from "./model.ts";
 import { safeSpendingIncome } from "./safeSpendingIncome.ts";
 

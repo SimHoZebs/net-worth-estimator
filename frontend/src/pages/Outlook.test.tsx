@@ -1,12 +1,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { resetWorkspaceStore } from "../state/workspaceStore.ts";
-import { testPlan } from "../test/plan.ts";
-import { acceptTestResource } from "../test/resource.ts";
+import { testPlan } from "../mocks/plan.ts";
+import { acceptTestResource } from "../mocks/resource.ts";
 import {
 	setServerModelFixture,
 	setServerStatusFixture,
-} from "../test/workspace.ts";
+} from "../mocks/workspace.ts";
 import { Outlook } from "./Outlook.tsx";
 
 vi.mock("../state/useRemoteProjection.ts", () => ({

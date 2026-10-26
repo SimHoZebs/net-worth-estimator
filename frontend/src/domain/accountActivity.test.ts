@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { testPlan as examplePlan } from "../test/plan.ts";
-import { activityProjection } from "../test/projection.ts";
+import { testPlan as examplePlan } from "../mocks/plan.ts";
+import { activityProjection } from "../mocks/projection.ts";
 import {
 	accountTransactions,
 	defaultActivityFilters,

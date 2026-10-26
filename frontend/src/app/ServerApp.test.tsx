@@ -15,14 +15,14 @@ import {
 } from "../state/workspaceStore.ts";
 import type { FinancialModelResponse } from "../api/index.ts";
 import { resetServerQueryCache } from "../state/serverQuery.ts";
-import { testPlan } from "../test/plan.ts";
-import { acceptTestResource } from "../test/resource.ts";
-import { setServerModelFixture } from "../test/workspace.ts";
+import { testPlan } from "../mocks/plan.ts";
+import { acceptTestResource } from "../mocks/resource.ts";
+import { setServerModelFixture } from "../mocks/workspace.ts";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import { usePlan } from "../state/useWorkspacePlan.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { ServerApp } from "./ServerApp.tsx";
-import { stubTestServer } from "../test/waypointServer.ts";
+import { stubTestServer } from "../mocks/waypointServer.ts";
 
 function stubWorkspaceFetch() {
 	const server = stubTestServer();

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Plan } from "../../domain/model.ts";
-import { testPlan } from "../../test/plan.ts";
+import { testPlan } from "../../mocks/plan.ts";
 import { AccountDetails } from "./AccountDetails.tsx";
 
 afterEach(cleanup);

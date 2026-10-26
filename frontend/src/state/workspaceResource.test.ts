@@ -20,8 +20,8 @@ import {
 	resetServerQueryCache,
 	serverQueryClient,
 } from "./serverQuery.ts";
-import { setServerModelFixture } from "../test/workspace.ts";
-import { testPlan } from "../test/plan.ts";
+import { setServerModelFixture } from "../mocks/workspace.ts";
+import { testPlan } from "../mocks/plan.ts";
 
 function owner(id: string) {
 	acceptResourceScope(

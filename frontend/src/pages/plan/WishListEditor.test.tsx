@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Plan } from "../../domain/model.ts";
-import { testPlan } from "../../test/plan.ts";
+import { testPlan } from "../../mocks/plan.ts";
 import { WishListEditor } from "./WishListEditor.tsx";
 
 vi.mock("../../components/Modal.tsx", async (importOriginal) => ({
