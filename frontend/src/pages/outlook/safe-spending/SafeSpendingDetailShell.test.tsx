@@ -104,6 +104,8 @@ const config: SafeSpendingConfigHints = {
 	trackedIds: [],
 	spendingAccounts: [],
 	trackedSpendingIds: [],
+	incomeAccounts: [],
+	trackedIncomeIds: [],
 };
 
 const noop = () => {};
@@ -331,6 +333,7 @@ describe("SafeSpendingConfigurePanel", () => {
 				onToggleBill={noop}
 				onToggleAccount={noop}
 				onToggleSpendingAccount={noop}
+				onToggleIncomeAccount={noop}
 				onUpdateConfig={noop}
 			/>,
 		);
@@ -355,6 +358,7 @@ describe("SafeSpendingConfigurePanel", () => {
 				onToggleBill={noop}
 				onToggleAccount={noop}
 				onToggleSpendingAccount={noop}
+				onToggleIncomeAccount={noop}
 				onUpdateConfig={noop}
 			/>,
 		);
@@ -372,6 +376,7 @@ describe("SafeSpendingConfigurePanel", () => {
 		expect(screen.queryByLabelText("Calculated budget values")).toBeNull();
 		expect(screen.getAllByRole("spinbutton")).toHaveLength(2);
 		for (const name of [
+			"Income accounts",
 			"Income sources",
 			labels.cashAccounts,
 			"Tracked cards",
@@ -394,6 +399,7 @@ describe("SafeSpendingConfigurePanel", () => {
 				onToggleBill={noop}
 				onToggleAccount={noop}
 				onToggleSpendingAccount={noop}
+				onToggleIncomeAccount={noop}
 				onUpdateConfig={update}
 			/>,
 		);

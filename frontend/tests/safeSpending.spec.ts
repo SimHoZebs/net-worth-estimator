@@ -76,7 +76,10 @@ test("household budget shows paycheck allocation and one sortable cycle bill lis
 	await page.goto("/#outlook/safe-spending-detail");
 	const drawer = page.getByRole("dialog");
 	await page.getByRole("tab", { name: "Configure", exact: true }).click();
-	await page.getByRole("checkbox", { name: /^Salary/ }).check();
+	await page
+		.getByRole("group", { name: "Income sources" })
+		.getByRole("button", { name: /^Salary/ })
+		.click();
 	await page.getByRole("tab", { name: /This cycle/ }).click();
 	await expect(page.getByRole("tab", { name: /This cycle/ })).toHaveAttribute(
 		"aria-selected",
@@ -326,8 +329,8 @@ test("Configure only selects sources and settings, and ignores legacy overrides"
 	await page.getByRole("tab", { name: "Configure", exact: true }).click();
 	await page
 		.getByRole("group", { name: "Included bills" })
-		.getByRole("checkbox", { name: /^Housing and living/ })
-		.uncheck();
+		.getByRole("button", { name: /^Housing and living/ })
+		.click();
 	const reserveSaved = page.waitForResponse(
 		(response) =>
 			response.url().endsWith("/v1/safe-spending-settings") &&
@@ -338,8 +341,8 @@ test("Configure only selects sources and settings, and ignores legacy overrides"
 	expect((await reserveSaved).ok()).toBe(true);
 	await page.reload();
 	await expect(
-		page.getByRole("checkbox", { name: /^Housing and living/ }),
-	).not.toBeChecked();
+		page.getByRole("button", { name: /^Housing and living/ }),
+	).toHaveAttribute("aria-pressed", "false");
 	await expect(
 		page
 			.getByRole("group", { name: labels.cashAccounts })
@@ -399,13 +402,13 @@ test("income sources combine independent recurrence rules and persist explicit d
 	expect((await response.json()).persisted).toBe(true);
 	await page.goto("/#outlook/safe-spending-detail/configure");
 	const sources = page.getByRole("group", { name: "Income sources" });
-	const salary = sources.getByRole("checkbox", { name: /^Salary/ });
-	const partner = sources.getByRole("checkbox", {
+	const salary = sources.getByRole("button", { name: /^Salary/ });
+	const partner = sources.getByRole("button", {
 		name: /^Partner take-home pay/,
 	});
-	await expect(salary).not.toBeChecked();
-	await expect(partner).not.toBeChecked();
-	await salary.check();
+	await expect(salary).toHaveAttribute("aria-pressed", "false");
+	await expect(partner).toHaveAttribute("aria-pressed", "false");
+	await salary.click();
 	await partner.focus();
 	const sourcesSaved = page.waitForResponse(
 		(response) =>
@@ -416,8 +419,8 @@ test("income sources combine independent recurrence rules and persist explicit d
 	await page.keyboard.press("Space");
 	expect((await sourcesSaved).ok()).toBe(true);
 	await page.reload();
-	await expect(salary).toBeChecked();
-	await expect(partner).toBeChecked();
+	await expect(salary).toHaveAttribute("aria-pressed", "true");
+	await expect(partner).toHaveAttribute("aria-pressed", "true");
 	await page.getByRole("tab", { name: /This cycle/ }).click();
 	await expect(
 		page
@@ -434,7 +437,7 @@ test("income sources combine independent recurrence rules and persist explicit d
 			.getByText("$7,000.00", { exact: true }),
 	).toBeVisible();
 	await page.getByRole("tab", { name: "Configure", exact: true }).click();
-	await salary.uncheck();
+	await salary.click();
 	await page.getByRole("tab", { name: /Last cycle/ }).click();
 	await expect(
 		page
@@ -448,11 +451,11 @@ test("income sources combine independent recurrence rules and persist explicit d
 			response.request().method() === "PUT" &&
 			response.request().postDataJSON().incomeRuleIds.length === 0,
 	);
-	await partner.uncheck();
+	await partner.click();
 	expect((await deselectionSaved).ok()).toBe(true);
 	await page.reload();
-	await expect(salary).not.toBeChecked();
-	await expect(partner).not.toBeChecked();
+	await expect(salary).toHaveAttribute("aria-pressed", "false");
+	await expect(partner).toHaveAttribute("aria-pressed", "false");
 	await page.getByRole("tab", { name: /This cycle/ }).click();
 	await expect(
 		page

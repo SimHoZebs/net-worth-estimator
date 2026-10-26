@@ -2036,6 +2036,12 @@
 						},
 						"type": ["array", "null"]
 					},
+					"incomeAccountIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
 					"movementIds": {
 						"items": {
 							"type": "string"
@@ -2068,6 +2074,7 @@
 					"reserve",
 					"accountIds",
 					"spendingAccountIds",
+					"incomeAccountIds",
 					"incomeRuleIds",
 					"movementIds",
 					"statementDaySet"

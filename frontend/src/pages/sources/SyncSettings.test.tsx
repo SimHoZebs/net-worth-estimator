@@ -123,14 +123,14 @@ it("shows the bridge link and keeps connect disabled until a token is pasted", a
 			name: /setup token from the SimpleFIN Bridge/i,
 		}),
 	).toBeTruthy();
+	expect(screen.getByPlaceholderText("Paste your setup token").tagName).toBe(
+		"INPUT",
+	);
 	const connect = screen.getByRole("button", { name: "Connect bank" });
 	expect((connect as HTMLButtonElement).disabled).toBe(true);
-	fireEvent.change(
-		screen.getByPlaceholderText("Paste your SimpleFIN setup token"),
-		{
-			target: { value: "dG9rZW4=" },
-		},
-	);
+	fireEvent.change(screen.getByPlaceholderText("Paste your setup token"), {
+		target: { value: "dG9rZW4=" },
+	});
 	expect((connect as HTMLButtonElement).disabled).toBe(false);
 });
 
@@ -138,7 +138,7 @@ it("connects with a setup token and shows the bridge host", async () => {
 	const requests = stubApi({ configured: false });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	fireEvent.change(
-		await screen.findByPlaceholderText("Paste your SimpleFIN setup token"),
+		await screen.findByPlaceholderText("Paste your setup token"),
 		{
 			target: { value: "dG9rZW4=" },
 		},
@@ -160,13 +160,17 @@ it("shows an error when the token is rejected", async () => {
 	stubApi({ configured: false, failConnect: true });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	fireEvent.change(
-		await screen.findByPlaceholderText("Paste your SimpleFIN setup token"),
+		await screen.findByPlaceholderText("Paste your setup token"),
 		{
 			target: { value: "bogus" },
 		},
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Connect bank" }));
-	expect(await screen.findByText(/could not be connected/)).toBeTruthy();
+	expect(
+		await screen.findByText(
+			"Could not connect. Check the token and try again.",
+		),
+	).toBeTruthy();
 	expect(screen.queryByText("Connected")).toBeNull();
 });
 
@@ -214,7 +218,7 @@ it("disables each connect button while the other field is filled", async () => {
 	stubApi({ configured: false });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	fireEvent.change(
-		await screen.findByPlaceholderText("Paste your SimpleFIN setup token"),
+		await screen.findByPlaceholderText("Paste your setup token"),
 		{
 			target: { value: "dG9rZW4=" },
 		},
@@ -261,7 +265,7 @@ it("invalidates server status after connecting", async () => {
 		await import("../../state/workspaceResources.ts");
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	fireEvent.change(
-		await screen.findByPlaceholderText("Paste your SimpleFIN setup token"),
+		await screen.findByPlaceholderText("Paste your setup token"),
 		{
 			target: { value: "dG9rZW4=" },
 		},

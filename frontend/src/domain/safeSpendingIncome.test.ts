@@ -42,7 +42,7 @@ const input = {
 		payment("partner", "2026-10-20", 2000),
 		payment("salary", "2026-11-15", 3300),
 	],
-	spendingAccountIds: ["checking"],
+	incomeAccountIds: ["checking"],
 	incomeRuleIds: ["salary", "partner"],
 	todayIso: "2026-10-08",
 };
@@ -104,7 +104,7 @@ describe("safeSpendingIncome", () => {
 		).toBe(1500);
 	});
 
-	it("exposes only enabled, current recurrence rules into selected accounts", () => {
+	it("exposes only enabled, current inflows into income accounts", () => {
 		const rules = [
 			rule("active"),
 			rule("disabled", { enabled: false }),
@@ -133,7 +133,17 @@ describe("safeSpendingIncome", () => {
 		expect(result.paycheck?.amount).toBe(200);
 	});
 
-	it("ignores disabled and archived accounts and transfers within selected cash accounts", () => {
+	it("scopes inflows to the selected income accounts, independent of spending", () => {
+		const result = safeSpendingIncome({
+			...input,
+			incomeAccountIds: ["brokerage"],
+		});
+		expect(result.candidates).toEqual([]);
+		expect(result.selectedRuleIds).toEqual([]);
+		expect(result.paycheck).toBeNull();
+	});
+
+	it("ignores disabled and archived accounts and transfers within income accounts", () => {
 		for (const accountPatch of [{ enabled: false }, { archived: true }]) {
 			const result = safeSpendingIncome({
 				...input,
@@ -150,7 +160,7 @@ describe("safeSpendingIncome", () => {
 		}
 		const result = safeSpendingIncome({
 			...input,
-			spendingAccountIds: ["checking", "savings"],
+			incomeAccountIds: ["checking", "savings"],
 		});
 		expect(result.selectedRuleIds).toEqual(["salary"]);
 		expect(result.paycheck?.amount).toBe(3000);

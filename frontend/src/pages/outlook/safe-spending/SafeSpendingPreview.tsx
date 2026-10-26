@@ -133,6 +133,13 @@ export function SafeSpendingPreview({
 			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
 		return resolveEffectiveIds(settings.spendingAccountIds, knownIds, fallback);
 	}, [settings.spendingAccountIds, spendableAccounts, plan]);
+	const incomeIds = useMemo(() => {
+		const knownIds = spendableAccounts.map((account) => account.id);
+		const fallbackId = checkingAccountId(plan);
+		const fallback =
+			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
+		return resolveEffectiveIds(settings.incomeAccountIds, knownIds, fallback);
+	}, [settings.incomeAccountIds, spendableAccounts, plan]);
 	const spendingDerived = useMemo(
 		() => spendingBalance(plan, spendingIds),
 		[plan, spendingIds],
@@ -164,11 +171,11 @@ export function SafeSpendingPreview({
 			safeSpendingIncome({
 				plan,
 				movements,
-				spendingAccountIds: spendingIds,
+				incomeAccountIds: incomeIds,
 				incomeRuleIds: settings.incomeRuleIds,
 				todayIso: displayToday,
 			}),
-		[plan, movements, spendingIds, settings.incomeRuleIds, displayToday],
+		[plan, movements, incomeIds, settings.incomeRuleIds, displayToday],
 	);
 	const paycheckDerived = income.paycheck;
 	const spentSinceStart = useMemo(
@@ -360,6 +367,17 @@ export function SafeSpendingPreview({
 		updateSettings({ spendingAccountIds: next.length ? next : null });
 	};
 
+	const toggleIncomeAccount = (accountId: string) => {
+		const known = new Set(spendableAccounts.map((account) => account.id));
+		const fallbackId = checkingAccountId(plan);
+		const fallback = fallbackId && known.has(fallbackId) ? [fallbackId] : [];
+		const explicit = settings.incomeAccountIds ?? fallback;
+		const next = explicit.includes(accountId)
+			? explicit.filter((id) => id !== accountId)
+			: [...explicit, accountId];
+		updateSettings({ incomeAccountIds: next.length ? next : null });
+	};
+
 	const billsSection = {
 		title: labels.scheduledBills,
 		subtitle: "Scheduled amounts",
@@ -533,6 +551,11 @@ export function SafeSpendingPreview({
 									name: account.name,
 								})),
 								trackedSpendingIds: spendingIds,
+								incomeAccounts: spendableAccounts.map((account) => ({
+									id: account.id,
+									name: account.name,
+								})),
+								trackedIncomeIds: incomeIds,
 							}}
 							billCandidates={billCandidates}
 							trackedBillIds={trackedBillIds}
@@ -540,6 +563,7 @@ export function SafeSpendingPreview({
 							onToggleBill={toggleBill}
 							onToggleAccount={toggleAccount}
 							onToggleSpendingAccount={toggleSpendingAccount}
+							onToggleIncomeAccount={toggleIncomeAccount}
 							onUpdateConfig={updateSettings}
 						/>
 					)}
