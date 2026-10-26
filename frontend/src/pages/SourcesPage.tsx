@@ -4,6 +4,7 @@ import { usePlan, useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
 import { useServerModel } from "../state/workspaceResources.ts";
 import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
 import { SourceBanner } from "./sources/SourceHealth.tsx";
+import { SyncSettings } from "./sources/SyncSettings.tsx";
 
 export function SourcesPage() {
 	// Everything subscribes here, including the access control.
@@ -16,6 +17,13 @@ export function SourcesPage() {
 	return (
 		<>
 			<SourceBanner sourceAccess={sourceAccess} />
+			<SyncSettings
+				accounts={plan.accounts.map((account) => ({
+					id: account.id,
+					name: account.name,
+				}))}
+				readOnly={readOnly}
+			/>
 			<AmountCatalog
 				accounts={plan.accounts.map((account) => ({
 					id: account.id,
