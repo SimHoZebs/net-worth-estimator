@@ -26,7 +26,9 @@ type Server struct {
 	// ReadOnly rejects canonical model writes with 403. Reads and compute
 	// endpoints are unaffected.
 	ReadOnly bool
-	// SyncRunner runs the SimpleFIN sync on trigger. Nil when unconfigured.
+	// SyncRunner runs the SimpleFIN sync on trigger. It may be nil (sample
+	// plans, tests) or unconfigured (no Bridge credential); triggers then
+	// return 503.
 	SyncRunner *simplefin.Runner
 }
 
@@ -37,7 +39,9 @@ type Config struct {
 	CanWrite       func(context.Context) bool
 	AllowedOrigins []string
 	ReadOnly       bool
-	// SyncRunner runs the SimpleFIN sync on trigger. Nil when unconfigured.
+	// SyncRunner runs the SimpleFIN sync on trigger. It may be nil (sample
+	// plans, tests) or unconfigured (no Bridge credential); triggers then
+	// return 503.
 	SyncRunner  *simplefin.Runner
 	FrontendDir string
 }
@@ -217,6 +221,41 @@ func New(store store.Store, serverConfig Config) http.Handler {
 		Path:        "/v1/sync/simplefin",
 		Summary:     "Run the SimpleFIN sync (balances and pending seed)",
 	}, server.triggerSync)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-sync-credential",
+		Method:      "GET",
+		Path:        "/v1/sync/simplefin/credential",
+		Summary:     "Report SimpleFIN connection state (never the secret)",
+	}, server.getSyncCredential)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "connect-sync-credential",
+		Method:      "POST",
+		Path:        "/v1/sync/simplefin/credential",
+		Summary:     "Connect a SimpleFIN key from a setup token or access URL",
+	}, server.connectSyncCredential)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "disconnect-sync-credential",
+		Method:      "DELETE",
+		Path:        "/v1/sync/simplefin/credential",
+		Summary:     "Disconnect the SimpleFIN key",
+	}, server.disconnectSyncCredential)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-sync-cards",
+		Method:      "GET",
+		Path:        "/v1/sync/simplefin/cards",
+		Summary:     "List per-plan SimpleFIN card accounts",
+	}, server.getSyncCards)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "set-sync-cards",
+		Method:      "PUT",
+		Path:        "/v1/sync/simplefin/cards",
+		Summary:     "Replace per-plan SimpleFIN card accounts",
+	}, server.setSyncCards)
 
 	huma.Register(api, huma.Operation{
 		OperationID: "get-amount-resolvers",
