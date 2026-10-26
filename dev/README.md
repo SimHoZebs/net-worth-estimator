@@ -15,11 +15,23 @@ Requires Docker Compose 5.0+ and Node 24+. The data commands use
 
 Setup generates private credentials, initializes Casdoor, and takes a SQLite-safe,
 read-only production snapshot. Use `setup --from /absolute/path/backup.db` instead
-to start from an existing backup. It starts Casdoor only if identity initialization
+to start from an existing shared-schema backup. Fresh setup copies one selected
+financial plan into the bootstrap dev account. It excludes production identity
+records and other users' plans. It starts Casdoor only if identity initialization
 is required. It does not start the API or frontend.
 
+Database provisioning occurs in this explicit setup workflow. Daily API startup
+requires the existing complete schema and never creates or repairs a database.
+
+If the source contains several private plans, supply `--source-plan "$SOURCE_PLAN"`.
+If the source contains exactly one private plan, setup selects it automatically.
+For legacy files, use `setup --manifest /private/migration.json` with the
+[explicit migration manifest](../docs/shared-database.md#manifest-version-1).
+Setup migrates into a private intermediate before it copies the selected financial scope.
+
 For an existing dev stack, run the same setup command once. It preserves saved
-credentials, issuer URLs, primary ownership, financial data, and sessions. It
+credentials, issuer URLs, plan ownership, financial data, and sessions. Legacy dev
+databases require offline migration before setup can continue. Setup
 exports runtime settings to the ignored `.env.dev` file without restarting services.
 
 `tmp/dev/config.json` retains setup credentials and the snapshot source. `.env.dev`
@@ -69,23 +81,29 @@ to another origin without an explicit identity migration.
 ## Explicit data operations
 
 Start the stack before these operations. Each command validates the incoming
-database, stops the API for replacement, then starts the same API container.
+database, stops the API for the scoped update, then starts the same API container.
 It does not build images or change production data.
 
 ```bash
-./scripts/dev refresh-db
-./scripts/dev refresh-db --from /absolute/path/backup.db
-./scripts/dev publish-sample --from /absolute/path/approved-snapshot.db
+./scripts/dev refresh-db --plan "$TARGET_PLAN" --source-plan "$SOURCE_PLAN"
+./scripts/dev refresh-db --plan "$TARGET_PLAN" --source-plan "$SOURCE_PLAN" --from /absolute/path/backup.db
+./scripts/dev publish-sample --source-plan "$SOURCE_PLAN" --from /absolute/path/approved-snapshot.db
 ```
 
-`refresh-db` backs up the prior primary database under `tmp/dev/backups/`. It
-preserves identities, passkeys, sessions, and other accounts' plans. `--from`
-changes the saved refresh source. Plain Compose startup never refreshes data.
+`refresh-db` backs up the shared application database under `tmp/dev/backups/`.
+It replaces only the explicitly selected private plan. It preserves identities,
+passkeys, application sessions, grants, logout records, and other accounts' plans.
+`--from` selects a source for that operation. Plain Compose startup never refreshes data.
 
-`publish-sample` publishes a separate snapshot for guests. Without `--from`, it
-copies the current dev primary plan. Approve the exact financial data before
-publication. The copy omits private projection history, Bridge links, sync times,
-and the source path. Later private edits do not change the sample.
+`publish-sample` publishes a snapshot as `plans/sample` in the shared application
+database. Without `--from`, it reads the selected plan from the current dev database. Approve the exact
+financial data before publication. The copy omits private projection history,
+Bridge links, upstream sync keys, sync times, migration history, and the source
+path. Later private edits do not change the sample.
+
+Use verified resource IDs for `TARGET_PLAN` and `SOURCE_PLAN`. The source must
+use the shared application schema. Migrate legacy backups first. The commands
+require explicit selection because one source snapshot can contain several owners.
 
 ## Access and state
 
@@ -93,18 +111,21 @@ Casdoor grants access to each account's private plan. Signup needs no role choic
 or manual grant. Guests can read and project only the separate sample. Account
 controls appear above sidebar navigation.
 
-The primary database belongs to the verified `ownerSubject` in `tmp/dev/config.json`.
-Fresh setup assigns the bootstrap account. Existing setups require an explicit
-owner assignment. Other accounts start empty under `tmp/dev/data/plans/`.
+One shared application database holds every private plan, the published sample,
+and application sessions. The verified `ownerSubject` in `tmp/dev/config.json`
+selects the account for server-level Bridge credentials. Dev keeps sync disabled.
+Fresh setup assigns the bootstrap
+account. Other accounts receive their own blank plan in the same database.
 
 Back up `.env.dev` and `tmp/dev/` to retain the full dev state. Files use `0600`,
 and private directories use `0700`. Compose `down` retains the bind-mounted data.
 Existing Casdoor instances require the reviewed permission objects described in
 [the authorization contract](../docs/authorization.md).
 
-The API upgrades older posting IDs to UUIDs on first open. Back up all financial
-databases before a schema update. See [the posting migration contract](../docs/posting-identity.md)
-for reference preservation and rollback. Identity state remains separate.
+Legacy per-plan databases require [explicit offline migration](../docs/shared-database.md).
+Back up every legacy source before migration. Runtime startup does not merge
+files or infer ownership. Casdoor's external state remains separate from the
+shared application database.
 
 ## Verification
 

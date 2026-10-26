@@ -82,6 +82,29 @@ For a backend change, it is the Go gate below.
 
 The pre-commit hook verifies the backend packages containing staged Go files, plus `oxlint` and `oxfmt --check` on staged frontend files. The pre-push hook verifies `./internal/...` and `./cmd/...`, plus whole-project `oxlint`. Remaining frontend gates (`typecheck`, `test`, `build`, `test:browser`) run only when invoked directly.
 
+## Shared Database Isolation
+
+The application stores all plans and application identity state in one SQLite
+database. Isolation tests must use at least two plans in that same physical file,
+with identical entity IDs, preset names, and upstream sync keys. Separate fixture
+files alone do not prove row-level isolation.
+
+```bash
+backend/scripts/verify.sh ./internal/store
+backend/scripts/verify.sh ./internal/dbmigration
+backend/scripts/verify.sh ./internal/plans
+backend/scripts/verify.sh ./internal/identity
+backend/scripts/verify.sh ./internal/api
+```
+
+Migration tests use disposable legacy sources and a new destination. They verify
+source immutability, failed-import cleanup, ownership validation, private sync
+identities, and application sessions. See [the migration guide](docs/shared-database.md).
+
+Test fixtures provision through `store.SetupDatabase` before runtime opens. Startup
+regressions verify that missing, empty, and incompatible databases create no files
+or schema. Identity initialization must also reject incomplete tables without repair.
+
 ## Casdoor Authentication
 
 Unit checks need no identity container:

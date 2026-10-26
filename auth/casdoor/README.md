@@ -316,7 +316,7 @@ Casdoor, frontend, and backend ports. Compose 2.24.4 or newer supports `!overrid
 ```bash
 export AUTH_TEST_DATA_DIR="$PWD/tmp/casdoor-lifecycle-app"
 mkdir -m 700 "$AUTH_TEST_DATA_DIR"
-export AUTH_TEST_SESSION_DB="$AUTH_TEST_DATA_DIR/identity.db"
+export NET_WORTH_ESTIMATOR_DB="$AUTH_TEST_DATA_DIR/net-worth-estimator.db"
 export COMPOSE_FILE="docker-compose.yml:auth/compose.casdoor.yml:auth/compose.test.yml"
 docker compose --env-file auth/casdoor/.env -p waypoint-auth-test up -d --build --wait
 CASDOOR_TEST_MUTATIONS=1 CASDOOR_RESTART_CONTAINER=waypoint-auth-test-casdoor-1 \

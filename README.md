@@ -22,20 +22,35 @@ public/data/income/
 └── tax-profiles.csv
 ```
 
-Offline replacement from `backend/`:
+Offline replacement from `backend/` requires an existing plan. Set `PLAN_ID` to
+the verified resource ID from `/v1/auth/session`. Stop the application first:
 
 ```bash
 go run ./cmd/importcsv \
   -db /path/to/net-worth-estimator.db \
-  -model ../public/configs \
-  -income ../public/data/income
+  -plan "$PLAN_ID" \
+  -model ../public/configs
 ```
 
 ## Persistence and Access
 
-- The SQLite file is authoritative for the canonical model, income snapshot, sync state, and projection artifacts.
+- One application SQLite file holds all private plans, the published sample, and application sessions.
+- Every financial table is plan-scoped. Each private plan belongs to a verified application account.
 - There is no HTTP reset route. Use a database backup and the offline import tool for replacement.
 - Canonical edits and artifacts survive redeployment only when the SQLite file is on durable storage.
+
+Database setup is a deployment step, not server initialization:
+
+```bash
+CGO_ENABLED=0 go -C backend run ./cmd/setupdb --db /private/application.db
+```
+
+The server requires that existing, compatible database. It never creates a missing
+database or repairs its schema. Use the same path in `NET_WORTH_ESTIMATOR_DB`.
+
+Existing per-plan databases require an explicit offline migration. See
+[the shared database guide](docs/shared-database.md). Runtime startup never merges
+legacy files or assigns their ownership from the first login.
 
 ## SimpleFIN Synchronization
 
@@ -55,8 +70,11 @@ image with isolated dev storage. Setup takes the initial SQLite-safe, read-only
 production snapshot. Daily Compose commands retain data and logins without a
 custom lifecycle wrapper. External sync stays disabled.
 
-Use `setup --from /path/backup.db` for an existing backup. Use `./scripts/dev refresh-db`
-to refresh financial data explicitly without resetting accounts or passkeys.
+Use `setup --from /path/backup.db` for an existing shared-schema backup. Use
+`--source-plan "$SOURCE_PLAN"` when the source contains several private plans.
+Use
+`./scripts/dev refresh-db --plan "$TARGET_PLAN" --source-plan "$SOURCE_PLAN"`
+to refresh one financial plan without resetting accounts or passkeys.
 See [the dev guide](dev/README.md) for tailnet setup, private plans, the guest sample,
 logs, and state recovery.
 
