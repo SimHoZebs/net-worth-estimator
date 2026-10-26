@@ -1,7 +1,7 @@
 import { cva } from "class-variance-authority";
 
 export const evaluationCard = cva(
-	"rounded-surface border border-line print:break-inside-avoid",
+	"flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-line p-5 print:break-inside-avoid",
 	{
 		variants: {
 			enabled: {

@@ -6,7 +6,7 @@ import {
 	ShieldCheck,
 	TriangleAlert,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { dateLabel, money } from "../../domain/format.ts";
 import {
 	deriveFundingGaps,
@@ -42,6 +42,7 @@ export function FundingGapsCard({
 		[item.enabled, item.postingIds, plan, projection],
 	);
 	const [selectedId, setSelectedId] = useSelectedId(plan);
+	const headingId = useId();
 	const first = gaps[0];
 	const summary = first ? summarizeFundingGap(first) : null;
 	const clear =
@@ -63,11 +64,14 @@ export function FundingGapsCard({
 				: null));
 	return (
 		<>
-			<section className={fundingCardStyles({ state })}>
-				<div className="flex items-center justify-between gap-3">
-					<h2 className={fundingCardTitleStyles({ state })}>
-						<StateIcon size={16} aria-hidden="true" />
-						{item.name}
+			<section
+				className={fundingCardStyles({ state })}
+				aria-labelledby={headingId}
+			>
+				<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+					<h2 id={headingId} className={fundingCardTitleStyles({ state })}>
+						<StateIcon size={16} aria-hidden="true" className="shrink-0" />
+						<span className="[overflow-wrap:anywhere]">{item.name}</span>
 					</h2>
 					<div className="flex items-center justify-end gap-1">
 						{first && <Badge tone="warning">{gaps.length} projected</Badge>}
@@ -97,7 +101,7 @@ export function FundingGapsCard({
 							</p>
 							<div className="flex items-start justify-between gap-3">
 								<div>
-									<span className="block text-3xl leading-tight font-medium tracking-tight text-danger-text tabular-nums">
+									<span className="type-value block text-3xl leading-[1.2] font-medium tracking-tight text-danger-text tabular-nums [overflow-wrap:anywhere]">
 										{money(summary.shortfall)} short
 									</span>
 									<span className="mt-2 block text-xs leading-relaxed text-muted">
@@ -179,9 +183,11 @@ export function FundingGapsCard({
 					</>
 				) : (
 					<div>
-						<h3 className="m-0 text-sm font-semibold">{statusTitle}</h3>
+						<div className="type-value mt-0 mr-0 mb-1 ml-0 text-3xl font-medium leading-[1.2] tracking-tight [overflow-wrap:anywhere]">
+							{statusTitle}
+						</div>
 						{statusDescription && (
-							<p className="mt-1 mb-0 text-xs text-muted">
+							<p className="m-0 text-sm leading-relaxed text-muted">
 								{statusDescription}
 							</p>
 						)}

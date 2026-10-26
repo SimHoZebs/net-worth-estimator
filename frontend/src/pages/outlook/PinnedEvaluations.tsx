@@ -59,7 +59,7 @@ export function PinnedEvaluations({
 			</h2>
 			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none grids. */}
 			<ul
-				className="mt-3 mb-0 grid list-none grid-cols-2 gap-6 p-0 max-lg:gap-4 max-sm:grid-cols-1"
+				className="mt-3 mb-0 grid list-none grid-cols-2 items-stretch gap-6 p-0 max-lg:gap-4 max-sm:grid-cols-1"
 				role="list"
 			>
 				{items.map((item) => {
