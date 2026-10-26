@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -47,4 +49,32 @@ func schemaKeys(spec *huma.OpenAPI) []string {
 		names = append(names, key)
 	}
 	return names
+}
+
+func TestServedSpecKeysAreGeneratorSafe(t *testing.T) {
+	router := New(openAPIStore(t), Config{})
+	request := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET /openapi.json status = %d, want 200", recorder.Code)
+	}
+	var document struct {
+		Components struct {
+			Schemas map[string]json.RawMessage `json:"schemas"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &document); err != nil {
+		t.Fatalf("decode served spec: %v", err)
+	}
+	names := make([]string, 0, len(document.Components.Schemas))
+	for key := range document.Components.Schemas {
+		names = append(names, key)
+	}
+	if len(names) == 0 {
+		t.Fatal("served spec declares no component schemas")
+	}
+	if err := checkOpenAPIKeys(names, recorder.Body.Bytes()); err != nil {
+		t.Fatal(err)
+	}
 }

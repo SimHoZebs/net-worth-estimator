@@ -46,14 +46,22 @@ func sanitizeOpenAPIComponentKey(name string) string {
 // checkOpenAPIComponentKeys reports component keys and dangling schema
 // references. Tests fail on either; the served spec must stay generator-safe.
 func checkOpenAPIComponentKeys(spec *huma.OpenAPI) error {
+	names := make([]string, 0, len(spec.Components.Schemas.Map()))
 	for key := range spec.Components.Schemas.Map() {
-		if !openAPIComponentKeyPattern.MatchString(key) {
-			return fmt.Errorf("invalid schema key %q", key)
-		}
+		names = append(names, key)
 	}
 	raw, err := json.Marshal(spec)
 	if err != nil {
 		return fmt.Errorf("marshal spec: %w", err)
+	}
+	return checkOpenAPIKeys(names, raw)
+}
+
+func checkOpenAPIKeys(names []string, raw []byte) error {
+	for _, key := range names {
+		if !openAPIComponentKeyPattern.MatchString(key) {
+			return fmt.Errorf("invalid schema key %q", key)
+		}
 	}
 	var decoded any
 	if err := json.Unmarshal(raw, &decoded); err != nil {
@@ -80,12 +88,16 @@ func checkOpenAPIComponentKeys(spec *huma.OpenAPI) error {
 		}
 	}
 	walk(decoded)
+	present := make(map[string]struct{}, len(names))
+	for _, key := range names {
+		present[key] = struct{}{}
+	}
 	for _, ref := range refs {
 		const prefix = "#/components/schemas/"
 		if !strings.HasPrefix(ref, prefix) {
 			continue
 		}
-		if _, ok := spec.Components.Schemas.Map()[strings.TrimPrefix(ref, prefix)]; !ok {
+		if _, ok := present[strings.TrimPrefix(ref, prefix)]; !ok {
 			return fmt.Errorf("dangling schema reference %q", ref)
 		}
 	}
