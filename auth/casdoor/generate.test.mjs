@@ -28,7 +28,7 @@ test('requires explicit distinct secrets and HTTPS outside loopback', () => {
   assert.equal(settingsFromEnv({ ...env, CASDOOR_PUBLIC_URL: 'https://auth.example.test/' }).publicUrl, 'https://auth.example.test');
 });
 
-test('seeds one normal user, code/refresh grants, sessions, passkeys, and a fresh cert', () => {
+test('seeds one normal user, code/refresh/device grants, sessions, passkeys, and a fresh cert', () => {
   const settings = settingsFromEnv(env);
   const seed = buildSeed(settings);
   assert.equal(seed.users.length, 1);
@@ -37,7 +37,7 @@ test('seeds one normal user, code/refresh grants, sessions, passkeys, and a fres
   assert.ok(seed.users.every((user) => user.owner === 'waypoint' && !user.isAdmin));
   assert.deepEqual(seed.organizations[0].passwordOptions, ['AtLeast8']);
   const app = seed.applications.find((app) => app.name === 'waypoint');
-  assert.deepEqual(app.grantTypes, ['authorization_code', 'refresh_token']);
+  assert.deepEqual(app.grantTypes, ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code']);
   assert.equal(app.backchannelLogoutUri, 'http://localhost:5178/v1/auth/backchannel-logout');
   assert.equal(app.tokenFormat, 'JWT-Standard');
   assert.equal(app.refreshExpireInHours, 720);

@@ -31,7 +31,7 @@ function service({ override = {}, accountOverride = {}, mutate = (app) => app, r
   let app = {
     owner: 'admin', name: 'waypoint', organization: 'waypoint', clientId: target.clientId,
     clientSecret: '***', redirectUris: ['https://app.example.test/v1/auth/callback'],
-    grantTypes: ['authorization_code', 'refresh_token'], tokenSigningMethod: 'RS256',
+    grantTypes: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code'], tokenSigningMethod: 'RS256',
     cert: 'existing-signing-key', expireInHours: 1, enableWebAuthn: true,
     signinItems: [{ name: 'Username', visible: true }], ...override,
   };
@@ -90,7 +90,7 @@ test('updates sparse presentation fields, preserves OIDC settings, backs up priv
     const fake = service();
     assert.deepEqual(await applyBranding(plan, { ...options, request: fake.request }), { changed: true });
     assert.equal(fake.app().cert, 'existing-signing-key');
-    assert.deepEqual(fake.app().grantTypes, ['authorization_code', 'refresh_token']);
+    assert.deepEqual(fake.app().grantTypes, ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code']);
     assert.equal(fake.app().enableWebAuthn, true);
     assert.equal(fake.app().title, 'Waypoint account');
     const backup = await readFile(options.backupFile, 'utf8');
