@@ -9,33 +9,13 @@ import (
 
 var errGrantRevoked = errors.New("provider grant was revoked")
 
-// Provider credentials stay in the private identity database, never in cookies.
+// Provider credentials stay in identity tables in the app database, never in cookies.
 // An application session holds only an opaque grant reference.
 type grant struct {
 	ID, Issuer, Subject, SID, Name, Nonce string
 	AccessToken, RefreshToken, IDToken    string
 	LoginStartedAt, TokenExpiry           int64
 	CheckedAt, Expiry                     int64
-}
-
-func (s *sessionStore) initGrants() error {
-	_, err := s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS identity_grants (
-			id TEXT PRIMARY KEY, issuer TEXT NOT NULL, subject TEXT NOT NULL,
-			sid TEXT NOT NULL, expiry INTEGER NOT NULL, data BLOB NOT NULL
-		);
-		CREATE INDEX IF NOT EXISTS identity_grant_subject ON identity_grants(issuer, subject, sid);
-		CREATE TABLE IF NOT EXISTS identity_logout_marks (
-			issuer TEXT NOT NULL, kind TEXT NOT NULL, identifier TEXT NOT NULL,
-			seen_at INTEGER NOT NULL, expiry INTEGER NOT NULL,
-			PRIMARY KEY(issuer, kind, identifier)
-		);
-		CREATE TABLE IF NOT EXISTS identity_logout_tokens (
-			issuer TEXT NOT NULL, jti TEXT NOT NULL, expiry INTEGER NOT NULL,
-			PRIMARY KEY(issuer, jti)
-		);
-	`)
-	return err
 }
 
 func (s *sessionStore) createGrant(g grant) error {

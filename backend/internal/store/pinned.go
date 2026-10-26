@@ -17,7 +17,7 @@ import (
 // in the same transaction, so pins never dangle.
 // ListPinnedEvaluations returns pinned evaluation instance IDs in pin order.
 func (s *sqliteStore) ListPinnedEvaluations() ([]string, error) {
-	rows, err := s.db.Query(`SELECT instance_id FROM pinned_evaluations ORDER BY position`)
+	rows, err := s.db.Query(`SELECT instance_id FROM pinned_evaluations WHERE plan_id = :plan_id ORDER BY position`)
 	if err != nil {
 		return nil, fmt.Errorf("list pinned evaluations: %w", err)
 	}
@@ -37,9 +37,9 @@ func (s *sqliteStore) ListPinnedEvaluations() ([]string, error) {
 }
 
 // evaluationExists reports whether an evaluation instance is present.
-func evaluationExists(tx *sql.Tx, instanceID string) (bool, error) {
+func evaluationExists(tx *planTx, instanceID string) (bool, error) {
 	var present int
-	if err := tx.QueryRow(`SELECT 1 FROM evaluations WHERE instance_id = ?`, instanceID).Scan(&present); err != nil {
+	if err := tx.QueryRow(`SELECT 1 FROM evaluations WHERE instance_id = ? AND plan_id = :plan_id`, instanceID).Scan(&present); err != nil {
 		if err == sql.ErrNoRows {
 			return false, nil
 		}
@@ -79,11 +79,11 @@ func (s *sqliteStore) SetPinnedEvaluations(ids []string) ([]string, error) {
 			return nil, &rowError{code: "not-found", id: id}
 		}
 	}
-	if _, err := tx.Exec(`DELETE FROM pinned_evaluations`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM pinned_evaluations WHERE plan_id = :plan_id`); err != nil {
 		return nil, fmt.Errorf("replace pinned evaluations: %w", err)
 	}
 	for position, id := range ordered {
-		if _, err := tx.Exec(`INSERT INTO pinned_evaluations (instance_id, position) VALUES (?,?)`, id, position); err != nil {
+		if _, err := tx.Exec(`INSERT INTO pinned_evaluations (instance_id, position, plan_id) VALUES (?,?, :plan_id)`, id, position); err != nil {
 			return nil, fmt.Errorf("pin evaluation %s: %w", id, err)
 		}
 	}

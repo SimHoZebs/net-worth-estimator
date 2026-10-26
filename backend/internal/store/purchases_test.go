@@ -53,6 +53,7 @@ func TestPurchasePolicyPersistsWithPosting(t *testing.T) {
 		t.Fatal(err)
 	}
 	posting := testPostingFixture("01900000-0000-7000-8000-000000000021")
+	seedAccount(t, database, "checking")
 	posting.Purchase = &types.PurchasePolicy{Priority: 7}
 	if _, err := database.CreatePosting(posting); err != nil {
 		t.Fatal(err)

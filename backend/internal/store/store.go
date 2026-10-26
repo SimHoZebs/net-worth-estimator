@@ -1,7 +1,6 @@
 package store
 
 import (
-	"database/sql"
 	"fmt"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -18,15 +17,17 @@ import (
 // suite (RunConformance) to prove it.
 //
 // Contract notes for implementers:
+//   - Every operation belongs to one immutable plan scope. There is no default
+//     private scope and no database-wide financial operation.
 //   - Writes are single-threaded by the caller discipline (one server, one
 //     instance); the backend must still serialize concurrent writes safely.
 //   - Readers always see the latest committed state (no stale replicas).
 //   - SQL must stay portable: plain DDL/DML plus ON CONFLICT only. No
-//     SQLite pragmas, extensions, or file assumptions outside Open.
+//     SQLite pragmas, extensions, or file assumptions outside database setup.
 //   - A fresh backend reports DocumentExists() == false. InitializeDocument
-//     activates an empty model without replacing existing data. Open only
-//     ensures the schema itself.
-//   - Clear resets all persisted state; the conformance suite relies on it.
+//     activates an empty model without replacing existing data.
+//   - Clear resets this plan's model, sync state, settings, and artifacts. It
+//     preserves amount presets, plan ownership, other plans, and identity state.
 type Store interface {
 	LoadDocument() (*types.FinancialModelDocument, error)
 	DocumentExists() (bool, error)
@@ -81,28 +82,34 @@ type Store interface {
 // sqliteStore is the embedded-SQLite Store implementation. Pure-Go driver
 // (modernc), single file, WAL mode, one open connection.
 type sqliteStore struct {
-	db *sql.DB
+	db    *planDB
+	owned *Database
 }
 
-// Open opens (creating if needed) the SQLite database and ensures the
-// current schema. It returns the Store interface so callers never name the
-// implementation. The preceding posting identity schema upgrades atomically.
+// Open creates or opens an explicit plans/fixture scope for isolated tests
+// and fixture tools. Runtime callers must use OpenDatabase. Legacy unscoped
+// databases require offline migration and are never converted here.
 func Open(path string) (Store, error) {
-	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
+	db, err := SetupDatabase(path)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
-	db.SetMaxOpenConns(1) // single-writer discipline; reads are cheap at this scale
-	store := &sqliteStore{db: db}
-	if err := store.ensureSchema(); err != nil {
+	store, err := db.ensurePlan("plans/fixture", "fixture", "", "", "")
+	if err != nil {
 		db.Close()
 		return nil, err
 	}
+	store.(*sqliteStore).owned = db
 	return store, nil
 }
 
-// Close closes the database.
-func (s *sqliteStore) Close() error { return s.db.Close() }
+// Close releases an owned fixture database. Shared plan handles never close it.
+func (s *sqliteStore) Close() error {
+	if s.owned != nil {
+		return s.owned.Close()
+	}
+	return nil
+}
 
 // Clear removes all canonical model rows (used by tests/import).
 func (s *sqliteStore) Clear() error {

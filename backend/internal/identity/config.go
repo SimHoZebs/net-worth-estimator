@@ -3,6 +3,7 @@ package identity
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -14,17 +15,19 @@ import (
 type Config struct {
 	Provider, Issuer, InternalURL, ClientID, ClientSecret string
 	PublicURL, AccountURL, SessionDB                      string
-	Lifetime                                              time.Duration
-	RecheckInterval                                       time.Duration
-	ResolveAccess                                         func(context.Context, string) (authorization.Scope, error)
-	RequireResourceHeader                                 bool
+	// Database is the application-owned connection. SessionDB is test-only fallback.
+	Database              *sql.DB
+	Lifetime              time.Duration
+	RecheckInterval       time.Duration
+	ResolveAccess         func(context.Context, string) (authorization.Scope, error)
+	RequireResourceHeader bool
 	// BrowserOrigins maps additional app origins to browser-facing Casdoor origins.
 	// Issuer and InternalURL remain the server-side identity and transport boundary.
 	BrowserOrigins map[string]string
 }
 
 // FromEnv keeps identity configuration separate from financial-server settings.
-func FromEnv(getenv func(string) string, databasePath string) (Config, error) {
+func FromEnv(getenv func(string) string) (Config, error) {
 	c := Config{
 		Provider:     getenv("NET_WORTH_ESTIMATOR_AUTH_PROVIDER"),
 		Issuer:       getenv("NET_WORTH_ESTIMATOR_AUTH_ISSUER"),
@@ -33,7 +36,7 @@ func FromEnv(getenv func(string) string, databasePath string) (Config, error) {
 		ClientSecret: getenv("NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET"),
 		PublicURL:    getenv("NET_WORTH_ESTIMATOR_PUBLIC_URL"),
 		AccountURL:   getenv("NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL"),
-		SessionDB:    databasePath + ".sessions", Lifetime: 7 * 24 * time.Hour, RecheckInterval: 30 * time.Second,
+		Lifetime:     7 * 24 * time.Hour, RecheckInterval: 30 * time.Second,
 		RequireResourceHeader: true,
 	}
 	if getenv("NET_WORTH_ESTIMATOR_AUTH_TOKEN") != "" {
@@ -46,7 +49,7 @@ func FromEnv(getenv func(string) string, databasePath string) (Config, error) {
 		return c, fmt.Errorf("AUTH_PROVIDER must be casdoor; unauthenticated server mode is retired")
 	}
 	if v := getenv("NET_WORTH_ESTIMATOR_AUTH_SESSION_DB"); v != "" {
-		c.SessionDB = v
+		return c, fmt.Errorf("AUTH_SESSION_DB is retired; migrate identity state into the application database")
 	}
 	if v := getenv("NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME"); v != "" {
 		d, err := time.ParseDuration(v)

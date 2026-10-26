@@ -12,7 +12,7 @@ import (
 // Amount presets are saved amount recipes. They live outside the canonical
 // financial model document, so they never affect the document ETag,
 // validation, or the row-sync diff — exactly like pinned evaluations.
-// Table definition and seed rows live in schema.go (ensureSchema);
+// Table definition and seed rows live in schema.go (SetupDatabase);
 // this file owns only preset row methods.
 // Preset writes run in their own transaction and never mark the model
 // document present: saving a preset into an empty database must not fake
@@ -26,7 +26,7 @@ import (
 
 // ListAmountPresets returns presets in stored order.
 func (s *sqliteStore) ListAmountPresets() ([]types.AmountPreset, error) {
-	rows, err := s.db.Query(`SELECT id, name, label, summary, when_use, amount_json, enabled FROM amount_presets ORDER BY position`)
+	rows, err := s.db.Query(`SELECT id, name, label, summary, when_use, amount_json, enabled FROM amount_presets WHERE plan_id = :plan_id ORDER BY position`)
 	if err != nil {
 		return nil, fmt.Errorf("list amount presets: %w", err)
 	}
@@ -67,7 +67,7 @@ func scanPresetRow(rows *sql.Rows) (types.AmountPreset, error) {
 }
 
 // presetTx runs a preset write without marking the model document present.
-func presetTx(db *sql.DB, fn func(tx *sql.Tx) error) error {
+func presetTx(db *planDB, fn func(tx *planTx) error) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -82,13 +82,13 @@ func presetTx(db *sql.DB, fn func(tx *sql.Tx) error) error {
 	return nil
 }
 
-func insertPreset(tx *sql.Tx, position int, preset *types.AmountPreset) error {
+func insertPreset(tx *planTx, position int, preset *types.AmountPreset) error {
 	amountJSON, err := json.Marshal(preset.Amount)
 	if err != nil {
 		return fmt.Errorf("marshal preset amount %s: %w", preset.ID, err)
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO amount_presets (id, position, name, label, summary, when_use, amount_json, enabled) VALUES (?,?,?,?,?,?,?,?)`,
+		`INSERT INTO amount_presets (id, position, name, label, summary, when_use, amount_json, enabled, plan_id) VALUES (?,?,?,?,?,?,?,?, :plan_id)`,
 		preset.ID, position, preset.Name, preset.Label, preset.Summary, preset.WhenUse, string(amountJSON), boolToInt(preset.Enabled),
 	); err != nil {
 		if isUniqueViolation(err) {
@@ -112,7 +112,7 @@ func (s *sqliteStore) CreateAmountPreset(preset types.AmountPreset) (types.Amoun
 		}
 		preset.ID = id
 	}
-	err := presetTx(s.db, func(tx *sql.Tx) error {
+	err := presetTx(s.db, func(tx *planTx) error {
 		position, err := nextTablePosition(tx, "amount_presets")
 		if err != nil {
 			return err
@@ -134,10 +134,10 @@ func (s *sqliteStore) UpdateAmountPreset(preset types.AmountPreset) (types.Amoun
 	if err := ValidateAmountPresetName(preset.Name); err != nil {
 		return types.AmountPreset{}, err
 	}
-	err := presetTx(s.db, func(tx *sql.Tx) error {
+	err := presetTx(s.db, func(tx *planTx) error {
 		var position int
 		var storedName string
-		if err := tx.QueryRow(`SELECT position, name FROM amount_presets WHERE id = ?`, preset.ID).Scan(&position, &storedName); err != nil {
+		if err := tx.QueryRow(`SELECT position, name FROM amount_presets WHERE id = ? AND plan_id = :plan_id`, preset.ID).Scan(&position, &storedName); err != nil {
 			if err == sql.ErrNoRows {
 				return &rowError{code: "not-found", id: preset.ID}
 			}
@@ -146,7 +146,7 @@ func (s *sqliteStore) UpdateAmountPreset(preset types.AmountPreset) (types.Amoun
 		if preset.Name != storedName {
 			return fmt.Errorf("amount preset %s name is immutable", preset.ID)
 		}
-		if _, err := tx.Exec(`DELETE FROM amount_presets WHERE id = ?`, preset.ID); err != nil {
+		if _, err := tx.Exec(`DELETE FROM amount_presets WHERE id = ? AND plan_id = :plan_id`, preset.ID); err != nil {
 			return fmt.Errorf("replace amount preset %s: %w", preset.ID, err)
 		}
 		return insertPreset(tx, position, &preset)
@@ -159,8 +159,8 @@ func (s *sqliteStore) UpdateAmountPreset(preset types.AmountPreset) (types.Amoun
 
 // DeleteAmountPreset removes one preset.
 func (s *sqliteStore) DeleteAmountPreset(id string) error {
-	return presetTx(s.db, func(tx *sql.Tx) error {
-		result, err := tx.Exec(`DELETE FROM amount_presets WHERE id = ?`, id)
+	return presetTx(s.db, func(tx *planTx) error {
+		result, err := tx.Exec(`DELETE FROM amount_presets WHERE id = ? AND plan_id = :plan_id`, id)
 		if err != nil {
 			return fmt.Errorf("delete amount preset %s: %w", id, err)
 		}
@@ -177,7 +177,7 @@ func (s *sqliteStore) DeleteAmountPreset(id string) error {
 
 // MoveAmountPreset positions one preset before another (or appends).
 func (s *sqliteStore) MoveAmountPreset(id, beforeID string) error {
-	return presetTx(s.db, func(tx *sql.Tx) error {
+	return presetTx(s.db, func(tx *planTx) error {
 		return moveRow(tx, RowPreset, "", id, beforeID)
 	})
 }

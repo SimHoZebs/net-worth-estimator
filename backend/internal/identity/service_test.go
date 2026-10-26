@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
 type testIDP struct {
@@ -155,6 +156,15 @@ func newService(t *testing.T, p *testIDP, path string, options ...func(*Config))
 	}
 	for _, option := range options {
 		option(&config)
+	}
+	if config.Database == nil && config.SessionDB != "" {
+		database, err := store.SetupDatabase(config.SessionDB)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := database.Close(); err != nil {
+			t.Fatal(err)
+		}
 	}
 	s, err := New(context.Background(), config)
 	if err != nil {
@@ -352,6 +362,13 @@ func TestAccountAccessSessionsAndCSRF(t *testing.T) {
 func TestSessionStorePersistsHashesAndExpires(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sessions.db")
 	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	database, err := store.SetupDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Close(); err != nil {
 		t.Fatal(err)
 	}
 	s, err := openSessions(path)

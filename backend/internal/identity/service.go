@@ -63,7 +63,12 @@ func New(ctx context.Context, c Config) (*Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("discover identity provider: %w", err)
 	}
-	store, err := openSessions(c.SessionDB)
+	var store *sessionStore
+	if c.Database != nil {
+		store, err = sharedSessions(c.Database)
+	} else {
+		store, err = openSessions(c.SessionDB)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("open sessions: %w", err)
 	}
@@ -89,11 +94,11 @@ func New(ctx context.Context, c Config) (*Service, error) {
 		BackchannelSupported  bool   `json:"backchannel_logout_supported"`
 	}
 	if err := provider.Claims(&metadata); err != nil {
-		store.db.Close()
+		store.Close()
 		return nil, err
 	}
 	if metadata.IntrospectionEndpoint == "" || !metadata.BackchannelSupported {
-		store.db.Close()
+		store.Close()
 		return nil, fmt.Errorf("identity provider must support token introspection and back-channel logout")
 	}
 	service := &Service{config: c, browsers: browsers, sessions: sm, store: store, provider: provider, client: client, logoutEndpoint: metadata.EndSessionEndpoint, introspection: metadata.IntrospectionEndpoint, csrf: csrf,
@@ -102,7 +107,7 @@ func New(ctx context.Context, c Config) (*Service, error) {
 	return service, nil
 }
 
-func (s *Service) Close() error { return s.store.db.Close() }
+func (s *Service) Close() error { return s.store.Close() }
 
 type principalKey struct{}
 type Principal struct {

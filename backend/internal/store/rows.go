@@ -109,10 +109,10 @@ func newRowID() (string, error) {
 
 func utcToday() string { return time.Now().UTC().Format("2006-01-02") }
 
-// claimRowID reserves an ID in the shared registry. A conflict means the
-// ID exists in some ID-bearing table.
-func claimRowID(tx *sql.Tx, id, kind string) error {
-	if _, err := tx.Exec(`INSERT INTO entity_ids (id, kind) VALUES (?,?)`, id, kind); err != nil {
+// claimRowID reserves an ID in the plan's registry. A conflict means the
+// ID exists in an ID-bearing table in this same plan.
+func claimRowID(tx *planTx, id, kind string) error {
+	if _, err := tx.Exec(`INSERT INTO entity_ids (id, kind, plan_id) VALUES (?,?, :plan_id)`, id, kind); err != nil {
 		if isUniqueViolation(err) {
 			return &rowError{code: "id-conflict", id: id}
 		}
@@ -121,8 +121,8 @@ func claimRowID(tx *sql.Tx, id, kind string) error {
 	return nil
 }
 
-func releaseRowID(tx *sql.Tx, id string) error {
-	if _, err := tx.Exec(`DELETE FROM entity_ids WHERE id = ?`, id); err != nil {
+func releaseRowID(tx *planTx, id string) error {
+	if _, err := tx.Exec(`DELETE FROM entity_ids WHERE id = ? AND plan_id = :plan_id`, id); err != nil {
 		return fmt.Errorf("release row id %s: %w", id, err)
 	}
 	return nil
@@ -132,17 +132,17 @@ func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
-func markDocumentPresent(tx *sql.Tx) error {
-	if _, err := tx.Exec(`INSERT INTO model_metadata (id, source_path, document_present) VALUES (1, '', 1)
-		ON CONFLICT(id) DO UPDATE SET document_present = 1`); err != nil {
+func markDocumentPresent(tx *planTx) error {
+	if _, err := tx.Exec(`INSERT INTO model_metadata (id, source_path, document_present, plan_id) VALUES (1, '', 1, :plan_id)
+		ON CONFLICT(plan_id, id) DO UPDATE SET document_present = 1`); err != nil {
 		return fmt.Errorf("mark document present: %w", err)
 	}
 	return nil
 }
 
-func accountExists(tx *sql.Tx, id string) (bool, error) {
+func accountExists(tx *planTx, id string) (bool, error) {
 	var present int
-	if err := tx.QueryRow(`SELECT 1 FROM accounts WHERE id = ?`, id).Scan(&present); err != nil {
+	if err := tx.QueryRow(`SELECT 1 FROM accounts WHERE id = ? AND plan_id = :plan_id`, id).Scan(&present); err != nil {
 		if err == sql.ErrNoRows {
 			return false, nil
 		}
@@ -152,21 +152,21 @@ func accountExists(tx *sql.Tx, id string) (bool, error) {
 }
 
 // orderedIDs loads row IDs in stored order for a move operation.
-func orderedIDs(tx *sql.Tx, kind RowKind, evaluationType string) ([]string, error) {
+func orderedIDs(tx *planTx, kind RowKind, evaluationType string) ([]string, error) {
 	var query string
 	var args []any
 	switch kind {
 	case RowAccount:
-		query = `SELECT id FROM accounts ORDER BY position`
+		query = `SELECT id FROM accounts WHERE plan_id = :plan_id ORDER BY position`
 	case RowPosting:
-		query = `SELECT id FROM postings ORDER BY position`
+		query = `SELECT id FROM postings WHERE plan_id = :plan_id ORDER BY position`
 	case RowRule:
-		query = `SELECT id FROM recurrence_rules ORDER BY position`
+		query = `SELECT id FROM recurrence_rules WHERE plan_id = :plan_id ORDER BY position`
 	case RowEvaluation:
-		query = `SELECT instance_id FROM evaluations WHERE type = ? ORDER BY position`
+		query = `SELECT instance_id FROM evaluations WHERE type = ? AND plan_id = :plan_id ORDER BY position`
 		args = append(args, evaluationType)
 	case RowPreset:
-		query = `SELECT id FROM amount_presets ORDER BY position`
+		query = `SELECT id FROM amount_presets WHERE plan_id = :plan_id ORDER BY position`
 	default:
 		return nil, fmt.Errorf("move unsupported for %q", kind)
 	}
@@ -189,25 +189,25 @@ func orderedIDs(tx *sql.Tx, kind RowKind, evaluationType string) ([]string, erro
 	return ids, rows.Close()
 }
 
-func rewritePositions(tx *sql.Tx, kind RowKind, evaluationType string, ids []string) error {
+func rewritePositions(tx *planTx, kind RowKind, evaluationType string, ids []string) error {
 	for position, id := range ids {
 		var query string
 		var args []any
 		switch kind {
 		case RowAccount:
-			query = `UPDATE accounts SET position = ? WHERE id = ?`
+			query = `UPDATE accounts SET position = ? WHERE id = ? AND plan_id = :plan_id`
 			args = []any{position, id}
 		case RowPosting:
-			query = `UPDATE postings SET position = ? WHERE id = ?`
+			query = `UPDATE postings SET position = ? WHERE id = ? AND plan_id = :plan_id`
 			args = []any{position, id}
 		case RowRule:
-			query = `UPDATE recurrence_rules SET position = ? WHERE id = ?`
+			query = `UPDATE recurrence_rules SET position = ? WHERE id = ? AND plan_id = :plan_id`
 			args = []any{position, id}
 		case RowEvaluation:
-			query = `UPDATE evaluations SET position = ? WHERE type = ? AND instance_id = ?`
+			query = `UPDATE evaluations SET position = ? WHERE type = ? AND instance_id = ? AND plan_id = :plan_id`
 			args = []any{position, evaluationType, id}
 		case RowPreset:
-			query = `UPDATE amount_presets SET position = ? WHERE id = ?`
+			query = `UPDATE amount_presets SET position = ? WHERE id = ? AND plan_id = :plan_id`
 			args = []any{position, id}
 		default:
 			return fmt.Errorf("move unsupported for %q", kind)
@@ -221,7 +221,7 @@ func rewritePositions(tx *sql.Tx, kind RowKind, evaluationType string, ids []str
 
 // moveRow positions id immediately before beforeID (or appends when
 // beforeID is empty) within one ordered table.
-func moveRow(tx *sql.Tx, kind RowKind, evaluationType, id, beforeID string) error {
+func moveRow(tx *planTx, kind RowKind, evaluationType, id, beforeID string) error {
 	ids, err := orderedIDs(tx, kind, evaluationType)
 	if err != nil {
 		return err
@@ -258,7 +258,7 @@ func moveRow(tx *sql.Tx, kind RowKind, evaluationType, id, beforeID string) erro
 	return rewritePositions(tx, kind, evaluationType, kept)
 }
 
-func withRowTx(db *sql.DB, fn func(tx *sql.Tx) error) error {
+func withRowTx(db *planDB, fn func(tx *planTx) error) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -285,7 +285,7 @@ func (s *sqliteStore) CreateAccount(account types.Account) (types.Account, error
 		}
 		account.ID = id
 	}
-	err := withRowTx(s.db, func(tx *sql.Tx) error {
+	err := withRowTx(s.db, func(tx *planTx) error {
 		if err := claimRowID(tx, account.ID, "account"); err != nil {
 			return err
 		}
@@ -297,7 +297,7 @@ func (s *sqliteStore) CreateAccount(account types.Account) (types.Account, error
 		maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
 		color := nullable(account.Color)
 		if _, err := tx.Exec(
-			`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled) VALUES (?,?,?,?,?,?,?,?)`,
+			`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled, plan_id) VALUES (?,?,?,?,?,?,?,?, :plan_id)`,
 			account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled),
 		); err != nil {
 			return fmt.Errorf("insert account %s: %w", account.ID, err)
@@ -315,9 +315,9 @@ func (s *sqliteStore) UpdateAccount(account types.Account) (types.Account, error
 	if account.ID == "" {
 		return types.Account{}, &rowError{code: "not-found", id: ""}
 	}
-	err := withRowTx(s.db, func(tx *sql.Tx) error {
+	err := withRowTx(s.db, func(tx *planTx) error {
 		var position int
-		if err := tx.QueryRow(`SELECT position FROM accounts WHERE id = ?`, account.ID).Scan(&position); err != nil {
+		if err := tx.QueryRow(`SELECT position FROM accounts WHERE id = ? AND plan_id = :plan_id`, account.ID).Scan(&position); err != nil {
 			if err == sql.ErrNoRows {
 				return &rowError{code: "not-found", id: account.ID}
 			}
@@ -327,7 +327,7 @@ func (s *sqliteStore) UpdateAccount(account types.Account) (types.Account, error
 		maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
 		color := nullable(account.Color)
 		if _, err := tx.Exec(
-			`UPDATE accounts SET name = ?, kind = ?, min_balance = ?, max_balance = ?, color = ?, enabled = ? WHERE id = ?`,
+			`UPDATE accounts SET name = ?, kind = ?, min_balance = ?, max_balance = ?, color = ?, enabled = ? WHERE id = ? AND plan_id = :plan_id`,
 			account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled), account.ID,
 		); err != nil {
 			return fmt.Errorf("update account %s: %w", account.ID, err)
@@ -344,10 +344,12 @@ func (s *sqliteStore) UpdateAccount(account types.Account) (types.Account, error
 // links are kept: the link is the memory of the mapping, so recreating
 // the account restores sync flow, and the links endpoint keeps showing
 // the last-seen snapshot. Dependent rows are validated at the API layer
-// before this runs.
+// before this runs. Composite foreign keys also reject dangling financial
+// references when a caller bypasses API validation. Stale account links are
+// deliberate metadata and have no account-row foreign key.
 func (s *sqliteStore) DeleteAccount(id string) error {
-	return withRowTx(s.db, func(tx *sql.Tx) error {
-		result, err := tx.Exec(`DELETE FROM accounts WHERE id = ?`, id)
+	return withRowTx(s.db, func(tx *planTx) error {
+		result, err := tx.Exec(`DELETE FROM accounts WHERE id = ? AND plan_id = :plan_id`, id)
 		if err != nil {
 			return fmt.Errorf("delete account %s: %w", id, err)
 		}
@@ -364,15 +366,15 @@ func (s *sqliteStore) DeleteAccount(id string) error {
 
 // MoveAccount positions one account before another (or appends).
 func (s *sqliteStore) MoveAccount(id, beforeID string) error {
-	return withRowTx(s.db, func(tx *sql.Tx) error {
+	return withRowTx(s.db, func(tx *planTx) error {
 		return moveRow(tx, RowAccount, "", id, beforeID)
 	})
 }
 
 // postingSource reads the ownership of one posting.
-func postingSource(tx *sql.Tx, id string) (string, error) {
+func postingSource(tx *planTx, id string) (string, error) {
 	var source sql.NullString
-	if err := tx.QueryRow(`SELECT source FROM postings WHERE id = ?`, id).Scan(&source); err != nil {
+	if err := tx.QueryRow(`SELECT source FROM postings WHERE id = ? AND plan_id = :plan_id`, id).Scan(&source); err != nil {
 		if err == sql.ErrNoRows {
 			return "", &rowError{code: "not-found", id: id}
 		}
@@ -401,7 +403,7 @@ func (s *sqliteStore) CreatePosting(posting types.Posting) (types.Posting, error
 	posting.Source = SourceModel
 	posting.Pending = false
 	posting.ExecutionOrder = 0
-	err = withRowTx(s.db, func(tx *sql.Tx) error {
+	err = withRowTx(s.db, func(tx *planTx) error {
 		if err := claimRowID(tx, posting.ID, "posting"); err != nil {
 			return err
 		}
@@ -424,7 +426,7 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 	}
 	posting.Source = SourceModel
 	posting.Pending = false
-	err := withRowTx(s.db, func(tx *sql.Tx) error {
+	err := withRowTx(s.db, func(tx *planTx) error {
 		source, err := postingSource(tx, posting.ID)
 		if err != nil {
 			return err
@@ -433,10 +435,10 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 			return &rowError{code: "sync-owned", id: posting.ID}
 		}
 		var position int
-		if err := tx.QueryRow(`SELECT position, execution_order FROM postings WHERE id = ?`, posting.ID).Scan(&position, &posting.ExecutionOrder); err != nil {
+		if err := tx.QueryRow(`SELECT position, execution_order FROM postings WHERE id = ? AND plan_id = :plan_id`, posting.ID).Scan(&position, &posting.ExecutionOrder); err != nil {
 			return fmt.Errorf("read posting %s: %w", posting.ID, err)
 		}
-		if _, err := tx.Exec(`DELETE FROM postings WHERE id = ?`, posting.ID); err != nil {
+		if _, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND plan_id = :plan_id`, posting.ID); err != nil {
 			return fmt.Errorf("replace posting %s: %w", posting.ID, err)
 		}
 		return insertPosting(tx, position, &posting, SourceModel)
@@ -449,7 +451,7 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 
 // DeletePosting removes one owner posting. Sync-owned rows are refused.
 func (s *sqliteStore) DeletePosting(id string) error {
-	return withRowTx(s.db, func(tx *sql.Tx) error {
+	return withRowTx(s.db, func(tx *planTx) error {
 		source, err := postingSource(tx, id)
 		if err != nil {
 			return err
@@ -457,7 +459,7 @@ func (s *sqliteStore) DeletePosting(id string) error {
 		if source != SourceModel {
 			return &rowError{code: "sync-owned", id: id}
 		}
-		if _, err := tx.Exec(`DELETE FROM postings WHERE id = ?`, id); err != nil {
+		if _, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND plan_id = :plan_id`, id); err != nil {
 			return fmt.Errorf("delete posting %s: %w", id, err)
 		}
 		return releaseRowID(tx, id)
@@ -466,7 +468,7 @@ func (s *sqliteStore) DeletePosting(id string) error {
 
 // MovePosting positions one posting before another (or appends).
 func (s *sqliteStore) MovePosting(id, beforeID string) error {
-	return withRowTx(s.db, func(tx *sql.Tx) error {
+	return withRowTx(s.db, func(tx *planTx) error {
 		return moveRow(tx, RowPosting, "", id, beforeID)
 	})
 }
@@ -480,7 +482,7 @@ func (s *sqliteStore) CreateRule(rule types.RecurrenceRule) (types.RecurrenceRul
 		}
 		rule.ID = id
 	}
-	err := withRowTx(s.db, func(tx *sql.Tx) error {
+	err := withRowTx(s.db, func(tx *planTx) error {
 		if err := claimRowID(tx, rule.ID, "rule"); err != nil {
 			return err
 		}
@@ -501,15 +503,15 @@ func (s *sqliteStore) UpdateRule(rule types.RecurrenceRule) (types.RecurrenceRul
 	if rule.ID == "" {
 		return types.RecurrenceRule{}, &rowError{code: "not-found", id: ""}
 	}
-	err := withRowTx(s.db, func(tx *sql.Tx) error {
+	err := withRowTx(s.db, func(tx *planTx) error {
 		var position int
-		if err := tx.QueryRow(`SELECT position FROM recurrence_rules WHERE id = ?`, rule.ID).Scan(&position); err != nil {
+		if err := tx.QueryRow(`SELECT position FROM recurrence_rules WHERE id = ? AND plan_id = :plan_id`, rule.ID).Scan(&position); err != nil {
 			if err == sql.ErrNoRows {
 				return &rowError{code: "not-found", id: rule.ID}
 			}
 			return fmt.Errorf("read rule %s: %w", rule.ID, err)
 		}
-		if _, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ?`, rule.ID); err != nil {
+		if _, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND plan_id = :plan_id`, rule.ID); err != nil {
 			return fmt.Errorf("replace rule %s: %w", rule.ID, err)
 		}
 		return insertRule(tx, position, &rule)
@@ -522,8 +524,8 @@ func (s *sqliteStore) UpdateRule(rule types.RecurrenceRule) (types.RecurrenceRul
 
 // DeleteRule removes one recurrence rule.
 func (s *sqliteStore) DeleteRule(id string) error {
-	return withRowTx(s.db, func(tx *sql.Tx) error {
-		result, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ?`, id)
+	return withRowTx(s.db, func(tx *planTx) error {
+		result, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND plan_id = :plan_id`, id)
 		if err != nil {
 			return fmt.Errorf("delete rule %s: %w", id, err)
 		}
@@ -540,7 +542,7 @@ func (s *sqliteStore) DeleteRule(id string) error {
 
 // MoveRule positions one rule before another (or appends).
 func (s *sqliteStore) MoveRule(id, beforeID string) error {
-	return withRowTx(s.db, func(tx *sql.Tx) error {
+	return withRowTx(s.db, func(tx *planTx) error {
 		return moveRow(tx, RowRule, "", id, beforeID)
 	})
 }
@@ -549,14 +551,14 @@ func (s *sqliteStore) MoveRule(id, beforeID string) error {
 // write wins over a sync-owned row on the same key.
 func (s *sqliteStore) SaveCheckpoint(checkpoint types.Checkpoint) (types.Checkpoint, error) {
 	checkpoint.Source = SourceModel
-	err := withRowTx(s.db, func(tx *sql.Tx) error {
+	err := withRowTx(s.db, func(tx *planTx) error {
 		position, err := nextTablePosition(tx, "checkpoints")
 		if err != nil {
 			return err
 		}
 		result, err := tx.Exec(
-			`INSERT INTO checkpoints (position, date, account_id, balance, source) VALUES (?,?,?,?,?)
-			 ON CONFLICT(account_id, date) DO UPDATE SET balance = excluded.balance, source = excluded.source`,
+			`INSERT INTO checkpoints (position, date, account_id, balance, source, plan_id, id) VALUES (?,?,?,?,?, :plan_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE plan_id = :plan_id))
+			 ON CONFLICT(plan_id, account_id, date) DO UPDATE SET balance = excluded.balance, source = excluded.source`,
 			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceModel,
 		)
 		if err != nil {
@@ -574,8 +576,8 @@ func (s *sqliteStore) SaveCheckpoint(checkpoint types.Checkpoint) (types.Checkpo
 // DeleteCheckpoint removes the checkpoint row for one account/date,
 // regardless of owner. A deleted sync row returns on the next sync.
 func (s *sqliteStore) DeleteCheckpoint(accountID, date string) error {
-	return withRowTx(s.db, func(tx *sql.Tx) error {
-		result, err := tx.Exec(`DELETE FROM checkpoints WHERE account_id = ? AND date = ?`, accountID, date)
+	return withRowTx(s.db, func(tx *planTx) error {
+		result, err := tx.Exec(`DELETE FROM checkpoints WHERE account_id = ? AND date = ? AND plan_id = :plan_id`, accountID, date)
 		if err != nil {
 			return fmt.Errorf("delete checkpoint %s %s: %w", accountID, date, err)
 		}
@@ -609,7 +611,7 @@ type EvaluationUpdate struct {
 }
 
 // CreateEvaluation inserts one evaluation instance. Empty instance IDs
-// get a UUIDv7. Instance IDs share the global registry.
+// get a UUIDv7. Instance IDs share the plan's registry.
 func (s *sqliteStore) CreateEvaluation(item EvaluationUpdate) (EvaluationUpdate, error) {
 	if !validEvaluationType(item.Type) {
 		return EvaluationUpdate{}, fmt.Errorf("unknown evaluation type %q", item.Type)
@@ -624,12 +626,12 @@ func (s *sqliteStore) CreateEvaluation(item EvaluationUpdate) (EvaluationUpdate,
 	if item.Config == nil {
 		item.Config = map[string]any{}
 	}
-	err := withRowTx(s.db, func(tx *sql.Tx) error {
+	err := withRowTx(s.db, func(tx *planTx) error {
 		if err := claimRowID(tx, item.InstanceID, "evaluation"); err != nil {
 			return err
 		}
 		var position int
-		if err := tx.QueryRow(`SELECT COALESCE(MAX(position), -1) + 1 FROM evaluations WHERE type = ?`, item.Type).Scan(&position); err != nil {
+		if err := tx.QueryRow(`SELECT COALESCE(MAX(position), -1) + 1 FROM evaluations WHERE type = ? AND plan_id = :plan_id`, item.Type).Scan(&position); err != nil {
 			return fmt.Errorf("next evaluation position: %w", err)
 		}
 		return saveEvaluationTable(tx, item.Type, []evaluationRow{{
@@ -651,10 +653,10 @@ func (s *sqliteStore) UpdateEvaluation(item EvaluationUpdate) (EvaluationUpdate,
 	if item.Config == nil {
 		item.Config = map[string]any{}
 	}
-	err := withRowTx(s.db, func(tx *sql.Tx) error {
+	err := withRowTx(s.db, func(tx *planTx) error {
 		var position int
 		var storedType string
-		if err := tx.QueryRow(`SELECT type, position FROM evaluations WHERE instance_id = ?`, item.InstanceID).Scan(&storedType, &position); err != nil {
+		if err := tx.QueryRow(`SELECT type, position FROM evaluations WHERE instance_id = ? AND plan_id = :plan_id`, item.InstanceID).Scan(&storedType, &position); err != nil {
 			if err == sql.ErrNoRows {
 				return &rowError{code: "not-found", id: item.InstanceID}
 			}
@@ -668,7 +670,7 @@ func (s *sqliteStore) UpdateEvaluation(item EvaluationUpdate) (EvaluationUpdate,
 			return err
 		}
 		if _, err := tx.Exec(
-			`UPDATE evaluations SET name = ?, enabled = ?, config_json = ? WHERE instance_id = ?`,
+			`UPDATE evaluations SET name = ?, enabled = ?, config_json = ? WHERE instance_id = ? AND plan_id = :plan_id`,
 			item.Name, boolToInt(item.Enabled), configJSON, item.InstanceID,
 		); err != nil {
 			return fmt.Errorf("update evaluation %s: %w", item.InstanceID, err)
@@ -680,7 +682,7 @@ func (s *sqliteStore) UpdateEvaluation(item EvaluationUpdate) (EvaluationUpdate,
 	}
 	if item.Type == "" {
 		var storedType string
-		if err := s.db.QueryRow(`SELECT type FROM evaluations WHERE instance_id = ?`, item.InstanceID).Scan(&storedType); err != nil {
+		if err := s.db.QueryRow(`SELECT type FROM evaluations WHERE instance_id = ? AND plan_id = :plan_id`, item.InstanceID).Scan(&storedType); err != nil {
 			return EvaluationUpdate{}, err
 		}
 		item.Type = storedType
@@ -691,8 +693,8 @@ func (s *sqliteStore) UpdateEvaluation(item EvaluationUpdate) (EvaluationUpdate,
 // DeleteEvaluation removes one evaluation instance. Its pin, if any,
 // is dropped in the same transaction so pins never dangle.
 func (s *sqliteStore) DeleteEvaluation(instanceID string) error {
-	return withRowTx(s.db, func(tx *sql.Tx) error {
-		result, err := tx.Exec(`DELETE FROM evaluations WHERE instance_id = ?`, instanceID)
+	return withRowTx(s.db, func(tx *planTx) error {
+		result, err := tx.Exec(`DELETE FROM evaluations WHERE instance_id = ? AND plan_id = :plan_id`, instanceID)
 		if err != nil {
 			return fmt.Errorf("delete evaluation %s: %w", instanceID, err)
 		}
@@ -703,7 +705,7 @@ func (s *sqliteStore) DeleteEvaluation(instanceID string) error {
 		if affected == 0 {
 			return &rowError{code: "not-found", id: instanceID}
 		}
-		if _, err := tx.Exec(`DELETE FROM pinned_evaluations WHERE instance_id = ?`, instanceID); err != nil {
+		if _, err := tx.Exec(`DELETE FROM pinned_evaluations WHERE instance_id = ? AND plan_id = :plan_id`, instanceID); err != nil {
 			return fmt.Errorf("unpin evaluation %s: %w", instanceID, err)
 		}
 		return releaseRowID(tx, instanceID)
@@ -715,14 +717,14 @@ func (s *sqliteStore) MoveEvaluation(evalType, instanceID, beforeID string) erro
 	if !validEvaluationType(evalType) {
 		return fmt.Errorf("unknown evaluation type %q", evalType)
 	}
-	return withRowTx(s.db, func(tx *sql.Tx) error {
+	return withRowTx(s.db, func(tx *planTx) error {
 		return moveRow(tx, RowEvaluation, evalType, instanceID, beforeID)
 	})
 }
 
 // SavePaymentTerms upserts the terms row for one account.
 func (s *sqliteStore) SavePaymentTerms(terms types.PaymentTerms) (types.PaymentTerms, error) {
-	err := withRowTx(s.db, func(tx *sql.Tx) error {
+	err := withRowTx(s.db, func(tx *planTx) error {
 		position, err := nextTablePosition(tx, "payment_terms")
 		if err != nil {
 			return err
@@ -730,8 +732,8 @@ func (s *sqliteStore) SavePaymentTerms(terms types.PaymentTerms) (types.PaymentT
 		minimumPercent := nullable(terms.MinimumPercent)
 		statementDay := nullable(terms.StatementDay)
 		if _, err := tx.Exec(
-			`INSERT INTO payment_terms (account_id, position, minimum_fixed, minimum_percent, due_day, statement_day) VALUES (?,?,?,?,?,?)
-			 ON CONFLICT(account_id) DO UPDATE SET minimum_fixed = excluded.minimum_fixed, minimum_percent = excluded.minimum_percent,
+			`INSERT INTO payment_terms (account_id, position, minimum_fixed, minimum_percent, due_day, statement_day, plan_id) VALUES (?,?,?,?,?,?, :plan_id)
+			 ON CONFLICT(plan_id, account_id) DO UPDATE SET minimum_fixed = excluded.minimum_fixed, minimum_percent = excluded.minimum_percent,
 			 due_day = excluded.due_day, statement_day = excluded.statement_day`,
 			terms.AccountID, position, terms.MinimumFixed, minimumPercent, terms.DueDay, statementDay,
 		); err != nil {
@@ -747,8 +749,8 @@ func (s *sqliteStore) SavePaymentTerms(terms types.PaymentTerms) (types.PaymentT
 
 // DeletePaymentTerms removes the terms row for one account.
 func (s *sqliteStore) DeletePaymentTerms(accountID string) error {
-	return withRowTx(s.db, func(tx *sql.Tx) error {
-		result, err := tx.Exec(`DELETE FROM payment_terms WHERE account_id = ?`, accountID)
+	return withRowTx(s.db, func(tx *planTx) error {
+		result, err := tx.Exec(`DELETE FROM payment_terms WHERE account_id = ? AND plan_id = :plan_id`, accountID)
 		if err != nil {
 			return fmt.Errorf("delete payment terms %s: %w", accountID, err)
 		}
@@ -765,7 +767,7 @@ func (s *sqliteStore) DeletePaymentTerms(accountID string) error {
 
 // ListAccountLinks returns all bridge-to-model bindings.
 func (s *sqliteStore) ListAccountLinks() ([]AccountLink, error) {
-	rows, err := s.db.Query(`SELECT bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at FROM account_links ORDER BY bridge_account_id`)
+	rows, err := s.db.Query(`SELECT bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at FROM account_links WHERE plan_id = :plan_id ORDER BY bridge_account_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -797,7 +799,7 @@ func (s *sqliteStore) SaveAccountLink(link AccountLink) (AccountLink, error) {
 	if link.Origin != LinkOriginManual && link.Origin != LinkOriginAuto {
 		return AccountLink{}, fmt.Errorf("unknown link origin %q", link.Origin)
 	}
-	err := withRowTx(s.db, func(tx *sql.Tx) error {
+	err := withRowTx(s.db, func(tx *planTx) error {
 		exists, err := accountExists(tx, link.ModelAccountID)
 		if err != nil {
 			return err
@@ -806,8 +808,8 @@ func (s *sqliteStore) SaveAccountLink(link AccountLink) (AccountLink, error) {
 			return &rowError{code: "account-missing", id: link.ModelAccountID}
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO account_links (bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at) VALUES (?,?,?,?,?,?)
-			 ON CONFLICT(bridge_account_id) DO UPDATE SET model_account_id = excluded.model_account_id, bridge_name = excluded.bridge_name,
+			`INSERT INTO account_links (bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at, plan_id) VALUES (?,?,?,?,?,?, :plan_id)
+			 ON CONFLICT(plan_id, bridge_account_id) DO UPDATE SET model_account_id = excluded.model_account_id, bridge_name = excluded.bridge_name,
 			 currency = excluded.currency, origin = excluded.origin, last_seen_at = excluded.last_seen_at`,
 			link.BridgeAccountID, link.ModelAccountID, link.BridgeName, link.Currency, link.Origin, link.LastSeenAt,
 		); err != nil {
@@ -827,8 +829,8 @@ func (s *sqliteStore) SaveAccountLink(link AccountLink) (AccountLink, error) {
 // DeleteAccountLink removes one binding. Data stays; the bridge account
 // simply stops resolving until relinked.
 func (s *sqliteStore) DeleteAccountLink(bridgeAccountID string) error {
-	return withRowTx(s.db, func(tx *sql.Tx) error {
-		result, err := tx.Exec(`DELETE FROM account_links WHERE bridge_account_id = ?`, bridgeAccountID)
+	return withRowTx(s.db, func(tx *planTx) error {
+		result, err := tx.Exec(`DELETE FROM account_links WHERE bridge_account_id = ? AND plan_id = :plan_id`, bridgeAccountID)
 		if err != nil {
 			return fmt.Errorf("delete account link %s: %w", bridgeAccountID, err)
 		}
@@ -846,11 +848,11 @@ func (s *sqliteStore) DeleteAccountLink(bridgeAccountID string) error {
 // EnsureLinkedAccount resolves a bridge account to a model account,
 // provisioning both the account and an auto link when unknown. It runs
 // inside the caller's sync transaction so errors roll everything back.
-func EnsureLinkedAccount(tx *sql.Tx, bridgeAccountID, bridgeName, currency string, kind types.AccountKind) (string, bool, error) {
+func EnsureLinkedAccount(tx *planTx, bridgeAccountID, bridgeName, currency string, kind types.AccountKind) (string, bool, error) {
 	var modelAccountID string
-	if err := tx.QueryRow(`SELECT model_account_id FROM account_links WHERE bridge_account_id = ?`, bridgeAccountID).Scan(&modelAccountID); err == nil {
+	if err := tx.QueryRow(`SELECT model_account_id FROM account_links WHERE bridge_account_id = ? AND plan_id = :plan_id`, bridgeAccountID).Scan(&modelAccountID); err == nil {
 		if _, err := tx.Exec(
-			`UPDATE account_links SET bridge_name = ?, currency = ?, last_seen_at = ? WHERE bridge_account_id = ?`,
+			`UPDATE account_links SET bridge_name = ?, currency = ?, last_seen_at = ? WHERE bridge_account_id = ? AND plan_id = :plan_id`,
 			bridgeName, currency, utcToday(), bridgeAccountID,
 		); err != nil {
 			return "", false, fmt.Errorf("touch account link %s: %w", bridgeAccountID, err)
@@ -875,13 +877,13 @@ func EnsureLinkedAccount(tx *sql.Tx, bridgeAccountID, bridgeName, currency strin
 		name = "Synced account"
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled) VALUES (?,?,?,?,?,?,?,?)`,
+		`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled, plan_id) VALUES (?,?,?,?,?,?,?,?, :plan_id)`,
 		id, position, name, string(kind), types.NoFloor, types.NoCeiling, nil, 1,
 	); err != nil {
 		return "", false, fmt.Errorf("provision account for %s: %w", bridgeAccountID, err)
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO account_links (bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at) VALUES (?,?,?,?,?,?)`,
+		`INSERT INTO account_links (bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at, plan_id) VALUES (?,?,?,?,?,?, :plan_id)`,
 		bridgeAccountID, id, bridgeName, currency, LinkOriginAuto, utcToday(),
 	); err != nil {
 		return "", false, fmt.Errorf("link provisioned account %s: %w", bridgeAccountID, err)
@@ -890,9 +892,9 @@ func EnsureLinkedAccount(tx *sql.Tx, bridgeAccountID, bridgeName, currency strin
 }
 
 // TouchAccountLink refreshes the snapshot and last-seen date.
-func TouchAccountLink(tx *sql.Tx, bridgeAccountID, bridgeName, currency string) error {
+func TouchAccountLink(tx *planTx, bridgeAccountID, bridgeName, currency string) error {
 	if _, err := tx.Exec(
-		`UPDATE account_links SET bridge_name = ?, currency = ?, last_seen_at = ? WHERE bridge_account_id = ?`,
+		`UPDATE account_links SET bridge_name = ?, currency = ?, last_seen_at = ? WHERE bridge_account_id = ? AND plan_id = :plan_id`,
 		bridgeName, currency, utcToday(), bridgeAccountID,
 	); err != nil {
 		return fmt.Errorf("touch account link %s: %w", bridgeAccountID, err)

@@ -64,43 +64,31 @@ func main() {
 	}
 	host := envOr("HOST", "127.0.0.1")
 	dbPath := envOr("NET_WORTH_ESTIMATOR_DB", defaultDBPath())
-	if dir := filepath.Dir(dbPath); dir != "" && dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			log.Fatalf("create database directory %s: %v", dir, err)
-		}
-	}
 	frontendPath := envOr("NET_WORTH_ESTIMATOR_FRONTEND_PATH", "")
 	allowedOrigins, err := parseAllowedOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
 	if err != nil {
 		log.Fatalf("configure allowed origins: %v", err)
 	}
 	readOnly := parseReadOnly(os.Getenv("NET_WORTH_ESTIMATOR_READ_ONLY"))
-	identityConfig, err := identity.FromEnv(os.Getenv, dbPath)
+	identityConfig, err := identity.FromEnv(os.Getenv)
 	if err != nil {
 		log.Fatalf("configure identity: %v", err)
 	}
-	database, err := store.Open(dbPath)
+	database, err := store.OpenDatabase(dbPath)
 	if err != nil {
 		log.Fatalf("open store: %v", err)
 	}
 	defer database.Close()
 
-	exists, err := database.DocumentExists()
-	if err != nil {
-		log.Fatalf("check store: %v", err)
-	}
-	if !exists {
-		fmt.Println("no financial model stored: import one through Configs or cmd/importcsv")
-	}
-	resources, err := resourceConfigFromEnv(os.Getenv, dbPath)
+	resources, err := resourceConfigFromEnv(os.Getenv)
 	if err != nil {
 		log.Fatalf("configure plan resources: %v", err)
 	}
-	if exists && resources.OwnerSubject == "" {
-		log.Fatal("existing financial data requires NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT before authenticated startup")
+	syncStore, err := bridgeStore(database, identityConfig.Issuer, resources.OwnerSubject, os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL") != "")
+	if err != nil {
+		log.Fatalf("configure SimpleFIN plan: %v", err)
 	}
-
-	syncRunner, syncStop := configureSync(database)
+	syncRunner, syncStop := configureSync(syncStore)
 	defer syncStop()
 
 	apiConfig := api.Config{
@@ -109,7 +97,7 @@ func main() {
 		SyncRunner:     syncRunner,
 		FrontendDir:    frontendPath,
 	}
-	handler, closeResources, err := resourceHandler(context.Background(), database, dbPath, resources, identityConfig, apiConfig)
+	handler, closeResources, err := resourceHandler(context.Background(), database, resources, identityConfig, apiConfig)
 	if err != nil {
 		log.Fatalf("configure resource access: %v", err)
 	}

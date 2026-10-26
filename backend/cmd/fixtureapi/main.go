@@ -67,11 +67,18 @@ func main() {
 	modelPath := envOr("NET_WORTH_ESTIMATOR_MODEL_PATH", "public/configs")
 	allowedOrigins := splitOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
 
-	database, err := store.Open(dbPath)
-	if err != nil {
-		log.Fatalf("open store: %v", err)
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o700); err != nil {
+		log.Fatalf("create fixture directory: %v", err)
 	}
-	defer database.Close()
+	application, err := store.SetupDatabase(dbPath)
+	if err != nil {
+		log.Fatalf("open application database: %v", err)
+	}
+	defer application.Close()
+	database, err := application.EnsurePrivatePlan(fixtureResource.ID, "fixture-browser-test", "http://fixture.invalid", "browser-test")
+	if err != nil {
+		log.Fatalf("ensure fixture plan: %v", err)
+	}
 
 	readOnly := parseBool(os.Getenv("NET_WORTH_ESTIMATOR_READ_ONLY"))
 	// A reset must not interleave with an in-flight request holding the store.

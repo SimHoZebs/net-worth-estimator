@@ -29,51 +29,54 @@ func DocumentETag(document *types.FinancialModelDocument) (string, error) {
 	return fmt.Sprintf(`"sha256-%x"`, digest), nil
 }
 
-func deleteDocumentRows(tx *sql.Tx) error {
-	if _, err := tx.Exec(`DELETE FROM accounts`); err != nil {
+func deleteDocumentRows(tx *planTx) error {
+	if _, err := tx.Exec(`DELETE FROM accounts WHERE plan_id = :plan_id`); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM checkpoints`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM checkpoints WHERE plan_id = :plan_id`); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM postings`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM postings WHERE plan_id = :plan_id`); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM recurrence_rules`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM recurrence_rules WHERE plan_id = :plan_id`); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM evaluations`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM evaluations WHERE plan_id = :plan_id`); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM payment_terms`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM payment_terms WHERE plan_id = :plan_id`); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM pinned_evaluations`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM pinned_evaluations WHERE plan_id = :plan_id`); err != nil {
 		return err
 	}
 	return nil
 }
 
-func clearDocument(tx *sql.Tx) error {
-	if _, err := tx.Exec(`DELETE FROM safe_spending_settings`); err != nil {
+func clearDocument(tx *planTx) error {
+	if _, err := tx.Exec(`DELETE FROM safe_spending_settings WHERE plan_id = :plan_id`); err != nil {
 		return err
 	}
 	if err := deleteDocumentRows(tx); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`DELETE FROM entity_ids`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM entity_ids WHERE plan_id = :plan_id`); err != nil {
 		return fmt.Errorf("clear entity ids: %w", err)
 	}
-	if _, err := tx.Exec(`DELETE FROM posting_id_migrations`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM posting_id_migrations WHERE plan_id = :plan_id`); err != nil {
 		return fmt.Errorf("clear posting id history: %w", err)
 	}
-	if _, err := tx.Exec(`DELETE FROM account_links`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM account_links WHERE plan_id = :plan_id`); err != nil {
 		return fmt.Errorf("clear account links: %w", err)
 	}
-	if _, err := tx.Exec(`DELETE FROM sync_state`); err != nil {
+	if _, err := tx.Exec(`UPDATE sync_state SET last_sync_at = '' WHERE plan_id = :plan_id`); err != nil {
 		return fmt.Errorf("clear sync state: %w", err)
 	}
-	if _, err := tx.Exec(`UPDATE model_metadata SET source_path = '', document_present = 0 WHERE id = 1`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM projection_artifacts WHERE plan_id = :plan_id`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE model_metadata SET source_path = '', document_present = 0 WHERE id = 1 AND plan_id = :plan_id`); err != nil {
 		return fmt.Errorf("clear model metadata: %w", err)
 	}
 	return nil
@@ -81,7 +84,7 @@ func clearDocument(tx *sql.Tx) error {
 
 // replaceDocument is the seed/import path: it wholesale replaces owner
 // rows while preserving sync-owned rows. Runtime writes use row CRUD.
-func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
+func replaceDocument(tx *planTx, document *types.FinancialModelDocument) error {
 	// Invariant: bank lines survive your saves. Sync-owned rows are managed
 	// only by the sync, never by seed payloads: snapshot them, ignore
 	// incoming copies of those identities, then re-merge. Incoming
@@ -147,7 +150,7 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 		maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
 		color := nullable(account.Color)
 		if _, err := tx.Exec(
-			`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled) VALUES (?,?,?,?,?,?,?,?)`,
+			`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled, plan_id) VALUES (?,?,?,?,?,?,?,?, :plan_id)`,
 			account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled),
 		); err != nil {
 			return fmt.Errorf("insert account %s: %w", account.ID, err)
@@ -181,7 +184,7 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 		return err
 	}
 	if _, err := tx.Exec(
-		`UPDATE model_metadata SET source_path = ?, document_present = 1 WHERE id = 1`,
+		`UPDATE model_metadata SET source_path = ?, document_present = 1 WHERE id = 1 AND plan_id = :plan_id`,
 		document.SourcePath,
 	); err != nil {
 		return fmt.Errorf("save model metadata: %w", err)
@@ -189,9 +192,9 @@ func replaceDocument(tx *sql.Tx, document *types.FinancialModelDocument) error {
 	return nil
 }
 
-func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source string) error {
+func insertPosting(tx *planTx, position int, posting *types.Posting, source string) error {
 	if posting.ExecutionOrder == 0 {
-		if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) + 1 FROM postings`).Scan(&posting.ExecutionOrder); err != nil {
+		if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) + 1 FROM postings WHERE plan_id = :plan_id`).Scan(&posting.ExecutionOrder); err != nil {
 			return fmt.Errorf("allocate posting execution order: %w", err)
 		}
 	}
@@ -214,8 +217,8 @@ func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source stri
 		claimOccurrenceDate = posting.Claim.OccurrenceDate
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order, plan_id)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, :plan_id)`,
 		posting.ID, position, posting.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
 		posting.PostedTime, posting.TransactionTime, claimRuleID, claimOccurrenceDate, boolToInt(posting.Enabled), source, boolToInt(source != SourceModel && posting.Pending), posting.ExecutionOrder,
 	); err != nil {
@@ -224,7 +227,7 @@ func insertPosting(tx *sql.Tx, position int, posting *types.Posting, source stri
 	return insertPurchasePolicy(tx, posting)
 }
 
-func insertRule(tx *sql.Tx, position int, rule *types.RecurrenceRule) error {
+func insertRule(tx *planTx, position int, rule *types.RecurrenceRule) error {
 	destinationsJSON := []byte("null")
 	if rule.Destinations != nil {
 		var err error
@@ -241,8 +244,8 @@ func insertRule(tx *sql.Tx, position int, rule *types.RecurrenceRule) error {
 	endDate := nullable(rule.EndDate)
 	annualCap := nullable(rule.AnnualCap)
 	if _, err := tx.Exec(
-		`INSERT INTO recurrence_rules (id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`INSERT INTO recurrence_rules (id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled, plan_id)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?, :plan_id)`,
 		rule.ID, position, rule.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
 		string(rule.Frequency),
 		rule.StartDate, endDate, annualCap, rule.Priority, boolToInt(rule.Enabled),
@@ -252,12 +255,12 @@ func insertRule(tx *sql.Tx, position int, rule *types.RecurrenceRule) error {
 	return nil
 }
 
-func savePaymentTerms(tx *sql.Tx, terms []types.PaymentTerms) error {
+func savePaymentTerms(tx *planTx, terms []types.PaymentTerms) error {
 	for position, term := range terms {
 		minimumPercent := nullable(term.MinimumPercent)
 		statementDay := nullable(term.StatementDay)
 		if _, err := tx.Exec(
-			`INSERT INTO payment_terms (account_id, position, minimum_fixed, minimum_percent, due_day, statement_day) VALUES (?,?,?,?,?,?)`,
+			`INSERT INTO payment_terms (account_id, position, minimum_fixed, minimum_percent, due_day, statement_day, plan_id) VALUES (?,?,?,?,?,?, :plan_id)`,
 			term.AccountID, position, term.MinimumFixed, minimumPercent, term.DueDay, statementDay,
 		); err != nil {
 			return fmt.Errorf("insert payment terms %s: %w", term.AccountID, err)
@@ -361,14 +364,14 @@ type evaluationRow struct {
 	configValue types.JsonValue
 }
 
-func saveEvaluationTable(tx *sql.Tx, evaluationType string, rows []evaluationRow) error {
+func saveEvaluationTable(tx *planTx, evaluationType string, rows []evaluationRow) error {
 	for _, row := range rows {
 		configJSON, err := json.Marshal(row.configValue)
 		if err != nil {
 			return fmt.Errorf("marshal config %s: %w", row.instanceID, err)
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO evaluations (type, instance_id, position, name, enabled, config_json) VALUES (?,?,?,?,?,?)`,
+			`INSERT INTO evaluations (type, instance_id, position, name, enabled, config_json, plan_id) VALUES (?,?,?,?,?,?, :plan_id)`,
 			evaluationType, row.instanceID, row.position, row.name, boolToInt(row.enabled), string(configJSON),
 		); err != nil {
 			return fmt.Errorf("insert evaluation %s: %w", row.instanceID, err)
@@ -397,7 +400,7 @@ func (s *sqliteStore) LoadDocument() (*types.FinancialModelDocument, error) {
 func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 	var sourcePath string
 	var documentPresent int
-	if err := q.QueryRow(`SELECT source_path, document_present FROM model_metadata WHERE id = 1`).Scan(&sourcePath, &documentPresent); err != nil {
+	if err := q.QueryRow(`SELECT source_path, document_present FROM model_metadata WHERE id = 1 AND plan_id = :plan_id`).Scan(&sourcePath, &documentPresent); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -410,7 +413,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		SourcePath:  sourcePath,
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	accountRows, err := q.Query(`SELECT id, name, kind, min_balance, max_balance, color, enabled FROM accounts ORDER BY position`)
+	accountRows, err := q.Query(`SELECT id, name, kind, min_balance, max_balance, color, enabled FROM accounts WHERE plan_id = :plan_id ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -454,7 +457,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close accounts: %w", err)
 	}
 
-	checkpointRows, err := q.Query(`SELECT date, account_id, balance, source FROM checkpoints ORDER BY position`)
+	checkpointRows, err := q.Query(`SELECT date, account_id, balance, source FROM checkpoints WHERE plan_id = :plan_id ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +477,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close checkpoints: %w", err)
 	}
 
-	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order FROM postings ORDER BY position`)
+	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order FROM postings WHERE plan_id = :plan_id ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -497,7 +500,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, err
 	}
 
-	ruleRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules ORDER BY position`)
+	ruleRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules WHERE plan_id = :plan_id ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -517,7 +520,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close recurrence rules: %w", err)
 	}
 
-	evaluationRows, err := q.Query(`SELECT type, instance_id, name, enabled, config_json FROM evaluations ORDER BY type, position`)
+	evaluationRows, err := q.Query(`SELECT type, instance_id, name, enabled, config_json FROM evaluations WHERE plan_id = :plan_id ORDER BY type, position`)
 	if err != nil {
 		return nil, err
 	}
@@ -546,7 +549,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close evaluations: %w", err)
 	}
 
-	termRows, err := q.Query(`SELECT account_id, minimum_fixed, minimum_percent, due_day, statement_day FROM payment_terms ORDER BY position`)
+	termRows, err := q.Query(`SELECT account_id, minimum_fixed, minimum_percent, due_day, statement_day FROM payment_terms WHERE plan_id = :plan_id ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}
@@ -597,7 +600,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 // DocumentExists reports whether any canonical rows are present.
 func (s *sqliteStore) DocumentExists() (bool, error) {
 	var present int
-	row := s.db.QueryRow(`SELECT document_present FROM model_metadata WHERE id = 1`)
+	row := s.db.QueryRow(`SELECT document_present FROM model_metadata WHERE id = 1 AND plan_id = :plan_id`)
 	if err := row.Scan(&present); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil

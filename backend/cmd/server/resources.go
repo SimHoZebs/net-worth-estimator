@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
@@ -16,33 +14,24 @@ import (
 )
 
 type resourceConfig struct {
-	OwnerSubject, PrivateDir, SampleDB, ModelID string
+	OwnerSubject, ModelID string
 }
 
-func resourceConfigFromEnv(getenv func(string) string, dbPath string) (resourceConfig, error) {
+func resourceConfigFromEnv(getenv func(string) string) (resourceConfig, error) {
 	c := resourceConfig{
 		OwnerSubject: getenv("NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT"),
-		PrivateDir:   getenv("NET_WORTH_ESTIMATOR_PLANS_DIR"),
-		SampleDB:     getenv("NET_WORTH_ESTIMATOR_SAMPLE_DB"),
 		ModelID:      getenv("NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL"),
 	}
 	if c.OwnerSubject != strings.TrimSpace(c.OwnerSubject) || strings.ContainsAny(c.OwnerSubject, "*\x00\r\n") {
 		return c, errors.New("PLAN_OWNER_SUBJECT must be one verified OIDC subject")
 	}
-	if c.PrivateDir == "" {
-		var err error
-		c.PrivateDir, err = filepath.Abs(dbPath + ".plans")
-		if err != nil {
-			return c, err
-		}
-	}
-	if !filepath.IsAbs(c.PrivateDir) || (c.SampleDB != "" && !filepath.IsAbs(c.SampleDB)) {
-		return c, errors.New("PLANS_DIR and SAMPLE_DB require absolute paths")
+	if getenv("NET_WORTH_ESTIMATOR_PLANS_DIR") != "" || getenv("NET_WORTH_ESTIMATOR_SAMPLE_DB") != "" {
+		return c, errors.New("PLANS_DIR and SAMPLE_DB are retired; migrate plans into the application database")
 	}
 	return c, nil
 }
 
-func resourceHandler(ctx context.Context, primary store.Store, dbPath string, config resourceConfig, loginConfig identity.Config, apiConfig api.Config) (http.Handler, func() error, error) {
+func resourceHandler(ctx context.Context, database *store.Database, config resourceConfig, loginConfig identity.Config, apiConfig api.Config) (http.Handler, func() error, error) {
 	permissions, err := authorization.New(authorization.Config{
 		Issuer: loginConfig.Issuer, InternalURL: loginConfig.InternalURL,
 		ClientID: loginConfig.ClientID, ClientSecret: loginConfig.ClientSecret, ModelID: config.ModelID,
@@ -55,27 +44,15 @@ func resourceHandler(ctx context.Context, primary store.Store, dbPath string, co
 		primaryID = authorization.ResourceFor(loginConfig.Issuer, config.OwnerSubject).ID
 	}
 	apiConfig.CanWrite = identity.CanWrite
-	router, err := plans.New(primary, plans.Config{
-		PrimaryResourceID: primaryID, PrimaryDBPath: dbPath,
-		SampleDBPath: config.SampleDB, PrivateDir: config.PrivateDir, API: apiConfig,
+	router, err := plans.New(database, plans.Config{
+		PrimaryResourceID: primaryID, API: apiConfig,
 	})
 	if err != nil {
 		return nil, nil, err
 	}
-	loginConfig.ResolveAccess = func(ctx context.Context, subject string) (authorization.Scope, error) {
-		scope, err := permissions.Resolve(ctx, subject)
-		if err != nil {
-			return authorization.Scope{}, err
-		}
-		if subject == "" {
-			// Never fall back from an unpublished sample to the primary owner's data.
-			info, err := os.Lstat(config.SampleDB)
-			if err != nil || !info.Mode().IsRegular() {
-				scope.Permissions = []string{}
-			}
-		}
-		return scope, nil
-	}
+	loginConfig.Database = database.SQL()
+	loginConfig.SessionDB = ""
+	loginConfig.ResolveAccess = planAccessResolver(database, loginConfig.Issuer, permissions.Resolve)
 	loginConfig.RequireResourceHeader = true
 	login, err := identity.New(ctx, loginConfig)
 	if err != nil {
@@ -83,4 +60,37 @@ func resourceHandler(ctx context.Context, primary store.Store, dbPath string, co
 		return nil, nil, err
 	}
 	return login.Wrap(router), func() error { return errors.Join(login.Close(), router.Close()) }, nil
+}
+
+// The subject comes only from a verified identity grant. Casdoor must authorize
+// the derived resource before this boundary provisions any private state.
+func planAccessResolver(database *store.Database, issuer string, resolve func(context.Context, string) (authorization.Scope, error)) func(context.Context, string) (authorization.Scope, error) {
+	return func(ctx context.Context, subject string) (authorization.Scope, error) {
+		scope, err := resolve(ctx, subject)
+		if err != nil {
+			return authorization.Scope{}, err
+		}
+		expected := authorization.ResourceFor(issuer, subject)
+		if scope.Resource != expected {
+			return authorization.Scope{}, errors.New("authorization returned an unexpected plan")
+		}
+		if subject == "" {
+			exists, err := database.HasPlan(expected.ID)
+			if err != nil {
+				return authorization.Scope{}, err
+			}
+			if !exists {
+				scope.Permissions = []string{}
+			}
+		} else if scope.Allows(authorization.Read) || scope.Allows(authorization.Project) || scope.Allows(authorization.Write) {
+			scoped, err := database.EnsurePrivatePlan(expected.ID, authorization.ActorKey(issuer, subject), issuer, subject)
+			if err != nil {
+				return authorization.Scope{}, err
+			}
+			if err := scoped.InitializeDocument(); err != nil {
+				return authorization.Scope{}, err
+			}
+		}
+		return scope, nil
+	}
 }
