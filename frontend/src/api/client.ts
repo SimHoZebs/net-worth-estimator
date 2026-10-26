@@ -28,6 +28,10 @@ import type {
 	StochasticProjectionResult,
 } from "./contracts.ts";
 import { getApiBaseUrl } from "./runtime.ts";
+import type {
+	CurrentPositionRequest,
+	CurrentPositionResponse,
+} from "./position.ts";
 import {
 	responseScopeError,
 	scopedRequest,
@@ -400,6 +404,16 @@ export class ApiClient {
 		return this.requestJson<AmountPresetMoveResponse>(
 			"amount-presets/reorder",
 			requestInit("POST", { id, beforeId: beforeId ?? "" }, options),
+		);
+	}
+
+	getCurrentPosition(
+		request: CurrentPositionRequest,
+		options: ApiRequestOptions = {},
+	): Promise<Error | CurrentPositionResponse> {
+		return this.requestJson<CurrentPositionResponse>(
+			"position",
+			requestInit("POST", request, options),
 		);
 	}
 

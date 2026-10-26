@@ -21,7 +21,7 @@ import {
 import { projectionMovements } from "../api/projectionMovements.ts";
 import { defaultScopedApiClient } from "../api/scopedClients.ts";
 import { ResourceScopeError } from "../api/scopedRequest.ts";
-import { dateLabel, money, percent, todayIso } from "../domain/format.ts";
+import { dateLabel, money, percent } from "../domain/format.ts";
 import {
 	fundingEvaluationName,
 	fundingLabels,
@@ -40,7 +40,9 @@ import {
 } from "./serverQuery.ts";
 import { dismissKey, notifyError } from "./notifications.ts";
 import { useUiStore } from "./uiStore.ts";
-import { deriveDraftDocument, useWorkspaceStore } from "./workspaceStore.ts";
+import { useProjectionDocument } from "./useProjectionDocument.ts";
+import { projectionStartDate } from "./projectionStartDate.ts";
+export { projectionStartDate } from "./projectionStartDate.ts";
 import { purchaseEvaluationResult } from "./purchaseEvaluation.ts";
 
 export interface RemoteProjectionClient {
@@ -117,30 +119,6 @@ function valueRecord(
 	value: JsonValue | undefined,
 ): Record<string, unknown> | null {
 	return isRecord(value) ? value : null;
-}
-
-function latestDate(values: string[]): string | null {
-	return values.length
-		? values.reduce((latest, value) => (value > latest ? value : latest))
-		: null;
-}
-
-export function projectionStartDate(document: FinancialModelDocument): string {
-	const posting = document.postings.find((item) => !item.purchase);
-	return (
-		latestDate(document.checkpoints.map((checkpoint) => checkpoint.Date)) ??
-		(document.recurrenceRules ?? [])[0]?.startDate ??
-		(posting
-			? new Date(
-					(posting.transactionTime > 0
-						? posting.transactionTime
-						: posting.postedTime) * 1000,
-				)
-					.toISOString()
-					.slice(0, 10)
-			: undefined) ??
-		todayIso()
-	);
 }
 
 export function projectionRequest(
@@ -695,56 +673,15 @@ export function useRemoteProjection({
 	enabled = true,
 }: UseRemoteProjectionOptions = {}) {
 	const api = useMemo(() => client ?? defaultApiClient(), [client]);
-	// Explicit inputs win; undefined inherits the shared stores so consuming
-	// components subscribe where the query is declared instead of receiving
-	// fetched data as props. Null stays explicit: it means "none", not
-	// "fall back".
-	const storeDraft = useWorkspaceStore(
-		(state) => state.workspace?.draft ?? null,
-	);
-	const storeDocument = useWorkspaceStore((state) => state.serverDocument);
-	const storeDraftPresentation = useWorkspaceStore(
-		(state) => state.draftPresentation,
-	);
-	const storeSavedPresentation = useWorkspaceStore(
-		(state) => state.savedPresentation,
-	);
-	// The draft document derives on demand from the stored draft plan: the
-	// reverse conversion already runs on every edit for the loss check, so a
-	// stored copy only duplicated that result. Memoized on reference, so this
-	// re-converts only when the draft, server document, or presentation
-	// actually changes.
-	const derivedDraftDocument = useMemo(
-		() =>
-			deriveDraftDocument(
-				storeDraft,
-				storeDocument,
-				storeDraftPresentation ?? storeSavedPresentation,
-			),
-		[storeDraft, storeDocument, storeDraftPresentation, storeSavedPresentation],
-	);
-	const draftDocument =
-		draftOverride !== undefined ? draftOverride : derivedDraftDocument;
+	const { activeDocument, documentKey } = useProjectionDocument({
+		document: documentOverride,
+		draftDocument: draftOverride,
+		evaluations: evaluationsOverride,
+	});
 	const storeYears = useUiStore((state) => state.years);
 	const storeRanges = useUiStore((state) => state.ranges);
-	const document =
-		documentOverride !== undefined ? documentOverride : storeDocument;
 	const years = yearsOverride ?? storeYears;
 	const ranges = rangesOverride ?? storeRanges;
-	const sourceDocument = draftDocument ?? document ?? null;
-	const activeDocument = useMemo(
-		() =>
-			sourceDocument && evaluationsOverride
-				? { ...sourceDocument, evaluations: evaluationsOverride }
-				: sourceDocument,
-		[sourceDocument, evaluationsOverride],
-	);
-	// Memoized on reference: callers rebuild equivalent documents per render,
-	// so this only re-stringifies when the store reference actually changes.
-	const documentKey = useMemo(
-		() => (activeDocument ? JSON.stringify(activeDocument) : "null"),
-		[activeDocument],
-	);
 	// The requested slice participates in cache identity alongside the
 	// document: different ranges hold different payloads.
 	const effectiveRange = useMemo(
@@ -967,6 +904,14 @@ export function useRemoteProjection({
 
 	return {
 		base,
+		status: !enabled
+			? ("disabled" as const)
+			: missingDocument || deterministic.isError
+				? ("error" as const)
+				: deterministic.isPending
+					? ("pending" as const)
+					: ("success" as const),
+		isPlaceholderData: deterministic.isPlaceholderData,
 		range,
 		progress,
 		rangeError,

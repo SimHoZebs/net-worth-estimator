@@ -1,37 +1,39 @@
 import { CircleHelp, TrendingUp } from "lucide-react";
-import { IconButton } from "../../components/Button.tsx";
+import { IconButton, TextButton } from "../../components/Button.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
 import { compactMoney, dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import { currentNetWorth, type Projection } from "../../domain/result.ts";
 import { outlookMetricStyles } from "./outlookMetricStyles.ts";
+import type { useCurrentPosition } from "../../state/useCurrentPosition.ts";
 
 export function OutlookMetrics({
 	plan,
 	projection,
+	position,
 	years,
 	onEvidence,
 	pending = false,
 }: {
 	plan: Plan;
 	projection: Projection | null;
+	position: ReturnType<typeof useCurrentPosition>;
 	years: number;
 	onEvidence: () => void;
 	pending?: boolean;
 }) {
-	if (!projection && !pending) return null;
-	const current = projection ? currentNetWorth(projection) : null;
+	const current = position.data?.netWorth ?? null;
+	const forecastCurrent = projection ? currentNetWorth(projection) : null;
 	const final = projection?.points.at(-1);
-	if (projection && !final) return null;
 	const finalYear =
 		final?.date.slice(0, 4) ??
 		Number.parseInt(plan.startDate.slice(0, 4), 10) + years;
 	return (
-		<div
-			className="grid grid-cols-2 gap-3 lg:grid-cols-1"
-			aria-busy={!projection || undefined}
-		>
-			<section className={outlookMetricStyles()}>
+		<div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+			<section
+				className={outlookMetricStyles()}
+				aria-busy={position.status === "pending"}
+			>
 				<div className="mb-2 flex min-h-6 items-center justify-between text-xs text-muted max-sm:mb-3 max-sm:gap-1">
 					<span>Current net worth</span>
 					<IconButton
@@ -41,10 +43,17 @@ export function OutlookMetrics({
 						className="size-6"
 						label="Inspect current net worth evidence"
 						onClick={onEvidence}
-						disabled={!projection}
+						disabled={!position.data}
 					/>
 				</div>
-				{current === null ? (
+				{position.status === "error" ? (
+					<div className="text-sm text-muted" role="status">
+						Could not load current position.{" "}
+						<TextButton onClick={position.retry}>
+							Retry current position
+						</TextButton>
+					</div>
+				) : current === null ? (
 					<Skeleton className="h-7 w-32" />
 				) : (
 					<div className="flex flex-wrap items-center gap-2 text-xl leading-tight font-medium tracking-tight tabular-nums sm:text-2xl xl:text-3xl">
@@ -56,16 +65,23 @@ export function OutlookMetrics({
 						className="inline-block size-1 rounded-full bg-primary"
 						aria-hidden="true"
 					/>
-					As of {dateLabel(plan.startDate, true)}
+					As of {dateLabel(position.data?.asOfDate ?? plan.startDate, true)}
 				</div>
 			</section>
-			<section className={outlookMetricStyles({ tone: "projected" })}>
+			<section
+				className={outlookMetricStyles({ tone: "projected" })}
+				aria-busy={pending}
+			>
 				<div className="mb-2 flex min-h-6 items-center justify-between text-xs text-muted max-sm:mb-3 max-sm:gap-1">
 					<span>Base case in {finalYear}</span>
 					<TrendingUp size={19} className="max-sm:w-4" aria-hidden="true" />
 				</div>
-				{!final || current === null ? (
-					<Skeleton className="h-7 w-36" />
+				{!final || forecastCurrent === null ? (
+					pending ? (
+						<Skeleton className="h-7 w-36" />
+					) : (
+						<p className="text-sm text-muted">Forecast unavailable</p>
+					)
 				) : (
 					<div
 						className="flex flex-wrap items-center gap-2 text-xl leading-tight font-medium tracking-tight text-ink tabular-nums sm:text-2xl xl:text-3xl"
@@ -73,8 +89,8 @@ export function OutlookMetrics({
 					>
 						{compactMoney(final.total)}
 						<span className="rounded-control bg-success-bg px-2 py-1 text-xs font-semibold tracking-normal text-success-text max-sm:px-1">
-							{final.total >= current ? "+" : ""}
-							{compactMoney(final.total - current)}
+							{final.total >= forecastCurrent ? "+" : ""}
+							{compactMoney(final.total - forecastCurrent)}
 						</span>
 					</div>
 				)}

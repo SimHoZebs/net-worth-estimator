@@ -16,13 +16,26 @@ const EvidenceDialog = lazy(() =>
 	})),
 );
 
+const CurrentPositionDialog = lazy(() =>
+	import("../components/evidence/CurrentPositionDialog.tsx").then((module) => ({
+		default: module.CurrentPositionDialog,
+	})),
+);
+
 export function WorkspaceEvidence({
 	overlays,
 }: {
 	overlays: WorkspaceOverlays;
 }) {
+	const plan = useWorkspaceStore(selectPlan);
 	// Evidence subscribes to the base case only while its dialog is open.
 	if (!overlays.evidence) return null;
+	if (overlays.evidence.kind === "position")
+		return plan ? (
+			<Suspense fallback={<Skeleton className="h-32 w-full" />}>
+				<CurrentPositionDialog plan={plan} onClose={overlays.closeEvidence} />
+			</Suspense>
+		) : null;
 	return <WorkspaceEvidenceLoaded overlays={overlays} />;
 }
 
@@ -39,7 +52,13 @@ function WorkspaceEvidenceLoaded({
 		projection.base instanceof Error || projection.base === null
 			? null
 			: projection.base;
-	if (!overlays.evidence || !plan || !base) return null;
+	if (
+		!overlays.evidence ||
+		overlays.evidence.kind === "position" ||
+		!plan ||
+		!base
+	)
+		return null;
 	return (
 		<Suspense fallback={<Skeleton className="h-32 w-full" />}>
 			<EvidenceDialog

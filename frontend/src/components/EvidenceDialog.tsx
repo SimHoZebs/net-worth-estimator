@@ -3,7 +3,6 @@ import type { EditorTarget } from "../domain/planEdits.ts";
 import type { Projection } from "../domain/result.ts";
 import { AccountDialog } from "./AccountDialog.tsx";
 import { FailureEvidence } from "./evidence/FailureEvidence.tsx";
-import { PositionEvidence } from "./evidence/PositionEvidence.tsx";
 import { SafeSpendingEvidence } from "./evidence/SafeSpendingEvidence.tsx";
 
 export type EvidenceTarget =
@@ -21,7 +20,7 @@ export function EvidenceDialog({
 	onEdit,
 	onApply,
 }: {
-	target: EvidenceTarget;
+	target: Exclude<EvidenceTarget, { kind: "position" }>;
 	plan: Plan;
 	projection: Projection;
 	temporary?: boolean;
@@ -36,14 +35,6 @@ export function EvidenceDialog({
 		onEdit(next);
 	};
 	switch (target.kind) {
-		case "position":
-			return (
-				<PositionEvidence
-					plan={plan}
-					projection={projection}
-					onClose={onClose}
-				/>
-			);
 		case "failure":
 			return (
 				<FailureEvidence
