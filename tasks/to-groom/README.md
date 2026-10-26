@@ -10,6 +10,10 @@ The separate database/sqlc draft is paused in its isolated worktree. sqlc is not
 
 ## Runtime and verification tasks
 
+The separate [long-chain inventory](long-chaining/README.md) records the first
+chaining pass. Its records defer justification and change decisions to pass two.
+They do not adopt the recommendations in the older tasks below.
+
 - [Use one saved-plan identity](saved-plan-identity.md).
 - [Use server shortfall evidence](transaction-shortfall-evidence.md).
 - [Replace financial-independence callbacks with a direct loop](financial-independence-monthly-loop.md).
