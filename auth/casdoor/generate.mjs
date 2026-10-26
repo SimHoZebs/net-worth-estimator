@@ -123,7 +123,7 @@ export function buildSeed(settings) {
             name, visible: true, required: true, prompted: false, rule: 'None',
           })),
         ],
-        grantTypes: ['authorization_code', 'refresh_token'],
+        grantTypes: ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code'],
         backchannelLogoutUri: settings.backchannelUrl,
         redirectUris: [...new Set([settings.appUrl, ...Object.keys(settings.browserOrigins || {})])]
           .flatMap(app => [`${app}/v1/auth/callback`, `${app}/`]),

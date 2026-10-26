@@ -19,7 +19,7 @@ test('seeds only Waypoint presentation, without replacing Casdoor credential for
   assert.equal(app.signinHtml, undefined);
   assert.equal(app.signupHtml, undefined);
   assert.equal(seed.applications[0].logo, undefined, 'Built-in administrator UI remains unchanged');
-  assert.deepEqual(app.grantTypes, ['authorization_code', 'refresh_token']);
+  assert.deepEqual(app.grantTypes, ['authorization_code', 'refresh_token', 'urn:ietf:params:oauth:grant-type:device_code']);
   assert.equal(app.enableWebAuthn, true);
   assert.equal(app.formOffset, 4);
   assert.deepEqual(fields.themeData, { isEnabled: true, themeType: 'default', colorPrimary: '#007a55', borderRadius: 6, isCompact: false });
