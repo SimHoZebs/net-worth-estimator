@@ -6,7 +6,7 @@ import type {
 	CurrentPositionResponse,
 } from "../api/position.ts";
 import { defaultScopedApiClient } from "../api/scopedClients.ts";
-import { getResourceScope } from "../auth/resourceScope.ts";
+import { currentPositionQueryKey } from "./serverQuery.ts";
 import {
 	useProjectionDocument,
 	type ProjectionDocumentOptions,
@@ -31,9 +31,8 @@ export function useCurrentPosition({
 	const api = useMemo(() => client ?? defaultScopedApiClient(), [client]);
 	const { activeDocument, documentKey } = useProjectionDocument(options);
 	const asOfDate = activeDocument ? projectionStartDate(activeDocument) : "";
-	const scope = getResourceScope();
 	const query = useQuery({
-		queryKey: ["current-position", scope.key, documentKey, asOfDate],
+		queryKey: currentPositionQueryKey(documentKey, asOfDate),
 		enabled: enabled && activeDocument !== null,
 		queryFn: async ({ signal }) => {
 			if (!activeDocument) throw new Error("No financial model is available.");
