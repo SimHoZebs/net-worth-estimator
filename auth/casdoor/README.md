@@ -65,7 +65,7 @@ Files use `0600`. Directories use `0700`. Config mounts read-only. SQLite uses
 WAL with a five-second busy timeout. Preserve the whole private state directory
 for backups. Keep it outside Git and frontend assets.
 
-The client accepts only code and refresh grants. It uses PKCE S256,
+The client accepts code, refresh, and device-code grants. It uses PKCE S256,
 `client_secret_basic` or `client_secret_post`, `JWT-Standard`, one-hour access/ID
 tokens, and 720-hour refresh tokens. Request `openid profile email offline_access`.
 The account page is `<CASDOOR_PUBLIC_URL>/account`.
@@ -93,6 +93,34 @@ configure username/display-name/password/confirmation signup fields. Keep
 generated IDs random and built-in administrator signup disabled.
 
 See [combined deployment](../README.md) and [session/recovery rules](../../docs/authentication.md).
+
+## Command-line access
+
+The `nwe` CLI signs in through the device flow and then calls the same API
+as the frontend. No password or application secret leaves the server:
+
+```bash
+export NWE_API=https://app.example.test
+go run ./backend/cmd/nwe login
+go run ./backend/cmd/nwe status
+go run ./backend/cmd/nwe api POST /v1/sync/simplefin --data @trigger.json
+```
+
+`login` prints a verification URL plus a user code. Approve it in the
+browser. The CLI caches tokens owner-only (`0600`) and refreshes them
+without further approval. Every request carries the cached plan resource,
+so `Waypoint-Resource` checks and `plan:write` enforcement behave exactly
+like browser traffic. `logout` wipes the local cache; issued tokens expire
+on their own.
+
+Fresh seeds include the device-code grant. Existing sealed instances need
+one manual step: enable `Device Code`
+(`urn:ietf:params:oauth:grant-type:device_code`) in Grant types on the
+`waypoint` application through Casdoor's application editor. The branding
+apply flow preserves grant types, so it never removes this access. The CLI
+caches its base URL nowhere, so keep `NWE_API` exported (or pass `--api` to
+every command). Compromised tokens stop working immediately only when
+revoked from the account page; otherwise they expire on their own.
 
 ## Plan permissions
 
