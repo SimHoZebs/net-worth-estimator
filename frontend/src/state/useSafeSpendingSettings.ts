@@ -22,6 +22,7 @@ export const defaultSafeSpendingSettings = (): TotalCycleSettings => ({
 	reserve: DEFAULT_PROTECTED_RESERVE,
 	accountIds: null,
 	spendingAccountIds: null,
+	incomeAccountIds: null,
 	incomeRuleIds: [],
 	movementIds: null,
 	statementDaySet: false,
@@ -82,6 +83,7 @@ export function sanitizeSafeSpendingSettings(
 		),
 		accountIds: stringIds(record.accountIds),
 		spendingAccountIds: stringIds(record.spendingAccountIds),
+		incomeAccountIds: stringIds(record.incomeAccountIds),
 		incomeRuleIds: [...new Set(stringIds(record.incomeRuleIds) ?? [])],
 		movementIds: stringIds(record.movementIds),
 	};
@@ -146,6 +148,10 @@ export function updateSettingsForScope(
 				next.spendingAccountIds !== undefined
 					? next.spendingAccountIds
 					: previous.spendingAccountIds,
+			incomeAccountIds:
+				next.incomeAccountIds !== undefined
+					? next.incomeAccountIds
+					: previous.incomeAccountIds,
 			incomeRuleIds: next.incomeRuleIds ?? previous.incomeRuleIds,
 			movementIds:
 				next.movementIds !== undefined

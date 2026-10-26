@@ -93,6 +93,8 @@ export interface SafeSpendingConfigHints {
 	trackedIds: string[];
 	spendingAccounts: { id: string; name: string }[];
 	trackedSpendingIds: string[];
+	incomeAccounts: { id: string; name: string }[];
+	trackedIncomeIds: string[];
 }
 
 export interface BillCandidate {

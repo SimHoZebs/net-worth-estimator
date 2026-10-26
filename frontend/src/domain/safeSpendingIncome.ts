@@ -1,4 +1,5 @@
 import type { Movement, Plan } from "./model.ts";
+import { nextProjectedPayments } from "./nextProjectedPayment.ts";
 import type { MovementResult } from "./result.ts";
 
 export interface IncomePayment {
@@ -11,6 +12,7 @@ export interface SafeSpendingIncome {
 		id: string;
 		name: string;
 		frequency: Movement["frequency"];
+		amount: number;
 		nextPayment: IncomePayment | null;
 	}[];
 	selectedRuleIds: string[];
@@ -18,20 +20,21 @@ export interface SafeSpendingIncome {
 }
 
 /**
- * Income sources are explicit active recurrence rules into selected cash
- * accounts. Transfers between those accounts do not add income. Each source
- * contributes its next server-projected requested payment, once per rule.
+ * Income sources are explicit positive recurring inflows into the selected
+ * income accounts. Transfers within those accounts do not add income. Each
+ * source contributes its next server-projected requested payment, once per
+ * rule.
  */
 export function safeSpendingIncome({
 	plan,
 	movements,
-	spendingAccountIds,
+	incomeAccountIds,
 	incomeRuleIds,
 	todayIso,
 }: {
 	plan: Plan;
 	movements: MovementResult[];
-	spendingAccountIds: string[];
+	incomeAccountIds: string[];
 	incomeRuleIds: string[];
 	todayIso: string;
 }): SafeSpendingIncome {
@@ -42,7 +45,7 @@ export function safeSpendingIncome({
 			.map((account) => account.id),
 	);
 	const destinations = new Set(
-		spendingAccountIds.filter((id) => availableAccounts.has(id)),
+		incomeAccountIds.filter((id) => availableAccounts.has(id)),
 	);
 	const rules = plan.movements.filter(
 		(rule) =>
@@ -55,22 +58,11 @@ export function safeSpendingIncome({
 			(rule.fromId === null ||
 				(availableAccounts.has(rule.fromId) && !destinations.has(rule.fromId))),
 	);
-	const known = new Map(rules.map((rule) => [rule.id, rule]));
-	const nextPayments = new Map<string, IncomePayment>();
-	for (const movement of movements) {
-		const rule = known.get(movement.movementId);
-		if (!rule || movement.date <= today || movement.requested <= 0) continue;
-		if (rule.endDate !== null && movement.date > rule.endDate) continue;
-		const previous = nextPayments.get(rule.id);
-		if (!previous || movement.date < previous.date) {
-			nextPayments.set(rule.id, {
-				date: movement.date,
-				amount: movement.requested,
-			});
-		} else if (movement.date === previous.date) {
-			previous.amount += movement.requested;
-		}
-	}
+	const nextPayments = nextProjectedPayments({
+		movements,
+		rules,
+		todayIso,
+	});
 	const selected = new Set(incomeRuleIds);
 	const selectedRuleIds = rules
 		.filter((rule) => selected.has(rule.id))
@@ -82,6 +74,7 @@ export function safeSpendingIncome({
 			id: rule.id,
 			name: rule.name,
 			frequency: rule.frequency,
+			amount: rule.amount,
 			nextPayment: nextPayments.get(rule.id) ?? null,
 		})),
 		selectedRuleIds,

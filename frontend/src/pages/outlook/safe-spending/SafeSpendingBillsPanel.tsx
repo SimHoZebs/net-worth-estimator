@@ -27,10 +27,7 @@ import type {
 	SafeSpendingHeroes,
 	SafeSpendingMandatorySection,
 } from "./safeSpendingDetailModel.ts";
-import {
-	SAFE_SPENDING_LABELS as labels,
-	SAFE_SPENDING_FORMULAS as formulas,
-} from "./safeSpendingLabels.ts";
+import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import {
 	householdPanelStyles,
 	householdValueStyles,
@@ -161,9 +158,6 @@ export function SafeSpendingBillsPanel({
 					]}
 					ariaLabel={`${labels.cardSpending} ${money(heroes.committedTotal)}, ${labels.allowance} ${money(paycheck.allowance)}, ${labels.reserve} ${money(paycheck.reserve)}`}
 				/>
-				<p className="text-sm leading-relaxed text-muted">
-					{formulas.allowance}
-				</p>
 				<div className="h-px w-full bg-line" />
 				<div className="flex items-center justify-between">
 					{heroes.committedByCard.map((card, index) => {
@@ -235,9 +229,6 @@ export function SafeSpendingBillsPanel({
 						<strong>{exactMoney(cashNow.spentSinceStart)}</strong>
 					</div>
 				) : null}
-				<p className="text-sm leading-relaxed text-muted">
-					{formulas.cashAfterBills}
-				</p>
 				<div className="h-px w-full bg-line" />
 				<div className="flex flex-wrap items-center justify-end gap-3">
 					<TransactionSortButton

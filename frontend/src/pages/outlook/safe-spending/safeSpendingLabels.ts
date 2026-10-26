@@ -20,11 +20,3 @@ export const SAFE_SPENDING_LABELS = {
 	cycleStart: "Cycle start day",
 	scheduledBills: "Upcoming bills this cycle",
 } as const;
-
-const labels = SAFE_SPENDING_LABELS;
-
-export const SAFE_SPENDING_FORMULAS = {
-	cashAfterBills: `${labels.cashAfterBills} = ${labels.cashBalance} − ${labels.cashPayments} − ${labels.remainingBills}.`,
-	allowance: `${labels.allowance} = ${labels.nextPaycheck} − ${labels.fixedBills} − ${labels.cardSpending} − ${labels.reserve}.`,
-	unallocated: `${labels.unallocated} = ${labels.nextPaycheck} − ${labels.fixedBills} − ${labels.closedCards} − ${labels.reserve}.`,
-} as const;

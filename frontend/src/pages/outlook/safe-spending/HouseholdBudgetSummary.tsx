@@ -10,10 +10,7 @@ import type {
 	PaycheckDecomposition,
 	SafeSpendingHeroes,
 } from "./safeSpendingDetailModel.ts";
-import {
-	SAFE_SPENDING_LABELS as labels,
-	SAFE_SPENDING_FORMULAS as formulas,
-} from "./safeSpendingLabels.ts";
+import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 const budgetMoney = (amount: number | null) =>
 	amount === null ? "—" : exactMoney(amount);
@@ -155,9 +152,6 @@ export function HouseholdBudgetSummary({
 						</dd>
 					</div>
 				</dl>
-				<p className="text-sm leading-relaxed text-muted">
-					{formulas.unallocated}
-				</p>
 			</div>
 			<div className={householdPanelStyles()}>
 				<p className="flex items-start justify-start gap-2 text-xs leading-normal text-muted">

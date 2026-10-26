@@ -570,6 +570,8 @@ export interface SafeSpendingSettings {
 	accountIds: string[] | null;
 	/** Null uses the detected checking account. */
 	spendingAccountIds: string[] | null;
+	/** Null uses the detected checking account. */
+	incomeAccountIds: string[] | null;
 	/** Explicit recurrence rule sources. Empty means no automatic income. */
 	incomeRuleIds: string[];
 	/** Null includes all recurring outflows. */
