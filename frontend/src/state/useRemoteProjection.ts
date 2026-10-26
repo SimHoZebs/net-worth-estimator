@@ -3,7 +3,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import {
 	type ApiRequestOptions,
 	type DeterministicProjectionRequest,
@@ -14,7 +14,6 @@ import {
 	type JsonValue,
 	type ProjectionAccountSummary,
 	type ProjectionResult,
-	parseSSE,
 	type StochasticProjectionRequest,
 	type StochasticProjectionResult,
 } from "../api/index.ts";
@@ -44,6 +43,7 @@ import { useProjectionDocument } from "./useProjectionDocument.ts";
 import { projectionStartDate } from "./projectionStartDate.ts";
 export { projectionStartDate } from "./projectionStartDate.ts";
 import { purchaseEvaluationResult } from "./purchaseEvaluation.ts";
+import { stochasticProjectionOptions } from "./stochasticProjectionQuery.ts";
 
 export interface RemoteProjectionClient {
 	projectDeterministic(
@@ -639,10 +639,6 @@ function projectionResponseError(
 	return new Error(errors.map((issue) => issue.message).join(" "));
 }
 
-function progressValue(value: number): number {
-	return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
-}
-
 function randomRunCount(): number {
 	return 400;
 }
@@ -692,12 +688,6 @@ export function useRemoteProjection({
 		[activeDocument, years, dateRangeOverride],
 	);
 	const rangeKey = effectiveRange ? projectionRangeKey(effectiveRange) : "";
-	// Refs give the streaming effect latest values without keying it on
-	// object identity (callers may rebuild equivalent documents per render).
-	// Render-time sync keeps them fresh regardless of effect order.
-	const activeDocumentRef = useRef(activeDocument);
-	// oxlint-disable-next-line react/refs
-	activeDocumentRef.current = activeDocument;
 	const hasDocument = activeDocument !== null;
 	const queryClient = useQueryClient();
 	const queryClientRef = useRef(queryClient);
@@ -751,156 +741,29 @@ export function useRemoteProjection({
 			: (deterministic.error.message ??
 				"The deterministic projection request failed. Retry the connection.");
 	const loading = deterministic.isFetching;
-	const [range, setRange] = useState<RangeResult | null>(null);
-	const [progress, setProgress] = useState(0);
-	const [rangeError, setRangeError] = useState<string | null>(null);
-	const [rangeAttempt, setRangeAttempt] = useState(0);
-	const mounted = useRef(true);
-	const rangeController = useRef<AbortController | null>(null);
-
-	useEffect(() => {
-		mounted.current = true;
-		return () => {
-			mounted.current = false;
-			rangeController.current?.abort();
-		};
-	}, []);
-
-	useEffect(() => {
-		const current = enabled ? activeDocumentRef.current : null;
-		if (!ranges || !current) {
-			rangeController.current?.abort();
-			setRange(null);
-			setProgress(0);
-			setRangeError(null);
-			return () => rangeController.current?.abort();
-		}
-		const controller = new AbortController();
-		rangeController.current?.abort();
-		rangeController.current = controller;
-		setRange(null);
-		setProgress(0);
-		setRangeError(null);
-		const runCount = randomRunCount();
-		const seed = 42;
-		const request: StochasticProjectionRequest = {
-			...projectionRequest(current, years),
-			config: { runCount, seed },
-		};
-		// The stream runs through the shared query cache: identical
-		// concurrent streams attach to one fetch, and the final bands are
-		// reused across remounts (e.g. hopping between Outlook and
-		// Evaluations) instead of recomputing hundreds of runs. Progress and
-		// partials stay local; only the final result is cached.
-		const streamStochastic = async (): Promise<RangeResult> => {
-			const response = await api.projectStochastic(request, {
-				signal: controller.signal,
-			});
-			// Rethrow intact: the client disguises aborts as ApiNetworkError
-			// with the AbortError as cause, and the remount redrive below
-			// recognizes only the original chain. Wrapping the message in a
-			// fresh Error would report every remount abort as a failed range.
-			if (response instanceof Error) throw response;
-			let finalRange: RangeResult | null = null;
-			let streamError: string | null = null;
-			const parseResult = await parseSSE(
-				response,
-				{
-					onProgress: (data) => {
-						if (!mounted.current || controller.signal.aborted) return;
-						setProgress(progressValue(data.progress.fraction));
-					},
-					onPartial: (data) => {
-						if (!mounted.current || controller.signal.aborted) return;
-						setProgress(progressValue(data.progress.fraction));
-						setRange(stochasticResultToLocal(data.partial));
-					},
-					onResult: (data) => {
-						if (!mounted.current || controller.signal.aborted) return;
-						finalRange = stochasticResultToLocal(data.result);
-						setProgress(1);
-						setRange(finalRange);
-						setRangeError(null);
-						dismissKey("projection-range");
-					},
-					onError: (data) => {
-						if (!mounted.current || controller.signal.aborted) return;
-						// A server-sent error event on a live stream is genuine
-						// content, not a transport rejection, so it floats.
-						// Scope transitions abort the stream above instead.
-						streamError = data.error;
-						setRangeError(data.error);
-						notifyError("projection-range", data.error, {
-							label: "Retry scenario calculation",
-							onAction: () => setRangeAttempt((value) => value + 1),
-						});
-					},
-				},
-				controller.signal,
-			);
-			if (finalRange) return finalRange;
-			throw new Error(
-				streamError ??
-					parseResult?.message ??
-					"The range stream ended before returning a result. Retry the calculation.",
-			);
-		};
-		let redriven = false;
-		const runStream = (): void => {
-			void serverQueryClient()
-				.fetchQuery({
-					queryKey: stochasticQueryKey(
-						documentKey,
-						years,
-						runCount,
-						seed,
-						rangeAttempt,
-					),
-					queryFn: streamStochastic,
-				})
-				.then((finalRange) => {
-					if (!mounted.current || controller.signal.aborted) return;
-					setProgress(1);
-					setRange(finalRange);
-					setRangeError(null);
-					dismissKey("projection-range");
-				})
-				.catch((cause: unknown) => {
-					if (!mounted.current || controller.signal.aborted) return;
-					// A remount can attach to an in-flight fetch that another
-					// mount's cleanup then aborts. That shared death is not a
-					// genuine failure, so re-issue once: the previous rejection is
-					// settled, the new fetch re-attaches to (or restarts) the
-					// server run, and the per-run flag bounds the redrive.
-					if (isAbortError(cause) && !redriven) {
-						redriven = true;
-						runStream();
-						return;
-					}
-					// Stale-assertion rejections belong to the session layer,
-					// never to a toast: the recheck flow owns them.
-					const scopeOwned = cause instanceof ResourceScopeError;
-					const message =
-						cause instanceof Error && cause.message
-							? cause.message
-							: "The range request failed. Retry the calculation.";
-					setRangeError(message);
-					if (!scopeOwned)
-						notifyError("projection-range", message, {
-							label: "Retry scenario calculation",
-							onAction: () => setRangeAttempt((value) => value + 1),
-						});
-				});
-		};
-		runStream();
-		return () => controller.abort();
-	}, [api, documentKey, enabled, rangeAttempt, ranges, years]);
-
-	const abort = useCallback(() => {
-		// Deterministic cancellation is Query-managed; only the streaming
-		// range request needs an explicit signal here.
-		rangeController.current?.abort();
-	}, []);
+	const runCount = randomRunCount();
+	const seed = 42;
+	const rangeEnabled = enabled && ranges && activeDocument !== null;
+	// A disabled observer must detach from the active stream, so the last
+	// real subscriber leaving lets Query cancel its signal.
+	const rangeQueryKey = rangeEnabled
+		? stochasticQueryKey(documentKey, years, runCount, seed, 0)
+		: ["stochastic-projection-disabled"];
+	const rangeRequest: StochasticProjectionRequest | null = rangeEnabled
+		? {
+				...projectionRequest(activeDocument, years),
+				config: { runCount, seed },
+			}
+		: null;
+	const rangeQuery = useQuery(
+		stochasticProjectionOptions({
+			queryKey: rangeQueryKey,
+			api,
+			request: rangeRequest,
+			mapResult: stochasticResultToLocal,
+		}),
+		serverQueryClient(),
+	);
 
 	return {
 		base,
@@ -912,15 +775,22 @@ export function useRemoteProjection({
 					? ("pending" as const)
 					: ("success" as const),
 		isPlaceholderData: deterministic.isPlaceholderData,
-		range,
-		progress,
-		rangeError,
+		range: rangeQuery.data?.range ?? null,
+		progress: rangeQuery.data?.progress ?? 0,
+		rangeError: rangeQuery.error?.message ?? null,
 		baseError,
-		retryRange: () => setRangeAttempt((value) => value + 1),
+		retryRange: () => {
+			if (rangeEnabled) void rangeQuery.refetch();
+		},
 		retryProjection: () => {
 			void deterministic.refetch();
 		},
 		loading,
-		abort,
+		abort: () => {
+			void serverQueryClient().cancelQueries({
+				queryKey: rangeQueryKey,
+				exact: true,
+			});
+		},
 	};
 }

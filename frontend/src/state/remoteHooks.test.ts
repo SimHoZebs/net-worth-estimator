@@ -14,7 +14,7 @@ import {
 import type { RowWriteResponse } from "../api/index.ts";
 import {
 	ApiHttpError,
-	ApiNetworkError,
+	type ApiRequestOptions,
 	type AmountPreset,
 	type BackendAccount,
 	type BackendCheckpoint,
@@ -26,6 +26,7 @@ import {
 	type ProjectionResult,
 	type ServerStatus,
 	type StochasticProjectionResult,
+	type StochasticProjectionRequest,
 } from "../api/index.ts";
 import type { Plan } from "../domain/model.ts";
 
@@ -39,7 +40,11 @@ import {
 	remoteStorageKey,
 	serverDocumentFingerprint,
 } from "./remoteStorage.ts";
-import { resetServerQueryCache } from "./serverQuery.ts";
+import {
+	clearResourceQueryCache,
+	resetServerQueryCache,
+	serverQueryClient,
+} from "./serverQuery.ts";
 import { resetNotifications, useNotifications } from "./notifications.ts";
 import { resetUiStore, useUiStore } from "./uiStore.ts";
 import {
@@ -74,6 +79,7 @@ interface Rendered<T> {
 	result: () => T;
 	settle: () => Promise<void>;
 	unmount: () => void;
+	rerender: () => void;
 }
 
 function Passthrough({ children }: { children: ReactNode }) {
@@ -91,7 +97,8 @@ function renderHookWith<T>(
 	callback: () => T,
 	options: { strictMode: boolean },
 ): Rendered<T> {
-	// Fresh cache per render: cases stay isolated without relying on resets.
+	// Deterministic queries use this local cache. Scenario queries share the
+	// server cache, which afterEach resets between cases.
 	const client = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
 	});
@@ -101,7 +108,10 @@ function renderHookWith<T>(
 			? createElement(StrictMode, null, tree)
 			: createElement(Passthrough, null, tree);
 	}
-	const rendered = renderHookRTL(callback, { wrapper: Wrapper });
+	const rendered = renderHookRTL(callback, {
+		wrapper: Wrapper,
+		reactStrictMode: options.strictMode,
+	});
 	return {
 		result: () => rendered.result.current,
 		settle: async () => {
@@ -110,7 +120,60 @@ function renderHookWith<T>(
 			});
 		},
 		unmount: () => rendered.unmount(),
+		rerender: () => rendered.rerender(),
 	};
+}
+
+function scenarioStreamClient(cancelBody = true) {
+	const streams: {
+		signal: AbortSignal;
+		send: (event: string, data: unknown) => void;
+		close: () => void;
+	}[] = [];
+	const client = {
+		projectDeterministic: vi.fn(async () => ({
+			result: projectionFixture(),
+			issues: [],
+		})),
+		projectStochastic: vi.fn(
+			async (
+				_request: StochasticProjectionRequest,
+				options?: ApiRequestOptions,
+			) => {
+				const signal = options?.signal;
+				if (!signal) throw new Error("Expected a query-owned signal");
+				const body = new ReadableStream<Uint8Array>({
+					start(controller) {
+						streams.push({
+							signal,
+							send: (event, data) =>
+								controller.enqueue(
+									new TextEncoder().encode(
+										`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
+									),
+								),
+							close: () => controller.close(),
+						});
+						if (cancelBody)
+							signal.addEventListener(
+								"abort",
+								() => controller.error(signal.reason),
+								{ once: true },
+							);
+					},
+				});
+				return new Response(body, {
+					headers: { "content-type": "text/event-stream" },
+				});
+			},
+		),
+	};
+	const stream = (index = 0) => {
+		const selected = streams.at(index);
+		if (!selected) throw new Error("Expected an active scenario stream");
+		return selected;
+	};
+	return { client, stream };
 }
 
 function memoryStorage(): Storage & { values: Map<string, string> } {
@@ -2774,49 +2837,246 @@ describe("remote projection mapping and SSE", () => {
 		two.unmount();
 	});
 
-	it("redrives the range stream when a shared fetch dies under remount", async () => {
-		// A remount can attach to an in-flight shared fetch that another
-		// mount's cleanup then aborts. The client disguises the abortion as a
-		// connection failure, so the effect must recognize the cause chain
-		// and re-issue instead of reporting a failed range.
-		const stochastic = stochasticFixture();
-		const stream = `event: result\ndata: ${JSON.stringify({ result: stochastic })}\n\n`;
-		const aborted = new ApiNetworkError(
-			new DOMException("This operation was aborted.", "AbortError"),
-		);
-		let calls = 0;
-		const client = {
-			projectDeterministic: vi.fn(async () => ({
-				result: projectionFixture(),
-				issues: [],
-			})),
-			projectStochastic: vi.fn(async () => {
-				calls += 1;
-				// The client contract returns errors instead of throwing, so
-				// the first call returns the abortion for the hook to
-				// recognize rather than throwing it.
-				if (calls === 1) return aborted;
-				return new Response(stream, {
-					status: 200,
-					headers: { "content-type": "text/event-stream" },
+	it.each([0, 1] as const)(
+		"shares progress and survives consumer %i leaving without a retry",
+		async (leaving) => {
+			const { client, stream } = scenarioStreamClient();
+			const consume = () =>
+				useRemoteProjection({
+					client,
+					document: modelFixture(),
+					years: 2,
+					ranges: true,
 				});
-			}),
-		};
+			const consumers = [renderHook(consume), renderHook(consume)] as const;
+			await consumers[0].settle();
+			expect(client.projectStochastic).toHaveBeenCalledTimes(1);
+			await act(async () => {
+				stream().send("progress", { progress: { fraction: 0.25 } });
+			});
+			await waitFor(() => {
+				for (const consumer of consumers)
+					expect(consumer.result().progress).toBe(0.25);
+			});
+			await act(async () => {
+				stream().send("partial", {
+					progress: { fraction: 0.5 },
+					partial: stochasticFixture(),
+				});
+			});
+			await waitFor(() => {
+				for (const consumer of consumers)
+					expect(consumer.result().range).toMatchObject({ count: 4 });
+			});
+			const late = renderHook(consume);
+			expect(late.result().progress).toBe(0.5);
+			expect(late.result().range).toMatchObject({ count: 4 });
+			consumers[leaving].unmount();
+			late.unmount();
+			expect(stream().signal.aborted).toBe(false);
+			await act(async () => {
+				stream().send("result", { result: stochasticFixture() });
+				stream().close();
+			});
+			const remaining = consumers[leaving === 0 ? 1 : 0];
+			await waitFor(() => expect(remaining.result().progress).toBe(1));
+			expect(remaining.result().rangeError).toBeNull();
+			expect(client.projectStochastic).toHaveBeenCalledTimes(1);
+			remaining.unmount();
+			const remounted = renderHook(consume);
+			await remounted.settle();
+			expect(remounted.result().progress).toBe(1);
+			expect(client.projectStochastic).toHaveBeenCalledTimes(1);
+			remounted.unmount();
+		},
+	);
+
+	it("cancels the last subscriber and never reuses an unfinished snapshot", async () => {
+		const { client, stream } = scenarioStreamClient();
+		const consume = () =>
+			useRemoteProjection({ client, document: modelFixture(), ranges: true });
+		const first = renderHook(consume);
+		await first.settle();
+		await act(async () => {
+			stream().send("partial", {
+				progress: { fraction: 0.5 },
+				partial: stochasticFixture(),
+			});
+		});
+		await waitFor(() => expect(first.result().progress).toBe(0.5));
+		first.unmount();
+		expect(stream().signal.aborted).toBe(true);
+		const second = renderHook(consume);
+		await second.settle();
+		expect(client.projectStochastic).toHaveBeenCalledTimes(2);
+		expect(second.result().progress).toBe(0);
+		expect(second.result().range).toBeNull();
+		expect(useNotifications.getState().items).toHaveLength(0);
+		second.unmount();
+	});
+
+	it("cancels explicitly without exposing a framework error or retry notice", async () => {
+		const { client, stream } = scenarioStreamClient();
 		const rendered = renderHook(() =>
-			useRemoteProjection({
-				client,
-				document: modelFixture(),
-				years: 2,
-				ranges: true,
-			}),
+			useRemoteProjection({ client, document: modelFixture(), ranges: true }),
 		);
 		await rendered.settle();
-		await rendered.settle();
-		expect(client.projectStochastic).toHaveBeenCalledTimes(2);
-		expect(rendered.result().range).toMatchObject({ count: 4 });
+		await act(async () => {
+			stream().send("partial", {
+				progress: { fraction: 0.5 },
+				partial: stochasticFixture(),
+			});
+		});
+		await waitFor(() => expect(rendered.result().progress).toBe(0.5));
+		await act(async () => rendered.result().abort());
+		expect(stream().signal.aborted).toBe(true);
 		expect(rendered.result().rangeError).toBeNull();
-		expect(rendered.result().progress).toBe(1);
+		expect(useNotifications.getState().items).toHaveLength(0);
+		expect(client.projectStochastic).toHaveBeenCalledTimes(1);
 		rendered.unmount();
+	});
+
+	it("lets Query restart a canceled stream under Strict Mode", async () => {
+		const { client, stream } = scenarioStreamClient();
+		const rendered = renderHookWith(
+			() =>
+				useRemoteProjection({ client, document: modelFixture(), ranges: true }),
+			{ strictMode: true },
+		);
+		await rendered.settle();
+		expect(stream().signal.aborted).toBe(true);
+		const active = stream(-1);
+		expect(active.signal.aborted).toBe(false);
+		await act(async () => {
+			active.send("result", { result: stochasticFixture() });
+			active.close();
+		});
+		await waitFor(() => expect(rendered.result().progress).toBe(1));
+		expect(rendered.result().rangeError).toBeNull();
+		expect(useNotifications.getState().items).toHaveLength(0);
+		rendered.unmount();
+	});
+
+	it("detaches disabled consumers and cancels when none remain", async () => {
+		const { client, stream } = scenarioStreamClient();
+		let ranges = true;
+		const first = renderHook(() =>
+			useRemoteProjection({ client, document: modelFixture(), ranges }),
+		);
+		const second = renderHook(() =>
+			useRemoteProjection({ client, document: modelFixture(), ranges }),
+		);
+		await first.settle();
+		ranges = false;
+		first.rerender();
+		expect(stream().signal.aborted).toBe(false);
+		second.rerender();
+		expect(stream().signal.aborted).toBe(true);
+		expect(first.result().range).toBeNull();
+		expect(first.result().progress).toBe(0);
+		first.unmount();
+		second.unmount();
+	});
+
+	it.each(["button", "notice"])(
+		"shares stream errors and retries through the %s",
+		async (retryFrom) => {
+			const { client, stream } = scenarioStreamClient();
+			const consume = () =>
+				useRemoteProjection({ client, document: modelFixture(), ranges: true });
+			const first = renderHook(consume);
+			const second = renderHook(consume);
+			await first.settle();
+			await act(async () => {
+				stream().send("partial", {
+					progress: { fraction: 0.5 },
+					partial: stochasticFixture(),
+				});
+				stream().send("error", { error: "range failed" });
+				stream().close();
+			});
+			await waitFor(() => {
+				expect(first.result().rangeError).toBe("range failed");
+				expect(second.result().rangeError).toBe("range failed");
+			});
+			expect(client.projectStochastic).toHaveBeenCalledTimes(1);
+			await act(async () => {
+				if (retryFrom === "button") second.result().retryRange();
+				else {
+					const action = useNotifications.getState().items[0]?.action;
+					if (!action) throw new Error("Expected a shared retry notice");
+					action.onAction();
+				}
+			});
+			await waitFor(() =>
+				expect(client.projectStochastic).toHaveBeenCalledTimes(2),
+			);
+			await waitFor(() => {
+				expect(first.result().progress).toBe(0);
+				expect(second.result().range).toBeNull();
+				expect(second.result().rangeError).toBeNull();
+			});
+			await act(async () => {
+				stream(1).send("result", { result: stochasticFixture() });
+				stream(1).close();
+			});
+			await waitFor(() => {
+				expect(first.result().progress).toBe(1);
+				expect(second.result().progress).toBe(1);
+			});
+			expect(useNotifications.getState().items).toHaveLength(0);
+			first.unmount();
+			second.unmount();
+		},
+	);
+
+	it("cancels shared work at session change and ignores late retired results", async () => {
+		// Deliberately ignore abort in the transport to test the publication guard.
+		const { client, stream } = scenarioStreamClient(false);
+		const consume = () =>
+			useRemoteProjection({ client, document: modelFixture(), ranges: true });
+		const first = renderHook(consume);
+		const second = renderHook(consume);
+		await first.settle();
+		await act(async () => {
+			stream().send("partial", {
+				progress: { fraction: 0.5 },
+				partial: stochasticFixture(),
+			});
+		});
+		await waitFor(() => expect(second.result().progress).toBe(0.5));
+		await act(async () => {
+			suspendResourceScope();
+			await clearResourceQueryCache();
+			expect(stream().signal.aborted).toBe(true);
+			first.unmount();
+			second.unmount();
+		});
+		expect(stream().signal.aborted).toBe(true);
+		await act(async () => {
+			stream().send("result", { result: stochasticFixture() });
+			stream().close();
+		});
+		expect(serverQueryClient().getQueryCache().getAll()).toHaveLength(0);
+		expect(useNotifications.getState().items).toHaveLength(0);
+		acceptResourceScope(
+			{
+				apiBaseUrl: "http://localhost",
+				resource: {
+					id: "plans/other",
+					kind: "private",
+					permissions: ["plan:read", "plan:project"],
+				},
+				subject: "other",
+			},
+			suspendResourceScope(),
+		);
+		const nextOwner = renderHook(consume);
+		await nextOwner.settle();
+		expect(client.projectStochastic).toHaveBeenCalledTimes(2);
+		expect(nextOwner.result().range).toBeNull();
+		nextOwner.unmount();
+		stream(1).close();
 	});
 
 	it("preserves an SSE error event as the range error", async () => {
