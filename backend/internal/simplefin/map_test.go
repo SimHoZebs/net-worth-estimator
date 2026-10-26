@@ -45,10 +45,8 @@ const fixtureAccountSet = `{
   ]
 }`
 
-func fixtureConfig() Config {
-	return Config{
-		CardAccounts: map[string]struct{}{"prime_card": {}},
-	}
+func fixtureCards() map[string]struct{} {
+	return map[string]struct{}{"prime_card": {}}
 }
 
 func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
@@ -56,7 +54,7 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if err := json.Unmarshal([]byte(fixtureAccountSet), &set); err != nil {
 		t.Fatalf("decode fixture: %v", err)
 	}
-	plan, err := Map(&set, fixtureConfig(), map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
+	plan, err := Map(&set, fixtureCards(), map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
 	if err != nil {
 		t.Fatalf("map: %v", err)
 	}
@@ -126,7 +124,7 @@ func TestMapPreservesExactUpstreamTransactionKeys(t *testing.T) {
 				set.Accounts[1].Transactions[i].ID = key
 			}
 		}
-		plan, err := Map(&set, fixtureConfig(), map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
+		plan, err := Map(&set, fixtureCards(), map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
 		if err != nil || len(plan.Pending) != 1 || plan.Pending[0].TransactionID != key || plan.Pending[0].ID != "" {
 			t.Fatalf("upstream key was changed: plan %+v, err %v", plan, err)
 		}

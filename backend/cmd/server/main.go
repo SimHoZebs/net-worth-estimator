@@ -84,18 +84,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure plan resources: %v", err)
 	}
-	syncStore, err := bridgeStore(database, identityConfig.Issuer, resources.OwnerSubject, os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL") != "")
+	syncStore, err := ownerSyncStore(database, identityConfig.Issuer, resources.OwnerSubject)
 	if err != nil {
 		log.Fatalf("configure SimpleFIN plan: %v", err)
-	}
-	if syncStore == nil {
-		// No env key and no owner plan at boot (fresh install): start
-		// unconfigured. After first login provisions the plan and the key
-		// is connected, restart once so startup can scope the runner.
-		syncStore, err = bridgeBYOKStore(database, identityConfig.Issuer, resources.OwnerSubject)
-		if err != nil {
-			log.Fatalf("configure SimpleFIN BYOK plan: %v", err)
-		}
 	}
 	syncRunner, syncStop := configureSync(syncStore)
 	defer syncStop()

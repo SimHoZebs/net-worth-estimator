@@ -54,7 +54,6 @@ const env = {
   NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT: subject,
   NET_WORTH_ESTIMATOR_READ_ONLY: '',
   NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: origin.origin,
-  NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL: '',
 };
 // Retired split-storage settings must not leak from the operator's environment.
 for (const key of ['NET_WORTH_ESTIMATOR_SAMPLE_DB', 'NET_WORTH_ESTIMATOR_PLANS_DIR', 'NET_WORTH_ESTIMATOR_AUTH_SESSION_DB']) delete env[key];

@@ -529,13 +529,13 @@ The seed controls the state sequence. Run-count normalization and seed-null beha
 
 `internal/simplefin` is configured once in `cmd/server`:
 
-- `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` enables a real Bridge runner.
+- The Bridge key is connected per plan through `POST /v1/sync/simplefin/credential` and stored in `sync_credentials`. The old `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` and `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` environment variables are retired.
 - Account links live in the `account_links` table.
-- `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` selects model accounts eligible for pending-charge seeds.
+- Card selection is stored per plan in `sync_credentials` and selects model accounts eligible for pending-charge seeds.
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.
 - A bridge account that vanishes keeps its link, rows, and data (stale, never deleted by sync).
 
-`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through links plus env bootstrap, provisions unmapped USD accounts, then `Map` emits one balance checkpoint per resolved account/date and only pending negative card charges as disabled postings. Posted, positive, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
+`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Map` emits one balance checkpoint per resolved account/date and only pending negative card charges as disabled postings. Posted, positive, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
 
 `Store.ApplySyncPlan` applies checkpoints and the pending snapshot in one transaction. Owner checkpoints win key collisions. Exact provider/account/transaction keys map to store-allocated UUIDs. Repeated snapshots update those same rows. Only absent rows with the matching provider, model account, and explicit pending state are deleted. Summary counters distinguish `pendingInserted`, `pendingUpdated`, and `pendingDeleted`.
 

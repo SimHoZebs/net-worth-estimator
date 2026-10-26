@@ -385,15 +385,18 @@ Expected status: 200. Also verify unsupported preflight methods and request head
 
 ## SimpleFIN Checks
 
-For live Bridge verification, set the access URL and card set:
+For live Bridge verification, connect a key through the credential endpoint
+with a writable owner session and its resource assertion (the retired
+environment variables are ignored):
 
 ```bash
-export NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL=https://bridge.simplefin.org/simplefin/claim/...
-export NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS=prime_card
+curl -fsS -X POST "$BASE_URL/v1/sync/simplefin/credential" \
+  -H 'Content-Type: application/json' \
+  --data-binary '{"setupToken":"<pasted-base64-token>"}' | jq .
 CGO_ENABLED=0 go -C backend run ./cmd/server
 ```
 
-With a writable owner session and its resource assertion, trigger and inspect counts:
+Then select card accounts and trigger, and inspect counts:
 
 ```bash
 curl -fsS -X POST "$BASE_URL/v1/sync/simplefin" | jq .

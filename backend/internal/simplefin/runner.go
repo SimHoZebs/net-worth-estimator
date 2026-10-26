@@ -68,10 +68,10 @@ func (e *NotConfiguredError) Error() string {
 	return "simplefin sync is not configured"
 }
 
-// CredentialProvider resolves the current Bridge credential. It reads the
-// per-plan database credential with an environment fallback so connecting a
-// key needs no restart. Card selection unions the stored per-plan set with
-// the configured environment set.
+// CredentialProvider resolves the current per-plan Bridge credential from
+// the database: the access URL plus the card selection. Connecting,
+// rotating, or disconnecting a key takes effect on the next run with no
+// restart.
 type CredentialProvider func() (accessURL string, cards map[string]struct{})
 
 // Runner orchestrates fetch, map, and apply. The zero value is unusable;
@@ -127,12 +127,11 @@ func (r *Runner) rateLimitWait(rateLimited *RateLimitedError) time.Duration {
 // When client is non-nil the provider resolves its AccessURL so status and
 // fetch never disagree.
 func NewRunner(database store.Store, config Config, client *Client) *Runner {
-	staticAccessURL := config.AccessURL
+	var provider CredentialProvider
 	if client != nil {
-		staticAccessURL = client.AccessURL
+		accessURL := client.AccessURL
+		provider = func() (string, map[string]struct{}) { return accessURL, nil }
 	}
-	staticCards := config.CardAccounts
-	provider := func() (string, map[string]struct{}) { return staticAccessURL, staticCards }
 	runner := &Runner{store: database, config: config, credential: provider, now: time.Now}
 	if client != nil {
 		httpClient := client.HTTPClient
@@ -149,11 +148,8 @@ func NewRunner(database store.Store, config Config, client *Client) *Runner {
 }
 
 // NewRunnerWithProvider builds a runner whose Bridge credential resolves per
-// run from the provider (database credential with environment fallback).
+// run from the provider (database credential).
 func NewRunnerWithProvider(database store.Store, config Config, provider CredentialProvider, httpClient *http.Client) *Runner {
-	if provider == nil {
-		provider = func() (string, map[string]struct{}) { return config.AccessURL, config.CardAccounts }
-	}
 	runner := &Runner{store: database, config: config, credential: provider, httpClient: httpClient, now: time.Now}
 	runner.fetch = runner.fetchWithCredential
 	return runner
@@ -169,14 +165,13 @@ func (r *Runner) fetchWithCredential(ctx context.Context, start, end time.Time) 
 	return (&Client{AccessURL: accessURL, HTTPClient: r.httpClient}).Fetch(ctx, start, end)
 }
 
-// resolveCredential returns the current access URL and effective card set.
+// resolveCredential returns the current access URL and card set from the
+// provider, or empty values when no provider is set.
 func (r *Runner) resolveCredential() (string, map[string]struct{}) {
 	if r.credential != nil {
-		if accessURL, cards := r.credential(); accessURL != "" || cards != nil {
-			return accessURL, cards
-		}
+		return r.credential()
 	}
-	return r.config.AccessURL, r.config.CardAccounts
+	return "", nil
 }
 
 // IsConfigured reports whether a Bridge credential is available.
@@ -197,13 +192,9 @@ func (r *Runner) BridgeHost() string {
 	return BridgeHost(accessURL)
 }
 
-// effectiveCards unions the configured environment cards with the
-// credential-provided per-plan cards.
+// effectiveCards returns the credential-provided per-plan card set.
 func (r *Runner) effectiveCards() map[string]struct{} {
 	merged := map[string]struct{}{}
-	for id := range r.config.CardAccounts {
-		merged[id] = struct{}{}
-	}
 	if _, cards := r.resolveCredential(); cards != nil {
 		for id := range cards {
 			merged[id] = struct{}{}
@@ -264,9 +255,8 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	for _, link := range links {
 		resolved[link.BridgeAccountID] = link.ModelAccountID
 	}
-	effectiveConfig := r.config
-	effectiveConfig.CardAccounts = r.effectiveCards()
-	plan, err := Map(set, effectiveConfig, resolved, now)
+	cardsByID := r.effectiveCards()
+	plan, err := Map(set, cardsByID, resolved, now)
 	if err != nil {
 		return nil, err
 	}
@@ -307,8 +297,8 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 			Balance:   checkpoint.Balance,
 		})
 	}
-	cards := make([]string, 0, len(effectiveConfig.CardAccounts))
-	for accountID := range effectiveConfig.CardAccounts {
+	cards := make([]string, 0, len(cardsByID))
+	for accountID := range cardsByID {
 		cards = append(cards, accountID)
 	}
 	applied, err := r.store.ApplySyncPlan(checkpoints, plan.Pending, cards)

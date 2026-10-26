@@ -88,7 +88,9 @@ func TestStatusReportsSyncConfigurationAndLastSync(t *testing.T) {
 		t.Fatalf("status = %v, want no lastSyncAt before any sync", unconfigured)
 	}
 
-	runner := simplefin.NewRunner(database, simplefin.Config{AccessURL: "https://user:pass@bridge.example/simplefin"}, nil)
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+		return "https://user:pass@bridge.example/simplefin", nil
+	}, nil)
 	configured := New(database, Config{SyncRunner: runner})
 	if err := database.SetLastSyncTime("2026-10-18T14:30:00Z"); err != nil {
 		t.Fatalf("record last sync: %v", err)
