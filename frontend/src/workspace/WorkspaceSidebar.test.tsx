@@ -3,11 +3,11 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ServerStatus } from "../api/index.ts";
 import { SessionContext, type Session } from "../auth/sessionContext.ts";
-import {
-	resetWorkspaceStore,
-	useWorkspaceStore,
-} from "../state/workspaceStore.ts";
+import { resetWorkspaceStore } from "../state/workspaceStore.ts";
 import { WorkspaceSidebar } from "./WorkspaceSidebar.tsx";
+import { acceptTestResource } from "../test/resource.ts";
+import { setServerStatusFixture } from "../test/workspace.ts";
+import { resetServerQueryCache } from "../state/serverQuery.ts";
 
 vi.mock("../components/ThemeToggle.tsx", () => ({ ThemeToggle: () => null }));
 
@@ -30,20 +30,22 @@ function localSyncTime(value: string) {
 }
 
 describe("sidebar sync signals", () => {
-	beforeEach(() => resetWorkspaceStore());
+	beforeEach(() => {
+		acceptTestResource();
+		resetWorkspaceStore();
+		resetServerQueryCache();
+	});
 	afterEach(() => {
 		cleanup();
 		resetWorkspaceStore();
 	});
 
 	it("shows the server's last successful sync in browser-local time, including read-only mode", () => {
-		useWorkspaceStore.setState({
-			status: {
-				...baseStatus,
-				readOnly: true,
-				syncConfigured: true,
-				lastSyncAt,
-			},
+		setServerStatusFixture({
+			...baseStatus,
+			readOnly: true,
+			syncConfigured: true,
+			lastSyncAt,
 		});
 		const view = renderSidebar();
 		expect(
@@ -65,7 +67,7 @@ describe("sidebar sync signals", () => {
 	] satisfies [ServerStatus | null, string][])(
 		"renders honest sync state for %j",
 		(status, label) => {
-			useWorkspaceStore.setState({ status });
+			if (status) setServerStatusFixture(status);
 			const view = renderSidebar();
 			expect(view.getByText(label)).toBeTruthy();
 			expect(view.container.querySelector("time")).toBeNull();
@@ -73,8 +75,10 @@ describe("sidebar sync signals", () => {
 	);
 
 	it("preserves a recorded sync time when sync is no longer configured", () => {
-		useWorkspaceStore.setState({
-			status: { ...baseStatus, syncConfigured: false, lastSyncAt },
+		setServerStatusFixture({
+			...baseStatus,
+			syncConfigured: false,
+			lastSyncAt,
 		});
 		const view = renderSidebar();
 		expect(
@@ -82,19 +86,19 @@ describe("sidebar sync signals", () => {
 		).toBeTruthy();
 	});
 
-	it("updates the timestamp when server status changes", () => {
-		useWorkspaceStore.setState({
-			status: { ...baseStatus, syncConfigured: true },
-		});
+	it("updates the timestamp when server status changes", async () => {
+		setServerStatusFixture({ ...baseStatus, syncConfigured: true });
 		const view = renderSidebar();
 		expect(view.getByText("Never synced")).toBeTruthy();
-		act(() => {
-			useWorkspaceStore.setState({
-				status: { ...baseStatus, syncConfigured: true, lastSyncAt },
+		await act(async () => {
+			setServerStatusFixture({
+				...baseStatus,
+				syncConfigured: true,
+				lastSyncAt,
 			});
 		});
 		expect(
-			view.getByText(`Last synced ${localSyncTime(lastSyncAt)}`),
+			await view.findByText(`Last synced ${localSyncTime(lastSyncAt)}`),
 		).toBeTruthy();
 		expect(view.queryByText("Never synced")).toBeNull();
 	});

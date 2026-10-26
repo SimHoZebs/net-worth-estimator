@@ -6,39 +6,35 @@ import {
 } from "../auth/resourceScope.ts";
 import { useSession } from "../auth/sessionContext.ts";
 import { type RemoteApiClient, useWorkspaceStore } from "./workspaceStore.ts";
+import {
+	useAmountPresets,
+	useServerModel,
+	useServerStatus,
+} from "./workspaceResources.ts";
 import { useWorkspaceSyncMonitor } from "./useWorkspaceSyncMonitor.ts";
 
-interface WorkspaceStartupOptions {
-	client?: RemoteApiClient;
-}
-
-const defaultClient = defaultScopedApiClient;
-
-/** Bind and boot the store engine. Screens subscribe to their own state. */
 export function useWorkspaceStartup({
 	client,
-}: WorkspaceStartupOptions = {}): void {
+}: { client?: RemoteApiClient } = {}): void {
 	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
 	const resourceId = useSession()?.session.resource.id;
-	const api = useMemo(() => {
-		// The session boundary publishes a new owner after its preferences load.
-		if (
-			scope.status !== "ready" ||
-			(resourceId && resourceId !== scope.resource?.id)
-		)
-			return null;
-		return client ?? defaultClient();
-	}, [client, scope, resourceId]);
-	useWorkspaceSyncMonitor(api);
-	const bindEngine = useWorkspaceStore((state) => state.bindEngine);
-	const bootWorkspace = useWorkspaceStore((state) => state.bootWorkspace);
-	const shutdownWorkspace = useWorkspaceStore(
-		(state) => state.shutdownWorkspace,
+	const enabled =
+		scope.status === "ready" &&
+		(!resourceId || resourceId === scope.resource?.id);
+	const api = useMemo(
+		() =>
+			scope.status === "ready" ? (client ?? defaultScopedApiClient()) : null,
+		[client, scope],
 	);
+	const model = useServerModel({ client: api ?? undefined, enabled });
+	useServerStatus({ client: api ?? undefined, enabled });
+	useAmountPresets({ client: api ?? undefined, enabled });
+	useWorkspaceSyncMonitor(enabled ? api : null);
 	useEffect(() => {
-		if (!api) return;
-		bindEngine(api);
-		bootWorkspace();
-		return () => shutdownWorkspace();
-	}, [bindEngine, bootWorkspace, shutdownWorkspace, api, scope]);
+		if (enabled) useWorkspaceStore.getState().restore(scope);
+	}, [enabled, scope]);
+	useEffect(() => {
+		if (enabled && model.data)
+			useWorkspaceStore.getState().reconcile(model.data);
+	}, [enabled, model.data]);
 }

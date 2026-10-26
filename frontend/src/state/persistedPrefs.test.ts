@@ -23,10 +23,11 @@ import { useThemeStore } from "./useTheme.ts";
 import {
 	resetSafeSpendingSettings,
 	sanitizeSafeSpendingSettings,
-	useSafeSpendingSettings,
 	defaultSafeSpendingSettings,
 	hydrateFinancialPreferences,
+	refreshSafeSpendingSettings,
 } from "./useSafeSpendingSettings.ts";
+import { safeSpendingSettingsObserver as useSafeSpendingSettings } from "../test/safeSpendingSettings.ts";
 
 function memoryStorage(): Storage {
 	const values = new Map<string, string>();
@@ -172,7 +173,7 @@ describe("unified persisted prefs", () => {
 		vi.mocked(ApiClient.prototype.getSafeSpendingSettings).mockResolvedValue({
 			settings: { ...defaultSafeSpendingSettings(), reserve: 123 },
 		});
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		expect(useSafeSpendingSettings.getState().reserve).toBe(123);
 		expect(ApiClient.prototype.setSafeSpendingSettings).not.toHaveBeenCalled();
 	});
@@ -195,7 +196,7 @@ describe("unified persisted prefs", () => {
 	it("serializes rapid edits and stores them only in the backend", async () => {
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 123 });
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 456 });
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		expect(
 			vi
 				.mocked(ApiClient.prototype.setSafeSpendingSettings)
@@ -245,7 +246,7 @@ describe("unified persisted prefs", () => {
 				mandatoryFrame: "cycle",
 			}),
 		);
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		const state = useSafeSpendingSettings.getState();
 		expect(state.statementDay).toBe(5);
 		expect(state.reserve).toBe(100);
@@ -257,13 +258,13 @@ describe("unified persisted prefs", () => {
 		useSafeSpendingSettings
 			.getState()
 			.updateSettings({ incomeRuleIds: ["salary", "partner"] });
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		expect(useSafeSpendingSettings.getState().incomeRuleIds).toEqual([
 			"salary",
 			"partner",
 		]);
 		useSafeSpendingSettings.getState().updateSettings({ incomeRuleIds: [] });
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		expect(useSafeSpendingSettings.getState().incomeRuleIds).toEqual([]);
 	});
 
@@ -287,7 +288,7 @@ describe("unified persisted prefs", () => {
 				version: 4,
 			}),
 		);
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		const state = useSafeSpendingSettings.getState();
 		expect(state.reserve).toBe(100);
 		expect(state.incomeRuleIds).toEqual(["salary"]);
@@ -296,7 +297,7 @@ describe("unified persisted prefs", () => {
 			expect(state).not.toHaveProperty(key);
 		state.updateSettings({ reserve: 200 });
 		expect(window.localStorage.getItem(financialKey())).toBeNull();
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		expect(
 			vi.mocked(ApiClient.prototype.setSafeSpendingSettings).mock.lastCall?.[0],
 		).not.toHaveProperty("checkingOverride");
@@ -342,7 +343,7 @@ describe("financial preference owner isolation", () => {
 			movementIds: ["private-a-bill"],
 		};
 		useSafeSpendingSettings.getState().updateSettings(settingsA);
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		await verifyOwner(B);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
@@ -357,7 +358,7 @@ describe("financial preference owner isolation", () => {
 			movementIds: ["private-b-bill"],
 		};
 		useSafeSpendingSettings.getState().updateSettings(settingsB);
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		await verifyOwner("plans/sample");
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
@@ -365,7 +366,7 @@ describe("financial preference owner isolation", () => {
 		useSafeSpendingSettings
 			.getState()
 			.updateSettings({ reserve: 42, incomeRuleIds: ["sample-income"] });
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(settingsA);
 		await verifyOwner(B);
@@ -380,7 +381,7 @@ describe("financial preference owner isolation", () => {
 	it("resets synchronously during verification and rejects stale actions without overwriting saved preferences", async () => {
 		const oldAction = useSafeSpendingSettings.getState().updateSettings;
 		oldAction({ reserve: 123, incomeRuleIds: ["private-a-income"] });
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		const keyA = financialKey();
 		const rawA = window.localStorage.getItem(keyA);
 		suspendResourceScope();
@@ -433,7 +434,7 @@ describe("financial preference owner isolation", () => {
 		useUiStore.getState().setYears(30);
 		useUiStore.getState().setRanges(false);
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 100 });
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		await verifyOwner(A, "https://different-api.example");
 		expect(useSafeSpendingSettings.getState().reserve).toBe(
 			defaultSafeSpendingSettings().reserve,
@@ -442,7 +443,7 @@ describe("financial preference owner isolation", () => {
 		useSafeSpendingSettings
 			.getState()
 			.updateSettings({ reserve: 200, incomeRuleIds: ["sample-income"] });
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState().reserve).toBe(100);
 		await verifyOwner("plans/sample");
@@ -473,7 +474,7 @@ describe("financial preference owner isolation", () => {
 		useSafeSpendingSettings
 			.getState()
 			.updateSettings({ reserve: 111, movementIds: ["private-a-bill"] });
-		await useSafeSpendingSettings.persist.rehydrate();
+		await refreshSafeSpendingSettings();
 		await verifyOwner(B);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),

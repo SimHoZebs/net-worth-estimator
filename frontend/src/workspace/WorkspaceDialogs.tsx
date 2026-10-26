@@ -5,9 +5,9 @@ import { Skeleton } from "../components/Skeleton.tsx";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import {
 	selectDraftChangeCount,
-	selectPlan,
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
+import { usePlan } from "../state/useWorkspacePlan.ts";
 import type { WorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 
 const EvidenceDialog = lazy(() =>
@@ -27,7 +27,7 @@ export function WorkspaceEvidence({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const plan = useWorkspaceStore(selectPlan);
+	const plan = usePlan();
 	// Evidence subscribes to the base case only while its dialog is open.
 	if (!overlays.evidence) return null;
 	if (overlays.evidence.kind === "position")
@@ -44,8 +44,8 @@ function WorkspaceEvidenceLoaded({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const plan = useWorkspaceStore(selectPlan);
-	const hasDraft = useWorkspaceStore((state) => state.workspace?.draft != null);
+	const plan = usePlan();
+	const hasDraft = useWorkspaceStore((state) => state.draft != null);
 	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	const projection = useRemoteProjection({ ranges: false });
 	const base =
@@ -79,7 +79,7 @@ export function WorkspaceDialogs({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const plan = useWorkspaceStore(selectPlan);
+	const plan = usePlan();
 	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	const applyError = useWorkspaceStore((state) => state.error);
 	const changeCount = useWorkspaceStore(selectDraftChangeCount);

@@ -645,10 +645,12 @@ export class ApiClient {
 		);
 	}
 
-	getSafeSpendingSettings(): Promise<Error | SafeSpendingSettingsResponse> {
+	getSafeSpendingSettings(
+		options: ApiRequestOptions = {},
+	): Promise<Error | SafeSpendingSettingsResponse> {
 		return this.requestJson<SafeSpendingSettingsResponse>(
 			"safe-spending-settings",
-			requestInit("GET", undefined, {}),
+			requestInit("GET", undefined, options),
 		);
 	}
 

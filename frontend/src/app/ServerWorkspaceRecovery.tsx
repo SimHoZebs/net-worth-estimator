@@ -8,7 +8,13 @@ import { ModelImportPreview } from "../components/imports/ModelImportPreview.tsx
 import { dismissKey, notifyError } from "../state/notifications.ts";
 import { useFileReview } from "../state/useFileReview.ts";
 import { useServerModelImport } from "../state/useServerModelImport.ts";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
+import {
+	reloadWorkspace,
+	useServerModel,
+	useServerStatus,
+} from "../state/workspaceResources.ts";
+import { importServerDocument } from "../state/workspaceWrites.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { WorkspaceTopbar } from "../workspace/WorkspaceHeader.tsx";
 import { WorkspaceLayout } from "../workspace/WorkspaceLayout.tsx";
@@ -17,18 +23,10 @@ import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar.tsx";
 export function ServerWorkspaceRecovery() {
 	// Terminal load states subscribe everything they display, including the
 	// model import flow and access control.
-	const status = useWorkspaceStore((state) => state.status);
-	const serverDocument = useWorkspaceStore((state) => state.serverDocument);
-	const statusReadOnly = useWorkspaceStore(
-		(state) => state.status?.readOnly ?? false,
-	);
-	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
-	const readOnly = statusReadOnly || writeBlocked;
-	const errorCode = useWorkspaceStore((state) => state.errorCode);
-	const retry = useWorkspaceStore((state) => state.retry);
-	const importServerDocument = useWorkspaceStore(
-		(state) => state.importServerDocument,
-	);
+	const status = useServerStatus().data;
+	const serverDocument = useServerModel().data?.document;
+	const readOnly = useWorkspaceReadOnly();
+	const retry = reloadWorkspace;
 	const { importDocument } = useServerModelImport({
 		preconditions: {
 			hasWorkspace: false,
@@ -54,9 +52,7 @@ export function ServerWorkspaceRecovery() {
 	const failImport = (message: string) => {
 		notifyError("model-import", message);
 	};
-	const missingModel =
-		status !== null &&
-		(serverDocument === null || errorCode === "missing-model");
+	const missingModel = status !== undefined && serverDocument === null;
 	const importCandidate = async () => {
 		if (!candidate || readOnly) return;
 		clearCandidate();

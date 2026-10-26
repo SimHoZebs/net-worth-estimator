@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApiClient } from "../api/index.ts";
 import {
 	acceptResourceScope,
@@ -6,194 +6,121 @@ import {
 } from "../auth/resourceScope.ts";
 import { resetNotifications, useNotifications } from "./notifications.ts";
 import {
+	pinnedEvaluationsKey,
+	refreshPins,
 	resetPinnedEvaluationsClient,
-	usePinnedEvaluationsStore,
+	togglePin,
 } from "./pinnedEvaluations.ts";
+import { serverQueryClient } from "./serverQuery.ts";
 
-function fakeClient(
-	pins: string[],
-	failPut = false,
-): Pick<ApiClient, "getPinnedEvaluations" | "setPinnedEvaluations"> {
+function client(ids: string[] = [], fail = false) {
 	return {
-		getPinnedEvaluations: async () => ({ instanceIds: [...pins] }),
-		setPinnedEvaluations: async (next: string[]) =>
-			failPut
-				? new Error("The server is read-only.")
-				: { instanceIds: [...next] },
-	} as Pick<ApiClient, "getPinnedEvaluations" | "setPinnedEvaluations">;
+		getPinnedEvaluations: vi.fn(async () => ({ instanceIds: ids })),
+		setPinnedEvaluations: vi.fn(async (next: string[]) =>
+			fail ? new Error("Read-only") : { instanceIds: next },
+		),
+	} as unknown as ApiClient;
 }
 
-function countingClient(pins: string[]): {
-	calls: () => number;
-	client: ApiClient;
-} {
-	let calls = 0;
-	return {
-		calls: () => calls,
-		client: {
-			getPinnedEvaluations: async () => {
-				calls += 1;
-				return { instanceIds: [...pins] };
-			},
-			setPinnedEvaluations: async (next: string[]) => ({
-				instanceIds: [...next],
-			}),
-		} as unknown as ApiClient,
-	};
-}
+const pins = () =>
+	serverQueryClient().getQueryData<string[]>(pinnedEvaluationsKey());
 
 beforeEach(() => {
+	resetNotifications();
+	resetPinnedEvaluationsClient();
 	acceptResourceScope(
 		{
 			apiBaseUrl: "http://localhost",
 			resource: {
 				id: "plans/sample",
 				kind: "sample",
-				permissions: ["plan:read", "plan:project"],
+				permissions: ["plan:read"],
 			},
 			subject: null,
 		},
 		suspendResourceScope(),
 	);
-	usePinnedEvaluationsStore.setState({
-		ids: null,
-		loading: false,
-		error: null,
-	});
-	resetPinnedEvaluationsClient();
 });
 
-afterEach(() => {
-	resetNotifications();
-});
-
-describe("pinned evaluations", () => {
-	it("clears pins at a resource transition before another account can render", async () => {
-		await usePinnedEvaluationsStore
-			.getState()
-			.refresh(fakeClient(["private-a"]) as ApiClient);
-		suspendResourceScope();
-		expect(usePinnedEvaluationsStore.getState()).toMatchObject({
-			ids: null,
-			loading: false,
-			error: null,
-		});
+describe("query-owned pins", () => {
+	it("loads in server order and deduplicates concurrent reads", async () => {
+		const api = client(["b", "a"]);
+		await Promise.all([refreshPins(api), refreshPins(api)]);
+		expect(pins()).toEqual(["b", "a"]);
+		expect(api.getPinnedEvaluations).toHaveBeenCalledTimes(1);
+		await refreshPins(api);
+		expect(api.getPinnedEvaluations).toHaveBeenCalledTimes(1);
+		await refreshPins(api, true);
+		expect(api.getPinnedEvaluations).toHaveBeenCalledTimes(2);
 	});
 
-	it.each(["refresh", "toggle"] as const)(
-		"ignores a late %s completion from the previous account",
+	it("toggles and rolls back failures", async () => {
+		await refreshPins(client(["a"]));
+		expect(await togglePin("b", client())).toBe(true);
+		expect(pins()).toEqual(["a", "b"]);
+		expect(await togglePin("c", client([], true))).toBe(false);
+		expect(pins()).toEqual(["a", "b"]);
+		expect(useNotifications.getState().items[0]?.action?.label).toBe(
+			"Reload pins",
+		);
+		expect(await togglePin("a", client())).toBe(true);
+		expect(pins()).toEqual(["b"]);
+	});
+
+	it("serializes rapid toggles against the latest accepted order", async () => {
+		const api = client();
+		await refreshPins(api);
+		await Promise.all([togglePin("a", api), togglePin("b", api)]);
+		expect(pins()).toEqual(["a", "b"]);
+		expect(api.setPinnedEvaluations).toHaveBeenNthCalledWith(2, ["a", "b"]);
+	});
+
+	it("loads the server baseline before a first toggle", async () => {
+		const api = client(["existing"]);
+		await togglePin("new", api);
+		expect(api.setPinnedEvaluations).toHaveBeenCalledWith(["existing", "new"]);
+		expect(pins()).toEqual(["existing", "new"]);
+	});
+
+	it.each(["read", "write"])(
+		"ignores a late %s from an old resource",
 		async (operation) => {
 			let finish!: (value: { instanceIds: string[] }) => void;
 			const pending = new Promise<{ instanceIds: string[] }>((resolve) => {
 				finish = resolve;
 			});
-			const client = {
-				getPinnedEvaluations: () => pending,
-				setPinnedEvaluations: () => pending,
+			const api = {
+				getPinnedEvaluations: vi.fn(() => pending),
+				setPinnedEvaluations: vi.fn(() => pending),
 			} as unknown as ApiClient;
-			const store = usePinnedEvaluationsStore.getState();
+			if (operation === "write")
+				serverQueryClient().setQueryData(pinnedEvaluationsKey(), []);
 			const action =
-				operation === "refresh"
-					? store.refresh(client)
-					: store.toggle("private-a", client);
+				operation === "read" ? refreshPins(api) : togglePin("private-a", api);
+			await vi.waitFor(() =>
+				expect(
+					operation === "read"
+						? api.getPinnedEvaluations
+						: api.setPinnedEvaluations,
+				).toHaveBeenCalledOnce(),
+			);
 			suspendResourceScope();
-			usePinnedEvaluationsStore.getState().reset();
 			finish({ instanceIds: ["private-a"] });
 			await action;
-			expect(usePinnedEvaluationsStore.getState()).toMatchObject({
-				ids: null,
-				loading: false,
-				error: null,
-			});
+			expect(pins()).toBeUndefined();
+			expect(
+				serverQueryClient()
+					.getQueryCache()
+					.findAll({ queryKey: ["pinned-evaluations"] }),
+			).toHaveLength(0);
 		},
 	);
 
-	it("loads pins in server order", async () => {
-		const store = usePinnedEvaluationsStore.getState();
-		await store.refresh(fakeClient(["b", "a"]) as ApiClient);
-		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["b", "a"]);
-	});
-
-	it("toggles optimistically and reverts on failure", async () => {
-		const store = usePinnedEvaluationsStore.getState();
-		await store.refresh(fakeClient([]) as ApiClient);
-		const ok = await store.toggle("x", fakeClient([]) as ApiClient);
-		expect(ok).toBe(true);
-		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["x"]);
-
-		const failed = await store.toggle(
-			"y",
-			fakeClient(["x"], true) as ApiClient,
-		);
-		expect(failed).toBe(false);
-		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["x"]);
-		expect(usePinnedEvaluationsStore.getState().error).toContain("read-only");
-	});
-
-	it("unpins an already-pinned evaluation", async () => {
-		const store = usePinnedEvaluationsStore.getState();
-		await store.refresh(fakeClient(["a", "b"]) as ApiClient);
-		await store.toggle("a", fakeClient(["a", "b"]) as ApiClient);
-		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["b"]);
-	});
-
-	it("suppresses duplicate refreshes within the TTL and refetches with force", async () => {
-		const store = usePinnedEvaluationsStore.getState();
-		const first = countingClient(["a"]);
-		await store.refresh(first.client);
-		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["a"]);
-
-		const second = countingClient(["b"]);
-		await store.refresh(second.client);
-		expect(second.calls()).toBe(0);
-		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["a"]);
-
-		await store.refresh(second.client, true);
-		expect(second.calls()).toBe(1);
-		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["b"]);
-	});
-
-	it("refetches after an error without force", async () => {
-		const store = usePinnedEvaluationsStore.getState();
-		await store.refresh(fakeClient(["a"]) as ApiClient);
-		const failed = await store.toggle(
-			"y",
-			fakeClient(["a"], true) as ApiClient,
-		);
-		expect(failed).toBe(false);
-		expect(usePinnedEvaluationsStore.getState().error).toContain("read-only");
-
-		const retry = countingClient(["a"]);
-		await store.refresh(retry.client);
-		expect(retry.calls()).toBe(1);
-		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["a"]);
-		expect(usePinnedEvaluationsStore.getState().error).toBeNull();
-	});
-
-	it("floats failures with a reload action", async () => {
-		const store = usePinnedEvaluationsStore.getState();
-		const failed = await store.toggle(
-			"y",
-			fakeClient(["x"], true) as ApiClient,
-		);
-		expect(failed).toBe(false);
-		const items = useNotifications.getState().items;
-		expect(items).toHaveLength(1);
-		expect(items[0]).toMatchObject({
-			key: "evaluation-pins",
-			kind: "error",
-		});
-		expect(items[0]?.message).toContain("read-only");
-		expect(items[0]?.action?.label).toBe("Reload pins");
-	});
-
-	it("refetches after reset within the TTL", async () => {
-		const store = usePinnedEvaluationsStore.getState();
-		await store.refresh(countingClient(["a"]).client);
-		store.reset();
-		const next = countingClient(["b"]);
-		await store.refresh(next.client);
-		expect(next.calls()).toBe(1);
-		expect(usePinnedEvaluationsStore.getState().ids).toEqual(["b"]);
+	it("retries after a failed mutation without waiting for freshness expiry", async () => {
+		await refreshPins(client(["a"]));
+		await togglePin("b", client([], true));
+		const api = client(["a"]);
+		await refreshPins(api);
+		expect(api.getPinnedEvaluations).toHaveBeenCalledOnce();
 	});
 });

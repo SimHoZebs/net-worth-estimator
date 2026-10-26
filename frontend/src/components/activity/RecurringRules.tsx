@@ -13,6 +13,10 @@ import { money } from "../../domain/format.ts";
 import type { Account, Movement, Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
+import {
+	useServerModel,
+	useServerStatus,
+} from "../../state/workspaceResources.ts";
 import { Badge } from "../Badge.tsx";
 import { EmptyState } from "../EmptyState.tsx";
 import { Button, IconButton, TextButton } from "../Button.tsx";
@@ -21,7 +25,6 @@ import {
 	transactionBadgeStyles,
 } from "./activityStyles.ts";
 import { MovementDetail } from "./TransactionDetail.tsx";
-import { useSelectedId } from "../entrySelection.ts";
 
 type Direction = "in" | "out" | "transfer";
 
@@ -113,16 +116,15 @@ export function RecurringRules({
 	onEdit: (target: EditorTarget) => void;
 }) {
 	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
-	const status = useWorkspaceStore((state) => state.status);
-	const serverDocument = useWorkspaceStore((state) => state.serverDocument);
+	const status = useServerStatus().data;
+	const model = useServerModel().data;
+	const serverDocument = model?.document;
 	const draftPresentation = useWorkspaceStore(
 		(state) => state.draftPresentation,
 	);
-	const savedPresentation = useWorkspaceStore(
-		(state) => state.savedPresentation,
-	);
+	const savedPresentation = model?.conversion?.presentation;
 	const [editing, setEditing] = useState(false);
-	const [selectedId, setSelectedId] = useSelectedId(plan);
+	const [selectedId, setSelectedId] = useState<string | null>(null);
 
 	const presentation = draftPresentation ?? savedPresentation;
 	const serverRules = useMemo(
@@ -144,6 +146,8 @@ export function RecurringRules({
 			),
 		[globalRecurring, account.id],
 	);
+	if (selectedId !== null && !rules.some((rule) => rule.id === selectedId))
+		setSelectedId(null);
 
 	const detailFor = (movement: Movement) => {
 		const stored = presentation?.movements[movement.id];
@@ -169,7 +173,7 @@ export function RecurringRules({
 			cursor += 1;
 			return next ?? movement;
 		});
-		updatePlan({ ...plan, movements });
+		return updatePlan({ ...plan, movements });
 	};
 
 	// Local drag order. Reorder fires onReorder continuously mid-drag, so
@@ -210,7 +214,10 @@ export function RecurringRules({
 			current.length !== next.length ||
 			current.some((id, index) => id !== next[index])
 		) {
-			persistOrder(next);
+			if (!persistOrder(next)) {
+				localIdsRef.current = current;
+				setLocalIds(current);
+			}
 		}
 	};
 

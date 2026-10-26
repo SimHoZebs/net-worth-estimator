@@ -1,5 +1,4 @@
 import { Wallet } from "lucide-react";
-import { useEffect } from "react";
 import type { BackendCheckpoint } from "../api/contracts.ts";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
@@ -7,10 +6,14 @@ import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
 import { Notice } from "../components/Notice.tsx";
 import { TextButton } from "../components/Button.tsx";
 import { useCurrentPosition } from "../state/useCurrentPosition.ts";
-import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
+import { usePinnedEvaluations } from "../state/pinnedEvaluations.ts";
 import { useUiStore } from "../state/uiStore.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { useWorkspaceStore, selectPlan } from "../state/workspaceStore.ts";
+import { usePlan, useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
+import {
+	useServerModel,
+	useServerStatus,
+} from "../state/workspaceResources.ts";
 import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
 import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
 import type { SafeSpendingDetailTab } from "./outlook/safe-spending/safeSpendingDetailModel.ts";
@@ -61,10 +64,9 @@ function OutlookContent({
 }: OutlookProps) {
 	// Every data input subscribes where the query is declared; only UI
 	// callbacks arrive as props.
-	const checkpoints = useWorkspaceStore(
-		(state) => state.serverDocument?.checkpoints ?? EMPTY_CHECKPOINTS,
-	);
-	const plan = useWorkspaceStore(selectPlan);
+	const checkpoints =
+		useServerModel().data?.document?.checkpoints ?? EMPTY_CHECKPOINTS;
+	const plan = usePlan();
 	const years = useUiStore((state) => state.years);
 	const setYears = useUiStore((state) => state.setYears);
 	const ranges = useUiStore((state) => state.ranges);
@@ -75,15 +77,13 @@ function OutlookContent({
 	const position = useCurrentPosition({
 		enabled: (plan?.accounts.length ?? 0) > 0,
 	});
-	const pinnedIds = usePinnedEvaluationsStore((state) => state.ids);
-	const refreshPins = usePinnedEvaluationsStore((state) => state.refresh);
-	const togglePin = usePinnedEvaluationsStore((state) => state.toggle);
-	const pinsLoading = usePinnedEvaluationsStore((state) => state.loading);
-	const status = useWorkspaceStore((state) => state.status);
-	const writeBlocked = useWorkspaceStore((state) => state.writeBlocked);
-	useEffect(() => {
-		void refreshPins();
-	}, [refreshPins]);
+	const {
+		ids: pinnedIds,
+		toggle: togglePin,
+		loading: pinsLoading,
+	} = usePinnedEvaluations();
+	const status = useServerStatus().data;
+	const writeBlocked = useWorkspaceReadOnly();
 	// Previous-input placeholders are not forecasts for the active model.
 	const base =
 		projection.base instanceof Error || projection.isPlaceholderData

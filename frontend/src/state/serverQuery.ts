@@ -2,13 +2,14 @@ import { QueryClient } from "@tanstack/react-query";
 import { getResourceScope } from "../auth/resourceScope.ts";
 
 /**
- * Shared TanStack Query cache for derived projections. A projection is a
+ * Shared TanStack Query cache for server resources and derived projections. A projection is a
  * pure function of its inputs, so a cache key holding the full input set
  * can never go stale: identical concurrent requests attach to one in-flight
  * fetch instead of computing side by side, and completed results are reused
  * across remounts while fresh. Resource identity belongs in each key:
  * identical inputs from different accounts never share
- * data or in-flight requests. Session discovery belongs to its own hook.
+ * data or in-flight requests. Mutable resources define their own freshness
+ * and mutation policy. Session discovery belongs to its own hook.
  */
 
 export function deterministicQueryKey(

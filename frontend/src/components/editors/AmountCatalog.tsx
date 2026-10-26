@@ -6,10 +6,14 @@ import {
 	FALLBACK_PROVIDERS,
 	FALLBACK_RESOLVERS,
 } from "../../domain/amountCatalog.ts";
+import { useAmountPresets } from "../../state/workspaceResources.ts";
+import { useWorkspaceReadOnly } from "../../state/useWorkspacePlan.ts";
 import {
-	useWorkspaceStore,
-	selectIsReadOnly,
-} from "../../state/workspaceStore.ts";
+	createPreset,
+	updatePreset,
+	deletePreset,
+	movePreset,
+} from "../../state/workspaceWrites.ts";
 import { Button, TextButton } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { Checkbox, InputField } from "../Field.tsx";
@@ -109,13 +113,9 @@ export function AmountCatalog({
 }) {
 	const id = useId();
 	const remote = useRemoteNames();
-	const serverPresets = useWorkspaceStore((state) => state.serverPresets);
-	const createPreset = useWorkspaceStore((state) => state.createPreset);
-	const updatePreset = useWorkspaceStore((state) => state.updatePreset);
-	const deletePreset = useWorkspaceStore((state) => state.deletePreset);
-	const movePreset = useWorkspaceStore((state) => state.movePreset);
+	const serverPresets = useAmountPresets().data ?? null;
 	const presetThunks = { createPreset, updatePreset, deletePreset, movePreset };
-	const readOnly = useWorkspaceStore(selectIsReadOnly);
+	const readOnly = useWorkspaceReadOnly();
 
 	// Server presets are the source of truth; the hook covers the offline gap.
 	const templates = useAmountTemplates();

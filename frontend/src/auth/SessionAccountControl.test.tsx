@@ -14,10 +14,8 @@ import { resetNotifications } from "../state/notifications.ts";
 import { AuthBoundary } from "./AuthBoundary.tsx";
 import { redirectToSignIn } from "./navigation.ts";
 import { SessionAccountControl } from "./SessionAccountControl.tsx";
-import {
-	defaultSafeSpendingSettings,
-	useSafeSpendingSettings,
-} from "../state/useSafeSpendingSettings.ts";
+import { defaultSafeSpendingSettings } from "../state/useSafeSpendingSettings.ts";
+import { safeSpendingSettingsObserver as useSafeSpendingSettings } from "../test/safeSpendingSettings.ts";
 import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { getResourceScope } from "./resourceScope.ts";
 import { remoteStorageKey } from "../state/remoteStorage.ts";
@@ -197,23 +195,29 @@ describe("session account controls", () => {
 			name: "Sign out",
 		});
 		const scope = getResourceScope();
-		const engine = useWorkspaceStore.getState().engine;
+		const draftScope = useWorkspaceStore.getState().scope;
 		const recovery = {
 			version: 1 as const,
 			draft: null,
 			draftPresentation: null,
 			baseRevision: "unsaved-private-draft",
 		};
-		engine.volatileState = recovery;
-		act(() => useWorkspaceStore.setState({ volatile: true }));
+		act(() =>
+			useWorkspaceStore.setState({
+				volatile: true,
+				baseRevision: recovery.baseRevision,
+			}),
+		);
 		fireEvent.click(logoutButton);
 		expect((await screen.findByRole("alert")).textContent).toBe(
 			"Your draft has recovery data. Discard the draft before signing out.",
 		);
 		expect(fetcher).toHaveBeenCalledTimes(1);
 		expect(useWorkspaceStore.getState().volatile).toBe(true);
-		expect(useWorkspaceStore.getState().engine).toBe(engine);
-		expect(engine.volatileState).toBe(recovery);
+		expect(useWorkspaceStore.getState().scope).toBe(draftScope);
+		expect(useWorkspaceStore.getState().baseRevision).toBe(
+			recovery.baseRevision,
+		);
 		expect(getResourceScope()).toBe(scope);
 		expect(screen.getByText("Workspace content")).toBeTruthy();
 		expect(

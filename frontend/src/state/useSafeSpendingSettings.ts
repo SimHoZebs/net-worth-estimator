@@ -1,6 +1,7 @@
-import { create } from "zustand";
+import { useQuery } from "@tanstack/react-query";
+import { useSyncExternalStore } from "react";
+import { createApiClient } from "../api/client.ts";
 import type { SafeSpendingSettings } from "../api/contracts.ts";
-import { persist } from "zustand/middleware";
 import {
 	getResourceScope,
 	subscribeResourceScope,
@@ -10,8 +11,9 @@ import {
 	DEFAULT_CYCLE_STATEMENT_DAY,
 	DEFAULT_PROTECTED_RESERVE,
 } from "../domain/safeSpending.ts";
-import { SAFE_SPENDING_STORAGE_KEY } from "./persisted.ts";
-import { safeSpendingStorage } from "./safeSpendingStorage.ts";
+import { readSafeSpendingSettings } from "./safeSpendingStorage.ts";
+import { serverQueryClient } from "./serverQuery.ts";
+import { notifyError, dismissKey } from "./notifications.ts";
 
 export type TotalCycleSettings = SafeSpendingSettings;
 
@@ -89,30 +91,52 @@ interface SafeSpendingSettingsState extends TotalCycleSettings {
 	updateSettings: (next: Partial<TotalCycleSettings>) => void;
 }
 
-let writableScope: ResourceScope | null = null;
-let boundScope = getResourceScope();
-let hydration: Promise<void> = Promise.resolve();
-let loadError: Error | null = null;
-
-function backendStorage(scope: ResourceScope, canWrite: () => boolean) {
-	return safeSpendingStorage(
-		scope,
-		canWrite,
-		sanitizeSafeSpendingSettings,
-		(error) => {
-			loadError = error;
-		},
-		() => {
-			if (scope === getResourceScope())
-				useSafeSpendingSettings.getState().updateSettings({});
-		},
-	);
+export function safeSpendingSettingsKey(scope = getResourceScope()) {
+	return ["safe-spending-settings", scope.key] as const;
 }
 
-function updateSettingsForScope(scope: ResourceScope) {
+const defaults = defaultSafeSpendingSettings();
+
+function settingsOptions(scope = getResourceScope()) {
+	return {
+		queryKey: safeSpendingSettingsKey(scope),
+		staleTime: Infinity,
+		queryFn: async ({ signal }: { signal: AbortSignal }) =>
+			(await readSafeSpendingSettings(
+				scope,
+				sanitizeSafeSpendingSettings,
+				signal,
+			)) ?? defaultSafeSpendingSettings(),
+	};
+}
+
+export function getSafeSpendingSettings(
+	scope = getResourceScope(),
+): TotalCycleSettings {
+	return scope.status === "pending"
+		? defaults
+		: (serverQueryClient().getQueryData<TotalCycleSettings>(
+				safeSpendingSettingsKey(scope),
+			) ?? defaults);
+}
+
+function subscribeSettings(listener: () => void) {
+	return serverQueryClient().getQueryCache().subscribe(listener);
+}
+
+export function updateSettingsForScope(
+	scope: ResourceScope = getResourceScope(),
+) {
 	return (next: Partial<TotalCycleSettings>) => {
-		if (scope !== getResourceScope() || writableScope !== scope) return;
-		useSafeSpendingSettings.setState((previous) => ({
+		if (
+			scope !== getResourceScope() ||
+			scope.status !== "ready" ||
+			serverQueryClient().getQueryState(safeSpendingSettingsKey(scope))
+				?.status !== "success"
+		)
+			return;
+		const previous = getSafeSpendingSettings(scope);
+		const snapshot: TotalCycleSettings = {
 			statementDay: next.statementDay ?? previous.statementDay,
 			statementDaySet: next.statementDaySet ?? previous.statementDaySet,
 			reserve: next.reserve ?? previous.reserve,
@@ -127,78 +151,108 @@ function updateSettingsForScope(scope: ResourceScope) {
 				next.movementIds !== undefined
 					? next.movementIds
 					: previous.movementIds,
-		}));
+		};
+		const cache = serverQueryClient();
+		const key = safeSpendingSettingsKey(scope);
+		void cache.cancelQueries({ queryKey: key, exact: true });
+		// The cache contains an explicit optimistic value until this mutation succeeds.
+		const optimistic = cache.setQueryData(key, snapshot);
+		const mutation = cache.getMutationCache().build(cache, {
+			mutationKey: key,
+			scope: { id: JSON.stringify(key) },
+			mutationFn: async () => {
+				if (scope !== getResourceScope()) return;
+				const result = await createApiClient({
+					baseUrl: scope.apiBaseUrl,
+				}).setSafeSpendingSettings(snapshot);
+				if (scope !== getResourceScope()) return;
+				if (result instanceof Error) throw result;
+				if (cache.getQueryData(key) === optimistic)
+					cache.setQueryData(
+						key,
+						sanitizeSafeSpendingSettings(result.settings),
+					);
+				dismissKey("safe-spending-settings");
+			},
+			onError: (error) => {
+				if (scope !== getResourceScope()) return;
+				notifyError(
+					"safe-spending-settings",
+					`Budget settings were not saved. ${error instanceof Error ? error.message : "Unknown error"}`,
+					{
+						label: "Retry save",
+						onAction: () => updateSettingsForScope(scope)({}),
+					},
+				);
+			},
+		});
+		void mutation.execute(undefined).catch(() => {});
 	};
 }
 
-export const useSafeSpendingSettings = create<SafeSpendingSettingsState>()(
-	persist(
-		() => ({
-			...defaultSafeSpendingSettings(),
-			updateSettings: updateSettingsForScope(boundScope),
-		}),
-		{
-			name: SAFE_SPENDING_STORAGE_KEY,
-			version: 4,
-			storage: backendStorage(boundScope, () => false),
-			skipHydration: true,
-			partialize: (state) => ({
-				statementDay: state.statementDay,
-				reserve: state.reserve,
-				accountIds: state.accountIds,
-				spendingAccountIds: state.spendingAccountIds,
-				incomeRuleIds: state.incomeRuleIds,
-				movementIds: state.movementIds,
-				statementDaySet: state.statementDaySet,
-			}),
-			migrate: (persisted) => sanitizeSafeSpendingSettings(persisted),
-			merge: (persisted, current) => ({
-				...current,
-				...sanitizeSafeSpendingSettings(persisted),
-			}),
-		},
-	),
-);
+export async function refreshSafeSpendingSettings() {
+	const scope = getResourceScope();
+	if (scope.status === "pending") return;
+	const cache = serverQueryClient();
+	const key = safeSpendingSettingsKey(scope);
+	if (cache.isMutating({ mutationKey: key })) {
+		await new Promise<void>((resolve) => {
+			const stop = cache.getMutationCache().subscribe(() => {
+				if (!cache.isMutating({ mutationKey: key })) {
+					stop();
+					resolve();
+				}
+			});
+		});
+	}
+	if (scope !== getResourceScope()) return;
+	await cache.invalidateQueries({ queryKey: key, refetchType: "none" });
+	await cache.fetchQuery(settingsOptions(scope));
+}
+
+/** Query owns both the saved response and its explicit optimistic updates. */
+export function useSafeSpendingSettings(): SafeSpendingSettingsState {
+	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	useQuery(
+		{ ...settingsOptions(scope), enabled: scope.status === "ready" },
+		serverQueryClient(),
+	);
+	// Controlled inputs need the cache write in the same event, before Query's batched observer notification.
+	const settings = useSyncExternalStore(subscribeSettings, () =>
+		getSafeSpendingSettings(scope),
+	);
+	return {
+		...settings,
+		updateSettings: updateSettingsForScope(scope),
+	};
+}
 
 function bindFinancialPreferences(): void {
 	const scope = getResourceScope();
-	boundScope = scope;
-	writableScope = null;
-	loadError = null;
-	useSafeSpendingSettings.persist.setOptions({
-		storage: backendStorage(scope, () => writableScope === scope),
-	});
-	// Reset without writing defaults over this owner's saved preferences.
-	useSafeSpendingSettings.setState({
-		...defaultSafeSpendingSettings(),
-		updateSettings: updateSettingsForScope(scope),
-	});
-	// Rehydrate even while pending to invalidate an older asynchronous hydration.
-	const result = useSafeSpendingSettings.persist.rehydrate();
-	const finish = () => {
-		if (
-			scope === getResourceScope() &&
-			scope.status !== "pending" &&
-			!loadError &&
-			useSafeSpendingSettings.persist.hasHydrated()
-		)
-			writableScope = scope;
-	};
-	if (result instanceof Promise) hydration = result.then(finish);
-	else {
-		finish();
-		hydration = Promise.resolve();
-	}
+	const cache = serverQueryClient();
+	void cache.cancelQueries({ queryKey: ["safe-spending-settings"] });
+	cache.removeQueries({ queryKey: ["safe-spending-settings"] });
+	if (scope.status === "ready")
+		void cache.fetchQuery(settingsOptions(scope)).catch(() => {});
 }
 
 /** The session boundary waits for this owner before it mounts financial screens. */
 export async function hydrateFinancialPreferences(
 	scope: ResourceScope,
 ): Promise<boolean> {
-	if (boundScope !== scope) return false;
-	await hydration;
-	if (scope === getResourceScope() && loadError) throw loadError;
-	return scope === getResourceScope() && writableScope === scope;
+	if (scope !== getResourceScope() || scope.status !== "ready") return false;
+	try {
+		await serverQueryClient().fetchQuery(settingsOptions(scope));
+	} catch (error) {
+		if (scope === getResourceScope()) throw error;
+		else return false;
+	}
+	return (
+		scope === getResourceScope() &&
+		scope.status === "ready" &&
+		serverQueryClient().getQueryState(safeSpendingSettingsKey(scope))
+			?.status === "success"
+	);
 }
 
 subscribeResourceScope(bindFinancialPreferences);
@@ -206,5 +260,5 @@ bindFinancialPreferences();
 
 /** Test hook: restores safe spending defaults between cases. */
 export function resetSafeSpendingSettings(): void {
-	useSafeSpendingSettings.setState({ ...defaultSafeSpendingSettings() });
+	serverQueryClient().removeQueries({ queryKey: ["safe-spending-settings"] });
 }

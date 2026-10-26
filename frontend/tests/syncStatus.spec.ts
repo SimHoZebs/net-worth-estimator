@@ -33,6 +33,10 @@ for (const width of [1440, 390]) {
 		});
 		await page.goto("/");
 		await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+		// The loading shell also has a heading. Open the loaded sidebar, not its retiring placeholder.
+		await expect(
+			page.getByRole("region", { name: "Loading workspace" }),
+		).toHaveCount(0);
 		if (width < 600)
 			await page.getByRole("button", { name: "Open navigation" }).click();
 		const time = page.locator(`time[datetime="${lastSyncAt}"]`);

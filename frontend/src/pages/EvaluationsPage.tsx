@@ -1,14 +1,19 @@
 import { Flag, Plus } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { Button } from "../components/Button.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
 import type { Evaluation, Plan } from "../domain/model.ts";
 import { removeEvaluation } from "../domain/planEdits.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
-import { usePinnedEvaluationsStore } from "../state/pinnedEvaluations.ts";
+import { usePinnedEvaluations } from "../state/pinnedEvaluations.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { useWorkspaceStore, selectPlan } from "../state/workspaceStore.ts";
+import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { usePlan } from "../state/useWorkspacePlan.ts";
+import {
+	useServerModel,
+	useServerStatus,
+} from "../state/workspaceResources.ts";
 import { EvaluationCard } from "./evaluations/EvaluationCard.tsx";
 import { OtherEvaluationCard } from "./evaluations/OtherEvaluationCard.tsx";
 
@@ -19,7 +24,7 @@ export function EvaluationsPage({
 }) {
 	// Plan, actions, and projection subscribe where the query is declared;
 	// only UI callbacks arrive as props.
-	const plan = useWorkspaceStore(selectPlan);
+	const plan = usePlan();
 	const onUpdate = useWorkspaceStore((state) => state.updatePlan);
 	const projection = useRemoteProjection();
 	const base = projection.base instanceof Error ? null : projection.base;
@@ -55,14 +60,9 @@ function EvaluationsContent({
 	// Other evaluation kinds are configured server-side, so their count is
 	// unknowable until the projection lands; they join the grid on arrival.
 	const others = projection?.otherEvaluations ?? [];
-	const serverDocument = useWorkspaceStore((state) => state.serverDocument);
-	const status = useWorkspaceStore((state) => state.status);
-	const pinnedIds = usePinnedEvaluationsStore((state) => state.ids);
-	const refreshPins = usePinnedEvaluationsStore((state) => state.refresh);
-	const togglePin = usePinnedEvaluationsStore((state) => state.toggle);
-	useEffect(() => {
-		void refreshPins();
-	}, [refreshPins]);
+	const serverDocument = useServerModel().data?.document;
+	const status = useServerStatus().data;
+	const { ids: pinnedIds, toggle: togglePin } = usePinnedEvaluations();
 	// Pins name persisted server instances: draft-only evaluations have no
 	// server row yet, so their pin control stays disabled until saved.
 	const savedEvaluationIds = useMemo(() => {

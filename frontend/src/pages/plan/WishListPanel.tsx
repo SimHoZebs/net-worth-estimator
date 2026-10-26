@@ -20,6 +20,10 @@ import { movePurchase, purchaseQueue } from "../../domain/purchases.ts";
 import { horizonDate, type PurchaseSchedule } from "../../domain/result.ts";
 import { useUiStore } from "../../state/uiStore.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
+import {
+	useDraftConflict,
+	useWorkspaceReadOnly,
+} from "../../state/useWorkspacePlan.ts";
 import { PurchaseTimeline } from "./PurchaseTimeline.tsx";
 import { WishListEditor } from "./WishListEditor.tsx";
 
@@ -32,13 +36,9 @@ export function WishListPanel({
 }) {
 	const onUpdate = useWorkspaceStore((state) => state.updatePlan);
 	const applyError = useWorkspaceStore((state) => state.error);
-	const readOnly = useWorkspaceStore((state) =>
-		Boolean(
-			state.status?.readOnly ||
-			state.writeBlocked ||
-			state.workspace?.draftStale,
-		),
-	);
+	const blocked = useWorkspaceReadOnly();
+	const conflict = useDraftConflict();
+	const readOnly = blocked || Boolean(conflict);
 	const years = useUiStore((state) => state.years);
 	const [editor, setEditor] = useState<{ item: Movement | null } | null>(null);
 	const [remove, setRemove] = useState<Movement | null>(null);

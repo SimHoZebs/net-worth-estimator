@@ -1,4 +1,4 @@
-import { useWorkspaceStore } from "../../state/workspaceStore.ts";
+import { useAmountPresets } from "../../state/workspaceResources.ts";
 import {
 	FALLBACK_TEMPLATES,
 	presetToTemplate,
@@ -7,7 +7,7 @@ import {
 /** Single source for amount-recipe templates. Server presets are truth;
  * the bundled fallback only covers the gap before the first load. */
 export function useAmountTemplates() {
-	const serverPresets = useWorkspaceStore((state) => state.serverPresets);
-	if (serverPresets === null) return FALLBACK_TEMPLATES;
+	const serverPresets = useAmountPresets().data;
+	if (!serverPresets) return FALLBACK_TEMPLATES;
 	return serverPresets.map(presetToTemplate);
 }

@@ -13,6 +13,11 @@ import {
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
 import { AuthBoundary } from "./AuthBoundary.tsx";
+import {
+	useServerModel,
+	workspaceResourceKey,
+} from "../state/workspaceResources.ts";
+import { setServerRevisionFixture } from "../test/workspace.ts";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import { resetNotifications } from "../state/notifications.ts";
 import { getResourceScope, suspendResourceScope } from "./resourceScope.ts";
@@ -22,6 +27,7 @@ import {
 	defaultSafeSpendingSettings,
 	useSafeSpendingSettings,
 } from "../state/useSafeSpendingSettings.ts";
+import { safeSpendingSettingsObserver } from "../test/safeSpendingSettings.ts";
 import { canonicalApiBaseUrl } from "./resourceScope.ts";
 
 const A = `plans/${"a".repeat(64)}`;
@@ -56,7 +62,7 @@ function response(body: unknown, resource: string | null = A) {
 
 function WorkspaceProbe() {
 	const account = useSession();
-	const revision = useWorkspaceStore((state) => state.serverRevision);
+	const revision = useServerModel().data?.revision;
 	return (
 		<p data-testid="active-workspace">
 			{account?.session.resource?.id}:{revision ?? "empty"}
@@ -151,7 +157,7 @@ describe("authentication resource isolation", () => {
 		);
 		await screen.findByTestId("financial-preferences");
 		act(() =>
-			useSafeSpendingSettings.getState().updateSettings({
+			safeSpendingSettingsObserver.getState().updateSettings({
 				reserve: 123456,
 				incomeRuleIds: ["private-a-income"],
 			}),
@@ -173,24 +179,32 @@ describe("authentication resource isolation", () => {
 		);
 		// Stale-while-revalidate keeps the previous owner's preferences
 		// visible until discovery proves the new owner.
-		expect(screen.getByTestId("financial-preferences").textContent).toBe(
-			"123456:private-a-income",
+		await waitFor(() =>
+			expect(screen.getByTestId("financial-preferences").textContent).toBe(
+				"123456:private-a-income",
+			),
 		);
 		await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
 		expect(screen.getByTestId("financial-preferences").textContent).toBe(
 			"123456:private-a-income",
 		);
 		await act(async () => finish(response(session(B), B)));
-		expect(
-			(await screen.findByTestId("financial-preferences")).textContent,
-		).toBe(`${defaultSafeSpendingSettings().reserve}:`);
+		await waitFor(() => expect(getResourceScope().resource?.id).toBe(B));
+		expect(safeSpendingSettingsObserver.getState().reserve).toBe(
+			defaultSafeSpendingSettings().reserve,
+		);
+		await waitFor(() =>
+			expect(screen.getByTestId("financial-preferences").textContent).toBe(
+				`${defaultSafeSpendingSettings().reserve}:`,
+			),
+		);
 	});
 
 	it("clears live model and projection state before it first mounts a verified workspace", async () => {
-		useWorkspaceStore.setState({
-			serverRevision: "previous-account-private-revision",
-			serverPresets: [{ id: "previous-private-recipe" }] as never,
-		});
+		setServerRevisionFixture("previous-account-private-revision");
+		serverQueryClient().setQueryData(workspaceResourceKey("presets"), [
+			{ id: "previous-private-recipe" },
+		]);
 		serverQueryClient().setQueryData(
 			["old-projection"],
 			"previous-private-result",
@@ -203,8 +217,22 @@ describe("authentication resource isolation", () => {
 		expect((await screen.findByTestId("active-workspace")).textContent).toBe(
 			`${A}:empty`,
 		);
-		expect(useWorkspaceStore.getState().serverPresets).toBeNull();
-		expect(serverQueryClient().getQueryCache().getAll()).toHaveLength(0);
+		expect(
+			serverQueryClient().getQueryData(workspaceResourceKey("presets")),
+		).toBeUndefined();
+		expect(
+			serverQueryClient().getQueryData(["old-projection"]),
+		).toBeUndefined();
+		expect(
+			serverQueryClient()
+				.getQueryCache()
+				.getAll()
+				.every(
+					(query) =>
+						query.queryKey[0] === "safe-spending-settings" ||
+						query.state.data === undefined,
+				),
+		).toBe(true);
 	});
 
 	it.each([B, "plans/sample"])(
@@ -214,11 +242,7 @@ describe("authentication resource isolation", () => {
 			vi.stubGlobal("fetch", fetcher);
 			renderWorkspace();
 			await screen.findByTestId("active-workspace");
-			act(() =>
-				useWorkspaceStore.setState({
-					serverRevision: "account-a-private-revision",
-				}),
-			);
+			act(() => setServerRevisionFixture("account-a-private-revision"));
 			const oldKey = deterministicQueryKey("private-a-document", 10);
 			serverQueryClient().setQueryData(oldKey, "private-a-result");
 			let finish: (value: Response) => void = () => {};
@@ -239,8 +263,10 @@ describe("authentication resource isolation", () => {
 			// Stale-while-revalidate: the previous workspace stays mounted
 			// with its scope until the new resource is verified.
 			expect(getResourceScope().status).toBe("ready");
-			expect(screen.getByTestId("active-workspace").textContent).toBe(
-				`${A}:account-a-private-revision`,
+			await waitFor(() =>
+				expect(screen.getByTestId("active-workspace").textContent).toBe(
+					`${A}:account-a-private-revision`,
+				),
 			);
 			await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
 			expect(screen.getByTestId("active-workspace").textContent).toBe(
@@ -299,24 +325,26 @@ describe("authentication resource isolation", () => {
 		};
 		const key = deterministicQueryKey("private-a-document", 10);
 		act(() => {
-			useWorkspaceStore.getState().engine.volatileState = recovery;
+			useWorkspaceStore.setState({ draft: recovery.draft });
 			useWorkspaceStore.setState({
-				serverRevision: "private-a-revision",
 				volatile: true,
 			});
+			setServerRevisionFixture("private-a-revision");
 			serverQueryClient().setQueryData(key, "private-a-result");
 			window.dispatchEvent(new Event("focus"));
 		});
 		// Same-account revalidation never unmounts the workspace.
-		expect(screen.getByTestId("active-workspace").textContent).toBe(
-			`${A}:private-a-revision`,
+		await waitFor(() =>
+			expect(screen.getByTestId("active-workspace").textContent).toBe(
+				`${A}:private-a-revision`,
+			),
 		);
 		await waitFor(() =>
 			expect(screen.getByTestId("active-workspace").textContent).toBe(
 				`${A}:private-a-revision`,
 			),
 		);
-		expect(useWorkspaceStore.getState().engine.volatileState).toBe(recovery);
+		expect(useWorkspaceStore.getState().draft).toBe(recovery.draft);
 		expect(useWorkspaceStore.getState().volatile).toBe(true);
 		expect(deterministicQueryKey("private-a-document", 10)).toEqual(key);
 		expect(serverQueryClient().getQueryData(key)).toBe("private-a-result");
@@ -336,7 +364,7 @@ describe("authentication resource isolation", () => {
 				baseRevision: "a",
 			};
 			act(() => {
-				useWorkspaceStore.getState().engine.volatileState = recovery;
+				useWorkspaceStore.setState({ draft: recovery.draft });
 				useWorkspaceStore.setState({ volatile: true });
 			});
 			fetcher.mockImplementationOnce(
@@ -348,13 +376,13 @@ describe("authentication resource isolation", () => {
 			// retry toast instead of wiping the UI.
 			expect(screen.getByTestId("active-workspace")).toBeTruthy();
 			expect(getResourceScope().status).toBe("ready");
-			expect(useWorkspaceStore.getState().engine.volatileState).toBe(recovery);
+			expect(useWorkspaceStore.getState().draft).toBe(recovery.draft);
 			fetcher.mockImplementation(async () => response(session(nextId), nextId));
 			act(() => window.dispatchEvent(new Event("focus")));
 			await screen.findByTestId("active-workspace");
 			expect(getResourceScope().resource?.id).toBe(nextId);
-			expect(useWorkspaceStore.getState().engine.volatileState).toBe(
-				nextId === A ? recovery : null,
+			expect(useWorkspaceStore.getState().draft).toBe(
+				nextId === A ? recovery.draft : null,
 			);
 		},
 	);
@@ -364,9 +392,7 @@ describe("authentication resource isolation", () => {
 		vi.stubGlobal("fetch", fetcher);
 		renderWorkspace();
 		await screen.findByTestId("active-workspace");
-		act(() =>
-			useWorkspaceStore.setState({ serverRevision: "old-write-capability" }),
-		);
+		act(() => setServerRevisionFixture("old-write-capability"));
 		const key = deterministicQueryKey("private-a-document", 10);
 		serverQueryClient().setQueryData(key, "old-permissions-result");
 		fetcher.mockImplementation(async () =>
@@ -395,13 +421,12 @@ describe("authentication resource isolation", () => {
 		const key = deterministicQueryKey("private-a-document", 10);
 		serverQueryClient().setQueryData(key, "first-api-result");
 		act(() => {
-			useWorkspaceStore.setState({ serverRevision: "first-api-data" });
-			useWorkspaceStore.getState().engine.volatileState = {
-				version: 1,
+			setServerRevisionFixture("first-api-data");
+			useWorkspaceStore.setState({
 				draft: { name: "First API draft" } as never,
 				draftPresentation: null,
 				baseRevision: "first-api",
-			};
+			});
 			window.__WAYPOINT_CONFIG__ = { apiBaseUrl: "/second-api" };
 			window.dispatchEvent(new Event("focus"));
 		});
@@ -413,7 +438,7 @@ describe("authentication resource isolation", () => {
 		expect(getResourceScope().apiBaseUrl).toBe(
 			canonicalApiBaseUrl("/second-api"),
 		);
-		expect(useWorkspaceStore.getState().engine.volatileState).toBeNull();
+		expect(useWorkspaceStore.getState().draft).toBeNull();
 		expect(serverQueryClient().getQueryData(key)).toBeUndefined();
 	});
 

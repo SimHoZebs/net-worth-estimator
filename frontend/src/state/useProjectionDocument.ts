@@ -4,6 +4,8 @@ import type {
 	FinancialModelDocument,
 } from "../api/contracts.ts";
 import { deriveDraftDocument, useWorkspaceStore } from "./workspaceStore.ts";
+import { useServerModel } from "./workspaceResources.ts";
+import { getResourceScope } from "../auth/resourceScope.ts";
 
 export interface ProjectionDocumentOptions {
 	document?: FinancialModelDocument | null;
@@ -17,16 +19,13 @@ export function useProjectionDocument({
 	draftDocument,
 	evaluations,
 }: ProjectionDocumentOptions = {}) {
-	const storeDraft = useWorkspaceStore(
-		(state) => state.workspace?.draft ?? null,
-	);
-	const storeDocument = useWorkspaceStore((state) => state.serverDocument);
+	const storeDraft = useWorkspaceStore((state) => state.draft);
+	const model = useServerModel().data;
+	const storeDocument = model?.document ?? null;
 	const draftPresentation = useWorkspaceStore(
 		(state) => state.draftPresentation,
 	);
-	const savedPresentation = useWorkspaceStore(
-		(state) => state.savedPresentation,
-	);
+	const savedPresentation = model?.conversion?.presentation ?? null;
 	const derivedDraft = useMemo(
 		() =>
 			deriveDraftDocument(
@@ -38,7 +37,8 @@ export function useProjectionDocument({
 	);
 	const draft = draftDocument !== undefined ? draftDocument : derivedDraft;
 	const saved = document !== undefined ? document : storeDocument;
-	const source = draft ?? saved ?? null;
+	const source =
+		getResourceScope().status === "ready" ? (draft ?? saved ?? null) : null;
 	const activeDocument = useMemo(
 		() => (source && evaluations ? { ...source, evaluations } : source),
 		[source, evaluations],

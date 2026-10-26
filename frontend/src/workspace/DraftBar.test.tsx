@@ -8,6 +8,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetUiStore } from "../state/uiStore.ts";
 import {
+	notifySuccess,
 	resetNotifications,
 	useNotifications,
 } from "../state/notifications.ts";
@@ -16,72 +17,70 @@ import {
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
 import { testPlan } from "../test/plan.ts";
+import { acceptTestResource } from "../test/resource.ts";
+import {
+	setServerModelFixture,
+	setServerStatusFixture,
+} from "../test/workspace.ts";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
+import { saveWorkspace } from "../state/workspaceWrites.ts";
 import { DraftBar } from "./DraftBar.tsx";
 
-function workspace(draft = false) {
-	return {
-		version: 1 as const,
-		saved: testPlan,
-		draft: draft ? { ...testPlan, name: "Edited household" } : null,
-		baseFingerprint: null,
-		baseRevision: null,
-		draftStale: false,
-	};
-}
+vi.mock("../state/workspaceWrites.ts", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../state/workspaceWrites.ts")>()),
+	saveWorkspace: vi.fn(async () => true),
+}));
 
 beforeEach(() => {
+	acceptTestResource();
 	resetWorkspaceStore();
 	resetUiStore();
 	resetNotifications();
-	useWorkspaceStore.setState({ workspace: workspace(), loading: false });
+	setServerModelFixture();
+	setServerStatusFixture({ readOnly: false });
 });
-
 afterEach(() => {
 	cleanup();
 	resetWorkspaceStore();
 	resetUiStore();
 	resetNotifications();
+	vi.clearAllMocks();
 });
 
 describe("draft bar presence", () => {
-	it("exposes a state attribute only while changes exist", () => {
+	it("appears only while local changes exist", () => {
 		const view = render(<DraftBar onDiscard={() => {}} />);
 		expect(view.container.querySelector("[data-draft-bar]")).toBeNull();
-		act(() => useWorkspaceStore.setState({ workspace: workspace(true) }));
-		const message = view.getByText("1 unsaved change · saved plan unchanged");
-		const bar = message.closest("[data-draft-bar]");
-		expect(bar).not.toBeNull();
-		expect(bar?.hasAttribute("data-testid")).toBe(false);
-		act(() => useWorkspaceStore.setState({ workspace: workspace() }));
+		act(() =>
+			useWorkspaceStore.setState({
+				draft: { ...testPlan, name: "Edited household" },
+				baseline: testPlan,
+			}),
+		);
+		expect(
+			view.getByText("1 unsaved change · saved plan unchanged"),
+		).toBeTruthy();
+		act(() => useWorkspaceStore.setState({ draft: null, baseline: null }));
 		expect(view.container.querySelector("[data-draft-bar]")).toBeNull();
 	});
-
-	it("preserves native save and discard controls", async () => {
-		const save = vi.fn(async () => true);
+	it("uses Query's save command and a local discard callback", async () => {
+		useWorkspaceStore.setState({
+			draft: { ...testPlan, name: "Edited household" },
+			baseline: testPlan,
+		});
 		const onDiscard = vi.fn();
-		useWorkspaceStore.setState({ workspace: workspace(true), save });
 		const view = render(<DraftBar onDiscard={onDiscard} />);
 		fireEvent.click(view.getByRole("button", { name: "Discard" }));
 		expect(onDiscard).toHaveBeenCalledOnce();
 		fireEvent.click(view.getByRole("button", { name: "Save changes" }));
-		await waitFor(() => expect(save).toHaveBeenCalledOnce());
-		await waitFor(() =>
-			expect(
-				view
-					.getByRole("button", { name: "Save changes" })
-					.getAttribute("aria-busy"),
-			).toBe("false"),
-		);
+		await waitFor(() => expect(saveWorkspace).toHaveBeenCalledOnce());
 	});
-
-	it("preserves the toast status and dismissal without a test-only styling hook", () => {
-		useWorkspaceStore.setState({ notice: "Plan saved." });
+	it("lets the notification store own confirmation dismissal", () => {
+		notifySuccess("workspace-notice", "Plan saved.");
 		const view = render(<NotificationCenter />);
 		expect(view.getByRole("status").textContent).toContain("Plan saved.");
 		fireEvent.click(view.getByRole("button", { name: "Dismiss notification" }));
-		expect(view.queryByRole("status")).toBeNull();
-		expect(useWorkspaceStore.getState().notice).toBe("");
 		expect(useNotifications.getState().items).toHaveLength(0);
+		expect(useWorkspaceStore.getState()).not.toHaveProperty("notice");
 	});
 });
