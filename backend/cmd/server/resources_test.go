@@ -134,3 +134,28 @@ func TestBridgeCredentialsRequireExistingConfiguredOwner(t *testing.T) {
 		t.Fatal("Bridge fell back to another owner's plan")
 	}
 }
+
+func TestBridgeBYOKStoreSkipsMissingPlan(t *testing.T) {
+	database, err := store.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	const issuer, subject = "https://identity.test", "owner"
+	if scoped, err := bridgeBYOKStore(database, issuer, ""); err != nil || scoped != nil {
+		t.Fatalf("empty subject = %v, %v; want nil, nil", scoped, err)
+	}
+	if scoped, err := bridgeBYOKStore(database, issuer, subject); err != nil || scoped != nil {
+		t.Fatalf("missing plan = %v, %v; want nil, nil", scoped, err)
+	}
+	resource := authorization.ResourceFor(issuer, subject)
+	if exists, err := database.HasPlan(resource.ID); err != nil || exists {
+		t.Fatalf("startup provisioned an owner: %v", err)
+	}
+	if _, err := database.EnsurePrivatePlan(resource.ID, resource.Owner, issuer, subject); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bridgeBYOKStore(database, issuer, subject); err != nil {
+		t.Fatalf("existing owner rejected: %v", err)
+	}
+}

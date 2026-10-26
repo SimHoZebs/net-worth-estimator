@@ -213,9 +213,13 @@ func TestPlanRoutingFailsClosedWithoutProvisioning(t *testing.T) {
 func TestServerBridgeCredentialsStayInConfiguredOwnersPlan(t *testing.T) {
 	_, database, _ := newRouter(t)
 	ensurePrivate(t, database, "b")
+	ownerStore, err := database.Plan(privateID("a"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	router, err := New(database, Config{
 		PrimaryResourceID: privateID("a"),
-		API:               api.Config{SyncRunner: &simplefin.Runner{}},
+		API:               api.Config{SyncRunner: simplefin.NewRunner(ownerStore, simplefin.Config{AccessURL: "https://bridge.test/simplefin"}, nil)},
 	})
 	if err != nil {
 		t.Fatal(err)

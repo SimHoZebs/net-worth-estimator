@@ -25,11 +25,29 @@ func bridgeStore(database *store.Database, issuer, subject string, enabled bool)
 	return database.Plan(authorization.ResourceFor(issuer, subject).ID)
 }
 
-// configureSync builds the SimpleFIN runner from environment. An empty
-// access URL disables the sync (nil runner, trigger returns 503).
-// Account links live in the database: unmapped bridge accounts are
-// auto-provisioned, and disaster recovery is a database backup, never an
-// env map.
+// bridgeBYOKStore returns the owner plan when it exists, or nil when the
+// plan has not been provisioned yet (before first login). Unlike
+// bridgeStore it never fails for a missing plan and never provisions one,
+// so a fresh deployment starts unconfigured and picks up a stored key once
+// the owner connects.
+func bridgeBYOKStore(database *store.Database, issuer, subject string) (store.Store, error) {
+	if subject == "" {
+		return nil, nil
+	}
+	planID := authorization.ResourceFor(issuer, subject).ID
+	exists, err := database.HasPlan(planID)
+	if err != nil || !exists {
+		return nil, err
+	}
+	return database.Plan(planID)
+}
+
+// configureSync builds the SimpleFIN runner with a per-plan database
+// credential fallback. For a scoped store it always constructs a runner:
+// an empty access URL (env and database) leaves it unconfigured and the
+// trigger returns 503. A nil store (no owner plan provisioned yet at boot)
+// disables the sync the same way. After first login provisions the plan
+// and the key is connected, restart once so startup can scope the runner.
 //
 // Throttling matches the Bridge daily-update quota (24 requests or fewer
 // per day, replenished throughout the day): the scheduler runs every 6
@@ -53,19 +71,45 @@ func configureSync(database store.Store) (*simplefin.Runner, func()) {
 	if err != nil {
 		log.Fatalf("invalid simplefin rate-limit cooldown: %v", err)
 	}
-	accessURL := os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL")
-	if accessURL == "" {
+	if database == nil {
 		return nil, func() {}
 	}
 	config := simplefin.Config{
-		AccessURL:          accessURL,
+		AccessURL:          os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL"),
 		CardAccounts:       simplefin.ParseCardAccounts(os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS")),
 		MinTriggerInterval: triggerInterval,
 		RateLimitCooldown:  rateLimitCooldown,
 	}
-	runner := simplefin.NewRunner(database, config, &simplefin.Client{AccessURL: accessURL})
+	runner := newDynamicRunner(database, config)
 	stop := startSyncScheduler(runner)
 	return runner, stop
+}
+
+// newDynamicRunner builds a runner whose credential resolves per run: the
+// stored per-plan BYOK key first, then the server-level environment URL.
+// Card selection unions the stored per-plan set with the environment set.
+func newDynamicRunner(database store.Store, config simplefin.Config) *simplefin.Runner {
+	envAccessURL := config.AccessURL
+	provider := func() (string, map[string]struct{}) {
+		stored, err := database.GetSyncCredential()
+		if err != nil {
+			// A transient store failure must not trigger a Bridge fetch
+			// with an empty key; fall back to the environment value.
+			log.Printf("simplefin credential read failed: %v", err)
+			return envAccessURL, nil
+		}
+		if stored.AccessURL != "" {
+			cards := map[string]struct{}{}
+			for _, id := range stored.CardAccounts {
+				if id != "" {
+					cards[id] = struct{}{}
+				}
+			}
+			return stored.AccessURL, cards
+		}
+		return envAccessURL, nil
+	}
+	return simplefin.NewRunnerWithProvider(database, config, provider, nil)
 }
 
 // syncInterval is the fixed scheduler cadence: four Bridge hits per day,
@@ -97,6 +141,10 @@ func startSyncScheduler(runner *simplefin.Runner) func() {
 			case <-stop:
 				return
 			case <-timer.C:
+				if !runner.IsConfigured() {
+					timer.Reset(syncInterval)
+					continue
+				}
 				summary, err := runner.Sync(context.Background())
 				if err != nil {
 					log.Printf("simplefin scheduled sync failed: %v", err)

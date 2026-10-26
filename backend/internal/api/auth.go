@@ -35,6 +35,9 @@ func readOnlyMiddleware(readOnly bool) func(http.Handler) http.Handler {
 		http.MethodPost + " /v1/payment-terms",
 		http.MethodDelete + " /v1/payment-terms/",
 		http.MethodPost + " /v1/sync/simplefin",
+		http.MethodPost + " /v1/sync/simplefin/credential",
+		http.MethodDelete + " /v1/sync/simplefin/credential",
+		http.MethodPut + " /v1/sync/simplefin/cards",
 		http.MethodPut + " /v1/sync/simplefin/accounts/",
 		http.MethodDelete + " /v1/sync/simplefin/accounts/",
 	}
